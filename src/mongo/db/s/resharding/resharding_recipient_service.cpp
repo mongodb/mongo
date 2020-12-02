@@ -35,9 +35,11 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/persistent_task_store.h"
+#include "mongo/db/repl/oplog_applier.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/s/migration_destination_manager.h"
 #include "mongo/db/s/resharding/resharding_collection_cloner.h"
+#include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding_util.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/executor/network_interface_factory.h"
@@ -47,6 +49,7 @@
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/stale_shard_version_helpers.h"
+#include "mongo/util/future_util.h"
 
 namespace mongo {
 
@@ -61,9 +64,12 @@ std::shared_ptr<executor::ThreadPoolTaskExecutor> makeTaskExecutor(StringData na
     threadPoolOptions.threadNamePrefix = name + "-";
     threadPoolOptions.poolName = name + "ThreadPool";
 
-    return std::make_shared<executor::ThreadPoolTaskExecutor>(
+    auto executor = std::make_shared<executor::ThreadPoolTaskExecutor>(
         std::make_unique<ThreadPool>(std::move(threadPoolOptions)),
         executor::makeNetworkInterface(name + "Network"));
+
+    executor->startup();
+    return executor;
 }
 
 ChunkManager getShardedCollectionRoutingInfo(OperationContext* opCtx, const NamespaceString& nss) {
@@ -207,6 +213,14 @@ void ReshardingRecipientService::RecipientStateMachine::interrupt(Status status)
         _oplogFetcherExecutor->shutdown();
     }
 
+    if (_oplogApplierExecutor) {
+        _oplogApplierExecutor->shutdown();
+    }
+
+    for (auto&& threadPool : _oplogApplierWorkers) {
+        threadPool->shutdown();
+    }
+
     if (!_allDonorsMirroring.getFuture().isReady()) {
         _allDonorsMirroring.setError(status);
     }
@@ -271,13 +285,11 @@ ReshardingRecipientService::RecipientStateMachine::_cloneThenTransitionToApplyin
 
     auto numDonors = _recipientDoc.getDonorShardsMirroring().size();
     _oplogFetchers.reserve(numDonors);
+    _oplogFetcherFutures.reserve(numDonors);
 
     {
-        auto executor = makeTaskExecutor("ReshardingOplogFetcher"_sd, numDonors);
-        executor->startup();
-
         stdx::lock_guard<Latch> lk(_mutex);
-        _oplogFetcherExecutor = std::move(executor);
+        _oplogFetcherExecutor = makeTaskExecutor("ReshardingOplogFetcher"_sd, numDonors);
     }
 
     const auto& minKeyChunkOwningShardId = [&] {
@@ -301,13 +313,11 @@ ReshardingRecipientService::RecipientStateMachine::_cloneThenTransitionToApplyin
             donor.getId() == minKeyChunkOwningShardId,
             getLocalOplogBufferNamespace(_recipientDoc.get_id(), donor.getId())));
 
-        // TODO SERVER-52594: Unrecoverable errors during oplog fetching should be propagated
-        // through the RecipientStateMachine's future chain.
-        _oplogFetchers.back()->schedule(_oplogFetcherExecutor.get()).getAsync([](Status status) {
-            if (!status.isOK()) {
+        _oplogFetcherFutures.emplace_back(
+            _oplogFetchers.back()->schedule(_oplogFetcherExecutor.get()).onError([](Status status) {
                 LOGV2(5259300, "Error fetching oplog entries", "error"_attr = redact(status));
-            }
-        });
+                return status;
+            }));
     }
 
     return _collectionCloner->run(serviceContext, **executor).then([this] {
@@ -320,6 +330,16 @@ void ReshardingRecipientService::RecipientStateMachine::_applyThenTransitionToSt
         return;
     }
 
+    // The contents of the temporary resharding collection are already consistent because the
+    // ReshardingCollectionCloner uses atClusterTime. Using replication's initial sync nomenclature,
+    // resharding has immediately finished the "apply phase" as soon as the
+    // ReshardingCollectionCloner has finished. This is why it is acceptable to not call
+    // applyUntilCloneFinishedTs() here and to only do so in
+    // _awaitAllDonorsMirroringThenTransitionToStrictConsistency() instead.
+    //
+    // TODO: Consider removing _applyThenTransitionToSteadyState() and changing
+    // _cloneThenTransitionToApplying() to call _transitionStateAndUpdateCoordinator(kSteadyState).
+
     _transitionStateAndUpdateCoordinator(RecipientStateEnum::kSteadyState);
     interrupt({ErrorCodes::InternalError, "Artificial interruption to enable jsTests"});
 }
@@ -331,7 +351,65 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
         return ExecutorFuture<void>(**executor, Status::OK());
     }
 
-    return _allDonorsMirroring.getFuture().thenRunOn(**executor).then([this]() {
+    auto numDonors = _recipientDoc.getDonorShardsMirroring().size();
+    _oplogAppliers.reserve(numDonors);
+    _oplogApplierWorkers.reserve(numDonors);
+
+    {
+        stdx::lock_guard<Latch> lk(_mutex);
+        _oplogApplierExecutor = makeTaskExecutor("ReshardingOplogApplier"_sd, numDonors);
+    }
+
+    auto* serviceContext = Client::getCurrent()->getServiceContext();
+    const auto& sourceChunkMgr = [&] {
+        auto opCtx = cc().makeOperationContext();
+        return getShardedCollectionRoutingInfo(opCtx.get(), _recipientDoc.getNss());
+    }();
+
+    size_t i = 0;
+    auto futuresToWaitOn = std::move(_oplogFetcherFutures);
+    for (const auto& donor : _recipientDoc.getDonorShardsMirroring()) {
+        {
+            stdx::lock_guard<Latch> lk(_mutex);
+            _oplogApplierWorkers.emplace_back(
+                repl::makeReplWriterPool(resharding::gReshardingWriterThreadCount,
+                                         "ReshardingOplogApplierWorker",
+                                         true /* isKillableByStepdown */));
+        }
+
+        auto oplogBufferNss = getLocalOplogBufferNamespace(_recipientDoc.get_id(), donor.getId());
+        _oplogAppliers.emplace_back(std::make_unique<ReshardingOplogApplier>(
+            serviceContext,
+            ReshardingSourceId{_recipientDoc.get_id(), donor.getId()},
+            oplogBufferNss,
+            _recipientDoc.getNss(),
+            _recipientDoc.getExistingUUID(),
+            *_recipientDoc.getFetchTimestamp(),
+            // The recipient applies oplog entries from the donor starting from the fetchTimestamp,
+            // which corresponds to {clusterTime: fetchTimestamp, ts: fetchTimestamp} as a resume
+            // token value.
+            std::make_unique<ReshardingDonorOplogIterator>(
+                oplogBufferNss,
+                ReshardingDonorOplogId{*_recipientDoc.getFetchTimestamp(),
+                                       *_recipientDoc.getFetchTimestamp()},
+                _oplogFetchers[i].get()),
+            resharding::gReshardingBatchLimitOperations,
+            sourceChunkMgr,
+            _oplogApplierExecutor.get(),
+            _oplogApplierWorkers.back().get()));
+
+        // The contents of the temporary resharding collection are already consistent because the
+        // ReshardingCollectionCloner uses atClusterTime. Using replication's initial sync
+        // nomenclature, resharding has immediately finished the "apply phase" as soon as the
+        // ReshardingCollectionCloner has finished. This is why applyUntilCloneFinishedTs() and
+        // applyUntilDone() are both called here in sequence.
+        auto* applier = _oplogAppliers.back().get();
+        futuresToWaitOn.emplace_back(applier->applyUntilCloneFinishedTs().then(
+            [applier] { return applier->applyUntilDone(); }));
+        ++i;
+    }
+
+    return whenAllSucceed(std::move(futuresToWaitOn)).thenRunOn(**executor).then([this] {
         _transitionStateAndUpdateCoordinator(RecipientStateEnum::kStrictConsistency);
     });
 }

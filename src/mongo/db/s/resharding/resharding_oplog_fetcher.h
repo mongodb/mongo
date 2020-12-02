@@ -36,14 +36,17 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/s/resharding/donor_oplog_id_gen.h"
+#include "mongo/db/s/resharding/resharding_donor_oplog_iterator.h"
 #include "mongo/db/service_context.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/shard_id.h"
 #include "mongo/util/background.h"
+#include "mongo/util/future.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
-class ReshardingOplogFetcher {
+class ReshardingOplogFetcher : public resharding::OnInsertAwaitable {
 public:
     ReshardingOplogFetcher(UUID reshardingUUID,
                            UUID collUUID,
@@ -52,6 +55,10 @@ public:
                            ShardId recipientShard,
                            bool doesDonorOwnMinKeyChunk,
                            NamespaceString toWriteInto);
+
+    ~ReshardingOplogFetcher();
+
+    Future<void> awaitInsert(const ReshardingDonorOplogId& lastSeen) override;
 
     /**
      * Schedules a task that will do the following:
@@ -120,6 +127,10 @@ private:
 
     Promise<void> _fetchedFinishPromise;
     int _numOplogEntriesCopied = 0;
+
+    Mutex _mutex = MONGO_MAKE_LATCH("ReshardingOplogFetcher::_mutex");
+    Promise<void> _onInsertPromise;
+    Future<void> _onInsertFuture;
 
     // For testing to control behavior.
 

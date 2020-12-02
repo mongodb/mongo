@@ -31,8 +31,10 @@
 
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/s/resharding/recipient_document_gen.h"
+#include "mongo/db/s/resharding/resharding_oplog_applier.h"
 #include "mongo/db/s/resharding/resharding_oplog_fetcher.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
+#include "mongo/util/concurrency/thread_pool.h"
 
 namespace mongo {
 
@@ -161,8 +163,15 @@ private:
 
     std::unique_ptr<ReshardingCollectionCloner> _collectionCloner;
 
+    std::vector<std::unique_ptr<ReshardingOplogApplier>> _oplogAppliers;
+    std::shared_ptr<executor::TaskExecutor> _oplogApplierExecutor;
+    std::vector<std::unique_ptr<ThreadPool>> _oplogApplierWorkers;
+
+    // The ReshardingOplogFetcher must be destructed before the corresponding ReshardingOplogApplier
+    // to ensure the future returned by awaitInsert() is always eventually readied.
     std::vector<std::unique_ptr<ReshardingOplogFetcher>> _oplogFetchers;
     std::shared_ptr<executor::TaskExecutor> _oplogFetcherExecutor;
+    std::vector<Future<void>> _oplogFetcherFutures;
 
     // Protects the promises below
     Mutex _mutex = MONGO_MAKE_LATCH("ReshardingRecipient::_mutex");

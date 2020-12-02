@@ -58,8 +58,12 @@ ReshardingDonorOplogId getId(const repl::OplogEntry& oplog) {
 }  // anonymous namespace
 
 ReshardingDonorOplogIterator::ReshardingDonorOplogIterator(
-    NamespaceString donorOplogBufferNs, boost::optional<ReshardingDonorOplogId> resumeToken)
-    : _oplogBufferNs(std::move(donorOplogBufferNs)), _resumeToken(std::move(resumeToken)) {}
+    NamespaceString donorOplogBufferNs,
+    boost::optional<ReshardingDonorOplogId> resumeToken,
+    resharding::OnInsertAwaitable* insertNotifier)
+    : _oplogBufferNs(std::move(donorOplogBufferNs)),
+      _resumeToken(std::move(resumeToken)),
+      _insertNotifier(insertNotifier) {}
 
 Future<boost::optional<repl::OplogEntry>> ReshardingDonorOplogIterator::getNext(
     OperationContext* opCtx) {
@@ -107,7 +111,7 @@ bool ReshardingDonorOplogIterator::hasMore() const {
 }
 
 Future<void> ReshardingDonorOplogIterator::_waitForNewOplog() {
-    return Future<void>::makeReady();
+    return _insertNotifier->awaitInsert(*_resumeToken);
 }
 
 boost::intrusive_ptr<ExpressionContext> ReshardingDonorOplogIterator::_makeExpressionContext(

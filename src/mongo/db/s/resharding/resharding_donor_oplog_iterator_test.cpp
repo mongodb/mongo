@@ -65,6 +65,13 @@ repl::MutableOplogEntry makeOplog(const NamespaceString& nss,
     return oplogEntry;
 }
 
+class OnInsertAlwaysReady : public resharding::OnInsertAwaitable {
+public:
+    Future<void> awaitInsert(const ReshardingDonorOplogId& lastSeen) override {
+        return Future<void>::makeReady();
+    }
+} onInsertAlwaysReady;
+
 class ReshardingDonorOplogIterTest : public ShardingMongodTestFixture {
 public:
     repl::MutableOplogEntry makeInsertOplog(const Timestamp& id, BSONObj doc) {
@@ -113,7 +120,7 @@ TEST_F(ReshardingDonorOplogIterTest, BasicExhaust) {
     client.insert(ns, finalOplog.toBSON());
     client.insert(ns, oplogBeyond.toBSON());
 
-    ReshardingDonorOplogIterator iter(oplogNss(), boost::none);
+    ReshardingDonorOplogIterator iter(oplogNss(), boost::none, &onInsertAlwaysReady);
     ASSERT_TRUE(iter.hasMore());
     auto next = iter.getNext(operationContext()).get();
 
@@ -144,7 +151,7 @@ TEST_F(ReshardingDonorOplogIterTest, ResumeFromMiddle) {
     client.insert(ns, finalOplog.toBSON());
 
     ReshardingDonorOplogId resumeToken(Timestamp(2, 4), Timestamp(2, 4));
-    ReshardingDonorOplogIterator iter(oplogNss(), resumeToken);
+    ReshardingDonorOplogIterator iter(oplogNss(), resumeToken, &onInsertAlwaysReady);
     ASSERT_TRUE(iter.hasMore());
     auto next = iter.getNext(operationContext()).get();
     ASSERT_BSONOBJ_EQ(getId(oplog2), getId(*next));
@@ -166,7 +173,7 @@ TEST_F(ReshardingDonorOplogIterTest, ExhaustWithIncomingInserts) {
     const auto ns = oplogNss().ns();
     client.insert(ns, oplog1.toBSON());
 
-    ReshardingDonorOplogIterator iter(oplogNss(), boost::none);
+    ReshardingDonorOplogIterator iter(oplogNss(), boost::none, &onInsertAlwaysReady);
     ASSERT_TRUE(iter.hasMore());
     auto next = iter.getNext(operationContext()).get();
     ASSERT_BSONOBJ_EQ(getId(oplog1), getId(*next));

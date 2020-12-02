@@ -416,5 +416,78 @@ TEST_F(ReshardingOplogFetcherTest, TestFallingOffOplog) {
     ASSERT_EQ(ErrorCodes::OplogQueryMinTsMissing, fetcherStatus->code());
 }
 
+TEST_F(ReshardingOplogFetcherTest, TestAwaitInsert) {
+    const NamespaceString outputCollectionNss("dbtests.outputCollection");
+    const NamespaceString dataCollectionNss("dbtests.runFetchIteration");
+
+    create(outputCollectionNss);
+    create(dataCollectionNss);
+    _fetchTimestamp = repl::StorageInterface::get(_svcCtx)->getLatestOplogTimestamp(_opCtx);
+
+    const auto& collectionUUID = [&] {
+        AutoGetCollection dataColl(_opCtx, dataCollectionNss, LockMode::MODE_IX);
+        return dataColl->uuid();
+    }();
+
+    ReshardingDonorOplogId startAt{_fetchTimestamp, _fetchTimestamp};
+    ReshardingOplogFetcher fetcher(_reshardingUUID,
+                                   collectionUUID,
+                                   startAt,
+                                   _donorShard,
+                                   _destinationShard,
+                                   true,
+                                   outputCollectionNss);
+
+    // The ReshardingOplogFetcher hasn't inserted a record for
+    // {_id: {clusterTime: _fetchTimestamp, ts: _fetchTimestamp}} so awaitInsert(startAt) won't be
+    // immediately ready.
+    auto hasSeenStartAtFuture = fetcher.awaitInsert(startAt);
+    ASSERT_FALSE(hasSeenStartAtFuture.isReady());
+
+    // iterate() won't lead to any documents being inserted into the output collection (because no
+    // writes have happened to the data collection) so `hasSeenStartAtFuture` still won't be ready.
+    auto fetcherJob = launchAsync([&, this] {
+        ThreadClient tc("RunnerForFetcher", _svcCtx, nullptr);
+        fetcher.useReadConcernForTest(false);
+        fetcher.setInitialBatchSizeForTest(2);
+        return fetcher.iterate(&cc());
+    });
+    ASSERT_TRUE(requestPassthroughHandler(fetcherJob));
+    ASSERT_FALSE(hasSeenStartAtFuture.isReady());
+
+    // Insert a document into the data collection and have it generate an oplog entry with a
+    // "destinedRecipient" field. Only after iterate() is called again and inserts a record into the
+    // output collection will `hasSeenStartAtFuture` have become ready.
+    auto dataWriteTimestamp = [&] {
+        FailPointEnableBlock fp("addDestinedRecipient",
+                                BSON("destinedRecipient" << _destinationShard.toString()));
+
+        AutoGetCollection dataColl(_opCtx, dataCollectionNss, LockMode::MODE_IX);
+        WriteUnitOfWork wuow(_opCtx);
+        insertDocument(dataColl.getCollection(), InsertStatement(BSON("_id" << 1 << "a" << 1)));
+        wuow.commit();
+
+        repl::StorageInterface::get(_opCtx)->waitForAllEarlierOplogWritesToBeVisible(_opCtx);
+        return repl::StorageInterface::get(_svcCtx)->getLatestOplogTimestamp(_opCtx);
+    }();
+    ASSERT_FALSE(hasSeenStartAtFuture.isReady());
+
+    fetcherJob = launchAsync([&, this] {
+        ThreadClient tc("RunnerForFetcher", _svcCtx, nullptr);
+        fetcher.useReadConcernForTest(false);
+        fetcher.setInitialBatchSizeForTest(2);
+        return fetcher.iterate(&cc());
+    });
+    ASSERT_TRUE(requestPassthroughHandler(fetcherJob));
+    ASSERT_TRUE(hasSeenStartAtFuture.isReady());
+
+    // Asking for `startAt` again would return an immediately ready future.
+    ASSERT_TRUE(fetcher.awaitInsert(startAt).isReady());
+
+    // However, asking for `dataWriteTimestamp` wouldn't become ready until the next record is
+    // insert into the output collection.
+    ASSERT_FALSE(fetcher.awaitInsert({dataWriteTimestamp, dataWriteTimestamp}).isReady());
+}
+
 }  // namespace
 }  // namespace mongo

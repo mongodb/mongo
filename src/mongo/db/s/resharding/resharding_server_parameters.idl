@@ -58,6 +58,31 @@ server_parameters:
         validator:
             gte: 1
 
+    reshardingWriterThreadCount:
+        description: >-
+            The number of threads in the thread pool used by *each* ReshardingOplogApplier to apply
+            oplog entries from the corresponding donor shard. There is one ReshardingOplogApplier
+            instance per donor shard.
+        set_at: startup
+        cpp_vartype: int
+        cpp_varname: gReshardingWriterThreadCount
+        default: 4
+        validator:
+            gte: 1
+            lte: 256
+
+    reshardingBatchLimitOperations:
+        description: >-
+            The maximum number of operations for ReshardingOplogApplier to apply in a single batch.
+        set_at: startup
+        cpp_vartype: int
+        cpp_varname: gReshardingBatchLimitOperations
+        default: 1
+        validator:
+            gte: 1
+            lte:
+                expr: 1000 * 1000
+
     useReshardingOplogApplicationRules:
         description: >-
             Whether or not the ReshardingOplogApplier should use ReshardingOplogApplicationRules

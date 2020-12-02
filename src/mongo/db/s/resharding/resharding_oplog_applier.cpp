@@ -177,6 +177,19 @@ bool isRetryableNoOp(const repl::OplogEntryOrGroupedInserts& oplogOrGroupedInser
     return op.getObject().woCompare(kReshardingOplogTag) == 0;
 }
 
+ServiceContext::UniqueClient makeKillableClient(ServiceContext* serviceContext, StringData name) {
+    auto client = serviceContext->makeClient(name.toString());
+    stdx::lock_guard<Client> lk(*client);
+    client->setSystemOperationKillableByStepdown(lk);
+    return client;
+}
+
+ServiceContext::UniqueOperationContext makeInterruptibleOperationContext() {
+    auto opCtx = cc().makeOperationContext();
+    opCtx->setAlwaysInterruptAtStepDownOrUp();
+    return opCtx;
+}
+
 }  // anonymous namespace
 
 ReshardingOplogApplier::ReshardingOplogApplier(
@@ -197,12 +210,13 @@ ReshardingOplogApplier::ReshardingOplogApplier(
       _uuidBeingResharded(std::move(collUUIDBeingResharded)),
       _outputNs(_nsBeingResharded.db(),
                 "system.resharding.{}"_format(_uuidBeingResharded.toString())),
-      _reshardingTempNs(_nsBeingResharded.db(),
-                        "{}.{}"_format(_nsBeingResharded.coll(), _oplogNs.coll())),
+      // TODO: Also make the stash collection a system collection to guarantee it won't conflict
+      // with any user collections.
+      _stashNs(_nsBeingResharded.db(), "{}.{}"_format(_nsBeingResharded.coll(), _oplogNs.coll())),
       _reshardingCloneFinishedTs(std::move(reshardingCloneFinishedTs)),
       _batchSize(batchSize),
       _applicationRules(ReshardingOplogApplicationRules(
-          _outputNs, _reshardingTempNs, _sourceId.getShardId(), sourceChunkMgr)),
+          _outputNs, _stashNs, _sourceId.getShardId(), sourceChunkMgr)),
       _service(service),
       _executor(executor),
       _writerPool(writerPool),
@@ -222,13 +236,13 @@ Future<void> ReshardingOplogApplier::applyUntilCloneFinishedTs() {
             return;
         }
 
-        ThreadClient scheduleNextBatchClient(kClientName, _service);
-        auto opCtx = scheduleNextBatchClient->makeOperationContext();
+        auto scheduleNextBatchClient = makeKillableClient(_service, kClientName);
+        AlternativeClientRegion acr(scheduleNextBatchClient);
+        auto opCtx = makeInterruptibleOperationContext();
 
         try {
-            uassertStatusOK(createCollection(opCtx.get(),
-                                             _reshardingTempNs.db().toString(),
-                                             BSON("create" << _reshardingTempNs.coll())));
+            uassertStatusOK(createCollection(
+                opCtx.get(), _stashNs.db().toString(), BSON("create" << _stashNs.coll())));
 
             _scheduleNextBatch();
         } catch (const DBException& ex) {
@@ -277,20 +291,31 @@ void ReshardingOplogApplier::_scheduleNextBatch() {
         }
     }
 
-    auto scheduleBatchClient = _service->makeClient(kClientName.toString());
+    auto scheduleBatchClient = makeKillableClient(_service, kClientName);
     AlternativeClientRegion acr(scheduleBatchClient);
-    auto opCtx = cc().makeOperationContext();
+    auto opCtx = makeInterruptibleOperationContext();
 
     auto future = _oplogIter->getNext(opCtx.get());
+    // It is possible for the future returned by ReshardingDonorOplogIterator::getNext() to only
+    // become ready after `opCtx` would have been destructed. This can happen due to how the
+    // returned future may not be immediately ready if the donor iterator has reached the end of the
+    // oplog buffer and is waiting for an insert notification from the ReshardingOplogFetcher.
+    // Calling wait() here blocks the current thread but keeps `opCtx` alive while we're waiting.
+    // This situation also prevents using a _batchSize > 1 in production.
+    //
+    // TODO SERVER-53108: Remove this call to future.wait() and change
+    // resharding::gReshardingBatchLimitOperations to a value > 1 by default.
+    future.wait(opCtx.get());
+
     for (size_t count = 1; count < _batchSize; count++) {
         future = std::move(future).then([this](boost::optional<repl::OplogEntry> oplogEntry) {
             if (oplogEntry) {
                 _preProcessAndPushOpsToBuffer(std::move(*oplogEntry));
             }
 
-            auto batchClient = _service->makeClient(kClientName.toString());
+            auto batchClient = makeKillableClient(_service, kClientName);
             AlternativeClientRegion acr(batchClient);
-            auto getNextOpCtx = cc().makeOperationContext();
+            auto getNextOpCtx = makeInterruptibleOperationContext();
 
             return _oplogIter->getNext(getNextOpCtx.get());
         });
@@ -303,9 +328,9 @@ void ReshardingOplogApplier::_scheduleNextBatch() {
                 _preProcessAndPushOpsToBuffer(std::move(*oplogEntry));
             }
 
-            auto applyBatchClient = _service->makeClient(kClientName.toString());
+            auto applyBatchClient = makeKillableClient(_service, kClientName);
             AlternativeClientRegion acr(applyBatchClient);
-            auto applyBatchOpCtx = cc().makeOperationContext();
+            auto applyBatchOpCtx = makeInterruptibleOperationContext();
 
             return _applyBatch(applyBatchOpCtx.get());
         })
@@ -313,9 +338,9 @@ void ReshardingOplogApplier::_scheduleNextBatch() {
             if (!_currentBatchToApply.empty()) {
                 auto lastApplied = _currentBatchToApply.back();
 
-                auto scheduleBatchClient = _service->makeClient(kClientName.toString());
+                auto scheduleBatchClient = makeKillableClient(_service, kClientName);
                 AlternativeClientRegion acr(scheduleBatchClient);
-                auto opCtx = cc().makeOperationContext();
+                auto opCtx = makeInterruptibleOperationContext();
 
                 auto lastAppliedTs = _clearAppliedOpsAndStoreProgress(opCtx.get());
 
@@ -472,7 +497,7 @@ std::vector<std::vector<const repl::OplogEntry*>> ReshardingOplogApplier::_fillW
 
 Status ReshardingOplogApplier::_applyOplogBatchPerWorker(
     std::vector<const repl::OplogEntry*>* ops) {
-    auto opCtx = cc().makeOperationContext();
+    auto opCtx = makeInterruptibleOperationContext();
 
     return repl::OplogApplierUtils::applyOplogBatchCommon(
         opCtx.get(),

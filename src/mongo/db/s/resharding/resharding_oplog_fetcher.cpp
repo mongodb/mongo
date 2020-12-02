@@ -49,6 +49,7 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
+#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 namespace {
@@ -87,7 +88,45 @@ ReshardingOplogFetcher::ReshardingOplogFetcher(UUID reshardingUUID,
       _donorShard(donorShard),
       _recipientShard(recipientShard),
       _doesDonorOwnMinKeyChunk(doesDonorOwnMinKeyChunk),
-      _toWriteInto(toWriteInto) {}
+      _toWriteInto(toWriteInto) {
+    auto [p, f] = makePromiseFuture<void>();
+    stdx::lock_guard lk(_mutex);
+    _onInsertPromise = std::move(p);
+    _onInsertFuture = std::move(f);
+}
+
+ReshardingOplogFetcher::~ReshardingOplogFetcher() {
+    stdx::lock_guard lk(_mutex);
+    _onInsertPromise.setError(
+        {ErrorCodes::CallbackCanceled, "explicitly breaking promise from ReshardingOplogFetcher"});
+}
+
+Future<void> ReshardingOplogFetcher::awaitInsert(const ReshardingDonorOplogId& lastSeen) {
+    // `lastSeen` is the _id of the document ReshardingDonorOplogIterator::getNext() has last read
+    // from the oplog buffer collection.
+    //
+    // `_startAt` is updated after each insert into the oplog buffer collection by
+    // ReshardingOplogFetcher to reflect the newer resume point if a new aggregation request was
+    // being issued.
+
+    stdx::lock_guard lk(_mutex);
+    if (lastSeen < _startAt) {
+        // `lastSeen < _startAt` means there's at least one document which has been inserted by
+        // ReshardingOplogFetcher and hasn't been returned by
+        // ReshardingDonorOplogIterator::getNext(). The caller has no reason to wait until yet
+        // another document has been inserted before reading from the oplog buffer collection.
+        return Future<void>::makeReady();
+    }
+
+    // `lastSeen == _startAt` means the last document inserted by ReshardingOplogFetcher has already
+    // been returned by ReshardingDonorOplogIterator::getNext() and so ReshardingDonorOplogIterator
+    // would want to wait until ReshardingOplogFetcher does another insert.
+    //
+    // `lastSeen > _startAt` isn't expected to happen in practice because
+    // ReshardingDonorOplogIterator only uses _id's from documents that it actually read from the
+    // oplog buffer collection for `lastSeen`, but would also mean the caller wants to wait.
+    return std::move(_onInsertFuture);
+}
 
 Future<void> ReshardingOplogFetcher::schedule(executor::TaskExecutor* executor) {
     auto pf = makePromiseFuture<void>();
@@ -241,11 +280,20 @@ bool ReshardingOplogFetcher::consume(Client* client, Shard* shard) {
                 WriteUnitOfWork wuow(opCtx);
                 auto nextOplog = uassertStatusOK(repl::OplogEntry::parse(doc));
 
-                _startAt = ReshardingDonorOplogId::parse(
+                auto startAt = ReshardingDonorOplogId::parse(
                     {"OplogFetcherParsing"}, nextOplog.get_id()->getDocument().toBson());
                 uassertStatusOK(toWriteTo->insertDocument(opCtx, InsertStatement{doc}, nullptr));
                 wuow.commit();
                 ++_numOplogEntriesCopied;
+
+                auto [p, f] = makePromiseFuture<void>();
+                {
+                    stdx::lock_guard lk(_mutex);
+                    _startAt = startAt;
+                    _onInsertPromise.emplaceValue();
+                    _onInsertPromise = std::move(p);
+                    _onInsertFuture = std::move(f);
+                }
 
                 if (isFinalOplog(nextOplog, _reshardingUUID)) {
                     moreToCome = false;

@@ -42,14 +42,30 @@ namespace mongo {
 
 class OperationContext;
 
+namespace resharding {
+
+class OnInsertAwaitable {
+public:
+    virtual ~OnInsertAwaitable() = default;
+
+    /**
+     * Returns a future that becomes ready when the {_id: lastSeen} document is no longer the last
+     * inserted document in the oplog buffer collection.
+     */
+    virtual Future<void> awaitInsert(const ReshardingDonorOplogId& lastSeen) = 0;
+};
+
+}  // namespace resharding
+
 /**
- * Iterator for extracting oplog entries from the resharding donor oplog buffer. This is not thread
- * safe.
+ * Iterator for extracting oplog entries from the resharding donor oplog buffer. This is not
+ * thread safe.
  */
 class ReshardingDonorOplogIterator : public ReshardingDonorOplogIteratorInterface {
 public:
     ReshardingDonorOplogIterator(NamespaceString donorOplogBufferNs,
-                                 boost::optional<ReshardingDonorOplogId> resumeToken);
+                                 boost::optional<ReshardingDonorOplogId> resumeToken,
+                                 resharding::OnInsertAwaitable* insertNotifier);
 
     /**
      * Returns the next oplog entry. Returns boost::none when there are no more entries to return.
@@ -78,6 +94,11 @@ private:
     const NamespaceString _oplogBufferNs;
 
     boost::optional<ReshardingDonorOplogId> _resumeToken;
+
+    // _insertNotifier is used to asynchronously wait for a document to be inserted into the oplog
+    // buffer collection by the ReshardingOplogFetcher after _pipeline is exhausted and the final
+    // oplog entry hasn't been reached yet.
+    resharding::OnInsertAwaitable* const _insertNotifier;
 
     std::unique_ptr<Pipeline, PipelineDeleter> _pipeline;
     bool _hasSeenFinalOplogEntry{false};

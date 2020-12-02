@@ -167,7 +167,7 @@ private:
     const NamespaceString _outputNs;
 
     // Namespace for temp collection used by this applier.
-    const NamespaceString _reshardingTempNs;
+    const NamespaceString _stashNs;
 
     // The timestamp of the latest oplog entry on the source shard at the time when resharding
     // finished cloning from it.
