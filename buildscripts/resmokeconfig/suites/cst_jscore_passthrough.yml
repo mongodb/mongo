@@ -686,6 +686,7 @@ selector:
   - jstests/core/geo_mindistance_boundaries.js
   - jstests/core/geo_multinest0.js
   - jstests/core/geo_multinest1.js
+  - jstests/core/geo_near_point_query.js
   - jstests/core/geo_near_random1.js
   - jstests/core/geo_near_random2.js
   - jstests/core/geo_near_tailable.js
