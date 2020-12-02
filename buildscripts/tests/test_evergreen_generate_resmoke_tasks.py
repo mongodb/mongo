@@ -563,6 +563,15 @@ class CalculateTimeoutTest(unittest.TestCase):
             under_test.calculate_timeout(30, scaling_factor))
 
 
+class TimeoutEstimateTest(unittest.TestCase):
+    def test_too_high_a_timeout_raises_errors(self):
+        timeout_est = under_test.TimeoutEstimate(
+            max_test_runtime=5, expected_task_runtime=under_test.MAX_EXPECTED_TIMEOUT)
+
+        with self.assertRaises(ValueError):
+            timeout_est.generate_timeout_cmd(is_patch=True, repeat_factor=1)
+
+
 class EvergreenConfigGeneratorTest(unittest.TestCase):
     @staticmethod
     def generate_mock_suites(count):
@@ -572,6 +581,8 @@ class EvergreenConfigGeneratorTest(unittest.TestCase):
             suite.name = "suite {0}".format(idx)
             suite.max_runtime = 5.28
             suite.get_runtime = lambda: 100.874
+            suite.get_timeout_estimate.return_value = under_test.TimeoutEstimate(
+                max_test_runtime=5.28, expected_task_runtime=100.874)
             suites.append(suite)
 
         return suites
@@ -723,15 +734,6 @@ class EvergreenConfigGeneratorTest(unittest.TestCase):
         expected_exec_timeout = under_test.calculate_timeout(suites[0].get_runtime(), 3) * 5
         self.assertEqual(expected_exec_timeout, timeout_cmd["params"]["exec_timeout_secs"])
 
-    def test_evg_config_has_fails_if_timeout_too_high(self):
-        options = self.generate_mock_options()
-        options.repeat_suites = under_test.MAX_EXPECTED_TIMEOUT
-        suites = self.generate_mock_suites(3)
-
-        with self.assertRaises(ValueError):
-            generator = under_test.EvergreenConfigGenerator(suites, options, MagicMock())
-            generator.generate_config(MagicMock())
-
     def test_evg_config_does_not_fails_if_timeout_too_high_on_mainline(self):
         options = self.generate_mock_options()
         options.is_patch = False
@@ -780,7 +782,9 @@ class EvergreenConfigGeneratorTest(unittest.TestCase):
         suite_without_timing_info = 1
         options = self.generate_mock_options()
         suites = self.generate_mock_suites(3)
-        suites[suite_without_timing_info].should_overwrite_timeout.return_value = False
+        suites[
+            suite_without_timing_info].get_timeout_estimate.return_value = under_test.TimeoutEstimate.no_timeouts(
+            )
         build_variant = BuildVariant("variant")
 
         generator = under_test.EvergreenConfigGenerator(suites, options, MagicMock())

@@ -24,11 +24,10 @@ class NormalizeTestNameTest(unittest.TestCase):
 class TestHistoricTaskData(unittest.TestCase):
     def test_no_hooks(self):
         evg_results = [
-            self._make_evg_result("dir/test1.js", 1, 10),
             self._make_evg_result("dir/test2.js", 1, 30),
-            self._make_evg_result("dir/test1.js", 2, 25),
+            self._make_evg_result("dir/test1.js", 2, 20),
         ]
-        test_stats = under_test.HistoricTaskData(evg_results)
+        test_stats = under_test.HistoricTaskData.from_stats_list(evg_results)
         expected_runtimes = [
             under_test.TestRuntime(test_name="dir/test2.js", runtime=30),
             under_test.TestRuntime(test_name="dir/test1.js", runtime=20),
@@ -37,44 +36,41 @@ class TestHistoricTaskData(unittest.TestCase):
 
     def test_hooks(self):
         evg_results = [
-            self._make_evg_result("dir/test1.js", 1, 10),
             self._make_evg_result("dir/test2.js", 1, 30),
-            self._make_evg_result("dir/test1.js", 2, 25),
+            self._make_evg_result("dir/test1.js", 2, 30),
             self._make_evg_result("dir/test3.js", 5, 10),
-            self._make_evg_result("test3:CleanEveryN", 10, 30),
+            self._make_evg_result("test3:Validate", 10, 30),
             self._make_evg_result("test3:CheckReplDBHash", 10, 35),
         ]
-        test_stats = under_test.HistoricTaskData(evg_results)
+        test_stats = under_test.HistoricTaskData.from_stats_list(evg_results)
         expected_runtimes = [
             under_test.TestRuntime(test_name="dir/test3.js", runtime=75),
             under_test.TestRuntime(test_name="dir/test2.js", runtime=30),
-            under_test.TestRuntime(test_name="dir/test1.js", runtime=20),
+            under_test.TestRuntime(test_name="dir/test1.js", runtime=30),
         ]
         self.assertEqual(expected_runtimes, test_stats.get_tests_runtimes())
 
     def test_hook_first(self):
         evg_results = [
-            self._make_evg_result("test3:CleanEveryN", 10, 35),
-            self._make_evg_result("dir/test1.js", 1, 10),
+            self._make_evg_result("test3:Validate", 10, 35),
             self._make_evg_result("dir/test2.js", 1, 30),
             self._make_evg_result("dir/test1.js", 2, 25),
             self._make_evg_result("dir/test3.js", 5, 10),
             self._make_evg_result("test3:CheckReplDBHash", 10, 35),
         ]
-        test_stats = under_test.HistoricTaskData(evg_results)
+        test_stats = under_test.HistoricTaskData.from_stats_list(evg_results)
         expected_runtimes = [
             under_test.TestRuntime(test_name="dir/test3.js", runtime=80),
             under_test.TestRuntime(test_name="dir/test2.js", runtime=30),
-            under_test.TestRuntime(test_name="dir/test1.js", runtime=20),
+            under_test.TestRuntime(test_name="dir/test1.js", runtime=25),
         ]
         self.assertEqual(expected_runtimes, test_stats.get_tests_runtimes())
 
     def test_zero_runs(self):
         evg_results = [
             self._make_evg_result("dir/test1.js", 0, 0),
-            self._make_evg_result("dir/test1.js", 0, 0),
         ]
-        test_stats = under_test.HistoricTaskData(evg_results)
+        test_stats = under_test.HistoricTaskData.from_stats_list(evg_results)
         expected_runtimes = [
             under_test.TestRuntime(test_name="dir/test1.js", runtime=0),
         ]
