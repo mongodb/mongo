@@ -94,7 +94,7 @@ SemiFuture<TenantOplogApplier::OpTimePair> TenantOplogApplier::getNotificationFo
 }
 
 Status TenantOplogApplier::_doStartup_inlock() noexcept {
-    _oplogBatcher = std::make_unique<TenantOplogBatcher>(_tenantId, _oplogBuffer, _executor);
+    _oplogBatcher = std::make_shared<TenantOplogBatcher>(_tenantId, _oplogBuffer, _executor);
     auto status = _oplogBatcher->startup();
     if (!status.isOK())
         return status;
