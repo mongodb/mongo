@@ -178,6 +178,7 @@ BSONObj makeTimeseriesDataStages(const std::vector<BSONObj>& docs, uint16_t coun
  */
 BSONObj makeTimeseriesUpsertRequest(const OID& oid,
                                     const std::vector<BSONObj>& docs,
+                                    const BSONObj& metadata,
                                     uint16_t count) {
     BSONObjBuilder builder;
     builder.append(write_ops::UpdateOpEntry::kQFieldName, BSON("_id" << oid));
@@ -190,6 +191,11 @@ BSONObj makeTimeseriesUpsertRequest(const OID& oid,
             BSON("$set" << BSON("control.version"
                                 << BSON("$ifNull" << BSON_ARRAY("$control.version"
                                                                 << kTimeseriesControlVersion)))));
+        if (auto metadataElem = metadata.firstElement()) {
+            stagesBuilder.append(BSON(
+                "$set" << BSON("control.meta"
+                               << BSON("$ifNull" << BSON_ARRAY("$control.meta" << metadataElem)))));
+        }
         stagesBuilder.append(BSON("$set" << makeTimeseriesControlMinMaxStages(docs)));
         stagesBuilder.append(BSON("$set" << makeTimeseriesDataStages(docs, count)));
     }
@@ -491,6 +497,7 @@ private:
             boost::optional<OID> electionId;
 
             for (const auto& [bucketId, index] : bucketsToCommit) {
+                auto metadata = bucketCatalog.getMetadata(bucketId);
                 auto data = bucketCatalog.commit(bucketId);
                 while (!data.docs.empty()) {
                     BSONObjBuilder builder;
@@ -509,7 +516,7 @@ private:
                         BSONArrayBuilder updatesBuilder(
                             builder.subarrayStart(write_ops::Update::kUpdatesFieldName));
                         updatesBuilder.append(makeTimeseriesUpsertRequest(
-                            bucketId, data.docs, data.numCommittedMeasurements));
+                            bucketId, data.docs, metadata, data.numCommittedMeasurements));
                     }
 
                     auto request = OpMsgRequest::fromDBAndBody(bucketsNs.db(), builder.obj());

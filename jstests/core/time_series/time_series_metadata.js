@@ -64,13 +64,16 @@ const runTest = function(docsBucketA, docsBucketB) {
               'invalid number of measurements in first bucket: ' + tojson(bucketDocs[0]));
     if (docsBucketA[0].hasOwnProperty(metaFieldName)) {
         assert.eq(docsBucketA[0][metaFieldName],
-                  bucketDocs[0].control.min[metaFieldName],
+                  bucketDocs[0].control.meta,
                   'invalid control.meta in first bucket: ' + tojson(bucketDocs[0].control));
         assert(bucketDocs[0].data.hasOwnProperty(metaFieldName),
                'metadata missing first bucket data: ' + tojson(bucketDocs[0]));
     } else {
-        assert(!bucketDocs[0].control.hasOwnProperty(metaFieldName),
-               'invalid control.meta in first bucket: ' + tojson(bucketDocs[0].control));
+        assert(bucketDocs[0].control.hasOwnProperty('meta'),
+               'missing control.meta in first bucket: ' + tojson(bucketDocs[0].control));
+        assert.eq(null,
+                  bucketDocs[0].control.meta,
+                  'invalid control.meta for x in first bucket: ' + tojson(bucketDocs[0].control));
     }
 
     // Second bucket should contain documents specified in 'bucketB'.
@@ -79,13 +82,16 @@ const runTest = function(docsBucketA, docsBucketB) {
               'invalid number of measurements in second bucket: ' + tojson(bucketDocs[1]));
     if (docsBucketB[0].hasOwnProperty(metaFieldName)) {
         assert.eq(docsBucketB[0][metaFieldName],
-                  bucketDocs[1].control.min[metaFieldName],
+                  bucketDocs[1].control.meta,
                   'invalid control.meta in second bucket: ' + tojson(bucketDocs[1].control));
         assert(bucketDocs[1].data.hasOwnProperty(metaFieldName),
                'metadata missing second bucket data: ' + tojson(bucketDocs[1]));
     } else {
-        assert(!bucketDocs[1].control.hasOwnProperty(metaFieldName),
-               'invalid control.meta in second bucket: ' + tojson(bucketDocs[1].control));
+        assert(bucketDocs[1].control.hasOwnProperty('meta'),
+               'missing control.meta in second bucket: ' + tojson(bucketDocs[1].control));
+        assert.eq(null,
+                  bucketDocs[1].control.meta,
+                  'invalid control.meta for x in second bucket: ' + tojson(bucketDocs[1].control));
     }
 };
 
