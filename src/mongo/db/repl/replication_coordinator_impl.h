@@ -1624,7 +1624,8 @@ private:
     // here so we can update our term to match as part of finishing stepdown.
     boost::optional<long long> _pendingTermUpdateDuringStepDown;  // (M)
 
-    AtomicWord<bool> _startedSteadyStateReplication{false};
+    // Whether data replication is active.
+    bool _startedSteadyStateReplication = false;  // (M)
 
     // If we're in terminal shutdown.  If true, we'll refuse to vote in elections.
     bool _inTerminalShutdown = false;  // (M)

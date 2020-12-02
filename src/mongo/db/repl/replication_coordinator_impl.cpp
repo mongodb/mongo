@@ -682,6 +682,11 @@ void ReplicationCoordinatorImpl::_stopDataReplication(OperationContext* opCtx) {
     std::shared_ptr<InitialSyncer> initialSyncerCopy;
     {
         stdx::lock_guard<Latch> lk(_mutex);
+        if (!_startedSteadyStateReplication) {
+            return;
+        }
+
+        _startedSteadyStateReplication = false;
         _initialSyncer.swap(initialSyncerCopy);
     }
     if (initialSyncerCopy) {
@@ -708,20 +713,24 @@ void ReplicationCoordinatorImpl::_stopDataReplication(OperationContext* opCtx) {
 
 void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* opCtx,
                                                        std::function<void()> startCompleted) {
-    if (_startedSteadyStateReplication.swap(true)) {
-        // This is not the first call.
+    stdx::unique_lock<Latch> lk(_mutex);
+    if (_startedSteadyStateReplication) {
         return;
     }
 
+    _startedSteadyStateReplication = true;
+
     // Check to see if we need to do an initial sync.
-    const auto lastOpTime = getMyLastAppliedOpTime();
+    const auto lastOpTime = _getMyLastAppliedOpTime_inlock();
     const auto needsInitialSync =
         lastOpTime.isNull() || _externalState->isInitialSyncFlagSet(opCtx);
     if (!needsInitialSync) {
         // Start steady replication, since we already have data.
         // ReplSetConfig has been installed, so it's either in STARTUP2 or REMOVED.
-        auto memberState = getMemberState();
+        auto memberState = _getMemberState_inlock();
         invariant(memberState.startup2() || memberState.removed());
+
+        lk.unlock();
         invariant(setFollowerMode(MemberState::RS_RECOVERING));
         // Set an initial sync ID, in case we were upgraded or restored from backup without doing
         // an initial sync.
@@ -784,8 +793,6 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* opCtx,
     std::shared_ptr<InitialSyncer> initialSyncerCopy;
     try {
         {
-            // Must take the lock to set _initialSyncer, but not call it.
-            stdx::lock_guard<Latch> lock(_mutex);
             if (_inShutdown) {
                 LOGV2(21326, "Initial Sync not starting because replication is shutting down");
                 return;
@@ -802,6 +809,7 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* opCtx,
         }
         // InitialSyncer::startup() must be called outside lock because it uses features (eg.
         // setting the initial sync flag) which depend on the ReplicationCoordinatorImpl.
+        lk.unlock();
         uassertStatusOK(initialSyncerCopy->startup(opCtx, numInitialSyncAttempts.load()));
     } catch (const DBException& e) {
         auto status = e.toStatus();
