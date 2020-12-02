@@ -843,11 +843,12 @@ StatusWith<CollectionAndChangedChunks> ShardServerCatalogCacheLoader::_getLoader
         persisted.changedChunks.erase(persistedChangedChunksIt, persisted.changedChunks.end());
 
         // Append 'enqueued's chunks to 'persisted', which no longer overlaps. Also add 'enqueued's
-        // reshardingFields to 'persisted'.
+        // reshardingFields and allowMigrations setting to 'persisted'.
         persisted.changedChunks.insert(persisted.changedChunks.end(),
                                        enqueued.changedChunks.begin(),
                                        enqueued.changedChunks.end());
         persisted.reshardingFields = std::move(enqueued.reshardingFields);
+        persisted.allowMigrations = enqueued.allowMigrations;
 
         return persisted;
     }

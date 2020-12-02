@@ -740,6 +740,9 @@ RoutingTableHistory RoutingTableHistory::makeNew(
         .makeUpdated(std::move(reshardingFields), allowMigrations, chunks);
 }
 
+// Note that any new parameters added to RoutingTableHistory::makeUpdated() must also be added to
+// ShardServerCatalogCacheLoader::_getLoaderMetadata() and copied into the persisted metadata when
+// it may overlap with the enqueued metadata.
 RoutingTableHistory RoutingTableHistory::makeUpdated(
     boost::optional<TypeCollectionReshardingFields> reshardingFields,
     bool allowMigrations,
