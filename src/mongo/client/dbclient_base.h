@@ -841,8 +841,7 @@ private:
     enum QueryOptions _cachedAvailableOptions;
     bool _haveCachedAvailableOptions;
 
-    // The operationTime associated with the last command handles by the client.
-    // TODO(SERVER-49791): Implement proper tracking of operationTime.
+    // The operationTime associated with the last command handled by the client.
     Timestamp _lastOperationTime;
 
     ClientAPIVersionParameters _apiParameters;
