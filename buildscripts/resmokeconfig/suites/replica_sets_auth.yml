@@ -18,17 +18,6 @@ selector:
   - jstests/replsets/transactions_committed_with_tickets_exhausted.js
   # This test disables test commands which is incompatible with this suite.
   - jstests/replsets/test_only_repl_commands.js
-  # TODO SERVER-50670: should whitelist.
-  - jstests/replsets/tenant_migration_no_failover.js
-  - jstests/replsets/tenant_migration_donor_startup_recovery.js
-  - jstests/replsets/tenant_migration_commit_transaction_retry.js
-  - jstests/replsets/tenant_migration_donor_interrupt_on_stepdown_and_shutdown.js
-  - jstests/replsets/tenant_migration_concurrent_migrations.js
-  - jstests/replsets/tenant_migration_retryable_write_retry.js
-  - jstests/replsets/tenant_migration_large_txn.js
-  - jstests/replsets/tenant_migration_donor_abort_state_transition.js
-  - jstests/replsets/tenant_migration_donor_current_op.js
-  - jstests/replsets/tenant_migration_concurrent_bulk_writes.js
 
 executor:
   config:

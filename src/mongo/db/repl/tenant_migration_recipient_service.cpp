@@ -47,6 +47,7 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
+#include "mongo/db/repl/replication_auth.h"
 #include "mongo/db/repl/tenant_migration_recipient_entry_helpers.h"
 #include "mongo/db/repl/tenant_migration_recipient_service.h"
 #include "mongo/db/repl/tenant_migration_state_machine_gen.h"
@@ -259,6 +260,13 @@ std::unique_ptr<DBClientConnection> TenantMigrationRecipientService::Instance::_
                     "error"_attr = errMsg);
         uasserted(ErrorCodes::HostNotFound, errMsg);
     }
+
+    // Authenticate connection to the donor.
+    uassertStatusOK(replAuthenticate(clientBase.get())
+                        .withContext(str::stream()
+                                     << "TenantMigrationRecipientService failed to authenticate to "
+                                     << serverAddress));
+
     // ConnectionString::connect() always returns a DBClientConnection in a unique_ptr of
     // DBClientBase type.
     std::unique_ptr<DBClientConnection> client(
