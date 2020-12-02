@@ -358,6 +358,8 @@ TenantOplogApplier::OpTimePair TenantOplogApplier::_writeNoOpEntries(
     OperationContext* opCtx, const TenantOplogBatch& batch) {
     auto* opObserver = cc().getServiceContext()->getOpObserver();
 
+    // We start WriteUnitOfWork only to reserve oplog slots. So, it's ok to abort the
+    // WriteUnitOfWork when it goes out of scope.
     WriteUnitOfWork wuow(opCtx);
     // Reserve oplog slots for all entries.  This allows us to write them in parallel.
     auto oplogSlots = repl::getNextOpTimes(opCtx, batch.ops.size());
@@ -478,6 +480,7 @@ void TenantOplogApplier::_writeNoOpsForRange(OpObserver* opObserver,
                     _maybeGetRecipientOpTime(entry.getPrevWriteOpTimeInTransaction()),
                     *slot);
             }
+            wuow.commit();
         });
 }
 
