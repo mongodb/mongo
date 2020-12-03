@@ -115,8 +115,11 @@ const int kTimeseriesControlVersion = 1;
 
 /**
  * Returns min/max $set expressions for the bucket's control field.
+ * If 'metadataElem' is not empty, the time-series collection was created with a metadata field
+ * and we do not have to calculate the min/max for the metadata field in 'docs'.
  */
-BSONObj makeTimeseriesControlMinMaxStages(const std::vector<BSONObj>& docs) {
+BSONObj makeTimeseriesControlMinMaxStages(const std::vector<BSONObj>& docs,
+                                          BSONElement metadataElem) {
     struct MinMaxBuilders {
         BSONArrayBuilder min;
         BSONArrayBuilder max;
@@ -126,6 +129,9 @@ BSONObj makeTimeseriesControlMinMaxStages(const std::vector<BSONObj>& docs) {
     for (const auto& doc : docs) {
         for (const auto& elem : doc) {
             auto key = elem.fieldNameStringData();
+            if (metadataElem && key == metadataElem.fieldNameStringData()) {
+                continue;
+            }
             auto [it, created] = minMaxBuilders.insert({key, MinMaxBuilders{}});
             if (created) {
                 it->second.min.append("$control.min." + key);
@@ -195,8 +201,11 @@ BSONObj makeTimeseriesUpsertRequest(const OID& oid,
             stagesBuilder.append(BSON(
                 "$set" << BSON("control.meta"
                                << BSON("$ifNull" << BSON_ARRAY("$control.meta" << metadataElem)))));
+            stagesBuilder.append(
+                BSON("$set" << makeTimeseriesControlMinMaxStages(docs, metadataElem)));
+        } else {
+            stagesBuilder.append(BSON("$set" << makeTimeseriesControlMinMaxStages(docs, {})));
         }
-        stagesBuilder.append(BSON("$set" << makeTimeseriesControlMinMaxStages(docs)));
         stagesBuilder.append(BSON("$set" << makeTimeseriesDataStages(docs, count)));
     }
     return builder.obj();
