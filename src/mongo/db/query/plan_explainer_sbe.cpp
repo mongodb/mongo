@@ -299,14 +299,13 @@ PlanSummaryStats collectExecutionStatsSummary(const sbe::PlanStageStats* stats) 
 }
 
 PlanExplainer::PlanStatsDetails buildPlanStatsDetails(const QuerySolutionNode* node,
-                                                      const sbe::PlanStage* root,
+                                                      const sbe::PlanStageStats* stats,
                                                       ExplainOptions::Verbosity verbosity) {
     BSONObjBuilder bob;
 
     if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
-        auto stats = root->getStats(true /* includeDebugInfo  */);
-        auto summary = collectExecutionStatsSummary(stats.get());
-        statsToBSON(stats.get(), &bob, &bob);
+        auto summary = collectExecutionStatsSummary(stats);
+        statsToBSON(stats, &bob, &bob);
         return {bob.obj(), std::move(summary)};
     }
 
@@ -462,7 +461,8 @@ PlanExplainer::PlanStatsDetails PlanExplainerSBE::getWinningPlanStats(
     ExplainOptions::Verbosity verbosity) const {
     invariant(_root);
     invariant(_solution);
-    return buildPlanStatsDetails(_solution->root(), _root, verbosity);
+    auto stats = _root->getStats(true /* includeDebugInfo  */);
+    return buildPlanStatsDetails(_solution->root(), stats.get(), verbosity);
 }
 
 std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerSBE::getRejectedPlansStats(
@@ -477,15 +477,29 @@ std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerSBE::getRejectedPlansS
         invariant(candidate.root);
         invariant(candidate.solution);
 
-        res.push_back(
-            buildPlanStatsDetails(candidate.solution->root(), candidate.root.get(), verbosity));
+        auto stats = candidate.root->getStats(true /* includeDebugInfo  */);
+        res.push_back(buildPlanStatsDetails(candidate.solution->root(), stats.get(), verbosity));
     }
     return res;
 }
 
 std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerSBE::getCachedPlanStats(
-    const PlanCacheEntry::DebugInfo&, ExplainOptions::Verbosity) const {
-    // TODO: SERVER-50728
-    return {};
+    const PlanCacheEntry::DebugInfo& debugInfo, ExplainOptions::Verbosity verbosity) const {
+    const auto& decision = *debugInfo.decision;
+    std::vector<PlanStatsDetails> res;
+
+    auto&& stats = decision.getStats<mongo::sbe::PlanStageStats>();
+    if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
+        for (auto&& planStats : stats.candidatePlanStats) {
+            res.push_back(buildPlanStatsDetails(nullptr, planStats.get(), verbosity));
+        }
+    } else {
+        // At the "queryPlanner" verbosity we only need to provide details about the winning plan
+        // when explaining from the plan cache.
+        invariant(verbosity == ExplainOptions::Verbosity::kQueryPlanner);
+        res.push_back({stats.serializedWinningPlan, boost::none});
+    }
+
+    return res;
 }
 }  // namespace mongo

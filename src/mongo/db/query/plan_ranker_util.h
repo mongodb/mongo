@@ -138,7 +138,22 @@ StatusWith<std::unique_ptr<PlanRankingDecision>> pickBestPlan(
                      });
 
     auto why = std::make_unique<PlanRankingDecision>();
-    why->stats = std::vector<std::unique_ptr<PlanStageStatsType>>{};
+
+    if constexpr (std::is_same_v<PlanStageStatsType, mongo::sbe::PlanStageStats>) {
+        // For SBE, we need to store a serialized winning plan within the ranking decision to be
+        // able to included it into the explain output for a cached plan stats, since we cannot
+        // reconstruct it from a PlanStageStats tree.
+        auto explainer =
+            plan_explainer_factory::make(candidates[0].root.get(), candidates[0].solution.get());
+        auto&& [stats, _] =
+            explainer->getWinningPlanStats(ExplainOptions::Verbosity::kQueryPlanner);
+        SBEStatsDetails details;
+        details.serializedWinningPlan = std::move(stats);
+        why->stats = std::move(details);
+    } else {
+        static_assert(std::is_same_v<PlanStageStatsType, PlanStageStats>);
+        why->stats = StatsDetails{};
+    }
 
     // Determine whether plans tied for the win.
     if (scoresAndCandidateIndices.size() > 1U) {
@@ -150,6 +165,7 @@ StatusWith<std::unique_ptr<PlanRankingDecision>> pickBestPlan(
 
     // Update results in 'why'
     // Stats and scores in 'why' are sorted in descending order by score.
+    auto&& stats = why->getStats<PlanStageStatsType>();
     why->failedCandidates = std::move(failed);
     for (size_t i = 0; i < scoresAndCandidateIndices.size(); ++i) {
         double score = scoresAndCandidateIndices[i].first;
@@ -175,12 +191,12 @@ StatusWith<std::unique_ptr<PlanRankingDecision>> pickBestPlan(
             score -= eofBonus;
         }
 
-        why->getStats<PlanStageStatsType>().push_back(std::move(statTrees[candidateIndex]));
+        stats.candidatePlanStats.push_back(std::move(statTrees[candidateIndex]));
         why->scores.push_back(score);
         why->candidateOrder.push_back(candidateIndex);
     }
     for (auto& i : why->failedCandidates) {
-        why->getStats<PlanStageStatsType>().push_back(std::move(statTrees[i]));
+        stats.candidatePlanStats.push_back(std::move(statTrees[i]));
     }
 
     return StatusWith<std::unique_ptr<PlanRankingDecision>>(std::move(why));

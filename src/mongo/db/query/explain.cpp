@@ -382,13 +382,12 @@ void Explain::planCacheEntryToBSON(const PlanCacheEntry& entry, BSONObjBuilder* 
         }
 
         auto explainer = stdx::visit(
-            visit_helper::Overloaded{
-                [](const std::vector<std::unique_ptr<PlanStageStats>>& stats) {
-                    return plan_explainer_factory::make(nullptr);
-                },
-                [](const std::vector<std::unique_ptr<sbe::PlanStageStats>>& stats) {
-                    return plan_explainer_factory::make(nullptr, nullptr);
-                }},
+            visit_helper::Overloaded{[](const plan_ranker::StatsDetails&) {
+                                         return plan_explainer_factory::make(nullptr);
+                                     },
+                                     [](const plan_ranker::SBEStatsDetails&) {
+                                         return plan_explainer_factory::make(nullptr, nullptr);
+                                     }},
             debugInfo.decision->stats);
         auto plannerStats =
             explainer->getCachedPlanStats(debugInfo, ExplainOptions::Verbosity::kQueryPlanner);

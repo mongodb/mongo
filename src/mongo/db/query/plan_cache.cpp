@@ -559,7 +559,8 @@ Status PlanCache::set(const CanonicalQuery& query,
         return Status(ErrorCodes::BadValue, "no solutions provided");
     }
 
-    auto statsSize = stdx::visit([](auto&& stats) { return stats.size(); }, why->stats);
+    auto statsSize =
+        stdx::visit([](auto&& stats) { return stats.candidatePlanStats.size(); }, why->stats);
     if (statsSize != solns.size()) {
         return Status(ErrorCodes::BadValue, "number of stats in decision must match solutions");
     }
@@ -575,14 +576,15 @@ Status PlanCache::set(const CanonicalQuery& query,
                       "match the number of solutions");
     }
 
-    auto newWorks = stdx::visit(
-        visit_helper::Overloaded{[](std::vector<std::unique_ptr<PlanStageStats>>& stats) {
-                                     return stats[0]->common.works;
-                                 },
-                                 [](std::vector<std::unique_ptr<sbe::PlanStageStats>>& stats) {
-                                     return calculateNumberOfReads(stats[0].get());
-                                 }},
-        why->stats);
+    auto newWorks =
+        stdx::visit(visit_helper::Overloaded{[](const plan_ranker::StatsDetails& details) {
+                                                 return details.candidatePlanStats[0]->common.works;
+                                             },
+                                             [](const plan_ranker::SBEStatsDetails& details) {
+                                                 return calculateNumberOfReads(
+                                                     details.candidatePlanStats[0].get());
+                                             }},
+                    why->stats);
     const auto key = computeKey(query);
     stdx::lock_guard<Latch> cacheLock(_cacheMutex);
     bool isNewEntryActive = false;

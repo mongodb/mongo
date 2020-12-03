@@ -695,7 +695,7 @@ std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerImpl::getCachedPlanSta
     const PlanCacheEntry::DebugInfo& debugInfo, ExplainOptions::Verbosity verbosity) const {
     const auto& decision = *debugInfo.decision;
     std::vector<PlanStatsDetails> res;
-    for (auto&& stats : decision.getStats<PlanStageStats>()) {
+    for (auto&& stats : decision.getStats<PlanStageStats>().candidatePlanStats) {
         BSONObjBuilder bob;
         statsToBSON(*stats, verbosity, &bob, &bob);
         res.push_back({bob.obj(),

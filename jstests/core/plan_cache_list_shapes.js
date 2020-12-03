@@ -11,7 +11,6 @@
 //   assumes_read_concern_unchanged,
 //   assumes_read_preference_unchanged,
 //   assumes_unsharded_collection,
-//   sbe_incompatible,
 // ]
 (function() {
 const coll = db.jstests_plan_cache_list_shapes;

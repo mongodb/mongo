@@ -310,7 +310,7 @@ std::unique_ptr<plan_ranker::PlanRankingDecision> createDecision(size_t numPlans
         why->scores.push_back(0U);
         why->candidateOrder.push_back(i);
     }
-    why->getStats<PlanStageStats>() = std::move(stats);
+    why->getStats<PlanStageStats>().candidatePlanStats = std::move(stats);
     return why;
 }
 
@@ -686,7 +686,7 @@ TEST(PlanCacheTest, WorksValueIncreases) {
     ASSERT(entry->debugInfo);
     ASSERT(entry->debugInfo->decision);
     auto&& decision = entry->debugInfo->decision;
-    ASSERT_EQ(decision->getStats<PlanStageStats>()[0]->common.works, 25U);
+    ASSERT_EQ(decision->getStats<PlanStageStats>().candidatePlanStats[0]->common.works, 25U);
     ASSERT_EQ(entry->works, 25U);
 
     ASSERT_EQUALS(planCache.size(), 1U);

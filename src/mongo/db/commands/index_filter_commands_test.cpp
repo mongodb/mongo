@@ -116,7 +116,7 @@ std::unique_ptr<plan_ranker::PlanRankingDecision> createDecision(size_t numPlans
         why->scores.push_back(0U);
         why->candidateOrder.push_back(i);
     }
-    why->getStats<PlanStageStats>() = std::move(stats);
+    why->getStats<PlanStageStats>().candidatePlanStats = std::move(stats);
     return why;
 }
 
