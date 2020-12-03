@@ -8,7 +8,7 @@
 (function() {
 "use strict";
 
-load("jstests/core/time_series/libs/time_series.js");
+load("jstests/core/timeseries/libs/timeseries.js");
 
 if (!TimeseriesTest.timeseriesCollectionsEnabled(db.getMongo())) {
     jsTestLog("Skipping test because the time-series collection feature flag is disabled");

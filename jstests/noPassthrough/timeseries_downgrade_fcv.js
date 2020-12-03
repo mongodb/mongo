@@ -9,7 +9,7 @@
 (function() {
 "use strict";
 
-load('jstests/core/time_series/libs/time_series.js');
+load('jstests/core/timeseries/libs/timeseries.js');
 
 const conn = MongoRunner.runMongod();
 
