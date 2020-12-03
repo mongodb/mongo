@@ -361,7 +361,7 @@ void ReplicationRecoveryImpl::recoverFromOplogUpTo(OperationContext* opCtx, Time
     acquireOplogCollectionForLogging(opCtx);
 
     // This may take an IS lock on the oplog collection.
-    _truncateOplogIfNeededAndThenClearOplogTruncateAfterPoint(opCtx, recoveryTS);
+    _truncateOplogIfNeededAndThenClearOplogTruncateAfterPoint(opCtx, &recoveryTS);
 
     boost::optional<Timestamp> startPoint =
         _storageInterface->getRecoveryTimestamp(opCtx->getServiceContext());
@@ -432,7 +432,7 @@ void ReplicationRecoveryImpl::recoverFromOplog(OperationContext* opCtx,
     }
 
     // This may take an IS lock on the oplog collection.
-    _truncateOplogIfNeededAndThenClearOplogTruncateAfterPoint(opCtx, stableTimestamp);
+    _truncateOplogIfNeededAndThenClearOplogTruncateAfterPoint(opCtx, &stableTimestamp);
 
     auto topOfOplogSW = _getTopOfOplog(opCtx);
     if (topOfOplogSW.getStatus() == ErrorCodes::CollectionIsEmpty ||
@@ -646,7 +646,8 @@ StatusWith<OpTime> ReplicationRecoveryImpl::_getTopOfOplog(OperationContext* opC
 }
 
 void ReplicationRecoveryImpl::_truncateOplogTo(OperationContext* opCtx,
-                                               Timestamp truncateAfterTimestamp) {
+                                               Timestamp truncateAfterTimestamp,
+                                               boost::optional<Timestamp>* stableTimestamp) {
     Timer timer;
 
     // Fetch the oplog collection.
@@ -678,7 +679,8 @@ void ReplicationRecoveryImpl::_truncateOplogTo(OperationContext* opCtx,
     // Parse the response.
     auto truncateAfterOplogEntry =
         fassert(51766, repl::OplogEntry::parse(truncateAfterOplogEntryBSON.get()));
-    auto truncateAfterRecordId = RecordId(truncateAfterOplogEntry.getTimestamp().asULL());
+    auto truncateAfterOplogEntryTs = truncateAfterOplogEntry.getTimestamp();
+    auto truncateAfterRecordId = RecordId(truncateAfterOplogEntryTs.asULL());
 
     invariant(truncateAfterRecordId <= RecordId(truncateAfterTimestamp.asULL()),
               str::stream() << "Should have found a oplog entry timestamp lte to "
@@ -694,6 +696,34 @@ void ReplicationRecoveryImpl::_truncateOplogTo(OperationContext* opCtx,
           "truncateAfterOplogEntryTimestamp"_attr = truncateAfterOplogEntry.getTimestamp(),
           "oplogTruncateAfterPoint"_attr = truncateAfterTimestamp);
 
+    if (*stableTimestamp && (**stableTimestamp) > truncateAfterOplogEntryTs) {
+        // Truncating the oplog sets the storage engine's maximum durable timestamp to the new top
+        // of the oplog.  It is illegal for this maximum durable timestamp to be before the oldest
+        // timestamp, so if the oldest timestamp is ahead of that point, we need to move it back.
+        // Since the stable timestamp is never behind the oldest and also must not be ahead of the
+        // maximum durable timesatmp, it has to be moved back as well.  This usually happens when
+        // the truncateAfterTimestamp does not exist in the oplog because there was a hole open when
+        // we crashed; in that case the oldest timestamp and the stable timestamp will be the
+        // timestamp immediately prior to the hole.
+        LOGV2_DEBUG(5104900,
+                    0,
+                    "Resetting stable and oldest timestamp to oplog entry we truncate after",
+                    "stableTimestamp"_attr = *stableTimestamp,
+                    "truncateAfterRecordTimestamp"_attr = truncateAfterOplogEntryTs);
+        // We're moving the stable timestamp backwards, so we need to force it.
+        const bool force = true;
+        opCtx->getServiceContext()->getStorageEngine()->setStableTimestamp(
+            truncateAfterOplogEntryTs, force);
+        **stableTimestamp = truncateAfterOplogEntryTs;
+
+        // The initialDataTimestamp may also be at the hole; move it back.
+        auto initialDataTimestamp =
+            opCtx->getServiceContext()->getStorageEngine()->getInitialDataTimestamp();
+        if (initialDataTimestamp > truncateAfterOplogEntryTs) {
+            _storageInterface->setInitialDataTimestamp(opCtx->getServiceContext(),
+                                                       truncateAfterOplogEntryTs);
+        }
+    }
     oplogCollection->cappedTruncateAfter(opCtx, truncateAfterRecordId, /*inclusive*/ false);
 
     LOGV2(21554,
@@ -703,7 +733,7 @@ void ReplicationRecoveryImpl::_truncateOplogTo(OperationContext* opCtx,
 }
 
 void ReplicationRecoveryImpl::_truncateOplogIfNeededAndThenClearOplogTruncateAfterPoint(
-    OperationContext* opCtx, boost::optional<Timestamp> stableTimestamp) {
+    OperationContext* opCtx, boost::optional<Timestamp>* stableTimestamp) {
 
     Timestamp truncatePoint = _consistencyMarkers->getOplogTruncateAfterPoint(opCtx);
 
@@ -712,23 +742,23 @@ void ReplicationRecoveryImpl::_truncateOplogIfNeededAndThenClearOplogTruncateAft
         return;
     }
 
-    if (stableTimestamp && !stableTimestamp->isNull() && truncatePoint <= stableTimestamp) {
+    if (*stableTimestamp && !(*stableTimestamp)->isNull() && truncatePoint <= *stableTimestamp) {
         LOGV2(21556,
               "The oplog truncation point ({truncatePoint}) is equal to or earlier than the stable "
               "timestamp ({stableTimestamp}), so truncating after the stable timestamp instead",
               "The oplog truncation point is equal to or earlier than the stable timestamp, so "
               "truncating after the stable timestamp instead",
               "truncatePoint"_attr = truncatePoint,
-              "stableTimestamp"_attr = stableTimestamp.get());
+              "stableTimestamp"_attr = (*stableTimestamp).get());
 
-        truncatePoint = stableTimestamp.get();
+        truncatePoint = (*stableTimestamp).get();
     }
 
     LOGV2(21557,
           "Removing unapplied oplog entries starting after: {oplogTruncateAfterPoint}",
           "Removing unapplied oplog entries after oplogTruncateAfterPoint",
           "oplogTruncateAfterPoint"_attr = truncatePoint.toBSON());
-    _truncateOplogTo(opCtx, truncatePoint);
+    _truncateOplogTo(opCtx, truncatePoint, stableTimestamp);
 
     // Clear the oplogTruncateAfterPoint now that we have removed any holes that might exist in the
     // oplog -- and so that we do not truncate future entries erroneously.

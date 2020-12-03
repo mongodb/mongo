@@ -131,8 +131,11 @@ private:
 
     /**
      * Truncates the oplog after the "truncateAfterTimestamp" entry.
+     * If the stableTimestamp is set, may move it backwards to the new top of oplog.
      */
-    void _truncateOplogTo(OperationContext* opCtx, Timestamp truncateAfterTimestamp);
+    void _truncateOplogTo(OperationContext* opCtx,
+                          Timestamp truncateAfterTimestamp,
+                          boost::optional<Timestamp>* stableTimestamp);
 
     /**
      * Uses the oplogTruncateAfterPoint, accessed via '_consistencyMarkers', to decide whether to
@@ -145,9 +148,12 @@ private:
      * stable timestamp. The oplogTruncateAfterPoint can lag behind the stable timestamp because the
      * oplogTruncateAfterPoint is updated on primaries by an asynchronously looping thread that can
      * potentially be starved.
+     *
+     * If the stable timestamp is at a hole, this will move the stable timestamp back to the new
+     * top of oplog.  This can happen on primaries when EMRC=false or in single-node replica sets.
      */
     void _truncateOplogIfNeededAndThenClearOplogTruncateAfterPoint(
-        OperationContext* opCtx, boost::optional<Timestamp> stableTimestamp);
+        OperationContext* opCtx, boost::optional<Timestamp>* stableTimestamp);
 
     StorageInterface* _storageInterface;
     ReplicationConsistencyMarkers* _consistencyMarkers;

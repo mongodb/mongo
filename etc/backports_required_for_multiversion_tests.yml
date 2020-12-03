@@ -106,6 +106,8 @@ all:
     test_file: jstests/replsets/not_primary_errors_returned_if_client_sends_helloOk.js
   - ticket: SERVER-50412
     test_file: jstests/sharding/mongos_helloOk_protocol.js
+  - ticket: SERVER-51049
+    test_file: jstests/replsets/node_restarts_no_oplog_entry_at_stable.js
   - ticket: SERVER-50414
     test_file: jstests/replsets/not_primary_errors_returned_during_rollback_if_helloOk.js
 
