@@ -330,6 +330,9 @@ selector:
   # operation and cluster times aren't shared between shells.
   # "Cowardly refusing to run test with network retries enabled when it uses startParallelShell()"
   - uses_parallel_shell
+  # Transaction-continuing commands cannot specify API parameters, so tests that use API parameters
+  # cannot be run with transactions.
+  - uses_api_parameters
 
 executor:
   archive:

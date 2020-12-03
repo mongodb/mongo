@@ -41,6 +41,7 @@
 #include <vector>
 
 #include "mongo/base/init.h"
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/dependencies.h"
@@ -89,6 +90,20 @@ class DocumentSource;
     (InitializerContext*) {                                                                \
         Expression::registerExpression("$" #key, (parser), (minVersion));                  \
         return Status::OK();                                                               \
+    }
+
+/**
+ * Registers a Parser only if test commands are enabled. Use this if your expression is only used
+ * for testing purposes.
+ */
+#define REGISTER_TEST_EXPRESSION(key, parser)                                                  \
+    MONGO_INITIALIZER_GENERAL(                                                                 \
+        addToExpressionParserMap_##key, ("EndStartupOptionHandling"), ("expressionParserMap")) \
+    (InitializerContext*) {                                                                    \
+        if (getTestCommandsEnabled()) {                                                        \
+            Expression::registerExpression("$" #key, (parser), boost::none);                   \
+        }                                                                                      \
+        return Status::OK();                                                                   \
     }
 
 class Expression : public RefCountable {

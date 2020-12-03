@@ -125,6 +125,8 @@ ExpressionContext::ExpressionContext(
     }
     if (letParameters)
         variables.seedVariablesWithLetParameters(this, *letParameters);
+    if (opCtx)
+        apiParameters = APIParameters::get(opCtx);
 }
 
 ExpressionContext::ExpressionContext(

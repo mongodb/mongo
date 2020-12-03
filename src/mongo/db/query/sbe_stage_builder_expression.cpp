@@ -427,6 +427,7 @@ public:
     void visit(ExpressionSwitch* expr) final {
         _context->evalStack.emplaceFrame(EvalStage{});
     }
+    void visit(ExpressionTestApiVersion* expr) final {}
     void visit(ExpressionToLower* expr) final {}
     void visit(ExpressionToUpper* expr) final {}
     void visit(ExpressionTrim* expr) final {}
@@ -622,6 +623,7 @@ public:
     void visit(ExpressionSwitch* expr) final {
         _context->evalStack.emplaceFrame(EvalStage{});
     }
+    void visit(ExpressionTestApiVersion* expr) final {}
     void visit(ExpressionToLower* expr) final {}
     void visit(ExpressionToUpper* expr) final {}
     void visit(ExpressionTrim* expr) final {}
@@ -2323,6 +2325,9 @@ public:
     }
     void visit(ExpressionSwitch* expr) final {
         visitConditionalExpression(expr);
+    }
+    void visit(ExpressionTestApiVersion* expr) final {
+        unsupportedExpression("$_testApiVersion");
     }
     void visit(ExpressionToLower* expr) final {
         generateStringCaseConversionExpression(_context, "toLower");

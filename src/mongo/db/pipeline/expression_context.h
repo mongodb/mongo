@@ -37,6 +37,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/api_parameters.h"
 #include "mongo/db/exec/document_value/document_comparator.h"
 #include "mongo/db/exec/document_value/value_comparator.h"
 #include "mongo/db/namespace_string.h"
@@ -362,6 +363,11 @@ public:
     // Indicates where there is any chance this operation will be profiled. Must be set at
     // construction.
     const bool mayDbProfile = true;
+
+    // API Parameters pulled from OperationContext upon object creation.
+    // This may become stale if OperationContext changes after object creation.
+    // Expressions should reach APIParameters with this variable instead of using the decorator.
+    APIParameters apiParameters;
 
 protected:
     static const int kInterruptCheckPeriod = 128;

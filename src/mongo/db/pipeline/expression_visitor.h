@@ -117,6 +117,7 @@ class ExpressionBinarySize;
 class ExpressionStrLenCP;
 class ExpressionSubtract;
 class ExpressionSwitch;
+class ExpressionTestApiVersion;
 class ExpressionToLower;
 class ExpressionToUpper;
 class ExpressionTrim;
@@ -185,6 +186,7 @@ public:
     virtual void visit(ExpressionAllElementsTrue*) = 0;
     virtual void visit(ExpressionAnd*) = 0;
     virtual void visit(ExpressionAnyElementTrue*) = 0;
+    virtual void visit(ExpressionTestApiVersion*) = 0;
     virtual void visit(ExpressionArray*) = 0;
     virtual void visit(ExpressionArrayElemAt*) = 0;
     virtual void visit(ExpressionFirst*) = 0;
