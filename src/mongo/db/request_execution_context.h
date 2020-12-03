@@ -55,7 +55,9 @@ class RequestExecutionContext {
 public:
     RequestExecutionContext() = delete;
     RequestExecutionContext(const RequestExecutionContext&) = delete;
+    RequestExecutionContext& operator=(const RequestExecutionContext&) = delete;
     RequestExecutionContext(RequestExecutionContext&&) = delete;
+    RequestExecutionContext& operator=(RequestExecutionContext&&) = delete;
 
     RequestExecutionContext(OperationContext* opCtx, Message message)
         : _opCtx(opCtx),
