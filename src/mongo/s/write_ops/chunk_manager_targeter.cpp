@@ -762,14 +762,14 @@ void ChunkManagerTargeter::refreshIfNeeded(OperationContext* opCtx, bool* wasCha
 
 bool ChunkManagerTargeter::endpointIsConfigServer() const {
     if (!_cm->isSharded()) {
-        return _cm->dbPrimary() == ShardRegistry::kConfigServerShardId;
+        return _cm->dbPrimary() == ShardId::kConfigServerId;
     }
 
     std::set<ShardId> shardIds;
     _cm->getAllShardIds(&shardIds);
 
     if (std::any_of(shardIds.begin(), shardIds.end(), [](const auto& shardId) {
-            return shardId == ShardRegistry::kConfigServerShardId;
+            return shardId == ShardId::kConfigServerId;
         })) {
         // There should be no namespaces that target both config servers and shards.
         invariant(shardIds.size() == 1);

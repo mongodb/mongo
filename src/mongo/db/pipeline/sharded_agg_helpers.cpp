@@ -208,7 +208,7 @@ std::vector<RemoteCursor> establishShardCursors(OperationContext* opCtx,
     } else {
         // The collection is unsharded. Target only the primary shard for the database.
         // Don't append shard version info when contacting the config servers.
-        const auto cmdObjWithShardVersion = cm->dbPrimary() != ShardRegistry::kConfigServerShardId
+        const auto cmdObjWithShardVersion = cm->dbPrimary() != ShardId::kConfigServerId
             ? appendShardVersion(cmdObj, ChunkVersion::UNSHARDED())
             : cmdObj;
         requests.emplace_back(cm->dbPrimary(),
@@ -680,7 +680,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> runPipelineDirectlyOnSingleShard(
         } else {
             // The collection is unsharded. Don't append shard version info when contacting the
             // config servers.
-            const auto cmdObjWithShardVersion = (shardId != ShardRegistry::kConfigServerShardId)
+            const auto cmdObjWithShardVersion = (shardId != ShardId::kConfigServerId)
                 ? appendShardVersion(request.serializeToCommandObj().toBson(),
                                      ChunkVersion::UNSHARDED())
                 : request.serializeToCommandObj().toBson();

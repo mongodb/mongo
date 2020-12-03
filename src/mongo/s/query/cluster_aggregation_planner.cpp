@@ -616,7 +616,7 @@ Status runPipelineOnPrimaryShard(const boost::intrusive_ptr<ExpressionContext>& 
                                       expCtx, serializedCommand, explain, nullptr, BSONObj())));
 
     const auto shardId = cm.dbPrimary();
-    const auto cmdObjWithShardVersion = (shardId != ShardRegistry::kConfigServerShardId)
+    const auto cmdObjWithShardVersion = (shardId != ShardId::kConfigServerId)
         ? appendShardVersion(std::move(cmdObj), ChunkVersion::UNSHARDED())
         : std::move(cmdObj);
 

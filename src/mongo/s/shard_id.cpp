@@ -37,6 +37,8 @@
 
 namespace mongo {
 
+const ShardId ShardId::kConfigServerId("config");
+
 bool ShardId::isValid() const {
     return !_shardId.empty();
 }

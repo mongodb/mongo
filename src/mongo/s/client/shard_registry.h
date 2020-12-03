@@ -165,11 +165,6 @@ class ShardRegistry {
 
 public:
     /**
-     * A ShardId for the config servers.
-     */
-    static const ShardId kConfigServerShardId;
-
-    /**
      * A callback type for functions that can be called on shard removal.
      */
     using ShardRemovalHook = std::function<void(const ShardId&)>;

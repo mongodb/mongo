@@ -92,7 +92,7 @@ class ReshardingTxnClonerTest : public ShardServerTestFixture {
         // The config database's primary shard is always config, and it is always sharded.
         mockLoader->setDatabaseRefreshReturnValue(
             DatabaseType{NamespaceString::kConfigDb.toString(),
-                         ShardRegistry::kConfigServerShardId,
+                         ShardId::kConfigServerId,
                          true,
                          DatabaseVersion::makeFixed()});
 

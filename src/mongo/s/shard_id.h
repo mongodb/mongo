@@ -42,8 +42,11 @@ namespace mongo {
  */
 class ShardId {
 public:
-    ShardId() = default;
+    static const ShardId kConfigServerId;
+
     ShardId(std::string shardId) : _shardId(std::move(shardId)) {}
+
+    ShardId() = default;
 
     operator StringData() const {
         return StringData(_shardId);

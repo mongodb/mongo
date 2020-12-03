@@ -393,7 +393,7 @@ std::vector<AsyncRequestsSender::Request> buildVersionedRequestsForTargetedShard
         }
 
         // Attach shardVersion "UNSHARDED", unless targeting the config server.
-        const auto cmdObjWithShardVersion = (primaryShardId != ShardRegistry::kConfigServerShardId)
+        const auto cmdObjWithShardVersion = (primaryShardId != ShardId::kConfigServerId)
             ? appendShardVersion(cmdToSend, ChunkVersion::UNSHARDED())
             : cmdToSend;
 
@@ -813,8 +813,7 @@ StatusWith<Shard::QueryResponse> loadIndexesFromAuthoritativeShard(OperationCont
         } else {
             // For an unsharded collection, the primary shard will have correct indexes. We attach
             // unsharded shard version to detect if the collection has become sharded.
-            const auto cmdObjWithShardVersion =
-                (cm.dbPrimary() != ShardRegistry::kConfigServerShardId)
+            const auto cmdObjWithShardVersion = (cm.dbPrimary() != ShardId::kConfigServerId)
                 ? appendShardVersion(cmdNoVersion, ChunkVersion::UNSHARDED())
                 : cmdNoVersion;
             return {

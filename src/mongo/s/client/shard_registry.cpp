@@ -68,8 +68,6 @@ bool useActualTopologyTime() {
 
 using CallbackArgs = executor::TaskExecutor::CallbackArgs;
 
-const ShardId ShardRegistry::kConfigServerShardId = ShardId("config");
-
 ShardRegistry::ShardRegistry(std::unique_ptr<ShardFactory> shardFactory,
                              const ConnectionString& configServerCS,
                              std::vector<ShardRemovalHook> shardRemovalHooks)
@@ -114,7 +112,7 @@ void ShardRegistry::init(ServiceContext* service) {
     {
         stdx::lock_guard<Latch> lk(_mutex);
         _configShardData = ShardRegistryData::createWithConfigShardOnly(
-            _shardFactory->createShard(kConfigServerShardId, _initConfigServerCS));
+            _shardFactory->createShard(ShardId::kConfigServerId, _initConfigServerCS));
         _latestConnStrings[_initConfigServerCS.getSetName()] = _initConfigServerCS;
     }
 
@@ -323,7 +321,7 @@ ConnectionString ShardRegistry::getConfigServerConnectionString() const {
 
 std::shared_ptr<Shard> ShardRegistry::getConfigShard() const {
     stdx::lock_guard<Latch> lk(_mutex);
-    return _configShardData.findShard(kConfigServerShardId);
+    return _configShardData.findShard(ShardId::kConfigServerId);
 }
 
 StatusWith<std::shared_ptr<Shard>> ShardRegistry::getShard(OperationContext* opCtx,

@@ -171,8 +171,7 @@ public:
             opCtx,
             ReadPreferenceSetting::get(opCtx),
             dbName,
-            cm.dbPrimary() == ShardRegistry::kConfigServerShardId ? filteredCmdObj
-                                                                  : filteredCmdObjWithVersion,
+            cm.dbPrimary() == ShardId::kConfigServerId ? filteredCmdObj : filteredCmdObjWithVersion,
             Shard::RetryPolicy::kIdempotent));
 
         uassert(ErrorCodes::IllegalOperation,

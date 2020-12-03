@@ -171,7 +171,7 @@ private:
             // the config server, run the drop only against the config server unless the collection
             // is config.system.sessions, since no other collections whose primary shard is the
             // config server can have been sharded.
-            if (dbt.getPrimary() == ShardRegistry::kConfigServerShardId &&
+            if (dbt.getPrimary() == ShardId::kConfigServerId &&
                 nss != NamespaceString::kLogicalSessionsNamespace) {
                 auto cmdDropResult =
                     uassertStatusOK(Grid::get(opCtx)

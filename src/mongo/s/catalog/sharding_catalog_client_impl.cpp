@@ -185,17 +185,13 @@ DatabaseType ShardingCatalogClientImpl::getDatabase(OperationContext* opCtx,
 
     // The admin database is always hosted on the config server.
     if (dbName == NamespaceString::kAdminDb)
-        return DatabaseType(dbName.toString(),
-                            ShardRegistry::kConfigServerShardId,
-                            false,
-                            DatabaseVersion::makeFixed());
+        return DatabaseType(
+            dbName.toString(), ShardId::kConfigServerId, false, DatabaseVersion::makeFixed());
 
     // The config database's primary shard is always config, and it is always sharded.
     if (dbName == NamespaceString::kConfigDb)
-        return DatabaseType(dbName.toString(),
-                            ShardRegistry::kConfigServerShardId,
-                            true,
-                            DatabaseVersion::makeFixed());
+        return DatabaseType(
+            dbName.toString(), ShardId::kConfigServerId, true, DatabaseVersion::makeFixed());
 
     auto result =
         _fetchDatabaseMetadata(opCtx, dbName.toString(), kConfigReadSelector, readConcernLevel);

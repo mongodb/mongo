@@ -124,7 +124,7 @@ public:
 
         std::vector<ShardId> shardIds;
         shardRegistry->getAllShardIdsNoReload(&shardIds);
-        shardIds.emplace_back(ShardRegistry::kConfigServerShardId);
+        shardIds.emplace_back(ShardId::kConfigServerId);
 
         // { filter: matchExpression }.
         auto filteredCmd = applyReadWriteConcern(
