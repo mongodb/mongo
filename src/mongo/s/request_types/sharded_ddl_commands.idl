@@ -33,6 +33,7 @@ imports:
     - "mongo/db/drop_database.idl"
     - "mongo/db/commands/rename_collection.idl"
     - "mongo/idl/basic_types.idl"
+    - "mongo/s/chunk_version.idl"
     - "mongo/s/database_version.idl"
     - "mongo/s/chunk_version.idl"
 
@@ -46,7 +47,52 @@ structs:
                 description: "Latest version of the collection"
                 optional: false
 
+    CreateCollectionResponse:
+        description: "Response of the create collection command"
+        strict: false
+        fields:
+            collectionUUID:
+                type: uuid
+                description: "UUID of the created collection"
+                optional: true
+            collectionVersion:
+                type: ChunkVersion
+                description: "Latest version of the collection"
+                optional: false
+
 commands:
+    _shardsvrCreateCollection:
+        command_name: _shardsvrCreateCollection
+        cpp_name: ShardsvrCreateCollection
+        description: "The internal createCollection command for a shard."
+        strict: false
+        namespace: concatenate_with_db
+        fields:
+            shardKey:
+                type: object
+                description: "The index specification document to use as the shard key."
+                optional: true
+            unique:
+                type: bool
+                description: "Whether the shard key index should enforce a unique constraint"
+                optional: true
+            numInitialChunks:
+                type: safeInt64
+                description: "The number of chunks to create initially when sharding an empty collection with a hashed shard key."
+                optional: true
+            presplitHashedZones:
+                type: bool
+                description: "True if the chunks should be pre-split based on the existing zones when sharding a collection with hashed shard key"
+                optional: true
+            initialSplitPoints:
+                type: array<object>
+                description: "A specific set of points to create initial splits at, currently used only by mapReduce"
+                optional: true
+            collation:
+                type: object
+                description: "The collation to use for the shard key index."
+                optional: true
+
     _shardsvrDropDatabase:
         description: "Parser for the shardDropDatabase command"
         command_name: _shardsvrDropDatabase

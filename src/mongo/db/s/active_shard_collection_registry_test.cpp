@@ -88,7 +88,9 @@ TEST_F(ShardCollectionRegistrationTest, ScopedShardCollectionConstructorAndAssig
     ASSERT(originalScopedShardCollection.mustExecute());
 
     // Need to signal the registered shard collection so the destructor doesn't invariant
-    originalScopedShardCollection.emplaceUUID(UUID::gen());
+    CreateCollectionResponse response(ChunkVersion(1, 0, OID::gen()));
+    response.setCollectionUUID(UUID::gen());
+    originalScopedShardCollection.emplaceResponse(response);
 }
 
 TEST_F(ShardCollectionRegistrationTest,
@@ -117,7 +119,9 @@ TEST_F(ShardCollectionRegistrationTest,
         _registry.registerShardCollection(secondShardsvrShardCollectionRequest);
     ASSERT_EQ(ErrorCodes::ConflictingOperationInProgress, secondScopedShardCollection.getStatus());
 
-    originalScopedShardCollection.emplaceUUID(UUID::gen());
+    CreateCollectionResponse response(ChunkVersion(1, 0, OID::gen()));
+    response.setCollectionUUID(UUID::gen());
+    originalScopedShardCollection.emplaceResponse(response);
 }
 
 TEST_F(ShardCollectionRegistrationTest, SecondShardCollectionWithSameOptionsJoinsFirstOnSuccess) {
@@ -149,9 +153,12 @@ TEST_F(ShardCollectionRegistrationTest, SecondShardCollectionWithSameOptionsJoin
 
     auto uuid = UUID::gen();
 
-    originalScopedShardCollection.emplaceUUID(uuid);
-    auto swUUID = secondScopedShardCollection.getUUID().getNoThrow();
-    ASSERT_EQ(uuid, swUUID.getValue().get());
+    CreateCollectionResponse response(ChunkVersion(1, 0, OID::gen()));
+    response.setCollectionUUID(uuid);
+    originalScopedShardCollection.emplaceResponse(response);
+
+    auto swResponse = secondScopedShardCollection.getResponse().getNoThrow();
+    ASSERT_EQ(uuid, swResponse.getValue().get().getCollectionUUID().value());
 }
 
 TEST_F(ShardCollectionRegistrationTest, SecondShardCollectionWithSameOptionsJoinsFirstOnError) {
@@ -181,9 +188,9 @@ TEST_F(ShardCollectionRegistrationTest, SecondShardCollectionWithSameOptionsJoin
         assertGet(_registry.registerShardCollection(secondShardsvrShardCollectionRequest));
     ASSERT(!secondScopedShardCollection.mustExecute());
 
-    originalScopedShardCollection.emplaceUUID({ErrorCodes::InternalError, "Test error"});
-    auto swUUID = secondScopedShardCollection.getUUID().getNoThrow();
-    ASSERT_EQ(Status(ErrorCodes::InternalError, "Test error"), swUUID.getStatus());
+    originalScopedShardCollection.emplaceResponse({ErrorCodes::InternalError, "Test error"});
+    auto swResponse = secondScopedShardCollection.getResponse().getNoThrow();
+    ASSERT_EQ(Status(ErrorCodes::InternalError, "Test error"), swResponse.getStatus());
 }
 
 TEST_F(ShardCollectionRegistrationTest, TwoShardCollectionsOnDifferentCollectionsAllowed) {
@@ -213,8 +220,14 @@ TEST_F(ShardCollectionRegistrationTest, TwoShardCollectionsOnDifferentCollection
         assertGet(_registry.registerShardCollection(secondShardsvrShardCollectionRequest));
     ASSERT(secondScopedShardCollection.mustExecute());
 
-    originalScopedShardCollection.emplaceUUID(UUID::gen());
-    secondScopedShardCollection.emplaceUUID(UUID::gen());
+    CreateCollectionResponse responseOriginal(ChunkVersion(1, 0, OID::gen()));
+    responseOriginal.setCollectionUUID(UUID::gen());
+
+    CreateCollectionResponse responseSecond(ChunkVersion(1, 0, OID::gen()));
+    responseOriginal.setCollectionUUID(UUID::gen());
+
+    originalScopedShardCollection.emplaceResponse(responseOriginal);
+    secondScopedShardCollection.emplaceResponse(responseSecond);
 }
 
 }  // namespace

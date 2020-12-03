@@ -35,3 +35,8 @@ feature_flags:
     description: "Ensures extra guarantees on DDL operations under a sharded cluster."
     cpp_varname: gShardingFullDDLSupport
     default: false
+  
+  shardingFullDDLSupportDistLocksOnStepDown:
+    description: "Once implemented allow usage of Distributed locks on shards."
+    cpp_varname: gShardingFullDDLSupportDistLocksOnStepDown
+    default: false

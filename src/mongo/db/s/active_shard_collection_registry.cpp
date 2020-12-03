@@ -101,14 +101,14 @@ StatusWith<ScopedShardCollection> ActiveShardCollectionRegistry::registerShardCo
         _activeShardCollectionMap.try_emplace(nss, activeShardCollectionState);
 
         return {ScopedShardCollection(
-            nss, this, true, activeShardCollectionState->_uuidPromise.getFuture())};
+            nss, this, true, activeShardCollectionState->_responsePromise.getFuture())};
     } else {
         auto activeShardCollectionState = iter->second;
 
         if (ActiveShardsvrShardCollectionEqualsNewRequest(activeShardCollectionState->activeRequest,
                                                           request)) {
             return {ScopedShardCollection(
-                nss, nullptr, false, activeShardCollectionState->_uuidPromise.getFuture())};
+                nss, nullptr, false, activeShardCollectionState->_responsePromise.getFuture())};
         }
         return activeShardCollectionState->constructErrorStatus(request);
     }
@@ -121,13 +121,13 @@ void ActiveShardCollectionRegistry::_clearShardCollection(std::string nss) {
     _activeShardCollectionMap.erase(nss);
 }
 
-void ActiveShardCollectionRegistry::_setUUIDOrError(std::string nss,
-                                                    StatusWith<boost::optional<UUID>> swUUID) {
+void ActiveShardCollectionRegistry::_setResponseOrError(
+    std::string nss, StatusWith<boost::optional<CreateCollectionResponse>> swResponse) {
     stdx::lock_guard<Latch> lk(_mutex);
     auto iter = _activeShardCollectionMap.find(nss);
     invariant(iter != _activeShardCollectionMap.end());
     auto activeShardCollectionState = iter->second;
-    activeShardCollectionState->_uuidPromise.setFrom(swUUID);
+    activeShardCollectionState->_responsePromise.setFrom(swResponse);
 }
 
 Status ActiveShardCollectionRegistry::ActiveShardCollectionState::constructErrorStatus(
@@ -140,14 +140,15 @@ Status ActiveShardCollectionRegistry::ActiveShardCollectionState::constructError
                           << "collection with arguments: " << activeRequest.toBSON()};
 }
 
-ScopedShardCollection::ScopedShardCollection(std::string nss,
-                                             ActiveShardCollectionRegistry* registry,
-                                             bool shouldExecute,
-                                             SharedSemiFuture<boost::optional<UUID>> uuidFuture)
+ScopedShardCollection::ScopedShardCollection(
+    std::string nss,
+    ActiveShardCollectionRegistry* registry,
+    bool shouldExecute,
+    SharedSemiFuture<boost::optional<CreateCollectionResponse>> responseFuture)
     : _nss(nss),
       _registry(registry),
       _shouldExecute(shouldExecute),
-      _uuidFuture(std::move(uuidFuture)) {}
+      _responseFuture(std::move(responseFuture)) {}
 
 ScopedShardCollection::~ScopedShardCollection() {
     if (_registry && _shouldExecute) {
@@ -164,21 +165,22 @@ ScopedShardCollection& ScopedShardCollection::operator=(ScopedShardCollection&& 
         _registry = other._registry;
         other._registry = nullptr;
         _shouldExecute = other._shouldExecute;
-        _uuidFuture = std::move(other._uuidFuture);
+        _responseFuture = std::move(other._responseFuture);
         _nss = std::move(other._nss);
     }
 
     return *this;
 }
 
-void ScopedShardCollection::emplaceUUID(StatusWith<boost::optional<UUID>> swUUID) {
+void ScopedShardCollection::emplaceResponse(
+    StatusWith<boost::optional<CreateCollectionResponse>> swResponse) {
     invariant(_shouldExecute);
-    _registry->_setUUIDOrError(_nss, swUUID);
+    _registry->_setResponseOrError(_nss, swResponse);
 }
 
-SharedSemiFuture<boost::optional<UUID>> ScopedShardCollection::getUUID() {
+SharedSemiFuture<boost::optional<CreateCollectionResponse>> ScopedShardCollection::getResponse() {
     invariant(!_shouldExecute);
-    return _uuidFuture;
+    return _responseFuture;
 }
 
 }  // namespace mongo
