@@ -108,7 +108,7 @@ private:
  * write mutex.
  *
  * We don't want a non-const Database to be required to do modifications on the ViewCatalog, so all
- * members of this class is mutable.
+ * members of this class are mutable.
  */
 class ViewCatalogStorage {
 public:
@@ -135,6 +135,10 @@ public:
 private:
     mutable std::shared_ptr<ViewCatalog> _catalog;
     mutable Mutex _mutex = MONGO_MAKE_LATCH("ViewCatalogStorage::mutex");  // Serializes writes
+
+    // This is safe to not be atomic because it is only accessed on the write path for the
+    // 'system.views' collection for this db. Modifications to this collection happens only through
+    // this class and we have it locked with MODE_X.
     mutable bool _ignoreExternalChange = false;
 };
 auto getViewCatalog = Database::declareDecoration<ViewCatalogStorage>();

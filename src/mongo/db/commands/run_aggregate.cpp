@@ -268,17 +268,13 @@ StatusWith<StringMap<ExpressionContext::ResolvedNamespace>> resolveInvolvedNames
         return {StringMap<ExpressionContext::ResolvedNamespace>()};
     }
 
-    // We intentionally do not drop and reacquire our system.views collection lock after resolving
-    // the view definition in order to prevent the definition for any view namespaces we've already
-    // resolved from changing. This is necessary to prevent a cycle from being formed among the view
-    // definitions cached in 'resolvedNamespaces' because we won't re-resolve a view namespace we've
-    // already encountered.
-    AutoGetCollection autoColl(opCtx,
-                               NamespaceString(request.getNamespaceString().db(),
-                                               NamespaceString::kSystemDotViewsCollectionName),
-                               MODE_IS);
-    Database* const db = autoColl.getDb();
-    auto viewCatalog = db ? ViewCatalog::get(db) : nullptr;
+    // Acquire a single const view of the database's ViewCatalog (if it exists) and use it for all
+    // view definition resolutions that follow. This prevents the view definitions cached in
+    // 'resolvedNamespaces' from changing relative to those in the acquired ViewCatalog. The
+    // resolution of the view definitions below might lead into an endless cycle if any are allowed
+    // to change.
+    auto viewCatalog =
+        DatabaseHolder::get(opCtx)->getViewCatalog(opCtx, request.getNamespaceString().db());
 
     std::deque<NamespaceString> involvedNamespacesQueue(pipelineInvolvedNamespaces.begin(),
                                                         pipelineInvolvedNamespaces.end());
@@ -334,7 +330,7 @@ StatusWith<StringMap<ExpressionContext::ResolvedNamespace>> resolveInvolvedNames
             } else {
                 resolvedNamespaces[involvedNs.coll()] = {involvedNs, std::vector<BSONObj>{}};
             }
-        } else if (!db ||
+        } else if (!viewCatalog ||
                    CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, involvedNs)) {
             // If the aggregation database exists and 'involvedNs' refers to a collection namespace,
             // then we resolve it as an empty pipeline in order to read directly from the underlying
@@ -560,10 +556,14 @@ Status runAggregate(OperationContext* opCtx,
             // Upgrade and wait for read concern if necessary.
             _adjustChangeStreamReadConcern(opCtx);
 
-            // AutoGetCollectionForReadCommand will raise an error if 'origNss' is a view. We do not
-            // need to check this if we are opening a stream on an entire db or across the cluster.
+            // Raise an error if 'origNss' is a view. We do not need to check this if we are opening
+            // a stream on an entire db or across the cluster.
             if (!origNss.isCollectionlessAggregateNS()) {
-                AutoGetCollectionForReadCommandMaybeLockFree origNssCtx(opCtx, origNss);
+                auto viewCatalog = DatabaseHolder::get(opCtx)->getViewCatalog(opCtx, origNss.db());
+                uassert(ErrorCodes::CommandNotSupportedOnView,
+                        str::stream()
+                            << "Namespace " << origNss.ns() << " is a view, not a collection",
+                        !viewCatalog || !viewCatalog->lookup(opCtx, origNss.ns()));
             }
 
             // If the user specified an explicit collation, adopt it; otherwise, use the simple
