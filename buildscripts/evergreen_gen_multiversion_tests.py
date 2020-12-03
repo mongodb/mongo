@@ -23,7 +23,7 @@ from buildscripts.resmokelib.multiversionconstants import (LAST_STABLE_MONGO_BIN
                                                            REQUIRES_FCV_TAG)
 import buildscripts.resmokelib.parser
 import buildscripts.util.taskname as taskname
-from buildscripts.util.fileops import write_file_to_dir
+from buildscripts.util.fileops import write_file_to_dir, read_yaml_file
 import buildscripts.evergreen_generate_resmoke_tasks as generate_resmoke
 from buildscripts.evergreen_generate_resmoke_tasks import Suite, ConfigOptions
 import buildscripts.evergreen_gen_fuzzer_tests as gen_fuzzer
@@ -42,7 +42,7 @@ DEFAULT_CONFIG_VALUES = generate_resmoke.DEFAULT_CONFIG_VALUES
 CONFIG_DIR = DEFAULT_CONFIG_VALUES["generated_config_dir"]
 DEFAULT_CONFIG_VALUES["is_jstestfuzz"] = False
 TEST_SUITE_DIR = DEFAULT_CONFIG_VALUES["test_suites_dir"]
-CONFIG_FILE = generate_resmoke.CONFIG_FILE
+CONFIG_FILE = generate_resmoke.EVG_CONFIG_FILE
 CONFIG_FORMAT_FN = generate_resmoke.CONFIG_FORMAT_FN
 REPL_MIXED_VERSION_CONFIGS = ["new-old-new", "new-new-old", "old-new-new"]
 SHARDED_MIXED_VERSION_CONFIGS = ["new-old-old-new"]
@@ -74,7 +74,7 @@ def enable_logging():
 
 def is_suite_sharded(suite_dir: str, suite_name: str) -> bool:
     """Return true if a suite uses ShardedClusterFixture."""
-    source_config = generate_resmoke.read_yaml(suite_dir, suite_name + ".yml")
+    source_config = read_yaml_file(os.path.join(suite_dir, suite_name + ".yml"))
     return source_config["executor"]["fixture"]["class"] == "ShardedClusterFixture"
 
 
@@ -121,7 +121,7 @@ def get_last_stable_yaml(last_stable_commit_hash):
     with open(os.path.join(temp_dir, last_stable_file), "w") as fileh:
         fileh.write(response.text)
 
-    backports_required_last_stable = generate_resmoke.read_yaml(temp_dir, last_stable_file)
+    backports_required_last_stable = read_yaml_file(os.path.join(temp_dir, last_stable_file))
     return backports_required_last_stable
 
 
@@ -393,7 +393,7 @@ def generate_exclude_yaml(task_path_suffix: str, output: str) -> None:
         LOGGER.info(f"Cannot write to {output}. Not generating tag file.")
         return
 
-    backports_required_latest = generate_resmoke.read_yaml(ETC_DIR, BACKPORTS_REQUIRED_FILE)
+    backports_required_latest = read_yaml_file(os.path.join(ETC_DIR, BACKPORTS_REQUIRED_FILE))
 
     # Get the state of the backports_required_for_multiversion_tests.yml file for the last-lts
     # binary we are running tests against. We do this by using the commit hash from the last-lts
