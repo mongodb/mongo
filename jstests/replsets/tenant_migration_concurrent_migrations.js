@@ -61,8 +61,8 @@ const kTenantIdPrefix = "testTenantId";
         assert.commandWorked(tenantMigrationTest1.waitForMigrationToComplete(migrationOpts1));
 
     // Verify that both migrations succeeded.
-    assert(stateRes0.state, TenantMigrationTest.State.kCommitted);
-    assert(stateRes1.state, TenantMigrationTest.State.kCommitted);
+    assert.eq(stateRes0.state, TenantMigrationTest.State.kCommitted);
+    assert.eq(stateRes1.state, TenantMigrationTest.State.kCommitted);
 })();
 
 // Test concurrent incoming migrations from different donors.
@@ -94,8 +94,8 @@ const kTenantIdPrefix = "testTenantId";
         assert.commandWorked(tenantMigrationTest1.waitForMigrationToComplete(migrationOpts1));
 
     // Verify that both migrations succeeded.
-    assert(stateRes0.state, TenantMigrationTest.State.kCommitted);
-    assert(stateRes1.state, TenantMigrationTest.State.kCommitted);
+    assert.eq(stateRes0.state, TenantMigrationTest.State.kCommitted);
+    assert.eq(stateRes1.state, TenantMigrationTest.State.kCommitted);
 })();
 
 // TODO (SERVER-50467): Ensure that tenant migration donor only removes a ReplicaSetMonitor for
