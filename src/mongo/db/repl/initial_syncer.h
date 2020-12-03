@@ -154,6 +154,13 @@ public:
 
     using StartCollectionClonerFn = DatabaseCloner::StartCollectionClonerFn;
 
+    /**
+     * Type of function to create a database client
+     *
+     * Used for testing only.
+     */
+    using CreateClientFn = stdx::function<std::unique_ptr<DBClientConnection>()>;
+
     struct InitialSyncAttemptInfo {
         int durationMillis;
         Status status;
@@ -229,6 +236,13 @@ public:
      * For testing only.
      */
     void setStartCollectionClonerFn(const StartCollectionClonerFn& startCollectionCloner);
+
+    /**
+     * Allows a different client class to be injected for the databases cloner.
+     *
+     * For testing only.
+     */
+    void setDbsClonerCreateClientFn_forTest(const CreateClientFn& createClientFn);
 
     // State transitions:
     // PreStart --> Running --> ShuttingDown --> Complete
@@ -673,6 +687,10 @@ private:
 
     // Current initial syncer state. See comments for State enum class for details.
     State _state = State::kPreStart;  // (M)
+
+    // Passed to DatabasesCloner.
+    CreateClientFn _dbsClonerCreateClientFn;  // (M)
+
 
     // Passed to CollectionCloner via DatabasesCloner.
     DatabaseCloner::ScheduleDbWorkFn _scheduleDbWorkFn;  // (M)

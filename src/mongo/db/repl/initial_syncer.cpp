@@ -340,6 +340,11 @@ InitialSyncer::State InitialSyncer::getState_forTest() const {
     return _state;
 }
 
+void InitialSyncer::setDbsClonerCreateClientFn_forTest(const CreateClientFn& createClientFn) {
+    stdx::lock_guard<Latch> lk(_mutex);
+    _dbsClonerCreateClientFn = createClientFn;
+}
+
 Date_t InitialSyncer::getWallClockTime_forTest() const {
     stdx::lock_guard<Latch> lk(_mutex);
     return _lastApplied.wallTime;
@@ -387,6 +392,29 @@ void InitialSyncer::_appendInitialSyncProgressMinimal_inlock(BSONObjBuilder* bob
     _stats.append(bob);
     if (!_initialSyncState) {
         return;
+    }
+    if (_initialSyncState && _initialSyncState->dbsCloner) {
+        const auto dbsClonerStats = _initialSyncState->dbsCloner->getStats();
+        const auto approxTotalDataSize = dbsClonerStats.dataSize;
+        bob->appendNumber("approxTotalDataSize", approxTotalDataSize);
+        long long approxTotalBytesCopied = 0;
+        for (auto dbClonerStats : dbsClonerStats.databaseStats) {
+            for (auto collClonerStats : dbClonerStats.collectionStats) {
+                approxTotalBytesCopied += collClonerStats.approxBytesCopied;
+            }
+        }
+        bob->appendNumber("approxTotalBytesCopied", approxTotalBytesCopied);
+        if (approxTotalBytesCopied > 0) {
+            const auto statsObj = bob->asTempObj();
+            auto totalInitialSyncElapsedMillis =
+                statsObj.getField("totalInitialSyncElapsedMillis").safeNumberLong();
+            const auto downloadRate =
+                (double)totalInitialSyncElapsedMillis / (double)approxTotalBytesCopied;
+            const auto remainingInitialSyncEstimatedMillis =
+                downloadRate * (double)(approxTotalDataSize - approxTotalBytesCopied);
+            bob->appendNumber("remainingInitialSyncEstimatedMillis",
+                              (long long)remainingInitialSyncEstimatedMillis);
+        }
     }
     bob->appendNumber("fetchedMissingDocs", _initialSyncState->fetchedMissingDocs);
     bob->appendNumber("appliedOps", _initialSyncState->appliedOps);
@@ -1060,6 +1088,10 @@ void InitialSyncer::_fcvFetcherCallback(const StatusWith<Fetcher::QueryResponse>
         // to the CollectionCloner so that CollectionCloner's default TaskRunner can be disabled to
         // facilitate testing.
         _initialSyncState->dbsCloner->setScheduleDbWorkFn_forTest(_scheduleDbWorkFn);
+    }
+    if (_dbsClonerCreateClientFn) {
+        // Used for testing to inject a different client class to be used in the DatabasesCloner.
+        _initialSyncState->dbsCloner->setCreateClientFn_forTest(_dbsClonerCreateClientFn);
     }
     if (_startCollectionClonerFn) {
         _initialSyncState->dbsCloner->setStartCollectionClonerFn(_startCollectionClonerFn);
@@ -1854,12 +1886,14 @@ void InitialSyncer::Stats::append(BSONObjBuilder* builder) const {
                           static_cast<long long>(maxFailedInitialSyncAttempts));
     if (initialSyncStart != Date_t()) {
         builder->appendDate("initialSyncStart", initialSyncStart);
+        auto elapsedDurationEnd = Date_t::now();
         if (initialSyncEnd != Date_t()) {
             builder->appendDate("initialSyncEnd", initialSyncEnd);
-            auto elapsed = initialSyncEnd - initialSyncStart;
-            long long elapsedMillis = duration_cast<Milliseconds>(elapsed).count();
-            builder->appendNumber("initialSyncElapsedMillis", elapsedMillis);
+            elapsedDurationEnd = initialSyncEnd;
         }
+        long long elapsedMillis =
+            duration_cast<Milliseconds>(elapsedDurationEnd - initialSyncStart).count();
+        builder->appendNumber("totalInitialSyncElapsedMillis", elapsedMillis);
     }
     BSONArrayBuilder arrBuilder(builder->subarrayStart("initialSyncAttempts"));
     for (unsigned int i = 0; i < initialSyncAttemptInfos.size(); ++i) {

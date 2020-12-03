@@ -41,6 +41,7 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/client.h"
 #include "mongo/db/repl/databases_cloner_gen.h"
+#include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/stdx/functional.h"
@@ -74,7 +75,8 @@ DatabasesCloner::DatabasesCloner(StorageInterface* si,
       _source(source),
       _includeDbFn(includeDbPred),
       _finishFn(finishFn),
-      _storage(si) {
+      _storage(si),
+      _createClientFn([] { return stdx::make_unique<DBClientConnection>(); }) {
     uassert(ErrorCodes::InvalidOptions, "storage interface must be provided.", si);
     uassert(ErrorCodes::InvalidOptions, "executor must be provided.", exec);
     uassert(
@@ -93,6 +95,7 @@ std::string DatabasesCloner::toString() const {
     return str::stream() << "initial sync --"
                          << " active:" << _isActive_inlock() << " status:" << _status.toString()
                          << " source:" << _source.toString()
+                         << " db cloners remaining:" << _stats.databasesToClone
                          << " db cloners completed:" << _stats.databasesCloned
                          << " db count:" << _databaseCloners.size();
 }
@@ -170,6 +173,7 @@ BSONObj DatabasesCloner::Stats::toBSON() const {
 }
 
 void DatabasesCloner::Stats::append(BSONObjBuilder* builder) const {
+    builder->appendNumber("databasesToClone", databasesToClone);
     builder->appendNumber("databasesCloned", databasesCloned);
     for (auto&& db : databaseStats) {
         BSONObjBuilder dbBuilder(builder->subobjStart(db.dbname));
@@ -225,6 +229,11 @@ Status DatabasesCloner::startup() noexcept {
 void DatabasesCloner::setScheduleDbWorkFn_forTest(const ScheduleDbWorkFn& work) {
     LockGuard lk(_mutex);
     _scheduleDbWorkFn = work;
+}
+
+void DatabasesCloner::setCreateClientFn_forTest(const CreateClientFn& createClientFn) {
+    stdx::lock_guard<Latch> lk(_mutex);
+    _createClientFn = createClientFn;
 }
 
 void DatabasesCloner::setStartCollectionClonerFn(
@@ -302,6 +311,10 @@ void DatabasesCloner::_onListDatabaseFinish(
     // will be the first to be cloned. This allows users to authenticate against a database while
     // initial sync is occurring.
     _setAdminAsFirst(dbsArray);
+
+    // Create a client connection to call 'dbStats' to gather initial sync metrics.
+    auto clientConnection = _createClientFn();
+    const auto clientConnectionStatus = clientConnection->connect(_source, StringData());
 
     for (BSONElement arrayElement : dbsArray) {
         const BSONObj dbBSON = arrayElement.Obj();
@@ -384,6 +397,37 @@ void DatabasesCloner::_onListDatabaseFinish(
 
         // add cloner to list.
         _databaseCloners.push_back(dbCloner);
+
+        try {
+            if (!replAuthenticate(clientConnection.get())) {
+                LOG(1) << "Skipping the recording of initial sync data size metrics for the '"
+                       << dbName << "' database as we failed to authenticate to " << _source;
+                continue;
+            }
+            auto status = clientConnectionStatus;
+            if (status.isOK()) {
+                BSONObj res;
+                clientConnection->runCommand(dbName, BSON("dbStats" << 1), res);
+                auto respStatus = getStatusFromCommandResult(res);
+                if (respStatus.isOK()) {
+                    _stats.dataSize += res.getField("dataSize").safeNumberLong();
+                    continue;
+                }
+                // 'dbStats' returned a bad status.
+                status = respStatus;
+            }
+            // It is possible for the call to 'dbStats' to fail if the sync source contains
+            // invalid views. We should not fail initial sync in this case due to the
+            // situation where the replica set may have lost majority availability and
+            // therefore have no access to a primary to fix the view definitions. Instead,
+            // we simply skip recording the data size metrics.
+            LOG(1) << "Skipping the recording of initial sync data size metrics for the '" << dbName
+                   << "' database due to bad status response to 'dbStats' command: " << status;
+        } catch (const DBException& e) {
+            LOG(1) << "Skipping the recording of initial sync data size metrics for the '" << dbName
+                   << "' database due to an error when calling the 'dbStats' command: "
+                   << e.toStatus();
+        }
     }
     if (_databaseCloners.size() == 0) {
         if (_status.isOK()) {
@@ -392,6 +436,7 @@ void DatabasesCloner::_onListDatabaseFinish(
             _fail_inlock(&lk, _status);
         }
     }
+    _stats.databasesToClone = _databaseCloners.size();
 }
 
 std::vector<std::shared_ptr<DatabaseCloner>> DatabasesCloner::_getDatabaseCloners() const {
@@ -435,6 +480,7 @@ void DatabasesCloner::_onEachDBCloneFinish(const Status& status, const std::stri
     }
 
     _stats.databasesCloned++;
+    _stats.databasesToClone--;
 
     if (_stats.databasesCloned == _databaseCloners.size()) {
         _succeed_inlock(&lk);

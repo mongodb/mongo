@@ -57,6 +57,8 @@ class DatabasesCloner {
 public:
     struct Stats {
         size_t databasesCloned{0};
+        size_t databasesToClone{0};
+        long long dataSize{0};
         std::vector<DatabaseCloner::Stats> databaseStats;
 
         std::string toString() const;
@@ -69,6 +71,13 @@ public:
     using StartCollectionClonerFn = DatabaseCloner::StartCollectionClonerFn;
     using ScheduleDbWorkFn = stdx::function<StatusWith<executor::TaskExecutor::CallbackHandle>(
         executor::TaskExecutor::CallbackFn)>;
+
+    /**
+     * Type of function to create a database client
+     *
+     * Used for testing only.
+     */
+    using CreateClientFn = stdx::function<std::unique_ptr<DBClientConnection>()>;
 
     DatabasesCloner(StorageInterface* si,
                     executor::TaskExecutor* exec,
@@ -118,6 +127,13 @@ public:
      * For testing only.
      */
     StatusWith<std::vector<BSONElement>> parseListDatabasesResponse_forTest(BSONObj dbResponse);
+
+    /**
+     * Allows a different client class to be injected.
+     *
+     * For testing only.
+     */
+    void setCreateClientFn_forTest(const CreateClientFn& createClientFn);
 
 private:
     bool _isActive_inlock() const;
@@ -174,6 +190,7 @@ private:
     // (R)  Read-only in concurrent operation; no synchronization required.
     // (M)  Reads and writes guarded by _mutex
     // (S)  Self-synchronizing; access in any way from any context.
+    // (RT)  Read-only in concurrent operation; synchronized externally by tests
     //
     mutable Mutex _mutex = MONGO_MAKE_LATCH("DatabasesCloner::_mutex");  // (S)
     Status _status{ErrorCodes::NotYetInitialized, ""};  // (M) If it is not OK, we stop everything.
@@ -190,6 +207,8 @@ private:
     std::unique_ptr<RemoteCommandRetryScheduler> _listDBsScheduler;  // (M) scheduler for listDBs.
     std::vector<std::shared_ptr<DatabaseCloner>> _databaseCloners;   // (M) database cloners by name
     Stats _stats;                                                    // (M)
+
+    CreateClientFn _createClientFn;  // (RT) Function for creating a database client.
 
     // State transitions:
     // PreStart --> Running --> ShuttingDown --> Complete

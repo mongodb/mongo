@@ -285,6 +285,15 @@ protected:
         return Status::OK();
     };
 
+    void startWithMockClient(DatabasesCloner& cloner) {
+        // The databases cloner uses DBDirectClient to call 'dbstats' for initial sync metrics.
+        cloner.setCreateClientFn_forTest([this]() {
+            return std::unique_ptr<DBClientConnection>(
+                new MockDBClientConnection(_mockServer.get()));
+        });
+        ASSERT_OK(cloner.startup());
+    }
+
     void runCompleteClone(Responses responses) {
         Status result{Status::OK()};
         bool done = false;
@@ -304,6 +313,11 @@ protected:
                                }};
         cloner.setScheduleDbWorkFn_forTest([this](executor::TaskExecutor::CallbackFn work) {
             return getExecutor().scheduleWork(std::move(work));
+        });
+
+        cloner.setCreateClientFn_forTest([this]() {
+            return std::unique_ptr<DBClientConnection>(
+                new MockDBClientConnection(_mockServer.get()));
         });
 
         cloner.setStartCollectionClonerFn([this](CollectionCloner& cloner) {
@@ -688,7 +702,7 @@ TEST_F(DBsClonerTest, DatabasesClonerResetsOnFinishCallbackFunctionAfterCompleti
                                result = status;
                            }};
 
-    ASSERT_OK(cloner.startup());
+    startWithMockClient(cloner);
     ASSERT_TRUE(cloner.isActive());
 
     sharedCallbackData.reset();
@@ -717,7 +731,7 @@ TEST_F(DBsClonerTest, FailsOnListCollectionsOnOnlyDatabase) {
                                result = status;
                            }};
 
-    ASSERT_OK(cloner.startup());
+    startWithMockClient(cloner);
     ASSERT_TRUE(cloner.isActive());
 
     auto net = getNet();
@@ -747,7 +761,7 @@ TEST_F(DBsClonerTest, FailsOnListCollectionsOnFirstOfTwoDatabases) {
                                result = status;
                            }};
 
-    ASSERT_OK(cloner.startup());
+    startWithMockClient(cloner);
     ASSERT_TRUE(cloner.isActive());
 
     auto net = getNet();
@@ -805,7 +819,7 @@ TEST_F(DBsClonerTest, FailingToScheduleSecondDatabaseClonerShouldCancelTheCloner
                                result = status;
                            }};
 
-    ASSERT_OK(cloner.startup());
+    startWithMockClient(cloner);
     ASSERT_TRUE(cloner.isActive());
 
     auto net = getNet();
@@ -850,7 +864,7 @@ TEST_F(DBsClonerTest, DatabaseClonerChecksAdminDbUsingStorageInterfaceAfterCopyi
                                result = status;
                            }};
 
-    ASSERT_OK(cloner.startup());
+    startWithMockClient(cloner);
     ASSERT_TRUE(cloner.isActive());
 
     auto net = getNet();
@@ -891,7 +905,7 @@ TEST_F(DBsClonerTest, AdminDbValidationErrorShouldAbortTheCloner) {
                                result = status;
                            }};
 
-    ASSERT_OK(cloner.startup());
+    startWithMockClient(cloner);
     ASSERT_TRUE(cloner.isActive());
 
     auto net = getNet();

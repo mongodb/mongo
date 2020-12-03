@@ -544,6 +544,30 @@ void CollectionCloner::_runQuery(const executor::TaskExecutor::CallbackArgs& cal
     }
 
     try {
+        BSONObj res;
+        _clientConnection->runCommand(
+            _sourceNss.db().toString(), BSON("collStats" << _sourceNss.coll().toString()), res);
+        if (auto status = getStatusFromCommandResult(res); status.isOK()) {
+            stdx::lock_guard<Latch> lock(_mutex);
+            _stats.bytesToCopy = res.getField("size").safeNumberLong();
+            if (_stats.bytesToCopy > 0) {
+                // The 'avgObjSize' parameter is only available if 'collStats' returns a 'size'
+                // field greater than zero.
+                _stats.avgObjSize = res.getField("avgObjSize").safeNumberLong();
+            }
+        } else {
+            LOG(1) << "Skipping the recording of some initial sync metrics due to a bad status "
+                      "response from calling 'collStats' on source '"
+                   << _source.toString() << "': " << status;
+        }
+    } catch (const DBException& e) {
+        LOG(1)
+            << "Skipping the recording of some initial sync metrics due to an error when calling "
+               "'collStats' on source '"
+            << _source.toString() << "': " << e.toStatus();
+    }
+
+    try {
         _clientConnection->query(
             [this, onCompletionGuard](DBClientCursorBatchIterator& iter) {
                 _handleNextBatch(onCompletionGuard, iter);
@@ -700,6 +724,7 @@ void CollectionCloner::_insertDocumentsCallback(
     }
     _documentsToInsert.swap(docs);
     _stats.documentsCopied += docs.size();
+    _stats.approxBytesCopied = ((long)_stats.documentsCopied) * _stats.avgObjSize;
     ++_stats.fetchedBatches;
     _progressMeter.hit(int(docs.size()));
     invariant(_collLoader);
@@ -789,6 +814,10 @@ void CollectionCloner::Stats::append(BSONObjBuilder* builder) const {
     builder->appendNumber(kDocumentsCopiedFieldName, documentsCopied);
     builder->appendNumber("indexes", indexes);
     builder->appendNumber("fetchedBatches", fetchedBatches);
+    builder->appendNumber("bytesToCopy", bytesToCopy);
+    if (bytesToCopy) {
+        builder->appendNumber("approxBytesCopied", approxBytesCopied);
+    }
     if (start != Date_t()) {
         builder->appendDate("start", start);
         if (end != Date_t()) {

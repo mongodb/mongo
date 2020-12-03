@@ -1139,6 +1139,14 @@ DB.prototype.printSecondaryReplicationInfo = function() {
         }
     }
 
+    function printNodeInitialSyncInfo(syncSourceString, remainingMillis) {
+        print("\tInitialSyncSyncSource: " + syncSourceString);
+        let minutes = Math.floor((remainingMillis / (1000 * 60)) % 60);
+        let hours = Math.floor(remainingMillis / (1000 * 60 * 60));
+        print("\tInitialSyncRemainingEstimatedDuration: " + hours + " hour(s) " + minutes +
+              " minute(s)");
+    }
+
     var L = this.getSiblingDB("local");
 
     if (L.system.replset.count() != 0) {
@@ -1158,7 +1166,19 @@ DB.prototype.printSecondaryReplicationInfo = function() {
         }
 
         for (i in status.members) {
-            r(status.members[i]);
+            if (status.members[i].self && status.members[i].state === 5) {
+                print("source: " + status.members[i].name);
+                if (!status.initialSyncStatus) {
+                    print("InitialSyncStatus information not found");
+                    continue;
+                }
+                // Print initial sync info if node is in the STARTUP2 state.
+                printNodeInitialSyncInfo(
+                    status.members[i].syncSourceHost,
+                    status.initialSyncStatus.remainingInitialSyncEstimatedMillis);
+            } else {
+                r(status.members[i]);
+            }
         }
     }
 };
