@@ -9,6 +9,9 @@
 
 #include "wt_internal.h"
 
+static int __curhs_prev_visible(WT_SESSION_IMPL *, WT_CURSOR_HS *);
+static int __curhs_next_visible(WT_SESSION_IMPL *, WT_CURSOR_HS *);
+
 /*
  * __hs_cursor_open_int --
  *     Open a new history store table cursor, internal function.
@@ -140,6 +143,62 @@ __wt_hs_cursor_search_near(WT_SESSION_IMPL *session, WT_CURSOR *cursor, int *exa
     WT_WITH_TXN_ISOLATION(
       session, WT_ISO_READ_UNCOMMITTED, ret = cursor->search_near(cursor, exactp));
     return (ret);
+}
+
+/*
+ * __curhs_next --
+ *     WT_CURSOR->next method for the hs cursor type.
+ */
+static int
+__curhs_next(WT_CURSOR *cursor)
+{
+    WT_CURSOR *file_cursor;
+    WT_CURSOR_HS *hs_cursor;
+    WT_DECL_RET;
+    WT_SESSION_IMPL *session;
+
+    hs_cursor = (WT_CURSOR_HS *)cursor;
+    file_cursor = hs_cursor->file_cursor;
+    CURSOR_API_CALL_PREPARE_ALLOWED(cursor, session, next, CUR2BT(file_cursor));
+
+    WT_ERR(__wt_hs_cursor_next(session, file_cursor));
+    /*
+     * We need to check if the history store record is visible to the current session. If not, the
+     * __curhs_next_visible() will also keep iterating forward through the records until it finds a
+     * visible record or bail out if records stop satisfying the fields set in cursor.
+     */
+    WT_ERR(__curhs_next_visible(session, hs_cursor));
+
+err:
+    API_END_RET(session, ret);
+}
+
+/*
+ * __curhs_prev --
+ *     WT_CURSOR->prev method for the hs cursor type.
+ */
+static int
+__curhs_prev(WT_CURSOR *cursor)
+{
+    WT_CURSOR *file_cursor;
+    WT_CURSOR_HS *hs_cursor;
+    WT_DECL_RET;
+    WT_SESSION_IMPL *session;
+
+    hs_cursor = (WT_CURSOR_HS *)cursor;
+    file_cursor = hs_cursor->file_cursor;
+    CURSOR_API_CALL_PREPARE_ALLOWED(cursor, session, prev, CUR2BT(file_cursor));
+
+    WT_ERR(__wt_hs_cursor_prev(session, file_cursor));
+    /*
+     * We need to check if the history store record is visible to the current session. If not, the
+     * __curhs_prev_visible() will also keep iterating backwards through the records until it finds
+     * a visible record or bail out if records stop satisfying the fields set in cursor.
+     */
+    WT_ERR(__curhs_prev_visible(session, hs_cursor));
+
+err:
+    API_END_RET(session, ret);
 }
 
 /*
@@ -501,7 +560,7 @@ __curhs_search_near(WT_CURSOR *cursor, int *exactp)
              * be more than one record away the end of our target key/timestamp range. Keep
              * iterating backwards until we land on our key.
              */
-            while ((ret = file_cursor->prev(cursor)) == 0) {
+            while ((ret = __wt_hs_cursor_prev(session, file_cursor)) == 0) {
                 WT_STAT_CONN_INCR(session, cursor_skip_hs_cur_position);
                 WT_STAT_DATA_INCR(session, cursor_skip_hs_cur_position);
 
@@ -812,8 +871,8 @@ __wt_curhs_open(WT_SESSION_IMPL *session, WT_CURSOR *owner, WT_CURSOR **cursorp)
       __curhs_set_value,                          /* set-value */
       __wt_cursor_compare_notsup,                 /* compare */
       __wt_cursor_equals_notsup,                  /* equals */
-      __wt_cursor_notsup,                         /* next */
-      __wt_cursor_notsup,                         /* prev */
+      __curhs_next,                               /* next */
+      __curhs_prev,                               /* prev */
       __curhs_reset,                              /* reset */
       __wt_cursor_notsup,                         /* search */
       __curhs_search_near,                        /* search-near */
