@@ -100,6 +100,13 @@ public:
     void run() {
         auto serviceContext = getGlobalServiceContext();
 
+        // This test is designed for storage engines that detect write conflicts when they attempt
+        // to write to a record. ephemeralForTest, however, only detects write conflicts when a
+        // WriteUnitOfWork commits.
+        if (storageGlobalParams.engine == "ephemeralForTest") {
+            return;
+        }
+
         repl::ReplSettings replSettings;
         replSettings.setOplogSizeBytes(10 * 1024 * 1024);
         replSettings.setReplSetString("rs");
