@@ -967,10 +967,12 @@ void OpDebug::report(OperationContext* opCtx,
 
     pAttrs->addDeepCopy("ns", curop.getNS());
 
-    if (auto clientMetadata = ClientMetadata::get(client)) {
-        StringData appName = clientMetadata->getApplicationName();
-        if (!appName.empty()) {
-            pAttrs->add("appName", appName);
+    if (client) {
+        if (auto clientMetadata = ClientMetadata::get(client)) {
+            StringData appName = clientMetadata->getApplicationName();
+            if (!appName.empty()) {
+                pAttrs->add("appName", appName);
+            }
         }
     }
 
