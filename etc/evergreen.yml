@@ -8785,6 +8785,7 @@ buildvariants:
     # generated suites. Once everything is converted to generated suites, we should remove the
     # '--repeatSuites=10' from the test_flags. This will be done in SERVER-38817.
     scons_cache_scope: shared
+    large_distro_name: rhel62-medium
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -8818,6 +8819,7 @@ buildvariants:
     target_resmoke_time: 15
     max_sub_suites: 5
     num_scons_link_jobs_available: 0.99
+    large_distro_name: rhel62-medium
   tasks:
   - name: compile_parallel_TG
     distros:
@@ -8887,6 +8889,7 @@ buildvariants:
     # exclude those tests as well.
     test_flags: --nojournal --excludeWithAnyTags=requires_journaling,requires_replication,requires_sharding,uses_transactions,requires_http_client
     scons_cache_scope: shared
+    large_distro_name: rhel62-medium
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -8923,6 +8926,7 @@ buildvariants:
     packager_distro: ubuntu1804
     repo_edition: org
     scons_cache_scope: shared
+    large_distro_name: ubuntu1804-build
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -8979,6 +8983,7 @@ buildvariants:
     packager_distro: ubuntu1804
     repo_edition: enterprise
     scons_cache_scope: shared
+    large_distro_name: ubuntu1804-build
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -9046,6 +9051,7 @@ buildvariants:
     packager_distro: ubuntu1604
     repo_edition: org
     scons_cache_scope: shared
+    large_distro_name: ubuntu1604-build
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -9382,6 +9388,7 @@ buildvariants:
     packager_distro: ubuntu2004
     repo_edition: org
     scons_cache_scope: shared
+    large_distro_name: ubuntu2004-large
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -9437,6 +9444,7 @@ buildvariants:
     packager_distro: ubuntu2004
     repo_edition: enterprise
     scons_cache_scope: shared
+    large_distro_name: ubuntu2004-large
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -12407,6 +12415,7 @@ buildvariants:
     packager_distro: debian92
     repo_edition: enterprise
     scons_cache_scope: shared
+    large_distro_name: debian92-build
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -12449,6 +12458,7 @@ buildvariants:
     packager_distro: debian92
     repo_edition: org
     scons_cache_scope: shared
+    large_distro_name: debian92-build
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -12503,6 +12513,7 @@ buildvariants:
     packager_distro: debian10
     repo_edition: enterprise
     scons_cache_scope: shared
+    large_distro_name: debian10-build
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -12545,6 +12556,7 @@ buildvariants:
     packager_distro: debian10
     repo_edition: org
     scons_cache_scope: shared
+    large_distro_name: debian10-build
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -13124,7 +13136,7 @@ buildvariants:
       --mongosSetParameters="{replicaSetMonitorProtocol: sdam}"
       --mongodSetParameters="{replicaSetMonitorProtocol: sdam}"
       --excludeWithAnyTags=requires_streamable_rsm
-
+    large_distro_name: ubuntu1604-build
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -13153,6 +13165,7 @@ buildvariants:
     multiversion_edition: enterprise
     test_flags: |- # Set the taskExecutorPoolSize for all tests
         --mongosSetParameters="taskExecutorPoolSize: 4"
+    large_distro_name: ubuntu1604-build
   tasks:
   - name: compile_all_run_unittests_TG
     distros:

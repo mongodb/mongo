@@ -1,6 +1,8 @@
 """Utility to support file operations."""
-
 import os
+from typing import Dict, Any
+
+import yaml
 
 
 def create_empty(path):
@@ -52,3 +54,14 @@ def write_file_to_dir(directory: str, file: str, contents: str) -> None:
         os.makedirs(directory)
 
     write_file(os.path.join(directory, file), contents)
+
+
+def read_yaml_file(path: str) -> Dict[str, Any]:
+    """
+    Read the yaml file at the given path and return the contents.
+
+    :param path: Path to file to read.
+    :return: Contents of given file.
+    """
+    with open(path) as file_handle:
+        return yaml.safe_load(file_handle)

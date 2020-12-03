@@ -1,18 +1,15 @@
 ''' Tests for the multiversion generators '''
 
 import os
-import shutil
 import unittest
 from tempfile import TemporaryDirectory, NamedTemporaryFile
 
 from mock import patch, MagicMock
-from shrub.v2 import BuildVariant, ShrubProject
-from shrub.variant import DisplayTaskDefinition
 from click.testing import CliRunner
 
 from buildscripts import evergreen_gen_multiversion_tests as under_test
-from buildscripts.evergreen_generate_resmoke_tasks import read_yaml
 import buildscripts.evergreen_generate_resmoke_tasks as generate_resmoke
+from buildscripts.util.fileops import read_yaml_file
 
 # pylint: disable=missing-docstring, no-self-use
 
@@ -79,7 +76,7 @@ class TestGenerateExcludeYaml(unittest.TestCase):
             self._tmpdir.cleanup()
 
     def assert_contents(self, expected):
-        actual = read_yaml(self._tmpdir.name, under_test.EXCLUDE_TAGS_FILE)
+        actual = read_yaml_file(os.path.join(self._tmpdir.name, under_test.EXCLUDE_TAGS_FILE))
         self.assertEqual(actual, expected)
 
     def patch_and_run(self, latest, last_lts):
@@ -93,7 +90,7 @@ class TestGenerateExcludeYaml(unittest.TestCase):
 
         with patch.multiple('buildscripts.evergreen_gen_multiversion_tests',
                             **mock_multiversion_methods):
-            with patch('buildscripts.evergreen_generate_resmoke_tasks.read_yaml',
+            with patch('buildscripts.evergreen_gen_multiversion_tests.read_yaml_file',
                        return_value=latest) as mock_read_yaml:
 
                 output = os.path.join(self._tmpdir.name, under_test.EXCLUDE_TAGS_FILE)

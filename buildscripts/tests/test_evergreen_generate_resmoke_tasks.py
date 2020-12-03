@@ -660,6 +660,37 @@ class EvergreenConfigGeneratorTest(unittest.TestCase):
         self.assertEqual(options.large_distro_name,
                          config["buildvariants"][0]["tasks"][0]["distros"][0])
 
+    def test_build_variant_without_large_distro_defined_fails(self):
+        options = self.generate_mock_options()
+        options.use_large_distro = "true"
+        options.large_distro_name = None
+        suites = self.generate_mock_suites(3)
+        build_variant = BuildVariant("variant")
+
+        generator = under_test.EvergreenConfigGenerator(suites, options, MagicMock())
+        with self.assertRaises(ValueError):
+            generator.generate_config(build_variant)
+
+    def test_build_variant_without_large_distro_defined_can_be_ignored(self):
+        options = self.generate_mock_options()
+        options.use_large_distro = "true"
+        options.large_distro_name = None
+        suites = self.generate_mock_suites(3)
+        build_variant = BuildVariant("variant")
+        generate_config = under_test.GenerationConfiguration(
+            build_variant_large_distro_exceptions={"variant"})
+
+        generator = under_test.EvergreenConfigGenerator(suites, options, MagicMock(),
+                                                        generate_config)
+        generator.generate_config(build_variant)
+
+        shrub_project = ShrubProject.empty().add_build_variant(build_variant)
+        config = shrub_project.as_dict()
+
+        self.assertEqual(len(config["tasks"]), len(suites) + 1)
+        self.assertEqual(options.large_distro_name,
+                         config["buildvariants"][0]["tasks"][0]["distros"][0])
+
     def test_selecting_tasks(self):
         is_task_dependency = under_test.EvergreenConfigGenerator._is_task_dependency
         self.assertFalse(is_task_dependency("sharding", "sharding"))
