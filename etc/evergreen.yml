@@ -7370,6 +7370,7 @@ buildvariants:
     scons_cache_scope: shared
     tooltags: ""
     build_mongoreplay: true
+    large_distro_name: rhel62-large
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -7405,6 +7406,8 @@ buildvariants:
     tooltags: ""
     build_mongoreplay: true
     target_resmoke_time: 15
+    max_sub_suites: 3
+    large_distro_name: rhel62-large
   tasks:
   - name: compile_all_run_unittests_TG
   - name: .aggregation !.encrypt
@@ -7452,6 +7455,7 @@ buildvariants:
     scons_cache_scope: shared
     tooltags: ""
     build_mongoreplay: true
+    large_distro_name: rhel62-large
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -7491,6 +7495,7 @@ buildvariants:
     scons_cache_scope: shared
     tooltags: "ssl"
     build_mongoreplay: true
+    large_distro_name: ubuntu1804-build
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -7548,6 +7553,7 @@ buildvariants:
     scons_cache_scope: shared
     tooltags: "ssl sasl gssapi"
     build_mongoreplay: true
+    large_distro_name: ubuntu1804-build
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -7595,6 +7601,7 @@ buildvariants:
     scons_cache_scope: shared
     tooltags: "ssl"
     build_mongoreplay: true
+    large_distro_name: ubuntu1604-build
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -10230,6 +10237,7 @@ buildvariants:
     tooltags: "ssl sasl gssapi"
     scons_cache_scope: shared
     build_mongoreplay: true
+    large_distro_name: debian10-build
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -10278,6 +10286,7 @@ buildvariants:
     tooltags: "ssl"
     scons_cache_scope: shared
     build_mongoreplay: true
+    large_distro_name: debian92-build
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -10335,6 +10344,7 @@ buildvariants:
     tooltags: "ssl"
     scons_cache_scope: shared
     build_mongoreplay: true
+    large_distro_name: debian10-build
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -10875,6 +10885,7 @@ buildvariants:
     multiversion_edition: enterprise
     test_flags: |- # Set the taskExecutorPoolSize for all tests
         --mongosSetParameters="taskExecutorPoolSize: 4"
+    large_distro_name: ubuntu1604-build
   tasks:
   - name: compile_all_run_unittests_TG
     distros:

@@ -1,6 +1,8 @@
 """Utility to support file operations."""
-
 import os
+from typing import Dict, Any
+
+import yaml
 
 
 def create_empty(path):
@@ -25,3 +27,14 @@ def get_file_handle(path, append_file=False):
     """Open 'path', truncate it if 'append_file' is False, and return file handle."""
     mode = "a+" if append_file else "w"
     return open(path, mode)
+
+
+def read_yaml_file(path: str) -> Dict[str, Any]:
+    """
+    Read the yaml file at the given path and return the contents.
+
+    :param path: Path to file to read.
+    :return: Contents of given file.
+    """
+    with open(path) as file_handle:
+        return yaml.safe_load(file_handle)
