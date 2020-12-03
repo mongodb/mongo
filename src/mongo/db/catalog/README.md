@@ -658,7 +658,7 @@ index builds are resumable under the following conditions:
 * Majority read concern is enabled.
 
 The [Recover To A Timestamp (RTT) rollback algorithm](https://github.com/mongodb/mongo/blob/04b12743cbdcfea11b339e6ad21fc24dec8f6539/src/mongo/db/repl/README.md#rollback) supports
-resuming index builds interrupted at the collection scan phase. On entering rollback, the resumable
+resuming index builds interrupted at any phase. On entering rollback, the resumable
 index information is persisted to disk using the same mechanism as shutdown. We resume the
 index build using the startup recovery logic that RTT uses to bring the node back to a writable
 state.
