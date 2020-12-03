@@ -153,12 +153,20 @@ BSONObj makeTimeseriesControlMinMaxStages(const std::vector<BSONObj>& docs,
 
 /**
  * Returns $set expressions for the bucket's data field.
+ * If 'metadataElem' is not empty, the time-series collection was created with a metadata field.
+ * All measurements in a bucket share the same value in the metadata field stored in control.meta,
+ * so there is no need to add the metadata to the data field.
  */
-BSONObj makeTimeseriesDataStages(const std::vector<BSONObj>& docs, uint16_t count) {
+BSONObj makeTimeseriesDataStages(const std::vector<BSONObj>& docs,
+                                 BSONElement metadataElem,
+                                 uint16_t count) {
     StringDataMap<BSONArrayBuilder> measurements;
     for (const auto& doc : docs) {
         for (const auto& elem : doc) {
             auto key = elem.fieldNameStringData();
+            if (metadataElem && key == metadataElem.fieldNameStringData()) {
+                continue;
+            }
             measurements[key].append(
                 BSON("k" << std::to_string(count) << elem.wrap("v").firstElement()));
         }
@@ -203,10 +211,12 @@ BSONObj makeTimeseriesUpsertRequest(const OID& oid,
                                << BSON("$ifNull" << BSON_ARRAY("$control.meta" << metadataElem)))));
             stagesBuilder.append(
                 BSON("$set" << makeTimeseriesControlMinMaxStages(docs, metadataElem)));
+            stagesBuilder.append(
+                BSON("$set" << makeTimeseriesDataStages(docs, metadataElem, count)));
         } else {
             stagesBuilder.append(BSON("$set" << makeTimeseriesControlMinMaxStages(docs, {})));
+            stagesBuilder.append(BSON("$set" << makeTimeseriesDataStages(docs, {}, count)));
         }
-        stagesBuilder.append(BSON("$set" << makeTimeseriesDataStages(docs, count)));
     }
     return builder.obj();
 }

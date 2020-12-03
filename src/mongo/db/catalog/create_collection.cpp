@@ -125,14 +125,19 @@ Status _createTimeseries(OperationContext* opCtx,
     options.viewOn = bucketsNs.coll().toString();
 
     // The time field cannot be sparse, so we use it as the exit condition for the loop.
+    auto defaultAssembledObj = options.timeseries->getMetaField()
+        ? "(metadata !== null ? {'" + *options.timeseries->getMetaField() + "': metadata} : {})"
+        : "{}";
     auto assembleData =
-        "function(dataArray) { \
+        "function(dataArray, metadata) { \
                 const assembledData = []; \
                 if (dataArray.length === 0) { \
                     return assembledData; \
                 } \
                 for (let i = 0;;i++) { \
-                    const assembledObj = {}; \
+                    const assembledObj = " +
+        defaultAssembledObj +
+        "; \
                     for (const elem of dataArray) { \
                         if (elem.v.hasOwnProperty(i)) { \
                             assembledObj[elem.k] = elem.v[i]; \
@@ -147,12 +152,16 @@ Status _createTimeseries(OperationContext* opCtx,
             }";
     options.pipeline =
         BSON_ARRAY(BSON("$project" << BSON("dataArray" << BSON("$objectToArray"
-                                                               << "$data")))
-                   << BSON("$project" << BSON(
-                               "assembledData" << BSON(
-                                   "$function" << BSON("body" << assembleData << "args"
-                                                              << BSON_ARRAY("$dataArray") << "lang"
-                                                              << "js"))))
+                                                               << "$data")
+                                                       << "metadata"
+                                                       << "$control.meta"))
+                   << BSON("$project"
+                           << BSON("assembledData"
+                                   << BSON("$function" << BSON("body" << assembleData << "args"
+                                                                      << BSON_ARRAY("$dataArray"
+                                                                                    << "$metadata")
+                                                                      << "lang"
+                                                                      << "js"))))
                    << BSON("$unwind"
                            << "$assembledData")
                    << BSON("$replaceWith"

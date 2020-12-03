@@ -66,8 +66,8 @@ const runTest = function(docsBucketA, docsBucketB) {
         assert.eq(docsBucketA[0][metaFieldName],
                   bucketDocs[0].control.meta,
                   'invalid control.meta in first bucket: ' + tojson(bucketDocs[0].control));
-        assert(bucketDocs[0].data.hasOwnProperty(metaFieldName),
-               'metadata missing first bucket data: ' + tojson(bucketDocs[0]));
+        assert(!bucketDocs[0].data.hasOwnProperty(metaFieldName),
+               'unexpected metadata in first bucket data: ' + tojson(bucketDocs[0]));
     } else {
         assert(bucketDocs[0].control.hasOwnProperty('meta'),
                'missing control.meta in first bucket: ' + tojson(bucketDocs[0].control));
@@ -84,8 +84,8 @@ const runTest = function(docsBucketA, docsBucketB) {
         assert.eq(docsBucketB[0][metaFieldName],
                   bucketDocs[1].control.meta,
                   'invalid control.meta in second bucket: ' + tojson(bucketDocs[1].control));
-        assert(bucketDocs[1].data.hasOwnProperty(metaFieldName),
-               'metadata missing second bucket data: ' + tojson(bucketDocs[1]));
+        assert(!bucketDocs[1].data.hasOwnProperty(metaFieldName),
+               'unexpected metadata in second bucket data: ' + tojson(bucketDocs[1]));
     } else {
         assert(bucketDocs[1].control.hasOwnProperty('meta'),
                'missing control.meta in second bucket: ' + tojson(bucketDocs[1].control));
