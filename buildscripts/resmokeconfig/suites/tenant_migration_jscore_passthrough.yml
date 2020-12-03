@@ -16,6 +16,7 @@ selector:
   - jstests/core/operation_latency_histogram.js
   - jstests/core/top.js
   - jstests/core/profile_sampling.js
+  - jstests/core/profile_hide_index.js
   # The override cannot deep copy very large or small dates.
   - jstests/core/index_large_and_small_dates.js
   # These tests are not expected to pass with replica-sets.
