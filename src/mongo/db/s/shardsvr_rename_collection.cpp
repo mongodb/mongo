@@ -47,15 +47,15 @@ RenameCollectionResponse renameCollectionLegacy(OperationContext* opCtx,
                                                 const NamespaceString& fromNss) {
     const auto toNss = request.getTo();
 
-    const auto fromCM =
-        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, fromNss));
+    const auto fromDB = uassertStatusOK(
+        Grid::get(opCtx)->catalogCache()->getDatabaseWithRefresh(opCtx, fromNss.db()));
 
-    const auto toCM =
-        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, toNss));
+    const auto toDB = uassertStatusOK(
+        Grid::get(opCtx)->catalogCache()->getDatabaseWithRefresh(opCtx, toNss.db()));
 
     uassert(13137,
             "Source and destination collections must be on same shard",
-            fromCM.dbPrimary() == toCM.dbPrimary());
+            fromDB.primaryId() == toDB.primaryId());
 
     RenameCollectionOptions options;
     options.dropTarget = request.getDropTarget();

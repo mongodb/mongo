@@ -45,7 +45,6 @@ namespace {
 class RenameCollectionCmd final : public TypedCommand<RenameCollectionCmd> {
 public:
     using Request = RenameCollectionCommand;
-    using Response = RenameCollectionResponse;
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
@@ -59,7 +58,7 @@ public:
     public:
         using InvocationBase::InvocationBase;
 
-        Response typedRun(OperationContext* opCtx) {
+        void typedRun(OperationContext* opCtx) {
             auto fromNss = ns();
             auto toNss = request().getTo();
 
@@ -104,8 +103,6 @@ public:
                 toNss, renameCollResp.getCollectionVersion(), dbInfo.primaryId());
 
             catalogCache->invalidateCollectionEntry_LINEARIZABLE(fromNss);
-
-            return renameCollResp;
         }
 
         NamespaceString ns() const override {
