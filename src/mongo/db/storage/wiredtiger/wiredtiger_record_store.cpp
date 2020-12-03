@@ -915,8 +915,14 @@ void WiredTigerRecordStore::checkSize(OperationContext* opCtx) {
 }
 
 void WiredTigerRecordStore::postConstructorInit(OperationContext* opCtx) {
+    // When starting up with recoverFromOplogAsStandalone=true, the readOnly flag is initially set
+    // to false to allow oplog recovery to run and perform its necessary writes. After recovery is
+    // complete, the readOnly flag gets flipped to true. Because of this subtlety, we avoid
+    // calculating the oplog stones when recoverFromOplogAsStandalone=true as the RecordStore
+    // construction for the oplog happens before the readOnly flag gets flipped to true.
     if (NamespaceString::oplog(ns()) &&
-        !(storageGlobalParams.repair || storageGlobalParams.readOnly)) {
+        !(storageGlobalParams.repair || storageGlobalParams.readOnly ||
+          repl::ReplSettings::shouldRecoverFromOplogAsStandalone())) {
         _oplogStones = std::make_shared<OplogStones>(opCtx, this);
     }
 
