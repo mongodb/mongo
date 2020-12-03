@@ -70,10 +70,11 @@ protected:
             nullptr,
             false,
             epoch,
+            boost::none /* timestamp */,
             boost::none,
             true,
             [&] {
-                ChunkVersion version(1, 0, epoch);
+                ChunkVersion version(1, 0, epoch, boost::none /* timestamp */);
 
                 ChunkType chunk1(kNss,
                                  {shardKeyPattern.getKeyPattern().globalMin(), BSON("_id" << -100)},

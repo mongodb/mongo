@@ -58,9 +58,9 @@ TEST(CommitChunkMigrationRequest, WithoutControlChunk) {
     ChunkType migratedChunk;
     migratedChunk.setMin(kKey0);
     migratedChunk.setMax(kKey1);
-    migratedChunk.setVersion({12, 7, OID::gen()});
+    migratedChunk.setVersion({12, 7, OID::gen(), boost::none /* timestamp */});
 
-    ChunkVersion fromShardCollectionVersion(1, 2, OID::gen());
+    ChunkVersion fromShardCollectionVersion(1, 2, OID::gen(), boost::none /* timestamp */);
 
     Timestamp validAfter{1};
 

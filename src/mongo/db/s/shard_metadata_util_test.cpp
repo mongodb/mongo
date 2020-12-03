@@ -102,8 +102,8 @@ struct ShardMetadataUtilTest : public ShardServerTestFixture {
                      << ChunkType::max(maxs[i]) << ChunkType::shard(kShardId.toString())
                      << ChunkType::lastmod(Date_t::fromMillisSinceEpoch(maxCollVersion.toLong())));
 
-            chunks.push_back(
-                assertGet(ChunkType::fromShardBSON(shardChunk, maxCollVersion.epoch())));
+            chunks.push_back(assertGet(ChunkType::fromShardBSON(
+                shardChunk, maxCollVersion.epoch(), maxCollVersion.getTimestamp())));
         }
 
         return chunks;
@@ -148,8 +148,8 @@ struct ShardMetadataUtilTest : public ShardServerTestFixture {
 
                 ASSERT(cursor->more());
                 BSONObj queryResult = cursor->nextSafe();
-                ChunkType foundChunk =
-                    assertGet(ChunkType::fromShardBSON(queryResult, chunk.getVersion().epoch()));
+                ChunkType foundChunk = assertGet(ChunkType::fromShardBSON(
+                    queryResult, chunk.getVersion().epoch(), chunk.getVersion().getTimestamp()));
                 ASSERT_BSONOBJ_EQ(chunk.getMin(), foundChunk.getMin());
                 ASSERT_BSONOBJ_EQ(chunk.getMax(), foundChunk.getMax());
                 ASSERT_EQUALS(chunk.getShard(), foundChunk.getShard());
@@ -160,7 +160,7 @@ struct ShardMetadataUtilTest : public ShardServerTestFixture {
         }
     }
 
-    ChunkVersion maxCollVersion{0, 0, OID::gen()};
+    ChunkVersion maxCollVersion{0, 0, OID::gen(), boost::none /* timestamp */};
     const KeyPattern keyPattern{BSON("a" << 1)};
     const BSONObj defaultCollation{BSON("locale"
                                         << "fr_CA")};
@@ -214,7 +214,8 @@ TEST_F(ShardMetadataUtilTest, PersistedRefreshSignalStartAndFinish) {
 
     ASSERT_EQUALS(state.epoch, maxCollVersion.epoch());
     ASSERT_EQUALS(state.refreshing, true);
-    ASSERT_EQUALS(state.lastRefreshedCollectionVersion, ChunkVersion(0, 0, maxCollVersion.epoch()));
+    ASSERT_EQUALS(state.lastRefreshedCollectionVersion,
+                  ChunkVersion(0, 0, maxCollVersion.epoch(), maxCollVersion.getTimestamp()));
 
     // Signal refresh finish
     ASSERT_OK(unsetPersistedRefreshFlags(operationContext(), kNss, maxCollVersion));
@@ -232,14 +233,15 @@ TEST_F(ShardMetadataUtilTest, WriteAndReadChunks) {
     checkChunks(kChunkMetadataNss, chunks);
 
     // read all the chunks
-    QueryAndSort allChunkDiff =
-        createShardChunkDiffQuery(ChunkVersion(0, 0, maxCollVersion.epoch()));
+    QueryAndSort allChunkDiff = createShardChunkDiffQuery(
+        ChunkVersion(0, 0, maxCollVersion.epoch(), boost::none /* timestamp */));
     std::vector<ChunkType> readChunks = assertGet(readShardChunks(operationContext(),
                                                                   kNss,
                                                                   allChunkDiff.query,
                                                                   allChunkDiff.sort,
                                                                   boost::none,
-                                                                  maxCollVersion.epoch()));
+                                                                  maxCollVersion.epoch(),
+                                                                  maxCollVersion.getTimestamp()));
     for (auto chunkIt = chunks.begin(), readChunkIt = readChunks.begin();
          chunkIt != chunks.end() && readChunkIt != readChunks.end();
          ++chunkIt, ++readChunkIt) {
@@ -253,7 +255,8 @@ TEST_F(ShardMetadataUtilTest, WriteAndReadChunks) {
                                            oneChunkDiff.query,
                                            oneChunkDiff.sort,
                                            boost::none,
-                                           maxCollVersion.epoch()));
+                                           maxCollVersion.epoch(),
+                                           maxCollVersion.getTimestamp()));
 
     ASSERT(readChunks.size() == 1);
     ASSERT_BSONOBJ_EQ(chunks.back().toShardBSON(), readChunks.front().toShardBSON());
@@ -283,8 +286,8 @@ TEST_F(ShardMetadataUtilTest, UpdateWithWriteNewChunks) {
     }
     splitChunkOneBuilder.append(ChunkType::shard(), lastChunk.getShard().toString());
     collVersion.appendLegacyWithField(&splitChunkOneBuilder, ChunkType::lastmod());
-    ChunkType splitChunkOne =
-        assertGet(ChunkType::fromShardBSON(splitChunkOneBuilder.obj(), collVersion.epoch()));
+    ChunkType splitChunkOne = assertGet(ChunkType::fromShardBSON(
+        splitChunkOneBuilder.obj(), collVersion.epoch(), collVersion.getTimestamp()));
     newChunks.push_back(splitChunkOne);
 
     collVersion.incMajor();  // chunk split and moved
@@ -297,8 +300,8 @@ TEST_F(ShardMetadataUtilTest, UpdateWithWriteNewChunks) {
     splitChunkTwoMovedBuilder.append(ChunkType::max(), lastChunk.getMax());
     splitChunkTwoMovedBuilder.append(ChunkType::shard(), "altShard");
     collVersion.appendLegacyWithField(&splitChunkTwoMovedBuilder, ChunkType::lastmod());
-    ChunkType splitChunkTwoMoved =
-        assertGet(ChunkType::fromShardBSON(splitChunkTwoMovedBuilder.obj(), collVersion.epoch()));
+    ChunkType splitChunkTwoMoved = assertGet(ChunkType::fromShardBSON(
+        splitChunkTwoMovedBuilder.obj(), collVersion.epoch(), collVersion.getTimestamp()));
     newChunks.push_back(splitChunkTwoMoved);
 
     collVersion.incMinor();  // bump control chunk version

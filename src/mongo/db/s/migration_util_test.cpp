@@ -547,7 +547,7 @@ TEST_F(SubmitRangeDeletionTaskTest, SucceedsIfFilteringMetadataUUIDMatchesTaskUU
     _mockCatalogCacheLoader->setDatabaseRefreshReturnValue(kDefaultDatabaseType);
     _mockCatalogCacheLoader->setCollectionRefreshReturnValue(coll);
     _mockCatalogCacheLoader->setChunkRefreshReturnValue(
-        makeChangedChunks(ChunkVersion(1, 0, kEpoch)));
+        makeChangedChunks(ChunkVersion(1, 0, kEpoch, boost::none /* timestamp */)));
     _mockCatalogClient->setCollections({coll});
     forceShardFilteringMetadataRefresh(opCtx, kNss);
 
@@ -575,7 +575,7 @@ TEST_F(
     _mockCatalogCacheLoader->setDatabaseRefreshReturnValue(kDefaultDatabaseType);
     _mockCatalogCacheLoader->setCollectionRefreshReturnValue(coll);
     _mockCatalogCacheLoader->setChunkRefreshReturnValue(
-        makeChangedChunks(ChunkVersion(1, 0, kEpoch)));
+        makeChangedChunks(ChunkVersion(1, 0, kEpoch, boost::none /* timestamp */)));
     _mockCatalogClient->setCollections({coll});
 
     // The task should have been submitted successfully.
@@ -607,7 +607,7 @@ TEST_F(SubmitRangeDeletionTaskTest,
     auto matchingColl = makeCollectionType(collectionUUID, kEpoch);
     _mockCatalogCacheLoader->setCollectionRefreshReturnValue(matchingColl);
     _mockCatalogCacheLoader->setChunkRefreshReturnValue(
-        makeChangedChunks(ChunkVersion(10, 0, kEpoch)));
+        makeChangedChunks(ChunkVersion(10, 0, kEpoch, boost::none /* timestamp */)));
     _mockCatalogClient->setCollections({matchingColl});
 
     // The task should have been submitted successfully.
@@ -627,7 +627,7 @@ TEST_F(SubmitRangeDeletionTaskTest,
     _mockCatalogCacheLoader->setDatabaseRefreshReturnValue(kDefaultDatabaseType);
     _mockCatalogCacheLoader->setCollectionRefreshReturnValue(staleColl);
     _mockCatalogCacheLoader->setChunkRefreshReturnValue(
-        makeChangedChunks(ChunkVersion(1, 0, staleEpoch)));
+        makeChangedChunks(ChunkVersion(1, 0, staleEpoch, boost::none /* timestamp */)));
     _mockCatalogClient->setCollections({staleColl});
     forceShardFilteringMetadataRefresh(opCtx, kNss);
 
@@ -644,7 +644,7 @@ TEST_F(SubmitRangeDeletionTaskTest,
     auto matchingColl = makeCollectionType(collectionUUID, kEpoch);
     _mockCatalogCacheLoader->setCollectionRefreshReturnValue(matchingColl);
     _mockCatalogCacheLoader->setChunkRefreshReturnValue(
-        makeChangedChunks(ChunkVersion(10, 0, kEpoch)));
+        makeChangedChunks(ChunkVersion(10, 0, kEpoch, boost::none /* timestamp */)));
     _mockCatalogClient->setCollections({matchingColl});
 
     // The task should have been submitted successfully.
@@ -670,7 +670,7 @@ TEST_F(SubmitRangeDeletionTaskTest,
     _mockCatalogCacheLoader->setDatabaseRefreshReturnValue(kDefaultDatabaseType);
     _mockCatalogCacheLoader->setCollectionRefreshReturnValue(otherColl);
     _mockCatalogCacheLoader->setChunkRefreshReturnValue(
-        makeChangedChunks(ChunkVersion(1, 0, otherEpoch)));
+        makeChangedChunks(ChunkVersion(1, 0, otherEpoch, boost::none /* timestamp */)));
     _mockCatalogClient->setCollections({otherColl});
 
     // The task should not have been submitted, and the task's entry should have been removed from

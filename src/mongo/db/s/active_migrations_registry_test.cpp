@@ -59,7 +59,7 @@ protected:
 };
 
 MoveChunkRequest createMoveChunkRequest(const NamespaceString& nss) {
-    const ChunkVersion chunkVersion(1, 2, OID::gen());
+    const ChunkVersion chunkVersion(1, 2, OID::gen(), boost::none /* timestamp */);
 
     BSONObjBuilder builder;
     MoveChunkRequest::appendAsCommand(

@@ -206,7 +206,7 @@ public:
         std::vector<ChunkType> chunks;
 
         for (unsigned long i = 0; i < chunkRanges.size(); ++i) {
-            ChunkVersion version(1, 0, OID::gen());
+            ChunkVersion version(1, 0, OID::gen(), boost::none /* timestamp */);
             ChunkType chunk(_nss, chunkRanges[i], version, shardIds[i]);
             chunk.setHistory({ChunkHistory(timeStamp, shardIds[i])});
             chunks.push_back(chunk);

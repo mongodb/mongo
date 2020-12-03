@@ -193,7 +193,7 @@ CollectionType ShardServerCatalogCacheLoaderTest::makeCollectionType(
 }
 
 vector<ChunkType> ShardServerCatalogCacheLoaderTest::setUpChunkLoaderWithFiveChunks() {
-    ChunkVersion collectionVersion(1, 0, OID::gen());
+    ChunkVersion collectionVersion(1, 0, OID::gen(), boost::none /* timestamp */);
 
     CollectionType collectionType = makeCollectionType(collectionVersion);
     vector<ChunkType> chunks = makeFiveChunks(collectionVersion);
@@ -360,7 +360,7 @@ TEST_F(ShardServerCatalogCacheLoaderTest, PrimaryLoadFromShardedAndFindNewEpoch)
 
     // Then refresh again and find that the collection has been dropped and recreated.
 
-    ChunkVersion collVersionWithNewEpoch(1, 0, OID::gen());
+    ChunkVersion collVersionWithNewEpoch(1, 0, OID::gen(), boost::none /* timestamp */);
     CollectionType collectionTypeWithNewEpoch = makeCollectionType(collVersionWithNewEpoch);
     vector<ChunkType> chunksWithNewEpoch = makeFiveChunks(collVersionWithNewEpoch);
     _remoteLoaderMock->setCollectionRefreshReturnValue(collectionTypeWithNewEpoch);
@@ -389,7 +389,7 @@ TEST_F(ShardServerCatalogCacheLoaderTest, PrimaryLoadFromShardedAndFindMixedChun
 
     CollectionType originalCollectionType = makeCollectionType(chunks.back().getVersion());
 
-    ChunkVersion collVersionWithNewEpoch(1, 0, OID::gen());
+    ChunkVersion collVersionWithNewEpoch(1, 0, OID::gen(), boost::none /* timestamp */);
     CollectionType collectionTypeWithNewEpoch = makeCollectionType(collVersionWithNewEpoch);
     vector<ChunkType> chunksWithNewEpoch = makeFiveChunks(collVersionWithNewEpoch);
     vector<ChunkType> mixedChunks;

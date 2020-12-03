@@ -528,7 +528,7 @@ TEST_F(ClusterExchangeTest, CompoundShardKeyThreeShards) {
     const std::vector<std::string> xBoundaries = {"a", "g", "m", "r", "u"};
     auto chunks = [&]() {
         std::vector<ChunkType> chunks;
-        ChunkVersion version(1, 0, epoch);
+        ChunkVersion version(1, 0, epoch, boost::none /* timestamp */);
         chunks.emplace_back(kTestTargetNss,
                             ChunkRange{BSON("x" << MINKEY << "y" << MINKEY),
                                        BSON("x" << xBoundaries[0] << "y" << MINKEY)},

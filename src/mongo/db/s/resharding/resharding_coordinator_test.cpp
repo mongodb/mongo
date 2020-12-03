@@ -157,7 +157,7 @@ protected:
             _newShardKey.isShardKey(shardKey.toBSON()) ? _newChunkRanges : _oldChunkRanges;
 
         // Create two chunks, one on each shard with the given namespace and epoch
-        ChunkVersion version(1, 0, epoch);
+        ChunkVersion version(1, 0, epoch, boost::none /* timestamp */);
         ChunkType chunk1(nss, chunkRanges[0], version, ShardId("shard0000"));
         chunk1.setName(ids[0]);
         ChunkType chunk2(nss, chunkRanges[1], version, ShardId("shard0001"));
@@ -201,7 +201,10 @@ protected:
         client.insert(CollectionType::ConfigNS.ns(), originalNssCatalogEntry.toBSON());
 
         auto tempNssCatalogEntry = resharding::createTempReshardingCollectionType(
-            opCtx, coordinatorDoc, ChunkVersion(1, 1, OID::gen()), BSONObj());
+            opCtx,
+            coordinatorDoc,
+            ChunkVersion(1, 1, OID::gen(), boost::none /* timestamp */),
+            BSONObj());
         client.insert(CollectionType::ConfigNS.ns(), tempNssCatalogEntry.toBSON());
 
         return coordinatorDoc;
@@ -440,7 +443,10 @@ protected:
         if (expectedCoordinatorDoc.getState() < CoordinatorStateEnum::kCommitted ||
             expectedCoordinatorDoc.getState() == CoordinatorStateEnum::kError) {
             tempCollType = resharding::createTempReshardingCollectionType(
-                opCtx, expectedCoordinatorDoc, ChunkVersion(1, 1, OID::gen()), BSONObj());
+                opCtx,
+                expectedCoordinatorDoc,
+                ChunkVersion(1, 1, OID::gen(), boost::none /* timestamp */),
+                BSONObj());
         }
 
         readTemporaryCollectionCatalogEntryAndAssertReshardingFieldsMatchExpected(opCtx,

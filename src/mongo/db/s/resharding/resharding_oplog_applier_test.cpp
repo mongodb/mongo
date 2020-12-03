@@ -148,11 +148,11 @@ public:
         std::vector<ChunkType> chunks = {
             ChunkType{kCrudNs,
                       ChunkRange{BSON(kOriginalShardKey << MINKEY), BSON(kOriginalShardKey << 0)},
-                      ChunkVersion(1, 0, epoch),
+                      ChunkVersion(1, 0, epoch, boost::none /* timestamp */),
                       kOtherShardId},
             ChunkType{kCrudNs,
                       ChunkRange{BSON(kOriginalShardKey << 0), BSON(kOriginalShardKey << MAXKEY)},
-                      ChunkVersion(1, 0, epoch),
+                      ChunkVersion(1, 0, epoch, boost::none /* timestamp */),
                       _sourceId.getShardId()}};
 
         auto rt = RoutingTableHistory::makeNew(kCrudNs,
@@ -161,6 +161,7 @@ public:
                                                nullptr,
                                                false,
                                                epoch,
+                                               boost::none /* timestamp */,
                                                boost::none,
                                                false,
                                                chunks);

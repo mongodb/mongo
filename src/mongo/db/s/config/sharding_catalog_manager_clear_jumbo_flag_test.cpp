@@ -77,7 +77,7 @@ protected:
         ChunkType chunk;
         chunk.setName(OID::gen());
         chunk.setNS(_namespace);
-        chunk.setVersion({12, 7, _epoch});
+        chunk.setVersion({12, 7, _epoch, boost::none /* timestamp */});
         chunk.setShard(shard.getName());
         chunk.setMin(jumboChunk().getMin());
         chunk.setMax(jumboChunk().getMax());
@@ -86,7 +86,7 @@ protected:
         ChunkType otherChunk;
         otherChunk.setName(OID::gen());
         otherChunk.setNS(_namespace);
-        otherChunk.setVersion({14, 7, _epoch});
+        otherChunk.setVersion({14, 7, _epoch, boost::none /* timestamp */});
         otherChunk.setShard(shard.getName());
         otherChunk.setMin(nonJumboChunk().getMin());
         otherChunk.setMax(nonJumboChunk().getMax());
@@ -105,7 +105,7 @@ TEST_F(ClearJumboFlagTest, ClearJumboShouldBumpVersion) {
 
     auto chunkDoc = uassertStatusOK(getChunkDoc(operationContext(), jumboChunk().getMin()));
     ASSERT_FALSE(chunkDoc.getJumbo());
-    ASSERT_EQ(ChunkVersion(15, 0, epoch()), chunkDoc.getVersion());
+    ASSERT_EQ(ChunkVersion(15, 0, epoch(), boost::none /* timestamp */), chunkDoc.getVersion());
 }
 
 TEST_F(ClearJumboFlagTest, ClearJumboShouldNotBumpVersionIfChunkNotJumbo) {
@@ -114,7 +114,7 @@ TEST_F(ClearJumboFlagTest, ClearJumboShouldNotBumpVersionIfChunkNotJumbo) {
 
     auto chunkDoc = uassertStatusOK(getChunkDoc(operationContext(), nonJumboChunk().getMin()));
     ASSERT_FALSE(chunkDoc.getJumbo());
-    ASSERT_EQ(ChunkVersion(14, 7, epoch()), chunkDoc.getVersion());
+    ASSERT_EQ(ChunkVersion(14, 7, epoch(), boost::none /* timestamp */), chunkDoc.getVersion());
 }
 
 TEST_F(ClearJumboFlagTest, AssertsOnEpochMismatch) {

@@ -79,7 +79,7 @@ public:
     std::vector<ChunkType> makeChunks(const NamespaceString& nss,
                                       const OID epoch,
                                       std::vector<std::pair<ChunkRange, ShardId>> chunkInfos) {
-        ChunkVersion version(1, 0, epoch);
+        ChunkVersion version(1, 0, epoch, boost::none /* timestamp */);
         std::vector<ChunkType> chunks;
         for (auto&& pair : chunkInfos) {
             chunks.emplace_back(nss, pair.first, version, pair.second);

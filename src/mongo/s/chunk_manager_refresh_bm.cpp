@@ -75,12 +75,20 @@ CollectionMetadata makeChunkManagerWithShardSelector(int nShards,
     for (uint32_t i = 0; i < nChunks; ++i) {
         chunks.emplace_back(kNss,
                             getRangeForChunk(i, nChunks),
-                            ChunkVersion{i + 1, 0, collEpoch},
+                            ChunkVersion{i + 1, 0, collEpoch, boost::none /* timestamp */},
                             selectShard(i, nShards, nChunks));
     }
 
-    auto rt = RoutingTableHistory::makeNew(
-        kNss, UUID::gen(), shardKeyPattern, nullptr, true, collEpoch, boost::none, true, chunks);
+    auto rt = RoutingTableHistory::makeNew(kNss,
+                                           UUID::gen(),
+                                           shardKeyPattern,
+                                           nullptr,
+                                           true,
+                                           collEpoch,
+                                           boost::none /* timestamp */,
+                                           boost::none,
+                                           true,
+                                           chunks);
     return CollectionMetadata(ChunkManager(ShardId("Shard0"),
                                            DatabaseVersion(UUID::gen()),
                                            makeStandaloneRoutingTableHistory(std::move(rt)),
@@ -155,7 +163,7 @@ auto BM_FullBuildOfChunkManager(benchmark::State& state, ShardSelectorFn selectS
     for (uint32_t i = 0; i < nChunks; ++i) {
         chunks.emplace_back(kNss,
                             getRangeForChunk(i, nChunks),
-                            ChunkVersion{i + 1, 0, collEpoch},
+                            ChunkVersion{i + 1, 0, collEpoch, boost::none /* timestamp */},
                             selectShard(i, nShards, nChunks));
     }
 
@@ -166,6 +174,7 @@ auto BM_FullBuildOfChunkManager(benchmark::State& state, ShardSelectorFn selectS
                                                nullptr,
                                                true,
                                                collEpoch,
+                                               boost::none /* timestamp */,
                                                boost::none,
                                                true,
                                                chunks);

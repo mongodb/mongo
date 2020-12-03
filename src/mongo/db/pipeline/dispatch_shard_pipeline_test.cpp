@@ -221,7 +221,7 @@ TEST_F(DispatchShardPipelineTest, WrappedDispatchDoesRetryOnStaleConfigError) {
     const ShardKeyPattern shardKeyPattern(BSON("_id" << 1));
     expectGetCollection(kTestAggregateNss, epoch, uuid, shardKeyPattern);
     expectFindSendBSONObjVector(kConfigHostAndPort, [&]() {
-        ChunkVersion version(1, 0, epoch);
+        ChunkVersion version(1, 0, epoch, boost::none /* timestamp */);
 
         ChunkType chunk1(kTestAggregateNss,
                          {shardKeyPattern.getKeyPattern().globalMin(), BSON("_id" << 0)},

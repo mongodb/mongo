@@ -154,11 +154,12 @@ protected:
                 nullptr,
                 false,
                 epoch,
+                boost::none /* timestamp */,
                 boost::none,
                 true,
                 {ChunkType{kNss,
                            ChunkRange{BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY)},
-                           ChunkVersion(1, 0, epoch),
+                           ChunkVersion(1, 0, epoch, boost::none /* timestamp */),
                            ShardId("dummyShardId")}});
 
             AutoGetDb autoDb(operationContext(), kNss.db(), MODE_IX);
@@ -187,7 +188,7 @@ protected:
         MoveChunkRequest::appendAsCommand(
             &cmdBuilder,
             kNss,
-            ChunkVersion(1, 0, OID::gen()),
+            ChunkVersion(1, 0, OID::gen(), boost::none /* timestamp */),
             kConfigConnStr,
             kDonorConnStr.getSetName(),
             kRecipientConnStr.getSetName(),

@@ -51,21 +51,24 @@ protected:
                                                   UUID uuid = UUID::gen()) {
         const OID epoch = OID::gen();
         auto range = ChunkRange(BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY));
-        auto chunk =
-            ChunkType(kTestNss, std::move(range), ChunkVersion(1, 0, epoch), ShardId("other"));
-        ChunkManager cm(
-            ShardId("0"),
-            DatabaseVersion(UUID::gen()),
-            makeStandaloneRoutingTableHistory(RoutingTableHistory::makeNew(kTestNss,
-                                                                           uuid,
-                                                                           kShardKeyPattern,
-                                                                           nullptr,
-                                                                           false,
-                                                                           epoch,
-                                                                           boost::none,
-                                                                           true,
-                                                                           {std::move(chunk)})),
-            boost::none);
+        auto chunk = ChunkType(kTestNss,
+                               std::move(range),
+                               ChunkVersion(1, 0, epoch, boost::none /* timestamp */),
+                               ShardId("other"));
+        ChunkManager cm(ShardId("0"),
+                        DatabaseVersion(UUID::gen()),
+                        makeStandaloneRoutingTableHistory(
+                            RoutingTableHistory::makeNew(kTestNss,
+                                                         uuid,
+                                                         kShardKeyPattern,
+                                                         nullptr,
+                                                         false,
+                                                         epoch,
+                                                         boost::none /* timestamp */,
+                                                         boost::none,
+                                                         true,
+                                                         {std::move(chunk)})),
+                        boost::none);
 
         if (!OperationShardingState::isOperationVersioned(opCtx)) {
             const auto version = cm.getVersion(ShardId("0"));

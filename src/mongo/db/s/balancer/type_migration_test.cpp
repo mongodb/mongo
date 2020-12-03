@@ -48,7 +48,7 @@ const ShardId kToShard("shard0001");
 const bool kWaitForDelete{true};
 
 TEST(MigrationTypeTest, ConvertFromMigrationInfo) {
-    const ChunkVersion version(1, 2, OID::gen());
+    const ChunkVersion version(1, 2, OID::gen(), boost::none /* timestamp */);
 
     BSONObjBuilder chunkBuilder;
     chunkBuilder.append(ChunkType::name(), OID::gen());
@@ -84,7 +84,7 @@ TEST(MigrationTypeTest, ConvertFromMigrationInfo) {
 }
 
 TEST(MigrationTypeTest, FromAndToBSON) {
-    const ChunkVersion version(1, 2, OID::gen());
+    const ChunkVersion version(1, 2, OID::gen(), boost::none /* timestamp */);
 
     BSONObjBuilder builder;
     builder.append(MigrationType::ns(), kNs);
@@ -104,7 +104,7 @@ TEST(MigrationTypeTest, FromAndToBSON) {
 }
 
 TEST(MigrationTypeTest, MissingRequiredNamespaceField) {
-    const ChunkVersion version(1, 2, OID::gen());
+    const ChunkVersion version(1, 2, OID::gen(), boost::none /* timestamp */);
 
     BSONObjBuilder builder;
     builder.append(MigrationType::min(), kMin);
@@ -121,7 +121,7 @@ TEST(MigrationTypeTest, MissingRequiredNamespaceField) {
 }
 
 TEST(MigrationTypeTest, MissingRequiredMinField) {
-    const ChunkVersion version(1, 2, OID::gen());
+    const ChunkVersion version(1, 2, OID::gen(), boost::none /* timestamp */);
 
     BSONObjBuilder builder;
     builder.append(MigrationType::ns(), kNs);
@@ -138,7 +138,7 @@ TEST(MigrationTypeTest, MissingRequiredMinField) {
 }
 
 TEST(MigrationTypeTest, MissingRequiredMaxField) {
-    const ChunkVersion version(1, 2, OID::gen());
+    const ChunkVersion version(1, 2, OID::gen(), boost::none /* timestamp */);
 
     BSONObjBuilder builder;
     builder.append(MigrationType::ns(), kNs);
@@ -155,7 +155,7 @@ TEST(MigrationTypeTest, MissingRequiredMaxField) {
 }
 
 TEST(MigrationTypeTest, MissingRequiredFromShardField) {
-    const ChunkVersion version(1, 2, OID::gen());
+    const ChunkVersion version(1, 2, OID::gen(), boost::none /* timestamp */);
 
     BSONObjBuilder builder;
     builder.append(MigrationType::ns(), kNs);
@@ -172,7 +172,7 @@ TEST(MigrationTypeTest, MissingRequiredFromShardField) {
 }
 
 TEST(MigrationTypeTest, MissingRequiredToShardField) {
-    const ChunkVersion version(1, 2, OID::gen());
+    const ChunkVersion version(1, 2, OID::gen(), boost::none /* timestamp */);
 
     BSONObjBuilder builder;
     builder.append(MigrationType::ns(), kNs);

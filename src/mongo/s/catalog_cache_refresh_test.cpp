@@ -103,7 +103,7 @@ TEST_F(CatalogCacheRefreshTest, FullLoad) {
 
     expectGetCollectionWithReshardingFields(epoch, shardKeyPattern, reshardingUUID);
     expectFindSendBSONObjVector(kConfigHostAndPort, [&]() {
-        ChunkVersion version(1, 0, epoch);
+        ChunkVersion version(1, 0, epoch, boost::none /* timestamp */);
 
         ChunkType chunk1(kNss,
                          {shardKeyPattern.getKeyPattern().globalMin(), BSON("_id" << -100)},
@@ -300,11 +300,12 @@ TEST_F(CatalogCacheRefreshTest, ChunksBSONCorrupted) {
     // Return no chunks three times, which is how frequently the catalog cache retries
     expectGetCollection(epoch, shardKeyPattern);
     expectFindSendBSONObjVector(kConfigHostAndPort, [&] {
-        return std::vector<BSONObj>{ChunkType(kNss,
-                                              {shardKeyPattern.getKeyPattern().globalMin(),
-                                               BSON("_id" << 0)},
-                                              ChunkVersion(1, 0, epoch),
-                                              {"0"})
+        return std::vector<BSONObj>{ChunkType(
+                                        kNss,
+                                        {shardKeyPattern.getKeyPattern().globalMin(),
+                                         BSON("_id" << 0)},
+                                        ChunkVersion(1, 0, epoch, boost::none /* timestamp */),
+                                        {"0"})
                                         .toConfigBSON(),
                                     BSON("BadValue"
                                          << "This value should not be in a chunk config document")};
@@ -328,7 +329,7 @@ TEST_F(CatalogCacheRefreshTest, FullLoadMissingChunkWithLowestVersion) {
     expectGetDatabase();
 
     const auto incompleteChunks = [&]() {
-        ChunkVersion version(1, 0, epoch);
+        ChunkVersion version(1, 0, epoch, boost::none /* timestamp */);
 
         // Chunk from (MinKey, -100) is missing (as if someone is dropping the collection
         // concurrently) and has the lowest version.
@@ -383,7 +384,7 @@ TEST_F(CatalogCacheRefreshTest, FullLoadMissingChunkWithHighestVersion) {
     expectGetDatabase();
 
     const auto incompleteChunks = [&]() {
-        ChunkVersion version(1, 0, epoch);
+        ChunkVersion version(1, 0, epoch, boost::none /* timestamp */);
 
         // Chunk from (MinKey, -100) is missing (as if someone is dropping the collection
         // concurrently) and has the higest version.
@@ -434,13 +435,14 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadMissingChunkWithLowestVersion) {
 
     auto initialRoutingInfo(makeChunkManager(kNss, shardKeyPattern, nullptr, true, {}));
     const OID epoch = initialRoutingInfo.getVersion().epoch();
+    const auto timestamp = initialRoutingInfo.getVersion().getTimestamp();
 
     ASSERT_EQ(1, initialRoutingInfo.numChunks());
 
     auto future = scheduleRoutingInfoIncrementalRefresh(kNss);
 
     const auto incompleteChunks = [&]() {
-        ChunkVersion version(1, 0, epoch);
+        ChunkVersion version(1, 0, epoch, timestamp);
 
         // Chunk from (MinKey, -100) is missing (as if someone is dropping the collection
         // concurrently) and has the lowest version.
@@ -491,13 +493,14 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadMissingChunkWithHighestVersion) {
 
     auto initialRoutingInfo(makeChunkManager(kNss, shardKeyPattern, nullptr, true, {}));
     const OID epoch = initialRoutingInfo.getVersion().epoch();
+    const auto timestamp = initialRoutingInfo.getVersion().getTimestamp();
 
     ASSERT_EQ(1, initialRoutingInfo.numChunks());
 
     auto future = scheduleRoutingInfoIncrementalRefresh(kNss);
 
     const auto incompleteChunks = [&]() {
-        ChunkVersion version(1, 0, epoch);
+        ChunkVersion version(1, 0, epoch, timestamp);
 
         // Chunk from (MinKey, -100) is missing (as if someone is dropping the collection
         // concurrently) and has the higest version.
@@ -560,7 +563,7 @@ TEST_F(CatalogCacheRefreshTest, ChunkEpochChangeDuringIncrementalLoad) {
 
         ChunkType chunk2(kNss,
                          {BSON("_id" << 0), shardKeyPattern.getKeyPattern().globalMax()},
-                         ChunkVersion(1, 0, OID::gen()),
+                         ChunkVersion(1, 0, OID::gen(), boost::none /* timestamp */),
                          {"1"});
         chunk2.setName(OID::gen());
 
@@ -624,7 +627,7 @@ TEST_F(CatalogCacheRefreshTest, ChunkEpochChangeDuringIncrementalLoadRecoveryAft
         // recreated collection.
         ChunkType chunk3(kNss,
                          {BSON("_id" << 100), shardKeyPattern.getKeyPattern().globalMax()},
-                         ChunkVersion(5, 2, newEpoch),
+                         ChunkVersion(5, 2, newEpoch, boost::none /* timestamp */),
                          {"1"});
         chunk3.setName(OID::gen());
 
@@ -634,7 +637,7 @@ TEST_F(CatalogCacheRefreshTest, ChunkEpochChangeDuringIncrementalLoadRecoveryAft
     // On the second retry attempt, return the correct set of chunks from the recreated collection
     expectGetCollection(newEpoch, shardKeyPattern);
 
-    ChunkVersion newVersion(5, 0, newEpoch);
+    ChunkVersion newVersion(5, 0, newEpoch, boost::none /* timestamp */);
     onFindCommand([&](const RemoteCommandRequest& request) {
         // Ensure it is a differential query but starting from version zero (to fetch all the
         // chunks) since the incremental refresh above produced a different version
@@ -668,8 +671,10 @@ TEST_F(CatalogCacheRefreshTest, ChunkEpochChangeDuringIncrementalLoadRecoveryAft
     ASSERT(cm.isSharded());
     ASSERT_EQ(3, cm.numChunks());
     ASSERT_EQ(newVersion, cm.getVersion());
-    ASSERT_EQ(ChunkVersion(5, 1, newVersion.epoch()), cm.getVersion({"0"}));
-    ASSERT_EQ(ChunkVersion(5, 2, newVersion.epoch()), cm.getVersion({"1"}));
+    ASSERT_EQ(ChunkVersion(5, 1, newVersion.epoch(), newVersion.getTimestamp()),
+              cm.getVersion({"0"}));
+    ASSERT_EQ(ChunkVersion(5, 2, newVersion.epoch(), newVersion.getTimestamp()),
+              cm.getVersion({"1"}));
 }
 
 TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterCollectionEpochChange) {
@@ -682,7 +687,7 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterCollectionEpochChange) {
 
     auto future = scheduleRoutingInfoIncrementalRefresh(kNss);
 
-    ChunkVersion newVersion(1, 0, OID::gen());
+    ChunkVersion newVersion(1, 0, OID::gen(), boost::none /* timestamp */);
 
     // Return collection with a different epoch
     expectGetCollection(newVersion.epoch(), shardKeyPattern);
@@ -715,8 +720,10 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterCollectionEpochChange) {
     ASSERT(cm.isSharded());
     ASSERT_EQ(2, cm.numChunks());
     ASSERT_EQ(newVersion, cm.getVersion());
-    ASSERT_EQ(ChunkVersion(1, 0, newVersion.epoch()), cm.getVersion({"0"}));
-    ASSERT_EQ(ChunkVersion(1, 1, newVersion.epoch()), cm.getVersion({"1"}));
+    ASSERT_EQ(ChunkVersion(1, 0, newVersion.epoch(), newVersion.getTimestamp()),
+              cm.getVersion({"0"}));
+    ASSERT_EQ(ChunkVersion(1, 1, newVersion.epoch(), newVersion.getTimestamp()),
+              cm.getVersion({"1"}));
 }
 
 TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterSplit) {
@@ -759,7 +766,7 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterSplit) {
     ASSERT_EQ(2, cm.numChunks());
     ASSERT_EQ(version, cm.getVersion());
     ASSERT_EQ(version, cm.getVersion({"0"}));
-    ASSERT_EQ(ChunkVersion(0, 0, version.epoch()), cm.getVersion({"1"}));
+    ASSERT_EQ(ChunkVersion(0, 0, version.epoch(), version.getTimestamp()), cm.getVersion({"1"}));
 }
 
 TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterMoveWithReshardingFieldsAdded) {
@@ -843,7 +850,7 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterMoveLastChunkWithReshardingF
     ASSERT(cm.isSharded());
     ASSERT_EQ(1, cm.numChunks());
     ASSERT_EQ(version, cm.getVersion());
-    ASSERT_EQ(ChunkVersion(0, 0, version.epoch()), cm.getVersion({"0"}));
+    ASSERT_EQ(ChunkVersion(0, 0, version.epoch(), version.getTimestamp()), cm.getVersion({"0"}));
     ASSERT_EQ(version, cm.getVersion({"1"}));
     ASSERT(boost::none == cm.getReshardingFields());
 }

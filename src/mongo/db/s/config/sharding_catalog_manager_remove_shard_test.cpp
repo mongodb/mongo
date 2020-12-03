@@ -201,15 +201,15 @@ TEST_F(RemoveShardTest, RemoveShardStillDrainingChunksRemaining) {
     auto epoch = OID::gen();
     ChunkType chunk1(NamespaceString("testDB.testColl"),
                      ChunkRange(BSON("_id" << 0), BSON("_id" << 20)),
-                     ChunkVersion(1, 1, epoch),
+                     ChunkVersion(1, 1, epoch, boost::none /* timestamp */),
                      shard1.getName());
     ChunkType chunk2(NamespaceString("testDB.testColl"),
                      ChunkRange(BSON("_id" << 21), BSON("_id" << 50)),
-                     ChunkVersion(1, 2, epoch),
+                     ChunkVersion(1, 2, epoch, boost::none /* timestamp */),
                      shard1.getName());
     ChunkType chunk3(NamespaceString("testDB.testColl"),
                      ChunkRange(BSON("_id" << 51), BSON("_id" << 1000)),
-                     ChunkVersion(1, 3, epoch),
+                     ChunkVersion(1, 3, epoch, boost::none /* timestamp */),
                      shard1.getName());
 
     chunk3.setJumbo(true);
@@ -286,15 +286,15 @@ TEST_F(RemoveShardTest, RemoveShardCompletion) {
     auto epoch = OID::gen();
     ChunkType chunk1(NamespaceString("testDB.testColl"),
                      ChunkRange(BSON("_id" << 0), BSON("_id" << 20)),
-                     ChunkVersion(1, 1, epoch),
+                     ChunkVersion(1, 1, epoch, boost::none /* timestamp */),
                      shard1.getName());
     ChunkType chunk2(NamespaceString("testDB.testColl"),
                      ChunkRange(BSON("_id" << 21), BSON("_id" << 50)),
-                     ChunkVersion(1, 2, epoch),
+                     ChunkVersion(1, 2, epoch, boost::none /* timestamp */),
                      shard1.getName());
     ChunkType chunk3(NamespaceString("testDB.testColl"),
                      ChunkRange(BSON("_id" << 51), BSON("_id" << 1000)),
-                     ChunkVersion(1, 3, epoch),
+                     ChunkVersion(1, 3, epoch, boost::none /* timestamp */),
                      shard1.getName());
 
     std::vector<ChunkType> chunks{chunk1, chunk2, chunk3};

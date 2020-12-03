@@ -53,7 +53,7 @@ private:
 
 TEST_F(ChunkMapTest, TestAddChunk) {
     const OID epoch = OID::gen();
-    ChunkVersion version{1, 0, epoch};
+    ChunkVersion version{1, 0, epoch, boost::none /* timestamp */};
 
     auto chunk = std::make_shared<ChunkInfo>(
         ChunkType{kNss,
@@ -61,7 +61,7 @@ TEST_F(ChunkMapTest, TestAddChunk) {
                   version,
                   kThisShard});
 
-    ChunkMap chunkMap{epoch};
+    ChunkMap chunkMap{epoch, boost::none /* timestamp */};
     auto newChunkMap = chunkMap.createMerged({chunk});
 
     ASSERT_EQ(newChunkMap.size(), 1);
@@ -69,8 +69,8 @@ TEST_F(ChunkMapTest, TestAddChunk) {
 
 TEST_F(ChunkMapTest, TestEnumerateAllChunks) {
     const OID epoch = OID::gen();
-    ChunkMap chunkMap{epoch};
-    ChunkVersion version{1, 0, epoch};
+    ChunkMap chunkMap{epoch, boost::none /* timestamp */};
+    ChunkVersion version{1, 0, epoch, boost::none /* timestamp */};
 
     auto newChunkMap = chunkMap.createMerged(
         {std::make_shared<ChunkInfo>(
@@ -104,8 +104,8 @@ TEST_F(ChunkMapTest, TestEnumerateAllChunks) {
 
 TEST_F(ChunkMapTest, TestIntersectingChunk) {
     const OID epoch = OID::gen();
-    ChunkMap chunkMap{epoch};
-    ChunkVersion version{1, 0, epoch};
+    ChunkMap chunkMap{epoch, boost::none /* timestamp */};
+    ChunkVersion version{1, 0, epoch, boost::none /* timestamp */};
 
     auto newChunkMap = chunkMap.createMerged(
         {std::make_shared<ChunkInfo>(
@@ -134,8 +134,8 @@ TEST_F(ChunkMapTest, TestIntersectingChunk) {
 
 TEST_F(ChunkMapTest, TestEnumerateOverlappingChunks) {
     const OID epoch = OID::gen();
-    ChunkMap chunkMap{epoch};
-    ChunkVersion version{1, 0, epoch};
+    ChunkMap chunkMap{epoch, boost::none /* timestamp */};
+    ChunkVersion version{1, 0, epoch, boost::none /* timestamp */};
 
     auto newChunkMap = chunkMap.createMerged(
         {std::make_shared<ChunkInfo>(

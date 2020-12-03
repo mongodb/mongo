@@ -154,7 +154,7 @@ public:
             return std::vector<BSONObj>{coll.toBSON()};
         }());
         expectFindSendBSONObjVector(kConfigHostAndPort, [&]() {
-            ChunkVersion version(1, 0, epoch);
+            ChunkVersion version(1, 0, epoch, boost::none /* timestamp */);
 
             ChunkType chunk(tempNss,
                             {skey.getKeyPattern().globalMin(), skey.getKeyPattern().globalMax()},

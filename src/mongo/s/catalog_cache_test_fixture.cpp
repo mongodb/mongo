@@ -130,7 +130,7 @@ ChunkManager CatalogCacheTestFixture::makeChunkManager(
     bool unique,
     const std::vector<BSONObj>& splitPoints,
     boost::optional<ReshardingFields> reshardingFields) {
-    ChunkVersion version(1, 0, OID::gen());
+    ChunkVersion version(1, 0, OID::gen(), boost::none /* timestamp */);
 
     const BSONObj databaseBSON = [&]() {
         DatabaseType db(nss.db().toString(), {"0"}, true, DatabaseVersion(UUID::gen()));
@@ -239,7 +239,7 @@ ChunkManager CatalogCacheTestFixture::loadRoutingTableWithTwoChunksAndTwoShardsI
     }
     expectGetCollection(nss, epoch, uuid, shardKeyPattern);
     expectFindSendBSONObjVector(kConfigHostAndPort, [&]() {
-        ChunkVersion version(1, 0, epoch);
+        ChunkVersion version(1, 0, epoch, boost::none /* timestamp */);
 
         ChunkType chunk1(
             nss, {shardKeyPattern.getKeyPattern().globalMin(), BSON("_id" << 0)}, version, {"0"});

@@ -51,7 +51,7 @@ TEST_F(MergeChunkTest, MergeExistingChunksCorrectlyShouldSucceed) {
     chunk.setName(OID::gen());
     chunk.setNS(kNamespace);
 
-    auto origVersion = ChunkVersion(1, 0, OID::gen());
+    auto origVersion = ChunkVersion(1, 0, OID::gen(), boost::none /* timestamp */);
     chunk.setVersion(origVersion);
     chunk.setShard(ShardId("shard0000"));
 
@@ -90,8 +90,10 @@ TEST_F(MergeChunkTest, MergeExistingChunksCorrectlyShouldSucceed) {
     ASSERT_EQ(collVersion, shardVersion);
 
     // Check for increment on mergedChunk's minor version
-    auto expectedShardVersion = ChunkVersion(
-        origVersion.majorVersion(), origVersion.minorVersion() + 1, origVersion.epoch());
+    auto expectedShardVersion = ChunkVersion(origVersion.majorVersion(),
+                                             origVersion.minorVersion() + 1,
+                                             origVersion.epoch(),
+                                             origVersion.getTimestamp());
     ASSERT_EQ(expectedShardVersion, shardVersion);
 
     auto findResponse = uassertStatusOK(
@@ -126,7 +128,7 @@ TEST_F(MergeChunkTest, MergeSeveralChunksCorrectlyShouldSucceed) {
     chunk.setName(OID::gen());
     chunk.setNS(kNamespace);
 
-    auto origVersion = ChunkVersion(1, 0, OID::gen());
+    auto origVersion = ChunkVersion(1, 0, OID::gen(), boost::none /* timestamp */);
     chunk.setVersion(origVersion);
     chunk.setShard(ShardId("shard0000"));
 
@@ -203,7 +205,7 @@ TEST_F(MergeChunkTest, NewMergeShouldClaimHighestVersion) {
     otherChunk.setNS(kNamespace);
     auto collEpoch = OID::gen();
 
-    auto origVersion = ChunkVersion(1, 2, collEpoch);
+    auto origVersion = ChunkVersion(1, 2, collEpoch, boost::none /* timestamp */);
     chunk.setVersion(origVersion);
     chunk.setShard(ShardId("shard0000"));
 
@@ -225,7 +227,7 @@ TEST_F(MergeChunkTest, NewMergeShouldClaimHighestVersion) {
     std::vector<BSONObj> chunkBoundaries{chunkMin, chunkBound, chunkMax};
 
     // Set up other chunk with competing version
-    auto competingVersion = ChunkVersion(2, 1, collEpoch);
+    auto competingVersion = ChunkVersion(2, 1, collEpoch, boost::none /* timestamp */);
     otherChunk.setVersion(competingVersion);
     otherChunk.setShard(ShardId("shard0000"));
     otherChunk.setMin(BSON("a" << 10));
@@ -278,7 +280,7 @@ TEST_F(MergeChunkTest, MergeLeavesOtherChunksAlone) {
     chunk.setName(OID::gen());
     chunk.setNS(kNamespace);
 
-    auto origVersion = ChunkVersion(1, 2, OID::gen());
+    auto origVersion = ChunkVersion(1, 2, OID::gen(), boost::none /* timestamp */);
     chunk.setVersion(origVersion);
     chunk.setShard(ShardId("shard0000"));
 
@@ -352,7 +354,7 @@ TEST_F(MergeChunkTest, NonExistingNamespace) {
     ChunkType chunk;
     chunk.setNS(kNamespace);
 
-    auto origVersion = ChunkVersion(1, 0, OID::gen());
+    auto origVersion = ChunkVersion(1, 0, OID::gen(), boost::none /* timestamp */);
     chunk.setVersion(origVersion);
     chunk.setShard(ShardId("shard0000"));
 
@@ -389,7 +391,7 @@ TEST_F(MergeChunkTest, NonMatchingEpochsOfChunkAndRequestErrors) {
     ChunkType chunk;
     chunk.setNS(kNamespace);
 
-    auto origVersion = ChunkVersion(1, 0, OID::gen());
+    auto origVersion = ChunkVersion(1, 0, OID::gen(), boost::none /* timestamp */);
     chunk.setVersion(origVersion);
     chunk.setShard(ShardId("shard0000"));
 
@@ -427,7 +429,7 @@ TEST_F(MergeChunkTest, MergeAlreadyHappenedSucceeds) {
     chunk.setName(OID::gen());
     chunk.setNS(kNamespace);
 
-    auto origVersion = ChunkVersion(1, 0, OID::gen());
+    auto origVersion = ChunkVersion(1, 0, OID::gen(), boost::none /* timestamp */);
     chunk.setVersion(origVersion);
     chunk.setShard(ShardId("shard0000"));
 
@@ -492,7 +494,7 @@ TEST_F(MergeChunkTest, ChunkBoundariesOutOfOrderFails) {
 
     {
         std::vector<ChunkType> originalChunks;
-        ChunkVersion version = ChunkVersion(1, 0, epoch);
+        ChunkVersion version = ChunkVersion(1, 0, epoch, boost::none /* timestamp */);
 
         ChunkType chunk;
         chunk.setName(OID::gen());
@@ -535,7 +537,7 @@ TEST_F(MergeChunkTest, MergingChunksWithDollarPrefixShouldSucceed) {
     chunk1.setName(OID::gen());
     chunk1.setNS(kNamespace);
 
-    auto origVersion = ChunkVersion(1, 0, OID::gen());
+    auto origVersion = ChunkVersion(1, 0, OID::gen(), boost::none /* timestamp */);
     chunk1.setVersion(origVersion);
     chunk1.setShard(ShardId("shard0000"));
 

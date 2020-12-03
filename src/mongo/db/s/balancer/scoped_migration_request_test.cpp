@@ -98,7 +98,7 @@ ScopedMigrationRequest ScopedMigrationRequestTest::makeScopedMigrationRequest(
 }
 
 MigrateInfo makeMigrateInfo() {
-    const ChunkVersion kChunkVersion{1, 2, OID::gen()};
+    const ChunkVersion kChunkVersion{1, 2, OID::gen(), boost::none /* timestamp */};
 
     BSONObjBuilder chunkBuilder;
     chunkBuilder.append(ChunkType::ns(), kNs);

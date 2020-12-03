@@ -62,7 +62,8 @@ public:
 
 TEST_F(MongosProcessInterfaceTest, FailsToEnsureFieldsUniqueIfTargetCollectionVersionIsSpecified) {
     auto expCtx = getExpCtx();
-    auto targetCollectionVersion = boost::make_optional(ChunkVersion(0, 0, OID::gen()));
+    auto targetCollectionVersion =
+        boost::make_optional(ChunkVersion(0, 0, OID::gen(), boost::none /* timestamp */));
     auto processInterface = makeProcessInterface();
 
     ASSERT_THROWS_CODE(processInterface->ensureFieldsUniqueOrResolveDocumentKey(

@@ -234,7 +234,7 @@ TEST_F(CatalogCacheTest, OnStaleDatabaseVersionNoVersion) {
 
 TEST_F(CatalogCacheTest, OnStaleShardVersionWithSameVersion) {
     const auto dbVersion = DatabaseVersion(UUID::gen());
-    const auto cachedCollVersion = ChunkVersion(1, 0, OID::gen());
+    const auto cachedCollVersion = ChunkVersion(1, 0, OID::gen(), boost::none /* timestamp */);
 
     loadDatabases({DatabaseType(kNss.db().toString(), kShards[0], true, dbVersion)});
     loadCollection(cachedCollVersion);
@@ -245,7 +245,7 @@ TEST_F(CatalogCacheTest, OnStaleShardVersionWithSameVersion) {
 
 TEST_F(CatalogCacheTest, OnStaleShardVersionWithNoVersion) {
     const auto dbVersion = DatabaseVersion(UUID::gen());
-    const auto cachedCollVersion = ChunkVersion(1, 0, OID::gen());
+    const auto cachedCollVersion = ChunkVersion(1, 0, OID::gen(), boost::none /* timestamp */);
 
     loadDatabases({DatabaseType(kNss.db().toString(), kShards[0], true, dbVersion)});
     loadCollection(cachedCollVersion);
@@ -258,8 +258,9 @@ TEST_F(CatalogCacheTest, OnStaleShardVersionWithNoVersion) {
 
 TEST_F(CatalogCacheTest, OnStaleShardVersionWithGraterVersion) {
     const auto dbVersion = DatabaseVersion(UUID::gen());
-    const auto cachedCollVersion = ChunkVersion(1, 0, OID::gen());
-    const auto wantedCollVersion = ChunkVersion(2, 0, cachedCollVersion.epoch());
+    const auto cachedCollVersion = ChunkVersion(1, 0, OID::gen(), boost::none /* timestamp */);
+    const auto wantedCollVersion =
+        ChunkVersion(2, 0, cachedCollVersion.epoch(), cachedCollVersion.getTimestamp());
 
     loadDatabases({DatabaseType(kNss.db().toString(), kShards[0], true, dbVersion)});
     loadCollection(cachedCollVersion);
@@ -271,7 +272,7 @@ TEST_F(CatalogCacheTest, OnStaleShardVersionWithGraterVersion) {
 }
 
 TEST_F(CatalogCacheTest, CheckEpochNoDatabase) {
-    const auto collVersion = ChunkVersion(1, 0, OID::gen());
+    const auto collVersion = ChunkVersion(1, 0, OID::gen(), boost::none /* timestamp */);
     ASSERT_THROWS_WITH_CHECK(_catalogCache->checkEpochOrThrow(kNss, collVersion, kShards[0]),
                              StaleConfigException,
                              [&](const StaleConfigException& ex) {
@@ -286,7 +287,7 @@ TEST_F(CatalogCacheTest, CheckEpochNoDatabase) {
 
 TEST_F(CatalogCacheTest, CheckEpochNoCollection) {
     const auto dbVersion = DatabaseVersion(UUID::gen());
-    const auto collVersion = ChunkVersion(1, 0, OID::gen());
+    const auto collVersion = ChunkVersion(1, 0, OID::gen(), boost::none /* timestamp */);
 
     loadDatabases({DatabaseType(kNss.db().toString(), kShards[0], true, dbVersion)});
     ASSERT_THROWS_WITH_CHECK(_catalogCache->checkEpochOrThrow(kNss, collVersion, kShards[0]),
@@ -303,7 +304,7 @@ TEST_F(CatalogCacheTest, CheckEpochNoCollection) {
 
 TEST_F(CatalogCacheTest, CheckEpochUnshardedCollection) {
     const auto dbVersion = DatabaseVersion(UUID::gen());
-    const auto collVersion = ChunkVersion(1, 0, OID::gen());
+    const auto collVersion = ChunkVersion(1, 0, OID::gen(), boost::none /* timestamp */);
 
     loadDatabases({DatabaseType(kNss.db().toString(), kShards[0], true, dbVersion)});
     loadUnshardedCollection(kNss);
@@ -321,8 +322,8 @@ TEST_F(CatalogCacheTest, CheckEpochUnshardedCollection) {
 
 TEST_F(CatalogCacheTest, CheckEpochWithMismatch) {
     const auto dbVersion = DatabaseVersion(UUID::gen());
-    const auto wantedCollVersion = ChunkVersion(1, 0, OID::gen());
-    const auto receivedCollVersion = ChunkVersion(1, 0, OID::gen());
+    const auto wantedCollVersion = ChunkVersion(1, 0, OID::gen(), boost::none /* timestamp */);
+    const auto receivedCollVersion = ChunkVersion(1, 0, OID::gen(), boost::none /* timestamp */);
 
     loadDatabases({DatabaseType(kNss.db().toString(), kShards[0], true, dbVersion)});
     loadCollection(wantedCollVersion);
@@ -343,7 +344,7 @@ TEST_F(CatalogCacheTest, CheckEpochWithMismatch) {
 
 TEST_F(CatalogCacheTest, CheckEpochWithMatch) {
     const auto dbVersion = DatabaseVersion(UUID::gen());
-    const auto collVersion = ChunkVersion(1, 0, OID::gen());
+    const auto collVersion = ChunkVersion(1, 0, OID::gen(), boost::none /* timestamp */);
 
     loadDatabases({DatabaseType(kNss.db().toString(), kShards[0], true, dbVersion)});
     loadCollection(collVersion);

@@ -366,7 +366,7 @@ TEST_F(ShardingCatalogClientTest, GetChunksForNSWithSortAndLimit) {
     chunkA.setNS(kNamespace);
     chunkA.setMin(BSON("a" << 1));
     chunkA.setMax(BSON("a" << 100));
-    chunkA.setVersion({1, 2, oid});
+    chunkA.setVersion({1, 2, oid, boost::none /* timestamp */});
     chunkA.setShard(ShardId("shard0000"));
 
     ChunkType chunkB;
@@ -374,10 +374,10 @@ TEST_F(ShardingCatalogClientTest, GetChunksForNSWithSortAndLimit) {
     chunkB.setNS(kNamespace);
     chunkB.setMin(BSON("a" << 100));
     chunkB.setMax(BSON("a" << 200));
-    chunkB.setVersion({3, 4, oid});
+    chunkB.setVersion({3, 4, oid, boost::none /* timestamp */});
     chunkB.setShard(ShardId("shard0001"));
 
-    ChunkVersion queryChunkVersion({1, 2, oid});
+    ChunkVersion queryChunkVersion({1, 2, oid, boost::none /* timestamp */});
 
     const BSONObj chunksQuery(
         BSON(ChunkType::ns("TestDB.TestColl")
@@ -442,7 +442,7 @@ TEST_F(ShardingCatalogClientTest, GetChunksForNSWithSortAndLimit) {
 TEST_F(ShardingCatalogClientTest, GetChunksForNSNoSortNoLimit) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
-    ChunkVersion queryChunkVersion({1, 2, OID::gen()});
+    ChunkVersion queryChunkVersion({1, 2, OID::gen(), boost::none /* timestamp */});
 
     const BSONObj chunksQuery(
         BSON(ChunkType::ns("TestDB.TestColl")
@@ -487,7 +487,7 @@ TEST_F(ShardingCatalogClientTest, GetChunksForNSNoSortNoLimit) {
 TEST_F(ShardingCatalogClientTest, GetChunksForNSInvalidChunk) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
-    ChunkVersion queryChunkVersion({1, 2, OID::gen()});
+    ChunkVersion queryChunkVersion({1, 2, OID::gen(), boost::none /* timestamp */});
 
     const BSONObj chunksQuery(
         BSON(ChunkType::ns("TestDB.TestColl")
@@ -511,14 +511,14 @@ TEST_F(ShardingCatalogClientTest, GetChunksForNSInvalidChunk) {
         chunkA.setNS(kNamespace);
         chunkA.setMin(BSON("a" << 1));
         chunkA.setMax(BSON("a" << 100));
-        chunkA.setVersion({1, 2, OID::gen()});
+        chunkA.setVersion({1, 2, OID::gen(), boost::none /* timestamp */});
         chunkA.setShard(ShardId("shard0000"));
 
         ChunkType chunkB;
         chunkB.setNS(kNamespace);
         chunkB.setMin(BSON("a" << 100));
         chunkB.setMax(BSON("a" << 200));
-        chunkB.setVersion({3, 4, OID::gen()});
+        chunkB.setVersion({3, 4, OID::gen(), boost::none /* timestamp */});
         // Missing shard id
 
         return vector<BSONObj>{chunkA.toConfigBSON(), chunkB.toConfigBSON()};
@@ -1142,7 +1142,7 @@ TEST_F(ShardingCatalogClientTest, ApplyChunkOpsDeprecatedSuccessful) {
                                         << BSON("precondition2"
                                                 << "second precondition"));
     const NamespaceString nss("config.chunks");
-    ChunkVersion lastChunkVersion(0, 0, OID());
+    ChunkVersion lastChunkVersion(0, 0, OID(), boost::none /* timestamp */);
 
     auto future = launchAsync([this, updateOps, preCondition, nss, lastChunkVersion] {
         auto status =
@@ -1186,7 +1186,7 @@ TEST_F(ShardingCatalogClientTest, ApplyChunkOpsDeprecatedSuccessfulWithCheck) {
                                         << BSON("precondition2"
                                                 << "second precondition"));
     const NamespaceString nss("config.chunks");
-    ChunkVersion lastChunkVersion(0, 0, OID());
+    ChunkVersion lastChunkVersion(0, 0, OID(), boost::none /* timestamp */);
 
     auto future = launchAsync([this, updateOps, preCondition, nss, lastChunkVersion] {
         auto status =
@@ -1213,7 +1213,7 @@ TEST_F(ShardingCatalogClientTest, ApplyChunkOpsDeprecatedSuccessfulWithCheck) {
         chunk.setNS(kNamespace);
         chunk.setMin(BSON("a" << 1));
         chunk.setMax(BSON("a" << 100));
-        chunk.setVersion({1, 2, OID::gen()});
+        chunk.setVersion({1, 2, OID::gen(), boost::none /* timestamp */});
         chunk.setShard(ShardId("shard0000"));
         return vector<BSONObj>{chunk.toConfigBSON()};
     });
@@ -1234,7 +1234,7 @@ TEST_F(ShardingCatalogClientTest, ApplyChunkOpsDeprecatedFailedWithCheck) {
                                         << BSON("precondition2"
                                                 << "second precondition"));
     const NamespaceString nss("config.chunks");
-    ChunkVersion lastChunkVersion(0, 0, OID());
+    ChunkVersion lastChunkVersion(0, 0, OID(), boost::none /* timestamp */);
 
     auto future = launchAsync([this, updateOps, preCondition, nss, lastChunkVersion] {
         auto status =

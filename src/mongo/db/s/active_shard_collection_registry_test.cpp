@@ -88,7 +88,7 @@ TEST_F(ShardCollectionRegistrationTest, ScopedShardCollectionConstructorAndAssig
     ASSERT(originalScopedShardCollection.mustExecute());
 
     // Need to signal the registered shard collection so the destructor doesn't invariant
-    CreateCollectionResponse response(ChunkVersion(1, 0, OID::gen()));
+    CreateCollectionResponse response(ChunkVersion(1, 0, OID::gen(), boost::none /* timestamp */));
     response.setCollectionUUID(UUID::gen());
     originalScopedShardCollection.emplaceResponse(response);
 }
@@ -119,7 +119,7 @@ TEST_F(ShardCollectionRegistrationTest,
         _registry.registerShardCollection(secondShardsvrShardCollectionRequest);
     ASSERT_EQ(ErrorCodes::ConflictingOperationInProgress, secondScopedShardCollection.getStatus());
 
-    CreateCollectionResponse response(ChunkVersion(1, 0, OID::gen()));
+    CreateCollectionResponse response(ChunkVersion(1, 0, OID::gen(), boost::none /* timestamp */));
     response.setCollectionUUID(UUID::gen());
     originalScopedShardCollection.emplaceResponse(response);
 }
@@ -153,7 +153,7 @@ TEST_F(ShardCollectionRegistrationTest, SecondShardCollectionWithSameOptionsJoin
 
     auto uuid = UUID::gen();
 
-    CreateCollectionResponse response(ChunkVersion(1, 0, OID::gen()));
+    CreateCollectionResponse response(ChunkVersion(1, 0, OID::gen(), boost::none /* timestamp */));
     response.setCollectionUUID(uuid);
     originalScopedShardCollection.emplaceResponse(response);
 
@@ -220,10 +220,12 @@ TEST_F(ShardCollectionRegistrationTest, TwoShardCollectionsOnDifferentCollection
         assertGet(_registry.registerShardCollection(secondShardsvrShardCollectionRequest));
     ASSERT(secondScopedShardCollection.mustExecute());
 
-    CreateCollectionResponse responseOriginal(ChunkVersion(1, 0, OID::gen()));
+    CreateCollectionResponse responseOriginal(
+        ChunkVersion(1, 0, OID::gen(), boost::none /* timestamp */));
     responseOriginal.setCollectionUUID(UUID::gen());
 
-    CreateCollectionResponse responseSecond(ChunkVersion(1, 0, OID::gen()));
+    CreateCollectionResponse responseSecond(
+        ChunkVersion(1, 0, OID::gen(), boost::none /* timestamp */));
     responseOriginal.setCollectionUUID(UUID::gen());
 
     originalScopedShardCollection.emplaceResponse(responseOriginal);

@@ -126,7 +126,7 @@ TEST_F(BalancerChunkSelectionTest, TagRangesOverlap) {
         operationContext(), ShardType::ConfigNS, kShard1, kMajorityWriteConcern));
 
     // Set up a database and a sharded collection in the metadata.
-    ChunkVersion version(2, 0, OID::gen());
+    ChunkVersion version(2, 0, OID::gen(), boost::none /* timestamp */);
     setUpDatabase(kDbName, kShardId0);
     setUpCollection(kNamespace, version);
 
@@ -182,7 +182,7 @@ TEST_F(BalancerChunkSelectionTest, TagRangeMaxNotAlignedWithChunkMax) {
                                                     kMajorityWriteConcern));
 
     // Set up a database and a sharded collection in the metadata.
-    ChunkVersion version(2, 0, OID::gen());
+    ChunkVersion version(2, 0, OID::gen(), boost::none /* timestamp */);
     setUpDatabase(kDbName, kShardId0);
     setUpCollection(kNamespace, version);
 
