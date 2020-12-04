@@ -13,6 +13,7 @@ selector:
   - jstests/core/views/views_stats.js
   # These tests contain assertions on the number of executed operations and this suite retries
   # operations on TenantMigrationAborted errors.
+  - jstests/core/find_and_modify_metrics.js
   - jstests/core/operation_latency_histogram.js
   - jstests/core/top.js
   - jstests/core/profile_sampling.js
