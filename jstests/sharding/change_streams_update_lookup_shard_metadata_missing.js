@@ -32,7 +32,7 @@ st.ensurePrimaryShard(mongosDB.getName(), shard0.getURL());
 st.shardColl(mongosColl, {a: 1}, {a: 0}, {a: 1});
 
 // Open a change stream on the collection.
-const csCursor = mongosColl.watch();
+let csCursor = mongosColl.watch();
 
 // Write one document onto shard0 and obtain its resume token.
 assert.commandWorked(mongosColl.insert({_id: 0, a: -100}));
@@ -58,17 +58,19 @@ mongosColl = st.s.getDB(mongosDB.getName())[mongosColl.getName()];
 assert.soonNoExcept(
     () => assert.commandWorked(mongosColl.update({_id: 0}, {$set: {updated: true}}, false, true)));
 
-// Resume the change stream with {fullDocument: 'updateLookup'}.
-const cmdRes = assert.commandWorked(mongosColl.runCommand("aggregate", {
-    pipeline: [{$changeStream: {resumeAfter: resumeToken, fullDocument: "updateLookup"}}],
-    cursor: {}
-}));
-
+// Resume the change stream with {fullDocument: 'updateLookup'}. Update lookup can successfully
+// identify the document based on its _id alone so long as the _id is unique in the collection, so
+// this alone does not prove that the multi-update actually wrote its shard key into the oplog.
+csCursor = mongosColl.watch([], {resumeAfter: resumeToken, fullDocument: "updateLookup"});
 assert.soon(() => csCursor.hasNext());
+assert.docEq(csCursor.next().fullDocument, {_id: 0, a: -100, updated: true});
 
-const updateObj = csCursor.next();
-
-assert.eq(true, updateObj.updateDescription.updatedFields.updated);
+// Now insert a new document with the same _id on the other shard. Update lookup will be able to
+// distinguish between the two, proving that they both have full shard keys available.
+assert.commandWorked(mongosColl.insert({_id: 0, a: 100}));
+csCursor = mongosColl.watch([], {resumeAfter: resumeToken, fullDocument: "updateLookup"});
+assert.soon(() => csCursor.hasNext());
+assert.docEq(csCursor.next().fullDocument, {_id: 0, a: -100, updated: true});
 
 st.stop();
 })();
