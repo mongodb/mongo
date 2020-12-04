@@ -179,6 +179,23 @@ TenantMigrationRecipientService::Instance::Instance(
       _donorConnectionString(_stateDoc.getDonorConnectionString().toString()),
       _readPreference(_stateDoc.getReadPreference()) {}
 
+// TODO(SERVER-50974) Extend this basic implementation.
+boost::optional<BSONObj> TenantMigrationRecipientService::Instance::reportForCurrentOp(
+    MongoProcessInterface::CurrentOpConnectionsMode connMode,
+    MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept {
+
+    BSONObjBuilder bob;
+    bob.append("desc", "tenant recipient migration");
+    bob.append("migrationCompleted", _completionPromise.getFuture().isReady());
+    bob.append("instanceID", _stateDoc.getId().toBSON());
+    bob.append("tenantId", _stateDoc.getTenantId());
+    bob.append("readPreference", _stateDoc.getReadPreference().toInnerBSON());
+    if (_stateDoc.getExpireAt()) {
+        bob.append("expireAt", _stateDoc.getExpireAt()->toString());
+    }
+    return bob.obj();
+}
+
 Status TenantMigrationRecipientService::Instance::checkIfOptionsConflict(
     const TenantMigrationRecipientDocument& requestedStateDoc) const {
     invariant(requestedStateDoc.getId() == _migrationUuid);

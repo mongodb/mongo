@@ -38,6 +38,15 @@ function checkTenantMigrationRecipientStateCollCount(expectedCount) {
               "'config.tenantMigrationRecipients' collection count mismatch: " + tojson(res));
 }
 
+/**
+ * Returns an array of currentOp entries for the TenantMigrationRecipientService instances that
+ * match the given query.
+ */
+function getTenantMigrationRecipientCurrentOpEntries(recipientPrimary, query) {
+    const cmdObj = Object.assign({currentOp: true, desc: "tenant recipient migration"}, query);
+    return assert.commandWorked(recipientPrimary.adminCommand(cmdObj)).inprog;
+}
+
 function startRecipientSyncDataCmd(migrationUuid, tenantId, connectionString, readPreference) {
     jsTestLog("Starting a recipientSyncDataCmd for migrationUuid: " + migrationUuid +
               " tenantId: '" + tenantId + "'");
@@ -82,13 +91,27 @@ assert.commandWorked(primary.adminCommand({
     waitForCurOpByFailPoint(
         configDB, tenantMigrationRecipientStateCollNss, "hangBeforeUpsertPerformsInsert");
 
+    // These are the instances before the "insert" operation is attempted. The insert will fail
+    // after the failpoint is unblocked for one of the recipientSyncDataCmds. However, two instances
+    // will have been created at first.
+    const currentOpEntriesBeforeInsert = getTenantMigrationRecipientCurrentOpEntries(
+        primary, {desc: "tenant recipient migration", tenantId});
+    assert.eq(2, currentOpEntriesBeforeInsert.length, tojson(currentOpEntriesBeforeInsert));
+
     // Unblock the tenant migration instance from persisting the state doc.
     assert.commandWorked(
         primary.adminCommand({configureFailPoint: "hangBeforeUpsertPerformsInsert", mode: "off"}));
 
-    // Wait for both the conflicting instances to complete.
+    // Wait for both the conflicting instances to complete. Although both will "complete", one will
+    // return with ErrorCodes.ConflictingOperationInProgress, and the other with a
+    // TestData.stopFailPointErrorCode (a failpoint indicating that we have persisted the document).
     recipientSyncDataCmd1();
     recipientSyncDataCmd2();
+
+    // One of the two instances should have been cleaned up, and therefore only one will remain.
+    const currentOpEntriesAfterInsert = getTenantMigrationRecipientCurrentOpEntries(
+        primary, {desc: "tenant recipient migration", tenantId});
+    assert.eq(1, currentOpEntriesAfterInsert.length, tojson(currentOpEntriesAfterInsert));
 
     // Only one instance should have succeeded in persisting the state doc, other should have failed
     // with ErrorCodes.ConflictingOperationInProgress.

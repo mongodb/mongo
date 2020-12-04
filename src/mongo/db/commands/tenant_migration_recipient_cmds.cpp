@@ -78,15 +78,32 @@ public:
                                               kTenantMigrationRecipientServiceName);
             auto recipientInstance = repl::TenantMigrationRecipientService::Instance::getOrCreate(
                 opCtx, recipientService, stateDoc.toBSON());
+
+            // Ensure that the options (e.g. tenantId, recipientConnectionString, or readPreference)
+            // received by this migration match the options it was created with. If there is a
+            // conflict, it means there exists a migration with the same migrationId, but different
+            // options.
             uassertStatusOK(recipientInstance->checkIfOptionsConflict(stateDoc));
 
             auto returnAfterReachingDonorTs = cmd.getReturnAfterReachingDonorTimestamp();
-            if (!returnAfterReachingDonorTs) {
-                return Response(recipientInstance->waitUntilMigrationReachesConsistentState(opCtx));
-            }
 
-            return Response(recipientInstance->waitUntilTimestampIsMajorityCommitted(
-                opCtx, *returnAfterReachingDonorTs));
+            try {
+                if (!returnAfterReachingDonorTs) {
+                    return Response(
+                        recipientInstance->waitUntilMigrationReachesConsistentState(opCtx));
+                }
+
+                return Response(recipientInstance->waitUntilTimestampIsMajorityCommitted(
+                    opCtx, *returnAfterReachingDonorTs));
+
+            } catch (ExceptionFor<ErrorCodes::ConflictingOperationInProgress>&) {
+                // A conflict may arise when inserting the recipientInstance's  state document.
+                // Since the conflict occurred at the insert stage, that means this instance's
+                // tenantId conflicts with an existing instance's tenantId. Therefore, remove the
+                // instance that was just created.
+                recipientService->releaseInstance(stateDoc.toBSON()["_id"].wrap());
+                throw;
+            }
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const {}

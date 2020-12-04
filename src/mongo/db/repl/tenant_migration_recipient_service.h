@@ -101,9 +101,7 @@ public:
          */
         boost::optional<BSONObj> reportForCurrentOp(
             MongoProcessInterface::CurrentOpConnectionsMode connMode,
-            MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept final {
-            return boost::none;
-        }
+            MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept final;
 
         /*
          *  Returns the instance id.
