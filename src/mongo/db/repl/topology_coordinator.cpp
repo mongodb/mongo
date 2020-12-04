@@ -351,17 +351,12 @@ HostAndPort TopologyCoordinator::_chooseNearbySyncSource(Date_t now,
             const auto closestNode = _rsConfig.getMemberAt(closestIndex).getHostAndPort();
 
             // Do not update 'closestIndex' if the candidate is not the closest node we've seen.
-            auto syncSourceCandidatePing = _getPing(syncSourceCandidate);
-            auto closestPing = _getPing(closestNode);
-            if (syncSourceCandidatePing > closestPing) {
+            if (_getPing(syncSourceCandidate) > _getPing(closestNode)) {
                 LOGV2_DEBUG(3873114,
                             2,
                             "Cannot select sync source with higher latency than the best "
                             "candidate",
-                            "syncSourceCandidate"_attr = syncSourceCandidate,
-                            "syncSourceCandidatePing"_attr = syncSourceCandidatePing,
-                            "closestNode"_attr = closestNode,
-                            "closestPing"_attr = closestPing);
+                            "syncSourceCandidate"_attr = syncSourceCandidate);
                 continue;
             }
             closestIndex = candidateIndex;
