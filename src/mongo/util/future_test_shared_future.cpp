@@ -294,6 +294,15 @@ public:
     }
 };
 
+/** Try a simple single-worker shared get. Exercise JoinThread. */
+TEST(SharedFuture, ConcurrentTest_Simple) {
+    SharedPromise<void> promise;
+    auto shared = promise.getFuture();
+    JoinThread thread{stdx::thread{[&] { shared.get(); }}};
+    stdx::this_thread::yield();  // Slightly increase the chance of racing.
+    promise.emplaceValue();
+}
+
 void sharedFutureTestWorker(size_t i, SharedSemiFuture<void>& shared) {
     auto exec = InlineRecursiveCountingExecutor::make();
     if (i % 5 == 0) {
@@ -332,9 +341,9 @@ void sharedFutureConcurrentTest(unittest::ThreadAssertionMonitor& monitor, Polic
         const size_t nThreads = 16;
 
         SharedPromise<void> promise;
-        std::vector<JoinThread> threads;
 
         auto&& tryState = policy.onTryBegin(promise);
+        std::vector<JoinThread> threads;
         for (size_t i = 0; i < nThreads; i++) {
             threads.push_back(JoinThread{monitor.spawn([&, i] {
                 auto&& shared = policy.onThreadBegin(tryState);
