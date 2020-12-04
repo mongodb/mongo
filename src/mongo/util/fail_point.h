@@ -39,6 +39,7 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/cancelation.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/interruptible.h"
 #include "mongo/util/string_map.h"
@@ -361,6 +362,14 @@ public:
         _impl()->pauseWhileSet(interruptible);
     }
 
+    /**
+     * Like `pauseWhileSet`, but will also unpause as soon as the cancellation token is canceled.
+     * This method does not generate any cancellation related error by itself, it only waits.
+     */
+    void pauseWhileSetAndNotCanceled(Interruptible* interruptible, const CancelationToken& token) {
+        _impl()->pauseWhileSetAndNotCanceled(interruptible, token);
+    }
+
 private:
     class Impl {
     private:
@@ -408,6 +417,17 @@ private:
             for (auto entryMode = kFirstTimeEntered;
                  MONGO_unlikely(_shouldFail(entryMode, nullptr));
                  entryMode = kEnteredAlready) {
+                interruptible->sleepFor(kWaitGranularity);
+            }
+        }
+
+        /** See `FailPoint::pauseWhileSetAndNotCanceled`. */
+        void pauseWhileSetAndNotCanceled(Interruptible* interruptible,
+                                         const CancelationToken& token) {
+            for (auto entryMode = kFirstTimeEntered;
+                 MONGO_unlikely(_shouldFail(entryMode, nullptr)) && !token.isCanceled();
+                 entryMode = kEnteredAlready) {
+                // Not using token->onCancel() because we need to handle the fail point unset.
                 interruptible->sleepFor(kWaitGranularity);
             }
         }

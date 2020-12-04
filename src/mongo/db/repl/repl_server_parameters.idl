@@ -423,6 +423,17 @@ server_parameters:
         validator:
             gte: 1
 
+    tenantMigrationBlockingStateTimeoutMS:
+        description: >-
+            Period of time, in milliseconds, after which the blocking state should be interrupted.
+        set_at: [ startup, runtime ]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: tenantMigrationBlockingStateTimeoutMS
+        # TODO: SERVER-53571 determine the best default timeout.
+        default: 3600000
+        validator:
+            gte: 1
+
 feature_flags:
     featureFlagTenantMigrations:
         description: >-

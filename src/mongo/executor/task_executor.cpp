@@ -36,6 +36,8 @@ namespace executor {
 
 namespace {
 
+MONGO_FAIL_POINT_DEFINE(pauseScheduleCallWithCancelTokenUntilCanceled);
+
 Status wrapCallbackHandleWithCancelToken(
     const std::shared_ptr<TaskExecutor>& executor,
     const StatusWith<TaskExecutor::CallbackHandle>& swCallbackHandle,
@@ -82,6 +84,12 @@ ExecutorFuture<Response> wrapScheduleCallWithCancelTokenAndFuture(
             sharedPromise->setError(status);
         }
     };
+
+    // Fail point to make this method to wait until the token is canceled.
+    if (!token.isCanceled()) {
+        pauseScheduleCallWithCancelTokenUntilCanceled.pauseWhileSetAndNotCanceled(
+            Interruptible::notInterruptible(), token);
+    }
 
     auto scheduleStatus = wrapCallbackHandleWithCancelToken(
         executor,

@@ -13,6 +13,7 @@ load("jstests/replsets/libs/tenant_migration_test.js");
 load("jstests/replsets/libs/tenant_migration_util.js");
 
 const kTenantIdPrefix = "testTenantId";
+
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 if (!tenantMigrationTest.isFeatureFlagEnabled()) {
     jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
@@ -81,7 +82,10 @@ function testAbortStateTransition(donorRst, pauseFailPoint, setUpFailPoints, nex
         tenantId,
     };
 
-    setUpFailPoints.forEach(failPoint => configureFailPoint(donorPrimary, failPoint));
+    let failPointsToClear = [];
+    setUpFailPoints.forEach(failPoint => {
+        failPointsToClear.push(configureFailPoint(donorPrimary, failPoint));
+    });
     let pauseFp = configureFailPoint(donorPrimary, pauseFailPoint);
 
     assert.commandWorked(tenantMigrationTest.startMigration(migrationOpts));
@@ -109,6 +113,9 @@ function testAbortStateTransition(donorRst, pauseFailPoint, setUpFailPoints, nex
         tenantMigrationTest.waitForNodesToReachState(
             donorRst.nodes, migrationId, tenantId, TenantMigrationTest.State.kCommitted);
     }
+    failPointsToClear.forEach(failPoint => {
+        failPoint.off();
+    });
 
     assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
 }

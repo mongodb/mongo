@@ -588,9 +588,45 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
             }
 
             invariant(_stateDoc.getBlockTimestamp());
+            // Source to cancel the timeout if the operation completed in time.
+            CancelationSource cancelTimeoutSource;
+            // Source to cancel if the timeout expires before completion, as a child of parent
+            // token.
+            CancelationSource recipientSyncDataCommandCancelSource(token);
 
-            return _sendRecipientSyncDataCommand(executor, recipientTargeterRS, token)
-                .then([this, self = shared_from_this()] {
+            auto deadlineReachedFuture = (*executor)->sleepFor(
+                Milliseconds(repl::tenantMigrationBlockingStateTimeoutMS.load()),
+                cancelTimeoutSource.token());
+            std::vector<ExecutorFuture<void>> futures;
+
+            futures.push_back(std::move(deadlineReachedFuture));
+            futures.push_back(_sendRecipientSyncDataCommand(
+                executor, recipientTargeterRS, recipientSyncDataCommandCancelSource.token()));
+
+            return whenAny(std::move(futures))
+                .thenRunOn(**executor)
+                .then([cancelTimeoutSource,
+                       recipientSyncDataCommandCancelSource,
+                       self = shared_from_this()](auto result) mutable {
+                    const auto& [status, idx] = result;
+
+                    if (idx == 0) {
+                        LOGV2(5290301,
+                              "Tenant migration blocking stage timeout expired",
+                              "timeoutMs"_attr =
+                                  repl::tenantMigrationGarbageCollectionDelayMS.load());
+                        // Deadline reached, cancel the pending '_sendRecipientSyncDataCommand()'...
+                        recipientSyncDataCommandCancelSource.cancel();
+                        // ...and return error.
+                        uasserted(ErrorCodes::ExceededTimeLimit, "Blocking state timeout expired");
+                    } else if (idx == 1) {
+                        // '_sendRecipientSyncDataCommand()' finished first, cancel the timeout.
+                        cancelTimeoutSource.cancel();
+                        return status;
+                    }
+                    MONGO_UNREACHABLE;
+                })
+                .then([this, self = shared_from_this()]() -> void {
                     auto opCtxHolder = cc().makeOperationContext();
                     auto opCtx = opCtxHolder.get();
 
