@@ -204,14 +204,14 @@ function extractTenantMigrationAbortedError(resObj) {
 function modifyCmdObjForRetry(cmdObj, resObj) {
     if (cmdObj.insert) {
         let retryOps = [];
-        if (cmdObj.ordered) {
-            retryOps = cmdObj.documents.slice(resObj.writeErrors[0].index);
-        } else {
+        if (cmdObj.ordered === false) {
             for (let writeError of resObj.writeErrors) {
                 if (writeError.code == ErrorCodes.TenantMigrationAborted) {
                     retryOps.push(cmdObj.documents[writeError.index]);
                 }
             }
+        } else {
+            retryOps = cmdObj.documents.slice(resObj.writeErrors[0].index);
         }
         cmdObj.documents = retryOps;
     }
@@ -219,28 +219,28 @@ function modifyCmdObjForRetry(cmdObj, resObj) {
     // findAndModify may also have an update field, but is not a batched command.
     if (cmdObj.update && !cmdObj.findAndModify && !cmdObj.findandmodify) {
         let retryOps = [];
-        if (cmdObj.ordered) {
-            retryOps = cmdObj.updates.slice(resObj.writeErrors[0].index);
-        } else {
+        if (cmdObj.ordered === false) {
             for (let writeError of resObj.writeErrors) {
                 if (writeError.code == ErrorCodes.TenantMigrationAborted) {
                     retryOps.push(cmdObj.updates[writeError.index]);
                 }
             }
+        } else {
+            retryOps = cmdObj.updates.slice(resObj.writeErrors[0].index);
         }
         cmdObj.updates = retryOps;
     }
 
     if (cmdObj.delete) {
         let retryOps = [];
-        if (cmdObj.ordered) {
-            retryOps = cmdObj.deletes.slice(resObj.writeErrors[0].index);
-        } else {
+        if (cmdObj.ordered === false) {
             for (let writeError of resObj.writeErrors) {
                 if (writeError.code == ErrorCodes.TenantMigrationAborted) {
                     retryOps.push(cmdObj.deletes[writeError.index]);
                 }
             }
+        } else {
+            retryOps = cmdObj.deletes.slice(resObj.writeErrors[0].index);
         }
         cmdObj.deletes = retryOps;
     }
