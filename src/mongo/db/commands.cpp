@@ -595,7 +595,8 @@ bool CommandHelpers::shouldActivateFailCommandFailPoint(const BSONObj& data,
     if (cmd->getName() == "configureFailPoint"_sd)  // Banned even if in failCommands.
         return false;
 
-    if (!client->session()) {
+    if (!(data.hasField("failLocalClients") && data.getBoolField("failLocalClients")) &&
+        !client->session()) {
         return false;
     }
 
@@ -604,7 +605,8 @@ bool CommandHelpers::shouldActivateFailCommandFailPoint(const BSONObj& data,
     if (auto clientMetadata = ClientMetadata::get(client)) {
         appName = clientMetadata->getApplicationName();
     }
-    auto isInternalClient = client->session()->getTags() & transport::Session::kInternalClient;
+    auto isInternalClient =
+        !client->session() || (client->session()->getTags() & transport::Session::kInternalClient);
 
     if (data.hasField("threadName") && (threadName != data.getStringField("threadName"))) {
         return false;  // only activate failpoint on thread from certain client

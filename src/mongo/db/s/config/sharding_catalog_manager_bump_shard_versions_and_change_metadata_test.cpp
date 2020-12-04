@@ -30,6 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/logical_session_cache_noop.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
@@ -39,6 +40,7 @@
 #include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/fail_point.h"
 
 namespace mongo {
 namespace {
@@ -216,6 +218,162 @@ TEST_F(ShardingCatalogManagerBumpShardVersionsAndChangeMetadataTest,
 
     assertOnlyOneChunkVersionBumped(
         operationContext(), {shard1Chunk0, shard1Chunk1}, targetChunkVersion);
+}
+
+TEST_F(ShardingCatalogManagerBumpShardVersionsAndChangeMetadataTest,
+       SucceedsInThePresenceOfTransientTransactionErrors) {
+    const auto epoch = OID::gen();
+    const auto shard0Chunk0 = generateChunkType(
+        kNss, ChunkVersion(10, 1, epoch), kShard0.getName(), BSON("a" << 1), BSON("a" << 10));
+    const auto shard1Chunk0 = generateChunkType(
+        kNss, ChunkVersion(11, 2, epoch), kShard1.getName(), BSON("a" << 11), BSON("a" << 20));
+    const auto initialCollectionVersion = shard1Chunk0.getVersion();
+
+    setupCollection(kNss, kKeyPattern, {shard0Chunk0, shard1Chunk0});
+
+    size_t numCalls = 0;
+    const std::vector<ShardId> shardIds{kShard0.getName(), kShard1.getName()};
+    ShardingCatalogManager::get(operationContext())
+        ->bumpCollShardVersionsAndChangeMetadataInTxn(
+            operationContext(), kNss, shardIds, [&](OperationContext*, TxnNumber) {
+                ++numCalls;
+                if (numCalls < 5) {
+                    throw WriteConflictException();
+                }
+            });
+
+    auto targetChunkVersion = ChunkVersion{
+        initialCollectionVersion.majorVersion() + 1, 0, initialCollectionVersion.epoch()};
+
+    ASSERT_TRUE(chunkMajorVersionWasBumpedAndOtherFieldsAreUnchanged(
+        shard0Chunk0, getChunkDoc(operationContext(), shard0Chunk0.getMin()), targetChunkVersion));
+
+    ASSERT_TRUE(chunkMajorVersionWasBumpedAndOtherFieldsAreUnchanged(
+        shard1Chunk0, getChunkDoc(operationContext(), shard1Chunk0.getMin()), targetChunkVersion));
+
+    ASSERT_EQ(numCalls, 5) << "transaction succeeded after unexpected number of attempts";
+
+    auto fp = std::make_unique<FailPointEnableBlock>(
+        "failCommand",
+        BSON("errorCode" << ErrorCodes::LockTimeout << "failCommands"
+                         << BSON_ARRAY("commitTransaction") << "failLocalClients" << true
+                         << "failInternalCommands" << true));
+
+    numCalls = 0;
+    ShardingCatalogManager::get(operationContext())
+        ->bumpCollShardVersionsAndChangeMetadataInTxn(
+            operationContext(), kNss, shardIds, [&](OperationContext*, TxnNumber) {
+                ++numCalls;
+                if (numCalls >= 5) {
+                    fp.reset();
+                }
+            });
+
+    targetChunkVersion = ChunkVersion{
+        initialCollectionVersion.majorVersion() + 2, 0, initialCollectionVersion.epoch()};
+
+    ASSERT_TRUE(chunkMajorVersionWasBumpedAndOtherFieldsAreUnchanged(
+        shard0Chunk0, getChunkDoc(operationContext(), shard0Chunk0.getMin()), targetChunkVersion));
+
+    ASSERT_TRUE(chunkMajorVersionWasBumpedAndOtherFieldsAreUnchanged(
+        shard1Chunk0, getChunkDoc(operationContext(), shard1Chunk0.getMin()), targetChunkVersion));
+
+    ASSERT_EQ(numCalls, 5) << "transaction succeeded after unexpected number of attempts";
+}
+
+TEST_F(ShardingCatalogManagerBumpShardVersionsAndChangeMetadataTest,
+       StopsRetryingOnPermanentServerErrors) {
+    const auto epoch = OID::gen();
+    const auto shard0Chunk0 = generateChunkType(
+        kNss, ChunkVersion(10, 1, epoch), kShard0.getName(), BSON("a" << 1), BSON("a" << 10));
+    const auto shard1Chunk0 = generateChunkType(
+        kNss, ChunkVersion(11, 2, epoch), kShard1.getName(), BSON("a" << 11), BSON("a" << 20));
+
+    setupCollection(kNss, kKeyPattern, {shard0Chunk0, shard1Chunk0});
+
+    size_t numCalls = 0;
+    const std::vector<ShardId> shardIds{kShard0.getName(), kShard1.getName()};
+    ASSERT_THROWS_CODE(ShardingCatalogManager::get(operationContext())
+                           ->bumpCollShardVersionsAndChangeMetadataInTxn(
+                               operationContext(),
+                               kNss,
+                               shardIds,
+                               [&](OperationContext*, TxnNumber) {
+                                   ++numCalls;
+                                   uasserted(ErrorCodes::ShutdownInProgress,
+                                             "simulating shutdown error from test");
+                               }),
+                       DBException,
+                       ErrorCodes::ShutdownInProgress);
+
+    ASSERT_TRUE(chunkMajorVersionWasBumpedAndOtherFieldsAreUnchanged(
+        shard0Chunk0,
+        getChunkDoc(operationContext(), shard0Chunk0.getMin()),
+        shard0Chunk0.getVersion()));
+
+    ASSERT_TRUE(chunkMajorVersionWasBumpedAndOtherFieldsAreUnchanged(
+        shard1Chunk0,
+        getChunkDoc(operationContext(), shard1Chunk0.getMin()),
+        shard1Chunk0.getVersion()));
+
+    ASSERT_EQ(numCalls, 1) << "transaction failed after unexpected number of attempts";
+
+    numCalls = 0;
+    ASSERT_THROWS_CODE(ShardingCatalogManager::get(operationContext())
+                           ->bumpCollShardVersionsAndChangeMetadataInTxn(
+                               operationContext(),
+                               kNss,
+                               shardIds,
+                               [&](OperationContext*, TxnNumber) {
+                                   ++numCalls;
+                                   uasserted(ErrorCodes::NotWritablePrimary,
+                                             "simulating not writable primary error from test");
+                               }),
+                       DBException,
+                       ErrorCodes::NotWritablePrimary);
+
+    ASSERT_TRUE(chunkMajorVersionWasBumpedAndOtherFieldsAreUnchanged(
+        shard0Chunk0,
+        getChunkDoc(operationContext(), shard0Chunk0.getMin()),
+        shard0Chunk0.getVersion()));
+
+    ASSERT_TRUE(chunkMajorVersionWasBumpedAndOtherFieldsAreUnchanged(
+        shard1Chunk0,
+        getChunkDoc(operationContext(), shard1Chunk0.getMin()),
+        shard1Chunk0.getVersion()));
+
+    ASSERT_EQ(numCalls, 1) << "transaction failed after unexpected number of attempts";
+
+    numCalls = 0;
+    ASSERT_THROWS_CODE(ShardingCatalogManager::get(operationContext())
+                           ->bumpCollShardVersionsAndChangeMetadataInTxn(
+                               operationContext(),
+                               kNss,
+                               shardIds,
+                               [&](OperationContext*, TxnNumber) {
+                                   ++numCalls;
+                                   cc().getOperationContext()->markKilled(ErrorCodes::Interrupted);
+
+                                   // Throw a LockTimeout exception so
+                                   // bumpCollShardVersionsAndChangeMetadataInTxn() makes another
+                                   // retry attempt and discovers operation context has been killed.
+                                   uasserted(ErrorCodes::LockTimeout,
+                                             "simulating lock timeout error from test");
+                               }),
+                       DBException,
+                       ErrorCodes::Interrupted);
+
+    ASSERT_TRUE(chunkMajorVersionWasBumpedAndOtherFieldsAreUnchanged(
+        shard0Chunk0,
+        getChunkDoc(operationContext(), shard0Chunk0.getMin()),
+        shard0Chunk0.getVersion()));
+
+    ASSERT_TRUE(chunkMajorVersionWasBumpedAndOtherFieldsAreUnchanged(
+        shard1Chunk0,
+        getChunkDoc(operationContext(), shard1Chunk0.getMin()),
+        shard1Chunk0.getVersion()));
+
+    ASSERT_EQ(numCalls, 1) << "transaction failed after unexpected number of attempts";
 }
 
 }  // namespace

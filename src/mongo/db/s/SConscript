@@ -289,6 +289,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/vector_clock_mongod',
         '$BUILD_DIR/mongo/s/catalog/dist_lock_manager',
         '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_impl',
+        '$BUILD_DIR/mongo/util/log_and_backoff',
         '$BUILD_DIR/mongo/util/options_parser/options_parser',
         'sharding_logging',
         'sharding_runtime_d_params',
