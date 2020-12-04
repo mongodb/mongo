@@ -70,6 +70,50 @@ void emplaceFetchTimestampIfExists(ClassWithFetchTimestamp& c,
     fetchTimestampStruct.setFetchTimestamp(std::move(fetchTimestamp));
     c.setFetchTimestampStruct(std::move(fetchTimestampStruct));
 }
+/**
+ * Emplaces the 'minFetchTimestamp' onto the ClassWithFetchTimestamp if the timestamp has been
+ * emplaced inside the boost::optional.
+ */
+template <class ClassWithMinFetchTimestamp>
+void emplaceMinFetchTimestampIfExists(ClassWithMinFetchTimestamp& c,
+                                      boost::optional<Timestamp> minFetchTimestamp) {
+    if (!minFetchTimestamp) {
+        return;
+    }
+
+    invariant(!minFetchTimestamp->isNull());
+
+    if (auto alreadyExistingMinFetchTimestamp = c.getMinFetchTimestamp()) {
+        invariant(minFetchTimestamp == alreadyExistingMinFetchTimestamp);
+    }
+
+    MinFetchTimestamp minFetchTimestampStruct;
+    minFetchTimestampStruct.setMinFetchTimestamp(std::move(minFetchTimestamp));
+    c.setMinFetchTimestampStruct(std::move(minFetchTimestampStruct));
+}
+
+/**
+ * Emplaces the 'strictConsistencyTimestamp' onto the ClassWithStrictConsistencyTimestamp if the
+ * timestamp has been emplaced inside the boost::optional.
+ */
+template <class ClassWithStrictConsistencyTimestamp>
+void emplaceStrictConsistencyTimestampIfExists(
+    ClassWithStrictConsistencyTimestamp& c, boost::optional<Timestamp> strictConsistencyTimestamp) {
+    if (!strictConsistencyTimestamp) {
+        return;
+    }
+
+    invariant(!strictConsistencyTimestamp->isNull());
+
+    if (auto alreadyExistingStrictConsistencyTimestamp = c.getStrictConsistencyTimestamp()) {
+        invariant(strictConsistencyTimestamp == alreadyExistingStrictConsistencyTimestamp);
+    }
+
+    StrictConsistencyTimestamp strictConsistencyTimestampStruct;
+    strictConsistencyTimestampStruct.setStrictConsistencyTimestamp(
+        std::move(strictConsistencyTimestamp));
+    c.setStrictConsistencyTimestampStruct(std::move(strictConsistencyTimestampStruct));
+}
 
 /**
  * Helper method to construct a DonorShardEntry with the fields specified.

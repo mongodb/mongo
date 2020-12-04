@@ -318,15 +318,7 @@ void ReshardingDonorService::DonorStateMachine::_transitionState(
     DonorStateEnum endState, boost::optional<Timestamp> minFetchTimestamp) {
     ReshardingDonorDocument replacementDoc(_donorDoc);
     replacementDoc.setState(endState);
-    if (minFetchTimestamp) {
-        auto& minFetchTimestampStruct = replacementDoc.getMinFetchTimestampStruct();
-        if (minFetchTimestampStruct.getMinFetchTimestamp())
-            invariant(minFetchTimestampStruct.getMinFetchTimestamp().get() ==
-                      minFetchTimestamp.get());
-
-        minFetchTimestampStruct.setMinFetchTimestamp(std::move(minFetchTimestamp));
-    }
-
+    emplaceMinFetchTimestampIfExists(replacementDoc, minFetchTimestamp);
     _updateDonorDocument(std::move(replacementDoc));
 }
 

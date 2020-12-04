@@ -91,11 +91,7 @@ DonorShardEntry makeDonorShard(ShardId shardId,
                                boost::optional<Timestamp> minFetchTimestamp) {
     DonorShardEntry entry(shardId);
     entry.setState(donorState);
-    if (minFetchTimestamp) {
-        auto minFetchTimestampStruct = MinFetchTimestamp();
-        minFetchTimestampStruct.setMinFetchTimestamp(minFetchTimestamp);
-        entry.setMinFetchTimestampStruct(minFetchTimestampStruct);
-    }
+    emplaceMinFetchTimestampIfExists(entry, minFetchTimestamp);
     return entry;
 }
 
@@ -104,11 +100,7 @@ RecipientShardEntry makeRecipientShard(ShardId shardId,
                                        boost::optional<Timestamp> strictConsistencyTimestamp) {
     RecipientShardEntry entry(shardId);
     entry.setState(recipientState);
-    if (strictConsistencyTimestamp) {
-        auto strictConsistencyTimestampStruct = StrictConsistencyTimestamp();
-        strictConsistencyTimestampStruct.setStrictConsistencyTimestamp(strictConsistencyTimestamp);
-        entry.setStrictConsistencyTimestampStruct(strictConsistencyTimestampStruct);
-    }
+    emplaceStrictConsistencyTimestampIfExists(entry, strictConsistencyTimestamp);
     return entry;
 }
 
