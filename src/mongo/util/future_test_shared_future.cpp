@@ -265,10 +265,10 @@ TEST(SharedFuture, InterruptedGet_AddChild_Get) {
     FUTURE_SUCCESS_TEST([] {},
                         [](/*Future<void>*/ auto&& fut) {
                             const auto exec = InlineRecursiveCountingExecutor::make();
-                            DummyInterruptable dummyInterruptable;
+                            DummyInterruptible dummyInterruptible;
 
                             auto shared = std::move(fut).share();
-                            auto res = shared.waitNoThrow(&dummyInterruptable);
+                            auto res = shared.waitNoThrow(&dummyInterruptible);
                             if (!shared.isReady()) {
                                 ASSERT_EQ(res, ErrorCodes::Interrupted);
                             }
@@ -310,8 +310,8 @@ void sharedFutureTestWorker(size_t i, SharedSemiFuture<void>& shared) {
         shared.get();
     } else if (i % 7 == 0) {
         // interrupted wait, then blocking wait.
-        DummyInterruptable dummyInterruptable;
-        auto res = shared.waitNoThrow(&dummyInterruptable);
+        DummyInterruptible dummyInterruptible;
+        auto res = shared.waitNoThrow(&dummyInterruptible);
         if (!shared.isReady()) {
             ASSERT_EQ(res, ErrorCodes::Interrupted);
         }

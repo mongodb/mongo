@@ -190,18 +190,18 @@ TEST(Future_EdgeCases, looping_onError_with_then) {
 }
 
 TEST(Future_EdgeCases, interrupted_wait_then_get) {
-    DummyInterruptable dummyInterruptable;
+    DummyInterruptible dummyInterruptible;
 
     auto pf = makePromiseFuture<void>();
-    ASSERT_EQ(pf.future.waitNoThrow(&dummyInterruptable), ErrorCodes::Interrupted);
-    ASSERT_EQ(pf.future.getNoThrow(&dummyInterruptable), ErrorCodes::Interrupted);
+    ASSERT_EQ(pf.future.waitNoThrow(&dummyInterruptible), ErrorCodes::Interrupted);
+    ASSERT_EQ(pf.future.getNoThrow(&dummyInterruptible), ErrorCodes::Interrupted);
 
     pf.promise.emplaceValue();
     pf.future.get();
 }
 
 TEST(Future_EdgeCases, interrupted_wait_then_get_with_bgthread) {
-    DummyInterruptable dummyInterruptable;
+    DummyInterruptible dummyInterruptible;
 
     // Note, this is intentionally somewhat racy. async() is defined to sleep 100ms before running
     // the function so it will generally test blocking in the final get(). Under TSAN the sleep is
@@ -209,12 +209,12 @@ TEST(Future_EdgeCases, interrupted_wait_then_get_with_bgthread) {
     // detecting data races.
     auto future = async([] {});
 
-    auto res = future.waitNoThrow(&dummyInterruptable);
+    auto res = future.waitNoThrow(&dummyInterruptible);
     if (!res.isOK()) {
         ASSERT_EQ(res, ErrorCodes::Interrupted);
     }
 
-    res = future.getNoThrow(&dummyInterruptable);
+    res = future.getNoThrow(&dummyInterruptible);
     if (!res.isOK()) {
         ASSERT_EQ(res, ErrorCodes::Interrupted);
     }
@@ -223,10 +223,10 @@ TEST(Future_EdgeCases, interrupted_wait_then_get_with_bgthread) {
 }
 
 TEST(Future_EdgeCases, interrupted_wait_then_then) {
-    DummyInterruptable dummyInterruptable;
+    DummyInterruptible dummyInterruptible;
 
     auto pf = makePromiseFuture<void>();
-    ASSERT_EQ(pf.future.waitNoThrow(&dummyInterruptable), ErrorCodes::Interrupted);
+    ASSERT_EQ(pf.future.waitNoThrow(&dummyInterruptible), ErrorCodes::Interrupted);
     auto fut2 = std::move(pf.future).then([] {});
 
     pf.promise.emplaceValue();
@@ -234,7 +234,7 @@ TEST(Future_EdgeCases, interrupted_wait_then_then) {
 }
 
 TEST(Future_EdgeCases, interrupted_wait_then_then_with_bgthread) {
-    DummyInterruptable dummyInterruptable;
+    DummyInterruptible dummyInterruptible;
 
     // Note, this is intentionally somewhat racy. async() is defined to sleep 100ms before running
     // the function so it will generally test blocking in the final get(). Under TSAN the sleep is
@@ -242,12 +242,12 @@ TEST(Future_EdgeCases, interrupted_wait_then_then_with_bgthread) {
     // detecting data races.
     auto future = async([] {});
 
-    auto res = future.waitNoThrow(&dummyInterruptable);
+    auto res = future.waitNoThrow(&dummyInterruptible);
     if (!res.isOK()) {
         ASSERT_EQ(res, ErrorCodes::Interrupted);
     }
 
-    res = future.getNoThrow(&dummyInterruptable);
+    res = future.getNoThrow(&dummyInterruptible);
     if (!res.isOK()) {
         ASSERT_EQ(res, ErrorCodes::Interrupted);
     }

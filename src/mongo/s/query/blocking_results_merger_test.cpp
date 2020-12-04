@@ -185,7 +185,7 @@ TEST_F(ResultsMergerTestFixture, ShouldBeAbleToBlockUntilNextResultIsReadyWithDe
     future.default_timed_get();
 }
 
-TEST_F(ResultsMergerTestFixture, ShouldBeInterruptableDuringBlockingNext) {
+TEST_F(ResultsMergerTestFixture, ShouldBeInterruptibleDuringBlockingNext) {
     std::vector<RemoteCursor> cursors;
     cursors.emplace_back(
         makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 1, {})));

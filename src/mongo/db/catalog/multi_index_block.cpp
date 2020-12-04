@@ -1155,7 +1155,7 @@ Status MultiIndexBlock::_scanReferenceIdxInsertAndCommit(OperationContext* opCtx
               "refIdx"_attr = refIdx->descriptor()->indexName());
         _phase = IndexBuildPhaseEnum::kBulkLoad;
         WriteUnitOfWork wuow(opCtx);
-        // Allow the commit operation to be interruptable:
+        // Allow the commit operation to be interruptible:
         bulkLoader->commit(true);
         wuow.commit();
         return Status::OK();
@@ -1201,7 +1201,7 @@ Status MultiIndexBlock::_scanReferenceIdxInsertAndCommit(OperationContext* opCtx
     _phase = IndexBuildPhaseEnum::kBulkLoad;
 
     WriteUnitOfWork wuow(opCtx);
-    // Allow the commit operation to be interruptable:
+    // Allow the commit operation to be interruptible:
     bulkLoader->commit(true);
     wuow.commit();
 

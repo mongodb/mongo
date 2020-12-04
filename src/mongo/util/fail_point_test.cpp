@@ -508,7 +508,7 @@ namespace mongo {
  * Runs the given function with an operation context that has a deadline and asserts that
  * the function is interruptible.
  */
-void assertFunctionInterruptable(std::function<void(Interruptible* interruptible)> f) {
+void assertFunctionInterruptible(std::function<void(Interruptible* interruptible)> f) {
     const auto service = ServiceContext::make();
     const std::shared_ptr<ClockSourceMock> mockClock = std::make_shared<ClockSourceMock>();
     service->setFastClockSource(std::make_unique<SharedClockSourceAdapter>(mockClock));
@@ -531,7 +531,7 @@ TEST(FailPoint, PauseWhileSetInterruptibility) {
     FailPoint failPoint("testFP");
     failPoint.setMode(FailPoint::alwaysOn);
 
-    assertFunctionInterruptable(
+    assertFunctionInterruptible(
         [&failPoint](Interruptible* interruptible) { failPoint.pauseWhileSet(interruptible); });
 
     failPoint.setMode(FailPoint::off);
@@ -541,7 +541,7 @@ TEST(FailPoint, WaitForFailPointTimeout) {
     FailPoint failPoint("testFP");
     failPoint.setMode(FailPoint::alwaysOn);
 
-    assertFunctionInterruptable([&failPoint](Interruptible* interruptible) {
+    assertFunctionInterruptible([&failPoint](Interruptible* interruptible) {
         failPoint.waitForTimesEntered(interruptible, 1);
     });
 

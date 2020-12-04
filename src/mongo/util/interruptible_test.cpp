@@ -36,7 +36,7 @@
 namespace mongo {
 namespace {
 
-class DummyInterruptable final : public Interruptible {
+class DummyInterruptible final : public Interruptible {
     Date_t getDeadline() const override {
         MONGO_UNREACHABLE;
     }
@@ -71,7 +71,7 @@ public:
 };
 
 TEST(Interruptible, WaitForConditionOrInterruptTimed) {
-    auto interruptible = std::make_unique<DummyInterruptable>();
+    auto interruptible = std::make_unique<DummyInterruptible>();
     const auto sleepFor = Milliseconds(500);
 
     auto mutex = MONGO_MAKE_LATCH();
@@ -110,7 +110,7 @@ TEST(Interruptible, WaitForConditionOrInterruptTimed) {
 }
 
 TEST(Interruptible, ZeroWaitTimeForImmediateReturn) {
-    auto interruptible = std::make_unique<DummyInterruptable>();
+    auto interruptible = std::make_unique<DummyInterruptible>();
     auto mutex = MONGO_MAKE_LATCH();
     stdx::condition_variable cv;
     stdx::unique_lock<Latch> lk(mutex);
