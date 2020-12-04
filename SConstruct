@@ -198,6 +198,14 @@ add_option('wiredtiger',
     type='choice',
 )
 
+add_option('ocsp-stapling',
+    choices=['on', 'off'],
+    default='on',
+    help='Enable OCSP Stapling on servers',
+    nargs='?',
+    type='choice',
+)
+
 js_engine_choices = ['mozjs', 'none']
 add_option('js-engine',
     choices=js_engine_choices,
@@ -2443,6 +2451,13 @@ if get_option('wiredtiger') == 'on':
     else:
         wiredtiger = True
         env.SetConfigHeaderDefine("MONGO_CONFIG_WIREDTIGER_ENABLED")
+
+if get_option('ocsp-stapling') == 'on':
+    # OCSP Stapling needs to be disabled on ubuntu 18.04 machines because when TLS 1.3 is
+    # enabled on that machine, the status-response message sent contains garbage data. This
+    # is a known bug and needs to be fixed by upstream, but for the time being we need to
+    # disable OCSP Stapling on Ubuntu 18.04 machines. See SERVER-51364 for more details.
+    env.SetConfigHeaderDefine("MONGO_CONFIG_OCSP_STAPLING_ENABLED")
 
 if env['TARGET_ARCH'] == 'i386':
     # If we are using GCC or clang to target 32 bit, set the ISA minimum to 'nocona',

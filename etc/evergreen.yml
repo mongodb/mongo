@@ -9028,9 +9028,10 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: x86_64-ubuntu1804
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl --ocsp-stapling=off MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     multiversion_platform: ubuntu1804
     multiversion_edition: targeted
+    test_flags: --excludeWithAnyTags=requires_ocsp_stapling
     has_packages: true
     packager_script: packager.py
     packager_arch: x86_64
@@ -9085,9 +9086,10 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-ubuntu1804
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl --ocsp-stapling=off MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     multiversion_platform: ubuntu1804
     multiversion_edition: enterprise
+    test_flags: --excludeWithAnyTags=requires_ocsp_stapling
     has_packages: true
     packager_script: packager_enterprise.py
     packager_arch: x86_64
@@ -9263,7 +9265,8 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: aarch64-enterprise-ubuntu1804
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) CCFLAGS="-march=armv8-a+crc -mtune=generic" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl --ocsp-stapling=off MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) CCFLAGS="-march=armv8-a+crc -mtune=generic" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    test_flags: --excludeWithAnyTags=requires_ocsp_stapling
     resmoke_jobs_max: 4 # Avoid starting too many mongod's on ARM test servers
     has_packages: true
     packager_script: packager_enterprise.py
@@ -9308,7 +9311,8 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: aarch64-ubuntu1804
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) CCFLAGS="-march=armv8-a+crc -mtune=generic" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl --ocsp-stapling=off MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) CCFLAGS="-march=armv8-a+crc -mtune=generic" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    test_flags: --excludeWithAnyTags=requires_ocsp_stapling
     resmoke_jobs_max: 8 # Avoid starting too many mongod's on ARM test servers
     has_packages: true
     packager_script: packager.py
@@ -9342,7 +9346,8 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: ppc64le-enterprise-ubuntu1804
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu1804 -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc) CCFLAGS="-mcpu=power8 -mtune=power8 -mcmodel=medium" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl --ocsp-stapling=off MONGO_DISTMOD=ubuntu1804 -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc) CCFLAGS="-mcpu=power8 -mtune=power8 -mcmodel=medium" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    test_flags: --excludeWithAnyTags=requires_ocsp_stapling
     resmoke_jobs_max: 2
     has_packages: true
     packager_script: packager_enterprise.py
@@ -9383,7 +9388,8 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: s390x-ubuntu1804
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) CCFLAGS="-march=z196 -mtune=zEC12" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl --ocsp-stapling=off MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) CCFLAGS="-march=z196 -mtune=zEC12" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    test_flags: --excludeWithAnyTags=requires_ocsp_stapling
     multiversion_platform: ubuntu1804
     multiversion_edition: targeted
     multiversion_architecture: s390x
@@ -9416,7 +9422,8 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: s390x-enterprise-ubuntu1804
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) CCFLAGS="-march=z196 -mtune=zEC12" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl --ocsp-stapling=off MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) CCFLAGS="-march=z196 -mtune=zEC12" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    test_flags: --excludeWithAnyTags=requires_ocsp_stapling
     resmoke_jobs_max: 2
     has_packages: true
     packager_script: packager_enterprise.py
@@ -9445,7 +9452,8 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: s390x-enterprise-ubuntu1804
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) CCFLAGS="-march=z196 -mtune=zEC12" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl --ocsp-stapling=off MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) CCFLAGS="-march=z196 -mtune=zEC12" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    test_flags: --excludeWithAnyTags=requires_ocsp_stapling
     resmoke_jobs_max: 2
     has_packages: true
     packager_script: packager_enterprise.py
@@ -12872,13 +12880,13 @@ buildvariants:
     # If you add anything to san_options, make sure the appropriate changes are
     # also made to SConstruct.
     san_options: LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer" ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
-    compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --allocator=system --sanitize=address --ssl --enable-free-mon=on -j$(grep -c ^processor /proc/cpuinfo)
+    compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --allocator=system --sanitize=address --ssl --ocsp-stapling=off --enable-free-mon=on -j$(grep -c ^processor /proc/cpuinfo)
+    test_flags: --excludeWithAnyTags=requires_fast_memory,requires_ocsp_stapling
     multiversion_platform: ubuntu1804
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under ASAN build.
     hang_analyzer_dump_core: false
     scons_cache_scope: shared
-    test_flags: --excludeWithAnyTags=requires_fast_memory
   tasks:
   - name: compile_all_run_unittests_TG
   - name: compile_benchmarks
@@ -12938,13 +12946,13 @@ buildvariants:
   expansions:
     lang_environment: LANG=C
     san_options: LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer" ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
-    compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --opt=on --allocator=system --sanitize=address --ssl -j$(grep -c ^processor /proc/cpuinfo)
+    compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --opt=on --allocator=system --sanitize=address --ssl --ocsp-stapling=off -j$(grep -c ^processor /proc/cpuinfo)
     multiversion_platform: ubuntu1804
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under ASAN build.
     hang_analyzer_dump_core: false
     scons_cache_scope: shared
-    test_flags: --excludeWithAnyTags=requires_fast_memory
+    test_flags: --excludeWithAnyTags=requires_fast_memory,requires_ocsp_stapling
   tasks:
   - name: compile_all_run_unittests_TG
   - name: .aggfuzzer .common
@@ -12965,7 +12973,8 @@ buildvariants:
     # If you add anything to san_options, make sure the appropriate changes are
     # also made to SConstruct.
     san_options: UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
-    compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --sanitize=undefined --ssl --enable-free-mon=on -j$(grep -c ^processor /proc/cpuinfo)
+    compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --sanitize=undefined --ssl --ocsp-stapling=off --enable-free-mon=on -j$(grep -c ^processor /proc/cpuinfo)
+    test_flags: --excludeWithAnyTags=requires_ocsp_stapling
     multiversion_platform: ubuntu1804
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under UBSAN build.
@@ -13031,7 +13040,8 @@ buildvariants:
     # If you add anything to san_options, make sure the appropriate changes are
     # also made to SConstruct.
     san_options: UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer" LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1" ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
-    compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --allocator=system --sanitize=undefined,address --ssl -j$(grep -c ^processor /proc/cpuinfo) --link-model=dynamic
+    compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --allocator=system --sanitize=undefined,address --ssl --ocsp-stapling=off -j$(grep -c ^processor /proc/cpuinfo) --link-model=dynamic
+    test_flags: --excludeWithAnyTags=requires_ocsp_stapling
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under {A,UB}SAN build.
     hang_analyzer_dump_core: false
     scons_cache_scope: shared
@@ -13059,7 +13069,8 @@ buildvariants:
     # If you add anything to san_options, make sure the appropriate changes are
     # also made to SConstruct.
     san_options: UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer" LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1" ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
-    compile_flags: LINKFLAGS=-nostdlib++ LIBS=stdc++ --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --allocator=system --sanitize=undefined,address,fuzzer --ssl -j$(grep -c ^processor /proc/cpuinfo)
+    compile_flags: LINKFLAGS=-nostdlib++ LIBS=stdc++ --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --allocator=system --sanitize=undefined,address,fuzzer --ssl --ocsp-stapling=off -j$(grep -c ^processor /proc/cpuinfo)
+    test_flags: --excludeWithAnyTags=requires_ocsp_stapling
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under {A,UB}SAN build.
     hang_analyzer_dump_core: false
     scons_cache_scope: shared

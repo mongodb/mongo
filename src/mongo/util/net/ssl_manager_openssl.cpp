@@ -1936,6 +1936,7 @@ std::tuple<X509*> getCertificateForContext(SSL_CTX* context) {
 }
 #endif
 
+#ifdef MONGO_CONFIG_OCSP_STAPLING_ENABLED
 Status SSLManagerOpenSSL::stapleOCSPResponse(SSL_CTX* context, bool asyncOCSPStaple) {
     if (MONGO_unlikely(disableStapling.shouldFail()) || !tlsOCSPEnabled) {
         return Status::OK();
@@ -1943,6 +1944,11 @@ Status SSLManagerOpenSSL::stapleOCSPResponse(SSL_CTX* context, bool asyncOCSPSta
 
     return _fetcher.start(context, asyncOCSPStaple);
 }
+#else
+Status SSLManagerOpenSSL::stapleOCSPResponse(SSL_CTX* context, bool asyncOCSPStaple) {
+    return Status::OK();
+}
+#endif  // MONGO_CONFIG_OCSP_STAPLING_ENABLED
 
 Status OCSPFetcher::start(SSL_CTX* context, bool asyncOCSPStaple) {
     // Increment the ref count on SSL_CTX by creating a SSL object so that our context lives with

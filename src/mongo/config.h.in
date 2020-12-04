@@ -74,6 +74,9 @@
 // A number, if we have some extended alignment ability
 @mongo_config_max_extended_alignment@
 
+// defined if OCSP Stapling is enabled
+@mongo_config_ocsp_stapling_enabled@
+
 // Defined if building an optimized build
 @mongo_config_optimized_build@
 

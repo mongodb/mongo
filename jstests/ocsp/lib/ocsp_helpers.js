@@ -55,3 +55,13 @@ var waitForServer = function(conn) {
         sleep(15000);
     }
 };
+
+var supportsStapling = function() {
+    if (determineSSLProvider() !== "openssl") {
+        return false;
+    }
+
+    if (isUbuntu1804() === true) {
+        return false;
+    }
+};

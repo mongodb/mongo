@@ -1,12 +1,12 @@
 // Validate rotate certificates works with ocsp
-// @tags: [live_record_incompatible]
+// @tags: [live_record_incompatible, requires_http_client, requires_ocsp_stapling]
 (function() {
 "use strict";
 
 load('jstests/ssl/libs/ssl_helpers.js');
 load('jstests/ocsp/lib/mock_ocsp.js');
 
-if (determineSSLProvider() !== "openssl") {
+if (!supportsStapling()) {
     return;
 }
 

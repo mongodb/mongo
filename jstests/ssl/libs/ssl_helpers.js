@@ -321,6 +321,22 @@ function isUbuntu2004() {
     return false;
 }
 
+function isUbuntu1804() {
+    if (_isWindows()) {
+        return false;
+    }
+
+    // Ubuntu 18.04's TLS 1.3 implementation has an issue with OCSP stapling. We have disabled
+    // stapling on this build variant, so we need to ensure that tests that require stapling
+    // do not run on this machine.
+    const grep_result = runProgram('grep', 'bionic', '/etc/os-release');
+    if (grep_result === 0) {
+        return true;
+    }
+
+    return false;
+}
+
 function isDebian10() {
     if (_isWindows()) {
         return false;
