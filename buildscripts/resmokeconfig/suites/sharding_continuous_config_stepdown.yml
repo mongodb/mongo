@@ -228,18 +228,15 @@ selector:
   - jstests/sharding/api_params_transaction_sharded.js
   - jstests/sharding/api_params_transaction_unsharded.js
 
-  # SERVER-51495 reenable after resharding M3
-  - jstests/sharding/reshard_collection_basic.js
-
-  # TODO SERVER-50584: Re-enable after reshardCollection command errors when one of the recipient
-  # shards error.
-  - jstests/sharding/resharding_clones_duplicate_key.js
+  # TODO SERVER-51495: Re-enable these tests after reshardCollection is resilient to config server
+  # primary failovers.
+  - jstests/sharding/*reshard*.js
+  # TODO SERVER-52620: resharding_replicate_updates_as_insert_delete writes directly to the config
+  # server primary.
+  - jstests/sharding/resharding_replicate_updates_as_insert_delete.js
 
   # SERVER-51805 splitChunk op is not idempotent
   - jstests/sharding/mongos_get_shard_version.js
-
-  # SERVER-52620 test writes directly to CSRS primary
-  - jstests/sharding/resharding_replicate_updates_as_insert_delete.js
 
 executor:
   config:

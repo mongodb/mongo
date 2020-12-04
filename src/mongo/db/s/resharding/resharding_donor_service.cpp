@@ -37,6 +37,7 @@
 #include "mongo/db/op_observer.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding_util.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
@@ -205,8 +206,16 @@ void ReshardingDonorService::DonorStateMachine::
     auto minFetchTimestamp = generateMinFetchTimestamp(_donorDoc);
     _transitionStateAndUpdateCoordinator(DonorStateEnum::kDonatingInitialData, minFetchTimestamp);
 
-    // TODO SERVER-XXXXX Remove this line.
-    interrupt({ErrorCodes::InternalError, "Artificial interruption to enable jsTests"});
+    // Unless a test is willing to leak the contents of the config.localReshardingOperations.donor
+    // collection, without this interrupt(), an invariant would be hit from
+    // _allRecipientsDoneCloning not being ready when this DonorStateMachine is being destructed.
+    //
+    // TODO SERVER-51130: Move this interrupt() to after _transitionState(kDonatingOplogEntries)
+    // once the donor shards learn from the coordinator when all recipient shards have finished
+    // cloning.
+    if (resharding::gReshardingTempInterruptBeforeOplogApplication) {
+        interrupt({ErrorCodes::InternalError, "Artificial interruption to enable jsTests"});
+    }
 }
 
 ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::
@@ -240,6 +249,7 @@ void ReshardingDonorService::DonorStateMachine::
     }
 
     _transitionState(DonorStateEnum::kMirroring);
+    interrupt({ErrorCodes::InternalError, "Artificial interruption to enable jsTests"});
 }
 
 ExecutorFuture<void>

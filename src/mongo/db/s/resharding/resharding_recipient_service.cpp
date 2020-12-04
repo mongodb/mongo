@@ -341,7 +341,14 @@ void ReshardingRecipientService::RecipientStateMachine::_applyThenTransitionToSt
     // _cloneThenTransitionToApplying() to call _transitionStateAndUpdateCoordinator(kSteadyState).
 
     _transitionStateAndUpdateCoordinator(RecipientStateEnum::kSteadyState);
-    interrupt({ErrorCodes::InternalError, "Artificial interruption to enable jsTests"});
+
+    // Unless a test is prepared to write the final oplog entries itself, without this interrupt(),
+    // the futures returned by ReshardingOplogFetcher::schedule() would never become ready.
+    //
+    // TODO SERVER-52795: Remove once the donor shards write the final oplog entry themselves.
+    if (resharding::gReshardingTempInterruptBeforeOplogApplication) {
+        interrupt({ErrorCodes::InternalError, "Artificial interruption to enable jsTests"});
+    }
 }
 
 ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
@@ -411,6 +418,7 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
 
     return whenAllSucceed(std::move(futuresToWaitOn)).thenRunOn(**executor).then([this] {
         _transitionStateAndUpdateCoordinator(RecipientStateEnum::kStrictConsistency);
+        interrupt({ErrorCodes::InternalError, "Artificial interruption to enable jsTests"});
     });
 }
 

@@ -37,6 +37,7 @@
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
 #include "mongo/db/s/resharding/resharding_coordinator_service.h"
+#include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_tags.h"
@@ -213,9 +214,14 @@ public:
 
             instance->getObserver()->awaitAllRecipientsFinishedCloning().wait(opCtx);
 
-            // This promise is currently automatically filled by recipient shards after creating
-            // the temporary resharding collection.
-            instance->getObserver()->awaitAllRecipientsFinishedApplying().wait(opCtx);
+            if (resharding::gReshardingTempInterruptBeforeOplogApplication) {
+                // This promise is currently automatically filled by recipient shards after creating
+                // the temporary resharding collection.
+                instance->getObserver()->awaitAllRecipientsFinishedApplying().wait(opCtx);
+            } else {
+                instance->getObserver()->awaitAllRecipientsFinishedApplying().wait(opCtx);
+                instance->getObserver()->awaitAllRecipientsInStrictConsistency().wait(opCtx);
+            }
 
             instance->interrupt(
                 {ErrorCodes::InternalError, "Artificial interruption to enable jsTests"});

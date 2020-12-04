@@ -46,12 +46,16 @@
 #include "mongo/s/shard_id.h"
 #include "mongo/s/sharded_collections_ddl_parameters_gen.h"
 #include "mongo/s/write_ops/batched_command_response.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/future_util.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace {
+
+MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorInSteadyState);
+MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforeCommit);
 
 BatchedCommandRequest buildInsertOp(const NamespaceString& nss, std::vector<BSONObj> docs) {
     BatchedCommandRequest request([&] {
@@ -832,6 +836,11 @@ ReshardingCoordinatorService::ReshardingCoordinator::_awaitAllRecipientsFinished
     return _reshardingCoordinatorObserver->awaitAllRecipientsFinishedApplying()
         .thenRunOn(**executor)
         .then([this](ReshardingCoordinatorDocument coordinatorDocChangedOnDisk) {
+            {
+                auto opCtx = cc().makeOperationContext();
+                reshardingPauseCoordinatorInSteadyState.pauseWhileSet(opCtx.get());
+            }
+
             this->_updateCoordinatorDocStateAndCatalogEntries(CoordinatorStateEnum::kMirroring,
                                                               coordinatorDocChangedOnDisk);
         });
@@ -858,6 +867,7 @@ Future<void> ReshardingCoordinatorService::ReshardingCoordinator::_commit(
     updatedCoordinatorDoc.setState(CoordinatorStateEnum::kCommitted);
 
     auto opCtx = cc().makeOperationContext();
+    reshardingPauseCoordinatorBeforeCommit.pauseWhileSet(opCtx.get());
 
     // The new epoch and timestamp to use for the resharded collection to indicate that the
     // collection is a new incarnation of the namespace
