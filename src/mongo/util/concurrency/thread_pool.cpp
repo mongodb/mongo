@@ -515,9 +515,16 @@ void ThreadPool::Impl::_doOneTask(stdx::unique_lock<Latch>* lk) noexcept {
     Task task = std::move(_pendingTasks.front());
     _pendingTasks.pop_front();
     --_numIdleThreads;
+
     lk->unlock();
+    // Run the task outside of the lock. Note that if the task throws, the task destructor will run
+    // outside of the lock before the exception hits the noexcept boundary.
     task(Status::OK());
+
+    // Reset the task and run the dtor before we reacquire the lock.
+    task = {};
     lk->lock();
+
     ++_numIdleThreads;
     if (_pendingTasks.empty() && _threads.size() == _numIdleThreads) {
         _poolIsIdle.notify_all();
