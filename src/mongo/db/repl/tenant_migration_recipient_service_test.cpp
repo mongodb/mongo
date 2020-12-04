@@ -965,7 +965,7 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogApplierFails) {
                                      BSON("_id"
                                           << "bad insert"),
                                      boost::none /* o2 */);
-    oplogFetcher->receiveBatch(1LL, {oplogEntry.toBSON()});
+    oplogFetcher->receiveBatch(1LL, {oplogEntry.toBSON()}, injectedEntryOpTime.getTimestamp());
 
     // Wait for task completion failure.
     ASSERT_NOT_OK(instance->getCompletionFuture().getNoThrow());
