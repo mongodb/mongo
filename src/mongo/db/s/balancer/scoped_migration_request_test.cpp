@@ -32,7 +32,6 @@
 #include "mongo/db/s/balancer/scoped_migration_request.h"
 #include "mongo/db/s/balancer/type_migration.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
-#include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/request_types/migration_secondary_throttle_options.h"
 

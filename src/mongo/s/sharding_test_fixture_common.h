@@ -38,13 +38,6 @@
 
 namespace mongo {
 
-class DistLockCatalog;
-class DistLockManager;
-
-namespace executor {
-class TaskExecutor;
-}  // namespace executor
-
 /**
  * Contains common functionality and tools, which apply to both mongos and mongod unit-tests.
  */
@@ -87,16 +80,6 @@ protected:
         return _targeterFactory;
     }
 
-    DistLockCatalog* distLockCatalog() const {
-        invariant(_distLockCatalog);
-        return _distLockCatalog;
-    }
-
-    DistLockManager* distLock() const {
-        invariant(_distLockManager);
-        return _distLockManager;
-    }
-
     /**
      * Blocking methods, which receive one message from the network and respond using the responses
      * returned from the input function. This is a syntactic sugar for simple, single request +
@@ -129,14 +112,9 @@ protected:
                                       const std::string& ns,
                                       const BSONObj& detail);
 
-    /**
-     * Base class returns nullptr.
-     *
-     * Note: ShardingCatalogClient takes ownership of DistLockManager, so if DistLockManager is not
-     * nulllptr, a real or mock ShardingCatalogClient must be supplied.
-     */
-    virtual std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient(
-        std::unique_ptr<DistLockManager> distLockManager);
+    virtual std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient() {
+        return nullptr;
+    }
 
     // Since a NetworkInterface is a private member of a TaskExecutor, we store a raw pointer to the
     // fixed TaskExecutor's NetworkInterface here.
@@ -152,14 +130,6 @@ protected:
     // Since the RemoteCommandTargeterFactory is currently a private member of ShardFactory, we
     // store a raw pointer to it here.
     RemoteCommandTargeterFactoryMock* _targeterFactory = nullptr;
-
-    // Since the DistLockCatalog is currently a private member of ReplSetDistLockManager, we store
-    // a raw pointer to it here.
-    DistLockCatalog* _distLockCatalog = nullptr;
-
-    // Since the DistLockManager is currently a private member of ShardingCatalogClient, we
-    // store a raw pointer to it here.
-    DistLockManager* _distLockManager = nullptr;
 
 private:
     // Keeps the lifetime of the operation context

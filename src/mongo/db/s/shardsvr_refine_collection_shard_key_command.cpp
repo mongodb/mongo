@@ -34,7 +34,6 @@
 #include "mongo/db/drop_database_gen.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/sharding_logging.h"
-#include "mongo/s/catalog/dist_lock_manager.h"
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/grid.h"

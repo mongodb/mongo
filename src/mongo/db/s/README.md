@@ -521,8 +521,8 @@ collections, such as config.shards, config.chunks, and config.tags. For example,
 mergeChunks, and moveChunk all take the chunk ResourceMutex.
 
 #### Code references
-* [**DistLockManager class**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/s/catalog/dist_lock_manager.h)
-* [**DistLockCatalog class**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/s/catalog/dist_lock_catalog.h)
+* [**DistLockManager class**](https://github.com/mongodb/mongo/blob/master/src/mongo/db/s/dist_lock_manager.h)
+* [**DistLockCatalog class**](https://github.com/mongodb/mongo/blob/master/src/mongo/db/s/dist_lock_catalog.h)
 * [**NamespaceSerializer class**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/s/config/namespace_serializer.h)
 * The interface for acquiring NamespaceSerializer locks
 [**via the ShardingCatalogManager**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/s/config/sharding_catalog_manager.h#L276)

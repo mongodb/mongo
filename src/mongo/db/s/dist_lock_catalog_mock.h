@@ -31,9 +31,8 @@
 
 #include <functional>
 
-#include "mongo/base/status_with.h"
+#include "mongo/db/s/dist_lock_catalog.h"
 #include "mongo/platform/mutex.h"
-#include "mongo/s/catalog/dist_lock_catalog.h"
 #include "mongo/s/catalog/type_lockpings.h"
 #include "mongo/s/catalog/type_locks.h"
 
@@ -220,4 +219,5 @@ private:
     GetServerInfoFunc _getServerInfoChecker;
     StatusWith<DistLockCatalog::ServerInfo> _getServerInfoReturnValue;
 };
+
 }  // namespace mongo

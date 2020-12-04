@@ -53,7 +53,6 @@
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/rpc/metadata/tracking_metadata.h"
 #include "mongo/s/balancer_configuration.h"
-#include "mongo/s/catalog/dist_lock_manager_mock.h"
 #include "mongo/s/catalog/sharding_catalog_client_impl.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_shard.h"
@@ -132,9 +131,6 @@ ShardingTestFixture::ShardingTestFixture()
     auto executorPool = std::make_unique<executor::TaskExecutorPool>();
     executorPool->addExecutors(std::move(executorsForPool), _fixedExecutor);
 
-    auto uniqueDistLockManager = std::make_unique<DistLockManagerMock>(nullptr);
-    _distLockManager = uniqueDistLockManager.get();
-
     NumHostsTargetedMetrics::get(service).startup();
 
     ConnectionString configCS = ConnectionString::forReplicaSet(
@@ -174,17 +170,13 @@ ShardingTestFixture::ShardingTestFixture()
     // until we get rid of it.
     auto uniqueOpCtx = makeOperationContext();
     auto const grid = Grid::get(uniqueOpCtx.get());
-    grid->init(makeShardingCatalogClient(std::move(uniqueDistLockManager)),
+    grid->init(makeShardingCatalogClient(),
                std::move(catalogCache),
                std::move(shardRegistry),
                std::make_unique<ClusterCursorManager>(service->getPreciseClockSource()),
                std::make_unique<BalancerConfiguration>(),
                std::move(executorPool),
                _mockNetwork);
-
-    if (grid->catalogClient()) {
-        grid->catalogClient()->startup();
-    }
 }
 
 ShardingTestFixture::~ShardingTestFixture() {
@@ -193,9 +185,6 @@ ShardingTestFixture::~ShardingTestFixture() {
     if (auto grid = Grid::get(getServiceContext())) {
         if (grid->getExecutorPool()) {
             grid->getExecutorPool()->shutdownAndJoin();
-        }
-        if (grid->catalogClient()) {
-            grid->catalogClient()->shutDown(makeOperationContext().get());
         }
         if (grid->shardRegistry()) {
             grid->shardRegistry()->shutdown();
@@ -419,10 +408,8 @@ void ShardingTestFixture::checkReadConcern(const BSONObj& cmdObj,
     }
 }
 
-std::unique_ptr<ShardingCatalogClient> ShardingTestFixture::makeShardingCatalogClient(
-    std::unique_ptr<DistLockManager> distLockManager) {
-    invariant(distLockManager);
-    return std::make_unique<ShardingCatalogClientImpl>(std::move(distLockManager));
+std::unique_ptr<ShardingCatalogClient> ShardingTestFixture::makeShardingCatalogClient() {
+    return std::make_unique<ShardingCatalogClientImpl>();
 }
 
 }  // namespace mongo

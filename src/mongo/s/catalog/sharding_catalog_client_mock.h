@@ -38,12 +38,8 @@ namespace mongo {
  */
 class ShardingCatalogClientMock : public ShardingCatalogClient {
 public:
-    ShardingCatalogClientMock(std::unique_ptr<DistLockManager> distLockManager);
+    ShardingCatalogClientMock();
     ~ShardingCatalogClientMock();
-
-    void startup() override;
-
-    void shutDown(OperationContext* opCtx) override;
 
     DatabaseType getDatabase(OperationContext* opCtx,
                              StringData db,
@@ -129,8 +125,6 @@ public:
 
     Status createDatabase(OperationContext* opCtx, StringData dbName, ShardId primaryShard);
 
-    DistLockManager* getDistLockManager() override;
-
     StatusWith<std::vector<KeysCollectionDocument>> getNewKeys(
         OperationContext* opCtx,
         StringData purpose,
@@ -138,8 +132,6 @@ public:
         repl::ReadConcernLevel readConcernLevel) override;
 
 private:
-    std::unique_ptr<DistLockManager> _distLockManager;
-
     StatusWith<repl::OpTimeWith<std::vector<BSONObj>>> _exhaustiveFindOnConfig(
         OperationContext* opCtx,
         const ReadPreferenceSetting& readPref,

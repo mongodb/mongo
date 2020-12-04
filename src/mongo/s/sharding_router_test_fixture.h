@@ -37,7 +37,6 @@ class BSONObj;
 class ShardingCatalogClient;
 struct ChunkVersion;
 class CollectionType;
-class DistLockManagerMock;
 class ShardRegistry;
 class ShardType;
 
@@ -143,8 +142,7 @@ protected:
     }
 
 private:
-    std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient(
-        std::unique_ptr<DistLockManager> distLockManager) override;
+    std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient() override;
 
     transport::SessionHandle _transportSession;
 

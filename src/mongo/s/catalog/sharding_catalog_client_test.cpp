@@ -43,7 +43,6 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/rpc/metadata/tracking_metadata.h"
-#include "mongo/s/catalog/dist_lock_manager_mock.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
@@ -70,13 +69,6 @@ using rpc::ReplSetMetadata;
 using std::vector;
 using unittest::assertGet;
 
-class ShardingCatalogClientTest : public ShardingTestFixture {
-protected:
-    DistLockManagerMock* distLock() const {
-        return dynamic_cast<DistLockManagerMock*>(ShardingTestFixture::distLock());
-    }
-};
-
 const int kMaxCommandRetry = 3;
 const NamespaceString kNamespace("TestDB", "TestColl");
 
@@ -86,6 +78,8 @@ BSONObj getReplSecondaryOkMetadata() {
     o.append(rpc::kReplSetMetadataFieldName, 1);
     return o.obj();
 }
+
+using ShardingCatalogClientTest = ShardingTestFixture;
 
 TEST_F(ShardingCatalogClientTest, GetCollectionExisting) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
@@ -635,13 +629,6 @@ TEST_F(ShardingCatalogClientTest, RunUserManagementWriteCommandInvalidWriteConce
 TEST_F(ShardingCatalogClientTest, RunUserManagementWriteCommandRewriteWriteConcern) {
     // Tests that if you send a w:1 write concern it gets replaced with w:majority
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
-
-    distLock()->expectLock(
-        [](StringData name, StringData whyMessage, Milliseconds waitFor) {
-            ASSERT_EQUALS("authorizationData", name);
-            ASSERT_EQUALS("dropUser", whyMessage);
-        },
-        Status::OK());
 
     auto future =
         launchAsync([this] {

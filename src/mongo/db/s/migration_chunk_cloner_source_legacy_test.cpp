@@ -213,11 +213,10 @@ protected:
     TxnNumber _txnNumber{0};
 
 private:
-    std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient(
-        std::unique_ptr<DistLockManager> distLockManager) override {
+    std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient() override {
         class StaticCatalogClient final : public ShardingCatalogClientMock {
         public:
-            StaticCatalogClient() : ShardingCatalogClientMock(nullptr) {}
+            StaticCatalogClient() = default;
 
             StatusWith<repl::OpTimeWith<std::vector<ShardType>>> getAllShards(
                 OperationContext* opCtx, repl::ReadConcernLevel readConcern) override {

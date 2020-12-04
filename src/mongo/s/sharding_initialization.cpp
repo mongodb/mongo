@@ -57,8 +57,6 @@
 #include "mongo/rpc/metadata/config_server_metadata.h"
 #include "mongo/rpc/metadata/metadata_hook.h"
 #include "mongo/s/balancer_configuration.h"
-#include "mongo/s/catalog/dist_lock_catalog_impl.h"
-#include "mongo/s/catalog/replset_dist_lock_manager.h"
 #include "mongo/s/catalog/sharding_catalog_client_impl.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog_cache.h"
@@ -79,7 +77,6 @@
 #include "mongo/util/str.h"
 
 namespace mongo {
-
 namespace {
 
 using executor::ConnectionPool;
@@ -89,19 +86,6 @@ using executor::TaskExecutorPool;
 using executor::ThreadPoolTaskExecutor;
 
 static constexpr auto kRetryInterval = Seconds{2};
-
-std::unique_ptr<ShardingCatalogClient> makeCatalogClient(ServiceContext* service,
-                                                         StringData distLockProcessId) {
-    auto distLockCatalog = std::make_unique<DistLockCatalogImpl>();
-    auto distLockManager =
-        std::make_unique<ReplSetDistLockManager>(service,
-                                                 distLockProcessId,
-                                                 std::move(distLockCatalog),
-                                                 ReplSetDistLockManager::kDistLockPingInterval,
-                                                 ReplSetDistLockManager::kDistLockExpirationTime);
-
-    return std::make_unique<ShardingCatalogClientImpl>(std::move(distLockManager));
-}
 
 std::shared_ptr<executor::TaskExecutor> makeShardingFixedTaskExecutor(
     std::unique_ptr<NetworkInterface> net) {
@@ -208,7 +192,7 @@ Status initializeGlobalShardingState(OperationContext* opCtx,
     const auto service = opCtx->getServiceContext();
     auto const grid = Grid::get(service);
 
-    grid->init(makeCatalogClient(service, distLockProcessId),
+    grid->init(std::make_unique<ShardingCatalogClientImpl>(),
                std::move(catalogCache),
                std::move(shardRegistry),
                std::make_unique<ClusterCursorManager>(service->getPreciseClockSource()),
@@ -218,9 +202,6 @@ Status initializeGlobalShardingState(OperationContext* opCtx,
 
     // The shard registry must be started once the grid is initialized
     grid->shardRegistry()->startupPeriodicReloader(opCtx);
-
-    // The catalog client must be started after the shard registry has been started up
-    grid->catalogClient()->startup();
 
     auto keysCollectionClient =
         std::make_unique<KeysCollectionClientSharded>(grid->catalogClient());

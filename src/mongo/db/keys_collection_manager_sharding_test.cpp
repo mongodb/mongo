@@ -29,17 +29,12 @@
 
 #include "mongo/platform/basic.h"
 
-#include <memory>
-#include <set>
-#include <string>
-
 #include "mongo/db/jsobj.h"
 #include "mongo/db/keys_collection_client_sharded.h"
 #include "mongo/db/keys_collection_document.h"
 #include "mongo/db/keys_collection_manager.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
 #include "mongo/db/vector_clock_mutable.h"
-#include "mongo/s/catalog/dist_lock_manager_mock.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/fail_point.h"
@@ -73,15 +68,6 @@ protected:
         _keyManager->stopMonitoring();
 
         ConfigServerTestFixture::tearDown();
-    }
-
-    /**
-     * Intentionally create a DistLockManagerMock, even though this is a config serfver test in
-     * order to avoid the lock pinger thread from executing and accessing uninitialized state.
-     */
-    std::unique_ptr<DistLockManager> makeDistLockManager(
-        std::unique_ptr<DistLockCatalog> distLockCatalog) override {
-        return std::make_unique<DistLockManagerMock>(std::move(distLockCatalog));
     }
 
 private:

@@ -52,7 +52,6 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/s/catalog/config_server_version.h"
-#include "mongo/s/catalog/dist_lock_manager.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_config_version.h"
@@ -135,32 +134,9 @@ void sendRetryableWriteBatchRequestToConfig(OperationContext* opCtx,
 
 }  // namespace
 
-ShardingCatalogClientImpl::ShardingCatalogClientImpl(
-    std::unique_ptr<DistLockManager> distLockManager)
-    : _distLockManager(std::move(distLockManager)) {}
+ShardingCatalogClientImpl::ShardingCatalogClientImpl() = default;
 
 ShardingCatalogClientImpl::~ShardingCatalogClientImpl() = default;
-
-void ShardingCatalogClientImpl::startup() {
-    stdx::lock_guard<Latch> lk(_mutex);
-    if (_started) {
-        return;
-    }
-
-    _started = true;
-    _distLockManager->startUp();
-}
-
-void ShardingCatalogClientImpl::shutDown(OperationContext* opCtx) {
-    LOGV2_DEBUG(22673, 1, "ShardingCatalogClientImpl::shutDown() called.");
-    {
-        stdx::lock_guard<Latch> lk(_mutex);
-        _inShutdown = true;
-    }
-
-    invariant(_distLockManager);
-    _distLockManager->shutDown(opCtx);
-}
 
 Status ShardingCatalogClientImpl::updateShardingCatalogEntryForCollection(
     OperationContext* opCtx,
@@ -705,11 +681,6 @@ Status ShardingCatalogClientImpl::applyChunkOpsDeprecated(OperationContext* opCt
     }
 
     return Status::OK();
-}
-
-DistLockManager* ShardingCatalogClientImpl::getDistLockManager() {
-    invariant(_distLockManager);
-    return _distLockManager.get();
 }
 
 Status ShardingCatalogClientImpl::insertConfigDocument(OperationContext* opCtx,

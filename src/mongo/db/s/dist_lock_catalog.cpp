@@ -29,17 +29,24 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/catalog/dist_lock_ping_info.h"
+#include "mongo/db/s/dist_lock_catalog.h"
 
 namespace mongo {
 
-DistLockPingInfo::DistLockPingInfo() = default;
+const WriteConcernOptions DistLockCatalog::kLocalWriteConcern(1,
+                                                              WriteConcernOptions::SyncMode::UNSET,
+                                                              Milliseconds(0));
 
-DistLockPingInfo::DistLockPingInfo(
-    StringData idArg, Date_t lastPingArg, Date_t remoteArg, OID tsArg, OID electionIdArg)
-    : processId(idArg.toString()),
-      lastPing(lastPingArg),
-      configLocalTime(remoteArg),
-      lockSessionId(std::move(tsArg)),
-      electionId(std::move(electionIdArg)) {}
+const WriteConcernOptions DistLockCatalog::kMajorityWriteConcern(
+    WriteConcernOptions::kMajority,
+    // Note: Even though we're setting UNSET here, kMajority implies JOURNAL if journaling is
+    // supported by this mongod.
+    WriteConcernOptions::SyncMode::UNSET,
+    WriteConcernOptions::kWriteConcernTimeoutSystem);
+
+DistLockCatalog::DistLockCatalog() = default;
+
+DistLockCatalog::ServerInfo::ServerInfo(Date_t time, OID _electionId)
+    : serverTime(std::move(time)), electionId(std::move(_electionId)) {}
+
 }  // namespace mongo

@@ -1389,7 +1389,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/query_exec',
         '$BUILD_DIR/mongo/db/repl/oplog_buffer_proxy',
         '$BUILD_DIR/mongo/db/repl/replication_metrics',
-        '$BUILD_DIR/mongo/db/s/sharding_catalog_manager',
         '$BUILD_DIR/mongo/db/s/sharding_runtime_d',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/stats/counters',

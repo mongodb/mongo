@@ -125,8 +125,7 @@ public:
 
     class StaticCatalogClient final : public ShardingCatalogClientMock {
     public:
-        StaticCatalogClient(std::vector<ShardType> shards)
-            : ShardingCatalogClientMock(nullptr), _shards(std::move(shards)) {}
+        StaticCatalogClient(std::vector<ShardType> shards) : _shards(std::move(shards)) {}
 
         StatusWith<repl::OpTimeWith<std::vector<ShardType>>> getAllShards(
             OperationContext* opCtx, repl::ReadConcernLevel readConcern) override {
@@ -149,8 +148,7 @@ public:
         std::vector<CollectionType> _colls;
     };
 
-    std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient(
-        std::unique_ptr<DistLockManager> distLockManager) override {
+    std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient() override {
         return std::make_unique<StaticCatalogClient>(kShardList);
     }
 

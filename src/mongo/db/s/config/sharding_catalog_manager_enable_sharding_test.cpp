@@ -40,7 +40,6 @@
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/tracking_metadata.h"
-#include "mongo/s/catalog/dist_lock_catalog_impl.h"
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard_registry.h"

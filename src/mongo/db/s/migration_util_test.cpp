@@ -372,8 +372,7 @@ public:
     // and loading all collections when a database is loaded for the first time by the CatalogCache.
     class StaticCatalogClient final : public ShardingCatalogClientMock {
     public:
-        StaticCatalogClient(std::vector<ShardType> shards)
-            : ShardingCatalogClientMock(nullptr), _shards(std::move(shards)) {}
+        StaticCatalogClient(std::vector<ShardType> shards) : _shards(std::move(shards)) {}
 
         StatusWith<repl::OpTimeWith<std::vector<ShardType>>> getAllShards(
             OperationContext* opCtx, repl::ReadConcernLevel readConcern) override {
@@ -404,8 +403,7 @@ public:
         return autoColl.getCollection()->uuid();
     }
 
-    std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient(
-        std::unique_ptr<DistLockManager> distLockManager) override {
+    std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient() override {
         auto mockCatalogClient = std::make_unique<StaticCatalogClient>(kShardList);
         // Stash a pointer to the mock so its return values can be set.
         _mockCatalogClient = mockCatalogClient.get();

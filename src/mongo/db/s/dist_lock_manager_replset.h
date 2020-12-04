@@ -30,24 +30,17 @@
 #pragma once
 
 #include <deque>
-#include <memory>
-#include <string>
 
-#include "mongo/base/string_data.h"
+#include "mongo/db/s/dist_lock_catalog.h"
+#include "mongo/db/s/dist_lock_manager.h"
 #include "mongo/platform/mutex.h"
-#include "mongo/s/catalog/dist_lock_catalog.h"
-#include "mongo/s/catalog/dist_lock_manager.h"
-#include "mongo/s/catalog/dist_lock_ping_info.h"
-#include "mongo/stdx/chrono.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/stdx/unordered_map.h"
 
 namespace mongo {
 
-class ServiceContext;
-
-class ReplSetDistLockManager final : public DistLockManager {
+class ReplSetDistLockManager : public DistLockManager {
 public:
     // How frequently should the dist lock pinger thread run and write liveness information about
     // this instance of the dist lock manager
@@ -88,10 +81,9 @@ public:
 
     void unlockAll(OperationContext* opCtx, const std::string& processID) override;
 
-protected:
+private:
     Status checkStatus(OperationContext* opCtx, const DistLockHandle& lockSessionID) override;
 
-private:
     /**
      * Queue a lock to be unlocked asynchronously with retry until it doesn't error.
      */
@@ -114,6 +106,34 @@ private:
     StatusWith<bool> isLockExpired(OperationContext* opCtx,
                                    const LocksType lockDoc,
                                    const Milliseconds& lockExpiration);
+
+    /**
+     * Data structure for storing information about distributed lock pings.
+     */
+    struct DistLockPingInfo {
+        DistLockPingInfo();
+        DistLockPingInfo(StringData processId,
+                         Date_t lastPing,
+                         Date_t configLocalTime,
+                         OID lockSessionId,
+                         OID electionId);
+
+        // the process processId of the last known owner of the lock.
+        std::string processId;
+
+        // the ping value from the last owner of the lock.
+        Date_t lastPing;
+
+        // the config server local time when this object was updated.
+        Date_t configLocalTime;
+
+        // last known owner of the lock.
+        OID lockSessionId;
+
+        // the election id of the config server when this object was updated.
+        // Note: unused by legacy dist lock.
+        OID electionId;
+    };
 
     //
     // All member variables are labeled with one of the following codes indicating the

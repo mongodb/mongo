@@ -42,7 +42,6 @@
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclient_rs.h"
 #include "mongo/client/global_conn_pool.h"
-#include "mongo/client/remote_command_targeter.h"
 #include "mongo/client/remote_command_targeter_factory_impl.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/config.h"
@@ -344,10 +343,6 @@ void cleanupTask(const ShutdownTaskArgs& shutdownArgs) {
 
         if (auto pool = Grid::get(opCtx)->getExecutorPool()) {
             pool->shutdownAndJoin();
-        }
-
-        if (auto catalog = Grid::get(opCtx)->catalogClient()) {
-            catalog->shutDown(opCtx);
         }
 
         if (auto shardRegistry = Grid::get(opCtx)->shardRegistry()) {

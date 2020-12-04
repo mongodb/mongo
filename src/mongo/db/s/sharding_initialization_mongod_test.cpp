@@ -44,7 +44,6 @@
 #include "mongo/db/s/sharding_initialization_mongod.h"
 #include "mongo/db/s/type_shard_identity.h"
 #include "mongo/db/server_options.h"
-#include "mongo/s/catalog/dist_lock_manager_mock.h"
 #include "mongo/s/catalog/sharding_catalog_client_impl.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/config_server_catalog_cache_loader.h"
@@ -60,9 +59,6 @@ const std::string kShardName("TestShard");
  */
 class ShardingInitializationMongoDTest : public ShardingMongodTestFixture {
 protected:
-    // Used to write to set up local collections before exercising server logic.
-    std::unique_ptr<DBDirectClient> _dbDirectClient;
-
     void setUp() override {
         serverGlobalParams.clusterRole = ClusterRole::None;
         ShardingMongodTestFixture::setUp();
@@ -109,15 +105,8 @@ protected:
         ShardingMongodTestFixture::tearDown();
     }
 
-    std::unique_ptr<DistLockManager> makeDistLockManager(
-        std::unique_ptr<DistLockCatalog> distLockCatalog) override {
-        return std::make_unique<DistLockManagerMock>(nullptr);
-    }
-
-    std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient(
-        std::unique_ptr<DistLockManager> distLockManager) override {
-        invariant(distLockManager);
-        return std::make_unique<ShardingCatalogClientImpl>(std::move(distLockManager));
+    std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient() override {
+        return std::make_unique<ShardingCatalogClientImpl>();
     }
 
     auto* shardingInitialization() {
@@ -127,6 +116,9 @@ protected:
     auto* shardingState() {
         return ShardingState::get(getServiceContext());
     }
+
+    // Used to write to set up local collections before exercising server logic.
+    std::unique_ptr<DBDirectClient> _dbDirectClient;
 };
 
 /**

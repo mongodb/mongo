@@ -31,7 +31,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/catalog/dist_lock_manager_mock.h"
+#include "mongo/db/s/dist_lock_manager_mock.h"
 
 #include <algorithm>
 
@@ -40,10 +40,9 @@
 #include "mongo/util/time_support.h"
 
 namespace mongo {
-
 namespace {
 
-void NoLockFuncSet(StringData name, StringData whyMessage, Milliseconds waitFor) {
+void noLockFuncSet(StringData name, StringData whyMessage, Milliseconds waitFor) {
     FAIL(str::stream() << "Lock not expected to be called. "
                        << "Name: " << name << ", whyMessage: " << whyMessage
                        << ", waitFor: " << waitFor);
@@ -51,8 +50,10 @@ void NoLockFuncSet(StringData name, StringData whyMessage, Milliseconds waitFor)
 
 }  // namespace
 
-DistLockManagerMock::DistLockManagerMock(std::unique_ptr<DistLockCatalog> catalog)
-    : _catalog(std::move(catalog)), _lockReturnStatus{Status::OK()}, _lockChecker{NoLockFuncSet} {}
+DistLockManagerMock::DistLockManagerMock()
+    : _lockReturnStatus{Status::OK()}, _lockChecker{noLockFuncSet} {}
+
+DistLockManagerMock::~DistLockManagerMock() = default;
 
 void DistLockManagerMock::startUp() {}
 
@@ -70,7 +71,7 @@ StatusWith<DistLockHandle> DistLockManagerMock::lockWithSessionID(OperationConte
                                                                   const OID& lockSessionID,
                                                                   Milliseconds waitFor) {
     _lockChecker(name, whyMessage, waitFor);
-    _lockChecker = NoLockFuncSet;
+    _lockChecker = noLockFuncSet;
 
     if (!_lockReturnStatus.isOK()) {
         return _lockReturnStatus;

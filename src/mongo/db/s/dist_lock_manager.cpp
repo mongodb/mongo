@@ -31,11 +31,17 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/catalog/dist_lock_manager.h"
+#include "mongo/db/s/dist_lock_manager.h"
 
-#include <memory>
+#include "mongo/db/operation_context.h"
 
 namespace mongo {
+namespace {
+
+const auto getDistLockManager =
+    ServiceContext::declareDecoration<std::unique_ptr<DistLockManager>>();
+
+}  // namespace
 
 const Seconds DistLockManager::kDefaultLockTimeout(20);
 const Milliseconds DistLockManager::kSingleLockAttemptTimeout(0);
@@ -71,6 +77,21 @@ DistLockManager::ScopedDistLock& DistLockManager::ScopedDistLock::operator=(
     return *this;
 }
 
+Status DistLockManager::ScopedDistLock::checkStatus() {
+    invariant(_lockManager);
+    return _lockManager->checkStatus(_opCtx, _lockID);
+}
+
+DistLockManager* DistLockManager::get(OperationContext* opCtx) {
+    return getDistLockManager(opCtx->getServiceContext()).get();
+}
+
+void DistLockManager::create(ServiceContext* service,
+                             std::unique_ptr<DistLockManager> distLockManager) {
+    invariant(!getDistLockManager(service));
+    getDistLockManager(service) = std::move(distLockManager);
+}
+
 StatusWith<DistLockManager::ScopedDistLock> DistLockManager::lock(OperationContext* opCtx,
                                                                   StringData name,
                                                                   StringData whyMessage,
@@ -81,14 +102,6 @@ StatusWith<DistLockManager::ScopedDistLock> DistLockManager::lock(OperationConte
     }
 
     return DistLockManager::ScopedDistLock(opCtx, std::move(distLockHandleStatus.getValue()), this);
-}
-
-Status DistLockManager::ScopedDistLock::checkStatus() {
-    if (!_lockManager) {
-        return Status(ErrorCodes::IllegalOperation, "no lock manager, lock was not acquired");
-    }
-
-    return _lockManager->checkStatus(_opCtx, _lockID);
 }
 
 }  // namespace mongo

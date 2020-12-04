@@ -165,8 +165,4 @@ void ShardingTestFixtureCommon::expectConfigCollectionInsert(const HostAndPort& 
     });
 }
 
-std::unique_ptr<ShardingCatalogClient> ShardingTestFixtureCommon::makeShardingCatalogClient(
-    std::unique_ptr<DistLockManager> distLockManager) {
-    return nullptr;
-}
 }  // namespace mongo

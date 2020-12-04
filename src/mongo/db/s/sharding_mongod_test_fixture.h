@@ -30,16 +30,11 @@
 #pragma once
 
 #include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/s/dist_lock_manager.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/s/sharding_test_fixture_common.h"
 
 namespace mongo {
-
-class CatalogCacheLoader;
-
-namespace repl {
-class ReplSettings;
-}  // namespace repl
 
 /**
  * Sets up this fixture as a mongod with a storage engine, OpObserver, and as a member of a replica
@@ -57,7 +52,6 @@ protected:
     ~ShardingMongodTestFixture();
 
     void setUp() override;
-
     void tearDown() override;
 
     /**
@@ -110,18 +104,9 @@ protected:
     virtual std::unique_ptr<ShardRegistry> makeShardRegistry(ConnectionString configConnStr);
 
     /**
-     * Base class returns nullptr.
+     * Allows tests to conditionally construct a DistLockManager
      */
-    virtual std::unique_ptr<DistLockCatalog> makeDistLockCatalog();
-
-    /**
-     * Base class returns nullptr.
-     *
-     * Note: DistLockManager takes ownership of the DistLockCatalog, so if DistLockCatalog is not
-     * nullptr, a real or mock DistLockManager must be supplied.
-     */
-    virtual std::unique_ptr<DistLockManager> makeDistLockManager(
-        std::unique_ptr<DistLockCatalog> distLockCatalog);
+    virtual std::unique_ptr<DistLockManager> makeDistLockManager();
 
     /**
      * Base class returns nullptr.

@@ -74,13 +74,12 @@ void TransactionCoordinatorTestFixture::tearDown() {
     ShardServerTestFixture::tearDown();
 }
 
-std::unique_ptr<ShardingCatalogClient> TransactionCoordinatorTestFixture::makeShardingCatalogClient(
-    std::unique_ptr<DistLockManager> distLockManager) {
+std::unique_ptr<ShardingCatalogClient>
+TransactionCoordinatorTestFixture::makeShardingCatalogClient() {
 
     class StaticCatalogClient final : public ShardingCatalogClientMock {
     public:
-        StaticCatalogClient(std::vector<ShardId> shardIds)
-            : ShardingCatalogClientMock(nullptr), _shardIds(std::move(shardIds)) {}
+        StaticCatalogClient(std::vector<ShardId> shardIds) : _shardIds(std::move(shardIds)) {}
 
         StatusWith<repl::OpTimeWith<std::vector<ShardType>>> getAllShards(
             OperationContext* opCtx, repl::ReadConcernLevel readConcern) override {

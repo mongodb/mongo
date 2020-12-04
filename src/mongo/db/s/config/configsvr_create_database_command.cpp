@@ -42,6 +42,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "mongo/db/s/dist_lock_manager.h"
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/grid.h"
@@ -90,9 +91,8 @@ public:
             auto scopedLock =
                 ShardingCatalogManager::get(opCtx)->serializeCreateOrDropDatabase(opCtx, dbname);
 
-            auto dbDistLock =
-                uassertStatusOK(Grid::get(opCtx)->catalogClient()->getDistLockManager()->lock(
-                    opCtx, dbname, "createDatabase", DistLockManager::kDefaultLockTimeout));
+            auto dbDistLock = uassertStatusOK(DistLockManager::get(opCtx)->lock(
+                opCtx, dbname, "createDatabase", DistLockManager::kDefaultLockTimeout));
 
             ShardingCatalogManager::get(opCtx)->createDatabase(opCtx, dbname, ShardId());
         }

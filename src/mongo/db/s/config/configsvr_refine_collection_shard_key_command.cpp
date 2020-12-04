@@ -36,9 +36,9 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "mongo/db/s/dist_lock_manager.h"
 #include "mongo/db/s/shard_key_util.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/catalog/dist_lock_manager.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/refine_collection_shard_key_gen.h"
 #include "mongo/s/stale_shard_version_helpers.h"
@@ -74,15 +74,15 @@ public:
 
             // Acquire distlocks on the namespace's database and collection.
             DistLockManager::ScopedDistLock dbDistLock(uassertStatusOK(
-                catalogClient->getDistLockManager()->lock(opCtx,
-                                                          nss.db(),
-                                                          "refineCollectionShardKey",
-                                                          DistLockManager::kDefaultLockTimeout)));
+                DistLockManager::get(opCtx)->lock(opCtx,
+                                                  nss.db(),
+                                                  "refineCollectionShardKey",
+                                                  DistLockManager::kDefaultLockTimeout)));
             DistLockManager::ScopedDistLock collDistLock(uassertStatusOK(
-                catalogClient->getDistLockManager()->lock(opCtx,
-                                                          nss.ns(),
-                                                          "refineCollectionShardKey",
-                                                          DistLockManager::kDefaultLockTimeout)));
+                DistLockManager::get(opCtx)->lock(opCtx,
+                                                  nss.ns(),
+                                                  "refineCollectionShardKey",
+                                                  DistLockManager::kDefaultLockTimeout)));
 
             // Validate the given namespace is (i) sharded, (ii) doesn't already have the proposed
             // key, and (iii) has the same epoch as the router that received

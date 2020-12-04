@@ -36,8 +36,8 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/find_and_modify_command_gen.h"
+#include "mongo/db/s/dist_lock_catalog.h"
 #include "mongo/db/write_concern_options.h"
-#include "mongo/s/catalog/dist_lock_catalog.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {

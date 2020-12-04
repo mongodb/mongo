@@ -37,7 +37,6 @@
 #include "mongo/db/keys_collection_document.h"
 #include "mongo/db/repl/optime_with.h"
 #include "mongo/db/write_concern_options.h"
-#include "mongo/s/catalog/dist_lock_manager.h"
 #include "mongo/s/client/shard.h"
 
 namespace mongo {
@@ -96,18 +95,6 @@ public:
     static const WriteConcernOptions kLocalWriteConcern;
 
     virtual ~ShardingCatalogClient() = default;
-
-    /**
-     * Performs implementation-specific startup tasks. Must be run after the catalog client
-     * has been installed into the global 'grid' object. Implementations do not need to guarantee
-     * thread safety so callers should employ proper synchronization when calling this method.
-     */
-    virtual void startup() = 0;
-
-    /**
-     * Performs necessary cleanup when shutting down cleanly.
-     */
-    virtual void shutDown(OperationContext* opCtx) = 0;
 
     /**
      * Retrieves the metadata for a given database, if it exists.
@@ -210,8 +197,8 @@ public:
         OperationContext* opCtx, repl::ReadConcernLevel readConcern) = 0;
 
     /**
-     * Runs a user management command on the config servers, potentially synchronizing through
-     * a distributed lock. Do not use for general write command execution.
+     * Runs a user management command on the config servers. Do not use for general write command
+     * execution.
      *
      * @param commandName: name of command
      * @param dbname: database for which the user management command is invoked
@@ -342,15 +329,6 @@ public:
                                          const NamespaceString& nss,
                                          const BSONObj& query,
                                          const WriteConcernOptions& writeConcern) = 0;
-
-    /**
-     * Obtains a reference to the distributed lock manager instance to use for synchronizing
-     * system-wide changes.
-     *
-     * The returned reference is valid only as long as the catalog client is valid and should not
-     * be cached.
-     */
-    virtual DistLockManager* getDistLockManager() = 0;
 
 protected:
     ShardingCatalogClient() = default;

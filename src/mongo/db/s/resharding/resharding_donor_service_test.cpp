@@ -58,6 +58,7 @@
 
 namespace mongo {
 namespace {
+
 auto reshardingTempNss(const UUID& existingUUID) {
     return NamespaceString(fmt::format("db.system.resharding.{}", existingUUID.toString()));
 }
@@ -67,9 +68,7 @@ protected:
     class ThreeRecipientsCatalogClient final : public ShardingCatalogClientMock {
     public:
         ThreeRecipientsCatalogClient(UUID existingUUID, std::vector<ShardId> recipients)
-            : ShardingCatalogClientMock(nullptr),
-              _existingUUID(std::move(existingUUID)),
-              _recipients(std::move(recipients)) {}
+            : _existingUUID(std::move(existingUUID)), _recipients(std::move(recipients)) {}
 
         // Makes one chunk object per shard; the actual key ranges not relevant for the test.
         // The output is deterministic since this function is also used to provide data to the
@@ -134,12 +133,9 @@ protected:
             NamespaceString(kReshardNs), reshardingTempNss(kExistingUUID), kRecipientShards);
     }
 
-
-    std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient(
-        std::unique_ptr<DistLockManager> distLockManager) {
-        auto mockClient = std::make_unique<ThreeRecipientsCatalogClient>(
+    std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient() override {
+        return std::make_unique<ThreeRecipientsCatalogClient>(
             uassertStatusOK(UUID::parse(kExistingUUID.toString())), kRecipientShards);
-        return mockClient;
     }
 
     std::shared_ptr<ReshardingDonorService::DonorStateMachine> getStateMachineInstace(

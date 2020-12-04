@@ -40,7 +40,6 @@
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/platform/mutex.h"
-#include "mongo/s/catalog/dist_lock_manager.h"
 #include "mongo/s/request_types/migration_secondary_throttle_options.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/unordered_map.h"

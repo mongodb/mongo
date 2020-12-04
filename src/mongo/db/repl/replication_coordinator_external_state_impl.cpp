@@ -78,6 +78,7 @@
 #include "mongo/db/s/balancer/balancer.h"
 #include "mongo/db/s/chunk_splitter.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "mongo/db/s/dist_lock_manager.h"
 #include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/periodic_balancer_config_refresher.h"
 #include "mongo/db/s/periodic_sharded_index_consistency_checker.h"
@@ -862,7 +863,7 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
         }
 
         // Free any leftover locks from previous instantiations.
-        auto distLockManager = Grid::get(opCtx)->catalogClient()->getDistLockManager();
+        auto distLockManager = DistLockManager::get(opCtx);
         distLockManager->unlockAll(opCtx, distLockManager->getProcessID());
 
         if (auto validator = LogicalTimeValidator::get(_service)) {

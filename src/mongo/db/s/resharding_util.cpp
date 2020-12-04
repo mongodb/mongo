@@ -49,7 +49,6 @@
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/document_source_unwind.h"
 #include "mongo/db/s/collection_sharding_state.h"
-#include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"

@@ -34,6 +34,7 @@
 #include <boost/optional.hpp>
 
 #include "mongo/db/json.h"
+#include "mongo/db/s/dist_lock_manager_mock.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/db/s/sharding_initialization_mongod.h"
 #include "mongo/db/s/split_chunk.h"
@@ -42,7 +43,6 @@
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/catalog/dist_lock_manager_mock.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_database.h"

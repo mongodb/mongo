@@ -47,7 +47,7 @@
 #include "mongo/db/s/active_shard_collection_registry.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/config/initial_split_policy.h"
-#include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "mongo/db/s/dist_lock_manager.h"
 #include "mongo/db/s/shard_collection_legacy.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/shard_key_util.h"
@@ -589,10 +589,9 @@ CreateCollectionResponse shardCollection(OperationContext* opCtx,
         boost::optional<DistLockManager::ScopedDistLock> dbDistLock;
         boost::optional<DistLockManager::ScopedDistLock> collDistLock;
         if (!mustTakeDistLock) {
-            auto const catalogClient = Grid::get(opCtx)->catalogClient();
-            dbDistLock.emplace(uassertStatusOK(catalogClient->getDistLockManager()->lock(
+            dbDistLock.emplace(uassertStatusOK(DistLockManager::get(opCtx)->lock(
                 opCtx, nss.db(), "shardCollection", DistLockManager::kDefaultLockTimeout)));
-            collDistLock.emplace(uassertStatusOK(catalogClient->getDistLockManager()->lock(
+            collDistLock.emplace(uassertStatusOK(DistLockManager::get(opCtx)->lock(
                 opCtx, nss.ns(), "shardCollection", DistLockManager::kDefaultLockTimeout)));
         }
 

@@ -160,15 +160,11 @@ protected:
         }
     }
 
-    std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient(
-        std::unique_ptr<DistLockManager> distLockManager) override {
+    std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient() override {
 
         class StaticCatalogClient final : public ShardingCatalogClientMock {
         public:
-            StaticCatalogClient(std::unique_ptr<DistLockManager> distLockManager,
-                                std::vector<ShardId> shardIds)
-                : ShardingCatalogClientMock(std::move(distLockManager)),
-                  _shardIds(std::move(shardIds)) {}
+            StaticCatalogClient(std::vector<ShardId> shardIds) : _shardIds(std::move(shardIds)) {}
 
             StatusWith<repl::OpTimeWith<std::vector<ShardType>>> getAllShards(
                 OperationContext* opCtx, repl::ReadConcernLevel readConcern) override {
@@ -188,7 +184,7 @@ protected:
             const std::vector<ShardId> _shardIds;
         };
 
-        return std::make_unique<StaticCatalogClient>(std::move(distLockManager), kShardIdList);
+        return std::make_unique<StaticCatalogClient>(kShardIdList);
     }
 
     const ShardId kShard1{"s1"};

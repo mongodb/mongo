@@ -278,8 +278,13 @@ private:
 TEST_F(GenerateInitialHashedSplitChunksTest, NoSplitPoints) {
     const std::vector<BSONObj> splitPoints;
     const std::vector<ShardId> shardIds = makeShardIds(2);
-    const auto shardCollectionConfig = InitialSplitPolicy::generateShardCollectionInitialChunks(
-        {nss(), boost::none, shardIds[0]}, shardKeyPattern(), timeStamp(), splitPoints, shardIds);
+    const auto shardCollectionConfig =
+        InitialSplitPolicy::generateShardCollectionInitialChunks({nss(), boost::none, shardIds[0]},
+                                                                 shardKeyPattern(),
+                                                                 timeStamp(),
+                                                                 splitPoints,
+                                                                 shardIds,
+                                                                 1);
 
     // there should only be one chunk
     const auto expectedChunks =
@@ -296,7 +301,8 @@ TEST_F(GenerateInitialHashedSplitChunksTest, SplitPointsMoreThanAvailableShards)
                                                                  shardKeyPattern(),
                                                                  timeStamp(),
                                                                  hashedSplitPoints(),
-                                                                 shardIds);
+                                                                 shardIds,
+                                                                 1);
 
     // // chunks should be distributed in a round-robin manner
     const std::vector<ChunkType> expectedChunks = makeChunks(

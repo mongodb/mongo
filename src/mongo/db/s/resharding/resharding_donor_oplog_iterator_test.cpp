@@ -37,12 +37,10 @@
 #include "mongo/db/s/resharding/resharding_donor_oplog_iterator.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding_util.h"
-#include "mongo/db/s/sharding_mongod_test_fixture.h"
-#include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
-#include "mongo/unittest/unittest.h"
-
 #include "mongo/logv2/log.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {
@@ -93,7 +91,7 @@ private:
     const int _originalValue;
 };
 
-class ReshardingDonorOplogIterTest : public ShardingMongodTestFixture {
+class ReshardingDonorOplogIterTest : public ShardServerTestFixture {
 public:
     repl::MutableOplogEntry makeInsertOplog(Timestamp ts, BSONObj doc) {
         ReshardingDonorOplogId oplogId(ts, ts);

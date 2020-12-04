@@ -51,13 +51,13 @@
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "mongo/db/s/dist_lock_catalog_replset.h"
+#include "mongo/db/s/dist_lock_manager_replset.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/rpc/metadata/tracking_metadata.h"
 #include "mongo/s/balancer_configuration.h"
-#include "mongo/s/catalog/dist_lock_catalog_impl.h"
-#include "mongo/s/catalog/replset_dist_lock_manager.h"
 #include "mongo/s/catalog/sharding_catalog_client_impl.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
@@ -161,25 +161,17 @@ void ConfigServerTestFixture::tearDown() {
     ShardingMongodTestFixture::tearDown();
 }
 
-std::unique_ptr<DistLockCatalog> ConfigServerTestFixture::makeDistLockCatalog() {
-    return std::make_unique<DistLockCatalogImpl>();
-}
-
-std::unique_ptr<DistLockManager> ConfigServerTestFixture::makeDistLockManager(
-    std::unique_ptr<DistLockCatalog> distLockCatalog) {
-    invariant(distLockCatalog);
+std::unique_ptr<DistLockManager> ConfigServerTestFixture::makeDistLockManager() {
     return std::make_unique<ReplSetDistLockManager>(
         getServiceContext(),
         "distLockProcessId",
-        std::move(distLockCatalog),
+        std::make_unique<DistLockCatalogImpl>(),
         ReplSetDistLockManager::kDistLockPingInterval,
         ReplSetDistLockManager::kDistLockExpirationTime);
 }
 
-std::unique_ptr<ShardingCatalogClient> ConfigServerTestFixture::makeShardingCatalogClient(
-    std::unique_ptr<DistLockManager> distLockManager) {
-    invariant(distLockManager);
-    return std::make_unique<ShardingCatalogClientImpl>(std::move(distLockManager));
+std::unique_ptr<ShardingCatalogClient> ConfigServerTestFixture::makeShardingCatalogClient() {
+    return std::make_unique<ShardingCatalogClientImpl>();
 }
 
 std::unique_ptr<BalancerConfiguration> ConfigServerTestFixture::makeBalancerConfiguration() {

@@ -31,15 +31,12 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/oid.h"
+#include "mongo/db/service_context.h"
 #include "mongo/stdx/chrono.h"
 
 namespace mongo {
 
 using DistLockHandle = OID;
-class OperationContext;
-class Status;
-template <typename T>
-class StatusWith;
 
 /**
  * Interface for handling distributed locks.
@@ -97,6 +94,12 @@ public:
     };
 
     virtual ~DistLockManager() = default;
+
+    /**
+     * Retrieves the DistLockManager singleton for the node.
+     */
+    static DistLockManager* get(OperationContext* opCtx);
+    static void create(ServiceContext* service, std::unique_ptr<DistLockManager> distLockManager);
 
     /**
      * Performs bootstrapping for the manager. Implementation do not need to guarantee
@@ -176,7 +179,7 @@ public:
      */
     virtual void unlockAll(OperationContext* opCtx, const std::string& processID) = 0;
 
-protected:
+private:
     /**
      * Checks if the lockHandle still exists in the config server.
      */

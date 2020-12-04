@@ -16,61 +16,6 @@ env.Library(
 )
 
 env.Library(
-    target='dist_lock_manager',
-    source=[
-        'dist_lock_manager.cpp',
-        'dist_lock_ping_info.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-    ],
-)
-
-env.Library(
-    target='dist_lock_catalog_interface',
-    source=[
-        'dist_lock_catalog.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/write_concern_options',
-    ],
-)
-
-env.Library(
-    target='replset_dist_lock_manager',
-    source=[
-        'replset_dist_lock_manager.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/s/catalog/dist_lock_catalog_interface',
-        '$BUILD_DIR/mongo/s/catalog/dist_lock_manager',
-        '$BUILD_DIR/mongo/s/client/sharding_client',
-        '$BUILD_DIR/mongo/util/fail_point'
-    ],
-)
-
-env.Library(
-    target='dist_lock_catalog_impl',
-    source=[
-        'dist_lock_catalog_impl.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/client/read_preference',
-        '$BUILD_DIR/mongo/client/remote_command_targeter',
-        '$BUILD_DIR/mongo/db/common',
-        '$BUILD_DIR/mongo/db/query/command_request_response',
-        '$BUILD_DIR/mongo/db/repl/read_concern_args',
-        '$BUILD_DIR/mongo/rpc/command_status',
-        '$BUILD_DIR/mongo/s/catalog/dist_lock_catalog_interface',
-        '$BUILD_DIR/mongo/s/client/sharding_client',
-        '$BUILD_DIR/mongo/s/write_ops/batch_write_types',
-        '$BUILD_DIR/mongo/util/net/network',
-    ],
-)
-
-env.Library(
     target='sharding_catalog_client_impl',
     source=[
         'sharding_catalog_client_impl.cpp',
@@ -81,34 +26,10 @@ env.Library(
         '$BUILD_DIR/mongo/executor/network_interface',
         '$BUILD_DIR/mongo/s/client/sharding_client',
         '$BUILD_DIR/mongo/s/coreshard',
-        'dist_lock_manager',
         'sharding_catalog_client',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/logical_session_id_helpers'
-    ]
-)
-
-env.Library(
-    target='dist_lock_manager_mock',
-    source=[
-        'dist_lock_manager_mock.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/unittest/unittest',
-        'dist_lock_manager',
-    ],
-)
-
-env.Library(
-    target='dist_lock_catalog_mock',
-    source=[
-        'dist_lock_catalog_mock.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/s/common_s',
-        '$BUILD_DIR/mongo/unittest/unittest',
-        'dist_lock_catalog_interface',
     ]
 )
 
@@ -118,27 +39,6 @@ env.Library(
         'sharding_catalog_client_mock.cpp',
     ],
     LIBDEPS=[
-        'dist_lock_manager_mock',
         'sharding_catalog_client',
-    ]
-)
-
-env.CppUnitTest(
-    target='s_catalog_test',
-    source=[
-        'dist_lock_catalog_impl_test.cpp',
-        'replset_dist_lock_manager_test.cpp',
-        'sharding_catalog_client_test.cpp',
-        'sharding_catalog_write_retry_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/s/shard_server_test_fixture',
-        '$BUILD_DIR/mongo/db/storage/duplicate_key_error_info',
-        '$BUILD_DIR/mongo/s/catalog/dist_lock_catalog_mock',
-        '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_mock',
-        '$BUILD_DIR/mongo/s/sharding_router_test_fixture',
-        'dist_lock_catalog_impl',
-        'replset_dist_lock_manager',
     ]
 )

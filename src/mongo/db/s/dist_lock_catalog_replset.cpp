@@ -29,7 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/catalog/dist_lock_catalog_impl.h"
+#include "mongo/db/s/dist_lock_catalog_replset.h"
 
 #include <string>
 

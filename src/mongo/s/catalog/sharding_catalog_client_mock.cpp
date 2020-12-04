@@ -31,10 +31,6 @@
 
 #include "mongo/s/catalog/sharding_catalog_client_mock.h"
 
-#include <memory>
-
-#include "mongo/base/status.h"
-#include "mongo/db/repl/optime.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_config_version.h"
@@ -44,23 +40,9 @@
 
 namespace mongo {
 
-ShardingCatalogClientMock::ShardingCatalogClientMock(
-    std::unique_ptr<DistLockManager> distLockManager)
-    : _distLockManager(std::move(distLockManager)) {}
+ShardingCatalogClientMock::ShardingCatalogClientMock() = default;
 
 ShardingCatalogClientMock::~ShardingCatalogClientMock() = default;
-
-void ShardingCatalogClientMock::startup() {
-    if (_distLockManager) {
-        _distLockManager->startUp();
-    }
-}
-
-void ShardingCatalogClientMock::shutDown(OperationContext* opCtx) {
-    if (_distLockManager) {
-        _distLockManager->shutDown(opCtx);
-    }
-}
 
 DatabaseType ShardingCatalogClientMock::getDatabase(OperationContext* opCtx,
                                                     StringData db,
@@ -175,10 +157,6 @@ Status ShardingCatalogClientMock::createDatabase(OperationContext* opCtx,
                                                  StringData dbName,
                                                  ShardId primaryShard) {
     return {ErrorCodes::InternalError, "Method not implemented"};
-}
-
-DistLockManager* ShardingCatalogClientMock::getDistLockManager() {
-    return _distLockManager.get();
 }
 
 StatusWith<std::vector<KeysCollectionDocument>> ShardingCatalogClientMock::getNewKeys(

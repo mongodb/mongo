@@ -30,19 +30,16 @@
 #pragma once
 
 #include <functional>
-#include <string>
 #include <vector>
 
-#include "mongo/s/catalog/dist_lock_catalog.h"
-#include "mongo/s/catalog/dist_lock_manager.h"
+#include "mongo/db/s/dist_lock_manager.h"
 
 namespace mongo {
 
 class DistLockManagerMock : public DistLockManager {
 public:
-    DistLockManagerMock(std::unique_ptr<DistLockCatalog> catalog);
-
-    virtual ~DistLockManagerMock() = default;
+    DistLockManagerMock();
+    virtual ~DistLockManagerMock();
 
     void startUp() override;
     void shutDown(OperationContext* opCtx) override;
@@ -67,14 +64,11 @@ public:
 
     void expectLock(LockFunc checkerFunc, Status lockStatus);
 
-protected:
     void unlock(OperationContext* opCtx, const DistLockHandle& lockHandle) override;
 
     void unlock(OperationContext* opCtx,
                 const DistLockHandle& lockHandle,
                 StringData name) override;
-
-    Status checkStatus(OperationContext* opCtx, const DistLockHandle& lockHandle) override;
 
 private:
     struct LockInfo {
@@ -82,10 +76,7 @@ private:
         std::string name;
     };
 
-    /**
-     * Unused, but needed so that test code mirrors the ownership semantics of production code.
-     */
-    const std::unique_ptr<DistLockCatalog> _catalog;
+    Status checkStatus(OperationContext* opCtx, const DistLockHandle& lockHandle) override;
 
     std::vector<LockInfo> _locks;
     Status _lockReturnStatus;

@@ -31,15 +31,9 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/catalog/replset_dist_lock_manager.h"
+#include "mongo/db/s/dist_lock_manager_replset.h"
 
-#include <memory>
-
-#include "mongo/base/status.h"
-#include "mongo/base/status_with.h"
-#include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/catalog/dist_lock_catalog.h"
 #include "mongo/s/catalog/type_lockpings.h"
 #include "mongo/s/catalog/type_locks.h"
 #include "mongo/s/client/shard_registry.h"
@@ -53,21 +47,16 @@
 #include "mongo/util/timer.h"
 
 namespace mongo {
-
-MONGO_FAIL_POINT_DEFINE(setDistLockTimeout);
-
-using std::string;
-using std::unique_ptr;
-
 namespace {
-
-MONGO_FAIL_POINT_DEFINE(disableReplSetDistLockManager);
 
 // How many times to retry acquiring the lock after the first attempt fails
 const int kMaxNumLockAcquireRetries = 2;
 
 // How frequently to poll the distributed lock when it is found to be locked
 const Milliseconds kLockRetryInterval(500);
+
+MONGO_FAIL_POINT_DEFINE(setDistLockTimeout);
+MONGO_FAIL_POINT_DEFINE(disableReplSetDistLockManager);
 
 }  // namespace
 
@@ -76,7 +65,7 @@ const Minutes ReplSetDistLockManager::kDistLockExpirationTime{15};
 
 ReplSetDistLockManager::ReplSetDistLockManager(ServiceContext* globalContext,
                                                StringData processID,
-                                               unique_ptr<DistLockCatalog> catalog,
+                                               std::unique_ptr<DistLockCatalog> catalog,
                                                Milliseconds pingInterval,
                                                Milliseconds lockExpiration)
     : _serviceContext(globalContext),
@@ -351,7 +340,7 @@ StatusWith<DistLockHandle> ReplSetDistLockManager::lockWithSessionID(OperationCo
     // until the lockTryInterval has been reached. If a network error occurs at each lock
     // acquisition attempt, the lock acquisition will be retried immediately.
     while (waitFor <= Milliseconds::zero() || Milliseconds(timer.millis()) < waitFor) {
-        const string who = str::stream() << _processID << ":" << getThreadName();
+        const std::string who = str::stream() << _processID << ":" << getThreadName();
 
         auto lockExpiration = _lockExpiration;
         setDistLockTimeout.execute([&](const BSONObj& data) {
@@ -517,7 +506,7 @@ StatusWith<DistLockHandle> ReplSetDistLockManager::lockWithSessionID(OperationCo
 
 StatusWith<DistLockHandle> ReplSetDistLockManager::tryLockWithLocalWriteConcern(
     OperationContext* opCtx, StringData name, StringData whyMessage, const OID& lockSessionID) {
-    const string who = str::stream() << _processID << ":" << getThreadName();
+    const std::string who = str::stream() << _processID << ":" << getThreadName();
 
     LOGV2_DEBUG(22662,
                 1,
@@ -619,5 +608,15 @@ void ReplSetDistLockManager::queueUnlock(const DistLockHandle& lockSessionID,
     stdx::unique_lock<Latch> lk(_mutex);
     _unlockList.push_back(std::make_pair(lockSessionID, name));
 }
+
+ReplSetDistLockManager::DistLockPingInfo::DistLockPingInfo() = default;
+
+ReplSetDistLockManager::DistLockPingInfo::DistLockPingInfo(
+    StringData idArg, Date_t lastPingArg, Date_t remoteArg, OID tsArg, OID electionIdArg)
+    : processId(idArg.toString()),
+      lastPing(lastPingArg),
+      configLocalTime(remoteArg),
+      lockSessionId(std::move(tsArg)),
+      electionId(std::move(electionIdArg)) {}
 
 }  // namespace mongo

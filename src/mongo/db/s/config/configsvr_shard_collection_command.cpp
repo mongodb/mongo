@@ -41,6 +41,7 @@
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "mongo/db/s/dist_lock_manager.h"
 #include "mongo/db/s/shard_key_util.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/type_database.h"
@@ -248,10 +249,10 @@ public:
 
         // Make the distlocks boost::optional so that they can be released by being reset below.
         boost::optional<DistLockManager::ScopedDistLock> dbDistLock(
-            uassertStatusOK(catalogClient->getDistLockManager()->lock(
+            uassertStatusOK(DistLockManager::get(opCtx)->lock(
                 opCtx, nss.db(), "shardCollection", DistLockManager::kDefaultLockTimeout)));
         boost::optional<DistLockManager::ScopedDistLock> collDistLock(
-            uassertStatusOK(catalogClient->getDistLockManager()->lock(
+            uassertStatusOK(DistLockManager::get(opCtx)->lock(
                 opCtx, nss.ns(), "shardCollection", DistLockManager::kDefaultLockTimeout)));
 
         // Ensure sharding is allowed on the database.

@@ -37,15 +37,14 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "mongo/db/s/dist_lock_manager.h"
 #include "mongo/db/s/sharding_logging.h"
-#include "mongo/s/catalog/dist_lock_manager.h"
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
-
 namespace {
 
 /**
@@ -121,10 +120,9 @@ public:
         auto const catalogClient = Grid::get(opCtx)->catalogClient();
         auto const catalogManager = ShardingCatalogManager::get(opCtx);
 
-        auto scopedLock =
-            ShardingCatalogManager::get(opCtx)->serializeCreateOrDropDatabase(opCtx, dbname);
+        auto scopedLock = catalogManager->serializeCreateOrDropDatabase(opCtx, dbname);
 
-        auto dbDistLock = uassertStatusOK(catalogClient->getDistLockManager()->lock(
+        auto dbDistLock = uassertStatusOK(DistLockManager::get(opCtx)->lock(
             opCtx, dbname, "dropDatabase", DistLockManager::kDefaultLockTimeout));
 
         // Invalidate the database metadata so the next access kicks off a full reload.
@@ -153,7 +151,7 @@ public:
         // Drop the database's collections.
         for (const auto& nss : catalogClient->getAllShardedCollectionsForDb(
                  opCtx, dbname, repl::ReadConcernArgs::get(opCtx).getLevel())) {
-            auto collDistLock = uassertStatusOK(catalogClient->getDistLockManager()->lock(
+            auto collDistLock = uassertStatusOK(DistLockManager::get(opCtx)->lock(
                 opCtx, nss.ns(), "dropCollection", DistLockManager::kDefaultLockTimeout));
             catalogManager->dropCollection(opCtx, nss);
         }

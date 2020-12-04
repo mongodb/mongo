@@ -36,8 +36,6 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/s/shard_server_catalog_cache_loader.h"
 #include "mongo/db/s/sharding_state.h"
-#include "mongo/s/catalog/dist_lock_catalog_mock.h"
-#include "mongo/s/catalog/dist_lock_manager_mock.h"
 #include "mongo/s/catalog/sharding_catalog_client_impl.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/config_server_catalog_cache_loader.h"
@@ -91,20 +89,8 @@ void ShardServerTestFixture::tearDown() {
     ShardingMongodTestFixture::tearDown();
 }
 
-std::unique_ptr<DistLockCatalog> ShardServerTestFixture::makeDistLockCatalog() {
-    return std::make_unique<DistLockCatalogMock>();
-}
-
-std::unique_ptr<DistLockManager> ShardServerTestFixture::makeDistLockManager(
-    std::unique_ptr<DistLockCatalog> distLockCatalog) {
-    invariant(distLockCatalog);
-    return std::make_unique<DistLockManagerMock>(std::move(distLockCatalog));
-}
-
-std::unique_ptr<ShardingCatalogClient> ShardServerTestFixture::makeShardingCatalogClient(
-    std::unique_ptr<DistLockManager> distLockManager) {
-    invariant(distLockManager);
-    return std::make_unique<ShardingCatalogClientImpl>(std::move(distLockManager));
+std::unique_ptr<ShardingCatalogClient> ShardServerTestFixture::makeShardingCatalogClient() {
+    return std::make_unique<ShardingCatalogClientImpl>();
 }
 
 }  // namespace mongo

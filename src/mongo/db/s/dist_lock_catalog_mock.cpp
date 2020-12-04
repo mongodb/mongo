@@ -29,12 +29,8 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/catalog/dist_lock_catalog_mock.h"
+#include "mongo/db/s/dist_lock_catalog_mock.h"
 
-#include "mongo/base/status.h"
-#include "mongo/base/status_with.h"
-#include "mongo/s/catalog/type_lockpings.h"
-#include "mongo/s/catalog/type_locks.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/str.h"
 

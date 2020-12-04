@@ -35,8 +35,8 @@
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/cloner.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/grid.h"
@@ -136,7 +136,7 @@ public:
         return true;
     }
 
-} CloneCatalogDataCmd;
+} cloneCatalogDataCmd;
 
 }  // namespace
 }  // namespace mongo

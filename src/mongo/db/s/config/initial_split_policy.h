@@ -66,6 +66,31 @@ public:
         size_t numShards,
         bool collectionIsEmpty);
 
+    virtual ~InitialSplitPolicy() {}
+
+    /**
+     * Generates a list of initial chunks to be created during a shardCollection operation.
+     */
+    struct ShardCollectionConfig {
+        std::vector<ChunkType> chunks;
+        Timestamp creationTime;
+
+        const auto& collVersion() const {
+            return chunks.back().getVersion();
+        }
+    };
+    virtual ShardCollectionConfig createFirstChunks(OperationContext* opCtx,
+                                                    const ShardKeyPattern& shardKeyPattern,
+                                                    SplitPolicyParams params) = 0;
+
+    /**
+     * Returns whether the chunk generation strategy being used is optimized or not. Since there is
+     * only a single unoptimized policy, we return true by default here.
+     */
+    virtual bool isOptimized() {
+        return true;
+    }
+
     /**
      * Returns split points to use for creating chunks in cases where the shard key contains a
      * hashed field. For new collections which use hashed shard keys, we can can pre-split the range
@@ -78,15 +103,6 @@ public:
     static std::vector<BSONObj> calculateHashedSplitPoints(const ShardKeyPattern& shardKeyPattern,
                                                            BSONObj prefix,
                                                            int numInitialChunks);
-
-    struct ShardCollectionConfig {
-        std::vector<ChunkType> chunks;
-        Timestamp creationTime;
-
-        const auto& collVersion() const {
-            return chunks.back().getVersion();
-        }
-    };
 
     /**
      * Produces the initial chunks that need to be written for an *empty* collection which is being
@@ -111,24 +127,7 @@ public:
         const Timestamp& validAfter,
         const std::vector<BSONObj>& splitPoints,
         const std::vector<ShardId>& allShardIds,
-        const int numContiguousChunksPerShard = 1);
-
-    /**
-     * Generates a list of initial chunks to be created during a shardCollection operation.
-     */
-    virtual ShardCollectionConfig createFirstChunks(OperationContext* opCtx,
-                                                    const ShardKeyPattern& shardKeyPattern,
-                                                    SplitPolicyParams params) = 0;
-
-    /**
-     * Returns whether the chunk generation strategy being used is optimized or not. Since there is
-     * only a single unoptimized policy, we return true by default here.
-     */
-    virtual bool isOptimized() {
-        return true;
-    }
-
-    virtual ~InitialSplitPolicy() {}
+        int numContiguousChunksPerShard);
 };
 
 /**

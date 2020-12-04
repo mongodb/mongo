@@ -57,22 +57,7 @@ protected:
      */
     std::shared_ptr<RemoteCommandTargeterMock> configTargeterMock();
 
-    /**
-     * Creates a DistLockCatalogMock.
-     */
-    std::unique_ptr<DistLockCatalog> makeDistLockCatalog() override;
-
-    /**
-     * Creates a DistLockManagerMock.
-     */
-    std::unique_ptr<DistLockManager> makeDistLockManager(
-        std::unique_ptr<DistLockCatalog> distLockCatalog) override;
-
-    /**
-     * Creates a real ShardingCatalogClient.
-     */
-    std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient(
-        std::unique_ptr<DistLockManager> distLockManager) override;
+    std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient() override;
 
     void setCatalogCacheLoader(std::unique_ptr<CatalogCacheLoader> loader);
 

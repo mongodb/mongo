@@ -44,6 +44,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
+#include "mongo/db/s/dist_lock_manager.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
@@ -135,7 +136,7 @@ StatusWith<boost::optional<ChunkRange>> splitChunk(OperationContext* opCtx,
     const std::string whyMessage(str::stream()
                                  << "splitting chunk " << redact(chunkRange.toString()) << " in "
                                  << nss.toString());
-    auto scopedDistLock = Grid::get(opCtx)->catalogClient()->getDistLockManager()->lock(
+    auto scopedDistLock = DistLockManager::get(opCtx)->lock(
         opCtx, nss.ns(), whyMessage, DistLockManager::kDefaultLockTimeout);
     if (!scopedDistLock.isOK()) {
         return scopedDistLock.getStatus().withContext(

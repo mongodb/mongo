@@ -39,13 +39,13 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/s/add_shard_cmd_gen.h"
 #include "mongo/db/s/add_shard_util.h"
-#include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/grid.h"
 
 namespace mongo {
 namespace {
+
 /**
  * Internal sharding command run on mongod to initialize itself as a shard in the cluster.
  */

@@ -43,17 +43,13 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "mongo/db/s/dist_lock_manager.h"
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
-
-using std::set;
-using std::shared_ptr;
-using std::string;
-
 namespace {
 
 /**
@@ -137,9 +133,8 @@ public:
         // Make sure to force update of any stale metadata
         ON_BLOCK_EXIT([opCtx, dbname] { Grid::get(opCtx)->catalogCache()->purgeDatabase(dbname); });
 
-        auto dbDistLock =
-            uassertStatusOK(Grid::get(opCtx)->catalogClient()->getDistLockManager()->lock(
-                opCtx, dbname, "enableSharding", DistLockManager::kDefaultLockTimeout));
+        auto dbDistLock = uassertStatusOK(DistLockManager::get(opCtx)->lock(
+            opCtx, dbname, "enableSharding", DistLockManager::kDefaultLockTimeout));
 
         ShardingCatalogManager::get(opCtx)->enableSharding(opCtx, dbname, shardId);
         audit::logEnableSharding(Client::getCurrent(), dbname);

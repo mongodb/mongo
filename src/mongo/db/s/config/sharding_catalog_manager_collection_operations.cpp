@@ -218,40 +218,6 @@ void triggerFireAndForgetShardRefreshes(OperationContext* opCtx, const Namespace
 
 }  // namespace
 
-void checkForExistingChunks(OperationContext* opCtx, const NamespaceString& nss) {
-    BSONObjBuilder countBuilder;
-    countBuilder.append("count", ChunkType::ConfigNS.coll());
-    countBuilder.append("query", BSON(ChunkType::ns(nss.ns())));
-
-    // OK to use limit=1, since if any chunks exist, we will fail.
-    countBuilder.append("limit", 1);
-
-    // Use readConcern local to guarantee we see any chunks that have been written and may
-    // become committed; readConcern majority will not see the chunks if they have not made it
-    // to the majority snapshot.
-    repl::ReadConcernArgs readConcern(repl::ReadConcernLevel::kLocalReadConcern);
-    readConcern.appendInfo(&countBuilder);
-
-    auto cmdResponse = uassertStatusOK(
-        Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommandWithFixedRetryAttempts(
-            opCtx,
-            kConfigReadSelector,
-            ChunkType::ConfigNS.db().toString(),
-            countBuilder.done(),
-            Shard::kDefaultConfigCommandTimeout,
-            Shard::RetryPolicy::kIdempotent));
-    uassertStatusOK(cmdResponse.commandStatus);
-
-    long long numChunks;
-    uassertStatusOK(bsonExtractIntegerField(cmdResponse.response, "n", &numChunks));
-    uassert(ErrorCodes::ManualInterventionRequired,
-            str::stream() << "A previous attempt to shard collection " << nss.ns()
-                          << " failed after writing some initial chunks to config.chunks. Please "
-                             "manually delete the partially written chunks for collection "
-                          << nss.ns() << " from config.chunks",
-            numChunks == 0);
-}
-
 void sendDropCollectionToAllShards(OperationContext* opCtx, const NamespaceString& nss) {
     const auto catalogClient = Grid::get(opCtx)->catalogClient();
 

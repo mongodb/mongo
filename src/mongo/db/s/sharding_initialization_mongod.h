@@ -38,10 +38,6 @@
 
 namespace mongo {
 
-class ConnectionString;
-class OperationContext;
-class ServiceContext;
-
 /**
  * This class serves as a bootstrap and shutdown for the sharding subsystem and also controls the
  * persisted cluster identity. The default ShardingEnvironmentInitFunc instantiates all the sharding
@@ -61,10 +57,6 @@ public:
 
     static ShardingInitializationMongoD* get(OperationContext* opCtx);
     static ShardingInitializationMongoD* get(ServiceContext* service);
-
-    void initializeShardingEnvironmentOnShardServer(OperationContext* opCtx,
-                                                    const ShardIdentity& shardIdentity,
-                                                    StringData distLockProcessId);
 
     /**
      * If started with --shardsvr, initializes sharding awareness from the shardIdentity document on
@@ -112,6 +104,10 @@ public:
     }
 
 private:
+    void _initializeShardingEnvironmentOnShardServer(OperationContext* opCtx,
+                                                     const ShardIdentity& shardIdentity,
+                                                     StringData distLockProcessId);
+
     // This mutex ensures that only one thread at a time executes the sharding
     // initialization/teardown sequence
     Mutex _initSynchronizationMutex =

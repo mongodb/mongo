@@ -29,14 +29,12 @@
 
 #include "mongo/platform/basic.h"
 
-#include <memory>
-
 #include "mongo/db/commands.h"
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/read_write_concern_defaults_cache_lookup_mock.h"
 #include "mongo/db/s/balancer/migration_manager.h"
 #include "mongo/db/s/balancer/migration_test_fixture.h"
-#include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "mongo/db/s/dist_lock_manager.h"
 #include "mongo/s/request_types/move_chunk_request.h"
 
 namespace mongo {
@@ -521,7 +519,7 @@ TEST_F(MigrationManagerTest, MigrationRecovery) {
     setUpMigration(chunk2, kShardId3.toString());
 
     // Mimic all config distlocks being released on config server stepup to primary.
-    auto distLockManager = catalogClient()->getDistLockManager();
+    auto distLockManager = DistLockManager::get(operationContext());
     distLockManager->unlockAll(operationContext(), distLockManager->getProcessID());
 
     _migrationManager->startRecoveryAndAcquireDistLocks(operationContext());
@@ -588,12 +586,12 @@ TEST_F(MigrationManagerTest, FailMigrationRecovery) {
     // Take the distributed lock for the collection, which should be released during recovery when
     // it fails. Any dist lock held by the config server will be released via proccessId, so the
     // session ID used here doesn't matter.
-    ASSERT_OK(catalogClient()->getDistLockManager()->lockWithSessionID(
-        operationContext(),
-        collName.ns(),
-        "MigrationManagerTest",
-        OID::gen(),
-        DistLockManager::kSingleLockAttemptTimeout));
+    ASSERT_OK(DistLockManager::get(operationContext())
+                  ->lockWithSessionID(operationContext(),
+                                      collName.ns(),
+                                      "MigrationManagerTest",
+                                      OID::gen(),
+                                      DistLockManager::kSingleLockAttemptTimeout));
 
     _migrationManager->startRecoveryAndAcquireDistLocks(operationContext());
     _migrationManager->finishRecovery(operationContext(), 0, kDefaultSecondaryThrottle);

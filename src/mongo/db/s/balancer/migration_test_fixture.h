@@ -37,7 +37,6 @@
 #include "mongo/db/s/balancer/type_migration.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
 #include "mongo/db/write_concern_options.h"
-#include "mongo/s/catalog/dist_lock_manager_mock.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog/type_locks.h"

@@ -134,13 +134,11 @@ class ReshardingTxnClonerTest : public ShardServerTestFixture {
      * ShardRegistry reload is done over DBClient, not the NetworkInterface, and there is no
      * DBClientMock analogous to the NetworkInterfaceMock.
      */
-    std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient(
-        std::unique_ptr<DistLockManager> distLockManager) {
+    std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient() {
 
         class StaticCatalogClient final : public ShardingCatalogClientMock {
         public:
-            StaticCatalogClient(std::vector<ShardId> shardIds)
-                : ShardingCatalogClientMock(nullptr), _shardIds(std::move(shardIds)) {}
+            StaticCatalogClient(std::vector<ShardId> shardIds) : _shardIds(std::move(shardIds)) {}
 
             StatusWith<repl::OpTimeWith<std::vector<ShardType>>> getAllShards(
                 OperationContext* opCtx, repl::ReadConcernLevel readConcern) override {

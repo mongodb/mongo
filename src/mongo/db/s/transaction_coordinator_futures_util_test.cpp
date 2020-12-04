@@ -292,12 +292,11 @@ protected:
     // expected shards. We cannot mock the network responses for the ShardRegistry reload, since the
     // ShardRegistry reload is done over DBClient, not the NetworkInterface, and there is no
     // DBClientMock analogous to the NetworkInterfaceMock.
-    std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient(
-        std::unique_ptr<DistLockManager> distLockManager) override {
+    std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient() override {
 
         class StaticCatalogClient final : public ShardingCatalogClientMock {
         public:
-            StaticCatalogClient() : ShardingCatalogClientMock(nullptr) {}
+            StaticCatalogClient() = default;
 
             StatusWith<repl::OpTimeWith<std::vector<ShardType>>> getAllShards(
                 OperationContext* opCtx, repl::ReadConcernLevel readConcern) override {

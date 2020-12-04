@@ -47,14 +47,7 @@
 
 namespace mongo {
 
-struct CollectionOptions;
-class OperationContext;
-class RemoteCommandTargeter;
-class ServiceContext;
-class UUID;
-
 struct RemoveShardProgress {
-
     /**
      * Used to indicate to the caller of the removeShard method whether draining of chunks for
      * a particular shard has started, is ongoing, or has been completed.
@@ -89,7 +82,6 @@ struct RemoveShardProgress {
 class ShardingCatalogManager {
     ShardingCatalogManager(const ShardingCatalogManager&) = delete;
     ShardingCatalogManager& operator=(const ShardingCatalogManager&) = delete;
-    friend class ConfigSvrShardCollectionCommand;
 
 public:
     ShardingCatalogManager(ServiceContext* serviceContext,
