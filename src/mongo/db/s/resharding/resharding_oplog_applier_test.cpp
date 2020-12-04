@@ -131,6 +131,16 @@ public:
         _cm = createChunkManagerForOriginalColl();
     }
 
+    void tearDown() override {
+        _writerPool->shutdown();
+        _writerPool->join();
+
+        _executor->shutdown();
+        _executor->join();
+
+        ShardingMongodTestFixture::tearDown();
+    }
+
     ChunkManager createChunkManagerForOriginalColl() {
         // Create two chunks, one that is owned by this donor shard and the other owned by some
         // other shard.
