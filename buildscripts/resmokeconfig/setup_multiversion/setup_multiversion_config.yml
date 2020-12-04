@@ -94,7 +94,7 @@ evergreen_buildvariants:
 
   - name: enterprise-linux-64-amazon-ami
     edition: enterprise
-    platform: amazon
+    platform: amzn64
     architecture: x86_64
 
   - name: amazon2

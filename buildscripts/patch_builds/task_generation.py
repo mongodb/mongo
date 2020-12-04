@@ -26,6 +26,7 @@ def resmoke_commands(run_tests_fn_name: str, run_tests_vars: Dict[str, Any],
     commands = [
         timeout_info.cmd,
         FunctionCall("do setup"),
+        FunctionCall("configure evergreen api credentials") if use_multiversion else None,
         FunctionCall("do multiversion setup") if use_multiversion else None,
         FunctionCall(run_tests_fn_name, run_tests_vars),
     ]

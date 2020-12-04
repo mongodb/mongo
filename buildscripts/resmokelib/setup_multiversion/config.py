@@ -1,7 +1,7 @@
 """Setup multiversion config."""
 from typing import List
 
-SETUP_MULTIVERSION_CONFIG = "etc/setup_multiversion_config.yml"
+SETUP_MULTIVERSION_CONFIG = "buildscripts/resmokeconfig/setup_multiversion/setup_multiversion_config.yml"
 
 
 class Buildvariant:

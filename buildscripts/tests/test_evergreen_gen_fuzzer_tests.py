@@ -64,6 +64,6 @@ class TestCreateFuzzerTask(unittest.TestCase):
         shrub_project = ShrubProject.empty().add_build_variant(build_variant)
         config = shrub_project.as_dict()
 
-        self.assertEqual("do multiversion setup", config["tasks"][0]["commands"][1]["func"])
+        self.assertEqual("do multiversion setup", config["tasks"][0]["commands"][2]["func"])
         self.assertEqual("/data/multiversion",
-                         config["tasks"][0]["commands"][4]["vars"]["task_path_suffix"])
+                         config["tasks"][0]["commands"][5]["vars"]["task_path_suffix"])

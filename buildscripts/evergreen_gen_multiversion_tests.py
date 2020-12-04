@@ -178,6 +178,7 @@ class EvergreenMultiversionConfigGenerator(object):
         commands = [
             FunctionCall("do setup"),
             # Fetch and download the proper mongod binaries before running multiversion tests.
+            FunctionCall("configure evergreen api credentials"),
             FunctionCall("do multiversion setup"),
             FunctionCall("run generated tests", run_tests_vars),
         ]

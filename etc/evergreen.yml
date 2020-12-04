@@ -1296,16 +1296,17 @@ functions:
         rm -rf /data/install /data/multiversion
 
         edition="${multiversion_edition|base}"
-        platform="${multiversion_platform|linux}"
+        platform="${multiversion_platform|linux_x86_64}"
         architecture="${multiversion_architecture|x86_64}"
 
-        $python buildscripts/setup_multiversion_mongodb.py   \
+        $python buildscripts/resmoke.py setup-multiversion   \
           --installDir /data/install                         \
           --linkDir /data/multiversion                       \
           --edition $edition                                 \
           --platform $platform                               \
           --architecture $architecture                       \
-          --useLatest 3.2 3.4 3.6 4.0
+          --githubOauthToken "${github_token}"               \
+          --useLatest 3.6 4.0
 
         # The platform and architecture for how some of the binaries are reported in
         # https://downloads.mongodb.org/full.json changed between MongoDB 4.0 and MongoDB 4.2.
@@ -1324,12 +1325,13 @@ functions:
           architecture="${multiversion_architecture_42_or_later}"
         fi
 
-        $python buildscripts/setup_multiversion_mongodb.py   \
+        $python buildscripts/resmoke.py setup-multiversion   \
           --installDir /data/install                         \
           --linkDir /data/multiversion                       \
           --edition $edition                                 \
           --platform $platform                               \
           --architecture $architecture                       \
+          --githubOauthToken "${github_token}"               \
           --useLatest 4.2 4.2.1
 
         # The platform and architecture for how some of the binaries are reported in
@@ -1349,12 +1351,13 @@ functions:
           architecture="${multiversion_architecture_44_or_later}"
         fi
 
-        $python buildscripts/setup_multiversion_mongodb.py   \
+        $python buildscripts/resmoke.py setup-multiversion   \
           --installDir /data/install                         \
           --linkDir /data/multiversion                       \
           --edition $edition                                 \
           --platform $platform                               \
           --architecture $architecture                       \
+          --githubOauthToken "${github_token}"               \
           --useLatest 4.4 4.7 4.8
 
   "execute resmoke tests": &execute_resmoke_tests
@@ -4935,6 +4938,7 @@ tasks:
       suite: jstestfuzz_replication
       is_jstestfuzz: true
       use_multiversion: /data/multiversion
+      task_path_suffix: /data/multiversion
       npm_command: jstestfuzz
 
 ## jstestfuzz initial sync replica set ##
@@ -4991,6 +4995,7 @@ tasks:
       suite: jstestfuzz_sharded
       is_jstestfuzz: true
       use_multiversion: /data/multiversion
+      task_path_suffix: /data/multiversion
       npm_command: jstestfuzz
 
 ## jstestfuzz sharded cluster causal consistency ##

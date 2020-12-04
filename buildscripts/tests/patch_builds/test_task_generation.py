@@ -25,8 +25,8 @@ class TestResmokeCommand(unittest.TestCase):
         commands = under_test.resmoke_commands(run_tests, test_vars, timeout_info,
                                                use_multiversion="multiversion")
 
-        # 3 expected command = 1 for setup + 1 for running tests + 1 for multiversion setup.
-        self.assertEqual(3, len(commands))
+        # 4 expected command = 1 for setup + 1 for running tests + 2 for multiversion setup.
+        self.assertEqual(4, len(commands))
 
     def test_with_timeout(self):
         run_tests = "run tests"
@@ -46,9 +46,9 @@ class TestResmokeCommand(unittest.TestCase):
         commands = under_test.resmoke_commands(run_tests, test_vars, timeout_info,
                                                use_multiversion="multiversion")
 
-        # 4 expected command = 1 for setup + 1 for running tests + 1 for multiversion setup +
+        # 5 expected command = 1 for setup + 1 for running tests + 2 for multiversion setup +
         # 1 for timeout.
-        self.assertEqual(4, len(commands))
+        self.assertEqual(5, len(commands))
 
 
 class TestTimeoutInfo(unittest.TestCase):

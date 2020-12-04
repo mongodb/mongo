@@ -236,7 +236,7 @@ class TestCreateGenerateTasksConfig(unittest.TestCase):
         evg_config_dict = shrub_project.as_dict()
         tasks = evg_config_dict["tasks"]
         self.assertEqual(n_tasks * n_tests, len(tasks))
-        self.assertEqual(multiversion_path, tasks[0]["commands"][2]["vars"]["task_path_suffix"])
+        self.assertEqual(multiversion_path, tasks[0]["commands"][3]["vars"]["task_path_suffix"])
 
 
 class TestGatherTaskInfo(unittest.TestCase):

@@ -105,6 +105,7 @@ def build_fuzzer_sub_task(task_name: str, task_index: int, options: ConfigOption
 
     commands = [
         FunctionCall("do setup"),
+        FunctionCall("configure evergreen api credentials") if options.use_multiversion else None,
         FunctionCall("do multiversion setup") if options.use_multiversion else None,
         FunctionCall("setup jstestfuzz"),
         FunctionCall("run jstestfuzz", run_jstestfuzz_vars),

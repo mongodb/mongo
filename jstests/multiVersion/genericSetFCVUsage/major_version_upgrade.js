@@ -31,8 +31,6 @@ const defaultOptions = {
 // TODO SERVER-26792: In the future, we should have a common place from which both the
 // multiversion setup procedure and this test get information about supported major releases.
 const versions = [
-    {binVersion: '3.2', testCollection: 'three_two'},
-    {binVersion: '3.4', featureCompatibilityVersion: '3.4', testCollection: 'three_four'},
     {binVersion: '3.6', featureCompatibilityVersion: '3.6', testCollection: 'three_six'},
     {binVersion: '4.0', featureCompatibilityVersion: '4.0', testCollection: 'four_zero'},
     {binVersion: '4.2', featureCompatibilityVersion: '4.2', testCollection: 'four_two'},
@@ -41,80 +39,6 @@ const versions = [
     {binVersion: 'last-continuous', testCollection: 'last_continuous'},
     {binVersion: 'latest', featureCompatibilityVersion: latestFCV, testCollection: 'latest'},
 ];
-
-// These key patterns are considered valid for existing v:0 and v:1 indexes, but are considered
-// invalid for v:2 indexes or new index builds.
-var invalidIndexSpecs = [
-    {a: 0},
-    {a: NaN},
-    {a: true},
-];
-
-// When running the oldest supported version, insert indexes with bad key patterns.
-function insertBadIndexes(testDB) {
-    invalidIndexSpecs.forEach((spec) => {
-        // Generate a unique and identifiable collection name.
-        let collName = 'bad_index_' + tojson(spec.a);
-        assert.commandWorked(testDB[collName].createIndex(spec, {name: 'badkp'}),
-                             'failed to create index with key pattern' + tojson(spec));
-    });
-}
-
-// When running the newest version, check that the indexes with bad key patterns are readable.
-function validateBadIndexesStandalone(testDB) {
-    invalidIndexSpecs.forEach((spec) => {
-        // Generate a unique and identifiable collection name.
-        let collName = 'bad_index_' + tojson(spec.a);
-        let indexSpec = GetIndexHelpers.findByName(testDB[collName].getIndexes(), 'badkp');
-        assert.neq(null, indexSpec, 'could not find index "badkp"');
-        assert.eq(1, indexSpec.v, tojson(indexSpec));
-
-        // Collection compact command should succeed, despite the presence of the v:1 index
-        // which would fail v:2 validation rules.
-        assert.commandWorked(testDB.runCommand({compact: collName}));
-
-        // reIndex will fail because when featureCompatibilityVersion>=3.4, reIndex
-        // automatically upgrades v=1 indexes to v=2.
-        assert.commandFailed(testDB[collName].reIndex());
-
-        // reIndex should not drop the index.
-        indexSpec = GetIndexHelpers.findByName(testDB[collName].getIndexes(), 'badkp');
-        assert.neq(null, indexSpec, 'could not find index "badkp" after reIndex');
-        assert.eq(1, indexSpec.v, tojson(indexSpec));
-
-        // A query that hints the index should succeed.
-        assert.commandWorked(testDB.runCommand({find: collName, hint: "badkp"}));
-
-        // Newly created indexes will do stricter validation and should fail if the
-        // key pattern is invalid.
-        assert.commandWorked(testDB[collName].dropIndexes());
-        assert.commandFailedWithCode(
-            testDB[collName].createIndex(spec),
-            ErrorCodes.CannotCreateIndex,
-            'creating index with key pattern ' + tojson(spec) + ' unexpectedly succeeded');
-        // Index build should also fail if v:1 or v:2 is explicitly requested.
-        assert.commandFailedWithCode(
-            testDB[collName].createIndex(spec, {v: 1}),
-            ErrorCodes.CannotCreateIndex,
-            'creating index with key pattern ' + tojson(spec) + ' unexpectedly succeeded');
-        assert.commandFailedWithCode(
-            testDB[collName].createIndex(spec, {v: 2}),
-            ErrorCodes.CannotCreateIndex,
-            'creating index with key pattern ' + tojson(spec) + ' unexpectedly succeeded');
-    });
-}
-
-// Check that secondary nodes have the v:1 indexes.
-function validateBadIndexesSecondary(testDB) {
-    invalidIndexSpecs.forEach((spec) => {
-        // Generate a unique and identifiable collection name.
-        let collName = 'bad_index_' + tojson(spec.a);
-        // Verify that the secondary has the v:1 index.
-        let indexSpec = GetIndexHelpers.findByName(testDB[collName].getIndexes(), 'badkp');
-        assert.neq(null, indexSpec, 'could not find index "badkp"');
-        assert.eq(1, indexSpec.v, tojson(indexSpec));
-    });
-}
 
 // Standalone
 // Iterate from earliest to latest versions specified in the versions list, and follow the steps
@@ -187,14 +111,6 @@ for (let i = 0; i < versions.length; i++) {
     // Create an index on the new collection.
     assert.commandWorked(testDB[version.testCollection].createIndex({a: 1}));
 
-    if (i === 0) {
-        // We're on the earliest version, insert indexes with bad key patterns.
-        insertBadIndexes(testDB);
-    } else if (i === versions.length - 1) {
-        // We're on the latest version, check bad indexes are still readable.
-        validateBadIndexesStandalone(testDB);
-    }
-
     // Set the appropriate featureCompatibilityVersion upon upgrade, if applicable.
     if (version.hasOwnProperty('featureCompatibilityVersion')) {
         let adminDB = conn.getDB("admin");
@@ -249,16 +165,6 @@ for (let i = 0; i < versions.length; i++) {
 
     // Create an index on the new collection.
     assert.commandWorked(testDB[version.testCollection].createIndex({a: 1}));
-
-    if (i === 0) {
-        // We're on the earliest version, insert indexes with bad key patterns.
-        insertBadIndexes(testDB);
-    } else if (i === versions.length - 1) {
-        // We're on the latest version, check bad indexes are still readable.
-        for (let secondary of rst.getSecondaries()) {
-            validateBadIndexesSecondary(secondary.getDB('test'));
-        }
-    }
 
     // Do the index creation and insertion again after upgrading the primary node.
     primary = rst.upgradePrimary(primary, {binVersion: version.binVersion});
