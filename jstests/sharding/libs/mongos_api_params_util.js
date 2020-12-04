@@ -883,7 +883,7 @@ let MongosAPIParametersUtil = (function() {
             commandName: "refineCollectionShardKey",
             run: {
                 inAPIVersion1: false,
-                configServerCommandName: "_configsvrRefineCollectionShardKey",
+                shardCommandName: "_shardsvrRefineCollectionShardKey",
                 runsAgainstAdminDb: true,
                 permittedInTxn: false,
                 requiresShardedCollection: true,

@@ -34,8 +34,11 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/logv2/log.h"
+#include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/refine_collection_shard_key_gen.h"
+#include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 #include "mongo/util/fail_point.h"
 
 namespace mongo {
@@ -53,31 +56,30 @@ public:
 
         void typedRun(OperationContext* opCtx) {
             const NamespaceString& nss = ns();
-
-            const auto cm = uassertStatusOK(
-                Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(opCtx,
-                                                                                             nss));
+            const std::string dbName = nss.db().toString();
+            const CachedDatabaseInfo dbInfo =
+                uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbName));
 
             if (MONGO_unlikely(hangRefineCollectionShardKeyAfterRefresh.shouldFail())) {
                 LOGV2(22756, "Hit hangRefineCollectionShardKeyAfterRefresh failpoint");
                 hangRefineCollectionShardKeyAfterRefresh.pauseWhileSet(opCtx);
             }
 
-            ConfigsvrRefineCollectionShardKey configsvrRefineCollShardKey(
-                nss, request().getKey(), cm.getVersion().epoch());
-            configsvrRefineCollShardKey.setDbName(request().getDbName());
+            // Send it to the primary shard
+            ShardsvrRefineCollectionShardKey refineCollectionShardKeyCommand(nss,
+                                                                             request().getKey());
 
-            auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-            auto cmdResponse = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
+            auto cmdResponse = executeCommandAgainstDatabasePrimary(
                 opCtx,
+                dbName,
+                dbInfo,
+                CommandHelpers::appendMajorityWriteConcern(
+                    refineCollectionShardKeyCommand.toBSON({}), opCtx->getWriteConcern()),
                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                "admin",
-                CommandHelpers::appendMajorityWriteConcern(configsvrRefineCollShardKey.toBSON({}),
-                                                           opCtx->getWriteConcern()),
-                Shard::RetryPolicy::kIdempotent));
+                Shard::RetryPolicy::kIdempotent);
 
-            uassertStatusOK(cmdResponse.commandStatus);
-            uassertStatusOK(cmdResponse.writeConcernStatus);
+            const auto remoteResponse = uassertStatusOK(cmdResponse.swResponse);
+            uassertStatusOK(getStatusFromCommandResult(remoteResponse.data));
         }
 
     private:

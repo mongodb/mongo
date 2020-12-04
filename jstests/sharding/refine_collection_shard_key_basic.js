@@ -325,26 +325,6 @@ dropAndRecreateColl({aKey: 1});
 hangAfterRefreshFailPoint.off();
 awaitShellToTriggerNamespaceNotSharded();
 
-assert.commandWorked(mongos.adminCommand({shardCollection: kNsName, key: {_id: 1}}));
-
-// Configure failpoint 'hangRefineCollectionShardKeyAfterRefresh' on staleMongos and run
-// refineCollectionShardKey against this mongos in a parallel thread.
-hangAfterRefreshFailPoint =
-    configureFailPoint(staleMongos, 'hangRefineCollectionShardKeyAfterRefresh');
-const awaitShellToTriggerStaleEpoch = startParallelShell(() => {
-    assert.commandFailedWithCode(
-        db.adminCommand({refineCollectionShardKey: 'db.foo', key: {_id: 1, aKey: 1}}),
-        ErrorCodes.StaleEpoch);
-}, staleMongos.port);
-hangAfterRefreshFailPoint.wait();
-
-// Drop and re-shard namespace 'db.foo' without staleMongos refreshing its metadata.
-dropAndReshardColl({_id: 1});
-
-// Should fail because staleMongos has a stale epoch.
-hangAfterRefreshFailPoint.off();
-awaitShellToTriggerStaleEpoch();
-
 assert.commandWorked(mongos.getDB(kDbName).dropDatabase());
 
 jsTestLog('********** SHARD KEY VALIDATION TESTS **********');

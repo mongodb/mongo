@@ -33,9 +33,9 @@ imports:
     - "mongo/db/drop_database.idl"
     - "mongo/db/commands/rename_collection.idl"
     - "mongo/idl/basic_types.idl"
-    - "mongo/s/chunk_version.idl"
     - "mongo/s/database_version.idl"
     - "mongo/s/chunk_version.idl"
+    - "mongo/db/keypattern.idl"
 
 structs:
     RenameCollectionResponse:
@@ -129,3 +129,14 @@ commands:
                 description: "If true, the original collection will remain temp if it was temp
                 before the rename."
                 default: false
+
+    _shardsvrRefineCollectionShardKey:
+        description: "Parser for the _shardsvrRefineCollectionShardKey command"
+        command_name: _shardsvrRefineCollectionShardKey
+        namespace: concatenate_with_db
+        fields:
+            newShardKey:
+                type: KeyPattern
+                description: "The index specification document to use as the new shard key."
+                optional: false
+        cpp_name: ShardsvrRefineCollectionShardKey
