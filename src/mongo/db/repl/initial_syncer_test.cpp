@@ -4387,8 +4387,9 @@ TEST_F(InitialSyncerTest, TestRemainingInitialSyncEstimatedMillisMetric) {
 
     auto hangDuringCloningFailPoint =
         globalFailPointRegistry().find("initialSyncHangDuringCollectionClone");
-    auto timesEntered =
-        hangDuringCloningFailPoint->setMode(FailPoint::alwaysOn, 0, BSON("namespace" << nss.ns()));
+    // Hang after all docs have been cloned in collection 'a.a'.
+    auto timesEntered = hangDuringCloningFailPoint->setMode(
+        FailPoint::alwaysOn, 0, BSON("namespace" << nss.ns() << "numDocsToClone" << numDocs));
 
     {
         // Keep the cloner from finishing so end-of-clone-stage network events don't interfere.
