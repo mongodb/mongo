@@ -189,7 +189,7 @@ class CollectionShardingRuntimeWithRangeDeleterTest : public CollectionShardingR
 public:
     void setUp() override {
         CollectionShardingRuntimeTest::setUp();
-        WaitForMajorityService::get(getServiceContext()).setUp(getServiceContext());
+        WaitForMajorityService::get(getServiceContext()).startup(getServiceContext());
         // Set up replication coordinator to be primary and have no replication delay.
         auto replCoord = std::make_unique<repl::ReplicationCoordinatorMock>(getServiceContext());
         replCoord->setCanAcceptNonLocalWrites(true);
