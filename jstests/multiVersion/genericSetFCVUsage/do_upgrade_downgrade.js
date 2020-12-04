@@ -250,7 +250,6 @@ let replicaSetTest = function(nodeOptions, downgradeVersion) {
 
         // Change featureCompatibilityVersion to downgradeFCV.
         setFCV(primaryAdminDB, downgradeFCV);
-        rst.awaitReplication();
     } else {
         checkFCV(primaryAdminDB, lastLTSFCV);
 
@@ -258,12 +257,13 @@ let replicaSetTest = function(nodeOptions, downgradeVersion) {
         // setFeatureCompatibilityVersion is called with fromConfigServer: true.
         assert.commandWorked(primaryAdminDB.runCommand(
             {setFeatureCompatibilityVersion: downgradeFCV, fromConfigServer: true}));
-        checkFCV(primaryAdminDB, downgradeFCV);
     }
 
     // Ensure featureCompatibilityVersion is 'downgradeVersion' and all collections still have
     // UUIDs.
     checkFCV(primaryAdminDB, downgradeFCV);
+    // Ensure all replica set members have finished setting the FCV before checking secondaries.
+    rst.awaitReplication();
     for (let j = 0; j < secondaries.length; j++) {
         let secondaryAdminDB = secondaries[j].getDB("admin");
         checkFCV(secondaryAdminDB, downgradeFCV);
