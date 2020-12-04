@@ -449,13 +449,15 @@ private:
         const std::shared_ptr<CappedInsertNotifier> _cappedNotifier;
 
         const bool _needCappedLock;
+
+        AtomicWord<bool> _committed{true};
     };
 
 
     NamespaceString _ns;
     RecordId _catalogId;
     UUID _uuid;
-    bool _committed = true;
+    bool _cachedCommitted = true;
     std::shared_ptr<SharedState> _shared;
 
     clonable_ptr<IndexCatalog> _indexCatalog;

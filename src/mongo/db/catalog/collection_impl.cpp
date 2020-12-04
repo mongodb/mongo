@@ -327,6 +327,8 @@ std::shared_ptr<Collection> CollectionImpl::clone() const {
     auto cloned = std::make_shared<CollectionImpl>(*this);
     checked_cast<IndexCatalogImpl*>(cloned->_indexCatalog.get())->setCollection(cloned.get());
     cloned->_shared->instanceCreated(cloned.get());
+    // We are per definition committed if we get cloned
+    cloned->_cachedCommitted = true;
     return cloned;
 }
 
@@ -376,12 +378,19 @@ bool CollectionImpl::isInitialized() const {
 }
 
 bool CollectionImpl::isCommitted() const {
-    return _committed;
+    return _cachedCommitted || _shared->_committed.load();
 }
 
 void CollectionImpl::setCommitted(bool val) {
-    invariant((!_committed && val) || (_committed && !val));
-    _committed = val;
+    bool previous = isCommitted();
+    invariant((!previous && val) || (previous && !val));
+    _shared->_committed.store(val);
+
+    // Going from false->true need to be synchronized by an atomic. Leave this as false and read
+    // from the atomic in the shared state that will be flipped to true at first clone.
+    if (!val) {
+        _cachedCommitted = val;
+    }
 }
 
 bool CollectionImpl::requiresIdIndex() const {
