@@ -46,6 +46,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
+#include "mongo/util/cancelation.h"
 #include "mongo/util/future_util.h"
 
 namespace mongo {

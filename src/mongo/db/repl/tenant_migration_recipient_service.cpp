@@ -69,6 +69,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/cancelation.h"
 #include "mongo/util/future_util.h"
 
 namespace mongo {
@@ -778,7 +779,7 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::_initializeStateDoc(
             // doesn't rollback.
             auto writeOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
             return WaitForMajorityService::get(opCtx->getServiceContext())
-                .waitUntilMajority(writeOpTime);
+                .waitUntilMajority(writeOpTime, CancelationToken::uncancelable());
         })
         .semi();
 }
@@ -1429,7 +1430,7 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::_onCloneSuccess() {
 
             auto writeOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
             return WaitForMajorityService::get(opCtx->getServiceContext())
-                .waitUntilMajority(writeOpTime);
+                .waitUntilMajority(writeOpTime, CancelationToken::uncancelable());
         })
         .semi();
 }
@@ -1458,7 +1459,8 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::_getDataConsistentFu
             uassertStatusOK(
                 tenantMigrationRecipientEntryHelpers::updateStateDoc(opCtx.get(), stateDoc));
             return WaitForMajorityService::get(opCtx->getServiceContext())
-                .waitUntilMajority(repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp());
+                .waitUntilMajority(repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp(),
+                                   CancelationToken::uncancelable());
         })
         .semi();
 }
@@ -1550,7 +1552,7 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::_markStateDocAsGarba
 
             auto writeOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
             return WaitForMajorityService::get(opCtx->getServiceContext())
-                .waitUntilMajority(writeOpTime);
+                .waitUntilMajority(writeOpTime, CancelationToken::uncancelable());
         })
         .semi();
 }
@@ -1712,7 +1714,7 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::_updateStateDocForMa
 
             auto writeOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
             return WaitForMajorityService::get(opCtx->getServiceContext())
-                .waitUntilMajority(writeOpTime);
+                .waitUntilMajority(writeOpTime, CancelationToken::uncancelable());
         })
         .semi();
 }

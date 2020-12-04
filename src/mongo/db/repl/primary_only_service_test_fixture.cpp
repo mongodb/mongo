@@ -46,7 +46,7 @@ void PrimaryOnlyServiceMongoDTest::setUp() {
     ServiceContextMongoDTest::setUp();
 
     auto serviceContext = getServiceContext();
-    WaitForMajorityService::get(serviceContext).setUp(serviceContext);
+    WaitForMajorityService::get(serviceContext).startup(serviceContext);
 
     {
         auto opCtx = makeOperationContext();

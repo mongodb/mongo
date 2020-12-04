@@ -821,7 +821,7 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_updateC
     repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
     auto clientOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
     return WaitForMajorityService::get(opCtx->getServiceContext())
-        .waitUntilMajority(clientOpTime)
+        .waitUntilMajority(clientOpTime, CancelationToken::uncancelable())
         .thenRunOn(**executor)
         .then([this] {
             auto opCtx = cc().makeOperationContext();
