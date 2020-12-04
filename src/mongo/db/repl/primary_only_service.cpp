@@ -365,7 +365,7 @@ void PrimaryOnlyService::onStepUp(const OpTime& stepUpOpTime) {
     stdx::lock_guard lk(_mutex);
     auto term = _term;
     WaitForMajorityService::get(_serviceContext)
-        .waitUntilMajority(stepUpOpTime)
+        .waitUntilMajority(stepUpOpTime, _source.token())
         .thenRunOn(**_scopedExecutor)
         .then([this] {
             if (MONGO_unlikely(PrimaryOnlyServiceSkipRebuildingInstances.shouldFail())) {

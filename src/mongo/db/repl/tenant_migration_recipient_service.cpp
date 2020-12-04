@@ -59,6 +59,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/cancelation.h"
 #include "mongo/util/future_util.h"
 
 namespace mongo {
@@ -317,7 +318,8 @@ OpTime TenantMigrationRecipientService::Instance::waitUntilTimestampIsMajorityCo
 
     // Wait for the read recipient optime to be majority committed.
     WaitForMajorityService::get(opCtx->getServiceContext())
-        .waitUntilMajority(donorRecipientOpTimePair.recipientOpTime)
+        .waitUntilMajority(donorRecipientOpTimePair.recipientOpTime,
+                           CancelationToken::uncancelable())
         .get(opCtx);
     return donorRecipientOpTimePair.donorOpTime;
 }
@@ -505,7 +507,7 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::_initializeStateDoc(
     // rollback.
     auto insertOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
     return WaitForMajorityService::get(opCtx->getServiceContext())
-        .waitUntilMajority(insertOpTime)
+        .waitUntilMajority(insertOpTime, CancelationToken::uncancelable())
         .semi();
 }
 
@@ -863,7 +865,8 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::_onCloneSuccess() {
 
     uassertStatusOK(tenantMigrationRecipientEntryHelpers::updateStateDoc(opCtx.get(), _stateDoc));
     return WaitForMajorityService::get(opCtx->getServiceContext())
-        .waitUntilMajority(repl::ReplClientInfo::forClient(cc()).getLastOp())
+        .waitUntilMajority(repl::ReplClientInfo::forClient(cc()).getLastOp(),
+                           CancelationToken::uncancelable())
         .semi();
 }
 
@@ -889,7 +892,8 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::_getDataConsistentFu
                 uassertStatusOK(
                     tenantMigrationRecipientEntryHelpers::updateStateDoc(opCtx.get(), _stateDoc));
                 return WaitForMajorityService::get(opCtx->getServiceContext())
-                    .waitUntilMajority(repl::ReplClientInfo::forClient(cc()).getLastOp());
+                    .waitUntilMajority(repl::ReplClientInfo::forClient(cc()).getLastOp(),
+                                       CancelationToken::uncancelable());
             })
         .semi();
 }
@@ -977,7 +981,7 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::_markStateDocAsGarba
 
     auto writeOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
     return WaitForMajorityService::get(opCtx->getServiceContext())
-        .waitUntilMajority(writeOpTime)
+        .waitUntilMajority(writeOpTime, CancelationToken::uncancelable())
         .semi();
 }
 
@@ -1130,7 +1134,9 @@ SharedSemiFuture<void> TenantMigrationRecipientService::Instance::_updateStateDo
     auto opCtx = cc().makeOperationContext();
     uassertStatusOK(tenantMigrationRecipientEntryHelpers::updateStateDoc(opCtx.get(), _stateDoc));
     return WaitForMajorityService::get(opCtx->getServiceContext())
-        .waitUntilMajority(repl::ReplClientInfo::forClient(cc()).getLastOp());
+        .waitUntilMajority(repl::ReplClientInfo::forClient(cc()).getLastOp(),
+                           CancelationToken::uncancelable())
+        .share();
 }
 
 ExecutorFuture<void>

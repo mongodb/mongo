@@ -176,7 +176,7 @@ public:
         serviceContext->setPreciseClockSource(
             std::make_unique<SharedClockSourceAdapter>(_clkSource));
 
-        WaitForMajorityService::get(getServiceContext()).setUp(getServiceContext());
+        WaitForMajorityService::get(serviceContext).startup(serviceContext);
 
         // Automatically mark the state doc garbage collectable after data sync completion.
         globalFailPointRegistry()

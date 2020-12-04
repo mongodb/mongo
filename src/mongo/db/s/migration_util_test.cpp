@@ -349,7 +349,7 @@ public:
 
         configTargeterMock()->setFindHostReturnValue(kConfigHostAndPort);
 
-        WaitForMajorityService::get(getServiceContext()).setUp(getServiceContext());
+        WaitForMajorityService::get(getServiceContext()).startup(getServiceContext());
 
         // Set up 2 default shards.
         for (const auto& shard : kShardList) {

@@ -76,7 +76,6 @@ TEST_F(ReshardingDonorRecipientCommonInternalsTest,
     assertRecipientDocMatchesReshardingFields(metadata, reshardingFields, recipientDoc);
 }
 
-
 TEST_F(ReshardingDonorRecipientCommonTest, CreateDonorServiceInstance) {
     OperationContext* opCtx = operationContext();
     auto metadata = makeShardedMetadataForOriginalCollection(opCtx, kThisShard);

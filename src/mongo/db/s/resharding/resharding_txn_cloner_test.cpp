@@ -114,7 +114,7 @@ class ReshardingTxnClonerTest : public ShardServerTestFixture {
             shardTargeter->setFindHostReturnValue(makeHostAndPort(shardId));
         }
 
-        WaitForMajorityService::get(getServiceContext()).setUp(getServiceContext());
+        WaitForMajorityService::get(getServiceContext()).startup(getServiceContext());
 
         // onStepUp() relies on the storage interface to create the config.transactions table.
         repl::StorageInterface::set(getServiceContext(),

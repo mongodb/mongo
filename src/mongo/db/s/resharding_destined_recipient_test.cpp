@@ -105,7 +105,7 @@ public:
 
         configTargeterMock()->setFindHostReturnValue(kConfigHostAndPort);
 
-        WaitForMajorityService::get(getServiceContext()).setUp(getServiceContext());
+        WaitForMajorityService::get(getServiceContext()).startup(getServiceContext());
 
         for (const auto& shard : kShardList) {
             std::unique_ptr<RemoteCommandTargeterMock> targeter(
