@@ -13072,6 +13072,7 @@ buildvariants:
     test_flags: >-
       --mongosSetParameters="{initialServiceExecutorThreadingModel: borrowed}"
       --mongodSetParameters="{initialServiceExecutorThreadingModel: borrowed}"
+    large_distro_name: ubuntu1604-build
 
   tasks:
   - name: compile_all_run_unittests_TG
@@ -13105,6 +13106,7 @@ buildvariants:
       --mongosSetParameters="{replicaSetMonitorProtocol: scanning}"
       --mongodSetParameters="{replicaSetMonitorProtocol: scanning}"
       --excludeWithAnyTags=requires_streamable_rsm
+    large_distro_name: ubuntu1604-build
 
   tasks:
   - name: compile_all_run_unittests_TG
