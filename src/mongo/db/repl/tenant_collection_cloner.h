@@ -90,6 +90,9 @@ public:
     UUID getSourceUuid() const {
         return *_sourceDbAndUuid.uuid();
     }
+    const std::string& getTenantId() const {
+        return _tenantId;
+    }
 
     /**
      * Set the cloner batch size.

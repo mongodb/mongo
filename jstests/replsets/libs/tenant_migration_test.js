@@ -306,6 +306,7 @@ function TenantMigrationTest(
         const coll = db.getCollection(collName);
 
         assert.commandWorked(coll.insertMany(data));
+        this.getDonorRst().awaitReplication();
     };
 
     /**

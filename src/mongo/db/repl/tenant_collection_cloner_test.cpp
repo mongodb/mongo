@@ -612,5 +612,184 @@ TEST_F(TenantCollectionClonerTest, QueryFailure) {
     clonerThread.join();
 }
 
+// On NamespaceNotFound, the TenantCollectionCloner should exit without doing anything.
+TEST_F(TenantCollectionClonerTest, CountStageNamespaceNotFound) {
+    auto cloner = makeCollectionCloner();
+    // The tenant collection cloner pre-stage makes a remote call to collStats to store in-progress
+    // metrics.
+    _mockServer->setCommandReply("collStats", BSON("size" << 10000));
+    _mockServer->setCommandReply("count", Status(ErrorCodes::NamespaceNotFound, "NoSuchUuid"));
+    ASSERT_OK(cloner->run());
+}
+
+// NamespaceNotFound is treated the same as no indexes.
+TEST_F(TenantCollectionClonerTest, ListIndexesReturnedNamespaceNotFound) {
+    auto cloner = makeCollectionCloner();
+    _mockServer->setCommandReply("collStats", BSON("size" << 10));
+    _mockServer->setCommandReply("count", createCountResponse(1));
+    _mockServer->setCommandReply("listIndexes",
+                                 Status(ErrorCodes::NamespaceNotFound, "No indexes here."));
+
+    // We expect the collection to *not* be created.
+    bool collCreated = false;
+    _storageInterface.createCollFn =
+        [&](OperationContext* opCtx, const NamespaceString& nss, const CollectionOptions& options) {
+            collCreated = true;
+            return Status::OK();
+        };
+
+    ASSERT_OK(cloner->run());
+    ASSERT_FALSE(collCreated);
+    ASSERT(getIdIndexSpec(cloner.get()).isEmpty());
+    ASSERT(getIndexSpecs(cloner.get()).empty());
+    ASSERT_EQ(0, cloner->getStats().indexes);
+}
+
+TEST_F(TenantCollectionClonerTest, QueryStageNamespaceNotFoundOnFirstBatch) {
+    // Set up data for preliminary stages.
+    _mockServer->setCommandReply("count", createCountResponse(2));
+    _mockServer->setCommandReply("listIndexes",
+                                 createCursorResponse(_nss.ns(), BSON_ARRAY(_idIndexSpec)));
+    _mockServer->setCommandReply("find", createFindResponse());  // majority read after listIndexes
+
+    // Set up before-stage failpoint.
+    auto beforeStageFailPoint = globalFailPointRegistry().find("hangBeforeClonerStage");
+    auto timesEnteredBeforeStage = beforeStageFailPoint->setMode(
+        FailPoint::alwaysOn, 0, fromjson("{cloner: 'TenantCollectionCloner', stage: 'query'}"));
+
+    // Set up documents to be returned from upstream node.
+    _mockServer->insert(_nss.ns(), BSON("_id" << 1));
+    _mockServer->insert(_nss.ns(), BSON("_id" << 2));
+    _mockServer->insert(_nss.ns(), BSON("_id" << 3));
+
+    auto cloner = makeCollectionCloner();
+
+    // Run the cloner in a separate thread. The cloner should detect the drop at the beginning
+    // of the query stage and exit normally, without copying over any documents.
+    stdx::thread clonerThread([&] {
+        Client::initThread("ClonerRunner");
+        ASSERT_OK(cloner->run());
+        ASSERT_EQ(0, cloner->getStats().documentsCopied);
+    });
+
+    // Wait until we get to the query stage.
+    beforeStageFailPoint->waitForTimesEntered(timesEnteredBeforeStage + 1);
+
+    // Verify we've made no progress yet.
+    auto stats = cloner->getStats();
+    ASSERT_EQUALS(0, stats.receivedBatches);
+
+    // Despite the name, this will also trigger on the initial batch.
+    auto failNextBatch = globalFailPointRegistry().find("mockCursorThrowErrorOnGetMore");
+    failNextBatch->setMode(FailPoint::nTimes, 1, fromjson("{errorType: 'NamespaceNotFound'}"));
+
+    // Proceed with the query stage.
+    beforeStageFailPoint->setMode(FailPoint::off, 0);
+    clonerThread.join();
+    ASSERT_EQUALS(0, _opObserver->numDocsInserted);
+}
+
+TEST_F(TenantCollectionClonerTest, QueryStageNamespaceNotFoundOnSubsequentBatch) {
+    // Set up data for preliminary stages.
+    _mockServer->setCommandReply("count", createCountResponse(2));
+    _mockServer->setCommandReply("listIndexes",
+                                 createCursorResponse(_nss.ns(), BSON_ARRAY(_idIndexSpec)));
+    _mockServer->setCommandReply("find", createFindResponse());  // majority read after listIndexes
+
+    // Set up after-first-batch failpoint.
+    auto afterBatchFailpoint = globalFailPointRegistry().find(
+        "tenantMigrationHangCollectionClonerAfterHandlingBatchResponse");
+    auto timesEnteredAfterBatch = afterBatchFailpoint->setMode(FailPoint::alwaysOn, 0);
+
+    // Set up documents to be returned from upstream node.
+    _mockServer->insert(_nss.ns(), BSON("_id" << 1));
+    _mockServer->insert(_nss.ns(), BSON("_id" << 2));
+    _mockServer->insert(_nss.ns(), BSON("_id" << 3));
+    _mockServer->insert(_nss.ns(), BSON("_id" << 4));
+    _mockServer->insert(_nss.ns(), BSON("_id" << 5));
+
+    auto cloner = makeCollectionCloner();
+    cloner->setBatchSize_forTest(2);
+
+    // Run the cloner in a separate thread. The cloner should detect the drop on the second query
+    // batch and exit normally.
+    stdx::thread clonerThread([&] {
+        Client::initThread("ClonerRunner");
+        ASSERT_OK(cloner->run());
+        // We cloned two documents before we registered the drop.
+        ASSERT_EQ(2, cloner->getStats().documentsCopied);
+    });
+
+    // Wait until we get to the query stage.
+    afterBatchFailpoint->waitForTimesEntered(timesEnteredAfterBatch + 1);
+
+    // Verify we've processed exactly one batch.
+    auto stats = cloner->getStats();
+    ASSERT_EQUALS(1, stats.receivedBatches);
+
+    // Trigger drop before second batch.
+    auto failNextBatch = globalFailPointRegistry().find("mockCursorThrowErrorOnGetMore");
+    failNextBatch->setMode(FailPoint::nTimes, 1, fromjson("{errorType: 'NamespaceNotFound'}"));
+
+    // Proceed with the query stage.
+    afterBatchFailpoint->setMode(FailPoint::off, 0);
+    clonerThread.join();
+    ASSERT_EQUALS(2, _opObserver->numDocsInserted);
+}
+
+// TODO(SERVER-53282): Enable this test.
+// // We receive a QueryPlanKilled error, then a NamespaceNotFound error, indicating that the
+// // collection no longer exists in the database.
+// TEST_F(TenantCollectionClonerTest, QueryStageCursorDropOK) {
+//     // Set up data for preliminary stages.
+//     _mockServer->setCommandReply("count", createCountResponse(2));
+//     _mockServer->setCommandReply("listIndexes",
+//                                  createCursorResponse(_nss.ns(), BSON_ARRAY(_idIndexSpec)));
+//     _mockServer->setCommandReply("find", createFindResponse());  // maj read after listIndexes
+
+//     auto beforeStageFailPoint = globalFailPointRegistry().find("hangBeforeClonerStage");
+//     auto timesEnteredBeforeStage = beforeStageFailPoint->setMode(
+//         FailPoint::alwaysOn, 0, fromjson("{cloner: 'CollectionCloner', stage: 'query'}"));
+
+//     auto beforeRetryFailPoint = globalFailPointRegistry().find("hangBeforeRetryingClonerStage");
+//     auto timesEnteredBeforeRetry = beforeRetryFailPoint->setMode(
+//         FailPoint::alwaysOn, 0, fromjson("{cloner: 'TenantCollectionCloner', stage: 'query'}"));
+
+//     // Set up documents to be returned from upstream node.
+//     _mockServer->insert(_nss.ns(), BSON("_id" << 1));
+//     _mockServer->insert(_nss.ns(), BSON("_id" << 2));
+//     _mockServer->insert(_nss.ns(), BSON("_id" << 3));
+
+//     auto cloner = makeCollectionCloner();
+
+//     // Run the cloner in a separate thread. The cloner should detect the drop at the beginning
+//     // of the query stage and exit normally, without copying over any documents.
+//     stdx::thread clonerThread([&] {
+//         Client::initThread("ClonerRunner");
+//         ASSERT_OK(cloner->run());
+//     });
+
+//     // Wait until we get to the query stage.
+//     beforeStageFailPoint->waitForTimesEntered(timesEnteredBeforeStage + 1);
+
+//     // Verify we've processed exactly one batch.
+//     auto stats = cloner->getStats();
+//     ASSERT_EQUALS(1, stats.receivedBatches);
+
+//     // Trigger drop after this batch. This is the error we will observe.
+//     auto failNextBatch = globalFailPointRegistry().find("mockCursorThrowErrorOnGetMore");
+//     failNextBatch->setMode(FailPoint::nTimes, 1, fromjson("{errorType: 'NamespaceNotFound'}"));
+
+//     // Resume cloning.
+//     beforeStageFailPoint->setMode(FailPoint::off, 0);
+//     beforeRetryFailPoint->waitForTimesEntered(timesEnteredBeforeRetry + 1);
+
+//     // Follow-up the QueryPlanKilled error with a NamespaceNotFound.
+//     failNextBatch->setMode(FailPoint::nTimes, 1, fromjson("{errorType: 'NamespaceNotFound'}"));
+
+//     beforeRetryFailPoint->setMode(FailPoint::off, 0);
+//     clonerThread.join();
+// }
+
 }  // namespace repl
 }  // namespace mongo

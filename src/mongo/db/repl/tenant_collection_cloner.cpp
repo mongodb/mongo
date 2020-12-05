@@ -128,6 +128,14 @@ void TenantCollectionCloner::postStage() {
 BaseCloner::AfterStageBehavior TenantCollectionCloner::TenantCollectionClonerStage::run() {
     try {
         return ClonerStage<TenantCollectionCloner>::run();
+    } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+        LOGV2(5289701,
+              "TenantCollectionCloner stopped because collection was dropped on the donor.",
+              "namespace"_attr = getCloner()->getSourceNss(),
+              "uuid"_attr = getCloner()->getSourceUuid(),
+              "tenantId"_attr = getCloner()->getTenantId());
+        getCloner()->waitForDatabaseWorkToComplete();
+        return kSkipRemainingStages;
     } catch (const DBException&) {
         getCloner()->waitForDatabaseWorkToComplete();
         throw;
