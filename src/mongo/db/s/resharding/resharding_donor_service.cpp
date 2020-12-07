@@ -166,6 +166,7 @@ SemiFuture<void> ReshardingDonorService::DonorStateMachine::run(
             }
 
             if (status.isOK()) {
+                _removeDonorDocument();
                 _completionPromise.emplaceValue();
             } else {
                 _completionPromise.setError(status);
@@ -381,6 +382,16 @@ void ReshardingDonorService::DonorStateMachine::_updateDonorDocument(
                  WriteConcerns::kMajorityWriteConcern);
 
     _donorDoc = replacementDoc;
+}
+
+void ReshardingDonorService::DonorStateMachine::_removeDonorDocument() {
+    auto opCtx = cc().makeOperationContext();
+    PersistentTaskStore<ReshardingDonorDocument> store(
+        NamespaceString::kDonorReshardingOperationsNamespace);
+    store.remove(opCtx.get(),
+                 BSON(ReshardingDonorDocument::k_idFieldName << _id),
+                 WriteConcerns::kMajorityWriteConcern);
+    _donorDoc = {};
 }
 
 }  // namespace mongo

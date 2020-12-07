@@ -53,6 +53,8 @@
 
 namespace mongo {
 
+MONGO_FAIL_POINT_DEFINE(removeRecipientDocFailpoint);
+
 namespace {
 
 std::shared_ptr<executor::ThreadPoolTaskExecutor> makeTaskExecutor(StringData name,
@@ -191,11 +193,14 @@ SemiFuture<void> ReshardingRecipientService::RecipientStateMachine::run(
         .onCompletion([this](Status status) {
             stdx::lock_guard<Latch> lg(_mutex);
             if (_completionPromise.getFuture().isReady()) {
-                // interrupt() was called before we got her.e
+                // interrupt() was called before we got here.
                 return;
             }
 
+            removeRecipientDocFailpoint.pauseWhileSet();
+
             if (status.isOK()) {
+                _removeRecipientDocument();
                 _completionPromise.emplaceValue();
             } else {
                 // Set error on all promises
@@ -518,6 +523,16 @@ void ReshardingRecipientService::RecipientStateMachine::_updateRecipientDocument
                  WriteConcerns::kMajorityWriteConcern);
 
     _recipientDoc = replacementDoc;
+}
+
+void ReshardingRecipientService::RecipientStateMachine::_removeRecipientDocument() {
+    auto opCtx = cc().makeOperationContext();
+    PersistentTaskStore<ReshardingRecipientDocument> store(
+        NamespaceString::kRecipientReshardingOperationsNamespace);
+    store.remove(opCtx.get(),
+                 BSON(ReshardingRecipientDocument::k_idFieldName << _id),
+                 WriteConcerns::kMajorityWriteConcern);
+    _recipientDoc = {};
 }
 
 }  // namespace mongo

@@ -154,6 +154,9 @@ private:
     // Updates the recipient document on-disk and in-memory with the 'replacementDoc.'
     void _updateRecipientDocument(ReshardingRecipientDocument&& replacementDoc);
 
+    // Removes the local recipient document from disk and clears the in-memory state.
+    void _removeRecipientDocument();
+
     // The in-memory representation of the underlying document in
     // config.localReshardingOperations.recipient.
     ReshardingRecipientDocument _recipientDoc;

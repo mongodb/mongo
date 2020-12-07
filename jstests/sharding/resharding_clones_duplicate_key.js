@@ -12,6 +12,7 @@
 
 load("jstests/libs/parallelTester.js");
 load("jstests/sharding/libs/create_sharded_collection_util.js");
+load("jstests/libs/fail_point_util.js");
 
 const st = new ShardingTest({
     mongos: 1,
@@ -68,6 +69,9 @@ const thread = new Thread(function(host, appName, commandObj) {
     ],
 });
 
+let failPoint1 = configureFailPoint(st.shard0, "removeRecipientDocFailpoint");
+let failPoint2 = configureFailPoint(st.shard1, "removeRecipientDocFailpoint");
+
 thread.start();
 
 function assertEventuallyErrorsLocally(shard) {
@@ -96,6 +100,9 @@ assert.eq(1, ops.inprog.length, () => {
 
 assert.commandWorked(configPrimary.killOp(ops.inprog[0].opid));
 thread.join();
+
+failPoint1.off();
+failPoint2.off();
 
 st.stop();
 })();

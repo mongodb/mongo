@@ -96,6 +96,32 @@ let removeAllReshardingCollections = () => {
     st.rs1.getPrimary().getDB('config').localReshardingOperations.recipient.remove({nss: ns});
 };
 
+let verifyAllShardingCollectionsRemoved = (tempReshardingCollName) => {
+    assert.eq(0, mongos.getDB(kDbName)[tempReshardingCollName].find().itcount());
+    assert.eq(0, mongosConfig.reshardingOperations.find({nss: ns}).itcount());
+    assert.eq(0, mongosConfig.collections.find({reshardingFields: {$exists: true}}).itcount());
+    assert.eq(0,
+              st.rs0.getPrimary()
+                  .getDB('config')
+                  .localReshardingOperations.donor.find({nss: ns})
+                  .itcount());
+    assert.eq(0,
+              st.rs0.getPrimary()
+                  .getDB('config')
+                  .localReshardingOperations.recipient.find({nss: ns})
+                  .itcount());
+    assert.eq(0,
+              st.rs1.getPrimary()
+                  .getDB('config')
+                  .localReshardingOperations.donor.find({nss: ns})
+                  .itcount());
+    assert.eq(0,
+              st.rs1.getPrimary()
+                  .getDB('config')
+                  .localReshardingOperations.recipient.find({nss: ns})
+                  .itcount());
+};
+
 let assertSuccessfulReshardCollection = (commandObj, presetReshardedChunks) => {
     assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {_id: 1}}));
 
@@ -117,7 +143,13 @@ let assertSuccessfulReshardCollection = (commandObj, presetReshardedChunks) => {
         getAllShardIdsFromExpectedChunks(presetReshardedChunks));
     verifyTemporaryReshardingChunksMatchExpected(presetReshardedChunks);
 
+    const tempReshardingCollName = constructTemporaryReshardingCollName(kDbName, collName);
+
+    // TODO(SERVER-53173): remove this call so that verifyAllShardingCollectionsRemoved() can verify
+    // that the resharding artifacts have been cleaned up by the server code.
     removeAllReshardingCollections();
+
+    verifyAllShardingCollectionsRemoved(tempReshardingCollName);
 };
 
 let presetReshardedChunks =

@@ -137,6 +137,9 @@ private:
     // Updates the donor document on-disk and in-memory with the 'replacementDoc.'
     void _updateDonorDocument(ReshardingDonorDocument&& replacementDoc);
 
+    // Removes the local donor document from disk and clears the in-memory state.
+    void _removeDonorDocument();
+
     // The in-memory representation of the underlying document in
     // config.localReshardingOperations.donor.
     ReshardingDonorDocument _donorDoc;

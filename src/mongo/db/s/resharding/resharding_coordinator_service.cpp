@@ -728,6 +728,9 @@ SemiFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::run(
             }
 
             if (status.isOK()) {
+                auto opCtx = cc().makeOperationContext();
+                resharding::removeCoordinatorDocAndReshardingFields(opCtx.get(), _coordinatorDoc);
+
                 _completionPromise.emplaceValue();
             } else {
                 _completionPromise.setError(status);
