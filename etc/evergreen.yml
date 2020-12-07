@@ -1207,7 +1207,21 @@ functions:
           # Windows path separator
           toolchain_txt="$pip_dir/toolchain-requirements.txt"
           ${activate_virtualenv}
-          python -m pip install -r "$toolchain_txt" -q
+          pip_resolver=""
+          # Upgrade pip only on x86_64 systems. The upgraded pip is incompatible
+          # with older versions of setuptools, including those available on
+          # s390x, and arm64. See SERVER-53250
+          uname_arch=$(uname -m || echo "unknown")
+          if [[ "$uname_arch" == "x86_64" ]]; then
+            echo "Upgrading pip to 20.3.1"
+            python -m pip install "pip==20.3.1"
+            # this flag is only supported on the 20.x versions of pip.
+            pip_resolver="--use-deprecated=legacy-resolver"
+            echo "Upgraded pip to 20.3.1, using legacy resolver"
+          else
+            echo "Skipping pip upgrade, architecture was: $uname_arch"
+          fi
+          python -m pip install $pip_resolver -r "$toolchain_txt" -q
           python -m pip freeze > pip-requirements.txt
 
   "upload pip requirements": &upload_pip_requirements
