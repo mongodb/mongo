@@ -169,36 +169,37 @@ TEST_F(ServiceExecutorSynchronousFixture, ScheduleFailsBeforeStartup) {
     scheduleBasicTask(executor.get(), false);
 }
 
-class ServiceExecutorFixedFixture : public ServiceContextTest {
+class ServiceExecutorFixedFixture : public unittest::Test {
 public:
     static constexpr auto kNumExecutorThreads = 2;
 
     class ServiceExecutorHandle {
     public:
-        static constexpr int kNone = 0b00;
-        static constexpr int kStartExecutor = 0b01;
-        static constexpr int kSkipShutdown = 0b10;
-
-        ServiceExecutorHandle() = delete;
         ServiceExecutorHandle(const ServiceExecutorHandle&) = delete;
         ServiceExecutorHandle(ServiceExecutorHandle&&) = delete;
-
-        explicit ServiceExecutorHandle(int flags = kNone) : _skipShutdown(flags & kSkipShutdown) {
+        ServiceExecutorHandle() {
             ThreadPool::Limits limits;
             limits.minThreads = limits.maxThreads = kNumExecutorThreads;
             _executor = std::make_shared<ServiceExecutorFixed>(std::move(limits));
-
-            if (flags & kStartExecutor) {
-                ASSERT_OK(_executor->start());
-            }
         }
 
         ~ServiceExecutorHandle() {
-            if (_skipShutdown) {
-                LOGV2(4987901, "Skipped shutting down the executor");
-            } else {
-                invariant(_executor->shutdown(kShutdownTime));
+            join();
+        }
+
+        void start() {
+            ASSERT_OK(_executor->start());
+        }
+
+        void join() {
+            if (auto exec = std::exchange(_executor, {})) {
+                ASSERT_OK(exec->shutdown(kShutdownTime));
+                exec->join();
             }
+        }
+
+        void joinWithoutShutdown() {
+            _executor->join();
         }
 
         std::shared_ptr<ServiceExecutorFixed> operator->() noexcept {
@@ -210,27 +211,38 @@ public:
         }
 
     private:
-        const bool _skipShutdown;
         std::shared_ptr<ServiceExecutorFixed> _executor;
     };
 };
 
 TEST_F(ServiceExecutorFixedFixture, ScheduleFailsBeforeStartup) {
-    ServiceExecutorHandle executorHandle(ServiceExecutorHandle::kSkipShutdown);
+    auto executorHandle = ServiceExecutorHandle();
     ASSERT_NOT_OK(executorHandle->scheduleTask([] {}, ServiceExecutor::kEmptyFlags));
 }
 
-DEATH_TEST_F(ServiceExecutorFixedFixture, DestructorFailsBeforeShutdown, "invariant") {
-    FailPointEnableBlock failpoint("hangAfterServiceExecutorFixedExecutorThreadsStart");
-    ServiceExecutorHandle executorHandle(ServiceExecutorHandle::kStartExecutor |
-                                         ServiceExecutorHandle::kSkipShutdown);
-    // The following ensures `executorHandle` holds the only reference to the service executor, thus
-    // returning from this block would trigger destruction of the executor.
-    failpoint->waitForTimesEntered(kNumExecutorThreads);
+TEST_F(ServiceExecutorFixedFixture, JoinWorksBeforeShutdown) {
+    auto executorHandle = ServiceExecutorHandle();
+
+    {
+        FailPointEnableBlock failpoint("hangAfterServiceExecutorFixedExecutorThreadsStart");
+        executorHandle.start();
+
+        // The following ensures `executorHandle` holds the only reference to the service executor,
+        // thus returning from this block would trigger destruction of the executor.
+        failpoint->waitForTimesEntered(kNumExecutorThreads);
+    }
+
+    // Explicitly skip shutdown.
+    executorHandle.joinWithoutShutdown();
+
+    // Poke the executor to make sure it is shutdown.
+    ASSERT_NOT_OK(executorHandle->scheduleTask([] {}, ServiceExecutor::kEmptyFlags));
 }
 
 TEST_F(ServiceExecutorFixedFixture, BasicTaskRuns) {
-    ServiceExecutorHandle executorHandle(ServiceExecutorHandle::kStartExecutor);
+    auto executorHandle = ServiceExecutorHandle();
+    executorHandle.start();
+
     auto barrier = std::make_shared<unittest::Barrier>(2);
     ASSERT_OK(executorHandle->scheduleTask([barrier]() mutable { barrier->countDownAndWait(); },
                                            ServiceExecutor::kEmptyFlags));
@@ -238,7 +250,9 @@ TEST_F(ServiceExecutorFixedFixture, BasicTaskRuns) {
 }
 
 TEST_F(ServiceExecutorFixedFixture, RecursiveTask) {
-    ServiceExecutorHandle executorHandle(ServiceExecutorHandle::kStartExecutor);
+    auto executorHandle = ServiceExecutorHandle();
+    executorHandle.start();
+
     auto barrier = std::make_shared<unittest::Barrier>(2);
 
     std::function<void()> recursiveTask;
@@ -258,7 +272,9 @@ TEST_F(ServiceExecutorFixedFixture, RecursiveTask) {
 }
 
 TEST_F(ServiceExecutorFixedFixture, FlattenRecursiveScheduledTasks) {
-    ServiceExecutorHandle executorHandle(ServiceExecutorHandle::kStartExecutor);
+    auto executorHandle = ServiceExecutorHandle();
+    executorHandle.start();
+
     auto barrier = std::make_shared<unittest::Barrier>(2);
     AtomicWord<int> tasksToSchedule{fixedServiceExecutorRecursionLimit.load() * 3};
 
@@ -283,12 +299,14 @@ TEST_F(ServiceExecutorFixedFixture, FlattenRecursiveScheduledTasks) {
 }
 
 TEST_F(ServiceExecutorFixedFixture, ShutdownTimeLimit) {
-    ServiceExecutorHandle executorHandle(ServiceExecutorHandle::kStartExecutor);
+    auto executorHandle = ServiceExecutorHandle();
+    executorHandle.start();
+
     auto invoked = std::make_shared<SharedPromise<void>>();
     auto mayReturn = std::make_shared<SharedPromise<void>>();
 
     ASSERT_OK(executorHandle->scheduleTask(
-        [executor = *executorHandle, invoked, mayReturn]() mutable {
+        [invoked, mayReturn]() mutable {
             invoked->emplaceValue();
             mayReturn->getFuture().get();
         },
@@ -302,13 +320,13 @@ TEST_F(ServiceExecutorFixedFixture, ShutdownTimeLimit) {
 }
 
 TEST_F(ServiceExecutorFixedFixture, ScheduleSucceedsBeforeShutdown) {
-    ServiceExecutorHandle executorHandle(ServiceExecutorHandle::kStartExecutor);
+    auto executorHandle = ServiceExecutorHandle();
+    executorHandle.start();
 
     auto thread = stdx::thread();
     auto barrier = std::make_shared<unittest::Barrier>(2);
     {
         FailPointEnableBlock failpoint("hangBeforeSchedulingServiceExecutorFixedTask");
-
 
         // The executor accepts the work, but hasn't used the underlying pool yet.
         thread = stdx::thread([&] {
@@ -331,7 +349,8 @@ TEST_F(ServiceExecutorFixedFixture, ScheduleSucceedsBeforeShutdown) {
 }
 
 TEST_F(ServiceExecutorFixedFixture, ScheduleFailsAfterShutdown) {
-    ServiceExecutorHandle executorHandle(ServiceExecutorHandle::kStartExecutor);
+    auto executorHandle = ServiceExecutorHandle();
+    executorHandle.start();
 
     ASSERT_OK(executorHandle->shutdown(kShutdownTime));
     ASSERT_NOT_OK(
@@ -342,7 +361,8 @@ TEST_F(ServiceExecutorFixedFixture, RunTaskAfterWaitingForData) {
     auto tl = std::make_unique<TransportLayerMock>();
     auto session = tl->createSession();
 
-    ServiceExecutorHandle executorHandle(ServiceExecutorHandle::kStartExecutor);
+    auto executorHandle = ServiceExecutorHandle();
+    executorHandle.start();
 
     const auto mainThreadId = stdx::this_thread::get_id();
     AtomicWord<bool> ranOnDataAvailable{false};
@@ -361,14 +381,12 @@ TEST_F(ServiceExecutorFixedFixture, RunTaskAfterWaitingForData) {
 }
 
 TEST_F(ServiceExecutorFixedFixture, StartAndShutdownAreDeterministic) {
-
-    std::unique_ptr<ServiceExecutorHandle> handle;
+    auto handle = ServiceExecutorHandle();
 
     // Ensure starting the executor results in spawning the specified number of executor threads.
     {
         FailPointEnableBlock failpoint("hangAfterServiceExecutorFixedExecutorThreadsStart");
-        handle = std::make_unique<ServiceExecutorHandle>(ServiceExecutorHandle::kNone);
-        ASSERT_OK((*handle)->start());
+        handle.start();
         failpoint->waitForTimesEntered(kNumExecutorThreads);
     }
 
@@ -379,7 +397,7 @@ TEST_F(ServiceExecutorFixedFixture, StartAndShutdownAreDeterministic) {
     // Ensure all executor threads return after receiving the shutdown signal.
     {
         FailPointEnableBlock failpoint("hangBeforeServiceExecutorFixedLastExecutorThreadReturns");
-        shutdownThread = stdx::thread{[handle = std::move(handle)]() mutable { handle.reset(); }};
+        shutdownThread = stdx::thread{[&]() mutable { handle.join(); }};
         failpoint->waitForTimesEntered(1);
     }
     shutdownThread.join();

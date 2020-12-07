@@ -70,6 +70,8 @@ public:
 
     Status start() override;
     Status shutdown(Milliseconds timeout) override;
+    void join() noexcept;
+
     Status scheduleTask(Task task, ScheduleFlags flags) override;
     void schedule(OutOfLineExecutor::Task task) override {
         _schedule(std::move(task));
@@ -96,8 +98,8 @@ private:
     // Maintains the execution state (e.g., recursion depth) for executor threads
     class ExecutorThreadContext;
 
-private:
     void _checkForShutdown(WithLock);
+    void _beginShutdown(WithLock);
     void _schedule(OutOfLineExecutor::Task task) noexcept;
 
     auto _threadsRunning() const {
@@ -152,6 +154,7 @@ private:
      * State transition diagram: kNotStarted ---> kRunning ---> kStopping ---> kStopped
      */
     enum State { kNotStarted, kRunning, kStopping, kStopped } _state = kNotStarted;
+    bool _isJoined = false;
 
     ThreadPool::Options _options;
     std::shared_ptr<ThreadPool> _threadPool;

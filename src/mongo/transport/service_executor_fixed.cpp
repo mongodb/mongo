@@ -56,16 +56,23 @@ constexpr auto kClientsInTotal = "clientsInTotal"_sd;
 constexpr auto kClientsRunning = "clientsRunning"_sd;
 constexpr auto kClientsWaiting = "clientsWaitingForData"_sd;
 
-const auto getServiceExecutorFixed =
-    ServiceContext::declareDecoration<std::shared_ptr<ServiceExecutorFixed>>();
+struct Handle {
+    ~Handle() {
+        if (ptr) {
+            ptr->join();
+        }
+    }
+
+    std::shared_ptr<ServiceExecutorFixed> ptr;
+};
+const auto getHandle = ServiceContext::declareDecoration<Handle>();
 
 const auto serviceExecutorFixedRegisterer = ServiceContext::ConstructorActionRegisterer{
     "ServiceExecutorFixed", [](ServiceContext* ctx) {
         auto limits = ThreadPool::Limits{};
         limits.minThreads = 0;
         limits.maxThreads = fixedServiceExecutorThreadLimit;
-        getServiceExecutorFixed(ctx) =
-            std::make_shared<ServiceExecutorFixed>(ctx, std::move(limits));
+        getHandle(ctx).ptr = std::make_shared<ServiceExecutorFixed>(ctx, std::move(limits));
     }};
 }  // namespace
 
@@ -134,28 +141,28 @@ ServiceExecutorFixed::ServiceExecutorFixed(ServiceContext* ctx, ThreadPool::Limi
 }
 
 ServiceExecutorFixed::~ServiceExecutorFixed() {
-    switch (_state) {
-        case State::kNotStarted:
-            return;
-        case State::kRunning: {
-            // We should not be running while in this destructor.
-            MONGO_UNREACHABLE;
-        }
-        case State::kStopping:
-        case State::kStopped: {
-            // We can go ahead and attempt to join our thread pool.
-        } break;
-        default: { MONGO_UNREACHABLE; }
-    }
+    join();
+}
 
+void ServiceExecutorFixed::join() noexcept {
     LOGV2_DEBUG(4910502,
                 kDiagnosticLogLevel,
-                "Shutting down pool for fixed thread-pool service executor",
+                "Joining fixed thread-pool service executor",
                 "name"_attr = _options.poolName);
 
-    // We only can desturct when we have joined all of our tasks and canceled all of our sessions.
-    // This thread pool doesn't get to refuse work over its lifetime. It's possible that tasks are
-    // stiil blocking. If so, we block until they finish here.
+    {
+        auto lk = stdx::unique_lock(_mutex);
+        _beginShutdown(lk);
+
+        _shutdownCondition.wait(lk, [this]() { return _state == State::kStopped; });
+        if (std::exchange(_isJoined, true)) {
+            return;
+        }
+    }
+
+    // We only can join when we have joined all of our tasks and canceled all of our sessions.  This
+    // thread pool doesn't get to refuse work over its lifetime. It's possible that tasks are stiil
+    // blocking. If so, we block until they finish here.
     _threadPool->shutdown();
     _threadPool->join();
 
@@ -198,7 +205,11 @@ Status ServiceExecutorFixed::start() {
     }
 
     auto tl = _svcCtx->getTransportLayer();
-    invariant(tl);
+    if (!tl) {
+        // For some tests, we do not have a TransportLayer.
+        invariant(TestingProctor::instance().isEnabled());
+        return Status::OK();
+    }
 
     auto reactor = tl->getReactor(TransportLayer::WhichReactor::kIngress);
     invariant(reactor);
@@ -221,9 +232,9 @@ Status ServiceExecutorFixed::start() {
 }
 
 ServiceExecutorFixed* ServiceExecutorFixed::get(ServiceContext* ctx) {
-    auto& ref = getServiceExecutorFixed(ctx);
-    invariant(ref);
-    return ref.get();
+    auto& handle = getHandle(ctx);
+    invariant(handle.ptr);
+    return handle.ptr.get();
 }
 
 Status ServiceExecutorFixed::shutdown(Milliseconds timeout) {
@@ -234,51 +245,51 @@ Status ServiceExecutorFixed::shutdown(Milliseconds timeout) {
 
     {
         auto lk = stdx::unique_lock(_mutex);
+        _beginShutdown(lk);
 
-        switch (_state) {
-            case State::kNotStarted:
-            case State::kRunning: {
-                _state = State::kStopping;
-
-                for (auto& waiter : _waiters) {
-                    // Cancel any session we own.
-                    waiter.session->cancelAsyncOperations();
-                }
-
-                // There may not be outstanding threads, check for shutdown now.
-                _checkForShutdown(lk);
-
-                if (_state == State::kStopped) {
-                    // We were able to become stopped immediately.
-                    return Status::OK();
-                }
-            } break;
-            case State::kStopping: {
-                // Just nead to wait it out.
-            } break;
-            case State::kStopped: {
-                // Totally done.
-                return Status::OK();
-            } break;
-            default: { MONGO_UNREACHABLE; }
+        // There is a world where we are able to simply do a timed wait upon a future chain.
+        // However, that world likely requires an OperationContext available through shutdown.
+        if (!_shutdownCondition.wait_for(
+                lk, timeout.toSystemDuration(), [this] { return _state == State::kStopped; })) {
+            return Status(ErrorCodes::ExceededTimeLimit,
+                          "Failed to shutdown all executor threads within the time limit");
         }
     }
 
     LOGV2_DEBUG(4910504,
                 kDiagnosticLogLevel,
-                "Waiting for shutdown of fixed thread-pool service executor",
+                "Shutdown fixed thread-pool service executor",
                 "name"_attr = _options.poolName);
 
-    // There is a world where we are able to simply do a timed wait upon a future chain. However,
-    // that world likely requires an OperationContext available through shutdown.
-    auto lk = stdx::unique_lock(_mutex);
-    if (!_shutdownCondition.wait_for(
-            lk, timeout.toSystemDuration(), [this] { return _state == State::kStopped; })) {
-        return Status(ErrorCodes::ExceededTimeLimit,
-                      "Failed to shutdown all executor threads within the time limit");
-    }
-
     return Status::OK();
+}
+
+void ServiceExecutorFixed::_beginShutdown(WithLock lk) {
+    switch (_state) {
+        case State::kNotStarted: {
+            invariant(_waiters.empty());
+            invariant(_tasksLeft() == 0);
+            _state = State::kStopped;
+        } break;
+        case State::kRunning: {
+            _state = State::kStopping;
+
+            for (auto& waiter : _waiters) {
+                // Cancel any session we own.
+                waiter.session->cancelAsyncOperations();
+            }
+
+            // There may not be outstanding threads, check for shutdown now.
+            _checkForShutdown(lk);
+        } break;
+        case State::kStopping: {
+            // Just nead to wait it out.
+        } break;
+        case State::kStopped: {
+            // Totally done.
+        } break;
+        default: { MONGO_UNREACHABLE; }
+    }
 }
 
 void ServiceExecutorFixed::_checkForShutdown(WithLock) {
@@ -286,7 +297,6 @@ void ServiceExecutorFixed::_checkForShutdown(WithLock) {
         // We're actively running.
         return;
     }
-    invariant(_state != State::kNotStarted);
 
     if (!_waiters.empty()) {
         // We still have some in wait.
@@ -321,7 +331,11 @@ void ServiceExecutorFixed::_checkForShutdown(WithLock) {
     }
 
     auto tl = _svcCtx->getTransportLayer();
-    invariant(tl);
+    if (!tl) {
+        // For some tests, we do not have a TransportLayer.
+        invariant(TestingProctor::instance().isEnabled());
+        return;
+    }
 
     auto reactor = tl->getReactor(TransportLayer::WhichReactor::kIngress);
     invariant(reactor);
