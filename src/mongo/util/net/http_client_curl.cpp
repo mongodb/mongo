@@ -123,25 +123,63 @@ private:
         curl_share_setopt(_share, CURLSHOPT_SHARE, CURL_LOCK_DATA_DNS);
         curl_share_setopt(_share, CURLSHOPT_SHARE, CURL_LOCK_DATA_CONNECT);
         curl_share_setopt(_share, CURLSHOPT_SHARE, CURL_LOCK_DATA_SSL_SESSION);
-        curl_share_setopt(_share, CURLSHOPT_USERDATA, &this->_shareMutex);
+        curl_share_setopt(_share, CURLSHOPT_USERDATA, this);
         curl_share_setopt(_share, CURLSHOPT_LOCKFUNC, _lockShare);
         curl_share_setopt(_share, CURLSHOPT_UNLOCKFUNC, _unlockShare);
 
         return Status::OK();
     }
 
-    static void _lockShare(CURL*, curl_lock_data, curl_lock_access, void* ctx) {
-        reinterpret_cast<Mutex*>(ctx)->lock();
+
+    static void _lockShare(CURL*, curl_lock_data lock_data, curl_lock_access, void* ctx) {
+        // curl_lock_access maps to shared and single access, i.e. a read and exclusive lock
+        // except the unlock method does not have curl_lock_access as a parameter so we map
+        // all lock requests to regular mutexes
+        switch (lock_data) {
+            case CURL_LOCK_DATA_SHARE:
+                reinterpret_cast<CurlLibraryManager*>(ctx)->_mutexShare.lock();
+                break;
+            case CURL_LOCK_DATA_DNS:
+                reinterpret_cast<CurlLibraryManager*>(ctx)->_mutexDns.lock();
+                break;
+            case CURL_LOCK_DATA_SSL_SESSION:
+                reinterpret_cast<CurlLibraryManager*>(ctx)->_mutexSSLSession.lock();
+                break;
+            case CURL_LOCK_DATA_CONNECT:
+                reinterpret_cast<CurlLibraryManager*>(ctx)->_mutexConnect.lock();
+                break;
+            default:
+                fassert(5185801, "Unsupported curl lock type");
+        }
     }
 
-    static void _unlockShare(CURL*, curl_lock_data, void* ctx) {
-        reinterpret_cast<Mutex*>(ctx)->unlock();
+    static void _unlockShare(CURL*, curl_lock_data lock_data, void* ctx) {
+        switch (lock_data) {
+            case CURL_LOCK_DATA_SHARE:
+                reinterpret_cast<CurlLibraryManager*>(ctx)->_mutexShare.unlock();
+                break;
+            case CURL_LOCK_DATA_DNS:
+                reinterpret_cast<CurlLibraryManager*>(ctx)->_mutexDns.unlock();
+                break;
+            case CURL_LOCK_DATA_SSL_SESSION:
+                reinterpret_cast<CurlLibraryManager*>(ctx)->_mutexSSLSession.unlock();
+                break;
+            case CURL_LOCK_DATA_CONNECT:
+                reinterpret_cast<CurlLibraryManager*>(ctx)->_mutexConnect.unlock();
+                break;
+            default:
+                fassert(5185802, "Unsupported curl unlock type");
+        }
     }
 
 private:
     bool _initialized = false;
     CURLSH* _share = nullptr;
-    Mutex _shareMutex = MONGO_MAKE_LATCH("CurlLibraryManager::_shareMutex");
+
+    Mutex _mutexDns = MONGO_MAKE_LATCH("CurlLibraryManager::ShareDns");
+    Mutex _mutexConnect = MONGO_MAKE_LATCH("CurlLibraryManager::ShareConnect");
+    Mutex _mutexSSLSession = MONGO_MAKE_LATCH("CurlLibraryManager::ShareSSLSession");
+    Mutex _mutexShare = MONGO_MAKE_LATCH("CurlLibraryManager::ShareLock");
 } curlLibraryManager;
 
 /**
