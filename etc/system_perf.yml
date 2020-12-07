@@ -105,10 +105,11 @@ modules:
   prefix: ../../src
   branch: master
 - name: py-tpcc
-  repo: git@github.com:10gen/py-tpcc.git
+  repo: git@github.com:mongodb-labs/py-tpcc.git
   prefix: ../../src
   branch: master
-  ref: 52185e96bf28be6608ea65b61ff1d134b7cb3f13
+  ref: 2d19705337a40e24831a904266a648b85df5be84
+
 ###
 
 - name: enterprise
