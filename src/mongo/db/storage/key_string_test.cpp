@@ -254,17 +254,34 @@ TEST(TypeBitsTest, AppendLotsOfZeroTypeBits) {
 }
 
 TEST_F(KeyStringBuilderTest, TooManyElementsInCompoundKey) {
-    // Construct an illegal KeyString with more than the limit of 32 elements in a compound index
-    // key. Encode 33 kBoolTrue ('o') values.
+    // Construct a KeyString with more than the limit of 32 elements in a compound index key. Encode
+    // 33 kBoolTrue ('o') values.
+    // Note that this KeyString encoding is legal, but it may not be legally stored in an index.
     const char* data = "ooooooooooooooooooooooooooooooooo";
     const size_t size = 33;
 
     KeyString::Builder ks(KeyString::Version::V1);
     ks.resetFromBuffer(data, size);
 
-    ASSERT_THROWS_CODE(KeyString::toBsonSafe(data, size, ALL_ASCENDING, ks.getTypeBits()),
-                       AssertionException,
-                       ErrorCodes::Overflow);
+    // No exceptions should be thrown.
+    KeyString::toBsonSafe(data, size, ALL_ASCENDING, ks.getTypeBits());
+    KeyString::decodeDiscriminator(ks.getBuffer(), ks.getSize(), ALL_ASCENDING, ks.getTypeBits());
+    KeyString::getKeySize(ks.getBuffer(), ks.getSize(), ALL_ASCENDING, ks.getTypeBits());
+}
+
+TEST_F(KeyStringBuilderTest, MaxElementsInCompoundKey) {
+    // Construct a KeyString with 32 elements in a compound index key followed by an end byte.
+    // Encode 32 kBoolTrue ('o') values and an end byte, 0x4.
+    const char* data = "oooooooooooooooooooooooooooooooo\x4";
+    const size_t size = 33;
+
+    KeyString::Builder ks(KeyString::Version::V1);
+    ks.resetFromBuffer(data, size);
+
+    // No exceptions should be thrown.
+    KeyString::toBsonSafe(data, size, ALL_ASCENDING, ks.getTypeBits());
+    KeyString::decodeDiscriminator(ks.getBuffer(), ks.getSize(), ALL_ASCENDING, ks.getTypeBits());
+    KeyString::getKeySize(ks.getBuffer(), ks.getSize(), ALL_ASCENDING, ks.getTypeBits());
 }
 
 TEST_F(KeyStringBuilderTest, ExceededBSONDepth) {
