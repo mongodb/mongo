@@ -62,7 +62,13 @@ public:
     int get(int i) const {
         uassert(ErrorCodes::Overflow,
                 str::stream() << "Ordering offset is out of bounds: " << i,
-                i >= 0 && static_cast<size_t>(i) < kMaxCompoundIndexKeys);
+                i >= 0);
+        // Ordering only allows the first 32 fields to be inverted; any fields after the 32nd must
+        // be ascending. Return 1 to avoid a left shift a 32-bit integer by more than 31 bits, which
+        // is undefined behavior in C++.
+        if (static_cast<size_t>(i) >= kMaxCompoundIndexKeys) {
+            return 1;
+        }
         return ((1u << i) & bits) ? -1 : 1;
     }
 
