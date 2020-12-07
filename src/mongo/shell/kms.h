@@ -56,9 +56,9 @@ public:
     virtual ~KMSService() = default;
 
     /**
-     * Encrypt a plaintext with the specified key and return a encrypted blob.
+     * Return name of KMS service for use in error messages.
      */
-    virtual std::vector<uint8_t> encrypt(ConstDataRange cdr, StringData keyId) = 0;
+    virtual StringData name() const = 0;
 
     /**
      * Decrypt an encrypted blob and return the plaintext.
@@ -66,8 +66,8 @@ public:
     virtual SecureVector<uint8_t> decrypt(ConstDataRange cdr, BSONObj masterKey) = 0;
 
     /**
-     * Encrypt a data key with the specified key and return a BSONObj that describes what needs to
-     * be store in the key vault.
+     * Encrypt a data key with the specified key string and return a BSONObj that describes what
+     * needs to be store in the key vault.
      *
      * {
      *   keyMaterial : "<ciphertext>""
@@ -77,7 +77,13 @@ public:
      *   }
      * }
      */
-    virtual BSONObj encryptDataKey(ConstDataRange cdr, StringData keyId) = 0;
+    virtual BSONObj encryptDataKeyByString(ConstDataRange cdr, StringData keyId);
+
+    /**
+     * Encrypt a data key with the specified key object and return a BSONObj that describes what
+     * needs to be store in the key vault.
+     */
+    virtual BSONObj encryptDataKeyByBSONObj(ConstDataRange cdr, BSONObj keyId);
 };
 
 /**

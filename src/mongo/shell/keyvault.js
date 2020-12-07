@@ -31,7 +31,7 @@ class KeyVault {
             return "TypeError: kmsProvider must be of String type.";
         }
 
-        if (typeof customerMasterKey !== "string") {
+        if (typeof customerMasterKey !== "string" && typeof customerMasterKey !== "object") {
             return "TypeError: customer master key must be of String type.";
         }
 

@@ -47,6 +47,31 @@ function runKMS(mock_kms, func) {
     mock_kms.stop();
 }
 
+function testWrongKeyType() {
+    const awsKMS = {accessKeyId: "access", secretAccessKey: "secret", url: "localhost:8000"};
+
+    const clientSideFLEOptions = {
+        kmsProviders: {
+            aws: awsKMS,
+        },
+        keyVaultNamespace: "test.coll",
+        schemaMap: {}
+    };
+
+    const shell = Mongo(conn.host, clientSideFLEOptions);
+
+    collection.drop();
+
+    const keyVault = shell.getKeyVault();
+
+    assert.throws(() => keyVault.createKey(
+                      "aws",
+                      {"region": "us-east-1", "key": "arn:aws:kms:us-east-1:fake:fake:fake"},
+                      ["mongoKey"]));
+}
+
+testWrongKeyType();
+
 function testBadEncryptResult(fault) {
     const mock_kms = new MockKMSServer(fault, false);
 

@@ -66,6 +66,8 @@ struct AWSConfig {
     boost::optional<std::string> sessionToken;
 };
 
+constexpr auto kAwsKms = "aws"_sd;
+
 /**
  * Manages SSL information and config for how to talk to AWS KMS.
  */
@@ -73,15 +75,19 @@ class AWSKMSService final : public KMSService {
 public:
     AWSKMSService() = default;
 
-    static std::unique_ptr<KMSService> create(const AwsKMS& config);
+    StringData name() const {
+        return kAwsKms;
+    }
 
-    std::vector<uint8_t> encrypt(ConstDataRange cdr, StringData kmsKeyId) final;
+    static std::unique_ptr<KMSService> create(const AwsKMS& config);
 
     SecureVector<uint8_t> decrypt(ConstDataRange cdr, BSONObj masterKey) final;
 
-    BSONObj encryptDataKey(ConstDataRange cdr, StringData keyId) final;
+    BSONObj encryptDataKeyByString(ConstDataRange cdr, StringData keyId) final;
 
 private:
+    std::vector<uint8_t> encrypt(ConstDataRange cdr, StringData kmsKeyId);
+
     void initRequest(kms_request_t* request, StringData host, StringData region);
 
 private:
@@ -212,7 +218,7 @@ std::vector<uint8_t> AWSKMSService::encrypt(ConstDataRange cdr, StringData kmsKe
     return toVector(blobStr);
 }
 
-BSONObj AWSKMSService::encryptDataKey(ConstDataRange cdr, StringData keyId) {
+BSONObj AWSKMSService::encryptDataKeyByString(ConstDataRange cdr, StringData keyId) {
     auto dataKey = encrypt(cdr, keyId);
 
     AwsMasterKey masterKey;

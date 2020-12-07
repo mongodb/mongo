@@ -49,6 +49,18 @@ HostAndPort parseUrl(StringData url) {
     return HostAndPort(hostAndPort);
 }
 
+BSONObj KMSService::encryptDataKeyByString(ConstDataRange cdr, StringData keyId) {
+    uasserted(5380101,
+              str::stream() << "Customer Master Keys for " << name()
+                            << " must be BSON object, not a string.");
+}
+
+BSONObj KMSService::encryptDataKeyByBSONObj(ConstDataRange cdr, BSONObj keyId) {
+    uasserted(5380102,
+              str::stream() << "Customer Master Keys for " << name()
+                            << " must be a string, not a BSON object.");
+}
+
 stdx::unordered_map<KMSProviderEnum, std::unique_ptr<KMSServiceFactory>>
     KMSServiceController::_factories;
 

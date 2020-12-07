@@ -293,12 +293,12 @@ void EncryptedDBClientBase::generateDataKey(JSContext* cx, JS::CallArgs args) {
         uasserted(ErrorCodes::BadValue, "1st param to generateDataKey has to be a string");
     }
 
-    if (!args.get(1).isString()) {
-        uasserted(ErrorCodes::BadValue, "2nd param to generateDataKey has to be a string");
+    if (!args.get(1).isString() && !args.get(1).isObject()) {
+        uasserted(ErrorCodes::BadValue,
+                  "2nd param to generateDataKey has to be a string or object");
     }
 
     std::string kmsProvider = mozjs::ValueWriter(cx, args.get(0)).toString();
-    std::string clientMasterKey = mozjs::ValueWriter(cx, args.get(1)).toString();
 
     std::unique_ptr<KMSService> kmsService = KMSServiceController::createFromClient(
         kmsProvider, _encryptionOptions.getKmsProviders().toBSON());
@@ -307,10 +307,22 @@ void EncryptedDBClientBase::generateDataKey(JSContext* cx, JS::CallArgs args) {
     auto res = crypto::engineRandBytes(dataKey->data(), dataKey->size());
     uassert(31042, "Error generating data key: " + res.codeString(), res.isOK());
 
-    BSONObj obj = kmsService->encryptDataKey(ConstDataRange(dataKey->data(), dataKey->size()),
-                                             clientMasterKey);
 
-    mozjs::ValueReader(cx, args.rval()).fromBSON(obj, nullptr, false);
+    if (args.get(1).isString()) {
+        std::string clientMasterKey = mozjs::ValueWriter(cx, args.get(1)).toString();
+
+        BSONObj obj = kmsService->encryptDataKeyByString(
+            ConstDataRange(dataKey->data(), dataKey->size()), clientMasterKey);
+
+        mozjs::ValueReader(cx, args.rval()).fromBSON(obj, nullptr, false);
+    } else {
+        BSONObj clientMasterKey = mozjs::ValueWriter(cx, args.get(1)).toBSON();
+
+        BSONObj obj = kmsService->encryptDataKeyByBSONObj(
+            ConstDataRange(dataKey->data(), dataKey->size()), clientMasterKey);
+
+        mozjs::ValueReader(cx, args.rval()).fromBSON(obj, nullptr, false);
+    }
 }
 
 void EncryptedDBClientBase::getDataKeyCollection(JSContext* cx, JS::CallArgs args) {
