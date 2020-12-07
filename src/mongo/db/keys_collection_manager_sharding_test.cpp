@@ -376,26 +376,66 @@ LogicalTime addSeconds(const LogicalTime& logicalTime, const Seconds& seconds) {
     return LogicalTime(Timestamp(asTimestamp.getSecs() + seconds.count(), asTimestamp.getInc()));
 }
 
-TEST(KeysCollectionManagerUtilTest, HowMuchSleepNeededForCalculationDoesNotOverflow) {
+TEST(KeysCollectionManagerUtilTest, HowMuchSleepNeedForWithDefaultKeysRotationIntervalIs20Days) {
     auto secondsSinceEpoch = durationCount<Seconds>(Date_t::now().toDurationSinceEpoch());
     auto defaultKeysIntervalSeconds = Seconds(KeysRotationIntervalSec);
 
-    // Mock inputs that would have caused an overflow without the changes from SERVER-48709.
-    // "currentTime" is the current clusterTime in the VectorClock, which will typically be close
-    // to a timestamp constructed from the number of seconds since the unix epoch. "latestExpiredAt"
-    // is the highest expiration logical time of any key, which will at most be currentTime +
-    // (default key rotation interval * 2) because two valid keys are kept at a time. "interval" is
-    // the duration a key is valid for, which defaults to 90 days = 7,776,000 seconds.
     auto currentTime = LogicalTime(Timestamp(secondsSinceEpoch, 0));
     auto latestExpiredAt = addSeconds(currentTime, defaultKeysIntervalSeconds * 2);
-    auto interval = Milliseconds(defaultKeysIntervalSeconds);
+    auto defaultInterval = Milliseconds(defaultKeysIntervalSeconds);
 
-    // Despite the default rotation interval seconds * 1000 not fitting in a 32 bit unsigned
-    // integer (7,776,000,000 vs. 4,294,967,295), the calculation should not overflow, and the next
-    // wakeup should correctly be the default interval.
+    auto nextWakeupMillis = keys_collection_manager_util::howMuchSleepNeedFor(
+        currentTime, latestExpiredAt, defaultInterval);
+    ASSERT_EQ(nextWakeupMillis, Days(20));
+}
+
+TEST(KeysCollectionManagerUtilTest, HowMuchSleepNeedForIsNeverLongerThan20Days) {
+    auto secondsSinceEpoch = durationCount<Seconds>(Date_t::now().toDurationSinceEpoch());
+    auto keysRotationInterval = Seconds(Days(50));
+
+    auto currentTime = LogicalTime(Timestamp(secondsSinceEpoch, 0));
+    auto latestExpiredAt = addSeconds(currentTime, keysRotationInterval * 2);
+    auto interval = Milliseconds(keysRotationInterval);
+
+    auto nextWakeupMillis =
+        keys_collection_manager_util::howMuchSleepNeedFor(currentTime, latestExpiredAt, interval);
+    ASSERT_EQ(nextWakeupMillis, Days(20));
+}
+
+TEST(KeysCollectionManagerUtilTest, HowMuchSleepNeedForIsNeverHigherThanRotationInterval) {
+    auto secondsSinceEpoch = durationCount<Seconds>(Date_t::now().toDurationSinceEpoch());
+    auto keysRotationInterval = Seconds(Days(5));
+
+    auto currentTime = LogicalTime(Timestamp(secondsSinceEpoch, 0));
+    auto latestExpiredAt = addSeconds(currentTime, keysRotationInterval * 2);
+    auto interval = Milliseconds(keysRotationInterval);
+
     auto nextWakeupMillis =
         keys_collection_manager_util::howMuchSleepNeedFor(currentTime, latestExpiredAt, interval);
     ASSERT_EQ(nextWakeupMillis, interval);
+}
+
+LogicalTime subtractSeconds(const LogicalTime& logicalTime, const Seconds& seconds) {
+    auto asTimestamp = logicalTime.asTimestamp();
+    return LogicalTime(Timestamp(asTimestamp.getSecs() - seconds.count(), asTimestamp.getInc()));
+}
+
+TEST(KeysCollectionManagerUtilTest, HowMuchSleepNeedForAfterNotFindingKeys) {
+    // Default refresh interval if keys could not be found.
+    const Milliseconds kRefreshIntervalIfErrored(200);
+
+    auto secondsSinceEpoch = durationCount<Seconds>(Date_t::now().toDurationSinceEpoch());
+    auto keysRotationInterval = Milliseconds(5000);
+
+    // The latest found key expired before the current time, which means no new keys were found
+    // despite the previous refresh succeeding.
+    auto currentTime = LogicalTime(Timestamp(secondsSinceEpoch, 0));
+    auto latestExpiredAt = subtractSeconds(currentTime, Seconds(1));
+    auto interval = Milliseconds(keysRotationInterval);
+
+    auto nextWakeupMillis =
+        keys_collection_manager_util::howMuchSleepNeedFor(currentTime, latestExpiredAt, interval);
+    ASSERT_EQ(nextWakeupMillis, kRefreshIntervalIfErrored);
 }
 
 }  // namespace
