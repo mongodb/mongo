@@ -45,6 +45,8 @@
 namespace mongo {
 namespace {
 
+constexpr auto kLocalKms = "local"_sd;
+
 /**
  * Manages Local KMS Information
  */
@@ -53,13 +55,18 @@ public:
     LocalKMSService(SymmetricKey key) : _key(std::move(key)) {}
     ~LocalKMSService() final = default;
 
-    static std::unique_ptr<KMSService> create(const LocalKMS& config);
+    StringData name() const {
+        return kLocalKms;
+    }
 
-    std::vector<uint8_t> encrypt(ConstDataRange cdr, StringData kmsKeyId) final;
+    static std::unique_ptr<KMSService> create(const LocalKMS& config);
 
     SecureVector<uint8_t> decrypt(ConstDataRange cdr, BSONObj masterKey) final;
 
-    BSONObj encryptDataKey(ConstDataRange cdr, StringData keyId) final;
+    BSONObj encryptDataKeyByString(ConstDataRange cdr, StringData keyId) final;
+
+private:
+    std::vector<uint8_t> encrypt(ConstDataRange cdr, StringData kmsKeyId);
 
 private:
     // Key that wraps all KMS encrypted data
@@ -74,7 +81,7 @@ std::vector<uint8_t> LocalKMSService::encrypt(ConstDataRange cdr, StringData kms
     return ciphertext;
 }
 
-BSONObj LocalKMSService::encryptDataKey(ConstDataRange cdr, StringData keyId) {
+BSONObj LocalKMSService::encryptDataKeyByString(ConstDataRange cdr, StringData keyId) {
     auto dataKey = encrypt(cdr, keyId);
 
     LocalMasterKey masterKey;

@@ -72,7 +72,8 @@ TEST(KmsTest, TestGoodKey) {
 
     auto myKey = "My Secret Key"_sd;
 
-    auto material = service->encryptDataKey(ConstDataRange(myKey.rawData(), myKey.size()), "");
+    auto material =
+        service->encryptDataKeyByString(ConstDataRange(myKey.rawData(), myKey.size()), "");
 
     LocalMasterKeyAndMaterial glob =
         LocalMasterKeyAndMaterial::parse(IDLParserErrorContext("root"), material);
