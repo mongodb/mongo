@@ -1,7 +1,8 @@
 /**
- * Tests that the donorStartMigration & recipientSyncData command throws an error if the provided
+ * Tests that the donorStartMigration and recipientSyncData commands throw an error if the provided
  * tenantId is unsupported (i.e. '', 'admin', 'local' or 'config') or if the recipient
- * connection string matches the donor's connection string.
+ * connection string matches the donor's connection string or doesn't correspond to a replica set
+ * with a least one host.
  *
  * @tags: [requires_fcv_47]
  */
@@ -11,17 +12,18 @@
 
 load("jstests/replsets/libs/tenant_migration_util.js");
 
-const rst = new ReplSetTest({nodes: 1});
-rst.startSet();
-rst.initiate();
-if (!TenantMigrationUtil.isFeatureFlagEnabled(rst.getPrimary())) {
+const tenantMigrationTest =
+    new TenantMigrationTest({name: jsTestName(), enableRecipientTesting: false});
+
+if (!tenantMigrationTest.isFeatureFlagEnabled()) {
     jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-    rst.stopSet();
     return;
 }
-const primary = rst.getPrimary();
-const tenantId = "test";
-const connectionString = "foo/bar:12345";
+
+const donorPrimary = tenantMigrationTest.getDonorPrimary();
+const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
+
+const tenantId = "testTenantId";
 const readPreference = {
     mode: 'primary'
 };
@@ -31,32 +33,42 @@ jsTestLog("Testing 'donorStartMigration' command provided with invalid options."
 // Test unsupported database prefixes.
 const unsupportedtenantIds = ['', 'admin', 'local', 'config'];
 unsupportedtenantIds.forEach((invalidTenantId) => {
-    assert.commandFailedWithCode(primary.adminCommand({
+    assert.commandFailedWithCode(donorPrimary.adminCommand({
         donorStartMigration: 1,
         migrationId: UUID(),
-        recipientConnectionString: connectionString,
+        recipientConnectionString: tenantMigrationTest.getRecipientRst().getURL(),
         tenantId: invalidTenantId,
         readPreference: readPreference
     }),
                                  ErrorCodes.BadValue);
 });
 
-// Test migrating a database to the donor itself.
-assert.commandFailedWithCode(primary.adminCommand({
+// Test migrating a tenant to the donor itself.
+assert.commandFailedWithCode(donorPrimary.adminCommand({
     donorStartMigration: 1,
     migrationId: UUID(),
-    recipientConnectionString: rst.getURL(),
+    recipientConnectionString: tenantMigrationTest.getDonorRst().getURL(),
     tenantId: tenantId,
     readPreference: readPreference
 }),
                              ErrorCodes.BadValue);
 
-// Test migrating a database to a recipient that has one or more same hosts as donor.
-const conflictingRecipientConnectionString = connectionString + "," + primary.host;
-assert.commandFailedWithCode(primary.adminCommand({
+// Test migrating a tenant to a recipient that shares one or more hosts with the donor.
+assert.commandFailedWithCode(donorPrimary.adminCommand({
     donorStartMigration: 1,
     migrationId: UUID(),
-    recipientConnectionString: conflictingRecipientConnectionString,
+    recipientConnectionString:
+        tenantMigrationTest.getRecipientRst().getURL() + "," + donorPrimary.host,
+    tenantId: tenantId,
+    readPreference: readPreference
+}),
+                             ErrorCodes.BadValue);
+
+// Test migrating a tenant to a standalone recipient.
+assert.commandFailedWithCode(donorPrimary.adminCommand({
+    donorStartMigration: 1,
+    migrationId: UUID(),
+    recipientConnectionString: recipientPrimary.host,
     tenantId: tenantId,
     readPreference: readPreference
 }),
@@ -66,32 +78,41 @@ jsTestLog("Testing 'recipientSyncData' command provided with invalid options.");
 
 // Test unsupported database prefixes.
 unsupportedtenantIds.forEach((invalidTenantId) => {
-    assert.commandFailedWithCode(primary.adminCommand({
+    assert.commandFailedWithCode(recipientPrimary.adminCommand({
         recipientSyncData: 1,
         migrationId: UUID(),
-        donorConnectionString: connectionString,
+        donorConnectionString: tenantMigrationTest.getDonorRst().getURL(),
         tenantId: invalidTenantId,
         readPreference: readPreference
     }),
                                  ErrorCodes.BadValue);
 });
 
-// Test migrating a database from recipient itself.
-assert.commandFailedWithCode(primary.adminCommand({
+// Test migrating a tenant from the recipient itself.
+assert.commandFailedWithCode(recipientPrimary.adminCommand({
     recipientSyncData: 1,
     migrationId: UUID(),
-    donorConnectionString: rst.getURL(),
+    donorConnectionString: tenantMigrationTest.getRecipientRst().getURL(),
     tenantId: tenantId,
     readPreference: readPreference
 }),
                              ErrorCodes.BadValue);
 
-// Test migrating a database from a donor that has one or more same hosts as recipient.
-const conflictingDonorConnectionString = connectionString + "," + primary.host;
-assert.commandFailedWithCode(primary.adminCommand({
+// Test migrating a tenant from a donor that shares one or more hosts with the recipient.
+assert.commandFailedWithCode(recipientPrimary.adminCommand({
     recipientSyncData: 1,
     migrationId: UUID(),
-    donorConnectionString: conflictingDonorConnectionString,
+    donorConnectionString: tenantMigrationTest.getDonorRst().getURL() + "," + recipientPrimary.host,
+    tenantId: tenantId,
+    readPreference: readPreference
+}),
+                             ErrorCodes.BadValue);
+
+// Test migrating a tenant from a standalone donor.
+assert.commandFailedWithCode(recipientPrimary.adminCommand({
+    recipientSyncData: 1,
+    migrationId: UUID(),
+    donorConnectionString: recipientPrimary.host,
     tenantId: tenantId,
     readPreference: readPreference
 }),
@@ -100,10 +121,10 @@ assert.commandFailedWithCode(primary.adminCommand({
 // Test 'returnAfterReachingDonorTimestamp' can' be null.
 const nullTimestamps = [Timestamp(0, 0), Timestamp(0, 1)];
 nullTimestamps.forEach((nullTs) => {
-    assert.commandFailedWithCode(primary.adminCommand({
+    assert.commandFailedWithCode(donorPrimary.adminCommand({
         recipientSyncData: 1,
         migrationId: UUID(),
-        donorConnectionString: connectionString,
+        donorConnectionString: tenantMigrationTest.getDonorRst().getURL(),
         tenantId: tenantId,
         readPreference: readPreference,
         returnAfterReachingDonorTimestamp: nullTs
@@ -111,5 +132,5 @@ nullTimestamps.forEach((nullTs) => {
                                  ErrorCodes.BadValue);
 });
 
-rst.stopSet();
+tenantMigrationTest.stop();
 })();
