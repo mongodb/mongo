@@ -2079,13 +2079,26 @@ void IndexBuildsCoordinator::_runIndexBuildInner(
         return;
     }
 
-    {
-        // If the index build has already been cleaned-up because it encountered an error at
-        // commit-time, there is no work to do. This is the most routine case, since index
-        // constraint checking happens at commit-time for index builds.
-        if (replState->isAborted()) {
-            uassertStatusOK(status);
+    if (status.code() == ErrorCodes::IndexBuildAborted) {
+        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+        auto& collector = ResourceConsumption::MetricsCollector::get(opCtx);
+
+        // Only report metrics for index builds on primaries. We are being aborted by an external
+        // thread, thus we can assume it is holding the RSTL while waiting for us to exit.
+        bool wasCollecting = collector.endScopedCollecting();
+        bool isPrimary = replCoord->canAcceptWritesFor_UNSAFE(
+            opCtx, {replState->dbName, replState->collectionUUID});
+        if (isPrimary && wasCollecting && ResourceConsumption::isMetricsAggregationEnabled()) {
+            ResourceConsumption::get(opCtx).merge(
+                opCtx, collector.getDbName(), collector.getMetrics());
         }
+    }
+
+    // If the index build has already been cleaned-up because it encountered an error at
+    // commit-time, there is no work to do. This is the most routine case, since index
+    // constraint checking happens at commit-time for index builds.
+    if (replState->isAborted()) {
+        uassertStatusOK(status);
     }
 
     // We do not hold a collection lock here, but we are protected against the collection being
@@ -2450,13 +2463,9 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
     // While we are still holding the RSTL and before returning, ensure the metrics collected for
     // this index build are attributed to the primary that commits or aborts the index build.
     auto metricsGuard = makeGuard([&]() {
-        if (!isPrimary) {
-            return;
-        }
-
         auto& collector = ResourceConsumption::MetricsCollector::get(opCtx);
         bool wasCollecting = collector.endScopedCollecting();
-        if (!wasCollecting || !ResourceConsumption::isMetricsAggregationEnabled()) {
+        if (!isPrimary || !wasCollecting || !ResourceConsumption::isMetricsAggregationEnabled()) {
             return;
         }
 
