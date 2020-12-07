@@ -355,7 +355,7 @@ private:
      * state machine collection.
      */
     virtual ExecutorFuture<void> _rebuildService(
-        std::shared_ptr<executor::ScopedTaskExecutor> executor) {
+        std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancelationToken& token) {
         return ExecutorFuture<void>(**executor, Status::OK());
     };
 

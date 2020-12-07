@@ -120,7 +120,7 @@ public:
          * oplog entry.
          */
         ExecutorFuture<repl::OpTime> _insertStateDocument(
-            std::shared_ptr<executor::ScopedTaskExecutor> executor);
+            std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancelationToken& token);
 
         /**
          * Updates the state document to have the given state. Then, persists the updated document
@@ -130,14 +130,15 @@ public:
          */
         ExecutorFuture<repl::OpTime> _updateStateDocument(
             std::shared_ptr<executor::ScopedTaskExecutor> executor,
-            const TenantMigrationDonorStateEnum nextState);
+            const TenantMigrationDonorStateEnum nextState,
+            const CancelationToken& token);
 
         /**
          * Sets the "expireAt" time for the state document to be garbage collected, and returns the
          * the opTime for the write.
          */
         ExecutorFuture<repl::OpTime> _markStateDocumentAsGarbageCollectable(
-            std::shared_ptr<executor::ScopedTaskExecutor> executor);
+            std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancelationToken& token);
 
         /**
          * Waits for given opTime to be majority committed.
@@ -193,8 +194,8 @@ public:
     };
 
 private:
-    ExecutorFuture<void> _rebuildService(
-        std::shared_ptr<executor::ScopedTaskExecutor> executor) override;
+    ExecutorFuture<void> _rebuildService(std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                                         const CancelationToken& token) override;
 
     ServiceContext* _serviceContext;
 };

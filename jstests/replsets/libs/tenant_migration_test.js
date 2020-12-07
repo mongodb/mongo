@@ -235,10 +235,6 @@ function TenantMigrationTest(
             const configDonorsColl = node.getCollection("config.tenantMigrationDonors");
             assert.soon(() => 0 === configDonorsColl.count({_id: migrationId}));
 
-            assert.soon(() => 0 ===
-                            assert.commandWorked(node.adminCommand({serverStatus: 1}))
-                                .repl.primaryOnlyServices.TenantMigrationDonorService);
-
             let mtabs;
             assert.soon(() => {
                 mtabs = assert.commandWorked(node.adminCommand({serverStatus: 1}))

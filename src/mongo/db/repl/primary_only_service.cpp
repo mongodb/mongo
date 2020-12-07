@@ -372,7 +372,7 @@ void PrimaryOnlyService::onStepUp(const OpTime& stepUpOpTime) {
                 return ExecutorFuture<void>(**_scopedExecutor, Status::OK());
             }
 
-            return _rebuildService(_scopedExecutor);
+            return _rebuildService(_scopedExecutor, _source.token());
         })
         .then([this, term] { _rebuildInstances(term); })
         .getAsync([](auto&&) {});  // Ignore the result Future

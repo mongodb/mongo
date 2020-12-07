@@ -265,8 +265,8 @@ public:
     };
 
 private:
-    ExecutorFuture<void> _rebuildService(
-        std::shared_ptr<executor::ScopedTaskExecutor> executor) override {
+    ExecutorFuture<void> _rebuildService(std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                                         const CancelationToken& token) override {
         auto nss = getStateDocumentsNS();
 
         AllowOpCtxWhenServiceRebuildingBlock allowOpCtxBlock(Client::getCurrent());

@@ -66,30 +66,27 @@ std::shared_ptr<TenantMigrationAccessBlocker> getTenantMigrationAccessBlocker(
         .getTenantMigrationAccessBlockerForTenantId(tenantId);
 }
 
-bool shouldStopCreatingTTLIndex(Status status) {
-    return status.isOK() || ErrorCodes::isShutdownError(status) ||
-        ErrorCodes::isNotPrimaryError(status);
+bool shouldStopCreatingTTLIndex(Status status, const CancelationToken& token) {
+    return status.isOK() || token.isCanceled();
 }
 
-bool shouldStopInsertingDonorStateDoc(Status status) {
+bool shouldStopInsertingDonorStateDoc(Status status, const CancelationToken& token) {
     return status.isOK() || status == ErrorCodes::ConflictingOperationInProgress ||
-        ErrorCodes::isShutdownError(status) || ErrorCodes::isNotPrimaryError(status);
+        token.isCanceled();
 }
 
-bool shouldStopUpdatingDonorStateDoc(Status status) {
-    return status.isOK() || ErrorCodes::isShutdownError(status) ||
-        ErrorCodes::isNotPrimaryError(status);
+bool shouldStopUpdatingDonorStateDoc(Status status, const CancelationToken& token) {
+    return status.isOK() || token.isCanceled();
 }
 
-bool shouldStopSendingRecipientCommand(Status status) {
-    return status.isOK() || ErrorCodes::isShutdownError(status) ||
-        ErrorCodes::isNotPrimaryError(status);
+bool shouldStopSendingRecipientCommand(Status status, const CancelationToken& token) {
+    return status.isOK() || token.isCanceled();
 }
 
 }  // namespace
 
 ExecutorFuture<void> TenantMigrationDonorService::_rebuildService(
-    std::shared_ptr<executor::ScopedTaskExecutor> executor) {
+    std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancelationToken& token) {
     return AsyncTry([this] {
                auto nss = getStateDocumentsNS();
 
@@ -108,7 +105,7 @@ ExecutorFuture<void> TenantMigrationDonorService::_rebuildService(
                    result);
                uassertStatusOK(getStatusFromCommandResult(result));
            })
-        .until([](Status status) { return shouldStopCreatingTTLIndex(status); })
+        .until([token](Status status) { return shouldStopCreatingTTLIndex(status, token); })
         .withBackoffBetweenIterations(kExponentialBackoff)
         .on(**executor, CancelationToken::uncancelable());
 }
@@ -217,7 +214,7 @@ void TenantMigrationDonorService::Instance::interrupt(Status status) {
 }
 
 ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_insertStateDocument(
-    std::shared_ptr<executor::ScopedTaskExecutor> executor) {
+    std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancelationToken& token) {
     invariant(_stateDoc.getState() == TenantMigrationDonorStateEnum::kUninitialized);
     _stateDoc.setState(TenantMigrationDonorStateEnum::kDataSync);
 
@@ -245,8 +242,8 @@ ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_insertState
 
                return repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
            })
-        .until([](StatusWith<repl::OpTime> swOpTime) {
-            return shouldStopInsertingDonorStateDoc(swOpTime.getStatus());
+        .until([token](StatusWith<repl::OpTime> swOpTime) {
+            return shouldStopInsertingDonorStateDoc(swOpTime.getStatus(), token);
         })
         .withBackoffBetweenIterations(kExponentialBackoff)
         .on(**executor, CancelationToken::uncancelable());
@@ -254,7 +251,8 @@ ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_insertState
 
 ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_updateStateDocument(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
-    const TenantMigrationDonorStateEnum nextState) {
+    const TenantMigrationDonorStateEnum nextState,
+    const CancelationToken& token) {
     const auto originalStateDocBson = _stateDoc.toBSON();
 
     return AsyncTry([this, self = shared_from_this(), executor, nextState, originalStateDocBson] {
@@ -340,8 +338,8 @@ ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_updateState
                invariant(updateOpTime);
                return updateOpTime.get();
            })
-        .until([](StatusWith<repl::OpTime> swOpTime) {
-            return shouldStopUpdatingDonorStateDoc(swOpTime.getStatus());
+        .until([token](StatusWith<repl::OpTime> swOpTime) {
+            return shouldStopUpdatingDonorStateDoc(swOpTime.getStatus(), token);
         })
         .withBackoffBetweenIterations(kExponentialBackoff)
         .on(**executor, CancelationToken::uncancelable());
@@ -349,7 +347,7 @@ ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_updateState
 
 ExecutorFuture<repl::OpTime>
 TenantMigrationDonorService::Instance::_markStateDocumentAsGarbageCollectable(
-    std::shared_ptr<executor::ScopedTaskExecutor> executor) {
+    std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancelationToken& token) {
     return AsyncTry([this, self = shared_from_this()] {
                auto opCtxHolder = cc().makeOperationContext();
                auto opCtx = opCtxHolder.get();
@@ -378,8 +376,8 @@ TenantMigrationDonorService::Instance::_markStateDocumentAsGarbageCollectable(
 
                return repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
            })
-        .until([](StatusWith<repl::OpTime> swOpTime) {
-            return shouldStopUpdatingDonorStateDoc(swOpTime.getStatus());
+        .until([token](StatusWith<repl::OpTime> swOpTime) {
+            return shouldStopUpdatingDonorStateDoc(swOpTime.getStatus(), token);
         })
         .withBackoffBetweenIterations(kExponentialBackoff)
         .on(**executor, CancelationToken::uncancelable());
@@ -444,7 +442,7 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendCommandToRecipi
                                });
                        });
                })
-        .until([](Status status) { return shouldStopSendingRecipientCommand(status); })
+        .until([token](Status status) { return shouldStopSendingRecipientCommand(status, token); })
         .withBackoffBetweenIterations(kExponentialBackoff)
         .on(**executor, token);
 }
@@ -501,14 +499,14 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
                                                                          recipientUri.getServers());
 
     return ExecutorFuture<void>(**executor)
-        .then([this, self = shared_from_this(), executor] {
+        .then([this, self = shared_from_this(), executor, token] {
             if (_stateDoc.getState() > TenantMigrationDonorStateEnum::kUninitialized) {
                 return ExecutorFuture<void>(**executor, Status::OK());
             }
 
             // Enter "dataSync" state.
-            return _insertStateDocument(executor).then(
-                [this, self = shared_from_this(), executor](repl::OpTime opTime) {
+            return _insertStateDocument(executor, token)
+                .then([this, self = shared_from_this(), executor](repl::OpTime opTime) {
                     return _waitForMajorityWriteConcern(executor, std::move(opTime));
                 });
         })
@@ -523,9 +521,10 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
                     auto opCtx = opCtxHolder.get();
                     pauseTenantMigrationAfterDataSync.pauseWhileSet(opCtx);
                 })
-                .then([this, self = shared_from_this(), executor] {
+                .then([this, self = shared_from_this(), executor, token] {
                     // Enter "blocking" state.
-                    return _updateStateDocument(executor, TenantMigrationDonorStateEnum::kBlocking)
+                    return _updateStateDocument(
+                               executor, TenantMigrationDonorStateEnum::kBlocking, token)
                         .then([this, self = shared_from_this(), executor](repl::OpTime opTime) {
                             return _waitForMajorityWriteConcern(executor, std::move(opTime));
                         });
@@ -564,15 +563,16 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
                         uasserted(ErrorCodes::InternalError, "simulate a tenant migration error");
                     });
                 })
-                .then([this, self = shared_from_this(), executor] {
+                .then([this, self = shared_from_this(), executor, token] {
                     // Enter "commit" state.
-                    return _updateStateDocument(executor, TenantMigrationDonorStateEnum::kCommitted)
+                    return _updateStateDocument(
+                               executor, TenantMigrationDonorStateEnum::kCommitted, token)
                         .then([this, self = shared_from_this(), executor](repl::OpTime opTime) {
                             return _waitForMajorityWriteConcern(executor, std::move(opTime));
                         });
                 });
         })
-        .onError([this, self = shared_from_this(), executor](Status status) {
+        .onError([this, self = shared_from_this(), executor, token](Status status) {
             if (_stateDoc.getState() == TenantMigrationDonorStateEnum::kAborted) {
                 // The migration was resumed on stepup and it was already aborted.
                 return ExecutorFuture<void>(**executor, Status::OK());
@@ -590,7 +590,8 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
             } else {
                 // Enter "abort" state.
                 _abortReason.emplace(status);
-                return _updateStateDocument(executor, TenantMigrationDonorStateEnum::kAborted)
+                return _updateStateDocument(
+                           executor, TenantMigrationDonorStateEnum::kAborted, token)
                     .then([this, self = shared_from_this(), executor](repl::OpTime opTime) {
                         return _waitForMajorityWriteConcern(executor, std::move(opTime));
                     });
@@ -620,8 +621,8 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
                     return _sendRecipientForgetMigrationCommand(
                         executor, recipientTargeterRS, token);
                 })
-                .then([this, self = shared_from_this(), executor] {
-                    return _markStateDocumentAsGarbageCollectable(executor);
+                .then([this, self = shared_from_this(), executor, token] {
+                    return _markStateDocumentAsGarbageCollectable(executor, token);
                 })
                 .then([this, self = shared_from_this(), executor](repl::OpTime opTime) {
                     return _waitForMajorityWriteConcern(executor, std::move(opTime));
