@@ -125,8 +125,6 @@ class TestReport(unittest.TestResult):  # pylint: disable=too-many-instance-attr
         test_info.url_endpoint = url_endpoint
         if self.logging_prefix is not None:
             test_logger.info(self.logging_prefix)
-        # Set job_num in test.
-        test.job_num = self.job_num
 
         test.override_logger(test_logger)
         test_info.start_time = time.time()

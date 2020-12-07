@@ -120,10 +120,6 @@ DEFAULTS = {
     "variant_name": None,
     "version_id": None,
 
-    # Cedar options.
-    "cedar_url": "cedar.mongodb.com",
-    "cedar_rpc_port": "7070",
-
     # WiredTiger options.
     "wt_coll_config": None,
     "wt_engine_config": None,
@@ -252,12 +248,6 @@ BASE_PORT = None
 
 # The root url of the buildlogger server.
 BUILDLOGGER_URL = None
-
-# URL to connect to the Cedar service.
-CEDAR_URL = None
-
-# Cedar gRPC service port.
-CEDAR_RPC_PORT = None
 
 # Root directory for where resmoke.py puts directories containing data files of mongod's it starts,
 # as well as those started by individual tests.
@@ -410,10 +400,6 @@ SHUFFLE = None
 # Possible values are python and jasper. If python, resmoke uses the python built-in subprocess
 # or subprocess32 module to spawn threads. If jasper, resmoke uses the jasper module.
 SPAWN_USING = None
-
-# The connection string to the jasper service, populated when the service is
-# initialized in TestRunner.
-JASPER_CONNECTION_STR = None
 
 # If true, the launching of jobs is staggered in resmoke.py.
 STAGGER_JOBS = None

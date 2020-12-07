@@ -241,10 +241,6 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many
     _config.EVERGREEN_VARIANT_NAME = config.pop("variant_name")
     _config.EVERGREEN_VERSION_ID = config.pop("version_id")
 
-    # Cedar options.
-    _config.CEDAR_URL = config.pop("cedar_url")
-    _config.CEDAR_RPC_PORT = config.pop("cedar_rpc_port")
-
     # Archival options. Archival is enabled only when running on evergreen.
     if not _config.EVERGREEN_TASK_ID:
         _config.ARCHIVE_FILE = None
