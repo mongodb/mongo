@@ -54,6 +54,8 @@
 namespace mongo {
 namespace {
 
+using namespace fmt::literals;
+
 MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorInSteadyState);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforeCommit);
 
@@ -614,7 +616,9 @@ void persistStateTransitionAndCatalogUpdatesThenBumpShardVersions(
     invariant(notifyForStateTransition.find(nextState) != notifyForStateTransition.end());
     // TODO SERVER-51800 Remove special casing for kError.
     invariant(nextState == CoordinatorStateEnum::kError ||
-              notifyForStateTransition[nextState] != ParticipantsToNotifyEnum::kNone);
+                  notifyForStateTransition[nextState] != ParticipantsToNotifyEnum::kNone,
+              "failed to persist state transition with nextState {}"_format(
+                  CoordinatorState_serializer(nextState)));
 
     // Resharding metadata changes to be executed.
     auto changeMetadataFunc = [&](OperationContext* opCtx, TxnNumber txnNumber) {
@@ -711,10 +715,13 @@ SemiFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::run(
             return;
         })
         .then([this, executor] { _tellAllParticipantsToRefresh(executor); })
-        .then([this, executor] {
+        .then([this, self = shared_from_this(), executor] {
+            // The shared_ptr maintaining the ReshardingCoordinatorService Instance object gets
+            // deleted from the PrimaryOnlyService's map. Thus, shared_from_this() is necessary to
+            // keep 'this' pointer alive for the remaining callbacks.
             return _awaitAllParticipantShardsRenamedOrDroppedOriginalCollection(executor);
         })
-        .onError([this, executor](Status status) {
+        .onError([this, self = shared_from_this(), executor](Status status) {
             stdx::lock_guard<Latch> lg(_mutex);
             if (_completionPromise.getFuture().isReady()) {
                 // interrupt() was called before we got here.
@@ -736,7 +743,7 @@ SemiFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::run(
 
             return status;
         })
-        .onCompletion([this](Status status) {
+        .onCompletion([this, self = shared_from_this()](Status status) {
             stdx::lock_guard<Latch> lg(_mutex);
             if (_completionPromise.getFuture().isReady()) {
                 // interrupt() was called before we got here.

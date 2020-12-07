@@ -36,6 +36,7 @@ var ReshardingTest = class {
         this._dbName = undefined;
         this._collName = undefined;
         this._ns = undefined;
+        this._sourceCollectionUUIDString = undefined;
 
         this._tempCollName = undefined;
         this._tempNs = undefined;
@@ -43,6 +44,7 @@ var ReshardingTest = class {
         this._st = undefined;
         this._reshardingThread = undefined;
         this._pauseCoordinatorInSteadyStateFailpoint = undefined;
+        this._newShardKey = undefined;
     }
 
     setup() {
@@ -134,9 +136,9 @@ var ReshardingTest = class {
 
         const sourceCollectionUUID =
             getUUIDFromListCollections(sourceDB, sourceCollection.getName());
-        const sourceCollectionUUIDString = extractUUIDFromObject(sourceCollectionUUID);
+        this._sourceCollectionUUIDString = extractUUIDFromObject(sourceCollectionUUID);
 
-        this._tempCollName = `system.resharding.${sourceCollectionUUIDString}`;
+        this._tempCollName = `system.resharding.${this._sourceCollectionUUIDString}`;
         this._tempNs = `${this._dbName}.${this._tempCollName}`;
 
         return sourceCollection;
@@ -152,6 +154,8 @@ var ReshardingTest = class {
     startReshardingInBackground({newShardKeyPattern, newChunks}) {
         newChunks = newChunks.map(
             chunk => ({min: chunk.min, max: chunk.max, recipientShardId: chunk.shard}));
+
+        this._newShardKey = newShardKeyPattern;
 
         this._pauseCoordinatorInSteadyStateFailpoint = configureFailPoint(
             this._st.configRS.getPrimary(), "reshardingPauseCoordinatorInSteadyState");
@@ -186,6 +190,49 @@ var ReshardingTest = class {
             docsExtraAfterResharding: [],
             docsMissingAfterResharding: [],
         });
+    }
+
+    _checkConsistencyPostReshardingComplete() {
+        ///
+        // Check that resharding content on the configsvr is cleaned up.
+        ///
+        assert.eq(0, this._st.config.reshardingOperations.find({nss: this._ns}).itcount());
+
+        assert.eq(
+            0,
+            this._st.config.collections.find({reshardingFields: {$exists: true}, _id: this._ns})
+                .itcount());
+
+        assert.eq(0, this._st.config.collections.find({_id: this._tempNs}).itcount());
+
+        ///
+        // Check that resharding content local to each participant is cleaned up.
+        ///
+        this._donorShards().forEach((donor) => {
+            assert.eq(0,
+                      donor.getDB("config")
+                          .localReshardingOperations.donor.find({nss: this._ns})
+                          .itcount());
+        });
+
+        this._recipientShards().forEach((recipient) => {
+            assert(!recipient.getCollection(this._tempNs).exists());
+            assert.eq(0,
+                      recipient.getDB("config")
+                          .localReshardingOperations.recipient.find({nss: this._ns})
+                          .itcount());
+        });
+
+        ///
+        // Check that the collection is updated from the resharding operation.
+        ///
+        const finalReshardedCollectionUUID =
+            getUUIDFromListCollections(this._st.s.getDB(this._dbName), this._collName);
+        assert.neq(this._sourceCollectionUUIDString,
+                   extractUUIDFromObject(finalReshardedCollectionUUID));
+
+        const actualShardKey = this._st.config.collections.findOne({_id: this._ns}).key;
+        assert.eq(this._newShardKey, actualShardKey);
     }
 
     _writeFinalOplogEntry() {
@@ -250,12 +297,9 @@ var ReshardingTest = class {
 
         pauseCoordinatorBeforeCommitFailpoint.off();
         this._reshardingThread.join();
-        // The recipient shards may or may not have renamed the sharded collection by the time the
-        // _configsvrReshardCollection command returns.
-        //
-        // TODO SERVER-52931: Remove once _configsvrReshardCollection waits for the sharded
-        // collection to have been renamed on all of the recipient shards.
-        TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
+
+        this._checkConsistencyPostReshardingComplete();
+
         this._st.stop();
     }
 };

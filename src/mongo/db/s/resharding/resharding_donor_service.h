@@ -95,8 +95,7 @@ public:
         return boost::none;
     }
 
-    void onReshardingFieldsChanges(
-        boost::optional<TypeCollectionReshardingFields> reshardingFields);
+    void onReshardingFieldsChanges(const TypeCollectionReshardingFields& reshardingFields);
 
 private:
     // The following functions correspond to the actions to take at a particular donor state.

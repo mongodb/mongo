@@ -109,6 +109,15 @@ Timestamp generateMinFetchTimestamp(const ReshardingDonorDocument& donorDoc) {
 
     return generatedOpTime.getTimestamp();
 }
+
+/**
+ * Fulfills the promise if it is not already. Otherwise, does nothing.
+ */
+void ensureFulfilledPromise(WithLock lk, SharedPromise<void>& sp) {
+    if (!sp.getFuture().isReady()) {
+        sp.emplaceValue();
+    }
+}
 }  // namespace
 
 std::shared_ptr<repl::PrimaryOnlyService::Instance> ReshardingDonorService::constructInstance(
@@ -146,8 +155,13 @@ SemiFuture<void> ReshardingDonorService::DonorStateMachine::run(
         .then([this, executor] {
             return _awaitCoordinatorHasCommittedThenTransitionToDropping(executor);
         })
-        .then([this] { return _dropOriginalCollectionThenDeleteLocalState(); })
-        .onError([this](Status status) {
+        .then([this, self = shared_from_this()] {
+            // After this line, the shared_ptr stored in the PrimaryOnlyService's map for
+            // the ReshardingDonorService Instance is removed. It is necessary to use
+            // shared_from_this() to extend the lifetime for the remaining callbacks.
+            return _dropOriginalCollectionThenDeleteLocalState();
+        })
+        .onError([this, self = shared_from_this()](Status status) {
             LOGV2(4956400,
                   "Resharding operation donor state machine failed",
                   "namespace"_attr = _donorDoc.getNss().ns(),
@@ -155,10 +169,10 @@ SemiFuture<void> ReshardingDonorService::DonorStateMachine::run(
                   "error"_attr = status);
             // TODO SERVER-50584 Report errors to the coordinator so that the resharding operation
             // can be aborted.
-            this->_transitionStateToError(status);
+            _transitionStateToError(status);
             return status;
         })
-        .onCompletion([this](Status status) {
+        .onCompletion([this, self = shared_from_this()](Status status) {
             stdx::lock_guard<Latch> lg(_mutex);
             if (_completionPromise.getFuture().isReady()) {
                 // interrupt() was called before we got here.
@@ -196,7 +210,30 @@ void ReshardingDonorService::DonorStateMachine::interrupt(Status status) {
 }
 
 void ReshardingDonorService::DonorStateMachine::onReshardingFieldsChanges(
-    boost::optional<TypeCollectionReshardingFields> reshardingFields) {}
+    const TypeCollectionReshardingFields& reshardingFields) {
+    auto coordinatorState = reshardingFields.getState();
+    if (coordinatorState == CoordinatorStateEnum::kError) {
+        // TODO SERVER-52838: Investigate if we want to have a special error code so the donor knows
+        // when it has recieved the error from the coordinator rather than needing to report an
+        // error to the coordinator.
+        interrupt({ErrorCodes::InternalError,
+                   "ReshardingDonorService observed CoordinatorStateEnum::kError"});
+        return;
+    }
+
+    stdx::lock_guard<Latch> lk(_mutex);
+    if (coordinatorState >= CoordinatorStateEnum::kApplying) {
+        ensureFulfilledPromise(lk, _allRecipientsDoneCloning);
+    }
+
+    if (coordinatorState >= CoordinatorStateEnum::kMirroring) {
+        ensureFulfilledPromise(lk, _allRecipientsDoneApplying);
+    }
+
+    if (coordinatorState >= CoordinatorStateEnum::kCommitted) {
+        ensureFulfilledPromise(lk, _coordinatorHasCommitted);
+    }
+}
 
 void ReshardingDonorService::DonorStateMachine::
     _onPreparingToDonateCalculateTimestampThenTransitionToDonatingInitialData() {
@@ -217,17 +254,6 @@ void ReshardingDonorService::DonorStateMachine::
 
     auto minFetchTimestamp = generateMinFetchTimestamp(_donorDoc);
     _transitionStateAndUpdateCoordinator(DonorStateEnum::kDonatingInitialData, minFetchTimestamp);
-
-    // Unless a test is willing to leak the contents of the config.localReshardingOperations.donor
-    // collection, without this interrupt(), an invariant would be hit from
-    // _allRecipientsDoneCloning not being ready when this DonorStateMachine is being destructed.
-    //
-    // TODO SERVER-51130: Move this interrupt() to after _transitionState(kDonatingOplogEntries)
-    // once the donor shards learn from the coordinator when all recipient shards have finished
-    // cloning.
-    if (resharding::gReshardingTempInterruptBeforeOplogApplication) {
-        interrupt({ErrorCodes::InternalError, "Artificial interruption to enable jsTests"});
-    }
 }
 
 ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::
@@ -239,6 +265,16 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::
 
     return _allRecipientsDoneCloning.getFuture().thenRunOn(**executor).then([this]() {
         _transitionState(DonorStateEnum::kDonatingOplogEntries);
+
+        // Unless a test is willing to leak the contents of the
+        // config.localReshardingOperations.donor collection, without this interrupt(), an invariant
+        // would be hit from _allRecipientsDoneCloning not being ready when this DonorStateMachine
+        // is being destructed.
+        //
+        // TODO SERVER-53372: Remove this interrupt altogether.
+        if (resharding::gReshardingTempInterruptBeforeOplogApplication) {
+            interrupt({ErrorCodes::InternalError, "Artificial interruption to enable jsTests"});
+        }
     });
 }
 
@@ -261,7 +297,6 @@ void ReshardingDonorService::DonorStateMachine::
     }
 
     _transitionState(DonorStateEnum::kMirroring);
-    interrupt({ErrorCodes::InternalError, "Artificial interruption to enable jsTests"});
 }
 
 ExecutorFuture<void>

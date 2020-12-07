@@ -116,8 +116,7 @@ public:
         return boost::none;
     }
 
-    void onReshardingFieldsChanges(
-        boost::optional<TypeCollectionReshardingFields> reshardingFields);
+    void onReshardingFieldsChanges(const TypeCollectionReshardingFields& reshardingFields);
 
 private:
     // The following functions correspond to the actions to take at a particular recipient state.
@@ -182,8 +181,6 @@ private:
 
     // Each promise below corresponds to a state on the recipient state machine. They are listed in
     // ascending order, such that the first promise below will be the first promise fulfilled.
-    SharedPromise<void> _allDonorsMirroring;
-
     SharedPromise<void> _coordinatorHasCommitted;
 
     SharedPromise<void> _completionPromise;
