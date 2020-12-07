@@ -116,22 +116,35 @@ ResourceConsumption::MetricsCollector& ResourceConsumption::MetricsCollector::ge
     return getMetricsCollector(opCtx);
 }
 
+void ResourceConsumption::UnitCounter::observeOne(size_t datumBytes) {
+    _units += std::ceil(datumBytes / static_cast<float>(unitSize()));
+    _bytes += datumBytes;
+}
+
+int ResourceConsumption::DocumentUnitCounter::unitSize() const {
+    return gDocumentUnitSizeBytes;
+}
+
+int ResourceConsumption::IdxEntryUnitCounter::unitSize() const {
+    return gIndexEntryUnitSizeBytes;
+}
+
 void ResourceConsumption::ReadMetrics::toBson(BSONObjBuilder* builder) const {
-    builder->appendNumber(kDocBytesRead, docBytesRead);
-    builder->appendNumber(kDocUnitsRead, docUnitsRead);
-    builder->appendNumber(kIdxEntryBytesRead, idxEntryBytesRead);
-    builder->appendNumber(kIdxEntryUnitsRead, idxEntryUnitsRead);
+    builder->appendNumber(kDocBytesRead, docsRead.bytes());
+    builder->appendNumber(kDocUnitsRead, docsRead.units());
+    builder->appendNumber(kIdxEntryBytesRead, idxEntriesRead.bytes());
+    builder->appendNumber(kIdxEntryUnitsRead, idxEntriesRead.units());
     builder->appendNumber(kKeysSorted, keysSorted);
     builder->appendNumber(kSorterSpills, sorterSpills);
-    builder->appendNumber(kDocUnitsReturned, docUnitsReturned);
+    builder->appendNumber(kDocUnitsReturned, docsReturned.units());
     builder->appendNumber(kCursorSeeks, cursorSeeks);
 }
 
 void ResourceConsumption::WriteMetrics::toBson(BSONObjBuilder* builder) const {
-    builder->appendNumber(kDocBytesWritten, docBytesWritten);
-    builder->appendNumber(kDocUnitsWritten, docUnitsWritten);
-    builder->appendNumber(kIdxEntryBytesWritten, idxEntryBytesWritten);
-    builder->appendNumber(kIdxEntryUnitsWritten, idxEntryUnitsWritten);
+    builder->appendNumber(kDocBytesWritten, docsWritten.bytes());
+    builder->appendNumber(kDocUnitsWritten, docsWritten.units());
+    builder->appendNumber(kIdxEntryBytesWritten, idxEntriesWritten.bytes());
+    builder->appendNumber(kIdxEntryUnitsWritten, idxEntriesWritten.units());
 }
 
 void ResourceConsumption::AggregatedMetrics::toBson(BSONObjBuilder* builder) const {
@@ -160,22 +173,22 @@ void ResourceConsumption::OperationMetrics::toBson(BSONObjBuilder* builder) cons
 }
 
 void ResourceConsumption::OperationMetrics::toBsonNonZeroFields(BSONObjBuilder* builder) const {
-    appendNonZeroMetric(builder, kDocBytesRead, readMetrics.docBytesRead);
-    appendNonZeroMetric(builder, kDocUnitsRead, readMetrics.docUnitsRead);
-    appendNonZeroMetric(builder, kIdxEntryBytesRead, readMetrics.idxEntryBytesRead);
-    appendNonZeroMetric(builder, kIdxEntryUnitsRead, readMetrics.idxEntryUnitsRead);
+    appendNonZeroMetric(builder, kDocBytesRead, readMetrics.docsRead.bytes());
+    appendNonZeroMetric(builder, kDocUnitsRead, readMetrics.docsRead.units());
+    appendNonZeroMetric(builder, kIdxEntryBytesRead, readMetrics.idxEntriesRead.bytes());
+    appendNonZeroMetric(builder, kIdxEntryUnitsRead, readMetrics.idxEntriesRead.units());
     appendNonZeroMetric(builder, kKeysSorted, readMetrics.keysSorted);
     appendNonZeroMetric(builder, kSorterSpills, readMetrics.sorterSpills);
-    appendNonZeroMetric(builder, kDocUnitsReturned, readMetrics.docUnitsReturned);
+    appendNonZeroMetric(builder, kDocUnitsReturned, readMetrics.docsReturned.units());
     appendNonZeroMetric(builder, kCursorSeeks, readMetrics.cursorSeeks);
 
     if (cpuTimer) {
         appendNonZeroMetric(builder, kCpuNanos, durationCount<Nanoseconds>(cpuTimer->getElapsed()));
     }
-    appendNonZeroMetric(builder, kDocBytesWritten, writeMetrics.docBytesWritten);
-    appendNonZeroMetric(builder, kDocUnitsWritten, writeMetrics.docUnitsWritten);
-    appendNonZeroMetric(builder, kIdxEntryBytesWritten, writeMetrics.idxEntryBytesWritten);
-    appendNonZeroMetric(builder, kIdxEntryUnitsWritten, writeMetrics.idxEntryUnitsWritten);
+    appendNonZeroMetric(builder, kDocBytesWritten, writeMetrics.docsWritten.bytes());
+    appendNonZeroMetric(builder, kDocUnitsWritten, writeMetrics.docsWritten.units());
+    appendNonZeroMetric(builder, kIdxEntryBytesWritten, writeMetrics.idxEntriesWritten.bytes());
+    appendNonZeroMetric(builder, kIdxEntryUnitsWritten, writeMetrics.idxEntriesWritten.units());
 }
 
 template <typename Func>
@@ -187,19 +200,11 @@ inline void ResourceConsumption::MetricsCollector::_doIfCollecting(Func&& func) 
 }
 
 void ResourceConsumption::MetricsCollector::incrementOneDocRead(size_t docBytesRead) {
-    _doIfCollecting([&]() {
-        size_t docUnits = std::ceil(docBytesRead / static_cast<float>(gDocumentUnitSizeBytes));
-        _metrics.readMetrics.docBytesRead += docBytesRead;
-        _metrics.readMetrics.docUnitsRead += docUnits;
-    });
+    _doIfCollecting([&]() { _metrics.readMetrics.docsRead.observeOne(docBytesRead); });
 }
 
 void ResourceConsumption::MetricsCollector::incrementOneIdxEntryRead(size_t bytesRead) {
-    _doIfCollecting([&]() {
-        size_t units = std::ceil(bytesRead / static_cast<float>(gIndexEntryUnitSizeBytes));
-        _metrics.readMetrics.idxEntryBytesRead += bytesRead;
-        _metrics.readMetrics.idxEntryUnitsRead += units;
-    });
+    _doIfCollecting([&]() { _metrics.readMetrics.idxEntriesRead.observeOne(bytesRead); });
 }
 
 void ResourceConsumption::MetricsCollector::incrementKeysSorted(size_t keysSorted) {
@@ -210,24 +215,17 @@ void ResourceConsumption::MetricsCollector::incrementSorterSpills(size_t spills)
     _doIfCollecting([&]() { _metrics.readMetrics.sorterSpills += spills; });
 }
 
-void ResourceConsumption::MetricsCollector::incrementDocUnitsReturned(size_t returned) {
-    _doIfCollecting([&]() { _metrics.readMetrics.docUnitsReturned += returned; });
+void ResourceConsumption::MetricsCollector::incrementDocUnitsReturned(
+    DocumentUnitCounter docUnits) {
+    _doIfCollecting([&]() { _metrics.readMetrics.docsReturned += docUnits; });
 }
 
 void ResourceConsumption::MetricsCollector::incrementOneDocWritten(size_t bytesWritten) {
-    _doIfCollecting([&] {
-        size_t docUnits = std::ceil(bytesWritten / static_cast<float>(gDocumentUnitSizeBytes));
-        _metrics.writeMetrics.docBytesWritten += bytesWritten;
-        _metrics.writeMetrics.docUnitsWritten += docUnits;
-    });
+    _doIfCollecting([&] { _metrics.writeMetrics.docsWritten.observeOne(bytesWritten); });
 }
 
 void ResourceConsumption::MetricsCollector::incrementOneIdxEntryWritten(size_t bytesWritten) {
-    _doIfCollecting([&] {
-        size_t idxUnits = std::ceil(bytesWritten / static_cast<float>(gIndexEntryUnitSizeBytes));
-        _metrics.writeMetrics.idxEntryBytesWritten += bytesWritten;
-        _metrics.writeMetrics.idxEntryUnitsWritten += idxUnits;
-    });
+    _doIfCollecting([&] { _metrics.writeMetrics.idxEntriesWritten.observeOne(bytesWritten); });
 }
 
 void ResourceConsumption::MetricsCollector::beginScopedCollecting(OperationContext* opCtx,

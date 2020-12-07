@@ -69,6 +69,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/retryable_writes_stats.h"
 #include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/db/stats/top.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/db/transaction_participant.h"
@@ -553,6 +554,14 @@ public:
         }
         recordStatsForTopCommand(opCtx);
 
+        if (docFound) {
+            ResourceConsumption::DocumentUnitCounter docUnitsReturned;
+            docUnitsReturned.observeOne(docFound->objsize());
+
+            auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
+            metricsCollector.incrementDocUnitsReturned(docUnitsReturned);
+        }
+
         appendCommandResponse(exec.get(), request.getRemove().value_or(false), docFound, &result);
 
         return true;
@@ -639,6 +648,14 @@ public:
             curOp->debug().execStats = std::move(stats);
         }
         recordStatsForTopCommand(opCtx);
+
+        if (docFound) {
+            ResourceConsumption::DocumentUnitCounter docUnitsReturned;
+            docUnitsReturned.observeOne(docFound->objsize());
+
+            auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
+            metricsCollector.incrementDocUnitsReturned(docUnitsReturned);
+        }
 
         appendCommandResponse(exec.get(), request.getRemove().value_or(false), docFound, &result);
 

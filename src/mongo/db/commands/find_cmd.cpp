@@ -51,6 +51,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/db/stats/server_read_concern_metrics.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/transaction_participant.h"
@@ -465,6 +466,7 @@ public:
             PlanExecutor::ExecState state = PlanExecutor::ADVANCED;
             std::uint64_t numResults = 0;
             bool stashedResult = false;
+            ResourceConsumption::DocumentUnitCounter docUnitsReturned;
 
             try {
                 while (!FindCommon::enoughForFirstBatch(originalQR, numResults) &&
@@ -483,6 +485,7 @@ public:
                     // Add result to output buffer.
                     firstBatch.append(obj);
                     numResults++;
+                    docUnitsReturned.observeOne(obj.objsize());
                 }
             } catch (DBException& exception) {
                 firstBatch.abandon();
@@ -549,6 +552,11 @@ public:
 
             // Generate the response object to send to the client.
             firstBatch.done(cursorId, nss.ns());
+
+            // Increment this metric once we have generated a response and we know it will return
+            // documents.
+            auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
+            metricsCollector.incrementDocUnitsReturned(docUnitsReturned);
         }
 
         void appendMirrorableRequest(BSONObjBuilder* bob) const override {

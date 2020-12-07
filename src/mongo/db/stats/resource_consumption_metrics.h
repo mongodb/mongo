@@ -50,17 +50,80 @@ public:
     static ResourceConsumption& get(OperationContext* opCtx);
     static ResourceConsumption& get(ServiceContext* svcCtx);
 
+    /**
+     * UnitCounter observes individual input datums and then calculates the total number of bytes
+     * and whole number units observed.
+     */
+    class UnitCounter {
+    public:
+        UnitCounter() = default;
+
+        void add(const UnitCounter& other) {
+            _bytes += other._bytes;
+            _units += other._units;
+        }
+
+        UnitCounter& operator+=(const UnitCounter& other) {
+            add(other);
+            return *this;
+        }
+
+        long long bytes() const {
+            return _bytes;
+        }
+        long long units() const {
+            return _units;
+        }
+
+        /**
+         * Call once per input datum with its size in bytes.
+         *
+         * This function calculates the number of units observed based on the implentation-specific
+         * unitSize(). The function uses the following formula to calculate the number of units per
+         * datum:
+         *
+         * units = ceil (datum bytes / unit size in bytes)
+         *
+         * This achieves the goal of counting small datums as at least one unit while ensuring
+         * larger units are accounted proportionately. This can result in overstating smaller datums
+         * when the unit size is large. This is desired behavior, and the extent to which small
+         * datums are overstated is tunable by the unit size of the implementor.
+         */
+        void observeOne(size_t datumBytes);
+
+    protected:
+        /**
+         * Returns the implementation-specific unit size.
+         */
+        virtual int unitSize() const = 0;
+
+        long long _bytes = 0;
+        long long _units = 0;
+    };
+
+    /** DocumentUnitCounter records the number of document units observed. */
+    class DocumentUnitCounter : public UnitCounter {
+    private:
+        int unitSize() const final;
+    };
+
+    /** IdxEntryUnitCounter records the number of index entry units observed. */
+    class IdxEntryUnitCounter : public UnitCounter {
+    private:
+        int unitSize() const final;
+    };
+
     /** ReadMetrics maintains metrics for read operations. */
     class ReadMetrics {
     public:
+        ReadMetrics() = default;
+
         void add(const ReadMetrics& other) {
-            docBytesRead += other.docBytesRead;
-            docUnitsRead += other.docUnitsRead;
-            idxEntryBytesRead += other.idxEntryBytesRead;
-            idxEntryUnitsRead += other.idxEntryUnitsRead;
+            docsRead += other.docsRead;
+            idxEntriesRead += other.idxEntriesRead;
+            docsReturned += other.docsReturned;
             keysSorted += other.keysSorted;
             sorterSpills += other.sorterSpills;
-            docUnitsReturned += other.docUnitsReturned;
             cursorSeeks += other.cursorSeeks;
         }
 
@@ -74,20 +137,17 @@ public:
          */
         void toBson(BSONObjBuilder* builder) const;
 
-        // Number of document bytes read
-        long long docBytesRead = 0;
         // Number of document units read
-        long long docUnitsRead = 0;
-        // Number of index entry bytes read
-        long long idxEntryBytesRead = 0;
-        // Number of index entries units read
-        long long idxEntryUnitsRead = 0;
+        DocumentUnitCounter docsRead;
+        // Number of index entry units read
+        IdxEntryUnitCounter idxEntriesRead;
+        // Number of document units returned by a query
+        DocumentUnitCounter docsReturned;
+
         // Number of keys sorted for query operations
         long long keysSorted = 0;
         // Number of individual spills of data to disk by the sorter
         long long sorterSpills = 0;
-        // Number of document units returned by a query
-        long long docUnitsReturned = 0;
         // Number of cursor seeks
         long long cursorSeeks = 0;
     };
@@ -96,10 +156,8 @@ public:
     class WriteMetrics {
     public:
         void add(const WriteMetrics& other) {
-            docBytesWritten += other.docBytesWritten;
-            docUnitsWritten += other.docUnitsWritten;
-            idxEntryBytesWritten += other.idxEntryBytesWritten;
-            idxEntryUnitsWritten += other.idxEntryUnitsWritten;
+            docsWritten += other.docsWritten;
+            idxEntriesWritten += other.idxEntriesWritten;
         }
 
         WriteMetrics& operator+=(const WriteMetrics& other) {
@@ -112,14 +170,10 @@ public:
          */
         void toBson(BSONObjBuilder* builder) const;
 
-        // Number of document bytes written
-        long long docBytesWritten = 0;
-        // Number of document units written
-        long long docUnitsWritten = 0;
-        // Number of index entry bytes written
-        long long idxEntryBytesWritten = 0;
-        // Number of index entry units written
-        long long idxEntryUnitsWritten = 0;
+        // Number of documents written
+        DocumentUnitCounter docsWritten;
+        // Number of index entries written
+        IdxEntryUnitCounter idxEntriesWritten;
     };
 
     /**
@@ -191,11 +245,6 @@ public:
     public:
         MetricsCollector() = default;
 
-        // Delete copy constructors to prevent callers from accidentally copying when this is
-        // decorated on the OperationContext by reference.
-        MetricsCollector(const MetricsCollector&) = delete;
-        MetricsCollector operator=(const MetricsCollector&) = delete;
-
         static MetricsCollector& get(OperationContext* opCtx);
 
         /**
@@ -256,9 +305,7 @@ public:
 
         void reset() {
             invariant(!isInScope());
-            _metrics = {};
-            _dbName = {};
-            _hasCollectedMetrics = false;
+            *this = {};
         }
 
         /**
@@ -285,7 +332,10 @@ public:
          */
         void incrementSorterSpills(size_t spills);
 
-        void incrementDocUnitsReturned(size_t docUnitsReturned);
+        /**
+         * Increments the number of document units returned in the command response.
+         */
+        void incrementDocUnitsReturned(DocumentUnitCounter docUnitsReturned);
 
         /**
          * This should be called once per document written with the number of bytes written for that
@@ -310,6 +360,11 @@ public:
         void incrementOneCursorSeek();
 
     private:
+        // Privatize copy constructors to prevent callers from accidentally copying when this is
+        // decorated on the OperationContext by reference.
+        MetricsCollector(const MetricsCollector&) = default;
+        MetricsCollector& operator=(const MetricsCollector&) = default;
+
         /**
          * Helper function that calls the Func when this collector is currently collecting metrics.
          */

@@ -162,6 +162,7 @@ void generateBatch(int ntoreturn,
                    ClientCursor* cursor,
                    BufBuilder* bb,
                    std::uint64_t* numResults,
+                   ResourceConsumption::DocumentUnitCounter* docUnitsReturned,
                    PlanExecutor::ExecState* state) {
     PlanExecutor* exec = cursor->getExecutor();
 
@@ -181,6 +182,8 @@ void generateBatch(int ntoreturn,
 
             // Count the result.
             (*numResults)++;
+
+            docUnitsReturned->observeOne(obj.objsize());
         }
     } catch (DBException& exception) {
         auto&& explainer = exec->getPlanExplainer();
@@ -302,6 +305,7 @@ Message getMore(OperationContext* opCtx,
 
     std::uint64_t numResults = 0;
     int startingResult = 0;
+    ResourceConsumption::DocumentUnitCounter docUnitsReturned;
 
     const int initialBufSize =
         512 + sizeof(QueryResult::Value) + FindCommon::kMaxBytesToReturnToClientAtOnce;
@@ -456,7 +460,7 @@ Message getMore(OperationContext* opCtx,
                                                          nullptr);
     }
 
-    generateBatch(ntoreturn, cursorPin.getCursor(), &bb, &numResults, &state);
+    generateBatch(ntoreturn, cursorPin.getCursor(), &bb, &numResults, &docUnitsReturned, &state);
 
     // If this is an await data cursor, and we hit EOF without generating any results, then we block
     // waiting for new data to arrive.
@@ -480,7 +484,8 @@ Message getMore(OperationContext* opCtx,
 
         // We woke up because either the timed_wait expired, or there was more data. Either way,
         // attempt to generate another batch of results.
-        generateBatch(ntoreturn, cursorPin.getCursor(), &bb, &numResults, &state);
+        generateBatch(
+            ntoreturn, cursorPin.getCursor(), &bb, &numResults, &docUnitsReturned, &state);
     }
 
     PlanSummaryStats postExecutionStats;
@@ -552,6 +557,10 @@ Message getMore(OperationContext* opCtx,
             "waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch",
             dropAndReaquireReadLock);
     }
+
+    // Increment this metric once the command succeeds and we know it will return documents.
+    auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
+    metricsCollector.incrementDocUnitsReturned(docUnitsReturned);
 
     QueryResult::View qr = bb.buf();
     qr.msgdata().setLen(bb.len());
@@ -678,6 +687,7 @@ bool runQuery(OperationContext* opCtx,
 
     // How many results have we obtained from the executor?
     int numResults = 0;
+    ResourceConsumption::DocumentUnitCounter docUnitsReturned;
 
     BSONObj obj;
     PlanExecutor::ExecState state;
@@ -701,6 +711,8 @@ bool runQuery(OperationContext* opCtx,
 
             // Count the result.
             ++numResults;
+
+            docUnitsReturned.observeOne(obj.objsize());
 
             if (FindCommon::enoughForFirstBatch(qr, numResults)) {
                 LOGV2_DEBUG(20915,
@@ -780,6 +792,10 @@ bool runQuery(OperationContext* opCtx,
             20917, 5, "Not caching executor but returning results", "numResults"_attr = numResults);
         endQueryOp(opCtx, collection.getCollection(), *exec, numResults, ccId);
     }
+
+    // Increment this metric once it has succeeded and we know it will return documents.
+    auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
+    metricsCollector.incrementDocUnitsReturned(docUnitsReturned);
 
     // Fill out the output buffer's header.
     QueryResult::View queryResultView = bb.buf();

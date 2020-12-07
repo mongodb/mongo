@@ -71,6 +71,7 @@
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/views/view.h"
 #include "mongo/db/views/view_catalog.h"
@@ -167,6 +168,7 @@ bool handleCursorCommand(OperationContext* opCtx,
     invariant(cursor);
     auto exec = cursor->getExecutor();
     invariant(exec);
+    ResourceConsumption::DocumentUnitCounter docUnitsReturned;
 
     bool stashedResult = false;
     // We are careful to avoid ever calling 'getNext()' on the PlanExecutor when the batchSize is
@@ -221,6 +223,7 @@ bool handleCursorCommand(OperationContext* opCtx,
         // If this executor produces a postBatchResumeToken, add it to the cursor response.
         responseBuilder.setPostBatchResumeToken(exec->getPostBatchResumeToken());
         responseBuilder.append(nextDoc);
+        docUnitsReturned.observeOne(nextDoc.objsize());
     }
 
     if (cursor) {
@@ -247,6 +250,9 @@ bool handleCursorCommand(OperationContext* opCtx,
 
     const CursorId cursorId = cursor ? cursor->cursorid() : 0LL;
     responseBuilder.done(cursorId, nsForCursor.ns());
+
+    auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
+    metricsCollector.incrementDocUnitsReturned(docUnitsReturned);
 
     return static_cast<bool>(cursor);
 }

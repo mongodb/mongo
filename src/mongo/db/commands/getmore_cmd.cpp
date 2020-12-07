@@ -56,6 +56,7 @@
 #include "mongo/db/repl/speculative_majority_read_info.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/db/stats/top.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/chunk_version.h"
@@ -303,7 +304,8 @@ public:
                            const GetMoreRequest& request,
                            const bool isTailable,
                            CursorResponseBuilder* nextBatch,
-                           std::uint64_t* numResults) {
+                           std::uint64_t* numResults,
+                           ResourceConsumption::DocumentUnitCounter* docUnitsReturned) {
             PlanExecutor* exec = cursor->getExecutor();
 
             // If an awaitData getMore is killed during this process due to our max time expiring at
@@ -328,6 +330,7 @@ public:
                     nextBatch->setPostBatchResumeToken(exec->getPostBatchResumeToken());
                     nextBatch->append(obj);
                     (*numResults)++;
+                    docUnitsReturned->observeOne(obj.objsize());
                 }
             } catch (const ExceptionFor<ErrorCodes::CloseChangeStream>&) {
                 // This exception indicates that we should close the cursor without reporting an
@@ -561,6 +564,7 @@ public:
             CursorResponseBuilder nextBatch(reply, options);
             BSONObj obj;
             std::uint64_t numResults = 0;
+            ResourceConsumption::DocumentUnitCounter docUnitsReturned;
 
             // We report keysExamined and docsExamined to OpDebug for a given getMore operation. To
             // obtain these values we need to take a diff of the pre-execution and post-execution
@@ -610,7 +614,8 @@ public:
                                                         _request,
                                                         cursorPin->isTailable(),
                                                         &nextBatch,
-                                                        &numResults);
+                                                        &numResults,
+                                                        &docUnitsReturned);
 
             PlanSummaryStats postExecutionStats;
             exec->getPlanExplainer().getSummaryStats(&postExecutionStats);
@@ -652,6 +657,11 @@ public:
             }
 
             nextBatch.done(respondWithId, _request.nss.ns());
+
+            // Increment this metric once we have generated a response and we know it will return
+            // documents.
+            auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
+            metricsCollector.incrementDocUnitsReturned(docUnitsReturned);
 
             // Ensure log and profiler include the number of results returned in this getMore's
             // response batch.
