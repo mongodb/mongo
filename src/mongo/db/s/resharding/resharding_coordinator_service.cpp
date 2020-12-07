@@ -649,14 +649,19 @@ void persistStateTransitionAndCatalogUpdatesThenBumpShardVersions(
 
 void removeCoordinatorDocAndReshardingFields(OperationContext* opCtx,
                                              const ReshardingCoordinatorDocument& coordinatorDoc) {
+    invariant(coordinatorDoc.getState() == CoordinatorStateEnum::kRenaming);
+
+    ReshardingCoordinatorDocument updatedCoordinatorDoc = coordinatorDoc;
+    updatedCoordinatorDoc.setState(CoordinatorStateEnum::kDone);
+
     executeStateTransitionAndMetadataChangesInTxn(
-        opCtx, coordinatorDoc, [&](OperationContext* opCtx, TxnNumber txnNumber) {
+        opCtx, updatedCoordinatorDoc, [&](OperationContext* opCtx, TxnNumber txnNumber) {
             // Remove entry for this resharding operation from config.reshardingOperations
-            writeToCoordinatorStateNss(opCtx, coordinatorDoc, txnNumber);
+            writeToCoordinatorStateNss(opCtx, updatedCoordinatorDoc, txnNumber);
 
             // Remove the resharding fields from the config.collections entry
             updateConfigCollectionsForOriginalNss(
-                opCtx, coordinatorDoc, boost::none, boost::none, txnNumber);
+                opCtx, updatedCoordinatorDoc, boost::none, boost::none, txnNumber);
         });
 }
 }  // namespace resharding
@@ -739,9 +744,6 @@ SemiFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::run(
             }
 
             if (status.isOK()) {
-                auto opCtx = cc().makeOperationContext();
-                resharding::removeCoordinatorDocAndReshardingFields(opCtx.get(), _coordinatorDoc);
-
                 _completionPromise.emplaceValue();
             } else {
                 _completionPromise.setError(status);
@@ -918,9 +920,10 @@ ExecutorFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::
 
     return whenAllSucceed(std::move(futures))
         .thenRunOn(**executor)
-        .then([this, executor](const auto& coordinatorDocsChangedOnDisk) {
-            _updateCoordinatorDocStateAndCatalogEntries(CoordinatorStateEnum::kDone,
-                                                        coordinatorDocsChangedOnDisk[1]);
+        .then([executor](const auto& coordinatorDocsChangedOnDisk) {
+            auto opCtx = cc().makeOperationContext();
+            resharding::removeCoordinatorDocAndReshardingFields(opCtx.get(),
+                                                                coordinatorDocsChangedOnDisk[1]);
         });
 }
 

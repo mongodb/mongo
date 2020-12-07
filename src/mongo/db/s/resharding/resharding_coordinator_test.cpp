@@ -524,7 +524,7 @@ protected:
     }
 
     void removeCoordinatorDocAndReshardingFieldsExpectSuccess(
-        OperationContext* opCtx, ReshardingCoordinatorDocument expectedCoordinatorDoc) {
+        OperationContext* opCtx, const ReshardingCoordinatorDocument& expectedCoordinatorDoc) {
         resharding::removeCoordinatorDocAndReshardingFields(opCtx, expectedCoordinatorDoc);
 
         // Check that the entry is removed from config.reshardingOperations
@@ -698,12 +698,7 @@ TEST_F(ReshardingCoordinatorPersistenceTest, PersistTransitionToDoneSucceeds) {
     auto coordinatorDoc =
         insertStateAndCatalogEntries(CoordinatorStateEnum::kRenaming, _finalEpoch);
 
-    // Persist the updates on disk
-    auto expectedCoordinatorDoc = coordinatorDoc;
-    expectedCoordinatorDoc.setState(CoordinatorStateEnum::kDone);
-
-    removeCoordinatorDocAndReshardingFieldsExpectSuccess(operationContext(),
-                                                         expectedCoordinatorDoc);
+    removeCoordinatorDocAndReshardingFieldsExpectSuccess(operationContext(), coordinatorDoc);
 }
 
 TEST_F(ReshardingCoordinatorPersistenceTest,
