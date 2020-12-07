@@ -114,44 +114,6 @@ bool isTimeseries(OperationContext* opCtx, const NamespaceString& ns) {
 const int kTimeseriesControlVersion = 1;
 
 /**
- * Returns min/max $set expressions for the bucket's control field.
- * If 'metadataElem' is not empty, the time-series collection was created with a metadata field
- * and we do not have to calculate the min/max for the metadata field in 'docs'.
- */
-BSONObj makeTimeseriesControlMinMaxStages(const std::vector<BSONObj>& docs,
-                                          BSONElement metadataElem) {
-    struct MinMaxBuilders {
-        BSONArrayBuilder min;
-        BSONArrayBuilder max;
-    };
-    StringDataMap<MinMaxBuilders> minMaxBuilders;
-
-    for (const auto& doc : docs) {
-        for (const auto& elem : doc) {
-            auto key = elem.fieldNameStringData();
-            if (metadataElem && key == metadataElem.fieldNameStringData()) {
-                continue;
-            }
-            auto [it, created] = minMaxBuilders.insert({key, MinMaxBuilders{}});
-            if (created) {
-                it->second.min.append("$control.min." + key);
-                it->second.max.append("$control.max." + key);
-            }
-            it->second.min.append(elem);
-            it->second.max.append(elem);
-        }
-    }
-
-    BSONObjBuilder builder;
-    for (auto& builders : minMaxBuilders) {
-        builder.append("control.min." + builders.first, BSON("$min" << builders.second.min.arr()));
-        builder.append("control.max." + builders.first, BSON("$max" << builders.second.max.arr()));
-    }
-
-    return builder.obj();
-}
-
-/**
  * Returns $set expressions for the bucket's data field.
  * If 'metadataElem' is not empty, the time-series collection was created with a metadata field.
  * All measurements in a bucket share the same value in the 'meta' field, so there is no need to add
@@ -190,12 +152,11 @@ BSONObj makeTimeseriesDataStages(const std::vector<BSONObj>& docs,
 /**
  * Transforms a single time-series insert to an upsert request.
  */
-BSONObj makeTimeseriesUpsertRequest(const OID& oid,
-                                    const std::vector<BSONObj>& docs,
-                                    const BSONObj& metadata,
-                                    uint16_t count) {
+BSONObj makeTimeseriesUpsertRequest(const OID& bucketId,
+                                    const BucketCatalog::CommitData& data,
+                                    const BSONObj& metadata) {
     BSONObjBuilder builder;
-    builder.append(write_ops::UpdateOpEntry::kQFieldName, BSON("_id" << oid));
+    builder.append(write_ops::UpdateOpEntry::kQFieldName, BSON("_id" << bucketId));
     builder.append(write_ops::UpdateOpEntry::kMultiFieldName, false);
     builder.append(write_ops::UpdateOpEntry::kUpsertFieldName, true);
     {
@@ -205,17 +166,15 @@ BSONObj makeTimeseriesUpsertRequest(const OID& oid,
             BSON("$set" << BSON("control.version"
                                 << BSON("$ifNull" << BSON_ARRAY("$control.version"
                                                                 << kTimeseriesControlVersion)))));
+        stagesBuilder.append(BSON("$set" << BSON("control.min" << data.bucketMin)));
+        stagesBuilder.append(BSON("$set" << BSON("control.max" << data.bucketMax)));
         if (auto metadataElem = metadata.firstElement()) {
             stagesBuilder.append(BSON(
                 "$set" << BSON("meta" << BSON("$ifNull" << BSON_ARRAY("$meta" << metadataElem)))));
-            stagesBuilder.append(
-                BSON("$set" << makeTimeseriesControlMinMaxStages(docs, metadataElem)));
-            stagesBuilder.append(
-                BSON("$set" << makeTimeseriesDataStages(docs, metadataElem, count)));
-        } else {
-            stagesBuilder.append(BSON("$set" << makeTimeseriesControlMinMaxStages(docs, {})));
-            stagesBuilder.append(BSON("$set" << makeTimeseriesDataStages(docs, {}, count)));
         }
+        stagesBuilder.append(
+            BSON("$set" << makeTimeseriesDataStages(
+                     data.docs, metadata.firstElement(), data.numCommittedMeasurements)));
     }
     return builder.obj();
 }
@@ -533,8 +492,8 @@ private:
                     {
                         BSONArrayBuilder updatesBuilder(
                             builder.subarrayStart(write_ops::Update::kUpdatesFieldName));
-                        updatesBuilder.append(makeTimeseriesUpsertRequest(
-                            bucketId, data.docs, metadata, data.numCommittedMeasurements));
+                        updatesBuilder.append(
+                            makeTimeseriesUpsertRequest(bucketId, data, metadata));
                     }
 
                     auto request = OpMsgRequest::fromDBAndBody(bucketsNs.db(), builder.obj());

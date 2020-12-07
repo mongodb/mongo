@@ -51,6 +51,8 @@ public:
 
     struct CommitData {
         std::vector<BSONObj> docs;
+        BSONObj bucketMin;
+        BSONObj bucketMax;
         uint16_t numCommittedMeasurements;
     };
 
@@ -126,6 +128,12 @@ private:
 
         // Top-level field names of the measurements that have been inserted into the bucket.
         StringSet fieldNames;
+
+        // The minimum values for each field in the bucket.
+        BSONObj min;
+
+        // The maximum values for each field in the bucket.
+        BSONObj max;
 
         // The total size in bytes of the bucket's BSON serialization, including measurements to be
         // inserted.

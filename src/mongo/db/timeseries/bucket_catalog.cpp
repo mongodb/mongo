@@ -42,6 +42,70 @@ const auto getBucketCatalog = ServiceContext::declareDecoration<BucketCatalog>()
 const int kTimeseriesBucketMaxCount = 1000;
 const int kTimeseriesBucketMaxSizeBytes = 125 * 1024;  // 125 KB
 const Hours kTimeseriesBucketMaxTimeRange(1);
+
+BSONObj updateMinOrMax(const BSONObj& doc,
+                       BSONObj&& minOrMax,
+                       boost::optional<StringData> metaField,
+                       const std::function<bool(int, int)>& comp) {
+    StringDataSet fieldsToUpdate;
+
+    for (const auto& elem : doc) {
+        auto fieldName = elem.fieldNameStringData();
+        if (fieldName == metaField) {
+            continue;
+        }
+
+        auto minOrMaxElem = minOrMax[fieldName];
+        if (elem.type() == Object) {
+            auto subdoc = elem.Obj();
+
+            // If comparing two object, do so element-wise.
+            if (minOrMaxElem.type() == Object) {
+                minOrMax = minOrMax.addField(
+                    BSON(fieldName << updateMinOrMax(subdoc, minOrMaxElem.Obj(), metaField, comp))
+                        .firstElement());
+                continue;
+            }
+
+            // Remove empty subdocuments.
+            StringDataSet emptySubdocs;
+            for (const auto& subelem : subdoc) {
+                if (subelem.type() == Object && subelem.Obj().isEmpty()) {
+                    emptySubdocs.insert(subelem.fieldNameStringData());
+                }
+            }
+            if (!emptySubdocs.empty()) {
+                subdoc = subdoc.removeFields(emptySubdocs);
+            }
+
+            if (!subdoc.isEmpty() &&
+                (minOrMaxElem.eoo() || comp(subdoc.woCompare(minOrMaxElem.wrap()), 0))) {
+                minOrMax = minOrMax.addField(BSON(fieldName << subdoc).firstElement());
+            }
+
+            continue;
+        }
+
+        // If comparing two arrays, do so element-wise.
+        if (elem.type() == Array && minOrMaxElem.type() == Array) {
+            BSONObjBuilder builder;
+            builder.appendArray(fieldName,
+                                updateMinOrMax(elem.Obj(), minOrMaxElem.Obj(), metaField, comp));
+            minOrMax = minOrMax.addField(builder.obj().firstElement());
+            continue;
+        }
+
+        if (minOrMaxElem.eoo() || comp(elem.woCompare(minOrMaxElem, false), 0)) {
+            fieldsToUpdate.insert(fieldName);
+        }
+    }
+
+    if (!fieldsToUpdate.empty()) {
+        minOrMax = minOrMax.addFields(doc, fieldsToUpdate);
+    }
+
+    return std::move(minOrMax);
+}
 }  // namespace
 
 BucketCatalog& BucketCatalog::get(ServiceContext* svcCtx) {
@@ -101,7 +165,7 @@ BucketCatalog::InsertResult BucketCatalog::insert(OperationContext* opCtx,
     StringSet newFieldNamesToBeInserted;
     uint32_t sizeToBeAdded = 0;
     for (const auto& elem : doc) {
-        if (options.getMetaField() && elem.fieldNameStringData() == *options.getMetaField()) {
+        if (elem.fieldNameStringData() == options.getMetaField()) {
             // Ignore the metadata field since it will not be inserted.
             continue;
         }
@@ -141,6 +205,10 @@ BucketCatalog::InsertResult BucketCatalog::insert(OperationContext* opCtx,
         bucket->ns = ns;
         bucket->metadata = it->first.second;
     }
+    bucket->min =
+        updateMinOrMax(doc, std::move(bucket->min), options.getMetaField(), std::less<>());
+    bucket->max =
+        updateMinOrMax(doc, std::move(bucket->max), options.getMetaField(), std::greater<>());
 
     // If there is exactly 1 uncommitted measurement, the caller is the committer. Otherwise, it is
     // a waiter.
@@ -158,6 +226,7 @@ BucketCatalog::CommitData BucketCatalog::commit(const OID& bucketId,
                                                 boost::optional<CommitInfo> previousCommitInfo) {
     stdx::lock_guard lk(_mutex);
     auto it = _buckets.find(bucketId);
+    invariant(it != _buckets.end());
     auto& bucket = it->second;
 
     // The only case in which previousCommitInfo should not be provided is the first time a given
@@ -172,7 +241,7 @@ BucketCatalog::CommitData BucketCatalog::commit(const OID& bucketId,
     bucket.measurementsToBeInserted.swap(measurements);
 
     // Inform waiters that their measurements have been committed.
-    for (uint32_t i = 0; i < bucket.numPendingCommitMeasurements; i++) {
+    for (uint16_t i = 0; i < bucket.numPendingCommitMeasurements; i++) {
         auto it = bucket.promises.find(i + bucket.numCommittedMeasurements);
         if (it != bucket.promises.end()) {
             it->second.emplaceValue(*previousCommitInfo);
@@ -181,10 +250,14 @@ BucketCatalog::CommitData BucketCatalog::commit(const OID& bucketId,
     }
 
     bucket.numWriters -= bucket.numPendingCommitMeasurements;
-    auto numCommittedMeasurements = bucket.numCommittedMeasurements +=
+    bucket.numCommittedMeasurements +=
         std::exchange(bucket.numPendingCommitMeasurements, measurements.size());
 
-    if (measurements.empty()) {
+    auto allCommitted = measurements.empty();
+    CommitData data = {
+        std::move(measurements), bucket.min, bucket.max, bucket.numCommittedMeasurements};
+
+    if (allCommitted) {
         if (bucket.full) {
             // Everything in the bucket has been committed, and nothing more will be added since the
             // bucket is full. Thus, we can remove it.
@@ -196,7 +269,7 @@ BucketCatalog::CommitData BucketCatalog::commit(const OID& bucketId,
         }
     }
 
-    return {std::move(measurements), numCommittedMeasurements};
+    return data;
 }
 
 void BucketCatalog::clear(const NamespaceString& ns) {

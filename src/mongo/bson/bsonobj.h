@@ -49,6 +49,7 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/bufreader.h"
 #include "mongo/util/shared_buffer.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
 
@@ -312,7 +313,7 @@ public:
      * replaced.
      */
     BSONObj addFields(const BSONObj& from,
-                      const boost::optional<std::set<std::string>>& fields = boost::none) const;
+                      const boost::optional<StringDataSet>& fields = boost::none) const;
 
     /** remove specified field and return a new object with the remaining fields.
         slowish as builds a full new object
@@ -323,6 +324,7 @@ public:
      * Remove specified fields and return a new object with the remaining fields.
      */
     BSONObj removeFields(const std::set<std::string>& fields) const;
+    BSONObj removeFields(const StringDataSet& fields) const;
 
     /** returns # of top level fields in the object
        note: iterates to count the fields

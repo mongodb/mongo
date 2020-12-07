@@ -700,29 +700,25 @@ TEST(BSONObj, addFieldsWithoutSpecifyingFields) {
 
     // No fields added when the set is empty
     obj = BSON("p" << 1);
-    std::set<std::string> emptySet;
-    output = obj.addFields(BSON("q" << 2), emptySet);
+    output = obj.addFields(BSON("q" << 2), StringDataSet{});
     ASSERT_BSONOBJ_EQ(output, BSON("p" << 1));
 }
 
 TEST(BSONObj, addFields) {
     // Fields that are not present in the 'from' object are ignored.
     auto obj = BSON("p" << 1 << "q" << 1);
-    auto output = obj.addFields(BSON("a" << 2 << "b" << BSON("b" << 2)),
-                                boost::optional<std::set<std::string>>({"b", "c"}));
+    auto output = obj.addFields(BSON("a" << 2 << "b" << BSON("b" << 2)), {{"b", "c"}});
     ASSERT_BSONOBJ_EQ(output, BSON("p" << 1 << "q" << 1 << "b" << BSON("b" << 2)));
 
     // Duplicate fields names are merged at original poistion.
     obj = BSON("p" << 2 << "q" << 2 << "b" << 2);
-    output = obj.addFields(BSON("q" << 1 << "p" << BSON("p" << 1)),
-                           boost::optional<std::set<std::string>>({"q", "p", "b", "c"}));
+    output = obj.addFields(BSON("q" << 1 << "p" << BSON("p" << 1)), {{"q", "p", "b", "c"}});
     ASSERT_BSONOBJ_EQ(output, BSON("p" << BSON("p" << 1) << "q" << 1 << "b" << 2));
 
     // New fields are appended to the end, in the order in which they appear in the 'from'
     // object.
     obj = BSON("p" << 1 << "q" << 1 << "b" << BSON("a" << 1));
-    output = obj.addFields(BSON("d" << 2 << "b" << 2 << "c" << 2),
-                           boost::optional<std::set<std::string>>({"b", "c", "d"}));
+    output = obj.addFields(BSON("d" << 2 << "b" << 2 << "c" << 2), {{"b", "c", "d"}});
     ASSERT_BSONOBJ_EQ(output, BSON("p" << 1 << "q" << 1 << "b" << 2 << "d" << 2 << "c" << 2));
 }
 
