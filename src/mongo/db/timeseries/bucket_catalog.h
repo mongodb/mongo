@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/bson/unordered_fields_bsonobj_comparator.h"
 #include "mongo/db/ops/single_write_result_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
@@ -103,9 +104,8 @@ private:
 
         template <typename H>
         friend H AbslHashValue(H h, const BucketMetadata& metadata) {
-            // TODO (SERVER-52967): Hash the metadata in a way that does not depend on its ordering.
-            SimpleBSONObjComparator::Hasher hasher;
-            return H::combine(std::move(h), hasher(metadata.metadata));
+            return H::combine(std::move(h),
+                              UnorderedFieldsBSONObjComparator().hash(metadata.metadata));
         }
 
         BSONObj metadata;

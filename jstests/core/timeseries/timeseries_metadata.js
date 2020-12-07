@@ -64,16 +64,16 @@ const runTest = function(docsBucketA, docsBucketB) {
               'invalid number of measurements in first bucket: ' + tojson(bucketDocs[0]));
     if (docsBucketA[0].hasOwnProperty(metaFieldName)) {
         assert.eq(docsBucketA[0][metaFieldName],
-                  bucketDocs[0].control.meta,
-                  'invalid control.meta in first bucket: ' + tojson(bucketDocs[0].control));
+                  bucketDocs[0].meta,
+                  'invalid meta in first bucket: ' + tojson(bucketDocs[0]));
         assert(!bucketDocs[0].data.hasOwnProperty(metaFieldName),
                'unexpected metadata in first bucket data: ' + tojson(bucketDocs[0]));
     } else {
-        assert(bucketDocs[0].control.hasOwnProperty('meta'),
-               'missing control.meta in first bucket: ' + tojson(bucketDocs[0].control));
+        assert(bucketDocs[0].hasOwnProperty('meta'),
+               'missing meta in first bucket: ' + tojson(bucketDocs[0]));
         assert.eq(null,
-                  bucketDocs[0].control.meta,
-                  'invalid control.meta for x in first bucket: ' + tojson(bucketDocs[0].control));
+                  bucketDocs[0].meta,
+                  'invalid meta for x in first bucket: ' + tojson(bucketDocs[0]));
     }
 
     // Second bucket should contain documents specified in 'bucketB'.
@@ -82,16 +82,16 @@ const runTest = function(docsBucketA, docsBucketB) {
               'invalid number of measurements in second bucket: ' + tojson(bucketDocs[1]));
     if (docsBucketB[0].hasOwnProperty(metaFieldName)) {
         assert.eq(docsBucketB[0][metaFieldName],
-                  bucketDocs[1].control.meta,
-                  'invalid control.meta in second bucket: ' + tojson(bucketDocs[1].control));
+                  bucketDocs[1].meta,
+                  'invalid meta in second bucket: ' + tojson(bucketDocs[1]));
         assert(!bucketDocs[1].data.hasOwnProperty(metaFieldName),
                'unexpected metadata in second bucket data: ' + tojson(bucketDocs[1]));
     } else {
-        assert(bucketDocs[1].control.hasOwnProperty('meta'),
-               'missing control.meta in second bucket: ' + tojson(bucketDocs[1].control));
+        assert(bucketDocs[1].hasOwnProperty('meta'),
+               'missing meta in second bucket: ' + tojson(bucketDocs[1]));
         assert.eq(null,
-                  bucketDocs[1].control.meta,
-                  'invalid control.meta for x in second bucket: ' + tojson(bucketDocs[1].control));
+                  bucketDocs[1].meta,
+                  'invalid meta for x in second bucket: ' + tojson(bucketDocs[1]));
     }
 };
 
@@ -137,15 +137,13 @@ runTest(
     ]);
 
 runTest(
-    // Metadata field contains an object.
+    // Metadata field contains an object. Its ordering does not affect which bucket is used.
     [
         {_id: 0, time: t[0], meta: {a: 1, b: 1}, x: 0},
         {_id: 1, time: t[1], meta: {a: 1, b: 1}, x: 10},
-    ],
-    // Metadata field contains the same object as the first bucket's contents in a different order.
-    // TODO(SERVER-52967): These measurements should go into the first bucket.
-    [
         {_id: 2, time: t[2], meta: {b: 1, a: 1}, x: 20},
-        {_id: 3, time: t[3], meta: {b: 1, a: 1}, x: 30},
+    ],
+    [
+        {_id: 3, time: t[3], meta: {a: 1}, x: 30},
     ]);
 })();

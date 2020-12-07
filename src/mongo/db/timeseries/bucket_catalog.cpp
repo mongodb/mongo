@@ -228,6 +228,6 @@ bool BucketCatalog::BucketMetadata::operator<(const BucketMetadata& other) const
 }
 
 bool BucketCatalog::BucketMetadata::operator==(const BucketMetadata& other) const {
-    return metadata.binaryEqual(other.metadata);
+    return UnorderedFieldsBSONObjComparator().compare(metadata, other.metadata) == 0;
 }
 }  // namespace mongo

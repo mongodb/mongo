@@ -154,8 +154,8 @@ BSONObj makeTimeseriesControlMinMaxStages(const std::vector<BSONObj>& docs,
 /**
  * Returns $set expressions for the bucket's data field.
  * If 'metadataElem' is not empty, the time-series collection was created with a metadata field.
- * All measurements in a bucket share the same value in the metadata field stored in control.meta,
- * so there is no need to add the metadata to the data field.
+ * All measurements in a bucket share the same value in the 'meta' field, so there is no need to add
+ * the metadata to the data field.
  */
 BSONObj makeTimeseriesDataStages(const std::vector<BSONObj>& docs,
                                  BSONElement metadataElem,
@@ -207,8 +207,7 @@ BSONObj makeTimeseriesUpsertRequest(const OID& oid,
                                                                 << kTimeseriesControlVersion)))));
         if (auto metadataElem = metadata.firstElement()) {
             stagesBuilder.append(BSON(
-                "$set" << BSON("control.meta"
-                               << BSON("$ifNull" << BSON_ARRAY("$control.meta" << metadataElem)))));
+                "$set" << BSON("meta" << BSON("$ifNull" << BSON_ARRAY("$meta" << metadataElem)))));
             stagesBuilder.append(
                 BSON("$set" << makeTimeseriesControlMinMaxStages(docs, metadataElem)));
             stagesBuilder.append(

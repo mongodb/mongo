@@ -154,7 +154,7 @@ Status _createTimeseries(OperationContext* opCtx,
         BSON_ARRAY(BSON("$project" << BSON("dataArray" << BSON("$objectToArray"
                                                                << "$data")
                                                        << "metadata"
-                                                       << "$control.meta"))
+                                                       << "$meta"))
                    << BSON("$project"
                            << BSON("assembledData"
                                    << BSON("$function" << BSON("body" << assembleData << "args"
