@@ -131,34 +131,23 @@ DocumentSource::GetNextResult DocumentSourceCollStats::doGetNext() {
     if (_collStatsSpec.hasField("storageStats")) {
         // If the storageStats field exists, it must have been validated as an object when parsing.
         BSONObjBuilder storageBuilder(builder.subobjStart("storageStats"));
-        Status status = pExpCtx->mongoProcessInterface->appendStorageStats(
-            pExpCtx->opCtx, pExpCtx->ns, _collStatsSpec["storageStats"].Obj(), &storageBuilder);
+        uassertStatusOKWithContext(
+            pExpCtx->mongoProcessInterface->appendStorageStats(
+                pExpCtx->opCtx, pExpCtx->ns, _collStatsSpec["storageStats"].Obj(), &storageBuilder),
+            "Unable to retrieve storageStats in $collStats stage");
         storageBuilder.doneFast();
-        if (!status.isOK()) {
-            uasserted(40280,
-                      str::stream() << "Unable to retrieve storageStats in $collStats stage: "
-                                    << status.reason());
-        }
     }
 
     if (_collStatsSpec.hasField("count")) {
-        Status status = pExpCtx->mongoProcessInterface->appendRecordCount(
-            pExpCtx->opCtx, pExpCtx->ns, &builder);
-        if (!status.isOK()) {
-            uasserted(40481,
-                      str::stream()
-                          << "Unable to retrieve count in $collStats stage: " << status.reason());
-        }
+        uassertStatusOKWithContext(pExpCtx->mongoProcessInterface->appendRecordCount(
+                                       pExpCtx->opCtx, pExpCtx->ns, &builder),
+                                   "Unable to retrieve count in $collStats stage");
     }
 
     if (_collStatsSpec.hasField("queryExecStats")) {
-        Status status = pExpCtx->mongoProcessInterface->appendQueryExecStats(
-            pExpCtx->opCtx, pExpCtx->ns, &builder);
-        if (!status.isOK()) {
-            uasserted(31142,
-                      str::stream() << "Unable to retrieve queryExecStats in $collStats stage: "
-                                    << status.reason());
-        }
+        uassertStatusOKWithContext(pExpCtx->mongoProcessInterface->appendQueryExecStats(
+                                       pExpCtx->opCtx, pExpCtx->ns, &builder),
+                                   "Unable to retrieve queryExecStats in $collStats stage");
     }
 
     return {Document(builder.obj())};

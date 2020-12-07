@@ -154,12 +154,12 @@ Status appendCollectionRecordCount(OperationContext* opCtx,
                                    BSONObjBuilder* result) {
     AutoGetCollectionForReadCommand collection(opCtx, nss);
     if (!collection.getDb()) {
-        return {ErrorCodes::BadValue,
+        return {ErrorCodes::NamespaceNotFound,
                 str::stream() << "Database [" << nss.db().toString() << "] not found."};
     }
 
     if (!collection) {
-        return {ErrorCodes::BadValue,
+        return {ErrorCodes::NamespaceNotFound,
                 str::stream() << "Collection [" << nss.toString() << "] not found."};
     }
 

@@ -45,11 +45,14 @@ public:
     public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                                  const BSONElement& spec) {
-            return std::make_unique<LiteParsed>(spec.fieldName(), nss);
+            bool hasCount = spec.isABSONObj() && spec.embeddedObject().hasField("count");
+            return std::make_unique<LiteParsed>(spec.fieldName(), nss, hasCount);
         }
 
-        explicit LiteParsed(std::string parseTimeName, NamespaceString nss)
-            : LiteParsedDocumentSource(std::move(parseTimeName)), _nss(std::move(nss)) {}
+        explicit LiteParsed(std::string parseTimeName, NamespaceString nss, bool hasCount)
+            : LiteParsedDocumentSource(std::move(parseTimeName)),
+              _nss(std::move(nss)),
+              _hasCount(hasCount) {}
 
         bool isCollStats() const final {
             return true;
@@ -68,8 +71,13 @@ public:
             return true;
         }
 
+        bool isCollStatsWithCount() const final {
+            return _hasCount;
+        }
+
     private:
         const NamespaceString _nss;
+        const bool _hasCount;
     };
 
     DocumentSourceCollStats(const boost::intrusive_ptr<ExpressionContext>& pExpCtx)

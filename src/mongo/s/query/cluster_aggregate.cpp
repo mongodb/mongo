@@ -236,6 +236,14 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     boost::optional<ChunkManager> cm;
     auto executionNsRoutingInfoStatus =
         sharded_agg_helpers::getExecutionNsRoutingInfo(opCtx, namespaces.executionNss);
+
+    // For consistency, we assert that when running a pipeline with collStats as the source and a
+    // count parameter that the collection exists.
+    if (liteParsedPipeline.startsWithCollStatsWithCount()) {
+        uassertStatusOKWithContext(executionNsRoutingInfoStatus,
+                                   "Unable to retrieve queryExecStats in $collStats stage");
+    }
+
     if (executionNsRoutingInfoStatus.isOK()) {
         cm = std::move(executionNsRoutingInfoStatus.getValue());
     } else if (!(hasChangeStream &&

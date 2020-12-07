@@ -105,6 +105,10 @@ public:
         return false;
     }
 
+    virtual bool isCollStatsWithCount() const {
+        return false;
+    }
+
     /**
      * Returns true if this is a $changeStream stage.
      */

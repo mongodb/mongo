@@ -66,7 +66,7 @@ assert.eq(nDocs + 1, result.queryExecStats.collectionScans.nonTailable);
 // Test that we error when the collection does not exist.
 coll.drop();
 pipeline = [{$collStats: {queryExecStats: {}}}];
-assertErrorCode(coll, pipeline, 31142);
+assertErrorCode(coll, pipeline, ErrorCodes.NamespaceNotFound);
 
 // Test that we error when the database does not exist.
 // TODO SERVER-35479 When running against a mongos, a non-existent database will cause all
@@ -75,6 +75,6 @@ assert.commandWorked(testDB.dropDatabase());
 if (FixtureHelpers.isMongos(testDB)) {
     assert.eq([], coll.aggregate(pipeline).toArray());
 } else {
-    assertErrorCode(coll, pipeline, 31142);
+    assertErrorCode(coll, pipeline, ErrorCodes.NamespaceNotFound);
 }
 }());
