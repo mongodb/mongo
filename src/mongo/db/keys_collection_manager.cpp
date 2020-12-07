@@ -55,7 +55,11 @@ namespace {
 
 Milliseconds kDefaultRefreshWaitTime(30 * 1000);
 Milliseconds kRefreshIntervalIfErrored(200);
-Milliseconds kMaxRefreshWaitTime(10 * 60 * 1000);
+Milliseconds kMaxRefreshWaitTimeIfErrored(10 * 60 * 1000);
+// Never wait more than the number of milliseconds in 20 days to avoid sleeping for a number greater
+// than can fit in a signed 32 bit integer.
+// 20 days = 1000 * 60 * 60 * 24 * 20 = 1,728,000,000 vs signed integer max of 2,147,483,648.
+Milliseconds kMaxRefreshWaitTimeOnSuccess(Days(20));
 
 // Prevents the refresher thread from waiting longer than the given number of milliseconds, even on
 // a successful refresh.
@@ -79,11 +83,7 @@ Milliseconds howMuchSleepNeedFor(const LogicalTime& currentTime,
 
     Milliseconds millisBeforeExpire = Milliseconds(expiredSecs) - Milliseconds(currentSecs);
 
-    if (interval <= millisBeforeExpire) {
-        return interval;
-    }
-
-    return millisBeforeExpire;
+    return std::min({millisBeforeExpire, interval, kMaxRefreshWaitTimeOnSuccess});
 }
 
 }  // namespace keys_collection_manager_util
@@ -261,8 +261,8 @@ void KeysCollectionManager::PeriodicRunner::_doPeriodicRefresh(ServiceContext* s
             } else {
                 errorCount += 1;
                 nextWakeup = Milliseconds(kRefreshIntervalIfErrored.count() * errorCount);
-                if (nextWakeup > kMaxRefreshWaitTime) {
-                    nextWakeup = kMaxRefreshWaitTime;
+                if (nextWakeup > kMaxRefreshWaitTimeIfErrored) {
+                    nextWakeup = kMaxRefreshWaitTimeIfErrored;
                 }
             }
 
