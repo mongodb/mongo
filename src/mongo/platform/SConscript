@@ -41,8 +41,12 @@ env.Library(
     source=[
         "visibility_test_libcommon.cpp",
     ],
+    LIBDEPS_NO_INHERIT=[
+        '$BUILD_DIR/third_party/shim_allocator',
+        '$BUILD_DIR/shim_crt',
+        '$BUILD_DIR/shim_cxx',
+    ],
     LIBDEPS=[],
-    DISABLE_ALLOCATOR_SHIM_INJECTION=True,
     MONGO_API_NAME="visibility_test_libcommon",
 )
 
@@ -51,11 +55,15 @@ env.Library(
     source=[
         "visibility_test_lib1.cpp"
     ],
+    LIBDEPS_NO_INHERIT=[
+        '$BUILD_DIR/third_party/shim_allocator',
+        '$BUILD_DIR/shim_crt',
+        '$BUILD_DIR/shim_cxx',
+    ],
     LIBDEPS=[],
     LIBDEPS_PRIVATE=[
         "visibility_test_libcommon",
     ],
-    DISABLE_ALLOCATOR_SHIM_INJECTION=True,
     MONGO_API_NAME="visibility_test_lib1",
 )
 
@@ -64,13 +72,17 @@ env.Library(
     source=[
         "visibility_test_lib2.cpp"
     ],
+    LIBDEPS_NO_INHERIT=[
+        '$BUILD_DIR/third_party/shim_allocator',
+        '$BUILD_DIR/shim_crt',
+        '$BUILD_DIR/shim_cxx',
+    ],
     LIBDEPS=[
         "visibility_test_lib1",
     ],
     LIBDEPS_PRIVATE=[
         "visibility_test_libcommon",
     ],
-    DISABLE_ALLOCATOR_SHIM_INJECTION=True,
     MONGO_API_NAME="visibility_test_lib2",
 )
 
@@ -79,10 +91,14 @@ visibility_test1 = env.Program(
     source=[
         "visibility_test1.cpp",
     ],
+    LIBDEPS_NO_INHERIT=[
+        '$BUILD_DIR/third_party/shim_allocator',
+        '$BUILD_DIR/shim_crt',
+        '$BUILD_DIR/shim_cxx',
+    ],
     LIBDEPS=[
         "visibility_test_lib1",
     ],
-    DISABLE_ALLOCATOR_SHIM_INJECTION=True,
     AIB_COMPONENT="visibility-test",
     AIB_COMPONENTS_EXTRA=[
         "unittests",
@@ -96,10 +112,14 @@ visibility_test2 = env.Program(
     source=[
         "visibility_test2.cpp",
     ],
+    LIBDEPS_NO_INHERIT=[
+        '$BUILD_DIR/third_party/shim_allocator',
+        '$BUILD_DIR/shim_crt',
+        '$BUILD_DIR/shim_cxx',
+    ],
     LIBDEPS=[
         "visibility_test_lib2",
     ],
-    DISABLE_ALLOCATOR_SHIM_INJECTION=True,
     AIB_COMPONENT="visibility-test",
     AIB_COMPONENTS_EXTRA=[
         "unittests",

@@ -31,11 +31,7 @@ ca = env.SharedLibrary(
         'customaction.def',
     ],
     # We don't want any special allocator here either.
-    LIBDEPS_GLOBAL=[
-        dep
-        for dep in env.get('LIBDEPS_GLOBAL', [])
-        if not dep.endswith('shim_allocator')
+    LIBDEPS_NO_INHERIT=[
+        '$BUILD_DIR/third_party/shim_allocator',
     ],
-    # TODO: Remove when SERVER-48291 is merged into stable build tools
-    DISABLE_ALLOCATOR_SHIM_INJECTION=True,
 )

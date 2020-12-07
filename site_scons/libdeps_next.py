@@ -72,6 +72,7 @@ class Constants:
     LibdepsCached = "LIBDEPS_cached"
     LibdepsDependents = "LIBDEPS_DEPENDENTS"
     LibdepsGlobal = "LIBDEPS_GLOBAL"
+    LibdepsNoInherit = "LIBDEPS_NO_INHERIT"
     LibdepsInterface ="LIBDEPS_INTERFACE"
     LibdepsPrivate = "LIBDEPS_PRIVATE"
     LibdepsTypeinfo = "LIBDEPS_TYPEINFO"
@@ -580,8 +581,8 @@ class LibdepLinter:
 
                 target_type = self.target[0].builder.get_name(self.env)
                 self._raise_libdep_lint_exception(textwrap.dedent(f"""\
-                    Found non-list type '{libdeps_list}' while evaluating {dep_type_val} for {target_type} '{self.target[0]}'
-                    {dep_type_val} must be setup as a list."""
+                    Found non-list type '{libdeps_list}' while evaluating {dep_type_val[1]} for {target_type} '{self.target[0]}'
+                    {dep_type_val[1]} must be setup as a list."""
                 ))
 
 dependency_visibility_ignored = {
@@ -732,6 +733,8 @@ def update_scanner(env, builder_name=None, debug=False):
             print(f"    public: {env.get(Constants.Libdeps, None)}")
             print(f"    interface: {env.get(Constants.LibdepsInterface, None)}")
             print(f"    typeinfo: {env.get(Constants.LibdepsTypeinfo, None)}")
+            print(f"    no_inherit: {env.get(Constants.LibdepsNoInherit, None)}")
+
         if old_scanner:
             result = old_scanner.function(node, env, path)
         else:
@@ -896,10 +899,14 @@ def get_libdeps_nodes(env, target, builder, debug=False, visibility_map=None):
     if not SCons.Util.is_List(target):
         target = [target]
 
+    # Get the current list of nodes not to inherit on each target
+    no_inherit = set(env.get(Constants.LibdepsNoInherit, []))
+
     # Get all the libdeps from the env so we can
     # can append them to the current target_node.
     libdeps = []
     for dep_type in sorted(visibility_map.keys()):
+
         if dep_type == deptype.Global:
             if any("conftest" in str(t) for t in target):
                 # Ignore global dependencies for conftests
@@ -915,11 +922,17 @@ def get_libdeps_nodes(env, target, builder, debug=False, visibility_map=None):
             if not lib:
                 continue
 
-            if debug and not any("conftest" in str(t) for t in target):
-                print(f"     {dep_type} => {lib}")
-
             lib_with_ixes = _get_node_with_ixes(env, lib, builder)
-            libdeps.append(dependency(lib_with_ixes, dep_type, lib))
+
+            if lib in no_inherit:
+                if debug and not any("conftest" in str(t) for t in target):
+                    print(f"     {dep_type[1]} =/> {lib}")
+
+            else:
+                if debug and not any("conftest" in str(t) for t in target):
+                    print(f"     {dep_type[1]} => {lib}")
+
+                libdeps.append(dependency(lib_with_ixes, dep_type, lib))
 
     return libdeps
 
@@ -953,8 +966,11 @@ def libdeps_emitter(target, source, env, debug=False, builder=None, visibility_m
         print(f"    public: {env.get(Constants.Libdeps, None)}")
         print(f"    interface: {env.get(Constants.LibdepsInterface, None)}")
         print(f"    typeinfo: {env.get(Constants.LibdepsTypeinfo, None)}")
+        print(f"    no_inherit: {env.get(Constants.LibdepsNoInherit, None)}")
         print(f"  Edges:")
+
     libdeps = get_libdeps_nodes(env, target, builder, debug, visibility_map)
+
     if debug and not any("conftest" in str(t) for t in target):
         print(f"\n")
 
