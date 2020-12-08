@@ -11,6 +11,7 @@ selector:
   # TODO (SERVER-50479): Enable resumable index build rollback tests once resumable index builds
   # support ESE.
   - jstests/replsets/rollback_resumable_index_build_*.js
+  - jstests/replsets/restart_index_build_if_resume_interrupted_by_rollback.js
 
 executor:
   config:

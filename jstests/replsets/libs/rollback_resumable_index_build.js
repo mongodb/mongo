@@ -2,6 +2,18 @@ load("jstests/noPassthrough/libs/index_build.js");
 load('jstests/replsets/libs/rollback_test.js');
 
 const RollbackResumableIndexBuildTest = class {
+    static checkCompletedAndDrop(
+        rollbackTest, originalPrimary, dbName, colls, buildUUIDs, indexNames) {
+        for (let i = 0; i < colls.length; i++) {
+            ResumableIndexBuildTest.assertCompleted(
+                originalPrimary, colls[i], [buildUUIDs[i]], indexNames[i]);
+            ResumableIndexBuildTest.checkIndexes(
+                rollbackTest, dbName, colls[i].getName(), indexNames[i], []);
+            assert.commandWorked(
+                rollbackTest.getPrimary().getDB(dbName).runCommand({drop: colls[i].getName()}));
+        }
+    }
+
     /**
      * Runs a resumable index build rollback test.
      *
@@ -42,6 +54,11 @@ const RollbackResumableIndexBuildTest = class {
      * 'sideWrites' is documents to insert into the side writes table. If either
      *   'rollbackStartFailPointName' or 'rollbackEndFailPointName' the above two are in the drain
      *   writes phase, this is required.
+     *
+     * 'shouldComplete' is a boolean which determines whether the index builds started by the test
+     *   fixture should be expected to be completed when this function returns. If false, this
+     *   function returns the collections, buildUUIDs, and index names of the index builds started
+     *   by the test fixture.
      */
     static run(rollbackTest,
                dbName,
@@ -56,7 +73,8 @@ const RollbackResumableIndexBuildTest = class {
                expectedResumePhases,
                resumeChecks,
                insertsToBeRolledBack,
-               sideWrites = []) {
+               sideWrites = [],
+               shouldComplete = true) {
         const originalPrimary = rollbackTest.getPrimary();
 
         if (!ResumableIndexBuildTest.resumableIndexBuildsEnabled(originalPrimary)) {
@@ -217,20 +235,87 @@ const RollbackResumableIndexBuildTest = class {
 
         rollbackTest.transitionToSteadyStateOperations();
 
-        // Ensure that the index builds completed after rollback.
-        for (let i = 0; i < colls.length; i++) {
-            ResumableIndexBuildTest.assertCompleted(
-                originalPrimary, colls[i], [buildUUIDs[i]], indexNames[i]);
+        if (shouldComplete) {
+            // Ensure that the index builds completed after rollback.
+            RollbackResumableIndexBuildTest.checkCompletedAndDrop(
+                rollbackTest, originalPrimary, dbName, colls, buildUUIDs, indexNames);
         }
 
         ResumableIndexBuildTest.checkResume(
             originalPrimary, buildUUIDs, expectedResumePhases, resumeChecks);
 
-        for (let i = 0; i < colls.length; i++) {
-            ResumableIndexBuildTest.checkIndexes(
-                rollbackTest, dbName, colls[i].getName(), indexNames[i], []);
-            assert.commandWorked(
-                rollbackTest.getPrimary().getDB(dbName).runCommand({drop: colls[i].getName()}));
+        if (!shouldComplete) {
+            return {colls: colls, buildUUIDs: buildUUIDs, indexNames: indexNames};
         }
+    }
+
+    static runResumeInterruptedByRollback(
+        rollbackTest, dbName, docs, indexSpec, insertsToBeRolledBack, sideWrites = []) {
+        const originalPrimary = rollbackTest.getPrimary();
+
+        if (!ResumableIndexBuildTest.resumableIndexBuildsEnabled(originalPrimary)) {
+            jsTestLog("Skipping test because resumable index builds are not enabled");
+            return;
+        }
+
+        const fp1 = configureFailPoint(originalPrimary, "hangAfterIndexBuildDumpsInsertsFromBulk");
+        const fp2 = configureFailPoint(originalPrimary, "hangAfterIndexBuildFirstDrain");
+
+        const testInfo = RollbackResumableIndexBuildTest.run(
+            rollbackTest,
+            dbName,
+            "",
+            docs,
+            [[indexSpec]],
+            [{
+                name: "hangIndexBuildDuringCollectionScanPhaseBeforeInsertion",
+                logIdWithBuildUUID: 20386
+            }],
+            1,  // rollbackStartFailPointsIteration
+            [{name: "hangAfterSettingUpIndexBuild", logIdWithBuildUUID: 20387}],
+            0,  // rollbackEndFailPointsIteration
+            ["setYieldAllLocksHang"],
+            ["collection scan"],
+            [{numScannedAferResume: docs.length - 1}],
+            insertsToBeRolledBack,
+            sideWrites,
+            false /* shouldComplete */);
+
+        // Cycle through the rollback test phases so the original primary becomes primary again.
+        rollbackTest.transitionToRollbackOperations();
+        rollbackTest.transitionToSyncSourceOperationsBeforeRollback();
+        rollbackTest.transitionToSyncSourceOperationsDuringRollback();
+        rollbackTest.transitionToSteadyStateOperations();
+
+        // Clear the logs from when the index build was resumed.
+        assert.commandWorked(originalPrimary.adminCommand({clearLog: "global"}));
+
+        rollbackTest.transitionToRollbackOperations();
+
+        fp1.wait();
+        fp1.off();
+
+        rollbackTest.transitionToSyncSourceOperationsBeforeRollback();
+
+        fp2.wait();
+        fp2.off();
+
+        rollbackTest.transitionToSyncSourceOperationsDuringRollback();
+        rollbackTest.transitionToSteadyStateOperations();
+
+        // Ensure that the index build restarted, rather than resumed.
+        checkLog.containsJson(originalPrimary, 20660, {
+            buildUUID: function(uuid) {
+                return uuid["uuid"]["$uuid"] === testInfo.buildUUIDs[0];
+            }
+        });
+        assert(!checkLog.checkContainsOnceJson(originalPrimary, 4841700));
+
+        RollbackResumableIndexBuildTest.checkCompletedAndDrop(rollbackTest,
+                                                              originalPrimary,
+                                                              dbName,
+                                                              testInfo.colls,
+                                                              testInfo.buildUUIDs,
+                                                              testInfo.indexNames);
     }
 };
