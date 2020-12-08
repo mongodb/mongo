@@ -35,12 +35,14 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/persistent_task_store.h"
+#include "mongo/db/query/collation/collation_spec.h"
 #include "mongo/db/repl/oplog_applier.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/s/migration_destination_manager.h"
 #include "mongo/db/s/resharding/resharding_collection_cloner.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding_util.h"
+#include "mongo/db/s/shard_key_util.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/thread_pool_task_executor.h"
@@ -91,6 +93,7 @@ namespace resharding {
 
 void createTemporaryReshardingCollectionLocally(OperationContext* opCtx,
                                                 const NamespaceString& originalNss,
+                                                const NamespaceString& reshardingNss,
                                                 const UUID& reshardingUUID,
                                                 const UUID& existingUUID,
                                                 Timestamp fetchTimestamp) {
@@ -98,7 +101,6 @@ void createTemporaryReshardingCollectionLocally(OperationContext* opCtx,
         5002300, 1, "Creating temporary resharding collection", "originalNss"_attr = originalNss);
 
     auto catalogCache = Grid::get(opCtx)->catalogCache();
-    auto reshardingNss = constructTemporaryReshardingNss(originalNss.db(), existingUUID);
 
     // Load the original collection's options from the database's primary shard.
     auto [collOptions, uuid] =
@@ -259,11 +261,33 @@ void ReshardingRecipientService::RecipientStateMachine::
 
     {
         auto opCtx = cc().makeOperationContext();
+        auto tempNss = constructTemporaryReshardingNss(_recipientDoc.getNss().db(),
+                                                       _recipientDoc.getExistingUUID());
+
         resharding::createTemporaryReshardingCollectionLocally(opCtx.get(),
                                                                _recipientDoc.getNss(),
+                                                               tempNss,
                                                                _recipientDoc.get_id(),
                                                                _recipientDoc.getExistingUUID(),
                                                                *_recipientDoc.getFetchTimestamp());
+
+        ShardKeyPattern shardKeyPattern(_recipientDoc.getReshardingKey());
+
+        auto catalogCache = Grid::get(opCtx.get())->catalogCache();
+        shardVersionRetry(opCtx.get(),
+                          catalogCache,
+                          tempNss,
+                          "validating shard key index for reshardCollection"_sd,
+                          [&] {
+                              shardkeyutil::validateShardKeyIndexExistsOrCreateIfPossible(
+                                  opCtx.get(),
+                                  tempNss,
+                                  shardKeyPattern.toBSON(),
+                                  shardKeyPattern,
+                                  CollationSpec::kSimpleSpec,
+                                  false,
+                                  shardkeyutil::ValidationBehaviorsShardCollection(opCtx.get()));
+                          });
     }
 
     _transitionState(RecipientStateEnum::kCloning);

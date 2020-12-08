@@ -49,6 +49,7 @@ namespace resharding {
  */
 void createTemporaryReshardingCollectionLocally(OperationContext* opCtx,
                                                 const NamespaceString& originalNss,
+                                                const NamespaceString& reshardingNss,
                                                 const UUID& reshardingUUID,
                                                 const UUID& existingUUID,
                                                 Timestamp fetchTimestamp);

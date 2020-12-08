@@ -251,8 +251,12 @@ TEST_F(ReshardingRecipientServiceTest, CreateLocalReshardingCollectionBasic) {
         expectListIndexes(kOrigNss, kOrigUUID, indexes, HostAndPort(shards[0].getHost()));
     });
 
-    resharding::createTemporaryReshardingCollectionLocally(
-        operationContext(), kOrigNss, kReshardingUUID, kOrigUUID, kDefaultFetchTimestamp);
+    resharding::createTemporaryReshardingCollectionLocally(operationContext(),
+                                                           kOrigNss,
+                                                           kReshardingNss,
+                                                           kReshardingUUID,
+                                                           kOrigUUID,
+                                                           kDefaultFetchTimestamp);
 
     future.default_timed_get();
 
@@ -301,8 +305,12 @@ TEST_F(ReshardingRecipientServiceTest,
         expectListIndexes(kOrigNss, kOrigUUID, indexes, HostAndPort(shards[0].getHost()));
     });
 
-    resharding::createTemporaryReshardingCollectionLocally(
-        operationContext(), kOrigNss, kReshardingUUID, kOrigUUID, kDefaultFetchTimestamp);
+    resharding::createTemporaryReshardingCollectionLocally(operationContext(),
+                                                           kOrigNss,
+                                                           kReshardingNss,
+                                                           kReshardingUUID,
+                                                           kOrigUUID,
+                                                           kDefaultFetchTimestamp);
 
     future.default_timed_get();
 
@@ -362,8 +370,12 @@ TEST_F(ReshardingRecipientServiceTest,
         expectListIndexes(kOrigNss, kOrigUUID, indexes, HostAndPort(shards[0].getHost()));
     });
 
-    resharding::createTemporaryReshardingCollectionLocally(
-        operationContext(), kOrigNss, kReshardingUUID, kOrigUUID, kDefaultFetchTimestamp);
+    resharding::createTemporaryReshardingCollectionLocally(operationContext(),
+                                                           kOrigNss,
+                                                           kReshardingNss,
+                                                           kReshardingUUID,
+                                                           kOrigUUID,
+                                                           kDefaultFetchTimestamp);
 
     future.default_timed_get();
 
@@ -425,8 +437,12 @@ TEST_F(ReshardingRecipientServiceTest,
         expectListIndexes(kOrigNss, kOrigUUID, indexes, HostAndPort(shards[0].getHost()));
     });
 
-    resharding::createTemporaryReshardingCollectionLocally(
-        operationContext(), kOrigNss, kReshardingUUID, kOrigUUID, kDefaultFetchTimestamp);
+    resharding::createTemporaryReshardingCollectionLocally(operationContext(),
+                                                           kOrigNss,
+                                                           kReshardingNss,
+                                                           kReshardingUUID,
+                                                           kOrigUUID,
+                                                           kDefaultFetchTimestamp);
 
     future.default_timed_get();
 
@@ -478,8 +494,12 @@ TEST_F(ReshardingRecipientServiceTest,
         expectListIndexes(kOrigNss, kOrigUUID, indexes, HostAndPort(shards[0].getHost()));
     });
 
-    resharding::createTemporaryReshardingCollectionLocally(
-        operationContext(), kOrigNss, kReshardingUUID, kOrigUUID, kDefaultFetchTimestamp);
+    resharding::createTemporaryReshardingCollectionLocally(operationContext(),
+                                                           kOrigNss,
+                                                           kReshardingNss,
+                                                           kReshardingUUID,
+                                                           kOrigUUID,
+                                                           kDefaultFetchTimestamp);
 
     future.default_timed_get();
 

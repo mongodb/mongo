@@ -33,7 +33,11 @@ var ReshardingTest = class {
         this._numShards = this._reshardInPlace ? Math.max(this._numDonors, this._numRecipients)
                                                : this._numDonors + this._numRecipients;
 
+        this._dbName = undefined;
+        this._collName = undefined;
         this._ns = undefined;
+
+        this._tempCollName = undefined;
         this._tempNs = undefined;
 
         this._st = undefined;
@@ -105,6 +109,10 @@ var ReshardingTest = class {
         return this._recipientShards().map(shard => shard.shardName);
     }
 
+    get temporaryReshardingCollectionName() {
+        return this._tempCollName;
+    }
+
     /**
      * Shards a non-existing collection using the specified shard key and chunk ranges.
      *
@@ -116,15 +124,20 @@ var ReshardingTest = class {
         this._ns = ns;
 
         const sourceCollection = this._st.s.getCollection(ns);
+        const sourceDB = sourceCollection.getDB();
+
+        this._dbName = sourceDB.getName();
+        this._collName = sourceCollection.getName();
+
         CreateShardedCollectionUtil.shardCollectionWithChunks(
             sourceCollection, shardKeyPattern, chunks);
 
-        const sourceDB = sourceCollection.getDB();
         const sourceCollectionUUID =
             getUUIDFromListCollections(sourceDB, sourceCollection.getName());
         const sourceCollectionUUIDString = extractUUIDFromObject(sourceCollectionUUID);
 
-        this._tempNs = `${sourceDB.getName()}.system.resharding.${sourceCollectionUUIDString}`;
+        this._tempCollName = `system.resharding.${sourceCollectionUUIDString}`;
+        this._tempNs = `${this._dbName}.${this._tempCollName}`;
 
         return sourceCollection;
     }

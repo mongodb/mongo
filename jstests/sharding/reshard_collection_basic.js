@@ -22,6 +22,10 @@ let shardToRSMap = {};
 shardToRSMap[st.shard0.shardName] = st.rs0;
 shardToRSMap[st.shard1.shardName] = st.rs1;
 
+let shardIdToShardMap = {};
+shardIdToShardMap[st.shard0.shardName] = st.shard0;
+shardIdToShardMap[st.shard1.shardName] = st.shard1;
+
 let getUUIDFromCollectionInfo = (dbName, collName, collInfo) => {
     if (collInfo) {
         return extractUUIDFromObject(collInfo.info.uuid);
@@ -81,6 +85,8 @@ let verifyTemporaryReshardingCollectionExistsWithCorrectOptions = (expectedRecip
     expectedRecipientShards.forEach(shardId => {
         verifyTemporaryReshardingCollectionExistsWithCorrectOptionsForConn(
             originalCollInfo, tempReshardingCollName, shardToRSMap[shardId].getPrimary());
+        ShardedIndexUtil.assertIndexExistsOnShard(
+            shardIdToShardMap[shardId], kDbName, tempReshardingCollName, {newKey: 1});
     });
 };
 
@@ -123,7 +129,7 @@ let verifyAllShardingCollectionsRemoved = (tempReshardingCollName) => {
 };
 
 let assertSuccessfulReshardCollection = (commandObj, presetReshardedChunks) => {
-    assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {_id: 1}}));
+    assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {oldKey: 1}}));
 
     if (presetReshardedChunks) {
         commandObj._presetReshardedChunks = presetReshardedChunks;
@@ -153,7 +159,7 @@ let assertSuccessfulReshardCollection = (commandObj, presetReshardedChunks) => {
 };
 
 let presetReshardedChunks =
-    [{recipientShardId: st.shard1.shardName, min: {_id: MinKey}, max: {_id: MaxKey}}];
+    [{recipientShardId: st.shard1.shardName, min: {newKey: MinKey}, max: {newKey: MaxKey}}];
 const existingZoneName = 'x1';
 
 /**
@@ -161,33 +167,34 @@ const existingZoneName = 'x1';
  */
 
 // Fail if sharding is disabled.
-assert.commandFailedWithCode(mongos.adminCommand({reshardCollection: ns, key: {_id: 1}}),
+assert.commandFailedWithCode(mongos.adminCommand({reshardCollection: ns, key: {newKey: 1}}),
                              ErrorCodes.NamespaceNotFound);
 
 assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
 
 // Fail if collection is unsharded.
-assert.commandFailedWithCode(mongos.adminCommand({reshardCollection: ns, key: {_id: 1}}),
+assert.commandFailedWithCode(mongos.adminCommand({reshardCollection: ns, key: {newKey: 1}}),
                              ErrorCodes.NamespaceNotSharded);
 
-assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {_id: 1}}));
+assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {oldKey: 1}}));
 
 // Fail if missing required key.
 assert.commandFailedWithCode(mongos.adminCommand({reshardCollection: ns}), 40414);
 
 // Fail if unique is specified and is true.
 assert.commandFailedWithCode(
-    mongos.adminCommand({reshardCollection: ns, key: {_id: 1}, unique: true}), ErrorCodes.BadValue);
+    mongos.adminCommand({reshardCollection: ns, key: {newKey: 1}, unique: true}),
+    ErrorCodes.BadValue);
 
 // Fail if collation is specified and is not {locale: 'simple'}.
 assert.commandFailedWithCode(
-    mongos.adminCommand({reshardCollection: ns, key: {_id: 1}, collation: {locale: 'en_US'}}),
+    mongos.adminCommand({reshardCollection: ns, key: {newKey: 1}, collation: {locale: 'en_US'}}),
     ErrorCodes.BadValue);
 
 // Fail if both numInitialChunks and _presetReshardedChunks are provided.
 assert.commandFailedWithCode(mongos.adminCommand({
     reshardCollection: ns,
-    key: {_id: 1},
+    key: {newKey: 1},
     unique: false,
     collation: {locale: 'simple'},
     numInitialChunks: 2,
@@ -199,11 +206,11 @@ assert.commandFailedWithCode(mongos.adminCommand({
 assert.commandWorked(
     st.s.adminCommand({addShardToZone: st.shard1.shardName, zone: existingZoneName}));
 assert.commandWorked(st.s.adminCommand(
-    {updateZoneKeyRange: ns, min: {_id: 0}, max: {_id: 5}, zone: existingZoneName}));
+    {updateZoneKeyRange: ns, min: {oldKey: 0}, max: {oldKey: 5}, zone: existingZoneName}));
 
 assert.commandFailedWithCode(mongos.adminCommand({
     reshardCollection: ns,
-    key: {_id: 1},
+    key: {newKey: 1},
     unique: false,
     collation: {locale: 'simple'},
     numInitialChunks: 2,
@@ -214,10 +221,10 @@ assert.commandFailedWithCode(mongos.adminCommand({
 // which does not exist in authoritative tags.
 assert.commandFailedWithCode(mongos.adminCommand({
     reshardCollection: ns,
-    key: {_id: 1},
+    key: {newKey: 1},
     unique: false,
     collation: {locale: 'simple'},
-    zones: [{tag: 'x', min: {_id: 5}, max: {_id: 10}, ns: ns}],
+    zones: [{tag: 'x', min: {newKey: 5}, max: {newKey: 10}, ns: ns}],
     numInitialChunks: 2,
 }),
                              ErrorCodes.BadValue);
@@ -230,26 +237,26 @@ removeAllReshardingCollections();
 
 // Succeed when correct locale is provided.
 assertSuccessfulReshardCollection(
-    {reshardCollection: ns, key: {_id: 1}, collation: {locale: 'simple'}});
+    {reshardCollection: ns, key: {newKey: 1}, collation: {locale: 'simple'}});
 
 // Succeed base case.
-assertSuccessfulReshardCollection({reshardCollection: ns, key: {_id: 1}});
+assertSuccessfulReshardCollection({reshardCollection: ns, key: {newKey: 1}});
 
 // Succeed if unique is specified and is false.
-assertSuccessfulReshardCollection({reshardCollection: ns, key: {_id: 1}, unique: false});
+assertSuccessfulReshardCollection({reshardCollection: ns, key: {newKey: 1}, unique: false});
 
 // Succeed if _presetReshardedChunks is provided and test commands are enabled (default).
-assertSuccessfulReshardCollection({reshardCollection: ns, key: {_id: 1}}, presetReshardedChunks);
+assertSuccessfulReshardCollection({reshardCollection: ns, key: {newKey: 1}}, presetReshardedChunks);
 
 presetReshardedChunks = [
-    {recipientShardId: st.shard0.shardName, min: {_id: MinKey}, max: {_id: 0}},
-    {recipientShardId: st.shard1.shardName, min: {_id: 0}, max: {_id: MaxKey}}
+    {recipientShardId: st.shard0.shardName, min: {newKey: MinKey}, max: {newKey: 0}},
+    {recipientShardId: st.shard1.shardName, min: {newKey: 0}, max: {newKey: MaxKey}}
 ];
 
 // Succeed if all optional fields and numInitialChunks are provided with correct values.
 assertSuccessfulReshardCollection({
     reshardCollection: ns,
-    key: {_id: 1},
+    key: {newKey: 1},
     unique: false,
     collation: {locale: 'simple'},
     numInitialChunks: 2,
@@ -258,17 +265,17 @@ assertSuccessfulReshardCollection({
 // Succeed if all optional fields and _presetReshardedChunks are provided with correct values and
 // test commands are enabled (default).
 assertSuccessfulReshardCollection(
-    {reshardCollection: ns, key: {_id: 1}, unique: false, collation: {locale: 'simple'}},
+    {reshardCollection: ns, key: {newKey: 1}, unique: false, collation: {locale: 'simple'}},
     presetReshardedChunks);
 
 // Succeed if authoritative tags exist in config.tags collection and zones are provided and use an
 // existing zone's name.
 assertSuccessfulReshardCollection({
     reshardCollection: ns,
-    key: {_id: 1},
+    key: {newKey: 1},
     unique: false,
     collation: {locale: 'simple'},
-    zones: [{tag: existingZoneName, min: {_id: 5}, max: {_id: 10}, ns: ns}]
+    zones: [{tag: existingZoneName, min: {newKey: 5}, max: {newKey: 10}, ns: ns}]
 },
                                   presetReshardedChunks);
 
