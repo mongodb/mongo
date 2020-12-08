@@ -5266,6 +5266,7 @@ tasks:
     vars:
       pip_dir: ${workdir}/src/etc/pip
   - func: "upload pip requirements"
+  - func: "configure evergreen api credentials"
   - func: "do multiversion setup"
   - func: "generate burn in tags"
     vars:
