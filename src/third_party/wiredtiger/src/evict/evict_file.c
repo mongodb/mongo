@@ -20,7 +20,7 @@ __wt_evict_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
     WT_DECL_RET;
     WT_PAGE *page;
     WT_REF *next_ref, *ref;
-    uint32_t walk_flags;
+    uint32_t rec_flags, walk_flags;
 
     dhandle = session->dhandle;
     btree = dhandle->handle;
@@ -62,9 +62,17 @@ __wt_evict_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
          * sets of files open, updates in a no-longer-referenced file may not yet be visible, and
          * the write will fail with EBUSY. Our caller handles that error, retrying later.
          */
-        if (syncop == WT_SYNC_CLOSE && __wt_page_is_modified(page))
-            WT_ERR(__wt_reconcile(session, ref, NULL,
-              WT_REC_EVICT | WT_REC_HS | WT_REC_CLEAN_AFTER_REC | WT_REC_VISIBLE_ALL));
+        if (syncop == WT_SYNC_CLOSE && __wt_page_is_modified(page)) {
+            /*
+             * When setting the reconciliation flags, remember to not enable history store eviction
+             * for the history store file itself. Also metadata file doesn't have any associated
+             * history.
+             */
+            rec_flags = WT_REC_EVICT | WT_REC_CLEAN_AFTER_REC | WT_REC_VISIBLE_ALL;
+            if (!WT_IS_HS(btree) && !WT_IS_METADATA(dhandle))
+                rec_flags |= WT_REC_HS;
+            WT_ERR(__wt_reconcile(session, ref, NULL, rec_flags));
+        }
 
         /*
          * We can't evict the page just returned to us (it marks our place in the tree), so move the

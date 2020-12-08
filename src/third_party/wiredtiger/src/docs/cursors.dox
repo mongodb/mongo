@@ -59,7 +59,7 @@ Any operation that consists of multiple related updates should be
 enclosed in an explicit transaction to ensure that the updates are
 applied atomically.
 
-At \c snapshot (the default) or \c read-committed isolation levels,
+At \c read-committed (the default) or \c snapshot isolation levels,
 committed changes from concurrent transactions become visible when no
 cursor is positioned.  In other words, at these isolation levels, all
 cursors in a session read from a stable snapshot while any cursor in the

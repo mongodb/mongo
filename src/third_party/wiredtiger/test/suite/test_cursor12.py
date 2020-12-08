@@ -263,7 +263,8 @@ class test_cursor12(wttest.WiredTigerTestCase):
                 row = row + 1
         c.close()
 
-    # Smoke-test the modify API, anything other than an snapshot isolation fails.
+    # Smoke-test the modify API, anything other than an explicit transaction
+    # in snapshot isolation fails.
     def test_modify_txn_api(self):
         ds = SimpleDataSet(self, self.uri, 100, key_format=self.keyfmt, value_format=self.valuefmt)
         ds.populate()
@@ -271,6 +272,12 @@ class test_cursor12(wttest.WiredTigerTestCase):
         c = self.session.open_cursor(self.uri, None)
         c.set_key(ds.key(10))
         msg = '/not supported/'
+
+        self.session.begin_transaction()
+        mods = []
+        mods.append(wiredtiger.Modify('-', 1, 1))
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda: c.modify(mods), msg)
+        self.session.rollback_transaction()
 
         self.session.begin_transaction("isolation=read-uncommitted")
         mods = []

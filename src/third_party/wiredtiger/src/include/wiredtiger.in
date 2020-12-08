@@ -793,7 +793,7 @@ struct __wt_session {
 	 * size., a boolean flag; default \c false.}
 	 * @config{isolation, the default isolation level for operations in this session., a
 	 * string\, chosen from the following options: \c "read-uncommitted"\, \c "read-committed"\,
-	 * \c "snapshot"; default \c snapshot.}
+	 * \c "snapshot"; default \c read-committed.}
 	 * @configend
 	 * @errors
 	 */
@@ -2212,7 +2212,7 @@ struct __wt_connection {
 	 * size., a boolean flag; default \c false.}
 	 * @config{isolation, the default isolation level for operations in this session., a
 	 * string\, chosen from the following options: \c "read-uncommitted"\, \c "read-committed"\,
-	 * \c "snapshot"; default \c snapshot.}
+	 * \c "snapshot"; default \c read-committed.}
 	 * @configend
 	 * @param[out] sessionp the new session handle
 	 * @errors
