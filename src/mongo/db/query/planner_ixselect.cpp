@@ -526,6 +526,10 @@ bool QueryPlannerIXSelect::_compatible(const BSONElement& keyPatternElt,
         // above.
         MONGO_UNREACHABLE;
     } else if (IndexNames::HASHED == indexedFieldType) {
+        if (index.sparse && !nodeIsSupportedBySparseIndex(node, isChildOfElemMatchValue)) {
+            return false;
+        }
+
         if (ComparisonMatchExpressionBase::isEquality(exprtype)) {
             return true;
         }
@@ -600,11 +604,6 @@ bool QueryPlannerIXSelect::nodeIsSupportedBySparseIndex(const MatchExpression* q
     // cannot answer), so this function only needs to check if the query performs an equality to
     // null.
 
-    // Equality to null inside an $elemMatch implies a match on literal 'null'.
-    if (isInElemMatch) {
-        return true;
-    }
-
     // Otherwise, we can't use a sparse index for $eq (or $lte, or $gte) with a null element.
     //
     // We can use a sparse index for $_internalExprEq with a null element. Expression language
@@ -613,10 +612,30 @@ bool QueryPlannerIXSelect::nodeIsSupportedBySparseIndex(const MatchExpression* q
     const auto typ = queryExpr->matchType();
     if (typ == MatchExpression::EQ) {
         const auto* queryExprEquality = static_cast<const EqualityMatchExpression*>(queryExpr);
-        return !queryExprEquality->getData().isNull();
+        // Equality to null inside an $elemMatch implies a match on literal 'null'.
+        return isInElemMatch || !queryExprEquality->getData().isNull();
     } else if (queryExpr->matchType() == MatchExpression::MATCH_IN) {
         const auto* queryExprIn = static_cast<const InMatchExpression*>(queryExpr);
-        return !queryExprIn->hasNull();
+        // Equality to null inside an $elemMatch implies a match on literal 'null'.
+        return isInElemMatch || !queryExprIn->hasNull();
+    } else if (queryExpr->matchType() == MatchExpression::NOT) {
+        const auto* child = queryExpr->getChild(0);
+        const MatchExpression::MatchType childtype = child->matchType();
+        const bool isNotEqualsNull =
+            (childtype == MatchExpression::EQ &&
+             static_cast<const ComparisonMatchExpression*>(child)->getData().type() ==
+                 BSONType::jstNULL);
+
+        // Prevent negated predicates from using sparse indices. Doing so would cause us to
+        // miss documents which do not contain the indexed fields. The only case where we may
+        // use a sparse index for a negation is when the query is {$ne: null}. This is due to
+        // the behavior of {$eq: null} matching documents where the field does not exist OR the
+        // field is equal to literal null. The negation of {$eq: null} therefore matches
+        // documents where the field does exist AND the field is not equal to literal
+        // null. Since the field must exist, it is safe to use a sparse index.
+        if (!isNotEqualsNull) {
+            return false;
+        }
     }
 
     return true;

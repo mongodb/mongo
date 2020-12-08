@@ -1290,6 +1290,34 @@ TEST(QueryPlannerIXSelectTest, HashedIndexShouldNotBeRelevantForNotEqualsNullPre
     testRateIndices("{a: {$ne: null}}", "", kSimpleCollator, {entry}, "a,a", expectedIndices);
 }
 
+TEST(QueryPlannerIXSelectTest, HashedSparseIndexShouldNotBeRelevantForNotEqualsNullPredicate) {
+    auto entry = buildSimpleIndexEntry(BSON("a"
+                                            << "hashed"));
+    entry.type = IndexType::INDEX_HASHED;
+    entry.sparse = true;
+    std::set<size_t> expectedIndices = {};
+    testRateIndices("{a: {$ne: null}}", "", kSimpleCollator, {entry}, "a,a", expectedIndices);
+}
+
+TEST(QueryPlannerIXSelectTest, HashedSparseIndexShouldNotBeRelevantForEqualsNull) {
+    auto entry = buildSimpleIndexEntry(BSON("a"
+                                            << "hashed"));
+    entry.type = IndexType::INDEX_HASHED;
+    entry.sparse = true;
+    std::set<size_t> expectedIndices = {};
+    testRateIndices("{a: {$eq: null}}", "", kSimpleCollator, {entry}, "a", expectedIndices);
+}
+
+TEST(QueryPlannerIXSelectTest, HashedSparseIndexShouldNotBeRelevantForInWithNull) {
+    auto entry = buildSimpleIndexEntry(BSON("a"
+                                            << "hashed"));
+    entry.type = IndexType::INDEX_HASHED;
+    entry.sparse = true;
+    std::set<size_t> expectedIndices = {};
+    // A non-null value must be included as well to prevent rewrite to {$eq: null}.
+    testRateIndices("{a: {$in: [1, null]}}", "", kSimpleCollator, {entry}, "a", expectedIndices);
+}
+
 /*
  * Will compare 'keyPatterns' with 'entries'. As part of comparing, it will sort both of them.
  */
