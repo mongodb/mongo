@@ -36,16 +36,33 @@ namespace mongo {
 namespace repl {
 class TenantMigrationSharedData final : public ReplSyncSharedData {
 public:
-    TenantMigrationSharedData(ClockSource* clock) : ReplSyncSharedData(clock) {}
+    TenantMigrationSharedData(ClockSource* clock, const UUID& migrationId)
+        : ReplSyncSharedData(clock), _migrationId(migrationId), _resuming(false) {}
+    TenantMigrationSharedData(ClockSource* clock, const UUID& migrationId, bool resuming)
+        : ReplSyncSharedData(clock), _migrationId(migrationId), _resuming(resuming) {}
 
     void setLastVisibleOpTime(WithLock, OpTime opTime);
 
     OpTime getLastVisibleOpTime(WithLock);
 
+    const mongo::UUID& getMigrationId() const {
+        return _migrationId;
+    }
+
+    bool isResuming() const {
+        return _resuming;
+    }
+
 private:
     // Must hold mutex (in base class) to access this.
     // Represents last visible majority committed donor opTime.
     OpTime _lastVisibleOpTime;
+
+    // Id of the current tenant migration.
+    const UUID _migrationId;
+
+    // Indicate whether the tenant migration is resuming from a failover.
+    const bool _resuming;
 };
 }  // namespace repl
 }  // namespace mongo

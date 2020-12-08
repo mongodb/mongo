@@ -30,6 +30,9 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/base/checked_cast.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/repl/tenant_cloner_test_fixture.h"
 
 namespace mongo {
@@ -38,7 +41,13 @@ namespace repl {
 void TenantClonerTestFixture::setUp() {
     ClonerTestFixture::setUp();
 
-    _sharedData = std::make_unique<TenantMigrationSharedData>(&_clock);
+    serviceContext = getServiceContext();
+    auto replCoord = std::make_unique<ReplicationCoordinatorMock>(serviceContext);
+    ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
+    ReplicationCoordinator::set(serviceContext, std::move(replCoord));
+    StorageInterface::set(serviceContext, std::make_unique<StorageInterfaceImpl>());
+
+    _sharedData = std::make_unique<TenantMigrationSharedData>(&_clock, _migrationId);
 
     _mockClient->setOperationTime(_operationTime);
 }
@@ -46,5 +55,14 @@ void TenantClonerTestFixture::setUp() {
 TenantMigrationSharedData* TenantClonerTestFixture::getSharedData() {
     return checked_cast<TenantMigrationSharedData*>(_sharedData.get());
 }
+
+Status TenantClonerTestFixture::createCollection(const NamespaceString& nss,
+                                                 const CollectionOptions& options) {
+    auto storage = StorageInterface::get(serviceContext);
+    auto opCtx = cc().makeOperationContext();
+    repl::createOplog(opCtx.get());
+    return storage->createCollection(opCtx.get(), nss, options);
+}
+
 }  // namespace repl
 }  // namespace mongo

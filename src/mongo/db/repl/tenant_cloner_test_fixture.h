@@ -31,6 +31,7 @@
 
 #include "mongo/db/repl/cloner_test_fixture.h"
 #include "mongo/db/repl/tenant_migration_shared_data.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace repl {
@@ -39,10 +40,13 @@ class TenantClonerTestFixture : public ClonerTestFixture {
 protected:
     void setUp() override;
 
+    ServiceContext* serviceContext;
     TenantMigrationSharedData* getSharedData();
+    Status createCollection(const NamespaceString& nss, const CollectionOptions& options);
 
     const Timestamp _operationTime = Timestamp(12345, 67);
     const std::string _tenantId = "tenant42";
+    const UUID _migrationId = UUID::gen();
 };
 
 }  // namespace repl

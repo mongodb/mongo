@@ -33,6 +33,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/commands/list_collections_filter.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/repl/cloner_utils.h"
 #include "mongo/db/repl/database_cloner_gen.h"
 #include "mongo/db/repl/tenant_collection_cloner.h"
@@ -59,13 +60,15 @@ TenantDatabaseCloner::TenantDatabaseCloner(const std::string& dbName,
           "TenantDatabaseCloner"_sd, sharedData, source, client, storageInterface, dbPool),
       _dbName(dbName),
       _listCollectionsStage("listCollections", this, &TenantDatabaseCloner::listCollectionsStage),
+      _listExistingCollectionsStage(
+          "listExistingCollections", this, &TenantDatabaseCloner::listExistingCollectionsStage),
       _tenantId(tenantId) {
     invariant(!dbName.empty());
     _stats.dbname = dbName;
 }
 
 BaseCloner::ClonerStages TenantDatabaseCloner::getStages() {
-    return {&_listCollectionsStage};
+    return {&_listCollectionsStage, &_listExistingCollectionsStage};
 }
 
 void TenantDatabaseCloner::preStage() {
@@ -128,7 +131,7 @@ BaseCloner::AfterStageBehavior TenantDatabaseCloner::listCollectionsStage() {
         ListCollectionResult result;
         try {
             result = ListCollectionResult::parse(
-                IDLParserErrorContext("DatabaseCloner::listCollectionsStage"), info);
+                IDLParserErrorContext("TenantDatabaseCloner::listCollectionsStage"), info);
         } catch (const DBException& e) {
             uasserted(
                 ErrorCodes::FailedToParse,
@@ -165,6 +168,74 @@ BaseCloner::AfterStageBehavior TenantDatabaseCloner::listCollectionsStage() {
         result.getOptions().uuid = result.getInfo().getUuid();
         _collections.emplace_back(collectionNamespace, result.getOptions());
     }
+    return kContinueNormally;
+}
+
+BaseCloner::AfterStageBehavior TenantDatabaseCloner::listExistingCollectionsStage() {
+    auto opCtx = cc().makeOperationContext();
+    DBDirectClient client(opCtx.get());
+
+    std::vector<UUID> clonedCollectionUUIDs;
+    auto collectionInfos =
+        client.getCollectionInfos(_dbName, ListCollectionsFilter::makeTypeCollectionFilter());
+    for (auto&& info : collectionInfos) {
+        ListCollectionResult result;
+        try {
+            result = ListCollectionResult::parse(
+                IDLParserErrorContext("TenantDatabaseCloner::listExistingCollectionsStage"), info);
+        } catch (const DBException& e) {
+            uasserted(
+                ErrorCodes::FailedToParse,
+                e.toStatus()
+                    .withContext(str::stream() << "Collection info could not be parsed : " << info)
+                    .reason());
+        }
+        NamespaceString collectionNamespace(_dbName, result.getName());
+        if (collectionNamespace.isSystem() && !collectionNamespace.isLegalClientSystemNS()) {
+            LOGV2_DEBUG(5271600,
+                        1,
+                        "Tenant database cloner skipping 'system' collection",
+                        "migrationId"_attr = getSharedData()->getMigrationId(),
+                        "tenantId"_attr = _tenantId,
+                        "namespace"_attr = collectionNamespace.ns());
+            continue;
+        }
+        clonedCollectionUUIDs.emplace_back(result.getInfo().getUuid());
+    }
+
+    if (!getSharedData()->isResuming()) {
+        uassert(ErrorCodes::NamespaceExists,
+                str::stream() << "Tenant '" << _tenantId
+                              << "': collections already exist prior to data sync",
+                clonedCollectionUUIDs.empty());
+        return kContinueNormally;
+    }
+
+    // We are resuming, restart from the collection whose UUID compared greater than or equal to
+    // the last collection we have on disk.
+    if (!clonedCollectionUUIDs.empty()) {
+        const auto& lastClonedCollectionUUID = clonedCollectionUUIDs.back();
+        const auto& startingCollection = std::lower_bound(
+            _collections.begin(),
+            _collections.end(),
+            lastClonedCollectionUUID,
+            [](const auto& collection, const auto& uuid) { return collection.second.uuid < uuid; });
+        _collections.erase(_collections.begin(), startingCollection);
+        if (!_collections.empty()) {
+            LOGV2(5271601,
+                  "Tenant DatabaseCloner resumes cloning",
+                  "migrationId"_attr = getSharedData()->getMigrationId(),
+                  "tenantId"_attr = _tenantId,
+                  "resumeFrom"_attr = _collections.front().first);
+        } else {
+            LOGV2(5271602,
+                  "Tenant DatabaseCloner has already cloned all collections",
+                  "migrationId"_attr = getSharedData()->getMigrationId(),
+                  "tenantId"_attr = _tenantId,
+                  "dbName"_attr = _dbName);
+        }
+    }
+
     return kContinueNormally;
 }
 

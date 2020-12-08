@@ -85,9 +85,15 @@ private:
     };
 
     /**
-     * Stage function that retrieves database information from the sync source.
+     * Stage function that retrieves database information from the donor.
      */
     AfterStageBehavior listDatabasesStage();
+
+    /**
+     * Stage function that retrieves information locally on the recipient for databases that are
+     * already cloned.
+     */
+    AfterStageBehavior listExistingDatabasesStage();
 
     /**
      *
@@ -111,7 +117,8 @@ private:
     // The database name prefix of the tenant associated with this migration.
     std::string _tenantId;  // (R)
 
-    TenantAllDatabaseClonerStage _listDatabasesStage;  // (R)
+    TenantAllDatabaseClonerStage _listDatabasesStage;          // (R)
+    TenantAllDatabaseClonerStage _listExistingDatabasesStage;  // (R)
 
     // The operationTime returned with the listDatabases result.
     Timestamp _operationTime;  // (X)

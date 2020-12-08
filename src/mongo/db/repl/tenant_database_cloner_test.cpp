@@ -79,9 +79,10 @@ protected:
         _mockClient->setOperationTime(_operationTime);
     }
 
-    std::unique_ptr<TenantDatabaseCloner> makeDatabaseCloner() {
+    std::unique_ptr<TenantDatabaseCloner> makeDatabaseCloner(
+        TenantMigrationSharedData* sharedData = nullptr) {
         return std::make_unique<TenantDatabaseCloner>(_dbName,
-                                                      getSharedData(),
+                                                      sharedData ? sharedData : getSharedData(),
                                                       _source,
                                                       _mockClient.get(),
                                                       &_storageInterface,
@@ -632,6 +633,214 @@ TEST_F(TenantDatabaseClonerTest, DatabaseAndCollectionStats) {
     ASSERT_EQ(2, stats.collectionStats[0].indexes);
     ASSERT_EQ(1, stats.collectionStats[1].indexes);
     ASSERT_EQ(_clock.now(), stats.collectionStats[1].end);
+}
+
+TEST_F(TenantDatabaseClonerTest, TenantCollectionsAlreadyExist) {
+    auto uuid = UUID::gen();
+
+    CollectionOptions options;
+    options.uuid = uuid;
+    ASSERT_OK(createCollection(NamespaceString(_dbName, "a"), options));
+
+    auto cloner = makeDatabaseCloner();
+    cloner->setStopAfterStage_forTest("listExistingCollections");
+
+    const std::vector<BSONObj> sourceInfos = {BSON("name"
+                                                   << "a"
+                                                   << "type"
+                                                   << "collection"
+                                                   << "options" << BSONObj() << "info"
+                                                   << BSON("readOnly" << false << "uuid" << uuid))};
+    _mockServer->setCommandReply("listCollections", createListCollectionsResponse(sourceInfos));
+    _mockServer->setCommandReply("find", createFindResponse());
+
+    ASSERT_NOT_OK(cloner->run());
+    ASSERT_NOT_OK(getSharedData()->getStatus(WithLock::withoutLock()));
+}
+
+TEST_F(TenantDatabaseClonerTest, ResumingFromLastClonedCollection) {
+    // Test that database cloner correctly resume from the last cloned collection.
+    std::vector<UUID> uuid;
+    uuid.push_back(UUID::gen());
+    uuid.push_back(UUID::gen());
+    std::sort(uuid.begin(), uuid.end());
+
+    CollectionOptions options;
+    options.uuid = uuid[0];
+    ASSERT_OK(createCollection(NamespaceString(_dbName, "a"), options));
+    options.uuid = uuid[1];
+    ASSERT_OK(createCollection(NamespaceString(_dbName, "b"), options));
+
+    TenantMigrationSharedData resumingSharedData(&_clock, _migrationId, /*resuming=*/true);
+    auto cloner = makeDatabaseCloner(&resumingSharedData);
+    cloner->setStopAfterStage_forTest("listExistingCollections");
+
+    const std::vector<BSONObj> sourceInfos = {BSON("name"
+                                                   << "a"
+                                                   << "type"
+                                                   << "collection"
+                                                   << "options" << BSONObj() << "info"
+                                                   << BSON("readOnly" << false << "uuid"
+                                                                      << uuid[0])),
+                                              BSON("name"
+                                                   << "b"
+                                                   << "type"
+                                                   << "collection"
+                                                   << "options" << BSONObj() << "info"
+                                                   << BSON("readOnly" << false << "uuid"
+                                                                      << uuid[1]))};
+    _mockServer->setCommandReply("listCollections", createListCollectionsResponse(sourceInfos));
+    _mockServer->setCommandReply("find", createFindResponse());
+
+    ASSERT_OK(cloner->run());
+    ASSERT_OK(getSharedData()->getStatus(WithLock::withoutLock()));
+    auto collections = getCollectionsFromCloner(cloner.get());
+
+    ASSERT_EQUALS(1U, collections.size());
+    ASSERT_EQ(NamespaceString(_dbName, "b"), collections[0].first);
+    ASSERT_BSONOBJ_EQ(BSON("uuid" << uuid[1]), collections[0].second.toBSON());
+}
+
+TEST_F(TenantDatabaseClonerTest, LastClonedCollectionDeleted_AllGreater) {
+    // Test that we correctly resume from next collection whose UUID compared greater than the last
+    // cloned collection if the last cloned collection is dropped. This tests the case when all
+    // collections in the latest listCollections result are compared greater than the last cloned
+    // collection.
+    std::vector<UUID> uuid;
+    uuid.push_back(UUID::gen());
+    uuid.push_back(UUID::gen());
+    uuid.push_back(UUID::gen());
+    std::sort(uuid.begin(), uuid.end());
+
+    CollectionOptions options;
+    options.uuid = uuid[0];
+    ASSERT_OK(createCollection(NamespaceString(_dbName, "a"), options));
+
+    TenantMigrationSharedData resumingSharedData(&_clock, _migrationId, /*resuming=*/true);
+    auto cloner = makeDatabaseCloner(&resumingSharedData);
+    cloner->setStopAfterStage_forTest("listExistingCollections");
+
+    const std::vector<BSONObj> sourceInfos = {BSON("name"
+                                                   << "b"
+                                                   << "type"
+                                                   << "collection"
+                                                   << "options" << BSONObj() << "info"
+                                                   << BSON("readOnly" << false << "uuid"
+                                                                      << uuid[1])),
+                                              BSON("name"
+                                                   << "c"
+                                                   << "type"
+                                                   << "collection"
+                                                   << "options" << BSONObj() << "info"
+                                                   << BSON("readOnly" << false << "uuid"
+                                                                      << uuid[2]))};
+    _mockServer->setCommandReply("listCollections", createListCollectionsResponse(sourceInfos));
+    _mockServer->setCommandReply("find", createFindResponse());
+
+    ASSERT_OK(cloner->run());
+    ASSERT_OK(getSharedData()->getStatus(WithLock::withoutLock()));
+    auto collections = getCollectionsFromCloner(cloner.get());
+
+    ASSERT_EQUALS(2U, collections.size());
+    ASSERT_EQ(NamespaceString(_dbName, "b"), collections[0].first);
+    ASSERT_BSONOBJ_EQ(BSON("uuid" << uuid[1]), collections[0].second.toBSON());
+    ASSERT_EQ(NamespaceString(_dbName, "c"), collections[1].first);
+    ASSERT_BSONOBJ_EQ(BSON("uuid" << uuid[2]), collections[1].second.toBSON());
+}
+
+TEST_F(TenantDatabaseClonerTest, LastClonedCollectionDeleted_SomeGreater) {
+    // Test that we correctly resume from next collection whose UUID compared greater than the last
+    // cloned collection if the last cloned collection is dropped. This tests the case when some but
+    // not all collections in the latest listCollections result are compared greater than the last
+    // cloned collection.
+    std::vector<UUID> uuid;
+    uuid.push_back(UUID::gen());
+    uuid.push_back(UUID::gen());
+    uuid.push_back(UUID::gen());
+    std::sort(uuid.begin(), uuid.end());
+
+    CollectionOptions options;
+    options.uuid = uuid[0];
+    ASSERT_OK(createCollection(NamespaceString(_dbName, "a"), options));
+    options.uuid = uuid[1];
+    ASSERT_OK(createCollection(NamespaceString(_dbName, "b"), options));
+
+    TenantMigrationSharedData resumingSharedData(&_clock, _migrationId, /*resuming=*/true);
+    auto cloner = makeDatabaseCloner(&resumingSharedData);
+    cloner->setStopAfterStage_forTest("listExistingCollections");
+
+    const std::vector<BSONObj> sourceInfos = {BSON("name"
+                                                   << "a"
+                                                   << "type"
+                                                   << "collection"
+                                                   << "options" << BSONObj() << "info"
+                                                   << BSON("readOnly" << false << "uuid"
+                                                                      << uuid[0])),
+                                              BSON("name"
+                                                   << "c"
+                                                   << "type"
+                                                   << "collection"
+                                                   << "options" << BSONObj() << "info"
+                                                   << BSON("readOnly" << false << "uuid"
+                                                                      << uuid[2]))};
+    _mockServer->setCommandReply("listCollections", createListCollectionsResponse(sourceInfos));
+    _mockServer->setCommandReply("find", createFindResponse());
+
+    ASSERT_OK(cloner->run());
+    ASSERT_OK(getSharedData()->getStatus(WithLock::withoutLock()));
+    auto collections = getCollectionsFromCloner(cloner.get());
+
+    ASSERT_EQUALS(1U, collections.size());
+    ASSERT_EQ(NamespaceString(_dbName, "c"), collections[0].first);
+    ASSERT_BSONOBJ_EQ(BSON("uuid" << uuid[2]), collections[0].second.toBSON());
+}
+
+TEST_F(TenantDatabaseClonerTest, LastClonedCollectionDeleted_AllLess) {
+    // Test that we correctly resume from next collection whose UUID compared greater than the last
+    // cloned collection if the last cloned collection is dropped. This tests the case when all
+    // collections in the latest listCollections result are compared less than the last cloned
+    // collection.
+    std::vector<UUID> uuid;
+    uuid.push_back(UUID::gen());
+    uuid.push_back(UUID::gen());
+    uuid.push_back(UUID::gen());
+    std::sort(uuid.begin(), uuid.end());
+
+    CollectionOptions options;
+    options.uuid = uuid[0];
+    ASSERT_OK(createCollection(NamespaceString(_dbName, "a"), options));
+    options.uuid = uuid[1];
+    ASSERT_OK(createCollection(NamespaceString(_dbName, "b"), options));
+    options.uuid = uuid[2];
+    ASSERT_OK(createCollection(NamespaceString(_dbName, "c"), options));
+
+    TenantMigrationSharedData resumingSharedData(&_clock, _migrationId, /*resuming=*/true);
+    auto cloner = makeDatabaseCloner(&resumingSharedData);
+    cloner->setStopAfterStage_forTest("listExistingCollections");
+
+    const std::vector<BSONObj> sourceInfos = {BSON("name"
+                                                   << "a"
+                                                   << "type"
+                                                   << "collection"
+                                                   << "options" << BSONObj() << "info"
+                                                   << BSON("readOnly" << false << "uuid"
+                                                                      << uuid[0])),
+                                              BSON("name"
+                                                   << "b"
+                                                   << "type"
+                                                   << "collection"
+                                                   << "options" << BSONObj() << "info"
+                                                   << BSON("readOnly" << false << "uuid"
+                                                                      << uuid[1]))};
+    _mockServer->setCommandReply("listCollections", createListCollectionsResponse(sourceInfos));
+    _mockServer->setCommandReply("find", createFindResponse());
+
+    ASSERT_OK(cloner->run());
+    ASSERT_OK(getSharedData()->getStatus(WithLock::withoutLock()));
+    auto collections = getCollectionsFromCloner(cloner.get());
+
+    // Nothing to clone.
+    ASSERT_EQUALS(0U, collections.size());
 }
 
 }  // namespace repl

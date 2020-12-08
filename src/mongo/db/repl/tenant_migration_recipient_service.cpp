@@ -884,7 +884,7 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
             // Create the writer pool and shared data.
             _writerPool = makeTenantMigrationWriterPool();
             _sharedData = std::make_unique<TenantMigrationSharedData>(
-                getGlobalServiceContext()->getFastClockSource());
+                getGlobalServiceContext()->getFastClockSource(), getMigrationUUID());
         })
         .then([this] {
             _stopOrHangOnFailPoint(&fpAfterConnectingTenantMigrationRecipientInstance);

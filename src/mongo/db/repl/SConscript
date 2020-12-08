@@ -1028,6 +1028,7 @@ env.Library(
     ],
     LIBDEPS = [
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/dbdirectclient',
         'base_cloner',
         'cloner_utils',
         'repl_sync_shared_data',

@@ -97,6 +97,12 @@ private:
     AfterStageBehavior listCollectionsStage();
 
     /**
+     * Stage function that retrieves collection information locally for collections that are already
+     * cloned.
+     */
+    AfterStageBehavior listExistingCollectionsStage();
+
+    /**
      * The preStage sets the start time in _stats.
      */
     void preStage() final;
@@ -120,7 +126,8 @@ private:
     std::vector<std::pair<NamespaceString, CollectionOptions>> _collections;  // (X)
     std::unique_ptr<TenantCollectionCloner> _currentCollectionCloner;         // (MX)
 
-    TenantDatabaseClonerStage _listCollectionsStage;  // (R)
+    TenantDatabaseClonerStage _listCollectionsStage;          // (R)
+    TenantDatabaseClonerStage _listExistingCollectionsStage;  // (R)
 
     // The database name prefix of the tenant associated with this migration.
     std::string _tenantId;  // (R)

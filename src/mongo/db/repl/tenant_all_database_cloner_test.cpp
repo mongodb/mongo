@@ -50,8 +50,9 @@ public:
     TenantAllDatabaseClonerTest() {}
 
 protected:
-    std::unique_ptr<TenantAllDatabaseCloner> makeAllDatabaseCloner() {
-        return std::make_unique<TenantAllDatabaseCloner>(getSharedData(),
+    std::unique_ptr<TenantAllDatabaseCloner> makeAllDatabaseCloner(
+        TenantMigrationSharedData* sharedData = nullptr) {
+        return std::make_unique<TenantAllDatabaseCloner>(sharedData ? sharedData : getSharedData(),
                                                          _source,
                                                          _mockClient.get(),
                                                          &_storageInterface,
@@ -355,6 +356,113 @@ TEST_F(TenantAllDatabaseClonerTest, ListDatabasesRecordsCorrectOperationTime) {
     ASSERT_EQUALS(2u, databases.size());
     ASSERT_EQUALS(_tenantDbA, databases[0]);
     ASSERT_EQUALS(_tenantDbAAB, databases[1]);
+}
+
+TEST_F(TenantAllDatabaseClonerTest, TenantDatabasesAlreadyExist) {
+    // Test that cloner should fail if tenant databases already exist on the recipient prior to
+    // starting cloning phase of the migration.
+    ASSERT_OK(createCollection(NamespaceString(_tenantDbA, "coll"), CollectionOptions()));
+
+    auto listDatabasesReply =
+        "{ok:1, databases:[{name:'" + _tenantDbA + "'}, {name:'" + _tenantDbAAB + "'}]}";
+    _mockServer->setCommandReply("listDatabases", fromjson(listDatabasesReply));
+    _mockServer->setCommandReply("find", createFindResponse());
+
+    auto cloner = makeAllDatabaseCloner();
+
+    ASSERT_NOT_OK(cloner->run());
+}
+
+TEST_F(TenantAllDatabaseClonerTest, ResumingFromLastClonedDb) {
+    // Test that all databases cloner correctly resume from the last cloned database.
+    ASSERT_OK(createCollection(NamespaceString(_tenantDbA, "coll"), CollectionOptions()));
+    ASSERT_OK(createCollection(NamespaceString(_tenantDbAAB, "coll"), CollectionOptions()));
+
+    auto listDatabasesReply =
+        "{ok:1, databases:[{name:'" + _tenantDbA + "'}, {name:'" + _tenantDbAAB + "'}]}";
+    _mockServer->setCommandReply("listDatabases", fromjson(listDatabasesReply));
+    _mockServer->setCommandReply("find", createFindResponse());
+
+    TenantMigrationSharedData resumingSharedData(&_clock, _migrationId, /*resuming=*/true);
+    auto cloner = makeAllDatabaseCloner(&resumingSharedData);
+    cloner->setStopAfterStage_forTest("listExistingDatabases");
+
+    ASSERT_OK(cloner->run());
+
+    auto databases = getDatabasesFromCloner(cloner.get());
+    ASSERT_EQUALS(1u, databases.size());
+    ASSERT_EQUALS(_tenantDbAAB, databases[0]);
+}
+
+TEST_F(TenantAllDatabaseClonerTest, LastClonedDbDeleted_AllGreater) {
+    // Test that we correctly resume from next database compared greater than the last cloned
+    // database if the last cloned database is dropped. This tests the case when all databases in
+    // the latest listDatabases result are compared greater than the last cloned database.
+    ASSERT_OK(createCollection(NamespaceString(_tenantDbA, "coll"), CollectionOptions()));
+
+    auto listDatabasesReply =
+        "{ok:1, databases:[{name:'" + _tenantDbAAB + "'}, {name:'" + _tenantDbABC + "'}]}";
+    _mockServer->setCommandReply("listDatabases", fromjson(listDatabasesReply));
+    _mockServer->setCommandReply("find", createFindResponse());
+
+    TenantMigrationSharedData resumingSharedData(&_clock, _migrationId, /*resuming=*/true);
+    auto cloner = makeAllDatabaseCloner(&resumingSharedData);
+    cloner->setStopAfterStage_forTest("listExistingDatabases");
+
+    ASSERT_OK(cloner->run());
+
+    auto databases = getDatabasesFromCloner(cloner.get());
+    ASSERT_EQUALS(2u, databases.size());
+    ASSERT_EQUALS(_tenantDbAAB, databases[0]);
+    ASSERT_EQUALS(_tenantDbABC, databases[1]);
+}
+
+TEST_F(TenantAllDatabaseClonerTest, LastClonedDbDeleted_SomeGreater) {
+    // Test that we correctly resume from next database compared greater than the last cloned
+    // database if the last cloned database is dropped. This tests the case when some but not all
+    // databases in the latest listDatabases result are compared greater than the last cloned
+    // database.
+    ASSERT_OK(createCollection(NamespaceString(_tenantDbA, "coll"), CollectionOptions()));
+    ASSERT_OK(createCollection(NamespaceString(_tenantDbAAB, "coll"), CollectionOptions()));
+
+    auto listDatabasesReply =
+        "{ok:1, databases:[{name:'" + _tenantDbA + "'}, {name:'" + _tenantDbABC + "'}]}";
+    _mockServer->setCommandReply("listDatabases", fromjson(listDatabasesReply));
+    _mockServer->setCommandReply("find", createFindResponse());
+
+    TenantMigrationSharedData resumingSharedData(&_clock, _migrationId, /*resuming=*/true);
+    auto cloner = makeAllDatabaseCloner(&resumingSharedData);
+    cloner->setStopAfterStage_forTest("listExistingDatabases");
+
+    ASSERT_OK(cloner->run());
+
+    auto databases = getDatabasesFromCloner(cloner.get());
+    ASSERT_EQUALS(1u, databases.size());
+    ASSERT_EQUALS(_tenantDbABC, databases[0]);
+}
+
+TEST_F(TenantAllDatabaseClonerTest, LastClonedDbDeleted_AllLess) {
+    // Test that we correctly resume from next database compared greater than the last cloned
+    // database if the last cloned database is dropped. This tests the case when all databases in
+    // the latest listDatabases result are compared less than the last cloned database.
+    ASSERT_OK(createCollection(NamespaceString(_tenantDbA, "coll"), CollectionOptions()));
+    ASSERT_OK(createCollection(NamespaceString(_tenantDbAAB, "coll"), CollectionOptions()));
+    ASSERT_OK(createCollection(NamespaceString(_tenantDbABC, "coll"), CollectionOptions()));
+
+    auto listDatabasesReply =
+        "{ok:1, databases:[{name:'" + _tenantDbA + "'}, {name:'" + _tenantDbAAB + "'}]}";
+    _mockServer->setCommandReply("listDatabases", fromjson(listDatabasesReply));
+    _mockServer->setCommandReply("find", createFindResponse());
+
+    TenantMigrationSharedData resumingSharedData(&_clock, _migrationId, /*resuming=*/true);
+    auto cloner = makeAllDatabaseCloner(&resumingSharedData);
+    cloner->setStopAfterStage_forTest("listExistingDatabases");
+
+    ASSERT_OK(cloner->run());
+
+    // Nothing to clone.
+    auto databases = getDatabasesFromCloner(cloner.get());
+    ASSERT_EQUALS(0u, databases.size());
 }
 
 }  // namespace repl

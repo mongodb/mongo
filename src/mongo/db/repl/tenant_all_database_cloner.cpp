@@ -33,6 +33,7 @@
 
 #include <algorithm>
 
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/repl/cloner_utils.h"
 #include "mongo/db/repl/tenant_all_database_cloner.h"
 #include "mongo/db/repl/tenant_database_cloner.h"
@@ -56,10 +57,12 @@ TenantAllDatabaseCloner::TenantAllDatabaseCloner(TenantMigrationSharedData* shar
     : TenantBaseCloner(
           "TenantAllDatabaseCloner"_sd, sharedData, source, client, storageInterface, dbPool),
       _tenantId(tenantId),
-      _listDatabasesStage("listDatabases", this, &TenantAllDatabaseCloner::listDatabasesStage) {}
+      _listDatabasesStage("listDatabases", this, &TenantAllDatabaseCloner::listDatabasesStage),
+      _listExistingDatabasesStage(
+          "listExistingDatabases", this, &TenantAllDatabaseCloner::listExistingDatabasesStage) {}
 
 BaseCloner::ClonerStages TenantAllDatabaseCloner::getStages() {
-    return {&_listDatabasesStage};
+    return {&_listDatabasesStage, &_listExistingDatabasesStage};
 }
 
 BaseCloner::AfterStageBehavior TenantAllDatabaseCloner::listDatabasesStage() {
@@ -116,6 +119,63 @@ BaseCloner::AfterStageBehavior TenantAllDatabaseCloner::listDatabasesStage() {
     }
 
     std::sort(_databases.begin(), _databases.end());
+    return kContinueNormally;
+}
+
+BaseCloner::AfterStageBehavior TenantAllDatabaseCloner::listExistingDatabasesStage() {
+    auto opCtx = cc().makeOperationContext();
+    DBDirectClient client(opCtx.get());
+
+    BSONObj res;
+    const BSONObj filter = ClonerUtils::makeTenantDatabaseFilter(_tenantId);
+    auto databasesArray = client.getDatabaseInfos(filter, true /* nameOnly */);
+
+    std::vector<std::string> clonedDatabases;
+    for (const auto& dbBSON : databasesArray) {
+        LOGV2_DEBUG(5271500,
+                    2,
+                    "listExistingDatabases entry",
+                    "migrationId"_attr = getSharedData()->getMigrationId(),
+                    "tenantId"_attr = _tenantId,
+                    "db"_attr = dbBSON);
+        uassert(5271501,
+                "Cloned database from recipient must have 'name' set",
+                dbBSON.hasField("name"));
+
+        const auto& dbName = dbBSON["name"].str();
+        clonedDatabases.emplace_back(dbName);
+    }
+
+    if (!getSharedData()->isResuming()) {
+        uassert(ErrorCodes::NamespaceExists,
+                str::stream() << "Tenant '" << _tenantId
+                              << "': databases already exist prior to data sync",
+                clonedDatabases.empty());
+        return kContinueNormally;
+    }
+
+    // We are resuming, restart from the database alphabetically compared greater than or equal to
+    // the last database we have on disk.
+    std::sort(clonedDatabases.begin(), clonedDatabases.end());
+    if (!clonedDatabases.empty()) {
+        const auto& lastClonedDb = clonedDatabases.back();
+        const auto& startingDb =
+            std::lower_bound(_databases.begin(), _databases.end(), lastClonedDb);
+        _databases.erase(_databases.begin(), startingDb);
+        if (!_databases.empty()) {
+            LOGV2(5271502,
+                  "Tenant AllDatabaseCloner resumes cloning",
+                  "migrationId"_attr = getSharedData()->getMigrationId(),
+                  "tenantId"_attr = _tenantId,
+                  "resumeFrom"_attr = _databases.front());
+        } else {
+            LOGV2(5271503,
+                  "Tenant AllDatabaseCloner has already cloned all databases",
+                  "migrationId"_attr = getSharedData()->getMigrationId(),
+                  "tenantId"_attr = _tenantId);
+        }
+    }
+
     return kContinueNormally;
 }
 
