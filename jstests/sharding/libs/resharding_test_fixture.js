@@ -3,6 +3,7 @@
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/parallelTester.js");
 load("jstests/libs/uuid_util.js");
+load("jstests/libs/write_concern_util.js");
 load("jstests/sharding/libs/create_sharded_collection_util.js");
 
 /**
@@ -185,6 +186,11 @@ var ReshardingTest = class {
             getUUIDFromListCollections(tempCollection.getDB(), tempCollection.getName());
 
         for (let donor of this._donorShards()) {
+            // We temporarily disable replication's oplog fetching on secondaries before manually
+            // inserting the final oplog entry for resharding to ensure that secondaries won't
+            // accidentally skip past it.
+            stopReplicationOnSecondaries(donor.rs);
+
             const shardPrimary = donor.rs.getPrimary();
             assert.commandWorked(
                 shardPrimary.getDB("local").oplog.rs.insert(this._recipientShards().map(
@@ -207,9 +213,11 @@ var ReshardingTest = class {
                     }))));
 
             // We follow up the direct writes to the oplog with a write to a replicated collection
-            // because otherwise the majority-commit point won't advance and the
+            // because otherwise the majority-committed snapshot won't advance and the
             // ReshardingOplogFetcher would never see the no-op oplog entries that were inserted.
             assert.commandWorked(shardPrimary.getDB("dummydb").dummycoll.insert({}));
+
+            restartReplicationOnSecondaries(donor.rs);
         }
     }
 
