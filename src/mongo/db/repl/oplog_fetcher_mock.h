@@ -112,6 +112,11 @@ private:
     // _onShutdownCallbackFn will be called with the status.
     std::unique_ptr<SharedPromise<void>> _finishPromise = std::make_unique<SharedPromise<void>>();
 
+    // Mutex to ensure we call join() on the _waitForFinishThread only once.  This mutex should
+    // never be held when _mutex is held.
+    mutable Mutex _joinFinishThreadMutex =
+        MONGO_MAKE_LATCH("OplogFetcherMock::_joinFinishThreadMutex");
+
     // Thread to wait for _finishPromise and call _onShutdownCallbackFn with the given status only
     // once before the OplogFetcher finishes.
     stdx::thread _waitForFinishThread;

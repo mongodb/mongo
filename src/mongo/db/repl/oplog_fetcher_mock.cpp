@@ -81,6 +81,7 @@ OplogFetcherMock::OplogFetcherMock(
 OplogFetcherMock::~OplogFetcherMock() {
     shutdown();
     join();
+    stdx::lock_guard lk(_joinFinishThreadMutex);
     if (_waitForFinishThread.joinable()) {
         _waitForFinishThread.join();
     }
@@ -172,10 +173,14 @@ void OplogFetcherMock::shutdownWith(Status status) {
             _finishPromise->setError(status);
         }
     }
-    _waitForFinishThread.join();
+    stdx::lock_guard lk(_joinFinishThreadMutex);
+    if (_waitForFinishThread.joinable()) {
+        _waitForFinishThread.join();
+    }
 }
 
 void OplogFetcherMock::waitForshutdown() {
+    stdx::lock_guard lk(_joinFinishThreadMutex);
     if (_waitForFinishThread.joinable()) {
         _waitForFinishThread.join();
     }
