@@ -218,6 +218,10 @@ function RollbackTest(name = "RollbackTest", replSet) {
         config.members[2].priority = 0;
         config.settings = {chainingAllowed: false};
         replSet.initiateWithHighElectionTimeout(config);
+        // Tiebreaker's replication is paused for most of the test, avoid falling off the oplog.
+        replSet.nodes.forEach((node) => {
+            assert.commandWorked(node.adminCommand({replSetResizeOplog: 1, minRetentionHours: 2}));
+        });
 
         assert.eq(replSet.nodes.length,
                   kNumDataBearingNodes,

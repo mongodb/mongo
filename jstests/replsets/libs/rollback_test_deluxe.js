@@ -165,6 +165,13 @@ function RollbackTestDeluxe(name = "FiveNodeDoubleRollbackTest", replSet) {
                 {_id: 4, host: nodes[4], arbiterOnly: true},
             ]
         });
+
+        // Tiebreaker's replication is paused for most of the test, avoid falling off the oplog.
+        for (let i = 0; i < 3; i++) {
+            assert.commandWorked(
+                replSet.nodes[i].adminCommand({replSetResizeOplog: 1, minRetentionHours: 2}));
+        }
+
         return replSet;
     }
 
