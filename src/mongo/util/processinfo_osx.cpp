@@ -231,17 +231,4 @@ bool ProcessInfo::blockInMemory(const void* start) {
     return x & 0x1;
 }
 
-bool ProcessInfo::pagesInMemory(const void* start, size_t numPages, std::vector<char>* out) {
-    out->resize(numPages);
-    if (mincore(alignToStartOfPage(start), numPages * getPageSize(), &out->front())) {
-        LOGV2(23355,
-              "mincore failed: {errnoWithDescription}",
-              "errnoWithDescription"_attr = errnoWithDescription());
-        return false;
-    }
-    for (size_t i = 0; i < numPages; ++i) {
-        (*out)[i] &= 0x1;
-    }
-    return true;
-}
 }  // namespace mongo

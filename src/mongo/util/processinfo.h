@@ -176,16 +176,6 @@ public:
                                              ~(getPageSize() - 1));
     }
 
-    /**
-     * Sets i-th element of 'out' to non-zero if the i-th page starting from the one containing
-     * 'start' is in memory.
-     * The 'out' vector will be resized to fit the requested number of pages.
-     * @return true on success, false otherwise
-     *
-     * NOTE: requires blockCheckSupported() == true
-     */
-    static bool pagesInMemory(const void* start, size_t numPages, std::vector<char>* out);
-
     static const std::string& getProcessName() {
         return appInfo().getProcessName();
     }

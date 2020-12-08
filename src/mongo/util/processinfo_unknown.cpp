@@ -67,10 +67,6 @@ bool ProcessInfo::blockInMemory(const void* start) {
     verify(0);
 }
 
-bool ProcessInfo::pagesInMemory(const void* start, size_t numPages, std::vector<char>* out) {
-    verify(0);
-}
-
 boost::optional<unsigned long> ProcessInfo::getNumCoresForProcess() {
     return boost::none;
 }

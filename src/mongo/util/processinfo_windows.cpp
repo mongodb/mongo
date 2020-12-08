@@ -370,25 +370,4 @@ bool ProcessInfo::blockInMemory(const void* start) {
     return false;
 }
 
-bool ProcessInfo::pagesInMemory(const void* start, size_t numPages, std::vector<char>* out) {
-    out->resize(numPages);
-    std::unique_ptr<PSAPI_WORKING_SET_EX_INFORMATION[]> wsinfo(
-        new PSAPI_WORKING_SET_EX_INFORMATION[numPages]);
-
-    const void* startOfFirstPage = alignToStartOfPage(start);
-    for (size_t i = 0; i < numPages; i++) {
-        wsinfo[i].VirtualAddress = reinterpret_cast<void*>(
-            reinterpret_cast<unsigned long long>(startOfFirstPage) + i * getPageSize());
-    }
-
-    BOOL result = QueryWorkingSetEx(
-        GetCurrentProcess(), wsinfo.get(), sizeof(PSAPI_WORKING_SET_EX_INFORMATION) * numPages);
-
-    if (!result)
-        return false;
-    for (size_t i = 0; i < numPages; ++i) {
-        (*out)[i] = wsinfo[i].VirtualAttributes.Valid ? 1 : 0;
-    }
-    return true;
-}
 }  // namespace mongo
