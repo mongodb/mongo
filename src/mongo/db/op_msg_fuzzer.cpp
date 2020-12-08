@@ -33,6 +33,7 @@
 #include "mongo/db/auth/authz_manager_external_state_local.h"
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
 #include "mongo/db/client.h"
+#include "mongo/db/client_strand.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/repl_client_info.h"
@@ -49,7 +50,7 @@
 
 extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
     static mongo::ServiceContext* serviceContext;
-    static mongo::ServiceContext::UniqueClient client;
+    static mongo::ClientStrandPtr clientStrand;
     static mongo::transport::TransportLayerMock transportLayer;
     static mongo::transport::SessionHandle session;
     static std::unique_ptr<mongo::AuthzManagerExternalStateMock> localExternalState;
@@ -71,8 +72,7 @@ extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
         serviceContext = mongo::getGlobalServiceContext();
         serviceContext->setServiceEntryPoint(
             std::make_unique<mongo::ServiceEntryPointMongod>(serviceContext));
-        client = serviceContext->makeClient("test", session);
-        // opCtx = serviceContext->makeOperationContext(client.get());
+        clientStrand = mongo::ClientStrand::make(serviceContext->makeClient("test", session));
 
         localExternalState = std::make_unique<mongo::AuthzManagerExternalStateMock>();
         externalState = localExternalState.get();
@@ -95,8 +95,9 @@ extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
     if (Size < sizeof(mongo::MSGHEADER::Value)) {
         return 0;
     }
-    mongo::ServiceContext::UniqueOperationContext opCtx =
-        serviceContext->makeOperationContext(client.get());
+
+    auto clientGuard = clientStrand->bind();
+    auto opCtx = serviceContext->makeOperationContext(clientGuard.get());
     mongo::VectorClockMutable::get(serviceContext)->tickClusterTimeTo(kInMemoryLogicalTime);
 
     int new_size = Size + sizeof(int);
@@ -106,8 +107,6 @@ extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
     mongo::Message msg(std::move(sb));
 
     try {
-        // TODO SERVER-51278: Replace `AlternativeClientRegion` with `ClientStrand`.
-        mongo::AlternativeClientRegion acr(client);
         serviceContext->getServiceEntryPoint()->handleRequest(opCtx.get(), msg).get();
     } catch (const mongo::AssertionException&) {
         // We need to catch exceptions caused by invalid inputs
