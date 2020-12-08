@@ -275,6 +275,8 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/catalog/collection_options_idl',
+        '$BUILD_DIR/mongo/idl/basic_types',
         '$BUILD_DIR/mongo/idl/idl_parser',
     ],
 )

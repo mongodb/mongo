@@ -39,6 +39,7 @@ class IndexConsistency;
 class CollectionCatalog;
 class CollectionImpl final : public Collection {
 public:
+    // TODO (SERVER-52538): Replace with IDL-generated enums.
     enum ValidationAction { WARN, ERROR_V };
     enum ValidationLevel { OFF, MODERATE, STRICT_V };
 

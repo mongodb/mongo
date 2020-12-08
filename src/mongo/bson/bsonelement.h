@@ -399,6 +399,10 @@ public:
      */
     long long safeNumberLongForHash() const;
 
+    /** Convert a numeric field to long long, and uassert the conversion is exact.
+     */
+    long long exactNumberLong() const;
+
     /**
      * Parses a BSONElement of any numeric type into a positive long long, failing if the value
      * is any of the following:
@@ -1076,6 +1080,10 @@ inline long long BSONElement::safeNumberLongForHash() const {
     } else {
         return safeNumberLong();
     }
+}
+
+inline long long BSONElement::exactNumberLong() const {
+    return uassertStatusOK(parseIntegerElementToLong());
 }
 
 inline BSONElement::BSONElement() {

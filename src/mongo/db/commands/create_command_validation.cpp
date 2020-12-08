@@ -30,44 +30,9 @@
 #include "mongo/db/commands/create_command_validation.h"
 
 namespace mongo::create_command_validation {
-namespace {
-Status validateNotEmpty(StringData name, bool isEmpty) {
-    return isEmpty
-        ? Status(ErrorCodes::BadValue, str::stream() << "'" << name << "' cannot be empty")
-        : Status::OK();
-}
-}  // namespace
-
-Status validateCollationNotEmpty(const BSONObj& collation) {
-    return validateNotEmpty("collation", collation.isEmpty());
-}
-
 Status validateViewOnNotEmpty(const std::string& viewOn) {
-    return validateNotEmpty("viewOn", viewOn.empty());
-}
-
-Status validateStorageEngineOptions(const BSONObj& storageEngine) {
-    // Every field inside 'storageEngine' must be a document.
-    // Format:
-    // {
-    //     ...
-    //     storageEngine: {
-    //         storageEngine1: {
-    //             ...
-    //         },
-    //         storageEngine2: {
-    //             ...
-    //         }
-    //     },
-    //     ...
-    // }
-    for (auto&& elem : storageEngine) {
-        if (elem.type() != mongo::Object) {
-            return {ErrorCodes::BadValue,
-                    str::stream() << "'storageEngine." << elem.fieldName()
-                                  << "' must be an embedded document"};
-        }
-    }
-    return Status::OK();
+    return viewOn.empty()
+        ? Status(ErrorCodes::BadValue, str::stream() << "'viewOn' cannot be empty")
+        : Status::OK();
 }
 }  // namespace mongo::create_command_validation

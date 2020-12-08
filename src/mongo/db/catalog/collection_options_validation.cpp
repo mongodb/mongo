@@ -27,11 +27,31 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/db/catalog/collection_options_validation.h"
 
-#include "mongo/base/status.h"
-#include "mongo/bson/bsonobj.h"
-
-namespace mongo::create_command_validation {
-Status validateViewOnNotEmpty(const std::string& viewOn);
-}  // namespace mongo::create_command_validation
+namespace mongo::collection_options_validation {
+Status validateStorageEngineOptions(const BSONObj& storageEngine) {
+    // Every field inside 'storageEngine' must be a document.
+    // Format:
+    // {
+    //     ...
+    //     storageEngine: {
+    //         storageEngine1: {
+    //             ...
+    //         },
+    //         storageEngine2: {
+    //             ...
+    //         }
+    //     },
+    //     ...
+    // }
+    for (auto&& elem : storageEngine) {
+        if (elem.type() != mongo::Object) {
+            return {ErrorCodes::BadValue,
+                    str::stream() << "'storageEngine." << elem.fieldName()
+                                  << "' must be an embedded document"};
+        }
+    }
+    return Status::OK();
+}
+}  // namespace mongo::collection_options_validation

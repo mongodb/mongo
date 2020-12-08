@@ -66,6 +66,7 @@ assert.commandFailed(db.createCollection("collation", {collation: {blah: 1}}));
 assert.commandFailed(db.createCollection("collation", {collation: {locale: "en", blah: 1}}));
 assert.commandFailed(db.createCollection("collation", {collation: {locale: "xx"}}));
 assert.commandFailed(db.createCollection("collation", {collation: {locale: "en", strength: 99}}));
+assert.commandFailed(db.createCollection("collation", {collation: {locale: "en", strength: 9.9}}));
 
 // Attempting to create a collection whose collation version does not match the collator version
 // produced by ICU should result in failure with a special error code.

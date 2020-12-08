@@ -34,7 +34,9 @@
 #include <algorithm>
 
 #include "mongo/base/string_data.h"
+#include "mongo/db/catalog/collection_options_validation.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/create_gen.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/idl/command_generic_argument.h"
@@ -136,7 +138,7 @@ StatusWith<CollectionOptions> CollectionOptions::parse(const BSONObj& options, P
                 return {ErrorCodes::TypeMismatch, "'storageEngine' must be a document"};
             }
 
-            auto status = create_command_validation::validateStorageEngineOptions(e.Obj());
+            auto status = collection_options_validation::validateStorageEngineOptions(e.Obj());
             if (!status.isOK()) {
                 return status;
             }
@@ -256,10 +258,12 @@ CollectionOptions CollectionOptions::parse(const CreateCommand& cmd) {
         options.validator = std::move(*validator);
     }
     if (auto validationLevel = cmd.getValidationLevel()) {
-        options.validationLevel = validationLevel->toString();
+        // TODO (SERVER-52538): Don't convert to string, maintain IDL-generated enum value.
+        options.validationLevel = ValidationLevel_serializer(*validationLevel).toString();
     }
     if (auto validationAction = cmd.getValidationAction()) {
-        options.validationAction = validationAction->toString();
+        // TODO (SERVER-52538): Don't convert to string, maintain IDL-generated enum value.
+        options.validationAction = ValidationAction_serializer(*validationAction).toString();
     }
     if (auto indexOptionDefaults = cmd.getIndexOptionDefaults()) {
         options.indexOptionDefaults = std::move(*indexOptionDefaults);
@@ -275,7 +279,7 @@ CollectionOptions CollectionOptions::parse(const CreateCommand& cmd) {
         options.pipeline = std::move(builder.arr());
     }
     if (auto collation = cmd.getCollation()) {
-        options.collation = std::move(*collation);
+        options.collation = collation->toBSON();
     }
     if (auto recordPreImages = cmd.getRecordPreImages()) {
         options.recordPreImages = *recordPreImages;

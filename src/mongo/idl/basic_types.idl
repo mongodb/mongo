@@ -57,6 +57,16 @@ types:
         cpp_type: std::int64_t
         deserializer: "mongo::BSONElement::safeNumberLong"
 
+    exactInt64:
+        bson_serialization_type:
+                                - long
+                                - int
+                                - decimal
+                                - double
+        description: "Accepts any number that can be exactly converted to an int64"
+        cpp_type: std::int64_t
+        deserializer: "mongo::BSONElement::exactNumberLong"
+
     safeDouble:
         bson_serialization_type:
                                 - long
@@ -205,7 +215,7 @@ types:
     writeConcernW:
         bson_serialization_type:
                                  - string
-                                 - int 
+                                 - int
                                  - decimal
                                  - double
                                  - long
@@ -227,6 +237,27 @@ enums:
             customDefault: "customDefault"
             getLastErrorDefaults: "getLastErrorDefaults"
 
+    CollationCaseFirst:
+        description: Sort order of case differences.
+        type: string
+        values:
+            kUpper: upper
+            kLower: lower
+            kOff: off
+
+    CollationAlternate:
+        description: Whether collation should consider whitespace and punctuation as base characters for purposes of comparison.
+        type: string
+        values:
+            kAlternateNonIgnorable: non-ignorable
+            kAlternateShifted: shifted
+
+    CollationMaxVariable:
+        description: Up to which characters are considered ignorable when alternate is "shifted".
+        type: string
+        values:
+            kMaxVariablePunct: punct
+            kMaxVariableSpace: space
 
 structs:
     OkReply:
@@ -271,7 +302,7 @@ structs:
             fsync:
                 type: safeBool
                 optional: true
-            # Fields with names wElectionId, wOpTime, and getLastError are accepted in the WriteConcern document for 
+            # Fields with names wElectionId, wOpTime, and getLastError are accepted in the WriteConcern document for
             # backwards-compatibility reasons, but their values are entirely ignored.
             wElectionId:
                 type: any
@@ -287,3 +318,40 @@ structs:
                 cpp_name: source
                 type: ReadWriteConcernProvenanceSource
                 optional: true
+
+    Collation:
+        description: "Specifies the default collation for the collection or the view."
+        strict: true
+        generate_comparison_operators: true
+        fields:
+            locale:
+                type: string
+            caseLevel:
+                type: bool
+                optional: true
+            caseFirst:
+                type: CollationCaseFirst
+                optional: true
+            strength:
+                type: exactInt64
+                optional: true
+                validator: { gte: 0, lte: 5 }
+            numericOrdering:
+                type: bool
+                optional: true
+            alternate:
+                type: CollationAlternate
+                optional: true
+            maxVariable:
+                type: CollationMaxVariable
+                optional: true
+            normalization:
+                type: bool
+                optional: true
+            backwards:
+                type: bool
+                optional: true
+            version:
+                type: string
+                optional: true
+                unstable: true

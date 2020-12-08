@@ -32,20 +32,8 @@ global:
     - "mongo/db/commands/create_command_validation.h"
 
 imports:
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/catalog/collection_options.idl"
     - "mongo/db/timeseries/timeseries.idl"
-
-structs:
-    IndexOptionDefaults:
-        description: "The default configuration for indexes per storage engine."
-        strict: true
-        fields:
-            storageEngine:
-                description: "The index options for the specified storage engines."
-                type: object_owned
-                optional: true
-                validator:
-                    callback: create_command_validation::validateStorageEngineOptions
 
 commands:
     create:
@@ -53,6 +41,7 @@ commands:
         command_name: create
         namespace: concatenate_with_db
         cpp_name: CreateCommand
+        api_version: "1"
         strict: true
         fields:
             capped:
@@ -83,11 +72,13 @@ commands:
                 optional: true
                 validator:
                     lt: 2147483648  # 2^31
+            # TODO (SERVER-52538): Create a StorageEngineOptions struct.
             storageEngine:
                 description: "Specify a configuration to the storage engine on a per-collection
                               basis when creating a collection."
                 type: object
                 optional: true
+            # TODO (SERVER-52538): Create a Validator struct.
             validator:
                 description: "Specify validation rules or expressions for the collection."
                 type: object
@@ -96,13 +87,13 @@ commands:
                 description: "Determines how strictly to apply the validation rules to existing
                               documents during an update.
                               Can be one of following values: 'off', 'strict' or 'moderate'."
-                type: string
+                type: ValidationLevel
                 optional: true
             validationAction:
                 description: "Determines whether to error on invalid documents or just warn about
                               the violations but allow invalid documents to be inserted.
                               Can be either 'warn' or 'error'."
-                type: string
+                type: ValidationAction
                 optional: true
             indexOptionDefaults:
                 description: "Allows users to specify a default configuration for indexes when
@@ -124,19 +115,14 @@ commands:
                 optional: true
             collation:
                 description: "Specifies the default collation for the collection or the view."
-                type: object
-                optional: true
-                validator:
-                    callback: create_command_validation::validateCollationNotEmpty
-            writeConcern:
-                description: "A document that expresses the write concern for the operation."
-                type: object
+                type: Collation
                 optional: true
             recordPreImages:
                 description: "Sets whether updates/deletes should store the pre-image of the
                               document in the oplog"
                 type: safeBool
                 optional: true
+                unstable: true
             timeseries:
                 description: "The options to create the time-series collection with."
                 type: TimeseriesOptions
@@ -145,7 +131,10 @@ commands:
                 description: "DEPRECATED"
                 type: safeBool
                 optional: true
+                unstable: true
             flags:
                 description: "DEPRECATED"
                 type: safeInt64
                 optional: true
+                unstable: true
+        reply_type: OkReply

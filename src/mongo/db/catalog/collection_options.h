@@ -34,13 +34,15 @@
 #include <boost/optional.hpp>
 
 #include "mongo/base/status.h"
-#include "mongo/db/commands/create_gen.h"
+#include "mongo/db/catalog/collection_options_gen.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
 
 class CollatorFactoryInterface;
+class CreateCommand;
 
 /**
  * A CollectionUUID is a 128-bit unique identifier, per RFC 4122, v4. for a database collection.

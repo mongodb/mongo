@@ -35,6 +35,7 @@
 
 namespace mongo {
 
+// TODO (SERVER-52538): Factor with IDL-generated Collation struct.
 /**
  * A CollationSpec is a parsed representation of a user-provided collation BSONObj.
  */

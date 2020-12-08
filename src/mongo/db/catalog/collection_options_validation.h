@@ -32,6 +32,6 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 
-namespace mongo::create_command_validation {
-Status validateViewOnNotEmpty(const std::string& viewOn);
-}  // namespace mongo::create_command_validation
+namespace mongo::collection_options_validation {
+Status validateStorageEngineOptions(const BSONObj& storageEngine);
+}  // namespace mongo::collection_options_validation

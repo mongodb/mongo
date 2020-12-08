@@ -646,6 +646,7 @@ Status validateCollationSpec(const CollationSpec& spec) {
 
 }  // namespace
 
+// TODO (SERVER-52538): Use Collation parser from basic_types.idl
 StatusWith<std::unique_ptr<CollatorInterface>> CollatorFactoryICU::makeFromBSON(
     const BSONObj& spec) {
     // Parse the locale ID out of the spec.

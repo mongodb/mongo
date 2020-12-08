@@ -33,6 +33,7 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/create_gen.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/cluster_commands_helpers.h"
@@ -115,12 +116,12 @@ public:
              const std::string& dbName,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-        const NamespaceString nss(parseNs(dbName, cmdObj));
-        createShardDatabase(opCtx, dbName);
+        auto cmd = CreateCommand::parse({"create"}, cmdObj);
+        createShardDatabase(opCtx, cmd.getDbName());
 
         uassert(ErrorCodes::InvalidOptions,
                 "specify size:<n> when capped is true",
-                !cmdObj["capped"].trueValue() || cmdObj["size"].isNumber());
+                !cmd.getCapped() || cmd.getSize());
         uassert(ErrorCodes::InvalidOptions,
                 "the 'temp' field is an invalid option",
                 !cmdObj.hasField("temp"));
@@ -145,7 +146,7 @@ public:
             // NamespaceExists will cause multi-document transactions to implicitly abort, so
             // mongos should surface this error to the client.
             CollectionOptions options = uassertStatusOK(CollectionOptions::parse(cmdObj));
-            checkCollectionOptions(opCtx, nss, options);
+            checkCollectionOptions(opCtx, cmd.getNamespace(), options);
         } else {
             uassertStatusOK(createStatus);
         }

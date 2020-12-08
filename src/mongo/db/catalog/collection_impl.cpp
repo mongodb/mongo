@@ -163,6 +163,7 @@ std::unique_ptr<CollatorInterface> parseCollation(OperationContext* opCtx,
     return std::move(collator.getValue());
 }
 
+// TODO (SERVER-52538): Remove, rely on IDL-generated enum.
 StatusWith<CollectionImpl::ValidationLevel> _parseValidationLevel(StringData newLevel) {
     auto status = Collection::parseValidationLevel(newLevel);
     if (!status.isOK()) {
@@ -183,6 +184,7 @@ StatusWith<CollectionImpl::ValidationLevel> _parseValidationLevel(StringData new
     MONGO_UNREACHABLE;
 }
 
+// TODO (SERVER-52538): Remove, rely on IDL-generated enum.
 StatusWith<CollectionImpl::ValidationAction> _parseValidationAction(StringData newAction) {
     auto status = Collection::parseValidationAction(newAction);
     if (!status.isOK()) {

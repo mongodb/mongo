@@ -14,6 +14,18 @@ env.SConscript(
 )
 
 env.Library(
+    target='collection_options_idl',
+    source=[
+        'collection_options.idl',
+        'collection_options_validation.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/idl/idl_parser',
+    ],
+)
+
+env.Library(
     target='collection_options',
     source=[
         'collection_options.cpp',
@@ -22,7 +34,8 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/commands/create_command',
         '$BUILD_DIR/mongo/db/query/collation/collator_interface',
-        '$BUILD_DIR/mongo/idl/idl_parser',
+        '$BUILD_DIR/mongo/idl/basic_types',
+        'collection_options_idl',
     ],
 )
 

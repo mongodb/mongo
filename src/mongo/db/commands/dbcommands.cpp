@@ -339,8 +339,6 @@ public:
                      const string& dbname,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
-        const auto nsToCreate = CommandHelpers::parseNsCollectionRequired(dbname, cmdObj);
-
         IDLParserErrorContext ctx("create");
         CreateCommand cmd = CreateCommand::parse(ctx, cmdObj);
 
@@ -387,9 +385,9 @@ public:
                     feature_flags::gTimeseriesCollection.isEnabled(
                         serverGlobalParams.featureCompatibility));
 
-            const auto timeseriesNotAllowedWith = [&nsToCreate](StringData option) -> std::string {
-                return str::stream()
-                    << nsToCreate << ": 'timeseries' is not allowed with '" << option << "'";
+            const auto timeseriesNotAllowedWith = [&cmd](StringData option) -> std::string {
+                return str::stream() << cmd.getNamespace() << ": 'timeseries' is not allowed with '"
+                                     << option << "'";
             };
 
             uassert(
@@ -447,7 +445,7 @@ public:
             std::unique_ptr<CollatorInterface> defaultCollator;
             if (cmd.getCollation()) {
                 auto collatorStatus = CollatorFactoryInterface::get(opCtx->getServiceContext())
-                                          ->makeFromBSON(*cmd.getCollation());
+                                          ->makeFromBSON(cmd.getCollation()->toBSON());
                 uassertStatusOK(collatorStatus.getStatus());
                 defaultCollator = std::move(collatorStatus.getValue());
             }
@@ -472,7 +470,7 @@ public:
             cmd.setIdIndex(idIndexSpec);
         }
 
-        uassertStatusOK(createCollection(opCtx, nsToCreate, cmd));
+        uassertStatusOK(createCollection(opCtx, cmd.getNamespace(), cmd));
         return true;
     }
 } cmdCreate;
