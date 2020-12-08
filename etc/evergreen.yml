@@ -1380,6 +1380,30 @@ functions:
           --githubOauthToken "${github_token}"               \
           --useLatest 4.4 4.7 4.8
 
+        # This is primarily for tests for infrastructure which don't always need the latest
+        # binaries.
+        if [ ! -z "${install_master_bin}" ]; then
+          $python buildscripts/resmoke.py setup-multiversion   \
+            --installDir /data/install                         \
+            --linkDir /data/multiversion                       \
+            --edition $edition                                 \
+            --platform $platform                               \
+            --architecture $architecture                       \
+            --githubOauthToken "${github_token}"               \
+            --useLatest master
+        fi
+
+  "move multiversion binaries": &move_multiversion_binaries
+    command: shell.exec
+    params:
+      working_dir: src
+      script: |
+        set -o verbose
+
+        # powercycle expects the binaries to be in dist-test/bin
+        mkdir -p dist-test/bin
+        mv /data/multiversion/* dist-test/bin/
+
   "execute resmoke tests": &execute_resmoke_tests
     command: shell.exec
     type: test
@@ -7530,6 +7554,35 @@ tasks:
       resmoke_args: --suites=json_schema --storageEngine=wiredTiger
       resmoke_jobs_max: 1
 
+- name: powercycle_smoke
+  tags: ["powercycle"]
+  exec_timeout_secs: 7200 # 2 hour timeout for the task overall
+  commands:
+    - command: manifest.load
+    - func: "git get project"
+    - func: "set task expansion macros"
+    - func: "set up virtualenv"
+    - func: "upload pip requirements"
+    - func: "configure evergreen api credentials"
+    - func: "do multiversion setup"
+      vars:
+        install_master_bin: true
+    - *move_multiversion_binaries
+    - func: "set up remote credentials"
+      vars:
+        <<: *powercycle_remote_credentials
+    - func: "set up EC2 instance"
+      vars:
+        <<: *powercycle_ec2_instance
+    - command: expansions.update
+      <<: *powercycle_expansions
+    - func: "run powercycle test"
+      timeout_secs: 1800 # 30 minute timeout for no output
+      vars:
+        <<: *powercycle_test
+        mongod_extra_options: --mongodOptions=\"--setParameter enableTestCommands=1 --setParameter logComponentVerbosity='{storage:{recovery:2}}' --storageEngine wiredTiger --wiredTigerEngineConfigString 'debug_mode=[table_logging=true]'\"
+
+
 - name: powercycle
   tags: ["powercycle"]
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
@@ -9830,15 +9883,21 @@ buildvariants:
     distros:
     - amazon2-small
 
-- name: tig-daily-cron
+- name: stm-daily-cron
   modules:
   - enterprise
-  display_name: "~ TIG Daily Cron"
+  display_name: "~ STM Daily Cron"
   run_on:
   - rhel62-small
+  expansions:
+    multiversion_platform: amazon2
+    multiversion_edition: enterprise
   stepback: false
   tasks:
   - name: lint_fuzzer_sanity_all
+  - name: powercycle_smoke
+    distros:
+    - amazon2-test
 
 - name: security-daily-cron
   modules:

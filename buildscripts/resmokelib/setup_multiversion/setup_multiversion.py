@@ -72,7 +72,7 @@ class SetupMultiversion(Subcommand):
             LOGGER.info("Fetching download URL from Evergreen.")
 
             try:
-                re.match(r"\d+\.\d+", version).group(0)
+                re.match(r"(\d+\.\d+|master)", version).group(0)
             except AttributeError:
                 LOGGER.error(
                     "Input version is not recognized. Some correct examples: 4.0, 4.0.1, 4.0.0-rc0")
@@ -110,6 +110,8 @@ class SetupMultiversion(Subcommand):
         urls = {}
 
         evg_project = f"mongodb-mongo-v{version}"
+        if version == "master":
+            evg_project = "mongodb-mongo-master"
         if evg_project not in self.config.evergreen_projects:
             return urls
 

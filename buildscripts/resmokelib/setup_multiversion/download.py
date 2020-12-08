@@ -115,6 +115,8 @@ def symlink_version(version, installed_dir, link_dir):
 
         executable_name, executable_extension = os.path.splitext(executable)
         link_name = f"{executable_name}-{version}{executable_extension}"
+        if version == "master":
+            link_name = executable
 
         try:
             executable = os.path.join(bin_dir, executable)
