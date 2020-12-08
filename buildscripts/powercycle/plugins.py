@@ -115,8 +115,8 @@ class SetUpEC2Instance(PowercycleCommand):
             self.remote_op.operation(SSHOperation.SHELL, cmds, None)
 
         # Fourth operation -
-        # Copy buildscripts, pytests and mongoDB executables to the remote host.
-        files = ['etc', 'buildscripts', 'pytests']
+        # Copy buildscripts and mongoDB executables to the remote host.
+        files = ['etc', 'buildscripts']
         mongo_executables = ["mongo", "mongod", "mongos"]
         for executable in mongo_executables:
             files.append(f"dist-test/bin/{executable}{self.exe}")

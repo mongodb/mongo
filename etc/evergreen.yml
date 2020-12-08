@@ -2422,7 +2422,7 @@ functions:
           # Set an exit trap so we can save the real exit status (see SERVER-34033).
           trap 'echo $? > error_exit.txt; exit 0' EXIT
           config_file=powertest.yml
-          eval $python pytests/powertest.py \
+          eval $python buildscripts/resmoke.py powertest \
             "--saveConfigOptions=$config_file \
             ${connection_options}  \
             ${program_options}     \
@@ -2438,7 +2438,7 @@ functions:
             ${mongod_options}      \
             ${mongod_extra_options}"
           set +o errexit
-          $python -u pytests/powertest.py --configFile=$config_file
+          $python -u buildscripts/resmoke.py powertest --configFile=$config_file
 
     - command: expansions.update
       params:

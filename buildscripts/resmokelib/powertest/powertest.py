@@ -1,21 +1,4 @@
-#!/usr/bin/env python3
-"""Powercycle test.
-
-Tests robustness of mongod to survive multiple powercycle events.
-
-Client & server side powercycle test script.
-
-This script can be run against any host which is reachable via ssh.
-Note - the remote hosts should be running bash shell (this script may fail otherwise).
-There are no assumptions on the server what is the current deployment of MongoDB.
-For Windows the assumption is that Cygwin is installed.
-The server needs these utilities:
-    - python 3.7 or higher
-    - sshd
-    - rsync
-This script will either download a MongoDB tarball or use an existing setup.
-"""
-
+"""Powercycle test helper functions."""
 import atexit
 import collections
 import copy
@@ -24,7 +7,6 @@ import distutils.spawn  # pylint: disable=no-name-in-module
 import json
 import importlib
 import logging
-import optparse
 import os
 import pipes
 import posixpath
@@ -50,9 +32,17 @@ import pymongo
 import requests
 import yaml
 
-# Get relative imports to work when the package is not installed on the PYTHONPATH.
-if __name__ == "__main__" and __package__ is None:
-    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from buildscripts import aws_ec2, remote_operations
+
+AWS_ADDRESS_TYPES = [
+    "private_ip_address", "public_ip_address", "private_dns_name", "public_dns_name"
+]
+
+DEFAULT_SSH_CONNECTION_OPTIONS = ("-o ServerAliveCountMax=10"
+                                  " -o ServerAliveInterval=6"
+                                  " -o StrictHostKeyChecking=no"
+                                  " -o ConnectTimeout=30"
+                                  " -o ConnectionAttempts=20")
 
 # See https://docs.python.org/2/library/sys.html#sys.platform
 _IS_WINDOWS = sys.platform == "win32" or sys.platform == "cygwin"
@@ -72,12 +62,7 @@ def _try_import(module, name=None):
         pass
 
 
-# These modules are used on the 'client' side.
-_try_import("buildscripts.aws_ec2", "aws_ec2")
-_try_import("buildscripts.remote_operations", "remote_operations")
-
 if _IS_WINDOWS:
-
     # These modules are used on both sides for dumping python stacks.
     import win32api
     import win32event
@@ -1143,7 +1128,7 @@ class LocalToRemoteOperations(object):
             ssh_options=None, shell_binary="/bin/bash", use_shell=False):
         """Initialize LocalToRemoteOperations."""
 
-        self.remote_op = remote_operations.RemoteOperations(  # pylint: disable=undefined-variable
+        self.remote_op = remote_operations.RemoteOperations(
             user_host=user_host, ssh_connection_options=ssh_connection_options,
             ssh_options=ssh_options, retries=retries, retry_sleep=retry_sleep, debug=True,
             shell_binary=shell_binary, use_shell=use_shell)
@@ -1190,8 +1175,10 @@ def remote_handler(options, operations):  # pylint: disable=too-many-branches,to
     host = options.host if options.host else "localhost"
     host_port = "{}:{}".format(host, options.port)
 
+    options_dict = vars(options)
     if options.repl_set:
-        options.mongod_options = "{} --replSet {}".format(options.mongod_options, options.repl_set)
+        options_dict["mongod_options"] = "{} --replSet {}".format(options.mongod_options,
+                                                                  options.repl_set)
 
     # For MongodControl, the file references should be fully specified.
     if options.mongodb_bin_dir:
@@ -1494,12 +1481,12 @@ def crash_server_or_kill_mongod(  # pylint: disable=too-many-arguments,,too-many
             canary_cmd = ""
         crash_func = local_ops.shell
         crash_args = [
-            "{} {} --remoteOperation {} {} {} {}".format(options.remote_python, script_name,
+            "{} {} {} --remoteOperation {} {} {}".format(options.remote_python, script_name,
                                                          client_args, canary, canary_cmd, crash_cmd)
         ]
 
     elif options.crash_method == "aws_ec2":
-        ec2 = aws_ec2.AwsEc2()  # pylint: disable=undefined-variable
+        ec2 = aws_ec2.AwsEc2()
         crash_func = ec2.control_instance
         crash_args = ["force-stop", options.instance_id, 600, True]
 
@@ -1549,12 +1536,13 @@ def get_mongo_client_args(host=None, port=None, options=None,
         mongo_args["host"] = host
     if port:
         mongo_args["port"] = port
-    # Set the writeConcern
-    if hasattr(options, "write_concern"):
-        mongo_args.update(yaml.safe_load(options.write_concern))
-    # Set the readConcernLevel
-    if hasattr(options, "read_concern_level") and options.read_concern_level:
-        mongo_args["readConcernLevel"] = options.read_concern_level
+    if options:
+        # Set the writeConcern
+        if options.write_concern:
+            mongo_args.update(yaml.safe_load(options.write_concern))
+        # Set the readConcernLevel
+        if options.read_concern_level:
+            mongo_args["readConcernLevel"] = options.read_concern_level
     return mongo_args
 
 
@@ -1748,7 +1736,7 @@ def resmoke_client(  # pylint: disable=too-many-arguments
     return ret, output
 
 
-def main():  # pylint: disable=too-many-branches,too-many-locals,too-many-statements
+def main(parser, parser_actions, options):  # pylint: disable=too-many-branches,too-many-locals,too-many-statements
     """Execute Main program."""
 
     # pylint: disable=global-statement
@@ -1762,381 +1750,45 @@ def main():  # pylint: disable=too-many-branches,too-many-locals,too-many-statem
     atexit.register(exit_handler)
     register_signal_handler(dump_stacks_and_exit)
 
-    parser = optparse.OptionParser(usage="""
-%prog [options]
-
-MongoDB Powercycle test
-
-Examples:
-
-    Server is running as single node replica set connected to mFi mPower, outlet1:
-      python powertest.py
-            --sshUserHost 10.4.1.54
-            --rootDir pt-mmap
-            --replSet power
-            --crashMethod mpower
-            --crashOption output1
-            --sshCrashUserHost admin@10.4.100.2
-            --sshCrashOption "-oKexAlgorithms=+diffie-hellman-group1-sha1 -i /Users/jonathan/.ssh/mFi.pem"
-            --mongodOptions "--storageEngine wiredTiger"
-
-    Linux server running in AWS, testing nojournal:
-      python powertest.py
-            --sshUserHost ec2-user@52.4.173.196
-            --sshConnection "-i $HOME/.ssh/JAkey.pem"
-            --rootDir pt-nojournal
-            --mongodOptions "--nojournal"
-""")
-
-    test_options = optparse.OptionGroup(parser, "Test Options")
-    crash_options = optparse.OptionGroup(parser, "Crash Options")
-    mongodb_options = optparse.OptionGroup(parser, "MongoDB Options")
-    mongod_options = optparse.OptionGroup(parser, "mongod Options")
-    client_options = optparse.OptionGroup(parser, "Client Options")
-    program_options = optparse.OptionGroup(parser, "Program Options")
-
-    # Test options
-    test_options.add_option("--sshUserHost", dest="ssh_user_host",
-                            help="Server ssh user/host, i.e., user@host (REQUIRED)", default=None)
-
-    default_ssh_connection_options = ("-o ServerAliveCountMax=10"
-                                      " -o ServerAliveInterval=6"
-                                      " -o StrictHostKeyChecking=no"
-                                      " -o ConnectTimeout=30"
-                                      " -o ConnectionAttempts=20")
-    test_options.add_option(
-        "--sshConnection", dest="ssh_connection_options",
-        help="Server ssh additional connection options, i.e., '-i ident.pem'"
-        " which are added to '{}'".format(default_ssh_connection_options), default=None)
-
-    test_options.add_option("--testLoops", dest="num_loops",
-                            help="Number of powercycle loops to run [default: %default]",
-                            type="int", default=10)
-
-    test_options.add_option("--testTime", dest="test_time",
-                            help="Time to run test (in seconds), overrides --testLoops", type="int",
-                            default=0)
-
-    test_options.add_option("--rsync", dest="rsync_data",
-                            help="Rsync data directory between mongod stop and start",
-                            action="store_true", default=False)
-
-    test_options.add_option("--rsyncExcludeFiles", dest="rsync_exclude_files",
-                            help="Files excluded from rsync of the data directory", action="append",
-                            default=None)
-
-    test_options.add_option(
-        "--backupPathBefore", dest="backup_path_before",
-        help="Path where the db_path is backed up before crash recovery,"
-        " defaults to '<rootDir>/data-beforerecovery'", default=None)
-
-    test_options.add_option(
-        "--backupPathAfter", dest="backup_path_after",
-        help="Path where the db_path is backed up after crash recovery,"
-        " defaults to '<rootDir>/data-afterrecovery'", default=None)
-
-    validate_locations = ["local", "remote"]
-    test_options.add_option(
-        "--validate", dest="validate_collections",
-        help="Run validate on all collections after mongod restart after"
-        " a powercycle. Choose from {} to specify where the"
-        " validate runs.".format(validate_locations), choices=validate_locations, default=None)
-
-    canary_locations = ["local", "remote"]
-    test_options.add_option(
-        "--canary", dest="canary", help="Generate and validate canary document between powercycle"
-        " events. Choose from {} to specify where the canary is"
-        " generated from. If the 'crashMethod' is not 'internal"
-        " then this option must be 'local'.".format(canary_locations), choices=canary_locations,
-        default=None)
-
-    test_options.add_option("--docForCanary", dest="canary_doc", help=optparse.SUPPRESS_HELP,
-                            default="")
-
-    test_options.add_option(
-        "--seedDocNum", dest="seed_doc_num",
-        help="Number of documents to seed the default collection [default:"
-        " %default]", type="int", default=0)
-
-    test_options.add_option("--dbName", dest="db_name", help=optparse.SUPPRESS_HELP,
-                            default="power")
-
-    test_options.add_option("--collectionName", dest="collection_name", help=optparse.SUPPRESS_HELP,
-                            default="cycle")
-
-    test_options.add_option(
-        "--writeConcern", dest="write_concern", help="mongo (shell) CRUD client writeConcern, i.e.,"
-        " '{\"w\": \"majority\"}' [default: '%default']", default="{}")
-
-    test_options.add_option("--readConcernLevel", dest="read_concern_level",
-                            help="mongo (shell) CRUD client readConcernLevel, i.e.,"
-                            "'majority'", default=None)
-
-    # Crash options
-    crash_methods = ["aws_ec2", "internal", "kill", "mpower"]
-    crash_options.add_option(
-        "--crashMethod", dest="crash_method", choices=crash_methods,
-        help="Crash methods: {} [default: '%default']."
-        " Select 'aws_ec2' to force-stop/start an AWS instance."
-        " Select 'internal' to crash the remote server through an"
-        " internal command, i.e., sys boot (Linux) or notmyfault (Windows)."
-        " Select 'kill' to perform an unconditional kill of mongod,"
-        " which will keep the remote server running."
-        " Select 'mpower' to use the mFi mPower to cutoff power to"
-        " the remote server.".format(crash_methods), default="internal")
-
-    aws_address_types = [
-        "private_ip_address", "public_ip_address", "private_dns_name", "public_dns_name"
-    ]
-    crash_options.add_option(
-        "--crashOption", dest="crash_option",
-        help="Secondary argument for the following --crashMethod:"
-        " 'aws_ec2': specify EC2 'address_type', which is one of {} and"
-        " defaults to 'public_ip_address'."
-        " 'mpower': specify output<num> to turn"
-        " off/on, i.e., 'output1' (REQUIRED)."
-        " 'internal': for Windows, optionally specify a crash method,"
-        " i.e., 'notmyfault/notmyfaultc64.exe"
-        " -accepteula crash 1'".format(aws_address_types), default=None)
-
-    crash_options.add_option(
-        "--instanceId", dest="instance_id",
-        help="The instance ID of an AWS EC2 host. If specified, this instance"
-        " will be started after a crash, if it is not in a running state."
-        " This is required if --crashOption is 'aws_ec2'.", default=None)
-
-    crash_options.add_option(
-        "--crashWaitTime", dest="crash_wait_time",
-        help="Time, in seconds, to wait before issuing crash [default:"
-        " %default]", type="int", default=30)
-
-    crash_options.add_option(
-        "--jitterForCrashWaitTime", dest="crash_wait_time_jitter",
-        help="The maximum time, in seconds, to be added to --crashWaitTime,"
-        " as a uniform distributed random value, [default: %default]", type="int", default=10)
-
-    crash_options.add_option("--sshCrashUserHost", dest="ssh_crash_user_host",
-                             help="The crash host's user@host for performing the crash.",
-                             default=None)
-
-    crash_options.add_option("--sshCrashOption", dest="ssh_crash_option",
-                             help="The crash host's ssh connection options, i.e., '-i ident.pem'",
-                             default=None)
-
-    # MongoDB options
-    mongodb_options.add_option(
-        "--downloadUrl", dest="tarball_url",
-        help="URL of tarball to test, if unspecifed latest tarball will be"
-        " used", default="latest")
-
-    mongodb_options.add_option(
-        "--rootDir", dest="root_dir",
-        help="Root directory, on remote host, to install tarball and data"
-        " directory [default: 'mongodb-powertest-<epochSecs>']", default=None)
-
-    mongodb_options.add_option(
-        "--mongodbBinDir", dest="mongodb_bin_dir",
-        help="Directory, on remote host, containing mongoDB binaries,"
-        " overrides bin from tarball in --downloadUrl", default=None)
-
-    mongodb_options.add_option(
-        "--dbPath", dest="db_path", help="Data directory to use, on remote host, if unspecified"
-        " it will be '<rootDir>/data/db'", default=None)
-
-    mongodb_options.add_option(
-        "--logPath", dest="log_path", help="Log path, on remote host, if unspecified"
-        " it will be '<rootDir>/log/mongod.log'", default=None)
-
-    # mongod options
-    mongod_options.add_option(
-        "--replSet", dest="repl_set",
-        help="Name of mongod single node replica set, if unpsecified mongod"
-        " defaults to standalone node", default=None)
-
-    # The current host used to start and connect to mongod. Not meant to be specified
-    # by the user.
-    mongod_options.add_option("--mongodHost", dest="host", help=optparse.SUPPRESS_HELP,
-                              default=None)
-
-    # The current port used to start and connect to mongod. Not meant to be specified
-    # by the user.
-    mongod_options.add_option("--mongodPort", dest="port", help=optparse.SUPPRESS_HELP, type="int",
-                              default=None)
-
-    # The ports used on the 'server' side when in standard or secret mode.
-    mongod_options.add_option(
-        "--mongodUsablePorts", dest="usable_ports", nargs=2,
-        help="List of usable ports to be used by mongod for"
-        " standard and secret modes, [default: %default]", type="int", default=[27017, 37017])
-
-    mongod_options.add_option("--mongodOptions", dest="mongod_options",
-                              help="Additional mongod options", default="")
-
-    mongod_options.add_option("--fcv", dest="fcv_version",
-                              help="Set the FeatureCompatibilityVersion of mongod.", default=None)
-
-    mongod_options.add_option(
-        "--removeLockFile", dest="remove_lock_file",
-        help="If specified, the mongod.lock file will be deleted after a"
-        " powercycle event, before mongod is started.", action="store_true", default=False)
-
-    # Client options
-    mongo_path = distutils.spawn.find_executable("dist-test/bin/mongo",
-                                                 os.getcwd() + os.pathsep + os.environ["PATH"])
-    client_options.add_option(
-        "--mongoPath", dest="mongo_path",
-        help="Path to mongo (shell) executable, if unspecifed, mongo client"
-        " is launched from the current directory.", default=mongo_path)
-
-    client_options.add_option(
-        "--mongoRepoRootDir", dest="mongo_repo_root_dir",
-        help="Root directory of mongoDB repository, defaults to current"
-        " directory.", default=None)
-
-    client_options.add_option(
-        "--crudClient", dest="crud_client",
-        help="The path to the CRUD client script on the local host"
-        " [default: '%default'].", default="jstests/hooks/crud_client.js")
-
-    with_external_server = "buildscripts/resmokeconfig/suites/with_external_server.yml"
-    client_options.add_option(
-        "--configCrudClient", dest="config_crud_client",
-        help="The path to the CRUD client configuration YML file on the"
-        " local host. This is the resmoke.py suite file. If unspecified,"
-        " a default configuration YML file (%default) will be used that"
-        " provides a mongo (shell) DB connection to a running mongod.",
-        default=with_external_server)
-
-    client_options.add_option(
-        "--numCrudClients", dest="num_crud_clients",
-        help="The number of concurrent CRUD clients to run"
-        " [default: '%default'].", type="int", default=1)
-
-    client_options.add_option(
-        "--numFsmClients", dest="num_fsm_clients",
-        help="The number of concurrent FSM clients to run"
-        " [default: '%default'].", type="int", default=0)
-
-    client_options.add_option(
-        "--fsmWorkloadFiles", dest="fsm_workload_files",
-        help="A list of the FSM workload files to execute. More than one"
-        " file can be specified either in a comma-delimited string,"
-        " or by specifying this option more than once. If unspecified,"
-        " then all FSM workload files are executed.", action="append", default=[])
-
-    client_options.add_option(
-        "--fsmWorkloadBlacklistFiles", dest="fsm_workload_blacklist_files",
-        help="A list of the FSM workload files to blacklist. More than one"
-        " file can be specified either in a comma-delimited string,"
-        " or by specifying this option more than once. Note the"
-        " file name is the basename, i.e., 'distinct.js'.", action="append", default=[])
-
-    # Program options
-    program_options.add_option(
-        "--configFile", dest="config_file", help="YAML configuration file of program options."
-        " Option values are mapped to command line option names."
-        " The command line option overrides any specified options"
-        " from this file.", default=None)
-
-    program_options.add_option(
-        "--saveConfigOptions", dest="save_config_options",
-        help="Save the program options to a YAML configuration file."
-        " If this options is specified the program only saves"
-        " the configuration file and exits.", default=None)
-
-    program_options.add_option(
-        "--reportJsonFile", dest="report_json_file",
-        help="Create or update the specified report file upon program"
-        " exit.", default=None)
-
-    program_options.add_option(
-        "--exitYamlFile", dest="exit_yml_file",
-        help="If specified, create a YAML file on exit containing"
-        " exit code.", default=None)
-
-    program_options.add_option(
-        "--remotePython", dest="remote_python",
-        help="The python intepreter to use on the remote host"
-        " [default: '%default']."
-        " To be able to use a python virtual environment,"
-        " which has already been provisioned on the remote"
-        " host, specify something similar to this:"
-        " 'source venv/bin/activate;  python'", default="python")
-
-    program_options.add_option(
-        "--remoteSudo", dest="remote_sudo",
-        help="Use sudo on the remote host for priveleged operations."
-        " [default: %default]."
-        " For non-Windows systems, in order to perform privileged"
-        " operations on the remote host, specify this, if the"
-        " remote user is not able to perform root operations.", action="store_true", default=False)
-
-    log_levels = ["debug", "info", "warning", "error"]
-    program_options.add_option(
-        "--logLevel", dest="log_level", choices=log_levels,
-        help="The log level. Accepted values are: {}."
-        " [default: '%default'].".format(log_levels), default="info")
-
-    program_options.add_option("--logFile", dest="log_file",
-                               help="The destination file for the log output. Defaults to stdout.",
-                               default=None)
-
-    program_options.add_option("--version", dest="version", help="Display this program's version",
-                               action="store_true", default=False)
-
-    # Remote options, include commands and options sent from client to server under test.
-    # These are 'internal' options, not meant to be directly specifed.
-    # More than one remote operation can be provided and they are specified in the program args.
-    program_options.add_option("--remoteOperation", dest="remote_operation",
-                               help=optparse.SUPPRESS_HELP, action="store_true", default=False)
-
-    program_options.add_option("--rsyncDest", dest="rsync_dest", nargs=2,
-                               help=optparse.SUPPRESS_HELP, default=None)
-
-    parser.add_option_group(test_options)
-    parser.add_option_group(crash_options)
-    parser.add_option_group(client_options)
-    parser.add_option_group(mongodb_options)
-    parser.add_option_group(mongod_options)
-    parser.add_option_group(program_options)
-
-    options, args = parser.parse_args()
-
     logging.basicConfig(format="%(asctime)s %(levelname)s %(message)s", level=logging.ERROR,
                         filename=options.log_file)
     logging.getLogger(__name__).setLevel(options.log_level.upper())
     logging.Formatter.converter = time.gmtime
 
-    LOGGER.info("powertest.py invocation: %s", " ".join(sys.argv))
+    LOGGER.info("powertest invocation: %s", " ".join(sys.argv))
 
+    options_dict = vars(options)
     # Command line options override the config file options.
-    config_options = None
     if options.config_file:
         with open(options.config_file) as ystream:
             config_options = yaml.safe_load(ystream)
         LOGGER.info("Loading config file %s with options %s", options.config_file, config_options)
         # Load the options specified in the config_file
-        parser.set_defaults(**config_options)
-        options, args = parser.parse_args()
+        for key, value in config_options.items():
+            options_dict[key] = value
         # Disable this option such that the remote side does not load a config_file.
-        options.config_file = None
-        config_options["config_file"] = None
+        options_dict["config_file"] = None
 
     if options.save_config_options:
         # Disable this option such that the remote side does not save the config options.
         save_config_options = options.save_config_options
-        options.save_config_options = None
+        options_dict["save_config_options"] = None
         save_options = {}
-        for opt_group in parser.option_groups:
-            for opt in opt_group.option_list:
-                if getattr(options, opt.dest, None) != opt.default:
-                    save_options[opt.dest] = getattr(options, opt.dest, None)
+        for action in parser_actions:
+            option_value = options_dict.get(action.dest, None)
+            if option_value != action.default:
+                save_options[action.dest] = option_value
         LOGGER.info("Config options being saved %s", save_options)
         with open(save_config_options, "w") as ystream:
             yaml.safe_dump(save_options, ystream, default_flow_style=False)
         sys.exit(0)
 
-    script_name = os.path.basename(__file__)
+    # Temporary hardcode this value here
+    # TODO: It should be something like f"{remote_dir}{path_to_resmoke}"
+    # 'remote_dir' is stored in etc/evergreen.yml, but not passing to this script
+    # Most likely it should be removed from etc/evergreen.yml
+    # and hardcoded somewhere in python or another yaml file
+    script_name = "/log/powercycle/buildscripts/resmoke.py"
     # Print script name and version.
     if options.version:
         print("{}:{}".format(script_name, __version__))
@@ -2145,7 +1797,7 @@ Examples:
     if options.exit_yml_file:
         EXIT_YML_FILE = options.exit_yml_file
         # Disable this option such that the remote side does not generate exit_yml_file
-        options.exit_yml_file = None
+        options_dict["exit_yml_file"] = None
 
     if options.report_json_file:
         REPORT_JSON_FILE = options.report_json_file
@@ -2162,7 +1814,7 @@ Examples:
             }
         LOGGER.debug("Updating/creating report JSON %s", REPORT_JSON)
         # Disable this option such that the remote side does not generate report.json
-        options.report_json_file = None
+        options_dict["report_json_file"] = None
 
     # Setup the crash options
     if options.crash_method == "mpower" and options.crash_option is None:
@@ -2176,30 +1828,30 @@ Examples:
         address_type = "public_ip_address"
         if options.crash_option:
             address_type = options.crash_option
-        if address_type not in aws_address_types:
+        if address_type not in AWS_ADDRESS_TYPES:
             parser.error("Invalid crashOption address_type '{}' specified for crashMethod"
-                         " 'aws_ec2', specify one of {}".format(address_type, aws_address_types))
+                         " 'aws_ec2', specify one of {}".format(address_type, AWS_ADDRESS_TYPES))
 
     # Initialize the mongod options
     # Note - We use posixpath for Windows client to Linux server scenarios.
     if not options.root_dir:
-        options.root_dir = "mongodb-powertest-{}".format(int(time.time()))
+        options_dict["root_dir"] = "mongodb-powertest-{}".format(int(time.time()))
     if not options.db_path:
-        options.db_path = posixpath.join(options.root_dir, "data", "db")
+        options_dict["db_path"] = posixpath.join(options.root_dir, "data", "db")
     if not options.log_path:
-        options.log_path = posixpath.join(options.root_dir, "log", "mongod.log")
+        options_dict["log_path"] = posixpath.join(options.root_dir, "log", "mongod.log")
     mongod_options_map = parse_options(options.mongod_options)
     set_fcv_cmd = "set_fcv" if options.fcv_version is not None else ""
     remove_lock_file_cmd = "remove_lock_file" if options.remove_lock_file else ""
 
     # Error out earlier if these options are not properly specified
     write_concern = yaml.safe_load(options.write_concern)
-    options.canary_doc = yaml.safe_load(options.canary_doc)
+    options_dict["canary_doc"] = yaml.safe_load(options.canary_doc)
 
     # Invoke remote_handler if remote_operation is specified.
     # The remote commands are program args.
     if options.remote_operation:
-        ret = remote_handler(options, args)
+        ret = remote_handler(options, options.remote_operations)
         # Exit here since the local operations are performed after this.
         local_exit(ret)
 
@@ -2312,7 +1964,7 @@ Examples:
     # user-specified --sshConnection options.
     ssh_connection_options = "{} {}".format(
         options.ssh_connection_options if options.ssh_connection_options else "",
-        default_ssh_connection_options)
+        DEFAULT_SSH_CONNECTION_OPTIONS)
     # For remote operations requiring sudo, force pseudo-tty allocation,
     # see https://stackoverflow.com/questions/10310299/proper-way-to-sudo-over-ssh.
     # Note - the ssh option RequestTTY was added in OpenSSH 5.9, so we use '-tt'.
@@ -2320,7 +1972,7 @@ Examples:
 
     # Establish EC2 connection if an instance_id is specified.
     if options.instance_id:
-        ec2 = aws_ec2.AwsEc2()  # pylint: disable=undefined-variable
+        ec2 = aws_ec2.AwsEc2()
         # Determine address_type if not using 'aws_ec2' crash_method.
         if options.crash_method != "aws_ec2":
             address_type = "public_ip_address"
@@ -2337,32 +1989,25 @@ Examples:
                                         ssh_options=ssh_options, use_shell=True)
     verify_remote_access(local_ops)
 
-    # Bootstrap the remote host with this script.
-    ret, output = local_ops.copy_to(__file__)
-    if ret:
-        LOGGER.error("Cannot access remote system %s", output)
-        local_exit(1)
-
     # Pass client_args to the remote script invocation.
-    client_args = ""
-    for option in parser._get_all_options():  # pylint: disable=protected-access
-        if option.dest:
-            option_value = getattr(options, option.dest, None)
-            if option_value != option.default:
-                # The boolean options do not require the option_value.
-                if isinstance(option_value, bool):
-                    option_value = ""
-                # Quote the non-default option values from the invocation of this script,
-                # if they have spaces, or quotes, such that they can be safely passed to the
-                # remote host's invocation of this script.
-                elif isinstance(option_value, str) and re.search("\"|'| ", option_value):
-                    option_value = "'{}'".format(option_value)
-                # The tuple, list or set options need to be changed to a string.
-                elif isinstance(option_value, (tuple, list, set)):
-                    option_value = " ".join(map(str, option_value))
-                client_args = "{} {} {}".format(client_args, option.get_opt_string(), option_value)
+    client_args = "powertest"
+    for action in parser_actions:
+        option_value = options_dict.get(action.dest, None)
+        if option_value != action.default:
+            # The boolean options do not require the option_value.
+            if isinstance(option_value, bool):
+                option_value = ""
+            # Quote the non-default option values from the invocation of this script,
+            # if they have spaces, or quotes, such that they can be safely passed to the
+            # remote host's invocation of this script.
+            elif isinstance(option_value, str) and re.search("\"|'| ", option_value):
+                option_value = "'{}'".format(option_value)
+            # The tuple, list or set options need to be changed to a string.
+            elif isinstance(option_value, (tuple, list, set)):
+                option_value = " ".join(map(str, option_value))
+            client_args = "{} {} {}".format(client_args, action.option_strings[-1], option_value)
 
-    LOGGER.info("%s %s", __file__, client_args)
+    LOGGER.info("%s %s", script_name, client_args)
 
     # Remote install of MongoDB.
     ret, output = call_remote_operation(local_ops, options.remote_python, script_name, client_args,
@@ -2373,9 +2018,9 @@ Examples:
 
     # test_time option overrides num_loops.
     if options.test_time:
-        options.num_loops = 999999
+        options_dict["num_loops"] = 999999
     else:
-        options.test_time = 999999
+        options_dict["test_time"] = 999999
     loop_num = 0
     start_time = int(time.time())
     test_time = 0
@@ -2621,7 +2266,3 @@ Examples:
 
     REPORT_JSON_SUCCESS = True
     local_exit(0)
-
-
-if __name__ == "__main__":
-    main()
