@@ -7,6 +7,8 @@
 load("jstests/core/timeseries/libs/timeseries.js");
 
 const coll = db.getCollection(jsTestName());
+coll.drop();
+
 Random.setRandomSeed();
 
 const numHosts = 10;
