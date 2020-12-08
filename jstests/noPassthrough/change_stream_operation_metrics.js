@@ -9,7 +9,7 @@
 (function() {
 'use strict';
 
-var rst = new ReplSetTest({
+const rst = new ReplSetTest({
     nodes: 2,
     nodeOptions: {
         setParameter: {
@@ -141,6 +141,7 @@ let nextId = nDocs;
         if (cur.hasNext()) {
             return true;
         }
+        print("Change stream returned no data. Clearing metrics and retrying.");
         clearMetrics(primary);
         return false;
     });
