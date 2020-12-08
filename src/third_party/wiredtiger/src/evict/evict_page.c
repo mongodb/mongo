@@ -504,6 +504,7 @@ __evict_child_check(WT_SESSION_IMPL *session, WT_REF *parent)
 static int
 __evict_review(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_flags, bool *inmem_splitp)
 {
+    WT_BTREE *btree;
     WT_CACHE *cache;
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
@@ -514,6 +515,7 @@ __evict_review(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_flags, bool
 
     *inmem_splitp = false;
 
+    btree = S2BT(session);
     conn = S2C(session);
     page = ref->page;
     flags = WT_REC_EVICT;
@@ -622,13 +624,13 @@ __evict_review(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_flags, bool
 
     if (closing)
         LF_SET(WT_REC_VISIBILITY_ERR);
-    else if (F_ISSET(ref, WT_REF_FLAG_INTERNAL) || WT_IS_HS(S2BT(session)))
+    else if (F_ISSET(ref, WT_REF_FLAG_INTERNAL) || WT_IS_HS(btree))
         ;
-    else if (WT_SESSION_BTREE_SYNC(session))
+    else if (WT_SESSION_BTREE_SYNC(session) && !WT_IS_METADATA(btree->dhandle))
         LF_SET(WT_REC_HS);
     else if (F_ISSET(conn, WT_CONN_IN_MEMORY))
         LF_SET(WT_REC_IN_MEMORY | WT_REC_SCRUB);
-    else {
+    else if (!WT_IS_METADATA(btree->dhandle)) {
         LF_SET(WT_REC_HS);
 
         /*
@@ -662,7 +664,7 @@ __evict_review(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_flags, bool
     /* Make sure that both conditions above are not true at the same time. */
     WT_ASSERT(session, !use_snapshot_for_app_thread || !is_eviction_thread);
 
-    if (!conn->txn_global.checkpoint_running && !WT_IS_HS(S2BT(session)) &&
+    if (!conn->txn_global.checkpoint_running && !WT_IS_HS(btree) &&
       (use_snapshot_for_app_thread || is_eviction_thread)) {
         if (is_eviction_thread) {
             /*
@@ -725,7 +727,9 @@ __evict_review(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_flags, bool
     /*
      * Success: assert that the page is clean or reconciliation was configured to save updates.
      */
-    WT_ASSERT(session, !__wt_page_is_modified(page) || LF_ISSET(WT_REC_HS | WT_REC_IN_MEMORY));
+    WT_ASSERT(session,
+      !__wt_page_is_modified(page) || LF_ISSET(WT_REC_HS | WT_REC_IN_MEMORY) ||
+        WT_IS_METADATA(btree->dhandle));
 
     return (0);
 }

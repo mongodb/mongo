@@ -451,8 +451,8 @@ __wt_txn_oldest_id(WT_SESSION_IMPL *session)
      * Take a local copy of these IDs in case they are updated while we are checking visibility.
      */
     oldest_id = txn_global->oldest_id;
-    include_checkpoint_txn = btree == NULL ||
-      (!WT_IS_HS(btree) && btree->checkpoint_gen != __wt_gen(session, WT_GEN_CHECKPOINT));
+    include_checkpoint_txn =
+      btree == NULL || (btree->checkpoint_gen != __wt_gen(session, WT_GEN_CHECKPOINT));
     if (!include_checkpoint_txn)
         return (oldest_id);
 
@@ -993,8 +993,8 @@ retry:
 
     /* If there's no visible update in the update chain or ondisk, check the history store file. */
     if (F_ISSET(S2C(session), WT_CONN_HS_OPEN) && !F_ISSET(S2BT(session), WT_BTREE_HS))
-        WT_RET_NOTFOUND_OK(__wt_hs_find_upd(session, key, cbt->iface.value_format, recno,
-          cbt->upd_value, false, &cbt->upd_value->buf, &tw));
+        WT_RET(__wt_hs_find_upd(session, key, cbt->iface.value_format, recno, cbt->upd_value, false,
+          &cbt->upd_value->buf, &tw));
 
     /*
      * Retry if we race with prepared commit or rollback. If we race with prepared rollback, the

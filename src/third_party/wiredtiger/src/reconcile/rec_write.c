@@ -29,13 +29,16 @@ static int __reconcile(WT_SESSION_IMPL *, WT_REF *, WT_SALVAGE_COOKIE *, uint32_
 int
 __wt_reconcile(WT_SESSION_IMPL *session, WT_REF *ref, WT_SALVAGE_COOKIE *salvage, uint32_t flags)
 {
+    WT_BTREE *btree;
     WT_DECL_RET;
     WT_PAGE *page;
     uint64_t start, now;
     bool no_reconcile_set, page_locked;
 
-    __wt_seconds(session, &start);
+    btree = S2BT(session);
     page = ref->page;
+
+    __wt_seconds(session, &start);
 
     __wt_verbose(session, WT_VERB_RECONCILE, "%p reconcile %s (%s%s)", (void *)ref,
       __wt_page_type_string(page->type), LF_ISSET(WT_REC_EVICT) ? "evict" : "checkpoint",
@@ -51,6 +54,12 @@ __wt_reconcile(WT_SESSION_IMPL *session, WT_REF *ref, WT_SALVAGE_COOKIE *salvage
     WT_ASSERT(session,
       !LF_ISSET(WT_REC_EVICT) || LF_ISSET(WT_REC_VISIBLE_ALL) ||
         F_ISSET(session->txn, WT_TXN_HAS_SNAPSHOT));
+
+    /* Can't do history store eviction for history store itself or for metadata. */
+    WT_ASSERT(
+      session, !LF_ISSET(WT_REC_HS) || (!WT_IS_HS(btree) && !WT_IS_METADATA(btree->dhandle)));
+    /* Flag as unused for non diagnostic builds. */
+    WT_UNUSED(btree);
 
     /* It's an error to be called with a clean page. */
     WT_ASSERT(session, __wt_page_is_modified(page));
@@ -316,12 +325,13 @@ __rec_write_page_status(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 
         /*
          * Eviction should only be here if allowing writes to history store or in the in-memory
-         * eviction case. Otherwise, we must be reconciling a fixed length column store page (which
-         * does not allow history store content).
+         * eviction case. Otherwise, we must be reconciling a fixed length column store page or the
+         * metadata (which does not allow history store content).
          */
         WT_ASSERT(session,
           !F_ISSET(r, WT_REC_EVICT) ||
-            (F_ISSET(r, WT_REC_HS | WT_REC_IN_MEMORY) || page->type == WT_PAGE_COL_FIX));
+            (F_ISSET(r, WT_REC_HS | WT_REC_IN_MEMORY) || page->type == WT_PAGE_COL_FIX ||
+              WT_IS_METADATA(btree->dhandle)));
     } else {
         /*
          * Track the page's maximum transaction ID (used to decide if we can evict a clean page and
@@ -2265,9 +2275,20 @@ __rec_write_wrapup_err(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 static int
 __rec_hs_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 {
+    WT_BTREE *btree;
     WT_DECL_RET;
     WT_MULTI *multi;
     uint32_t i;
+
+    btree = S2BT(session);
+
+    /*
+     * Sanity check: Can't insert updates into history store from the history store itself or from
+     * the metadata file.
+     */
+    WT_ASSERT(session, !WT_IS_HS(btree) && !WT_IS_METADATA(btree->dhandle));
+    /* Flag as unused for non diagnostic builds. */
+    WT_UNUSED(btree);
 
     /* Check if there's work to do. */
     for (multi = r->multi, i = 0; i < r->multi_next; ++multi, ++i)
