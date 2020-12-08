@@ -49,7 +49,6 @@ const getDBMetrics = (adminDB) => {
 };
 
 const setParams = {
-    "measureOperationResourceConsumption": true,
     "aggregateOperationResourceConsumptionMetrics": true,
 };
 

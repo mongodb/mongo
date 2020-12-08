@@ -94,21 +94,15 @@ public:
 }  // namespace
 
 bool ResourceConsumption::isMetricsCollectionEnabled() {
-    return gMeasureOperationResourceConsumption.isEnabledAndIgnoreFCV();
+    return isMetricsProfilingEnabled() || isMetricsAggregationEnabled();
+}
+
+bool ResourceConsumption::isMetricsProfilingEnabled() {
+    return gProfileOperationResourceConsumptionMetrics;
 }
 
 bool ResourceConsumption::isMetricsAggregationEnabled() {
     return gAggregateOperationResourceConsumptionMetrics;
-}
-
-ResourceConsumption::ResourceConsumption() {
-    if (gAggregateOperationResourceConsumptionMetrics &&
-        !gMeasureOperationResourceConsumption.isEnabledAndIgnoreFCV()) {
-        LOGV2_FATAL_NOTRACE(
-            5091600,
-            "measureOperationResourceConsumption feature flag must be enabled to use "
-            "aggregateOperationResourceConsumptionMetrics");
-    }
 }
 
 ResourceConsumption::MetricsCollector& ResourceConsumption::MetricsCollector::get(

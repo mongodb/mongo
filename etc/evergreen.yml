@@ -6519,6 +6519,7 @@ tasks:
 
 - <<: *task_template
   name: concurrency_metrics
+  tags: ["concurrency"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -6528,6 +6529,7 @@ tasks:
 
 - <<: *task_template
   name: concurrency_replication_metrics
+  tags: ["concurrency", "repl"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -11039,46 +11041,6 @@ buildvariants:
   - name: noPassthrough_gen
   - name: noPassthroughWithMongod_gen
   - name: .replica_sets
-    distros:
-    - rhel62-medium
-
-- name: enterprise-rhel-62-64-bit-operation-resource-consumption-metrics
-  display_name: "Enterprise RHEL 6.2 Shared Library (Operation Resource Consumption Metrics)"
-  modules:
-  - enterprise
-  run_on:
-  - rhel62-small
-  batchtime: 10080 # 7 days
-  expansions:
-    test_flags: >-
-      --mongodSetParameters="{measureOperationResourceConsumption: true}"
-    compile_flags: >-
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --ssl
-      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-      MONGO_DISTMOD=rhel62
-      --link-model=dynamic
-    multiversion_platform: rhel62
-    multiversion_edition: enterprise
-    repo_edition: enterprise
-    scons_cache_scope: shared
-    build_mongoreplay: false
-    large_distro_name: rhel62-medium
-  tasks:
-  - name: compile_all_run_unittests_TG
-    distros:
-    - rhel62-large
-  - name: concurrency_metrics
-  - name: concurrency_replication_metrics
-    distros:
-      - rhel62-large
-  - name: jsCore
-  - name: noPassthrough_gen
-  - name: noPassthroughWithMongod_gen
-  - name: .replica_sets .common
-  - name: .concurrency .common !.large
-  - name: .concurrency .common .large
-  - name: sharding_jscore_passthrough
     distros:
     - rhel62-medium
 

@@ -1408,7 +1408,7 @@ const testOperation = (db, operation) => {
 };
 
 const setParams = {
-    measureOperationResourceConsumption: true
+    profileOperationResourceConsumptionMetrics: true
 };
 
 const runTest = (db) => {

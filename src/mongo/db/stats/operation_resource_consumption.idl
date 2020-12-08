@@ -29,19 +29,20 @@
 global:
   cpp_namespace: "mongo"
 
-feature_flags:
-  measureOperationResourceConsumption:
-    description: "When enabled, records and reports per-operation resource consumption"
-    cpp_varname: gMeasureOperationResourceConsumption
-    default: false
-
 server_parameters:
   aggregateOperationResourceConsumptionMetrics:
-    description: "When true, globally aggregates per-operation resource consumption metrics.
-                  Requires measureOperationResourceConsumption to also be set"
+    description: "When true, globally aggregates per-operation resource consumption metrics."
     set_at:
       - startup
     cpp_varname: gAggregateOperationResourceConsumptionMetrics
+    cpp_vartype: bool
+    default: false
+
+  profileOperationResourceConsumptionMetrics:
+    description: "When true, records and profiles per-operation resource consumption metrics"
+    set_at:
+      - startup
+    cpp_varname: gProfileOperationResourceConsumptionMetrics
     cpp_vartype: bool
     default: false
 

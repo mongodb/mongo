@@ -10,12 +10,7 @@
 
 var rst = new ReplSetTest({
     nodes: 2,
-    nodeOptions: {
-        setParameter: {
-            "measureOperationResourceConsumption": true,
-            "aggregateOperationResourceConsumptionMetrics": true
-        }
-    }
+    nodeOptions: {setParameter: {"aggregateOperationResourceConsumptionMetrics": true}}
 });
 rst.startSet();
 rst.initiate();

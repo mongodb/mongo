@@ -16,7 +16,6 @@ var rst = new ReplSetTest({
     nodes: 2,
     nodeOptions: {
         setParameter: {
-            "measureOperationResourceConsumption": true,
             "aggregateOperationResourceConsumptionMetrics": true,
             "ttlMonitorSleepSecs": 1,
         }

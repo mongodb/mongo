@@ -45,7 +45,7 @@ namespace mongo {
  */
 class ResourceConsumption {
 public:
-    ResourceConsumption();
+    ResourceConsumption() = default;
 
     static ResourceConsumption& get(OperationContext* opCtx);
     static ResourceConsumption& get(ServiceContext* svcCtx);
@@ -422,6 +422,11 @@ public:
      * Returns true if resource consumption metrics should be collected per-operation.
      */
     static bool isMetricsCollectionEnabled();
+
+    /**
+     * Returns true if operations should profile resource consumption metrics.
+     */
+    static bool isMetricsProfilingEnabled();
 
     /**
      * Returns true if resource consumption metrics should be aggregated globally.
