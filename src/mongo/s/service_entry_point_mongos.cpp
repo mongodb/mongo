@@ -133,15 +133,7 @@ struct HandleRequest::OpRunnerBase {
 struct CommandOpRunner final : public HandleRequest::OpRunnerBase {
     using HandleRequest::OpRunnerBase::OpRunnerBase;
     Future<DbResponse> run() override {
-        return Strategy::clientCommand(hr->rec).tap([hr = hr](const DbResponse&) {
-            // The hello/isMaster commands should take kMaxAwaitTimeMs at most, log if it takes
-            // twice that.
-            if (auto command = CurOp::get(hr->rec->getOpCtx())->getCommand();
-                command && (command->getName() == "hello" || command->getName() == "isMaster")) {
-                hr->slowMsOverride =
-                    2 * durationCount<Milliseconds>(SingleServerDiscoveryMonitor::kMaxAwaitTime);
-            }
-        });
+        return Strategy::clientCommand(hr->rec);
     }
 };
 

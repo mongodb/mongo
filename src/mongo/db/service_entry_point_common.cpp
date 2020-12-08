@@ -628,12 +628,6 @@ private:
                         ->setInExhaust(false, request.getCommandName());
                 }
             }
-
-            // Hello should take kMaxAwaitTimeMs at most, log if it takes twice that.
-            if (isHello()) {
-                _execContext->slowMsOverride =
-                    2 * durationCount<Milliseconds>(SingleServerDiscoveryMonitor::kMaxAwaitTime);
-            }
         });
         pf.promise.emplaceValue();
         return future;

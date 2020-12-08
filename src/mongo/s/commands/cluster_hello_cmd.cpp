@@ -35,6 +35,7 @@
 #include "mongo/db/auth/sasl_mechanism_registry.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops.h"
@@ -107,8 +108,10 @@ public:
         // present if and only if topologyVersion is present in the request.
         auto topologyVersionElement = cmdObj["topologyVersion"];
         auto maxAwaitTimeMSField = cmdObj["maxAwaitTimeMS"];
+        auto curOp = CurOp::get(opCtx);
         boost::optional<TopologyVersion> clientTopologyVersion;
         boost::optional<Date_t> deadline;
+        boost::optional<ScopeGuard<std::function<void()>>> timerGuard;
         if (topologyVersionElement && maxAwaitTimeMSField) {
             clientTopologyVersion = TopologyVersion::parse(IDLParserErrorContext("TopologyVersion"),
                                                            topologyVersionElement.Obj());
@@ -125,9 +128,8 @@ public:
                 Milliseconds(maxAwaitTimeMS);
 
             LOGV2_DEBUG(23871, 3, "Using maxAwaitTimeMS for awaitable hello protocol.");
-
-            // Awaitable hello commands have high latency by design. Ignore them.
-            opCtx->setShouldIncrementLatencyStats(false);
+            curOp->pauseTimer();
+            timerGuard.emplace([curOp]() { curOp->resumeTimer(); });
         } else {
             uassert(51760,
                     (topologyVersionElement
@@ -142,6 +144,7 @@ public:
         auto mongosHelloResponse =
             mongosTopCoord->awaitHelloResponse(opCtx, clientTopologyVersion, deadline);
 
+        timerGuard.reset();  // Resume curOp timer.
         mongosHelloResponse->appendToBuilder(&result, useLegacyResponseFields());
         // The hello response always includes a topologyVersion.
         auto currentMongosTopologyVersion = mongosHelloResponse->getTopologyVersion();
