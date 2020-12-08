@@ -1205,6 +1205,55 @@ const operations = [
             assert.eq(profileDoc.docUnitsReturned, 10);
         },
     },
+    resetProfileColl,
+    {
+        name: '$out',
+        command: (db) => {
+            db[collName].aggregate([{$out: {db: db.getName(), coll: 'outColl'}}]);
+        },
+        profileFilter: {'command.aggregate': collName},
+        profileAssert: (db, profileDoc) => {
+            // Creating a new collection writes to the durable catalog
+            assert.gte(profileDoc.docBytesRead, 29 * 100);
+            assert.gte(profileDoc.docUnitsRead, 100);
+            assert.eq(profileDoc.idxEntryBytesRead, 0);
+            assert.eq(profileDoc.idxEntryUnitsRead, 0);
+            assert.gte(profileDoc.cursorSeeks, 0);
+            assert.gte(profileDoc.docBytesWritten, 29 * 100);
+            assert.gte(profileDoc.docUnitsWritten, 100);
+            // The key size varies from 2 to 3 bytes.
+            assert.gte(profileDoc.idxEntryBytesWritten, 2 * 100);
+            assert.eq(profileDoc.idxEntryUnitsWritten, 100);
+            assert.eq(profileDoc.keysSorted, 0);
+            assert.eq(profileDoc.sorterSpills, 0);
+            assert.eq(profileDoc.docUnitsReturned, 0);
+        },
+    },
+    resetProfileColl,
+    {
+        name: '$merge',
+        command: (db) => {
+            db['outColl'].drop();
+            db[collName].aggregate([{$merge: {into: 'outColl'}}]);
+        },
+        profileFilter: {'command.aggregate': collName},
+        profileAssert: (db, profileDoc) => {
+            // Creating a new collection writes to the durable catalog
+            assert.gte(profileDoc.docBytesRead, 29 * 100);
+            assert.gte(profileDoc.docUnitsRead, 100);
+            assert.eq(profileDoc.idxEntryBytesRead, 0);
+            assert.eq(profileDoc.idxEntryUnitsRead, 0);
+            assert.gte(profileDoc.cursorSeeks, 0);
+            assert.gte(profileDoc.docBytesWritten, 29 * 100);
+            assert.gte(profileDoc.docUnitsWritten, 100);
+            // The key size varies from 2 to 3 bytes.
+            assert.gte(profileDoc.idxEntryBytesWritten, 2 * 100);
+            assert.eq(profileDoc.idxEntryUnitsWritten, 100);
+            assert.eq(profileDoc.keysSorted, 0);
+            assert.eq(profileDoc.sorterSpills, 0);
+            assert.eq(profileDoc.docUnitsReturned, 0);
+        },
+    },
     {
         name: 'cappedInitialSetup',
         command: (db) => {
