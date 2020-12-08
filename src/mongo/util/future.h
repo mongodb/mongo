@@ -680,6 +680,14 @@ public:
                 .template onErrorCategory<category>(wrapCB<Status>(std::forward<Func>(func))));
     }
 
+    /**
+     * Returns an inline Future type from this ExecutorFuture.
+     *
+     * WARNING: Do not use this unless you're extremely sure of what you're doing, as callbacks
+     * chained to the resulting Future may run in unexpected places.
+     */
+    using SemiFuture<T>::unsafeToInlineFuture;
+
 private:
     // This *must* take exec by ref to ensure it isn't moved from while evaluating wrapCB above.
     ExecutorFuture(ExecutorPtr&& exec, Impl&& impl) : SemiFuture<T>(std::move(impl)), _exec(exec) {
@@ -708,8 +716,6 @@ private:
 
     template <typename Sig>
     MONGO_COMPILER_NOINLINE auto wrapCBHelper(unique_function<Sig>&& func);
-
-    using SemiFuture<T>::unsafeToInlineFuture;
 
     template <typename>
     friend class ExecutorFuture;

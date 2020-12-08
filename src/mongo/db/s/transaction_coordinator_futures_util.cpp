@@ -226,7 +226,7 @@ Future<AsyncWorkScheduler::HostAndShard> AsyncWorkScheduler::_targetHostAsync(
     const ShardId& shardId,
     const ReadPreferenceSetting& readPref,
     OperationContextFn operationContextFn) {
-    return scheduleWork([shardId, readPref, operationContextFn](OperationContext* opCtx) {
+    return scheduleWork([this, shardId, readPref, operationContextFn](OperationContext* opCtx) {
         operationContextFn(opCtx);
         const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
         const auto shard = uassertStatusOK(shardRegistry->getShard(opCtx, shardId));
@@ -236,10 +236,13 @@ Future<AsyncWorkScheduler::HostAndShard> AsyncWorkScheduler::_targetHostAsync(
             hangWhileTargetingRemoteHost.pauseWhileSet(opCtx);
         }
 
-        // TODO (SERVER-51247): Return a SemiFuture<HostAndShard> rather than using a blocking call
-        return HostAndShard{
-            shard->getTargeter()->findHostWithMaxWait(readPref, Seconds(20)).get(opCtx),
-            std::move(shard)};
+        return shard->getTargeter()
+            ->findHostWithMaxWait(readPref, Seconds(20))
+            .thenRunOn(_executor)
+            .unsafeToInlineFuture()
+            .then([shard = std::move(shard)](HostAndPort host) -> HostAndShard {
+                return {std::move(host), std::move(shard)};
+            });
     });
 }
 
