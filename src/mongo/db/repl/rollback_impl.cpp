@@ -977,7 +977,6 @@ Status RollbackImpl::_processRollbackOpForApplyOps(OperationContext* opCtx,
                 return subStatus;
             }
         }
-        return Status::OK();
     } catch (DBException& e) {
         return e.toStatus();
     }
