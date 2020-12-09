@@ -742,14 +742,4 @@ bool ProcessInfo::blockCheckSupported() {
     return true;
 }
 
-bool ProcessInfo::blockInMemory(const void* start) {
-    unsigned char x = 0;
-    if (mincore(const_cast<void*>(alignToStartOfPage(start)), getPageSize(), &x)) {
-        auto e = errno;
-        LOGV2(23341, "mincore failed", "error"_attr = errnoWithDescription(e));
-        return 1;
-    }
-    return x & 0x1;
-}
-
 }  // namespace mongo

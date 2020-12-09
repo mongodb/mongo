@@ -164,8 +164,6 @@ public:
 
     static bool blockCheckSupported();
 
-    static bool blockInMemory(const void* start);
-
     /**
      * @return a pointer aligned to the start of the page the provided pointer belongs to.
      *

@@ -194,17 +194,6 @@ bool ProcessInfo::blockCheckSupported() {
     return true;
 }
 
-bool ProcessInfo::blockInMemory(const void* start) {
-    char x = 0;
-    if (mincore((void*)alignToStartOfPage(start), getPageSize(), &x)) {
-        LOGV2(23349,
-              "mincore failed: {errnoWithDescription}",
-              "errnoWithDescription"_attr = errnoWithDescription());
-        return 1;
-    }
-    return x & 0x1;
-}
-
 // get the number of CPUs available to the scheduler
 boost::optional<unsigned long> ProcessInfo::getNumCoresForProcess() {
     long nprocs = sysconf(_SC_NPROCESSORS_ONLN);

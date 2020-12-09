@@ -342,32 +342,4 @@ bool ProcessInfo::blockCheckSupported() {
     return true;
 }
 
-bool ProcessInfo::blockInMemory(const void* start) {
-#if 0
-        // code for printing out page fault addresses and pc's --
-        // this could be useful for targetting heavy pagefault locations in the code
-        static BOOL bstat = InitializeProcessForWsWatch( GetCurrentProcess() );
-        PSAPI_WS_WATCH_INFORMATION_EX wiex[30];
-        DWORD bufsize =  sizeof(wiex);
-        bstat = GetWsChangesEx( GetCurrentProcess(), &wiex[0], &bufsize );
-        if (bstat) {
-            for (int i=0; i<30; i++) {
-                if (wiex[i].BasicInfo.FaultingPc == 0) break;
-                LOGV2(677707,
-                      "Encountered a page fault",
-                      "faulting_pc"_attr = wiex[i].BasicInfo.FaultingPcm,
-                      "address"_attr = wiex[i].BasicInfo.FaultingVa,
-                      "thread_id"_attr = wiex[i].FaultingThreadId);
-            }
-        }
-#endif
-    PSAPI_WORKING_SET_EX_INFORMATION wsinfo;
-    wsinfo.VirtualAddress = const_cast<void*>(start);
-    BOOL result = QueryWorkingSetEx(GetCurrentProcess(), &wsinfo, sizeof(wsinfo));
-    if (result)
-        if (wsinfo.VirtualAttributes.Valid)
-            return true;
-    return false;
-}
-
 }  // namespace mongo

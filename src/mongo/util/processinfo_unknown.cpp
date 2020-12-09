@@ -63,10 +63,6 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {}
 
 void ProcessInfo::getExtraInfo(BSONObjBuilder& info) {}
 
-bool ProcessInfo::blockInMemory(const void* start) {
-    verify(0);
-}
-
 boost::optional<unsigned long> ProcessInfo::getNumCoresForProcess() {
     return boost::none;
 }
