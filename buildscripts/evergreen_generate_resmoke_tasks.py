@@ -666,11 +666,12 @@ class EvergreenConfigGenerator(object):
         :return: List of distros to run on.
         """
         if self.options.use_large_distro:
-            if (build_variant not in self.gen_config.build_variant_large_distro_exceptions
-                    and not self.options.large_distro_name):
+            if self.options.large_distro_name:
+                return [self.options.large_distro_name]
+
+            if build_variant not in self.gen_config.build_variant_large_distro_exceptions:
                 print(NO_LARGE_DISTRO_ERR.format(build_variant=build_variant))
                 raise ValueError("Invalid Evergreen Configuration")
-            return [self.options.large_distro_name]
         return None
 
     def _generate_resmoke_args(self, suite_file: str) -> str:
