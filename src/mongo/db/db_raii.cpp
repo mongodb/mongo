@@ -219,7 +219,9 @@ AutoGetCollectionForReadBase<AutoGetCollectionType, EmplaceAutoCollFunc>::
 
         // Once we have our locks, check whether or not we should override the ReadSource that was
         // set before acquiring locks.
-        if (auto newReadSource = SnapshotHelper::getNewReadSource(opCtx, nss)) {
+        auto [newReadSource, shouldReadAtLastApplied] =
+            SnapshotHelper::shouldChangeReadSource(opCtx, nss);
+        if (newReadSource) {
             opCtx->recoveryUnit()->setTimestampReadSource(*newReadSource);
             readSource = *newReadSource;
         }
@@ -257,8 +259,7 @@ AutoGetCollectionForReadBase<AutoGetCollectionType, EmplaceAutoCollFunc>::
         // serially in oplog application, and therefore can be safely read without taking the PBWM
         // lock or reading at a timestamp.
         if (readSource == RecoveryUnit::ReadSource::kNoTimestamp && callerWasConflicting &&
-            !nss.mustBeAppliedInOwnOplogBatch() &&
-            SnapshotHelper::shouldReadAtLastApplied(opCtx, nss)) {
+            !nss.mustBeAppliedInOwnOplogBatch() && shouldReadAtLastApplied) {
             LOGV2_FATAL(4728700,
                         "Reading from replicated collection on a secondary without read timestamp "
                         "or PBWM lock",
@@ -391,7 +392,8 @@ void AutoGetCollectionForReadLockFree::EmplaceHelper::emplace(
                     // replication state may have changed, invalidating our current choice of
                     // ReadSource. Using the same preconditions, change our ReadSource if necessary.
                     if (coll) {
-                        auto newReadSource = SnapshotHelper::getNewReadSource(opCtx, coll->ns());
+                        auto [newReadSource, _] =
+                            SnapshotHelper::shouldChangeReadSource(opCtx, coll->ns());
                         if (newReadSource) {
                             opCtx->recoveryUnit()->setTimestampReadSource(*newReadSource);
                         }

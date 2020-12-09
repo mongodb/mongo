@@ -33,13 +33,20 @@
 
 namespace mongo {
 namespace SnapshotHelper {
-// Returns a ReadSource if we should change our current ReadSource. Returns boost::none otherwise.
-boost::optional<RecoveryUnit::ReadSource> getNewReadSource(OperationContext* opCtx,
-                                                           const NamespaceString& nss);
+struct ReadSourceChange {
+    boost::optional<RecoveryUnit::ReadSource> newReadSource;
+    bool shouldReadAtLastApplied;
+};
 
-bool shouldReadAtLastApplied(OperationContext* opCtx,
-                             const NamespaceString& nss,
-                             std::string* reason = nullptr);
+/**
+ * Returns a ReadSourceChange containing data necessary to decide if we need to change read source.
+ *
+ * For Lock-Free Reads, the decisions made within this function based on replication state may
+ * become invalid after it returns and multiple calls may yield different answers. Higher level code
+ * must validate the relevance of the outcome based on replication state before and after calling
+ * this function.
+ */
+ReadSourceChange shouldChangeReadSource(OperationContext* opCtx, const NamespaceString& nss);
 
 bool collectionChangesConflictWithRead(boost::optional<Timestamp> collectionMin,
                                        boost::optional<Timestamp> readTimestamp);
