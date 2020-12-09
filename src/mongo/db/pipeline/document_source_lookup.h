@@ -93,6 +93,14 @@ public:
         boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
 
     /**
+     * This function utilizes both pipeline and field syntax; this implementation should replace the
+     * one in serializeToArray() when this combined syntax is enabled by default.
+     */
+    void serializeToArrayWithBothSyntaxes(
+        std::vector<Value>& array,
+        boost::optional<ExplainOptions::Verbosity> explain = boost::none) const;
+
+    /**
      * Returns the 'as' path, and possibly fields modified by an absorbed $unwind.
      */
     GetModPathsReturn getModifiedPaths() const final;
@@ -147,12 +155,12 @@ public:
         _unwindSrc = unwind;
     }
 
-    /**
-     * Returns true if DocumentSourceLookup was constructed with pipeline syntax (as opposed to
-     * localField/foreignField syntax).
-     */
-    bool wasConstructedWithPipelineSyntax() const {
-        return !static_cast<bool>(_localField);
+    bool hasLocalFieldForeignFieldJoin() const {
+        return _localField != boost::none;
+    }
+
+    bool hasPipeline() const {
+        return _userPipeline.size() > 0;
     }
 
     boost::optional<FieldPath> getForeignField() const {
@@ -225,13 +233,15 @@ private:
                          const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     /**
-     * Constructor used for a $lookup stage specified using the {from: ..., pipeline: [...], as:
-     * ...} syntax.
+     * Constructor used for a $lookup stage specified using the pipeline syntax {from: ...,
+     * pipeline: [...], as: ...} or using both the localField/foreignField syntax and pipeline
+     * syntax: {from: ..., localField: ..., foreignField: ..., pipeline: [...], as: ...}
      */
     DocumentSourceLookUp(NamespaceString fromNs,
                          std::string as,
                          std::vector<BSONObj> pipeline,
                          BSONObj letVariables,
+                         boost::optional<std::pair<std::string, std::string>> localForeignFields,
                          const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     /**
@@ -262,11 +272,11 @@ private:
 
     /**
      * Reinitialize the cache with a new max size. May only be called if this DSLookup was created
-     * with pipeline syntax, the cache has not been frozen or abandoned, and no data has been added
-     * to it.
+     * with pipeline syntax only, the cache has not been frozen or abandoned, and no data has been
+     * added to it.
      */
     void reInitializeCache(size_t maxCacheSizeBytes) {
-        invariant(wasConstructedWithPipelineSyntax());
+        invariant(!hasLocalFieldForeignFieldJoin());
         invariant(!_cache || (_cache->isBuilding() && _cache->sizeBytes() == 0));
         _cache.emplace(maxCacheSizeBytes);
     }
@@ -286,6 +296,8 @@ private:
     // For use when $lookup is specified with localField/foreignField syntax.
     boost::optional<FieldPath> _localField;
     boost::optional<FieldPath> _foreignField;
+    // Indicates the index in '_resolvedPipeline' where the local/foreignField $match resides.
+    boost::optional<size_t> _fieldMatchPipelineIdx;
 
     // Holds 'let' defined variables defined both in this stage and in parent pipelines. These are
     // copied to the '_fromExpCtx' ExpressionContext's 'variables' and 'variablesParseState' for use

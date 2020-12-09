@@ -70,6 +70,7 @@ DEFAULTS = {
     "mongod_set_parameters": [],
     "mongos_executable": None,
     "mongos_set_parameters": [],
+    "mongocryptd_set_parameters": [],
     "mrlog": None,
     "no_journal": False,
     "num_clients_per_fixture": 1,
@@ -352,6 +353,9 @@ MONGOS_EXECUTABLE = None
 
 # The --setParameter options passed to mongos.
 MONGOS_SET_PARAMETERS = []
+
+# The --setParameter options passed to mongocryptd.
+MONGOCRYPTD_SET_PARAMETERS = []
 
 # If true, then all mongod's started by resmoke.py and by the mongo shell will not have journaling
 # enabled.

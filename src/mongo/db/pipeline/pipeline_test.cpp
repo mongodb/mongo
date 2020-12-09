@@ -741,13 +741,12 @@ TEST(PipelineOptimizationTest, LookupShouldAbsorbUnwindMatch) {
         "{$match: {'asField.subfield': {$eq: 1}}}]";
     string outputPipe =
         "[{$lookup: {from: 'lookupColl', as: 'asField', localField: 'y', foreignField: 'z', "
-        "            unwinding: {preserveNullAndEmptyArrays: false}, "
-        "            matching: {subfield: {$eq: 1}}}}]";
+        "            let: {}, pipeline: [{$match: {subfield: {$eq: 1}}}],"
+        "            unwinding: {preserveNullAndEmptyArrays: false}}}]";
     string serializedPipe =
         "[{$lookup: {from: 'lookupColl', as: 'asField', localField: 'y', foreignField: "
-        "'z'}}, "
-        "{$unwind: {path: '$asField'}}, "
-        "{$match: {'asField.subfield': {$eq: 1}}}]";
+        "'z',  let: {}, pipeline: [{$match: {subfield: {$eq: 1}}}]}},"
+        "{$unwind: {path: '$asField'}}]";
     assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 
@@ -759,13 +758,12 @@ TEST(PipelineOptimizationTest, LookupShouldAbsorbUnwindAndTypeMatch) {
         "{$match: {'asField.subfield': {$type: [2]}}}]";
     string outputPipe =
         "[{$lookup: {from: 'lookupColl', as: 'asField', localField: 'y', foreignField: 'z', "
-        "            unwinding: {preserveNullAndEmptyArrays: false}, "
-        "            matching: {subfield: {$type: [2]}}}}]";
+        "            let: {}, pipeline: [{$match: {subfield: {$type: [2]}}}],"
+        "            unwinding: {preserveNullAndEmptyArrays: false}}}]";
     string serializedPipe =
         "[{$lookup: {from: 'lookupColl', as: 'asField', localField: 'y', foreignField: "
-        "'z'}}, "
-        "{$unwind: {path: '$asField'}}, "
-        "{$match: {'asField.subfield': {$type: [2]}}}]";
+        "'z', let: {}, pipeline: [{$match: {subfield: {$type: [2]}}}]}},"
+        "{$unwind: {path: '$asField'}}]";
     assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 
@@ -798,19 +796,17 @@ TEST(PipelineOptimizationTest, LookupShouldAbsorbUnwindAndSplitAndAbsorbMatch) {
         "      as: 'asField', "
         "      localField: 'y', "
         "      foreignField: 'z', "
+        "      let: {}, "
+        "      pipeline: [{$match: {subfield: {$eq: 1}}}], "
         "      unwinding: { "
         "          preserveNullAndEmptyArrays: false"
-        "      }, "
-        "      matching: { "
-        "          subfield: {$eq: 1} "
         "      } "
         " }}]";
     string serializedPipe =
         "[{$match: {independentField: {$gt: 2}}}, "
         " {$lookup: {from: 'lookupColl', as: 'asField', localField: 'y', foreignField: "
-        "'z'}}, "
-        " {$unwind: {path: '$asField'}}, "
-        " {$match: {'asField.subfield': {$eq: 1}}}]";
+        "'z', let: {}, pipeline: [{$match: {subfield: {$eq: 1}}}]}}, "
+        " {$unwind: {path: '$asField'}}]";
     assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 

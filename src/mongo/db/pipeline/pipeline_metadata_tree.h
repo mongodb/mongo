@@ -152,7 +152,7 @@ inline auto makeAdditionalChildren(
     std::vector<Stage<T>> children;
     std::vector<T> offTheEndContents;
     if (auto lookupSource = dynamic_cast<const DocumentSourceLookUp*>(&source);
-        lookupSource && lookupSource->wasConstructedWithPipelineSyntax()) {
+        lookupSource && lookupSource->hasPipeline()) {
         auto [child, offTheEndReshaper] =
             makeTreeWithOffTheEndStage(std::move(initialStageContents),
                                        lookupSource->getResolvedIntrospectionPipeline(),
@@ -229,7 +229,7 @@ inline void walk(Stage<T>* stage,
         walk(stage->principalChild.get(), sourceIter, zipper);
 
     if (auto lookupSource = dynamic_cast<DocumentSourceLookUp*>(&***sourceIter);
-        lookupSource && lookupSource->wasConstructedWithPipelineSyntax()) {
+        lookupSource && lookupSource->hasPipeline()) {
         auto iter = lookupSource->getResolvedIntrospectionPipeline().getSources().begin();
         walk(&stage->additionalChildren.front(), &iter, zipper);
     }

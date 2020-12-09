@@ -122,7 +122,8 @@ TEST_F(DocumentSourceLookUpTest, AcceptsPipelineSyntax) {
             .firstElement(),
         expCtx);
     auto lookup = static_cast<DocumentSourceLookUp*>(docSource.get());
-    ASSERT_TRUE(lookup->wasConstructedWithPipelineSyntax());
+    ASSERT_TRUE(lookup->hasPipeline());
+    ASSERT_FALSE(lookup->hasLocalFieldForeignFieldJoin());
 }
 
 TEST_F(DocumentSourceLookUpTest, AcceptsPipelineWithLetSyntax) {
@@ -146,7 +147,8 @@ TEST_F(DocumentSourceLookUpTest, AcceptsPipelineWithLetSyntax) {
             .firstElement(),
         expCtx);
     auto lookup = static_cast<DocumentSourceLookUp*>(docSource.get());
-    ASSERT_TRUE(lookup->wasConstructedWithPipelineSyntax());
+    ASSERT_TRUE(lookup->hasPipeline());
+    ASSERT_FALSE(lookup->hasLocalFieldForeignFieldJoin());
 }
 
 TEST_F(DocumentSourceLookUpTest, LookupEmptyPipelineDoesntUseDiskAndIsOKInATransaction) {
@@ -163,7 +165,7 @@ TEST_F(DocumentSourceLookUpTest, LookupEmptyPipelineDoesntUseDiskAndIsOKInATrans
         expCtx);
     auto lookup = static_cast<DocumentSourceLookUp*>(docSource.get());
 
-    ASSERT_TRUE(lookup->wasConstructedWithPipelineSyntax());
+    ASSERT_FALSE(lookup->hasLocalFieldForeignFieldJoin());
     ASSERT(lookup->constraints(Pipeline::SplitState::kUnsplit).diskRequirement ==
            DocumentSource::DiskUseRequirement::kNoDiskUse);
     ASSERT(lookup->constraints(Pipeline::SplitState::kUnsplit).transactionRequirement ==
@@ -271,14 +273,14 @@ TEST_F(ReplDocumentSourceLookUpTest, RejectsSubPipelineWithChangeStreamStage) {
         51047);
 }
 
-TEST_F(DocumentSourceLookUpTest, RejectsLocalFieldForeignFieldWhenPipelineIsSpecified) {
+TEST_F(DocumentSourceLookUpTest, AcceptsLocalFieldForeignFieldAndPipelineSyntax) {
     auto expCtx = getExpCtx();
     NamespaceString fromNs("test", "coll");
     expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
         {fromNs.coll().toString(), {fromNs, std::vector<BSONObj>()}}});
 
     try {
-        auto lookupStage = DocumentSourceLookUp::createFromBson(
+        auto docSource = DocumentSourceLookUp::createFromBson(
             BSON("$lookup" << BSON("from"
                                    << "coll"
                                    << "pipeline" << BSON_ARRAY(BSON("$match" << BSON("x" << 1)))
@@ -290,10 +292,42 @@ TEST_F(DocumentSourceLookUpTest, RejectsLocalFieldForeignFieldWhenPipelineIsSpec
                                    << "as"))
                 .firstElement(),
             expCtx);
+        auto lookup = static_cast<DocumentSourceLookUp*>(docSource.get());
+        ASSERT_TRUE(lookup->hasLocalFieldForeignFieldJoin());
+        ASSERT_TRUE(lookup->hasPipeline());
+    } catch (const AssertionException& ex) {
+        ASSERT_EQ(ErrorCodes::FailedToParse, ex.code());
+    }
+}
 
-        FAIL(str::stream()
-             << "Expected creation of the " << lookupStage->getSourceName()
-             << " stage to uassert on mix of localField/foreignField and pipeline options");
+TEST_F(DocumentSourceLookUpTest, AcceptsLocalFieldForeignFieldAndPipelineWithLetSyntax) {
+    auto expCtx = getExpCtx();
+    NamespaceString fromNs("test", "coll");
+    expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
+        {fromNs.coll().toString(), {fromNs, std::vector<BSONObj>()}}});
+
+    try {
+        auto docSource = DocumentSourceLookUp::createFromBson(
+            BSON("$lookup" << BSON("from"
+                                   << "coll"
+                                   << "let"
+                                   << BSON("var1"
+                                           << "$x")
+                                   << "pipeline"
+                                   << BSON_ARRAY(BSON("$project" << BSON("hasX"
+                                                                         << "$$var1"))
+                                                 << BSON("$match" << BSON("hasX" << true)))
+                                   << "localField"
+                                   << "a"
+                                   << "foreignField"
+                                   << "b"
+                                   << "as"
+                                   << "as"))
+                .firstElement(),
+            expCtx);
+        auto lookup = static_cast<DocumentSourceLookUp*>(docSource.get());
+        ASSERT_TRUE(lookup->hasLocalFieldForeignFieldJoin());
+        ASSERT_TRUE(lookup->hasPipeline());
     } catch (const AssertionException& ex) {
         ASSERT_EQ(ErrorCodes::FailedToParse, ex.code());
     }
@@ -407,6 +441,71 @@ TEST_F(DocumentSourceLookUpTest, ShouldBeAbleToReParseSerializedStage) {
     ASSERT_EQ(serializedStage.computeSize(), 4ULL);
     ASSERT_VALUE_EQ(serializedStage["from"], Value(std::string("coll")));
     ASSERT_VALUE_EQ(serializedStage["as"], Value(std::string("as")));
+
+    ASSERT_DOCUMENT_EQ(serializedStage["let"].getDocument(),
+                       Document(fromjson("{local_x: \"$x\"}")));
+
+    ASSERT_EQ(serializedStage["pipeline"].getType(), BSONType::Array);
+    ASSERT_EQ(serializedStage["pipeline"].getArrayLength(), 1UL);
+
+    ASSERT_EQ(serializedStage["pipeline"][0].getType(), BSONType::Object);
+    ASSERT_DOCUMENT_EQ(serializedStage["pipeline"][0]["$match"].getDocument(),
+                       Document(fromjson("{x: 1}")));
+
+    //
+    // Create a new $lookup stage from the serialization. Serialize the new stage and confirm that
+    // it is equivalent to the original serialization.
+    //
+    auto serializedBson = serializedDoc.toBson();
+    auto roundTripped = DocumentSourceLookUp::createFromBson(serializedBson.firstElement(), expCtx);
+
+    vector<Value> newSerialization;
+    roundTripped->serializeToArray(newSerialization);
+
+    ASSERT_EQ(newSerialization.size(), 1UL);
+    ASSERT_VALUE_EQ(newSerialization[0], serialization[0]);
+}
+
+TEST_F(DocumentSourceLookUpTest, ShouldBeAbleToReParseSerializedStageWithFieldsAndPipeline) {
+    auto expCtx = getExpCtx();
+    NamespaceString fromNs("test", "coll");
+    expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
+        {fromNs.coll().toString(), {fromNs, std::vector<BSONObj>()}}});
+
+    auto lookupStage = DocumentSourceLookUp::createFromBson(
+        BSON("$lookup" << BSON("from"
+                               << "coll"
+                               << "let"
+                               << BSON("local_x"
+                                       << "$x")
+                               << "pipeline" << BSON_ARRAY(BSON("$match" << BSON("x" << 1)))
+                               << "localField"
+                               << "a"
+                               << "foreignField"
+                               << "b"
+                               << "as"
+                               << "as"))
+            .firstElement(),
+        expCtx);
+
+    //
+    // Serialize the $lookup stage and confirm contents.
+    //
+    vector<Value> serialization;
+    lookupStage->serializeToArray(serialization);
+    ASSERT_EQ(serialization.size(), 1UL);
+    ASSERT_EQ(serialization[0].getType(), BSONType::Object);
+
+    // The fields are in no guaranteed order, so we can't perform a simple Document comparison.
+    auto serializedDoc = serialization[0].getDocument();
+    ASSERT_EQ(serializedDoc["$lookup"].getType(), BSONType::Object);
+
+    auto serializedStage = serializedDoc["$lookup"].getDocument();
+    ASSERT_EQ(serializedStage.computeSize(), 6ULL);
+    ASSERT_VALUE_EQ(serializedStage["from"], Value(std::string("coll")));
+    ASSERT_VALUE_EQ(serializedStage["as"], Value(std::string("as")));
+    ASSERT_VALUE_EQ(serializedStage["localField"], Value(std::string("a")));
+    ASSERT_VALUE_EQ(serializedStage["foreignField"], Value(std::string("b")));
 
     ASSERT_DOCUMENT_EQ(serializedStage["let"].getDocument(),
                        Document(fromjson("{local_x: \"$x\"}")));

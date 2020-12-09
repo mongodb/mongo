@@ -275,6 +275,7 @@ jsTestOptions = function() {
                 : true,
             setParameters: TestData.setParameters,
             setParametersMongos: TestData.setParametersMongos,
+            setParametersMongocryptd: TestData.setParametersMongocryptd,
             storageEngine: TestData.storageEngine,
             storageEngineCacheSizeGB: TestData.storageEngineCacheSizeGB,
             transportLayer: TestData.transportLayer,

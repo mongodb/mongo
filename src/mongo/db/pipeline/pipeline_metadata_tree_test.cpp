@@ -201,7 +201,7 @@ TEST_F(PipelineMetadataTreeTest, BranchingPipelinesConstructProperTrees) {
         if (typeid(source) == typeid(DocumentSourceGroup))
             return {previousThing.string + "g"};
         if (auto lookupSource = dynamic_cast<const DocumentSourceLookUp*>(&source)) {
-            if (lookupSource->wasConstructedWithPipelineSyntax())
+            if (lookupSource->hasPipeline())
                 return {previousThing.string + "l[" + extraThings.front().string + "]"};
             else
                 return {previousThing.string + "l"};

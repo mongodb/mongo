@@ -68,11 +68,15 @@ def _validate_options(parser, args):
     config = vars(args)
     mongod_set_param_errors = get_set_param_errors(config.get('mongod_set_parameters') or [])
     mongos_set_param_errors = get_set_param_errors(config.get('mongos_set_parameters') or [])
+    mongocryptd_set_param_errors = get_set_param_errors(
+        config.get('mongocryptd_set_parameters') or [])
     error_msgs = {}
     if mongod_set_param_errors:
         error_msgs["mongodSetParameters"] = mongod_set_param_errors
     if mongos_set_param_errors:
         error_msgs["mongosSetParameters"] = mongos_set_param_errors
+    if mongocryptd_set_param_errors:
+        error_msgs["mongocryptdSetParameters"] = mongocryptd_set_param_errors
     if error_msgs:
         parser.error(str(error_msgs))
 
@@ -196,6 +200,8 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many
 
     _config.MONGOS_EXECUTABLE = _expand_user(config.pop("mongos_executable"))
     _config.MONGOS_SET_PARAMETERS = _merge_set_params(config.pop("mongos_set_parameters"))
+
+    _config.MONGOCRYPTD_SET_PARAMETERS = _merge_set_params(config.pop("mongocryptd_set_parameters"))
 
     _config.MRLOG = config.pop("mrlog")
     _config.NO_JOURNAL = config.pop("no_journal")

@@ -485,18 +485,12 @@ function runTest(coll, from, thirdColl, fourthColl) {
     assertErrorCode(coll,
                     [{$lookup: {localField: "a", foreignField: "b", from: "from"}}],
                     ErrorCodes.FailedToParse);
-
-    // localField/foreignField and pipeline/let syntax must not be mixed.
     assertErrorCode(coll,
                     [{$lookup: {pipeline: [], foreignField: "b", from: "from", as: "as"}}],
                     ErrorCodes.FailedToParse);
     assertErrorCode(coll,
                     [{$lookup: {pipeline: [], localField: "b", from: "from", as: "as"}}],
                     ErrorCodes.FailedToParse);
-    assertErrorCode(
-        coll,
-        [{$lookup: {pipeline: [], localField: "b", foreignField: "b", from: "from", as: "as"}}],
-        ErrorCodes.FailedToParse);
     assertErrorCode(coll,
                     [{$lookup: {let : {a: "$b"}, foreignField: "b", from: "from", as: "as"}}],
                     ErrorCodes.FailedToParse);

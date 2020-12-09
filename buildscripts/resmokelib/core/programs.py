@@ -356,6 +356,7 @@ def mongo_shell_program(  # pylint: disable=too-many-arguments,too-many-branches
     # by the _format_shell_vars() function.
     mongod_set_parameters = test_data.get("setParameters", {}).copy()
     mongos_set_parameters = test_data.get("setParametersMongos", {}).copy()
+    mongocryptd_set_parameters = test_data.get("setParametersMongocryptd", {}).copy()
 
     # Propagate additional setParameters to mongod processes spawned by the mongo shell. Command
     # line options to resmoke.py override the YAML configuration.
@@ -366,6 +367,11 @@ def mongo_shell_program(  # pylint: disable=too-many-arguments,too-many-branches
     # line options to resmoke.py override the YAML configuration.
     if config.MONGOS_SET_PARAMETERS is not None:
         mongos_set_parameters.update(utils.load_yaml(config.MONGOS_SET_PARAMETERS))
+
+    # Propagate additional setParameters to mongocryptd processes spawned by the mongo shell.
+    # Command line options to resmoke.py override the YAML configuration.
+    if config.MONGOCRYPTD_SET_PARAMETERS is not None:
+        mongocryptd_set_parameters.update(utils.load_yaml(config.MONGOCRYPTD_SET_PARAMETERS))
 
     # If the 'logComponentVerbosity' setParameter for mongod was not already specified, we set its
     # value to a default.
@@ -384,6 +390,7 @@ def mongo_shell_program(  # pylint: disable=too-many-arguments,too-many-branches
 
     test_data["setParameters"] = mongod_set_parameters
     test_data["setParametersMongos"] = mongos_set_parameters
+    test_data["setParametersMongocryptd"] = mongocryptd_set_parameters
 
     test_data["undoRecorderPath"] = config.UNDO_RECORDER_PATH
 
