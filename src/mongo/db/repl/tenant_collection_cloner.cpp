@@ -143,12 +143,13 @@ BaseCloner::AfterStageBehavior TenantCollectionCloner::TenantCollectionClonerSta
 }
 
 BaseCloner::AfterStageBehavior TenantCollectionCloner::countStage() {
-    auto count = getClient()->count(_sourceDbAndUuid,
-                                    {} /* Query */,
-                                    QueryOption_SecondaryOk,
-                                    0 /* limit */,
-                                    0 /* skip */,
-                                    ReadConcernArgs::kImplicitDefault);
+    auto count =
+        getClient()->count(_sourceDbAndUuid,
+                           {} /* Query */,
+                           QueryOption_SecondaryOk,
+                           0 /* limit */,
+                           0 /* skip */,
+                           ReadConcernArgs(ReadConcernLevel::kMajorityReadConcern).toBSONInner());
 
     // The count command may return a negative value after an unclean shutdown,
     // so we set it to zero here to avoid aborting the collection clone.
@@ -304,7 +305,8 @@ void TenantCollectionCloner::runQuery() {
                        nullptr /* fieldsToReturn */,
                        QueryOption_NoCursorTimeout | QueryOption_SecondaryOk |
                            (collectionClonerUsesExhaust ? QueryOption_Exhaust : 0),
-                       _collectionClonerBatchSize);
+                       _collectionClonerBatchSize,
+                       ReadConcernArgs(ReadConcernLevel::kMajorityReadConcern).toBSONInner());
     _dbWorkTaskRunner.join();
 }
 

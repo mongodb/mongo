@@ -143,9 +143,12 @@ Message DBClientCursor::_assembleInit() {
                 // Legacy queries don't handle term.
                 qr.getValue()->setReplicationTerm(replTerm.numberLong());
             }
+            // Legacy queries don't handle readConcern.
+            // We prioritize the readConcern parsed from the query object over '_readConcernObj'.
             if (auto readConcern = query[repl::ReadConcernArgs::kReadConcernFieldName]) {
-                // Legacy queries don't handle readConcern.
                 qr.getValue()->setReadConcern(readConcern.Obj());
+            } else if (_readConcernObj) {
+                qr.getValue()->setReadConcern(*_readConcernObj);
             }
             BSONObj cmd = _nsOrUuid.uuid() ? qr.getValue()->asFindCommandWithUuid()
                                            : qr.getValue()->asFindCommand();
@@ -153,12 +156,6 @@ Message DBClientCursor::_assembleInit() {
                 // QueryRequest doesn't handle $readPreference.
                 cmd = BSONObjBuilder(std::move(cmd)).append(readPref).obj();
             }
-            if (!cmd.hasField(repl::ReadConcernArgs::kReadConcernFieldName) && _readConcernObj) {
-                cmd = BSONObjBuilder(std::move(cmd))
-                          .append(repl::ReadConcernArgs::kReadConcernFieldName, *_readConcernObj)
-                          .obj();
-            }
-
             return assembleCommandRequest(_client, ns.db(), opts, std::move(cmd));
         }
         // else use legacy OP_QUERY request.
