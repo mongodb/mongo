@@ -614,6 +614,7 @@ env.CppUnitTest(
         'shard_id_test.cpp',
         'shard_key_pattern_test.cpp',
         'sharding_task_executor_test.cpp',
+        'stale_exception_test.cpp',
         'transaction_router_test.cpp',
         'write_ops/batch_write_exec_test.cpp',
         'write_ops/batch_write_op_test.cpp',

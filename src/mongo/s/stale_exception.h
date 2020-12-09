@@ -37,22 +37,21 @@
 
 namespace mongo {
 
-template <class T>
-class StaleChunkVersionExtraInfo : public ErrorExtraInfo {
-protected:
-    StaleChunkVersionExtraInfo(
-        NamespaceString nss,
-        ChunkVersion received,
-        boost::optional<ChunkVersion> wanted,
-        ShardId shardId,
-        boost::optional<SharedSemiFuture<void>> criticalSectionSignal = boost::none)
+class StaleConfigInfo final : public ErrorExtraInfo {
+public:
+    static constexpr auto code = ErrorCodes::StaleConfig;
+
+    StaleConfigInfo(NamespaceString nss,
+                    ChunkVersion received,
+                    boost::optional<ChunkVersion> wanted,
+                    ShardId shardId,
+                    boost::optional<SharedSemiFuture<void>> criticalSectionSignal = boost::none)
         : _nss(std::move(nss)),
           _received(received),
           _wanted(wanted),
           _shardId(shardId),
           _criticalSectionSignal(criticalSectionSignal) {}
 
-public:
     const auto& getNss() const {
         return _nss;
     }
@@ -85,10 +84,10 @@ public:
     }
 
     static std::shared_ptr<const ErrorExtraInfo> parse(const BSONObj& obj) {
-        return std::make_shared<T>(parseFromCommandError(obj));
+        return std::make_shared<StaleConfigInfo>(parseFromCommandError(obj));
     }
 
-    static T parseFromCommandError(const BSONObj& obj) {
+    static StaleConfigInfo parseFromCommandError(const BSONObj& obj) {
         const auto shardId = obj["shardId"].String();
         invariant(shardId != "");
 
@@ -100,10 +99,11 @@ public:
             return ret;
         };
 
-        return T(NamespaceString(obj["ns"].String()),
-                 uassertStatusOK(ChunkVersion::parseLegacyWithField(obj, "vReceived")),
-                 extractOptionalChunkVersion("vWanted"),
-                 ShardId(shardId));
+        return StaleConfigInfo(
+            NamespaceString(obj["ns"].String()),
+            uassertStatusOK(ChunkVersion::parseLegacyWithField(obj, "vReceived")),
+            extractOptionalChunkVersion("vWanted"),
+            ShardId(shardId));
     }
 
 protected:
@@ -117,28 +117,30 @@ protected:
     boost::optional<SharedSemiFuture<void>> _criticalSectionSignal;
 };
 
-class StaleConfigInfo final : public StaleChunkVersionExtraInfo<StaleConfigInfo> {
-public:
-    static constexpr auto code = ErrorCodes::StaleConfig;
-
-    StaleConfigInfo(NamespaceString nss,
-                    ChunkVersion received,
-                    boost::optional<ChunkVersion> wanted,
-                    ShardId shardId,
-                    boost::optional<SharedSemiFuture<void>> criticalSectionSignal = boost::none)
-        : StaleChunkVersionExtraInfo(nss, received, wanted, shardId, criticalSectionSignal) {}
-};
-
-class StaleEpochInfo final : public StaleChunkVersionExtraInfo<StaleEpochInfo> {
+class StaleEpochInfo final : public ErrorExtraInfo {
 public:
     static constexpr auto code = ErrorCodes::StaleEpoch;
 
-    StaleEpochInfo(NamespaceString nss,
-                   ChunkVersion received,
-                   boost::optional<ChunkVersion> wanted,
-                   ShardId shardId,
-                   boost::optional<SharedSemiFuture<void>> criticalSectionSignal = boost::none)
-        : StaleChunkVersionExtraInfo(nss, received, wanted, shardId, criticalSectionSignal) {}
+    StaleEpochInfo(NamespaceString nss) : _nss(std::move(nss)) {}
+
+    const auto& getNss() const {
+        return _nss;
+    }
+
+    void serialize(BSONObjBuilder* bob) const {
+        bob->append("ns", _nss.ns());
+    }
+
+    static std::shared_ptr<const ErrorExtraInfo> parse(const BSONObj& obj) {
+        return std::make_shared<StaleEpochInfo>(parseFromCommandError(obj));
+    }
+
+    static StaleEpochInfo parseFromCommandError(const BSONObj& obj) {
+        return StaleEpochInfo(NamespaceString(obj["ns"].String()));
+    }
+
+private:
+    NamespaceString _nss;
 };
 
 using StaleConfigException = ExceptionFor<ErrorCodes::StaleConfig>;

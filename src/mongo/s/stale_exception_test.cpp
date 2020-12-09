@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2020-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,39 +27,52 @@
  *    it in the license file.
  */
 
+
 #include "mongo/platform/basic.h"
 
+#include "mongo/s/shard_id.h"
+#include "mongo/s/sharding_router_test_fixture.h"
 #include "mongo/s/stale_exception.h"
-
-#include "mongo/base/init.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
+
 namespace {
 
-MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(StaleConfigInfo);
-MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(StaleEpochInfo);
-MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(StaleDbRoutingVersion);
+using StaleExceptionTest = ShardingTestFixture;
+
+const NamespaceString kNss("test.nss");
+
+TEST_F(StaleExceptionTest, StaleConfigInfoSerializationTest) {
+    const ShardId kShardId("SHARD_ID");
+
+    StaleConfigInfo info(kNss, ChunkVersion::UNSHARDED(), ChunkVersion::UNSHARDED(), kShardId);
+
+    // Serialize
+    BSONObjBuilder bob;
+    info.serialize(&bob);
+
+    // Deserialize
+    auto deserializedInfo = StaleConfigInfo::parseFromCommandError(bob.obj());
+
+    ASSERT_EQUALS(deserializedInfo.getNss(), kNss);
+    ASSERT_EQUALS(deserializedInfo.getVersionReceived(), ChunkVersion::UNSHARDED());
+    ASSERT_EQUALS(*deserializedInfo.getVersionWanted(), ChunkVersion::UNSHARDED());
+    ASSERT_EQUALS(deserializedInfo.getShardId(), kShardId);
+}
+
+TEST_F(StaleExceptionTest, StaleEpochInfoSerializationTest) {
+    StaleEpochInfo info(kNss);
+
+    // Serialize
+    BSONObjBuilder bob;
+    info.serialize(&bob);
+
+    // Deserialize
+    auto deserializedInfo = StaleEpochInfo::parseFromCommandError(bob.obj());
+
+    ASSERT_EQUALS(deserializedInfo.getNss(), kNss);
+}
 
 }  // namespace
-
-void StaleDbRoutingVersion::serialize(BSONObjBuilder* bob) const {
-    bob->append("db", _db);
-    bob->append("vReceived", _received.toBSON());
-    if (_wanted) {
-        bob->append("vWanted", _wanted->toBSON());
-    }
-}
-
-std::shared_ptr<const ErrorExtraInfo> StaleDbRoutingVersion::parse(const BSONObj& obj) {
-    return std::make_shared<StaleDbRoutingVersion>(parseFromCommandError(obj));
-}
-
-StaleDbRoutingVersion StaleDbRoutingVersion::parseFromCommandError(const BSONObj& obj) {
-    return StaleDbRoutingVersion(obj["db"].String(),
-                                 DatabaseVersion(obj["vReceived"].Obj()),
-                                 !obj["vWanted"].eoo() ? DatabaseVersion(obj["vWanted"].Obj())
-                                                       : boost::optional<DatabaseVersion>{});
-}
-
 }  // namespace mongo
