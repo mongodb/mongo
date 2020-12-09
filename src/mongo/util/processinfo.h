@@ -164,16 +164,6 @@ public:
 
     static bool blockCheckSupported();
 
-    /**
-     * @return a pointer aligned to the start of the page the provided pointer belongs to.
-     *
-     * NOTE requires blockCheckSupported() == true
-     */
-    static const void* alignToStartOfPage(const void* ptr) {
-        return reinterpret_cast<const void*>(reinterpret_cast<unsigned long long>(ptr) &
-                                             ~(getPageSize() - 1));
-    }
-
     static const std::string& getProcessName() {
         return appInfo().getProcessName();
     }
