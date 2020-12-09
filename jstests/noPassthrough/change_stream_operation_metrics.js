@@ -99,9 +99,12 @@ let nextId = nDocs;
     const cur = primaryDB[collName].watch([], {fullDocument: "updateLookup"});
 
     assertMetrics(primary, (metrics) => {
-        // The first aggregate operation will read from the top of the oplog.
-        assert.eq(metrics[dbName].primaryMetrics.docBytesRead, 138);
-        assert.eq(metrics[dbName].primaryMetrics.docUnitsRead, 2);
+        // The first aggregate operation will read from the top of the oplog, size is not
+        // guaranteed, but we assume it stays under 2 doc units (unit size = 128),
+        assert.gt(metrics[dbName].primaryMetrics.docBytesRead, 0);
+        assert.gt(metrics[dbName].primaryMetrics.docUnitsRead, 0);
+        assert.lte(metrics[dbName].primaryMetrics.docBytesRead, 2 * 128);
+        assert.lte(metrics[dbName].primaryMetrics.docUnitsRead, 2);
         assert.eq(metrics[dbName].primaryMetrics.cursorSeeks, 1);
         assert.eq(metrics[dbName].primaryMetrics.docUnitsReturned, 0);
     });
@@ -111,9 +114,12 @@ let nextId = nDocs;
     clearMetrics(primary);
     assert(!cur.hasNext());
     assertMetrics(primary, (metrics) => {
-        // Calling hasNext will perform three reads from the oplog.
-        assert.eq(metrics[dbName].primaryMetrics.docBytesRead, 414);
-        assert.eq(metrics[dbName].primaryMetrics.docUnitsRead, 6);
+        // Calling hasNext may perform up to three reads from the oplog. The oplog entry size is not
+        // guaranteed, but we assume it stays under 2 doc units (unit size = 128).
+        assert.gt(metrics[dbName].primaryMetrics.docBytesRead, 0);
+        assert.gt(metrics[dbName].primaryMetrics.docUnitsRead, 0);
+        assert.lte(metrics[dbName].primaryMetrics.docBytesRead, 6 * 128);
+        assert.lte(metrics[dbName].primaryMetrics.docUnitsRead, 6);
         assert.eq(metrics[dbName].primaryMetrics.cursorSeeks, 3);
         assert.eq(metrics[dbName].primaryMetrics.docUnitsReturned, 0);
     });
@@ -148,8 +154,8 @@ let nextId = nDocs;
     assert.eq(doc, cur.next().fullDocument);
     assertMetrics(primary, (metrics) => {
         // Will read at least one document from the oplog.
-        assert.gte(metrics[dbName].primaryMetrics.docBytesRead, 138);
-        assert.gte(metrics[dbName].primaryMetrics.docUnitsRead, 2);
+        assert.gt(metrics[dbName].primaryMetrics.docBytesRead, 0);
+        assert.gt(metrics[dbName].primaryMetrics.docUnitsRead, 0);
         assert.gte(metrics[dbName].primaryMetrics.cursorSeeks, 1);
         // Returns one large document
         assert.eq(metrics[dbName].primaryMetrics.docUnitsReturned, 3);
@@ -187,8 +193,8 @@ let nextId = nDocs;
         // Performs at least three seeks (oplog, _id index, collection), reads at least one entry
         // from the oplog and once from the collection, and then returns one large response
         // document.
-        assert.gte(metrics[dbName].primaryMetrics.docBytesRead, 352);
-        assert.gte(metrics[dbName].primaryMetrics.docUnitsRead, 5);
+        assert.gte(metrics[dbName].primaryMetrics.docBytesRead, 0);
+        assert.gte(metrics[dbName].primaryMetrics.docUnitsRead, 2);
         assert.eq(metrics[dbName].primaryMetrics.idxEntryBytesRead, 3);
         assert.eq(metrics[dbName].primaryMetrics.idxEntryUnitsRead, 1);
         assert.gte(metrics[dbName].primaryMetrics.cursorSeeks, 3);
