@@ -16,12 +16,16 @@ load('jstests/libs/parallelTester.js');     // For Thread.
  * Returns true if the error code is transient.
  */
 function isIgnorableError(codeName) {
-    if (codeName == "NotWritablePrimary" || codeName == "InterruptedDueToReplStateChange" ||
-        codeName == "PrimarySteppedDown" || codeName === "NodeNotFound" ||
+    if (codeName === "NotWritablePrimary" || codeName === "InterruptedDueToReplStateChange" ||
+        codeName === "PrimarySteppedDown" || codeName === "NodeNotFound" ||
         codeName === "ShutdownInProgress") {
         return true;
     }
     return false;
+}
+
+function isShutdownError(code) {
+    return code === ErrorCodes.ShutdownInProgress || code === ErrorCodes.InterruptedAtShutdown;
 }
 
 /**
@@ -67,7 +71,18 @@ function reconfigBackground(primary, numNodes) {
     // could lead to generating an overwhelming amount of log messages.
     let conn;
     quietly(() => {
-        conn = new Mongo(primary);
+        // It's possible that the primary we passed in gets killed by the kill primary hook.
+        // During shutdown, mongod will respond to incoming hello requests with ShutdownInProgress
+        // or InterruptedAtShutdown. This hook should ignore both cases and wait until we have a
+        // new primary in a subsequent run.
+        try {
+            conn = new Mongo(primary);
+        } catch (e) {
+            if (!isShutdownError(e.code)) {
+                throw e;
+            }
+            return {ok: 1};
+        }
     });
     assert.neq(
         null, conn, "Failed to connect to primary '" + primary + "' for background reconfigs");
