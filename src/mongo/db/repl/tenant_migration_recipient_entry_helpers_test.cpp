@@ -91,7 +91,7 @@ TEST_F(TenantMigrationRecipientEntryHelpersTest, AddTenantMigrationRecipientStat
     const UUID migrationUUID = UUID::gen();
     TenantMigrationRecipientDocument activeTenantAStateDoc(
         migrationUUID,
-        "DonorHost:12345",
+        "donor-rs0/localhost:12345",
         "tenantA",
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     ASSERT_OK(insertStateDoc(opCtx.get(), activeTenantAStateDoc));
@@ -99,7 +99,7 @@ TEST_F(TenantMigrationRecipientEntryHelpersTest, AddTenantMigrationRecipientStat
 
     // Same migration uuid and same tenant id.
     TenantMigrationRecipientDocument stateDoc1(migrationUUID,
-                                               "AnotherDonorHost:12345",
+                                               "donor-rs1/localhost:12345",
                                                "tenantA",
                                                ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     auto status = insertStateDoc(opCtx.get(), stateDoc1);
@@ -108,7 +108,7 @@ TEST_F(TenantMigrationRecipientEntryHelpersTest, AddTenantMigrationRecipientStat
 
     // Same migration uuid and different tenant id.
     TenantMigrationRecipientDocument stateDoc2(migrationUUID,
-                                               "DonorHost:12345",
+                                               "donor-rs0/localhost:12345",
                                                "tenantB",
                                                ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     ASSERT_THROWS_CODE(
@@ -117,7 +117,7 @@ TEST_F(TenantMigrationRecipientEntryHelpersTest, AddTenantMigrationRecipientStat
 
     // Different migration uuid and same tenant id.
     TenantMigrationRecipientDocument stateDoc3(UUID::gen(),
-                                               "DonorHost:12345",
+                                               "donor-rs0/localhost:12345",
                                                "tenantA",
                                                ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     status = insertStateDoc(opCtx.get(), stateDoc3);
@@ -126,7 +126,7 @@ TEST_F(TenantMigrationRecipientEntryHelpersTest, AddTenantMigrationRecipientStat
 
     // Different migration uuid and different tenant id.
     TenantMigrationRecipientDocument stateDoc4(UUID::gen(),
-                                               "DonorHost:12345",
+                                               "donor-rs0/localhost:12345",
                                                "tenantB",
                                                ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     ASSERT_OK(insertStateDoc(opCtx.get(), stateDoc4));
@@ -140,7 +140,7 @@ TEST_F(TenantMigrationRecipientEntryHelpersTest,
     const UUID migrationUUID = UUID::gen();
     TenantMigrationRecipientDocument inactiveTenantAStateDoc(
         migrationUUID,
-        "DonorHost:12345",
+        "donor-rs0/localhost:12345",
         "tenantA",
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     inactiveTenantAStateDoc.setExpireAt(Date_t::now());
@@ -149,7 +149,7 @@ TEST_F(TenantMigrationRecipientEntryHelpersTest,
 
     // Same migration uuid and same tenant id.
     TenantMigrationRecipientDocument stateDoc1(migrationUUID,
-                                               "AnotherDonorHost:12345",
+                                               "donor-rs1/localhost:12345",
                                                "tenantA",
                                                ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     ASSERT_THROWS_CODE(
@@ -158,7 +158,7 @@ TEST_F(TenantMigrationRecipientEntryHelpersTest,
 
     // Same migration uuid and different tenant id.
     TenantMigrationRecipientDocument stateDoc2(migrationUUID,
-                                               "DonorHost:12345",
+                                               "donor-rs0/localhost:12345",
                                                "tenantB",
                                                ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     ASSERT_THROWS_CODE(
@@ -167,7 +167,7 @@ TEST_F(TenantMigrationRecipientEntryHelpersTest,
 
     // Different migration uuid and same tenant id.
     TenantMigrationRecipientDocument stateDoc3(UUID::gen(),
-                                               "DonorHost:12345",
+                                               "donor-rs0/localhost:12345",
                                                "tenantA",
                                                ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     ASSERT_OK(insertStateDoc(opCtx.get(), stateDoc3));
@@ -175,7 +175,7 @@ TEST_F(TenantMigrationRecipientEntryHelpersTest,
 
     // Different migration uuid and different tenant id.
     TenantMigrationRecipientDocument stateDoc4(UUID::gen(),
-                                               "DonorHost:12345",
+                                               "donor-rs0/localhost:12345",
                                                "tenantC",
                                                ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     ASSERT_OK(insertStateDoc(opCtx.get(), stateDoc4));

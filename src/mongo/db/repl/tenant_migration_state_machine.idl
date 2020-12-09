@@ -70,6 +70,8 @@ structs:
                 description: >-
                     The URI string that the donor will utilize to create a connection with
                     the recipient.
+                validator:
+                    callback: "validateConnectionString"
             readPreference:
                 type: readPreference
                 description: >-
@@ -118,6 +120,8 @@ structs:
                 description: >-
                     The URI string that the recipient will utilize to create a connection
                     with the donor.
+                validator:
+                    callback: "validateConnectionString"
             tenantId:
                 type: string
                 description: "The tenantId for the migration."

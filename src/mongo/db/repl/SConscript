@@ -1273,9 +1273,11 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/client/connection_string',
         '$BUILD_DIR/mongo/client/read_preference',
         '$BUILD_DIR/mongo/idl/idl_parser',
         'optime',
+        'repl_coordinator_interface',
     ],
 )
 

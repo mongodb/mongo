@@ -301,7 +301,7 @@ TEST_F(TenantMigrationRecipientServiceTest, BasicTenantMigrationRecipientService
 
     TenantMigrationRecipientDocument TenantMigrationRecipientInstance(
         migrationUUID,
-        "DonorHost:12345",
+        "donor-rs/localhost:12345",
         "tenantA",
         ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet::primaryOnly()));
 
@@ -324,7 +324,7 @@ TEST_F(TenantMigrationRecipientServiceTest, InstanceReportsErrorOnFailureWhilePe
 
     TenantMigrationRecipientDocument TenantMigrationRecipientInstance(
         migrationUUID,
-        "DonorHost:12345",
+        "donor-rs/localhost:12345",
         "tenantA",
         ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet::primaryOnly()));
 
@@ -553,12 +553,10 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientConnection_B
 
     // Create and start the instance.
     auto opCtx = makeOperationContext();
-    auto instance = TenantMigrationRecipientService::Instance::getOrCreate(
-        opCtx.get(), _service, initialStateDocument.toBSON());
-    ASSERT(instance.get());
-
-    // Wait for task completion failure.
-    ASSERT_EQUALS(ErrorCodes::FailedToParse, instance->getCompletionFuture().getNoThrow().code());
+    ASSERT_THROWS_CODE(TenantMigrationRecipientService::Instance::getOrCreate(
+                           opCtx.get(), _service, initialStateDocument.toBSON()),
+                       DBException,
+                       ErrorCodes::FailedToParse);
 }
 
 TEST_F(TenantMigrationRecipientServiceTest,
@@ -575,12 +573,10 @@ TEST_F(TenantMigrationRecipientServiceTest,
 
     // Create and start the instance.
     auto opCtx = makeOperationContext();
-    auto instance = TenantMigrationRecipientService::Instance::getOrCreate(
-        opCtx.get(), _service, initialStateDocument.toBSON());
-    ASSERT(instance.get());
-
-    // Wait for task completion failure.
-    ASSERT_EQUALS(ErrorCodes::FailedToParse, instance->getCompletionFuture().getNoThrow().code());
+    ASSERT_THROWS_CODE(TenantMigrationRecipientService::Instance::getOrCreate(
+                           opCtx.get(), _service, initialStateDocument.toBSON()),
+                       DBException,
+                       ErrorCodes::BadValue);
 }
 
 TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientGetStartOpTime_NoTransaction) {
