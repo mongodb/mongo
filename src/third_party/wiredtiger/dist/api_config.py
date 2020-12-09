@@ -132,7 +132,7 @@ for line in open(f, 'r'):
             fix_sentence_endings=True)
     # Separate at spaces, and after a set of non-breaking space indicators.
     w.wordsep_re = w.wordsep_simple_re = \
-        re.compile(r'(\s+|(?<=&nbsp;)[\w_,.;:]*)')
+        re.compile(r'(\s+|(?<=&nbsp;)[\w_,.;:]+)')
     for c in api_data.methods[config_name].config:
         if 'undoc' in c.flags:
             continue
