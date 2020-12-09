@@ -49,7 +49,13 @@ public:
     AsyncRequestExecutor(const AsyncRequestExecutor&) = delete;
 
     explicit AsyncRequestExecutor(std::string name);
-    ~AsyncRequestExecutor();
+
+    /**
+     * Wrap the startup and shutdown interfaces provided by `_pool` and delegate the concurrency
+     * control to corresponding member functions of `ThreadPool`.
+     */
+    void start();
+    void stop();
 
     /**
      * Runs the command-specific code to handle the request.
@@ -59,7 +65,7 @@ public:
 
     /**
      * Schedules the request on a thread pool (i.e., `_pool`) and calls into `handleRequest` to
-     * asynchronously execute the command.
+     * asynchronously execute the command. Note that the scheduled tasks run inline during shutdown.
      */
     Future<void> schedule(std::shared_ptr<RequestExecutionContext> rec);
 

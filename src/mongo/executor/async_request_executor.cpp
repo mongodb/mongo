@@ -46,12 +46,15 @@ AsyncRequestExecutor::AsyncRequestExecutor(std::string name) : _name(std::move(n
     options.minThreads = 0;
     options.maxThreads = 1;
     _pool = std::make_unique<ThreadPool>(std::move(options));
+}
+
+void AsyncRequestExecutor::start() {
     _pool->startup();
     LOGV2_DEBUG(
         4910801, kDiagnosticLogLevel, "Started asynchronous request executor", "name"_attr = _name);
 }
 
-AsyncRequestExecutor::~AsyncRequestExecutor() {
+void AsyncRequestExecutor::stop() {
     _pool->shutdown();
     _pool->join();
     LOGV2_DEBUG(

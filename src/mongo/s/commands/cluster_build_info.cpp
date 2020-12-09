@@ -59,6 +59,11 @@ ClusterBuildInfoExecutor* ClusterBuildInfoExecutor::get(ServiceContext* svc) {
     return const_cast<ClusterBuildInfoExecutor*>(&getClusterBuildInfoExecutor(svc));
 }
 
+const auto clusterBuildInfoExecutorRegisterer = ServiceContext::ConstructorActionRegisterer{
+    "ClusterBuildInfoExecutor",
+    [](ServiceContext* ctx) { getClusterBuildInfoExecutor(ctx).start(); },
+    [](ServiceContext* ctx) { getClusterBuildInfoExecutor(ctx).stop(); }};
+
 class ClusterCmdBuildInfo : public BasicCommand {
 public:
     ClusterCmdBuildInfo() : BasicCommand("buildInfo", "buildinfo") {}
