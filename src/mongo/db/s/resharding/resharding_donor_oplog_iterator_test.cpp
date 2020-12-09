@@ -83,9 +83,8 @@ public:
         ReshardingDonorOplogId oplogId(id, id);
         const BSONObj oField(BSON("msg"
                                   << "Created temporary resharding collection"));
-        const BSONObj o2Field(BSON("type"
-                                   << "reshardFinalOp"
-                                   << "reshardingUUID" << UUID::gen()));
+        const BSONObj o2Field(
+            BSON("type" << kReshardFinalOpLogType << "reshardingUUID" << UUID::gen()));
         return makeOplog(_crudNss, _uuid, repl::OpTypeEnum::kNoop, oField, o2Field, oplogId);
     }
 

@@ -356,7 +356,6 @@ std::unique_ptr<Pipeline, PipelineDeleter> createOplogFetchingPipelineForReshard
     UUID collUUID,
     const ShardId& recipientShard,
     bool doesDonorOwnMinKeyChunk) {
-
     using Doc = Document;
     using Arr = std::vector<Value>;
     using V = Value;
@@ -572,7 +571,7 @@ bool isFinalOplog(const repl::OplogEntry& oplog) {
         return false;
     }
 
-    return o2Field->getField("type").valueStringDataSafe() == "reshardFinalOp"_sd;
+    return o2Field->getField("type").valueStringDataSafe() == kReshardFinalOpLogType;
 }
 
 bool isFinalOplog(const repl::OplogEntry& oplog, UUID reshardingUUID) {

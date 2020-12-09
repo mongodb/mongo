@@ -118,6 +118,12 @@ void ensureFulfilledPromise(WithLock lk, SharedPromise<void>& sp) {
         sp.emplaceValue();
     }
 }
+
+void ensureFulfilledPromise(WithLock lk, SharedPromise<void>& sp, Status error) {
+    if (!sp.getFuture().isReady()) {
+        sp.setError(error);
+    }
+}
 }  // namespace
 
 std::shared_ptr<repl::PrimaryOnlyService::Instance> ReshardingDonorService::constructInstance(
@@ -198,6 +204,10 @@ void ReshardingDonorService::DonorStateMachine::interrupt(Status status) {
 
     if (!_allRecipientsDoneApplying.getFuture().isReady()) {
         _allRecipientsDoneApplying.setError(status);
+    }
+
+    if (!_finalOplogEntriesWritten.getFuture().isReady()) {
+        _finalOplogEntriesWritten.setError(status);
     }
 
     if (!_coordinatorHasCommitted.getFuture().isReady()) {
@@ -296,7 +306,91 @@ void ReshardingDonorService::DonorStateMachine::
         return;
     }
 
+    {
+        const auto& nss = _donorDoc.getNss();
+        const auto& nssUUID = _donorDoc.getExistingUUID();
+        const auto& reshardingUUID = _donorDoc.get_id();
+        auto opCtx = cc().makeOperationContext();
+        auto rawOpCtx = opCtx.get();
+
+        auto generateOplogEntry = [&](ShardId destinedRecipient) {
+            repl::MutableOplogEntry oplog;
+            oplog.setNss(nss);
+            oplog.setOpType(repl::OpTypeEnum::kNoop);
+            oplog.setUuid(nssUUID);
+            oplog.setDestinedRecipient(destinedRecipient);
+            oplog.setObject(
+                BSON("msg" << fmt::format("Writes to {} are temporarily blocked for resharding.",
+                                          nss.toString())));
+            oplog.setObject2(
+                BSON("type" << kReshardFinalOpLogType << "reshardingUUID" << reshardingUUID));
+            oplog.setOpTime(OplogSlot());
+            oplog.setWallClockTime(opCtx->getServiceContext()->getFastClockSource()->now());
+            return oplog;
+        };
+
+        try {
+            Timer latency;
+            const auto& tempNss = constructTemporaryReshardingNss(_donorDoc.getNss().db(),
+                                                                  _donorDoc.getExistingUUID());
+            auto* catalogCache = Grid::get(rawOpCtx)->catalogCache();
+            auto cm = uassertStatusOK(catalogCache->getCollectionRoutingInfo(rawOpCtx, tempNss));
+
+            uassert(ErrorCodes::NamespaceNotSharded,
+                    str::stream() << "Expected collection " << tempNss << " to be sharded",
+                    cm.isSharded());
+
+            std::set<ShardId> recipients;
+            cm.getAllShardIds(&recipients);
+
+            for (const auto& recipient : recipients) {
+                auto oplog = generateOplogEntry(recipient);
+                writeConflictRetry(
+                    rawOpCtx,
+                    "ReshardingBlockWritesOplog",
+                    NamespaceString::kRsOplogNamespace.ns(),
+                    [&] {
+                        AutoGetOplog oplogWrite(rawOpCtx, OplogAccessMode::kWrite);
+                        WriteUnitOfWork wunit(rawOpCtx);
+                        const auto& oplogOpTime = repl::logOp(rawOpCtx, &oplog);
+                        uassert(5279507,
+                                str::stream()
+                                    << "Failed to create new oplog entry for oplog with opTime: "
+                                    << oplog.getOpTime().toString() << ": "
+                                    << redact(oplog.toBSON()),
+                                !oplogOpTime.isNull());
+                        wunit.commit();
+                    });
+            }
+
+            {
+                stdx::lock_guard<Latch> lg(_mutex);
+                LOGV2_DEBUG(5279504,
+                            0,
+                            "Committed oplog entries to temporarily block writes for resharding",
+                            "namespace"_attr = nss,
+                            "reshardingUUID"_attr = reshardingUUID,
+                            "numRecipients"_attr = recipients.size(),
+                            "duration"_attr = duration_cast<Milliseconds>(latency.elapsed()));
+                ensureFulfilledPromise(lg, _finalOplogEntriesWritten);
+            }
+        } catch (const DBException& e) {
+            const auto& status = e.toStatus();
+            stdx::lock_guard<Latch> lg(_mutex);
+            LOGV2_ERROR(5279508,
+                        "Exception while writing resharding final oplog entries",
+                        "reshardingUUID"_attr = reshardingUUID,
+                        "error"_attr = status);
+            ensureFulfilledPromise(lg, _finalOplogEntriesWritten, status);
+            uassertStatusOK(status);
+        }
+    }
+
     _transitionState(DonorStateEnum::kMirroring);
+}
+
+SharedSemiFuture<void> ReshardingDonorService::DonorStateMachine::awaitFinalOplogEntriesWritten() {
+    return _finalOplogEntriesWritten.getFuture();
 }
 
 ExecutorFuture<void>
@@ -354,6 +448,13 @@ void ReshardingDonorService::DonorStateMachine::_transitionState(
     ReshardingDonorDocument replacementDoc(_donorDoc);
     replacementDoc.setState(endState);
     emplaceMinFetchTimestampIfExists(replacementDoc, minFetchTimestamp);
+
+    LOGV2_INFO(5279505,
+               "Transition resharding donor state",
+               "newState"_attr = DonorState_serializer(replacementDoc.getState()),
+               "oldState"_attr = DonorState_serializer(_donorDoc.getState()),
+               "reshardingUUID"_attr = _donorDoc.get_id());
+
     _updateDonorDocument(std::move(replacementDoc));
 }
 

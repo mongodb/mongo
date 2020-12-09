@@ -97,6 +97,8 @@ public:
 
     void onReshardingFieldsChanges(const TypeCollectionReshardingFields& reshardingFields);
 
+    SharedSemiFuture<void> awaitFinalOplogEntriesWritten();
+
 private:
     // The following functions correspond to the actions to take at a particular donor state.
     void _transitionToPreparingToDonate();
@@ -154,6 +156,8 @@ private:
     SharedPromise<void> _allRecipientsDoneCloning;
 
     SharedPromise<void> _allRecipientsDoneApplying;
+
+    SharedPromise<void> _finalOplogEntriesWritten;
 
     SharedPromise<void> _coordinatorHasCommitted;
 

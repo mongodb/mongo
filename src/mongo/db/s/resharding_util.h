@@ -48,6 +48,7 @@
 namespace mongo {
 
 constexpr auto kReshardingOplogPrePostImageOps = "prePostImageOps"_sd;
+constexpr auto kReshardFinalOpLogType = "reshardFinalOp"_sd;
 
 /**
  * Emplaces the 'fetchTimestamp' onto the ClassWithFetchTimestamp if the timestamp has been

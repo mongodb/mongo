@@ -47,9 +47,6 @@ using std::string;
 
 namespace {
 
-// TODO SERVER-52795: Remove once the donor shards write the final oplog entry themselves.
-MONGO_FAIL_POINT_DEFINE(allowDirectWritesToLiveOplog);
-
 /**
  * Validates the nesting depth of 'obj', returning a non-OK status if it exceeds the limit.
  */
@@ -188,8 +185,7 @@ Status userAllowedWriteNS(const NamespaceString& ns) {
          serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
              ServerGlobalParams::FeatureCompatibility::Version::kVersion47)) ||
         (ns.isOplog() &&
-         repl::ReplicationCoordinator::get(getGlobalServiceContext())->isReplEnabled() &&
-         !MONGO_unlikely(allowDirectWritesToLiveOplog.shouldFail()))) {
+         repl::ReplicationCoordinator::get(getGlobalServiceContext())->isReplEnabled())) {
         return Status(ErrorCodes::InvalidNamespace, str::stream() << "cannot write to " << ns);
     }
     return userAllowedCreateNS(ns);

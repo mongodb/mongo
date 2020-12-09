@@ -65,9 +65,10 @@ void ShardServerTestFixture::setUp() {
     _clusterId = OID::gen();
     ShardingState::get(getServiceContext())->setInitialized(_myShardName, _clusterId);
 
-    CatalogCacheLoader::set(getServiceContext(),
-                            std::make_unique<ShardServerCatalogCacheLoader>(
-                                std::make_unique<ConfigServerCatalogCacheLoader>()));
+    if (!_catalogCacheLoader)
+        _catalogCacheLoader = std::make_unique<ShardServerCatalogCacheLoader>(
+            std::make_unique<ConfigServerCatalogCacheLoader>());
+    CatalogCacheLoader::set(getServiceContext(), std::move(_catalogCacheLoader));
 
     uassertStatusOK(
         initializeGlobalShardingStateForMongodForTest(ConnectionString(kConfigHostAndPort)));
@@ -75,6 +76,13 @@ void ShardServerTestFixture::setUp() {
     // Set the findHost() return value on the mock targeter so that later calls to the
     // config targeter's findHost() return the appropriate value.
     configTargeterMock()->setFindHostReturnValue(kConfigHostAndPort);
+}
+
+// Sets the catalog cache loader for mocking. This must be called before the setUp function is
+// invoked.
+void ShardServerTestFixture::setCatalogCacheLoader(std::unique_ptr<CatalogCacheLoader> loader) {
+    invariant(loader && !_catalogCacheLoader);
+    _catalogCacheLoader = std::move(loader);
 }
 
 void ShardServerTestFixture::tearDown() {
