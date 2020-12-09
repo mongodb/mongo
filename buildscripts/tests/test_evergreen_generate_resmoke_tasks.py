@@ -688,8 +688,7 @@ class EvergreenConfigGeneratorTest(unittest.TestCase):
         config = shrub_project.as_dict()
 
         self.assertEqual(len(config["tasks"]), len(suites) + 1)
-        self.assertEqual(options.large_distro_name,
-                         config["buildvariants"][0]["tasks"][0]["distros"][0])
+        self.assertIsNone(config["buildvariants"][0]["tasks"][0].get("distros"))
 
     def test_selecting_tasks(self):
         is_task_dependency = under_test.EvergreenConfigGenerator._is_task_dependency
