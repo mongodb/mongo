@@ -96,6 +96,33 @@ void deletePersistedDefaultRWConcernDocument(OperationContext* opCtx) {
     uassertStatusOK(getStatusFromWriteCommandReply(commandResponse->getCommandReply()));
 }
 
+void checkInitialSyncFinished(OperationContext* opCtx) {
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    const bool isReplSet =
+        replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet;
+
+    uassert(ErrorCodes::ConflictingOperationInProgress,
+            str::stream() << "Cannot upgrade/downgrade the cluster when the replica set config "
+                          << "contains 'newlyAdded' members; wait for those members to "
+                          << "finish its initial sync procedure",
+            !(isReplSet && replCoord->replSetContainsNewlyAddedMembers()));
+
+
+    // We should make sure the current config w/o 'newlyAdded' members got replicated
+    // to all nodes.
+    LOGV2(4637904, "Waiting for the current replica set config to propagate to all nodes.");
+    // If a write concern is given, we'll use its wTimeout. It's kNoTimeout by default.
+    WriteConcernOptions writeConcern(repl::ReplSetConfig::kConfigAllWriteConcernName,
+                                     WriteConcernOptions::SyncMode::NONE,
+                                     opCtx->getWriteConcern().wTimeout);
+    writeConcern.checkCondition = WriteConcernOptions::CheckCondition::Config;
+    repl::OpTime fakeOpTime(Timestamp(1, 1), replCoord->getTerm());
+    uassertStatusOKWithContext(
+        replCoord->awaitReplication(opCtx, fakeOpTime, writeConcern).status,
+        "Failed to wait for the current replica set config to propagate to all nodes");
+    LOGV2(4637905, "The current replica set config has been propagated to all nodes.");
+}
+
 /**
  * Sets the minimum allowed feature compatibility version for the cluster. The cluster should not
  * use any new features introduced in binary versions that are newer than the feature compatibility
@@ -213,6 +240,8 @@ public:
             actualVersion, requestedVersion, isFromConfigServer);
 
         if (actualVersion < requestedVersion) {
+            checkInitialSyncFinished(opCtx);
+
             FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
                 opCtx, actualVersion, requestedVersion, isFromConfigServer);
             {
@@ -254,14 +283,19 @@ public:
                     ShardingCatalogManager::get(opCtx)->setFeatureCompatibilityVersionOnShards(
                         opCtx, CommandHelpers::appendMajorityWriteConcern(request.toBSON({}))));
 
-                // Create a 'timestamp' for the databases and collections that don't have one. This
-                // must be done after all shards have been upgraded in order to guarantee that when
-                // createDBTimestampsFor49 and createCollectionTimestampsFor49 start, no new
-                // databases or collections without a timestamp will be added.
-                if (requestedVersion >= FeatureCompatibilityParams::Version::kVersion49 &&
-                    feature_flags::gShardingFullDDLSupport.isEnabledAndIgnoreFCV()) {
-                    ShardingCatalogManager::get(opCtx)->createDBTimestampsFor49(opCtx);
-                    ShardingCatalogManager::get(opCtx)->createCollectionTimestampsFor49(opCtx);
+                // Amend metadata created before FCV 4.9. This must be done after all shards have
+                // been upgraded to 4.9 in order to guarantee that when the metadata is amended, no
+                // new databases or collections with the old version of the metadata will be added.
+                // TODO SERVER-53283: Remove once 5.0 has been released.
+                if (requestedVersion >= FeatureCompatibilityParams::Version::kVersion49) {
+                    try {
+                        ShardingCatalogManager::get(opCtx)->upgradeMetadataFor49(opCtx);
+                    } catch (const DBException& e) {
+                        LOGV2(5276708,
+                              "Failed to upgrade sharding metadata: {error}",
+                              "error"_attr = e.toString());
+                        throw;
+                    }
                 }
             }
 
@@ -295,26 +329,7 @@ public:
             const bool isReplSet =
                 replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet;
 
-            uassert(ErrorCodes::ConflictingOperationInProgress,
-                    str::stream() << "Cannot downgrade the cluster when the replica set config "
-                                  << "contains 'newlyAdded' members; wait for those members to "
-                                  << "finish its initial sync procedure",
-                    !(isReplSet && replCoord->replSetContainsNewlyAddedMembers()));
-
-            // We should make sure the current config w/o 'newlyAdded' members got replicated
-            // to all nodes.
-            LOGV2(4637904, "Waiting for the current replica set config to propagate to all nodes.");
-            // If a write concern is given, we'll use its wTimeout. It's kNoTimeout by default.
-            WriteConcernOptions writeConcern(repl::ReplSetConfig::kConfigAllWriteConcernName,
-                                             WriteConcernOptions::SyncMode::NONE,
-                                             opCtx->getWriteConcern().wTimeout);
-            writeConcern.checkCondition = WriteConcernOptions::CheckCondition::Config;
-            repl::OpTime fakeOpTime(Timestamp(1, 1), replCoord->getTerm());
-            uassertStatusOKWithContext(
-                replCoord->awaitReplication(opCtx, fakeOpTime, writeConcern).status,
-                "Failed to wait for the current replica set config to propagate to all "
-                "nodes");
-            LOGV2(4637905, "The current replica set config has been propagated to all nodes.");
+            checkInitialSyncFinished(opCtx);
 
             FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
                 opCtx, actualVersion, requestedVersion, isFromConfigServer);
@@ -356,16 +371,20 @@ public:
                     ShardingCatalogManager::get(opCtx)->setFeatureCompatibilityVersionOnShards(
                         opCtx, CommandHelpers::appendMajorityWriteConcern(request.toBSON({}))));
 
-                // Delete the 'timestamp' field in config.databases and config.collections entries.
-                // This must be done after all shards have been downgraded in order to guarantee
-                // that when downgradeConfigDatabasesEntriesToPre49 and
-                // downgradeConfigCollectionEntriesToPre49 start, no new databases or collections
-                // with a timestamp will be added.
+                // Amend metadata created in FCV 4.9. This must be done after all shards have
+                // been downgraded to prior 4.9 in order to guarantee that when the metadata is
+                // amended, no new databases or collections with the new version of the metadata
+                // will be added.
+                // TODO SERVER-53283: Remove once 5.0 has been released.
                 if (requestedVersion < FeatureCompatibilityParams::Version::kVersion49) {
-                    ShardingCatalogManager::get(opCtx)->downgradeConfigDatabasesEntriesToPre49(
-                        opCtx);
-                    ShardingCatalogManager::get(opCtx)->downgradeConfigCollectionEntriesToPre49(
-                        opCtx);
+                    try {
+                        ShardingCatalogManager::get(opCtx)->downgradeMetadataToPre49(opCtx);
+                    } catch (const DBException& e) {
+                        LOGV2(5276709,
+                              "Failed to downgrade sharding metadata: {error}",
+                              "error"_attr = e.toString());
+                        throw;
+                    }
                 }
             }
 

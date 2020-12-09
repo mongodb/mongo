@@ -396,6 +396,7 @@ function runReplicaSetTest(downgradeVersion) {
     // Verify that the 'downgradeVersion' secondary successfully performed its initial sync.
     assert.commandWorked(
         primaryAdminDB.getSiblingDB("test").coll.insert({awaitRepl: true}, {writeConcern: {w: 3}}));
+    rst.waitForAllNewlyAddedRemovals();
 
     // Test that a downgraded secondary can no longer replicate from the primary after the FCV is
     // upgraded to 'latestFCV'.
@@ -427,6 +428,7 @@ function runReplicaSetTest(downgradeVersion) {
     // Ensure the 'downgradeVersion' binary node succeeded its initial sync.
     assert.commandWorked(
         primary.getDB("test").coll.insert({awaitRepl: true}, {writeConcern: {w: 3}}));
+    rst.waitForAllNewlyAddedRemovals();
 
     // Run {setFCV: downgradeFCV}. This should be idempotent.
     assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: downgradeFCV}));

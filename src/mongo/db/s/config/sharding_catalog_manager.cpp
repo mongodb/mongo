@@ -176,6 +176,27 @@ void abortTransaction(OperationContext* opCtx, TxnNumber txnNumber) {
     }
 }
 
+BatchedCommandRequest buildUpdateOp(const NamespaceString& nss,
+                                    const BSONObj& query,
+                                    const BSONObj& update,
+                                    bool upsert,
+                                    bool multi) {
+    BatchedCommandRequest request([&] {
+        write_ops::Update updateOp(nss);
+        updateOp.setUpdates({[&] {
+            write_ops::UpdateOpEntry entry;
+            entry.setQ(query);
+            entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(update));
+            entry.setUpsert(upsert);
+            entry.setMulti(multi);
+            return entry;
+        }()});
+        return updateOp;
+    }());
+
+    return request;
+}
+
 }  // namespace
 
 void ShardingCatalogManager::create(ServiceContext* serviceContext,
@@ -499,7 +520,29 @@ void ShardingCatalogManager::removePre49LegacyMetadata(OperationContext* opCtx) 
     uassertStatusOK(getWriteConcernStatusFromCommandResult(commandResult->getCommandReply()));
 }
 
-void ShardingCatalogManager::createDBTimestampsFor49(OperationContext* opCtx) {
+void ShardingCatalogManager::upgradeMetadataFor49(OperationContext* opCtx) {
+    LOGV2(5276704, "Starting metadata upgrade to 4.9");
+
+    if (feature_flags::gShardingFullDDLSupport.isEnabledAndIgnoreFCV()) {
+        _createDBTimestampsFor49(opCtx);
+        _upgradeCollectionsAndChunksMetadataFor49(opCtx);
+    }
+
+    LOGV2(5276705, "Successfully upgraded metadata to 4.9");
+}
+
+void ShardingCatalogManager::downgradeMetadataToPre49(OperationContext* opCtx) {
+    LOGV2(5276706, "Starting metadata downgrade to pre 4.9");
+
+    if (feature_flags::gShardingFullDDLSupport.isEnabledAndIgnoreFCV()) {
+        _downgradeConfigDatabasesEntriesToPre49(opCtx);
+        _downgradeCollectionsAndChunksMetadataToPre49(opCtx);
+    }
+
+    LOGV2(5276707, "Successfully downgraded metadata to pre 4.9");
+}
+
+void ShardingCatalogManager::_createDBTimestampsFor49(OperationContext* opCtx) {
     LOGV2(5258802, "Starting upgrade of config.databases");
 
     const auto catalogClient = Grid::get(opCtx)->catalogClient();
@@ -541,119 +584,200 @@ void ShardingCatalogManager::createDBTimestampsFor49(OperationContext* opCtx) {
     LOGV2(5258803, "Successfully upgraded config.databases");
 }
 
-void ShardingCatalogManager::downgradeConfigDatabasesEntriesToPre49(OperationContext* opCtx) {
-    if (feature_flags::gShardingFullDDLSupport.isEnabledAndIgnoreFCV()) {
-        LOGV2(5258806, "Starting downgrade of config.databases");
+void ShardingCatalogManager::_downgradeConfigDatabasesEntriesToPre49(OperationContext* opCtx) {
+    LOGV2(5258806, "Starting downgrade of config.databases");
 
-        DBDirectClient client(opCtx);
+    DBDirectClient client(opCtx);
 
-        // Clear the 'timestamp' fields from config.databases
-        write_ops::Update unsetTimestamp(DatabaseType::ConfigNS, [] {
-            write_ops::UpdateOpEntry u;
-            u.setQ({});
-            u.setU(write_ops::UpdateModification::parseFromClassicUpdate(BSON(
-                "$unset" << BSON(
-                    DatabaseType::version() + "." + DatabaseVersion::kTimestampFieldName << ""))));
-            u.setMulti(true);
-            return std::vector{u};
-        }());
-        unsetTimestamp.setWriteCommandBase([] {
-            write_ops::WriteCommandBase base;
-            base.setOrdered(false);
-            return base;
-        }());
+    // Clear the 'timestamp' fields from config.databases
+    write_ops::Update unsetTimestamp(DatabaseType::ConfigNS, [] {
+        write_ops::UpdateOpEntry u;
+        u.setQ({});
+        u.setU(write_ops::UpdateModification::parseFromClassicUpdate(
+            BSON("$unset" << BSON(
+                     DatabaseType::version() + "." + DatabaseVersion::kTimestampFieldName << ""))));
+        u.setMulti(true);
+        return std::vector{u};
+    }());
+    unsetTimestamp.setWriteCommandBase([] {
+        write_ops::WriteCommandBase base;
+        base.setOrdered(false);
+        return base;
+    }());
 
-        auto commandResult = client.runCommand(OpMsgRequest::fromDBAndBody(
-            DatabaseType::ConfigNS.db(),
-            unsetTimestamp.toBSON(ShardingCatalogClient::kMajorityWriteConcern.toBSON())));
+    auto commandResult = client.runCommand(OpMsgRequest::fromDBAndBody(
+        DatabaseType::ConfigNS.db(),
+        unsetTimestamp.toBSON(ShardingCatalogClient::kMajorityWriteConcern.toBSON())));
 
-        uassertStatusOK([&] {
-            BatchedCommandResponse response;
-            std::string unusedErrmsg;
-            response.parseBSON(
-                commandResult->getCommandReply(),
-                &unusedErrmsg);  // Return value intentionally ignored, because response.toStatus()
-                                 // will contain any errors in more detail
-            return response.toStatus();
-        }());
-        uassertStatusOK(getWriteConcernStatusFromCommandResult(commandResult->getCommandReply()));
+    uassertStatusOK([&] {
+        BatchedCommandResponse response;
+        std::string unusedErrmsg;
+        response.parseBSON(
+            commandResult->getCommandReply(),
+            &unusedErrmsg);  // Return value intentionally ignored, because response.toStatus()
+                             // will contain any errors in more detail
+        return response.toStatus();
+    }());
+    uassertStatusOK(getWriteConcernStatusFromCommandResult(commandResult->getCommandReply()));
 
-        LOGV2(5258807, "Successfully downgraded of config.databases");
-    }
+    LOGV2(5258807, "Successfully downgraded config.databases");
 }
 
-void ShardingCatalogManager::createCollectionTimestampsFor49(OperationContext* opCtx) {
-    LOGV2(5258800, "Starting upgrade of config.collections");
+void ShardingCatalogManager::_upgradeCollectionsAndChunksMetadataFor49(OperationContext* opCtx) {
+    LOGV2(5276700, "Starting upgrade of config.collections and config.chunks");
 
-    const auto catalogClient = Grid::get(opCtx)->catalogClient();
     auto const catalogCache = Grid::get(opCtx)->catalogCache();
     auto const configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-    const auto collectionDocs =
-        uassertStatusOK(configShard->exhaustiveFindOnConfig(
-                            opCtx,
-                            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                            repl::ReadConcernLevel::kLocalReadConcern,
-                            CollectionType::ConfigNS,
-                            BSON(CollectionType::kTimestampFieldName << BSON("$exists" << false)),
-                            BSONObj(),
-                            boost::none))
+
+    auto collectionDocs =
+        uassertStatusOK(
+            configShard->exhaustiveFindOnConfig(
+                opCtx,
+                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                repl::ReadConcernLevel::kLocalReadConcern,
+                CollectionType::ConfigNS,
+                BSONObj(BSON(CollectionType::kTimestampFieldName << BSON("$exists" << false))),
+                BSONObj(),
+                boost::none))
             .docs;
 
+    for (const auto& doc : collectionDocs) {
+        const CollectionType coll(doc);
+        const auto uuid = coll.getUuid();
+        const auto nss = coll.getNss();
 
+        auto updateCollectionAndChunksFn = [&](OperationContext* opCtx, TxnNumber txnNumber) {
+            _createChunkCollUuidFor49InTxn(opCtx, nss, uuid, txnNumber);
+            _createCollectionTimestampFor49InTxn(opCtx, nss, txnNumber);
+        };
+
+        withTransaction(opCtx, nss, updateCollectionAndChunksFn);
+        catalogCache->invalidateCollectionEntry_LINEARIZABLE(nss);
+    }
+
+    LOGV2(5276701, "Successfully upgraded config.collections and config.chunks");
+}
+
+void ShardingCatalogManager::_downgradeCollectionsAndChunksMetadataToPre49(
+    OperationContext* opCtx) {
+    LOGV2(5276702, "Starting downgrade of config.collections and config.chunks");
+
+    auto const configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+    auto collectionDocs =
+        uassertStatusOK(
+            configShard->exhaustiveFindOnConfig(
+                opCtx,
+                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                repl::ReadConcernLevel::kLocalReadConcern,
+                CollectionType::ConfigNS,
+                BSONObj(BSON(CollectionType::kTimestampFieldName << BSON("$exists" << true))),
+                BSONObj(),
+                boost::none))
+            .docs;
+
+    auto const catalogCache = Grid::get(opCtx)->catalogCache();
     for (const auto& doc : collectionDocs) {
         const CollectionType coll(doc);
         const auto nss = coll.getNss();
 
-        auto now = VectorClock::get(opCtx)->getTime();
-        auto clusterTime = now.clusterTime().asTimestamp();
+        auto updateCollectionAndChunksFn = [&](OperationContext* opCtx, TxnNumber txnNumber) {
+            _deleteConfigCollectionsTimestampInTxn(opCtx, nss, txnNumber);
+            _deleteChunkCollUuidInTxn(opCtx, nss, txnNumber);
+        };
 
-        uassertStatusOK(catalogClient->updateConfigDocument(
-            opCtx,
-            CollectionType::ConfigNS,
-            BSON(CollectionType::kNssFieldName << nss.ns()),
-            BSON("$set" << BSON(CollectionType::kTimestampFieldName << clusterTime)),
-            false /* upsert */,
-            ShardingCatalogClient::kMajorityWriteConcern));
-
+        withTransaction(opCtx, nss, updateCollectionAndChunksFn);
         catalogCache->invalidateCollectionEntry_LINEARIZABLE(nss);
     }
 
-    LOGV2(5258801, "Successfully upgraded config.collections");
+    LOGV2(5276703, "Successfully downgraded config.collections and config.chunks");
 }
 
-void ShardingCatalogManager::downgradeConfigCollectionEntriesToPre49(OperationContext* opCtx) {
-    if (feature_flags::gShardingFullDDLSupport.isEnabledAndIgnoreFCV()) {
-        DBDirectClient client(opCtx);
+void ShardingCatalogManager::_createCollectionTimestampFor49InTxn(OperationContext* opCtx,
+                                                                  const NamespaceString& nss,
+                                                                  TxnNumber txnNumber) {
+    auto now = VectorClock::get(opCtx)->getTime();
+    auto clusterTime = now.clusterTime().asTimestamp();
 
-        // Clear the 'timestamp' fields from config.collections
-        write_ops::Update unsetTimestamp(CollectionType::ConfigNS, [] {
-            write_ops::UpdateOpEntry u;
-            u.setQ({});
-            u.setU(write_ops::UpdateModification::parseFromClassicUpdate(
-                BSON("$unset" << BSON(CollectionType::kTimestampFieldName << ""))));
-            u.setMulti(true);
-            return std::vector{u};
-        }());
-        unsetTimestamp.setWriteCommandBase([] {
-            write_ops::WriteCommandBase base;
-            base.setOrdered(false);
-            return base;
-        }());
+    try {
+        writeToConfigDocumentInTxn(
+            opCtx,
+            CollectionType::ConfigNS,
+            buildUpdateOp(CollectionType::ConfigNS,
+                          BSON(CollectionType::kNssFieldName << nss.ns()),
+                          BSON("$set" << BSON(CollectionType::kTimestampFieldName << clusterTime)),
+                          false, /* upsert */
+                          false  /* multi */
+                          ),
+            txnNumber);
+    } catch (DBException& e) {
+        e.addContext(str::stream() << "Failed to update config.collections to set timestamp for "
+                                   << nss.toString());
+        throw;
+    }
+}
 
-        auto commandResult = client.runCommand(OpMsgRequest::fromDBAndBody(
-            CollectionType::ConfigNS.db(),
-            unsetTimestamp.toBSON(ShardingCatalogClient::kMajorityWriteConcern.toBSON())));
+void ShardingCatalogManager::_deleteConfigCollectionsTimestampInTxn(OperationContext* opCtx,
+                                                                    const NamespaceString& nss,
+                                                                    TxnNumber txnNumber) {
+    try {
+        writeToConfigDocumentInTxn(
+            opCtx,
+            CollectionType::ConfigNS,
+            buildUpdateOp(CollectionType::ConfigNS,
+                          BSON(CollectionType::kNssFieldName << nss.ns()),
+                          BSON("$unset" << BSON(CollectionType::kTimestampFieldName << "")),
+                          false, /* upsert */
+                          false  /* multi */
+                          ),
+            txnNumber);
+    } catch (DBException& e) {
+        e.addContext(str::stream() << "Failed to update config.collections to unset timestamp for "
+                                   << nss.toString());
+        throw;
+    }
+}
 
-        uassertStatusOK([&] {
-            BatchedCommandResponse response;
-            std::string unusedErrmsg;
-            response.parseBSON(
-                commandResult->getCommandReply(),
-                &unusedErrmsg);  // Return value intentionally ignored, because response.toStatus()
-                                 // will contain any errors in more detail
-            return response.toStatus();
-        }());
-        uassertStatusOK(getWriteConcernStatusFromCommandResult(commandResult->getCommandReply()));
+void ShardingCatalogManager::_createChunkCollUuidFor49InTxn(OperationContext* opCtx,
+                                                            const NamespaceString& nss,
+                                                            const mongo::UUID& collectionUuid,
+                                                            TxnNumber txnNumber) {
+    try {
+        writeToConfigDocumentInTxn(
+            opCtx,
+            ChunkType::ConfigNS,
+            buildUpdateOp(
+                ChunkType::ConfigNS,
+                BSON(ChunkType::ns(nss.ns())),
+                BSON("$set" << BSON(ChunkType::collectionUUID(collectionUuid.toString()))),
+                false, /* upsert */
+                true   /* multi */
+                ),
+            txnNumber);
+    } catch (DBException& e) {
+        e.addContext(str::stream() << "Failed to update config.chunks to set collectionUUID for "
+                                   << nss.toString());
+        throw;
+    }
+}
+
+void ShardingCatalogManager::_deleteChunkCollUuidInTxn(OperationContext* opCtx,
+                                                       const NamespaceString& nss,
+                                                       TxnNumber txnNumber) {
+    try {
+        writeToConfigDocumentInTxn(
+            opCtx,
+            ChunkType::ConfigNS,
+            buildUpdateOp(ChunkType::ConfigNS,
+                          BSON(ChunkType::ns(nss.ns())),
+                          BSON("$unset" << BSON(ChunkType::collectionUUID(""))),
+                          false, /* upsert */
+                          true   /* multi */
+                          ),
+            txnNumber);
+    } catch (DBException& e) {
+        e.addContext(str::stream() << "Failed to update config.chunks to unset collectionUUID for "
+                                   << nss.toString());
+        throw;
     }
 }
 

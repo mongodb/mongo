@@ -456,36 +456,20 @@ public:
     void removePre49LegacyMetadata(OperationContext* opCtx);
 
     /**
-     * Creates a 'version.timestamp' for each one of the entries in the config server's
-     * config.databases where it didn't already exist before.
+     * Patches-up persistent metadata for 4.9.
      *
-     * It shall be called when upgrading to 4.9
+     * It shall be called when upgrading to 4.9 or newer versions.
+     * TODO SERVER-53283: Remove once 5.0 has been released.
      */
-    void createDBTimestampsFor49(OperationContext* opCtx);
+    void upgradeMetadataFor49(OperationContext* opCtx);
 
     /**
-     * Downgrades the config.databases entries to prior 4.9 version. More specifically, it removes
-     * the 'version.timestamp' field from all the documents in config.databases.
+     * Patches-up persistent metadata for downgrade from 4.9.
      *
      * It shall be called when downgrading from 4.9 to an earlier version.
+     * TODO SERVER-53283: Remove once 5.0 has been released.
      */
-    void downgradeConfigDatabasesEntriesToPre49(OperationContext* opCtx);
-
-    /**
-     * Creates a 'timestamp' for each one of the entries in the config server's config.collections,
-     * where 'timestamp' does not already exist.
-     *
-     * It shall be called when upgrading to 4.9.
-     */
-    void createCollectionTimestampsFor49(OperationContext* opCtx);
-
-    /**
-     * Downgrades the config.collections entries to prior 4.9 version. More specifically, it removes
-     * the 'timestamp' field from all the documents in config.collections.
-     *
-     * It shall be called when downgrading from 4.9 to an earlier version.
-     */
-    void downgradeConfigCollectionEntriesToPre49(OperationContext* opCtx);
+    void downgradeMetadataToPre49(OperationContext* opCtx);
 
     //
     // For Diagnostics
@@ -602,6 +586,84 @@ private:
                                                       const ReadPreferenceSetting& readPref,
                                                       const std::string& shardName,
                                                       const std::string& zoneName);
+
+    /**
+     * Creates a 'version.timestamp' for each one of the entries in the config server's
+     * config.databases where it didn't already exist before.
+     *
+     * TODO SERVER-53283: Remove once 5.0 has been released.
+     */
+    void _createDBTimestampsFor49(OperationContext* opCtx);
+
+    /**
+     * Downgrades the config.databases entries to prior 4.9 version. More specifically, it removes
+     * the 'version.timestamp' field from all the documents in config.databases.
+     *
+     * TODO SERVER-53283: Remove once 5.0 has been released.
+     */
+    void _downgradeConfigDatabasesEntriesToPre49(OperationContext* opCtx);
+
+    /**
+     * For each one of the entries in config.collections where there is no 'timestamp',
+     * transactionally:
+     * - Patches-up the entries in config.chunks with a 'ns' matching that of the collection to add
+     * a 'collectionUuid' field matching the uuid of the collection.
+     * - Creates a 'timestamp' in its entry in config.collections.
+     *
+     * TODO SERVER-53283: Remove once 5.0 has been released.
+     */
+    void _upgradeCollectionsAndChunksMetadataFor49(OperationContext* opCtx);
+
+    /**
+     * For each one of the entries in config.collections where there is a 'timestamp',
+     * transactionally:
+     * - Patches-up the entries in config.chunks with a 'ns' matching that of the collection to
+     * unset the 'collectionUuid' field.
+     * - Unsets the 'timestamp' in its entry in config.collections.
+     *
+     * TODO SERVER-53283: Remove once 5.0 has been released.
+     */
+    void _downgradeCollectionsAndChunksMetadataToPre49(OperationContext* opCtx);
+
+    /**
+     * Creates a 'timestamp' field for the entry matching nss in config.collections, in a
+     * transaction.
+     *
+     * TODO SERVER-53283: Remove once 5.0 has been released.
+     */
+    void _createCollectionTimestampFor49InTxn(OperationContext* opCtx,
+                                              const NamespaceString& nss,
+                                              TxnNumber txnNumber);
+
+    /**
+     * Deletes the 'timestamp' from the entry in config.collections matching nss, in a transaction.
+     *
+     * TODO SERVER-53283: Remove once 5.0 has been released.
+     */
+    void _deleteConfigCollectionsTimestampInTxn(OperationContext* opCtx,
+                                                const NamespaceString& nss,
+                                                TxnNumber txnNumber);
+
+    /**
+     * Sets the 'collectionUuid' field for the entries matching nss in config.chunks, in a
+     * transaction.
+     *
+     * TODO SERVER-53283: Remove once 5.0 has been released.
+     */
+    void _createChunkCollUuidFor49InTxn(OperationContext* opCtx,
+                                        const NamespaceString& nss,
+                                        const mongo::UUID& collectionUuid,
+                                        TxnNumber txnNumber);
+
+    /**
+     * Deletes the 'collectionUuid' field for the entries matching nss in config.chunks, in a
+     * transaction.
+     *
+     * TODO SERVER-53283: Remove once 5.0 has been released.
+     */
+    void _deleteChunkCollUuidInTxn(OperationContext* opCtx,
+                                   const NamespaceString& nss,
+                                   TxnNumber txnNumber);
 
     // The owning service context
     ServiceContext* const _serviceContext;

@@ -166,12 +166,46 @@ function testTimestampFieldChecksAfterFCVDowngrade() {
     assert.eq(null, timestampInShard);
 }
 
+// testChunkCollectionUuidField: ensures all config.chunks entries include a collection UUID after
+// upgrading from versions prior 4.9; and that it is deleted on downgrade.
+//
+// This test must be removed once 5.0 is defined as the lastLTS (SERVER-52630)
+function testChunkCollectionUuidFieldSetup() {
+    const ns = "sharded.test_chunk_uuid";
+
+    assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1}}));
+    assert.commandWorked(st.s.adminCommand({split: ns, middle: {x: 10}}));
+    assert.commandWorked(st.s.adminCommand({split: ns, middle: {x: -10}}));
+}
+
+function testChunkCollectionUuidFieldChecksAfterUpgrade() {
+    const ns = "sharded.test_chunk_uuid";
+
+    var collUUID = st.config.collections.findOne({_id: ns}).uuid;
+    var cursor = st.config.chunks.find({ns});
+    assert(cursor.hasNext());
+    do {
+        assert.eq(collUUID, UUID(cursor.next().uuid));
+    } while (cursor.hasNext());
+}
+
+function testChunkCollectionUuidFieldChecksAfterFCVDowngrade() {
+    const ns = "sharded.test_chunk_uuid";
+
+    var cursor = st.config.chunks.find({ns});
+    assert(cursor.hasNext());
+    do {
+        assert.eq(undefined, cursor.next().uuid);
+    } while (cursor.hasNext());
+}
+
 function setupInitialStateOnOldVersion() {
     assert.commandWorked(st.s.adminCommand({enableSharding: 'sharded'}));
 
     testDroppedAndDistributionModeFieldsSetup();
     testAllowedMigrationsFieldSetup();
     testTimestampFieldSetup();
+    testChunkCollectionUuidFieldSetup();
 }
 
 function runChecksAfterUpgrade() {
@@ -184,10 +218,9 @@ function runChecksAfterUpgrade() {
 
     if (shardingFullDDLSupport) {
         testTimestampFieldChecksAfterUpgrade();
+        testChunkCollectionUuidFieldChecksAfterUpgrade();
     } else {
-        jsTest.log(
-            'Skipping testTimestampFieldChecksAfterUpgrade because shardingFullDDLSupport is not ' +
-            'enabled');
+        jsTest.log('Skipping tests that require shardingFullDDLSupport feature to be enabled');
     }
 }
 
@@ -205,10 +238,9 @@ function runChecksAfterFCVDowngrade() {
 
     if (shardingFullDDLSupport) {
         testTimestampFieldChecksAfterFCVDowngrade();
+        testChunkCollectionUuidFieldChecksAfterFCVDowngrade();
     } else {
-        jsTest.log(
-            'Skipping testTimestampFieldChecksAfterFCVDowngrade because shardingFullDDLSupport ' +
-            'is not enabled');
+        jsTest.log('Skipping tests that require shardingFullDDLSupport feature to be enabled');
     }
 }
 

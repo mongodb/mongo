@@ -33,6 +33,7 @@ function runTest(downgradeVersion) {
     // Wait for the downgrade secondary to finish initial sync.
     rst.awaitSecondaryNodes();
     rst.awaitReplication();
+    rst.waitForAllNewlyAddedRemovals();
 
     // Stop replication on the downgrade secondary.
     stopServerReplication(downgradeSecondary);
