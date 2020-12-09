@@ -31,7 +31,9 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/util/printable_enum.h"
+#include "mongo/db/query/util/named_enum.h"
+
+namespace mongo {
 
 #define KEYVALUES(ENUMIFY)    \
     ENUMIFY(absentKey)        \
@@ -59,6 +61,6 @@
     ENUMIFY(textScore)        \
     ENUMIFY(trueKey)
 
-MAKE_PRINTABLE_ENUM(KeyValue, KEYVALUES);
-MAKE_PRINTABLE_ENUM_STRING_ARRAY(key_value, KeyValue, KEYVALUES);
+QUERY_UTIL_NAMED_ENUM_DEFINE(KeyValue, KEYVALUES)
 #undef KEYVALUES
+}  // namespace mongo

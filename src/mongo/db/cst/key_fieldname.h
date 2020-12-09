@@ -31,7 +31,9 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/util/printable_enum.h"
+#include "mongo/db/query/util/named_enum.h"
+
+namespace mongo {
 
 #define KEYFIELDNAMES(ENUMIFY)   \
     ENUMIFY(abs)                 \
@@ -192,6 +194,6 @@
     ENUMIFY(year)                \
     ENUMIFY(yearArg)
 
-MAKE_PRINTABLE_ENUM(KeyFieldname, KEYFIELDNAMES);
-MAKE_PRINTABLE_ENUM_STRING_ARRAY(key_fieldname, KeyFieldname, KEYFIELDNAMES);
-#undef FIELDNAMES
+QUERY_UTIL_NAMED_ENUM_DEFINE(KeyFieldname, KEYFIELDNAMES)
+#undef KEYFIELDNAMES
+}  // namespace mongo

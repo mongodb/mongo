@@ -29,16 +29,35 @@
 
 #pragma once
 
-// Declares a helper macro to print an enmumerator in an enum.
-#define PRINTABLE_ENUMERATOR(value) value,
-// Declares a helper macro to print an entry in a string array for an enum.
-#define PRINTABLE_ENUM_STRING(value) #value,
+#include "mongo/base/string_data.h"
 
-// Makes an enum class with a name based on a LIST macro of enumerators.
-#define MAKE_PRINTABLE_ENUM(name, LIST) enum class name { LIST(PRINTABLE_ENUMERATOR) };
-
-// Makes an array of enum names with a name based on a LIST macro of enumerators.
-#define MAKE_PRINTABLE_ENUM_STRING_ARRAY(nspace, name, LIST)          \
-    namespace nspace {                                                \
-    constexpr const char* toString[] = {LIST(PRINTABLE_ENUM_STRING)}; \
-    }  // namespace nspace
+/**
+ * Defines an `enum class ENUM_` populated by `LIST_`.
+ * Also defines an associated function `toStringData(ENUM_)`.
+ *
+ * Example:
+ *   Define an enum class mongo::MyColors.
+ *
+ *       namespace mongo {
+ *       #define MYCOLORS_TABLE(X) \
+ *            X(red)               \
+ *            X(green)             \
+ *            X(blue)
+ *
+ *       QUERY_UTIL_NAMED_ENUM_DEFINE(MyColors, MYCOLORS_TABLE)
+ *       #undef MYCOLORS_TABLE
+ *       }  // namespace mongo
+ *
+ *   Its elements are MyColors::red, MyColors::green, and MyColors::blue. We
+ *   also define an associated toStringData(MyColors) function which returns
+ *   the unqualified value names "red", "green", "blue" as constexpr
+ *   StringData.
+ */
+#define QUERY_UTIL_NAMED_ENUM_DEFINE(ENUM_, LIST_)                                   \
+    enum class ENUM_ { LIST_(QUERY_UTIL_NAMED_ENUM_INTERNAL_X_) };                   \
+    constexpr StringData toStringData(ENUM_ v_) {                                    \
+        constexpr StringData arr_[] = {LIST_(QUERY_UTIL_NAMED_ENUM_INTERNAL_X_SD_)}; \
+        return arr_[static_cast<size_t>(v_)];                                        \
+    }
+#define QUERY_UTIL_NAMED_ENUM_INTERNAL_X_(x) x,
+#define QUERY_UTIL_NAMED_ENUM_INTERNAL_X_SD_(x) #x ""_sd,

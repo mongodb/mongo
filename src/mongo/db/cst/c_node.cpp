@@ -51,12 +51,7 @@ auto tabs(int num) {
 auto printFieldname(const CNode::Fieldname& fieldname) {
     return stdx::visit(
         visit_helper::Overloaded{
-            [](const KeyFieldname& key) -> std::string {
-                return "<KeyFieldname "s +
-                    key_fieldname::toString[static_cast<std::underlying_type_t<KeyFieldname>>(
-                        key)] +
-                    ">";
-            },
+            [](const KeyFieldname& key) { return "<KeyFieldname "s + toStringData(key) + ">"; },
             [](const UserFieldname& user) { return "<UserFieldname "s + user + ">"; },
             [](const FieldnamePath& path) {
                 return stdx::visit(
@@ -95,10 +90,7 @@ auto printValue(const T& payload) {
             [](const CompoundInclusionKey&) { return "<CompoundInclusionKey>"s; },
             [](const CompoundExclusionKey&) { return "<CompoundExclusionKey>"s; },
             [](const CompoundInconsistentKey&) { return "<CompoundInconsistentKey>"s; },
-            [](const KeyValue& value) {
-                return "<KeyValue "s +
-                    key_value::toString[static_cast<std::underlying_type_t<KeyValue>>(value)] + ">";
-            },
+            [](const KeyValue& value) { return "<KeyValue "s + toStringData(value) + ">"; },
             [](const NonZeroKey& nonZeroKey) {
                 return "<NonZeroKey of type "s + printNonZeroKey(nonZeroKey) + ">";
             },
