@@ -67,44 +67,29 @@ conn = MongoRunner.runMongod(restartOpts42);
 assert.eq(null, conn, 'mongod was able to start with version ' + tojson(restartOpts42));
 
 /**
- * Restart with the 4.4 binary to set the FCV to 4.2.
+ * Cannot downgrade to FCV 4.2 on a 4.4 binary when long collection names are present.
  */
 let restartOpts44 = Object.extend(mongodOptions44, {restart: true});
 conn = MongoRunner.runMongod(restartOpts44);
 assert.neq(null, conn, 'mongod was unable to start with version ' + tojson(restartOpts44));
 
 testDb = conn.getDB(dbName);
+assert.commandFailedWithCode(testDb.adminCommand({setFeatureCompatibilityVersion: lastStableFCV}),
+                             ErrorCodes.InvalidNamespace);
+
+/**
+ * FCV can be set to 4.2 after removing the long collection name. However, we cannot create any new
+ * collections with long names in FCV 4.2.
+ */
+testDb = conn.getDB(dbName);
+assert.eq(true, testDb.getCollection(longCollName).drop());
+
 assert.commandWorked(testDb.adminCommand({setFeatureCompatibilityVersion: lastStableFCV}));
-MongoRunner.stopMongod(conn);
-
-/**
- * Restart with the 4.2 binary while in FCV 4.2 with long collection names present. This shouldn't
- * crash the server.
- */
-conn = MongoRunner.runMongod(restartOpts42);
-assert.neq(null, conn, 'mongod was unable to start with version ' + tojson(restartOpts42));
-
-testDb = conn.getDB(dbName);
-
-// Ensure we have the proper collections.
-let collNames = testDb.getCollectionNames();
-
-assert.eq(true, collNames.includes(shortCollName));
-assert.eq(true, collNames.includes(longCollName));
-
-MongoRunner.stopMongod(conn);
-
-/**
- * Restart with the 4.4 binary while in FCV 4.2. We shouldn't be able to create any collections with
- * long names.
- */
-conn = MongoRunner.runMongod(restartOpts44);
-assert.neq(null, conn, 'mongod was unable to start with version ' + tojson(restartOpts44));
-
-testDb = conn.getDB(dbName);
 
 // Creating a long collection name on a 4.4 binary with FCV 4.2 should fail.
 assert.commandFailedWithCode(testDb.createCollection('c'.repeat(8192)), 4862100);
+assert.commandFailedWithCode(testDb.createCollection(longCollName),
+                             ErrorCodes.IncompatibleServerVersion);
 
 // Running rename within the same database or across two databases should fail for long collection
 // names.

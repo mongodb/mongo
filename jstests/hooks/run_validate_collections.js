@@ -49,6 +49,8 @@ const requiredFCV = jsTest.options().forceValidationWithFeatureCompatibilityVers
 let originalFCV;
 let originalTransactionLifetimeLimitSeconds;
 
+let skipFCV = false;
+
 if (requiredFCV) {
     // Running the setFeatureCompatibilityVersion command may implicitly involve running a
     // multi-statement transaction. We temporarily raise the transactionLifetimeLimitSeconds to be
@@ -72,13 +74,18 @@ if (requiredFCV) {
     }
 
     // Now that we are certain that an upgrade or downgrade of the FCV is not in progress, ensure
-    // the 'requiredFCV' is set.
-    assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: requiredFCV}));
+    // the 'requiredFCV' is set. If we're trying to set the FCV to 4.2 while having long collection
+    // name present, we'll get the 'InvalidNamespace' error.
+    const fcvRes = adminDB.runCommand({setFeatureCompatibilityVersion: requiredFCV});
+    if (!fcvRes.ok) {
+        assert.commandFailedWithCode(fcvRes, ErrorCodes.InvalidNamespace);
+        skipFCV = true;
+    }
 }
 
-new CollectionValidator().validateNodes(hostList);
+new CollectionValidator().validateNodes(hostList, skipFCV);
 
-if (originalFCV && originalFCV.version !== requiredFCV) {
+if (originalFCV && originalFCV.version !== requiredFCV && !skipFCV) {
     assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: originalFCV.version}));
 }
 

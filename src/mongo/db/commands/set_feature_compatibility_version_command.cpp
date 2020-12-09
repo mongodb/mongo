@@ -33,6 +33,7 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/coll_mod.h"
+#include "mongo/db/catalog/collection_catalog_helper.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/commands.h"
@@ -348,6 +349,26 @@ public:
                         << numIndexBuilds,
                     numIndexBuilds == 0U);
             }
+
+            // Cannot downgrade to FCV 4.2 when long collection names are present.
+            const std::vector<std::string> dbNames = CollectionCatalog::get(opCtx).getAllDbNames();
+            for (const auto& dbName : dbNames) {
+                Lock::DBLock dbLock(opCtx, dbName, MODE_IS);
+                catalog::forEachCollectionFromDb(
+                    opCtx, dbName, MODE_IS, [&](const Collection* collection) {
+                        const auto collNss = collection->ns();
+                        uassert(ErrorCodes::InvalidNamespace,
+                                str::stream()
+                                    << "Cannot downgrade the cluster when there are long "
+                                    << "collection names present. FCV 4.2 limit: "
+                                    << NamespaceString::MaxNSCollectionLenFCV42
+                                    << ". Found: " << collNss
+                                    << ", but there may be more. Rename or drop the collection",
+                                collNss.size() <= NamespaceString::MaxNSCollectionLenFCV42);
+                        return true;
+                    });
+            }
+
 
             FeatureCompatibilityVersion::setTargetDowngrade(opCtx);
 
