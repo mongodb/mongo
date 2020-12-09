@@ -172,8 +172,6 @@ bool ReshardingOplogFetcher::iterate(Client* client) {
         auto opCtxRaii = client->makeOperationContext();
         opCtxRaii->checkForInterrupt();
 
-        const Seconds maxStaleness(10);
-        ReadPreferenceSetting readPref(ReadPreference::Nearest, maxStaleness);
         StatusWith<std::shared_ptr<Shard>> swDonor =
             Grid::get(opCtxRaii.get())->shardRegistry()->getShard(opCtxRaii.get(), _donorShard);
         if (!swDonor.isOK()) {
@@ -221,27 +219,28 @@ void ReshardingOplogFetcher::_ensureCollection(Client* client, const NamespaceSt
     });
 }
 
-std::vector<BSONObj> ReshardingOplogFetcher::_makePipeline(Client* client) {
+AggregationRequest ReshardingOplogFetcher::_makeAggregationRequest(Client* client) {
     auto opCtxRaii = client->makeOperationContext();
     auto opCtx = opCtxRaii.get();
     auto expCtx = _makeExpressionContext(opCtx);
 
-    return createOplogFetchingPipelineForResharding(
-               expCtx, _startAt, _collUUID, _recipientShard, _doesDonorOwnMinKeyChunk)
-        ->serializeToBson();
-}
+    auto serializedPipeline =
+        createOplogFetchingPipelineForResharding(
+            expCtx, _startAt, _collUUID, _recipientShard, _doesDonorOwnMinKeyChunk)
+            ->serializeToBson();
 
-bool ReshardingOplogFetcher::consume(Client* client, Shard* shard) {
-    _ensureCollection(client, _toWriteInto);
-    std::vector<BSONObj> serializedPipeline = _makePipeline(client);
-
-    AggregationRequest aggRequest(NamespaceString::kRsOplogNamespace, serializedPipeline);
+    AggregationRequest aggRequest(NamespaceString::kRsOplogNamespace,
+                                  std::move(serializedPipeline));
     if (_useReadConcern) {
         auto readConcernArgs = repl::ReadConcernArgs(
             boost::optional<LogicalTime>(_startAt.getTs()),
             boost::optional<repl::ReadConcernLevel>(repl::ReadConcernLevel::kMajorityReadConcern));
         aggRequest.setReadConcern(readConcernArgs.toBSONInner());
     }
+
+    ReadPreferenceSetting readPref(ReadPreference::Nearest,
+                                   ReadPreferenceSetting::kMinimalMaxStalenessValue);
+    aggRequest.setUnwrappedReadPref(readPref.toContainingBSON());
 
     aggRequest.setWriteConcern({});
     aggRequest.setHint(BSON("$natural" << 1));
@@ -250,6 +249,14 @@ bool ReshardingOplogFetcher::consume(Client* client, Shard* shard) {
     if (_initialBatchSize) {
         aggRequest.setBatchSize(_initialBatchSize);
     }
+
+    return aggRequest;
+}
+
+bool ReshardingOplogFetcher::consume(Client* client, Shard* shard) {
+    _ensureCollection(client, _toWriteInto);
+
+    auto aggRequest = _makeAggregationRequest(client);
 
     auto opCtxRaii = client->makeOperationContext();
     int batchesProcessed = 0;

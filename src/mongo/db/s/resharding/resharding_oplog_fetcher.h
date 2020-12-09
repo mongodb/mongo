@@ -114,7 +114,7 @@ private:
      * Returns true if there's more work to do and the task should be rescheduled.
      */
     void _ensureCollection(Client* client, const NamespaceString nss);
-    std::vector<BSONObj> _makePipeline(Client* client);
+    AggregationRequest _makeAggregationRequest(Client* client);
     void _reschedule(executor::TaskExecutor* executor);
 
     const UUID _reshardingUUID;
