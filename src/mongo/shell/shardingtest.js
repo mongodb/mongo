@@ -1834,28 +1834,44 @@ var ShardingTest = function(params) {
     // on the config server, which auto-shards the collection for the cluster.
     this.configRS.getPrimary().getDB("admin").runCommand({refreshLogicalSessionCacheNow: 1});
 
-    const x509AuthRequired = (mongosOptions[0] && mongosOptions[0].clusterAuthMode &&
-                              mongosOptions[0].clusterAuthMode === "x509");
-
     // Flushes the routing table cache on connection 'conn'. If 'keyFileLocal' is defined,
-    // authenticates the keyfile user on 'authConn' - a connection or set of connections for
-    // the shard - before executing the flush.
-    const flushRT = function flushRoutingTableAndHandleAuth(conn, authConn, keyFileLocal) {
+    // authenticates the keyfile user.
+    const flushRT = function flushRoutingTableAndHandleAuth(conn, keyFileLocal) {
         // Invokes the actual execution of cache refresh.
         const execFlushRT = (conn) => {
             assert.commandWorked(conn.getDB("admin").runCommand(
                 {_flushRoutingTableCacheUpdates: "config.system.sessions"}));
         };
 
+        const x509AuthRequired = (conn.fullOptions && conn.fullOptions.clusterAuthMode &&
+                                  conn.fullOptions.clusterAuthMode === "x509");
+
         if (keyFileLocal) {
-            authutil.asCluster(authConn, keyFileLocal, () => execFlushRT(conn));
+            authutil.asCluster(conn, keyFileLocal, () => execFlushRT(conn));
+        } else if (x509AuthRequired) {
+            const exitCode = _runMongoProgram(
+                ...["mongo",
+                    conn.host,
+                    "--tls",
+                    "--tlsAllowInvalidHostnames",
+                    "--tlsCertificateKeyFile",
+                    conn.fullOptions.tlsCertificateKeyFile ? conn.fullOptions.tlsCertificateKeyFile
+                                                           : conn.fullOptions.sslPEMKeyFile,
+                    "--tlsCAFile",
+                    conn.fullOptions.tlsCAFile ? conn.fullOptions.tlsCAFile
+                                               : conn.fullOptions.sslCAFile,
+                    "--authenticationDatabase=$external",
+                    "--authenticationMechanism=MONGODB-X509",
+                    "--eval",
+                    `(${execFlushRT.toString()})(db.getMongo())`,
+            ]);
+            assert.eq(0, exitCode, "parallel shell for x509 auth failed");
         } else {
             execFlushRT(conn);
         }
     };
 
-    // TODO SERVER-45108: Enable support for x509 auth for _flushRoutingTableCacheUpdates.
-    if (!otherParams.manualAddShard && !x509AuthRequired) {
+    if (!otherParams.manualAddShard) {
         for (let i = 0; i < numShards; i++) {
             const keyFileLocal =
                 (otherParams.shards && otherParams.shards[i] && otherParams.shards[i].keyFile)
@@ -1864,10 +1880,10 @@ var ShardingTest = function(params) {
 
             if (otherParams.rs || otherParams["rs" + i] || startShardsAsRS) {
                 const rs = this._rs[i].test;
-                flushRT(rs.getPrimary(), rs.nodes, keyFileLocal);
+                flushRT(rs.getPrimary(), keyFileLocal);
             } else {
                 // If specified, use the keyFile for the standalone shard.
-                flushRT(this["shard" + i], this["shard" + i], keyFileLocal);
+                flushRT(this["shard" + i], keyFileLocal);
             }
         }
     }
