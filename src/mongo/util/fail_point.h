@@ -31,6 +31,7 @@
 
 #include <functional>
 #include <string>
+#include <type_traits>
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -52,6 +53,13 @@ namespace mongo {
  *
  * A FailPoint is usually defined by the MONGO_FAIL_POINT_DEFINE(name) macro,
  * which arranges for it to be added to the global failpoint registry.
+ *
+ * A FailPoint object can have unusual lifetime semantics. It can be marked
+ * `immortal`, so that its internal state is never destroyed. This is possible
+ * because FailPoint is designed to have only trivially destructible nonstatic
+ * data members, and we can choose not to manually destroy the internal state
+ * object. This enables server code that is instrumented by an immortal
+ * static-duration FailPoint to remain valid even during process shutdown.
  *
  * Sample use:
  *
@@ -107,11 +115,9 @@ namespace mongo {
  */
 class FailPoint {
 private:
-    enum RetCode { fastOff = 0, slowOff, slowOn, userIgnored };
-
-    enum ShouldFailEntryMode { kFirstTimeEntered, kEnteredAlready };
-
     static constexpr auto kWaitGranularity = Milliseconds(100);
+
+    class Impl;
 
 public:
     using ValType = unsigned;
@@ -143,15 +149,12 @@ public:
      */
     class Scoped {
     public:
-        Scoped(FailPoint* failPoint, RetCode ret)
-            : _failPoint(failPoint),
-              _active(ret == FailPoint::slowOn),
-              _holdsRef(ret != FailPoint::fastOff) {}
+        Scoped(Impl* impl, bool active, bool holdsRef)
+            : _impl(impl), _active(active), _holdsRef(holdsRef) {}
 
         ~Scoped() {
-            if (_holdsRef) {
-                _failPoint->_shouldFailCloseBlock();
-            }
+            if (_holdsRef)
+                _impl->closeScoped();
         }
 
         Scoped(const Scoped&) = delete;
@@ -159,24 +162,25 @@ public:
 
         /**
          * @return true if fail point is on.
+         *
          * Calls to isActive should be placed inside MONGO_unlikely for performance.
          */
-        bool isActive() {
+        bool isActive() const {
             return _active;
         }
 
         /**
-         * @return the data stored in the fail point. #isActive must be true
-         *     before you can call this.
+         * @return the data stored in the fail point.
+         *
+         * #isActive must be true before you can call this.
          */
         const BSONObj& getData() const {
-            // Assert when attempting to get data without holding a ref.
-            fassert(16445, _holdsRef);
-            return _failPoint->_getData();
+            fassert(16445, _holdsRef);  // getData without holding a ref
+            return _impl->getData();
         }
 
     private:
-        FailPoint* _failPoint;
+        Impl* _impl;
         bool _active;
         bool _holdsRef;
     };
@@ -199,45 +203,45 @@ public:
      *       {"times" : val}   // active for the next val calls
      *       {"skip" : val}    // skip calls, activate on and after call number (val+1).
      *       {"activationProbability" : val}  // val is in interval [0.0, 1.0]
-     *   }
      */
     static StatusWith<ModeOptions> parseBSON(const BSONObj& obj);
 
-    explicit FailPoint(std::string name);
+    /**
+     * FailPoint state can be kept alive during shutdown by setting `immortal` true.
+     * The usual macro definition does this, but FailPoint unit tests do not.
+     */
+    explicit FailPoint(std::string name, bool immortal = false);
 
     FailPoint(const FailPoint&) = delete;
     FailPoint& operator=(const FailPoint&) = delete;
 
+    /**
+     * If this FailPoint was constructed as `immortal` (FailPoints defined by
+     * MONGO_FAIL_POINT_DEFINE are immortal), this destructor does nothing. In
+     * that case the FailPoint (and the code it is instrumenting) can operate
+     * normally while the process shuts down.
+     */
+    ~FailPoint();
+
     const std::string& getName() const {
-        return _name;
+        return _impl()->getName();
     }
 
     /**
      * Returns true if fail point is active.
      *
      * @param pred       see `executeIf` for more information.
-     * @param entryMode  kEnteredAlready if the caller has already entered the fail point,
-     *                   and kFirstTimeEntered otherwise. If `entryMode` is kFirstTimeEntered,
-     *                   calls to `shouldFail` can have side effects. For example, they affect
-     *                   the counters kept to manage the `skip` or `nTimes` modes (See `setMode`).
      *
      * Calls to `shouldFail` should be placed inside MONGO_unlikely for performance.
      *    if (MONGO_unlikely(failpoint.shouldFail())) ...
      */
     template <typename Pred>
-    bool shouldFail(Pred&& pred, ShouldFailEntryMode entryMode = kFirstTimeEntered) {
-        RetCode ret = _shouldFailOpenBlock(std::forward<Pred>(pred), entryMode);
-
-        if (MONGO_likely(ret == fastOff)) {
-            return false;
-        }
-
-        _shouldFailCloseBlock();
-        return ret == slowOn;
+    bool shouldFail(Pred&& pred) {
+        return _impl()->shouldFail(std::forward<Pred>(pred));
     }
 
-    bool shouldFail(ShouldFailEntryMode entryMode = kFirstTimeEntered) {
-        return shouldFail(nullptr, entryMode);
+    bool shouldFail() {
+        return shouldFail(nullptr);
     }
 
     /**
@@ -262,7 +266,10 @@ public:
      *
      * @returns the number of times the fail point has been entered so far.
      */
-    EntryCountT setMode(Mode mode, ValType val = 0, BSONObj extra = {});
+    EntryCountT setMode(Mode mode, ValType val = 0, BSONObj extra = {}) {
+        return _impl()->setMode(std::move(mode), std::move(val), std::move(extra));
+    }
+
     EntryCountT setMode(ModeOptions opt) {
         return setMode(std::move(opt.mode), std::move(opt.val), std::move(opt.extra));
     }
@@ -274,19 +281,25 @@ public:
      *
      * @returns the number of times the fail point has been entered so far.
      */
-    EntryCountT waitForTimesEntered(EntryCountT targetTimesEntered) const noexcept;
+    EntryCountT waitForTimesEntered(EntryCountT targetTimesEntered) const noexcept {
+        return waitForTimesEntered(Interruptible::notInterruptible(), targetTimesEntered);
+    }
 
     /**
      * Like `waitForTimesEntered`, but interruptible via the `interruptible->sleepFor` mechanism.
      * See `mongo::Interruptible::sleepFor`.
      */
     EntryCountT waitForTimesEntered(Interruptible* interruptible,
-                                    EntryCountT targetTimesEntered) const;
+                                    EntryCountT targetTimesEntered) const {
+        return _impl()->waitForTimesEntered(interruptible, targetTimesEntered);
+    }
 
     /**
      * @returns a BSON object showing the current mode and data stored.
      */
-    BSONObj toBSON() const;
+    BSONObj toBSON() const {
+        return _impl()->toBSON();
+    }
 
     /**
      * Create a Scoped from this FailPoint.
@@ -296,6 +309,7 @@ public:
     Scoped scoped() {
         return scopedIf(nullptr);
     }
+
     /**
      * Create a Scoped from this FailPoint.
      * If `pred(payload)` is true, then the returned Scoped object is active and the
@@ -307,7 +321,7 @@ public:
      */
     template <typename Pred>
     Scoped scopedIf(Pred&& pred) {
-        return Scoped(this, _shouldFailOpenBlock(std::forward<Pred>(pred), kFirstTimeEntered));
+        return _impl()->scopedIf(std::forward<Pred>(pred));
     }
 
     template <typename F>
@@ -331,9 +345,9 @@ public:
     }
 
     /**
-     * Take 'kWaitGranularity' pauses for as long as the FailPoint is active.
-     * This calls `shouldFail()` with kFirstTimeEntered once and with kEnteredAlready thereafter, so
-     * affects FailPoint counters once.
+     * Take short `kWaitGranularity` pauses for as long as the FailPoint is
+     * active. Though this makes several accesses to `shouldFail()`, it counts
+     * as only one increment in the FailPoint `nTimes` counter.
      */
     void pauseWhileSet() {
         pauseWhileSet(Interruptible::notInterruptible());
@@ -344,94 +358,188 @@ public:
      * `mongo::Interruptible::sleepFor`.
      */
     void pauseWhileSet(Interruptible* interruptible) {
-        for (auto entryMode = kFirstTimeEntered; MONGO_unlikely(shouldFail(entryMode));
-             entryMode = kEnteredAlready) {
-            interruptible->sleepFor(Milliseconds(100));
-        }
+        _impl()->pauseWhileSet(interruptible);
     }
 
 private:
-    void _enable();
-    void _disable();
+    class Impl {
+    private:
+        enum ShouldFailEntryMode { kFirstTimeEntered, kEnteredAlready };
 
-    /**
-     * Checks whether fail point is active and increments the reference counter without
-     * decrementing it. Must call shouldFailCloseBlock afterwards when the return value
-     * is not fastOff. Otherwise, this will remain read-only forever.
-     *
-     * Note: see `executeIf` for information on `pred`, and `shouldFail` for information
-     *       on `entryMode`.
-     *
-     * @return slowOn if its active and needs to be closed
-     *         userIgnored if its active and needs to be closed, but shouldn't be acted on
-     *         slowOff if its disabled and needs to be closed
-     *         fastOff if its disabled and doesn't need to be closed
-     */
-    template <typename Pred>
-    RetCode _shouldFailOpenBlock(Pred&& pred, ShouldFailEntryMode entryMode) {
-        if (MONGO_likely((_fpInfo.loadRelaxed() & kActiveBit) == 0)) {
-            return fastOff;
+        /** Possible return values from `_shouldFailOpenBlock`. */
+        enum ShouldFailOpenBlockResult {
+            fastOff,      ///< disabled and doesn't need to be closed
+            slowOff,      ///< disabled and needs to be closed
+            slowOn,       ///< active and needs to be closed
+            userIgnored,  ///< active and needs to be closed, but shouldn't be acted on
+        };
+
+        static constexpr ValType _kActiveBit = ValType{1} << 31;
+
+    public:
+        Impl(std::string name) : _name(std::move(name)) {}
+
+        template <typename Pred>
+        bool shouldFail(Pred&& pred) {
+            return _shouldFail(kFirstTimeEntered, std::forward<Pred>(pred));
         }
 
-        if (entryMode == kEnteredAlready) {
-            return _slowShouldFailOpenBlockWithoutIncrementingTimesEntered(
-                std::forward<Pred>(pred));
+        EntryCountT setMode(Mode mode, ValType val = 0, BSONObj extra = {});
+
+        EntryCountT waitForTimesEntered(Interruptible* interruptible,
+                                        EntryCountT targetTimesEntered) const;
+
+        BSONObj toBSON() const;
+
+        template <typename Pred>
+        Scoped scopedIf(Pred&& pred) {
+            auto ret = _shouldFailOpenBlock(kFirstTimeEntered, std::forward<Pred>(pred));
+            bool active = (ret == slowOn);
+            bool holdsRef = (ret != fastOff);
+            return Scoped(this, active, holdsRef);
         }
-        return _slowShouldFailOpenBlock(std::forward<Pred>(pred));
+
+        void closeScoped() {
+            _shouldFailCloseBlock();
+        }
+
+        /** See `FailPoint::pauseWhileSet`. */
+        void pauseWhileSet(Interruptible* interruptible) {
+            for (auto entryMode = kFirstTimeEntered;
+                 MONGO_unlikely(_shouldFail(entryMode, nullptr));
+                 entryMode = kEnteredAlready) {
+                interruptible->sleepFor(kWaitGranularity);
+            }
+        }
+
+        /** Return the stored BSONObj. Safe only when this FailPoint is on. */
+        const BSONObj& getData() const {
+            return _data;
+        }
+
+        const std::string& getName() const {
+            return _name;
+        }
+
+    private:
+        void _enable();
+        void _disable();
+
+        /** No default parameters. No-Frills shouldFail implementation. */
+        template <typename Pred>
+        bool _shouldFail(ShouldFailEntryMode entryMode, Pred&& pred) {
+            auto ret = _shouldFailOpenBlock(entryMode, std::forward<Pred>(pred));
+
+            if (MONGO_likely(ret == fastOff)) {
+                return false;
+            }
+
+            _shouldFailCloseBlock();
+            return ret == slowOn;
+        }
+
+        /**
+         * Checks whether fail point is active and increments the reference counter without
+         * decrementing it. Must call shouldFailCloseBlock afterwards when the return value
+         * is not fastOff. Otherwise, this will remain read-only forever.
+         *
+         * Note: see `executeIf` for information on `pred`, and `shouldFail` for information
+         *       on `entryMode`.
+         *
+         * @return slowOn if its active and needs to be closed
+         *         userIgnored if its active and needs to be closed, but shouldn't be acted on
+         *         slowOff if its disabled and needs to be closed
+         *         fastOff if its disabled and doesn't need to be closed
+         */
+        template <typename Pred>
+        ShouldFailOpenBlockResult _shouldFailOpenBlock(ShouldFailEntryMode entryMode, Pred&& pred) {
+            if (MONGO_likely((_fpInfo.loadRelaxed() & _kActiveBit) == 0)) {
+                return fastOff;
+            }
+
+            if (entryMode == kEnteredAlready) {
+                return _slowShouldFailOpenBlockWithoutIncrementingTimesEntered(
+                    std::forward<Pred>(pred));
+            }
+            return _slowShouldFailOpenBlock(std::forward<Pred>(pred));
+        }
+
+        ShouldFailOpenBlockResult _shouldFailOpenBlock(ShouldFailEntryMode entryMode) {
+            return _shouldFailOpenBlock(entryMode, nullptr);
+        }
+
+        /**
+         * Decrements the reference counter.
+         * @see #_shouldFailOpenBlock
+         */
+        void _shouldFailCloseBlock() {
+            _fpInfo.subtractAndFetch(1);
+        }
+
+        /**
+         * slow path for #_shouldFailOpenBlock
+         *
+         * If a callable is passed, and returns false, this will return userIgnored and avoid
+         * altering the mode in any way.  The argument is the fail point payload.
+         */
+        ShouldFailOpenBlockResult _slowShouldFailOpenBlockWithoutIncrementingTimesEntered(
+            std::function<bool(const BSONObj&)> cb) noexcept;
+
+        /**
+         * slow path for #_shouldFailOpenBlock
+         *
+         * Calls _slowShouldFailOpenBlockWithoutIncrementingTimesEntered. If it returns slowOn,
+         * increments the number of times the fail point has been entered before returning.
+         */
+        ShouldFailOpenBlockResult _slowShouldFailOpenBlock(
+            std::function<bool(const BSONObj&)> cb) noexcept;
+
+        // Bit layout:
+        // 31: tells whether this fail point is active.
+        // 0~30: unsigned ref counter for active dynamic instances.
+        AtomicWord<std::uint32_t> _fpInfo{0};
+
+        // Total number of times the fail point has been entered.
+        AtomicWord<EntryCountT> _timesEntered{0};
+
+        // Invariant: These should be read only if _kActiveBit of _fpInfo is set.
+        Mode _mode{off};
+        AtomicWord<int> _timesOrPeriod{0};
+        BSONObj _data;
+
+        const std::string _name;
+
+        // protects _mode, _timesOrPeriod, _data
+        mutable Mutex _modMutex = MONGO_MAKE_LATCH("FailPoint::_modMutex");
+    };
+
+    const Impl* _rawImpl() const {
+        return reinterpret_cast<const Impl*>(&_implStorage);
     }
 
-    RetCode _shouldFailOpenBlock(ShouldFailEntryMode entryMode) {
-        return _shouldFailOpenBlock(nullptr, entryMode);
+    Impl* _rawImpl() {
+        return const_cast<Impl*>(std::as_const(*this)._rawImpl());  // Reuse const overload
     }
 
-    /**
-     * Decrements the reference counter.
-     * @see #_shouldFailOpenBlock
-     */
-    void _shouldFailCloseBlock();
+    const Impl* _impl() const {
+        // Relaxed: such violations can only occur during single-threaded static initialization.
+        invariant(_ready.loadRelaxed(), "Use of uninitialized FailPoint");
+        return _rawImpl();
+    }
+
+    Impl* _impl() {
+        return const_cast<Impl*>(std::as_const(*this)._impl());  // Reuse const overload
+    }
+
+    const bool _immortal;
 
     /**
-     * slow path for #_shouldFailOpenBlock
-     *
-     * If a callable is passed, and returns false, this will return userIgnored and avoid altering
-     * the mode in any way.  The argument is the fail point payload.
+     * True only when `_impl()` should succeed.
+     * We exploit zero-initialization of statics to detect use-before-init.
      */
-    RetCode _slowShouldFailOpenBlockWithoutIncrementingTimesEntered(
-        std::function<bool(const BSONObj&)> cb) noexcept;
+    AtomicWord<bool> _ready;
 
-    /**
-     * slow path for #_shouldFailOpenBlock
-     *
-     * Calls _slowShouldFailOpenBlockWithoutIncrementingTimesEntered. If it returns slowOn,
-     * increments the number of times the fail point has been entered before returning the RetCode.
-     */
-    RetCode _slowShouldFailOpenBlock(std::function<bool(const BSONObj&)> cb) noexcept;
-
-    /**
-     * @return the stored BSONObj in this fail point. Note that this cannot be safely
-     *      read if this fail point is off.
-     */
-    const BSONObj& _getData() const;
-
-    static const ValType kActiveBit = 1 << 31;
-
-    // Bit layout:
-    // 31: tells whether this fail point is active.
-    // 0~30: unsigned ref counter for active dynamic instances.
-    AtomicWord<std::uint32_t> _fpInfo{0};
-
-    // Total number of times the fail point has been entered.
-    AtomicWord<EntryCountT> _timesEntered{0};
-
-    // Invariant: These should be read only if kActiveBit of _fpInfo is set.
-    Mode _mode{off};
-    AtomicWord<int> _timesOrPeriod{0};
-    BSONObj _data;
-
-    const std::string _name;
-
-    // protects _mode, _timesOrPeriod, _data
-    mutable Mutex _modMutex = MONGO_MAKE_LATCH("FailPoint::_modMutex");
+    std::aligned_storage_t<sizeof(Impl), alignof(Impl)> _implStorage;
 };
 
 class FailPointRegistry {
@@ -535,8 +643,8 @@ FailPointRegistry& globalFailPointRegistry();
  * Must be used at namespace scope, not at local (inside a function) or class scope.
  * Never use in header files, only .cpp files.
  */
-#define MONGO_FAIL_POINT_DEFINE(fp) \
-    ::mongo::FailPoint fp(#fp);     \
+#define MONGO_FAIL_POINT_DEFINE(fp)                               \
+    ::mongo::FailPoint fp(#fp, true); /* An immortal FailPoint */ \
     ::mongo::FailPointRegisterer fp##failPointRegisterer(&fp);
 
 

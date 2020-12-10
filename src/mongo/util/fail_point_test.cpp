@@ -55,6 +55,13 @@ namespace stdx = mongo::stdx;
 
 namespace mongo_test {
 namespace {
+
+#if 0  // Uncomment this block to manually test the _valid flag operation
+extern FailPoint notYetFailPointTest;
+[[maybe_unused]] bool expectAnInvariantViolation = notYetFailPointTest.shouldFail();
+MONGO_FAIL_POINT_DEFINE(notYetFailPointTest);
+#endif
+
 // Used by tests in this file that need access to a failpoint that is a registered in the
 // FailPointRegistry.
 MONGO_FAIL_POINT_DEFINE(dummy2);
