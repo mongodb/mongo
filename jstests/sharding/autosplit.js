@@ -5,11 +5,16 @@
 'use strict';
 load('jstests/sharding/autosplit_include.js');
 
+// Disabling the ShardingUptimeReporter because it could temporary disable the autosplitter
+const mongosFailpointParams = {
+    setParameter: {"failpoint.disableShardingUptimeReporterPeriodicThread": "{mode: 'alwaysOn'}"}
+};
+
 var s = new ShardingTest({
     name: "auto1",
     shards: 2,
     mongos: 1,
-    other: {enableAutoSplit: true, chunkSize: 10},
+    other: {enableAutoSplit: true, chunkSize: 10, mongosOptions: mongosFailpointParams}
 });
 
 assert.commandWorked(s.s0.adminCommand({enablesharding: "test"}));
