@@ -192,14 +192,8 @@ class MockTime(object):
 
 class UnitJob(job.Job):  # pylint: disable=too-many-instance-attributes
     def __init__(self, suite_options):  #pylint: disable=super-init-not-called
-        self.job_num = 0
-        self.logger = logging.getLogger("job_unittest")
-        self.fixture = None
-        self.hooks = []
-        self.report = None
-        self.archival = None
-        self.suite_options = suite_options
-        self.test_queue_logger = logging.getLogger("job_unittest")
+        super(UnitJob, self).__init__(0, logging.getLogger("job_unittest"), None, [], None, None,
+                                      suite_options, logging.getLogger("job_unittest"))
         self.total_test_num = 0
         self.tests = {}
 
