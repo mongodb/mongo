@@ -126,7 +126,7 @@ int main(int argc, char** argv) {
         std::cerr << "Global deinitilization failed: " << ret.reason() << std::endl;
     }
 
-    ::mongo::checkForTripwireAssertions();
+    ::mongo::TestingProctor::instance().exitAbruptlyIfDeferredErrors();
 
     return result;
 }

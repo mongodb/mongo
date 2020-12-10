@@ -60,6 +60,11 @@ public:
      */
     void setEnabled(bool enable);
 
+    /**
+     * Quick exits with EXIT_ABRUPT if any deferred errors have occurred.
+     */
+    void exitAbruptlyIfDeferredErrors(bool verbose = true) const;
+
 private:
     boost::optional<bool> _diagnosticsEnabled;
 };

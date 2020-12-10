@@ -29,6 +29,7 @@
 
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/testing_proctor.h"
 
 namespace mongo {
 
@@ -48,7 +49,10 @@ namespace mongo {
 MONGO_COMPILER_NORETURN void quickExitWithoutLogging(int);
 
 MONGO_COMPILER_NORETURN inline void quickExit(int code) {
-    checkForTripwireAssertions(code);
+    warnIfTripwireAssertionsOccurred();
+    if (code == EXIT_CLEAN) {
+        TestingProctor::instance().exitAbruptlyIfDeferredErrors(false);
+    }
     quickExitWithoutLogging(code);
 }
 

@@ -501,15 +501,14 @@ inline void tassertWithLocation(SourceLocationHolder loc, StatusWith<T>&& sw) {
 }
 
 /**
- * Handle tassert failures during exit with a given exit code.
- *
- * If the exit code is success (ie. EXIT_CLEAN, EXIT_SUCCESS, or 0) and there have been any tassert
- * failures, then abort the process.
- *
- * Otherwise, if the exit code is an error, then just log the number of tassert failures (and then
- * continue exiting with that exit code).
+ * Return true if tripwire conditions have occurred.
  */
-void checkForTripwireAssertions(int code = EXIT_CLEAN);
+bool haveTripwireAssertionsOccurred();
+
+/**
+ * If tripwire conditions have occurred, warn via the log.
+ */
+void warnIfTripwireAssertionsOccurred();
 
 /**
  * verify is deprecated. It is like invariant() in debug builds and massert() in release builds.

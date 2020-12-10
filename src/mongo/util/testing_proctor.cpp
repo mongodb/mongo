@@ -63,6 +63,16 @@ void TestingProctor::setEnabled(bool enable) {
     LOGV2(4672601, "Overriding testing diagnostics", "enabled"_attr = enable);
 }
 
+void TestingProctor::exitAbruptlyIfDeferredErrors(bool verbose) const {
+    if (isInitialized() && isEnabled() && haveTripwireAssertionsOccurred()) {
+        if (verbose) {
+            warnIfTripwireAssertionsOccurred();
+        }
+        LOGV2_FATAL_NOTRACE(
+            4457001, "Aborting process during exit due to prior failed tripwire assertions.");
+    }
+}
+
 namespace {
 
 /**
