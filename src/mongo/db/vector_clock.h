@@ -246,10 +246,12 @@ protected:
 
     /**
      * As for _gossipOutInternal, except for the components to be sent to a client external to the
-     * cluster, eg. a driver or user client. By default, just the ClusterTime is gossiped.
+     * cluster, eg. a driver or user client. By default, just the ClusterTime is gossiped, although
+     * it is disabled in some cases, e.g. when a node is in an unreadable state.
      */
     virtual ComponentSet _gossipOutExternal() const {
-        return ComponentSet{Component::ClusterTime};
+        return _permitGossipClusterTimeWithExternalClients() ? ComponentSet{Component::ClusterTime}
+                                                             : ComponentSet{};
     }
 
     /**
@@ -260,10 +262,12 @@ protected:
 
     /**
      * As for _gossipInInternal, except from a client external to the cluster, eg. a driver or user
-     * client. By default, just the ClusterTime is gossiped.
+     * client. By default, just the ClusterTime is gossiped, although it is disabled in some cases,
+     * e.g. when a node is in an unreadable state.
      */
     virtual ComponentSet _gossipInExternal() const {
-        return ComponentSet{Component::ClusterTime};
+        return _permitGossipClusterTimeWithExternalClients() ? ComponentSet{Component::ClusterTime}
+                                                             : ComponentSet{};
     }
 
     /**
@@ -305,6 +309,13 @@ private:
     class SignedComponentFormat;
     template <class ActualFormat>
     class OnlyOutOnNewFCVComponentFormat;
+
+    /**
+     * Called to determine if the cluster time component should be gossiped in and out to external
+     * clients. In some circumstances such gossiping is disabled, e.g. for replica set nodes in
+     * unreadable states.
+     */
+    virtual bool _permitGossipClusterTimeWithExternalClients() const = 0;
 
     /**
      * Called in order to output a Component time to the passed BSONObjBuilder, using the

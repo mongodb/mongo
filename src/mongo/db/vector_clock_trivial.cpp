@@ -54,6 +54,10 @@ private:
     ComponentSet _gossipInInternal() const override;
     ComponentSet _gossipInExternal() const override;
 
+    bool _permitGossipClusterTimeWithExternalClients() const override {
+        return true;
+    }
+
     bool _permitRefreshDuringGossipOut() const override {
         return false;
     }

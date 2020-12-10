@@ -34,6 +34,7 @@
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/replica_set_aware_service.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/vector_clock_document_gen.h"
 #include "mongo/db/vector_clock_mutable.h"
@@ -60,6 +61,16 @@ private:
 
     ComponentSet _gossipOutInternal() const override;
     ComponentSet _gossipInInternal() const override;
+
+    bool _permitGossipClusterTimeWithExternalClients() const override {
+        // If this node is in an unreadable state, skip gossiping because it may require reading a
+        // signing key from the keys collection.
+        auto replicationCoordinator = repl::ReplicationCoordinator::get(_service);
+        return !replicationCoordinator ||
+            (replicationCoordinator->getReplicationMode() ==
+                 repl::ReplicationCoordinator::modeReplSet &&
+             replicationCoordinator->getMemberState().readable());
+    }
 
     bool _permitRefreshDuringGossipOut() const override {
         return false;
