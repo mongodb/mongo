@@ -33,12 +33,20 @@
 
 #include "mongo/db/auth/authorization_session_for_test.h"
 #include "mongo/db/auth/authz_manager_external_state_local.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_impl.h"
+#include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/catalog/database_holder_impl.h"
 #include "mongo/db/client.h"
+#include "mongo/db/index/index_access_method.h"
+#include "mongo/db/index/index_access_method_factory_impl.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/s/collection_sharding_state_factory_standalone.h"
 #include "mongo/db/service_entry_point_common.h"
 #include "mongo/db/service_entry_point_mongod.h"
+#include "mongo/db/storage/storage_engine_mock.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/transport/service_entry_point_impl.h"
 
@@ -57,6 +65,16 @@ OpMsgFuzzerFixture::OpMsgFuzzerFixture(bool skipGlobalInitializers) {
         std::make_unique<ServiceEntryPointMongod>(_serviceContext));
 
     _clientStrand = ClientStrand::make(_serviceContext->makeClient("test", _session));
+
+    _serviceContext->setStorageEngine(std::make_unique<StorageEngineMock>());
+
+    CollectionShardingStateFactory::set(
+        _serviceContext,
+        std::make_unique<CollectionShardingStateFactoryStandalone>(_serviceContext));
+    DatabaseHolder::set(_serviceContext, std::make_unique<DatabaseHolderImpl>());
+    IndexAccessMethodFactory::set(_serviceContext,
+                                  std::make_unique<IndexAccessMethodFactoryImpl>());
+    Collection::Factory::set(_serviceContext, std::make_unique<CollectionImpl::FactoryImpl>());
 
     auto localExternalState = std::make_unique<AuthzManagerExternalStateMock>();
     _externalState = localExternalState.get();
