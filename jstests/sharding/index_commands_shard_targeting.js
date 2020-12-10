@@ -86,10 +86,12 @@ function assertCommandBlocksIfCriticalSectionInProgress(
     waitForMoveChunkStep(fromShard, moveChunkStepNames.chunkDataCommitted);
 
     // Run the command with maxTimeMS.
-    const cmdWithMaxTimeMS = Object.assign({}, testCase.command, {maxTimeMS: 500});
+    const cmdWithMaxTimeMS = Object.assign({}, testCase.command, {maxTimeMS: 750});
     assert.commandFailed(st.s.getDB(dbName).runCommand(cmdWithMaxTimeMS));
 
-    // Assert that the command eventually times out.
+    // Assert that the command reached the shard and then timed out.
+    // It could be possible that the following check fails on slow clusters because the request
+    // expired its maxTimeMS on the mongos before to reach the shard.
     checkLog.checkContainsOnceJsonStringMatch(st.shard0, 22062, "error", "MaxTimeMSExpired");
 
     // Turn off the fail point and wait for moveChunk to complete.
