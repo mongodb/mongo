@@ -155,6 +155,7 @@ env.Library(
         '$BUILD_DIR/mongo/client/read_preference',
         '$BUILD_DIR/mongo/db/logical_time_validator',
         '$BUILD_DIR/mongo/db/repl/optime',
+        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
         '$BUILD_DIR/mongo/db/signed_logical_time',
     ],
 )
