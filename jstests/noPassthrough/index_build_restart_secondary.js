@@ -69,15 +69,15 @@ replTest.start(secondary,
                },
                true /* restart */);
 
-// The hangAfterSettingUpIndexBuildUnlocked fail point logs this message when it is active.
-checkLog.containsJson(secondary, 4585201);
-
 // Verify that we do not wait for the index build to complete on startup.
-IndexBuildTest.assertIndexes(secondaryDB.getCollection(collectionName),
-                             4,
-                             ["_id_"],
-                             ["i_1", "x_1", "y_1"],
-                             {includeBuildUUIDS: true});
+assert.soonNoExcept(() => {
+    IndexBuildTest.assertIndexes(secondaryDB.getCollection(collectionName),
+                                 4,
+                                 ["_id_"],
+                                 ["i_1", "x_1", "y_1"],
+                                 {includeBuildUUIDS: true});
+    return true;
+});
 
 assert.commandWorked(secondary.adminCommand(
     {configureFailPoint: 'hangAfterSettingUpIndexBuildUnlocked', mode: 'off'}));
