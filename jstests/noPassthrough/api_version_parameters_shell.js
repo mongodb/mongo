@@ -22,8 +22,8 @@ const testCases = [
     [false, false, {testDeprecation: 1}, {version: '1', deprecationErrors: true}],
     [false, false, {testDeprecation: 1}, {version: '1', strict: true, deprecationErrors: true}],
     // tests with setParameter requireApiVersion: true.
+    [true, false, {count: 'collection'}, {version: '1', strict: true}],
     [true, true, {count: 'collection'}, {version: '1'}],
-    [true, true, {count: 'collection'}, {version: '1', strict: true}],
     [true, false, {ping: 1}, {}],
     [true, true, {ping: 1}, {version: '1'}],
 ];

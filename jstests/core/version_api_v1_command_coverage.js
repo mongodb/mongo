@@ -43,7 +43,7 @@ const commands = [
     {cmd: () => ({serverStatus: 1}), apiVersion1: false},
     {cmd: () => ({usersInfo: 1}), apiVersion1: false},
     {cmd: () => ({aggregate: testColl.getName(), pipeline: [], cursor: {}}), apiVersion1: true},
-    {cmd: () => ({count: "system.js"}), apiVersion1: true},
+    {cmd: () => ({count: "system.js"}), apiVersion1: false},
     {cmd: () => ({create: counter_fun()}), apiVersion1: true},
     {cmd: () => ({find: counter_fun()}), apiVersion1: true},
     {
