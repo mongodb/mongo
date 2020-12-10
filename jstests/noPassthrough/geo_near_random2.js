@@ -1,4 +1,7 @@
 // this tests 1% of all points using $near and $nearSphere
+// @tags: [
+//   sbe_incompatible,
+// ]
 var db;
 (function() {
 "use strict";

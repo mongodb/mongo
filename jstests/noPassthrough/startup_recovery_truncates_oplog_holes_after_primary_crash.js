@@ -6,10 +6,11 @@
  * for no holes for writes with {j: true} write concern, and no confirmed writes will be truncated.
  *
  * @tags: [
- *     # The primary is restarted and must retain its data.
- *     requires_persistence,
- *     # Replica sets using WT require journaling (startup error otherwise).
- *     requires_journaling,
+ *   # Replica sets using WT require journaling (startup error otherwise).
+ *   requires_journaling,
+ *   # The primary is restarted and must retain its data.
+ *   requires_persistence,
+ *   sbe_incompatible,
  * ]
  */
 

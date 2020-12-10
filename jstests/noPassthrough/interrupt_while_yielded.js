@@ -24,14 +24,8 @@ assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryExecYieldIte
  * Executes 'queryFn' in a parallel shell while a failpoint is enabled to hang operations during
  * yield. Ensures that operation run by 'queryFn' reaches the yield point, then runs killOp()
  * against the yielded operation.
- *
- * The 'useSbe' boolean allows to caller to indicate whether the test should run using the classic
- * query execution engine or the slot-based execution engine.
  */
-function runTestWithQuery(queryFn, useSbe = false) {
-    assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalQueryEnableSlotBasedExecutionEngine: useSbe}));
-
+function runTestWithQuery(queryFn) {
     let waitForParallelShell = null;
 
     try {
@@ -99,13 +93,11 @@ function rootedOr() {
     coll.find({$or: [{a: 1}, {b: 1}]}).comment(kCommandComment).itcount();
 }
 runTestWithQuery(rootedOr);
-runTestWithQuery(rootedOr, kUseSbe);
 
 function groupFindDistinct() {
     coll.aggregate([{$group: {_id: "$a"}}], {comment: kCommandComment}).itcount();
 }
 runTestWithQuery(groupFindDistinct);
-runTestWithQuery(groupFindDistinct, kUseSbe);
 
 function projectImmediatelyAfterMatch() {
     coll.aggregate([{$match: {a: 1}}, {$project: {_id: 0, a: 1}}, {$unwind: "$a"}],
@@ -113,14 +105,12 @@ function projectImmediatelyAfterMatch() {
         .itcount();
 }
 runTestWithQuery(projectImmediatelyAfterMatch);
-runTestWithQuery(projectImmediatelyAfterMatch, kUseSbe);
 
 function sortImmediatelyAfterMatch() {
     coll.aggregate([{$match: {a: 1, b: 1, c: 1}}, {$sort: {a: 1}}], {comment: kCommandComment})
         .itcount();
 }
 runTestWithQuery(sortImmediatelyAfterMatch);
-runTestWithQuery(sortImmediatelyAfterMatch, kUseSbe);
 
 function sortAndProjectionImmediatelyAfterMatch() {
     coll.aggregate([{$match: {a: 1}}, {$project: {_id: 0, a: 1}}, {$sort: {a: 1}}],
@@ -128,7 +118,6 @@ function sortAndProjectionImmediatelyAfterMatch() {
         .itcount();
 }
 runTestWithQuery(sortAndProjectionImmediatelyAfterMatch);
-runTestWithQuery(sortAndProjectionImmediatelyAfterMatch, kUseSbe);
 
 MongoRunner.stopMongod(conn);
 }());

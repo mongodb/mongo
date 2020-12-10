@@ -3,7 +3,10 @@
  * of hybrid unique index builds. This test inserts a duplicate document at different phases of an
  * index build to confirm that the resulting behavior is failure.
  *
- * @tags: [requires_replication]
+ * @tags: [
+ *   requires_replication,
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";

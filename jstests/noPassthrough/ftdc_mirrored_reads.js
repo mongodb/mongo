@@ -1,7 +1,10 @@
 /**
  * Verify the FTDC metrics for mirrored reads.
  *
- * @tags: [requires_replication]
+ * @tags: [
+ *   requires_replication,
+ *   sbe_incompatible,
+ * ]
  */
 load('jstests/libs/ftdc.js');
 

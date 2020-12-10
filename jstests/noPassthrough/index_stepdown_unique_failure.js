@@ -3,6 +3,7 @@
  * scan phase. The new primary will discover a duplicate key violation and abort the build.
  * @tags: [
  *   requires_replication,
+ *   sbe_incompatible,
  * ]
  */
 (function() {

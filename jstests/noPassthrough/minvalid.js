@@ -1,7 +1,10 @@
 
 // this tests that members will stay in RECOVERING state on startup if they have not reached
 // their stored minvalid
-// @tags: [requires_replication]
+// @tags: [
+//   requires_replication,
+//   sbe_incompatible,
+// ]
 
 var name = "minvalid";
 var replTest = new ReplSetTest({name: name, nodes: 1, oplogSize: 1});

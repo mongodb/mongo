@@ -1,5 +1,6 @@
 // Test commands that are not allowed in multi-document transactions.
 // @tags: [
+//   sbe_incompatible,
 //   uses_snapshot_read_concern,
 //   uses_transactions,
 // ]

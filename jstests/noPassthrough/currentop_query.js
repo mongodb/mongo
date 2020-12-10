@@ -1,7 +1,10 @@
 /**
  * Confirms inclusion of query, command object and planSummary in currentOp() for CRUD operations.
  * This test should not be run in the parallel suite as it sets fail points.
- * @tags: [requires_replication, requires_sharding]
+ * @tags: [
+ *    requires_replication,
+ *    requires_sharding,
+ * ]
  */
 (function() {
 "use strict";
@@ -99,21 +102,34 @@ function runTests({conn, readMode, currentOp, truncatedOps, localOps}) {
      *  currentOp().query object.
      *  - 'testObj.operation' - The operation to test against. Will look for this to be the value
      *  of the currentOp().op field.
-     *  - 'testObj.useSbe' - True if the server should be configured to use the slot-based execution
-     *  engine rather than the classic query execution engine.
+     *  - 'testObj.skipMongosLocalOps' - True if this test should not be run against a mongos with
+     *  localOps=true.
+     *  - 'testObj.prohibitSbe' - True if this test is illegal to run in SBE passthroughs.
      */
     function confirmCurrentOpContents(testObj) {
-        const useSbe = testObj.useSbe || false;
-        // TODO SERVER-50712: SBE is not currently expected to be able to run queries that require
-        // shard filtering. If the test asks for SBE and we are running against mongos, just skip
-        // this case.
-        if (useSbe && FixtureHelpers.isMongos(conn.getDB("admin"))) {
+        const skipMongosLocalOps = testObj.skipMongosLocalOps || false;
+        const prohibitSbe = testObj.prohibitSbe || false;
+
+        if (isLocalMongosCurOp && skipMongosLocalOps) {
             return;
         }
-        FixtureHelpers.runCommandOnEachPrimary({
-            db: conn.getDB("admin"),
-            cmdObj: {setParameter: 1, internalQueryEnableSlotBasedExecutionEngine: useSbe}
-        });
+
+        // TODO SERVER-53942: All of the test cases in this file should pass with SBE. Once the
+        // failing test cases with SBE are diagnosed, fixed, and enabled, we should be able to
+        // delete the 'prohibitSbe' flag as well as the following early return statements.
+        //
+        // We consider SBE enabled if it is enabled on any primary node.
+        const isSbeEnabled =
+            FixtureHelpers
+                .runCommandOnEachPrimary(
+                    {db: conn.getDB("admin"), cmdObj: {getParameter: 1, featureFlagSBE: 1}})
+                .reduce((acc, curVal) => acc || curVal.featureFlagSBE.value);
+        if (isSbeEnabled && prohibitSbe) {
+            return;
+        }
+        if (isSbeEnabled && FixtureHelpers.isMongos(conn.getDB("admin"))) {
+            return;
+        }
 
         // Force queries to hang on yield to allow for currentOp capture.
         FixtureHelpers.runCommandOnEachPrimary({
@@ -223,7 +239,8 @@ function runTests({conn, readMode, currentOp, truncatedOps, localOps}) {
                     "collation.locale": "fr",
                     "hint": {_id: 1}
                 },
-                                                             isRemoteShardCurOp)
+                                                             isRemoteShardCurOp),
+                prohibitSbe: true,
             },
             {
                 test: function(db) {
@@ -260,14 +277,16 @@ function runTests({conn, readMode, currentOp, truncatedOps, localOps}) {
             },
             {
                 test: function(db) {
-                    assert.eq(
-                        db.currentop_query.find({a: 1}).comment("currentop_query_sbe").itcount(),
-                        1);
+                    assert.eq(db.currentop_query.find({a: 1}).comment("currentop_query").itcount(),
+                              1);
                 },
                 command: "find",
-                useSbe: true,
+                // Yields only take place on a mongod. Since this test depends on checking that the
+                // currentOp's reported 'numYields' has advanced beyond zero, this test is not
+                // expected to work when running against a mongos with localOps=true.
+                skipMongosLocalOps: true,
                 planSummary: "COLLSCAN",
-                currentOpFilter: {"command.comment": "currentop_query_sbe", numYields: {$gt: 0}}
+                currentOpFilter: {"command.comment": "currentop_query", numYields: {$gt: 0}}
             },
             {
                 test: function(db) {
@@ -302,6 +321,7 @@ function runTests({conn, readMode, currentOp, truncatedOps, localOps}) {
                                               "command.query.$comment": "currentop_query_mr",
                                               "ns": /^currentop_query.*currentop_query/
                                           }),
+                prohibitSbe: true,
             },
             {
                 test: function(db) {
@@ -388,7 +408,8 @@ function runTests({conn, readMode, currentOp, truncatedOps, localOps}) {
                 "collation.locale": "fr",
                 "comment": "currentop_query",
             },
-                                                         isRemoteShardCurOp)
+                                                         isRemoteShardCurOp),
+            prohibitSbe: true
         });
 
         //
@@ -435,7 +456,8 @@ function runTests({conn, readMode, currentOp, truncatedOps, localOps}) {
                 },
                 command: "getMore",
                 planSummary: "COLLSCAN",
-                currentOpFilter: filter
+                currentOpFilter: filter,
+                prohibitSbe: true,
             });
 
             delete TestData.commandResult;
@@ -603,7 +625,8 @@ function runTests({conn, readMode, currentOp, truncatedOps, localOps}) {
                 assert.eq(cursor.itcount(), 0);
             },
             planSummary: "COLLSCAN",
-            currentOpFilter: currentOpFilter
+            currentOpFilter: currentOpFilter,
+            prohibitSbe: true
         });
 
         delete TestData.commandResult;
@@ -629,7 +652,8 @@ function runTests({conn, readMode, currentOp, truncatedOps, localOps}) {
                 }));
             },
             planSummary: "COLLSCAN",
-            currentOpFilter: currentOpFilter
+            currentOpFilter: currentOpFilter,
+            prohibitSbe: true,
         });
 
         delete TestData.queryFilter;

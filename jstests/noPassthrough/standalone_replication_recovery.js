@@ -1,9 +1,15 @@
-/*
+/**
  * Tests that a standalone succeeds when passed the 'recoverFromOplogAsStandalone' parameter.
  *
  * This test only makes sense for storage engines that support recover to stable timestamp.
- * @tags: [requires_wiredtiger, requires_persistence, requires_journaling, requires_replication,
- * requires_majority_read_concern]
+ * @tags: [
+ *   requires_journaling,
+ *   requires_majority_read_concern,
+ *   requires_persistence,
+ *   requires_replication,
+ *   requires_wiredtiger,
+ *   sbe_incompatible,
+ * ]
  */
 
 (function() {

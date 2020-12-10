@@ -15,7 +15,10 @@
  * 3. Node A cannot achieve the commit quorum and is stuck. The "commitIndexBuild" oplog entry does
  *    not get sent to any other nodes.
  *
- * @tags: [requires_replication]
+ * @tags: [
+ *   requires_replication,
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";

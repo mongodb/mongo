@@ -1,7 +1,10 @@
 /**
  * Tests that building partial geo indexes using the hybrid method preserves multikey information.
  *
- * @tags: [requires_replication]
+ * @tags: [
+ *   requires_replication,
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 'use strict';

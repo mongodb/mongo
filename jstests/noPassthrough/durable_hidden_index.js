@@ -2,7 +2,11 @@
  * Test that hidden index status can be replicated by secondary nodes and will be persisted
  * into the index catalog, that is hidden index remains hidden after restart.
  *
- * @tags: [requires_journaling, requires_replication]
+ * @tags: [
+ *   requires_journaling,
+ *   requires_replication,
+ *   sbe_incompatible,
+ * ]
  */
 
 (function() {

@@ -1,7 +1,10 @@
 /**
  * Tests that the commit quorum can be changed during a two-phase index build.
  *
- * @tags: [requires_replication]
+ * @tags: [
+ *   requires_replication,
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 load("jstests/noPassthrough/libs/index_build.js");

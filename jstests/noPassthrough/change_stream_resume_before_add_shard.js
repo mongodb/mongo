@@ -1,7 +1,11 @@
 /**
  * Tests that a change stream can be resumed from a point in time before a new shard was added to
  * the cluster. Exercises the fix for SERVER-42232.
- * @tags: [uses_change_streams, requires_sharding]
+ * @tags: [
+ *   requires_sharding,
+ *   sbe_incompatible,
+ *   uses_change_streams,
+ * ]
  */
 (function() {
 "use strict";

@@ -1,7 +1,11 @@
 /**
  * Tests that the transaction items in the 'twoPhaseCommitCoordinator' object in currentOp() are
  * being tracked correctly.
- * @tags: [uses_transactions, uses_prepare_transaction]
+ * @tags: [
+ *   sbe_incompatible,
+ *   uses_prepare_transaction,
+ *   uses_transactions,
+ * ]
  */
 
 (function() {

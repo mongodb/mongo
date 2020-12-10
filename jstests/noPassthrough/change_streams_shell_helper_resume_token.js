@@ -2,7 +2,11 @@
  * Tests that the cursor.getResumeToken() shell helper behaves as expected, tracking the resume
  * token with each document and returning the postBatchResumeToken as soon as each batch is
  * exhausted.
- * @tags: [requires_journaling, requires_majority_read_concern]
+ * @tags: [
+ *   requires_journaling,
+ *   requires_majority_read_concern,
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";

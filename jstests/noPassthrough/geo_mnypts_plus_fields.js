@@ -1,4 +1,7 @@
 // Test sanity of geo queries with a lot of points
+// @tags: [
+//   sbe_incompatible,
+// ]
 
 (function() {
 "use strict";

@@ -10692,6 +10692,48 @@ buildvariants:
       - rhel62-large
   - name: cst_jscore_passthrough
 
+- name: enterprise-rhel-62-64-bit-dynamic-sbe
+  display_name: "Shared Library Enterprise RHEL 6.2 (SBE)"
+  batchtime: 1440 # 1 day
+  stepback: false
+  modules:
+  - enterprise
+  run_on:
+  - rhel62-small
+  expansions: &enterprise-rhel-62-64-bit-dynamic-sbe-expansions
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
+    compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
+    multiversion_platform: rhel62
+    multiversion_edition: enterprise
+    has_packages: false
+    scons_cache_scope: shared
+    scons_cache_mode: all
+    jstestfuzz_num_generated_files: 40
+    jstestfuzz_concurrent_num_files: 10
+    target_resmoke_time: 10
+    max_sub_suites: 5
+    large_distro_name: rhel62-medium
+    burn_in_tag_buildvariants: enterprise-rhel-62-64-bit-majority-read-concern-off enterprise-rhel-62-64-bit-inmem linux-64-duroff enterprise-rhel-62-64-bit-multiversion
+    num_scons_link_jobs_available: 0.99
+    test_flags: >-
+        --mongodSetParameters="{featureFlagSBE: true}"
+        --excludeWithAnyTags=sbe_incompatible
+  tasks:
+  - name: compile_parallel_TG
+    distros:
+      - rhel62-large
+  - name: unittests_parallel_TG
+    distros:
+      - rhel62-large
+  - name: dbtest_parallel_TG
+    distros:
+    - rhel62-medium
+  - name: .aggregation !.no_async !.secondary_reads !.read_write_concern !.sharded !.unwind !aggregation_disabled_optimization
+  - name: .jscore !.sharding !.decimal !.compat !cst_jscore_passthrough
+  - name: noPassthrough_gen
+    distros:
+    - rhel62-medium
+
 - name: enterprise-rhel-62-64-bit-large-txns-format
   display_name: "Enterprise RHEL 6.2 (large transactions format)"
   modules:

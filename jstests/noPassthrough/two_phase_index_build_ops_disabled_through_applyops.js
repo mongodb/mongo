@@ -2,7 +2,10 @@
  * Ensures that oplog entries specific to two-phase index builds are not allow when run through
  * applyOps.
  *
- * @tags: [requires_replication]
+ * @tags: [
+ *   requires_replication,
+ *   sbe_incompatible,
+ * ]
  */
 
 (function() {

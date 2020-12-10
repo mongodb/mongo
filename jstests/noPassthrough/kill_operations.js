@@ -1,5 +1,8 @@
 // Confirms basic killOperations execution via mongod and mongos.
-// @tags: [requires_replication, requires_sharding]
+// @tags: [
+//   requires_replication,
+//   requires_sharding,
+// ]
 
 (function() {
 "use strict";
@@ -91,12 +94,9 @@ function threadRoutine({connStr, dbName, collName, opKey}) {
     assert.commandFailedWithCode(ret, ErrorCodes.Interrupted);
 }
 
-function runTest(conn, useSbe) {
+function runTest(conn) {
     const db = conn.getDB(kDbName);
     const coll = db.getCollection(kCollName);
-
-    assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalQueryEnableSlotBasedExecutionEngine: useSbe}));
 
     assert.commandWorked(db.dropDatabase());
     let bulk = coll.initializeUnorderedBulkOp();
@@ -181,14 +181,11 @@ function runTest(conn, useSbe) {
                                  ErrorCodes.CursorNotFound);
 }
 
-// Run tests with the slot-based execution engine both disabled and enabled.
-for (const useSbe of [false, true]) {
-    // Test killOp against mongod.
-    runTest(shardConn, useSbe);
+// Test killOp against mongod.
+runTest(shardConn);
 
-    // Test killOp against mongos.
-    runTest(st.s, useSbe);
-}
+// Test killOp against mongos.
+runTest(st.s);
 
 st.stop();
 })();

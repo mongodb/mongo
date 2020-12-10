@@ -3,7 +3,10 @@
  * the command and generate expected oplog entries in which hiding a hidden index or un-hiding a
  * visible index will be a no-op if TTL index option is not involved.
  *
- * @tags: [requires_replication]
+ * @tags: [
+ *   requires_replication,
+ *   sbe_incompatible,
+ * ]
  */
 
 (function() {

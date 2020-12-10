@@ -1,7 +1,10 @@
 /**
  * Confirms that index builds on a primary are aborted when the createIndexes operation times out
  * (based on expiration derived from maxTimeMS).
- * @tags: [requires_replication]
+ * @tags: [
+ *   requires_replication,
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";

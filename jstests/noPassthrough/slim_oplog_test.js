@@ -2,10 +2,11 @@
  * The slim oplog is a view on the oplog to support efficient lookup queries for resharding.
  *
  * @tags: [
- *   requires_replication,
  *   requires_majority_read_concern,
+ *   requires_replication,
+ *   sbe_incompatible,
+ *   uses_prepare_transaction,
  *   uses_transactions,
- *   uses_prepare_transaction
  * ]
  */
 (function() {

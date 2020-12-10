@@ -4,7 +4,10 @@
  * oplog entry after the user kills the operation. The old primary will rely on the new primary to
  * replicate a commitIndexBuild oplog entry after the takeover.
  *
- * @tags: [requires_replication]
+ * @tags: [
+ *   requires_replication,
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";

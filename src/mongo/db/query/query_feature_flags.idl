@@ -34,3 +34,9 @@ feature_flags:
       description: "Feature flag for aggregation window function stage"
       cpp_varname: gFeatureFlagWindowFunctions
       default: false
+
+    featureFlagSBE:
+        description: >-
+          When set to true, SBE engine is used instead of the classic engine.
+        cpp_varname: gSBE
+        default: false

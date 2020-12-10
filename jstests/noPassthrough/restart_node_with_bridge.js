@@ -2,7 +2,11 @@
  * Tests that a node can be successfully restarted when the bridge is enabled. Also verifies the
  * bridge configuration is left intact even after the node is restarted.
  *
- * @tags: [requires_persistence, requires_replication]
+ * @tags: [
+ *   requires_persistence,
+ *   requires_replication,
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";

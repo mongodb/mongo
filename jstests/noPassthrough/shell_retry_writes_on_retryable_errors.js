@@ -1,7 +1,10 @@
 /**
  * Tests that the mongo shell retries exactly once on retryable errors.
  *
- * @tags: [requires_replication]
+ * @tags: [
+ *   requires_replication,
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";

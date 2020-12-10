@@ -5,7 +5,11 @@
  * Tag this test as 'requires_find_command' to prevent it from running in the legacy passthroughs.
  * The 'requires_sharding' tag prevents the test from running on variants with storage options which
  * cannot support a sharded cluster.
- * @tags: [requires_find_command, requires_sharding]
+ * @tags: [
+ *   requires_find_command,
+ *   requires_sharding,
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";

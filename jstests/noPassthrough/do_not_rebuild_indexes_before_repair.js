@@ -3,7 +3,12 @@
  * indexes before repairing the instance. Replication is used to get the database into a state where
  * an index has been dropped on disk, but still exists in the catalog.
  *
- * @tags: [requires_persistence, requires_replication, requires_majority_read_concern]
+ * @tags: [
+ *   requires_majority_read_concern,
+ *   requires_persistence,
+ *   requires_replication,
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";

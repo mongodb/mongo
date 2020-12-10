@@ -4,7 +4,10 @@
  *
  * Must be run with read commands enabled, since legacy OP_QUERY reads do not support the
  * 'allowDiskUse' parameter.
- * @tags: [requires_find_command]
+ * @tags: [
+ *   requires_find_command,
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";

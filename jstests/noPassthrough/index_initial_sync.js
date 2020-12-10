@@ -2,7 +2,10 @@
  * If a secondary attempts to initial sync from a primary while there is an index build in progress,
  * the index should not be visible on the secondary until it has processed the commitIndexBuild
  * oplog entry.
- * @tags: [requires_replication]
+ * @tags: [
+ *   requires_replication,
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";

@@ -7,6 +7,7 @@
  *   requires_replication,
  *   requires_sharding,
  *   requires_wiredtiger,
+ *   sbe_incompatible,
  * ]
  */
 (function() {

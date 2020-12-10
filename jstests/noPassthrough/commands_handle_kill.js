@@ -1,4 +1,7 @@
 // Tests that commands properly handle their underlying plan executor failing or being killed.
+// @tags: [
+//   sbe_incompatible,
+// ]
 (function() {
 'use strict';
 const dbpath = MongoRunner.dataPath + jsTest.name();

@@ -1,6 +1,10 @@
 /**
  * Test that an aggregation with a $out stage obeys the maxTimeMS.
- * @tags: [requires_sharding, requires_replication]
+ * @tags: [
+ *   requires_replication,
+ *   requires_sharding,
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 load("jstests/libs/curop_helpers.js");    // For waitForCurOpByFailPoint().

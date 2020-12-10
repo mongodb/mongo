@@ -1,7 +1,10 @@
 /**
  * Tests for the aggregate command's support for readConcern level "snapshot".
  *
- * @tags: [uses_transactions]
+ * @tags: [
+ *   sbe_incompatible,
+ *   uses_transactions,
+ * ]
  */
 (function() {
 "use strict";

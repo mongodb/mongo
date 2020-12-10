@@ -3,7 +3,11 @@
  * transaction when another operation is being performed concurrently inside of the multi-statement
  * transaction with the "WTSkipPrepareConflictRetries" failpoint is enabled.
  *
- * @tags: [uses_transactions, uses_prepare_transaction]
+ * @tags: [
+ *   sbe_incompatible,
+ *   uses_prepare_transaction,
+ *   uses_transactions,
+ * ]
  */
 (function() {
 "use strict";

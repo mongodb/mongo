@@ -1,6 +1,9 @@
 // Tests replSetInitiate and replSetReconfig with member _id values greater than the number of
 // members in the set, followed by waiting for writeConcern with "w" values equal to size of set.
-// @tags: [requires_replication]
+// @tags: [
+//   requires_replication,
+//   sbe_incompatible,
+// ]
 (function() {
 "use strict";
 

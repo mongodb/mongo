@@ -1,6 +1,9 @@
 // Test whether a pinned cursor does not show up as an idle cursor in curOp.
 // Then test and make sure a pinned cursor shows up in the operation object.
-// @tags: [requires_sharding]
+// @tags: [
+//   requires_sharding,
+//   sbe_incompatible,
+// ]
 (function() {
 "use strict";
 load("jstests/libs/pin_getmore_cursor.js");  // for "withPinnedCursor"

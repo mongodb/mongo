@@ -1,6 +1,9 @@
 /**
  * Test that verifies client metadata is logged into log file on new connections.
- * @tags: [requires_sharding]
+ * @tags: [
+ *   requires_sharding,
+ *   sbe_incompatible,
+ * ]
  */
 load("jstests/libs/logv2_helpers.js");
 

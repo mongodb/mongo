@@ -1,7 +1,12 @@
 /**
  * Test that mongobridge's *From commands work
  *
- * @tags: [requires_replication,requires_sharding,live_record_incompatible]
+ * @tags: [
+ *   live_record_incompatible,
+ *   requires_replication,
+ *   requires_sharding,
+ *   sbe_incompatible,
+ * ]
  */
 
 // mongobridge depends on test commands being enabled. Also EVERY repl/sharding

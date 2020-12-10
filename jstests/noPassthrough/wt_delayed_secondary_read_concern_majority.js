@@ -5,7 +5,10 @@
  * lookaside file results in a stall we can't recover from.
  *
  * This test is labeled resource intensive because its total io_write is 900MB.
- * @tags: [resource_intensive]
+ * @tags: [
+ *   resource_intensive,
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";

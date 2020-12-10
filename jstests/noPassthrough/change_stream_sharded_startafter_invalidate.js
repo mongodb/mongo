@@ -2,7 +2,11 @@
 // event that caused the invalidation is the last thing in the primary shard's oplog. There should
 // be no error creating the new change stream, which should initially see no events. Reproduces the
 // bug described in SERVER-41196.
-// @tags: [requires_sharding, uses_change_streams]
+// @tags: [
+//   requires_sharding,
+//   sbe_incompatible,
+//   uses_change_streams,
+// ]
 (function() {
 "use strict";
 

@@ -2,7 +2,10 @@
  * Tests that mongos reacts properly to a client disconnecting while the logical time is being
  * signed as a part of appending fields to a command response.
  *
- * @tags: [requires_sharding]
+ * @tags: [
+ *   requires_sharding,
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";

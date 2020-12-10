@@ -2,7 +2,10 @@
  * Confirms that aborting an index build on a primaries succeeds despite a concurrent stepDown
  * attempting to interrupt the operation.
  *
- * @tags: [requires_replication]
+ * @tags: [
+ *   requires_replication,
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";

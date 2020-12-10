@@ -2,7 +2,12 @@
 // set node.
 //
 // This test restarts a replica set node, which requires persistence and journaling.
-// @tags: [requires_sharding, requires_persistence, requires_journaling]
+// @tags: [
+//   requires_journaling,
+//   requires_persistence,
+//   requires_sharding,
+//   sbe_incompatible,
+// ]
 (function() {
 "use strict";
 load("jstests/replsets/rslib.js");  // For reconnect.

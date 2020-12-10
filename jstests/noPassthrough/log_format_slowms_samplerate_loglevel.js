@@ -2,7 +2,11 @@
  * Confirms that log output for each operation adheres to the expected, consistent format, including
  * query/write metrics where applicable, on both mongoD and mongoS and under both legacy and command
  * protocols.
- * @tags: [requires_replication, requires_sharding]
+ * @tags: [
+ *   requires_replication,
+ *   requires_sharding,
+ *   sbe_incompatible,
+ * ]
  */
 load("jstests/libs/logv2_helpers.js");
 

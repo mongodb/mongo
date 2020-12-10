@@ -1,4 +1,7 @@
 // Confirms the $planCacheStats output format includes information about failed plans.
+// @tags: [
+//   sbe_incompatible,
+// ]
 (function() {
 "use strict";
 

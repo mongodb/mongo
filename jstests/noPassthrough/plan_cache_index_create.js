@@ -1,7 +1,10 @@
 /**
  * Confirms that the query plan cache is cleared on index build completion, making the newly created
  * index available to queries that had a cached plan prior to the build.
- * @tags: [requires_replication]
+ * @tags: [
+ *   requires_replication,
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";

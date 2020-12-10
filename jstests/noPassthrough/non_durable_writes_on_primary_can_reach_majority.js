@@ -9,8 +9,9 @@
  * Then tests that writes cannot be majority confirmed without the primary and only one secondary.
  *
  * @tags: [
- *     # inMemory has journaling off, so {j:true} writes are not allowed.
- *     requires_journaling,
+ *   # inMemory has journaling off, so {j:true} writes are not allowed.
+ *   requires_journaling,
+ *   sbe_incompatible,
  * ]
  */
 

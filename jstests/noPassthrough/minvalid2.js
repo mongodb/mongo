@@ -15,7 +15,11 @@
  * scenario, none of the members will have any data, and upon restart will each look for a member to
  * initial sync from, so no primary will be elected. This test induces such a scenario, so cannot be
  * run on ephemeral storage engines.
- * @tags: [requires_persistence, requires_replication]
+ * @tags: [
+ *   requires_persistence,
+ *   requires_replication,
+ *   sbe_incompatible,
+ * ]
  */
 
 // Skip db hash check because replset cannot reach consistent state.

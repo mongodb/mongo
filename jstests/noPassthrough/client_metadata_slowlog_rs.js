@@ -1,7 +1,10 @@
 /**
  * Test that verifies client metadata is logged as part of slow query logging in MongoD in a replica
  * set.
- * @tags: [requires_replication]
+ * @tags: [
+ *   requires_replication,
+ *   sbe_incompatible,
+ * ]
  */
 load("jstests/libs/logv2_helpers.js");
 

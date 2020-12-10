@@ -3,7 +3,8 @@
  * indexed. Since we expect the index build on the primary to fail, the secondary should wait for
  * the primary's abortIndexBuild oplog entry.
  * @tags: [
- *     requires_replication,
+ *   requires_replication,
+ *   sbe_incompatible,
  * ]
  */
 (function() {

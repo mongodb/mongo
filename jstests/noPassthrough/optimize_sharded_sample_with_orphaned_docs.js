@@ -2,7 +2,11 @@
  * Confirms that the decision to run the optimized $sample stage takes the ratio of orphans to legit
  * documents into account. In particular, a shard which possesses *only* orphan documents does not
  * induce the infinite-loop behaviour detailed in SERVER-36871.
- * @tags: [requires_journaling, requires_replication]
+ * @tags: [
+ *   requires_journaling,
+ *   requires_replication,
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";

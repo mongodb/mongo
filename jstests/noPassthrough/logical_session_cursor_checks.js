@@ -1,4 +1,7 @@
-// @tags: [requires_sharding]
+// @tags: [
+//   requires_sharding,
+//   sbe_incompatible,
+// ]
 
 (function() {
 'use strict';

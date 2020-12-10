@@ -1,7 +1,10 @@
-/*
+/**
  * Tests the aggregation that collects index consistency metrics for serverStatus retries on stale
  * version errors.
- * @tags: [requires_sharding]
+ * @tags: [
+ *   requires_sharding,
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";

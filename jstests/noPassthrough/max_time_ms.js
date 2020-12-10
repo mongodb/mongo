@@ -1,8 +1,11 @@
-/*
+/**
  * Tests query/command option $maxTimeMS.
-
+ *
  * Creates a sharded cluster.
- * @tags: [requires_sharding]
+ * @tags: [
+ *   requires_sharding,
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";

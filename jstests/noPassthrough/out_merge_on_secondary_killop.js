@@ -3,7 +3,11 @@
  * original aggregate command is killed as well. Likewise, tests that when killOp is run on the
  * $out/$merge command on the secondary, no further insert/update batches are sent to the primary.
  *
- * @tags: [assumes_unsharded_collection, requires_replication]
+ * @tags: [
+ *   assumes_unsharded_collection,
+ *   requires_replication,
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";

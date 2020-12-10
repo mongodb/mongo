@@ -7,7 +7,11 @@
  * stages. For a sharded collection, the 'getAggPlanStages()' function is used to
  * check whether $limit was reordered.
  *
- * @tags: [requires_replication, requires_sharding]
+ * @tags: [
+ *   requires_replication,
+ *   requires_sharding,
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 load("jstests/libs/analyze_plan.js");  // For getAggPlanStages().

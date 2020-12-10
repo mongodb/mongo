@@ -1,7 +1,12 @@
 // Test that 'atClusterTime' triggers a noop write to advance the lastApplied optime if
 // necessary.  This covers the case where a read is done at a cluster time that is only present
 // as an actual opTime on another shard.
-// @tags: [requires_sharding, uses_transactions, uses_atclustertime]
+// @tags: [
+//   requires_sharding,
+//   sbe_incompatible,
+//   uses_atclustertime,
+//   uses_transactions,
+// ]
 (function() {
 "use strict";
 load("jstests/replsets/rslib.js");

@@ -2,7 +2,10 @@
  * Confirms that index builds on a secondary wait for the commitIndexBuild oplog entry before
  * committing.
  * Requires two phase index builds to be enabled via the twoPhaseIndexBuild server parameter.
- * @tags: [requires_replication]
+ * @tags: [
+ *   requires_replication,
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";

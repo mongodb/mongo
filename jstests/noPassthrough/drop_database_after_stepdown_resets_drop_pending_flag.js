@@ -3,7 +3,10 @@
  * flag. Additionally, after the node steps down, we ensure it can drop the database as instructed
  * by the new primary.
  *
- * @tags: [requires_replication]
+ * @tags: [
+ *   requires_replication,
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";

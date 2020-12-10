@@ -1,5 +1,8 @@
 // Tests that stashed transaction resources are destroyed at shutdown and stepdown.
-// @tags: [uses_transactions]
+// @tags: [
+//   sbe_incompatible,
+//   uses_transactions,
+// ]
 (function() {
 "use strict";
 

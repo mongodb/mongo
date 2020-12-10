@@ -2,7 +2,10 @@
  * Confirms that creating index creation on an empty collection does not require the thread pool
  * that we use for hybrid index builds. The fail points that we typically use to suspend hybrid
  * should not affect the progress of index builds on empty collections.
- * @tags: [requires_replication]
+ * @tags: [
+ *   requires_replication,
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";

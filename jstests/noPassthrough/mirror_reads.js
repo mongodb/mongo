@@ -1,7 +1,10 @@
 /**
  * Verify that mirroredReads happen in response to setParameters.mirroredReads
  *
- * @tags: [requires_replication]
+ * @tags: [
+ *   requires_replication,
+ *   sbe_incompatible,
+ * ]
  */
 
 (function() {

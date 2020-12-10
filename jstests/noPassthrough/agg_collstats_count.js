@@ -1,6 +1,11 @@
 /**
  * Tests for using collStats to retrieve count information.
- * @tags: [requires_replication, requires_sharding]
+ *
+ * @tags: [
+ *   requires_replication,
+ *   requires_sharding,
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";

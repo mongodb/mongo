@@ -2,7 +2,10 @@
  * Tests what values are accepted for the maxAcceptableLogicalClockDriftSecs startup parameter, and
  * that servers in a sharded clusters reject cluster times more than
  * maxAcceptableLogicalClockDriftSecs ahead of their wall clocks.
- * @tags: [requires_sharding]
+ * @tags: [
+ *   requires_sharding,
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";

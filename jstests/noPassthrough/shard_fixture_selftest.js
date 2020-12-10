@@ -1,5 +1,8 @@
 // A test to ensure that shard_fixture.js is consistent with shardingtest.js
-// @tags: [requires_sharding]
+// @tags: [
+//   requires_sharding,
+//   sbe_incompatible,
+// ]
 
 (function() {
 'use strict';

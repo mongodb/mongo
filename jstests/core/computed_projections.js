@@ -6,10 +6,10 @@ load("jstests/aggregation/extras/utils.js");  // For arrayEq and orderedArrayEq.
 // Note that the "getParameter" command is expected to fail in versions of mongod that do not yet
 // include the slot-based execution engine. When that happens, however, 'isSBEEnabled' still
 // correctly evaluates to false.
-const isSBEEnabled = db.adminCommand({
-                           getParameter: 1,
-                           internalQueryEnableSlotBasedExecutionEngine: 1
-                       }).internalQueryEnableSlotBasedExecutionEngine;
+const isSBEEnabled = (() => {
+    const getParam = db.adminCommand({getParameter: 1, featureFlagSBE: 1});
+    return getParam.hasOwnProperty("featureFlagSBE") && getParam.featureFlagSBE.value;
+})();
 if (isSBEEnabled) {
     // Override error-code-checking APIs. We only load this when SBE is explicitly enabled, because
     // it causes failures in the parallel suites.

@@ -1,6 +1,9 @@
 /**
  * Tests that wildcard indexes are prepared to handle and retry WriteConflictExceptions while
  * interacting with the storage layer to retrieve multikey paths.
+ * @tags: [
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "strict";

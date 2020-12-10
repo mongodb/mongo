@@ -3,11 +3,12 @@
  * that 'recordPreImages' is inactive in standalone mode.
  *
  * @tags: [
- *     # Servers are restarted in this test and the data must be retained.
- *     requires_persistence,
- *     # This test uses a replica set and must avoid replica set incompatible test suites, like the
- *     # test suite that turns journaling off.
- *     requires_replication,
+ *   # Servers are restarted in this test and the data must be retained.
+ *   requires_persistence,
+ *   # This test uses a replica set and must avoid replica set incompatible test suites, like the
+ *   # test suite that turns journaling off.
+ *   requires_replication,
+ *   sbe_incompatible,
  * ]
  */
 

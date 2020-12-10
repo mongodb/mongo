@@ -1,7 +1,10 @@
 // Test mongos implementation of time-limited operations: verify that mongos correctly forwards max
 // time to shards, and that mongos correctly times out max time sharded getmore operations (which
 // are run in parallel on shards).
-// @tags: [requires_journaling]
+// @tags: [
+//   requires_journaling,
+//   sbe_incompatible,
+// ]
 (function() {
 'use strict';
 

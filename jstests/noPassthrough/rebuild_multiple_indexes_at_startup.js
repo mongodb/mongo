@@ -2,7 +2,11 @@
  * Tests that rebuilding multiple indexes at startup succeeds. Getting into this state requires
  * replication, but the code can execute in any mode.
  *
- * @tags: [requires_persistence, requires_replication]
+ * @tags: [
+ *   requires_persistence,
+ *   requires_replication,
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";

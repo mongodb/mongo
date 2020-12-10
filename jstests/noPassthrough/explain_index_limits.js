@@ -1,4 +1,7 @@
 // Test that explain correctly outputs whether the planner hit or, and, or scan limits.
+// @tags: [
+//   sbe_incompatible,
+// ]
 
 (function() {
 "use strict";

@@ -2,7 +2,12 @@
  * Tests that a change stream can be resumed from the higher of two tokens on separate shards whose
  * clusterTime is identical, differing only by documentKey, without causing the PBRT sent to mongoS
  * to go back-in-time.
- * @tags: [requires_replication, requires_journaling, requires_majority_read_concern]
+ * @tags: [
+ *   requires_journaling,
+ *   requires_majority_read_concern,
+ *   requires_replication,
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";

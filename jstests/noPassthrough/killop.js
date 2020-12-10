@@ -1,5 +1,8 @@
 // Confirms basic killOp execution via mongod and mongos.
-// @tags: [requires_replication, requires_sharding]
+// @tags: [
+//   requires_replication,
+//   requires_sharding,
+// ]
 
 (function() {
 "use strict";
@@ -8,16 +11,12 @@ const dbName = "killop";
 const collName = "test";
 
 // 'conn' is a connection to either a mongod when testing a replicaset or a mongos when testing
-// a sharded cluster. 'shardConn' is a connection to the mongod we enable failpoints on. 'useSbe' is
-// a boolean which indicates whether the test should run with the slot-based execution engine
-// enabled or disabled.
-function runTest(conn, shardConn, useSbe) {
+// a sharded cluster. 'shardConn' is a connection to the mongod we enable failpoints on.
+function runTest(conn, shardConn) {
     const db = conn.getDB(dbName);
 
     assert.commandWorked(
         shardConn.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 1}));
-    assert.commandWorked(shardConn.adminCommand(
-        {setParameter: 1, internalQueryEnableSlotBasedExecutionEngine: useSbe}));
     assert.commandWorked(
         shardConn.adminCommand({"configureFailPoint": "setYieldAllLocksHang", "mode": "alwaysOn"}));
 
@@ -73,14 +72,11 @@ const shardConn = st.rs0.getPrimary();
 // Create the unsharded collection.
 assert.commandWorked(st.s.getDB(dbName).getCollection(collName).insert({x: 1}));
 
-// Run each test with SBE disbaled and enabled.
-for (const useSbe of [false, true]) {
-    // Test killOp against mongod.
-    runTest(shardConn, shardConn, useSbe);
+// Test killOp against mongod.
+runTest(shardConn, shardConn);
 
-    // Test killOp against mongos.
-    runTest(st.s, shardConn, useSbe);
-}
+// Test killOp against mongos.
+runTest(st.s, shardConn);
 
 st.stop();
 })();

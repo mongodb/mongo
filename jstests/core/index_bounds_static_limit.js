@@ -6,11 +6,13 @@
 
 load("jstests/libs/analyze_plan.js");  // For explain helpers.
 
-const isSBEEnabled = db.adminCommand({
-                           getParameter: 1,
-                           internalQueryEnableSlotBasedExecutionEngine: 1
-                       }).internalQueryEnableSlotBasedExecutionEngine;
-
+// Note that the "getParameter" command is expected to fail in versions of mongod that do not yet
+// include the slot-based execution engine. When that happens, however, 'isSBEEnabled' still
+// correctly evaluates to false.
+const isSBEEnabled = (() => {
+    const getParam = db.adminCommand({getParameter: 1, featureFlagSBE: 1});
+    return getParam.hasOwnProperty("featureFlagSBE") && getParam.featureFlagSBE.value;
+})();
 if (!isSBEEnabled) {
     // This test is only relevant when SBE is enabled.
     return;

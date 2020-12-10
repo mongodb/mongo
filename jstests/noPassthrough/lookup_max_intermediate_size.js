@@ -1,6 +1,9 @@
 // This test verifies that an intermediate $lookup stage can grow larger than 16MB,
 // but no larger than internalLookupStageIntermediateDocumentMaxSizeBytes.
-// @tags: [requires_sharding]
+// @tags: [
+//   requires_sharding,
+//   sbe_incompatible,
+// ]
 
 load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
 

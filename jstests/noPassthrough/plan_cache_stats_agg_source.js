@@ -1,5 +1,8 @@
 /**
  * Tests for the $planCacheStats aggregation metadata source.
+ * @tags: [
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";

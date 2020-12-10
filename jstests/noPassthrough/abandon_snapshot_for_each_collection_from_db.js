@@ -6,7 +6,10 @@
  * IndexCatalog of the new collection but not seeing them on-disk due to using an older snapshot
  * (BF-13133).
  *
- * @tags: [requires_replication]
+ * @tags: [
+ *   requires_replication,
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";

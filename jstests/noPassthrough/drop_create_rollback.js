@@ -1,6 +1,11 @@
 /**
  * Tests that the _mdb_catalog does not reuse RecordIds after a catalog restart.
- * @tags: [requires_replication, requires_wiredtiger, requires_persistence]
+ * @tags: [
+ *   requires_persistence,
+ *   requires_replication,
+ *   requires_wiredtiger,
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 'use strict';

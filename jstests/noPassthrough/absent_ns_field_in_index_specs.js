@@ -1,7 +1,11 @@
 /**
  * Ensures that the 'ns' field for index specs is absent with its removal in SERVER-41696.
  *
- * @tags: [requires_replication, requires_persistence]
+ * @tags: [
+ *   requires_persistence,
+ *   requires_replication,
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 'use strict';

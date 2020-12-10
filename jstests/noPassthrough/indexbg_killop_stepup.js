@@ -2,7 +2,10 @@
  * Confirms that aborting a background index build on a secondary during step up does not leave the
  * node in an inconsistent state.
  *
- * @tags: [requires_replication]
+ * @tags: [
+ *   requires_replication,
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";

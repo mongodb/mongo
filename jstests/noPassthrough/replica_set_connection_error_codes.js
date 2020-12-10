@@ -1,7 +1,10 @@
 /**
  * Tests that DBClientRS performs re-targeting when it sees an ErrorCodes.NotWritablePrimary error
  * response from a command even if "not master" doesn't appear in the message.
- * @tags: [requires_replication]
+ * @tags: [
+ *   requires_replication,
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";

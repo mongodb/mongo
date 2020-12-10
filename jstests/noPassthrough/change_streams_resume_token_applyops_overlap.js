@@ -2,7 +2,12 @@
  * Confirms that resuming from an event which has the same clusterTime as a transaction on another
  * shard does not cause the resume attempt to be prematurely rejected. Reproduction script for the
  * bug described in SERVER-40094.
- * @tags: [requires_sharding, uses_multi_shard_transaction, uses_transactions]
+ * @tags: [
+ *   requires_sharding,
+ *   sbe_incompatible,
+ *   uses_multi_shard_transaction,
+ *   uses_transactions,
+ * ]
  */
 (function() {
 "use strict";

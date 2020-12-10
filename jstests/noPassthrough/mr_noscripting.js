@@ -1,4 +1,7 @@
 // Tests that running mapReduce does not crash mongod if scripting is disabled.
+// @tags: [
+//   sbe_incompatible,
+// ]
 (function() {
 "use strict";
 

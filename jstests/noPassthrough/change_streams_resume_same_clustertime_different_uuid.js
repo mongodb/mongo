@@ -2,7 +2,11 @@
  * Confirms that resuming from an event which has the same clusterTime but a different UUID than on
  * another shard does not cause the resume attempt to be prematurely rejected. Reproduction script
  * for the bug described in SERVER-40094.
- * @tags: [requires_sharding, uses_change_streams]
+ * @tags: [
+ *   requires_sharding,
+ *   sbe_incompatible,
+ *   uses_change_streams,
+ * ]
  */
 (function() {
 "use strict";

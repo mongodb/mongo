@@ -2,7 +2,10 @@
  * The FTDC connection pool stats from mongos are a different structure than the connPoolStats
  * command, verify its contents.
  *
- * @tags: [requires_sharding]
+ * @tags: [
+ *   requires_sharding,
+ *   sbe_incompatible,
+ * ]
  */
 load('jstests/libs/ftdc.js');
 

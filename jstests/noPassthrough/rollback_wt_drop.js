@@ -1,6 +1,10 @@
 /**
  * Tests that a collection drop can be rolled back.
- * @tags: [requires_replication, requires_wiredtiger]
+ * @tags: [
+ *   requires_replication,
+ *   requires_wiredtiger,
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 'use strict';

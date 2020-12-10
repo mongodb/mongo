@@ -1,6 +1,10 @@
 /**
  * verify dropConnections command works for sharded clusters
- * @tags: [requires_replication, requires_sharding]
+ * @tags: [
+ *   requires_replication,
+ *   requires_sharding,
+ *   sbe_incompatible,
+ * ]
  */
 
 (function() {

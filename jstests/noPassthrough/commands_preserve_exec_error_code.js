@@ -2,6 +2,9 @@
 // with the original error code. This is important for retryable errors like
 // 'InterruptedDueToReplStateChange',
 // and also to ensure that the error is not swallowed and the diagnostic info is not lost.
+// @tags: [
+//   sbe_incompatible,
+// ]
 (function() {
 "use strict";
 

@@ -1,6 +1,9 @@
 /**
  * Confirms slow currentOp logging does not conflict with applying an oplog batch.
- * @tags: [requires_replication]
+ * @tags: [
+ *   requires_replication,
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";

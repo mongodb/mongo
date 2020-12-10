@@ -3,7 +3,10 @@
  * negative effects when the new primary runs the same dropDatabase command while the old primary
  * is still in the midst of dropping the database.
  *
- * @tags: [requires_replication]
+ * @tags: [
+ *   requires_replication,
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";

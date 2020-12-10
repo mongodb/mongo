@@ -1,7 +1,10 @@
 /**
  * Initiates a background index build on the primary, and while the secondary is building the index
  * through replication, the primary drops all the indexes.
- * @tags: [requires_replication]
+ * @tags: [
+ *   requires_replication,
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 'use strict';

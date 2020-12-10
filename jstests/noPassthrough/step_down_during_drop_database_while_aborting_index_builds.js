@@ -2,7 +2,10 @@
  * Tests that performing a stepdown on the primary during a dropDatabase command doesn't result in
  * any crashes when setting the drop-pending flag back to false.
  *
- * @tags: [requires_replication]
+ * @tags: [
+ *   requires_replication,
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";

@@ -1,6 +1,9 @@
 /**
  * Tests that detailed debug information is excluded from new plan cache entries once the estimated
  * cumulative size of the system's plan caches exceeds a pre-configured threshold.
+ * @tags: [
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";

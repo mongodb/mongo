@@ -1,5 +1,10 @@
 // Tests writeConcern metrics in the serverStatus output.
-// @tags: [requires_persistence, requires_journaling, requires_replication]
+// @tags: [
+//   requires_journaling,
+//   requires_persistence,
+//   requires_replication,
+//   sbe_incompatible,
+// ]
 (function() {
 "use strict";
 

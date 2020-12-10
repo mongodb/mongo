@@ -2,7 +2,11 @@
  * Test that the impersonated user metadata, client metadata, and cluster time are propagated to the
  * primary when a $out/$merge is executed on a secondary.
  *
- * @tags: [assumes_unsharded_collection, requires_replication]
+ * @tags: [
+ *   assumes_unsharded_collection,
+ *   requires_replication,
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";

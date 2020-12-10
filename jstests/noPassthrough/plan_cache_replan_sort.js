@@ -1,7 +1,10 @@
 /**
  * Test that when replanning happens due to blocking sort's memory limit, we include
  * replanReason: "cached plan returned: ..." in the profiling data.
- * @tags: [requires_profiling]
+ * @tags: [
+ *   requires_profiling,
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";

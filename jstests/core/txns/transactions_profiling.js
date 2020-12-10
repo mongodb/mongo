@@ -1,5 +1,8 @@
 // Test profiling for commands in multi-document transactions.
-// @tags: [uses_transactions]
+// @tags: [
+//   sbe_incompatible,
+//   uses_transactions,
+// ]
 (function() {
 "use strict";
 load("jstests/libs/profiler.js");  // For getLatestProfilerEntry.

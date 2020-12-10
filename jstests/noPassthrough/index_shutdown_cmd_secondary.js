@@ -1,7 +1,10 @@
 /**
  * If a user attempts to shut down the server using the shutdown command without the force: true
  * option while there is an index build in progress, we should reject the shutdown request.
- * @tags: [requires_replication]
+ * @tags: [
+ *   requires_replication,
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";

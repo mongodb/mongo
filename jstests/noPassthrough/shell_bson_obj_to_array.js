@@ -1,5 +1,8 @@
-/*
+/**
  * Tests that bsonObjToArray converts BSON objects to JS arrays.
+ * @tags: [
+ *   sbe_incompatible,
+ * ]
  */
 
 (function() {

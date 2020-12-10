@@ -6,7 +6,8 @@
  * entire replica set.
  *
  * @tags: [
- *     requires_replication,
+ *   requires_replication,
+ *   sbe_incompatible,
  * ]
  */
 (function() {

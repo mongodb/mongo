@@ -2,7 +2,10 @@
  * Tests the DataConsistencyChecker.getDiff() function can be used to compare the contents between
  * different collections.
  *
- * @tags: [requires_replication]
+ * @tags: [
+ *   requires_replication,
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";

@@ -1,8 +1,9 @@
 /**
  * Tests that various forms of normal and abnormal shutdown write to the log files as expected.
  * @tags: [
- *   requires_sharding,
  *   live_record_incompatible,
+ *   requires_sharding,
+ *   sbe_incompatible,
  * ]
  */
 

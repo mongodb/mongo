@@ -1,11 +1,12 @@
 /**
  * Fills WiredTiger cache during recovery oplog application.
  * @tags: [
+ *   live_record_incompatible,
+ *   requires_majority_read_concern,
  *   requires_persistence,
  *   requires_replication,
  *   requires_wiredtiger,
- *   requires_majority_read_concern,
- *   live_record_incompatible,
+ *   sbe_incompatible,
  * ]
  */
 (function() {

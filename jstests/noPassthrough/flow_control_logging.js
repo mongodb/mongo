@@ -2,9 +2,10 @@
  * Tests that flow control outputs a log when it is maximally engaged on some cadence.
  *
  * @tags: [
- *   requires_replication,
  *   requires_flow_control,
  *   requires_majority_read_concern,
+ *   requires_replication,
+ *   sbe_incompatible,
  * ]
  */
 (function() {

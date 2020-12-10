@@ -1,6 +1,9 @@
 /**
  * Test that the plan cache memory estimate increases and decreases correctly as plans are added to
  * and cleared from the cache.
+ * @tags: [
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";

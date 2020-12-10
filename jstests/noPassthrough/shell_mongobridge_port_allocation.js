@@ -3,7 +3,11 @@
  * reason about which mongobridge process corresponds to a particular mongod/mongos process in the
  * logs.
  *
- * @tags: [requires_replication, requires_sharding]
+ * @tags: [
+ *   requires_replication,
+ *   requires_sharding,
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";
