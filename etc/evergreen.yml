@@ -10077,6 +10077,8 @@ buildvariants:
   - name: auth_audit_gen
   - name: causally_consistent_jscore_txns_passthrough
   - name: .concurrency .common
+    distros:
+    - windows-64-vs2019-large
   - name: concurrency_replication_causal_consistency
     distros:
     - windows-64-vs2019-large
