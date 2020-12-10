@@ -338,8 +338,4 @@ bool ProcessInfo::checkNumaEnabled() {
     return numaNodeCount > 1;
 }
 
-bool ProcessInfo::blockCheckSupported() {
-    return true;
-}
-
 }  // namespace mongo

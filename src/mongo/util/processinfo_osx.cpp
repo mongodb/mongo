@@ -31,25 +31,21 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/util/processinfo.h"
+
 #include <boost/none.hpp>
 #include <boost/optional.hpp>
 
-#include <iostream>
-#include <mach/mach_host.h>
 #include <mach/mach_init.h>
 #include <mach/mach_traps.h>
 #include <mach/task.h>
 #include <mach/task_info.h>
-#include <mach/vm_map.h>
-#include <mach/vm_statistics.h>
 
-#include <sys/mman.h>
 #include <sys/sysctl.h>
 #include <sys/types.h>
 
-#include "mongo/db/jsobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/processinfo.h"
 
 namespace mongo {
 
@@ -214,10 +210,6 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
 
 bool ProcessInfo::checkNumaEnabled() {
     return false;
-}
-
-bool ProcessInfo::blockCheckSupported() {
-    return true;
 }
 
 }  // namespace mongo

@@ -223,8 +223,4 @@ bool ProcessInfo::checkNumaEnabled() {
     return groups > 1;
 }
 
-bool ProcessInfo::blockCheckSupported() {
-    return true;
-}
-
 }  // namespace mongo

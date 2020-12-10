@@ -162,8 +162,6 @@ public:
 
     bool supported();
 
-    static bool blockCheckSupported();
-
     static const std::string& getProcessName() {
         return appInfo().getProcessName();
     }

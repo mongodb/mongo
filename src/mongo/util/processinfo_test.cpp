@@ -47,12 +47,6 @@ TEST(ProcessInfo, SysInfoIsInitialized) {
     }
 }
 
-TEST(ProcessInfo, NonZeroPageSize) {
-    if (ProcessInfo::blockCheckSupported()) {
-        ASSERT_GREATER_THAN(ProcessInfo::getPageSize(), 0u);
-    }
-}
-
 TEST(ProcessInfo, GetNumAvailableCores) {
 #if defined(__APPLE__) || defined(__linux__) || (defined(__sun) && defined(__SVR4)) || \
     defined(_WIN32)

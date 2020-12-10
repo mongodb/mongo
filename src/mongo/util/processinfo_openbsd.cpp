@@ -190,10 +190,6 @@ bool ProcessInfo::supported() {
     return true;
 }
 
-bool ProcessInfo::blockCheckSupported() {
-    return true;
-}
-
 // get the number of CPUs available to the scheduler
 boost::optional<unsigned long> ProcessInfo::getNumCoresForProcess() {
     long nprocs = sysconf(_SC_NPROCESSORS_ONLN);

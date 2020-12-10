@@ -55,10 +55,6 @@ bool ProcessInfo::checkNumaEnabled() {
     return false;
 }
 
-bool ProcessInfo::blockCheckSupported() {
-    return false;
-}
-
 void ProcessInfo::SystemInfo::collectSystemInfo() {}
 
 void ProcessInfo::getExtraInfo(BSONObjBuilder& info) {}
