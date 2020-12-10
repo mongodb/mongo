@@ -36,6 +36,8 @@ assert.commandFailedWithCode(
         {find: "test", filter: {}, maxTimeMS: 60000, readConcern: {level: "majority"}}),
     ErrorCodes.NotYetInitialized);
 
+// Nodes don't process $clusterTime metadata when in an unreadable state, so this read will fail
+// because the logical clock's latest value is less than the given afterClusterTime timestamp.
 jsTestLog("afterClusterTime readConcern should fail with NotYetInitialized.");
 assert.commandFailedWithCode(localDB.runCommand({
     find: "test",
@@ -43,7 +45,7 @@ assert.commandFailedWithCode(localDB.runCommand({
     maxTimeMS: 60000,
     readConcern: {afterClusterTime: Timestamp(1, 1)}
 }),
-                             ErrorCodes.NotYetInitialized);
+                             ErrorCodes.NotPrimaryOrSecondary);
 
 jsTestLog("oplog query should fail with NotYetInitialized.");
 assert.commandFailedWithCode(localDB.runCommand({
@@ -56,6 +58,6 @@ assert.commandFailedWithCode(localDB.runCommand({
     term: 1,
     readConcern: {afterClusterTime: Timestamp(1, 1)}
 }),
-                             ErrorCodes.NotYetInitialized);
+                             ErrorCodes.NotPrimaryOrSecondary);
 rst.stopSet();
 }());

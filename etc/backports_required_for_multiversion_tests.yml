@@ -135,6 +135,10 @@ suites:
     test_file: jstests/replsets/disallow_adding_initialized_node1.js
   - ticket: SERVER-47863
     test_file: jstests/replsets/initial_sync_replSetGetStatus.js
+  - ticket: SERVER-47568
+    test_file: jstests/replsets/read_concern_uninitated_set.js
+  - ticket: SERVER-47568
+    test_file: jstests/replsets/disable_cluster_time_gossiping_in_unreadable_state.js
 
   concurrency_sharded_replication_multiversion:
 
