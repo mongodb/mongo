@@ -405,8 +405,7 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
         if (optMetadata) {
             const auto& metadata = *optMetadata;
             if (metadata.isSharded() &&
-                metadata.getCollVersion().epoch() == cm.getVersion().epoch() &&
-                metadata.getCollVersion() >= cm.getVersion()) {
+                cm.getVersion().isOlderOrEqualThan(metadata.getCollVersion())) {
                 LOGV2_DEBUG(
                     22063,
                     1,
@@ -436,8 +435,7 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
         if (optMetadata) {
             const auto& metadata = *optMetadata;
             if (metadata.isSharded() &&
-                metadata.getCollVersion().epoch() == cm.getVersion().epoch() &&
-                metadata.getCollVersion() >= cm.getVersion()) {
+                cm.getVersion().isOlderOrEqualThan(metadata.getCollVersion())) {
                 LOGV2_DEBUG(
                     22064,
                     1,

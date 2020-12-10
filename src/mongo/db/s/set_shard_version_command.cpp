@@ -189,9 +189,7 @@ public:
 
                 const auto kTenSeconds = Milliseconds(10000);
 
-                // TODO: Refactor all of this
-                if (requestedVersion < collectionShardVersion &&
-                    requestedVersion.epoch() == collectionShardVersion.epoch()) {
+                if (requestedVersion.isOlderThan(collectionShardVersion)) {
                     auto critSecSignal = csr->getCriticalSectionSignal(
                         opCtx, ShardingMigrationCriticalSection::kWrite);
                     if (critSecSignal) {

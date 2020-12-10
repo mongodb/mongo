@@ -67,7 +67,7 @@ void checkAllElementsAreOfType(BSONType type, const BSONObj& o) {
 void appendChunkTo(std::vector<std::shared_ptr<ChunkInfo>>& chunks,
                    const std::shared_ptr<ChunkInfo>& chunk) {
     if (!chunks.empty() && chunk->getRange().overlaps(chunks.back()->getRange())) {
-        if (chunk->getLastmod() > chunks.back()->getLastmod()) {
+        if (chunks.back()->getLastmod().isOlderThan(chunk->getLastmod())) {
             chunks.pop_back();
             chunks.push_back(chunk);
         }
@@ -144,7 +144,7 @@ ShardVersionMap ChunkMap::constructShardVersionMap() const {
                              if (currentChunk->getShardIdAt(boost::none) != currentRangeShardId)
                                  return true;
 
-                             if (currentChunk->getLastmod() > maxShardVersion)
+                             if (maxShardVersion.isOlderThan(currentChunk->getLastmod()))
                                  maxShardVersion = currentChunk->getLastmod();
 
                              return false;
@@ -194,7 +194,8 @@ ShardVersionMap ChunkMap::constructShardVersionMap() const {
 void ChunkMap::appendChunk(const std::shared_ptr<ChunkInfo>& chunk) {
     appendChunkTo(_chunkMap, chunk);
 
-    _collectionVersion = std::max(_collectionVersion, chunk->getLastmod());
+    if (_collectionVersion.isOlderThan(chunk->getLastmod()))
+        _collectionVersion = chunk->getLastmod();
 }
 
 std::shared_ptr<ChunkInfo> ChunkMap::findIntersectingChunk(const BSONObj& shardKey) const {
@@ -212,7 +213,7 @@ void validateChunk(const std::shared_ptr<ChunkInfo>& chunk, const ChunkVersion& 
                           << " has epoch different from that of the collection " << version.epoch(),
             version.epoch() == chunk->getLastmod().epoch());
 
-    invariant(chunk->getLastmod() >= version);
+    invariant(version.isOlderOrEqualThan(chunk->getLastmod()));
 }
 
 ChunkMap ChunkMap::createMerged(

@@ -174,12 +174,6 @@ public:
         return _timestamp;
     }
 
-    //
-    // Explicit comparison operators - versions with epochs have non-trivial comparisons.
-    // > < operators do not check epoch cases.  Generally if using == we need to handle
-    // more complex cases.
-    //
-
     bool operator==(const ChunkVersion& otherVersion) const {
         return otherVersion.epoch() == epoch() && otherVersion._combined == _combined;
     }
@@ -188,27 +182,14 @@ public:
         return !(otherVersion == *this);
     }
 
-    bool operator>(const ChunkVersion& otherVersion) const {
-        return this->_combined > otherVersion._combined;
-    }
-
-    bool operator>=(const ChunkVersion& otherVersion) const {
-        return this->_combined >= otherVersion._combined;
-    }
-
-    bool operator<(const ChunkVersion& otherVersion) const {
-        return this->_combined < otherVersion._combined;
-    }
-
     // Can we write to this data and not have a problem?
     bool isWriteCompatibleWith(const ChunkVersion& other) const {
         return epoch() == other.epoch() && majorVersion() == other.majorVersion();
     }
 
     /**
-     * Returns true if this version is (strictly) in the same epoch as the other version and
-     * this version is older.  Returns false if we're not sure because the epochs are different
-     * or if this version is newer.
+     * Returns true if both versions are comparable (i.e. same epochs) and the current version is
+     * older than the other one. Returns false otherwise.
      */
     bool isOlderThan(const ChunkVersion& otherVersion) const {
         if (otherVersion._epoch != _epoch)
@@ -218,6 +199,14 @@ public:
             return majorVersion() < otherVersion.majorVersion();
 
         return minorVersion() < otherVersion.minorVersion();
+    }
+
+    /**
+     * Returns true if both versions are comparable (i.e. same epochs) and the current version is
+     * older or equal than the other one. Returns false otherwise.
+     */
+    bool isOlderOrEqualThan(const ChunkVersion& otherVersion) const {
+        return isOlderThan(otherVersion) || (*this == otherVersion);
     }
 
     void appendToCommand(BSONObjBuilder* out) const {

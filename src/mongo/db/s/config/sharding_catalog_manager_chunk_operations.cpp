@@ -392,7 +392,7 @@ BSONObj getShardAndCollectionVersion(OperationContext* opCtx,
             str::stream() << "Aborting due to metadata corruption. Collection version '"
                           << collectionVersion.toString() << "' and shard version '"
                           << shardVersion.toString() << "'.",
-            collectionVersion >= shardVersion);
+            shardVersion.isOlderOrEqualThan(collectionVersion));
 
     collectionVersion.appendWithField(&result, "collectionVersion");
     shardVersion.appendWithField(&result, "shardVersion");

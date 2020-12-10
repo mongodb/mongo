@@ -236,7 +236,7 @@ CompareResult compareShardVersions(const ChunkVersion& shardVersionA,
         return CompareResult_Unknown;
     }
 
-    if (shardVersionA < shardVersionB)
+    if (shardVersionA.isOlderThan(shardVersionB))
         return CompareResult_LT;
     else
         return CompareResult_GTE;

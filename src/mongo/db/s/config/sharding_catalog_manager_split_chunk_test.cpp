@@ -75,7 +75,7 @@ TEST_F(SplitChunkTest, SplitExistingChunkCorrectlyShouldSucceed) {
     auto collVersion = assertGet(ChunkVersion::parseWithField(versions, "collectionVersion"));
     auto shardVersion = assertGet(ChunkVersion::parseWithField(versions, "shardVersion"));
 
-    ASSERT_GT(shardVersion, origVersion);
+    ASSERT_TRUE(origVersion.isOlderThan(shardVersion));
     ASSERT_EQ(collVersion, shardVersion);
 
     // Check for increment on mergedChunk's minor version

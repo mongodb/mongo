@@ -691,7 +691,7 @@ ShardServerCatalogCacheLoader::_schedulePrimaryGetChunksSince(
     }
 
     if ((collAndChunks.epoch != maxLoaderVersion.epoch()) ||
-        (collAndChunks.changedChunks.back().getVersion() > maxLoaderVersion)) {
+        maxLoaderVersion.isOlderThan(collAndChunks.changedChunks.back().getVersion())) {
         _ensureMajorityPrimaryAndScheduleCollAndChunksTask(
             opCtx,
             nss,
@@ -847,7 +847,7 @@ StatusWith<CollectionAndChangedChunks> ShardServerCatalogCacheLoader::_getLoader
         // the overlap.
         auto persistedChangedChunksIt = persisted.changedChunks.begin();
         while (persistedChangedChunksIt != persisted.changedChunks.end() &&
-               persistedChangedChunksIt->getVersion() < minEnqueuedVersion) {
+               persistedChangedChunksIt->getVersion().isOlderThan(minEnqueuedVersion)) {
             ++persistedChangedChunksIt;
         }
         persisted.changedChunks.erase(persistedChangedChunksIt, persisted.changedChunks.end());
@@ -891,7 +891,7 @@ std::pair<bool, CollectionAndChangedChunks> ShardServerCatalogCacheLoader::_getE
 
     auto changedChunksIt = collAndChunks.changedChunks.begin();
     while (changedChunksIt != collAndChunks.changedChunks.end() &&
-           changedChunksIt->getVersion() < catalogCacheSinceVersion) {
+           changedChunksIt->getVersion().isOlderThan(catalogCacheSinceVersion)) {
         ++changedChunksIt;
     }
     collAndChunks.changedChunks.erase(collAndChunks.changedChunks.begin(), changedChunksIt);
