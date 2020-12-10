@@ -173,15 +173,17 @@ bool isTransientTransactionError(ErrorCodes::Error code,
         case ErrorCodes::WriteConflict:
         case ErrorCodes::LockTimeout:
         case ErrorCodes::PreparedTransactionInProgress:
-            isTransient = true;
-            break;
+        case ErrorCodes::ShardInvalidatedForTargeting:
+        case ErrorCodes::StaleDbVersion:
+        case ErrorCodes::TenantMigrationAborted:
+        case ErrorCodes::TenantMigrationCommitted:
+            return true;
         default:
             isTransient = false;
             break;
     }
 
-    isTransient |= ErrorCodes::isSnapshotError(code) || ErrorCodes::isNeedRetargettingError(code) ||
-        code == ErrorCodes::ShardInvalidatedForTargeting || code == ErrorCodes::StaleDbVersion;
+    isTransient |= ErrorCodes::isSnapshotError(code) || ErrorCodes::isNeedRetargettingError(code);
 
     if (isCommitOrAbort) {
         // On NoSuchTransaction it's safe to retry the whole transaction only if the data cannot be

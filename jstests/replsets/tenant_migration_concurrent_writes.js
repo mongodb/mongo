@@ -217,6 +217,17 @@ function runCommand(testOpts, expectedError) {
 
     if (expectedError) {
         assert.commandFailedWithCode(res, expectedError);
+        // The 'TransientTransactionError' label is attached only in a scope of a transaction.
+        if (testOpts.testInTransaction &&
+            (expectedError == ErrorCodes.TenantMigrationAborted ||
+             expectedError == ErrorCodes.TenantMigrationCommitted)) {
+            assert(res["errorLabels"] != null, "Error labels are absent from " + tojson(res));
+            const expectedErrorLabels = ['TransientTransactionError'];
+            assert.sameMembers(res["errorLabels"],
+                               expectedErrorLabels,
+                               "Error labels " + tojson(res["errorLabels"]) +
+                                   " are different from expected " + expectedErrorLabels);
+        }
     } else {
         assert.commandWorked(res);
     }

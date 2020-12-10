@@ -39,6 +39,45 @@
 namespace mongo {
 namespace {
 
+TEST(IsTransientTransactionErrorTest, WriteConflictIsTransient) {
+    ASSERT_TRUE(isTransientTransactionError(
+        ErrorCodes::WriteConflict, false /* hasWriteConcernError */, false /* isCommitOrAbort */));
+}
+
+TEST(IsTransientTransactionErrorTest, LockTimeoutIsTransient) {
+    ASSERT_TRUE(isTransientTransactionError(
+        ErrorCodes::LockTimeout, false /* hasWriteConcernError */, false /* isCommitOrAbort */));
+}
+
+TEST(IsTransientTransactionErrorTest, PreparedTransactionInProgressIsTransient) {
+    ASSERT_TRUE(isTransientTransactionError(ErrorCodes::PreparedTransactionInProgress,
+                                            false /* hasWriteConcernError */,
+                                            false /* isCommitOrAbort */));
+}
+
+TEST(IsTransientTransactionErrorTest, TenantMigrationCommittedIsTransient) {
+    ASSERT_TRUE(isTransientTransactionError(ErrorCodes::TenantMigrationCommitted,
+                                            false /* hasWriteConcernError */,
+                                            false /* isCommitOrAbort */));
+}
+
+TEST(IsTransientTransactionErrorTest, TenantMigrationAbortedIsTransient) {
+    ASSERT_TRUE(isTransientTransactionError(ErrorCodes::TenantMigrationAborted,
+                                            false /* hasWriteConcernError */,
+                                            false /* isCommitOrAbort */));
+}
+
+TEST(IsTransientTransactionErrorTest, ShardInvalidatedForTargetingIsTransient) {
+    ASSERT_TRUE(isTransientTransactionError(ErrorCodes::ShardInvalidatedForTargeting,
+                                            false /* hasWriteConcernError */,
+                                            false /* isCommitOrAbort */));
+}
+
+TEST(IsTransientTransactionErrorTest, StaleDbVersionIsTransient) {
+    ASSERT_TRUE(isTransientTransactionError(
+        ErrorCodes::StaleDbVersion, false /* hasWriteConcernError */, false /* isCommitOrAbort */));
+}
+
 TEST(IsTransientTransactionErrorTest, NetworkErrorsAreTransientBeforeCommit) {
     ASSERT_TRUE(isTransientTransactionError(ErrorCodes::HostUnreachable,
                                             false /* hasWriteConcernError */,
