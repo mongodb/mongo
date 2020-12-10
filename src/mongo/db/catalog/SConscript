@@ -19,7 +19,7 @@ env.Library(
         'collection_options.idl',
         'collection_options_validation.cpp',
     ],
-    LIBDEPS=[
+    LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/idl/idl_parser',
     ],
@@ -31,11 +31,12 @@ env.Library(
         'collection_options.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        'collection_options_idl',
+    ],
+    LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/commands/create_command',
         '$BUILD_DIR/mongo/db/query/collation/collator_interface',
         '$BUILD_DIR/mongo/idl/basic_types',
-        'collection_options_idl',
     ],
 )
 
