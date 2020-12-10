@@ -118,6 +118,13 @@ protected:
         if (reshardingFields)
             collType.setReshardingFields(std::move(reshardingFields.get()));
 
+        // TODO SERVER-53330: Evaluate whether or not we can include
+        // CoordinatorStateEnum::kInitializing in this if statement.
+        if (coordinatorDoc.getState() == CoordinatorStateEnum::kDone) {
+            collType.setAllowMigrations(true);
+        } else if (coordinatorDoc.getState() >= CoordinatorStateEnum::kPreparingToDonate) {
+            collType.setAllowMigrations(false);
+        }
         return collType;
     }
 
@@ -288,13 +295,17 @@ protected:
         }
     }
 
-    void readOriginalCollectionCatalogEntryAndAssertReshardingFieldsMatchExpected(
+    // Reads the original collection's catalog entry from disk and validates that the
+    // reshardingFields and allowMigration matches the expected.
+    void assertOriginalCollectionCatalogEntryMatchesExpected(
         OperationContext* opCtx,
         CollectionType expectedCollType,
         const ReshardingCoordinatorDocument& expectedCoordinatorDoc) {
         DBDirectClient client(opCtx);
         CollectionType onDiskEntry(
             client.findOne(CollectionType::ConfigNS.ns(), Query(BSON("_id" << _originalNss.ns()))));
+
+        ASSERT_EQUALS(onDiskEntry.getAllowMigrations(), expectedCollType.getAllowMigrations());
 
         auto expectedReshardingFields = expectedCollType.getReshardingFields();
         auto expectedCoordinatorState = expectedCoordinatorDoc.getState();
@@ -337,7 +348,9 @@ protected:
         }
     }
 
-    void readTemporaryCollectionCatalogEntryAndAssertReshardingFieldsMatchExpected(
+    // Reads the temporary collection's catalog entry from disk and validates that the
+    // reshardingFields and allowMigration matches the expected.
+    void assertTemporaryCollectionCatalogEntryMatchesExpected(
         OperationContext* opCtx, boost::optional<CollectionType> expectedCollType) {
         DBDirectClient client(opCtx);
         auto doc =
@@ -347,8 +360,11 @@ protected:
             return;
         }
 
-        auto expectedReshardingFields = expectedCollType->getReshardingFields().get();
         CollectionType onDiskEntry(doc);
+
+        ASSERT_EQUALS(onDiskEntry.getAllowMigrations(), expectedCollType->getAllowMigrations());
+
+        auto expectedReshardingFields = expectedCollType->getReshardingFields().get();
         ASSERT(onDiskEntry.getReshardingFields());
 
         auto onDiskReshardingFields = onDiskEntry.getReshardingFields().get();
@@ -423,34 +439,34 @@ protected:
         OID collectionEpoch) {
         readReshardingCoordinatorDocAndAssertMatchesExpected(opCtx, expectedCoordinatorDoc);
 
-        // Check the resharding fields in the config.collections entry for the original collection
+        // Check the resharding fields and allowMigrations in the config.collections entry for the
+        // original collection
         TypeCollectionReshardingFields originalReshardingFields(expectedCoordinatorDoc.get_id());
         originalReshardingFields.setState(expectedCoordinatorDoc.getState());
         TypeCollectionDonorFields donorField(expectedCoordinatorDoc.getReshardingKey());
         originalReshardingFields.setDonorFields(donorField);
-        auto originalCollType = makeOriginalCollectionCatalogEntry(
+        auto expectedOriginalCollType = makeOriginalCollectionCatalogEntry(
             expectedCoordinatorDoc,
             originalReshardingFields,
             std::move(collectionEpoch),
             opCtx->getServiceContext()->getPreciseClockSource()->now());
-        readOriginalCollectionCatalogEntryAndAssertReshardingFieldsMatchExpected(
-            opCtx, originalCollType, expectedCoordinatorDoc);
+        assertOriginalCollectionCatalogEntryMatchesExpected(
+            opCtx, expectedOriginalCollType, expectedCoordinatorDoc);
 
-        // Check the resharding fields in the config.collections entry for the temp collection. If
-        // the expected state is >= kCommitted, the entry for the temp collection should have been
-        // removed.
-        boost::optional<CollectionType> tempCollType = boost::none;
+        // Check the resharding fields and allowMigrations in the config.collections entry for the
+        // temp collection. If the expected state is >= kCommitted, the entry for the temp
+        // collection should have been removed.
+        boost::optional<CollectionType> expectedTempCollType = boost::none;
         if (expectedCoordinatorDoc.getState() < CoordinatorStateEnum::kCommitted ||
             expectedCoordinatorDoc.getState() == CoordinatorStateEnum::kError) {
-            tempCollType = resharding::createTempReshardingCollectionType(
+            expectedTempCollType = resharding::createTempReshardingCollectionType(
                 opCtx,
                 expectedCoordinatorDoc,
                 ChunkVersion(1, 1, OID::gen(), boost::none /* timestamp */),
                 BSONObj());
         }
 
-        readTemporaryCollectionCatalogEntryAndAssertReshardingFieldsMatchExpected(opCtx,
-                                                                                  tempCollType);
+        assertTemporaryCollectionCatalogEntryMatchesExpected(opCtx, expectedTempCollType);
     }
 
     void persistInitialStateAndCatalogUpdatesExpectSuccess(
@@ -530,8 +546,11 @@ protected:
     }
 
     void removeCoordinatorDocAndReshardingFieldsExpectSuccess(
-        OperationContext* opCtx, const ReshardingCoordinatorDocument& expectedCoordinatorDoc) {
-        resharding::removeCoordinatorDocAndReshardingFields(opCtx, expectedCoordinatorDoc);
+        OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc) {
+        resharding::removeCoordinatorDocAndReshardingFields(opCtx, coordinatorDoc);
+
+        auto expectedCoordinatorDoc = coordinatorDoc;
+        expectedCoordinatorDoc.setState(CoordinatorStateEnum::kDone);
 
         // Check that the entry is removed from config.reshardingOperations
         DBDirectClient client(opCtx);
@@ -539,14 +558,15 @@ protected:
                                   Query(BSON("nss" << expectedCoordinatorDoc.getNss().ns())));
         ASSERT(doc.isEmpty());
 
-        // Check that the resharding fields are removed from the config.collections entry
-        auto collType = makeOriginalCollectionCatalogEntry(
+        // Check that the resharding fields are removed from the config.collections entry and
+        // allowMigrations is set back to true.
+        auto expectedOriginalCollType = makeOriginalCollectionCatalogEntry(
             expectedCoordinatorDoc,
             boost::none,
             _finalEpoch,
             opCtx->getServiceContext()->getPreciseClockSource()->now());
-        readOriginalCollectionCatalogEntryAndAssertReshardingFieldsMatchExpected(
-            opCtx, collType, expectedCoordinatorDoc);
+        assertOriginalCollectionCatalogEntryMatchesExpected(
+            opCtx, expectedOriginalCollType, expectedCoordinatorDoc);
     }
 
     void assertChunkVersionDidNotIncreaseAfterStateTransition(

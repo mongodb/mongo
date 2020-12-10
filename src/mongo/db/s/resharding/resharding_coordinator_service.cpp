@@ -550,6 +550,7 @@ CollectionType createTempReshardingCollectionType(
     auto recipientFields = constructRecipientFields(coordinatorDoc);
     tempEntryReshardingFields.setRecipientFields(std::move(recipientFields));
     collType.setReshardingFields(std::move(tempEntryReshardingFields));
+    collType.setAllowMigrations(false);
     return collType;
 }
 
