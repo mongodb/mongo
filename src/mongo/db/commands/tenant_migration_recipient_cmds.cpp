@@ -146,6 +146,27 @@ public:
                     "recipientForgetMigration command not enabled",
                     repl::feature_flags::gTenantMigrations.isEnabled(
                         serverGlobalParams.featureCompatibility));
+            const auto& cmd = request();
+
+            auto recipientService =
+                repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
+                    ->lookupServiceByName(repl::TenantMigrationRecipientService::
+                                              kTenantMigrationRecipientServiceName);
+
+            // We may not have a document if recipientForgetMigration is received before
+            // recipientSyncData. But even if that's the case, we still need to create an instance
+            // and persist a state document that's marked garbage collectable (which is done by the
+            // main chain).
+            TenantMigrationRecipientDocument stateDoc(cmd.getMigrationId(),
+                                                      cmd.getDonorConnectionString().toString(),
+                                                      cmd.getTenantId().toString(),
+                                                      cmd.getReadPreference());
+            auto recipientInstance = repl::TenantMigrationRecipientService::Instance::getOrCreate(
+                opCtx, recipientService, stateDoc.toBSON());
+
+            // Instruct the instance run() function to mark this migration garbage collectable.
+            recipientInstance->onReceiveRecipientForgetMigration(opCtx);
+            recipientInstance->getCompletionFuture().get(opCtx);
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const {}

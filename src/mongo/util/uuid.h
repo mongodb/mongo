@@ -83,6 +83,7 @@ class UUID {
     friend class LogicalSessionFromClient;
     friend class MigrationCoordinatorDocument;
     friend class MigrationDestinationManager;
+    friend class MigrationRecipientCommonData;
     friend class RangeDeletionTask;
     friend class ResolvedKeyId;
     friend class repl::CollectionInfo;

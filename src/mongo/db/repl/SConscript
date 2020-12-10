@@ -1304,6 +1304,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/read_preference',
+        '$BUILD_DIR/mongo/util/future_util',
         'primary_only_service',
         'tenant_migration_recipient_utils',
         'wait_for_majority_service',

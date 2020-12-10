@@ -48,34 +48,42 @@ structs:
                 type: optime
                 description: "Majority applied donor optime by the recipient"
 
+    MigrationRecipientCommonData:
+      description: "Command data for tenant migration recipient commands."
+      strict: true
+      fields:
+        migrationId:
+          description: "Unique identifier for the tenant migration."
+          type: uuid
+        donorConnectionString:
+          description: >-
+            The URI string that the recipient will utilize to create a connection with the
+            donor.
+          type: string
+          validator:
+            callback: "validateConnectionString"
+        tenantId:
+          description: >-
+            The prefix from which the migrating database will be matched. The prefixes 'admin',
+            'local', 'config', the empty string, are not allowed.
+          type: string
+          validator:
+            callback: "validateDatabasePrefix"
+        readPreference:
+          description: >-
+            The read preference settings that the donor will pass on to the recipient.
+          type: readPreference
+
 commands:
   recipientSyncData:
     description: "Parser for the 'recipientSyncData' command."
     command_name: recipientSyncData
     strict: true
     namespace: ignored
+    inline_chained_structs: true
+    chained_structs:
+      MigrationRecipientCommonData: MigrationRecipientCommonData
     fields:
-      migrationId:
-        description: "Unique identifier for the tenant migration."
-        type: uuid
-      donorConnectionString:
-        description: >-
-          The URI string that the recipient will utilize to create a connection with the 
-          donor.
-        type: string
-        validator:
-          callback: "validateConnectionString"
-      tenantId:
-        description: >-
-          The prefix from which the migrating database will be matched. The prefixes 'admin',
-          'local', 'config', the empty string, are not allowed.
-        type: string
-        validator:
-          callback: "validateDatabasePrefix"
-      readPreference:
-        description: >-
-          The read preference settings that the donor will pass on to the recipient.
-        type: readPreference
       returnAfterReachingDonorTimestamp:
         description: >-
           If provided, the recipient should return after syncing up to this donor timestamp.
@@ -90,7 +98,6 @@ commands:
     command_name: recipientForgetMigration
     strict: true
     namespace: ignored
-    fields:
-      migrationId:
-        description: "Unique identifier for the tenant migration."
-        type: uuid
+    inline_chained_structs: true
+    chained_structs:
+      MigrationRecipientCommonData: MigrationRecipientCommonData

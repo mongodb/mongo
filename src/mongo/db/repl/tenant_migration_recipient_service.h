@@ -89,11 +89,24 @@ public:
         void interrupt(Status status) override;
 
         /**
-         * Returns a Future that will be resolved when all work associated with this Instance has
+         * Interrupts the migration for garbage collection.
+         */
+        void onReceiveRecipientForgetMigration(OperationContext* opCtx);
+
+        /**
+         * Returns a Future that will be resolved when data sync associated with this Instance has
          * completed running.
          */
+        SharedSemiFuture<void> getDataSyncCompletionFuture() const {
+            return _dataSyncCompletionPromise.getFuture();
+        }
+
+        /**
+         * Returns a Future that will be resolved when the work associated with this Instance has
+         * completed to indicate whether the migration is forgotten successfully.
+         */
         SharedSemiFuture<void> getCompletionFuture() const {
-            return _completionPromise.getFuture();
+            return _taskCompletionPromise.getFuture();
         }
 
         /**
@@ -189,7 +202,7 @@ public:
 
             void setState(StateFlag state, boost::optional<Status> interruptStatus = boost::none) {
                 invariant(checkIfValidTransition(state),
-                          str::stream() << "current state :" << toString(_state)
+                          str::stream() << "current state: " << toString(_state)
                                         << ", new state: " << toString(state));
 
                 _state = state;
@@ -245,12 +258,28 @@ public:
         };
 
         /*
+         * Helper for interrupt().
+         * The _receivedForgetMigrationPromise is resolved when skipWaitingForForgetMigration is
+         * set (e.g. stepDown/shutDown). And we use skipWaitingForForgetMigration=false for
+         * interruptions coming from the instance's task chain itself (e.g. _oplogFetcherCallback).
+         */
+        void _interrupt(Status status, bool skipWaitingForForgetMigration);
+
+        /*
          * Transitions the instance state to 'kStarted'.
          *
          * Persists the instance state doc and waits for it to be majority replicated.
          * Throws an user assertion on failure.
          */
         SemiFuture<void> _initializeStateDoc(WithLock);
+
+        /*
+         * Transitions the instance state to 'kDone' and sets the expireAt field.
+         *
+         * Persists the instance state doc and waits for it to be majority replicated.
+         * Throws on shutdown / notPrimary errors.
+         */
+        SemiFuture<void> _markStateDocumentAsGarbageCollectable();
 
         /**
          * Creates a client, connects it to the donor, and authenticates it if authParams is
@@ -285,7 +314,6 @@ public:
         /**
          * Starts the tenant oplog fetcher.
          */
-
         void _startOplogFetcher();
 
         /**
@@ -329,10 +357,10 @@ public:
         void _cancelRemainingWork(WithLock lk);
 
         /*
-         * Performs some cleanup work on task completion, like, shutting down the components or
-         * fulfilling any instance promises.
+         * Performs some cleanup work on sync completion, like, shutting down the components or
+         * fulfilling any data-sync related instance promises.
          */
-        void _cleanupOnTaskCompletion(Status status);
+        void _cleanupOnDataSyncCompletion(Status status);
 
         /*
          * Makes the failpoint to stop or hang based on failpoint data "action" field.
@@ -386,13 +414,21 @@ public:
         // Indicates whether the main task future continuation chain state kicked off by run().
         TaskState _taskState;  // (M)
 
-        // Promise that is resolved when the chain of work kicked off by run() has completed.
-        SharedPromise<void> _completionPromise;  // (W)
+        // Promise that is resolved when the state document is initialized and persisted.
+        SharedPromise<void> _stateDocPersistedPromise;  // (W)
         // Promise that is resolved Signaled when the instance has started tenant database cloner
         // and tenant oplog fetcher.
         SharedPromise<void> _dataSyncStartedPromise;  // (W)
         // Promise that is resolved Signaled when the tenant data sync has reached consistent point.
         SharedPromise<OpTime> _dataConsistentPromise;  // (W)
+        // Promise that is resolved when the data sync has completed.
+        SharedPromise<void> _dataSyncCompletionPromise;  // (W)
+        // Promise that is resolved when the recipientForgetMigration command is received or on
+        // stepDown/shutDown with errors.
+        SharedPromise<void> _receivedRecipientForgetMigrationPromise;  // (W)
+        // Promise that is resolved when the chain of work kicked off by run() has completed to
+        // indicate whether the state doc is successfully marked as garbage collectable.
+        SharedPromise<void> _taskCompletionPromise;  // (W)
     };
 
 private:

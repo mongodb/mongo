@@ -460,10 +460,12 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendRecipientSyncDa
     BSONObj cmdObj = BSONObj([&]() {
         auto donorConnString =
             repl::ReplicationCoordinator::get(opCtx)->getConfig().getConnectionString();
-        RecipientSyncData request(_stateDoc.getId(),
-                                  donorConnString.toString(),
-                                  _stateDoc.getTenantId().toString(),
-                                  _stateDoc.getReadPreference());
+        RecipientSyncData request;
+        request.setDbName(NamespaceString::kAdminDb);
+        request.setMigrationRecipientCommonData({_stateDoc.getId(),
+                                                 donorConnString.toString(),
+                                                 _stateDoc.getTenantId().toString(),
+                                                 _stateDoc.getReadPreference()});
         request.setReturnAfterReachingDonorTimestamp(_stateDoc.getBlockTimestamp());
         return request.toBSON(BSONObj());
     }());
@@ -475,10 +477,19 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendRecipientForget
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     std::shared_ptr<RemoteCommandTargeter> recipientTargeterRS,
     const CancelationToken& token) {
-    return _sendCommandToRecipient(executor,
-                                   recipientTargeterRS,
-                                   RecipientForgetMigration(_stateDoc.getId()).toBSON(BSONObj()),
-                                   token);
+
+    auto opCtxHolder = cc().makeOperationContext();
+    auto opCtx = opCtxHolder.get();
+
+    auto donorConnString =
+        repl::ReplicationCoordinator::get(opCtx)->getConfig().getConnectionString();
+    RecipientForgetMigration request;
+    request.setDbName(NamespaceString::kAdminDb);
+    request.setMigrationRecipientCommonData({_stateDoc.getId(),
+                                             donorConnString.toString(),
+                                             _stateDoc.getTenantId().toString(),
+                                             _stateDoc.getReadPreference()});
+    return _sendCommandToRecipient(executor, recipientTargeterRS, request.toBSON(BSONObj()), token);
 }
 
 SemiFuture<void> TenantMigrationDonorService::Instance::run(
