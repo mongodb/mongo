@@ -116,12 +116,10 @@ void releaseValue(TypeTags tag, Value val) noexcept {
         case TypeTags::Object:
             delete getObjectView(val);
             break;
-        case TypeTags::StringBig:
-            delete[] getBigStringView(val);
-            break;
         case TypeTags::ObjectId:
             delete getObjectIdView(val);
             break;
+        case TypeTags::StringBig:
         case TypeTags::bsonObject:
         case TypeTags::bsonArray:
         case TypeTags::bsonObjectId:
@@ -265,21 +263,6 @@ void writeValueToStream(T& stream, TypeTags tag, Value val) {
         case value::TypeTags::Null:
             stream << "null";
             break;
-        case value::TypeTags::StringSmall:
-            stream << '"' << getSmallStringView(val) << '"';
-            break;
-        case value::TypeTags::StringBig: {
-            auto sb = getBigStringView(val);
-            if (strlen(sb) <= kStringMaxDisplayLength) {
-                stream << '"' << sb << '"';
-            } else {
-                char truncated[kStringMaxDisplayLength + 1];
-                strncpy(truncated, sb, kStringMaxDisplayLength);
-                truncated[kStringMaxDisplayLength] = '\0';
-                stream << '"' << truncated << '"' << "...";
-            }
-            break;
-        }
         case value::TypeTags::Array: {
             auto arr = getArrayView(val);
             stream << '[';
@@ -384,12 +367,15 @@ void writeValueToStream(T& stream, TypeTags tag, Value val) {
             stream << '}';
             break;
         }
+        case value::TypeTags::StringSmall:
+        case value::TypeTags::StringBig:
         case value::TypeTags::bsonString: {
-            auto bs = std::string(getStringView(value::TypeTags::bsonString, val));
-            if (bs.length() <= kStringMaxDisplayLength) {
-                stream << '"' << bs << '"';
+            auto sv = getStringView(tag, val);
+            if (sv.length() <= kStringMaxDisplayLength) {
+                stream << '"' << StringData{sv.data(), sv.size()} << '"';
             } else {
-                stream << '"' << bs.substr(0, kStringMaxDisplayLength) << '"' << "...";
+                auto sub = sv.substr(0, kStringMaxDisplayLength);
+                stream << '"' << StringData{sub.data(), sub.size()} << '"' << "...";
             }
             break;
         }

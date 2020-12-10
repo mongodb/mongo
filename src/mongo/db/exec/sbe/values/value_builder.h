@@ -105,13 +105,14 @@ public:
     }
 
     void append(StringData in) {
-        if (in.size() < kSmallStringThreshold - 1) {
-            appendValue(makeSmallString(std::string_view(in.rawData(), in.size())));
+        if (canUseSmallString({in.rawData(), in.size()})) {
+            appendValue(makeSmallString({in.rawData(), in.size()}));
         } else {
             appendValueBufferOffset(TypeTags::StringBig);
 
             // Note: This _will_ write a NULL-terminated string, even if the input StringData does
             // not have a NULL terminator.
+            _valueBufferBuilder->appendNum(static_cast<int32_t>(in.size() + 1));
             _valueBufferBuilder->appendStr(in);
         }
     }

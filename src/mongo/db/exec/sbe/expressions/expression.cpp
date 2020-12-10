@@ -657,7 +657,7 @@ std::vector<DebugPrinter::Block> ELocalBind::debugPrint() const {
 }
 
 std::unique_ptr<EExpression> EFail::clone() const {
-    return std::make_unique<EFail>(_code, _message);
+    return std::make_unique<EFail>(_code, getStringView(_messageTag, _messageVal));
 }
 
 std::unique_ptr<vm::CodeFragment> EFail::compile(CompileCtx& ctx) const {
@@ -666,8 +666,7 @@ std::unique_ptr<vm::CodeFragment> EFail::compile(CompileCtx& ctx) const {
     code->appendConstVal(value::TypeTags::NumberInt64,
                          value::bitcastFrom<int64_t>(static_cast<int64_t>(_code)));
 
-    code->appendConstVal(value::TypeTags::StringBig,
-                         value::bitcastFrom<const char*>(_message.c_str()));
+    code->appendConstVal(_messageTag, _messageVal);
 
     code->appendFail();
 
@@ -680,9 +679,9 @@ std::vector<DebugPrinter::Block> EFail::debugPrint() const {
 
     ret.emplace_back("(");
 
-    ret.emplace_back(DebugPrinter::Block(std::to_string(_code)));
-    ret.emplace_back(DebugPrinter::Block(",`"));
-    ret.emplace_back(DebugPrinter::Block(_message));
+    ret.emplace_back(std::to_string(_code));
+    ret.emplace_back(",`");
+    ret.emplace_back(getStringView(_messageTag, _messageVal));
 
     ret.emplace_back("`)");
 

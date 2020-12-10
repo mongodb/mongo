@@ -1506,10 +1506,10 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinToUpper(ArityTy
     auto [_, operandTag, operandVal] = getFromStack(0);
 
     if (value::isString(operandTag)) {
-        auto strView = value::getStringView(operandTag, operandVal);
-        auto [strTag, strVal] = value::makeNewString(strView);
-        char* str = value::getRawStringView(strTag, strVal);
-        boost::to_upper(str);
+        auto [strTag, strVal] = value::copyValue(operandTag, operandVal);
+        auto buf = value::getRawStringView(strTag, strVal);
+        auto range = std::make_pair(buf, buf + value::getStringLength(strTag, strVal));
+        boost::to_upper(range);
         return {true, strTag, strVal};
     }
     return {false, value::TypeTags::Nothing, 0};
@@ -1519,10 +1519,10 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinToLower(ArityTy
     auto [_, operandTag, operandVal] = getFromStack(0);
 
     if (value::isString(operandTag)) {
-        auto strView = value::getStringView(operandTag, operandVal);
-        auto [strTag, strVal] = value::makeNewString(strView);
-        char* str = value::getRawStringView(strTag, strVal);
-        boost::to_lower(str);
+        auto [strTag, strVal] = value::copyValue(operandTag, operandVal);
+        auto buf = value::getRawStringView(strTag, strVal);
+        auto range = std::make_pair(buf, buf + value::getStringLength(strTag, strVal));
+        boost::to_lower(range);
         return {true, strTag, strVal};
     }
     return {false, value::TypeTags::Nothing, 0};
@@ -1662,7 +1662,8 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinConcat(ArityTyp
         if (!value::isString(tag)) {
             return {false, value::TypeTags::Nothing, 0};
         }
-        result << sbe::value::getRawStringView(tag, value);
+        auto sv = sbe::value::getStringView(tag, value);
+        result << StringData{sv.data(), sv.size()};
     }
 
     auto [strTag, strValue] = sbe::value::makeNewString(result.str());

@@ -93,28 +93,29 @@ TEST(WriteValueToStream, ByteArrayDeprecatedBSONBinDataTest) {
 }
 
 TEST(WriteValueToStream, ShortStringBigTest) {
-    auto val = value::bitcastFrom<const char*>(kStringShort);
-    const std::pair<value::TypeTags, value::Value> value(value::TypeTags::StringBig, val);
+    auto [tag, val] = value::makeNewString(kStringShort);
+    value::ValueGuard guard{tag, val};
     std::ostringstream oss;
-    writeToStream(oss, value);
+    writeToStream(oss, {tag, val});
     auto expectedString = "\"" + std::string(kStringShort) + "\"";
     ASSERT_EQUALS(expectedString, oss.str());
 }
 
 TEST(WriteValueToStream, LongStringBigTest) {
-    auto val = value::bitcastFrom<const char*>(kStringLong);
-    const std::pair<value::TypeTags, value::Value> value(value::TypeTags::StringBig, val);
+    auto [tag, val] = value::makeNewString(kStringLong);
+    value::ValueGuard guard{tag, val};
     std::ostringstream oss;
-    writeToStream(oss, value);
+    writeToStream(oss, {tag, val});
     auto expectedString =
         "\"" + std::string(kStringLong).substr(0, value::kStringMaxDisplayLength) + "\"" + "...";
     ASSERT_EQUALS(expectedString, oss.str());
 }
 
 TEST(WriteValueToStream, StringSmallTest) {
-    auto value = value::makeSmallString("F");
+    auto [tag, val] = value::makeNewString("F");
+    value::ValueGuard guard{tag, val};
     std::ostringstream oss;
-    writeToStream(oss, value);
+    writeToStream(oss, {tag, val});
     ASSERT_EQUALS("\"F\"", oss.str());
 }
 

@@ -323,8 +323,7 @@ static int getApproximateSize(TypeTags tag, Value val) {
             break;
         case TypeTags::StringBig:
         case TypeTags::bsonString: {
-            auto sv = getStringView(tag, val);
-            result += sv.size();
+            result += sizeof(uint32_t) + getStringLength(tag, val) + sizeof(char);
             break;
         }
         case TypeTags::Array: {

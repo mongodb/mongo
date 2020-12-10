@@ -49,7 +49,7 @@ namespace {
  * not contain a stage requiring spilling to disk at all.
  */
 bool fetchNextDocument(plan_ranker::CandidatePlan* candidate,
-                       const std::pair<sbe::value::SlotAccessor*, sbe::value::SlotAccessor*>& slots,
+                       const std::pair<value::SlotAccessor*, value::SlotAccessor*>& slots,
                        size_t* numFailures) {
     try {
         BSONObj obj;
@@ -61,12 +61,12 @@ bool fetchNextDocument(plan_ranker::CandidatePlan* candidate,
                                recordIdSlot,
                                &obj,
                                recordIdSlot ? &recordId : nullptr);
-        if (state == sbe::PlanState::IS_EOF) {
+        if (state == PlanState::IS_EOF) {
             candidate->root->close();
             return true;
         }
 
-        invariant(state == sbe::PlanState::ADVANCED);
+        invariant(state == PlanState::ADVANCED);
         candidate->results.push({obj.getOwned(), {recordIdSlot != nullptr, recordId}});
     } catch (const ExceptionFor<ErrorCodes::QueryTrialRunCompleted>&) {
         candidate->exitedEarly = true;
@@ -80,7 +80,7 @@ bool fetchNextDocument(plan_ranker::CandidatePlan* candidate,
 }
 }  // namespace
 
-std::tuple<sbe::value::SlotAccessor*, sbe::value::SlotAccessor*, bool>
+std::tuple<value::SlotAccessor*, value::SlotAccessor*, bool>
 BaseRuntimePlanner::prepareExecutionPlan(PlanStage* root,
                                          stage_builder::PlanStageData* data) const {
     invariant(root);
@@ -88,13 +88,13 @@ BaseRuntimePlanner::prepareExecutionPlan(PlanStage* root,
 
     root->prepare(data->ctx);
 
-    sbe::value::SlotAccessor* resultSlot{nullptr};
+    value::SlotAccessor* resultSlot{nullptr};
     if (auto slot = data->outputs.getIfExists(stage_builder::PlanStageSlots::kResult); slot) {
         resultSlot = root->getAccessor(data->ctx, *slot);
         uassert(4822871, "Query does not have result slot.", resultSlot);
     }
 
-    sbe::value::SlotAccessor* recordIdSlot{nullptr};
+    value::SlotAccessor* recordIdSlot{nullptr};
     if (auto slot = data->outputs.getIfExists(stage_builder::PlanStageSlots::kRecordId); slot) {
         recordIdSlot = root->getAccessor(data->ctx, *slot);
         uassert(4822872, "Query does not have record ID slot.", recordIdSlot);
@@ -116,8 +116,16 @@ std::vector<plan_ranker::CandidatePlan> BaseRuntimePlanner::collectExecutionStat
     invariant(solutions.size() == roots.size());
 
     std::vector<plan_ranker::CandidatePlan> candidates;
-    std::vector<std::pair<sbe::value::SlotAccessor*, sbe::value::SlotAccessor*>> slots;
-    std::vector<std::unique_ptr<TrialRunTracker>> trialRunTrackers;
+    std::vector<std::pair<value::SlotAccessor*, value::SlotAccessor*>> slots;
+    std::vector<std::pair<PlanStage*, std::unique_ptr<TrialRunTracker>>> trialRunTrackers;
+
+    ON_BLOCK_EXIT([&] {
+        // Detach each SBE plan's TrialRunTracker.
+        while (!trialRunTrackers.empty()) {
+            trialRunTrackers.back().first->detachFromTrialRunTracker();
+            trialRunTrackers.pop_back();
+        }
+    });
 
     const auto maxNumResults{trial_period::getTrialPeriodNumToReturn(_cq)};
     const auto maxNumReads{trial_period::getTrialPeriodMaxWorks(_opCtx, _collection)};
@@ -128,7 +136,7 @@ std::vector<plan_ranker::CandidatePlan> BaseRuntimePlanner::collectExecutionStat
         // Attach a unique TrialRunTracker to each SBE plan.
         auto tracker = std::make_unique<TrialRunTracker>(maxNumResults, maxNumReads);
         root->attachToTrialRunTracker(tracker.get());
-        trialRunTrackers.emplace_back(std::move(tracker));
+        trialRunTrackers.emplace_back(root.get(), std::move(tracker));
 
         auto [resultSlot, recordIdSlot, exitedEarly] = prepareExecutionPlan(root.get(), &data);
 
@@ -154,11 +162,6 @@ std::vector<plan_ranker::CandidatePlan> BaseRuntimePlanner::collectExecutionStat
             done |= fetchNextDocument(&candidates[ix], slots[ix], &numFailures) ||
                 (numFailures == candidates.size());
         }
-    }
-
-    // Detach each SBE plan's TrialRunTracker.
-    for (size_t ix = 0; ix < candidates.size(); ++ix) {
-        candidates[ix].root->detachFromTrialRunTracker();
     }
 
     // Make sure we have at least one plan which hasn't failed.

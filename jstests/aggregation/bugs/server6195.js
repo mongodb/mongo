@@ -4,7 +4,7 @@ load('jstests/aggregation/extras/utils.js');
 
 c = db.s6570;
 c.drop();
-c.save({v: "$", w: ".", x: "foo", y: "bar"});
+c.save({v: "$", w: ".", x: "foo", y: "bar", z: "z\0z"});
 
 assert.eq(c.aggregate({$project: {str: {$concat: ["X", "$x", "Y", "$y"]}}}).toArray()[0].str,
           "XfooYbar");
@@ -12,6 +12,8 @@ assert.eq(c.aggregate({$project: {str: {$concat: ["$v", "X", "$w", "Y"]}}}).toAr
           "$X.Y");
 assert.eq(c.aggregate({$project: {str: {$concat: ["$w", "X", "$v", "Y"]}}}).toArray()[0].str,
           ".X$Y");
+assert.eq(c.aggregate({$project: {str: {$concat: ["X", "$z", "a\0a", "Y"]}}}).toArray()[0].str,
+          "Xz\0za\0aY");
 
 // Nullish (both with and without other strings)
 assert.isnull(c.aggregate({$project: {str: {$concat: ["$missing"]}}}).toArray()[0].str);

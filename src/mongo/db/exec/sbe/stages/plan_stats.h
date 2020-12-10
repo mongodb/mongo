@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/db/exec/plan_stats.h"
-#include "mongo/db/exec/sbe/util/debug_print.h"
 #include "mongo/db/query/stage_types.h"
 
 namespace mongo::sbe {

@@ -644,9 +644,18 @@ public:
     }
 
     /**
-     * Returns a view of this string without copying.
+     * stringView() returns a view of this string without copying.
      *
-     * WARNING: the view expires when this StringBuilder is modified or destroyed.
+     * WARNING: The view is invalidated when this StringBuilder is modified or destroyed.
+     */
+    std::string_view stringView() const {
+        return std::string_view(_buf.buf(), _buf.l);
+    }
+
+    /**
+     * stringData() returns a view of this string without copying.
+     *
+     * WARNING: The view is invalidated when this StringBuilder is modified or destroyed.
      */
     StringData stringData() const {
         return StringData(_buf.buf(), _buf.l);

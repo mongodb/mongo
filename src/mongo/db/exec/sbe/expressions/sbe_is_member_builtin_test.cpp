@@ -78,14 +78,14 @@ TEST_F(SBEBuiltinIsMemberTest, IsMemberArraySet) {
     inputSlotAccessor.reset(decimalTag, decimalVal);
     runAndAssertExpression(inputSlot, makeArraySet(BSON_ARRAY(1 << 9.0)), false);
 
-    auto [smallStrTag, smallStrVal] = value::makeSmallString("foo");
+    auto [smallStrTag, smallStrVal] = value::makeNewString("foo");
     inputSlotAccessor.reset(smallStrTag, smallStrVal);
     runAndAssertExpression(inputSlot,
                            makeArraySet(BSON_ARRAY("foo"
                                                    << "bar")),
                            true);
 
-    std::tie(smallStrTag, smallStrVal) = value::makeSmallString("baz");
+    std::tie(smallStrTag, smallStrVal) = value::makeNewString("baz");
     inputSlotAccessor.reset(smallStrTag, smallStrVal);
     runAndAssertExpression(inputSlot,
                            makeArraySet(BSON_ARRAY("foo"
@@ -142,14 +142,14 @@ TEST_F(SBEBuiltinIsMemberTest, IsMemberArray) {
     inputSlotAccessor.reset(decimalTag, decimalVal);
     runAndAssertExpression(inputSlot, makeArray(BSON_ARRAY(1 << 9.0)), false);
 
-    auto [smallStrTag, smallStrVal] = value::makeSmallString("foo");
+    auto [smallStrTag, smallStrVal] = value::makeNewString("foo");
     inputSlotAccessor.reset(smallStrTag, smallStrVal);
     runAndAssertExpression(inputSlot,
                            makeArray(BSON_ARRAY("foo"
                                                 << "bar")),
                            true);
 
-    std::tie(smallStrTag, smallStrVal) = value::makeSmallString("baz");
+    std::tie(smallStrTag, smallStrVal) = value::makeNewString("baz");
     inputSlotAccessor.reset(smallStrTag, smallStrVal);
     runAndAssertExpression(inputSlot,
                            makeArray(BSON_ARRAY("foo"
@@ -207,14 +207,14 @@ TEST_F(SBEBuiltinIsMemberTest, IsMemberBSONArray) {
     inputSlotAccessor.reset(decimalTag, decimalVal);
     runAndAssertExpression(inputSlot, makeBsonArray(BSON_ARRAY(1 << 9.0)), false);
 
-    auto [smallStrTag, smallStrVal] = value::makeSmallString("foo");
+    auto [smallStrTag, smallStrVal] = value::makeNewString("foo");
     inputSlotAccessor.reset(smallStrTag, smallStrVal);
     runAndAssertExpression(inputSlot,
                            makeBsonArray(BSON_ARRAY("foo"
                                                     << "bar")),
                            true);
 
-    std::tie(smallStrTag, smallStrVal) = value::makeSmallString("baz");
+    std::tie(smallStrTag, smallStrVal) = value::makeNewString("baz");
     inputSlotAccessor.reset(smallStrTag, smallStrVal);
     runAndAssertExpression(inputSlot,
                            makeBsonArray(BSON_ARRAY("foo"

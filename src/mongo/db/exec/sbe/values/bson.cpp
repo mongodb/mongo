@@ -116,21 +116,19 @@ std::pair<value::TypeTags, value::Value> convertFrom(bool view,
                 return {value::TypeTags::bsonString, value::bitcastFrom<const char*>(be)};
             }
             // len includes trailing zero.
-            auto len = ConstDataView(be).read<LittleEndian<uint32_t>>();
-            be += sizeof(len);
-            if (len < value::kSmallStringThreshold) {
+            auto lenWithNull = uint32_t{ConstDataView(be).read<LittleEndian<uint32_t>>()};
+            be += sizeof(lenWithNull);
+            if (value::canUseSmallString({be, lenWithNull - 1})) {
                 value::Value smallString;
                 // Copy 8 bytes fast if we have space.
                 if (be + 8 < end) {
                     memcpy(&smallString, be, 8);
                 } else {
-                    memcpy(&smallString, be, len);
+                    memcpy(&smallString, be, lenWithNull);
                 }
                 return {value::TypeTags::StringSmall, smallString};
             } else {
-                auto str = new char[len];
-                memcpy(str, be, len);
-                return {value::TypeTags::StringBig, value::bitcastFrom<const char*>(str)};
+                return value::makeBigString({be, lenWithNull - 1});
             }
         }
         case BSONType::BinData: {

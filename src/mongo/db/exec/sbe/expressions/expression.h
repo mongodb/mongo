@@ -313,10 +313,7 @@ public:
     EConstant(value::TypeTags tag, value::Value val) : _tag(tag), _val(val) {}
     EConstant(std::string_view str) {
         // Views are non-owning so we have to make a copy.
-        auto [tag, val] = value::makeNewString(str);
-
-        _tag = tag;
-        _val = val;
+        std::tie(_tag, _val) = value::makeNewString(str);
     }
 
     ~EConstant() override {
@@ -496,8 +493,13 @@ private:
  */
 class EFail final : public EExpression {
 public:
-    EFail(ErrorCodes::Error code, std::string message)
-        : _code(code), _message(std::move(message)) {}
+    EFail(ErrorCodes::Error code, std::string_view message) : _code(code) {
+        std::tie(_messageTag, _messageVal) = value::makeNewString(message);
+    }
+
+    ~EFail() override {
+        value::releaseValue(_messageTag, _messageVal);
+    }
 
     std::unique_ptr<EExpression> clone() const override;
 
@@ -507,7 +509,8 @@ public:
 
 private:
     ErrorCodes::Error _code;
-    std::string _message;
+    value::TypeTags _messageTag;
+    value::Value _messageVal;
 };
 
 /**

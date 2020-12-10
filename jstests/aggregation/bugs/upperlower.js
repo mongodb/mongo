@@ -30,6 +30,8 @@ assertResult('', '', ['']);
 assertResult('AB', 'ab', 'aB');
 assertResult('AB', 'ab', ['Ab']);
 assertResult('ABZ', 'abz', 'aBz');
+assertResult('A\0B\0\0Z', 'a\0b\0\0z', 'a\0B\0\0z');
+assertResult('A\0\0B\0Z', 'a\0\0b\0z', ['A\0\0b\0z']);
 
 // With non alphabet characters.
 assertResult('1', '1', '1');
@@ -69,7 +71,9 @@ assert.commandWorked(coll.insert({
     numberInt: NumberInt(42),
     numberDecimal: NumberDecimal(42.213),
     nested: {str: "hello world"},
-    unicode: "\u1ebd"
+    unicode: "\u1ebd",
+    string_with_nulls_1: "a\0B\0\0z",
+    string_with_nulls_2: "A\0\0b\0z"
 }));
 assertResult('-_AB', '-_ab', '$string');
 assertResult(
@@ -78,4 +82,6 @@ assertResult('2090845886852', '2090845886852', '$numberLong');
 assertResult('42', '42', '$numberInt');
 assertResult('HELLO WORLD', 'hello world', '$nested.str');
 assertResult('\u1ebd', '\u1ebd', '$unicode');
+assertResult('A\0B\0\0Z', 'a\0b\0\0z', '$string_with_nulls_1');
+assertResult('A\0\0B\0Z', 'a\0\0b\0z', '$string_with_nulls_2');
 }());
