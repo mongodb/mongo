@@ -42,7 +42,8 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(donorOpObserverFailAfterOnInsert);
 MONGO_FAIL_POINT_DEFINE(donorOpObserverFailAfterOnUpdate);
 
-const auto tenantIdToDeleteDecoration = OperationContext::declareDecoration<std::string>();
+const auto tenantIdToDeleteDecoration =
+    OperationContext::declareDecoration<boost::optional<std::string>>();
 
 /**
  * Initializes the TenantMigrationAccessBlocker for the tenant migration denoted by the given state
@@ -137,6 +138,13 @@ public:
 
     void commit(boost::optional<Timestamp>) override {
         if (_donorStateDoc.getExpireAt()) {
+            // The mtab entry needs to be removed for garbage collectable aborted migrations. This
+            // is to allow future migrations with the same tenantId, as this migration has been
+            // aborted and forgotten.
+            if (_donorStateDoc.getState() == TenantMigrationDonorStateEnum::kAborted) {
+                TenantMigrationAccessBlockerRegistry::get(_opCtx->getServiceContext())
+                    .remove(_donorStateDoc.getTenantId());
+            }
             return;
         }
 
@@ -261,7 +269,15 @@ void TenantMigrationDonorOpObserver::aboutToDelete(OperationContext* opCtx,
                 str::stream() << "cannot delete a donor's state document " << doc
                               << " since it has not been marked as garbage collectable",
                 donorStateDoc.getExpireAt());
-        tenantIdToDeleteDecoration(opCtx) = donorStateDoc.getTenantId().toString();
+
+        // Documents in the kAborted state have already had their tenantIds removed from the mtab,
+        // and therefore, TenantMigrationDonorOpObserver::onDelete doesn't have to delete the entry.
+        // Mark kAborted documents with boost::none so that onDelete skips them.
+        if (donorStateDoc.getState() == TenantMigrationDonorStateEnum::kAborted) {
+            tenantIdToDeleteDecoration(opCtx) = boost::none;
+        } else {
+            tenantIdToDeleteDecoration(opCtx) = donorStateDoc.getTenantId().toString();
+        }
     }
 }
 
@@ -271,9 +287,10 @@ void TenantMigrationDonorOpObserver::onDelete(OperationContext* opCtx,
                                               StmtId stmtId,
                                               bool fromMigrate,
                                               const boost::optional<BSONObj>& deletedDoc) {
-    if (nss == NamespaceString::kTenantMigrationDonorsNamespace && !inRecoveryMode(opCtx)) {
+    if (nss == NamespaceString::kTenantMigrationDonorsNamespace &&
+        tenantIdToDeleteDecoration(opCtx) && !inRecoveryMode(opCtx)) {
         opCtx->recoveryUnit()->registerChange(std::make_unique<TenantMigrationDonorDeleteHandler>(
-            opCtx, tenantIdToDeleteDecoration(opCtx)));
+            opCtx, tenantIdToDeleteDecoration(opCtx).get()));
     }
 }
 

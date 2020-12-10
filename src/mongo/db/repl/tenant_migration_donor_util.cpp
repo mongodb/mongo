@@ -186,6 +186,11 @@ void recoverTenantMigrationAccessBlockers(OperationContext* opCtx) {
     Query query;
 
     store.forEach(opCtx, query, [&](const TenantMigrationDonorDocument& doc) {
+        // Skip creating a TenantMigrationAccessBlocker for aborted migrations that have been
+        // marked as garbage collected.
+        if (doc.getExpireAt() && doc.getState() == TenantMigrationDonorStateEnum::kAborted)
+            return true;
+
         auto mtab = std::make_shared<TenantMigrationAccessBlocker>(
             opCtx->getServiceContext(),
             getTenantMigrationDonorExecutor(),
