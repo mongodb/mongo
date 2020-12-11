@@ -69,6 +69,10 @@ assertResult(2, [{$add: ['$one', '$one']}, '$three', '$zero']);
 assertError([16608, 4848401], [{$divide: ['$one', '$zero']}, '$zero']);
 assertError([16610, 4848403], [{$mod: ['$one', '$zero']}, '$zero']);
 
+// Return undefined.
+assertResult(undefined, ['$my_null', '$my_undefined']);
+assertResult(undefined, ['$my_undefined', '$my_undefined']);
+
 // Nested.
 assert(t.drop());
 assert.commandWorked(t.insertOne({d: 'foo'}));
@@ -76,9 +80,4 @@ assertResult('foo', ['$a', {$ifNull: ['$b', {$ifNull: ['$c', '$d']}]}]);
 assert.commandWorked(t.updateMany({}, {$set: {b: 'bar'}}));
 assertResult('bar', ['$a', {$ifNull: ['$b', {$ifNull: ['$c', '$d']}]}]);
 assertResult('bar', ['$a', {$ifNull: ['$b', {$ifNull: ['$c', '$d']}]}, '$e']);
-
-// Return undefined.
-// TODO SERVER-52703: Commented out for now; these tests return an empty doc in SBE
-// assertResult(undefined, ['$my_null', '$my_undefined']);
-// assertResult(undefined, ['$my_undefined', '$my_undefined']);
 }());
