@@ -53,7 +53,7 @@ namespace {
 
 // Given a serialized document source, appends execution stats 'nReturned' and
 // 'executionTimeMillisEstimate' to it.
-Value appendExecStats(Value docSource, const CommonStats& stats) {
+Value appendCommonExecStats(Value docSource, const CommonStats& stats) {
     invariant(docSource.getType() == BSONType::Object);
     MutableDocument doc(docSource.getDocument());
     auto nReturned = static_cast<long long>(stats.advanced);
@@ -464,7 +464,7 @@ vector<Value> Pipeline::writeExplainOps(ExplainOptions::Verbosity verbosity) con
         invariant(afterSize - beforeSize == 1u);
         if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
             auto serializedStage = array.back();
-            array.back() = appendExecStats(serializedStage, stage->getCommonStats());
+            array.back() = appendCommonExecStats(serializedStage, stage->getCommonStats());
         }
     }
     return array;

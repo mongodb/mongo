@@ -97,15 +97,9 @@ DocumentSource::GetNextResult DocumentSourceSort::doGetNext() {
 void DocumentSourceSort::serializeToArray(
     std::vector<Value>& array, boost::optional<ExplainOptions::Verbosity> explain) const {
     uint64_t limit = _sortExecutor->getLimit();
-    if (explain) {  // always one Value for combined $sort + $limit
-        array.push_back(Value(DOC(
-            kStageName << DOC("sortKey"
-                              << _sortExecutor->sortPattern().serialize(
-                                     SortPattern::SortKeySerialization::kForExplain)
-                              << "limit"
-                              << (_sortExecutor->hasLimit() ? Value(static_cast<long long>(limit))
-                                                            : Value())))));
-    } else {  // one Value for $sort and maybe a Value for $limit
+
+
+    if (!explain) {  // one Value for $sort and maybe a Value for $limit
         MutableDocument inner(_sortExecutor->sortPattern().serialize(
             SortPattern::SortKeySerialization::kForPipelineSerialization));
         array.push_back(Value(DOC(kStageName << inner.freeze())));
@@ -114,7 +108,26 @@ void DocumentSourceSort::serializeToArray(
             auto limitSrc = DocumentSourceLimit::create(pExpCtx, limit);
             limitSrc->serializeToArray(array);
         }
+        return;
     }
+
+    MutableDocument mutDoc(
+        DOC(kStageName << DOC("sortKey"
+                              << _sortExecutor->sortPattern().serialize(
+                                     SortPattern::SortKeySerialization::kForExplain)
+                              << "limit"
+                              << (_sortExecutor->hasLimit() ? Value(static_cast<long long>(limit))
+                                                            : Value()))));
+
+    if (explain >= ExplainOptions::Verbosity::kExecStats) {
+        auto& stats = _sortExecutor->stats();
+
+        mutDoc["totalDataSizeSortedBytesEstimate"] =
+            Value(static_cast<long long>(stats.totalDataSizeBytes));
+        mutDoc["usedDisk"] = Value(stats.spills > 0 ? true : false);
+    }
+
+    array.push_back(Value(mutDoc.freeze()));
 }
 
 boost::optional<long long> DocumentSourceSort::getLimit() const {
@@ -138,8 +151,8 @@ Pipeline::SourceContainer::iterator DocumentSourceSort::doOptimizeAt(
 
     limit = getLimit();
 
-    // Since $sort is not guaranteed to be stable, we can blindly remove the first $sort only when
-    // there's no limit on the current sort.
+    // Since $sort is not guaranteed to be stable, we can blindly remove the first $sort only
+    // when there's no limit on the current sort.
     auto nextSort = dynamic_cast<DocumentSourceSort*>((*nextStage).get());
     if (!limit && nextSort) {
         container->erase(itr);
@@ -211,9 +224,9 @@ void DocumentSourceSort::loadDocument(Document&& doc) {
 
     Value sortKey;
     Document docForSorter;
-    // We always need to extract the sort key if we've reached this point. If the query system had
-    // already computed the sort key we'd have split the pipeline there, would be merging presorted
-    // documents, and wouldn't use this method.
+    // We always need to extract the sort key if we've reached this point. If the query system
+    // had already computed the sort key we'd have split the pipeline there, would be merging
+    // presorted documents, and wouldn't use this method.
     std::tie(sortKey, docForSorter) = extractSortKey(std::move(doc));
     _sortExecutor->add(sortKey, docForSorter);
 }
@@ -234,8 +247,8 @@ std::pair<Value, Document> DocumentSourceSort::extractSortKey(Document&& doc) co
     Value sortKey = _sortKeyGen->computeSortKeyFromDocument(doc);
 
     if (pExpCtx->needsMerge) {
-        // If this sort stage is part of a merged pipeline, make sure that each Document's sort key
-        // gets saved with its metadata.
+        // If this sort stage is part of a merged pipeline, make sure that each Document's sort
+        // key gets saved with its metadata.
         MutableDocument toBeSorted(std::move(doc));
         toBeSorted.metadata().setSortKey(sortKey, _sortKeyGen->isSingleElementKey());
 
@@ -259,12 +272,12 @@ boost::optional<DocumentSource::DistributedPlanLogic> DocumentSourceSort::distri
 
 bool DocumentSourceSort::canRunInParallelBeforeWriteStage(
     const std::set<std::string>& nameOfShardKeyFieldsUponEntryToStage) const {
-    // This is an interesting special case. If there are no further stages which require merging the
-    // streams into one, a $sort should not require it. This is only the case because the sort order
-    // doesn't matter for a pipeline ending with a write stage. We may encounter it here as an
-    // intermediate stage before a final $group with a $sort, which would make sense. Should we
-    // extend our analysis to detect if an exchange is appropriate in a general pipeline, a $sort
-    // would generally require merging the streams before producing output.
+    // This is an interesting special case. If there are no further stages which require merging
+    // the streams into one, a $sort should not require it. This is only the case because the
+    // sort order doesn't matter for a pipeline ending with a write stage. We may encounter it
+    // here as an intermediate stage before a final $group with a $sort, which would make sense.
+    // Should we extend our analysis to detect if an exchange is appropriate in a general
+    // pipeline, a $sort would generally require merging the streams before producing output.
     return false;
 }
 

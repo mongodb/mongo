@@ -132,18 +132,18 @@ const char* DocumentSourceGroup::getSourceName() const {
     return kStageName.rawData();
 }
 
-bool DocumentSourceGroup::MemoryUsageTracker::shouldSpillWithAttemptToSaveMemory(
-    std::function<int()> saveMemory) {
-    if (!allowDiskUse && (memoryUsageBytes > maxMemoryUsageBytes)) {
-        memoryUsageBytes -= saveMemory();
+bool DocumentSourceGroup::shouldSpillWithAttemptToSaveMemory(std::function<int()> saveMemory) {
+    if (!_memoryTracker.allowDiskUse &&
+        (_stats.memoryUsageBytes > _memoryTracker.maxMemoryUsageBytes)) {
+        _stats.memoryUsageBytes -= saveMemory();
     }
 
-    if (memoryUsageBytes > maxMemoryUsageBytes) {
+    if (_stats.memoryUsageBytes > _memoryTracker.maxMemoryUsageBytes) {
         uassert(ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed,
                 "Exceeded memory limit for $group, but didn't allow external sort."
                 " Pass allowDiskUse:true to opt in.",
-                allowDiskUse);
-        memoryUsageBytes = 0;
+                _memoryTracker.allowDiskUse);
+        _stats.memoryUsageBytes = 0;
         return true;
     }
     return false;
@@ -308,14 +308,19 @@ Value DocumentSourceGroup::serialize(boost::optional<ExplainOptions::Verbosity> 
     if (explain >= ExplainOptions::Verbosity::kExecStats) {
         MutableDocument md;
         invariant(_accumulatedFields.size() == _memoryTracker.accumStatementMemoryBytes.size());
+
         for (size_t i = 0; i < _accumulatedFields.size(); i++) {
-            md[_accumulatedFields[i].fieldName] = _usedDisk
+            md[_accumulatedFields[i].fieldName] = _stats.usedDisk
                 ? Value(static_cast<long long>(
                       _memoryTracker.accumStatementMemoryBytes[i].maxMemoryBytes))
                 : Value(static_cast<long long>(
                       _memoryTracker.accumStatementMemoryBytes[i].currentMemoryBytes));
         }
+
         out["maxAccumulatorMemoryUsageBytes"] = Value(md.freezeToValue());
+        out["totalDataSizeGroupedBytesEstimate"] =
+            Value(static_cast<long long>(_stats.memoryUsageBytes));
+        out["usedDisk"] = Value(_stats.usedDisk);
     }
 
     return Value(out.freezeToValue());
@@ -394,7 +399,6 @@ intrusive_ptr<DocumentSourceGroup> DocumentSourceGroup::create(
 DocumentSourceGroup::DocumentSourceGroup(const intrusive_ptr<ExpressionContext>& expCtx,
                                          boost::optional<size_t> maxMemoryUsageBytes)
     : DocumentSource(kStageName, expCtx),
-      _usedDisk(false),
       _doingMerge(false),
       _memoryTracker{expCtx->allowDiskUse && !expCtx->inMongos,
                      maxMemoryUsageBytes ? *maxMemoryUsageBytes
@@ -541,7 +545,7 @@ DocumentSource::GetNextResult DocumentSourceGroup::initialize() {
     GetNextResult input = pSource->getNext();
 
     for (; input.isAdvanced(); input = pSource->getNext()) {
-        if (_memoryTracker.shouldSpillWithAttemptToSaveMemory([this]() { return freeMemory(); })) {
+        if (shouldSpillWithAttemptToSaveMemory([this]() { return freeMemory(); })) {
             _sortedFiles.push_back(spill());
         }
 
@@ -559,7 +563,7 @@ DocumentSource::GetNextResult DocumentSourceGroup::initialize() {
 
         vector<uint64_t> oldAccumMemUsage(numAccumulators, 0);
         if (inserted) {
-            _memoryTracker.memoryUsageBytes += id.getApproximateSize();
+            _stats.memoryUsageBytes += id.getApproximateSize();
 
             // Initialize and add the accumulators
             Value expandedId = expandId(id);
@@ -576,7 +580,7 @@ DocumentSource::GetNextResult DocumentSourceGroup::initialize() {
         } else {
             for (size_t i = 0; i < group.size(); i++) {
                 // subtract old mem usage. New usage added back after processing.
-                _memoryTracker.memoryUsageBytes -= group[i]->memUsageForSorter();
+                _stats.memoryUsageBytes -= group[i]->memUsageForSorter();
                 oldAccumMemUsage[i] = group[i]->memUsageForSorter();
             }
         }
@@ -589,7 +593,7 @@ DocumentSource::GetNextResult DocumentSourceGroup::initialize() {
                 _accumulatedFields[i].expr.argument->evaluate(rootDocument, &pExpCtx->variables),
                 _doingMerge);
 
-            _memoryTracker.memoryUsageBytes += group[i]->memUsageForSorter();
+            _stats.memoryUsageBytes += group[i]->memUsageForSorter();
             _memoryTracker.accumStatementMemoryBytes[i].currentMemoryBytes +=
                 group[i]->memUsageForSorter() - oldAccumMemUsage[i];
         }
@@ -650,12 +654,8 @@ DocumentSource::GetNextResult DocumentSourceGroup::initialize() {
     MONGO_UNREACHABLE;
 }
 
-bool DocumentSourceGroup::usedDisk() {
-    return _usedDisk;
-}
-
 shared_ptr<Sorter<Value, Value>::Iterator> DocumentSourceGroup::spill() {
-    _usedDisk = true;
+    _stats.usedDisk = true;
     vector<const GroupsMap::value_type*> ptrs;  // using pointers to speed sorting
     ptrs.reserve(_groups->size());
     for (GroupsMap::const_iterator it = _groups->begin(), end = _groups->end(); it != end; ++it) {

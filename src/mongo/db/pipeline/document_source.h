@@ -303,6 +303,14 @@ public:
     }
 
     /**
+     * Get the stats specific to the DocumentSource. It is legal for the DocumentSource to return
+     * nullptr to indicate that no specific stats are available.
+     */
+    virtual const SpecificStats* getSpecificStats() const {
+        return nullptr;
+    }
+
+    /**
      * Get the stage's name.
      */
     virtual const char* getSourceName() const;

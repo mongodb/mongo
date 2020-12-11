@@ -34,6 +34,8 @@
 #include <string>
 #include <vector>
 
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/plan_summary_stats.h"
@@ -840,6 +842,22 @@ struct TrialStats : public SpecificStats {
 
     bool trialCompleted = false;
     bool trialSucceeded = false;
+};
+
+struct GroupStats : public SpecificStats {
+    SpecificStats* clone() const final {
+        return new GroupStats(*this);
+    }
+
+    uint64_t estimateObjectSizeInBytes() const {
+        return sizeof(*this);
+    }
+
+    // The amount of data in bytes that were the input to the group stage.
+    size_t memoryUsageBytes = 0;
+
+    // Flag to specify if data was spilled to disk while grouping the data.
+    bool usedDisk = false;
 };
 
 }  // namespace mongo

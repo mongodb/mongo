@@ -159,7 +159,16 @@ public:
     /**
      * Returns true if this $group stage used disk during execution and false otherwise.
      */
-    bool usedDisk() final;
+    bool usedDisk() {
+        return _stats.usedDisk;
+    }
+
+    /**
+     * Returns $group stage specific stats.
+     */
+    const SpecificStats* getSpecificStats() const final {
+        return &_stats;
+    }
 
     boost::optional<DistributedPlanLogic> distributedPlanLogic() final;
     bool canRunInParallelBeforeWriteStage(
@@ -191,18 +200,8 @@ private:
             uint64_t currentMemoryBytes;
         };
 
-        /**
-         * Cleans up any pending memory usage. Throws error, if memory usage is above
-         * 'maxMemoryUsageBytes' and cannot spill to disk. The 'saveMemory' function should return
-         * the amount of memory saved by the cleanup.
-         *
-         * Returns true, if the caller should spill to disk, false otherwise.
-         */
-        bool shouldSpillWithAttemptToSaveMemory(std::function<int()> saveMemory);
-
         const bool allowDiskUse;
         const size_t maxMemoryUsageBytes;
-        size_t memoryUsageBytes = 0;
         // Tracks memory consumption per accumulation statement.
         std::vector<AccumStatementMemoryTracker> accumStatementMemoryBytes;
     };
@@ -263,12 +262,22 @@ private:
      */
     bool pathIncludedInGroupKeys(const std::string& dottedPath) const;
 
+    /**
+     * Cleans up any pending memory usage. Throws error, if memory usage is above
+     * 'maxMemoryUsageBytes' and cannot spill to disk. The 'saveMemory' function should return
+     * the amount of memory saved by the cleanup.
+     *
+     * Returns true, if the caller should spill to disk, false otherwise.
+     */
+    bool shouldSpillWithAttemptToSaveMemory(std::function<int()> saveMemory);
+
     std::vector<AccumulationStatement> _accumulatedFields;
 
-    bool _usedDisk;  // Keeps track of whether this $group spilled to disk.
     bool _doingMerge;
 
     MemoryUsageTracker _memoryTracker;
+
+    GroupStats _stats;
 
     std::string _fileName;
     std::streampos _nextSortedFileWriterOffset = 0;

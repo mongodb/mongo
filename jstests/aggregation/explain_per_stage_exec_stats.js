@@ -54,6 +54,19 @@ const facet = [{$facet: {a: pipelineShardedStages, b: pipelineNoShardedStages}}]
 // Verify behavior of $changeStream, which generates several internal stages.
 const changeStream = [{$changeStream: {}}];
 
+function assertExecutionStats(stage) {
+    assert(stage.hasOwnProperty("nReturned"));
+    assert(stage.hasOwnProperty("executionTimeMillisEstimate"));
+
+    if (stage.hasOwnProperty("$sort")) {
+        assert(stage.hasOwnProperty("totalDataSizeSortedBytesEstimate"), stage);
+        assert(stage.hasOwnProperty("usedDisk"), stage);
+    } else if (stage.hasOwnProperty("$group")) {
+        assert(stage.hasOwnProperty("totalDataSizeGroupedBytesEstimate"), stage);
+        assert(stage.hasOwnProperty("usedDisk"), stage);
+    }
+}
+
 function assertStatsInOutput(explain) {
     // Depending on how the pipeline is split, the explain output from each shard can contain either
     // of these.
@@ -61,8 +74,7 @@ function assertStatsInOutput(explain) {
     if (explain.hasOwnProperty("stages")) {
         const stages = explain["stages"];
         for (const stage of stages) {
-            assert(stage.hasOwnProperty("nReturned"));
-            assert(stage.hasOwnProperty("executionTimeMillisEstimate"));
+            assertExecutionStats(stage);
         }
     } else {
         // If we don't have a list of stages, "executionStats" should still contain "nReturned"
