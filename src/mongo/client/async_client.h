@@ -77,7 +77,9 @@ public:
 
     Future<void> authenticate(const BSONObj& params);
 
-    Future<void> authenticateInternal(boost::optional<std::string> mechanismHint);
+    Future<void> authenticateInternal(
+        boost::optional<std::string> mechanismHint,
+        std::shared_ptr<auth::InternalAuthParametersProvider> authProvider);
 
     Future<bool> completeSpeculativeAuth(std::shared_ptr<SaslClientSession> session,
                                          std::string authDB,

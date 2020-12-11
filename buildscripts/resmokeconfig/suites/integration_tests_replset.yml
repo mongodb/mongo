@@ -5,6 +5,7 @@ selector:
   exclude_files:
   - build/**/mongo/client/client_dbclient_connection_integration_test* # Needs connection to single host.
   - build/install/bin/client_dbclient_connection_integration_test* # Needs connection to single host.
+  - build/**/network_interface_ssl_test* # Requires SSL
 
 executor:
   archive:

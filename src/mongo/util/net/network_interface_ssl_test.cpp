@@ -29,21 +29,23 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
-#include <fstream>
-
 #include "mongo/platform/basic.h"
 
+#include <fstream>
+
+#include "mongo/client/authenticate.h"
+#include "mongo/db/auth/authorization_session_impl.h"
 #include "mongo/executor/network_interface_integration_fixture.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/integration_test.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/assert_util.h"
+#include "mongo/util/net/ssl_options.h"
 
 namespace mongo {
 namespace executor {
 namespace {
 
-std::string LoadFile(const std::string& name) {
+std::string loadFile(const std::string& name) {
     std::ifstream input(name);
     std::string str((std::istreambuf_iterator<char>(input)), std::istreambuf_iterator<char>());
     return str;
@@ -52,10 +54,26 @@ std::string LoadFile(const std::string& name) {
 class NetworkInterfaceSSLFixture : public NetworkInterfaceIntegrationFixture {
 public:
     void setUp() final {
+
+        // Setup an internal user so that we can use it for external auth
+        UserHandle user(User(UserName("__system", "local")));
+
+        internalSecurity.user = user;
+
+        // Force all connections to use SSL for outgoing
+        sslGlobalParams.sslMode.store(static_cast<int>(SSLParams::SSLModes::SSLMode_requireSSL));
+        sslGlobalParams.sslCAFile = "jstests/libs/ca.pem";
+        // Set a client cert that should be ignored if we use the transient cert correctly.
+        sslGlobalParams.sslPEMKeyFile = "jstests/libs/client.pem";
+
+        // Set the internal user auth parameters so we auth with X.509 externally
+        auth::setInternalUserAuthParams(
+            auth::createInternalX509AuthDocument(boost::optional<StringData>("Ignored")));
+
         ConnectionPool::Options options;
         options.transientSSLParams.emplace([] {
             TransientSSLParams params;
-            params.sslClusterPEMPayload = LoadFile("jstests/libs/client.pem");
+            params.sslClusterPEMPayload = loadFile("jstests/libs/server.pem");
             params.targetedClusterConnectionString = ConnectionString::forLocal();
             return params;
         }());

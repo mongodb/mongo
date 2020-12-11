@@ -510,6 +510,7 @@ Status storeMongodOptions(const moe::Environment& params) {
     if (!replSettings.getReplSetString().empty() &&
         (params.count("security.authorization") &&
          params["security.authorization"].as<std::string>() == "enabled") &&
+        serverGlobalParams.clusterAuthMode.load() != ServerGlobalParams::ClusterAuthMode_x509 &&
         !params.count("security.keyFile")) {
         return Status(
             ErrorCodes::BadValue,

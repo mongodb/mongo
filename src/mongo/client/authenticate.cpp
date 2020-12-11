@@ -35,8 +35,10 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/client/internal_auth.h"
 #include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/config.h"
 #include "mongo/db/auth/authorization_manager.h"
@@ -138,7 +140,22 @@ Future<void> authX509(RunCommandHook runCommand, const BSONObj& params, StringDa
     return runCommand(authRequest.getValue()).ignoreValue();
 }
 
+class DefaultInternalAuthParametersProvider : public InternalAuthParametersProvider {
+public:
+    ~DefaultInternalAuthParametersProvider() = default;
+
+    BSONObj get(size_t index, StringData mechanism) final {
+        return getInternalAuthParams(index, mechanism);
+    }
+};
+
 }  // namespace
+
+std::shared_ptr<InternalAuthParametersProvider> createDefaultInternalAuthProvider() {
+    return std::make_shared<DefaultInternalAuthParametersProvider>();
+}
+
+
 //
 // General Auth
 //
@@ -229,22 +246,26 @@ Future<std::string> negotiateSaslMechanism(RunCommandHook runCommand,
         });
 }
 
-Future<void> authenticateInternalClient(const std::string& clientSubjectName,
-                                        boost::optional<std::string> mechanismHint,
-                                        StepDownBehavior stepDownBehavior,
-                                        RunCommandHook runCommand) {
+Future<void> authenticateInternalClient(
+    const std::string& clientSubjectName,
+    boost::optional<std::string> mechanismHint,
+    StepDownBehavior stepDownBehavior,
+    RunCommandHook runCommand,
+    std::shared_ptr<InternalAuthParametersProvider> internalParamsProvider) {
     return negotiateSaslMechanism(
                runCommand, internalSecurity.user->getName(), mechanismHint, stepDownBehavior)
-        .then([runCommand, clientSubjectName](std::string mechanism) -> Future<void> {
-            auto params = getInternalAuthParams(0, mechanism);
+        .then([runCommand, clientSubjectName, internalParamsProvider](
+                  std::string mechanism) -> Future<void> {
+            auto params = internalParamsProvider->get(0, mechanism);
             if (params.isEmpty()) {
                 return Status(ErrorCodes::BadValue,
                               "Missing authentication parameters for internal user auth");
             }
             return authenticateClient(params, HostAndPort(), clientSubjectName, runCommand)
                 .onError<ErrorCodes::AuthenticationFailed>(
-                    [runCommand, clientSubjectName, mechanism](Status status) -> Future<void> {
-                        auto altCreds = getInternalAuthParams(1, mechanism);
+                    [runCommand, clientSubjectName, mechanism, internalParamsProvider](
+                        Status status) -> Future<void> {
+                        auto altCreds = internalParamsProvider->get(1, mechanism);
                         if (!altCreds.isEmpty()) {
                             return authenticateClient(
                                 altCreds, HostAndPort(), clientSubjectName, runCommand);

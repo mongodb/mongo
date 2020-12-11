@@ -1,0 +1,61 @@
+# This is a suite for TLS only and auth
+test_kind: cpp_integration_test
+
+selector:
+  root: build/integration_tests.txt
+  include_files:
+  - build/**/network_interface_ssl_test
+  - build/install/bin/network_interface_ssl_test
+
+config_variables:
+- &keyFile jstests/libs/authTestsKey
+- &keyFileData Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
+- &authOptions
+  authenticationDatabase: admin
+  authenticationMechanism: SCRAM-SHA-1
+  password: *keyFileData
+  username: __system
+- TestData: &TestData
+    auth: true
+    authMechanism: SCRAM-SHA-1
+    keyFile: *keyFile
+    keyFileData: *keyFileData
+
+executor:
+  archive:
+    hooks:
+      - ValidateCollections
+  config: {}
+  hooks:
+  # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
+  # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
+  # validating the entire contents of the collection.
+  - class: CheckReplOplogs
+    shell_options:
+      global_vars:
+        TestData: *TestData
+        eval: jsTest.authenticate(db.getMongo())
+      <<: *authOptions
+  - class: CheckReplDBHash
+    shell_options:
+      global_vars:
+        TestData: *TestData
+        eval: jsTest.authenticate(db.getMongo())
+      <<: *authOptions
+  - class: ValidateCollections
+  fixture:
+    class: ReplicaSetFixture
+    mongod_options:
+      set_parameters:
+        logComponentVerbosity:
+          command: 2
+        enableTestCommands: 1
+      tlsMode: preferTLS
+      tlsCAFile: jstests/libs/ca.pem
+      tlsCertificateKeyFile: jstests/libs/server.pem
+      keyFile: *keyFile
+      clusterAuthMode: sendX509
+      auth: ''
+    num_nodes: 2
+    auth_options:
+      <<: *authOptions

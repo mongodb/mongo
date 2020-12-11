@@ -81,6 +81,24 @@ constexpr auto kAuthenticateCommand = "authenticate"_sd;
 enum class StepDownBehavior { kKillConnection, kKeepConnectionOpen };
 
 /**
+ * Provider of SASL credentials for internal authentication purposes.
+ */
+class InternalAuthParametersProvider {
+public:
+    virtual ~InternalAuthParametersProvider() = default;
+
+    /**
+     * Get the information for a given SASL mechanism.
+     *
+     * If there are multiple entries for a mechanism, suppots retrieval by index. Used when rotating
+     * the security key.
+     */
+    virtual BSONObj get(size_t index, StringData mechanism) = 0;
+};
+
+std::shared_ptr<InternalAuthParametersProvider> createDefaultInternalAuthProvider();
+
+/**
  * Authenticate a user.
  *
  * Pass the default hostname for this client in through "hostname." If SSL is enabled and
@@ -126,10 +144,12 @@ Future<void> authenticateClient(const BSONObj& params,
  * Because this may retry during cluster keyfile rollover, this may call the RunCommandHook more
  * than once, but will only call the AuthCompletionHandler once.
  */
-Future<void> authenticateInternalClient(const std::string& clientSubjectName,
-                                        boost::optional<std::string> mechanismHint,
-                                        StepDownBehavior stepDownBehavior,
-                                        RunCommandHook runCommand);
+Future<void> authenticateInternalClient(
+    const std::string& clientSubjectName,
+    boost::optional<std::string> mechanismHint,
+    StepDownBehavior stepDownBehavior,
+    RunCommandHook runCommand,
+    std::shared_ptr<InternalAuthParametersProvider> internalParamsProvider);
 
 /**
  * Build a BSONObject representing parameters to be passed to authenticateClient(). Takes

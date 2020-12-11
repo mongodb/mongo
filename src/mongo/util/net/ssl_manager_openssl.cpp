@@ -97,6 +97,8 @@ int SSL_CTX_set_ciphersuites(SSL_CTX*, const char*) {
 }
 #endif
 
+using namespace fmt::literals;
+
 namespace mongo {
 
 namespace {
@@ -1128,7 +1130,7 @@ class SSLManagerOpenSSL : public SSLManagerInterface,
                           public std::enable_shared_from_this<SSLManagerOpenSSL> {
 public:
     explicit SSLManagerOpenSSL(const SSLParams& params, bool isServer);
-    ~SSLManagerOpenSSL() final {
+    ~SSLManagerOpenSSL() {
         stopJobs();
     }
 
@@ -1292,13 +1294,23 @@ private:
      * @param subjectName as a pointer to the subject name variable being set.
      * @param serverNotAfter a Date_t object pointer that is valued if the
      * date is to be checked (as for a server certificate) and null otherwise.
-     * @return bool showing if the function was successful.
+     * @return Status::Ok showing if the function was successful.
      */
-    bool _parseAndValidateCertificate(const std::string& keyFile,
-                                      PasswordFetcher* keyPassword,
-                                      SSLX509Name* subjectName,
-                                      Date_t* serverNotAfter);
+    Status _parseAndValidateCertificate(const std::string& keyFile,
+                                        PasswordFetcher* keyPassword,
+                                        SSLX509Name* subjectName,
+                                        Date_t* serverNotAfter);
 
+    Status _parseAndValidateCertificateFromBIO(UniqueBIO inBio,
+                                               PasswordFetcher* keyPassword,
+                                               StringData fileNameForLogging,
+                                               SSLX509Name* subjectName,
+                                               Date_t* serverNotAfter);
+
+    Status _parseAndValidateCertificateFromMemory(StringData buffer,
+                                                  PasswordFetcher* keyPassword,
+                                                  SSLX509Name* subjectName,
+                                                  Date_t* serverNotAfter);
     /*
      * Parse and return x509 object from the provided keyfile.
      * @param keyFile referencing the PEM file to be read.
@@ -1554,11 +1566,13 @@ SSLManagerOpenSSL::SSLManagerOpenSSL(const SSLParams& params, bool isServer)
     }
 
     if (!clientPEM.empty()) {
-        if (!_parseAndValidateCertificate(
-                clientPEM, clientPassword, &_sslConfiguration.clientSubjectName, nullptr)) {
-            uasserted(16941, "ssl initialization problem");
-        }
+        auto status = _parseAndValidateCertificate(
+            clientPEM, clientPassword, &_sslConfiguration.clientSubjectName, nullptr);
+        uassertStatusOKWithContext(
+            status,
+            str::stream() << "ssl client initialization problem for certificate: " << clientPEM);
     }
+
     // SSL server specific initialization
     if (isServer) {
         if (!_initSynchronousSSLContext(&_serverContext, params, ConnectionDirection::kIncoming)) {
@@ -1566,12 +1580,15 @@ SSLManagerOpenSSL::SSLManagerOpenSSL(const SSLParams& params, bool isServer)
         }
 
         SSLX509Name serverSubjectName;
-        if (!_parseAndValidateCertificate(params.sslPEMKeyFile,
-                                          &_serverPEMPassword,
-                                          &serverSubjectName,
-                                          &_sslConfiguration.serverCertificateExpirationDate)) {
-            uasserted(16942, "ssl initialization problem");
-        }
+        auto status =
+            _parseAndValidateCertificate(params.sslPEMKeyFile,
+                                         &_serverPEMPassword,
+                                         &serverSubjectName,
+                                         &_sslConfiguration.serverCertificateExpirationDate);
+        uassertStatusOKWithContext(status,
+                                   str::stream()
+                                       << "ssl server initialization problem for certificate: "
+                                       << params.sslPEMKeyFile);
 
         uassertStatusOK(_sslConfiguration.setServerSubjectName(std::move(serverSubjectName)));
 
@@ -2187,6 +2204,15 @@ Status SSLManagerOpenSSL::initSSLContext(SSL_CTX* context,
                           str::stream() << "Can not set up transient ssl cluster certificate for "
                                         << transientParams.targetedClusterConnectionString);
         }
+
+        auto status = _parseAndValidateCertificateFromMemory(transientParams.sslClusterPEMPayload,
+                                                             &_clusterPEMPassword,
+                                                             &_sslConfiguration.clientSubjectName,
+                                                             nullptr);
+        if (!status.isOK()) {
+            return status.withContext("Could not validate transient certificate");
+        }
+
     } else if (direction == ConnectionDirection::kOutgoing && params.tlsWithholdClientCertificate) {
         // Do not send a client certificate if they have been suppressed.
 
@@ -2294,60 +2320,97 @@ bool SSLManagerOpenSSL::_initSynchronousSSLContext(UniqueSSLContext* contextPtr,
     return true;
 }
 
-bool SSLManagerOpenSSL::_parseAndValidateCertificate(const std::string& keyFile,
-                                                     PasswordFetcher* keyPassword,
-                                                     SSLX509Name* subjectName,
-                                                     Date_t* serverCertificateExpirationDate) {
-    BIO* inBIO = BIO_new(BIO_s_file());
-    if (inBIO == nullptr) {
-        LOGV2_ERROR(23243,
-                    "Failed to allocate BIO object",
-                    "error"_attr = getSSLErrorMessage(ERR_get_error()));
-        return false;
+Status SSLManagerOpenSSL::_parseAndValidateCertificate(const std::string& keyFile,
+                                                       PasswordFetcher* keyPassword,
+                                                       SSLX509Name* subjectName,
+                                                       Date_t* serverCertificateExpirationDate) {
+    UniqueBIO inBio(BIO_new(BIO_s_file()));
+    if (!inBio) {
+        return Status(
+            ErrorCodes::InvalidSSLConfiguration,
+            "Failed to allocate BIO object. error: {}"_format(getSSLErrorMessage(ERR_get_error())));
     }
 
-    ON_BLOCK_EXIT([&] { BIO_free(inBIO); });
-    if (BIO_read_filename(inBIO, keyFile.c_str()) <= 0) {
-        LOGV2_ERROR(23244,
-                    "Cannot read key file when setting subject name",
-                    "keyFile"_attr = keyFile,
-                    "error"_attr = getSSLErrorMessage(ERR_get_error()));
-        return false;
+    if (BIO_read_filename(inBio.get(), keyFile.c_str()) <= 0) {
+        return Status(ErrorCodes::InvalidSSLConfiguration,
+                      "Cannot read key file '{}' when setting subject name. error: {}"_format(
+                          keyFile, getSSLErrorMessage(ERR_get_error())));
     }
 
+    return _parseAndValidateCertificateFromBIO(
+        std::move(inBio), keyPassword, keyFile, subjectName, serverCertificateExpirationDate);
+}
+
+Status SSLManagerOpenSSL::_parseAndValidateCertificateFromMemory(
+    StringData buffer,
+    PasswordFetcher* keyPassword,
+    SSLX509Name* subjectName,
+    Date_t* serverCertificateExpirationDate) {
+    logv2::DynamicAttributes errorAttrs;
+
+#if OPENSSL_VERSION_NUMBER <= 0x1000114fL
+    UniqueBIO inBio(BIO_new_mem_buf(const_cast<char*>(buffer.rawData()), buffer.size()));
+#else
+    UniqueBIO inBio(BIO_new_mem_buf(buffer.rawData(), buffer.size()));
+#endif
+
+    if (!inBio) {
+        CaptureSSLErrorInAttrs capture(errorAttrs);
+        return Status(ErrorCodes::InvalidSSLConfiguration,
+                      "Failed to allocate BIO object from in-memory payload. error: {}"_format(
+                          getSSLErrorMessage(ERR_get_error())));
+    }
+
+    return _parseAndValidateCertificateFromBIO(std::move(inBio),
+                                               keyPassword,
+                                               "transient"_sd,
+                                               subjectName,
+                                               serverCertificateExpirationDate);
+}
+
+Status SSLManagerOpenSSL::_parseAndValidateCertificateFromBIO(
+    UniqueBIO inBio,
+    PasswordFetcher* keyPassword,
+    StringData fileNameForLogging,
+    SSLX509Name* subjectName,
+    Date_t* serverCertificateExpirationDate) {
     X509* x509 = PEM_read_bio_X509(
-        inBIO, nullptr, &SSLManagerOpenSSL::password_cb, static_cast<void*>(&keyPassword));
+        inBio.get(), nullptr, &SSLManagerOpenSSL::password_cb, static_cast<void*>(&keyPassword));
     if (x509 == nullptr) {
-        LOGV2_ERROR(23245,
-                    "Cannot retrieve certificate from keyfile",
-                    "keyFile"_attr = keyFile,
-                    "error"_attr = getSSLErrorMessage(ERR_get_error()));
-        return false;
+        return Status(
+            ErrorCodes::InvalidSSLConfiguration,
+            "Cannot retrieve certificate from keyfile '{}' when setting subject name. error: {}"_format(
+                fileNameForLogging, getSSLErrorMessage(ERR_get_error())));
     }
     ON_BLOCK_EXIT([&] { X509_free(x509); });
 
     *subjectName = getCertificateSubjectX509Name(x509);
+
+    auto notBeforeMillis = convertASN1ToMillis(X509_get_notBefore(x509));
+    if (notBeforeMillis == Date_t()) {
+        return Status(ErrorCodes::InvalidSSLConfiguration,
+                      "notBefore certificate date conversion failed");
+    }
+
+    auto notAfterMillis = convertASN1ToMillis(X509_get_notAfter(x509));
+    if (notAfterMillis == Date_t()) {
+        return Status(ErrorCodes::InvalidSSLConfiguration,
+                      "notAfter certificate date conversion failed");
+    }
+
+    auto now = Date_t::now();
+    if ((notBeforeMillis > now) || (now > notAfterMillis)) {
+        return Status(
+            ErrorCodes::InvalidSSLConfiguration,
+            "The provided SSL certificate is expired or not yet valid. notBefore {}, notAfter {}"_format(
+                notBeforeMillis.toString(), notAfterMillis.toString()));
+    }
+
     if (serverCertificateExpirationDate != nullptr) {
-        auto notBeforeMillis = convertASN1ToMillis(X509_get_notBefore(x509));
-        if (notBeforeMillis == Date_t()) {
-            LOGV2_ERROR(23873, "date conversion failed");
-            return false;
-        }
-
-        auto notAfterMillis = convertASN1ToMillis(X509_get_notAfter(x509));
-        if (notAfterMillis == Date_t()) {
-            LOGV2_ERROR(23874, "date conversion failed");
-            return false;
-        }
-
-        if ((notBeforeMillis > Date_t::now()) || (Date_t::now() > notAfterMillis)) {
-            LOGV2_FATAL_NOTRACE(28652, "The provided SSL certificate is expired or not yet valid.");
-        }
-
         *serverCertificateExpirationDate = notAfterMillis;
     }
 
-    return true;
+    return Status::OK();
 }
 
 // static

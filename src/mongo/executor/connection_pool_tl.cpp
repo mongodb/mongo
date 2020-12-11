@@ -34,6 +34,7 @@
 #include "mongo/executor/connection_pool_tl.h"
 
 #include "mongo/client/authenticate.h"
+#include "mongo/config.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/logv2/log.h"
 
@@ -163,10 +164,12 @@ void TLConnection::cancelTimeout() {
     _timer->cancelTimeout();
 }
 
+namespace {
+
 class TLConnectionSetupHook : public executor::NetworkConnectionHook {
 public:
-    explicit TLConnectionSetupHook(executor::NetworkConnectionHook* hookToWrap)
-        : _wrappedHook(hookToWrap) {}
+    explicit TLConnectionSetupHook(executor::NetworkConnectionHook* hookToWrap, bool x509AuthOnly)
+        : _wrappedHook(hookToWrap), _x509AuthOnly(x509AuthOnly) {}
 
     BSONObj augmentIsMasterRequest(BSONObj cmdObj) override {
         BSONObjBuilder bob(std::move(cmdObj));
@@ -174,7 +177,12 @@ public:
         if (internalSecurity.user) {
             bob.append("saslSupportedMechs", internalSecurity.user->getName().getUnambiguousName());
         }
-        _speculativeAuthType = auth::speculateInternalAuth(&bob, &_session);
+
+        if (_x509AuthOnly) {
+            _speculativeAuthType = auth::SpeculativeAuthType::kAuthenticate;
+        } else {
+            _speculativeAuthType = auth::speculateInternalAuth(&bob, &_session);
+        }
 
         return bob.obj();
     }
@@ -184,11 +192,17 @@ public:
                         const RemoteCommandResponse& isMasterReply) override try {
         const auto& reply = isMasterReply.data;
 
-        const auto saslMechsElem = reply.getField("saslSupportedMechs");
-        if (saslMechsElem.type() == Array) {
-            auto array = saslMechsElem.Array();
-            for (const auto& elem : array) {
-                _saslMechsForInternalAuth.push_back(elem.checkAndGetStringData().toString());
+        // X.509 auth only means we only want to use a single mechanism regards of what hello says
+        if (_x509AuthOnly) {
+            _saslMechsForInternalAuth.clear();
+            _saslMechsForInternalAuth.push_back("MONGODB-X509");
+        } else {
+            const auto saslMechsElem = reply.getField("saslSupportedMechs");
+            if (saslMechsElem.type() == Array) {
+                auto array = saslMechsElem.Array();
+                for (const auto& elem : array) {
+                    _saslMechsForInternalAuth.push_back(elem.checkAndGetStringData().toString());
+                }
             }
         }
 
@@ -245,7 +259,38 @@ private:
     auth::SpeculativeAuthType _speculativeAuthType;
     BSONObj _speculativeAuthenticate;
     executor::NetworkConnectionHook* const _wrappedHook = nullptr;
+    bool _x509AuthOnly;
 };
+
+#ifdef MONGO_CONFIG_SSL
+class TransientInternalAuthParametersProvider : public auth::InternalAuthParametersProvider {
+public:
+    TransientInternalAuthParametersProvider(
+        const std::shared_ptr<const transport::SSLConnectionContext> transientSSLContext)
+        : _transientSSLContext(transientSSLContext) {}
+
+    ~TransientInternalAuthParametersProvider() = default;
+
+    BSONObj get(size_t index, StringData mechanism) final {
+        if (_transientSSLContext) {
+            if (index == 0) {
+                return auth::createInternalX509AuthDocument(
+                    boost::optional<StringData>{_transientSSLContext->manager->getSSLConfiguration()
+                                                    .clientSubjectName.toString()});
+            } else {
+                return BSONObj();
+            }
+        }
+
+        return auth::getInternalAuthParams(index, mechanism);
+    }
+
+private:
+    const std::shared_ptr<const transport::SSLConnectionContext> _transientSSLContext;
+};
+#endif
+
+}  // namespace
 
 void TLConnection::setup(Milliseconds timeout, SetupCallback cb) {
     auto anchor = shared_from_this();
@@ -269,7 +314,18 @@ void TLConnection::setup(Milliseconds timeout, SetupCallback cb) {
         }
     });
 
-    auto isMasterHook = std::make_shared<TLConnectionSetupHook>(_onConnectHook);
+#ifdef MONGO_CONFIG_SSL
+    bool x509AuthOnly =
+        _transientSSLContext.get() && _transientSSLContext->targetClusterURI.has_value();
+    auto authParametersProvider =
+        std::make_shared<TransientInternalAuthParametersProvider>(_transientSSLContext);
+#else
+    bool x509AuthOnly = false;
+    auto authParametersProvider = auth::createDefaultInternalAuthProvider();
+#endif
+
+    // For transient connections, only use X.509 auth.
+    auto isMasterHook = std::make_shared<TLConnectionSetupHook>(_onConnectHook, x509AuthOnly);
 
     AsyncDBClient::connect(
         _peer, _sslMode, _serviceContext, _reactor, timeout, _transientSSLContext)
@@ -291,7 +347,7 @@ void TLConnection::setup(Milliseconds timeout, SetupCallback cb) {
                                                     isMasterHook->getSpeculativeAuthenticateReply(),
                                                     isMasterHook->getSpeculativeAuthType());
         })
-        .then([this, isMasterHook](bool authenticatedDuringConnect) {
+        .then([this, isMasterHook, authParametersProvider](bool authenticatedDuringConnect) {
             if (_skipAuth || authenticatedDuringConnect) {
                 return Future<void>::makeReady();
             }
@@ -299,7 +355,7 @@ void TLConnection::setup(Milliseconds timeout, SetupCallback cb) {
             boost::optional<std::string> mechanism;
             if (!isMasterHook->saslMechsForInternalAuth().empty())
                 mechanism = isMasterHook->saslMechsForInternalAuth().front();
-            return _client->authenticateInternal(std::move(mechanism));
+            return _client->authenticateInternal(std::move(mechanism), authParametersProvider);
         })
         .then([this] {
             if (!_onConnectHook) {

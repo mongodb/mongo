@@ -372,11 +372,8 @@ void SSLManagerCoordinator::rotate() {
     int clusterAuthMode = serverGlobalParams.clusterAuthMode.load();
     if (clusterAuthMode == ServerGlobalParams::ClusterAuthMode_x509 ||
         clusterAuthMode == ServerGlobalParams::ClusterAuthMode_sendX509) {
-        auth::setInternalUserAuthParams(
-            BSON(saslCommandMechanismFieldName
-                 << "MONGODB-X509" << saslCommandUserDBFieldName << "$external"
-                 << saslCommandUserFieldName
-                 << manager->getSSLConfiguration().clientSubjectName.toString()));
+        auth::setInternalUserAuthParams(auth::createInternalX509AuthDocument(
+            StringData(manager->getSSLConfiguration().clientSubjectName.toString())));
     }
 
     auto tl = getGlobalServiceContext()->getTransportLayer();

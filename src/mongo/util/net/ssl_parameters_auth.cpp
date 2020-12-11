@@ -99,9 +99,7 @@ Status ClusterAuthModeServerParameter::setFromString(const std::string& strMode)
                     "connections"};
         }
         serverGlobalParams.clusterAuthMode.store(mode);
-        auth::setInternalUserAuthParams(BSON(saslCommandMechanismFieldName
-                                             << "MONGODB-X509" << saslCommandUserDBFieldName
-                                             << "$external"));
+        auth::setInternalUserAuthParams(auth::createInternalX509AuthDocument());
     } else if ((mode == ServerGlobalParams::ClusterAuthMode_x509) &&
                (oldMode == ServerGlobalParams::ClusterAuthMode_sendX509)) {
         serverGlobalParams.clusterAuthMode.store(mode);

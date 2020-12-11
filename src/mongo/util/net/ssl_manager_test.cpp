@@ -109,7 +109,7 @@ private:
     transport::TransportLayer* _transport = nullptr;
 };
 
-std::string LoadFile(const std::string& name) {
+std::string loadFile(const std::string& name) {
     std::ifstream input(name);
     std::string str((std::istreambuf_iterator<char>(input)), std::istreambuf_iterator<char>());
     return str;
@@ -521,7 +521,7 @@ TEST(SSLManager, InitContextFromFileShouldFail) {
     // TODO SERVER-52858: there is no exception on Mac & Windows.
     ASSERT_THROWS_CODE([&params] { SSLManagerInterface::create(params, true /* isSSLServer */); }(),
                        DBException,
-                       16942);
+                       ErrorCodes::InvalidSSLConfiguration);
 #endif
 }
 
@@ -571,7 +571,7 @@ TEST(SSLManager, InitContextFromMemory) {
     params.sslCAFile = "jstests/libs/ca.pem";
 
     TransientSSLParams transientParams;
-    transientParams.sslClusterPEMPayload = LoadFile("jstests/libs/client.pem");
+    transientParams.sslClusterPEMPayload = loadFile("jstests/libs/client.pem");
 
     std::shared_ptr<SSLManagerInterface> manager =
         SSLManagerInterface::create(params, false /* isSSLServer */);
@@ -590,7 +590,7 @@ TEST(SSLManager, InitServerSideContextFromMemory) {
     params.sslCAFile = "jstests/libs/ca.pem";
 
     TransientSSLParams transientParams;
-    transientParams.sslClusterPEMPayload = LoadFile("jstests/libs/client.pem");
+    transientParams.sslClusterPEMPayload = loadFile("jstests/libs/client.pem");
 
     std::shared_ptr<SSLManagerInterface> manager =
         SSLManagerInterface::create(params, true /* isSSLServer */);
@@ -622,7 +622,7 @@ TEST(SSLManager, TransientSSLParams) {
     transport::TransportLayerASIO tla(options, &sepu);
 
     TransientSSLParams transientSSLParams;
-    transientSSLParams.sslClusterPEMPayload = LoadFile("jstests/libs/client.pem");
+    transientSSLParams.sslClusterPEMPayload = loadFile("jstests/libs/client.pem");
     transientSSLParams.targetedClusterConnectionString = ConnectionString::forLocal();
 
     auto result = tla.createTransientSSLContext(transientSSLParams, manager.get());

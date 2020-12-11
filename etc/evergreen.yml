@@ -5648,6 +5648,26 @@ tasks:
       resmoke_args: --suites=integration_tests_replset --storageEngine=wiredTiger
 
 - <<: *task_template
+  name: integration_tests_replset_ssl_auth
+  tags: ["integration"]
+  commands:
+  - command: manifest.load
+  - func: "git get project"
+  - func: "do setup"
+  - func: "set up win mount script"
+  - func: "generate compile expansions"  # Generate compile expansions needs to be run to mount the shared scons cache.
+  - func: "apply compile expansions"
+  - func: "scons compile"
+    vars:
+      targets: install-integration-tests
+      compiling_for_test: true
+      bypass_compile: false
+  - func: "attach scons logs"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=integration_tests_replset_ssl_auth --storageEngine=wiredTiger
+
+- <<: *task_template
   name: integration_tests_sharded
   tags: ["integration", "sharded"]
   commands:

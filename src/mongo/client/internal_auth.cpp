@@ -72,7 +72,19 @@ bool isInternalAuthSet() {
     return internalAuthSet;
 }
 
-BSONObj getInternalAuthParams(size_t idx, const std::string& mechanism) {
+BSONObj createInternalX509AuthDocument(boost::optional<StringData> userName) {
+    BSONObjBuilder builder;
+    builder.append(saslCommandMechanismFieldName, "MONGODB-X509");
+    builder.append(saslCommandUserDBFieldName, "$external");
+
+    if (userName) {
+        builder.append(saslCommandUserFieldName, userName.get());
+    }
+
+    return builder.obj();
+}
+
+BSONObj getInternalAuthParams(size_t idx, StringData mechanism) {
     stdx::lock_guard<Latch> lk(internalAuthKeysMutex);
     if (!internalAuthSet) {
         return BSONObj();
