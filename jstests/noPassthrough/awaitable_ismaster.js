@@ -4,6 +4,7 @@
  */
 (function() {
 "use strict";
+load("jstests/libs/fail_point_util.js");
 load("jstests/libs/parallel_shell_helpers.js");
 
 function runTest(db) {
@@ -22,16 +23,25 @@ function runTest(db) {
     assert.commandWorked(
         db.runCommand({isMaster: 1, topologyVersion: topologyVersionField, maxAwaitTimeMS: 0}));
 
-    // Ensure isMaster waits for at least maxAwaitTimeMS before returning.
+    // Ensure the command waits for at least maxAwaitTimeMS before returning, and doesn't appear in
+    // slow query log even if it takes many seconds.
+    assert.commandWorked(db.adminCommand({clearLog: 'global'}));
     let now = new Date();
+    jsTestLog(`Running slow isMaster`);
     assert.commandWorked(
-        db.runCommand({isMaster: 1, topologyVersion: topologyVersionField, maxAwaitTimeMS: 2000}));
+        db.runCommand({isMaster: 1, topologyVersion: topologyVersionField, maxAwaitTimeMS: 20000}));
     let isMasterDuration = new Date() - now;
     // Allow for some clock imprecision between the server and the jstest.
     assert.gte(
         isMasterDuration,
-        1000,
-        `isMaster should have taken at least 1000ms, but completed in ${isMasterDuration}ms`);
+        10000,
+        `isMaster should have taken at least 10000ms, but completed in ${isMasterDuration}ms`);
+
+    assert(!checkLog.checkContainsOnceJson(db.getMongo(), 51803, {
+        'command': function(obj) {
+            return obj.hasOwnProperty('isMaster');
+        }
+    }));
 
     // Check that when a different processId is given, the server responds immediately.
     now = new Date();
@@ -148,18 +158,25 @@ function runTest(db) {
                                  [31373, 51759]);
 }
 
-const conn = MongoRunner.runMongod({});
+// Set command log verbosity to 0 to avoid logging *all* commands in the "slow query" log.
+const conn = MongoRunner.runMongod({setParameter: {logComponentVerbosity: tojson({command: 0})}});
 assert.neq(null, conn, "mongod was unable to start up");
 runTest(conn.getDB("admin"));
 MongoRunner.stopMongod(conn);
 
-const replTest = new ReplSetTest({nodes: 1});
+const replTest = new ReplSetTest(
+    {nodes: 1, nodeOptions: {setParameter: {logComponentVerbosity: tojson({command: 0})}}});
 replTest.startSet();
 replTest.initiate();
 runTest(replTest.getPrimary().getDB("admin"));
 replTest.stopSet();
 
-const st = new ShardingTest({mongos: 1, shards: [{nodes: 1}], config: 1});
+const st = new ShardingTest({
+    mongos: 1,
+    shards: [{nodes: 1}],
+    config: 1,
+    other: {mongosOptions: {setParameter: {logComponentVerbosity: tojson({command: 0})}}}
+});
 runTest(st.s.getDB("admin"));
 st.stop();
 })();

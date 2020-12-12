@@ -35,6 +35,7 @@
 #include "mongo/db/auth/sasl_mechanism_registry.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops.h"
@@ -139,6 +140,7 @@ public:
         // present if and only if topologyVersion is present in the request.
         auto topologyVersionElement = cmdObj["topologyVersion"];
         auto maxAwaitTimeMSField = cmdObj["maxAwaitTimeMS"];
+        auto curOp = CurOp::get(opCtx);
         boost::optional<TopologyVersion> clientTopologyVersion;
         if (topologyVersionElement && maxAwaitTimeMSField) {
             clientTopologyVersion = TopologyVersion::parse(IDLParserErrorContext("TopologyVersion"),
@@ -153,8 +155,8 @@ public:
 
             LOGV2_DEBUG(23871, 3, "Using maxAwaitTimeMS for awaitable isMaster protocol.");
 
-            // Awaitable isMaster commands have high latency by design. Ignore them.
-            opCtx->setShouldIncrementLatencyStats(false);
+            curOp->pauseTimer();
+            ON_BLOCK_EXIT([curOp]() { curOp->resumeTimer(); });
 
             if (clientTopologyVersion->getProcessId() == mongosTopologyVersion.getProcessId()) {
                 uassert(51761,

@@ -1717,13 +1717,6 @@ DbResponse ServiceEntryPointCommon::handleRequest(OperationContext* opCtx,
     DbResponse dbresponse;
     if (op == dbMsg || (op == dbQuery && isCommand)) {
         dbresponse = receivedCommands(opCtx, m, behaviors);
-        // The hello/isMaster commands should take kMaxAwaitTimeMs at most, log if it takes twice
-        // that.
-        if (auto command = currentOp.getCommand();
-            command && (command->getName() == "hello" || command->getName() == "isMaster")) {
-            slowMsOverride =
-                2 * durationCount<Milliseconds>(SingleServerIsMasterMonitor::kMaxAwaitTime);
-        }
     } else if (op == dbQuery) {
         invariant(!isCommand);
         opCtx->markKillOnClientDisconnect();
