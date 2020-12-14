@@ -1619,6 +1619,89 @@ TEST_F(ReshardingOplogApplierTest, UpdateOutputCollUseReshardingApplicationRules
     ASSERT_EQ(Timestamp(8, 3), progressDoc->getProgress().getTs());
 }
 
+TEST_F(ReshardingOplogApplierTest, UnsupportedCommandOpsShouldErrorUseReshardingApplicationRules) {
+    setReshardingOplogApplicationServerParameterTrue();
+
+    std::queue<repl::OplogEntry> ops;
+    ops.push(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
+                       repl::OpTypeEnum::kInsert,
+                       BSON("_id" << 1),
+                       boost::none));
+    ops.push(makeOplog(repl::OpTime(Timestamp(6, 3), 1),
+                       repl::OpTypeEnum::kCommand,
+                       BSON("renameCollection" << appliedToNs().ns() << "to" << stashNs().ns()),
+                       boost::none));
+    ops.push(makeOplog(repl::OpTime(Timestamp(7, 3), 1),
+                       repl::OpTypeEnum::kInsert,
+                       BSON("_id" << 2),
+                       boost::none));
+
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(ops));
+    ReshardingOplogApplier applier(getServiceContext(),
+                                   sourceId(),
+                                   oplogNs(),
+                                   crudNs(),
+                                   crudUUID(),
+                                   stashCollections(),
+                                   Timestamp(5, 3),
+                                   std::move(iterator),
+                                   1 /* batchSize */,
+                                   chunkManager(),
+                                   getExecutor(),
+                                   writerPool());
+
+    auto future = applier.applyUntilCloneFinishedTs();
+    future.get();
+
+    DBDirectClient client(operationContext());
+    auto doc = client.findOne(appliedToNs().ns(), BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 1), doc);
+
+    future = applier.applyUntilDone();
+
+    ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::OplogOperationUnsupported);
+
+    doc = client.findOne(appliedToNs().ns(), BSON("_id" << 2));
+    ASSERT_BSONOBJ_EQ(BSONObj(), doc);
+
+    auto progressDoc = ReshardingOplogApplier::checkStoredProgress(operationContext(), sourceId());
+    ASSERT_TRUE(progressDoc);
+    ASSERT_EQ(Timestamp(5, 3), progressDoc->getProgress().getClusterTime());
+    ASSERT_EQ(Timestamp(5, 3), progressDoc->getProgress().getTs());
+}
+
+TEST_F(ReshardingOplogApplierTest,
+       DropSourceCollectionCmdShouldErrorUseReshardingApplicationRules) {
+    setReshardingOplogApplicationServerParameterTrue();
+
+    std::queue<repl::OplogEntry> ops;
+    ops.push(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
+                       repl::OpTypeEnum::kCommand,
+                       BSON("drop" << appliedToNs().ns()),
+                       boost::none));
+
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(ops));
+    ReshardingOplogApplier applier(getServiceContext(),
+                                   sourceId(),
+                                   oplogNs(),
+                                   crudNs(),
+                                   crudUUID(),
+                                   stashCollections(),
+                                   Timestamp(5, 3),
+                                   std::move(iterator),
+                                   1 /* batchSize */,
+                                   chunkManager(),
+                                   getExecutor(),
+                                   writerPool());
+
+    auto future = applier.applyUntilCloneFinishedTs();
+
+    ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::OplogOperationUnsupported);
+
+    auto progressDoc = ReshardingOplogApplier::checkStoredProgress(operationContext(), sourceId());
+    ASSERT_FALSE(progressDoc);
+}
+
 class ReshardingOplogApplierRetryableTest : public ReshardingOplogApplierTest {
 public:
     void setUp() override {

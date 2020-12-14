@@ -44,6 +44,7 @@
 #include "mongo/db/ops/update.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_executor.h"
+#include "mongo/db/repl/oplog_applier_utils.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/stats/counters.h"
@@ -119,7 +120,7 @@ Status ReshardingOplogApplicationRules::applyOperation(
     invariant(opCtx->writesAreReplicated());
     auto op = opOrGroupedInserts.getOp();
 
-    return writeConflictRetry(opCtx, "applyOplogEntryResharding", op.getNss().ns(), [&] {
+    return writeConflictRetry(opCtx, "applyOplogEntryCRUDOpResharding", op.getNss().ns(), [&] {
         try {
             WriteUnitOfWork wuow(opCtx);
 
@@ -180,6 +181,49 @@ Status ReshardingOplogApplicationRules::applyOperation(
         } catch (const DBException& ex) {
             return ex.toStatus();
         }
+    });
+}
+
+Status ReshardingOplogApplicationRules::ReshardingOplogApplicationRules::applyCommand(
+    OperationContext* opCtx, const repl::OplogEntryOrGroupedInserts& opOrGroupedInserts) {
+    LOGV2_DEBUG(49909,
+                3,
+                "Applying command op for resharding",
+                "opl"_attr = redact(opOrGroupedInserts.toBSON()));
+
+    auto op = opOrGroupedInserts.getOp();
+
+    invariant(op.getOpType() == repl::OpTypeEnum::kCommand);
+    invariant(!opCtx->lockState()->inAWriteUnitOfWork());
+    invariant(opCtx->writesAreReplicated());
+
+    return writeConflictRetry(opCtx, "applyOplogEntryCommandOpResharding", op.getNss().ns(), [&] {
+        OpCounters* opCounters = &globalOpCounters;
+        opCounters->gotCommand();
+
+        invariant(op.getNss() == _outputNss);
+        BSONObj oField = op.getObject();
+
+        // Only applyOps, commitTransaction, and abortTransaction are allowed.
+        std::vector<std::string> supportedCmds{"applyOps", "commitTransaction", "abortTransaction"};
+        if (std::find(supportedCmds.begin(), supportedCmds.end(), oField.firstElementFieldName()) ==
+            supportedCmds.end()) {
+            if (oField.firstElementFieldName() == "drop"_sd) {
+                return Status(ErrorCodes::OplogOperationUnsupported,
+                              str::stream()
+                                  << "Received drop command for resharding source collection "
+                                  << redact(op.toBSON()));
+            }
+
+            return Status(ErrorCodes::OplogOperationUnsupported,
+                          str::stream() << "Command not supported during resharding: "
+                                        << redact(op.toBSON()));
+        }
+
+        // TODO SERVER-49907 implement applyOps write rule
+        // TODO SERVER-49905 handle commit and abort transaction rules
+        return repl::OplogApplierUtils::applyOplogEntryOrGroupedInsertsCommon(
+            opCtx, opOrGroupedInserts, repl::OplogApplication::Mode::kInitialSync, [] {}, nullptr);
     });
 }
 
