@@ -27,13 +27,16 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
 
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands/profile_common.h"
 #include "mongo/db/commands/profile_gen.h"
+#include "mongo/db/jsobj.h"
 #include "mongo/idl/idl_parser.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
@@ -70,10 +73,12 @@ bool ProfileCmdBase::run(OperationContext* opCtx,
     // Delegate to _applyProfilingLevel to set the profiling level appropriately whether we are on
     // mongoD or mongoS.
     int oldLevel = _applyProfilingLevel(opCtx, dbName, profilingLevel);
+    auto oldSlowMS = serverGlobalParams.slowMS;
+    auto oldSampleRate = serverGlobalParams.sampleRate;
 
     result.append("was", oldLevel);
-    result.append("slowms", serverGlobalParams.slowMS);
-    result.append("sampleRate", serverGlobalParams.sampleRate);
+    result.append("slowms", oldSlowMS);
+    result.append("sampleRate", oldSampleRate);
 
     if (auto slowms = request.getSlowms()) {
         serverGlobalParams.slowMS = *slowms;
@@ -83,6 +88,24 @@ bool ProfileCmdBase::run(OperationContext* opCtx,
                 "'sampleRate' must be between 0.0 and 1.0 inclusive",
                 *sampleRate >= 0.0 && *sampleRate <= 1.0);
         serverGlobalParams.sampleRate = *sampleRate;
+    }
+
+    // Log the change made to server's profiling settings, unless the request was to get the current
+    // value.
+    if (profilingLevel != -1) {
+        BSONObjBuilder oldState;
+        BSONObjBuilder newState;
+
+        oldState.append("level"_sd, oldLevel);
+        oldState.append("slowms"_sd, oldSlowMS);
+        oldState.append("sampleRate"_sd, oldSampleRate);
+
+        newState.append("level"_sd, profilingLevel);
+        newState.append("slowms"_sd, serverGlobalParams.slowMS);
+        newState.append("sampleRate"_sd, serverGlobalParams.sampleRate);
+
+        LOG(0) << "{msg: \"Profiler settings changed\", from:" << oldState.obj()
+               << ", to:" << newState.obj() << "}";
     }
 
     return true;
