@@ -458,22 +458,26 @@ std::unique_ptr<OplogFetcher> OplogFetcherTest::makeOplogFetcherWithDifferentExe
     BSONObj filter,
     ReadConcernArgs readConcern,
     bool requestResumeToken) {
-    auto oplogFetcher = std::make_unique<OplogFetcher>(
-        executor,
+    OplogFetcher::Config oplogFetcherConfig(
         lastFetched,
         source,
         _createConfig(),
-        std::make_unique<OplogFetcher::OplogFetcherRestartDecisionDefault>(numRestarts),
         requiredRBID,
-        requireFresherSyncSource,
+        defaultBatchSize,
+        requireFresherSyncSource
+            ? OplogFetcher::RequireFresherSyncSource::kRequireFresherSyncSource
+            : OplogFetcher::RequireFresherSyncSource::kDontRequireFresherSyncSource);
+    oplogFetcherConfig.startingPoint = startingPoint;
+    oplogFetcherConfig.queryFilter = filter;
+    oplogFetcherConfig.queryReadConcern = readConcern;
+    oplogFetcherConfig.requestResumeToken = requestResumeToken;
+    auto oplogFetcher = std::make_unique<OplogFetcher>(
+        executor,
+        std::make_unique<OplogFetcher::OplogFetcherRestartDecisionDefault>(numRestarts),
         dataReplicatorExternalState.get(),
         enqueueDocumentsFn,
         fn,
-        defaultBatchSize,
-        startingPoint,
-        filter,
-        readConcern,
-        requestResumeToken);
+        std::move(oplogFetcherConfig));
     oplogFetcher->setCreateClientFn_forTest([this]() {
         const auto autoReconnect = true;
         return std::unique_ptr<DBClientConnection>(

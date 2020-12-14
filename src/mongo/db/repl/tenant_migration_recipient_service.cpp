@@ -514,18 +514,28 @@ void TenantMigrationRecipientService::Instance::_startOplogFetcher() {
         StorageInterface::get(opCtx.get()), oplogBufferNs, options);
     _donorOplogBuffer->startup(opCtx.get());
     _dataReplicatorExternalState = std::make_unique<DataReplicatorExternalStateTenantMigration>();
-    _donorOplogFetcher = (*_createOplogFetcherFn)(
-        (**_scopedExecutor).get(),
+    OplogFetcher::Config oplogFetcherConfig(
         *_stateDoc.getStartFetchingDonorOpTime(),
         _oplogFetcherClient->getServerHostAndPort(),
         // The config is only used for setting the awaitData timeout; the defaults are fine.
         ReplSetConfig::parse(BSON("_id"
                                   << "dummy"
                                   << "version" << 1 << "members" << BSONObj())),
-        std::make_unique<OplogFetcherRestartDecisionTenantMigration>(),
         // We do not need to check the rollback ID.
         ReplicationProcess::kUninitializedRollbackId,
-        false /* requireFresherSyncSource */,
+        tenantMigrationOplogFetcherBatchSize,
+        OplogFetcher::RequireFresherSyncSource::kDontRequireFresherSyncSource);
+    oplogFetcherConfig.queryFilter = _getOplogFetcherFilter();
+    oplogFetcherConfig.queryReadConcern =
+        ReadConcernArgs(repl::ReadConcernLevel::kMajorityReadConcern);
+    oplogFetcherConfig.requestResumeToken = true;
+    oplogFetcherConfig.name =
+        "TenantOplogFetcher_" + getTenantId() + "_" + getMigrationUUID().toString();
+    oplogFetcherConfig.startingPoint = OplogFetcher::StartingPoint::kEnqueueFirstDoc;
+
+    _donorOplogFetcher = (*_createOplogFetcherFn)(
+        (**_scopedExecutor).get(),
+        std::make_unique<OplogFetcherRestartDecisionTenantMigration>(),
         _dataReplicatorExternalState.get(),
         [this, self = shared_from_this()](OplogFetcher::Documents::const_iterator first,
                                           OplogFetcher::Documents::const_iterator last,
@@ -533,12 +543,7 @@ void TenantMigrationRecipientService::Instance::_startOplogFetcher() {
             return _enqueueDocuments(first, last, info);
         },
         [this, self = shared_from_this()](const Status& s, int rbid) { _oplogFetcherCallback(s); },
-        tenantMigrationOplogFetcherBatchSize,
-        OplogFetcher::StartingPoint::kEnqueueFirstDoc,
-        _getOplogFetcherFilter(),
-        ReadConcernArgs(repl::ReadConcernLevel::kMajorityReadConcern),
-        true /* requestResumeToken */,
-        "TenantOplogFetcher_" + getTenantId() + "_" + getMigrationUUID().toString());
+        std::move(oplogFetcherConfig));
     _donorOplogFetcher->setConnection(std::move(_oplogFetcherClient));
     uassertStatusOK(_donorOplogFetcher->startup());
 }

@@ -1177,15 +1177,18 @@ void InitialSyncer::_fcvFetcherCallback(const StatusWith<Fetcher::QueryResponse>
     }
 
     const auto& config = configResult.getValue();
-    _oplogFetcher = (*_createOplogFetcherFn)(
-        *_attemptExec,
+    OplogFetcher::Config oplogFetcherConfig(
         beginFetchingOpTime,
         _syncSource,
         config,
+        _rollbackChecker->getBaseRBID(),
+        initialSyncOplogFetcherBatchSize,
+        OplogFetcher::RequireFresherSyncSource::kDontRequireFresherSyncSource);
+    oplogFetcherConfig.startingPoint = OplogFetcher::StartingPoint::kEnqueueFirstDoc;
+    _oplogFetcher = (*_createOplogFetcherFn)(
+        *_attemptExec,
         std::make_unique<OplogFetcherRestartDecisionInitialSyncer>(
             _sharedData.get(), _opts.oplogFetcherMaxFetcherRestarts),
-        _rollbackChecker->getBaseRBID(),
-        false /* requireFresherSyncSource */,
         _dataReplicatorExternalState.get(),
         [=](OplogFetcher::Documents::const_iterator first,
             OplogFetcher::Documents::const_iterator last,
@@ -1193,8 +1196,7 @@ void InitialSyncer::_fcvFetcherCallback(const StatusWith<Fetcher::QueryResponse>
             return _enqueueDocuments(first, last, info);
         },
         [=](const Status& s, int rbid) { _oplogFetcherCallback(s, onCompletionGuard); },
-        initialSyncOplogFetcherBatchSize,
-        OplogFetcher::StartingPoint::kEnqueueFirstDoc);
+        std::move(oplogFetcherConfig));
 
     LOGV2_DEBUG(21178,
                 2,

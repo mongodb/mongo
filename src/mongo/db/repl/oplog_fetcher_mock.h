@@ -38,21 +38,11 @@ class OplogFetcherMock : public OplogFetcher {
 public:
     explicit OplogFetcherMock(
         executor::TaskExecutor* executor,
-        OpTime lastFetched,
-        HostAndPort source,
-        ReplSetConfig config,
         std::unique_ptr<OplogFetcherRestartDecision> oplogFetcherRestartDecision,
-        int requiredRBID,
-        bool requireFresherSyncSource,
         DataReplicatorExternalState* dataReplicatorExternalState,
         EnqueueDocumentsFn enqueueDocumentsFn,
         OnShutdownCallbackFn onShutdownCallbackFn,
-        const int batchSize,
-        StartingPoint startingPoint = StartingPoint::kSkipFirstDoc,
-        BSONObj filter = BSONObj(),
-        ReadConcernArgs readConcern = ReadConcernArgs(),
-        bool requestResumeToken = false,
-        StringData name = "oplog fetcher"_sd);
+        Config config);
 
     virtual ~OplogFetcherMock();
 
