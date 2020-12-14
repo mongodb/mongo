@@ -2,8 +2,10 @@
  * An arbiter that is stopped and restarted on a different port and rejoins the
  * replica set should enter removed state and should not start data replication.
  *
+ * Skip this test in multiversion suites; the arbiter must restart using the same binary version.
+ *
  * @tags: [
- *     requires_fcv_49,
+ *     multiversion_incompatible,
  * ]
  */
 (function() {
