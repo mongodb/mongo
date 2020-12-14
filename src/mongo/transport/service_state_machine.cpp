@@ -60,6 +60,7 @@
 namespace mongo {
 namespace {
 MONGO_FAIL_POINT_DEFINE(doNotSetMoreToCome);
+MONGO_FAIL_POINT_DEFINE(beforeCompressingExhaustResponse);
 /**
  * Creates and returns a legacy exhaust message, if exhaust is allowed. The returned message is to
  * be used as the subsequent 'synthetic' exhaust request. Returns an empty message if exhaust is not
@@ -316,6 +317,12 @@ void ServiceStateMachine::_sourceMessage(ThreadGuard guard) {
     _state.store(State::SourceWait);
     guard.release();
 
+    // Reset the compressor only before sourcing a new message. This ensures the same compressor,
+    // if any, is used for sinking exhaust messages. For moreToCome messages, this allows resetting
+    // the compressor for each incoming (i.e., sourced) message, and using the latest compressor id
+    // for compressing the sink message.
+    _compressorId = boost::none;
+
     auto sourceMsgImpl = [&] {
         if (_transportMode == transport::Mode::kSynchronous) {
             MONGO_IDLE_THREAD_BLOCK;
@@ -452,7 +459,9 @@ void ServiceStateMachine::_processMessage(ThreadGuard guard) {
 
     auto& compressorMgr = MessageCompressorManager::forSession(_session());
 
-    _compressorId = boost::none;
+    // Setup compressor and acquire a compressor id when processing compressed messages. Exhaust
+    // messages produced via `makeExhaustMessage(...)` are not compressed, so the body of this if
+    // statement only runs for sourced compressed messages.
     if (_inMessage.operation() == dbCompressed) {
         MessageCompressorId compressorId;
         auto swm = compressorMgr.decompressMessage(_inMessage, &compressorId);
@@ -508,6 +517,12 @@ void ServiceStateMachine::_processMessage(ThreadGuard guard) {
         _inExhaust = !_inMessage.empty();
 
         networkCounter.hitLogicalOut(toSink.size());
+
+        beforeCompressingExhaustResponse.executeIf(
+            [&](const BSONObj&) {
+                // Nothing to do as we only need to record the incident.
+            },
+            [&](const BSONObj&) { return _compressorId.has_value() && _inExhaust; });
 
         if (_compressorId) {
             auto swm = compressorMgr.compressMessage(toSink, &_compressorId.value());
