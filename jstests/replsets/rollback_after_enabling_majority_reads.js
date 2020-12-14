@@ -39,13 +39,6 @@
     // Make sure the primary has not changed.
     assert.neq(rollbackTest.getPrimary(), rollbackNode);
 
-    // The first rollback attempt with EMRC=true will fassert, so we expect the actual rollback to
-    // occur with EMRC=false. Before the second rollback (via refetch) occurs, we must ensure that
-    // the sync source's lastApplied is greater than the rollback node's. Otherwise, the rollback
-    // node will never transition to SECONDARY since the rollback node's lastApplied will be less
-    // than the initialDataTS. See SERVER-48518 for a more detailed explanation of this behavior.
-    rollbackTest.awaitPrimaryAppliedSurpassesRollbackApplied();
-
     // The rollback crashes because we have not yet set a stable timestamp.
     jsTest.log("Attempt to roll back. This will fassert.");
     rollbackTest.transitionToSyncSourceOperationsDuringRollback();
