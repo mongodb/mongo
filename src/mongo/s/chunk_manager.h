@@ -278,6 +278,18 @@ public:
         return _uuid && *_uuid == uuid;
     }
 
+    bool sameAllowMigrations(const RoutingTableHistory& other) const {
+        return _allowMigrations == other._allowMigrations;
+    }
+
+    bool sameReshardingFields(const RoutingTableHistory& other) const {
+        if (_reshardingFields && other._reshardingFields) {
+            return _reshardingFields->toBSON().woCompare(other._reshardingFields->toBSON());
+        } else {
+            return !_reshardingFields && !other._reshardingFields;
+        }
+    }
+
     boost::optional<UUID> getUUID() const {
         return _uuid;
     }

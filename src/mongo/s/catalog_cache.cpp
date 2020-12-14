@@ -469,6 +469,7 @@ CatalogCache::DatabaseCache::LookupResult CatalogCache::DatabaseCache::_lookupDa
 
         auto newDbVersion =
             ComparableDatabaseVersion::makeComparableDatabaseVersion(newDb.getVersion());
+
         LOGV2_FOR_CATALOG_REFRESH(24101,
                                   1,
                                   "Refreshed cached database entry",
@@ -566,6 +567,7 @@ CatalogCache::CollectionCache::LookupResult CatalogCache::CollectionCache::_look
             // updating. Otherwise, we're making a whole new routing table.
             if (isIncremental &&
                 existingHistory->optRt->getVersion().epoch() == collectionAndChunks.epoch) {
+
                 return existingHistory->optRt->makeUpdated(collectionAndChunks.reshardingFields,
                                                            collectionAndChunks.allowMigrations,
                                                            collectionAndChunks.changedChunks);
@@ -606,6 +608,15 @@ CatalogCache::CollectionCache::LookupResult CatalogCache::CollectionCache::_look
 
         const auto newVersion =
             ComparableChunkVersion::makeComparableChunkVersion(newRoutingHistory.getVersion());
+
+        invariant(isIncremental == false ||
+                      (existingHistory->optRt->getVersion().epoch() !=
+                           newRoutingHistory.getVersion().epoch() ||
+                       existingHistory->optRt->getVersion().isOlderThan(
+                           newRoutingHistory.getVersion())) ||
+                      (newRoutingHistory.sameAllowMigrations(*existingHistory->optRt) &&
+                       newRoutingHistory.sameReshardingFields(*existingHistory->optRt)),
+                  "Unconsistent routing table info value for collections of the same version");
 
         LOGV2_FOR_CATALOG_REFRESH(4619901,
                                   isIncremental || newVersion != previousVersion ? 0 : 1,
