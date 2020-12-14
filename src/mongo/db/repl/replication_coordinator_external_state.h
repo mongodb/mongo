@@ -91,11 +91,6 @@ public:
                                              ReplicationCoordinator* replCoord) = 0;
 
     /**
-     * Stops the data replication threads = bgsync, applier, reporter.
-     */
-    virtual void stopDataReplication(OperationContext* opCtx) = 0;
-
-    /**
      * Performs any necessary external state specific shutdown tasks, such as cleaning up
      * the threads it started.
      */

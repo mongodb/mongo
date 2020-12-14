@@ -258,11 +258,6 @@ void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(
     });
 }
 
-void ReplicationCoordinatorExternalStateImpl::stopDataReplication(OperationContext* opCtx) {
-    stdx::unique_lock<Latch> lk(_threadMutex);
-    _stopDataReplication_inlock(opCtx, lk);
-}
-
 void ReplicationCoordinatorExternalStateImpl::_stopDataReplication_inlock(
     OperationContext* opCtx, stdx::unique_lock<Latch>& lock) {
     // Make sue no other _stopDataReplication calls are in progress.

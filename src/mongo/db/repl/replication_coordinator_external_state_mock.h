@@ -62,7 +62,6 @@ public:
     virtual void startThreads() override;
     virtual void startSteadyStateReplication(OperationContext* opCtx,
                                              ReplicationCoordinator* replCoord) override;
-    virtual void stopDataReplication(OperationContext* opCtx) override;
     virtual bool isInitialSyncFlagSet(OperationContext* opCtx) override;
 
     virtual void shutdown(OperationContext* opCtx);

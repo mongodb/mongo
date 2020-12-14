@@ -1101,11 +1101,6 @@ private:
                                std::function<void()> startCompleted = nullptr);
 
     /**
-     * Stops replicating data by stopping the applier, fetcher and such.
-     */
-    void _stopDataReplication(OperationContext* opCtx);
-
-    /**
      * Finishes the work of processReplSetInitiate() in the event of a successful quorum check.
      */
     void _finishReplSetInitiate(OperationContext* opCtx,

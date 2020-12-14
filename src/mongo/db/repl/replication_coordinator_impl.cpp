@@ -712,34 +712,6 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
     LOGV2_DEBUG(4280511, 1, "Set local replica set config");
 }
 
-void ReplicationCoordinatorImpl::_stopDataReplication(OperationContext* opCtx) {
-    std::shared_ptr<InitialSyncer> initialSyncerCopy;
-    {
-        stdx::lock_guard<Latch> lk(_mutex);
-        _initialSyncer.swap(initialSyncerCopy);
-    }
-    if (initialSyncerCopy) {
-        LOGV2_DEBUG(
-            21321,
-            1,
-            "ReplicationCoordinatorImpl::_stopDataReplication calling InitialSyncer::shutdown");
-        const auto status = initialSyncerCopy->shutdown();
-        if (!status.isOK()) {
-            LOGV2_WARNING(21408,
-                          "InitialSyncer shutdown failed: {error}",
-                          "InitialSyncer shutdown failed",
-                          "error"_attr = status);
-        }
-        initialSyncerCopy.reset();
-        // Do not return here, fall through.
-    }
-    LOGV2_DEBUG(21322,
-                1,
-                "ReplicationCoordinatorImpl::_stopDataReplication calling "
-                "ReplCoordExtState::stopDataReplication");
-    _externalState->stopDataReplication(opCtx);
-}
-
 void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* opCtx,
                                                        std::function<void()> startCompleted) {
     if (_startedSteadyStateReplication.swap(true)) {
