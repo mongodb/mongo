@@ -47,15 +47,21 @@ SdamServerSelector::SdamServerSelector(const SdamConfiguration& config)
 
 void SdamServerSelector::_getCandidateServers(std::vector<ServerDescriptionPtr>* result,
                                               const TopologyDescriptionPtr topologyDescription,
-                                              const ReadPreferenceSetting& criteria) {
+                                              const ReadPreferenceSetting& criteria,
+                                              const std::vector<HostAndPort>& excludedHosts) {
     // when querying the primary we don't need to consider tags
     bool shouldTagFilter = true;
 
     if (!criteria.minClusterTime.isNull()) {
-        auto eligibleServers = topologyDescription->findServers([](const ServerDescriptionPtr& s) {
-            return (s->getType() == ServerType::kRSPrimary ||
-                    s->getType() == ServerType::kRSSecondary);
-        });
+        auto eligibleServers =
+            topologyDescription->findServers([excludedHosts](const ServerDescriptionPtr& s) {
+                auto isPrimaryOrSecondary = (s->getType() == ServerType::kRSPrimary ||
+                                             s->getType() == ServerType::kRSSecondary);
+                auto isNotExcluded =
+                    (std::find(excludedHosts.begin(), excludedHosts.end(), s->getAddress()) ==
+                     excludedHosts.end());
+                return (isPrimaryOrSecondary && isNotExcluded);
+            });
 
         auto beginIt = eligibleServers.begin();
         auto endIt = eligibleServers.end();
@@ -77,19 +83,20 @@ void SdamServerSelector::_getCandidateServers(std::vector<ServerDescriptionPtr>*
     switch (criteria.pref) {
         case ReadPreference::Nearest: {
             auto filter = (topologyDescription->getType() != TopologyType::kSharded)
-                ? nearestFilter(criteria)
-                : shardedFilter(criteria);
+                ? nearestFilter(criteria, excludedHosts)
+                : shardedFilter(criteria, excludedHosts);
             *result = topologyDescription->findServers(filter);
             break;
         }
 
         case ReadPreference::SecondaryOnly:
-            *result = topologyDescription->findServers(secondaryFilter(criteria));
+            *result = topologyDescription->findServers(secondaryFilter(criteria, excludedHosts));
             break;
 
         case ReadPreference::PrimaryOnly: {
             const auto primaryCriteria = ReadPreferenceSetting(criteria.pref);
-            *result = topologyDescription->findServers(primaryFilter(primaryCriteria));
+            *result =
+                topologyDescription->findServers(primaryFilter(primaryCriteria, excludedHosts));
             shouldTagFilter = false;
             break;
         }
@@ -97,7 +104,7 @@ void SdamServerSelector::_getCandidateServers(std::vector<ServerDescriptionPtr>*
         case ReadPreference::PrimaryPreferred: {
             // ignore tags and max staleness for primary query
             auto primaryCriteria = ReadPreferenceSetting(ReadPreference::PrimaryOnly);
-            _getCandidateServers(result, topologyDescription, primaryCriteria);
+            _getCandidateServers(result, topologyDescription, primaryCriteria, excludedHosts);
             if (result->size()) {
                 shouldTagFilter = false;
                 break;
@@ -106,7 +113,7 @@ void SdamServerSelector::_getCandidateServers(std::vector<ServerDescriptionPtr>*
             // keep tags and maxStaleness for secondary query
             auto secondaryCriteria = criteria;
             secondaryCriteria.pref = ReadPreference::SecondaryOnly;
-            _getCandidateServers(result, topologyDescription, secondaryCriteria);
+            _getCandidateServers(result, topologyDescription, secondaryCriteria, excludedHosts);
             break;
         }
 
@@ -114,7 +121,7 @@ void SdamServerSelector::_getCandidateServers(std::vector<ServerDescriptionPtr>*
             // keep tags and maxStaleness for secondary query
             auto secondaryCriteria = criteria;
             secondaryCriteria.pref = ReadPreference::SecondaryOnly;
-            _getCandidateServers(result, topologyDescription, secondaryCriteria);
+            _getCandidateServers(result, topologyDescription, secondaryCriteria, excludedHosts);
             if (result->size()) {
                 break;
             }
@@ -122,7 +129,7 @@ void SdamServerSelector::_getCandidateServers(std::vector<ServerDescriptionPtr>*
             // ignore tags and maxStaleness for primary query
             shouldTagFilter = false;
             auto primaryCriteria = ReadPreferenceSetting(ReadPreference::PrimaryOnly);
-            _getCandidateServers(result, topologyDescription, primaryCriteria);
+            _getCandidateServers(result, topologyDescription, primaryCriteria, excludedHosts);
             break;
         }
 
@@ -136,7 +143,9 @@ void SdamServerSelector::_getCandidateServers(std::vector<ServerDescriptionPtr>*
 }
 
 boost::optional<std::vector<ServerDescriptionPtr>> SdamServerSelector::selectServers(
-    const TopologyDescriptionPtr topologyDescription, const ReadPreferenceSetting& criteria) {
+    const TopologyDescriptionPtr topologyDescription,
+    const ReadPreferenceSetting& criteria,
+    const std::vector<HostAndPort>& excludedHosts) {
     ReadPreferenceSetting effectiveCriteria = [&criteria](TopologyType topologyType) {
         if (topologyType != TopologyType::kSharded) {
             return criteria;
@@ -170,7 +179,7 @@ boost::optional<std::vector<ServerDescriptionPtr>> SdamServerSelector::selectSer
     }
 
     std::vector<ServerDescriptionPtr> results;
-    _getCandidateServers(&results, topologyDescription, effectiveCriteria);
+    _getCandidateServers(&results, topologyDescription, effectiveCriteria, excludedHosts);
 
     if (results.size()) {
         if (MONGO_unlikely(sdamServerSelectorIgnoreLatencyWindow.shouldFail())) {
@@ -199,8 +208,10 @@ ServerDescriptionPtr SdamServerSelector::_randomSelect(
 }
 
 boost::optional<ServerDescriptionPtr> SdamServerSelector::selectServer(
-    const TopologyDescriptionPtr topologyDescription, const ReadPreferenceSetting& criteria) {
-    auto servers = selectServers(topologyDescription, criteria);
+    const TopologyDescriptionPtr topologyDescription,
+    const ReadPreferenceSetting& criteria,
+    const std::vector<HostAndPort>& excludedHosts) {
+    auto servers = selectServers(topologyDescription, criteria, excludedHosts);
     return servers ? boost::optional<ServerDescriptionPtr>(_randomSelect(*servers)) : boost::none;
 }
 

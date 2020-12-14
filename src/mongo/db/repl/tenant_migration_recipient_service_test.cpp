@@ -63,6 +63,7 @@
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
 #include "mongo/unittest/log_test.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/clock_source_mock.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
@@ -192,6 +193,15 @@ public:
         // MockReplicaSet uses custom connection string which does not support auth.
         auto authFp = globalFailPointRegistry().find("skipTenantMigrationRecipientAuth");
         authFp->setMode(FailPoint::alwaysOn);
+
+        // Set up clocks.
+        serviceContext->setFastClockSource(std::make_unique<SharedClockSourceAdapter>(_clkSource));
+        serviceContext->setPreciseClockSource(
+            std::make_unique<SharedClockSourceAdapter>(_clkSource));
+
+        // Timestamps of "0 seconds" are not allowed, so we must advance our clock mock to the first
+        // real second.
+        _clkSource->advance(Milliseconds(1000));
     }
 
     void tearDown() override {
@@ -319,7 +329,23 @@ protected:
         return instance->_stateDoc;
     }
 
+    /**
+     * Advance the time by millis on both clock source mocks.
+     */
+    void advanceTime(Milliseconds millis) {
+        _clkSource->advance(millis);
+    }
+
+    /**
+     * Assumes that the times on both clock source mocks is the same.
+     */
+    Date_t now() {
+        return _clkSource->now();
+    }
+
 private:
+    std::shared_ptr<ClockSourceMock> _clkSource = std::make_shared<ClockSourceMock>();
+
     unittest::MinimumLoggedSeverityGuard _replicationSeverityGuard{
         logv2::LogComponent::kReplication, logv2::LogSeverity::Debug(1)};
     unittest::MinimumLoggedSeverityGuard _tenantMigrationSeverityGuard{
@@ -533,6 +559,299 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientConnection_P
     // Wait for task completion failure.
     ASSERT_EQUALS(ErrorCodes::FailedToSatisfyReadPreference,
                   instance->getDataSyncCompletionFuture().getNoThrow().code());
+    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+}
+
+TEST_F(TenantMigrationRecipientServiceTest,
+       TenantMigrationRecipientConnect_ExcludedPrimaryHostPrimaryOnly) {
+    auto taskFp = globalFailPointRegistry().find("hangBeforeTaskCompletion");
+    auto initialTimesEntered = taskFp->setMode(FailPoint::alwaysOn);
+
+    const UUID migrationUUID = UUID::gen();
+
+    MockReplicaSet replSet("donorSet", 2);
+
+    TenantMigrationRecipientDocument initialStateDocument(
+        migrationUUID,
+        replSet.getConnectionString(),
+        "tenantA",
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+        kRecipientPEMPayload);
+
+    // Create and start the instance.
+    auto opCtx = makeOperationContext();
+    auto instance = TenantMigrationRecipientService::Instance::getOrCreate(
+        opCtx.get(), _service, initialStateDocument.toBSON());
+    ASSERT(instance.get());
+
+    // Mark the primary as excluded.
+    auto hosts = replSet.getHosts();
+    auto now = opCtx->getServiceContext()->getFastClockSource()->now();
+    instance->excludeDonorHost(hosts.at(0), now + Milliseconds(500));
+
+    AtomicWord<bool> runReplMonitor{true};
+    // Keep scanning the replica set while waiting to reach the failpoint. This would normally
+    // be automatic but that doesn't work with mock replica sets.
+    stdx::thread replMonitorThread([&] {
+        Client::initThread("replMonitorThread");
+        while (runReplMonitor.load()) {
+            auto monitor = ReplicaSetMonitor::get(replSet.getSetName());
+            // Monitor may not have been created yet.
+            if (monitor) {
+                monitor->runScanForMockReplicaSet();
+            }
+            mongo::sleepmillis(100);
+        }
+    });
+
+    taskFp->waitForTimesEntered(initialTimesEntered + 1);
+    runReplMonitor.store(false);
+    replMonitorThread.join();
+
+    auto* client = getClient(instance.get());
+    auto* oplogFetcherClient = getOplogFetcherClient(instance.get());
+    // Neither client should be populated.
+    ASSERT_FALSE(client);
+    ASSERT_FALSE(oplogFetcherClient);
+
+    taskFp->setMode(FailPoint::off);
+
+    // Wait for task completion failure.
+    ASSERT_EQUALS(ErrorCodes::FailedToSatisfyReadPreference,
+                  instance->getDataSyncCompletionFuture().getNoThrow().code());
+    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+}
+
+TEST_F(TenantMigrationRecipientServiceTest,
+       TenantMigrationRecipientConnect_ExcludedPrimaryHostExpires) {
+    stopFailPointEnableBlock fp("fpAfterConnectingTenantMigrationRecipientInstance");
+
+    auto taskFp = globalFailPointRegistry().find("hangBeforeTaskCompletion");
+    auto initialTimesEntered = taskFp->setMode(FailPoint::alwaysOn);
+
+    const UUID migrationUUID = UUID::gen();
+
+    MockReplicaSet replSet("donorSet", 2);
+
+    TenantMigrationRecipientDocument initialStateDocument(
+        migrationUUID,
+        replSet.getConnectionString(),
+        "tenantA",
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+        kRecipientPEMPayload);
+
+    // Create and start the instance.
+    auto opCtx = makeOperationContext();
+    auto instance = TenantMigrationRecipientService::Instance::getOrCreate(
+        opCtx.get(), _service, initialStateDocument.toBSON());
+    ASSERT(instance.get());
+
+    // Mark the primary as excluded.
+    auto hosts = replSet.getHosts();
+    auto now = opCtx->getServiceContext()->getFastClockSource()->now();
+    auto excludeTime = Milliseconds(500);
+    instance->excludeDonorHost(hosts.at(0), now + excludeTime);
+
+    // Advance the clock past excludeTime.
+    advanceTime(excludeTime + Milliseconds(500));
+
+    taskFp->waitForTimesEntered(initialTimesEntered + 1);
+
+    auto* client = getClient(instance.get());
+    auto* oplogFetcherClient = getOplogFetcherClient(instance.get());
+    // Both clients should be populated.
+    ASSERT(client);
+    ASSERT(oplogFetcherClient);
+
+    // Clients should be distinct.
+    ASSERT(client != oplogFetcherClient);
+
+    // Clients should be connected to primary.
+    auto primary = replSet.getHosts()[0].toString();
+    ASSERT_EQ(primary, client->getServerAddress());
+    ASSERT(client->isStillConnected());
+    ASSERT_EQ(primary, oplogFetcherClient->getServerAddress());
+    ASSERT(oplogFetcherClient->isStillConnected());
+
+    taskFp->setMode(FailPoint::off);
+
+    // Wait for task completion.
+    ASSERT_EQ(stopFailPointErrorCode, instance->getDataSyncCompletionFuture().getNoThrow().code());
+    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+}
+
+TEST_F(TenantMigrationRecipientServiceTest,
+       TenantMigrationRecipientConnect_ExcludedAllHostsNearest) {
+    auto taskFp = globalFailPointRegistry().find("hangBeforeTaskCompletion");
+    auto initialTimesEntered = taskFp->setMode(FailPoint::alwaysOn);
+
+    const UUID migrationUUID = UUID::gen();
+
+    MockReplicaSet replSet("donorSet", 2);
+
+    TenantMigrationRecipientDocument initialStateDocument(
+        migrationUUID,
+        replSet.getConnectionString(),
+        "tenantA",
+        ReadPreferenceSetting(ReadPreference::Nearest),
+        kRecipientPEMPayload);
+
+    // Create and start the instance.
+    auto opCtx = makeOperationContext();
+    auto instance = TenantMigrationRecipientService::Instance::getOrCreate(
+        opCtx.get(), _service, initialStateDocument.toBSON());
+    ASSERT(instance.get());
+
+    // Mark all hosts as excluded.
+    auto hosts = replSet.getHosts();
+    for (const auto host : hosts) {
+        const auto now = opCtx->getServiceContext()->getFastClockSource()->now();
+        instance->excludeDonorHost(host, now + Milliseconds(500));
+    }
+
+    AtomicWord<bool> runReplMonitor{true};
+    // Keep scanning the replica set while waiting to reach the failpoint. This would normally
+    // be automatic but that doesn't work with mock replica sets.
+    stdx::thread replMonitorThread([&] {
+        Client::initThread("replMonitorThread");
+        while (runReplMonitor.load()) {
+            auto monitor = ReplicaSetMonitor::get(replSet.getSetName());
+            // Monitor may not have been created yet.
+            if (monitor) {
+                monitor->runScanForMockReplicaSet();
+            }
+            mongo::sleepmillis(100);
+        }
+    });
+
+    taskFp->waitForTimesEntered(initialTimesEntered + 1);
+    runReplMonitor.store(false);
+    replMonitorThread.join();
+
+    auto* client = getClient(instance.get());
+    auto* oplogFetcherClient = getOplogFetcherClient(instance.get());
+    // Neither client should be populated.
+    ASSERT_FALSE(client);
+    ASSERT_FALSE(oplogFetcherClient);
+
+    taskFp->setMode(FailPoint::off);
+
+    // Wait for task completion failure.
+    ASSERT_EQUALS(ErrorCodes::FailedToSatisfyReadPreference,
+                  instance->getDataSyncCompletionFuture().getNoThrow().code());
+    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+}
+
+TEST_F(TenantMigrationRecipientServiceTest,
+       TenantMigrationRecipientConnect_ExcludedPrimaryWithPrimaryPreferred) {
+    stopFailPointEnableBlock fp("fpAfterConnectingTenantMigrationRecipientInstance");
+
+    auto taskFp = globalFailPointRegistry().find("hangBeforeTaskCompletion");
+    auto initialTimesEntered = taskFp->setMode(FailPoint::alwaysOn);
+
+    const UUID migrationUUID = UUID::gen();
+
+    MockReplicaSet replSet("donorSet", 2);
+
+    TenantMigrationRecipientDocument initialStateDocument(
+        migrationUUID,
+        replSet.getConnectionString(),
+        "tenantA",
+        ReadPreferenceSetting(ReadPreference::PrimaryPreferred),
+        kRecipientPEMPayload);
+
+    // Create and start the instance.
+    auto opCtx = makeOperationContext();
+    auto instance = TenantMigrationRecipientService::Instance::getOrCreate(
+        opCtx.get(), _service, initialStateDocument.toBSON());
+    ASSERT(instance.get());
+
+    // Mark the primary as excluded.
+    auto hosts = replSet.getHosts();
+    auto now = opCtx->getServiceContext()->getFastClockSource()->now();
+    auto excludeTime = Milliseconds(500);
+    instance->excludeDonorHost(hosts.at(0), now + excludeTime);
+
+    taskFp->waitForTimesEntered(initialTimesEntered + 1);
+
+    auto* client = getClient(instance.get());
+    auto* oplogFetcherClient = getOplogFetcherClient(instance.get());
+    // Both clients should be populated.
+    ASSERT(client);
+    ASSERT(oplogFetcherClient);
+
+    // Clients should be distinct.
+    ASSERT(client != oplogFetcherClient);
+
+    // Clients should be connected to secondary.
+    auto secondary = replSet.getHosts()[1].toString();
+    ASSERT_EQ(secondary, client->getServerAddress());
+    ASSERT(client->isStillConnected());
+    ASSERT_EQ(secondary, oplogFetcherClient->getServerAddress());
+    ASSERT(oplogFetcherClient->isStillConnected());
+
+    taskFp->setMode(FailPoint::off);
+
+    // Wait for task completion.
+    ASSERT_EQ(stopFailPointErrorCode, instance->getDataSyncCompletionFuture().getNoThrow().code());
+    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+}
+
+TEST_F(TenantMigrationRecipientServiceTest,
+       TenantMigrationRecipientConnect_ExcludedPrimaryExpiresWithPrimaryPreferred) {
+    stopFailPointEnableBlock fp("fpAfterConnectingTenantMigrationRecipientInstance");
+
+    auto taskFp = globalFailPointRegistry().find("hangBeforeTaskCompletion");
+    auto initialTimesEntered = taskFp->setMode(FailPoint::alwaysOn);
+
+    const UUID migrationUUID = UUID::gen();
+
+    MockReplicaSet replSet("donorSet", 2);
+
+    TenantMigrationRecipientDocument initialStateDocument(
+        migrationUUID,
+        replSet.getConnectionString(),
+        "tenantA",
+        ReadPreferenceSetting(ReadPreference::PrimaryPreferred),
+        kRecipientPEMPayload);
+
+    // Create and start the instance.
+    auto opCtx = makeOperationContext();
+    auto instance = TenantMigrationRecipientService::Instance::getOrCreate(
+        opCtx.get(), _service, initialStateDocument.toBSON());
+    ASSERT(instance.get());
+
+    // Mark the primary as excluded.
+    auto hosts = replSet.getHosts();
+    auto now = opCtx->getServiceContext()->getFastClockSource()->now();
+    auto excludeTime = Milliseconds(500);
+    instance->excludeDonorHost(hosts.at(0), now + excludeTime);
+
+    // Advance the clock past excludeTime.
+    advanceTime(excludeTime + Milliseconds(500));
+
+    taskFp->waitForTimesEntered(initialTimesEntered + 1);
+
+    auto* client = getClient(instance.get());
+    auto* oplogFetcherClient = getOplogFetcherClient(instance.get());
+    // Both clients should be populated.
+    ASSERT(client);
+    ASSERT(oplogFetcherClient);
+
+    // Clients should be distinct.
+    ASSERT(client != oplogFetcherClient);
+
+    // Clients should be connected to primary.
+    auto primary = replSet.getHosts()[0].toString();
+    ASSERT_EQ(primary, client->getServerAddress());
+    ASSERT(client->isStillConnected());
+    ASSERT_EQ(primary, oplogFetcherClient->getServerAddress());
+    ASSERT(oplogFetcherClient->isStillConnected());
+
+    taskFp->setMode(FailPoint::off);
+
+    // Wait for task completion.
+    ASSERT_EQ(stopFailPointErrorCode, instance->getDataSyncCompletionFuture().getNoThrow().code());
     ASSERT_OK(instance->getCompletionFuture().getNoThrow());
 }
 
@@ -1278,6 +1597,8 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientForgetMigration_WaitUntilSt
 
     // Test that onReceiveRecipientForgetMigration waits until the state doc is initialized.
     opCtx->setDeadlineAfterNowBy(Seconds(2), opCtx->getTimeoutError());
+    // Advance time past deadline.
+    advanceTime(Milliseconds(3000));
     ASSERT_THROWS_CODE(instance->onReceiveRecipientForgetMigration(opCtx.get()),
                        AssertionException,
                        opCtx->getTimeoutError());

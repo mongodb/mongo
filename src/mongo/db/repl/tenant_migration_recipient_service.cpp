@@ -338,7 +338,11 @@ TenantMigrationRecipientService::Instance::_createAndConnectClients() {
             .getAsync([getHostCancelSource](auto) mutable { getHostCancelSource.cancel(); });
     });
 
-    return _donorReplicaSetMonitor->getHostOrRefresh(_readPreference, getHostCancelSource.token())
+    // Get all donor hosts that we have excluded.
+    const auto& excludedHosts = _getExcludedDonorHosts(lk);
+
+    return _donorReplicaSetMonitor
+        ->getHostOrRefresh(_readPreference, excludedHosts, getHostCancelSource.token())
         .thenRunOn(**_scopedExecutor)
         .then([this, self = shared_from_this(), donorConnectionString](
                   const HostAndPort& serverAddress) {
@@ -384,6 +388,38 @@ TenantMigrationRecipientService::Instance::_createAndConnectClients() {
                 return status;
             })
         .semi();
+}
+
+void TenantMigrationRecipientService::Instance::excludeDonorHost(const HostAndPort& host,
+                                                                 Date_t until) {
+    stdx::lock_guard lk(_mutex);
+    LOGV2_DEBUG(5271800,
+                2,
+                "Excluding donor host",
+                "donorHost"_attr = host,
+                "until"_attr = until.toString());
+
+    _excludedDonorHosts.emplace_back(std::make_pair(host, until));
+}
+
+std::vector<HostAndPort> TenantMigrationRecipientService::Instance::_getExcludedDonorHosts(
+    WithLock lk) {
+    const auto now = getGlobalServiceContext()->getFastClockSource()->now();
+
+    // Clean up any hosts that have had their exclusion duration expired.
+    auto itr = std::remove_if(
+        _excludedDonorHosts.begin(),
+        _excludedDonorHosts.end(),
+        [now](const std::pair<HostAndPort, Date_t>& pair) { return pair.second < now; });
+    _excludedDonorHosts.erase(itr, _excludedDonorHosts.end());
+
+    // Return the list of currently excluded donor hosts.
+    std::vector<HostAndPort> excludedHosts;
+    std::transform(_excludedDonorHosts.begin(),
+                   _excludedDonorHosts.end(),
+                   std::back_inserter(excludedHosts),
+                   [](const std::pair<HostAndPort, Date_t>& pair) { return pair.first; });
+    return excludedHosts;
 }
 
 SemiFuture<void> TenantMigrationRecipientService::Instance::_initializeStateDoc(WithLock) {

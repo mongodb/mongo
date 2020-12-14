@@ -154,6 +154,7 @@ public:
     struct Waiter {
         Date_t deadline;
         ReadPreferenceSetting criteria;
+        std::vector<HostAndPort> excludedHosts;
         Promise<std::vector<HostAndPort>> promise;
     };
 
@@ -166,9 +167,13 @@ public:
      *
      * Note: Uses only local data and does not go over the network.
      */
-    std::vector<HostAndPort> getMatchingHosts(const ReadPreferenceSetting& criteria) const;
+    std::vector<HostAndPort> getMatchingHosts(
+        const ReadPreferenceSetting& criteria,
+        const std::vector<HostAndPort>& excludedHosts = std::vector<HostAndPort>()) const;
 
-    HostAndPort getMatchingHost(const ReadPreferenceSetting& criteria) const;
+    HostAndPort getMatchingHost(
+        const ReadPreferenceSetting& criteria,
+        const std::vector<HostAndPort>& excludedHosts = std::vector<HostAndPort>()) const;
 
     /**
      * Returns the Node with the given host, or NULL if no Node has that host.

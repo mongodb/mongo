@@ -38,6 +38,7 @@
 #include "mongo/db/repl/tenant_migration_state_machine_gen.h"
 #include "mongo/db/repl/tenant_oplog_applier.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
@@ -147,6 +148,11 @@ public:
          */
         OpTime waitUntilTimestampIsMajorityCommitted(OperationContext* opCtx,
                                                      const Timestamp& donorTs) const;
+
+        /*
+         * Suppresses selecting 'host' as the donor sync source, until 'until'.
+         */
+        void excludeDonorHost(const HostAndPort& host, Date_t until);
 
         /*
          *  Set the oplog creator functor, to allow use of a mock oplog fetcher.
@@ -364,6 +370,12 @@ public:
         void _cleanupOnDataSyncCompletion(Status status);
 
         /*
+         * Returns a vector of currently excluded donor hosts. Also removes hosts from the list of
+         * excluded donor nodes, if the exclude duration has expired.
+         */
+        std::vector<HostAndPort> _getExcludedDonorHosts(WithLock lk);
+
+        /*
          * Makes the failpoint to stop or hang based on failpoint data "action" field.
          */
         void _stopOrHangOnFailPoint(FailPoint* fp);
@@ -390,6 +402,10 @@ public:
         const ReadPreferenceSetting _readPreference;  // (R)
 
         std::shared_ptr<ReplicaSetMonitor> _donorReplicaSetMonitor;  // (M)
+
+        // Members of the donor replica set that we have excluded as a potential sync source for
+        // some period of time.
+        std::vector<std::pair<HostAndPort, Date_t>> _excludedDonorHosts;  // (M)
 
         // Because the cloners and oplog fetcher use exhaust, we need a separate connection for
         // each.  The '_client' will be used for the cloners and other operations such as fetching

@@ -48,7 +48,9 @@ public:
      * Finds a list of candidate servers according to the ReadPreferenceSetting.
      */
     virtual boost::optional<std::vector<ServerDescriptionPtr>> selectServers(
-        TopologyDescriptionPtr topologyDescription, const ReadPreferenceSetting& criteria) = 0;
+        TopologyDescriptionPtr topologyDescription,
+        const ReadPreferenceSetting& criteria,
+        const std::vector<HostAndPort>& excludedHosts = std::vector<HostAndPort>()) = 0;
 
     /**
      * Select a single server according to the ReadPreference and latency of the
@@ -56,7 +58,8 @@ public:
      */
     virtual boost::optional<ServerDescriptionPtr> selectServer(
         const TopologyDescriptionPtr topologyDescription,
-        const ReadPreferenceSetting& criteria) = 0;
+        const ReadPreferenceSetting& criteria,
+        const std::vector<HostAndPort>& excludedHosts = std::vector<HostAndPort>()) = 0;
 
     virtual ~ServerSelector();
 };
@@ -68,11 +71,13 @@ public:
 
     boost::optional<std::vector<ServerDescriptionPtr>> selectServers(
         const TopologyDescriptionPtr topologyDescription,
-        const ReadPreferenceSetting& criteria) override;
+        const ReadPreferenceSetting& criteria,
+        const std::vector<HostAndPort>& excludedHosts = std::vector<HostAndPort>()) override;
 
     boost::optional<ServerDescriptionPtr> selectServer(
         const TopologyDescriptionPtr topologyDescription,
-        const ReadPreferenceSetting& criteria) override;
+        const ReadPreferenceSetting& criteria,
+        const std::vector<HostAndPort>& excludedHosts = std::vector<HostAndPort>()) override;
 
     // remove servers that do not match the TagSet
     void filterTags(std::vector<ServerDescriptionPtr>* servers, const TagSet& tagSet);
@@ -80,7 +85,8 @@ public:
 private:
     void _getCandidateServers(std::vector<ServerDescriptionPtr>* result,
                               const TopologyDescriptionPtr topologyDescription,
-                              const ReadPreferenceSetting& criteria);
+                              const ReadPreferenceSetting& criteria,
+                              const std::vector<HostAndPort>& excludedHosts);
 
     bool _containsAllTags(ServerDescriptionPtr server, const BSONObj& tags);
 
@@ -150,35 +156,47 @@ private:
 
     bool recencyFilter(const ReadPreferenceSetting& readPref, const ServerDescriptionPtr& s);
 
+    static bool excludedHostsFilter(const std::vector<HostAndPort>& excludedHosts,
+                                    const ServerDescriptionPtr& s) {
+        return std::find(excludedHosts.begin(), excludedHosts.end(), s->getAddress()) ==
+            excludedHosts.end();
+    }
+
     // A SelectionFilter is a higher order function used to filter out servers from the current
     // Topology. It's return value is used as input to the TopologyDescription::findServers
     // function, and is a function that takes a ServerDescriptionPtr and returns a bool indicating
     // whether to keep this server or not based on the ReadPreference, server type, and recency
     // metrics of the server.
     using SelectionFilter = unique_function<std::function<bool(const ServerDescriptionPtr&)>(
-        const ReadPreferenceSetting&)>;
+        const ReadPreferenceSetting&, const std::vector<HostAndPort>&)>;
 
-    const SelectionFilter secondaryFilter = [this](const ReadPreferenceSetting& readPref) {
+    const SelectionFilter secondaryFilter = [this](const ReadPreferenceSetting& readPref,
+                                                   const std::vector<HostAndPort>& excludedHosts) {
         return [&](const ServerDescriptionPtr& s) {
-            return (s->getType() == ServerType::kRSSecondary) && recencyFilter(readPref, s);
+            return (s->getType() == ServerType::kRSSecondary) && recencyFilter(readPref, s) &&
+                excludedHostsFilter(excludedHosts, s);
         };
     };
 
-    const SelectionFilter primaryFilter = [this](const ReadPreferenceSetting& readPref) {
+    const SelectionFilter primaryFilter = [this](const ReadPreferenceSetting& readPref,
+                                                 const std::vector<HostAndPort>& excludedHosts) {
         return [&](const ServerDescriptionPtr& s) {
-            return (s->getType() == ServerType::kRSPrimary) && recencyFilter(readPref, s);
+            return (s->getType() == ServerType::kRSPrimary) && recencyFilter(readPref, s) &&
+                excludedHostsFilter(excludedHosts, s);
         };
     };
 
-    const SelectionFilter nearestFilter = [this](const ReadPreferenceSetting& readPref) {
+    const SelectionFilter nearestFilter = [this](const ReadPreferenceSetting& readPref,
+                                                 const std::vector<HostAndPort>& excludedHosts) {
         return [&](const ServerDescriptionPtr& s) {
             return (s->getType() == ServerType::kRSPrimary ||
                     s->getType() == ServerType::kRSSecondary) &&
-                recencyFilter(readPref, s);
+                recencyFilter(readPref, s) && excludedHostsFilter(excludedHosts, s);
         };
     };
 
-    const SelectionFilter shardedFilter = [this](const ReadPreferenceSetting& readPref) {
+    const SelectionFilter shardedFilter = [this](const ReadPreferenceSetting& readPref,
+                                                 const std::vector<HostAndPort>& excludedHosts) {
         return [&](const ServerDescriptionPtr& s) { return s->getType() == ServerType::kMongos; };
     };
 

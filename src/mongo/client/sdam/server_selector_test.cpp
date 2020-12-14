@@ -265,6 +265,132 @@ TEST_F(ServerSelectorTestFixture, ShouldSelectRandomlyWhenMultipleOptionsAreAvai
     ASSERT_FALSE(frequencyInfo[HostAndPort("s3")]);
 }
 
+TEST_F(ServerSelectorTestFixture, ShouldNotSelectExcludedHostsNearest) {
+    TopologyStateMachine stateMachine(sdamConfiguration);
+    auto topologyDescription = std::make_shared<TopologyDescription>(sdamConfiguration);
+
+    const auto s0 = ServerDescriptionBuilder()
+                        .withAddress(HostAndPort("s0"))
+                        .withType(ServerType::kRSPrimary)
+                        .withLastUpdateTime(Date_t::now())
+                        .withLastWriteDate(Date_t::now())
+                        .withRtt(sdamConfiguration.getLocalThreshold())
+                        .withSetName("set")
+                        .withHost(HostAndPort("s0"))
+                        .withHost(HostAndPort("s1"))
+                        .withHost(HostAndPort("s2"))
+                        .withHost(HostAndPort("s3"))
+                        .withMinWireVersion(WireVersion::SUPPORTS_OP_MSG)
+                        .withMaxWireVersion(WireVersion::LATEST_WIRE_VERSION)
+                        .instance();
+    stateMachine.onServerDescription(*topologyDescription, s0);
+
+    const auto s1 = ServerDescriptionBuilder()
+                        .withAddress(HostAndPort("s1"))
+                        .withType(ServerType::kRSSecondary)
+                        .withRtt(sdamConfiguration.getLocalThreshold())
+                        .withSetName("set")
+                        .withMinWireVersion(WireVersion::SUPPORTS_OP_MSG)
+                        .withMaxWireVersion(WireVersion::LATEST_WIRE_VERSION)
+                        .withLastUpdateTime(Date_t::now())
+                        .withLastWriteDate(Date_t::now())
+                        .instance();
+    stateMachine.onServerDescription(*topologyDescription, s1);
+
+    const auto s2 = ServerDescriptionBuilder()
+                        .withAddress(HostAndPort("s2"))
+                        .withType(ServerType::kRSSecondary)
+                        .withRtt(sdamConfiguration.getLocalThreshold())
+                        .withSetName("set")
+                        .withMinWireVersion(WireVersion::SUPPORTS_OP_MSG)
+                        .withMaxWireVersion(WireVersion::LATEST_WIRE_VERSION)
+                        .withLastUpdateTime(Date_t::now())
+                        .withLastWriteDate(Date_t::now())
+                        .instance();
+    stateMachine.onServerDescription(*topologyDescription, s2);
+
+    const auto s3 = ServerDescriptionBuilder()
+                        .withAddress(HostAndPort("s3"))
+                        .withType(ServerType::kRSSecondary)
+                        .withRtt(sdamConfiguration.getLocalThreshold())
+                        .withSetName("set")
+                        .withMinWireVersion(WireVersion::SUPPORTS_OP_MSG)
+                        .withMaxWireVersion(WireVersion::LATEST_WIRE_VERSION)
+                        .withLastUpdateTime(Date_t::now())
+                        .withLastWriteDate(Date_t::now())
+                        .instance();
+    stateMachine.onServerDescription(*topologyDescription, s3);
+
+    auto excludedHosts = std::vector<HostAndPort>();
+    excludedHosts.push_back(HostAndPort("s2"));
+    excludedHosts.push_back(HostAndPort("s3"));
+
+    std::map<HostAndPort, int> frequencyInfo{{HostAndPort("s0"), 0},
+                                             {HostAndPort("s1"), 0},
+                                             {HostAndPort("s2"), 0},
+                                             {HostAndPort("s3"), 0}};
+    for (int i = 0; i < NUM_ITERATIONS; i++) {
+        auto server = selector.selectServer(
+            topologyDescription, ReadPreferenceSetting(ReadPreference::Nearest), excludedHosts);
+        if (server) {
+            frequencyInfo[(*server)->getAddress()]++;
+        }
+    }
+
+    ASSERT(frequencyInfo[HostAndPort("s0")]);
+    ASSERT(frequencyInfo[HostAndPort("s1")]);
+    ASSERT_FALSE(frequencyInfo[HostAndPort("s2")]);
+    ASSERT_FALSE(frequencyInfo[HostAndPort("s3")]);
+}
+
+TEST_F(ServerSelectorTestFixture, ShouldNotSelectWhenPrimaryExcludedAndPrimaryOnly) {
+    TopologyStateMachine stateMachine(sdamConfiguration);
+    auto topologyDescription = std::make_shared<TopologyDescription>(sdamConfiguration);
+
+    const auto s0 = ServerDescriptionBuilder()
+                        .withAddress(HostAndPort("s0"))
+                        .withType(ServerType::kRSPrimary)
+                        .withLastUpdateTime(Date_t::now())
+                        .withLastWriteDate(Date_t::now())
+                        .withRtt(sdamConfiguration.getLocalThreshold())
+                        .withSetName("set")
+                        .withHost(HostAndPort("s0"))
+                        .withHost(HostAndPort("s1"))
+                        .withMinWireVersion(WireVersion::SUPPORTS_OP_MSG)
+                        .withMaxWireVersion(WireVersion::LATEST_WIRE_VERSION)
+                        .instance();
+    stateMachine.onServerDescription(*topologyDescription, s0);
+
+    const auto s1 = ServerDescriptionBuilder()
+                        .withAddress(HostAndPort("s1"))
+                        .withType(ServerType::kRSSecondary)
+                        .withRtt(sdamConfiguration.getLocalThreshold())
+                        .withSetName("set")
+                        .withMinWireVersion(WireVersion::SUPPORTS_OP_MSG)
+                        .withMaxWireVersion(WireVersion::LATEST_WIRE_VERSION)
+                        .withLastUpdateTime(Date_t::now())
+                        .withLastWriteDate(Date_t::now())
+                        .instance();
+    stateMachine.onServerDescription(*topologyDescription, s1);
+
+    auto excludedHosts = std::vector<HostAndPort>();
+    excludedHosts.push_back(HostAndPort("s0"));
+
+    std::map<HostAndPort, int> frequencyInfo{{HostAndPort("s0"), 0}, {HostAndPort("s1"), 0}};
+    for (int i = 0; i < NUM_ITERATIONS; i++) {
+        auto server = selector.selectServer(
+            topologyDescription, ReadPreferenceSetting(ReadPreference::PrimaryOnly), excludedHosts);
+        if (server) {
+            frequencyInfo[(*server)->getAddress()]++;
+        }
+    }
+
+    // The primary has been excluded, and the read preference is PrimaryOnly. Thus, we should not
+    // select either of the nodes.
+    ASSERT_FALSE(frequencyInfo[HostAndPort("s0")]);
+    ASSERT_FALSE(frequencyInfo[HostAndPort("s1")]);
+}
+
 TEST_F(ServerSelectorTestFixture, ShouldFilterByLastWriteTime) {
     TopologyStateMachine stateMachine(sdamConfiguration);
     auto topologyDescription = std::make_shared<TopologyDescription>(sdamConfiguration);
