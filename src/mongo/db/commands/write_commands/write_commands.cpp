@@ -27,7 +27,8 @@
  *    it in the license file.
  */
 
-#include "mongo/base/init.h"
+#include "mongo/platform/basic.h"
+
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/mutable/element.h"
@@ -122,30 +123,19 @@ const int kTimeseriesControlVersion = 1;
 BSONObj makeTimeseriesDataStages(const std::vector<BSONObj>& docs,
                                  BSONElement metadataElem,
                                  uint16_t count) {
-    StringDataMap<BSONArrayBuilder> measurements;
+    BSONObjBuilder builder;
     for (const auto& doc : docs) {
         for (const auto& elem : doc) {
             auto key = elem.fieldNameStringData();
             if (metadataElem && key == metadataElem.fieldNameStringData()) {
                 continue;
             }
-            measurements[key].append(
-                BSON("k" << std::to_string(count) << elem.wrap("v").firstElement()));
+            // If 'elem' is an object, it may be evaluated as an aggregation expression.
+            // The $literal operator can be used to avoid this scenario.
+            builder.append(str::stream() << "data." << key << "." << count, elem.wrap("$literal"));
         }
         count++;
     }
-
-    BSONObjBuilder builder;
-    for (auto& field : measurements) {
-        builder.append(
-            "data." + field.first,
-            BSON("$arrayToObject" << BSON(
-                     "$setUnion" << BSON_ARRAY(
-                         BSON("$objectToArray" << BSON(
-                                  "$ifNull" << BSON_ARRAY(("$data." + field.first) << BSONObj())))
-                         << field.second.arr()))));
-    }
-
     return builder.obj();
 }
 
