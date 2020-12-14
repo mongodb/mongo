@@ -189,7 +189,7 @@ void OplogBufferCollection::push(OperationContext* opCtx,
     auto writeResult = write_ops_exec::performInserts(opCtx, insertOp);
     invariant(!writeResult.results.empty());
     // Since the writes are ordered, it's ok to check just the last writeOp result.
-    fassert(40161, writeResult.results.back());
+    uassertStatusOK(writeResult.results.back());
 
 
     _lastPushedTimestamp = ts;

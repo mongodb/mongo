@@ -796,9 +796,13 @@ Status OplogFetcher::_onSuccessfulBatch(const Documents& documents) {
         info.resumeToken = pbrt.getTs();
     }
 
-    auto status = _enqueueDocumentsFn(firstDocToApply, documents.cend(), info);
-    if (!status.isOK()) {
-        return status;
+    try {
+        auto status = _enqueueDocumentsFn(firstDocToApply, documents.cend(), info);
+        if (!status.isOK()) {
+            return status;
+        }
+    } catch (const DBException& e) {
+        return e.toStatus().withContext("Error inserting documents into oplog buffer collection");
     }
 
     if (changeSyncSourceAction == ChangeSyncSourceAction::kStopSyncingAndEnqueueLastBatch) {
