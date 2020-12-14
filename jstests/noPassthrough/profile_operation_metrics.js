@@ -1395,9 +1395,9 @@ const testOperation = (db, operation) => {
             ", second entry: " + tojson(cursor.next());
     });
 
-    assertMetricsExist(entry);
     if (operation.profileAssert) {
         try {
+            assertMetricsExist(entry);
             operation.profileAssert(db, entry.operationMetrics);
         } catch (e) {
             print("Caught exception while checking profile entry for '" + operation.name +
