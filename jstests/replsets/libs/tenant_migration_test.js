@@ -292,6 +292,22 @@ function TenantMigrationTest(
     };
 
     /**
+     * Runs the donorAbortMigration command with the given migration options and returns the
+     * response.
+     */
+    this.tryAbortMigration = function(migrationOpts, retryOnRetryableErrors = false) {
+        let donorPrimary = this.getDonorPrimary();
+
+        const cmdObj = {
+            donorAbortMigration: 1,
+            migrationId: UUID(migrationOpts.migrationIdString),
+        };
+
+        return TenantMigrationUtil.runTenantMigrationCommand(
+            cmdObj, donorPrimary, this.getDonorRst, retryOnRetryableErrors);
+    };
+
+    /**
      * Asserts that durable and in-memory state for the migration 'migrationId' and 'tenantId' is
      * eventually deleted from the given nodes.
      */

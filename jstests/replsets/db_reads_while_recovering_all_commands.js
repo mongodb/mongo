@@ -135,6 +135,7 @@ const allCommands = {
         expectFailure: true,
         expectedErrorCode: ErrorCodes.NotPrimaryOrSecondary,
     },
+    donorAbortMigration: {skip: isPrimaryOnly},
     donorForgetMigration: {skip: isPrimaryOnly},
     donorStartMigration: {skip: isPrimaryOnly},
     donorWaitForMigrationToCommit: {skip: isPrimaryOnly},

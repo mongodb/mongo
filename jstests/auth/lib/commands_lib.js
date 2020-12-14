@@ -3357,6 +3357,25 @@ var authCommandsLib = {
           ]
         },
         {
+          testname: "donorAbortMigration",
+          command: {
+              donorAbortMigration: 1,
+              migrationId: UUID(),
+          },
+          skipSharded: true,
+          testcases: [
+              {
+                  runOnDb: adminDbName,
+                  roles: roles_clusterManager,
+                  privileges: [{resource: {cluster: true}, actions: ["runTenantMigration"]}],
+                  // This is expected to throw NoSuchTenantMigration.
+                  expectFail: true,
+              },
+              {runOnDb: firstDbName, roles: {}},
+              {runOnDb: secondDbName, roles: {}}
+          ]
+        },
+        {
           testname: "donorForgetMigration",
           command: {
               donorForgetMigration: 1,

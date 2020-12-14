@@ -84,6 +84,11 @@ void recoverTenantMigrationAccessBlockers(OperationContext* opCtx);
  */
 void handleTenantMigrationConflict(OperationContext* opCtx, Status status);
 
+/**
+ * Append a no-op to the oplog.
+ */
+void performNoopWrite(OperationContext* opCtx, StringData msg);
+
 }  // namespace tenant_migration_donor
 
 }  // namespace mongo

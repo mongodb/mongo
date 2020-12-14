@@ -34,8 +34,11 @@
 
 #include "mongo/db/repl/tenant_migration_donor_util.h"
 
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands/tenant_migration_recipient_cmds_gen.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/op_observer.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_registry.h"
@@ -230,6 +233,22 @@ void handleTenantMigrationConflict(OperationContext* opCtx, Status status) {
     auto mtab = migrationConflictInfo->getTenantMigrationAccessBlocker();
     invariant(mtab);
     uassertStatusOK(mtab->waitUntilCommittedOrAborted(opCtx));
+}
+
+void performNoopWrite(OperationContext* opCtx, StringData msg) {
+    const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
+    uassert(ErrorCodes::NotWritablePrimary,
+            "Not primary when performing noop write for {}"_format(msg),
+            replCoord->canAcceptWritesForDatabase(opCtx, "admin"));
+
+    writeConflictRetry(
+        opCtx, "performNoopWrite", NamespaceString::kRsOplogNamespace.ns(), [&opCtx, &msg] {
+            WriteUnitOfWork wuow(opCtx);
+            opCtx->getClient()->getServiceContext()->getOpObserver()->onOpMessage(
+                opCtx, BSON("msg" << msg));
+            wuow.commit();
+        });
 }
 
 }  // namespace tenant_migration_donor

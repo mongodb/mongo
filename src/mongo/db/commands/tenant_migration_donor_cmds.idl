@@ -94,3 +94,13 @@ commands:
       migrationId:
         description: "Unique identifier for the tenant migration."
         type: uuid
+
+  donorAbortMigration:
+    description: "Parser for the 'donorAbortMigration' command."
+    command_name: donorAbortMigration
+    strict: true
+    namespace: ignored
+    fields:
+      migrationId:
+        description: "Unique identifier for the tenant migration."
+        type: uuid

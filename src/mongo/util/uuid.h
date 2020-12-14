@@ -66,6 +66,7 @@ class UUID {
     // Make the IDL generated parser a friend
     friend class ConfigsvrShardCollectionResponse;
     friend class CommonReshardingMetadata;
+    friend class DonorAbortMigration;
     friend class DonorStartMigration;
     friend class DonorWaitForMigrationToCommit;
     friend class DonorForgetMigration;

@@ -8,6 +8,7 @@
 (function() {
 "use strict";
 
+load("jstests/libs/fail_point_util.js");
 load("jstests/libs/parallelTester.js");
 load("jstests/libs/uuid_util.js");
 load("jstests/replsets/libs/tenant_migration_test.js");
@@ -15,6 +16,12 @@ load("jstests/replsets/libs/tenant_migration_util.js");
 
 const kMaxSleepTimeMS = 100;
 const kTenantId = "testTenantId";
+const kMigrationFpNames = [
+    "pauseTenantMigrationAfterDataSync",
+    "pauseTenantMigrationAfterBlockingStarts",
+    "abortTenantMigrationAfterBlockingStarts",
+    ""
+];
 
 /**
  * Runs the donorStartMigration command to start a migration, and interrupts the migration on the
@@ -44,7 +51,7 @@ function testDonorStartMigrationInterrupt(interruptFunc, verifyCmdResponseFunc) 
         new Thread(TenantMigrationUtil.runMigrationAsync, migrationOpts, donorRstArgs);
     runMigrationThread.start();
 
-    // Wait for to donorStartMigration command to start.
+    // Wait for donorStartMigration command to start.
     assert.soon(() => donorPrimary.adminCommand({currentOp: true, desc: "tenant donor migration"})
                           .inprog.length > 0);
 
@@ -95,6 +102,56 @@ function testDonorForgetMigrationInterrupt(interruptFunc, verifyCmdResponseFunc)
     sleep(Math.random() * kMaxSleepTimeMS);
     interruptFunc(donorRst, migrationId, migrationOpts.tenantId);
     verifyCmdResponseFunc(forgetMigrationThread);
+
+    tenantMigrationTest.stop();
+}
+
+/**
+ * Starts a migration and sets the passed in failpoint during the migration, then runs the
+ * donorAbortMigration, and interrupts the donor using the 'interruptFunc', and verifies the command
+ * response using the 'verifyCmdResponseFunc'.
+ */
+function testDonorAbortMigrationInterrupt(interruptFunc, verifyCmdResponseFunc, fpName) {
+    const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
+    if (!tenantMigrationTest.isFeatureFlagEnabled()) {
+        jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
+        return;
+    }
+
+    const donorRst = tenantMigrationTest.getDonorRst();
+    const donorPrimary = tenantMigrationTest.getDonorPrimary();
+
+    const migrationId = UUID();
+    const migrationOpts = {
+        migrationIdString: extractUUIDFromObject(migrationId),
+        tenantId: kTenantId,
+        recipientConnString: tenantMigrationTest.getRecipientConnString(),
+    };
+
+    const donorRstArgs = TenantMigrationUtil.createRstArgs(donorRst);
+
+    // If we passed in a valid failpoint we set it, otherwise we let the migration run normally.
+    if (fpName) {
+        configureFailPoint(donorPrimary, fpName);
+    }
+
+    assert.commandWorked(tenantMigrationTest.startMigration(migrationOpts));
+
+    const tryAbortThread = new Thread(TenantMigrationUtil.tryAbortMigrationAsync,
+                                      {migrationIdString: migrationOpts.migrationIdString},
+                                      donorRstArgs,
+                                      TenantMigrationUtil.runTenantMigrationCommand);
+    tryAbortThread.start();
+
+    // Wait for donorAbortMigration command to start.
+    assert.soon(() => {
+        const res = assert.commandWorked(
+            donorPrimary.adminCommand({currentOp: true, desc: "tenant donor migration"}));
+        return res.inprog[0].receivedCancelation;
+    });
+
+    interruptFunc(donorRst, migrationId, migrationOpts.tenantId);
+    verifyCmdResponseFunc(tryAbortThread);
 
     tenantMigrationTest.stop();
 }
@@ -152,5 +209,36 @@ function assertCmdSucceededOrInterruptedDueToShutDown(cmdThread) {
     testDonorForgetMigrationInterrupt((donorRst) => {
         donorRst.stopSet();
     }, assertCmdSucceededOrInterruptedDueToShutDown);
+})();
+
+(() => {
+    jsTest.log("Test that the donorAbortMigration is interrupted successfully on stepdown");
+    kMigrationFpNames.forEach(fpName => {
+        if (!fpName) {
+            jsTest.log("Testing without setting a failpoint.");
+        } else {
+            jsTest.log("Testing with failpoint: " + fpName);
+        }
+
+        testDonorAbortMigrationInterrupt((donorRst) => {
+            assert.commandWorked(
+                donorRst.getPrimary().adminCommand({replSetStepDown: 1000, force: true}));
+        }, assertCmdSucceededOrInterruptedDueToStepDown, fpName);
+    });
+})();
+
+(() => {
+    jsTest.log("Test that the donorAbortMigration is interrupted successfully on shutdown");
+    kMigrationFpNames.forEach(fpName => {
+        if (!fpName) {
+            jsTest.log("Testing without setting a failpoint.");
+        } else {
+            jsTest.log("Testing with failpoint: " + fpName);
+        }
+
+        testDonorAbortMigrationInterrupt((donorRst) => {
+            donorRst.stopSet();
+        }, assertCmdSucceededOrInterruptedDueToShutDown, fpName);
+    });
 })();
 })();

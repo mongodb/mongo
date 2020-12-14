@@ -324,7 +324,7 @@ protected:
 
     /**
      * Extracts an InstanceID from the _id field of the given 'initialState' object. If an Instance
-     * with the extracted InstanceID already exists in _intances, returns it.  If not, constructs a
+     * with the extracted InstanceID already exists in _instances, returns it.  If not, constructs a
      * new Instance (by calling constructInstance()), registers it in _instances, and returns it.
      * It is illegal to call this more than once with 'initialState' documents that have the same
      * _id but are otherwise not completely identical.

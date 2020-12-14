@@ -88,6 +88,14 @@ bool shouldStopSendingRecipientCommand(Status status, const CancelationToken& to
     return status.isOK() || !ErrorCodes::isRetriableError(status) || token.isCanceled();
 }
 
+void checkIfReceivedDonorAbortMigration(const CancelationToken& parent,
+                                        const CancelationToken& instance) {
+    // If only the instance token was canceled, then we must have gotten donorAbortMigration.
+    uassert(ErrorCodes::TenantMigrationAborted,
+            "Migration aborted due to receiving donorAbortMigration.",
+            !instance.isCanceled() || parent.isCanceled());
+}
+
 }  // namespace
 
 ExecutorFuture<void> TenantMigrationDonorService::_rebuildService(
@@ -170,8 +178,11 @@ TenantMigrationDonorService::Instance::Instance(ServiceContext* serviceContext,
                 getStatusFromCommandResult(_stateDoc.getAbortReason().get());
         }
 
-        if (!_initialDonorStateDurablePromise.getFuture().isReady()) {
-            _initialDonorStateDurablePromise.emplaceValue();
+        _initialDonorStateDurablePromise.emplaceValue();
+
+        if (_stateDoc.getState() == TenantMigrationDonorStateEnum::kAborted ||
+            _stateDoc.getState() == TenantMigrationDonorStateEnum::kCommitted) {
+            _decisionPromise.emplaceValue();
         }
     }
 }
@@ -200,6 +211,7 @@ boost::optional<BSONObj> TenantMigrationDonorService::Instance::reportForCurrent
     BSONObjBuilder bob;
     bob.append("desc", "tenant donor migration");
     bob.append("migrationCompleted", _completionPromise.getFuture().isReady());
+    bob.append("receivedCancelation", _instanceCancelationSource.token().isCanceled());
     bob.append("instanceID", _stateDoc.getId().toBSON());
     bob.append("tenantId", _stateDoc.getTenantId());
     bob.append("recipientConnectionString", _stateDoc.getRecipientConnectionString());
@@ -247,6 +259,10 @@ TenantMigrationDonorService::Instance::getDurableState(OperationContext* opCtx) 
     return _durableState;
 }
 
+void TenantMigrationDonorService::Instance::onReceiveDonorAbortMigration() {
+    _instanceCancelationSource.cancel();
+}
+
 void TenantMigrationDonorService::Instance::onReceiveDonorForgetMigration() {
     stdx::lock_guard<Latch> lg(_mutex);
     if (!_receiveDonorForgetMigrationPromise.getFuture().isReady()) {
@@ -266,10 +282,13 @@ void TenantMigrationDonorService::Instance::interrupt(Status status) {
     if (!_completionPromise.getFuture().isReady()) {
         _completionPromise.setError(status);
     }
+    if (!_decisionPromise.getFuture().isReady()) {
+        _decisionPromise.setError(status);
+    }
 }
 
 ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_insertStateDocument(
-    std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancelationToken& token) {
+    std::shared_ptr<executor::ScopedTaskExecutor> executor) {
     invariant(_stateDoc.getState() == TenantMigrationDonorStateEnum::kUninitialized);
     _stateDoc.setState(TenantMigrationDonorStateEnum::kDataSync);
 
@@ -294,8 +313,9 @@ ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_insertState
 
                return repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
            })
-        .until([token](StatusWith<repl::OpTime> swOpTime) {
-            return shouldStopInsertingDonorStateDoc(swOpTime.getStatus(), token);
+        .until([this, self = shared_from_this()](StatusWith<repl::OpTime> swOpTime) {
+            return shouldStopInsertingDonorStateDoc(swOpTime.getStatus(),
+                                                    _instanceCancelationSource.token());
         })
         .withBackoffBetweenIterations(kExponentialBackoff)
         .on(**executor, CancelationToken::uncancelable());
@@ -303,8 +323,7 @@ ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_insertState
 
 ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_updateStateDocument(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
-    const TenantMigrationDonorStateEnum nextState,
-    const CancelationToken& token) {
+    const TenantMigrationDonorStateEnum nextState) {
     const auto originalStateDocBson = _stateDoc.toBSON();
 
     return AsyncTry([this, self = shared_from_this(), executor, nextState, originalStateDocBson] {
@@ -390,8 +409,9 @@ ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_updateState
                invariant(updateOpTime);
                return updateOpTime.get();
            })
-        .until([token](StatusWith<repl::OpTime> swOpTime) {
-            return shouldStopUpdatingDonorStateDoc(swOpTime.getStatus(), token);
+        .until([this, self = shared_from_this()](StatusWith<repl::OpTime> swOpTime) {
+            return shouldStopUpdatingDonorStateDoc(swOpTime.getStatus(),
+                                                   _instanceCancelationSource.token());
         })
         .withBackoffBetweenIterations(kExponentialBackoff)
         .on(**executor, CancelationToken::uncancelable());
@@ -399,7 +419,7 @@ ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_updateState
 
 ExecutorFuture<repl::OpTime>
 TenantMigrationDonorService::Instance::_markStateDocumentAsGarbageCollectable(
-    std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancelationToken& token) {
+    std::shared_ptr<executor::ScopedTaskExecutor> executor) {
     _stateDoc.setExpireAt(_serviceContext->getFastClockSource()->now() +
                           Milliseconds{repl::tenantMigrationGarbageCollectionDelayMS.load()});
 
@@ -425,8 +445,9 @@ TenantMigrationDonorService::Instance::_markStateDocumentAsGarbageCollectable(
 
                return repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
            })
-        .until([token](StatusWith<repl::OpTime> swOpTime) {
-            return shouldStopUpdatingDonorStateDoc(swOpTime.getStatus(), token);
+        .until([this, self = shared_from_this()](StatusWith<repl::OpTime> swOpTime) {
+            return shouldStopUpdatingDonorStateDoc(swOpTime.getStatus(),
+                                                   _instanceCancelationSource.token());
         })
         .withBackoffBetweenIterations(kExponentialBackoff)
         .on(**executor, CancelationToken::uncancelable());
@@ -462,47 +483,45 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_waitForMajorityWrit
 ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendCommandToRecipient(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     std::shared_ptr<RemoteCommandTargeter> recipientTargeterRS,
-    const BSONObj& cmdObj,
-    const CancelationToken& token) {
-    return AsyncTry(
-               [this, self = shared_from_this(), executor, recipientTargeterRS, cmdObj, token] {
-                   return recipientTargeterRS->findHost(ReadPreferenceSetting(), token)
-                       .thenRunOn(**executor)
-                       .then([this, self = shared_from_this(), executor, cmdObj, token](
-                                 auto recipientHost) {
-                           executor::RemoteCommandRequest request(
-                               std::move(recipientHost),
-                               NamespaceString::kAdminDb.toString(),
-                               std::move(cmdObj),
-                               rpc::makeEmptyMetadata(),
-                               nullptr,
-                               kRecipientSyncDataTimeout);
+    const BSONObj& cmdObj) {
+    return AsyncTry([this, self = shared_from_this(), executor, recipientTargeterRS, cmdObj] {
+               return recipientTargeterRS
+                   ->findHost(ReadPreferenceSetting(), _instanceCancelationSource.token())
+                   .thenRunOn(**executor)
+                   .then([this, self = shared_from_this(), executor, cmdObj](auto recipientHost) {
+                       executor::RemoteCommandRequest request(std::move(recipientHost),
+                                                              NamespaceString::kAdminDb.toString(),
+                                                              std::move(cmdObj),
+                                                              rpc::makeEmptyMetadata(),
+                                                              nullptr,
+                                                              kRecipientSyncDataTimeout);
 
-                           request.sslMode = transport::kEnableSSL;
+                       request.sslMode = transport::kEnableSSL;
 
-                           return (_recipientCmdExecutor)
-                               ->scheduleRemoteCommand(std::move(request), token)
-                               .then([this,
-                                      self = shared_from_this()](const auto& response) -> Status {
-                                   if (!response.isOK()) {
-                                       return response.status;
-                                   }
-                                   auto commandStatus = getStatusFromCommandResult(response.data);
-                                   commandStatus.addContext(
-                                       "Tenant migration recipient command failed");
-                                   return commandStatus;
-                               });
-                       });
-               })
-        .until([token](Status status) { return shouldStopSendingRecipientCommand(status, token); })
+                       return (_recipientCmdExecutor)
+                           ->scheduleRemoteCommand(std::move(request),
+                                                   _instanceCancelationSource.token())
+                           .then([this, self = shared_from_this()](const auto& response) -> Status {
+                               if (!response.isOK()) {
+                                   return response.status;
+                               }
+                               auto commandStatus = getStatusFromCommandResult(response.data);
+                               commandStatus.addContext(
+                                   "Tenant migration recipient command failed");
+                               return commandStatus;
+                           });
+                   });
+           })
+        .until([this, self = shared_from_this()](Status status) {
+            return shouldStopSendingRecipientCommand(status, _instanceCancelationSource.token());
+        })
         .withBackoffBetweenIterations(kExponentialBackoff)
-        .on(**executor, token);
+        .on(**executor, _instanceCancelationSource.token());
 }
 
 ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendRecipientSyncDataCommand(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
-    std::shared_ptr<RemoteCommandTargeter> recipientTargeterRS,
-    const CancelationToken& token) {
+    std::shared_ptr<RemoteCommandTargeter> recipientTargeterRS) {
 
     auto opCtxHolder = cc().makeOperationContext();
     auto opCtx = opCtxHolder.get();
@@ -521,13 +540,12 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendRecipientSyncDa
         return request.toBSON(BSONObj());
     }());
 
-    return _sendCommandToRecipient(executor, recipientTargeterRS, cmdObj, token);
+    return _sendCommandToRecipient(executor, recipientTargeterRS, cmdObj);
 }
 
 ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendRecipientForgetMigrationCommand(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
-    std::shared_ptr<RemoteCommandTargeter> recipientTargeterRS,
-    const CancelationToken& token) {
+    std::shared_ptr<RemoteCommandTargeter> recipientTargeterRS) {
 
     auto opCtxHolder = cc().makeOperationContext();
     auto opCtx = opCtxHolder.get();
@@ -541,12 +559,13 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendRecipientForget
                                              _stateDoc.getTenantId().toString(),
                                              _stateDoc.getReadPreference(),
                                              _stateDoc.getRecipientCertificateForDonor()});
-    return _sendCommandToRecipient(executor, recipientTargeterRS, request.toBSON(BSONObj()), token);
+    return _sendCommandToRecipient(executor, recipientTargeterRS, request.toBSON(BSONObj()));
 }
 
 SemiFuture<void> TenantMigrationDonorService::Instance::run(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancelationToken& token) noexcept {
+    _instanceCancelationSource = CancelationSource(token);
     auto recipientTargeterRS = std::make_shared<RemoteCommandTargeterRS>(
         _recipientUri.getSetName(), _recipientUri.getServers());
 
@@ -557,8 +576,11 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
             }
 
             // Enter "dataSync" state.
-            return _insertStateDocument(executor, token)
-                .then([this, self = shared_from_this(), executor](repl::OpTime opTime) {
+            return _insertStateDocument(executor).then(
+                [this, self = shared_from_this(), executor](repl::OpTime opTime) {
+                    // TODO (SERVER-53389): TenantMigration{Donor, Recipient}Service should
+                    // use its base PrimaryOnlyService's cancelation source to pass tokens
+                    // in calls to WaitForMajorityService::waitUntilMajority.
                     return _waitForMajorityWriteConcern(executor, std::move(opTime));
                 });
         })
@@ -567,17 +589,27 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
                 return ExecutorFuture<void>(**executor, Status::OK());
             }
 
-            return _sendRecipientSyncDataCommand(executor, recipientTargeterRS, token)
+            checkIfReceivedDonorAbortMigration(token, _instanceCancelationSource.token());
+
+            return _sendRecipientSyncDataCommand(executor, recipientTargeterRS)
                 .then([this, self = shared_from_this()] {
                     auto opCtxHolder = cc().makeOperationContext();
                     auto opCtx = opCtxHolder.get();
                     pauseTenantMigrationAfterDataSync.pauseWhileSet(opCtx);
                 })
                 .then([this, self = shared_from_this(), executor, token] {
+                    checkIfReceivedDonorAbortMigration(token, _instanceCancelationSource.token());
+
                     // Enter "blocking" state.
-                    return _updateStateDocument(
-                               executor, TenantMigrationDonorStateEnum::kBlocking, token)
-                        .then([this, self = shared_from_this(), executor](repl::OpTime opTime) {
+                    return _updateStateDocument(executor, TenantMigrationDonorStateEnum::kBlocking)
+                        .then([this, self = shared_from_this(), executor, token](
+                                  repl::OpTime opTime) {
+                            // TODO (SERVER-53389): TenantMigration{Donor, Recipient}Service should
+                            // use its base PrimaryOnlyService's cancelation source to pass tokens
+                            // in calls to WaitForMajorityService::waitUntilMajority.
+                            checkIfReceivedDonorAbortMigration(token,
+                                                               _instanceCancelationSource.token());
+
                             return _waitForMajorityWriteConcern(executor, std::move(opTime));
                         });
                 });
@@ -586,6 +618,8 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
             if (_stateDoc.getState() > TenantMigrationDonorStateEnum::kBlocking) {
                 return ExecutorFuture<void>(**executor, Status::OK());
             }
+
+            checkIfReceivedDonorAbortMigration(token, _instanceCancelationSource.token());
 
             invariant(_stateDoc.getBlockTimestamp());
             // Source to cancel the timeout if the operation completed in time.
@@ -600,8 +634,7 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
             std::vector<ExecutorFuture<void>> futures;
 
             futures.push_back(std::move(deadlineReachedFuture));
-            futures.push_back(_sendRecipientSyncDataCommand(
-                executor, recipientTargeterRS, recipientSyncDataCommandCancelSource.token()));
+            futures.push_back(_sendRecipientSyncDataCommand(executor, recipientTargeterRS));
 
             return whenAny(std::move(futures))
                 .thenRunOn(**executor)
@@ -652,15 +685,32 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
                     });
                 })
                 .then([this, self = shared_from_this(), executor, token] {
+                    checkIfReceivedDonorAbortMigration(token, _instanceCancelationSource.token());
+
                     // Enter "commit" state.
-                    return _updateStateDocument(
-                               executor, TenantMigrationDonorStateEnum::kCommitted, token)
-                        .then([this, self = shared_from_this(), executor](repl::OpTime opTime) {
-                            return _waitForMajorityWriteConcern(executor, std::move(opTime));
+                    return _updateStateDocument(executor, TenantMigrationDonorStateEnum::kCommitted)
+                        .then([this, self = shared_from_this(), executor, token](
+                                  repl::OpTime opTime) {
+                            // TODO (SERVER-53389): TenantMigration{Donor, Recipient}Service should
+                            // use its base PrimaryOnlyService's cancelation source to pass tokens
+                            // in calls to WaitForMajorityService::waitUntilMajority.
+                            checkIfReceivedDonorAbortMigration(token,
+                                                               _instanceCancelationSource.token());
+
+                            return _waitForMajorityWriteConcern(executor, std::move(opTime))
+                                .then([this, self = shared_from_this()] {
+                                    // If interrupt is called at some point during execution, it is
+                                    // possible that interrupt() will fulfill the promise before we
+                                    // do.
+                                    if (!_decisionPromise.getFuture().isReady()) {
+                                        // Fulfill the promise since we have made a decision.
+                                        _decisionPromise.emplaceValue();
+                                    }
+                                });
                         });
                 });
         })
-        .onError([this, self = shared_from_this(), executor, token](Status status) {
+        .onError([this, self = shared_from_this(), executor](Status status) {
             if (_stateDoc.getState() == TenantMigrationDonorStateEnum::kAborted) {
                 // The migration was resumed on stepup and it was already aborted.
                 return ExecutorFuture<void>(**executor, Status::OK());
@@ -678,10 +728,17 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
             } else {
                 // Enter "abort" state.
                 _abortReason.emplace(status);
-                return _updateStateDocument(
-                           executor, TenantMigrationDonorStateEnum::kAborted, token)
+                return _updateStateDocument(executor, TenantMigrationDonorStateEnum::kAborted)
                     .then([this, self = shared_from_this(), executor](repl::OpTime opTime) {
-                        return _waitForMajorityWriteConcern(executor, std::move(opTime));
+                        return _waitForMajorityWriteConcern(executor, std::move(opTime))
+                            .then([this, self = shared_from_this()] {
+                                // If interrupt is called at some point during execution, it is
+                                // possible that interrupt() will fulfill the promise before we do.
+                                if (!_decisionPromise.getFuture().isReady()) {
+                                    // Fulfill the promise since we have made a decision.
+                                    _decisionPromise.emplaceValue();
+                                };
+                            });
                     });
             }
         })
@@ -693,7 +750,7 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
                   "status"_attr = status,
                   "abortReason"_attr = _abortReason);
         })
-        .then([this, self = shared_from_this(), executor, recipientTargeterRS, token] {
+        .then([this, self = shared_from_this(), executor, recipientTargeterRS] {
             if (_stateDoc.getExpireAt()) {
                 // The migration state has already been marked as garbage collectable. Set the
                 // donorForgetMigration promise here since the Instance's destructor has an
@@ -705,12 +762,11 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
             // Wait for the donorForgetMigration command.
             return std::move(_receiveDonorForgetMigrationPromise.getFuture())
                 .thenRunOn(**executor)
-                .then([this, self = shared_from_this(), executor, recipientTargeterRS, token] {
-                    return _sendRecipientForgetMigrationCommand(
-                        executor, recipientTargeterRS, token);
+                .then([this, self = shared_from_this(), executor, recipientTargeterRS] {
+                    return _sendRecipientForgetMigrationCommand(executor, recipientTargeterRS);
                 })
-                .then([this, self = shared_from_this(), executor, token] {
-                    return _markStateDocumentAsGarbageCollectable(executor, token);
+                .then([this, self = shared_from_this(), executor] {
+                    return _markStateDocumentAsGarbageCollectable(executor);
                 })
                 .then([this, self = shared_from_this(), executor](repl::OpTime opTime) {
                     return _waitForMajorityWriteConcern(executor, std::move(opTime));

@@ -164,6 +164,59 @@ var TenantMigrationUtil = (function() {
         return res;
     }
 
+    /**
+     * Runs the donorAbortMigration command with the given migration options and returns the
+     * response.
+     *
+     * If 'retryOnRetryableErrors' is set, this function will retry if the command fails with a
+     * NotPrimary or network error.
+     *
+     * Only use when it is necessary to run the donorAbortMigration command in its own thread. For
+     * all other use cases, please consider the tryAbortMigration() function in the
+     * TenantMigrationTest fixture.
+     */
+    function tryAbortMigrationAsync(
+        migrationOpts, donorRstArgs, runTenantMigrationFunc, retryOnRetryableErrors = false) {
+        const donorRst = new ReplSetTest({rstArgs: donorRstArgs});
+        let donorPrimary = donorRst.getPrimary();
+
+        const cmdObj = {
+            donorAbortMigration: 1,
+            migrationId: UUID(migrationOpts.migrationIdString),
+        };
+
+        return runTenantMigrationFunc(cmdObj, donorPrimary, donorRst, retryOnRetryableErrors);
+    }
+
+    /**
+     * Helper to run a given tenant migration command and retry the command if it is retryable.
+     */
+    function runTenantMigrationCommand(cmdObj, donorPrimary, donorRst, retryOnRetryableErrors) {
+        let res;
+        assert.soon(() => {
+            try {
+                res = donorPrimary.adminCommand(cmdObj);
+
+                if (!res.ok) {
+                    // If retry is enabled and the command failed with a NotPrimary error, continue
+                    // looping.
+                    if (retryOnRetryableErrors && ErrorCodes.isNotPrimaryError(res.code)) {
+                        donorPrimary = donorRst.getPrimary();
+                        return false;
+                    }
+                }
+
+                return true;
+            } catch (e) {
+                if (retryOnRetryableErrors && isNetworkError(e)) {
+                    return false;
+                }
+                throw e;
+            }
+        });
+        return res;
+    }
+
     function createRstArgs(donorRst) {
         const donorRstArgs = {
             name: donorRst.name,
@@ -179,7 +232,9 @@ var TenantMigrationUtil = (function() {
     return {
         runMigrationAsync,
         forgetMigrationAsync,
+        tryAbortMigrationAsync,
         createRstArgs,
+        runTenantMigrationCommand,
         isFeatureFlagEnabled,
         getCertificateAndPrivateKey,
         makeX509Options,

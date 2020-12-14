@@ -235,6 +235,7 @@ let viewsCommandTests = {
     dbStats: {command: {dbStats: 1}},
     delete: {command: {delete: "view", deletes: [{q: {x: 1}, limit: 1}]}, expectFailure: true},
     distinct: {command: {distinct: "view", key: "_id"}},
+    donorAbortMigration: {skip: isUnrelated},
     donorForgetMigration: {skip: isUnrelated},
     donorStartMigration: {skip: isUnrelated},
     donorWaitForMigrationToCommit: {skip: isUnrelated},

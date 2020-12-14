@@ -112,7 +112,38 @@ public:
             return _completionPromise.getFuture();
         }
 
+        /**
+         * Returns a Future that will be resolved when an abort or commit decision has been reached.
+         */
+        SharedSemiFuture<void> getDecisionFuture() const {
+            return _decisionPromise.getFuture();
+        }
+
+        /**
+         * Returns a Future that will be resolved when the donor has majority-committed the write to
+         * insert the donor state doc for the migration.
+         */
+        SharedSemiFuture<void> getInitialDonorStateDurableFuture() const {
+            return _initialDonorStateDurablePromise.getFuture();
+        }
+
+        /**
+         * Kicks off work for the donorAbortMigration command.
+         */
+        void onReceiveDonorAbortMigration();
+
+        /**
+         * Kicks off the work for the donorForgetMigration command.
+         */
         void onReceiveDonorForgetMigration();
+
+        StringData getTenantId() const {
+            return _stateDoc.getTenantId();
+        }
+
+        StringData getRecipientConnectionString() const {
+            return _stateDoc.getRecipientConnectionString();
+        }
 
     private:
         const NamespaceString _stateDocumentsNS = NamespaceString::kTenantMigrationDonorsNamespace;
@@ -122,7 +153,7 @@ public:
          * oplog entry.
          */
         ExecutorFuture<repl::OpTime> _insertStateDocument(
-            std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancelationToken& token);
+            std::shared_ptr<executor::ScopedTaskExecutor> executor);
 
         /**
          * Updates the state document to have the given state. Then, persists the updated document
@@ -132,15 +163,14 @@ public:
          */
         ExecutorFuture<repl::OpTime> _updateStateDocument(
             std::shared_ptr<executor::ScopedTaskExecutor> executor,
-            const TenantMigrationDonorStateEnum nextState,
-            const CancelationToken& token);
+            const TenantMigrationDonorStateEnum nextState);
 
         /**
          * Sets the "expireAt" time for the state document to be garbage collected, and returns the
          * the opTime for the write.
          */
         ExecutorFuture<repl::OpTime> _markStateDocumentAsGarbageCollectable(
-            std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancelationToken& token);
+            std::shared_ptr<executor::ScopedTaskExecutor> executor);
 
         /**
          * Waits for given opTime to be majority committed.
@@ -154,24 +184,21 @@ public:
         ExecutorFuture<void> _sendCommandToRecipient(
             std::shared_ptr<executor::ScopedTaskExecutor> executor,
             std::shared_ptr<RemoteCommandTargeter> recipientTargeterRS,
-            const BSONObj& cmdObj,
-            const CancelationToken& token);
+            const BSONObj& cmdObj);
 
         /**
          * Sends the recipientSyncData command to the recipient replica set.
          */
         ExecutorFuture<void> _sendRecipientSyncDataCommand(
             std::shared_ptr<executor::ScopedTaskExecutor> executor,
-            std::shared_ptr<RemoteCommandTargeter> recipientTargeterRS,
-            const CancelationToken& token);
+            std::shared_ptr<RemoteCommandTargeter> recipientTargeterRS);
 
         /**
          * Sends the recipientForgetMigration command to the recipient replica set.
          */
         ExecutorFuture<void> _sendRecipientForgetMigrationCommand(
             std::shared_ptr<executor::ScopedTaskExecutor> executor,
-            std::shared_ptr<RemoteCommandTargeter> recipientTargeterRS,
-            const CancelationToken& token);
+            std::shared_ptr<RemoteCommandTargeter> recipientTargeterRS);
 
         ServiceContext* _serviceContext;
 
@@ -202,6 +229,14 @@ public:
 
         // Promise that is resolved when the chain of work kicked off by run() has completed.
         SharedPromise<void> _completionPromise;
+
+        // Promise that is resolved when the donor has majority-committed the write to commit or
+        // abort.
+        SharedPromise<void> _decisionPromise;
+
+        // This CancelationSource is instantiated from CancelationToken that is passed into run().
+        // It allows for manual cancelation of work from the instance.
+        CancelationSource _instanceCancelationSource;
     };
 
 private:

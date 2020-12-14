@@ -297,6 +297,7 @@ let testCases = {
         checkReadConcern: true,
         checkWriteConcern: false,
     },
+    donorAbortMigration: {skip: "does not accept read or write concern"},
     donorForgetMigration: {skip: "does not accept read or write concern"},
     donorStartMigration: {skip: "does not accept read or write concern"},
     donorWaitForMigrationToCommit: {skip: "does not accept read or write concern"},

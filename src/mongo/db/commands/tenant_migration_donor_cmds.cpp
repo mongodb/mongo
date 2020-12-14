@@ -31,8 +31,10 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/tenant_migration_donor_cmds_gen.h"
 #include "mongo/db/repl/primary_only_service.h"
+#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/tenant_migration_committed_info.h"
 #include "mongo/db/repl/tenant_migration_donor_service.h"
 #include "mongo/db/repl/tenant_migration_donor_util.h"
 
@@ -204,6 +206,94 @@ public:
         return BasicCommand::AllowedOnSecondary::kNever;
     }
 } donorForgetMigrationCmd;
+
+class DonorAbortMigrationCmd : public TypedCommand<DonorAbortMigrationCmd> {
+public:
+    using Request = DonorAbortMigration;
+
+    class Invocation : public InvocationBase {
+
+    public:
+        using InvocationBase::InvocationBase;
+
+        void typedRun(OperationContext* opCtx) {
+            uassert(ErrorCodes::CommandNotSupported,
+                    "donorAbortMigration command not enabled",
+                    repl::feature_flags::gTenantMigrations.isEnabled(
+                        serverGlobalParams.featureCompatibility));
+
+            const RequestType& requestBody = request();
+
+            auto donorService =
+                repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
+                    ->lookupServiceByName(TenantMigrationDonorService::kServiceName);
+            auto donorPtr = TenantMigrationDonorService::Instance::lookup(
+                opCtx, donorService, BSON("_id" << requestBody.getMigrationId()));
+
+            // If there is NoSuchTenantMigration, perform a noop write and wait for it to be
+            // majority committed to verify that any durable data read up to this point is majority
+            // committed.
+            if (!donorPtr) {
+                tenant_migration_donor::performNoopWrite(opCtx, "NoSuchTenantMigration error");
+
+                auto& replClient = repl::ReplClientInfo::forClient(opCtx->getClient());
+                WriteConcernResult writeConcernResult;
+                WriteConcernOptions majority(WriteConcernOptions::kMajority,
+                                             WriteConcernOptions::SyncMode::UNSET,
+                                             WriteConcernOptions::kWriteConcernTimeoutUserCommand);
+                uassertStatusOK(waitForWriteConcern(
+                    opCtx, replClient.getLastOp(), majority, &writeConcernResult));
+
+                uasserted(ErrorCodes::NoSuchTenantMigration,
+                          str::stream() << "Could not find tenant migration with id "
+                                        << requestBody.getMigrationId());
+            }
+
+            const auto& donor = donorPtr.get().get();
+
+            // Ensure that we only are able to run donorAbortMigration after the donor inserts a
+            // majority committed state document for the migration.
+            donor->getInitialDonorStateDurableFuture().get(opCtx);
+            donor->onReceiveDonorAbortMigration();
+            donor->getDecisionFuture().get(opCtx);
+
+            auto durableState = donor->getDurableState(opCtx);
+
+            uassert(TenantMigrationCommittedInfo(donor->getTenantId().toString(),
+                                                 donor->getRecipientConnectionString().toString()),
+                    "Tenant migration already committed",
+                    durableState.state == TenantMigrationDonorStateEnum::kAborted);
+        }
+
+    private:
+        void doCheckAuthorization(OperationContext* opCtx) const {
+            uassert(ErrorCodes::Unauthorized,
+                    "Unauthorized",
+                    AuthorizationSession::get(opCtx->getClient())
+                        ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
+                                                           ActionType::runTenantMigration));
+        }
+
+        bool supportsWriteConcern() const override {
+            return false;
+        }
+        NamespaceString ns() const {
+            return NamespaceString(request().getDbName(), "");
+        }
+    };
+
+    std::string help() const override {
+        return "Abort a migration";
+    }
+
+    bool adminOnly() const override {
+        return true;
+    }
+
+    BasicCommand::AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+        return BasicCommand::AllowedOnSecondary::kNever;
+    }
+} donorAbortMigrationCmd;
 
 }  // namespace
 }  // namespace mongo
