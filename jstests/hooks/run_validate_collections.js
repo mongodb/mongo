@@ -52,6 +52,22 @@ let originalTransactionLifetimeLimitSeconds;
 let skipFCV = false;
 
 if (requiredFCV) {
+    // Can't set the FCV to 4.2 while having long collection names present.
+    adminDB.runCommand("listDatabases").databases.forEach(function(d) {
+        const mdb = adminDB.getSiblingDB(d.name);
+        try {
+            mdb.getCollectionInfos().forEach(function(c) {
+                const namespace = d.name + "." + c.name;
+                const namespaceLenBytes = encodeURIComponent(namespace).length;
+                if (namespaceLenBytes > 120) {
+                    skipFCV = true;
+                }
+            });
+        } catch (e) {
+            skipFCV = true;
+        }
+    });
+
     // Running the setFeatureCompatibilityVersion command may implicitly involve running a
     // multi-statement transaction. We temporarily raise the transactionLifetimeLimitSeconds to be
     // 24 hours to avoid spurious failures from it having been set to a lower value.
@@ -74,12 +90,9 @@ if (requiredFCV) {
     }
 
     // Now that we are certain that an upgrade or downgrade of the FCV is not in progress, ensure
-    // the 'requiredFCV' is set. If we're trying to set the FCV to 4.2 while having long collection
-    // name present, we'll get the 'InvalidNamespace' error.
-    const fcvRes = adminDB.runCommand({setFeatureCompatibilityVersion: requiredFCV});
-    if (!fcvRes.ok) {
-        assert.commandFailedWithCode(fcvRes, ErrorCodes.InvalidNamespace);
-        skipFCV = true;
+    // the 'requiredFCV' is set.
+    if (!skipFCV) {
+        assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: requiredFCV}));
     }
 }
 
