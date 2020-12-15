@@ -26,11 +26,11 @@ assert.commandFailedWithCode(
     4937600);
 assert.commandFailedWithCode(
     testDB.runCommand({getMore: cursorId, collection: testColl.getName(), apiStrict: false}),
-    4937600);
+    4886600);
 assert.commandFailedWithCode(
     testDB.runCommand(
         {getMore: cursorId, collection: testColl.getName(), apiDeprecationErrors: false}),
-    4937600);
+    4886600);
 
 // Verify that a 'getMore' without any API parameters will still succeed.
 assert.commandWorked(testDB.runCommand({getMore: cursorId, collection: testColl.getName()}));

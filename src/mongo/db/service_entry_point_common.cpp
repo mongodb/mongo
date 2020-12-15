@@ -615,6 +615,15 @@ private:
             auto command = _execContext->getCommand();
             auto& request = _execContext->getRequest();
 
+            const auto apiParamsFromClient = initializeAPIParameters(request.body, command);
+            Client* client = opCtx->getClient();
+
+            {
+                stdx::lock_guard<Client> lk(*client);
+                CurOp::get(opCtx)->setCommand_inlock(command);
+                APIParameters::get(opCtx) = APIParameters::fromClient(apiParamsFromClient);
+            }
+
             CommandHelpers::uassertShouldAttemptParse(opCtx, command, request);
             _startOperationTime = getClientOperationTime(opCtx);
 
@@ -1294,14 +1303,7 @@ Future<void> ExecCommandDatabase::_initiateCommand() try {
     // spent before the deadline is set on `opCtx`.
     const auto startedCommandExecAt = opCtx->getServiceContext()->getFastClockSource()->now();
 
-    const auto apiParamsFromClient = initializeAPIParameters(request.body, command);
     Client* client = opCtx->getClient();
-
-    {
-        stdx::lock_guard<Client> lk(*client);
-        CurOp::get(opCtx)->setCommand_inlock(command);
-        APIParameters::get(opCtx) = APIParameters::fromClient(apiParamsFromClient);
-    }
 
     if (isHello()) {
         // Preload generic ClientMetadata ahead of our first hello request. After the first

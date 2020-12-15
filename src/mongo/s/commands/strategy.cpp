@@ -520,6 +520,16 @@ Status ParseAndRunCommand::_prologue() {
         opCtx->setComment(commentField.wrap());
     }
 
+    Client* client = opCtx->getClient();
+    auto const apiParamsFromClient = initializeAPIParameters(request.body, command);
+
+    {
+        // We must obtain the client lock to set APIParameters on the operation context, as it may
+        // be concurrently read by CurrentOp.
+        stdx::lock_guard<Client> lk(*client);
+        APIParameters::get(opCtx) = APIParameters::fromClient(apiParamsFromClient);
+    }
+
     _invocation = command->parse(opCtx, request);
     CommandInvocation::set(opCtx, _invocation);
 
@@ -546,16 +556,12 @@ Status ParseAndRunCommand::_prologue() {
 
     _wc.emplace(uassertStatusOK(WriteConcernOptions::extractWCFromCommand(request.body)));
 
-    Client* client = opCtx->getClient();
-    auto const apiParamsFromClient = initializeAPIParameters(request.body, command);
-
     auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
     Status readConcernParseStatus = Status::OK();
     {
-        // We must obtain the client lock to set APIParameters and ReadConcernArgs on the operation
-        // context, as it may be concurrently read by CurrentOp.
+        // We must obtain the client lock to set ReadConcernArgs on the operation context, as it may
+        // be concurrently read by CurrentOp.
         stdx::lock_guard<Client> lk(*client);
-        APIParameters::get(opCtx) = APIParameters::fromClient(apiParamsFromClient);
         readConcernParseStatus = readConcernArgs.initialize(request.body);
     }
 
