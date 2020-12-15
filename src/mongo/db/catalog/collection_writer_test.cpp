@@ -37,6 +37,7 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/unittest/barrier.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {
@@ -202,6 +203,136 @@ TEST_F(CollectionWriterTest, CommitAfterDestroy) {
 
     // The writable Collection should have been written into the catalog
     ASSERT_EQ(writable, lookupCollectionFromCatalog().get());
+}
+
+TEST_F(CollectionWriterTest, CatalogWrite) {
+    auto catalog = CollectionCatalog::get(getServiceContext());
+    CollectionCatalog::write(
+        getServiceContext(), [this, &catalog](CollectionCatalog& writableCatalog) {
+            // We should see a different catalog instance than a reader would
+            ASSERT_NE(&writableCatalog, catalog.get());
+            // However, it should be a shallow copy. The collection instance should be the same
+            ASSERT_EQ(
+                writableCatalog.lookupCollectionByNamespaceForRead(operationContext(), kNss).get(),
+                catalog->lookupCollectionByNamespaceForRead(operationContext(), kNss).get());
+        });
+    auto after = CollectionCatalog::get(getServiceContext());
+    ASSERT_NE(&catalog, &after);
+}
+
+TEST_F(CatalogTestFixture, ConcurrentCatalogWritesSerialized) {
+    // Start threads and perform write that will try to lock mutex which should always succeed as
+    // all writes are serialized
+    constexpr int32_t NumThreads = 4;
+    constexpr int32_t WritesPerThread = 1000;
+
+    unittest::Barrier barrier(NumThreads);
+    Mutex m;
+    auto job = [&]() {
+        barrier.countDownAndWait();
+
+        for (int i = 0; i < WritesPerThread; ++i) {
+            CollectionCatalog::write(getServiceContext(), [&](CollectionCatalog& writableCatalog) {
+                stdx::unique_lock lock(m, stdx::try_to_lock);
+                ASSERT(lock.owns_lock());
+            });
+        }
+    };
+
+    std::array<stdx::thread, NumThreads> threads;
+    for (auto&& thread : threads) {
+        thread = stdx::thread(job);
+    }
+    for (auto&& thread : threads) {
+        thread.join();
+    }
+}
+
+/**
+ * This test uses a catalog with a large number of collections to make it slow to copy. The idea
+ * is to trigger the batching behavior when multiple threads want to perform catalog writes
+ * concurrently. The batching works correctly if the threads all observe the same catalog
+ * instance when they write. If this test is flaky, try to increase the number of collections in
+ * the catalog setup.
+ */
+class CatalogReadCopyUpdateTest : public CatalogTestFixture {
+public:
+    static constexpr size_t NumCollections = 10000;
+
+    void setUp() override {
+        CatalogTestFixture::setUp();
+
+        CollectionCatalog::write(getServiceContext(), [&](CollectionCatalog& catalog) {
+            for (size_t i = 0; i < NumCollections; ++i) {
+                catalog.registerCollection(operationContext(),
+                                           CollectionUUID::gen(),
+                                           std::make_shared<CollectionMock>(
+                                               NamespaceString("many", fmt::format("coll{}", i))));
+            }
+        });
+    }
+};
+
+TEST_F(CatalogReadCopyUpdateTest, ConcurrentCatalogWriteBatches) {
+    // Start threads and perform write at the same time, record catalog instance observed
+    constexpr int32_t NumThreads = 4;
+
+    unittest::Barrier barrier(NumThreads);
+    std::array<const CollectionCatalog*, NumThreads> catalogInstancesObserved;
+    AtomicWord<int32_t> threadIndex{0};
+    auto job = [&]() {
+        auto index = threadIndex.fetchAndAdd(1);
+        barrier.countDownAndWait();
+
+        CollectionCatalog::write(getServiceContext(), [&](CollectionCatalog& writableCatalog) {
+            catalogInstancesObserved[index] = &writableCatalog;
+        });
+    };
+
+    std::array<stdx::thread, NumThreads> threads;
+    for (auto&& thread : threads) {
+        thread = stdx::thread(job);
+    }
+    for (auto&& thread : threads) {
+        thread.join();
+    }
+
+    // Verify that all threads observed same instance. We do this by sorting the array, removing all
+    // duplicates and last verify that there is only one element remaining.
+    std::sort(catalogInstancesObserved.begin(), catalogInstancesObserved.end());
+    auto it = std::unique(catalogInstancesObserved.begin(), catalogInstancesObserved.end());
+    ASSERT_EQ(std::distance(catalogInstancesObserved.begin(), it), 1);
+}
+
+TEST_F(CatalogReadCopyUpdateTest, ConcurrentCatalogWriteBatchingMayThrow) {
+    // Start threads and perform write that will throw at the same time
+    constexpr int32_t NumThreads = 4;
+
+    unittest::Barrier barrier(NumThreads);
+    AtomicWord<int32_t> threadIndex{0};
+    auto job = [&]() {
+        auto index = threadIndex.fetchAndAdd(1);
+        barrier.countDownAndWait();
+
+        try {
+            CollectionCatalog::write(getServiceContext(),
+                                     [&](CollectionCatalog& writableCatalog) { throw index; });
+            // Should not reach this assert
+            ASSERT(false);
+        } catch (int32_t ex) {
+            // Verify that we received the correct exception even if our write job executed on a
+            // different thread
+            ASSERT_EQ(ex, index);
+        }
+    };
+
+    std::array<stdx::thread, NumThreads> threads;
+    for (auto&& thread : threads) {
+        thread = stdx::thread(job);
+    }
+    for (auto&& thread : threads) {
+        thread.join();
+    }
 }
 
 }  // namespace
