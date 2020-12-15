@@ -12,9 +12,13 @@ assert.commandWorked(testDB_s0.adminCommand({enableSharding: 'test'}));
 st.ensurePrimaryShard('test', st.shard1.shardName);
 assert.commandWorked(testDB_s0.adminCommand({shardCollection: 'test.user', key: {x: 1}}));
 
-var checkShardMajorVersion = function(conn, expectedVersion) {
-    var shardVersionInfo = conn.adminCommand({getShardVersion: 'test.user'});
-    assert.eq(expectedVersion, shardVersionInfo.global.getTime());
+var checkShardMajorVersion = function(conn, expectedMajorVersion) {
+    const shardVersion =
+        assert.commandWorked(conn.adminCommand({getShardVersion: 'test.user'})).global;
+    assert.eq(shardVersion.getTime(),
+              expectedMajorVersion,
+              "Node " + conn + " expected to have major version " + expectedMajorVersion +
+                  " but has version " + tojson(shardVersion));
 };
 
 ///////////////////////////////////////////////////////
@@ -64,11 +68,10 @@ assert.neq(null, testDB_s3.user.findOne({x: 1}));
 testDB_s1.user.drop();
 assert.commandWorked(testDB_s1.user.insert({x: 10}));
 
-// shard0: 0|0|0
+// shard0: UNKNOWN
 // shard1: 0|0|0
 // mongos0: 2|0|a
 
-checkShardMajorVersion(st.rs0.getPrimary(), 0);
 checkShardMajorVersion(st.rs1.getPrimary(), 0);
 
 // mongos0 still thinks { x: 10 } belong to st.shard0.shardName, but since coll is dropped,
@@ -142,9 +145,6 @@ assert.neq(null, testDB_s3.user.findOne({x: 1}));
 
 // Set mongos0 to version 0|0|0
 testDB_s0.user.drop();
-
-checkShardMajorVersion(st.rs0.getPrimary(), 0);
-checkShardMajorVersion(st.rs1.getPrimary(), 0);
 
 assert.eq(null, testDB_s0.user.findOne({x: 1}));
 

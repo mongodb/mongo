@@ -91,6 +91,7 @@ public:
     /**
      * Retrieves the DistLockManager singleton for the node.
      */
+    static DistLockManager* get(ServiceContext* service);
     static DistLockManager* get(OperationContext* opCtx);
     static void create(ServiceContext* service, std::unique_ptr<DistLockManager> distLockManager);
 

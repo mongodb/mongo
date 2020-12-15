@@ -350,7 +350,7 @@ let MongosAPIParametersUtil = (function() {
             commandName: "drop",
             run: {
                 inAPIVersion1: true,
-                shardCommandName: "drop",
+                shardCommandName: "_shardsvrDropCollection",
                 permittedInTxn: false,
                 command: () => ({drop: "collection"})
             }

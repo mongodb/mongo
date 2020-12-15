@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2020-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -32,33 +32,19 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/catalog/drop_collection.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/curop.h"
-#include "mongo/db/s/drop_collection_coordinator.h"
+#include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/grid.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
-#include "mongo/s/sharded_collections_ddl_parameters_gen.h"
 
 namespace mongo {
 namespace {
 
-void dropCollectionLegacy(OperationContext* opCtx, const NamespaceString& nss) {
-    auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-    const auto cmdResponse = configShard->runCommandWithFixedRetryAttempts(
-        opCtx,
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        "admin",
-        CommandHelpers::appendMajorityWriteConcern(
-            BSON("_configsvrDropCollection" << nss.toString()), opCtx->getWriteConcern()),
-        Shard::RetryPolicy::kIdempotent);
-
-    uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(cmdResponse));
-}
-
-class ShardsvrDropCollectionCommand final : public TypedCommand<ShardsvrDropCollectionCommand> {
+class ShardsvrDropCollectionParticipantCommand final
+    : public TypedCommand<ShardsvrDropCollectionParticipantCommand> {
 public:
     bool acceptsAnyApiVersionParameters() const override {
         return true;
@@ -69,11 +55,11 @@ public:
     }
 
     std::string help() const override {
-        return "Internal command, which is exported by the primary sharding server. Do not call "
-               "directly. Drops a collection.";
+        return "Internal command, which is exported by secondary sharding servers. Do not call "
+               "directly. Participates in droping a collection.";
     }
 
-    using Request = ShardsvrDropCollection;
+    using Request = ShardsvrDropCollectionParticipant;
 
     class Invocation final : public InvocationBase {
     public:
@@ -81,36 +67,36 @@ public:
 
         void typedRun(OperationContext* opCtx) {
             uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
-
             uassert(ErrorCodes::InvalidOptions,
                     str::stream() << Request::kCommandName
                                   << " must be called with majority writeConcern, got "
                                   << opCtx->getWriteConcern().wMode,
                     opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
 
-            if (!feature_flags::gShardingFullDDLSupport.isEnabled(
-                    serverGlobalParams.featureCompatibility) ||
-                feature_flags::gDisableIncompleteShardingDDLSupport.isEnabled(
-                    serverGlobalParams.featureCompatibility)) {
-                LOGV2_DEBUG(5280951,
+            DropReply result;
+            try {
+
+                uassertStatusOK(dropCollection(
+                    opCtx,
+                    ns(),
+                    &result,
+                    DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops));
+
+            } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+                LOGV2_DEBUG(5280920,
                             1,
-                            "Running legacy drop collection procedure",
+                            "Namespace not found while trying to delete local collection",
                             "namespace"_attr = ns());
-                dropCollectionLegacy(opCtx, ns());
-                return;
             }
 
-            LOGV2_DEBUG(
-                5280952, 1, "Running new drop collection procedure", "namespace"_attr = ns());
-
-            // Since this operation is not directly writing locally we need to force its db
-            // profile level increase in order to be logged in "<db>.system.profile"
-            CurOp::get(opCtx)->raiseDbProfileLevel(
-                CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(ns().db()));
-
-            auto dropCollectionCoordinator =
-                std::make_shared<DropCollectionCoordinator>(opCtx, ns());
-            dropCollectionCoordinator->run(opCtx).get();
+            {
+                // Clear CollectionShardingRuntime entry
+                UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+                Lock::DBLock dbLock(opCtx, ns().db(), MODE_IX);
+                Lock::CollectionLock collLock(opCtx, ns(), MODE_IX);
+                auto* csr = CollectionShardingRuntime::get(opCtx, ns());
+                csr->clearFilteringMetadata(opCtx);
+            }
         }
 
     private:
@@ -130,7 +116,7 @@ public:
                                                            ActionType::internal));
         }
     };
-} sharsvrdDropCollectionCommand;
+} sharsvrdDropCollectionParticipantCommand;
 
 }  // namespace
 }  // namespace mongo

@@ -6473,7 +6473,7 @@ tasks:
     vars:
       depends_on: jsCore
       use_large_distro: "true"
-      resmoke_args: --storageEngine=wiredTiger
+      resmoke_args: "--storageEngine=wiredTiger --mongodSetParameters='{featureFlagDisableIncompleteShardingDDLSupport: true}'"
       fallback_num_sub_suites: 48
 
 - name: multi_shard_multi_stmt_txn_stepdown_primary_jscore_passthrough_gen
@@ -10014,6 +10014,7 @@ buildvariants:
             featureFlagSpoon: true,
             featureFlagImprovedAuditing: true,
             featureFlagTimeseriesCollection: true,
+            featureFlagShardingFullDDLSupport: true,
         }"
 
 - &enterprise-windows-template
@@ -10112,6 +10113,7 @@ buildvariants:
             featureFlagSpoon: true,
             featureFlagImprovedAuditing: true,
             featureFlagTimeseriesCollection: true,
+            featureFlagShardingFullDDLSupport: true,
         }"
 
 - <<: *enterprise-windows-nopush-template
@@ -10667,6 +10669,7 @@ buildvariants:
             featureFlagTenantMigrations: true,
             featureFlagImprovedAuditing: true,
             featureFlagTimeseriesCollection: true,
+            featureFlagShardingFullDDLSupport: true,
         }"
   tasks:
   - name: compile_parallel_TG
@@ -12998,6 +13001,7 @@ buildvariants:
             featureFlagTenantMigrations: true,
             featureFlagImprovedAuditing: true,
             featureFlagTimeseriesCollection: true,
+            featureFlagShardingFullDDLSupport: true,
         }"
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under {A,UB}SAN build.
     hang_analyzer_dump_core: false

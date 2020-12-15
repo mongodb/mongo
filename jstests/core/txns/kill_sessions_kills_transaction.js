@@ -53,7 +53,15 @@ assert.soon(
         return adminDB
                    .aggregate([
                        {$currentOp: {}},
-                       {$match: {"command.drop": collName, waitingForLock: true}}
+                       {
+                           $match: {
+                               $or: [
+                                   {'command.drop': collName},
+                                   {'command._shardsvrDropCollectionParticipant': collName}
+                               ],
+                               waitingForLock: true
+                           }
+                       }
                    ])
                    .itcount() === 1;
     },

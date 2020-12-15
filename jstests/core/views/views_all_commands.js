@@ -117,6 +117,7 @@ let viewsCommandTests = {
     _recvChunkStatus: {skip: isAnInternalCommand},
     _shardsvrCloneCatalogData: {skip: isAnInternalCommand},
     _shardsvrDropCollection: {skip: isAnInternalCommand},
+    _shardsvrDropCollectionParticipant: {skip: isAnInternalCommand},
     _shardsvrCreateCollection: {skip: isAnInternalCommand},
     _shardsvrDropDatabase: {skip: isAnInternalCommand},
     _shardsvrMovePrimary: {skip: isAnInternalCommand},

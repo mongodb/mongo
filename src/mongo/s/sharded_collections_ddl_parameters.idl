@@ -31,11 +31,16 @@ global:
   cpp_namespace: "mongo::feature_flags"
 
 feature_flags:
-  shardingFullDDLSupport:
+  featureFlagShardingFullDDLSupport:
     description: "Ensures extra guarantees on DDL operations under a sharded cluster."
     cpp_varname: gShardingFullDDLSupport
     default: false
-  
+
+  featureFlagDisableIncompleteShardingDDLSupport:
+    description: "Disable incomplete sharding DDL features."
+    cpp_varname: gDisableIncompleteShardingDDLSupport
+    default: false
+
   shardingFullDDLSupportDistLocksOnStepDown:
     description: "Once implemented allow usage of Distributed locks on shards."
     cpp_varname: gShardingFullDDLSupportDistLocksOnStepDown

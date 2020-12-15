@@ -66,7 +66,7 @@ assert.eq(next.documentKey.shardKey, 1);
 assert.soon(() => changeStream.hasNext());
 next = changeStream.next();
 assert.eq(next.operationType, "insert");
-assert.eq(next.documentKey, {_id: 2});
+assert.eq(next.documentKey._id, 2);
 
 assert.soon(() => changeStream.hasNext());
 next = changeStream.next();

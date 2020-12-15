@@ -66,6 +66,7 @@ const allCommands = {
     _shardsvrCloneCatalogData: {skip: isPrimaryOnly},
     _shardsvrDropCollection: {skip: isPrimaryOnly},
     _shardsvrCreateCollection: {skip: isPrimaryOnly},
+    _shardsvrDropCollectionParticipant: {skip: isPrimaryOnly},
     _shardsvrMovePrimary: {skip: isPrimaryOnly},
     _shardsvrRenameCollection: {skip: isPrimaryOnly},
     _shardsvrDropDatabase: {skip: isPrimaryOnly},

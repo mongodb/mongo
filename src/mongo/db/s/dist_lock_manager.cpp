@@ -73,8 +73,12 @@ DistLockManager::ScopedDistLock DistLockManager::ScopedDistLock::moveToAnotherTh
     return unownedScopedDistLock;
 }
 
+DistLockManager* DistLockManager::get(ServiceContext* service) {
+    return getDistLockManager(service).get();
+}
+
 DistLockManager* DistLockManager::get(OperationContext* opCtx) {
-    return getDistLockManager(opCtx->getServiceContext()).get();
+    return get(opCtx->getServiceContext());
 }
 
 void DistLockManager::create(ServiceContext* service,

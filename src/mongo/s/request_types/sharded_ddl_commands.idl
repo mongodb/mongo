@@ -106,8 +106,14 @@ commands:
         command_name: _shardsvrDropCollection
         namespace: concatenate_with_db
         cpp_name: ShardsvrDropCollection
-        strict: true
-        reply_type: DropDatabaseReply
+        strict: false
+
+    _shardsvrDropCollectionParticipant:
+        description: "Parser for the _shardsvrDropCollectionParticipant command"
+        command_name: _shardsvrDropCollectionParticipant
+        namespace: concatenate_with_db
+        cpp_name: ShardsvrDropCollectionParticipant
+        strict: false
 
     _shardsvrRenameCollection:
         command_name: _shardsvrRenameCollection

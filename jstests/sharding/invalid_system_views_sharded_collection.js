@@ -111,7 +111,9 @@ function runTest(st, badViewDefinition) {
     assert.commandWorked(db.runCommand({drop: unshardedColl.getName()}), makeErrorMessage("drop"));
 
     // Drop the offending view so that the validate hook succeeds.
-    assert(db.system.views.drop());
+    [st.shard0, st.shard1].forEach(shard => {
+        assert(shard.getDB(db.getName())["system.views"].drop());
+    });
 }
 
 const st = new ShardingTest({name: "views_sharded", shards: 2, other: {enableBalancer: false}});
