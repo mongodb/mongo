@@ -1,6 +1,11 @@
 // Cannot implicitly shard accessed collections because renameCollection command not supported
 // on sharded collections.
-// @tags: [assumes_unsharded_collection, requires_non_retryable_commands, requires_fastcount]
+// @tags: [
+//   assumes_unsharded_collection,
+//   requires_non_retryable_commands,
+//   requires_fastcount,
+//   requires_getmore
+// ]
 
 (function() {
 'use strict';
@@ -16,7 +21,7 @@ function testIndexInvalidation(isRename) {
 
     // Get the first two indexes.
     let cmd = {listIndexes: collName};
-    Object.extend(cmd, {batchSize: 2});
+    Object.extend(cmd, {cursor: {batchSize: 2}});
     let res = db.runCommand(cmd);
     assert.commandWorked(res, 'could not run ' + tojson(cmd));
     printjson(res);
@@ -25,6 +30,7 @@ function testIndexInvalidation(isRename) {
     let cursor = new DBCommandCursor(db, res);
     let errMsg = 'expected more data from command ' + tojson(cmd) + ', with result ' + tojson(res);
     assert(cursor.hasNext(), errMsg);
+    assert(res.cursor.id !== NumberLong("0"), errMsg);
     if (isRename) {
         assert.commandWorked(coll.renameCollection(collNameRenamed));
     } else {

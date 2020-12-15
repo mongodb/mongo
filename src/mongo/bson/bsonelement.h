@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <fmt/format.h>
@@ -376,6 +377,13 @@ public:
      * arbitrary BSON element to an integer without risk of UB.
      */
     int numberInt() const;
+
+    /** Like numberInt() but with well-defined behavior for doubles that
+     *  are NaNs, or too large/small to be represented as int.
+     *  NaNs -> 0
+     *  very large doubles -> INT_MAX
+     *  very small doubles -> INT_MIN  */
+    int safeNumberInt() const;
 
     /**
      * Retrieves the value of this element as a 64 bit integer. If the BSON type is non-numeric,
@@ -948,6 +956,11 @@ inline int BSONElement::numberInt() const {
         default:
             return 0;
     }
+}
+
+inline int BSONElement::safeNumberInt() const {
+    return static_cast<int>(std::clamp<long long>(
+        safeNumberLong(), std::numeric_limits<int>::min(), std::numeric_limits<int>::max()));
 }
 
 inline long long BSONElement::numberLong() const {

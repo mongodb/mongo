@@ -23,7 +23,8 @@ function testOplogEntryIdIndexSpec(collectionName, idIndexSpec) {
     if (idIndexSpec === null) {
         assert(!oplogEntry.o.hasOwnProperty("idIndex"), tojson(oplogEntry));
     } else {
-        assert.eq(0, bsonWoCompare(idIndexSpec, oplogEntry.o.idIndex), tojson(oplogEntry));
+        assert.eq(
+            0, bsonUnorderedFieldsCompare(idIndexSpec, oplogEntry.o.idIndex), tojson(oplogEntry));
     }
 }
 

@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
+
 #include "mongo/platform/basic.h"
 
 #include <memory>
@@ -44,6 +46,7 @@
 #include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/list_indexes_gen.h"
 #include "mongo/db/query/cursor_request.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/find_common.h"
@@ -51,6 +54,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
@@ -61,6 +65,15 @@ using std::unique_ptr;
 using std::vector;
 
 namespace {
+
+void appendListIndexesCursorReply(CursorId cursorId,
+                                  const NamespaceString& cursorNss,
+                                  std::vector<mongo::ListIndexesReplyItem>&& firstBatch,
+                                  BSONObjBuilder& result) {
+    auto reply =
+        ListIndexesReply(ListIndexesReplyCursor(cursorId, cursorNss, std::move(firstBatch)));
+    reply.serialize(&result);
+}
 
 /**
  * Lists the indexes for a given collection.
@@ -146,19 +159,17 @@ public:
              const BSONObj& cmdObj,
              BSONObjBuilder& result) {
         CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
-        const long long defaultBatchSize = std::numeric_limits<long long>::max();
-        long long batchSize;
-        uassertStatusOK(
-            CursorRequest::parseCommandCursorOptions(cmdObj, defaultBatchSize, &batchSize));
-
-        auto includeBuildUUIDs = cmdObj["includeBuildUUIDs"].trueValue();
+        const auto parsed = ListIndexes::parse({"listIndexes"}, cmdObj);
+        long long batchSize = std::numeric_limits<long long>::max();
+        if (parsed.getCursor() && parsed.getCursor()->getBatchSize()) {
+            batchSize = *parsed.getCursor()->getBatchSize();
+        }
 
         NamespaceString nss;
         std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec;
-        BSONArrayBuilder firstBatch;
+        std::vector<mongo::ListIndexesReplyItem> firstBatch;
         {
-            AutoGetCollectionForReadCommand collection(
-                opCtx, CommandHelpers::parseNsOrUUID(dbname, cmdObj));
+            AutoGetCollectionForReadCommand collection(opCtx, parsed.getNamespaceOrUUID());
             uassert(ErrorCodes::NamespaceNotFound,
                     str::stream() << "ns does not exist: " << collection.getNss().ns(),
                     collection);
@@ -167,8 +178,8 @@ public:
             auto expCtx = make_intrusive<ExpressionContext>(
                 opCtx, std::unique_ptr<CollatorInterface>(nullptr), nss);
 
-            auto indexList =
-                listIndexesInLock(opCtx, collection.getCollection(), nss, includeBuildUUIDs);
+            auto indexList = listIndexesInLock(
+                opCtx, collection.getCollection(), nss, parsed.getIncludeBuildUUIDs());
             auto ws = std::make_unique<WorkingSet>();
             auto root = std::make_unique<QueuedDataStage>(expCtx.get(), ws.get());
 
@@ -190,6 +201,7 @@ public:
                                                             PlanYieldPolicy::YieldPolicy::NO_YIELD,
                                                             nss));
 
+            int bytesBuffered = 0;
             for (long long objCount = 0; objCount < batchSize; objCount++) {
                 BSONObj nextDoc;
                 PlanExecutor::ExecState state = exec->getNext(&nextDoc, nullptr);
@@ -199,16 +211,26 @@ public:
                 invariant(state == PlanExecutor::ADVANCED);
 
                 // If we can't fit this result inside the current batch, then we stash it for later.
-                if (!FindCommon::haveSpaceForNext(nextDoc, objCount, firstBatch.len())) {
+                if (!FindCommon::haveSpaceForNext(nextDoc, objCount, bytesBuffered)) {
                     exec->enqueue(nextDoc);
                     break;
                 }
 
-                firstBatch.append(nextDoc);
+                try {
+                    firstBatch.push_back(ListIndexesReplyItem::parse(
+                        IDLParserErrorContext("ListIndexesReplyItem"), nextDoc));
+                } catch (const DBException& exc) {
+                    LOGV2_ERROR(5254500,
+                                "Could not parse catalog entry while replying to listIndexes",
+                                "entry"_attr = nextDoc,
+                                "error"_attr = exc);
+                    fassertFailed(5254501);
+                }
+                bytesBuffered += nextDoc.objsize();
             }
 
             if (exec->isEOF()) {
-                appendCursorResponseObject(0LL, nss.ns(), firstBatch.arr(), &result);
+                appendListIndexesCursorReply(0 /* cursorId */, nss, std::move(firstBatch), result);
                 return true;
             }
 
@@ -228,8 +250,8 @@ public:
              cmdObj,
              {Privilege(ResourcePattern::forExactNamespace(nss), ActionType::listIndexes)}});
 
-        appendCursorResponseObject(
-            pinnedCursor.getCursor()->cursorid(), nss.ns(), firstBatch.arr(), &result);
+        appendListIndexesCursorReply(
+            pinnedCursor.getCursor()->cursorid(), nss, std::move(firstBatch), result);
 
         return true;
     }

@@ -50,5 +50,5 @@ structs:
             expireAfterSeconds:
                 description: "The number of seconds after which old time-series data should be
                               deleted."
-                type: long
+                type: safeInt64
                 optional: true
