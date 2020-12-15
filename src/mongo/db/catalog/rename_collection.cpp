@@ -33,7 +33,6 @@
 
 #include "mongo/db/catalog/rename_collection.h"
 
-#include "mongo/bson/unordered_fields_bsonobj_comparator.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/document_validation.h"
@@ -751,17 +750,14 @@ void doLocalRenameIfOptionsAndIndexesHaveNotChanged(OperationContext* opCtx,
 
     auto currentIndexes =
         listIndexesEmptyListIfMissing(opCtx, targetNs, false /* includeBuildUUIDs */);
-
-    UnorderedFieldsBSONObjComparator comparator;
-    uassert(
-        ErrorCodes::CommandFailed,
-        str::stream() << "indexes of target collection " << targetNs.ns()
-                      << " changed during processing.",
-        originalIndexes.size() == currentIndexes.size() &&
-            std::equal(originalIndexes.begin(),
-                       originalIndexes.end(),
-                       currentIndexes.begin(),
-                       [&](auto& lhs, auto& rhs) { return comparator.compare(lhs, rhs) == 0; }));
+    uassert(ErrorCodes::CommandFailed,
+            str::stream() << "indexes of target collection " << targetNs.ns()
+                          << " changed during processing.",
+            originalIndexes.size() == currentIndexes.size() &&
+                std::equal(originalIndexes.begin(),
+                           originalIndexes.end(),
+                           currentIndexes.begin(),
+                           SimpleBSONObjComparator::kInstance.makeEqualTo()));
 
     validateAndRunRenameCollection(opCtx, sourceNs, targetNs, options);
 }
