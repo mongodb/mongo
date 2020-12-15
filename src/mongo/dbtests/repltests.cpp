@@ -65,24 +65,25 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
                                 NamespaceString nss,
                                 BSONObj object,
                                 boost::optional<BSONObj> object2) {
-    return repl::OplogEntry(opTime,                     // optime
-                            0,                          // hash
-                            opType,                     // opType
-                            nss,                        // namespace
-                            boost::none,                // uuid
-                            boost::none,                // fromMigrate
-                            OplogEntry::kOplogVersion,  // version
-                            object,                     // o
-                            object2,                    // o2
-                            {},                         // sessionInfo
-                            boost::none,                // upsert
-                            Date_t(),                   // wall clock time
-                            boost::none,                // statement id
-                            boost::none,   // optime of previous write within same transaction
-                            boost::none,   // pre-image optime
-                            boost::none,   // post-image optime
-                            boost::none,   // ShardId of resharding recipient
-                            boost::none);  // _id
+    return {
+        repl::DurableOplogEntry(opTime,                     // optime
+                                0,                          // hash
+                                opType,                     // opType
+                                nss,                        // namespace
+                                boost::none,                // uuid
+                                boost::none,                // fromMigrate
+                                OplogEntry::kOplogVersion,  // version
+                                object,                     // o
+                                object2,                    // o2
+                                {},                         // sessionInfo
+                                boost::none,                // upsert
+                                Date_t(),                   // wall clock time
+                                boost::none,                // statement id
+                                boost::none,    // optime of previous write within same transaction
+                                boost::none,    // pre-image optime
+                                boost::none,    // post-image optime
+                                boost::none,    // ShardId of resharding recipient
+                                boost::none)};  // _id
 }
 
 BSONObj f(const char* s) {

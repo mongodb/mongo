@@ -34,7 +34,7 @@ namespace mongo {
 namespace repl {
 BSONObj OplogEntryOrGroupedInserts::toBSON() const {
     if (!isGroupedInserts())
-        return getOp().toBSON();
+        return getOp().getEntry().toBSON();
 
     // Since we found more than one document, create grouped insert of many docs.
     // We are going to group many 'i' ops into one big 'i' op, with array fields for
@@ -78,7 +78,7 @@ BSONObj OplogEntryOrGroupedInserts::toBSON() const {
     }
     // Generate an op object of all elements except for "ts", "t", and "o", since we
     // need to make those fields arrays of all the ts's, t's, and o's.
-    groupedInsertBuilder.appendElementsUnique(getOp().toBSON());
+    groupedInsertBuilder.appendElementsUnique(getOp().getEntry().toBSON());
     return groupedInsertBuilder.obj();
 }
 }  // namespace repl

@@ -160,7 +160,7 @@ public:
     }
 
     void assertNoOpMatches(const OplogEntry& op, const MutableOplogEntry& noOp) {
-        ASSERT_BSONOBJ_EQ(op.toBSON(), noOp.getObject());
+        ASSERT_BSONOBJ_EQ(op.getEntry().toBSON(), noOp.getObject());
         ASSERT_EQ(op.getNss(), noOp.getNss());
         ASSERT_EQ(op.getUuid(), noOp.getUuid());
         ASSERT_EQ(_migrationUuid, noOp.getFromTenantMigration());
@@ -169,7 +169,7 @@ public:
     void pushOps(const std::vector<OplogEntry>& ops) {
         std::vector<BSONObj> bsonOps;
         for (const auto& op : ops) {
-            bsonOps.push_back(op.toBSON());
+            bsonOps.push_back(op.getEntry().toBSON());
         }
         _oplogBuffer.push(nullptr, bsonOps.begin(), bsonOps.end());
     }

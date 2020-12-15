@@ -199,24 +199,24 @@ public:
                                const OperationSessionInfo& sessionInfo,
                                const boost::optional<StmtId>& statementId) {
         ReshardingDonorOplogId id(opTime.getTimestamp(), opTime.getTimestamp());
-        return repl::OplogEntry(opTime,
-                                boost::none /* hash */,
-                                opType,
-                                kCrudNs,
-                                kCrudUUID,
-                                false /* fromMigrate */,
-                                0 /* version */,
-                                obj1,
-                                obj2,
-                                sessionInfo,
-                                boost::none /* upsert */,
-                                {} /* date */,
-                                statementId,
-                                boost::none /* prevWrite */,
-                                boost::none /* preImage */,
-                                boost::none /* postImage */,
-                                kMyShardId,
-                                Value(id.toBSON()));
+        return {repl::DurableOplogEntry(opTime,
+                                        boost::none /* hash */,
+                                        opType,
+                                        kCrudNs,
+                                        kCrudUUID,
+                                        false /* fromMigrate */,
+                                        0 /* version */,
+                                        obj1,
+                                        obj2,
+                                        sessionInfo,
+                                        boost::none /* upsert */,
+                                        {} /* date */,
+                                        statementId,
+                                        boost::none /* prevWrite */,
+                                        boost::none /* preImage */,
+                                        boost::none /* postImage */,
+                                        kMyShardId,
+                                        Value(id.toBSON()))};
     }
 
     void setReshardingOplogApplicationServerParameterTrue() {
@@ -1833,7 +1833,7 @@ public:
         }
 
         auto operation =
-            repl::OplogEntry::makeInsertOperation(crudNs(), crudUUID(), BSON("x" << 20));
+            repl::DurableOplogEntry::makeInsertOperation(crudNs(), crudUUID(), BSON("x" << 20));
         txnParticipant.addTransactionOperation(innerOpCtx, operation);
         wuow.commit();
 

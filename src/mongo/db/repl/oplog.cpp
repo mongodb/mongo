@@ -1221,8 +1221,8 @@ Status applyOperation_inlock(OperationContext* opCtx,
                 //     The oplog entry is corrupted; or
                 //     The version of the upstream server is obsolete.
                 uassert(ErrorCodes::NoSuchKey,
-                        str::stream()
-                            << "Failed to apply insert due to missing _id: " << redact(op.toBSON()),
+                        str::stream() << "Failed to apply insert due to missing _id: "
+                                      << redact(op.toBSONForLogging()),
                         o.hasField("_id"));
 
                 // 1. Insert if
@@ -1346,7 +1346,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
             auto idField = o2["_id"];
             uassert(ErrorCodes::NoSuchKey,
                     str::stream() << "Failed to apply update due to missing _id: "
-                                  << redact(op.toBSON()),
+                                  << redact(op.toBSONForLogging()),
                     !idField.eoo());
 
             // The o2 field may contain additional fields besides the _id (like the shard key
@@ -1400,14 +1400,15 @@ Status applyOperation_inlock(OperationContext* opCtx,
                         LOGV2_DEBUG(2170003,
                                     2,
                                     "couldn't find doc in capped collection",
-                                    "op"_attr = redact(op.toBSON()));
+                                    "op"_attr = redact(op.toBSONForLogging()));
                     } else if (ur.modifiers) {
                         if (updateCriteria.nFields() == 1) {
                             // was a simple { _id : ... } update criteria
                             static constexpr char msg[] = "Failed to apply update";
-                            LOGV2_ERROR(21258, msg, "op"_attr = redact(op.toBSON()));
+                            LOGV2_ERROR(21258, msg, "op"_attr = redact(op.toBSONForLogging()));
                             return Status(ErrorCodes::UpdateOperationFailed,
-                                          str::stream() << msg << ": " << redact(op.toBSON()));
+                                          str::stream()
+                                              << msg << ": " << redact(op.toBSONForLogging()));
                         }
 
                         // Need to check to see if it isn't present so we can exit early with a
@@ -1422,9 +1423,10 @@ Status applyOperation_inlock(OperationContext* opCtx,
                             (!indexCatalog->haveIdIndex(opCtx) &&
                              Helpers::findOne(opCtx, collection, updateCriteria, false).isNull())) {
                             static constexpr char msg[] = "Couldn't find document";
-                            LOGV2_ERROR(21259, msg, "op"_attr = redact(op.toBSON()));
+                            LOGV2_ERROR(21259, msg, "op"_attr = redact(op.toBSONForLogging()));
                             return Status(ErrorCodes::UpdateOperationFailed,
-                                          str::stream() << msg << ": " << redact(op.toBSON()));
+                                          str::stream()
+                                              << msg << ": " << redact(op.toBSONForLogging()));
                         }
 
                         // Otherwise, it's present; zero objects were updated because of additional
@@ -1435,9 +1437,10 @@ Status applyOperation_inlock(OperationContext* opCtx,
                         // is (presumably) missing.
                         if (!upsert) {
                             static constexpr char msg[] = "Update of non-mod failed";
-                            LOGV2_ERROR(21260, msg, "op"_attr = redact(op.toBSON()));
+                            LOGV2_ERROR(21260, msg, "op"_attr = redact(op.toBSONForLogging()));
                             return Status(ErrorCodes::UpdateOperationFailed,
-                                          str::stream() << msg << ": " << redact(op.toBSON()));
+                                          str::stream()
+                                              << msg << ": " << redact(op.toBSONForLogging()));
                         }
                     }
                 } else if (mode == OplogApplication::Mode::kSecondary && !upsertOplogEntry &&
@@ -1446,7 +1449,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                     // upsert.  In steady state mode this is unexpected.
                     LOGV2_WARNING(2170001,
                                   "update needed to be converted to upsert",
-                                  "op"_attr = redact(op.toBSON()));
+                                  "op"_attr = redact(op.toBSONForLogging()));
                     opCounters->gotUpdateOnMissingDoc();
 
                     // We shouldn't be doing upserts in secondary mode when enforcing steady state
@@ -1477,7 +1480,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
             auto idField = o["_id"];
             uassert(ErrorCodes::NoSuchKey,
                     str::stream() << "Failed to apply delete due to missing _id: "
-                                  << redact(op.toBSON()),
+                                  << redact(op.toBSONForLogging()),
                     !idField.eoo());
 
             // The o field may contain additional fields besides the _id (like the shard key
@@ -1502,7 +1505,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                     LOGV2_WARNING(2170002,
                                   "Applied a delete which did not delete anything in steady state "
                                   "replication",
-                                  "op"_attr = redact(op.toBSON()));
+                                  "op"_attr = redact(op.toBSONForLogging()));
                     if (collection)
                         opCounters->gotDeleteWasEmpty();
                     else
@@ -1511,7 +1514,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                     uassert(collection ? ErrorCodes::NoSuchKey : ErrorCodes::NamespaceNotFound,
                             str::stream() << "Applied a delete which did not delete anything in "
                                              "steady state replication : "
-                                          << redact(op.toBSON()),
+                                          << redact(op.toBSONForLogging()),
                             !oplogApplicationEnforcesSteadyStateConstraints);
                 }
                 wuow.commit();
@@ -1539,7 +1542,7 @@ Status applyCommand_inlock(OperationContext* opCtx,
                 "applying command op: {oplogEntry}, oplog application mode: "
                 "{oplogApplicationMode}",
                 "Applying command op",
-                "oplogEntry"_attr = redact(entry.toBSON()),
+                "oplogEntry"_attr = redact(entry.toBSONForLogging()),
                 "oplogApplicationMode"_attr = OplogApplication::modeToString(mode));
 
     // Only commands are processed here.
@@ -1590,7 +1593,7 @@ Status applyCommand_inlock(OperationContext* opCtx,
         return Status(ErrorCodes::OplogOperationUnsupported,
                       str::stream() << "Applying command to feature compatibility version "
                                        "collection not supported in initial sync: "
-                                    << redact(entry.toBSON()));
+                                    << redact(entry.toBSONForLogging()));
     }
 
     // Parse optime from oplog entry unless we are applying this command in standalone or on a
@@ -1631,7 +1634,7 @@ Status applyCommand_inlock(OperationContext* opCtx,
     }();
     invariant(!assignCommandTimestamp || !opTime.isNull(),
               str::stream() << "Oplog entry did not have 'ts' field when expected: "
-                            << redact(entry.toBSON()));
+                            << redact(entry.toBSONForLogging()));
 
     const Timestamp writeTime = (assignCommandTimestamp ? opTime.getTimestamp() : Timestamp());
 
@@ -1689,7 +1692,7 @@ Status applyCommand_inlock(OperationContext* opCtx,
                             "Acceptable error during oplog application: background operation in "
                             "progress for database",
                             "db"_attr = nss.db(),
-                            "oplogEntry"_attr = redact(entry.toBSON()));
+                            "oplogEntry"_attr = redact(entry.toBSONForLogging()));
                 break;
             }
             case ErrorCodes::BackgroundOperationInProgressForNamespace: {
@@ -1734,7 +1737,7 @@ Status applyCommand_inlock(OperationContext* opCtx,
                             "Acceptable error during oplog application: background operation in "
                             "progress for namespace",
                             "namespace"_attr = ns,
-                            "oplogEntry"_attr = redact(entry.toBSON()));
+                            "oplogEntry"_attr = redact(entry.toBSONForLogging()));
                 break;
             }
             default: {
@@ -1765,7 +1768,7 @@ Status applyCommand_inlock(OperationContext* opCtx,
                                   "Acceptable error during oplog application",
                                   "db"_attr = nss.db(),
                                   "error"_attr = status,
-                                  "oplogEntry"_attr = redact(entry.toBSON()));
+                                  "oplogEntry"_attr = redact(entry.toBSONForLogging()));
                     opCounters->gotAcceptableErrorInCommand();
                 } else {
                     LOGV2_DEBUG(51776,
@@ -1773,7 +1776,7 @@ Status applyCommand_inlock(OperationContext* opCtx,
                                 "Acceptable error during oplog application",
                                 "db"_attr = nss.db(),
                                 "error"_attr = status,
-                                "oplogEntry"_attr = redact(entry.toBSON()));
+                                "oplogEntry"_attr = redact(entry.toBSONForLogging()));
                 }
             }
             // fallthrough

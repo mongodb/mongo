@@ -88,7 +88,7 @@ Status _applyOperationsForTransaction(OperationContext* opCtx,
                     "Error applying operation in transaction. {error}- oplog entry: {oplogEntry}",
                     "Error applying operation in transaction",
                     "error"_attr = redact(ex),
-                    "oplogEntry"_attr = redact(op.toBSON()));
+                    "oplogEntry"_attr = redact(op.toBSONForLogging()));
                 return exceptionToStatus();
             }
             LOGV2_DEBUG(21846,
@@ -99,7 +99,7 @@ Status _applyOperationsForTransaction(OperationContext* opCtx,
                         "Encountered but ignoring error while applying operations for transaction "
                         "because we are either in initial sync or recovering mode",
                         "error"_attr = redact(ex),
-                        "oplogEntry"_attr = redact(op.toBSON()),
+                        "oplogEntry"_attr = redact(op.toBSONForLogging()),
                         "oplogApplicationMode"_attr =
                             repl::OplogApplication::modeToString(oplogApplicationMode));
         }
@@ -297,7 +297,7 @@ std::pair<std::vector<OplogEntry>, bool> _readTransactionOperationsFromOplogChai
     // The non-DurableReplOperation fields of the extracted transaction operations will match those
     // of the lastEntryInTxn. For a prepared commit, this will include the commit oplog entry's
     // 'ts' field, which is what we want.
-    auto lastEntryInTxnObj = lastEntryInTxn.toBSON();
+    auto lastEntryInTxnObj = lastEntryInTxn.getEntry().toBSON();
 
     // First retrieve and transform the ops from the oplog, which will be retrieved in reverse
     // order.

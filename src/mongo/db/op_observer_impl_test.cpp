@@ -2317,13 +2317,13 @@ TEST_F(OpObserverLargeTransactionTest, LargeTransactionCreatesMultipleOplogEntri
     // entry.
     constexpr size_t kHalfTransactionSize = BSONObjMaxInternalSize / 2 - 175;
     std::unique_ptr<uint8_t[]> halfTransactionData(new uint8_t[kHalfTransactionSize]());
-    auto operation1 = repl::OplogEntry::makeInsertOperation(
+    auto operation1 = repl::DurableOplogEntry::makeInsertOperation(
         nss,
         uuid,
         BSON(
             "_id" << 0 << "data"
                   << BSONBinData(halfTransactionData.get(), kHalfTransactionSize, BinDataGeneral)));
-    auto operation2 = repl::OplogEntry::makeInsertOperation(
+    auto operation2 = repl::DurableOplogEntry::makeInsertOperation(
         nss,
         uuid,
         BSON(

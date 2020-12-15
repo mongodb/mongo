@@ -67,7 +67,7 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
                                 Date_t wallClockTime,
                                 boost::optional<StmtId> stmtId,
                                 boost::optional<repl::OpTime> prevWriteOpTimeInTransaction) {
-    return repl::OplogEntry(
+    return {repl::DurableOplogEntry(
         opTime,                        // optime
         0,                             // hash
         opType,                        // opType
@@ -85,7 +85,7 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
         boost::none,                   // pre-image optime
         boost::none,                   // post-image optime
         boost::none,                   // ShardId of resharding recipient
-        boost::none);                  // _id
+        boost::none)};                 // _id
 }
 
 class OpObserverMock : public OpObserverNoop {

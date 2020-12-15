@@ -276,7 +276,7 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(OperationContext* o
                     2,
                     "Updating rollback FixUpInfo for nested applyOps oplog entry: {oplogEntry}",
                     "Updating rollback FixUpInfo for nested applyOps oplog entry",
-                    "oplogEntry"_attr = redact(oplogEntry.toBSON()));
+                    "oplogEntry"_attr = redact(oplogEntry.toBSONForLogging()));
     }
 
     // Extract the op's collection namespace and UUID.
@@ -288,13 +288,13 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(OperationContext* o
 
     if (oplogEntry.getNss().isEmpty()) {
         throw RSFatalException(str::stream() << "Local op on rollback has no ns: "
-                                             << redact(oplogEntry.toBSON()));
+                                             << redact(oplogEntry.toBSONForLogging()));
     }
 
     auto obj = oplogEntry.getOperationToApply();
     if (obj.isEmpty()) {
         throw RSFatalException(str::stream() << "Local op on rollback has no object field: "
-                                             << redact(oplogEntry.toBSON()));
+                                             << redact(oplogEntry.toBSONForLogging()));
     }
 
     // If the operation being rolled back has a txnNumber, then the corresponding entry in the
@@ -320,7 +320,7 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(OperationContext* o
             throw RSFatalException(
                 str::stream() << NamespaceString::kSessionTransactionsTableNamespace.ns()
                               << " does not have a UUID, but local op has a transaction number: "
-                              << redact(oplogEntry.toBSON()));
+                              << redact(oplogEntry.toBSONForLogging()));
         }
         if (oplogEntry.isPartialTransaction()) {
             // If this is a transaction which did not commit, we need do nothing more than
@@ -397,7 +397,7 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(OperationContext* o
                                          "Missing index name in dropIndexes operation on rollback, "
                                          "document: {oplogEntry}",
                                          "Missing index name in dropIndexes operation on rollback",
-                                         "oplogEntry"_attr = redact(oplogEntry.toBSON()));
+                                         "oplogEntry"_attr = redact(oplogEntry.toBSONForLogging()));
                     throw RSFatalException(
                         "Missing index name in dropIndexes operation on rollback.");
                 }
@@ -438,7 +438,7 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(OperationContext* o
                         "Missing index name in createIndexes operation on rollback, "
                         "document: {oplogEntry}",
                         "Missing index name in createIndexes operation on rollback",
-                        "oplogEntry"_attr = redact(oplogEntry.toBSON()));
+                        "oplogEntry"_attr = redact(oplogEntry.toBSONForLogging()));
                     throw RSFatalException(
                         "Missing index name in createIndexes operation on rollback.");
                 }
@@ -791,7 +791,7 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(OperationContext* o
         LOGV2_FATAL_CONTINUE(21737,
                              message,
                              "namespace"_attr = nss.ns(),
-                             "oplogEntry"_attr = redact(oplogEntry.toBSON()));
+                             "oplogEntry"_attr = redact(oplogEntry.toBSONForLogging()));
         throw RSFatalException(str::stream() << message << ". ns: " << nss.ns());
     }
     fixUpInfo.docsToRefetch.insert(doc);

@@ -99,7 +99,7 @@ void OplogApplier::enqueue(OperationContext* opCtx,
                            std::vector<OplogEntry>::const_iterator end) {
     OplogBuffer::Batch batch;
     for (auto i = begin; i != end; ++i) {
-        batch.push_back(i->getRaw());
+        batch.push_back(i->getEntry().getRaw());
     }
     enqueue(opCtx, batch.cbegin(), batch.cend());
 }

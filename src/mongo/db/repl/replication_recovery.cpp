@@ -97,7 +97,7 @@ public:
                                    "opIndex"_attr = i,
                                    "batchSize"_attr = batch.size(),
                                    "numBatches"_attr = _numBatches,
-                                   "oplogEntry"_attr = redact(entry.getRaw()));
+                                   "oplogEntry"_attr = redact(entry.toBSONForLogging()));
             }
         }
     }
@@ -685,7 +685,8 @@ void ReplicationRecoveryImpl::_truncateOplogTo(OperationContext* opCtx,
     invariant(truncateAfterRecordId <= RecordId(truncateAfterTimestamp.asULL()),
               str::stream() << "Should have found a oplog entry timestamp lte to "
                             << truncateAfterTimestamp.toString() << ", but instead found "
-                            << truncateAfterOplogEntry.toString() << " with timestamp "
+                            << redact(truncateAfterOplogEntry.toBSONForLogging())
+                            << " with timestamp "
                             << Timestamp(truncateAfterRecordId.repr()).toString());
 
     // Truncate the oplog AFTER the oplog entry found to be <= truncateAfterTimestamp.

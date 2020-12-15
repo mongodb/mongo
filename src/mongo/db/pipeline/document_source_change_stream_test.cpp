@@ -205,7 +205,7 @@ public:
                              const boost::optional<Document> expectedInvalidate = {},
                              const std::vector<repl::OplogEntry> transactionEntries = {},
                              std::vector<Document> documentsForLookup = {}) {
-        vector<intrusive_ptr<DocumentSource>> stages = makeStages(entry.toBSON(), spec);
+        vector<intrusive_ptr<DocumentSource>> stages = makeStages(entry.getEntry().toBSON(), spec);
         auto closeCursor = stages.back();
 
         getExpCtx()->mongoProcessInterface = std::make_unique<MockMongoInterface>(
@@ -273,7 +273,7 @@ public:
     }
 
     vector<intrusive_ptr<DocumentSource>> makeStages(const OplogEntry& entry) {
-        return makeStages(entry.toBSON(), kDefaultSpec);
+        return makeStages(entry.getEntry().toBSON(), kDefaultSpec);
     }
 
     OplogEntry createCommand(const BSONObj& oField,
@@ -319,7 +319,7 @@ public:
                                              testUuid(),
                                              boost::none,  // fromMigrate
                                              BSONObj());
-        BSONObjBuilder builder(baseOplogEntry.toBSON());
+        BSONObjBuilder builder(baseOplogEntry.getEntry().toBSON());
         builder.append("lsid", lsid.toBSON());
         builder.append("txnNumber", 0LL);
         BSONObj oplogEntry = builder.done();
@@ -371,24 +371,25 @@ public:
         boost::optional<repl::OpTime> prevOpTime = {},
         boost::optional<repl::OpTime> preImageOpTime = boost::none) {
         long long hash = 1LL;
-        return repl::OplogEntry(opTime ? *opTime : kDefaultOpTime,  // optime
-                                hash,                               // hash
-                                opType,                             // opType
-                                nss,                                // namespace
-                                uuid,                               // uuid
-                                fromMigrate,                        // fromMigrate
-                                repl::OplogEntry::kOplogVersion,    // version
-                                object,                             // o
-                                object2,                            // o2
-                                sessionInfo,                        // sessionInfo
-                                boost::none,                        // upsert
-                                Date_t(),                           // wall clock time
-                                boost::none,                        // statement id
-                                prevOpTime,      // optime of previous write within same transaction
-                                preImageOpTime,  // pre-image optime
-                                boost::none,     // post-image optime
-                                boost::none,     // ShardId of resharding recipient
-                                boost::none);    // _id
+        return {
+            repl::DurableOplogEntry(opTime ? *opTime : kDefaultOpTime,  // optime
+                                    hash,                               // hash
+                                    opType,                             // opType
+                                    nss,                                // namespace
+                                    uuid,                               // uuid
+                                    fromMigrate,                        // fromMigrate
+                                    repl::OplogEntry::kOplogVersion,    // version
+                                    object,                             // o
+                                    object2,                            // o2
+                                    sessionInfo,                        // sessionInfo
+                                    boost::none,                        // upsert
+                                    Date_t(),                           // wall clock time
+                                    boost::none,                        // statement id
+                                    prevOpTime,  // optime of previous write within same transaction
+                                    preImageOpTime,  // pre-image optime
+                                    boost::none,     // post-image optime
+                                    boost::none,     // ShardId of resharding recipient
+                                    boost::none)};   // _id
     }
 
     /**
@@ -1213,24 +1214,24 @@ TEST_F(ChangeStreamStageTest, CommitCommandReturnsOperationsFromPreparedTransact
     sessionInfo.setTxnNumber(1);
     sessionInfo.setSessionId(makeLogicalSessionIdForTest());
     auto oplogEntry =
-        repl::OplogEntry(kDefaultOpTime,                   // optime
-                         1LL,                              // hash
-                         OpTypeEnum::kCommand,             // opType
-                         nss.getCommandNS(),               // namespace
-                         boost::none,                      // uuid
-                         boost::none,                      // fromMigrate
-                         repl::OplogEntry::kOplogVersion,  // version
-                         BSON("commitTransaction" << 1),   // o
-                         boost::none,                      // o2
-                         sessionInfo,                      // sessionInfo
-                         boost::none,                      // upsert
-                         Date_t(),                         // wall clock time
-                         boost::none,                      // statement id
-                         applyOpsOpTime,  // optime of previous write within same transaction
-                         boost::none,     // pre-image optime
-                         boost::none,     // post-image optime
-                         boost::none,     // ShardId of resharding recipient
-                         boost::none);    // _id
+        repl::DurableOplogEntry(kDefaultOpTime,                   // optime
+                                1LL,                              // hash
+                                OpTypeEnum::kCommand,             // opType
+                                nss.getCommandNS(),               // namespace
+                                boost::none,                      // uuid
+                                boost::none,                      // fromMigrate
+                                repl::OplogEntry::kOplogVersion,  // version
+                                BSON("commitTransaction" << 1),   // o
+                                boost::none,                      // o2
+                                sessionInfo,                      // sessionInfo
+                                boost::none,                      // upsert
+                                Date_t(),                         // wall clock time
+                                boost::none,                      // statement id
+                                applyOpsOpTime,  // optime of previous write within same transaction
+                                boost::none,     // pre-image optime
+                                boost::none,     // post-image optime
+                                boost::none,     // ShardId of resharding recipient
+                                boost::none);    // _id
 
     // When the DocumentSourceChangeStreamTransform sees the "commitTransaction" oplog entry, we
     // expect it to return the insert op within our 'preparedApplyOps' oplog entry.
@@ -1411,25 +1412,25 @@ TEST_F(ChangeStreamStageTest, PreparedTransactionWithMultipleOplogEntries) {
                                             applyOpsOpTime1);
 
     // Create an oplog entry representing the commit for the prepared transaction.
-    auto commitEntry =
-        repl::OplogEntry(kDefaultOpTime,                   // optime
-                         1LL,                              // hash
-                         OpTypeEnum::kCommand,             // opType
-                         nss.getCommandNS(),               // namespace
-                         boost::none,                      // uuid
-                         boost::none,                      // fromMigrate
-                         repl::OplogEntry::kOplogVersion,  // version
-                         BSON("commitTransaction" << 1),   // o
-                         boost::none,                      // o2
-                         sessionInfo,                      // sessionInfo
-                         boost::none,                      // upsert
-                         Date_t(),                         // wall clock time
-                         boost::none,                      // statement id
-                         applyOpsOpTime2,  // optime of previous write within same transaction
-                         boost::none,      // pre-image optime
-                         boost::none,      // post-image optime
-                         boost::none,      // ShardId of resharding recipient
-                         boost::none);     // _id
+    auto commitEntry = repl::DurableOplogEntry(
+        kDefaultOpTime,                   // optime
+        1LL,                              // hash
+        OpTypeEnum::kCommand,             // opType
+        nss.getCommandNS(),               // namespace
+        boost::none,                      // uuid
+        boost::none,                      // fromMigrate
+        repl::OplogEntry::kOplogVersion,  // version
+        BSON("commitTransaction" << 1),   // o
+        boost::none,                      // o2
+        sessionInfo,                      // sessionInfo
+        boost::none,                      // upsert
+        Date_t(),                         // wall clock time
+        boost::none,                      // statement id
+        applyOpsOpTime2,                  // optime of previous write within same transaction
+        boost::none,                      // pre-image optime
+        boost::none,                      // post-image optime
+        boost::none,                      // ShardId of resharding recipient
+        boost::none);                     // _id
 
     // We do not use the checkTransformation() pattern that other tests use since we expect multiple
     // documents to be returned from one applyOps.
@@ -1884,7 +1885,7 @@ TEST_F(ChangeStreamStageTest, UsesResumeTokenAsSortKeyIfNeedsMergeIsFalse) {
                                  boost::none,                   // fromMigrate
                                  boost::none);                  // o2
 
-    auto stages = makeStages(insert.toBSON(), kDefaultSpec);
+    auto stages = makeStages(insert.getEntry().toBSON(), kDefaultSpec);
 
     getExpCtx()->mongoProcessInterface =
         std::make_unique<MockMongoInterface>(std::vector<FieldPath>{{"x"}, {"_id"}});
@@ -2212,7 +2213,7 @@ TEST_F(ChangeStreamStageTest, TransformPreImageForDelete) {
     // entry before it so that we know we are finding the pre-image based on the given timestamp.
     repl::OpTime dummyOpTime{preImageOpTime.getTimestamp(), repl::OpTime::kInitialTerm};
     std::vector<Document> documentsForLookup = {Document{dummyOpTime.toBSON()},
-                                                Document{preImageEntry.toBSON()}};
+                                                Document{preImageEntry.getEntry().toBSON()}};
 
     // When run with {fullDocumentBeforeChange: "off"}, we do not see a pre-image even if available.
     auto spec = BSON("$changeStream" << BSON("fullDocumentBeforeChange"
@@ -2301,7 +2302,7 @@ TEST_F(ChangeStreamStageTest, TransformPreImageForUpdate) {
     // entry before it so that we know we are finding the pre-image based on the given timestamp.
     repl::OpTime dummyOpTime{preImageOpTime.getTimestamp(), repl::OpTime::kInitialTerm};
     std::vector<Document> documentsForLookup = {Document{dummyOpTime.toBSON()},
-                                                Document{preImageEntry.toBSON()}};
+                                                Document{preImageEntry.getEntry().toBSON()}};
 
     // When run with {fullDocumentBeforeChange: "off"}, we do not see a pre-image even if available.
     auto spec = BSON("$changeStream" << BSON("fullDocumentBeforeChange"
@@ -2398,7 +2399,7 @@ TEST_F(ChangeStreamStageTest, TransformPreImageForReplace) {
     // entry before it so that we know we are finding the pre-image based on the given timestamp.
     repl::OpTime dummyOpTime{preImageOpTime.getTimestamp(), repl::OpTime::kInitialTerm};
     std::vector<Document> documentsForLookup = {Document{dummyOpTime.toBSON()},
-                                                Document{preImageEntry.toBSON()}};
+                                                Document{preImageEntry.getEntry().toBSON()}};
 
     // When run with {fullDocumentBeforeChange: "off"}, we do not see a pre-image even if available.
     auto spec = BSON("$changeStream" << BSON("fullDocumentBeforeChange"

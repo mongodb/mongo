@@ -169,12 +169,12 @@ StatusWith<std::vector<OplogEntry>> OplogBatcher::getNextApplierBatch(
                                  message,
                                  "expectedVersion"_attr = OplogEntry::kOplogVersion,
                                  "foundVersion"_attr = entry.getVersion(),
-                                 "oplogEntry"_attr = redact(entry.toBSON()));
+                                 "oplogEntry"_attr = redact(entry.toBSONForLogging()));
             return {ErrorCodes::BadValue,
                     str::stream() << message << ", expected oplog version "
                                   << OplogEntry::kOplogVersion << ", found version "
                                   << entry.getVersion()
-                                  << ", oplog entry: " << redact(entry.toBSON())};
+                                  << ", oplog entry: " << redact(entry.toBSONForLogging())};
         }
 
         if (batchLimits.slaveDelayLatestTimestamp) {

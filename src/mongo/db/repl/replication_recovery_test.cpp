@@ -249,24 +249,25 @@ repl::OplogEntry _makeOplogEntry(repl::OpTime opTime,
                                  boost::optional<BSONObj> object2 = boost::none,
                                  OperationSessionInfo sessionInfo = {},
                                  Date_t wallTime = Date_t()) {
-    return repl::OplogEntry(opTime,                           // optime
-                            boost::none,                      // hash
-                            opType,                           // opType
-                            testNs,                           // namespace
-                            boost::none,                      // uuid
-                            boost::none,                      // fromMigrate
-                            repl::OplogEntry::kOplogVersion,  // version
-                            object,                           // o
-                            object2,                          // o2
-                            sessionInfo,                      // sessionInfo
-                            boost::none,                      // isUpsert
-                            wallTime,                         // wall clock time
-                            boost::none,                      // statement id
-                            boost::none,   // optime of previous write within same transaction
-                            boost::none,   // pre-image optime
-                            boost::none,   // post-image optime
-                            boost::none,   // ShardId of resharding recipient
-                            boost::none);  // _id
+    return {
+        repl::DurableOplogEntry(opTime,                           // optime
+                                boost::none,                      // hash
+                                opType,                           // opType
+                                testNs,                           // namespace
+                                boost::none,                      // uuid
+                                boost::none,                      // fromMigrate
+                                repl::OplogEntry::kOplogVersion,  // version
+                                object,                           // o
+                                object2,                          // o2
+                                sessionInfo,                      // sessionInfo
+                                boost::none,                      // isUpsert
+                                wallTime,                         // wall clock time
+                                boost::none,                      // statement id
+                                boost::none,    // optime of previous write within same transaction
+                                boost::none,    // pre-image optime
+                                boost::none,    // post-image optime
+                                boost::none,    // ShardId of resharding recipient
+                                boost::none)};  // _id
 }
 
 /**
@@ -302,7 +303,7 @@ TimestampedBSONObj _makeInsertOplogEntry(int t) {
                                  OpTypeEnum::kInsert,         // op type
                                  _makeInsertDocument(t),      // o
                                  boost::none);                // o2
-    return {entry.toBSON(), Timestamp(t)};
+    return {entry.getEntry().toBSON(), Timestamp(t)};
 }
 
 /**
@@ -849,35 +850,41 @@ TEST_F(ReplicationRecoveryTest, RecoveryAppliesUpdatesIdempotently) {
     ASSERT_OK(getStorageInterface()->insertDocument(
         opCtx,
         oplogNs,
-        {_makeUpdateOplogEntry(ts, BSON("_id" << 1), BSON("$set" << BSON("a" << 7))).toBSON(),
+        {_makeUpdateOplogEntry(ts, BSON("_id" << 1), BSON("$set" << BSON("a" << 7)))
+             .getEntry()
+             .toBSON(),
          Timestamp(ts, ts)},
         OpTime::kUninitializedTerm));
     ts++;
     ASSERT_OK(getStorageInterface()->insertDocument(
         opCtx,
         oplogNs,
-        {_makeDeleteOplogEntry(ts, BSON("_id" << 1)).toBSON(), Timestamp(ts, ts)},
+        {_makeDeleteOplogEntry(ts, BSON("_id" << 1)).getEntry().toBSON(), Timestamp(ts, ts)},
         OpTime::kUninitializedTerm));
     // Test that updates and deletes on a document succeed.
     ts++;
     ASSERT_OK(getStorageInterface()->insertDocument(
         opCtx,
         oplogNs,
-        {_makeUpdateOplogEntry(ts, BSON("_id" << 2), BSON("$set" << BSON("a" << 7))).toBSON(),
+        {_makeUpdateOplogEntry(ts, BSON("_id" << 2), BSON("$set" << BSON("a" << 7)))
+             .getEntry()
+             .toBSON(),
          Timestamp(ts, ts)},
         OpTime::kUninitializedTerm));
     ts++;
     ASSERT_OK(getStorageInterface()->insertDocument(
         opCtx,
         oplogNs,
-        {_makeDeleteOplogEntry(ts, BSON("_id" << 2)).toBSON(), Timestamp(ts, ts)},
+        {_makeDeleteOplogEntry(ts, BSON("_id" << 2)).getEntry().toBSON(), Timestamp(ts, ts)},
         OpTime::kUninitializedTerm));
     // Test that updates on a document succeed.
     ts++;
     ASSERT_OK(getStorageInterface()->insertDocument(
         opCtx,
         oplogNs,
-        {_makeUpdateOplogEntry(ts, BSON("_id" << 3), BSON("$set" << BSON("a" << 7))).toBSON(),
+        {_makeUpdateOplogEntry(ts, BSON("_id" << 3), BSON("$set" << BSON("a" << 7)))
+             .getEntry()
+             .toBSON(),
          Timestamp(ts, ts)},
         OpTime::kUninitializedTerm));
 
@@ -900,7 +907,9 @@ DEATH_TEST_F(ReplicationRecoveryTest, RecoveryFailsWithBadOp, "terminate() calle
     ASSERT_OK(getStorageInterface()->insertDocument(
         opCtx,
         oplogNs,
-        {_makeUpdateOplogEntry(2, BSON("bad_op" << 1), BSON("$set" << BSON("a" << 7))).toBSON(),
+        {_makeUpdateOplogEntry(2, BSON("bad_op" << 1), BSON("$set" << BSON("a" << 7)))
+             .getEntry()
+             .toBSON(),
          Timestamp(2, 2)},
         OpTime::kUninitializedTerm));
 
@@ -927,7 +936,7 @@ TEST_F(ReplicationRecoveryTest, CorrectlyUpdatesConfigTransactions) {
                                     Date_t::now());
 
     ASSERT_OK(getStorageInterface()->insertDocument(
-        opCtx, oplogNs, {insertOp.toBSON(), Timestamp(2, 0)}, 1));
+        opCtx, oplogNs, {insertOp.getEntry().toBSON(), Timestamp(2, 0)}, 1));
 
     auto lastDate = Date_t::now();
     auto insertOp2 = _makeOplogEntry({Timestamp(3, 0), 1},
@@ -938,7 +947,7 @@ TEST_F(ReplicationRecoveryTest, CorrectlyUpdatesConfigTransactions) {
                                      lastDate);
 
     ASSERT_OK(getStorageInterface()->insertDocument(
-        opCtx, oplogNs, {insertOp2.toBSON(), Timestamp(3, 0)}, 1));
+        opCtx, oplogNs, {insertOp2.getEntry().toBSON(), Timestamp(3, 0)}, 1));
 
     recovery.recoverFromOplog(opCtx, boost::none);
 
@@ -986,7 +995,7 @@ TEST_F(ReplicationRecoveryTest, PrepareTransactionOplogEntryCorrectlyUpdatesConf
                                    lastDate);
 
     ASSERT_OK(getStorageInterface()->insertDocument(
-        opCtx, oplogNs, {prepareOp.toBSON(), Timestamp(2, 0)}, 1));
+        opCtx, oplogNs, {prepareOp.getEntry().toBSON(), Timestamp(2, 0)}, 1));
 
     recovery.recoverFromOplog(opCtx, boost::none);
 
@@ -1034,7 +1043,7 @@ TEST_F(ReplicationRecoveryTest, AbortTransactionOplogEntryCorrectlyUpdatesConfig
                                    prepareDate);
 
     ASSERT_OK(getStorageInterface()->insertDocument(
-        opCtx, oplogNs, {prepareOp.toBSON(), Timestamp(2, 0)}, 1));
+        opCtx, oplogNs, {prepareOp.getEntry().toBSON(), Timestamp(2, 0)}, 1));
 
     const auto abortDate = Date_t::now();
     const auto abortOp = _makeTransactionOplogEntry({Timestamp(3, 0), 1},
@@ -1046,7 +1055,7 @@ TEST_F(ReplicationRecoveryTest, AbortTransactionOplogEntryCorrectlyUpdatesConfig
                                                     abortDate);
 
     ASSERT_OK(getStorageInterface()->insertDocument(
-        opCtx, oplogNs, {abortOp.toBSON(), Timestamp(3, 0)}, 1));
+        opCtx, oplogNs, {abortOp.getEntry().toBSON(), Timestamp(3, 0)}, 1));
 
     recovery.recoverFromOplog(opCtx, boost::none);
 
@@ -1097,7 +1106,7 @@ DEATH_TEST_REGEX_F(ReplicationRecoveryTest,
                                    lastDate);
 
     ASSERT_OK(getStorageInterface()->insertDocument(
-        opCtx, oplogNs, {prepareOp.toBSON(), Timestamp(2, 0)}, 1));
+        opCtx, oplogNs, {prepareOp.getEntry().toBSON(), Timestamp(2, 0)}, 1));
 
     serverGlobalParams.enableMajorityReadConcern = false;
 
@@ -1134,7 +1143,7 @@ TEST_F(ReplicationRecoveryTest, CommitTransactionOplogEntryCorrectlyUpdatesConfi
                                    prepareDate);
 
     ASSERT_OK(getStorageInterface()->insertDocument(
-        opCtx, oplogNs, {prepareOp.toBSON(), Timestamp(2, 0)}, 1));
+        opCtx, oplogNs, {prepareOp.getEntry().toBSON(), Timestamp(2, 0)}, 1));
 
     const auto commitDate = Date_t::now();
     const auto commitOp = _makeTransactionOplogEntry(
@@ -1147,7 +1156,7 @@ TEST_F(ReplicationRecoveryTest, CommitTransactionOplogEntryCorrectlyUpdatesConfi
         commitDate);
 
     ASSERT_OK(getStorageInterface()->insertDocument(
-        opCtx, oplogNs, {commitOp.toBSON(), Timestamp(3, 0)}, 1));
+        opCtx, oplogNs, {commitOp.getEntry().toBSON(), Timestamp(3, 0)}, 1));
 
     recovery.recoverFromOplog(opCtx, boost::none);
 
@@ -1209,7 +1218,7 @@ TEST_F(ReplicationRecoveryTest,
                                    prepareDate);
 
     ASSERT_OK(getStorageInterface()->insertDocument(
-        opCtx, oplogNs, {prepareOp.toBSON(), Timestamp(2, 0)}, 1));
+        opCtx, oplogNs, {prepareOp.getEntry().toBSON(), Timestamp(2, 0)}, 1));
 
     // Add an operation here so that we can have the appliedThrough time be in-between the commit
     // timestamp and the commitTransaction oplog entry.
@@ -1221,7 +1230,7 @@ TEST_F(ReplicationRecoveryTest,
                                           Date_t::now());
 
     ASSERT_OK(getStorageInterface()->insertDocument(
-        opCtx, oplogNs, {insertOp.toBSON(), Timestamp(2, 2)}, 1));
+        opCtx, oplogNs, {insertOp.getEntry().toBSON(), Timestamp(2, 2)}, 1));
 
     const auto commitDate = Date_t::now();
     const auto commitOp = _makeTransactionOplogEntry(
@@ -1234,7 +1243,7 @@ TEST_F(ReplicationRecoveryTest,
         commitDate);
 
     ASSERT_OK(getStorageInterface()->insertDocument(
-        opCtx, oplogNs, {commitOp.toBSON(), Timestamp(3, 0)}, 1));
+        opCtx, oplogNs, {commitOp.getEntry().toBSON(), Timestamp(3, 0)}, 1));
 
     recovery.recoverFromOplog(opCtx, boost::none);
 
@@ -1387,7 +1396,7 @@ TEST_F(ReplicationRecoveryTest, RecoverFromOplogUpToReconstructsPreparedTransact
                                        sessionInfo,
                                        lastDate);
         ASSERT_OK(getStorageInterface()->insertDocument(
-            opCtx, oplogNs, {prepareOp.toBSON(), Timestamp(3, 3)}, 1));
+            opCtx, oplogNs, {prepareOp.getEntry().toBSON(), Timestamp(3, 3)}, 1));
     }
 
     recovery.recoverFromOplogUpTo(opCtx, Timestamp(3, 3));
@@ -1429,7 +1438,7 @@ TEST_F(ReplicationRecoveryTest,
                                        sessionInfo,
                                        lastDate);
         ASSERT_OK(getStorageInterface()->insertDocument(
-            opCtx, oplogNs, {prepareOp.toBSON(), Timestamp(1, 1)}, 1));
+            opCtx, oplogNs, {prepareOp.getEntry().toBSON(), Timestamp(1, 1)}, 1));
 
         const BSONObj doc =
             BSON("_id" << sessionId.toBSON() << "txnNum" << static_cast<long long>(1)

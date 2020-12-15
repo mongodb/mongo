@@ -66,24 +66,25 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
                                 boost::optional<BSONObj> o2Field = boost::none,
                                 boost::optional<repl::OpTime> preImageOpTime = boost::none,
                                 boost::optional<repl::OpTime> postImageOpTime = boost::none) {
-    return repl::OplogEntry(opTime,                           // optime
-                            boost::none,                      // hash
-                            opType,                           // opType
-                            nss,                              // namespace
-                            boost::none,                      // uuid
-                            boost::none,                      // fromMigrate
-                            repl::OplogEntry::kOplogVersion,  // version
-                            oField,                           // o
-                            o2Field,                          // o2
-                            {},                               // sessionInfo
-                            boost::none,                      // upsert
-                            Date_t(),                         // wall clock time
-                            boost::none,                      // statement id
-                            boost::none,      // optime of previous write within same transaction
-                            preImageOpTime,   // pre-image optime
-                            postImageOpTime,  // post-image optime
-                            boost::none,      // ShardId of resharding recipient
-                            boost::none);     // _id
+    return {
+        repl::DurableOplogEntry(opTime,                           // optime
+                                boost::none,                      // hash
+                                opType,                           // opType
+                                nss,                              // namespace
+                                boost::none,                      // uuid
+                                boost::none,                      // fromMigrate
+                                repl::OplogEntry::kOplogVersion,  // version
+                                oField,                           // o
+                                o2Field,                          // o2
+                                {},                               // sessionInfo
+                                boost::none,                      // upsert
+                                Date_t(),                         // wall clock time
+                                boost::none,                      // statement id
+                                boost::none,     // optime of previous write within same transaction
+                                preImageOpTime,  // pre-image optime
+                                postImageOpTime,  // post-image optime
+                                boost::none,      // ShardId of resharding recipient
+                                boost::none)};    // _id
 }
 
 void setUpReplication(ServiceContext* svcCtx) {
@@ -134,7 +135,7 @@ TEST_F(WriteOpsRetryability, ParseOplogEntryForNestedUpdate) {
                                       repl::OpTypeEnum::kNoop,             // op type
                                       NamespaceString("a.b"),              // namespace
                                       kNestedOplog,                        // o
-                                      innerOplog.toBSON());                // o2
+                                      innerOplog.getEntry().toBSON());     // o2
 
     auto res = parseOplogEntryForUpdate(updateOplog);
 
@@ -167,7 +168,7 @@ TEST_F(WriteOpsRetryability, ParseOplogEntryForNestedUpsert) {
                                       repl::OpTypeEnum::kNoop,             // op type
                                       NamespaceString("a.b"),              // namespace
                                       kNestedOplog,                        // o
-                                      innerOplog.toBSON());                // o2
+                                      innerOplog.getEntry().toBSON());     // o2
 
     auto res = parseOplogEntryForUpdate(insertOplog);
 
@@ -421,7 +422,7 @@ TEST_F(FindAndModifyRetryability, NestedUpsert) {
                                       repl::OpTypeEnum::kNoop,             // op type
                                       kNs,                                 // namespace
                                       kNestedOplog,                        // o
-                                      innerOplog.toBSON());                // o2
+                                      innerOplog.getEntry().toBSON());     // o2
 
     auto result = constructFindAndModifyRetryResult(opCtx(), request, insertOplog);
     ASSERT_BSONOBJ_EQ(BSON("lastErrorObject"
@@ -568,7 +569,7 @@ TEST_F(FindAndModifyRetryability, NestedUpdateWithPreImage) {
                                       repl::OpTypeEnum::kNoop,             // optype
                                       kNs,                                 // namespace
                                       kNestedOplog,                        // o
-                                      innerOplog.toBSON(),                 // o2
+                                      innerOplog.getEntry().toBSON(),      // o2
                                       imageOpTime,                         // pre-image optime
                                       boost::none);                        // post-image optime
 
@@ -628,7 +629,7 @@ TEST_F(FindAndModifyRetryability, NestedUpdateWithPostImage) {
                                       repl::OpTypeEnum::kNoop,             // op type
                                       kNs,                                 // namespace
                                       kNestedOplog,                        // o
-                                      innerOplog.toBSON(),                 // o2
+                                      innerOplog.getEntry().toBSON(),      // o2
                                       boost::none,                         // pre-image optime
                                       imageOpTime);                        // post-image optime
 
@@ -703,7 +704,7 @@ TEST_F(FindAndModifyRetryability, NestedRemove) {
                                       repl::OpTypeEnum::kNoop,             // op type
                                       kNs,                                 // namespace
                                       kNestedOplog,                        // o
-                                      innerOplog.toBSON(),                 // o2
+                                      innerOplog.getEntry().toBSON(),      // o2
                                       imageOpTime,                         // pre-image optime
                                       boost::none);                        // post-image optime
 

@@ -1253,7 +1253,8 @@ void TransactionParticipant::Participant::addTransactionOperation(
     invariant(p().autoCommit && !*p().autoCommit && o().activeTxnNumber != kUninitializedTxnNumber);
     invariant(opCtx->lockState()->inAWriteUnitOfWork());
     p().transactionOperations.push_back(operation);
-    p().transactionOperationBytes += repl::OplogEntry::getDurableReplOperationSize(operation);
+    p().transactionOperationBytes +=
+        repl::DurableOplogEntry::getDurableReplOperationSize(operation);
     if (!operation.getPreImage().isEmpty()) {
         p().transactionOperationBytes += operation.getPreImage().objsize();
         ++p().numberOfPreImagesToWrite;

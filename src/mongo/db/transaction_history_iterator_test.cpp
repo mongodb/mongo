@@ -60,7 +60,7 @@ namespace {
 repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
                                 BSONObj docToInsert,
                                 boost::optional<repl::OpTime> prevWriteOpTimeInTransaction) {
-    return repl::OplogEntry(
+    return {repl::DurableOplogEntry(
         opTime,                           // optime
         0,                                // hash
         repl::OpTypeEnum::kInsert,        // opType
@@ -78,7 +78,7 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
         boost::none,                      // pre-image optime
         boost::none,                      // post-image optime
         boost::none,                      // ShardId of resharding recipient
-        boost::none);                     // _id
+        boost::none)};                    // _id
 }
 
 }  // namespace

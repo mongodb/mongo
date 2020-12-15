@@ -77,24 +77,24 @@ OplogEntry makeOplogEntry(OpTime opTime,
                           OptionalCollectionUUID uuid,
                           BSONObj o,
                           boost::optional<BSONObj> o2) {
-    return OplogEntry(opTime,                     // optime
-                      boost::none,                // hash
-                      opType,                     // opType
-                      nss,                        // namespace
-                      uuid,                       // uuid
-                      boost::none,                // fromMigrate
-                      OplogEntry::kOplogVersion,  // version
-                      o,                          // o
-                      o2,                         // o2
-                      {},                         // sessionInfo
-                      boost::none,                // upsert
-                      Date_t(),                   // wall clock time
-                      boost::none,                // statement id
-                      boost::none,   // optime of previous write within same transaction
-                      boost::none,   // pre-image optime
-                      boost::none,   // post-image optime
-                      boost::none,   // ShardId of resharding recipient
-                      boost::none);  // _id
+    return {DurableOplogEntry(opTime,                     // optime
+                              boost::none,                // hash
+                              opType,                     // opType
+                              nss,                        // namespace
+                              uuid,                       // uuid
+                              boost::none,                // fromMigrate
+                              OplogEntry::kOplogVersion,  // version
+                              o,                          // o
+                              o2,                         // o2
+                              {},                         // sessionInfo
+                              boost::none,                // upsert
+                              Date_t(),                   // wall clock time
+                              boost::none,                // statement id
+                              boost::none,    // optime of previous write within same transaction
+                              boost::none,    // pre-image optime
+                              boost::none,    // post-image optime
+                              boost::none,    // ShardId of resharding recipient
+                              boost::none)};  // _id
 }
 
 /**
@@ -264,6 +264,7 @@ protected:
                                         boost::none /* uuid */,
                                         BSONObj() /* o */,
                                         boost::none /* o2 */)
+                             .getEntry()
                              .toBSON());
     }
 
@@ -983,7 +984,8 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogApplierFails) {
                                      BSON("_id"
                                           << "bad insert"),
                                      boost::none /* o2 */);
-    oplogFetcher->receiveBatch(1LL, {oplogEntry.toBSON()}, injectedEntryOpTime.getTimestamp());
+    oplogFetcher->receiveBatch(
+        1LL, {oplogEntry.getEntry().toBSON()}, injectedEntryOpTime.getTimestamp());
 
     // Wait for task completion failure.
     ASSERT_NOT_OK(instance->getDataSyncCompletionFuture().getNoThrow());
@@ -1090,7 +1092,7 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientAddResumeTok
                                       UUID::gen() /* uuid */,
                                       BSON("doc" << 2) /* o */,
                                       boost::none /* o2 */);
-    oplogFetcher->receiveBatch(17, {oplogEntry1.toBSON()}, resumeToken1);
+    oplogFetcher->receiveBatch(17, {oplogEntry1.getEntry().toBSON()}, resumeToken1);
 
     const Timestamp oplogEntryTS2 = Timestamp(6, 2);
     const Timestamp resumeToken2 = Timestamp(7, 3);
@@ -1100,7 +1102,7 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientAddResumeTok
                                       UUID::gen() /* uuid */,
                                       BSON("doc" << 3) /* o */,
                                       boost::none /* o2 */);
-    oplogFetcher->receiveBatch(17, {oplogEntry2.toBSON()}, resumeToken2);
+    oplogFetcher->receiveBatch(17, {oplogEntry2.getEntry().toBSON()}, resumeToken2);
 
     // Receive an empty batch.
     oplogFetcher->receiveBatch(17, {}, resumeToken2);
@@ -1112,14 +1114,14 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientAddResumeTok
         BSONObj insertDoc;
         ASSERT_TRUE(oplogBuffer->tryPop(opCtx.get(), &insertDoc));
         LOGV2(5124601, "Insert oplog entry", "entry"_attr = insertDoc);
-        ASSERT_BSONOBJ_EQ(insertDoc, oplogEntry1.toBSON());
+        ASSERT_BSONOBJ_EQ(insertDoc, oplogEntry1.getEntry().toBSON());
     }
 
     {
         BSONObj insertDoc;
         ASSERT_TRUE(oplogBuffer->tryPop(opCtx.get(), &insertDoc));
         LOGV2(5124602, "Insert oplog entry", "entry"_attr = insertDoc);
-        ASSERT_BSONOBJ_EQ(insertDoc, oplogEntry2.toBSON());
+        ASSERT_BSONOBJ_EQ(insertDoc, oplogEntry2.getEntry().toBSON());
     }
 
     {

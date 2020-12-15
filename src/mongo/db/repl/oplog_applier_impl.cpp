@@ -394,9 +394,7 @@ void scheduleWritesToOplog(OperationContext* opCtx,
             std::vector<InsertStatement> docs;
             docs.reserve(end - begin);
             for (size_t i = begin; i < end; i++) {
-                // Add as unowned BSON to avoid unnecessary ref-count bumps.
-                // 'ops' will outlive 'docs' so the BSON lifetime will be guaranteed.
-                docs.emplace_back(InsertStatement{ops[i].getRaw(),
+                docs.emplace_back(InsertStatement{ops[i].getEntry().getRaw(),
                                                   ops[i].getOpTime().getTimestamp(),
                                                   ops[i].getOpTime().getTerm()});
             }
@@ -546,8 +544,8 @@ StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
                         "{failedWriterThread}: {error}",
                         "Failed to apply batch of operations",
                         "numOperationsInBatch"_attr = ops.size(),
-                        "firstOperation"_attr = redact(ops.front().toBSON()),
-                        "lastOperation"_attr = redact(ops.back().toBSON()),
+                        "firstOperation"_attr = redact(ops.front().toBSONForLogging()),
+                        "lastOperation"_attr = redact(ops.back().toBSONForLogging()),
                         "failedWriterThread"_attr = std::distance(statusVector.cbegin(), it),
                         "error"_attr = redact(status));
                     return status;

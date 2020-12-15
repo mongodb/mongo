@@ -127,7 +127,7 @@ StatusWith<IndexBuildOplogEntry> IndexBuildOplogEntry::parse(const repl::OplogEn
     }
 
     auto collUUID = entry.getUuid();
-    invariant(collUUID, str::stream() << redact(entry.getRaw()));
+    invariant(collUUID, str::stream() << redact(entry.toBSONForLogging()));
 
     return IndexBuildOplogEntry{*collUUID,
                                 commandType,

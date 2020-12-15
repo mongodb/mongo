@@ -91,24 +91,25 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
                                 boost::optional<StmtId> stmtId,
                                 boost::optional<repl::OpTime> preImageOpTime = boost::none,
                                 boost::optional<repl::OpTime> postImageOpTime = boost::none) {
-    return repl::OplogEntry(opTime,           // optime
-                            0,                // hash
-                            opType,           // opType
-                            kNs,              // namespace
-                            boost::none,      // uuid
-                            boost::none,      // fromMigrate
-                            0,                // version
-                            object,           // o
-                            object2,          // o2
-                            sessionInfo,      // sessionInfo
-                            boost::none,      // isUpsert
-                            wallClockTime,    // wall clock time
-                            stmtId,           // statement id
-                            boost::none,      // optime of previous write within same transaction
-                            preImageOpTime,   // pre-image optime
-                            postImageOpTime,  // post-image optime
-                            boost::none,      // ShardId of resharding recipient
-                            boost::none);     // _id
+    return {
+        repl::DurableOplogEntry(opTime,          // optime
+                                0,               // hash
+                                opType,          // opType
+                                kNs,             // namespace
+                                boost::none,     // uuid
+                                boost::none,     // fromMigrate
+                                0,               // version
+                                object,          // o
+                                object2,         // o2
+                                sessionInfo,     // sessionInfo
+                                boost::none,     // isUpsert
+                                wallClockTime,   // wall clock time
+                                stmtId,          // statement id
+                                boost::none,     // optime of previous write within same transaction
+                                preImageOpTime,  // pre-image optime
+                                postImageOpTime,  // post-image optime
+                                boost::none,      // ShardId of resharding recipient
+                                boost::none)};    // _id
 }
 
 repl::OplogEntry extractInnerOplog(const repl::OplogEntry& oplog) {
@@ -149,7 +150,7 @@ public:
             BSONArrayBuilder arrBuilder(builder.subarrayStart("oplog"));
 
             for (const auto& oplog : oplogList) {
-                arrBuilder.append(oplog.toBSON());
+                arrBuilder.append(oplog.getEntry().toBSON());
             }
 
             arrBuilder.doneFast();
@@ -614,21 +615,21 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldNotNestAlreadyNestedOplog) 
                                           Date_t(),                     // wall clock time
                                           45);                          // statement id
 
-    auto oplog1 = makeOplogEntry(OpTime(Timestamp(1100, 2), 1),  // optime
-                                 OpTypeEnum::kNoop,              // op type
-                                 BSONObj(),                      // o
-                                 origInnerOplog1.toBSON(),       // o2
-                                 sessionInfo,                    // session info
-                                 Date_t::now(),                  // wall clock time
-                                 23);                            // statement id
+    auto oplog1 = makeOplogEntry(OpTime(Timestamp(1100, 2), 1),        // optime
+                                 OpTypeEnum::kNoop,                    // op type
+                                 BSONObj(),                            // o
+                                 origInnerOplog1.getEntry().toBSON(),  // o2
+                                 sessionInfo,                          // session info
+                                 Date_t::now(),                        // wall clock time
+                                 23);                                  // statement id
 
-    auto oplog2 = makeOplogEntry(OpTime(Timestamp(1080, 2), 1),  // optime
-                                 OpTypeEnum::kNoop,              // op type
-                                 BSONObj(),                      // o
-                                 origInnerOplog2.toBSON(),       // o2
-                                 sessionInfo,                    // session info
-                                 Date_t::now(),                  // wall clock time
-                                 45);                            // statement id
+    auto oplog2 = makeOplogEntry(OpTime(Timestamp(1080, 2), 1),        // optime
+                                 OpTypeEnum::kNoop,                    // op type
+                                 BSONObj(),                            // o
+                                 origInnerOplog2.getEntry().toBSON(),  // o2
+                                 sessionInfo,                          // session info
+                                 Date_t::now(),                        // wall clock time
+                                 45);                                  // statement id
 
     returnOplog({oplog1, oplog2});
 

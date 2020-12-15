@@ -60,24 +60,24 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
                                 boost::optional<StmtId> stmtId,
                                 boost::optional<UUID> uuid,
                                 boost::optional<OpTime> prevOpTime) {
-    return repl::OplogEntry(opTime,                           // optime
-                            boost::none,                      // hash
-                            opType,                           // opType
-                            nss,                              // namespace
-                            uuid,                             // uuid
-                            boost::none,                      // fromMigrate
-                            repl::OplogEntry::kOplogVersion,  // version
-                            object,                           // o
-                            object2,                          // o2
-                            sessionInfo,                      // sessionInfo
-                            boost::none,                      // upsert
-                            wallClockTime,                    // wall clock time
-                            stmtId,                           // statement id
-                            prevOpTime,    // optime of previous write within same transaction
-                            boost::none,   // pre-image optime
-                            boost::none,   // post-image optime
-                            boost::none,   // ShardId of resharding recipient
-                            boost::none);  // _id
+    return {repl::DurableOplogEntry(opTime,                           // optime
+                                    boost::none,                      // hash
+                                    opType,                           // opType
+                                    nss,                              // namespace
+                                    uuid,                             // uuid
+                                    boost::none,                      // fromMigrate
+                                    repl::OplogEntry::kOplogVersion,  // version
+                                    object,                           // o
+                                    object2,                          // o2
+                                    sessionInfo,                      // sessionInfo
+                                    boost::none,                      // upsert
+                                    wallClockTime,                    // wall clock time
+                                    stmtId,                           // statement id
+                                    prevOpTime,  // optime of previous write within same transaction
+                                    boost::none,    // pre-image optime
+                                    boost::none,    // post-image optime
+                                    boost::none,    // ShardId of resharding recipient
+                                    boost::none)};  // _id
 }
 
 OplogEntry makeCommandOplogEntry(OpTime opTime,

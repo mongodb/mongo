@@ -448,7 +448,7 @@ std::string IdempotencyTest::getStatesString(const std::vector<CollectionState>&
     sb << "found after applying the operations a second time, therefore breaking idempotency.\n";
     sb << "Applied ops:\n";
     for (const auto& op : state2Ops) {
-        sb << op.toString() << "\n";
+        sb << op.toStringForLogging() << "\n";
     }
     return sb.str();
 }

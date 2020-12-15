@@ -102,7 +102,7 @@ boost::optional<long long> _parseDroppedCollectionCount(const OplogEntry& oplogE
         LOGV2_WARNING(21634,
                       "Unable to get collection count from oplog entry without the o2 field",
                       "type"_attr = desc,
-                      "oplogEntry"_attr = redact(oplogEntry.toBSON()));
+                      "oplogEntry"_attr = redact(oplogEntry.toBSONForLogging()));
         return boost::none;
     }
 
@@ -114,7 +114,7 @@ boost::optional<long long> _parseDroppedCollectionCount(const OplogEntry& oplogE
                       "Failed to parse oplog entry for collection count",
                       "type"_attr = desc,
                       "error"_attr = status,
-                      "oplogEntry"_attr = redact(oplogEntry.toBSON()));
+                      "oplogEntry"_attr = redact(oplogEntry.toBSONForLogging()));
         return boost::none;
     }
 
@@ -123,7 +123,7 @@ boost::optional<long long> _parseDroppedCollectionCount(const OplogEntry& oplogE
                       "Invalid collection count found in oplog entry",
                       "type"_attr = desc,
                       "count"_attr = count,
-                      "oplogEntry"_attr = redact(oplogEntry.toBSON()));
+                      "oplogEntry"_attr = redact(oplogEntry.toBSONForLogging()));
         return boost::none;
     }
 
@@ -132,7 +132,7 @@ boost::optional<long long> _parseDroppedCollectionCount(const OplogEntry& oplogE
                 "Parsed collection count of oplog entry",
                 "count"_attr = count,
                 "type"_attr = desc,
-                "oplogEntry"_attr = redact(oplogEntry.toBSON()));
+                "oplogEntry"_attr = redact(oplogEntry.toBSONForLogging()));
     return count;
 }
 
@@ -822,7 +822,7 @@ Status RollbackImpl::_processRollbackOp(OperationContext* opCtx, const OplogEntr
         const auto uuid = oplogEntry.getUuid();
         invariant(uuid,
                   str::stream() << "Oplog entry to roll back is unexpectedly missing a UUID: "
-                                << redact(oplogEntry.toBSON()));
+                                << redact(oplogEntry.toBSONForLogging()));
         const auto idElem = oplogEntry.getIdElement();
         if (!idElem.eoo()) {
             // We call BSONElement::wrap() on each _id element to create a new BSONObj with an owned
@@ -844,7 +844,7 @@ Status RollbackImpl::_processRollbackOp(OperationContext* opCtx, const OplogEntr
             LOGV2_WARNING(21641,
                           "Shard identity document rollback detected. oplog op: {oplogEntry}",
                           "Shard identity document rollback detected",
-                          "oplogEntry"_attr = redact(oplogEntry.toBSON()));
+                          "oplogEntry"_attr = redact(oplogEntry.toBSONForLogging()));
         } else if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer &&
                    opNss == VersionType::ConfigNS) {
             // Check if the creation of the config server config version document is being rolled
@@ -853,7 +853,7 @@ Status RollbackImpl::_processRollbackOp(OperationContext* opCtx, const OplogEntr
             LOGV2_WARNING(21642,
                           "Config version document rollback detected. oplog op: {oplogEntry}",
                           "Config version document rollback detected",
-                          "oplogEntry"_attr = redact(oplogEntry.toBSON()));
+                          "oplogEntry"_attr = redact(oplogEntry.toBSONForLogging()));
         }
 
         // Rolling back an insert must decrement the count by 1.
@@ -877,7 +877,7 @@ Status RollbackImpl::_processRollbackOp(OperationContext* opCtx, const OplogEntr
                     invariant(UUID::parse(catalogEntry["md"]["options"]["uuid"]),
                               str::stream() << "Oplog entry to roll back is unexpectedly missing "
                                                "import collection UUID: "
-                                            << redact(oplogEntry.toBSON()));
+                                            << redact(oplogEntry.toBSONForLogging()));
                 // If we roll back an import, then we do not need to change the size of that uuid.
                 _countDiffs.erase(importTargetUUID);
                 _pendingDrops.erase(importTargetUUID);
@@ -893,7 +893,7 @@ Status RollbackImpl::_processRollbackOp(OperationContext* opCtx, const OplogEntr
             const auto uuid = oplogEntry.getUuid().get();
             invariant(_countDiffs.find(uuid) == _countDiffs.end(),
                       str::stream() << "Unexpected existing count diff for " << uuid.toString()
-                                    << " op: " << redact(oplogEntry.toBSON()));
+                                    << " op: " << redact(oplogEntry.toBSONForLogging()));
             if (auto countResult = _parseDroppedCollectionCount(oplogEntry)) {
                 PendingDropInfo info;
                 info.count = *countResult;
@@ -917,11 +917,11 @@ Status RollbackImpl::_processRollbackOp(OperationContext* opCtx, const OplogEntr
                 UUID::parse(oplogEntry.getObject()[kDropTargetFieldName]),
                 str::stream()
                     << "Oplog entry to roll back is unexpectedly missing dropTarget UUID: "
-                    << redact(oplogEntry.toBSON()));
+                    << redact(oplogEntry.toBSONForLogging()));
             invariant(_countDiffs.find(dropTargetUUID) == _countDiffs.end(),
                       str::stream()
                           << "Unexpected existing count diff for " << dropTargetUUID.toString()
-                          << " op: " << redact(oplogEntry.toBSON()));
+                          << " op: " << redact(oplogEntry.toBSONForLogging()));
             if (auto countResult = _parseDroppedCollectionCount(oplogEntry)) {
                 PendingDropInfo info;
                 info.count = *countResult;

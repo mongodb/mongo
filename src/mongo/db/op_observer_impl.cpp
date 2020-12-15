@@ -70,8 +70,8 @@
 #include "mongo/util/fail_point.h"
 
 namespace mongo {
+using repl::DurableOplogEntry;
 using repl::MutableOplogEntry;
-using repl::OplogEntry;
 const OperationContext::Decoration<boost::optional<OpObserverImpl::DocumentKey>>
     documentKeyDecoration =
         OperationContext::declareDecoration<boost::optional<OpObserverImpl::DocumentKey>>();
@@ -957,7 +957,8 @@ std::vector<repl::ReplOperation>::iterator packTransactionStatementsForApplyOps(
         // should be able to be applied.
         if (opsArray.arrSize() == gMaxNumberOfTransactionOperationsInSingleOplogEntry ||
             (opsArray.arrSize() > 0 &&
-             (opsArray.len() + OplogEntry::getDurableReplOperationSize(stmt) > BSONObjMaxUserSize)))
+             (opsArray.len() + DurableOplogEntry::getDurableReplOperationSize(stmt) >
+              BSONObjMaxUserSize)))
             break;
         opsArray.append(stmt.toBSON());
     }

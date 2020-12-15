@@ -64,7 +64,7 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
                                 repl::OpTime prevWriteOpTimeInTransaction,
                                 boost::optional<repl::OpTime> preImageOpTime,
                                 boost::optional<repl::OpTime> postImageOpTime) {
-    return repl::OplogEntry(
+    return {repl::DurableOplogEntry(
         opTime,                           // optime
         0,                                // hash
         opType,                           // opType
@@ -82,7 +82,7 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
         preImageOpTime,                   // pre-image optime
         postImageOpTime,                  // post-image optime
         boost::none,                      // ShardId of resharding recipient
-        boost::none);                     // _id
+        boost::none)};                    // _id
 }
 
 repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
@@ -150,7 +150,7 @@ TEST_F(SessionCatalogMigrationSourceTest, OneSessionWithTwoWrites) {
         auto nextOplogResult = migrationSource.getLastFetchedOplog();
         ASSERT_FALSE(nextOplogResult.shouldWaitForMajority);
         // Cannot compare directly because of SERVER-31356
-        ASSERT_BSONOBJ_EQ(entry2.toBSON(), nextOplogResult.oplog->toBSON());
+        ASSERT_BSONOBJ_EQ(entry2.getEntry().toBSON(), nextOplogResult.oplog->getEntry().toBSON());
         ASSERT_TRUE(migrationSource.fetchNextOplog(opCtx()));
     }
 
@@ -159,7 +159,7 @@ TEST_F(SessionCatalogMigrationSourceTest, OneSessionWithTwoWrites) {
         auto nextOplogResult = migrationSource.getLastFetchedOplog();
         ASSERT_FALSE(nextOplogResult.shouldWaitForMajority);
         // Cannot compare directly because of SERVER-31356
-        ASSERT_BSONOBJ_EQ(entry1.toBSON(), nextOplogResult.oplog->toBSON());
+        ASSERT_BSONOBJ_EQ(entry1.getEntry().toBSON(), nextOplogResult.oplog->getEntry().toBSON());
     }
 
     ASSERT_FALSE(migrationSource.fetchNextOplog(opCtx()));
@@ -237,7 +237,8 @@ TEST_F(SessionCatalogMigrationSourceTest, TwoSessionWithTwoWrites) {
             auto nextOplogResult = migrationSource.getLastFetchedOplog();
             ASSERT_FALSE(nextOplogResult.shouldWaitForMajority);
             // Cannot compare directly because of SERVER-31356
-            ASSERT_BSONOBJ_EQ(firstExpectedOplog.toBSON(), nextOplogResult.oplog->toBSON());
+            ASSERT_BSONOBJ_EQ(firstExpectedOplog.getEntry().toBSON(),
+                              nextOplogResult.oplog->getEntry().toBSON());
             ASSERT_TRUE(migrationSource.fetchNextOplog(opCtx()));
         }
 
@@ -245,7 +246,8 @@ TEST_F(SessionCatalogMigrationSourceTest, TwoSessionWithTwoWrites) {
             ASSERT_TRUE(migrationSource.hasMoreOplog());
             auto nextOplogResult = migrationSource.getLastFetchedOplog();
             ASSERT_FALSE(nextOplogResult.shouldWaitForMajority);
-            ASSERT_BSONOBJ_EQ(secondExpectedOplog.toBSON(), nextOplogResult.oplog->toBSON());
+            ASSERT_BSONOBJ_EQ(secondExpectedOplog.getEntry().toBSON(),
+                              nextOplogResult.oplog->getEntry().toBSON());
         }
     };
 
@@ -333,7 +335,7 @@ TEST_F(SessionCatalogMigrationSourceTest, OneSessionWithFindAndModifyPreImageAnd
         auto nextOplogResult = migrationSource.getLastFetchedOplog();
         ASSERT_FALSE(nextOplogResult.shouldWaitForMajority);
         // Cannot compare directly because of SERVER-31356
-        ASSERT_BSONOBJ_EQ(oplog.toBSON(), nextOplogResult.oplog->toBSON());
+        ASSERT_BSONOBJ_EQ(oplog.getEntry().toBSON(), nextOplogResult.oplog->getEntry().toBSON());
         migrationSource.fetchNextOplog(opCtx());
     }
 
@@ -391,7 +393,7 @@ TEST_F(SessionCatalogMigrationSourceTest, OplogWithOtherNsShouldBeIgnored) {
     auto nextOplogResult = migrationSource.getLastFetchedOplog();
     ASSERT_FALSE(nextOplogResult.shouldWaitForMajority);
     // Cannot compare directly because of SERVER-31356
-    ASSERT_BSONOBJ_EQ(entry1.toBSON(), nextOplogResult.oplog->toBSON());
+    ASSERT_BSONOBJ_EQ(entry1.getEntry().toBSON(), nextOplogResult.oplog->getEntry().toBSON());
 
     ASSERT_FALSE(migrationSource.fetchNextOplog(opCtx()));
     ASSERT_FALSE(migrationSource.hasMoreOplog());
@@ -452,7 +454,7 @@ TEST_F(SessionCatalogMigrationSourceTest, SessionDumpWithMultipleNewWrites) {
         auto nextOplogResult = migrationSource.getLastFetchedOplog();
         ASSERT_FALSE(nextOplogResult.shouldWaitForMajority);
         // Cannot compare directly because of SERVER-31356
-        ASSERT_BSONOBJ_EQ(entry1.toBSON(), nextOplogResult.oplog->toBSON());
+        ASSERT_BSONOBJ_EQ(entry1.getEntry().toBSON(), nextOplogResult.oplog->getEntry().toBSON());
         ASSERT_TRUE(migrationSource.fetchNextOplog(opCtx()));
     }
 
@@ -460,7 +462,7 @@ TEST_F(SessionCatalogMigrationSourceTest, SessionDumpWithMultipleNewWrites) {
         ASSERT_TRUE(migrationSource.hasMoreOplog());
         auto nextOplogResult = migrationSource.getLastFetchedOplog();
         ASSERT_TRUE(nextOplogResult.shouldWaitForMajority);
-        ASSERT_BSONOBJ_EQ(entry2.toBSON(), nextOplogResult.oplog->toBSON());
+        ASSERT_BSONOBJ_EQ(entry2.getEntry().toBSON(), nextOplogResult.oplog->getEntry().toBSON());
         ASSERT_TRUE(migrationSource.fetchNextOplog(opCtx()));
     }
 
@@ -468,7 +470,7 @@ TEST_F(SessionCatalogMigrationSourceTest, SessionDumpWithMultipleNewWrites) {
         ASSERT_TRUE(migrationSource.hasMoreOplog());
         auto nextOplogResult = migrationSource.getLastFetchedOplog();
         ASSERT_TRUE(nextOplogResult.shouldWaitForMajority);
-        ASSERT_BSONOBJ_EQ(entry3.toBSON(), nextOplogResult.oplog->toBSON());
+        ASSERT_BSONOBJ_EQ(entry3.getEntry().toBSON(), nextOplogResult.oplog->getEntry().toBSON());
     }
 
     ASSERT_FALSE(migrationSource.fetchNextOplog(opCtx()));
@@ -509,7 +511,7 @@ TEST_F(SessionCatalogMigrationSourceTest, ShouldBeAbleInsertNewWritesAfterBuffer
         auto nextOplogResult = migrationSource.getLastFetchedOplog();
         ASSERT_TRUE(nextOplogResult.shouldWaitForMajority);
         // Cannot compare directly because of SERVER-31356
-        ASSERT_BSONOBJ_EQ(entry.toBSON(), nextOplogResult.oplog->toBSON());
+        ASSERT_BSONOBJ_EQ(entry.getEntry().toBSON(), nextOplogResult.oplog->getEntry().toBSON());
 
         ASSERT_FALSE(migrationSource.fetchNextOplog(opCtx()));
         ASSERT_FALSE(migrationSource.hasMoreOplog());
@@ -533,7 +535,7 @@ TEST_F(SessionCatalogMigrationSourceTest, ShouldBeAbleInsertNewWritesAfterBuffer
         ASSERT_TRUE(migrationSource.fetchNextOplog(opCtx()));
         auto nextOplogResult = migrationSource.getLastFetchedOplog();
         ASSERT_TRUE(nextOplogResult.shouldWaitForMajority);
-        ASSERT_BSONOBJ_EQ(entry.toBSON(), nextOplogResult.oplog->toBSON());
+        ASSERT_BSONOBJ_EQ(entry.getEntry().toBSON(), nextOplogResult.oplog->getEntry().toBSON());
 
         ASSERT_FALSE(migrationSource.fetchNextOplog(opCtx()));
         ASSERT_FALSE(migrationSource.hasMoreOplog());
@@ -557,7 +559,7 @@ TEST_F(SessionCatalogMigrationSourceTest, ShouldBeAbleInsertNewWritesAfterBuffer
         ASSERT_TRUE(migrationSource.fetchNextOplog(opCtx()));
         auto nextOplogResult = migrationSource.getLastFetchedOplog();
         ASSERT_TRUE(nextOplogResult.shouldWaitForMajority);
-        ASSERT_BSONOBJ_EQ(entry.toBSON(), nextOplogResult.oplog->toBSON());
+        ASSERT_BSONOBJ_EQ(entry.getEntry().toBSON(), nextOplogResult.oplog->getEntry().toBSON());
 
         ASSERT_FALSE(migrationSource.fetchNextOplog(opCtx()));
         ASSERT_FALSE(migrationSource.hasMoreOplog());
@@ -594,7 +596,7 @@ TEST_F(SessionCatalogMigrationSourceTest, ReturnsDeadEndSentinelForIncompleteHis
         auto nextOplogResult = migrationSource.getLastFetchedOplog();
         ASSERT_FALSE(nextOplogResult.shouldWaitForMajority);
         // Cannot compare directly because of SERVER-31356
-        ASSERT_BSONOBJ_EQ(entry.toBSON(), nextOplogResult.oplog->toBSON());
+        ASSERT_BSONOBJ_EQ(entry.getEntry().toBSON(), nextOplogResult.oplog->getEntry().toBSON());
         ASSERT_TRUE(migrationSource.fetchNextOplog(opCtx()));
     }
 
@@ -651,7 +653,7 @@ TEST_F(SessionCatalogMigrationSourceTest, ShouldAssertWhenRollbackDetected) {
         auto nextOplogResult = migrationSource.getLastFetchedOplog();
         ASSERT_FALSE(nextOplogResult.shouldWaitForMajority);
         // Cannot compare directly because of SERVER-31356
-        ASSERT_BSONOBJ_EQ(entry.toBSON(), nextOplogResult.oplog->toBSON());
+        ASSERT_BSONOBJ_EQ(entry.getEntry().toBSON(), nextOplogResult.oplog->getEntry().toBSON());
     }
 
     ASSERT_OK(repl::ReplicationProcess::get(opCtx())->incrementRollbackID(opCtx()));
@@ -792,7 +794,8 @@ TEST_F(SessionCatalogMigrationSourceTest,
         auto nextOplogResult = migrationSource.getLastFetchedOplog();
         ASSERT_FALSE(nextOplogResult.shouldWaitForMajority);
         // Cannot compare directly because of SERVER-31356
-        ASSERT_BSONOBJ_EQ(insertOplog.toBSON(), nextOplogResult.oplog->toBSON());
+        ASSERT_BSONOBJ_EQ(insertOplog.getEntry().toBSON(),
+                          nextOplogResult.oplog->getEntry().toBSON());
     };
 
     // Function to verify the oplog entry corresponding to the transaction.
@@ -935,7 +938,7 @@ TEST_F(SessionCatalogMigrationSourceTest,
         auto nextOplogResult = migrationSource.getLastFetchedOplog();
         ASSERT_FALSE(nextOplogResult.shouldWaitForMajority);
         // Cannot compare directly because of SERVER-31356
-        ASSERT_BSONOBJ_EQ(oplog.toBSON(), nextOplogResult.oplog->toBSON());
+        ASSERT_BSONOBJ_EQ(oplog.getEntry().toBSON(), nextOplogResult.oplog->getEntry().toBSON());
         migrationSource.fetchNextOplog(opCtx());
     }
 
@@ -1093,7 +1096,7 @@ TEST_F(SessionCatalogMigrationSourceTest, TwoSessionWithTwoWritesContainingWrite
         auto nextOplogResult = migrationSource.getLastFetchedOplog();
         ASSERT_FALSE(nextOplogResult.shouldWaitForMajority);
         // Cannot compare directly because of SERVER-31356
-        ASSERT_BSONOBJ_EQ(oplog.toBSON(), nextOplogResult.oplog->toBSON());
+        ASSERT_BSONOBJ_EQ(oplog.getEntry().toBSON(), nextOplogResult.oplog->getEntry().toBSON());
         migrationSource.fetchNextOplog(opCtx());
     }
 

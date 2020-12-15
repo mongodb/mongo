@@ -1092,7 +1092,7 @@ boost::optional<repl::OpTime> MigrationChunkClonerSourceLegacy::nextSessionMigra
         }
 
         auto newOpTime = result.oplog->getOpTime();
-        auto oplogDoc = result.oplog->toBSON();
+        auto oplogDoc = result.oplog->getEntry().toBSON();
 
         // Use the builder size instead of accumulating the document sizes directly so that we
         // take into consideration the overhead of BSONArray indices.

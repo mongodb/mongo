@@ -212,12 +212,12 @@ Status ReshardingOplogApplicationRules::ReshardingOplogApplicationRules::applyCo
                 return Status(ErrorCodes::OplogOperationUnsupported,
                               str::stream()
                                   << "Received drop command for resharding source collection "
-                                  << redact(op.toBSON()));
+                                  << redact(op.toBSONForLogging()));
             }
 
             return Status(ErrorCodes::OplogOperationUnsupported,
                           str::stream() << "Command not supported during resharding: "
-                                        << redact(op.toBSON()));
+                                        << redact(op.toBSONForLogging()));
         }
 
         // TODO SERVER-49907 implement applyOps write rule
@@ -264,7 +264,8 @@ void ReshardingOplogApplicationRules::_applyInsert_inlock(
     // If the 'o' field does not have an _id, the oplog entry is corrupted.
     auto idField = oField["_id"];
     uassert(ErrorCodes::NoSuchKey,
-            str::stream() << "Failed to apply insert due to missing _id: " << redact(op.toBSON()),
+            str::stream() << "Failed to apply insert due to missing _id: "
+                          << redact(op.toBSONForLogging()),
             !idField.eoo());
 
     BSONObj idQuery = idField.wrap();
@@ -360,7 +361,8 @@ void ReshardingOplogApplicationRules::_applyUpdate_inlock(
     // If the 'o2' field does not have an _id, the oplog entry is corrupted.
     auto idField = o2Field["_id"];
     uassert(ErrorCodes::NoSuchKey,
-            str::stream() << "Failed to apply update due to missing _id: " << redact(op.toBSON()),
+            str::stream() << "Failed to apply update due to missing _id: "
+                          << redact(op.toBSONForLogging()),
             !idField.eoo());
 
     BSONObj idQuery = idField.wrap();
@@ -445,7 +447,8 @@ void ReshardingOplogApplicationRules::_applyDelete_inlock(
     // If the 'o' field does not have an _id, the oplog entry is corrupted.
     auto idField = oField["_id"];
     uassert(ErrorCodes::NoSuchKey,
-            str::stream() << "Failed to apply delete due to missing _id: " << redact(op.toBSON()),
+            str::stream() << "Failed to apply delete due to missing _id: "
+                          << redact(op.toBSONForLogging()),
             !idField.eoo());
 
     BSONObj idQuery = idField.wrap();

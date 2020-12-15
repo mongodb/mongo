@@ -56,7 +56,7 @@ void TenantOplogBatcher::_pushEntry(OperationContext* opCtx,
                                     OplogEntry&& op) {
     uassert(4885606,
             str::stream() << "Prepared transactions are not supported for tenant migration."
-                          << redact(op.toBSON()),
+                          << redact(op.toBSONForLogging()),
             !op.isPreparedCommit() &&
                 (op.getCommandType() != OplogEntry::CommandType::kApplyOps || !op.shouldPrepare()));
     if (op.isTerminalApplyOps()) {
@@ -65,7 +65,7 @@ void TenantOplogBatcher::_pushEntry(OperationContext* opCtx,
         // This applies to both multi-document transactions and atomic applyOps.
         auto expansionsIndex = batch->expansions.size();
         auto& curExpansion = batch->expansions.emplace_back();
-        auto lastOpInTransactionBson = op.toBSON();
+        auto lastOpInTransactionBson = op.getEntry().toBSON();
         repl::ApplyOps::extractOperationsTo(op, lastOpInTransactionBson, &curExpansion);
         auto oplogPrevTsOption = op.getPrevWriteOpTimeInTransaction();
         if (oplogPrevTsOption && !oplogPrevTsOption->isNull()) {

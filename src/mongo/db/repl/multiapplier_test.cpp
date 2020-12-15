@@ -66,24 +66,24 @@ void MultiApplierTest::setUp() {
  * Generates oplog entries with the given number used for the timestamp.
  */
 OplogEntry makeOplogEntry(int ts) {
-    return OplogEntry(OpTime(Timestamp(ts, 1), 1),  // optime
-                      boost::none,                  // hash
-                      OpTypeEnum::kNoop,            // op type
-                      NamespaceString("a.a"),       // namespace
-                      boost::none,                  // uuid
-                      boost::none,                  // fromMigrate
-                      OplogEntry::kOplogVersion,    // version
-                      BSONObj(),                    // o
-                      boost::none,                  // o2
-                      {},                           // sessionInfo
-                      boost::none,                  // upsert
-                      Date_t(),                     // wall clock time
-                      boost::none,                  // statement id
-                      boost::none,   // optime of previous write within same transaction
-                      boost::none,   // pre-image optime
-                      boost::none,   // post-image optime
-                      boost::none,   // ShardId of resharding recipient
-                      boost::none);  // _id
+    return {DurableOplogEntry(OpTime(Timestamp(ts, 1), 1),  // optime
+                              boost::none,                  // hash
+                              OpTypeEnum::kNoop,            // op type
+                              NamespaceString("a.a"),       // namespace
+                              boost::none,                  // uuid
+                              boost::none,                  // fromMigrate
+                              OplogEntry::kOplogVersion,    // version
+                              BSONObj(),                    // o
+                              boost::none,                  // o2
+                              {},                           // sessionInfo
+                              boost::none,                  // upsert
+                              Date_t(),                     // wall clock time
+                              boost::none,                  // statement id
+                              boost::none,    // optime of previous write within same transaction
+                              boost::none,    // pre-image optime
+                              boost::none,    // post-image optime
+                              boost::none,    // ShardId of resharding recipient
+                              boost::none)};  // _id
 }
 
 TEST_F(MultiApplierTest, InvalidConstruction) {
@@ -260,7 +260,7 @@ TEST_F(
 
     ASSERT_TRUE(multiApplyTxn);
     ASSERT_EQUALS(1U, operationsToApply.size());
-    ASSERT_BSONOBJ_EQ(operations[0].getRaw(), operationsToApply[0].getRaw());
+    ASSERT_BSONOBJ_EQ(operations[0].getEntry().toBSON(), operationsToApply[0].getEntry().toBSON());
 
     ASSERT_OK(callbackResult);
     ASSERT_FALSE(callbackTxn);

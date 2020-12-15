@@ -78,7 +78,7 @@ StatusWith<InsertGroup::ConstIterator> InsertGroup::groupAndApplyInserts(
     if (entry.getOpType() != OpTypeEnum::kInsert) {
         return Status(ErrorCodes::TypeMismatch, "Can only group insert operations.");
     }
-    if (entry.isForCappedCollection) {
+    if (entry.isForCappedCollection()) {
         return Status(ErrorCodes::InvalidOptions,
                       "Cannot group insert operations on capped collections.");
     }
@@ -143,7 +143,7 @@ StatusWith<InsertGroup::ConstIterator> InsertGroup::groupAndApplyInserts(
             "Error applying inserts in bulk. Trying first insert as a lone insert";
         auto status = exceptionToStatus().withContext(
             str::stream() << message << ". Grouped inserts: " << redact(groupedInserts.toBSON())
-                          << ". First insert: " << redact(entry.getRaw()));
+                          << ". First insert: " << redact(entry.toBSONForLogging()));
 
         // It's not an error during initial sync to encounter DuplicateKey errors.
         if (Mode::kInitialSync == _mode && ErrorCodes::DuplicateKey == status) {
@@ -151,12 +151,12 @@ StatusWith<InsertGroup::ConstIterator> InsertGroup::groupAndApplyInserts(
                         2,
                         message,
                         "groupedInserts"_attr = redact(groupedInserts.toBSON()),
-                        "firstInsert"_attr = redact(entry.getRaw()));
+                        "firstInsert"_attr = redact(entry.toBSONForLogging()));
         } else {
             LOGV2_ERROR(21204,
                         message,
                         "groupedInserts"_attr = redact(groupedInserts.toBSON()),
-                        "firstInsert"_attr = redact(entry.getRaw()));
+                        "firstInsert"_attr = redact(entry.toBSONForLogging()));
         }
 
         // Avoid quadratic run time from failed insert by not retrying until we

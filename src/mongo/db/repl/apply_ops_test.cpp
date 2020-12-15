@@ -337,24 +337,24 @@ TEST_F(ApplyOpsTest, ApplyOpsPropagatesOplogApplicationMode) {
  * Generates oplog entries with the given number used for the timestamp.
  */
 OplogEntry makeOplogEntry(OpTypeEnum opType, const BSONObj& oField) {
-    return OplogEntry(OpTime(Timestamp(1, 1), 1),  // optime
-                      boost::none,                 // hash
-                      opType,                      // op type
-                      NamespaceString("a.a"),      // namespace
-                      boost::none,                 // uuid
-                      boost::none,                 // fromMigrate
-                      OplogEntry::kOplogVersion,   // version
-                      oField,                      // o
-                      boost::none,                 // o2
-                      {},                          // sessionInfo
-                      boost::none,                 // upsert
-                      Date_t(),                    // wall clock time
-                      boost::none,                 // statement id
-                      boost::none,   // optime of previous write within same transaction
-                      boost::none,   // pre-image optime
-                      boost::none,   // post-image optime
-                      boost::none,   // ShardId of resharding recipient
-                      boost::none);  // _id
+    return {DurableOplogEntry(OpTime(Timestamp(1, 1), 1),  // optime
+                              boost::none,                 // hash
+                              opType,                      // op type
+                              NamespaceString("a.a"),      // namespace
+                              boost::none,                 // uuid
+                              boost::none,                 // fromMigrate
+                              OplogEntry::kOplogVersion,   // version
+                              oField,                      // o
+                              boost::none,                 // o2
+                              {},                          // sessionInfo
+                              boost::none,                 // upsert
+                              Date_t(),                    // wall clock time
+                              boost::none,                 // statement id
+                              boost::none,    // optime of previous write within same transaction
+                              boost::none,    // pre-image optime
+                              boost::none,    // post-image optime
+                              boost::none,    // ShardId of resharding recipient
+                              boost::none)};  // _id
 }
 
 TEST_F(ApplyOpsTest, ExtractOperationsReturnsTypeMismatchIfNotCommand) {
@@ -403,7 +403,7 @@ TEST_F(ApplyOpsTest, ExtractOperationsReturnsOperationsWithSameOpTimeAsApplyOps)
 
     auto operations = ApplyOps::extractOperations(oplogEntry);
     ASSERT_EQUALS(3U, operations.size())
-        << "Unexpected number of operations extracted: " << oplogEntry.toBSON();
+        << "Unexpected number of operations extracted: " << oplogEntry.toBSONForLogging();
 
     // Check extracted CRUD operations.
     auto it = operations.cbegin();
@@ -411,7 +411,7 @@ TEST_F(ApplyOpsTest, ExtractOperationsReturnsOperationsWithSameOpTimeAsApplyOps)
         ASSERT(operations.cend() != it);
         const auto& operation1 = *(it++);
         ASSERT(OpTypeEnum::kInsert == operation1.getOpType())
-            << "Unexpected op type: " << operation1.toBSON();
+            << "Unexpected op type: " << operation1.toBSONForLogging();
         ASSERT_EQUALS(ui1, *operation1.getUuid());
         ASSERT_EQUALS(ns1, operation1.getNss());
         ASSERT_BSONOBJ_EQ(BSON("_id" << 1), operation1.getOperationToApply());
@@ -424,7 +424,7 @@ TEST_F(ApplyOpsTest, ExtractOperationsReturnsOperationsWithSameOpTimeAsApplyOps)
         ASSERT(operations.cend() != it);
         const auto& operation2 = *(it++);
         ASSERT(OpTypeEnum::kInsert == operation2.getOpType())
-            << "Unexpected op type: " << operation2.toBSON();
+            << "Unexpected op type: " << operation2.toBSONForLogging();
         ASSERT_EQUALS(ui2, *operation2.getUuid());
         ASSERT_EQUALS(ns2, operation2.getNss());
         ASSERT_BSONOBJ_EQ(BSON("_id" << 2), operation2.getOperationToApply());
@@ -437,7 +437,7 @@ TEST_F(ApplyOpsTest, ExtractOperationsReturnsOperationsWithSameOpTimeAsApplyOps)
         ASSERT(operations.cend() != it);
         const auto& operation3 = *(it++);
         ASSERT(OpTypeEnum::kUpdate == operation3.getOpType())
-            << "Unexpected op type: " << operation3.toBSON();
+            << "Unexpected op type: " << operation3.toBSONForLogging();
         ASSERT_EQUALS(ui3, *operation3.getUuid());
         ASSERT_EQUALS(ns3, operation3.getNss());
         ASSERT_BSONOBJ_EQ(BSON("x" << 1), operation3.getOperationToApply());

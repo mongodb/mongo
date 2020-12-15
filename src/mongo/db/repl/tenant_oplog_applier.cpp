@@ -470,7 +470,7 @@ void TenantOplogApplier::_writeNoOpsForRange(OpObserver* opObserver,
                     opCtx.get(),
                     entry.getNss(),
                     entry.getUuid(),
-                    entry.toBSON(),
+                    entry.getEntry().toBSON(),
                     BSONObj(),
                     // We link the no-ops together by recipient op time the same way the actual ops
                     // were linked together by donor op time.  This is to allow retryable writes
@@ -539,7 +539,7 @@ Status TenantOplogApplier::_applyOplogEntryOrGroupedInserts(
                     "Index operations are not currently supported in tenant migration",
                     "tenant"_attr = _tenantId,
                     "migrationUuid"_attr = _migrationUuid,
-                    "op"_attr = redact(op.toBSON()));
+                    "op"_attr = redact(op.toBSONForLogging()));
 
         return Status::OK();
     }
@@ -559,7 +559,7 @@ Status TenantOplogApplier::_applyOplogEntryOrGroupedInserts(
                 "tenant"_attr = _tenantId,
                 "migrationUuid"_attr = _migrationUuid,
                 "error"_attr = status,
-                "op"_attr = redact(op.toBSON()));
+                "op"_attr = redact(op.toBSONForLogging()));
     return status;
 }
 

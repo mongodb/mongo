@@ -114,7 +114,7 @@ Status insertOplogAndUpdateConfigForRetryable(OperationContext* opCtx,
 
     // TODO: handle pre/post image
 
-    auto rawOplogBSON = oplog.toBSON();
+    auto rawOplogBSON = oplog.getEntry().toBSON();
     auto noOpOplog = uassertStatusOK(repl::MutableOplogEntry::parse(rawOplogBSON));
     noOpOplog.setObject2(rawOplogBSON);
     noOpOplog.setNss({});
@@ -407,25 +407,25 @@ Future<void> ReshardingOplogApplier::_applyBatch(OperationContext* opCtx) {
 }
 
 repl::OplogEntry convertToNoOpWithReshardingTag(const repl::OplogEntry& oplog) {
-    return repl::OplogEntry(oplog.getOpTime(),
-                            oplog.getHash(),
-                            repl::OpTypeEnum::kNoop,
-                            oplog.getNss(),
-                            boost::none /* uuid */,
-                            oplog.getFromMigrate(),
-                            oplog.getVersion(),
-                            kReshardingOplogTag,
-                            // Set the o2 field with the original oplog.
-                            oplog.toBSON(),
-                            oplog.getOperationSessionInfo(),
-                            oplog.getUpsert(),
-                            oplog.getWallClockTime(),
-                            oplog.getStatementId(),
-                            oplog.getPrevWriteOpTimeInTransaction(),
-                            oplog.getPreImageOpTime(),
-                            oplog.getPostImageOpTime(),
-                            oplog.getDestinedRecipient(),
-                            oplog.get_id());
+    return {repl::DurableOplogEntry(oplog.getOpTime(),
+                                    oplog.getHash(),
+                                    repl::OpTypeEnum::kNoop,
+                                    oplog.getNss(),
+                                    boost::none /* uuid */,
+                                    oplog.getFromMigrate(),
+                                    oplog.getVersion(),
+                                    kReshardingOplogTag,
+                                    // Set the o2 field with the original oplog.
+                                    oplog.getEntry().toBSON(),
+                                    oplog.getOperationSessionInfo(),
+                                    oplog.getUpsert(),
+                                    oplog.getWallClockTime(),
+                                    oplog.getStatementId(),
+                                    oplog.getPrevWriteOpTimeInTransaction(),
+                                    oplog.getPreImageOpTime(),
+                                    oplog.getPostImageOpTime(),
+                                    oplog.getDestinedRecipient(),
+                                    oplog.get_id())};
 }
 
 void addDerivedOpsToWriterVector(std::vector<std::vector<const repl::OplogEntry*>>* writerVectors,
@@ -434,7 +434,7 @@ void addDerivedOpsToWriterVector(std::vector<std::vector<const repl::OplogEntry*
         invariant(op.getObject().woCompare(kReshardingOplogTag) == 0);
         uassert(4990403,
                 "expected resharding derived oplog to have session id: {}"_format(
-                    op.toBSON().toString()),
+                    redact(op.toBSONForLogging()).toString()),
                 op.getSessionId());
 
         LogicalSessionIdHash hasher;
@@ -478,8 +478,9 @@ std::vector<std::vector<const repl::OplogEntry*>> ReshardingOplogApplier::_fillW
             } else {
                 uasserted(4990401,
                           str::stream() << "retryable oplog applier for " << _sourceId.toBSON()
-                                        << " encountered out of order txnNum, saw " << op.toBSON()
-                                        << " after " << retryableOpList.ops.front()->toBSON());
+                                        << " encountered out of order txnNum, saw "
+                                        << redact(op.toBSONForLogging()) << " after "
+                                        << redact(retryableOpList.ops.front()->toBSONForLogging()));
             }
         }
     }
@@ -537,7 +538,7 @@ Status ReshardingOplogApplier::_applyOplogEntryOrGroupedInserts(
     if (opType == repl::OpTypeEnum::kNoop) {
         return Status::OK();
     } else if (resharding::gUseReshardingOplogApplicationRules) {
-        if (repl::OplogEntry::isCrudOpType(opType)) {
+        if (repl::DurableOplogEntry::isCrudOpType(opType)) {
             return _applicationRules.applyOperation(opCtx, entryOrGroupedInserts);
         } else if (opType == repl::OpTypeEnum::kCommand) {
             return _applicationRules.applyCommand(opCtx, entryOrGroupedInserts);
@@ -557,31 +558,32 @@ Status ReshardingOplogApplier::_applyOplogEntryOrGroupedInserts(
 void ReshardingOplogApplier::_preProcessAndPushOpsToBuffer(repl::OplogEntry oplog) {
     uassert(5012002,
             str::stream() << "trying to apply oplog not belonging to ns " << _nsBeingResharded
-                          << " during resharding: " << oplog.toBSON(),
+                          << " during resharding: " << redact(oplog.toBSONForLogging()),
             _nsBeingResharded == oplog.getNss());
     uassert(5012005,
             str::stream() << "trying to apply oplog with a different UUID from "
-                          << _uuidBeingResharded << " during resharding: " << oplog.toBSON(),
+                          << _uuidBeingResharded
+                          << " during resharding: " << redact(oplog.toBSONForLogging()),
             _uuidBeingResharded == oplog.getUuid());
 
-    auto newOplog = repl::OplogEntry(oplog.getOpTime(),
-                                     oplog.getHash(),
-                                     oplog.getOpType(),
-                                     _outputNs,
-                                     boost::none /* uuid */,
-                                     oplog.getFromMigrate(),
-                                     oplog.getVersion(),
-                                     oplog.getObject(),
-                                     oplog.getObject2(),
-                                     oplog.getOperationSessionInfo(),
-                                     oplog.getUpsert(),
-                                     oplog.getWallClockTime(),
-                                     oplog.getStatementId(),
-                                     oplog.getPrevWriteOpTimeInTransaction(),
-                                     oplog.getPreImageOpTime(),
-                                     oplog.getPostImageOpTime(),
-                                     oplog.getDestinedRecipient(),
-                                     oplog.get_id());
+    repl::OplogEntry newOplog(repl::DurableOplogEntry(oplog.getOpTime(),
+                                                      oplog.getHash(),
+                                                      oplog.getOpType(),
+                                                      _outputNs,
+                                                      boost::none /* uuid */,
+                                                      oplog.getFromMigrate(),
+                                                      oplog.getVersion(),
+                                                      oplog.getObject(),
+                                                      oplog.getObject2(),
+                                                      oplog.getOperationSessionInfo(),
+                                                      oplog.getUpsert(),
+                                                      oplog.getWallClockTime(),
+                                                      oplog.getStatementId(),
+                                                      oplog.getPrevWriteOpTimeInTransaction(),
+                                                      oplog.getPreImageOpTime(),
+                                                      oplog.getPostImageOpTime(),
+                                                      oplog.getDestinedRecipient(),
+                                                      oplog.get_id()));
 
     _currentBatchToApply.push_back(std::move(newOplog));
 }

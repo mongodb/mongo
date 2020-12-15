@@ -1262,11 +1262,11 @@ public:
         ASSERT(Helpers::getLast(
             _opCtx, NamespaceString::kRsOplogNamespace.toString().c_str(), result));
         repl::OplogEntry op(result);
-        ASSERT(op.getOpType() == repl::OpTypeEnum::kCommand) << op.toBSON();
+        ASSERT(op.getOpType() == repl::OpTypeEnum::kCommand) << op.toBSONForLogging();
         // The next logOp() call will get 'futureTs', which will be the timestamp at which we do
         // the write. Thus we expect the write to appear at 'futureTs' and not before.
-        ASSERT_EQ(op.getTimestamp(), futureTs) << op.toBSON();
-        ASSERT_EQ(op.getNss().ns(), nss.getCommandNS().ns()) << op.toBSON();
+        ASSERT_EQ(op.getTimestamp(), futureTs) << op.toBSONForLogging();
+        ASSERT_EQ(op.getNss().ns(), nss.getCommandNS().ns()) << op.toBSONForLogging();
         ASSERT_BSONOBJ_EQ(op.getObject(), BSON("create" << nss.coll()));
 
         assertNamespaceInIdents(nss, pastTs, false);
@@ -3365,7 +3365,7 @@ public:
         // The logOp() call for createCollection should have timestamp 'futureTs', which will also
         // be the timestamp at which we do the write which creates the collection. Thus we expect
         // the collection to appear at 'futureTs' and not before.
-        ASSERT_EQ(op.getTimestamp(), futureTs) << op.toBSON();
+        ASSERT_EQ(op.getTimestamp(), futureTs) << op.toBSONForLogging();
 
         // The index build emits three oplog entries.
         Timestamp indexStartTs;

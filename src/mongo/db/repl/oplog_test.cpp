@@ -118,10 +118,10 @@ TEST_F(OplogTest, LogOpReturnsOpTimeOnSuccessfulInsertIntoOplogCollection) {
     ASSERT_EQUALS(opTime, oplogEntry.getOpTime())
         << "OpTime returned from logOp() did not match that in the oplog entry written to the "
            "oplog: "
-        << oplogEntry.toBSON();
+        << oplogEntry.toBSONForLogging();
     ASSERT(OpTypeEnum::kNoop == oplogEntry.getOpType())
         << "Expected 'n' op type but found '" << OpType_serializer(oplogEntry.getOpType())
-        << "' instead: " << oplogEntry.toBSON();
+        << "' instead: " << oplogEntry.toBSONForLogging();
     ASSERT_BSONOBJ_EQ(msgObj, oplogEntry.getObject());
 
     // Ensure that the msg optime returned is the same as the last optime in the ReplClientInfo.
@@ -134,8 +134,8 @@ TEST_F(OplogTest, LogOpReturnsOpTimeOnSuccessfulInsertIntoOplogCollection) {
 void _checkOplogEntry(const OplogEntry& oplogEntry,
                       const OpTime& expectedOpTime,
                       const NamespaceString& expectedNss) {
-    ASSERT_EQUALS(expectedOpTime, oplogEntry.getOpTime()) << oplogEntry.toBSON();
-    ASSERT_EQUALS(expectedNss, oplogEntry.getNss()) << oplogEntry.toBSON();
+    ASSERT_EQUALS(expectedOpTime, oplogEntry.getOpTime()) << oplogEntry.toBSONForLogging();
+    ASSERT_EQUALS(expectedNss, oplogEntry.getNss()) << oplogEntry.toBSONForLogging();
 }
 void _checkOplogEntry(const OplogEntry& oplogEntry,
                       const std::pair<OpTime, NamespaceString>& expectedOpTimeAndNss) {
@@ -388,10 +388,10 @@ TEST_F(OplogTest, MigrationIdAddedToOplog) {
     ASSERT_EQUALS(opTime, oplogEntry.getOpTime())
         << "OpTime returned from logOp() did not match that in the oplog entry written to the "
            "oplog: "
-        << oplogEntry.toBSON();
+        << oplogEntry.toBSONForLogging();
     ASSERT(OpTypeEnum::kNoop == oplogEntry.getOpType())
         << "Expected 'n' op type but found '" << OpType_serializer(oplogEntry.getOpType())
-        << "' instead: " << oplogEntry.toBSON();
+        << "' instead: " << oplogEntry.toBSONForLogging();
     ASSERT_BSONOBJ_EQ(msgObj, oplogEntry.getObject());
     ASSERT_EQ(migrationUuid, oplogEntry.getFromTenantMigration());
 }

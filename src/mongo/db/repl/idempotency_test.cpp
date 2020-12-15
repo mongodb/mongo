@@ -163,7 +163,7 @@ std::string RandomizedIdempotencyTest::getStatesString(const std::vector<Collect
         } else {
             firstIter = false;
         }
-        sb << op.toString();
+        sb << op.toStringForLogging();
     }
     sb << " ]\n";
 

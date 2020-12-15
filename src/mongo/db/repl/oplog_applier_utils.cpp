@@ -97,7 +97,7 @@ void OplogApplierUtils::processCrudOp(OperationContext* opCtx,
     if (op->getOpType() == OpTypeEnum::kInsert && collProperties.isCapped) {
         // Mark capped collection ops before storing them to ensure we do not attempt to
         // bulk insert them.
-        op->isForCappedCollection = true;
+        op->setIsForCappedCollection(true);
     }
 }
 
@@ -201,7 +201,7 @@ Status OplogApplierUtils::applyOplogEntryOrGroupedInsertsCommon(
     if (opType == OpTypeEnum::kNoop) {
         incrementOpsAppliedStats();
         return Status::OK();
-    } else if (OplogEntry::isCrudOpType(opType)) {
+    } else if (DurableOplogEntry::isCrudOpType(opType)) {
         auto status =
             writeConflictRetry(opCtx, "applyOplogEntryOrGroupedInserts_CRUD", nss.ns(), [&] {
                 // Need to throw instead of returning a status for it to be properly ignored.
@@ -314,7 +314,7 @@ Status OplogApplierUtils::applyOplogBatchCommon(
                 LOGV2_FATAL_CONTINUE(21237,
                                      "Error applying operation ({oplogEntry}): {error}",
                                      "Error applying operation",
-                                     "oplogEntry"_attr = redact(entry.toBSON()),
+                                     "oplogEntry"_attr = redact(entry.toBSONForLogging()),
                                      "error"_attr = causedBy(redact(status)));
                 return status;
             }
@@ -330,7 +330,7 @@ Status OplogApplierUtils::applyOplogBatchCommon(
                                  "writer worker caught exception: {error} on: {oplogEntry}",
                                  "Writer worker caught exception",
                                  "error"_attr = redact(e),
-                                 "oplogEntry"_attr = redact(entry.toBSON()));
+                                 "oplogEntry"_attr = redact(entry.toBSONForLogging()));
             return e.toStatus();
         }
     }

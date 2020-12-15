@@ -623,28 +623,28 @@ OplogEntry makeOplogEntry(int t,
         oField = BSON("dropIndexes"
                       << "a_1");
     }
-    return OplogEntry(OpTime(Timestamp(t, 1), 1),  // optime
-                      boost::none,                 // hash
-                      opType,                      // op type
-                      NamespaceString("a.a"),      // namespace
-                      boost::none,                 // uuid
-                      boost::none,                 // fromMigrate
-                      version,                     // version
-                      oField,                      // o
-                      boost::none,                 // o2
-                      {},                          // sessionInfo
-                      boost::none,                 // upsert
-                      Date_t() + Seconds(t),       // wall clock time
-                      boost::none,                 // statement id
-                      boost::none,   // optime of previous write within same transaction
-                      boost::none,   // pre-image optime
-                      boost::none,   // post-image optime
-                      boost::none,   // ShardId of resharding recipient
-                      boost::none);  // _id
+    return {DurableOplogEntry(OpTime(Timestamp(t, 1), 1),  // optime
+                              boost::none,                 // hash
+                              opType,                      // op type
+                              NamespaceString("a.a"),      // namespace
+                              boost::none,                 // uuid
+                              boost::none,                 // fromMigrate
+                              version,                     // version
+                              oField,                      // o
+                              boost::none,                 // o2
+                              {},                          // sessionInfo
+                              boost::none,                 // upsert
+                              Date_t() + Seconds(t),       // wall clock time
+                              boost::none,                 // statement id
+                              boost::none,    // optime of previous write within same transaction
+                              boost::none,    // pre-image optime
+                              boost::none,    // post-image optime
+                              boost::none,    // ShardId of resharding recipient
+                              boost::none)};  // _id
 }
 
 BSONObj makeOplogEntryObj(int t, OpTypeEnum opType, int version) {
-    return makeOplogEntry(t, opType, version).toBSON();
+    return makeOplogEntry(t, opType, version).getEntry().toBSON();
 }
 
 void InitialSyncerTest::processSuccessfulLastOplogEntryFetcherResponse(std::vector<BSONObj> docs) {
@@ -2037,13 +2037,13 @@ TEST_F(
     _mock->runUntilExpectationsSatisfied();
 
     // Simulate response to OplogFetcher so it has enough operations to reach end timestamp.
-    getOplogFetcher()->receiveBatch(1LL, {makeOplogEntryObj(1), lastOp.toBSON()});
+    getOplogFetcher()->receiveBatch(1LL, {makeOplogEntryObj(1), lastOp.getEntry().toBSON()});
     // Simulate a network error response that restarts the OplogFetcher.
     getOplogFetcher()->simulateResponseError(Status(ErrorCodes::NetworkTimeout, "network error"));
 
     _mock
         ->expect([](auto& request) { return request["find"].str() == "oplog.rs"; },
-                 makeCursorResponse(0LL, _options.localOplogNS, {lastOp.toBSON()}))
+                 makeCursorResponse(0LL, _options.localOplogNS, {lastOp.getEntry().toBSON()}))
         .times(1);
 
     _mock->runUntilExpectationsSatisfied();
@@ -2096,7 +2096,8 @@ TEST_F(InitialSyncerTest,
             processSuccessfulFCVFetcherResponseLastLTS();
 
             // Simulate response to OplogFetcher so it has enough operations to reach end timestamp.
-            getOplogFetcher()->receiveBatch(1LL, {makeOplogEntryObj(1), lastOp.toBSON()});
+            getOplogFetcher()->receiveBatch(1LL,
+                                            {makeOplogEntryObj(1), lastOp.getEntry().toBSON()});
             // Simulate a network error response that restarts the OplogFetcher.
             getOplogFetcher()->simulateResponseError(
                 Status(ErrorCodes::NetworkTimeout, "network error"));
@@ -2104,7 +2105,7 @@ TEST_F(InitialSyncerTest,
 
         // Oplog entry associated with the stopTimestamp.
 
-        processSuccessfulLastOplogEntryFetcherResponse({lastOp.toBSON()});
+        processSuccessfulLastOplogEntryFetcherResponse({lastOp.getEntry().toBSON()});
 
         request = net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(baseRollbackId));
         assertRemoteCommandNameEquals("replSetGetRBID", request);
@@ -3525,7 +3526,7 @@ TEST_F(InitialSyncerTest, LastOpTimeShouldBeSetEvenIfNoOperationsAreAppliedAfter
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(baseRollbackId));
 
         // Oplog entry associated with the defaultBeginFetchingTimestamp.
-        processSuccessfulLastOplogEntryFetcherResponse({oplogEntry.toBSON()});
+        processSuccessfulLastOplogEntryFetcherResponse({oplogEntry.getEntry().toBSON()});
 
         // Send an empty optime as the response to the beginFetchingOptime find request, which will
         // cause the beginFetchingTimestamp to be set to the defaultBeginFetchingTimestamp.
@@ -3535,7 +3536,7 @@ TEST_F(InitialSyncerTest, LastOpTimeShouldBeSetEvenIfNoOperationsAreAppliedAfter
         net->runReadyNetworkOperations();
 
         // Oplog entry associated with the beginApplyingTimestamp.
-        processSuccessfulLastOplogEntryFetcherResponse({oplogEntry.toBSON()});
+        processSuccessfulLastOplogEntryFetcherResponse({oplogEntry.getEntry().toBSON()});
 
         // Instead of fast forwarding to AllDatabaseCloner completion by returning an empty list of
         // database names, we'll simulate copying a single database with a single collection on the
@@ -3587,7 +3588,7 @@ TEST_F(InitialSyncerTest, LastOpTimeShouldBeSetEvenIfNoOperationsAreAppliedAfter
         }
 
         // Oplog entry associated with the stopTimestamp.
-        processSuccessfulLastOplogEntryFetcherResponse({oplogEntry.toBSON()});
+        processSuccessfulLastOplogEntryFetcherResponse({oplogEntry.getEntry().toBSON()});
 
         // Last rollback checker replSetGetRBID command.
         request = assertRemoteCommandNameEquals(
@@ -4128,11 +4129,12 @@ OplogEntry InitialSyncerTest::doInitialSyncWithOneBatch() {
             processSuccessfulFCVFetcherResponseLastLTS();
 
             // Simulate an OplogFetcher batch that has enough operations to reach end timestamp.
-            getOplogFetcher()->receiveBatch(1LL, {makeOplogEntryObj(1), lastOp.toBSON()});
+            getOplogFetcher()->receiveBatch(1LL,
+                                            {makeOplogEntryObj(1), lastOp.getEntry().toBSON()});
         }
 
         // Oplog entry associated with the stopTimestamp.
-        processSuccessfulLastOplogEntryFetcherResponse({lastOp.toBSON()});
+        processSuccessfulLastOplogEntryFetcherResponse({lastOp.getEntry().toBSON()});
 
         request = net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(baseRollbackId));
         assertRemoteCommandNameEquals("replSetGetRBID", request);
@@ -4265,11 +4267,11 @@ TEST_F(InitialSyncerTest,
 
             // Simulate an OplogFetcher batch that has enough operations to reach end timestamp.
             getOplogFetcher()->receiveBatch(
-                1LL, {makeOplogEntryObj(1), makeOplogEntryObj(2), lastOp.toBSON()});
+                1LL, {makeOplogEntryObj(1), makeOplogEntryObj(2), lastOp.getEntry().toBSON()});
         }
 
         // Oplog entry associated with the stopTimestamp.
-        processSuccessfulLastOplogEntryFetcherResponse({lastOp.toBSON()});
+        processSuccessfulLastOplogEntryFetcherResponse({lastOp.getEntry().toBSON()});
 
         // Last rollback ID.
         request = net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(baseRollbackId));
