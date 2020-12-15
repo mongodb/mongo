@@ -443,7 +443,10 @@ const BSONObj& ClientMetadata::getDocument() const {
 }
 
 void ClientMetadata::logClientMetadata(Client* client) const {
-    invariant(!getDocument().isEmpty());
+    if (getDocument().isEmpty()) {
+        return;
+    }
+
     log() << "received client metadata from " << client->getRemote().toString() << " "
           << client->desc() << ": " << getDocument();
 }
@@ -519,16 +522,16 @@ void ClientMetadata::setFromMetadataForOperation(OperationContext* opCtx, BSONEl
 }
 
 void ClientMetadata::setFromMetadata(Client* client, BSONElement& elem) {
-    auto& state = getClientState(client);
+    if (elem.eoo()) {
+        return;
+    }
 
+    auto& state = getClientState(client);
     {
         auto lk = stdx::lock_guard(*client);
-        if (state.isFinalized) {
-            uassert(ErrorCodes::ClientMetadataCannotBeMutated,
-                    "The client metadata document may only be sent in the first hello",
-                    elem.eoo());
-            return;
-        }
+        uassert(ErrorCodes::ClientMetadataCannotBeMutated,
+                "The client metadata document may only be sent in the first hello",
+                !state.isFinalized);
     }
 
     auto meta = ClientMetadata::readFromMetadata(elem);
@@ -540,7 +543,6 @@ void ClientMetadata::setFromMetadata(Client* client, BSONElement& elem) {
     }
 
     auto lk = stdx::lock_guard(*client);
-    invariant(!state.meta, "ClientMetadata was previously set, it should be set precisely once");
     state.meta = std::move(meta);
 }
 
