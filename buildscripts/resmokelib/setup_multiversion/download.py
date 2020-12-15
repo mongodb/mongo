@@ -30,12 +30,11 @@ def download_mongodb(url):
     if not url:
         raise DownloadError("Download URL not found.")
 
-    LOGGER.info("Downloading mongodb.", url=url)
+    LOGGER.info("Downloading.", url=url)
     s3_key = url.split('/', 3)[-1].replace(f"{S3_BUCKET}/", "")
     filename = os.path.join(tempfile.gettempdir(), url.split('/')[-1])
 
-    LOGGER.debug("Downloading mongodb from S3.", s3_bucket=S3_BUCKET, s3_key=s3_key,
-                 filename=filename)
+    LOGGER.debug("Downloading from S3.", s3_bucket=S3_BUCKET, s3_key=s3_key, filename=filename)
     s3_client = boto3.client("s3", config=Config(signature_version=UNSIGNED))
     try:
         s3_client.download_file(S3_BUCKET, s3_key, filename)
@@ -107,13 +106,18 @@ def symlink_version(version, installed_dir, link_dir):
         else:
             raise
 
-    for executable in os.listdir(os.path.join(installed_dir, "bin")):
+    if os.path.isdir(os.path.join(installed_dir, "bin")):
+        bin_dir = os.path.join(installed_dir, "bin")
+    else:
+        bin_dir = installed_dir
+
+    for executable in os.listdir(bin_dir):
 
         executable_name, executable_extension = os.path.splitext(executable)
         link_name = f"{executable_name}-{version}{executable_extension}"
 
         try:
-            executable = os.path.join(installed_dir, "bin", executable)
+            executable = os.path.join(bin_dir, executable)
             executable_link = os.path.join(link_dir, link_name)
 
             if os.name == "nt":

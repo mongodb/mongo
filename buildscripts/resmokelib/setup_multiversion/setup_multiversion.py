@@ -54,6 +54,7 @@ class SetupMultiversion(Subcommand):
         self.architecture = options.architecture.lower() if options.architecture else None
         self.use_latest = options.use_latest
         self.versions = options.versions
+        self.debug_symbols = options.debug_symbols
 
         self.evg_api = evergreen_conn.get_evergreen_api(options.evergreen_config)
         # In evergreen github oauth token is stored as `token ******`, so we remove the leading part
@@ -87,10 +88,13 @@ class SetupMultiversion(Subcommand):
                     urls = self.get_urls(version)
 
                 binaries_url = urls.get("Binaries", "")
-                mongodb_archive = download.download_mongodb(binaries_url)
-                installed_dir = download.extract_archive(mongodb_archive, self.install_dir)
-                os.remove(mongodb_archive)
-                download.symlink_version(version, installed_dir, self.link_dir)
+                self.setup_mongodb(binaries_url, version)
+
+                if self.debug_symbols:
+                    debug_symbols_url = urls.get(" mongo-debugsymbols.tgz", "")
+                    if not debug_symbols_url:
+                        debug_symbols_url = urls.get(" mongo-debugsymbols.zip", "")
+                    self.setup_mongodb(debug_symbols_url, version)
 
             except (github_conn.GithubConnError, evergreen_conn.EvergreenConnError,
                     download.DownloadError) as ex:
@@ -152,6 +156,14 @@ class SetupMultiversion(Subcommand):
                                                         buildvariant_name)
 
         return urls
+
+    def setup_mongodb(self, url, version):
+        """Download, extract and symlink."""
+
+        archive = download.download_mongodb(url)
+        installed_dir = download.extract_archive(archive, self.install_dir)
+        os.remove(archive)
+        download.symlink_version(version, installed_dir, self.link_dir)
 
     def get_buildvariant_name(self, major_minor_version):
         """Return buildvariant name.
@@ -217,6 +229,8 @@ class SetupMultiversionPlugin(PluginInterface):
             "Examples: 4.0, 4.0.1, 4.0.0-rc0. If 'rc' is included in the version name, we'll use the exact rc, "
             "otherwise we'll pull the highest non-rc version compatible with the version specified."
         )
+        parser.add_argument("-ds", "--debugSymbols", dest="debug_symbols", action="store_true",
+                            default=False, help="Additionally download debug symbols.")
         parser.add_argument(
             "-ec", "--evergreenConfig", dest="evergreen_config",
             help="Location of evergreen configuration file. If not specified it will look "

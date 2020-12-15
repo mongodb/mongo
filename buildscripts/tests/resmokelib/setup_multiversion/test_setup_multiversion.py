@@ -44,6 +44,7 @@ class TestSetupMultiversionBase(unittest.TestCase):
             architecture=architecture,
             use_latest=False,
             versions=["4.2.1"],
+            debug_symbols=False,
             evergreen_config=None,
             github_oauth_token=None,
             debug=False,
