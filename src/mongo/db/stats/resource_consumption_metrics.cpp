@@ -45,21 +45,23 @@ const OperationContext::Decoration<ResourceConsumption::MetricsCollector> getMet
 const ServiceContext::Decoration<ResourceConsumption> getGlobalResourceConsumption =
     ServiceContext::declareDecoration<ResourceConsumption>();
 
+static const char kCpuNanos[] = "cpuNanos";
+static const char kCursorSeeks[] = "cursorSeeks";
+static const char kDocBytesRead[] = "docBytesRead";
+static const char kDocBytesWritten[] = "docBytesWritten";
+static const char kDocUnitsRead[] = "docUnitsRead";
+static const char kDocUnitsReturned[] = "docUnitsReturned";
+static const char kDocUnitsWritten[] = "docUnitsWritten";
+static const char kIdxEntryBytesRead[] = "idxEntryBytesRead";
+static const char kIdxEntryBytesWritten[] = "idxEntryBytesWritten";
+static const char kIdxEntryUnitsRead[] = "idxEntryUnitsRead";
+static const char kIdxEntryUnitsWritten[] = "idxEntryUnitsWritten";
+static const char kKeysSorted[] = "keysSorted";
+static const char kMemUsage[] = "memUsage";
+static const char kNumMetrics[] = "numMetrics";
 static const char kPrimaryMetrics[] = "primaryMetrics";
 static const char kSecondaryMetrics[] = "secondaryMetrics";
-static const char kDocBytesRead[] = "docBytesRead";
-static const char kDocUnitsRead[] = "docUnitsRead";
-static const char kIdxEntryBytesRead[] = "idxEntryBytesRead";
-static const char kIdxEntryUnitsRead[] = "idxEntryUnitsRead";
-static const char kKeysSorted[] = "keysSorted";
 static const char kSorterSpills[] = "sorterSpills";
-static const char kCpuNanos[] = "cpuNanos";
-static const char kDocBytesWritten[] = "docBytesWritten";
-static const char kDocUnitsWritten[] = "docUnitsWritten";
-static const char kIdxEntryBytesWritten[] = "idxEntryBytesWritten";
-static const char kIdxEntryUnitsWritten[] = "idxEntryUnitsWritten";
-static const char kDocUnitsReturned[] = "docUnitsReturned";
-static const char kCursorSeeks[] = "cursorSeeks";
 
 inline void appendNonZeroMetric(BSONObjBuilder* builder, const char* name, long long value) {
     if (value != 0) {
@@ -74,10 +76,10 @@ class ResourceConsumptionSSS : public ServerStatusSection {
 public:
     ResourceConsumptionSSS() : ServerStatusSection("resourceConsumption") {}
 
-    // Do not include this metric by default. It is likely to be misleading for diagnostic purposes
-    // because it does not include the CPU time for every operation or every command.
+    // Do not include this section unless metrics aggregation is enabled. It will not have populated
+    // data otherwise.
     bool includeByDefault() const override {
-        return false;
+        return ResourceConsumption::isMetricsAggregationEnabled();
     }
 
     BSONObj generateSection(OperationContext* opCtx, const BSONElement& configElem) const override {
@@ -87,6 +89,14 @@ public:
         }
         BSONObjBuilder builder;
         builder.append(kCpuNanos, durationCount<Nanoseconds>(resourceConsumption.getCpuTime()));
+
+        // The memory usage we report only estimates the amount of memory from the metrics
+        // themselves, and does not include the overhead of the map container or its keys.
+        auto numMetrics = resourceConsumption.getNumDbMetrics();
+        builder.append(
+            kMemUsage,
+            static_cast<long long>(numMetrics * sizeof(ResourceConsumption::AggregatedMetrics)));
+        builder.append(kNumMetrics, static_cast<long long>(numMetrics));
         return builder.obj();
     }
 } resourceConsumptionMetricSSM;
@@ -332,6 +342,11 @@ void ResourceConsumption::merge(OperationContext* opCtx,
 ResourceConsumption::MetricsMap ResourceConsumption::getDbMetrics() const {
     stdx::lock_guard<Mutex> lk(_mutex);
     return _dbMetrics;
+}
+
+size_t ResourceConsumption::getNumDbMetrics() const {
+    stdx::lock_guard<Mutex> lk(_mutex);
+    return _dbMetrics.size();
 }
 
 ResourceConsumption::MetricsMap ResourceConsumption::getAndClearDbMetrics() {

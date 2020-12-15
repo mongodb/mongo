@@ -450,6 +450,11 @@ public:
     MetricsMap getDbMetrics() const;
 
     /**
+     *  Returns the number of databases with aggregated metrics.
+     */
+    size_t getNumDbMetrics() const;
+
+    /**
      * Returns the per-database metrics map and then clears the contents. This attempts to swap and
      * return the metrics map rather than making a full copy like getDbMetrics.
      */
