@@ -32,7 +32,8 @@ import pymongo
 import requests
 import yaml
 
-from buildscripts import aws_ec2, remote_operations
+from buildscripts import aws_ec2
+from buildscripts.powercycle import remote_operations
 
 AWS_ADDRESS_TYPES = [
     "private_ip_address", "public_ip_address", "private_dns_name", "public_dns_name"
@@ -1124,14 +1125,14 @@ class LocalToRemoteOperations(object):
     """
 
     def __init__(  # pylint: disable=too-many-arguments
-            self, user_host, retries=2, retry_sleep=30, ssh_connection_options=None,
-            ssh_options=None, shell_binary="/bin/bash", use_shell=False):
+            self, user_host, ssh_connection_options=None, ssh_options=None,
+            shell_binary="/bin/bash", use_shell=False):
         """Initialize LocalToRemoteOperations."""
 
         self.remote_op = remote_operations.RemoteOperations(
             user_host=user_host, ssh_connection_options=ssh_connection_options,
-            ssh_options=ssh_options, retries=retries, retry_sleep=retry_sleep, debug=True,
-            shell_binary=shell_binary, use_shell=use_shell)
+            ssh_options=ssh_options, shell_binary=shell_binary, use_shell=use_shell,
+            ignore_ret=True)
 
     def shell(self, cmds, remote_dir=None):
         """Return tuple (ret, output) from performing remote shell operation."""

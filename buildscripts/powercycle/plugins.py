@@ -8,7 +8,7 @@ import sys
 import shlex
 import yaml
 
-from buildscripts.powercycle.run import RemoteOperations, SSHOperation
+from buildscripts.powercycle.remote_operations import RemoteOperations, SSHOperation
 from buildscripts.resmokelib.plugin import PluginInterface, Subcommand
 
 _EXPANSIONS_FILE = 'expansions.yml'
@@ -36,7 +36,6 @@ class PowercycleCommand(Subcommand):  # pylint: disable=abstract-method, too-man
         self.remote_op = RemoteOperations(
             user_host=self.user_host,
             ssh_connection_options=self.ssh_connection_options,
-            retries=self.retries,
         )
 
     @staticmethod
@@ -174,10 +173,7 @@ class SetUpEC2Instance(PowercycleCommand):
             cmds = f"{cmds}; then /sbin/sysctl kernel.core_pattern"
             cmds = f"{cmds}; fi"
 
-            remote_op_special_retry = self.remote_op if "ssh_retries" in self.expansions else RemoteOperations(
-                user_host=self.user_host, ssh_connection_options=self.ssh_connection_options,
-                retries=3, debug=True)
-            remote_op_special_retry.operation(SSHOperation.SHELL, cmds, None, True)
+            self.remote_op.operation(SSHOperation.SHELL, cmds, None, True)
 
         # Eighth operation -
         # Set up curator to collect system & process stats on remote.
