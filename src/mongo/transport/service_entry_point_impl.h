@@ -67,9 +67,12 @@ public:
     void startSession(transport::SessionHandle session) override;
 
     void endAllSessions(transport::Session::TagMask tags) final;
+    void endAllSessionsNoTagMask();
 
     Status start() final;
     bool shutdown(Milliseconds timeout) final;
+    bool shutdownAndWait(Milliseconds timeout);
+    bool waitForNoSessions(Milliseconds timeout);
 
     void appendStats(BSONObjBuilder* bob) const final;
 
@@ -82,7 +85,10 @@ public:
     }
 
 private:
-    using SSMList = std::list<std::shared_ptr<transport::ServiceStateMachine>>;
+    void _terminateAll(WithLock);
+    bool _waitForNoSessions(stdx::unique_lock<Mutex>& lk, Date_t deadline);
+
+    using SSMList = std::list<transport::ServiceStateMachine>;
     using SSMListIterator = SSMList::iterator;
 
     ServiceContext* const _svcCtx;
@@ -90,7 +96,7 @@ private:
 
     mutable Mutex _sessionsMutex =
         MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "ServiceEntryPointImpl::_sessionsMutex");
-    stdx::condition_variable _shutdownCondition;
+    stdx::condition_variable _sessionsCV;
     SSMList _sessions;
 
     const size_t _maxNumConnections{DEFAULT_MAX_CONN};

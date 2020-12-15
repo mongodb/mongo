@@ -62,8 +62,11 @@ public:
 
     friend StringData toString(ThreadingModel threadingModel);
 
-    static Status setInitialThreadingModel(StringData value) noexcept;
+    static Status setInitialThreadingModelFromString(StringData value) noexcept;
+    static void setInitialThreadingModel(ThreadingModel threadingModel) noexcept;
     static ThreadingModel getInitialThreadingModel() noexcept;
+
+    static void shutdownAll(ServiceContext* serviceContext, Date_t deadline);
 
     virtual ~ServiceExecutor() = default;
     using Task = unique_function<void()>;

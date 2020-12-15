@@ -95,6 +95,13 @@ public:
     virtual Future<DbResponse> handleRequest(OperationContext* opCtx,
                                              const Message& request) noexcept = 0;
 
+    /**
+     * Optional handler which is invoked after a session ends.
+     *
+     * This function implies that the Session itself will soon be destructed.
+     */
+    virtual void onEndSession(const transport::SessionHandle&) {}
+
 protected:
     ServiceEntryPoint() = default;
 };

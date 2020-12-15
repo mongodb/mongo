@@ -210,6 +210,10 @@ public:
           _sep{_serviceContext->getServiceEntryPoint()},
           _clientStrand{ClientStrand::make(std::move(client))} {}
 
+    ~Impl() {
+        _sep->onEndSession(session());
+    }
+
     void start(ServiceExecutorContext seCtx);
 
     void setCleanupHook(std::function<void()> hook);
@@ -297,7 +301,6 @@ private:
     ServiceContext* const _serviceContext;
     ServiceEntryPoint* const _sep;
 
-    transport::SessionHandle _sessionHandle;
     ClientStrandPtr _clientStrand;
     std::function<void()> _cleanupHook;
 
@@ -674,15 +677,15 @@ void ServiceStateMachine::Impl::cleanupSession(const Status& status) {
         transport::ServiceExecutorContext::reset(client);
     }
 
-    if (auto cleanupHook = std::exchange(_cleanupHook, {})) {
-        cleanupHook();
-    }
-
     _state.store(State::Ended);
 
     _inMessage.reset();
 
     _outMessage.reset();
+
+    if (auto cleanupHook = std::exchange(_cleanupHook, {})) {
+        cleanupHook();
+    }
 }
 
 ServiceStateMachine::ServiceStateMachine(ServiceContext::UniqueClient client)

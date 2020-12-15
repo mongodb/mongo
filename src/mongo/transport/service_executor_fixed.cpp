@@ -442,6 +442,7 @@ void ServiceExecutorFixed::runOnDataAvailable(const SessionHandle& session,
                 _stats.waitersEnded.fetchAndAdd(1);
             }
 
+            waiter.session.reset();
             waiter.onCompletionCallback(std::move(status));
         });
 }

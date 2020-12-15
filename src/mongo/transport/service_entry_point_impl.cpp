@@ -164,26 +164,24 @@ void ServiceEntryPointImpl::startSession(transport::SessionHandle session) {
     auto clientName = "conn{}"_format(session->id());
     auto client = _svcCtx->makeClient(clientName, session);
 
-    auto ssm = std::make_shared<transport::ServiceStateMachine>(std::move(client));
-
     const bool quiet = serverGlobalParams.quiet.load();
 
     size_t connectionCount;
-    auto ssmIt = [&]() -> boost::optional<SSMListIterator> {
+    auto maybeSsmIt = [&]() -> boost::optional<SSMListIterator> {
         stdx::lock_guard lk(_sessionsMutex);
         connectionCount = _currentConnections.load();
         if (connectionCount > _maxNumConnections && !canOverrideMaxConns) {
             return boost::none;
         }
 
-        auto it = _sessions.emplace(_sessions.begin(), ssm);
+        auto it = _sessions.emplace(_sessions.begin(), std::move(client));
         connectionCount = _sessions.size();
         _currentConnections.store(connectionCount);
         _createdConnections.addAndFetch(1);
         return it;
     }();
 
-    if (!ssmIt) {
+    if (!maybeSsmIt) {
         if (!quiet) {
             LOGV2(22942,
                   "Connection refused because there are too many open connections",
@@ -199,16 +197,16 @@ void ServiceEntryPointImpl::startSession(transport::SessionHandle session) {
               "connectionCount"_attr = connectionCount);
     }
 
-    ssm->setCleanupHook([this, ssmIt, quiet, session = std::move(session)] {
+    auto ssmIt = *maybeSsmIt;
+    ssmIt->setCleanupHook([this, ssmIt, quiet, session = std::move(session)] {
         size_t connectionCount;
         auto remote = session->remote();
         {
             stdx::lock_guard<decltype(_sessionsMutex)> lk(_sessionsMutex);
-            _sessions.erase(*ssmIt);
+            _sessions.erase(ssmIt);
             connectionCount = _sessions.size();
             _currentConnections.store(connectionCount);
         }
-        _shutdownCondition.notify_one();
 
         if (!quiet) {
             LOGV2(22944,
@@ -217,12 +215,14 @@ void ServiceEntryPointImpl::startSession(transport::SessionHandle session) {
                   "connectionId"_attr = session->id(),
                   "connectionCount"_attr = connectionCount);
         }
+
+        _sessionsCV.notify_one();
     });
 
     auto seCtx = transport::ServiceExecutorContext{};
     seCtx.setThreadingModel(transport::ServiceExecutor::getInitialThreadingModel());
     seCtx.setCanUseReserved(canOverrideMaxConns);
-    ssm->start(std::move(seCtx));
+    ssmIt->start(std::move(seCtx));
 }
 
 void ServiceEntryPointImpl::endAllSessions(transport::Session::TagMask tags) {
@@ -231,7 +231,7 @@ void ServiceEntryPointImpl::endAllSessions(transport::Session::TagMask tags) {
     {
         stdx::unique_lock<decltype(_sessionsMutex)> lk(_sessionsMutex);
         for (auto& ssm : _sessions) {
-            ssm->terminateIfTagsDontMatch(tags);
+            ssm.terminateIfTagsDontMatch(tags);
         }
     }
 }
@@ -241,36 +241,26 @@ bool ServiceEntryPointImpl::shutdown(Milliseconds timeout) {
     // When running under address sanitizer, we get false positive leaks due to disorder around
     // the lifecycle of a connection and request. When we are running under ASAN, we try a lot
     // harder to dry up the server from active connections before going on to really shut down.
+    return shutdownAndWait(timeout);
+#else
+    return true;
+#endif
+}
 
-    using logv2::LogComponent;
+bool ServiceEntryPointImpl::shutdownAndWait(Milliseconds timeout) {
+    auto deadline = _svcCtx->getPreciseClockSource()->now() + timeout;
 
-    auto start = _svcCtx->getPreciseClockSource()->now();
     stdx::unique_lock<decltype(_sessionsMutex)> lk(_sessionsMutex);
 
     // Request that all sessions end, while holding the _sesionsMutex, loop over all the current
-    // connections and terminate them
-    for (auto& ssm : _sessions) {
-        ssm->terminate();
-    }
+    // connections and terminate them. Then wait for the number of active connections to reach zero
+    // with a condition_variable that notifies in the session cleanup hook. If we haven't closed
+    // drained all active operations within the deadline, just keep going with shutdown: the OS will
+    // do it for us when the process terminates.
+    _terminateAll(lk);
+    auto result = _waitForNoSessions(lk, deadline);
+    lk.unlock();
 
-    // Close all sockets and then wait for the number of active connections to reach zero with a
-    // condition_variable that notifies in the session cleanup hook. If we haven't closed drained
-    // all active operations within the deadline, just keep going with shutdown: the OS will do it
-    // for us when the process terminates.
-    auto timeSpent = Milliseconds(0);
-    const auto checkInterval = std::min(Milliseconds(250), timeout);
-
-    auto noWorkersLeft = [this] { return numOpenSessions() == 0; };
-    while (timeSpent < timeout &&
-           !_shutdownCondition.wait_for(lk, checkInterval.toSystemDuration(), noWorkersLeft)) {
-        LOGV2(22945,
-              "shutdown: still waiting on {workers} active workers to drain... ",
-              "shutdown: still waiting on active workers to drain... ",
-              "workers"_attr = numOpenSessions());
-        timeSpent += checkInterval;
-    }
-
-    bool result = noWorkersLeft();
     if (result) {
         LOGV2(22946, "shutdown: no running workers found...");
     } else {
@@ -282,35 +272,36 @@ bool ServiceEntryPointImpl::shutdown(Milliseconds timeout) {
             "workers"_attr = numOpenSessions());
     }
 
-    lk.unlock();
-
-    timeSpent = _svcCtx->getPreciseClockSource()->now() - start;
-    timeout = std::max(Milliseconds{0}, timeout - timeSpent);
-    if (auto status = transport::ServiceExecutorFixed::get(_svcCtx)->shutdown(timeout);
-        !status.isOK()) {
-        LOGV2(4907202, "Failed to shutdown ServiceExecutorFixed", "error"_attr = status);
-    }
-
-    timeSpent = _svcCtx->getPreciseClockSource()->now() - start;
-    timeout = std::max(Milliseconds{0}, timeout - timeSpent);
-    if (auto exec = transport::ServiceExecutorReserved::get(_svcCtx)) {
-        if (auto status = exec->shutdown(timeout); !status.isOK()) {
-            LOGV2(4907201, "Failed to shutdown ServiceExecutorReserved", "error"_attr = status);
-        }
-    }
-
-    timeSpent = _svcCtx->getPreciseClockSource()->now() - start;
-    timeout = std::max(Milliseconds{0}, timeout - timeSpent);
-    if (auto status =
-            transport::ServiceExecutorSynchronous::get(_svcCtx)->shutdown(timeout - timeSpent);
-        !status.isOK()) {
-        LOGV2(4907200, "Failed to shutdown ServiceExecutorSynchronous", "error"_attr = status);
-    }
+    transport::ServiceExecutor::shutdownAll(_svcCtx, deadline);
 
     return result;
-#else
-    return true;
-#endif
+}
+
+void ServiceEntryPointImpl::endAllSessionsNoTagMask() {
+    auto lk = stdx::unique_lock<decltype(_sessionsMutex)>(_sessionsMutex);
+    _terminateAll(lk);
+}
+
+void ServiceEntryPointImpl::_terminateAll(WithLock) {
+    for (auto& ssm : _sessions) {
+        ssm.terminate();
+    }
+}
+
+bool ServiceEntryPointImpl::waitForNoSessions(Milliseconds timeout) {
+    auto deadline = _svcCtx->getPreciseClockSource()->now() + timeout;
+    LOGV2(5342100, "Waiting until for all sessions to conclude", "deadline"_attr = deadline);
+
+    auto lk = stdx::unique_lock<decltype(_sessionsMutex)>(_sessionsMutex);
+    return _waitForNoSessions(lk, deadline);
+}
+
+bool ServiceEntryPointImpl::_waitForNoSessions(stdx::unique_lock<decltype(_sessionsMutex)>& lk,
+                                               Date_t deadline) {
+    auto noWorkersLeft = [this] { return numOpenSessions() == 0; };
+    _sessionsCV.wait_until(lk, deadline.toSystemTimePoint(), noWorkersLeft);
+
+    return noWorkersLeft();
 }
 
 void ServiceEntryPointImpl::appendStats(BSONObjBuilder* bob) const {

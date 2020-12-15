@@ -70,16 +70,20 @@ StringData toString(ServiceExecutor::ThreadingModel threadingModel) {
     }
 }
 
-Status ServiceExecutor::setInitialThreadingModel(StringData value) noexcept {
+Status ServiceExecutor::setInitialThreadingModelFromString(StringData value) noexcept {
     if (value == kThreadingModelDedicatedStr) {
-        gInitialThreadingModel = ServiceExecutor::ThreadingModel::kDedicated;
+        setInitialThreadingModel(ServiceExecutor::ThreadingModel::kDedicated);
     } else if (value == kThreadingModelBorrowedStr) {
-        gInitialThreadingModel = ServiceExecutor::ThreadingModel::kBorrowed;
+        setInitialThreadingModel(ServiceExecutor::ThreadingModel::kBorrowed);
     } else {
         MONGO_UNREACHABLE;
     }
 
     return Status::OK();
+}
+
+void ServiceExecutor::setInitialThreadingModel(ThreadingModel threadingModel) noexcept {
+    gInitialThreadingModel = threadingModel;
 }
 
 auto ServiceExecutor::getInitialThreadingModel() noexcept -> ThreadingModel {
@@ -263,6 +267,30 @@ void ServiceExecutor::yieldIfAppropriate() const {
     static const auto cores = ProcessInfo::getNumAvailableCores();
     if (getRunningThreads() > cores) {
         stdx::this_thread::yield();
+    }
+}
+
+void ServiceExecutor::shutdownAll(ServiceContext* serviceContext, Date_t deadline) {
+    auto getTimeout = [&] {
+        auto now = serviceContext->getPreciseClockSource()->now();
+        return std::max(Milliseconds{0}, deadline - now);
+    };
+
+    if (auto status = transport::ServiceExecutorFixed::get(serviceContext)->shutdown(getTimeout());
+        !status.isOK()) {
+        LOGV2(4907202, "Failed to shutdown ServiceExecutorFixed", "error"_attr = status);
+    }
+
+    if (auto exec = transport::ServiceExecutorReserved::get(serviceContext)) {
+        if (auto status = exec->shutdown(getTimeout()); !status.isOK()) {
+            LOGV2(4907201, "Failed to shutdown ServiceExecutorReserved", "error"_attr = status);
+        }
+    }
+
+    if (auto status =
+            transport::ServiceExecutorSynchronous::get(serviceContext)->shutdown(getTimeout());
+        !status.isOK()) {
+        LOGV2(4907200, "Failed to shutdown ServiceExecutorSynchronous", "error"_attr = status);
     }
 }
 

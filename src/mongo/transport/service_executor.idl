@@ -38,7 +38,7 @@ server_parameters:
     set_at: [ startup ]
     cpp_vartype: "std::string"
     cpp_varname: "initialServiceExecutorThreadingModel"
-    on_update: "ServiceExecutor::setInitialThreadingModel"
+    on_update: "ServiceExecutor::setInitialThreadingModelFromString"
     default: "dedicated"
   synchronousServiceExecutorRecursionLimit:
     description: >-
