@@ -2232,6 +2232,24 @@ env.Program(
     ],
 )
 
+env.Library(
+    target='op_msg_fuzzer_fixture',
+    source=[
+        'op_msg_fuzzer_fixture.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/auth/auth',
+        '$BUILD_DIR/mongo/db/auth/authmocks',
+        '$BUILD_DIR/mongo/db/repl/replmocks',
+        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/db/service_context_d',
+        '$BUILD_DIR/mongo/transport/service_entry_point',
+        '$BUILD_DIR/mongo/transport/transport_layer_mock',
+        '$BUILD_DIR/mongo/unittest/unittest',
+    ],
+)
+
 envWithAsio = env.Clone()
 envWithAsio.InjectThirdParty(libraries=['asio'])
 
@@ -2259,6 +2277,7 @@ envWithAsio.CppUnitTest(
         'mirroring_sampler_test.cpp',
         'multi_key_path_tracker_test.cpp',
         'namespace_string_test.cpp',
+        'op_msg_fuzzer_fixture_test.cpp',
         'op_observer_impl_test.cpp',
         'op_observer_registry_test.cpp',
         'operation_context_test.cpp',
@@ -2294,6 +2313,7 @@ envWithAsio.CppUnitTest(
         '$BUILD_DIR/mongo/db/catalog/import_collection_oplog_entry',
         '$BUILD_DIR/mongo/db/catalog/index_build_entry_idl',
         '$BUILD_DIR/mongo/db/mongohasher',
+        '$BUILD_DIR/mongo/db/op_msg_fuzzer_fixture',
         '$BUILD_DIR/mongo/db/query/query_test_service_context',
         '$BUILD_DIR/mongo/db/storage/wiredtiger/storage_wiredtiger',
         '$BUILD_DIR/mongo/executor/async_timer_mock',
@@ -2406,14 +2426,7 @@ env.CppLibfuzzerTest(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/auth/auth',
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/repl/replmocks',
-        '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/db/service_context_d',
-        '$BUILD_DIR/mongo/transport/service_entry_point',
-        '$BUILD_DIR/mongo/transport/transport_layer_mock',
-        '$BUILD_DIR/mongo/unittest/unittest',
+        '$BUILD_DIR/mongo/db/op_msg_fuzzer_fixture',
     ],
 )
 

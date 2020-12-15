@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2019-present MongoDB, Inc.
+ *    Copyright (C) 2020-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,9 +27,30 @@
  *    it in the license file.
  */
 
-#include "mongo/db/op_msg_fuzzer_fixture.h"
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
-extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
-    static auto fixture = mongo::OpMsgFuzzerFixture();
-    return fixture.testOneInput(Data, Size);
+#include "mongo/platform/basic.h"
+
+#include "mongo/bson/json.h"
+#include "mongo/db/op_msg_fuzzer_fixture.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/unittest/unittest.h"
+
+namespace mongo {
+namespace {
+
+TEST(OpMsgFuzzerFixtureTest, Ping) {
+    auto fixture = OpMsgFuzzerFixture(/* skipGlobalInitializers */ true);
+
+    auto msg = [] {
+        OpMsgBuilder msgBuilder;
+
+        msgBuilder.setBody(fromjson(R"({ ping: 1 })"));
+
+        return msgBuilder.finishWithoutSizeChecking();
+    }();
+    ASSERT_EQ(fixture.testOneInput(msg.buf(), msg.size()), 0);
 }
+
+}  // namespace
+}  // namespace mongo
