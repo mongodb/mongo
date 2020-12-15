@@ -346,6 +346,8 @@ Mongo.prototype.runCommand = function(dbName, cmdObj, options) {
 
             if (resObj.upserted) {
                 for (let upsert of resObj.upserted) {
+                    let currentUpsertedIndex = upsert.index;
+
                     // Set the entry's index to the write's index in the original cmdObj.
                     upsert.index = indexMap[upsert.index];
 
@@ -353,7 +355,7 @@ Mongo.prototype.runCommand = function(dbName, cmdObj, options) {
                     upserted.push(upsert);
 
                     // This write will not need to be retried, so remove it from 'indexMap'.
-                    delete indexMap[upsert.index];
+                    delete indexMap[currentUpsertedIndex];
                 }
             }
             if (resObj.writeErrors) {
@@ -364,6 +366,8 @@ Mongo.prototype.runCommand = function(dbName, cmdObj, options) {
                         break;
                     }
 
+                    let currentWriteErrorIndex = writeError.index;
+
                     // Set the entry's index to the write's index in the original cmdObj.
                     writeError.index = indexMap[writeError.index];
 
@@ -371,7 +375,7 @@ Mongo.prototype.runCommand = function(dbName, cmdObj, options) {
                     nonRetryableWriteErrors.push(writeError);
 
                     // This write will not need to be retried, so remove it from 'indexMap'.
-                    delete indexMap[writeError.index];
+                    delete indexMap[currentWriteErrorIndex];
                 }
             }
         }
