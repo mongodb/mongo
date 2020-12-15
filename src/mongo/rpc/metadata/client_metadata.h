@@ -203,7 +203,8 @@ public:
      *
      * Once this function is called, no future hello can mutate the ClientMetadata.
      *
-     * This function takes the Client lock.
+     * This function is only valid to invoke if you are on the Client's thread. This function takes
+     * the Client lock.
      */
     static bool tryFinalize(Client* client);
 
@@ -213,7 +214,8 @@ public:
      * This function throws if the ClientMetadata has already been finalized but the BSONElement is
      * an object. ClientMetadata is allowed to be set via the first hello only.
      *
-     * This function takes the Client lock.
+     * This function is only valid to invoke if you are on the Client's thread. This function takes
+     * the Client lock.
      */
     static void setFromMetadata(Client* client, BSONElement& elem);
 
@@ -222,7 +224,8 @@ public:
      *
      * This function throws if called more than once for the same OperationContext.
      *
-     * This function takes the Client lock.
+     * This function is only valid to invoke if you are on the Client's thread. This function takes
+     * the Client lock.
      */
     static void setFromMetadataForOperation(OperationContext* opCtx, BSONElement& elem);
 
