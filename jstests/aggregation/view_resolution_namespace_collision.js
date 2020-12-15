@@ -50,7 +50,7 @@ const outStage = {
 
 // The aggregate should always use the view on 'testDB', not an empty collection on 'siblingDB'.
 for (const writeStage of [mergeStage, outStage]) {
-    sourceColl.aggregate([lookupStage, mergeStage]).toArray();
+    sourceColl.aggregate([lookupStage, writeStage]).toArray();
     const withWrite = siblingDB[collidingName].find().toArray();
     assert.eq(withoutWrite, withWrite);
     siblingDB[collidingName].drop();
