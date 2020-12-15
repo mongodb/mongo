@@ -60,8 +60,6 @@ coll.drop();
 assertErrorCode(coll, pipeline, ErrorCodes.NamespaceNotFound);
 
 // Test that we error when the database does not exist.
-// TODO SERVER-35479 When running against a mongos, a non-existent database will cause all
-// aggregations to return an empty result set.
 assert.commandWorked(testDB.dropDatabase());
 assertErrorCode(coll, pipeline, ErrorCodes.NamespaceNotFound);
 }());
