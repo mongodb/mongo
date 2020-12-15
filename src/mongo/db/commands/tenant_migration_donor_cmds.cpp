@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/tenant_migration_donor_cmds_gen.h"
 #include "mongo/db/repl/primary_only_service.h"
@@ -97,7 +98,13 @@ public:
             return response;
         }
 
-        void doCheckAuthorization(OperationContext* opCtx) const {}
+        void doCheckAuthorization(OperationContext* opCtx) const {
+            uassert(ErrorCodes::Unauthorized,
+                    "Unauthorized",
+                    AuthorizationSession::get(opCtx->getClient())
+                        ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
+                                                           ActionType::runTenantMigration));
+        }
 
     private:
         bool supportsWriteConcern() const override {
@@ -162,7 +169,13 @@ public:
         }
 
     private:
-        void doCheckAuthorization(OperationContext* opCtx) const {}
+        void doCheckAuthorization(OperationContext* opCtx) const {
+            uassert(ErrorCodes::Unauthorized,
+                    "Unauthorized",
+                    AuthorizationSession::get(opCtx->getClient())
+                        ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
+                                                           ActionType::runTenantMigration));
+        }
 
         bool supportsWriteConcern() const override {
             return false;

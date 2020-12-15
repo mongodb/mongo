@@ -247,6 +247,7 @@ MONGO_INITIALIZER(AuthorizationBuiltinRoles)(InitializerContext* context) {
         << ActionType::flushRouterConfig  // hostManager gets this also
         << ActionType::cleanupOrphaned
         << ActionType::getDefaultRWConcern // clusterMonitor gets this also
+        << ActionType::runTenantMigration
         << ActionType::setDefaultRWConcern
         << ActionType::setFeatureCompatibilityVersion
         << ActionType::setFreeMonitoring;

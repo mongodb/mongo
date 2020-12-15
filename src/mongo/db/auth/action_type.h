@@ -160,6 +160,7 @@ namespace mongo {
     X(revokeRolesFromUser)      /* ID only */                                         \
     X(rotateCertificates)                                                             \
     X(runAsLessPrivilegedUser)                                                        \
+    X(runTenantMigration)                                                             \
     X(serverStatus)                                                                   \
     X(setAuthenticationRestriction)                                                   \
     X(setDefaultRWConcern)                                                            \

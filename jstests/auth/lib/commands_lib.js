@@ -195,6 +195,7 @@ var authCommandsLib = {
         {
           testname: "abortTxn",
           command: {abortTransaction: 1},
+          // TODO (SERVER-53497): Enable auth testing for abortTransaction and commitTransaction.
           skipSharded: true,
           skipUnlessReplicaSet: true,
           testcases: [
@@ -2544,6 +2545,7 @@ var authCommandsLib = {
         {
           testname: "commitTxn",
           command: {commitTransaction: 1},
+          // TODO (SERVER-53497): Enable auth testing for abortTransaction and commitTransaction.
           skipSharded: true,
           skipUnlessReplicaSet: true,
           testcases: [
@@ -3349,6 +3351,47 @@ var authCommandsLib = {
                 privileges:
                     [{resource: {db: secondDbName, collection: "coll"}, actions: ["find"]}]
               }
+          ]
+        },
+        {
+          testname: "donorForgetMigration",
+          command: {
+              donorForgetMigration: 1,
+              migrationId: UUID(),
+          },
+          skipSharded: true,
+          testcases: [
+              {
+                  runOnDb: adminDbName,
+                  roles: roles_clusterManager,
+                  privileges: [{resource: {cluster: true}, actions: ["runTenantMigration"]}],
+                  // This is expected to throw NoSuchTenantMigration.
+                  expectFail: true,
+              },
+              {runOnDb: firstDbName, roles: {}},
+              {runOnDb: secondDbName, roles: {}}
+          ]
+        },
+        {
+          testname: "donorStartMigration",
+          command: {
+              donorStartMigration: 1,
+              tenantId: "testTenantId",
+              migrationId: UUID(),
+              recipientConnectionString: "recipient-rs/localhost:1234",
+              readPreference: {mode: "primary"},
+          },
+          skipSharded: true,
+          testcases: [
+              {
+                  runOnDb: adminDbName,
+                  roles: roles_clusterManager,
+                  privileges: [{resource: {cluster: true}, actions: ["runTenantMigration"]}],
+                  // Cannot start tenant migration on a standalone mongod.
+                  expectFail: true
+              },
+              {runOnDb: firstDbName, roles: {}},
+              {runOnDb: secondDbName, roles: {}}
           ]
         },
         {
