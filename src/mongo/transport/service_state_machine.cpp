@@ -267,7 +267,7 @@ public:
      * This is the initial function called at the beginning of a thread's lifecycle in the
      * TransportLayer.
      */
-    void runOnce();
+    void startNewLoop(const Status& execStatus);
 
     /*
      * Releases all the resources associated with the exhaust request.
@@ -376,7 +376,7 @@ void ServiceStateMachine::Impl::sourceCallback(Status status) {
         _state.store(State::Process);
 
         // If the sourceMessage succeeded then we can move to on to process the message. We simply
-        // return from here and the future chain in runOnce() will continue to the next state
+        // return from here and the future chain in startNewLoop() will continue to the next state
         // normally.
 
         // If any other issues arise, close the session.
@@ -415,7 +415,7 @@ void ServiceStateMachine::Impl::sinkCallback(Status status) {
     // end the session.
     //
     // Otherwise, update the current state depending on whether we're in exhaust or not and return
-    // from this function to let _runOnce continue the future chaining of state transitions.
+    // from this function to let startNewLoop() continue the future chaining of state transitions.
     if (!status.isOK()) {
         LOGV2(22989,
               "Error sending response to client. Ending connection from remote",
@@ -535,21 +535,18 @@ void ServiceStateMachine::Impl::start(ServiceExecutorContext seCtx) {
 
     invariant(_state.swap(State::Source) == State::Created);
 
-    auto cb = [this, anchor = shared_from_this()](Status status) {
-        _clientStrand->run([&] {
-            if (ErrorCodes::isCancelationError(status) || ErrorCodes::isNetworkError(status)) {
-                cleanupSession(status);
-                return;
-            }
-            invariant(status);
-
-            runOnce();
-        });
+    auto cb = [this, anchor = shared_from_this()](Status execStatus) {
+        _clientStrand->run([&] { startNewLoop(execStatus); });
     };
     executor()->runOnDataAvailable(session(), std::move(cb));
 }
 
-void ServiceStateMachine::Impl::runOnce() {
+void ServiceStateMachine::Impl::startNewLoop(const Status& execStatus) {
+    if (!execStatus.isOK()) {
+        cleanupSession(execStatus);
+        return;
+    }
+
     makeReadyFutureWith([&]() -> Future<void> {
         if (_inExhaust) {
             return Status::OK();
@@ -582,17 +579,8 @@ void ServiceStateMachine::Impl::runOnce() {
                 return;
             }
 
-            auto cb = [this, anchor = shared_from_this()](Status status) {
-                _clientStrand->run([&] {
-                    if (ErrorCodes::isCancelationError(status) ||
-                        ErrorCodes::isNetworkError(status)) {
-                        cleanupSession(status);
-                        return;
-                    }
-                    invariant(status);
-
-                    runOnce();
-                });
+            auto cb = [this, anchor = shared_from_this()](Status execStatus) {
+                _clientStrand->run([&] { startNewLoop(execStatus); });
             };
 
             // Start our loop again with a new stack.
