@@ -40,7 +40,7 @@ namespace {
 using unittest::assertGet;
 
 TEST(ChunkVersionParsing, ToFromBSONRoundtrip) {
-    ChunkVersion version(1, 2, OID::gen(), boost::none /* timestamp */);
+    ChunkVersion version(1, 2, OID::gen(), Timestamp(42));
     const auto roundTripVersion = assertGet(ChunkVersion::parseWithField(
         [&] {
             BSONObjBuilder builder;
@@ -53,7 +53,7 @@ TEST(ChunkVersionParsing, ToFromBSONRoundtrip) {
 }
 
 TEST(ChunkVersionParsing, ToFromBSONLegacyRoundtrip) {
-    ChunkVersion version(1, 2, OID::gen(), boost::none /* timestamp */);
+    ChunkVersion version(1, 2, OID::gen(), Timestamp(42));
     const auto roundTripVersion = assertGet(ChunkVersion::parseLegacyWithField(
         [&] {
             BSONObjBuilder builder;
@@ -65,7 +65,7 @@ TEST(ChunkVersionParsing, ToFromBSONLegacyRoundtrip) {
     ASSERT_EQ(version, roundTripVersion);
 }
 
-TEST(ChunkVersionParsing, FromBSON) {
+TEST(ChunkVersionParsing, FromBSONMissingCanThrowaAndTimestamp) {
     const OID oid = OID::gen();
     ChunkVersion chunkVersionComplete = assertGet(ChunkVersion::parseWithField(
         BSON("testVersionField" << BSON_ARRAY(Timestamp(Seconds(2), 3) << oid)),
@@ -77,6 +77,50 @@ TEST(ChunkVersionParsing, FromBSON) {
     ASSERT_EQ(3u, chunkVersionComplete.minorVersion());
 }
 
+TEST(ChunkVersionParsing, FromBSONMissingTimestamp) {
+    const OID oid = OID::gen();
+    const bool canThrowSSVOnIgnored = true;
+    ChunkVersion chunkVersionComplete = assertGet(ChunkVersion::parseWithField(
+        BSON("testVersionField" << BSON_ARRAY(Timestamp(Seconds(2), 3)
+                                              << oid << canThrowSSVOnIgnored)),
+        "testVersionField"));
+
+    ASSERT(chunkVersionComplete.epoch().isSet());
+    ASSERT_EQ(oid, chunkVersionComplete.epoch());
+    ASSERT_EQ(2u, chunkVersionComplete.majorVersion());
+    ASSERT_EQ(3u, chunkVersionComplete.minorVersion());
+}
+
+TEST(ChunkVersionParsing, FromBSONMissingCanThrow) {
+    const OID oid = OID::gen();
+    const Timestamp timestamp(42);
+    ChunkVersion chunkVersionComplete = assertGet(ChunkVersion::parseWithField(
+        BSON("testVersionField" << BSON_ARRAY(Timestamp(Seconds(2), 3) << oid << timestamp)),
+        "testVersionField"));
+
+    ASSERT(chunkVersionComplete.epoch().isSet());
+    ASSERT_EQ(oid, chunkVersionComplete.epoch());
+    ASSERT_EQ(2u, chunkVersionComplete.majorVersion());
+    ASSERT_EQ(3u, chunkVersionComplete.minorVersion());
+    ASSERT_EQ(timestamp, *chunkVersionComplete.getTimestamp());
+}
+
+TEST(ChunkVersionParsing, FromBSON) {
+    const OID oid = OID::gen();
+    const bool canThrowSSVOnIgnored = true;
+    const Timestamp timestamp(42);
+    ChunkVersion chunkVersionComplete = assertGet(ChunkVersion::parseWithField(
+        BSON("testVersionField" << BSON_ARRAY(Timestamp(Seconds(2), 3)
+                                              << oid << canThrowSSVOnIgnored << timestamp)),
+        "testVersionField"));
+
+    ASSERT(chunkVersionComplete.epoch().isSet());
+    ASSERT_EQ(oid, chunkVersionComplete.epoch());
+    ASSERT_EQ(2u, chunkVersionComplete.majorVersion());
+    ASSERT_EQ(3u, chunkVersionComplete.minorVersion());
+    ASSERT_EQ(timestamp, *chunkVersionComplete.getTimestamp());
+}
+
 TEST(ChunkVersionParsing, FromBSONMissingEpoch) {
     ASSERT_THROWS_CODE(
         uassertStatusOK(ChunkVersion::parseWithField(
@@ -85,7 +129,7 @@ TEST(ChunkVersionParsing, FromBSONMissingEpoch) {
         ErrorCodes::TypeMismatch);
 }
 
-TEST(ChunkVersionParsing, FromBSONMissingTimestamp) {
+TEST(ChunkVersionParsing, FromBSONMissingMajorAndMinor) {
     const OID oid = OID::gen();
     ASSERT_THROWS_CODE(uassertStatusOK(ChunkVersion::parseWithField(BSON("testVersionField" << oid),
                                                                     "testVersionField")),
@@ -95,8 +139,11 @@ TEST(ChunkVersionParsing, FromBSONMissingTimestamp) {
 
 TEST(ChunkVersionParsing, FromBSONLegacy) {
     const OID oid = OID::gen();
+    const Timestamp timestamp(42);
     ChunkVersion chunkVersionComplete = assertGet(ChunkVersion::parseLegacyWithField(
-        BSON("lastmod" << Timestamp(Seconds(2), 3) << "lastmodEpoch" << oid), "lastmod"));
+        BSON("lastmod" << Timestamp(Seconds(2), 3) << "lastmodEpoch" << oid << "lastmodTimestamp"
+                       << timestamp),
+        "lastmod"));
 
     ASSERT(chunkVersionComplete.epoch().isSet());
     ASSERT_EQ(oid, chunkVersionComplete.epoch());

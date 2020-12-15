@@ -239,13 +239,13 @@ public:
 private:
     uint64_t _combined;
     OID _epoch;
-    boost::optional<Timestamp> _timestamp;
-
     // Temporary flag to indicate shards that a router is able to process and retry multi-write
     // operations
     //
     // TODO (SERVER-53099): Once 5.0 is last stable, get rid of this field
     bool _canThrowSSVOnIgnored{false};
+
+    boost::optional<Timestamp> _timestamp;
 };
 
 inline std::ostream& operator<<(std::ostream& s, const ChunkVersion& v) {
