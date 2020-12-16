@@ -137,6 +137,41 @@ Status storeTestFrameworkOptions(const moe::Environment& params,
             params["replication.enableMajorityReadConcern"].as<bool>();
     }
 
+    if (params.count("setParameter")) {
+        std::map<std::string, std::string> parameters =
+            params["setParameter"].as<std::map<std::string, std::string>>();
+        for (std::map<std::string, std::string>::iterator parametersIt = parameters.begin();
+             parametersIt != parameters.end();
+             parametersIt++) {
+            const auto& serverParams = ServerParameterSet::getGlobal()->getMap();
+            auto iter = serverParams.find(parametersIt->first);
+            ServerParameter* parameter = (iter == serverParams.end()) ? nullptr : iter->second;
+            if (nullptr == parameter) {
+                StringBuilder sb;
+                sb << "Illegal --setParameter parameter: \"" << parametersIt->first << "\"";
+                return Status(ErrorCodes::BadValue, sb.str());
+            }
+            if (!parameter->allowedToChangeAtStartup()) {
+                StringBuilder sb;
+                sb << "Cannot use --setParameter to set \"" << parametersIt->first
+                   << "\" at startup";
+                return Status(ErrorCodes::BadValue, sb.str());
+            }
+            Status status = parameter->setFromString(parametersIt->second);
+            if (!status.isOK()) {
+                StringBuilder sb;
+                sb << "Bad value for parameter \"" << parametersIt->first
+                   << "\": " << status.reason();
+                return Status(ErrorCodes::BadValue, sb.str());
+            }
+
+            LOGV2(4539300,
+                  "Setting server parameter",
+                  "parameter"_attr = parametersIt->first,
+                  "value"_attr = parametersIt->second);
+        }
+    }
+
     return Status::OK();
 }
 }  // namespace mongo

@@ -98,6 +98,10 @@ configs:
         arg_vartype: Bool
         short_name: flowControl
         default: true
+    setParameter:
+        description: 'Set a configurable parameter'
+        arg_vartype: StringMap
+        duplicate_behavior: append
     suites:
         description: 'Test suites to run'
         arg_vartype: StringVector
