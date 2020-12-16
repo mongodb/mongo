@@ -47,14 +47,14 @@ public:
         return _mock->findHost(opCtx, readPref);
     }
 
-    SemiFuture<HostAndPort> findHostWithMaxWait(const ReadPreferenceSetting& readPref,
-                                                Milliseconds maxWait) override {
-        return _mock->findHostWithMaxWait(readPref, maxWait);
+    SemiFuture<HostAndPort> findHost(const ReadPreferenceSetting& readPref,
+                                     const CancelationToken& cancelToken) override {
+        return _mock->findHost(readPref, cancelToken);
     }
 
-    SemiFuture<std::vector<HostAndPort>> findHostsWithMaxWait(const ReadPreferenceSetting& readPref,
-                                                              Milliseconds maxWait) override {
-        return _mock->findHostsWithMaxWait(readPref, maxWait);
+    SemiFuture<std::vector<HostAndPort>> findHosts(const ReadPreferenceSetting& readPref,
+                                                   const CancelationToken& cancelToken) override {
+        return _mock->findHosts(readPref, cancelToken);
     }
 
     void markHostNotPrimary(const HostAndPort& host, const Status& status) override {

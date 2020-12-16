@@ -56,11 +56,11 @@ public:
     StatusWith<HostAndPort> findHost(OperationContext* opCtx,
                                      const ReadPreferenceSetting& readPref) override;
 
-    SemiFuture<std::vector<HostAndPort>> findHostsWithMaxWait(const ReadPreferenceSetting& readPref,
-                                                              Milliseconds maxWait) override;
+    SemiFuture<std::vector<HostAndPort>> findHosts(const ReadPreferenceSetting& readPref,
+                                                   const CancelationToken& cancelToken) override;
 
-    SemiFuture<HostAndPort> findHostWithMaxWait(const ReadPreferenceSetting& readPref,
-                                                Milliseconds maxWait) override;
+    SemiFuture<HostAndPort> findHost(const ReadPreferenceSetting& readPref,
+                                     const CancelationToken& cancelToken) override;
 
     void markHostNotPrimary(const HostAndPort& host, const Status& status) override;
 

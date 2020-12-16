@@ -59,8 +59,8 @@ StatusWith<HostAndPort> RemoteCommandTargeterMock::findHost(OperationContext* op
     return _findHostReturnValue.getValue()[0];
 }
 
-SemiFuture<HostAndPort> RemoteCommandTargeterMock::findHostWithMaxWait(
-    const ReadPreferenceSetting& readPref, Milliseconds maxTime) {
+SemiFuture<HostAndPort> RemoteCommandTargeterMock::findHost(const ReadPreferenceSetting&,
+                                                            const CancelationToken&) {
     if (!_findHostReturnValue.isOK()) {
         return _findHostReturnValue.getStatus();
     }
@@ -68,8 +68,8 @@ SemiFuture<HostAndPort> RemoteCommandTargeterMock::findHostWithMaxWait(
     return _findHostReturnValue.getValue()[0];
 }
 
-SemiFuture<std::vector<HostAndPort>> RemoteCommandTargeterMock::findHostsWithMaxWait(
-    const ReadPreferenceSetting& readPref, Milliseconds maxWait) {
+SemiFuture<std::vector<HostAndPort>> RemoteCommandTargeterMock::findHosts(
+    const ReadPreferenceSetting&, const CancelationToken&) {
 
     return _findHostReturnValue;
 }

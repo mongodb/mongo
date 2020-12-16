@@ -43,13 +43,13 @@ ConnectionString RemoteCommandTargeterStandalone::connectionString() {
     return ConnectionString(_hostAndPort);
 }
 
-SemiFuture<HostAndPort> RemoteCommandTargeterStandalone::findHostWithMaxWait(
-    const ReadPreferenceSetting& readPref, Milliseconds maxWait) {
+SemiFuture<HostAndPort> RemoteCommandTargeterStandalone::findHost(
+    const ReadPreferenceSetting& readPref, const CancelationToken& cancelToken) {
     return {_hostAndPort};
 }
 
-SemiFuture<std::vector<HostAndPort>> RemoteCommandTargeterStandalone::findHostsWithMaxWait(
-    const ReadPreferenceSetting& readPref, Milliseconds maxWait) {
+SemiFuture<std::vector<HostAndPort>> RemoteCommandTargeterStandalone::findHosts(
+    const ReadPreferenceSetting& readPref, const CancelationToken& cancelToken) {
     return {{_hostAndPort}};
 }
 

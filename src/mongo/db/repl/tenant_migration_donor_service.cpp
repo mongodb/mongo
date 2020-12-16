@@ -417,9 +417,7 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendCommandToRecipi
     const CancelationToken& token) {
     return AsyncTry(
                [this, self = shared_from_this(), executor, recipientTargeterRS, cmdObj, token] {
-                   return recipientTargeterRS
-                       ->findHostWithMaxWait(ReadPreferenceSetting(),
-                                             ReplicaSetMonitorInterface::kDefaultFindHostTimeout)
+                   return recipientTargeterRS->findHost(ReadPreferenceSetting(), token)
                        .thenRunOn(**executor)
                        .then([this, self = shared_from_this(), executor, cmdObj, token](
                                  auto recipientHost) {

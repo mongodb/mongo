@@ -191,7 +191,7 @@ SemiFuture<std::vector<HostAndPort>> AsyncRequestsSender::RemoteData::resolveSha
                       str::stream() << "Could not find shard " << _shardId);
     }
 
-    return shard->getTargeter()->findHostsWithMaxWait(readPref, Seconds(20));
+    return shard->getTargeter()->findHosts(readPref, CancelationToken::uncancelable());
 }
 
 auto AsyncRequestsSender::RemoteData::scheduleRemoteCommand(std::vector<HostAndPort>&& hostAndPorts)
