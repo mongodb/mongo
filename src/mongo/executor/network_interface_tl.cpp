@@ -838,17 +838,22 @@ void NetworkInterfaceTL::RequestState::resolve(Future<RemoteCommandResponse> fut
 
             returnConnection(status);
 
-            auto commandStatus = getStatusFromCommandResult(response.data);
-            // Ignore maxTimeMS expiration errors for hedged reads without triggering the finish
-            // line.
-            if (isHedge && commandStatus == ErrorCodes::MaxTimeMSExpired) {
-                LOGV2_DEBUG(4660701,
-                            2,
-                            "Hedged request returned status",
-                            "requestId"_attr = request->id,
-                            "target"_attr = request->target,
-                            "status"_attr = commandStatus);
-                return;
+            const auto commandStatus = getStatusFromCommandResult(response.data);
+            if (isHedge) {
+                // Ignore maxTimeMS expiration, StaleDbVersion or any error belonging to
+                // StaleShardVersionError
+                //  error category for hedged reads without triggering the finish line.
+                if (commandStatus == ErrorCodes::MaxTimeMSExpired ||
+                    commandStatus == ErrorCodes::StaleDbVersion ||
+                    ErrorCodes::isStaleShardVersionError(commandStatus)) {
+                    LOGV2_DEBUG(4660701,
+                                2,
+                                "Hedged request returned status",
+                                "requestId"_attr = request->id,
+                                "target"_attr = request->target,
+                                "status"_attr = commandStatus);
+                    return;
+                }
             }
 
             if (!cmdState->finishLine.arriveStrongly()) {
