@@ -35,6 +35,7 @@
 
 #include <boost/intrusive_ptr.hpp>
 
+#include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
@@ -203,6 +204,15 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                                       const LiteParsedPipeline& liteParsedPipeline,
                                       const PrivilegeVector& privileges,
                                       BSONObjBuilder* result) {
+    // If 'apiStrict: true', validates that the pipeline does not contain stages which are not in
+    // this API version.
+    auto apiParameters = APIParameters::get(opCtx);
+    if (apiParameters.getAPIStrict().value_or(false)) {
+        auto apiVersion = apiParameters.getAPIVersion().value_or("");
+        if (!apiVersion.empty())
+            liteParsedPipeline.validatePipelineStagesIfAPIStrict(apiVersion);
+    }
+
     uassert(51028, "Cannot specify exchange option to a mongos", !request.getExchange());
     uassert(51143,
             "Cannot specify runtime constants option to a mongos",

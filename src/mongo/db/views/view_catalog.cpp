@@ -39,6 +39,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/db/api_parameters.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/namespace_string.h"
@@ -393,6 +394,15 @@ StatusWith<stdx::unordered_set<NamespaceString>> ViewCatalog::_validatePipeline(
     OperationContext* opCtx, const ViewDefinition& viewDef) const {
     const LiteParsedPipeline liteParsedPipeline(viewDef.viewOn(), viewDef.pipeline());
     const auto involvedNamespaces = liteParsedPipeline.getInvolvedNamespaces();
+
+    // If 'apiStrict: true', validates that the pipeline does not contain stages which are not in
+    // this API version.
+    auto apiParameters = APIParameters::get(opCtx);
+    if (apiParameters.getAPIStrict().value_or(false)) {
+        auto apiVersion = apiParameters.getAPIVersion();
+        invariant(apiVersion);
+        liteParsedPipeline.validatePipelineStagesIfAPIStrict(*apiVersion);
+    }
 
     // Verify that this is a legitimate pipeline specification by making sure it parses
     // correctly. In order to parse a pipeline we need to resolve any namespaces involved to a

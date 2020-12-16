@@ -37,6 +37,7 @@
 #include <memory>
 #include <vector>
 
+#include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
@@ -513,6 +514,15 @@ Status runAggregate(OperationContext* opCtx,
                     const BSONObj& cmdObj,
                     const PrivilegeVector& privileges,
                     rpc::ReplyBuilderInterface* result) {
+    // If 'apiStrict: true', validates that the pipeline does not contain stages which are not in
+    // this API version.
+    auto apiParameters = APIParameters::get(opCtx);
+    if (apiParameters.getAPIStrict().value_or(false)) {
+        auto apiVersion = apiParameters.getAPIVersion();
+        invariant(apiVersion);
+        liteParsedPipeline.validatePipelineStagesIfAPIStrict(*apiVersion);
+    }
+
     // For operations on views, this will be the underlying namespace.
     NamespaceString nss = request.getNamespace();
 

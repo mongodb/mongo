@@ -124,4 +124,16 @@ void LiteParsedPipeline::tickGlobalStageCounters() const {
     }
 }
 
+void LiteParsedPipeline::validatePipelineStagesIfAPIStrict(const std::string& version) const {
+    for (auto&& stage : _stageSpecs) {
+        if (version == "1") {
+            uassert(ErrorCodes::APIStrictError,
+                    str::stream() << "stage " << stage->getParseTimeName()
+                                  << " is not allowed with 'apiStrict: true' in API Version "
+                                  << version,
+                    isStageInAPIVersion1(stage->getParseTimeName()));
+        }
+    }
+}
+
 }  // namespace mongo
