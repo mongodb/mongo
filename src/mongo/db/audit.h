@@ -252,6 +252,11 @@ void logReplSetReconfig(Client* client, const BSONObj* oldConfig, const BSONObj*
 void logApplicationMessage(Client* client, StringData msg);
 
 /**
+ * Logs the options associated with a startup event.
+ */
+void logStartupOptions(Client* client, const BSONObj& startupOptions);
+
+/**
  * Logs the result of a shutdown command.
  */
 void logShutdown(Client* client);

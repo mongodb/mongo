@@ -359,6 +359,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
 #endif
 
     logProcessDetails(nullptr);
+    audit::logStartupOptions(Client::getCurrent(), serverGlobalParams.parsedOpts);
 
     serviceContext->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongod>(serviceContext));
 
