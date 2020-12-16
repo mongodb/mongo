@@ -125,6 +125,8 @@ all:
     test_file: jstests/replsets/not_primary_errors_returned_during_rollback_if_helloOk.js
   - ticket: SERVER-48179
     test_file: jstests/replsets/reconfig_removes_node_in_rollback.js
+  - ticket: SERVER-50486
+    test_file: jstests/replsets/dont_refresh_session_prepare_secondary.js
 
 suites:
 
