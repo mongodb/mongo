@@ -120,23 +120,20 @@ const int kTimeseriesControlVersion = 1;
  * All measurements in a bucket share the same value in the 'meta' field, so there is no need to add
  * the metadata to the data field.
  */
-BSONObj makeTimeseriesDataStages(const std::vector<BSONObj>& docs,
-                                 BSONElement metadataElem,
-                                 uint16_t count) {
-    BSONObjBuilder builder;
+void appendTimeseriesDataFields(const std::vector<BSONObj>& docs,
+                                BSONElement metadataElem,
+                                uint16_t count,
+                                BSONObjBuilder* builder) {
     for (const auto& doc : docs) {
         for (const auto& elem : doc) {
             auto key = elem.fieldNameStringData();
             if (metadataElem && key == metadataElem.fieldNameStringData()) {
                 continue;
             }
-            // If 'elem' is an object, it may be evaluated as an aggregation expression.
-            // The $literal operator can be used to avoid this scenario.
-            builder.append(str::stream() << "data." << key << "." << count, elem.wrap("$literal"));
+            builder->appendAs(elem, str::stream() << "data." << key << "." << count);
         }
         count++;
     }
-    return builder.obj();
 }
 
 /**
@@ -150,21 +147,22 @@ BSONObj makeTimeseriesUpsertRequest(const OID& bucketId,
     builder.append(write_ops::UpdateOpEntry::kMultiFieldName, false);
     builder.append(write_ops::UpdateOpEntry::kUpsertFieldName, true);
     {
-        BSONArrayBuilder stagesBuilder(
-            builder.subarrayStart(write_ops::UpdateOpEntry::kUFieldName));
-        stagesBuilder.append(
-            BSON("$set" << BSON("control.version"
-                                << BSON("$ifNull" << BSON_ARRAY("$control.version"
-                                                                << kTimeseriesControlVersion)))));
-        stagesBuilder.append(BSON("$set" << BSON("control.min" << data.bucketMin)));
-        stagesBuilder.append(BSON("$set" << BSON("control.max" << data.bucketMax)));
-        if (auto metadataElem = metadata.firstElement()) {
-            stagesBuilder.append(BSON(
-                "$set" << BSON("meta" << BSON("$ifNull" << BSON_ARRAY("$meta" << metadataElem)))));
+        auto metadataElem = metadata.firstElement();
+        BSONObjBuilder updateBuilder(builder.subobjStart(write_ops::UpdateOpEntry::kUFieldName));
+        {
+            BSONObjBuilder setOnInsertOpBuilder(updateBuilder.subobjStart("$setOnInsert"));
+            setOnInsertOpBuilder.append("control.version", kTimeseriesControlVersion);
+            if (metadataElem) {
+                setOnInsertOpBuilder.appendAs(metadataElem, "meta");
+            }
         }
-        stagesBuilder.append(
-            BSON("$set" << makeTimeseriesDataStages(
-                     data.docs, metadata.firstElement(), data.numCommittedMeasurements)));
+        {
+            BSONObjBuilder setOpBuilder(updateBuilder.subobjStart("$set"));
+            setOpBuilder.append("control.min", data.bucketMin);
+            setOpBuilder.append("control.max", data.bucketMax);
+            appendTimeseriesDataFields(
+                data.docs, metadataElem, data.numCommittedMeasurements, &setOpBuilder);
+        }
     }
     return builder.obj();
 }
