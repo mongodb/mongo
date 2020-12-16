@@ -78,7 +78,7 @@ def injectMozJS(thisEnv):
             'JS_DEBUG',
         ])
 
-env.AddMethod(injectMozJS, 'InjectMozJS');
+env.AddMethod(injectMozJS, 'InjectMozJS')
 
 
 if not use_system_version_of_library('tcmalloc'):

@@ -44,9 +44,11 @@ env.Library(
         'engine_none.cpp',
     ],
     LIBDEPS=[
-        'bson_template_evaluator',
         'scripting_common',
     ],
+    LBDEPS_PRIVATE=[
+        'bson_template_evaluator',
+    ]
 )
 
 if usemozjs:

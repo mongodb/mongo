@@ -1168,6 +1168,7 @@ def shim_library(env, name, needs_link=False, *args, **kwargs):
 
     for n in nodes:
         setattr(n.attributes, "needs_link", needs_link)
+        setattr(n.attributes, "is_shim", True)
 
     return nodes
 

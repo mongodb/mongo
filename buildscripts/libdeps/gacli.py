@@ -49,8 +49,9 @@ class LinterSplitArgs(argparse.Action):
         if invalid_choices:
             raise Exception(
                 f"Invalid choices: {invalid_choices}\nMust use choices from {self.valid_choices}")
-        if graph_analyzer.CountTypes.all.name in selected_choices or selected_choices == []:
+        if 'all' in selected_choices or selected_choices == []:
             selected_choices = self.valid_choices
+            selected_choices.remove('all')
         setattr(namespace, self.dest, [opt.replace('-', '_') for opt in selected_choices])
 
 
@@ -62,17 +63,29 @@ class CountSplitArgs(LinterSplitArgs):
     ]
 
 
+class LintSplitArgs(LinterSplitArgs):
+    """Special case of common custom arg action for Count types."""
+
+    valid_choices = [
+        name[0].replace('_', '-') for name in graph_analyzer.LinterTypes.__members__.items()
+    ]
+
+
 class CustomFormatter(argparse.RawTextHelpFormatter, argparse.ArgumentDefaultsHelpFormatter):
     """Custom arg help formatter for modifying the defaults printed for the custom list action."""
+
+    @staticmethod
+    def _get_help_length(enum_type):
+        max_length = max([len(name[0]) for name in enum_type.__members__.items()])
+        count_help = {}
+        for name in enum_type.__members__.items():
+            count_help[name[0]] = name[0] + ('-' * (max_length - len(name[0]))) + ": "
+        return count_help
 
     def _get_help_string(self, action):
 
         if isinstance(action, CountSplitArgs):
-            max_length = max(
-                [len(name[0]) for name in graph_analyzer.CountTypes.__members__.items()])
-            count_help = {}
-            for name in graph_analyzer.CountTypes.__members__.items():
-                count_help[name[0]] = name[0] + ('-' * (max_length - len(name[0]))) + ": "
+            count_help = self._get_help_length(graph_analyzer.CountTypes)
             return textwrap.dedent(f"""\
                 {action.help}
                 default: all, choices:
@@ -85,6 +98,17 @@ class CustomFormatter(argparse.RawTextHelpFormatter, argparse.ArgumentDefaultsHe
                     {count_help[graph_analyzer.CountTypes.pub_edge.name]}count edges that are public
                     {count_help[graph_analyzer.CountTypes.priv_edge.name]}count edges that are private
                     {count_help[graph_analyzer.CountTypes.if_edge.name]}count edges that are interface
+                    {count_help[graph_analyzer.CountTypes.shim.name]}count shim nodes
+                    {count_help[graph_analyzer.CountTypes.lib.name]}count library nodes
+                    {count_help[graph_analyzer.CountTypes.prog.name]}count program nodes
+                """)
+        elif isinstance(action, LintSplitArgs):
+            count_help = self._get_help_length(graph_analyzer.LinterTypes)
+            return textwrap.dedent(f"""\
+                {action.help}
+                default: all, choices:
+                    {count_help[graph_analyzer.LinterTypes.all.name]}perform all linters
+                    {count_help[graph_analyzer.LinterTypes.node.name]}find unnecessary public libdeps
                 """)
         return super()._get_help_string(action)
 
@@ -97,16 +121,17 @@ def setup_args_parser():
     parser.add_argument('--graph-file', type=str, action='store', help="The LIBDEPS graph to load.",
                         default="build/opt/libdeps/libdeps.graphml")
 
-    parser.add_argument(
-        '--build-dir', type=str, action='store', help=
-        "The path where the generic build files live, corresponding to BUILD_DIR in the Sconscripts.",
-        default=None)
-
     parser.add_argument('--format', choices=['pretty', 'json'], default='pretty',
                         help="The output format type.")
 
+    parser.add_argument('--build-data', action='store_true',
+                        help="Print the invocation and git hash used to build the graph")
+
     parser.add_argument('--counts', metavar='COUNT,', nargs='*', action=CountSplitArgs,
                         help="Output various counts from the graph. Comma separated list.")
+
+    parser.add_argument('--lint', metavar='LINTER,', nargs='*', action=LintSplitArgs,
+                        help="Perform various linters on the graph. Comma separated list.")
 
     parser.add_argument('--direct-depends', action='append',
                         help="Print the nodes which depends on a given node.")
@@ -128,7 +153,7 @@ def load_graph_data(graph_file, output_format):
     if output_format == "pretty":
         sys.stdout.write("Loading graph data...")
         sys.stdout.flush()
-    graph = graph = networkx.read_graphml(graph_file)
+    graph = networkx.read_graphml(graph_file)
     if output_format == "pretty":
         sys.stdout.write("Loaded!\n\n")
     return graph
@@ -138,17 +163,26 @@ def main():
     """Perform graph analysis based on input args."""
 
     args = setup_args_parser()
-    if not args.build_dir:
-        args.build_dir = str(Path(args.graph_file).parents[1])
     graph = load_graph_data(args.graph_file, args.format)
-
-    depends_reports = {
-        graph_analyzer.DependsReportTypes.direct_depends.name: args.direct_depends,
-        graph_analyzer.DependsReportTypes.common_depends.name: args.common_depends,
-        graph_analyzer.DependsReportTypes.exclude_depends.name: args.exclude_depends,
-    }
     libdeps = graph_analyzer.LibdepsGraph(graph)
-    ga = graph_analyzer.LibdepsGraphAnalysis(libdeps, args.build_dir, args.counts, depends_reports)
+
+    analysis = graph_analyzer.counter_factory(libdeps, args.counts)
+
+    for depends in args.direct_depends:
+        analysis.append(graph_analyzer.DirectDependencies(libdeps, depends))
+
+    for depends in args.common_depends:
+        analysis.append(graph_analyzer.CommonDependencies(libdeps, depends))
+
+    for depends in args.exclude_depends:
+        analysis.append(graph_analyzer.ExcludeDependencies(libdeps, depends))
+
+    analysis += graph_analyzer.linter_factory(libdeps, args.lint)
+
+    if args.build_data:
+        analysis.append(graph_analyzer.BuildDataReport(libdeps))
+
+    ga = graph_analyzer.LibdepsGraphAnalysis(libdeps_graph=libdeps, analysis=analysis)
 
     if args.format == 'pretty':
         ga_printer = graph_analyzer.GaPrettyPrinter(ga)
