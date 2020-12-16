@@ -62,9 +62,11 @@ bool TransportLayerMock::owns(Session::Id id) {
     return _sessions.count(id) > 0;
 }
 
-StatusWith<SessionHandle> TransportLayerMock::connect(HostAndPort peer,
-                                                      ConnectSSLMode sslMode,
-                                                      Milliseconds timeout) {
+StatusWith<SessionHandle> TransportLayerMock::connect(
+    HostAndPort peer,
+    ConnectSSLMode sslMode,
+    Milliseconds timeout,
+    boost::optional<TransientSSLParams> transientSSLParams) {
     MONGO_UNREACHABLE;
 }
 
@@ -106,8 +108,7 @@ TransportLayerMock::~TransportLayerMock() {
 #ifdef MONGO_CONFIG_SSL
 
 StatusWith<std::shared_ptr<const transport::SSLConnectionContext>>
-TransportLayerMock::createTransientSSLContext(const TransientSSLParams& transientSSLParams,
-                                              const SSLManagerInterface* optionalManager) {
+TransportLayerMock::createTransientSSLContext(const TransientSSLParams& transientSSLParams) {
     return Status(ErrorCodes::InvalidSSLConfiguration, "Failure creating transient SSL context");
 }
 

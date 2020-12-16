@@ -112,7 +112,10 @@ public:
      * @param errmsg any relevant error message will appended to the string
      * @return false if fails to connect.
      */
-    bool connect(const HostAndPort& server, StringData applicationName, std::string& errmsg);
+    bool connect(const HostAndPort& server,
+                 StringData applicationName,
+                 std::string& errmsg,
+                 boost::optional<TransientSSLParams> transientSSLParams = boost::none);
 
     /**
      * Semantically equivalent to the previous connect method, but returns a Status
@@ -120,7 +123,9 @@ public:
      *
      * @param server The server to connect to.
      */
-    virtual Status connect(const HostAndPort& server, StringData applicationName);
+    virtual Status connect(const HostAndPort& server,
+                           StringData applicationName,
+                           boost::optional<TransientSSLParams> transientSSLParams = boost::none);
 
     /**
      * This version of connect does not run 'isMaster' after creating a TCP connection to the
@@ -129,7 +134,8 @@ public:
      *
      * @param server The server to connect to.
      */
-    Status connectSocketOnly(const HostAndPort& server);
+    Status connectSocketOnly(const HostAndPort& server,
+                             boost::optional<TransientSSLParams> transientSSLParams = boost::none);
 
     /**
      * Logs out the connection for the given database.

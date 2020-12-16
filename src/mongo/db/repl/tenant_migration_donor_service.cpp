@@ -84,7 +84,7 @@ bool shouldStopUpdatingDonorStateDoc(Status status, const CancelationToken& toke
 }
 
 bool shouldStopSendingRecipientCommand(Status status, const CancelationToken& token) {
-    return status.isOK() || token.isCanceled();
+    return status.isOK() || !ErrorCodes::isRetriableError(status) || token.isCanceled();
 }
 
 }  // namespace
@@ -486,7 +486,10 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendCommandToRecipi
                                    if (!response.isOK()) {
                                        return response.status;
                                    }
-                                   return getStatusFromCommandResult(response.data);
+                                   auto commandStatus = getStatusFromCommandResult(response.data);
+                                   commandStatus.addContext(
+                                       "Tenant migration recipient command failed");
+                                   return commandStatus;
                                });
                        });
                })

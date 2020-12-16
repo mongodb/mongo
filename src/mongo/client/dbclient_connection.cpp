@@ -275,8 +275,9 @@ Status DBClientConnection::authenticateInternalUser(auth::StepDownBehavior stepD
 
 bool DBClientConnection::connect(const HostAndPort& server,
                                  StringData applicationName,
-                                 std::string& errmsg) {
-    auto connectStatus = connect(server, applicationName);
+                                 std::string& errmsg,
+                                 boost::optional<TransientSSLParams> transientSSLParams) {
+    auto connectStatus = connect(server, applicationName, transientSSLParams);
     if (!connectStatus.isOK()) {
         errmsg = connectStatus.reason();
         return false;
@@ -284,8 +285,10 @@ bool DBClientConnection::connect(const HostAndPort& server,
     return true;
 }
 
-Status DBClientConnection::connect(const HostAndPort& serverAddress, StringData applicationName) {
-    auto connectStatus = connectSocketOnly(serverAddress);
+Status DBClientConnection::connect(const HostAndPort& serverAddress,
+                                   StringData applicationName,
+                                   boost::optional<TransientSSLParams> transientSSLParams) {
+    auto connectStatus = connectSocketOnly(serverAddress, transientSSLParams);
     if (!connectStatus.isOK()) {
         return connectStatus;
     }
@@ -391,7 +394,8 @@ Status DBClientConnection::connect(const HostAndPort& serverAddress, StringData 
     return Status::OK();
 }
 
-Status DBClientConnection::connectSocketOnly(const HostAndPort& serverAddress) {
+Status DBClientConnection::connectSocketOnly(
+    const HostAndPort& serverAddress, boost::optional<TransientSSLParams> transientSSLParams) {
     _serverAddress = serverAddress;
     _markFailed(kReleaseSession);
 
@@ -415,7 +419,10 @@ Status DBClientConnection::connectSocketOnly(const HostAndPort& serverAddress) {
     }
 
     auto sws = getGlobalServiceContext()->getTransportLayer()->connect(
-        serverAddress, _uri.getSSLMode(), _socketTimeout.value_or(Milliseconds{5000}));
+        serverAddress,
+        transientSSLParams ? transport::kEnableSSL : _uri.getSSLMode(),
+        _socketTimeout.value_or(Milliseconds{5000}),
+        transientSSLParams);
     if (!sws.isOK()) {
         return Status(ErrorCodes::HostUnreachable,
                       str::stream() << "couldn't connect to server " << _serverAddress.toString()

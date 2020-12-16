@@ -63,9 +63,11 @@ public:
     explicit TransportLayerManager(const WireSpec& wireSpec = WireSpec::instance())
         : TransportLayer(wireSpec) {}
 
-    StatusWith<SessionHandle> connect(HostAndPort peer,
-                                      ConnectSSLMode sslMode,
-                                      Milliseconds timeout) override;
+    StatusWith<SessionHandle> connect(
+        HostAndPort peer,
+        ConnectSSLMode sslMode,
+        Milliseconds timeout,
+        boost::optional<TransientSSLParams> transientSSLParams) override;
     Future<SessionHandle> asyncConnect(
         HostAndPort peer,
         ConnectSSLMode sslMode,
@@ -109,8 +111,7 @@ public:
                               bool asyncOCSPStaple) override;
 
     StatusWith<std::shared_ptr<const transport::SSLConnectionContext>> createTransientSSLContext(
-        const TransientSSLParams& transientSSLParams,
-        const SSLManagerInterface* optionalManager) override;
+        const TransientSSLParams& transientSSLParams) override;
 #endif
 private:
     template <typename Callable>

@@ -130,7 +130,7 @@ NetworkInterfaceTL::NetworkInterfaceTL(std::string instanceName,
 #ifdef MONGO_CONFIG_SSL
     if (_connPoolOpts.transientSSLParams) {
         auto statusOrContext =
-            _tl->createTransientSSLContext(_connPoolOpts.transientSSLParams.get(), nullptr);
+            _tl->createTransientSSLContext(_connPoolOpts.transientSSLParams.get());
         uassertStatusOK(statusOrContext.getStatus());
         transientSSLContext = std::move(statusOrContext.getValue());
     }

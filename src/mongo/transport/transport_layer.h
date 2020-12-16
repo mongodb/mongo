@@ -87,9 +87,11 @@ public:
 
     virtual ~TransportLayer() = default;
 
-    virtual StatusWith<SessionHandle> connect(HostAndPort peer,
-                                              ConnectSSLMode sslMode,
-                                              Milliseconds timeout) = 0;
+    virtual StatusWith<SessionHandle> connect(
+        HostAndPort peer,
+        ConnectSSLMode sslMode,
+        Milliseconds timeout,
+        boost::optional<TransientSSLParams> transientSSLParams = boost::none) = 0;
 
     virtual Future<SessionHandle> asyncConnect(
         HostAndPort peer,
@@ -142,8 +144,7 @@ public:
      * used.
      */
     virtual StatusWith<std::shared_ptr<const transport::SSLConnectionContext>>
-    createTransientSSLContext(const TransientSSLParams& transientSSLParams,
-                              const SSLManagerInterface* optionalManager) = 0;
+    createTransientSSLContext(const TransientSSLParams& transientSSLParams) = 0;
 #endif
 
 private:

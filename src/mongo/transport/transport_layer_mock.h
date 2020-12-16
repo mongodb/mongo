@@ -57,9 +57,11 @@ public:
     SessionHandle get(Session::Id id);
     bool owns(Session::Id id);
 
-    StatusWith<SessionHandle> connect(HostAndPort peer,
-                                      ConnectSSLMode sslMode,
-                                      Milliseconds timeout) override;
+    StatusWith<SessionHandle> connect(
+        HostAndPort peer,
+        ConnectSSLMode sslMode,
+        Milliseconds timeout,
+        boost::optional<TransientSSLParams> transientSSLParams) override;
     Future<SessionHandle> asyncConnect(
         HostAndPort peer,
         ConnectSSLMode sslMode,
@@ -85,8 +87,7 @@ public:
     }
 
     StatusWith<std::shared_ptr<const transport::SSLConnectionContext>> createTransientSSLContext(
-        const TransientSSLParams& transientSSLParams,
-        const SSLManagerInterface* optionalManager) override;
+        const TransientSSLParams& transientSSLParams) override;
 #endif
 
 private:

@@ -625,7 +625,7 @@ TEST(SSLManager, TransientSSLParams) {
     transientSSLParams.sslClusterPEMPayload = loadFile("jstests/libs/client.pem");
     transientSSLParams.targetedClusterConnectionString = ConnectionString::forLocal();
 
-    auto result = tla.createTransientSSLContext(transientSSLParams, manager.get());
+    auto result = tla.createTransientSSLContext(transientSSLParams);
 
     // This will fail because we need to rotate certificates first to
     // initialize the default SSL context inside TransportLayerASIO.
@@ -634,7 +634,7 @@ TEST(SSLManager, TransientSSLParams) {
     // Init the transport properly.
     uassertStatusOK(tla.rotateCertificates(manager, false /* asyncOCSPStaple */));
 
-    result = tla.createTransientSSLContext(transientSSLParams, manager.get());
+    result = tla.createTransientSSLContext(transientSSLParams);
     uassertStatusOK(result.getStatus());
 }
 

@@ -61,10 +61,12 @@ void TransportLayerManager::_foreach(Callable&& cb) const {
     }
 }
 
-StatusWith<SessionHandle> TransportLayerManager::connect(HostAndPort peer,
-                                                         ConnectSSLMode sslMode,
-                                                         Milliseconds timeout) {
-    return _tls.front()->connect(peer, sslMode, timeout);
+StatusWith<SessionHandle> TransportLayerManager::connect(
+    HostAndPort peer,
+    ConnectSSLMode sslMode,
+    Milliseconds timeout,
+    boost::optional<TransientSSLParams> transientSSLParams) {
+    return _tls.front()->connect(peer, sslMode, timeout, transientSSLParams);
 }
 
 Future<SessionHandle> TransportLayerManager::asyncConnect(
@@ -156,13 +158,12 @@ Status TransportLayerManager::rotateCertificates(std::shared_ptr<SSLManagerInter
 }
 
 StatusWith<std::shared_ptr<const transport::SSLConnectionContext>>
-TransportLayerManager::createTransientSSLContext(const TransientSSLParams& transientSSLParams,
-                                                 const SSLManagerInterface* optionalManager) {
+TransportLayerManager::createTransientSSLContext(const TransientSSLParams& transientSSLParams) {
 
     Status firstError(ErrorCodes::InvalidSSLConfiguration,
                       "Failure creating transient SSL context");
     for (auto&& tl : _tls) {
-        auto statusOrContext = tl->createTransientSSLContext(transientSSLParams, optionalManager);
+        auto statusOrContext = tl->createTransientSSLContext(transientSSLParams);
         if (statusOrContext.isOK()) {
             return std::move(statusOrContext.getValue());
         }

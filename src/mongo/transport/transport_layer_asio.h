@@ -122,7 +122,8 @@ public:
 
     StatusWith<SessionHandle> connect(HostAndPort peer,
                                       ConnectSSLMode sslMode,
-                                      Milliseconds timeout) final;
+                                      Milliseconds timeout,
+                                      boost::optional<TransientSSLParams> transientSSLParams) final;
 
     Future<SessionHandle> asyncConnect(
         HostAndPort peer,
@@ -166,8 +167,7 @@ public:
      * used.
      */
     StatusWith<std::shared_ptr<const transport::SSLConnectionContext>> createTransientSSLContext(
-        const TransientSSLParams& transientSSLParams,
-        const SSLManagerInterface* optionalManager) override;
+        const TransientSSLParams& transientSSLParams) override;
 #endif
 
 private:
@@ -182,9 +182,11 @@ private:
     void _acceptConnection(GenericAcceptor& acceptor);
 
     template <typename Endpoint>
-    StatusWith<ASIOSessionHandle> _doSyncConnect(Endpoint endpoint,
-                                                 const HostAndPort& peer,
-                                                 const Milliseconds& timeout);
+    StatusWith<ASIOSessionHandle> _doSyncConnect(
+        Endpoint endpoint,
+        const HostAndPort& peer,
+        const Milliseconds& timeout,
+        boost::optional<TransientSSLParams> transientSSLParams);
 
     StatusWith<std::shared_ptr<const transport::SSLConnectionContext>> _createSSLContext(
         std::shared_ptr<SSLManagerInterface>& manager,

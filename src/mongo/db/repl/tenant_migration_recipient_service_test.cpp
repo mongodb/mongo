@@ -187,9 +187,16 @@ public:
         _service = _registry->lookupServiceByName(
             TenantMigrationRecipientService::kTenantMigrationRecipientServiceName);
         ASSERT(_service);
+
+        // MockReplicaSet uses custom connection string which does not support auth.
+        auto authFp = globalFailPointRegistry().find("skipTenantMigrationRecipientAuth");
+        authFp->setMode(FailPoint::alwaysOn);
     }
 
     void tearDown() override {
+        auto authFp = globalFailPointRegistry().find("skipTenantMigrationRecipientAuth");
+        authFp->setMode(FailPoint::off);
+
         WaitForMajorityService::get(getServiceContext()).shutDown();
 
         _registry->onShutdown();

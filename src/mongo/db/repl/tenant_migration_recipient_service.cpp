@@ -67,6 +67,7 @@ constexpr StringData kOplogBufferPrefix = "repl.migration.oplog_"_sd;
 // A convenient place to set test-specific parameters.
 MONGO_FAIL_POINT_DEFINE(pauseBeforeRunTenantMigrationRecipientInstance);
 MONGO_FAIL_POINT_DEFINE(pauseAfterRunTenantMigrationRecipientInstance);
+MONGO_FAIL_POINT_DEFINE(skipTenantMigrationRecipientAuth);
 MONGO_FAIL_POINT_DEFINE(autoRecipientForgetMigration);
 
 // Fails before waiting for the state doc to be majority replicated.
@@ -267,9 +268,17 @@ OpTime TenantMigrationRecipientService::Instance::waitUntilTimestampIsMajorityCo
 }
 
 std::unique_ptr<DBClientConnection> TenantMigrationRecipientService::Instance::_connectAndAuth(
-    const HostAndPort& serverAddress, StringData applicationName, BSONObj authParams) {
+    const HostAndPort& serverAddress,
+    StringData applicationName,
+    const TransientSSLParams* transientSSLParams) {
     std::string errMsg;
-    auto clientBase = ConnectionString(serverAddress).connect(applicationName, errMsg);
+    auto clientBase = ConnectionString(serverAddress)
+                          .connect(applicationName,
+                                   errMsg,
+                                   0 /* socketTimeout */,
+                                   nullptr /* uri */,
+                                   nullptr /* apiParameters */,
+                                   transientSSLParams);
     if (!clientBase) {
         LOGV2_ERROR(4880400,
                     "Failed to connect to migration donor",
@@ -278,24 +287,21 @@ std::unique_ptr<DBClientConnection> TenantMigrationRecipientService::Instance::_
                     "serverAddress"_attr = serverAddress,
                     "applicationName"_attr = applicationName,
                     "error"_attr = errMsg);
-        uasserted(ErrorCodes::HostNotFound, errMsg);
+        // TODO (SERVER-53423): Make ConnectString::connect return a status instead of setting error
+        // message
+        uasserted(errMsg.find("InvalidSSLConfiguration") != std::string::npos
+                      ? ErrorCodes::InvalidSSLConfiguration
+                      : ErrorCodes::HostUnreachable,
+                  errMsg);
     }
-
-    // Authenticate connection to the donor.
-    uassertStatusOK(replAuthenticate(clientBase.get())
-                        .withContext(str::stream()
-                                     << "TenantMigrationRecipientService failed to authenticate to "
-                                     << serverAddress));
 
     // ConnectionString::connect() always returns a DBClientConnection in a unique_ptr of
     // DBClientBase type.
     std::unique_ptr<DBClientConnection> client(
         checked_cast<DBClientConnection*>(clientBase.release()));
-    if (!authParams.isEmpty()) {
-        client->auth(authParams);
-    } else {
-        // Tenant migration in production should always require auth.
-        uassert(4880405, "No auth data provided to tenant migration", getTestCommandsEnabled());
+
+    if (MONGO_likely(!skipTenantMigrationRecipientAuth.shouldFail())) {
+        client->auth(auth::createInternalX509AuthDocument());
     }
 
     return client;
@@ -309,8 +315,7 @@ TenantMigrationRecipientService::Instance::_createAndConnectClients() {
                 "tenantId"_attr = getTenantId(),
                 "migrationId"_attr = getMigrationUUID(),
                 "connectionString"_attr = _donorConnectionString,
-                "readPreference"_attr = _readPreference,
-                "authParams"_attr = redact(_authParams));
+                "readPreference"_attr = _readPreference);
     auto connectionStringWithStatus = ConnectionString::parse(_donorConnectionString);
     if (!connectionStringWithStatus.isOK()) {
         LOGV2_ERROR(4880403,
@@ -322,11 +327,11 @@ TenantMigrationRecipientService::Instance::_createAndConnectClients() {
 
         return SemiFuture<ConnectionPair>::makeReady(connectionStringWithStatus.getStatus());
     }
-    auto connectionString = std::move(connectionStringWithStatus.getValue());
-    const auto& servers = connectionString.getServers();
+    auto donorConnectionString = std::move(connectionStringWithStatus.getValue());
+    const auto& servers = donorConnectionString.getServers();
     stdx::lock_guard lk(_mutex);
     _donorReplicaSetMonitor = ReplicaSetMonitor::createIfNeeded(
-        connectionString.getSetName(), std::set<HostAndPort>(servers.begin(), servers.end()));
+        donorConnectionString.getSetName(), std::set<HostAndPort>(servers.begin(), servers.end()));
 
     // Only ever used to cancel when the setTenantMigrationRecipientInstanceHostTimeout failpoint is
     // set.
@@ -342,7 +347,8 @@ TenantMigrationRecipientService::Instance::_createAndConnectClients() {
 
     return _donorReplicaSetMonitor->getHostOrRefresh(_readPreference, getHostCancelSource.token())
         .thenRunOn(**_scopedExecutor)
-        .then([this, self = shared_from_this()](const HostAndPort& serverAddress) {
+        .then([this, self = shared_from_this(), donorConnectionString](
+                  const HostAndPort& serverAddress) {
             // Application name is constructed such that it doesn't exceeds
             // kMaxApplicationNameByteLength (128 bytes).
             // "TenantMigration_" (16 bytes) + <tenantId> (61 bytes) + "_" (1 byte) +
@@ -352,14 +358,22 @@ TenantMigrationRecipientService::Instance::_createAndConnectClients() {
             // character long, the maximum length of tenantId can only be 61 bytes.
             auto applicationName =
                 "TenantMigration_" + getTenantId() + "_" + getMigrationUUID().toString();
-            auto client = _connectAndAuth(serverAddress, applicationName, _authParams);
+
+            auto recipientCertificate = _stateDoc.getRecipientCertificateForDonor();
+            auto recipientSSLClusterPEMPayload = recipientCertificate.getCertificate().toString() +
+                "\n" + recipientCertificate.getPrivateKey().toString();
+            const TransientSSLParams transientSSLParams{donorConnectionString,
+                                                        std::move(recipientSSLClusterPEMPayload)};
+
+            auto client = _connectAndAuth(serverAddress, applicationName, &transientSSLParams);
 
             // Application name is constructed such that it doesn't exceeds
             // kMaxApplicationNameByteLength (128 bytes).
             // "TenantMigration_" (16 bytes) + <tenantId> (61 bytes) + "_" (1 byte) +
             // <migrationUuid> (36 bytes) + _oplogFetcher" (13 bytes) =  127 bytes length.
             applicationName += "_oplogFetcher";
-            auto oplogFetcherClient = _connectAndAuth(serverAddress, applicationName, _authParams);
+            auto oplogFetcherClient =
+                _connectAndAuth(serverAddress, applicationName, &transientSSLParams);
             return ConnectionPair(std::move(client), std::move(oplogFetcherClient));
         })
         .onError(

@@ -365,6 +365,50 @@ certs:
     - {role: backup, db: admin}
     - {role: advanceClusterTimeRole, db: admin}
 
+- name: 'rs1_tenant_migration_expired.pem'
+  description:
+    Client certificate file for tenant migration donor or recipient which has passed its expiration
+    date.
+  not_before: -10000000
+  not_after: -1000000
+  Subject:
+    OU: 'rs1_tenant_migration'
+  extensions:
+    basicConstraints: {CA: false}
+    subjectKeyIdentifier: hash
+    keyUsage: [digitalSignature, keyEncipherment]
+    extendedKeyUsage: [clientAuth]
+    mongoRoles:
+    - {role: backup, db: admin}
+    - {role: advanceClusterTimeRole, db: admin}
+
+- name: 'rs1_tenant_migration_no_backup_role.pem'
+  description:
+    Client certificate file for tenant migration donor or recipient without backup role.
+  Subject:
+    OU: 'rs1_tenant_migration'
+  extensions:
+    basicConstraints: {CA: false}
+    subjectKeyIdentifier: hash
+    keyUsage: [digitalSignature, keyEncipherment]
+    extendedKeyUsage: [clientAuth]
+    mongoRoles:
+    - {role: advanceClusterTimeRole, db: admin}
+
+- name: 'rs1_tenant_migration_no_advance_cluster_time_role.pem'
+  description:
+    Client certificate file for tenant migration donor or recipient without role to advance
+    cluster time.
+  Subject:
+    OU: 'rs1_tenant_migration'
+  extensions:
+    basicConstraints: {CA: false}
+    subjectKeyIdentifier: hash
+    keyUsage: [digitalSignature, keyEncipherment]
+    extendedKeyUsage: [clientAuth]
+    mongoRoles:
+    - {role: backup, db: admin}
+
 - name: 'rs2.pem'
   description: General purpose server certificate file.
   Subject:

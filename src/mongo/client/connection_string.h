@@ -46,6 +46,7 @@ namespace mongo {
 class ClientAPIVersionParameters;
 class DBClientBase;
 class MongoURI;
+struct TransientSSLParams;
 
 /**
  * ConnectionString handles parsing different ways to connect to mongo and determining method
@@ -150,7 +151,8 @@ public:
         std::string& errmsg,
         double socketTimeout = 0,
         const MongoURI* uri = nullptr,
-        const ClientAPIVersionParameters* apiParameters = nullptr) const;
+        const ClientAPIVersionParameters* apiParameters = nullptr,
+        const TransientSSLParams* transientSSLParams = nullptr) const;
 
     static StatusWith<ConnectionString> parse(const std::string& url);
 

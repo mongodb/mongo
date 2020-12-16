@@ -51,7 +51,8 @@ std::unique_ptr<DBClientBase> ConnectionString::connect(
     std::string& errmsg,
     double socketTimeout,
     const MongoURI* uri,
-    const ClientAPIVersionParameters* apiParameters) const {
+    const ClientAPIVersionParameters* apiParameters,
+    const TransientSSLParams* transientSSLParams) const {
     MongoURI newURI{};
     if (uri) {
         newURI = *uri;
@@ -69,7 +70,11 @@ std::unique_ptr<DBClientBase> ConnectionString::connect(
                             "Creating new connection to: {hostAndPort}",
                             "Creating new connection",
                             "hostAndPort"_attr = server);
-                if (!c->connect(server, applicationName, errmsg)) {
+                if (!c->connect(server,
+                                applicationName,
+                                errmsg,
+                                transientSSLParams ? boost::make_optional(*transientSSLParams)
+                                                   : boost::none)) {
                     continue;
                 }
                 LOGV2_DEBUG(20110, 1, "Connected connection!");

@@ -286,9 +286,10 @@ public:
          * non-empty.  Throws a user assertion on failure.
          *
          */
-        std::unique_ptr<DBClientConnection> _connectAndAuth(const HostAndPort& serverAddress,
-                                                            StringData applicationName,
-                                                            BSONObj authParams);
+        std::unique_ptr<DBClientConnection> _connectAndAuth(
+            const HostAndPort& serverAddress,
+            StringData applicationName,
+            const TransientSSLParams* transientSSLParams);
 
         /**
          * Creates and connects both the oplog fetcher client and the client used for other
@@ -387,8 +388,6 @@ public:
         const UUID _migrationUuid;                    // (R)
         const std::string _donorConnectionString;     // (R)
         const ReadPreferenceSetting _readPreference;  // (R)
-        // TODO(SERVER-50670): Populate authParams
-        const BSONObj _authParams;  // (M)
 
         std::shared_ptr<ReplicaSetMonitor> _donorReplicaSetMonitor;  // (M)
 
