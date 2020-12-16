@@ -34,11 +34,17 @@ var $config = (function() {
                         this.numDocScanned = this.batchSize;
                     });
             } else {
+                // The killOp() function below may cause Interrupted or CursorNotFound here, or the
+                // end of the test may cause ShutdownInProgress.
                 doSnapshotGetMoreAtClusterTime(
                     db,
                     collName,
                     this,
-                    [ErrorCodes.ShutdownInProgress, ErrorCodes.Interrupted],
+                    [
+                        ErrorCodes.Interrupted,
+                        ErrorCodes.CursorNotFound,
+                        ErrorCodes.ShutdownInProgress
+                    ],
                     (res) => {
                         let expectedDocs = [...Array(this.batchSize).keys()].map(
                             (i) => ({_id: i + this.numDocScanned, x: 1}));
