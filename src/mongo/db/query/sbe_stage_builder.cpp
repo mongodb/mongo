@@ -354,15 +354,16 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         relevantSlots = sbe::makeSV();
         outputs.forEachSlot(forwardingReqs, [&](auto&& slot) { relevantSlots.push_back(slot); });
 
-        stage = generateFilter(_opCtx,
-                               fn->filter.get(),
-                               std::move(stage),
-                               &_slotIdGenerator,
-                               &_frameIdGenerator,
-                               outputs.get(kResult),
-                               _data.env,
-                               std::move(relevantSlots),
-                               root->nodeId());
+
+        std::tie(std::ignore, stage) = generateFilter(_opCtx,
+                                                      fn->filter.get(),
+                                                      std::move(stage),
+                                                      &_slotIdGenerator,
+                                                      &_frameIdGenerator,
+                                                      outputs.get(kResult),
+                                                      _data.env,
+                                                      std::move(relevantSlots),
+                                                      root->nodeId());
     }
 
     return {std::move(stage), std::move(outputs)};
@@ -731,6 +732,9 @@ SlotBasedStageBuilder::buildProjectionDefault(const QuerySolutionNode* root,
     auto childReqs = reqs.copy().set(kResult);
     auto [inputStage, outputs] = build(pn->children[0], childReqs);
 
+    auto relevantSlots = sbe::makeSV();
+    outputs.forEachSlot(reqs, [&](auto&& slot) { relevantSlots.push_back(slot); });
+
     auto [slot, stage] = generateProjection(_opCtx,
                                             &pn->proj,
                                             std::move(inputStage),
@@ -738,6 +742,7 @@ SlotBasedStageBuilder::buildProjectionDefault(const QuerySolutionNode* root,
                                             &_frameIdGenerator,
                                             outputs.get(kResult),
                                             _data.env,
+                                            std::move(relevantSlots),
                                             root->nodeId());
     outputs.set(kResult, slot);
 
@@ -788,15 +793,15 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         auto forwardingReqs = reqs.copy().clear(kResult);
         outputs.forEachSlot(forwardingReqs, [&](auto&& slot) { relevantSlots.push_back(slot); });
 
-        stage = generateFilter(_opCtx,
-                               orn->filter.get(),
-                               std::move(stage),
-                               &_slotIdGenerator,
-                               &_frameIdGenerator,
-                               outputs.get(kResult),
-                               _data.env,
-                               std::move(relevantSlots),
-                               root->nodeId());
+        std::tie(std::ignore, stage) = generateFilter(_opCtx,
+                                                      orn->filter.get(),
+                                                      std::move(stage),
+                                                      &_slotIdGenerator,
+                                                      &_frameIdGenerator,
+                                                      outputs.get(kResult),
+                                                      _data.env,
+                                                      std::move(relevantSlots),
+                                                      root->nodeId());
     }
 
     return {std::move(stage), std::move(outputs)};

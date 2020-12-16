@@ -411,8 +411,18 @@ EvalExprStagePair generateSingleResultUnion(std::vector<EvalExprStagePair> branc
 EvalExprStagePair generateShortCircuitingLogicalOp(sbe::EPrimBinary::Op logicOp,
                                                    std::vector<EvalExprStagePair> branches,
                                                    PlanNodeId planNodeId,
-                                                   sbe::value::SlotIdGenerator* slotIdGenerator) {
+                                                   sbe::value::SlotIdGenerator* slotIdGenerator,
+                                                   const FilterStateHelper& stateHelper) {
     invariant(logicOp == sbe::EPrimBinary::logicAnd || logicOp == sbe::EPrimBinary::logicOr);
+
+    if (!branches.empty() && logicOp == sbe::EPrimBinary::logicOr) {
+        // OR does not support index tracking, so we must ensure that state from the last branch
+        // holds only boolean value.
+        // NOTE: There is no technical reason for that. We could support index tracking for OR
+        // expression, but this would differ from the existing behaviour.
+        auto& [expr, _] = branches.back();
+        expr = stateHelper.makeState(stateHelper.getBool(expr.extractExpr()));
+    }
 
     // For AND and OR, if 'branches' only has one element, we can just return branches[0].
     if (branches.size() == 1) {
@@ -426,28 +436,28 @@ EvalExprStagePair generateShortCircuitingLogicalOp(sbe::EPrimBinary::Op logicOp,
     // be evaluated. In other words, the evaluation process will "short-circuit". If a branch's
     // filter condition is false, the branch will not produce a value and the evaluation process
     // will continue. The last branch doesn't have a FilterStage and will always produce a value.
-    auto branchFn = [logicOp](EvalExpr expr,
-                              EvalStage stage,
-                              PlanNodeId planNodeId,
-                              sbe::value::SlotIdGenerator* slotIdGenerator) {
+    auto branchFn = [logicOp, &stateHelper](EvalExpr expr,
+                                            EvalStage stage,
+                                            PlanNodeId planNodeId,
+                                            sbe::value::SlotIdGenerator* slotIdGenerator) {
         // Create a FilterStage for each branch (except the last one). If a branch's filter
         // condition is true, it will "short-circuit" the evaluation process. For AND, short-
         // circuiting should happen if an operand evalautes to false. For OR, short-circuiting
         // should happen if an operand evaluates to true.
-        auto filterExpr = (logicOp == sbe::EPrimBinary::logicAnd) ? makeNot(expr.extractExpr())
-                                                                  : expr.extractExpr();
-
-        stage = makeFilter<false>(std::move(stage), std::move(filterExpr), planNodeId);
-
         // Set up an output value to be returned if short-circuiting occurs. For AND, when
         // short-circuiting occurs, the output returned should be false. For OR, when short-
         // circuiting occurs, the output returned should be true.
-        auto shortCircuitVal = sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Boolean,
-                                                          (logicOp == sbe::EPrimBinary::logicOr));
-        auto slot = slotIdGenerator->generate();
-        auto resultStage =
-            makeProject(std::move(stage), planNodeId, slot, std::move(shortCircuitVal));
-        return std::make_pair(slot, std::move(resultStage));
+        auto filterExpr = stateHelper.getBool(expr.extractExpr());
+        if (logicOp == sbe::EPrimBinary::logicAnd) {
+            filterExpr = makeNot(std::move(filterExpr));
+        }
+        stage = makeFilter<false>(std::move(stage), std::move(filterExpr), planNodeId);
+
+        auto resultSlot = slotIdGenerator->generate();
+        auto resultValue = stateHelper.makeState(logicOp == sbe::EPrimBinary::logicOr);
+        stage = makeProject(std::move(stage), planNodeId, resultSlot, std::move(resultValue));
+
+        return std::make_pair(resultSlot, std::move(stage));
     };
 
     return generateSingleResultUnion(std::move(branches), branchFn, planNodeId, slotIdGenerator);
@@ -523,5 +533,65 @@ uint32_t dateTypeMask() {
             getBSONTypeMask(sbe::value::TypeTags::Timestamp) |
             getBSONTypeMask(sbe::value::TypeTags::ObjectId) |
             getBSONTypeMask(sbe::value::TypeTags::bsonObjectId));
+}
+
+EvalStage IndexStateHelper::makeTraverseCombinator(
+    EvalStage outer,
+    EvalStage inner,
+    sbe::value::SlotId inputSlot,
+    sbe::value::SlotId outputSlot,
+    sbe::value::SlotId innerOutputSlot,
+    PlanNodeId planNodeId,
+    sbe::value::FrameIdGenerator* frameIdGenerator) const {
+    // Fold expression is executed only when array has more then 1 element. It increments index
+    // value on each iteration. During this process index is paired with false value. Once the
+    // predicate evaluates to true, false value of index is changed to true. Final expression of
+    // traverse stage detects that now index is paired with true value and it means that we have
+    // found an index of array element where predicate evaluates to true.
+    //
+    // First step is to increment index. Fold expression is always executed when index stored in
+    // 'outputSlot' is encoded as a false value. This means that to increment index, we should
+    // subtract 1 from it.
+    auto frameId = frameIdGenerator->generate();
+    auto advancedIndex = sbe::makeE<sbe::EPrimBinary>(
+        sbe::EPrimBinary::sub, sbe::makeE<sbe::EVariable>(outputSlot), makeConstant(ValueType, 1));
+    auto binds = sbe::makeEs(std::move(advancedIndex));
+    sbe::EVariable advancedIndexVar{frameId, 0};
+
+    // In case the predicate in the inner branch of traverse returns true, we want pair
+    // incremented index with true value. This will tell final expression of traverse that we
+    // have found a matching element and iteration can be stopped.
+    // The expression below express the following function: f(x) = abs(x) - 1. This function
+    // converts false value to a true value because f(- index - 2) = index + 1 (take a look at
+    // the comment for the 'IndexStateHelper' class for encoding description).
+    auto indexWithTrueValue =
+        sbe::makeE<sbe::EPrimBinary>(sbe::EPrimBinary::sub,
+                                     makeFunction("abs", advancedIndexVar.clone()),
+                                     makeConstant(ValueType, 1));
+
+    // Finally, we check if the predicate in the inner branch returned true. If that's the case,
+    // we pair incremented index with true value. Otherwise, it stays paired with false value.
+    auto foldExpr = sbe::makeE<sbe::EIf>(FilterStateHelper::getBool(innerOutputSlot),
+                                         std::move(indexWithTrueValue),
+                                         advancedIndexVar.clone());
+
+    foldExpr = sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(foldExpr));
+
+    return makeTraverse(std::move(outer),
+                        std::move(inner),
+                        inputSlot,
+                        outputSlot,
+                        innerOutputSlot,
+                        std::move(foldExpr),
+                        FilterStateHelper::getBool(outputSlot),
+                        planNodeId,
+                        1);
+}
+
+std::unique_ptr<FilterStateHelper> makeFilterStateHelper(bool trackIndex) {
+    if (trackIndex) {
+        return std::make_unique<IndexStateHelper>();
+    }
+    return std::make_unique<BooleanStateHelper>();
 }
 }  // namespace mongo::stage_builder

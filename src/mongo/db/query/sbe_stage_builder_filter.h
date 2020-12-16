@@ -41,15 +41,24 @@ namespace mongo::stage_builder {
  * parameter specifies the input slot the filter should use. The 'relevantSlotsIn' parameter
  * specifies the slots produced by the 'stage' subtree that must remain visible to consumers of
  * the tree returned by this function.
+ * Optional slot returned by this function stores index of array element that matches the 'root'
+ * match expression. The role of this slot is to be a replacement of 'MatchDetails::elemMatchKey()'.
+ * If 'trackIndex' is true and 'root' contains match expression with array semantics (there are
+ * certain predicates that do not, such as '{}'), valid slot id is returned. This slot is pointing
+ * to an optional value of type int32. Otherwise, 'boost::none' is returned.
+ * If match expression found matching array element, value behind slot id is an int32 array index.
+ * Otherwise, it is Nothing.
  */
-std::unique_ptr<sbe::PlanStage> generateFilter(OperationContext* opCtx,
-                                               const MatchExpression* root,
-                                               std::unique_ptr<sbe::PlanStage> stage,
-                                               sbe::value::SlotIdGenerator* slotIdGenerator,
-                                               sbe::value::FrameIdGenerator* frameIdGenerator,
-                                               sbe::value::SlotId inputSlotIn,
-                                               sbe::RuntimeEnvironment* env,
-                                               sbe::value::SlotVector relevantSlotsIn,
-                                               PlanNodeId planNodeId);
+std::pair<boost::optional<sbe::value::SlotId>, std::unique_ptr<sbe::PlanStage>> generateFilter(
+    OperationContext* opCtx,
+    const MatchExpression* root,
+    std::unique_ptr<sbe::PlanStage> stage,
+    sbe::value::SlotIdGenerator* slotIdGenerator,
+    sbe::value::FrameIdGenerator* frameIdGenerator,
+    sbe::value::SlotId inputSlotIn,
+    sbe::RuntimeEnvironment* env,
+    sbe::value::SlotVector relevantSlotsIn,
+    PlanNodeId planNodeId,
+    bool trackIndex = false);
 
 }  // namespace mongo::stage_builder

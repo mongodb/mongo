@@ -263,6 +263,12 @@ testSingleDocument({'a.b.c': {$slice: 1}, d: 0},
                    {a: [[[{b: [[[{c: [1, 2, 3]}]]]}]]], d: 456},
                    {a: [[[{b: [[[{c: [1, 2, 3]}]]]}]]]});
 
+// Test that even though $slice cannot be applied to deep arrays, fields are still filtered in the
+// objects inside these deep arrays for inclusion projections.
+testSingleDocument({e: 1, 'a.b': {$slice: 1}},
+                   {e: 123, a: [[[{b: [1, 2, 3], d: 4, f: 5}]]]},
+                   {e: 123, a: [[[{b: [1, 2, 3]}]]]});
+
 // Test $slice with an inclusion/exclusion projection for _id field.
 testSingleDocument({_id: 1, a: {$slice: [1, 1]}},
                    {_id: 123, a: [1, 2, 3]},

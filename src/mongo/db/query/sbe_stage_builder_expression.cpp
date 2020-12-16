@@ -2605,8 +2605,11 @@ private:
         }
         std::reverse(branches.begin(), branches.end());
 
-        auto [resultExpr, opStage] = generateShortCircuitingLogicalOp(
-            logicOp, std::move(branches), _context->planNodeId, _context->slotIdGenerator);
+        auto [resultExpr, opStage] = generateShortCircuitingLogicalOp(logicOp,
+                                                                      std::move(branches),
+                                                                      _context->planNodeId,
+                                                                      _context->slotIdGenerator,
+                                                                      BooleanStateHelper{});
 
         auto loopJoinStage = makeLoopJoin(_context->extractCurrentEvalStage(),
                                           std::move(opStage),

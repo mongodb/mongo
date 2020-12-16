@@ -319,7 +319,7 @@ void writeValueToStream(T& stream, TypeTags tag, Value val) {
             break;
         }
         case TypeTags::Nothing:
-            stream << "---===*** NOTHING ***===---";
+            stream << "Nothing";
             break;
         case TypeTags::MinKey:
             stream << "minKey";
@@ -387,9 +387,11 @@ void writeValueToStream(T& stream, TypeTags tag, Value val) {
             }
             break;
         }
-        case TypeTags::bsonObjectId:
-            stream << "---===*** bsonObjectId ***===---";
+        case TypeTags::bsonObjectId: {
+            auto objId = getRawPointerView(val);
+            stream << "bsonObjectId(\"" << OID::from(objId).toString() << "\")";
             break;
+        }
         case TypeTags::bsonBinData: {
             auto data =
                 reinterpret_cast<const char*>(getBSONBinDataCompat(TypeTags::bsonBinData, val));

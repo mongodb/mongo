@@ -4,45 +4,50 @@
  *
  * Note that the user's query/filter document may only contain _ONE_ array field for positional
  * projection to work correctly.
- * @tags: [
- *   sbe_incompatible,
- * ]
  */
 (function() {
 "use strict";
 
+load("jstests/aggregation/extras/utils.js");        // For documentEq.
+load("jstests/libs/sbe_assert_error_override.js");  // Override error-code-checking APIs.
+
 const coll = db.positional_projection_multiple_array_fields;
 coll.drop();
 
+function testSingleDocument(query, projection, expected) {
+    assert(documentEq(coll.findOne(query, projection), expected));
+}
+
 // Check that slice and positional (on different array fields) works correctly.
 assert.commandWorked(coll.insert({_id: 0, a: [1, 2, 3], z: [11, 12, 13]}));
-assert.eq(coll.find({z: 13}, {a: {$slice: 2}}).toArray(), [{_id: 0, a: [1, 2], z: [11, 12, 13]}]);
-assert.eq(coll.find({z: 13}, {a: {$slice: 2}, "z.$": 1}).toArray(), [{_id: 0, a: [1, 2], z: [13]}]);
-coll.drop();
+testSingleDocument({z: 13}, {a: {$slice: 2}}, {_id: 0, a: [1, 2], z: [11, 12, 13]});
+testSingleDocument({z: 13}, {a: {$slice: 2}, "z.$": 1}, {_id: 0, a: [1, 2], z: [13]});
+assert(coll.drop());
 
 coll.insert({_id: 0, importing: [{foo: "a"}, {foo: "b"}], "jobs": [{num: 1}, {num: 2}, {num: 3}]});
-assert.eq(coll.find({"importing.foo": "b"}, {jobs: {'$slice': 2}, 'importing.$': 1}).toArray(),
-          [{_id: 0, importing: [{foo: "b"}], jobs: [{num: 1}, {num: 2}]}]);
-assert.eq(coll.find({"importing.foo": "b"}, {jobs: {'$slice': -1}, 'importing.$': 1}).toArray(),
-          [{_id: 0, importing: [{foo: "b"}], jobs: [{num: 3}]}]);
+testSingleDocument({"importing.foo": "b"},
+                   {jobs: {'$slice': 2}, 'importing.$': 1},
+                   {_id: 0, importing: [{foo: "b"}], jobs: [{num: 1}, {num: 2}]});
+testSingleDocument({"importing.foo": "b"},
+                   {jobs: {'$slice': -1}, 'importing.$': 1},
+                   {_id: 0, importing: [{foo: "b"}], jobs: [{num: 3}]});
 
-coll.drop();
+assert(coll.drop());
 assert.commandWorked(coll.insert({_id: 1, a: [{b: 1, c: 2}, {b: 3, c: 4}], z: [11, 12, 13]}));
-assert.eq(coll.find({z: 12}, {"a.b": 1}).toArray(), [{_id: 1, a: [{"b": 1}, {"b": 3}]}]);
+testSingleDocument({z: 12}, {"a.b": 1}, {_id: 1, a: [{"b": 1}, {"b": 3}]});
 
 // The positional projection on 'z' which limits it to one element shouldn't be applied to 'a' as
 // well.
-assert.eq(coll.find({z: 12}, {"a.b": 1, "z.$": 1}).toArray(),
-          [{_id: 1, a: [{b: 1}, {b: 3}], z: [12]}]);
+testSingleDocument({z: 12}, {"a.b": 1, "z.$": 1}, {_id: 1, a: [{b: 1}, {b: 3}], z: [12]});
 
 // Test that the positional projection can be applied to a "parallel" array.
-coll.drop();
+assert(coll.drop());
 assert.commandWorked(coll.insert({_id: 1, a: [1, 2, 3], b: ["one", "two", "three"]}));
-assert.eq(coll.find({a: 2}, {"b.$": 1}).toArray(), [{_id: 1, b: ["two"]}]);
+testSingleDocument({a: 2}, {"b.$": 1}, {_id: 1, b: ["two"]});
 
 // Similar test, but try a parallel array which is on a dotted path.
 assert.commandWorked(coll.insert({_id: 2, a: {b: [1, 2, 3]}, c: {d: ["one", "two", "three"]}}));
-assert.eq(coll.find({"a.b": 2}, {"c.d.$": 1}).toArray(), [{_id: 2, c: {d: ["two"]}}]);
+testSingleDocument({"a.b": 2}, {"c.d.$": 1}, {_id: 2, c: {d: ["two"]}});
 
 // Attempting to apply it to a parallel array which is smaller.
 assert.commandWorked(coll.insert({_id: 3, a: [4, 5, 6], b: ["four", "five"]}));

@@ -67,6 +67,8 @@ const equivalentErrorCodesList = [
     [5166403, 5166603],
     [5166404, 5166604],
     [5166405, 5166606],
+    [51246, 5291401],
+    [51247, 5291402],
     [51744, 5154400],
     [51745, 5154400],
     [51746, 5154400],
@@ -104,6 +106,10 @@ const equivalentErrorCodesMap = function() {
 }();
 
 const lookupEquivalentErrorCodes = function(errorCodes) {
+    if (errorCodes === assert._kAnyErrorCode) {
+        return errorCodes;
+    }
+
     if (!Array.isArray(errorCodes)) {
         errorCodes = [errorCodes];
     }
