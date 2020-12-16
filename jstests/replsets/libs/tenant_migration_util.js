@@ -12,6 +12,22 @@ var TenantMigrationUtil = (function() {
     }
 
     /**
+     * Returns X509 options for ReplSetTest with the given certificate-key file and CA pem file.
+     */
+    function makeX509Options(certPemFile, caPemFile = "jstests/libs/ca.pem") {
+        return {
+            // When the global sslMode is preferSSL or requireSSL, the transport layer would do the
+            // SSL handshake regardless of the specified sslMode for the connection. So we use a
+            // allowTLS to verify that the donor and recipient use SSL to authenticate to each other
+            // regardless of the global sslMode.
+            tlsMode: "allowTLS",
+            tlsCertificateKeyFile: certPemFile,
+            tlsCAFile: caPemFile,
+            tlsAllowInvalidHostnames: ''
+        };
+    }
+
+    /**
      * Returns an object containing the certificate and private key extracted from the given
      * pem file.
      */
@@ -25,13 +41,26 @@ var TenantMigrationUtil = (function() {
     }
 
     /**
+     * Returns an object containing the donor and recipient ReplSetTest X509 options for tenant
+     * migration testing.
+     */
+    function makeX509OptionsForTest() {
+        return {
+            donor: makeX509Options("jstests/libs/rs0.pem"),
+            recipient: makeX509Options("jstests/libs/rs1.pem")
+        };
+    }
+
+    /**
      * Returns an object containing the donor and recipient's certificate and private key for
      * tenant migration testing.
      */
     function makeMigrationCertificatesForTest() {
         return {
-            donorCertificateForRecipient: getCertificateAndPrivateKey("jstests/libs/client.pem"),
-            recipientCertificateForDonor: getCertificateAndPrivateKey("jstests/libs/client.pem")
+            donorCertificateForRecipient:
+                getCertificateAndPrivateKey("jstests/libs/rs0_tenant_migration.pem"),
+            recipientCertificateForDonor:
+                getCertificateAndPrivateKey("jstests/libs/rs1_tenant_migration.pem")
         };
     }
 
@@ -153,6 +182,8 @@ var TenantMigrationUtil = (function() {
         createRstArgs,
         isFeatureFlagEnabled,
         getCertificateAndPrivateKey,
+        makeX509Options,
         makeMigrationCertificatesForTest,
+        makeX509OptionsForTest,
     };
 })();

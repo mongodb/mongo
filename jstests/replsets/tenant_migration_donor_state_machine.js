@@ -59,7 +59,7 @@ function testDonorForgetMigrationAfterMigrationCompletes(
 const donorRst = new ReplSetTest({
     nodes: [{}, {rsConfig: {priority: 0}}, {rsConfig: {priority: 0}}],
     name: "donor",
-    nodeOptions: {
+    nodeOptions: Object.assign(TenantMigrationUtil.makeX509OptionsForTest().donor, {
         setParameter: {
             // Set the delay before a donor state doc is garbage collected to be short to speed up
             // the test.
@@ -68,7 +68,7 @@ const donorRst = new ReplSetTest({
             // Set the TTL monitor to run at a smaller interval to speed up the test.
             ttlMonitorSleepSecs: 1,
         }
-    }
+    })
 });
 
 donorRst.startSet();

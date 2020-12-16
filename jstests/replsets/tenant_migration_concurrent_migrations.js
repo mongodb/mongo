@@ -18,9 +18,20 @@ load("jstests/libs/uuid_util.js");
 load("jstests/replsets/libs/tenant_migration_test.js");
 load("jstests/replsets/libs/tenant_migration_util.js");
 
-const rst0 = new ReplSetTest({nodes: 1, name: 'rst0'});
-const rst1 = new ReplSetTest({nodes: 1, name: 'rst1'});
-const rst2 = new ReplSetTest({nodes: 1, name: 'rst2'});
+const x509Options0 = TenantMigrationUtil.makeX509Options("jstests/libs/rs0.pem");
+const x509Options1 = TenantMigrationUtil.makeX509Options("jstests/libs/rs1.pem");
+const x509Options2 = TenantMigrationUtil.makeX509Options("jstests/libs/rs2.pem");
+
+const migrationCertificate0 =
+    TenantMigrationUtil.getCertificateAndPrivateKey("jstests/libs/rs0_tenant_migration.pem");
+const migrationCertificate1 =
+    TenantMigrationUtil.getCertificateAndPrivateKey("jstests/libs/rs1_tenant_migration.pem");
+const migrationCertificate2 =
+    TenantMigrationUtil.getCertificateAndPrivateKey("jstests/libs/rs2_tenant_migration.pem");
+
+const rst0 = new ReplSetTest({nodes: 1, name: 'rst0', nodeOptions: x509Options0});
+const rst1 = new ReplSetTest({nodes: 1, name: 'rst1', nodeOptions: x509Options1});
+const rst2 = new ReplSetTest({nodes: 1, name: 'rst2', nodeOptions: x509Options2});
 
 rst0.startSet();
 rst0.initiate();
@@ -49,10 +60,14 @@ const kTenantIdPrefix = "testTenantId";
     const migrationOpts0 = {
         migrationIdString: extractUUIDFromObject(UUID()),
         tenantId: tenantId0,
+        donorCertificateForRecipient: migrationCertificate0,
+        recipientCertificateForDonor: migrationCertificate1,
     };
     const migrationOpts1 = {
         migrationIdString: extractUUIDFromObject(UUID()),
         tenantId: tenantId1,
+        donorCertificateForRecipient: migrationCertificate0,
+        recipientCertificateForDonor: migrationCertificate2,
     };
 
     assert.commandWorked(tenantMigrationTest0.startMigration(migrationOpts0));
@@ -102,10 +117,14 @@ const kTenantIdPrefix = "testTenantId";
     const migrationOpts0 = {
         migrationIdString: extractUUIDFromObject(UUID()),
         tenantId: tenantId0,
+        donorCertificateForRecipient: migrationCertificate0,
+        recipientCertificateForDonor: migrationCertificate2,
     };
     const migrationOpts1 = {
         migrationIdString: extractUUIDFromObject(UUID()),
         tenantId: tenantId1,
+        donorCertificateForRecipient: migrationCertificate1,
+        recipientCertificateForDonor: migrationCertificate2,
     };
 
     assert.commandWorked(tenantMigrationTest0.startMigration(migrationOpts0));
@@ -155,10 +174,14 @@ const kTenantIdPrefix = "testTenantId";
     const migrationOpts0 = {
         migrationIdString: extractUUIDFromObject(UUID()),
         tenantId: tenantId0,
+        donorCertificateForRecipient: migrationCertificate0,
+        recipientCertificateForDonor: migrationCertificate1,
     };
     const migrationOpts1 = {
         migrationIdString: extractUUIDFromObject(UUID()),
         tenantId: tenantId1,
+        donorCertificateForRecipient: migrationCertificate0,
+        recipientCertificateForDonor: migrationCertificate1,
     };
 
     const donorPrimary = rst0.getPrimary();

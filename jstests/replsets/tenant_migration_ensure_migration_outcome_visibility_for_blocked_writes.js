@@ -26,12 +26,12 @@ const kTenantDefinedDbName = "0";
 const donorRst = new ReplSetTest({
     nodes: 1,
     name: 'donor',
-    nodeOptions: {
+    nodeOptions: Object.assign(TenantMigrationUtil.makeX509OptionsForTest().donor, {
         setParameter: {
             tenantMigrationGarbageCollectionDelayMS: kGarbageCollectionDelayMS,
             ttlMonitorSleepSecs: kTTLMonitorSleepSecs,
         }
-    }
+    })
 });
 
 function insertDocument(primaryHost, dbName, collName) {

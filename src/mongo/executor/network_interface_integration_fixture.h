@@ -97,7 +97,8 @@ public:
 
     void assertCommandOK(StringData db,
                          const BSONObj& cmd,
-                         Milliseconds timeoutMillis = Minutes(5));
+                         Milliseconds timeoutMillis = Minutes(5),
+                         transport::ConnectSSLMode sslMode = transport::kGlobalSSLMode);
     void assertCommandFailsOnClient(StringData db,
                                     const BSONObj& cmd,
                                     ErrorCodes::Error reason,

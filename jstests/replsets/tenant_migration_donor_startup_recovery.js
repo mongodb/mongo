@@ -18,10 +18,10 @@ load("jstests/replsets/libs/tenant_migration_test.js");
 const donorRst = new ReplSetTest({
     nodes: 1,
     name: 'donor',
-    nodeOptions: {
+    nodeOptions: Object.assign(TenantMigrationUtil.makeX509OptionsForTest().donor, {
         setParameter:
             {"failpoint.PrimaryOnlyServiceSkipRebuildingInstances": tojson({mode: "alwaysOn"})}
-    }
+    })
 });
 
 donorRst.startSet();

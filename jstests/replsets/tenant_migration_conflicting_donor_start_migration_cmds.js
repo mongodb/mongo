@@ -41,7 +41,8 @@ function generateUniqueTenantId() {
     return chars[charIndex++];
 }
 
-const donorRst = new ReplSetTest({nodes: 1, name: 'donorRst'});
+const donorRst = new ReplSetTest(
+    {nodes: 1, name: 'donorRst', nodeOptions: TenantMigrationUtil.makeX509OptionsForTest().donor});
 
 donorRst.startSet();
 donorRst.initiate();

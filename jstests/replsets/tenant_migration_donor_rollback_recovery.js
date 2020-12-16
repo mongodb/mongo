@@ -18,15 +18,17 @@ const kTenantId = "testTenantId";
 const kMaxSleepTimeMS = 250;
 const kGarbageCollectionDelayMS = 5 * 1000;
 
+const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
+
 const recipientRst = new ReplSetTest({
     name: "recipientRst",
     nodes: 1,
-    nodeOptions: {
+    nodeOptions: Object.assign(migrationX509Options.recipient, {
         setParameter: {
             // TODO SERVER-52719: Remove the failpoint 'returnResponseOkForRecipientSyncDataCmd'.
             'failpoint.returnResponseOkForRecipientSyncDataCmd': tojson({mode: 'alwaysOn'})
         }
-    }
+    })
 });
 recipientRst.startSet();
 recipientRst.initiate();
@@ -59,14 +61,14 @@ function testRollBack(setUpFunc, rollbackOpsFunc, steadyStateFunc) {
         nodes: 3,
         useBridge: true,
         settings: {chainingAllowed: false},
-        nodeOptions: {
+        nodeOptions: Object.assign(migrationX509Options.donor, {
             setParameter: {
                 // Set the delay before a donor state doc is garbage collected to be short to speed
                 // up the test.
                 tenantMigrationGarbageCollectionDelayMS: kGarbageCollectionDelayMS,
                 ttlMonitorSleepSecs: 1,
             }
-        }
+        })
     });
     donorRst.startSet();
     let config = donorRst.getReplSetConfig();

@@ -179,9 +179,11 @@ RemoteCommandResponse NetworkInterfaceIntegrationFixture::runCommandSync(
 
 void NetworkInterfaceIntegrationFixture::assertCommandOK(StringData db,
                                                          const BSONObj& cmd,
-                                                         Milliseconds timeoutMillis) {
+                                                         Milliseconds timeoutMillis,
+                                                         transport::ConnectSSLMode sslMode) {
     RemoteCommandRequest request{
         fixture().getServers()[0], db.toString(), cmd, BSONObj(), nullptr, timeoutMillis};
+    request.sslMode = sslMode;
     auto res = runCommandSync(request);
     ASSERT_OK(res.status);
     ASSERT_OK(getStatusFromCommandResult(res.data));

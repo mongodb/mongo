@@ -60,8 +60,6 @@ public:
 
         internalSecurity.user = user;
 
-        // Force all connections to use SSL for outgoing
-        sslGlobalParams.sslMode.store(static_cast<int>(SSLParams::SSLModes::SSLMode_requireSSL));
         sslGlobalParams.sslCAFile = "jstests/libs/ca.pem";
         // Set a client cert that should be ignored if we use the transient cert correctly.
         sslGlobalParams.sslPEMKeyFile = "jstests/libs/client.pem";
@@ -84,7 +82,8 @@ public:
 };
 
 TEST_F(NetworkInterfaceSSLFixture, Ping) {
-    assertCommandOK("admin", BSON("ping" << 1));
+    assertCommandOK(
+        "admin", BSON("ping" << 1), RemoteCommandRequest::kNoTimeout, transport::kEnableSSL);
 }
 
 

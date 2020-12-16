@@ -28,27 +28,28 @@ const kBatchTypes = {
     remove: 3
 };
 
+const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
 const donorRst = new ReplSetTest({
     nodes: 1,
     name: 'donor',
-    nodeOptions: {
+    nodeOptions: Object.assign(migrationX509Options.donor, {
         setParameter: {
             internalInsertMaxBatchSize:
                 kMaxBatchSize /* Decrease internal max batch size so we can still show writes are
                                  batched without inserting hundreds of documents. */
         }
-    }
+    })
 });
 const recipientRst = new ReplSetTest({
     nodes: 1,
     name: 'recipient',
-    nodeOptions: {
+    nodeOptions: Object.assign(migrationX509Options.recipient, {
         setParameter: {
             internalInsertMaxBatchSize:
                 kMaxBatchSize /* Decrease internal max batch size so we can still show writes are
                                  batched without inserting hundreds of documents. */
         },
-    }
+    })
 });
 const kRecipientConnString = recipientRst.getURL();
 

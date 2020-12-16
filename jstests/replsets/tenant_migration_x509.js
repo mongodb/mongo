@@ -23,9 +23,9 @@ if (!tenantMigrationTest.isFeatureFlagEnabled()) {
 }
 
 const kDonorCertificateAndPrivateKey =
-    TenantMigrationUtil.getCertificateAndPrivateKey("jstests/libs/client.pem");
+    TenantMigrationUtil.getCertificateAndPrivateKey("jstests/libs/rs0_tenant_migration.pem");
 const kRecipientCertificateAndPrivateKey =
-    TenantMigrationUtil.getCertificateAndPrivateKey("jstests/libs/client.pem");
+    TenantMigrationUtil.getCertificateAndPrivateKey("jstests/libs/rs1_tenant_migration.pem");
 
 (() => {
     jsTest.log("Test valid donor and recipient certificates");
@@ -123,6 +123,48 @@ const kRecipientCertificateAndPrivateKey =
             certificate: kDonorCertificateAndPrivateKey.certificate,
             privateKey: kDonorCertificateAndPrivateKey.certificate
         },
+        recipientCertificateForDonor: kRecipientCertificateAndPrivateKey,
+    };
+    const {dbName, collName} = makeTestNs(tenantId);
+
+    tenantMigrationTest.insertDonorDB(dbName, collName);
+    assert.commandFailedWithCode(tenantMigrationTest.runMigration(migrationOpts),
+                                 ErrorCodes.InvalidSSLConfiguration);
+    tenantMigrationTest.verifyRecipientDB(
+        tenantId, dbName, collName, false /* migrationCommitted */);
+})();
+
+(() => {
+    jsTest.log("Test invalid donor certificate and private key pair");
+    const migrationId = UUID();
+    const tenantId = "invalidDonorCertificatePrivateKeyPair";
+    const migrationOpts = {
+        migrationIdString: extractUUIDFromObject(migrationId),
+        tenantId: tenantId,
+        donorCertificateForRecipient: {
+            certificate: kDonorCertificateAndPrivateKey.certificate,
+            privateKey: kRecipientCertificateAndPrivateKey.privateKey
+        },
+        recipientCertificateForDonor: kRecipientCertificateAndPrivateKey,
+    };
+    const {dbName, collName} = makeTestNs(tenantId);
+
+    tenantMigrationTest.insertDonorDB(dbName, collName);
+    assert.commandFailedWithCode(tenantMigrationTest.runMigration(migrationOpts),
+                                 ErrorCodes.InvalidSSLConfiguration);
+    tenantMigrationTest.verifyRecipientDB(
+        tenantId, dbName, collName, false /* migrationCommitted */);
+})();
+
+(() => {
+    jsTest.log("Test expired donor certificate and key");
+    const migrationId = UUID();
+    const tenantId = "expiredDonorCertificate";
+    const migrationOpts = {
+        migrationIdString: extractUUIDFromObject(migrationId),
+        tenantId: tenantId,
+        donorCertificateForRecipient: TenantMigrationUtil.getCertificateAndPrivateKey(
+            "jstests/libs/rs0_tenant_migration_expired.pem"),
         recipientCertificateForDonor: kRecipientCertificateAndPrivateKey,
     };
     const {dbName, collName} = makeTestNs(tenantId);

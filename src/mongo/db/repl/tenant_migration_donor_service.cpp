@@ -33,6 +33,7 @@
 
 #include "mongo/client/connection_string.h"
 #include "mongo/client/replica_set_monitor.h"
+#include "mongo/config.h"
 #include "mongo/db/commands/tenant_migration_recipient_cmds_gen.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
@@ -43,8 +44,11 @@
 #include "mongo/db/repl/tenant_migration_donor_util.h"
 #include "mongo/db/repl/tenant_migration_state_machine_gen.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
+#include "mongo/executor/network_interface_factory.h"
+#include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/rpc/metadata/egress_metadata_hook_list.h"
 #include "mongo/util/cancelation.h"
 #include "mongo/util/future_util.h"
 
@@ -112,8 +116,49 @@ ExecutorFuture<void> TenantMigrationDonorService::_rebuildService(
 
 TenantMigrationDonorService::Instance::Instance(ServiceContext* serviceContext,
                                                 const BSONObj& initialState)
-    : repl::PrimaryOnlyService::TypedInstance<Instance>(), _serviceContext(serviceContext) {
-    _stateDoc = tenant_migration_donor::parseDonorStateDocument(initialState);
+    : repl::PrimaryOnlyService::TypedInstance<Instance>(),
+      _serviceContext(serviceContext),
+      _stateDoc(tenant_migration_donor::parseDonorStateDocument(initialState)),
+      _instanceName(kServiceName + "-" + _stateDoc.getTenantId()),
+      _recipientUri(
+          uassertStatusOK(MongoURI::parse(_stateDoc.getRecipientConnectionString().toString()))) {
+    ThreadPool::Options threadPoolOptions(_recipientCmdThreadPoolLimit);
+    threadPoolOptions.threadNamePrefix = _instanceName + "-";
+    threadPoolOptions.poolName = _instanceName + "ThreadPool";
+    threadPoolOptions.onCreateThread = [this](const std::string& threadName) {
+        Client::initThread(threadName.c_str());
+        auto client = Client::getCurrent();
+        AuthorizationSession::get(*client)->grantInternalAuthorization(&cc());
+
+        // Ideally, we should also associate the client created by _recipientCmdExecutor with the
+        // TenantMigrationDonorService to make the opCtxs created by the task executor get
+        // registered in the TenantMigrationDonorService, and killed on stepdown. But that would
+        // require passing the pointer to the TenantMigrationService into the Instance and making
+        // constructInstance not const so we can set the client's decoration here. Right now there
+        // is no need for that since the task executor is only used with scheduleRemoteCommand and
+        // no opCtx will be created (the cancelation token is responsible for canceling the
+        // outstanding work on the task executor).
+        stdx::lock_guard<Client> lk(*client);
+        client->setSystemOperationKillableByStepdown(lk);
+    };
+
+    auto hookList = std::make_unique<rpc::EgressMetadataHookList>();
+
+    auto connPoolOptions = executor::ConnectionPool::Options();
+#ifdef MONGO_CONFIG_SSL
+    auto donorCertificate = _stateDoc.getDonorCertificateForRecipient();
+    auto donorSSLClusterPEMPayload = donorCertificate.getCertificate().toString() + "\n" +
+        donorCertificate.getPrivateKey().toString();
+    connPoolOptions.transientSSLParams =
+        TransientSSLParams{_recipientUri.connectionString(), std::move(donorSSLClusterPEMPayload)};
+#endif
+
+    _recipientCmdExecutor = std::make_shared<executor::ThreadPoolTaskExecutor>(
+        std::make_unique<ThreadPool>(threadPoolOptions),
+        executor::makeNetworkInterface(
+            _instanceName + "-Network", nullptr, std::move(hookList), connPoolOptions));
+    _recipientCmdExecutor->startup();
+
     if (_stateDoc.getState() > TenantMigrationDonorStateEnum::kUninitialized) {
         // The migration was resumed on stepup.
         stdx::lock_guard<Latch> lg(_mutex);
@@ -134,6 +179,15 @@ TenantMigrationDonorService::Instance::~Instance() {
     stdx::lock_guard<Latch> lg(_mutex);
     invariant(_initialDonorStateDurablePromise.getFuture().isReady());
     invariant(_receiveDonorForgetMigrationPromise.getFuture().isReady());
+
+    // Unlike the TenantMigrationDonorService's scoped task executor which is shut down on stepdown
+    // and joined on stepup, _recipientCmdExecutor is only shut down and joined when the Instance
+    // is destroyed. This is safe since ThreadPoolTaskExecutor::shutdown() only cancels the
+    // outstanding work on the task executor which the cancelation token will already do, and the
+    // Instance will be destroyed on stepup so this is equivalent to joining the task executor on
+    // stepup.
+    _recipientCmdExecutor->shutdown();
+    _recipientCmdExecutor->join();
 }
 
 boost::optional<BSONObj> TenantMigrationDonorService::Instance::reportForCurrentOp(
@@ -423,7 +477,9 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendCommandToRecipi
                                nullptr,
                                kRecipientSyncDataTimeout);
 
-                           return (**executor)
+                           request.sslMode = transport::kEnableSSL;
+
+                           return (_recipientCmdExecutor)
                                ->scheduleRemoteCommand(std::move(request), token)
                                .then([this,
                                       self = shared_from_this()](const auto& response) -> Status {
@@ -487,10 +543,8 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendRecipientForget
 SemiFuture<void> TenantMigrationDonorService::Instance::run(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancelationToken& token) noexcept {
-    auto recipientUri =
-        uassertStatusOK(MongoURI::parse(_stateDoc.getRecipientConnectionString().toString()));
-    auto recipientTargeterRS = std::make_shared<RemoteCommandTargeterRS>(recipientUri.getSetName(),
-                                                                         recipientUri.getServers());
+    auto recipientTargeterRS = std::make_shared<RemoteCommandTargeterRS>(
+        _recipientUri.getSetName(), _recipientUri.getServers());
 
     return ExecutorFuture<void>(**executor)
         .then([this, self = shared_from_this(), executor, token] {
@@ -628,7 +682,7 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
                   "migrationId"_attr = _stateDoc.getId(),
                   "expireAt"_attr = _stateDoc.getExpireAt());
 
-            stdx::lock_guard lk(_mutex);
+            stdx::lock_guard<Latch> lg(_mutex);
             if (_completionPromise.getFuture().isReady()) {
                 // interrupt() was called before we got here
                 return;

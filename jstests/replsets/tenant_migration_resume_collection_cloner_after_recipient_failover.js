@@ -18,7 +18,8 @@ const recipientRst = new ReplSetTest({
     name: jsTestName() + "_recipient",
     // Use a batch size of 1 so that collection cloner requires more than a single batch to
     // complete. This is needed to make the failpoint tenantMigrationHangDuringCollectionClone work.
-    nodeOptions: {setParameter: {collectionClonerBatchSize: 1}}
+    nodeOptions: Object.assign(TenantMigrationUtil.makeX509OptionsForTest().recipient,
+                               {setParameter: {collectionClonerBatchSize: 1}})
 });
 
 recipientRst.startSet();

@@ -22,6 +22,8 @@ const kGarbageCollectionDelayMS = 30 * 1000;
 // Set the TTL monitor to run at a smaller interval to speed up the test.
 const kTTLMonitorSleepSecs = 1;
 
+const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
+
 /**
  * If the donor state doc for the migration 'migrationId' exists on the donor (i.e. the donor's
  * primary stepped down or shut down after inserting the doc), asserts that the migration
@@ -45,7 +47,8 @@ function assertMigrationCommitsIfDurableStateExists(tenantMigrationTest, migrati
  * donor using the 'interruptFunc', and asserts that migration eventually commits.
  */
 function testDonorStartMigrationInterrupt(interruptFunc) {
-    const donorRst = new ReplSetTest({nodes: 3, name: "donorRst"});
+    const donorRst =
+        new ReplSetTest({nodes: 3, name: "donorRst", nodeOptions: migrationX509Options.donor});
 
     donorRst.startSet();
     donorRst.initiate();
@@ -98,17 +101,17 @@ function testDonorForgetMigrationInterrupt(interruptFunc) {
     const donorRst = new ReplSetTest({
         nodes: 3,
         name: "donorRst",
-        nodeOptions: {
+        nodeOptions: Object.assign(migrationX509Options.donor, {
             setParameter: {
                 tenantMigrationGarbageCollectionDelayMS: kGarbageCollectionDelayMS,
                 ttlMonitorSleepSecs: kTTLMonitorSleepSecs,
             }
-        }
+        })
     });
     const recipientRst = new ReplSetTest({
         nodes: 1,
         name: "recipientRst",
-        nodeOptions: {
+        nodeOptions: Object.assign(migrationX509Options.recipient, {
             setParameter: {
                 // TODO SERVER-52719: Remove the failpoint
                 // 'returnResponseOkForRecipientSyncDataCmd'.
@@ -116,7 +119,7 @@ function testDonorForgetMigrationInterrupt(interruptFunc) {
                 tenantMigrationGarbageCollectionDelayMS: kGarbageCollectionDelayMS,
                 ttlMonitorSleepSecs: kTTLMonitorSleepSecs,
             }
-        }
+        })
     });
 
     donorRst.startSet();

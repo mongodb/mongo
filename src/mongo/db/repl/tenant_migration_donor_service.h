@@ -76,7 +76,7 @@ public:
             boost::optional<Status> abortReason;
         };
 
-        Instance(ServiceContext* serviceContext, const BSONObj& initialState);
+        explicit Instance(ServiceContext* serviceContext, const BSONObj& initialState);
 
         ~Instance();
 
@@ -176,6 +176,15 @@ public:
         ServiceContext* _serviceContext;
 
         TenantMigrationDonorDocument _stateDoc;
+        const std::string _instanceName;
+        const MongoURI _recipientUri;
+
+        // Task executor used for executing commands against the recipient using SSL connection
+        // created using the migration-specific certificate.
+        std::shared_ptr<executor::TaskExecutor> _recipientCmdExecutor;
+        // TODO (SERVER-50438): Limit the size of TenantMigrationDonorService thread pool.
+        const ThreadPool::Limits _recipientCmdThreadPoolLimit{};
+
         boost::optional<Status> _abortReason;
 
         // Protects the durable state and the promises below.

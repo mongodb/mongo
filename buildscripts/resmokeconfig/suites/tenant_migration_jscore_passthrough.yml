@@ -130,6 +130,10 @@ executor:
         # between the replica sets in the fixture.
         tenantMigrationGarbageCollectionDelayMS: 100
         ttlMonitorSleepSecs: 1
+      tlsMode: allowTLS
+      tlsCAFile: jstests/libs/ca.pem
+      tlsCertificateKeyFile: jstests/libs/rs0.pem
+      tlsAllowInvalidHostnames: ''
     num_replica_sets: 2
     num_nodes_per_replica_set: 3
     use_replica_set_connection_string: true

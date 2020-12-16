@@ -25,8 +25,12 @@ if (!flagEnabled) {
 
 function runDropTest({failPointName, failPointData, expectedLog, createNew}) {
     // Configure batch size for recipient clone.
-    const recipientRst = new ReplSetTest(
-        {nodes: 1, name: "recipient", nodeOptions: {setParameter: {collectionClonerBatchSize: 1}}});
+    const recipientRst = new ReplSetTest({
+        nodes: 1,
+        name: "recipient",
+        nodeOptions: Object.assign(TenantMigrationUtil.makeX509OptionsForTest().recipient,
+                                   {setParameter: {collectionClonerBatchSize: 1}})
+    });
 
     recipientRst.startSet();
     recipientRst.initiate();

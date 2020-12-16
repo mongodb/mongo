@@ -575,6 +575,13 @@ Future<SessionHandle> TransportLayerASIO::asyncConnect(
     const ReactorHandle& reactor,
     Milliseconds timeout,
     std::shared_ptr<const SSLConnectionContext> transientSSLContext) {
+    if (transientSSLContext) {
+        uassert(ErrorCodes::InvalidSSLConfiguration,
+                "Specified transient SSL context but connection SSL mode is not set",
+                sslMode == kEnableSSL);
+        LOGV2_DEBUG(
+            5270601, 2, "Connecting to peer using transient SSL connection", "peer"_attr = peer);
+    }
 
     struct AsyncConnectState {
         AsyncConnectState(HostAndPort peer,
@@ -1242,6 +1249,14 @@ TransportLayerASIO::_createSSLContext(std::shared_ptr<SSLManagerInterface>& mana
     }
 
     if (_listenerOptions.isEgress() && newSSLContext->manager) {
+        if (!transientEgressSSLParams.sslClusterPEMPayload.empty()) {
+            LOGV2_DEBUG(5270602,
+                        2,
+                        "Initializing transient egress SSL context",
+                        "targetClusterConnectionString"_attr =
+                            transientEgressSSLParams.targetedClusterConnectionString);
+        }
+
         newSSLContext->egress = std::make_unique<asio::ssl::context>(asio::ssl::context::sslv23);
         Status status = newSSLContext->manager->initSSLContext(
             newSSLContext->egress->native_handle(),

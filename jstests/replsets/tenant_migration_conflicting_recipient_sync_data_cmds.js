@@ -10,7 +10,8 @@ load("jstests/libs/parallel_shell_helpers.js");
 load("jstests/libs/curop_helpers.js");  // for waitForCurOpByFailPoint().
 load("jstests/replsets/libs/tenant_migration_util.js");
 
-var rst = new ReplSetTest({nodes: 1});
+var rst =
+    new ReplSetTest({nodes: 1, nodeOptions: TenantMigrationUtil.makeX509OptionsForTest().donor});
 rst.startSet();
 rst.initiate();
 if (!TenantMigrationUtil.isFeatureFlagEnabled(rst.getPrimary())) {

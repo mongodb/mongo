@@ -23,6 +23,7 @@ function TenantMigrationTest(
     const donorPassedIn = (donorRst !== undefined);
     const recipientPassedIn = (recipientRst !== undefined);
 
+    const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
     const migrationCertificates = TenantMigrationUtil.makeMigrationCertificatesForTest();
 
     donorRst = donorPassedIn ? donorRst : performSetUp(true /* isDonor */);
@@ -33,6 +34,8 @@ function TenantMigrationTest(
 
     recipientRst.getPrimary();
     recipientRst.awaitReplication();
+
+    createAdvanceClusterTimeRoleIfNotExist(donorRst);
 
     /**
      * Creates a ReplSetTest instance. The repl set will have 2 nodes.
@@ -49,7 +52,7 @@ function TenantMigrationTest(
                 tojson({mode: 'alwaysOn'});
         }
 
-        let nodeOptions = {};
+        let nodeOptions = isDonor ? migrationX509Options.donor : migrationX509Options.recipient;
         nodeOptions["setParameter"] = setParameterOpts;
 
         const rstName = `${name}_${(isDonor ? "donor" : "recipient")}`;
@@ -58,6 +61,22 @@ function TenantMigrationTest(
         rst.initiateWithHighElectionTimeout();
 
         return rst;
+    }
+
+    function createAdvanceClusterTimeRoleIfNotExist(rst) {
+        const adminDB = rst.getPrimary().getDB("admin");
+        const roles =
+            adminDB.getRoles({rolesInfo: 1, showPrivileges: false, showBuiltinRoles: false});
+
+        if (roles.filter(role => role._id == "admin.advanceClusterTimeRole").length > 0) {
+            return;
+        }
+
+        assert.commandWorked(adminDB.runCommand({
+            createRole: "advanceClusterTimeRole",
+            privileges: [{resource: {cluster: true}, actions: ["advanceClusterTime"]}],
+            roles: []
+        }));
     }
 
     /**
