@@ -112,6 +112,8 @@ all:
     test_file: jstests/sharding/time_zone_info_mongos.js
   - ticket: SERVER-39621
     test_file: jstests/replsets/step_down_chaining_disabled.js
+  - ticket: SERVER-50486
+    test_file: jstests/replsets/dont_refresh_session_prepare_secondary.js
 
 # Tests that should only be excluded from particular suites should be listed under that suite.
 suites:

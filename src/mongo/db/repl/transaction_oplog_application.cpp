@@ -60,6 +60,8 @@ MONGO_FAIL_POINT_DEFINE(skipReconstructPreparedTransactions);
 // conflict error.
 MONGO_FAIL_POINT_DEFINE(applyPrepareTxnOpsFailsWithWriteConflict);
 
+MONGO_FAIL_POINT_DEFINE(hangBeforeSessionCheckOutForApplyPrepare);
+
 // Apply the oplog entries for a prepare or a prepared commit during recovery/initial sync.
 Status _applyOperationsForTransaction(OperationContext* opCtx,
                                       const repl::MultiApplier::Operations& ops,
@@ -365,6 +367,7 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
         // The write on transaction table may be applied concurrently, so refreshing state
         // from disk may read that write, causing starting a new transaction on an existing
         // txnNumber. Thus, we start a new transaction without refreshing state from disk.
+        MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangBeforeSessionCheckOutForApplyPrepare);
         MongoDOperationContextSessionWithoutRefresh sessionCheckout(opCtx);
 
         auto txnParticipant = TransactionParticipant::get(opCtx);

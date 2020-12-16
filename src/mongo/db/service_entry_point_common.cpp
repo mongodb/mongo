@@ -104,6 +104,7 @@ MONGO_FAIL_POINT_DEFINE(skipCheckingForNotPrimaryInCommandDispatch);
 MONGO_FAIL_POINT_DEFINE(sleepMillisAfterCommandExecutionBegins);
 MONGO_FAIL_POINT_DEFINE(waitAfterCommandFinishesExecution);
 MONGO_FAIL_POINT_DEFINE(waitAfterNewStatementBlocksBehindPrepare);
+MONGO_FAIL_POINT_DEFINE(hangBeforeSessionCheckOut);
 
 // Tracks the number of times a legacy unacknowledged write failed due to
 // not primary error resulted in network disconnection.
@@ -399,6 +400,7 @@ void invokeWithSessionCheckedOut(OperationContext* opCtx,
     // This constructor will check out the session. It handles the appropriate state management
     // for both multi-statement transactions and retryable writes. Currently, only requests with
     // a transaction number will check out the session.
+    MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangBeforeSessionCheckOut);
     MongoDOperationContextSession sessionTxnState(opCtx);
     auto txnParticipant = TransactionParticipant::get(opCtx);
 
@@ -776,6 +778,13 @@ void execCommandDatabase(OperationContext* opCtx,
         if (!opCtx->getClient()->isInDirectClient() &&
             !MONGO_FAIL_POINT(skipCheckingForNotPrimaryInCommandDispatch)) {
             const bool inMultiDocumentTransaction = (sessionOptions.getAutocommit() == false);
+
+            // Kill this operation on step down even if it hasn't taken write locks yet, because it
+            // could conflict with transactions from a new primary.
+            if (inMultiDocumentTransaction) {
+                opCtx->setAlwaysInterruptAtStepDownOrUp();
+            }
+
             auto allowed = command->secondaryAllowed(opCtx->getServiceContext());
             bool alwaysAllowed = allowed == Command::AllowedOnSecondary::kAlways;
             bool couldHaveOptedIn =
