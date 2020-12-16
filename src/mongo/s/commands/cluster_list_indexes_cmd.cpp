@@ -33,6 +33,7 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/list_indexes_gen.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/query/store_possible_cursor.h"
 
@@ -65,6 +66,10 @@ bool cursorCommandPassthroughShardWithMinKeyChunk(OperationContext* opCtx,
                             privileges));
 
     CommandHelpers::filterCommandReplyForPassthrough(transformedResponse, out);
+    if (out->asTempObj()["ok"].trueValue()) {
+        // The reply syntax must conform to its IDL definition.
+        ListIndexesReply::parse({"listIndexes"}, out->asTempObj());
+    }
     return true;
 }
 
@@ -119,7 +124,10 @@ public:
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
+        // Check the command syntax before passing to shard.
+        const auto parsed = ListIndexes::parse({"listIndexes"}, cmdObj);
 
+        // The command's IDL definition permits namespace or UUID, but mongos requires a namespace.
         const NamespaceString nss(parseNs(dbName, cmdObj));
         const auto cm =
             uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));

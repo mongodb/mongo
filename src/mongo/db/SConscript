@@ -575,10 +575,12 @@ env.Library(
         'drop.idl',
         'drop_database.idl',
         'list_collections.idl',
+        'list_indexes.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         'api_parameters',
+        'create_indexes_idl',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
@@ -1371,15 +1373,25 @@ env.Library(
 )
 
 env.Library(
+    target='create_indexes_idl',
+    source=[
+        'create_indexes.idl',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/idl/idl_parser',
+    ],
+)
+
+env.Library(
     target='sessions_collection',
     source=[
         'sessions_collection.cpp',
-        'create_indexes.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/client/clientdriver_minimal',
         '$BUILD_DIR/mongo/s/write_ops/batch_write_types',
+        'create_indexes_idl',
         'logical_session_id',
     ],
 )

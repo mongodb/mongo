@@ -64,10 +64,13 @@ void assertBSONObjsSame(const std::vector<BSONObj>& expectedBSON,
                         const std::vector<BSONObj>& foundBSON) {
     ASSERT_EQUALS(expectedBSON.size(), foundBSON.size());
 
+    auto flags =
+        BSONObj::ComparisonRules::kIgnoreFieldOrder | BSONObj::ComparisonRules::kConsiderFieldName;
+
     for (const auto& expectedObj : expectedBSON) {
         bool wasFound = false;
         for (const auto& foundObj : foundBSON) {
-            if (expectedObj.woCompare(foundObj) == 0) {
+            if (expectedObj.woCompare(foundObj, {}, flags) == 0) {
                 wasFound = true;
                 break;
             }

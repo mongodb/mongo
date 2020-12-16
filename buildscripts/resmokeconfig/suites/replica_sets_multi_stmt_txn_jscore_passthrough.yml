@@ -203,6 +203,7 @@ selector:
   - jstests/core/kill_cursors.js
   - jstests/core/list_collections1.js
   - jstests/core/list_indexes.js
+  - jstests/core/list_indexes_invalidation.js
   - jstests/core/list_namespaces_invalidation.js
   - jstests/core/oro.js
 

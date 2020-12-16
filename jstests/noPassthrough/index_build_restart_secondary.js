@@ -75,7 +75,7 @@ assert.soonNoExcept(() => {
                                  4,
                                  ["_id_"],
                                  ["i_1", "x_1", "y_1"],
-                                 {includeBuildUUIDS: true});
+                                 {includeBuildUUIDs: true});
     return true;
 });
 

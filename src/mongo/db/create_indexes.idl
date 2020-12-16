@@ -38,35 +38,45 @@ imports:
 
 structs:
 
+  # A built index appears with these fields, which must be the same as ListIndexReplyItem's fields
+  # in list_indexes.idl.
+  # TODO (SERVER-52539): Write a test that asserts they're the same.
   NewIndexSpec:
     description: "A type representing a spec for a new index"
     strict: true
     fields:
-      key: object
+      v:
+        type: safeInt
+        optional: true
+      key: object_owned
       name: string
+      ns:
+        # MongoDB 4.2 and older generate this field, see SERVER-41696.
+        type: string
+        ignore: true
       background:
-        type: bool
+        type: safeBool
         optional: true
       unique:
-        type: bool
+        type: safeBool
         optional: true
       hidden:
-        type: bool
+        type: safeBool
         optional: true
       partialFilterExpression:
-        type: object
+        type: object_owned
         optional: true
       sparse:
-        type: bool
+        type: safeBool
         optional: true
       expireAfterSeconds:
-        type: int
+        type: safeInt
         optional: true
       storageEngine:
-        type: object
+        type: object_owned
         optional: true
       weights:
-        type: object
+        type: object_owned
         optional: true
       default_language:
         type: string
@@ -75,26 +85,39 @@ structs:
         type: string
         optional: true
       textIndexVersion:
-        type: int
+        type: safeInt
         optional: true
       2dsphereIndexVersion:
-        type: int
+        type: safeInt
         optional: true
       bits:
-        type: int
+        type: safeInt
         optional: true
       min:
-        type: double
+        type: safeDouble
         optional: true
       max:
-        type: double
+        type: safeDouble
         optional: true
       bucketSize:
-        type: double
+        type: safeDouble
         optional: true
       collation:
-        type: object
+        type: object_owned
         optional: true
+      wildcardProjection:
+        type: object_owned
+        optional: true
+      coarsestIndexedLevel:
+        type: safeInt
+        optional: true
+      finestIndexedLevel:
+        type: safeInt
+        optional: true
+      dropDups:
+        type: safeBool
+        optional: true
+        unstable: true
 
   CreateIndexesCmd:
     description: "A struct representing a createIndexes command"
