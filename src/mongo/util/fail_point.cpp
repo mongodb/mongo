@@ -63,6 +63,25 @@ MONGO_INITIALIZER_GENERAL(AllFailPointsRegistered, (), ())
 /** The per-thread PRNG used by fail-points. */
 thread_local PseudoRandom threadPrng{SecureRandom().nextInt64()};
 
+template <typename Pred>
+void spinWait(const Pred& pred) {
+    for (int n = 0; n < 100; ++n) {
+        if (pred())
+            return;
+    }
+    for (int n = 0; n < 100; ++n) {
+        if (pred())
+            return;
+        stdx::this_thread::yield();
+    }
+    while (true) {
+        if (pred())
+            return;
+        stdx::this_thread::sleep_for(stdx::chrono::milliseconds(50));
+    }
+}
+
+
 }  // namespace
 
 void FailPoint::setThreadPRNGSeed(int32_t seed) {
@@ -88,82 +107,50 @@ auto FailPoint::Impl::setMode(Mode mode, ValType val, BSONObj extra) -> EntryCou
      * 3. Sets the new mode.
      */
 
-    stdx::lock_guard<Latch> scoped(_modMutex);
+    stdx::lock_guard scoped(_modMutex);
 
     // Step 1
     _disable();
 
     // Step 2
-    while (_fpInfo.load() != 0) {
-        sleepmillis(50);
-    }
+    spinWait([&] { return _fpInfo.load() == 0; });
 
     // Step 3
     _mode = mode;
-    _timesOrPeriod.store(val);
+    _modeValue.store(val);
     _data = std::move(extra);
 
     if (_mode != off) {
         _enable();
     }
 
-    return _timesEntered.load();
+    return _hitCount.load();
 }
 
 auto FailPoint::Impl::waitForTimesEntered(Interruptible* interruptible,
                                           EntryCountT targetTimesEntered) const -> EntryCountT {
     while (true) {
-        if (auto entries = _timesEntered.load(); entries >= targetTimesEntered)
+        if (auto entries = _hitCount.load(); entries >= targetTimesEntered)
             return entries;
-        interruptible->sleepFor(kWaitGranularity);
+        interruptible->sleepFor(_kWaitGranularity);
     }
 }
 
-void FailPoint::Impl::_enable() {
-    _fpInfo.fetchAndBitOr(_kActiveBit);
-}
-
-void FailPoint::Impl::_disable() {
-    _fpInfo.fetchAndBitAnd(~_kActiveBit);
-}
-
-auto FailPoint::Impl::_slowShouldFailOpenBlockWithoutIncrementingTimesEntered(
-    std::function<bool(const BSONObj&)> cb) noexcept -> ShouldFailOpenBlockResult {
-    ValType localFpInfo = _fpInfo.addAndFetch(1);
-
-    if ((localFpInfo & _kActiveBit) == 0) {
-        return slowOff;
-    }
-
-    if (cb && !cb(getData())) {
-        return userIgnored;
-    }
-
+bool FailPoint::Impl::_evaluateByMode() {
     switch (_mode) {
         case alwaysOn:
-            return slowOn;
-        case random: {
-            std::uniform_int_distribution<int> distribution{};
-            if (distribution(threadPrng.urbg()) < _timesOrPeriod.load()) {
-                return slowOn;
-            }
-            return slowOff;
-        }
-        case nTimes: {
-            if (_timesOrPeriod.subtractAndFetch(1) <= 0)
+            return true;
+        case random:
+            return std::uniform_int_distribution<int>{}(threadPrng.urbg()) < _modeValue.load();
+        case nTimes:
+            if (_modeValue.subtractAndFetch(1) <= 0)
                 _disable();
-            return slowOn;
-        }
-        case skip: {
+            return true;
+        case skip:
             // Ensure that once the skip counter reaches within some delta from 0 we don't continue
             // decrementing it unboundedly because at some point it will roll over and become
             // positive again
-            if (_timesOrPeriod.load() <= 0 || _timesOrPeriod.subtractAndFetch(1) < 0) {
-                return slowOn;
-            }
-
-            return slowOff;
-        }
+            return _modeValue.load() <= 0 || _modeValue.subtractAndFetch(1) < 0;
         default:
             LOGV2_ERROR(23832,
                         "FailPoint mode not supported: {mode}",
@@ -171,15 +158,6 @@ auto FailPoint::Impl::_slowShouldFailOpenBlockWithoutIncrementingTimesEntered(
                         "mode"_attr = static_cast<int>(_mode));
             fassertFailed(16444);
     }
-}
-
-auto FailPoint::Impl::_slowShouldFailOpenBlock(std::function<bool(const BSONObj&)> cb) noexcept
-    -> ShouldFailOpenBlockResult {
-    auto ret = _slowShouldFailOpenBlockWithoutIncrementingTimesEntered(cb);
-    if (ret == slowOn) {
-        _timesEntered.addAndFetch(1);
-    }
-    return ret;
 }
 
 StatusWith<FailPoint::ModeOptions> FailPoint::parseBSON(const BSONObj& obj) {
@@ -273,10 +251,10 @@ StatusWith<FailPoint::ModeOptions> FailPoint::parseBSON(const BSONObj& obj) {
 BSONObj FailPoint::Impl::toBSON() const {
     BSONObjBuilder builder;
 
-    stdx::lock_guard<Latch> scoped(_modMutex);
+    stdx::lock_guard scoped(_modMutex);
     builder.append("mode", _mode);
     builder.append("data", _data);
-    builder.append("timesEntered", _timesEntered.load());
+    builder.append("timesEntered", _hitCount.load());
 
     return builder.obj();
 }
