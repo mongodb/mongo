@@ -81,14 +81,8 @@ function runStandaloneTest() {
 /**
  * Verifies that every node in 'replSetTest' has the indexes in 'expectedIndexes'.
  */
-function verifyIndexesPresentOnAllNodes(replSetTest, expectedIndexes, expectedPrimary) {
-    // Make sure that the replica set is stable.
-    if (expectedPrimary) {
-        replSetTest.awaitNodesAgreeOnPrimary(
-            replSetTest.kDefaultTimeoutMS, replSetTest.nodes, expectedPrimary);
-    } else {
-        replSetTest.awaitNodesAgreeOnPrimary();
-    }
+function verifyIndexesPresentOnAllNodes(replSetTest, expectedIndexes) {
+    replSetTest.awaitNodesAgreeOnPrimary();
     for (const node of [replSetTest.getPrimary(), replSetTest.getSecondary()]) {
         const db = node.getDB(dbName);
         const coll = db[collName];
@@ -112,30 +106,21 @@ function runReplicaSetTest() {
     // Wait until both nodes finish inserting the documents and building the index.
     rst.awaitReplication();
 
-    verifyIndexesPresentOnAllNodes(rst, indexList, initialPrimary);
+    verifyIndexesPresentOnAllNodes(rst, indexList);
 
-    // Upgrade the secondary.
-    rst.upgradeSecondaries({binVersion: "latest"});
-
-    // Verify that the primary has not changed and is in the last-lts version, while the
-    // secondary is in the latest version.
-    assert.eq(initialPrimary, rst.getPrimary());
-    assert.binVersion(initialPrimary, "last-lts");
-    assert.binVersion(rst.getSecondary(), "latest");
-
-    verifyIndexesPresentOnAllNodes(rst, indexList, initialPrimary);
-
-    // Upgrade the primary.
-    const upgradedPrimary = rst.upgradePrimary(initialPrimary, {binVersion: "latest"});
+    // Upgrade the replica set.
+    rst.upgradeSet({binVersion: "latest"});
+    rst.awaitNodesAgreeOnPrimary();
 
     // Verify that all nodes are in the latest version.
     for (const node of rst.nodes) {
         assert.binVersion(node, "latest");
     }
 
-    verifyIndexesPresentOnAllNodes(rst, indexList, upgradedPrimary);
+    verifyIndexesPresentOnAllNodes(rst, indexList);
 
     // Set the FCV.
+    const upgradedPrimary = rst.getPrimary();
     const adminDB = upgradedPrimary.getDB("admin");
     checkFCV(adminDB, lastLTSFCV);
     assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV}));
