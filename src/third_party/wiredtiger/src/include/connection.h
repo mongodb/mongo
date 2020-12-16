@@ -102,6 +102,15 @@ struct __wt_named_extractor {
 };
 
 /*
+ * WT_NAME_FLAG --
+ *	Simple structure for name and flag configuration searches
+ */
+struct __wt_name_flag {
+    const char *name;
+    uint64_t flag;
+};
+
+/*
  * WT_CONN_CHECK_PANIC --
  *	Check if we've panicked and return the appropriate error.
  */

@@ -393,7 +393,7 @@ __wt_schema_open_indices(WT_SESSION_IMPL *session, WT_TABLE *table)
  *     Open the data handle for a table (internal version).
  */
 static int
-__schema_open_table(WT_SESSION_IMPL *session, const char *cfg[])
+__schema_open_table(WT_SESSION_IMPL *session)
 {
     WT_CONFIG cparser;
     WT_CONFIG_ITEM ckey, cval;
@@ -407,7 +407,6 @@ __schema_open_table(WT_SESSION_IMPL *session, const char *cfg[])
     tablename = table->iface.name;
 
     WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_TABLE));
-    WT_UNUSED(cfg);
 
     WT_RET(__wt_config_gets(session, table_cfg, "columns", &cval));
     WT_RET(__wt_config_gets(session, table_cfg, "key_format", &cval));
@@ -551,13 +550,12 @@ err:
  *     Open a named table.
  */
 int
-__wt_schema_open_table(WT_SESSION_IMPL *session, const char *cfg[])
+__wt_schema_open_table(WT_SESSION_IMPL *session)
 {
     WT_DECL_RET;
 
     WT_WITH_TABLE_WRITE_LOCK(session,
-      WT_WITH_TXN_ISOLATION(
-        session, WT_ISO_READ_UNCOMMITTED, ret = __schema_open_table(session, cfg)));
+      WT_WITH_TXN_ISOLATION(session, WT_ISO_READ_UNCOMMITTED, ret = __schema_open_table(session)));
 
     return (ret);
 }

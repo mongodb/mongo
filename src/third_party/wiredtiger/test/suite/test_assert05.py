@@ -45,10 +45,10 @@ class test_assert05(wttest.WiredTigerTestCase, suite_subprocess):
     uri_never = base_uri + '.never.wt'
     uri_none = base_uri + '.none.wt'
     cfg = 'key_format=S,value_format=S,'
-    cfg_always = 'assert=(durable_timestamp=always)'
+    cfg_always = 'verbose=(write_timestamp=true),write_timestamp_usage=always,assert=(write_timestamp=on)'
     cfg_def = ''
-    cfg_never = 'assert=(durable_timestamp=never)'
-    cfg_none = 'assert=(durable_timestamp=none)'
+    cfg_never = 'write_timestamp_usage=never,assert=(write_timestamp=on)'
+    cfg_none = 'assert=(write_timestamp=off)'
 
     count = 1
     #
@@ -98,7 +98,7 @@ class test_assert05(wttest.WiredTigerTestCase, suite_subprocess):
         self.session.timestamp_transaction(
             'commit_timestamp=' + timestamp_str(self.count))
         # All settings other than always should commit successfully
-        if (use_ts != 'always'):
+        if (use_ts != 'always' and use_ts != 'never'):
             self.session.commit_transaction()
         else:
             '''
@@ -114,9 +114,6 @@ class test_assert05(wttest.WiredTigerTestCase, suite_subprocess):
         c.close()
 
     def test_durable_timestamp(self):
-        #if not wiredtiger.diagnostic_build():
-        #    self.skipTest('requires a diagnostic build')
-
         # Create a data item at a timestamp
         self.session.create(self.uri_always, self.cfg + self.cfg_always)
         self.session.create(self.uri_def, self.cfg + self.cfg_def)

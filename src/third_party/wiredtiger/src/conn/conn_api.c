@@ -1834,12 +1834,6 @@ __wt_debug_mode_config(WT_SESSION_IMPL *session, const char *cfg[])
     return (0);
 }
 
-/* Simple structure for name and flag configuration searches. */
-typedef struct {
-    const char *name;
-    uint64_t flag;
-} WT_NAME_FLAG;
-
 /*
  * __wt_verbose_config --
  *     Set verbose configuration.

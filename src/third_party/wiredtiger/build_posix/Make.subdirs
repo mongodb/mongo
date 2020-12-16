@@ -29,6 +29,7 @@ examples/c
 # Test programs.
 test/bloom
 test/checkpoint
+test/cppsuite HAVE_CXX
 test/csuite
 test/cursor_order
 test/fops

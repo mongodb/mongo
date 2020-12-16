@@ -1002,6 +1002,24 @@ struct __wt_session {
 	 * object blocks from the system buffer cache after that many bytes from this object are
 	 * read or written into the buffer cache., an integer greater than or equal to 0; default \c
 	 * 0.}
+	 * @config{verbose, enable messages for various events.  Options are given as a list\, such
+	 * as <code>"verbose=[write_timestamp]"</code>., a list\, with values chosen from the
+	 * following options: \c "write_timestamp"; default \c [].}
+	 * @config{write_timestamp_usage, describe how timestamps are expected to be used on
+	 * modifications to the table.  This option should be used in conjunction with the
+	 * corresponding \c write_timestamp configuration under the \c assert and \c verbose options
+	 * to provide logging and assertions for incorrect timestamp usage.  The choices are \c
+	 * always which ensures a timestamp is used for every operation on a table\, \c
+	 * key_consistent to ensure that once timestamps are used for a key\, they are always used\,
+	 * \c ordered is like \c key_consistent except it also enforces that subsequent updates to
+	 * each key must use increasing timestamps\, \c mixed_mode is like \c ordered except that
+	 * updates with no timestamp are allowed and have the effect of resetting the chain of
+	 * updates once the transaction ID based snapshot is no longer relevant\, \c never enforces
+	 * that timestamps are never used for a table and \c none does not enforce any expectation
+	 * on timestamp usage meaning that no log message or assertions will be produced regardless
+	 * of the corresponding \c assert and \c verbose settings., a string\, chosen from the
+	 * following options: \c "always"\, \c "key_consistent"\, \c "mixed_mode"\, \c "never"\, \c
+	 * "none"\, \c "ordered"; default \c none.}
 	 * @configend
 	 * @errors
 	 */
@@ -1225,6 +1243,24 @@ struct __wt_session {
 	 * applications use a WT_ITEM structure to manipulate raw byte arrays.  Value items of type
 	 * 't' are bitfields\, and when configured with record number type keys\, will be stored
 	 * using a fixed-length store., a format string; default \c u.}
+	 * @config{verbose, enable messages for various events.  Options are given as a list\, such
+	 * as <code>"verbose=[write_timestamp]"</code>., a list\, with values chosen from the
+	 * following options: \c "write_timestamp"; default \c [].}
+	 * @config{write_timestamp_usage, describe how timestamps are expected to be used on
+	 * modifications to the table.  This option should be used in conjunction with the
+	 * corresponding \c write_timestamp configuration under the \c assert and \c verbose options
+	 * to provide logging and assertions for incorrect timestamp usage.  The choices are \c
+	 * always which ensures a timestamp is used for every operation on a table\, \c
+	 * key_consistent to ensure that once timestamps are used for a key\, they are always used\,
+	 * \c ordered is like \c key_consistent except it also enforces that subsequent updates to
+	 * each key must use increasing timestamps\, \c mixed_mode is like \c ordered except that
+	 * updates with no timestamp are allowed and have the effect of resetting the chain of
+	 * updates once the transaction ID based snapshot is no longer relevant\, \c never enforces
+	 * that timestamps are never used for a table and \c none does not enforce any expectation
+	 * on timestamp usage meaning that no log message or assertions will be produced regardless
+	 * of the corresponding \c assert and \c verbose settings., a string\, chosen from the
+	 * following options: \c "always"\, \c "key_consistent"\, \c "mixed_mode"\, \c "never"\, \c
+	 * "none"\, \c "ordered"; default \c none.}
 	 * @configend
 	 * @errors
 	 */
@@ -2139,7 +2175,7 @@ struct __wt_connection {
 	 * "lsm_manager"\, \c "metadata"\, \c "mutex"\, \c "overflow"\, \c "read"\, \c "reconcile"\,
 	 * \c "recovery"\, \c "recovery_progress"\, \c "rts"\, \c "salvage"\, \c "shared_cache"\, \c
 	 * "split"\, \c "temporary"\, \c "thread_group"\, \c "timestamp"\, \c "transaction"\, \c
-	 * "verify"\, \c "version"\, \c "write"; default empty.}
+	 * "verify"\, \c "version"\, \c "write"; default \c [].}
 	 * @configend
 	 * @errors
 	 */
@@ -2856,7 +2892,7 @@ struct __wt_connection {
  * "history_store"\, \c "history_store_activity"\, \c "lsm"\, \c "lsm_manager"\, \c "metadata"\, \c
  * "mutex"\, \c "overflow"\, \c "read"\, \c "reconcile"\, \c "recovery"\, \c "recovery_progress"\,
  * \c "rts"\, \c "salvage"\, \c "shared_cache"\, \c "split"\, \c "temporary"\, \c "thread_group"\,
- * \c "timestamp"\, \c "transaction"\, \c "verify"\, \c "version"\, \c "write"; default empty.}
+ * \c "timestamp"\, \c "transaction"\, \c "verify"\, \c "version"\, \c "write"; default \c [].}
  * @config{verify_metadata, open connection and verify any WiredTiger metadata.  This API allows
  * verification and detection of corruption in WiredTiger metadata., a boolean flag; default \c
  * false.}

@@ -388,7 +388,7 @@ dump_projection(WT_SESSION *session, const char *config, WT_CURSOR *cursor, char
     while ((ret = parser->next(parser, &key, &value)) == 0) {
         WT_RET(dump_add_config(session, &newconfig, &len, "%.*s=", (int)key.len, key.str));
         if (STRING_MATCH_CONFIG("value_format", key))
-            WT_RET(dump_add_config(session, &newconfig, &len, "%s", cursor->value_format));
+            WT_RET(dump_add_config(session, &newconfig, &len, "%s,", cursor->value_format));
         else if (STRING_MATCH_CONFIG("columns", key)) {
             /* copy names of keys */
             p = value.str;

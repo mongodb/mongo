@@ -1054,6 +1054,9 @@ struct __wt_update {
 
     wt_timestamp_t durable_ts; /* timestamps */
     wt_timestamp_t start_ts;
+#ifdef HAVE_DIAGNOSTIC
+    wt_timestamp_t prev_durable_ts;
+#endif
 
     WT_UPDATE *next; /* forward-linked list */
 
@@ -1099,7 +1102,11 @@ struct __wt_update {
  * WT_UPDATE_SIZE is the expected structure size excluding the payload data -- we verify the build
  * to ensure the compiler hasn't inserted padding.
  */
+#ifdef HAVE_DIAGNOSTIC
+#define WT_UPDATE_SIZE 47
+#else
 #define WT_UPDATE_SIZE 39
+#endif
 
 /*
  * The memory size of an update: include some padding because this is such a common case that
