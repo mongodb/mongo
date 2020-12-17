@@ -500,49 +500,31 @@ Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHa
         hm->incrementNumTotalOperations();
     }
 
-    /**
-     * It is important that onFinish() runs out of line. That said, we can't thenRunOn() arbitrarily
-     * without doing extra context switches and delaying execution. The cmdState promise can be
-     * fulfilled in these paths:
-     *
-     * 1.  There are available connections to all nodes but they're all bad. This path is inline so
-     *     it then schedules onto the reactor to finish.
-     * 2.  All nodes are bad but some needed new connections. The reaction to the new connection
-     *     needs to be scheduled onto the reactor.
-     * 3.  The timer in sendRequest() fires and the operation times out. ASIO timers run on the
-     *     reactor.
-     * 4.  AsyncDBClient::runCommandRequest() concludes. This path is sadly indeterminate since
-     *     early failure can still be inline. The future chain is thenRunOn() either the baton or
-     *     the reactor.
-     *
-     * The important bits to remember here:
-     * - onFinish() is out-of-line
-     * - Stay inline as long as feasible until sendRequest()---i.e. until network operations
-     * - Baton execution *cannot* be relied upon at least until sendRequest()
-     * - Connection failure and command failure are related but distinct
-     */
+    // When our command finishes, run onFinish out of line.
+    std::move(future)
+        // Run the callback on the baton if it exists and is not shut down, and run on the reactor
+        // otherwise.
+        .thenRunOn(makeGuaranteedExecutor(baton, _reactor))
+        .getAsync([cmdState = cmdState,
+                   onFinish = std::move(onFinish)](StatusWith<RemoteCommandOnAnyResponse> swr) {
+            invariant(swr.isOK());
+            auto rs = std::move(swr.getValue());
+            // The TransportLayer has, for historical reasons returned
+            // SocketException for network errors, but sharding assumes
+            // HostUnreachable on network errors.
+            if (rs.status == ErrorCodes::SocketException) {
+                rs.status = Status(ErrorCodes::HostUnreachable, rs.status.reason());
+            }
 
-    // When our command finishes, run onFinish
-    std::move(future).getAsync([this, cmdState = cmdState, onFinish = std::move(onFinish)](
-                                   StatusWith<RemoteCommandOnAnyResponse> swr) {
-        invariant(swr.isOK());
-        auto rs = std::move(swr.getValue());
-        // The TransportLayer has, for historical reasons returned
-        // SocketException for network errors, but sharding assumes
-        // HostUnreachable on network errors.
-        if (rs.status == ErrorCodes::SocketException) {
-            rs.status = Status(ErrorCodes::HostUnreachable, rs.status.reason());
-        }
-
-        LOGV2_DEBUG(22597,
-                    2,
-                    "Request finished with response",
-                    "requestId"_attr = cmdState->requestOnAny.id,
-                    "isOK"_attr = rs.isOK(),
-                    "response"_attr =
-                        redact(rs.isOK() ? rs.data.toString() : rs.status.toString()));
-        onFinish(std::move(rs));
-    });
+            LOGV2_DEBUG(22597,
+                        2,
+                        "Request finished with response",
+                        "requestId"_attr = cmdState->requestOnAny.id,
+                        "isOK"_attr = rs.isOK(),
+                        "response"_attr =
+                            redact(rs.isOK() ? rs.data.toString() : rs.status.toString()));
+            onFinish(std::move(rs));
+        });
 
     if (MONGO_unlikely(networkInterfaceDiscardCommandsBeforeAcquireConn.shouldFail())) {
         LOGV2(22598, "Discarding command due to failpoint before acquireConn");
