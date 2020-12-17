@@ -664,6 +664,26 @@ public:
     virtual const KVEngine* getEngine() const = 0;
     virtual DurableCatalog* getCatalog() = 0;
     virtual const DurableCatalog* getCatalog() const = 0;
+
+    /**
+     * A service that would like to pin the oldest timestamp registers its request here. If the
+     * request can be satisfied, OK is returned with the oldest timestamp the caller can
+     * use. Otherwise, SnapshotTooOld is returned. See the following enumerations:
+     *
+     * | Timestamp Relation  | roundUpIfTooOld | Result                    |
+     * |---------------------+-----------------+---------------------------|
+     * | requested >= oldest | false/true      | <OK, requested timestamp> |
+     * | requested < oldest  | false           | <SnapshotTooOld>          |
+     * | requested < oldest  | true            | <OK, oldest timestamp>    |
+     */
+    virtual StatusWith<Timestamp> pinOldestTimestamp(const std::string& requestingServiceName,
+                                                     Timestamp requestedTimestamp,
+                                                     bool roundUpIfTooOld) = 0;
+
+    /**
+     * Unpins the request registered under `requestingServiceName`.
+     */
+    virtual void unpinOldestTimestamp(const std::string& requestingServiceName) = 0;
 };
 
 }  // namespace mongo

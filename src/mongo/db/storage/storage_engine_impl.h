@@ -363,6 +363,12 @@ public:
         return _options.directoryPerDB;
     }
 
+    StatusWith<Timestamp> pinOldestTimestamp(const std::string& requestingServiceName,
+                                             Timestamp requestedTimestamp,
+                                             bool roundUpIfTooOld) override;
+
+    void unpinOldestTimestamp(const std::string& requestingServiceName) override;
+
 private:
     using CollIter = std::list<std::string>::iterator;
 

@@ -460,6 +460,16 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    virtual StatusWith<Timestamp> pinOldestTimestamp(const std::string& requestingServiceName,
+                                                     Timestamp requestedTimestamp,
+                                                     bool roundUpIfTooOld) {
+        MONGO_UNREACHABLE;
+    }
+
+    virtual void unpinOldestTimestamp(const std::string& requestingServiceName) {
+        MONGO_UNREACHABLE
+    }
+
     /**
      * The destructor will never be called from mongod, but may be called from tests.
      * Engines may assume that this will only be called in the case of clean shutdown, even if

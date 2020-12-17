@@ -195,6 +195,14 @@ public:
     const DurableCatalog* getCatalog() const final {
         return nullptr;
     }
+
+    StatusWith<Timestamp> pinOldestTimestamp(const std::string& requestingServiceName,
+                                             Timestamp requestedTimestamp,
+                                             bool roundUpIfTooOld) final {
+        return Status::OK();
+    }
+
+    void unpinOldestTimestamp(const std::string& requestingServiceName) final {}
 };
 
 }  // namespace mongo

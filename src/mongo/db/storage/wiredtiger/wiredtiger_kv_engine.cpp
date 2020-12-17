@@ -1943,7 +1943,6 @@ void WiredTigerKVEngine::setStableTimestamp(Timestamp stableTimestamp, bool forc
     // `CheckpointThread` is to transition it from a state of not taking any checkpoints, to
     // taking "stable checkpoints". In the transitioning case, it's imperative for the "stable
     // timestamp" to have first been communicated to WiredTiger.
-    using namespace fmt::literals;
     std::string stableTSConfigString;
     auto ts = stableTimestamp.asULL();
     if (force) {
@@ -1996,6 +1995,27 @@ void WiredTigerKVEngine::setOldestTimestampFromStable() {
 void WiredTigerKVEngine::setOldestTimestamp(Timestamp newOldestTimestamp, bool force) {
     if (MONGO_unlikely(WTPreserveSnapshotHistoryIndefinitely.shouldFail())) {
         return;
+    }
+
+    // This mutex is not intended to synchronize updates to the oldest timestamp, but to ensure that
+    // there are no races with pinning the oldest timestamp.
+    stdx::lock_guard<Latch> lock(_oldestTimestampPinRequestsMutex);
+    const Timestamp currOldestTimestamp = Timestamp(_oldestTimestamp.load());
+    for (auto it : _oldestTimestampPinRequests) {
+        invariant(it.second >= currOldestTimestamp);
+        newOldestTimestamp = std::min(newOldestTimestamp, it.second);
+    }
+
+    if (force) {
+        // Forcing the oldest timestamp backwards (e.g: eMRC=off rollback) to a value of T
+        // invalidates all snapshots > T. Components that register a pinned timestamp must
+        // synchronize with events that invalidate their snapshots, unpin themselves and either
+        // fail themselves, or reacquire a new snapshot after the rollback event.
+        //
+        // Forcing the oldest timestamp forward -- potentially past a pin request raises the
+        // question of whether the pin should be honored. For now we will invariant there is no pin,
+        // but the invariant can be relaxed if there's a use-case to support.
+        invariant(_oldestTimestampPinRequests.empty());
     }
 
     if (force) {
@@ -2270,6 +2290,50 @@ Timestamp WiredTigerKVEngine::getPinnedOplog() const {
 
     // If getOplogNeededForRollback fails, don't truncate any oplog right now.
     return Timestamp::min();
+}
+
+StatusWith<Timestamp> WiredTigerKVEngine::pinOldestTimestamp(
+    const std::string& requestingServiceName, Timestamp requestedTimestamp, bool roundUpIfTooOld) {
+    stdx::lock_guard<Latch> lock(_oldestTimestampPinRequestsMutex);
+    Timestamp oldest = getOldestTimestamp();
+    LOGV2(5380104,
+          "Pin oldest timestamp request",
+          "service"_attr = requestingServiceName,
+          "requestedTs"_attr = requestedTimestamp,
+          "roundUpIfTooOld"_attr = roundUpIfTooOld,
+          "currOldestTs"_attr = oldest);
+
+    if (requestedTimestamp < oldest) {
+        if (roundUpIfTooOld) {
+            requestedTimestamp = oldest;
+        } else {
+            return {ErrorCodes::SnapshotTooOld,
+                    "Requested timestamp: {} Current oldest timestamp: {}"_format(
+                        requestedTimestamp.toString(), oldest.toString())};
+        }
+    }
+
+    _oldestTimestampPinRequests[requestingServiceName] = requestedTimestamp;
+
+    return {requestedTimestamp};
+}
+
+void WiredTigerKVEngine::unpinOldestTimestamp(const std::string& requestingServiceName) {
+    stdx::lock_guard<Latch> lock(_oldestTimestampPinRequestsMutex);
+    auto it = _oldestTimestampPinRequests.find(requestingServiceName);
+    if (it == _oldestTimestampPinRequests.end()) {
+        LOGV2_FATAL(5380105, "Missing pin request", "service"_attr = requestingServiceName);
+    }
+    LOGV2(5380103,
+          "Unpin oldest timestamp request",
+          "service"_attr = requestingServiceName,
+          "requestedTs"_attr = it->second);
+    _oldestTimestampPinRequests.erase(it);
+}
+
+std::map<std::string, Timestamp> WiredTigerKVEngine::getPinnedTimestampRequests() {
+    stdx::lock_guard<Latch> lock(_oldestTimestampPinRequestsMutex);
+    return _oldestTimestampPinRequests;
 }
 
 bool WiredTigerKVEngine::supportsReadConcernSnapshot() const {

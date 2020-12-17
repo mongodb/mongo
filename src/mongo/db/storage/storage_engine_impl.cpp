@@ -1216,4 +1216,14 @@ int64_t StorageEngineImpl::sizeOnDiskForDb(OperationContext* opCtx, StringData d
     return size;
 }
 
+StatusWith<Timestamp> StorageEngineImpl::pinOldestTimestamp(
+    const std::string& requestingServiceName, Timestamp requestedTimestamp, bool roundUpIfTooOld) {
+    return _engine->pinOldestTimestamp(requestingServiceName, requestedTimestamp, roundUpIfTooOld);
+}
+
+void StorageEngineImpl::unpinOldestTimestamp(const std::string& requestingServiceName) {
+    _engine->unpinOldestTimestamp(requestingServiceName);
+}
+
+
 }  // namespace mongo

@@ -377,6 +377,14 @@ public:
         return _clockSource;
     }
 
+    StatusWith<Timestamp> pinOldestTimestamp(const std::string& requestingServiceName,
+                                             Timestamp requestedTimestamp,
+                                             bool roundUpIfTooOld) override;
+
+    void unpinOldestTimestamp(const std::string& requestingServiceName) override;
+
+    std::map<std::string, Timestamp> getPinnedTimestampRequests();
+
 private:
     class WiredTigerSessionSweeper;
 
@@ -504,5 +512,9 @@ private:
     mutable Mutex _highestDurableTimestampMutex =
         MONGO_MAKE_LATCH("WiredTigerKVEngine::_highestDurableTimestampMutex");
     mutable unsigned long long _highestSeenDurableTimestamp = StorageEngine::kMinimumTimestamp;
+
+    mutable Mutex _oldestTimestampPinRequestsMutex =
+        MONGO_MAKE_LATCH("WiredTigerKVEngine::_oldestTimestampPinRequestsMutex");
+    std::map<std::string, Timestamp> _oldestTimestampPinRequests;
 };
 }  // namespace mongo

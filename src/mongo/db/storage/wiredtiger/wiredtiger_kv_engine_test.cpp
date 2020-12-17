@@ -391,6 +391,108 @@ TEST_F(WiredTigerKVEngineTest, IdentDrop) {
     ASSERT(boost::filesystem::exists(renamedFilePath));
 }
 
+TEST_F(WiredTigerKVEngineTest, TestBasicPinOldestTimestamp) {
+    const Timestamp initTs = Timestamp(1, 0);
+
+    // Initialize the oldest timestamp.
+    _engine->setOldestTimestamp(initTs, false);
+    ASSERT_EQ(initTs, _engine->getOldestTimestamp());
+
+    // Assert that advancing the oldest timestamp still succeeds.
+    _engine->setOldestTimestamp(initTs + 1, false);
+    ASSERT_EQ(initTs + 1, _engine->getOldestTimestamp());
+
+    // Error if there's a request to pin the oldest timestamp earlier than what it is already set
+    // as. This error case is not exercised in this test.
+    const bool roundUpIfTooOld = false;
+    // Pin the oldest timestamp to "3".
+    auto pinnedTs =
+        unittest::assertGet(_engine->pinOldestTimestamp("A", initTs + 3, roundUpIfTooOld));
+    // Assert that the pinning method returns the same timestamp as was requested.
+    ASSERT_EQ(initTs + 3, pinnedTs);
+    // Assert that pinning the oldest timestamp does not advance it.
+    ASSERT_EQ(initTs + 1, _engine->getOldestTimestamp());
+
+    // Attempt to advance the oldest timestamp to "5".
+    _engine->setOldestTimestamp(initTs + 5, false);
+    // Observe the oldest timestamp was pinned at the requested "3".
+    ASSERT_EQ(initTs + 3, _engine->getOldestTimestamp());
+
+    // Unpin the oldest timestamp. Assert that unpinning does not advance the oldest timestamp.
+    _engine->unpinOldestTimestamp("A");
+    ASSERT_EQ(initTs + 3, _engine->getOldestTimestamp());
+
+    // Now advancing the oldest timestamp to "5" succeeds.
+    _engine->setOldestTimestamp(initTs + 5, false);
+    ASSERT_EQ(initTs + 5, _engine->getOldestTimestamp());
+}
+
+/**
+ * Demonstrate that multiple actors can request different pins of the oldest timestamp. The minimum
+ * of all active requests will be obeyed.
+ */
+TEST_F(WiredTigerKVEngineTest, TestMultiPinOldestTimestamp) {
+    const Timestamp initTs = Timestamp(1, 0);
+
+    _engine->setOldestTimestamp(initTs, false);
+    ASSERT_EQ(initTs, _engine->getOldestTimestamp());
+
+    // Error if there's a request to pin the oldest timestamp earlier than what it is already set
+    // as. This error case is not exercised in this test.
+    const bool roundUpIfTooOld = false;
+    // Have "A" pin the timestamp to "1".
+    auto pinnedTs =
+        unittest::assertGet(_engine->pinOldestTimestamp("A", initTs + 1, roundUpIfTooOld));
+    ASSERT_EQ(initTs + 1, pinnedTs);
+    ASSERT_EQ(initTs, _engine->getOldestTimestamp());
+
+    // Have "B" pin the timestamp to "2".
+    pinnedTs = unittest::assertGet(_engine->pinOldestTimestamp("B", initTs + 2, roundUpIfTooOld));
+    ASSERT_EQ(initTs + 2, pinnedTs);
+    ASSERT_EQ(initTs, _engine->getOldestTimestamp());
+
+    // Advancing the oldest timestamp to "5" will only succeed in advancing it to "1".
+    _engine->setOldestTimestamp(initTs + 5, false);
+    ASSERT_EQ(initTs + 1, _engine->getOldestTimestamp());
+
+    // After unpinning "A" at "1", advancing the oldest timestamp will be pinned to "2".
+    _engine->unpinOldestTimestamp("A");
+    _engine->setOldestTimestamp(initTs + 5, false);
+    ASSERT_EQ(initTs + 2, _engine->getOldestTimestamp());
+
+    // Unpinning "B" at "2" allows the oldest timestamp to advance freely.
+    _engine->unpinOldestTimestamp("B");
+    _engine->setOldestTimestamp(initTs + 5, false);
+    ASSERT_EQ(initTs + 5, _engine->getOldestTimestamp());
+}
+
+/**
+ * Test error cases where a request to pin the oldest timestamp uses a value that's too early
+ * relative to the current oldest timestamp.
+ */
+TEST_F(WiredTigerKVEngineTest, TestPinOldestTimestampErrors) {
+    const Timestamp initTs = Timestamp(10, 0);
+
+    _engine->setOldestTimestamp(initTs, false);
+    ASSERT_EQ(initTs, _engine->getOldestTimestamp());
+
+    const bool roundUpIfTooOld = true;
+    // The false value means using this variable will cause the method to fail on error.
+    const bool failOnError = false;
+
+    // When rounding on error, the pin will succeed, but the return value will be the current oldest
+    // timestamp instead of the requested value.
+    auto pinnedTs =
+        unittest::assertGet(_engine->pinOldestTimestamp("A", initTs - 1, roundUpIfTooOld));
+    ASSERT_EQ(initTs, pinnedTs);
+    ASSERT_EQ(initTs, _engine->getOldestTimestamp());
+
+    // Using "fail on error" will result in a not-OK return value.
+    ASSERT_NOT_OK(_engine->pinOldestTimestamp("B", initTs - 1, failOnError));
+    ASSERT_EQ(initTs, _engine->getOldestTimestamp());
+}
+
+
 std::unique_ptr<KVHarnessHelper> makeHelper() {
     return std::make_unique<WiredTigerKVHarnessHelper>();
 }

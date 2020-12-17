@@ -974,6 +974,15 @@ void WiredTigerUtil::appendSnapshotWindowSettings(WiredTigerKVEngine* engine,
                     stableTimestamp.toStringPretty());
     settings.append("oldest majority snapshot timestamp available",
                     oldestTimestamp.toStringPretty());
+
+    std::map<std::string, Timestamp> pinnedTimestamps = engine->getPinnedTimestampRequests();
+    settings.append("pinned timestamp requests", static_cast<int>(pinnedTimestamps.size()));
+
+    Timestamp minPinned = Timestamp::max();
+    for (auto it : pinnedTimestamps) {
+        minPinned = std::min(minPinned, it.second);
+    }
+    settings.append("min pinned timestamp", minPinned);
 }
 
 }  // namespace mongo

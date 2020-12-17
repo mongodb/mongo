@@ -56,9 +56,8 @@ public:
     }
 
     /**
-     * DEPRECATED Constructor that builds a Timestamp from a Date_t by using the
-     * high-order 4 bytes of "date" for the "secs" field and the low-order 4 bytes
-     * for the "i" field.
+     * Constructor that builds a Timestamp from a Date_t by using the high-order 4 bytes of "date"
+     * for the "secs" field and the low-order 4 bytes for the "i" field.
      */
     explicit Timestamp(Date_t date) : Timestamp(date.toULL()) {}
 
@@ -67,7 +66,7 @@ public:
      * the high-order 4 bytes of "v" for the "secs" field and the low-order 4 bytes for the "i"
      * field.
      */
-    explicit Timestamp(unsigned long long v) : Timestamp(v >> 32, v) {}
+    explicit Timestamp(unsigned long long val) : Timestamp(val >> 32, val) {}
 
     Timestamp(Seconds s, unsigned increment) : Timestamp(s.count(), increment) {}
 
@@ -118,6 +117,14 @@ public:
     }
     bool operator>=(const Timestamp& r) const {
         return tie() >= r.tie();
+    }
+
+    Timestamp operator+(unsigned long long inc) const {
+        return Timestamp(asULL() + inc);
+    }
+
+    Timestamp operator-(unsigned long long inc) const {
+        return Timestamp(asULL() - inc);
     }
 
     // Append the BSON representation of this Timestamp to the given BufBuilder with the given
