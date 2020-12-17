@@ -10265,6 +10265,7 @@ buildvariants:
     resmoke_jobs_max: 6
   tasks:
   - name: compile_all_run_unittests_TG
+  - name: compile_build_tools_next_TG
   - name: .aggregation !.auth !.encrypt !.unwind
   - name: .auth .gle
   - name: auth_gen
@@ -10276,6 +10277,7 @@ buildvariants:
   - name: free_monitoring
   - name: initial_sync_fuzzer_gen
   - name: .jscore .common !.auth
+  - name: jsCore_txns_large_txns_format
   - name: .jstestfuzz .causal
   - name: .jstestfuzz .interrupt
   - name: .jstestfuzz .common
@@ -10285,6 +10287,7 @@ buildvariants:
   - name: .read_write_concern !.linearize
   - name: replica_sets
   - name: replica_sets_kill_secondaries_jscore_passthrough
+  - name: replica_sets_large_txns_format_gen
   - name: .replica_sets .common !.auth
   - name: retryable_writes_jscore_passthrough_gen
   - name: .rollbackfuzzer
@@ -10293,37 +10296,10 @@ buildvariants:
   - name: .sharding .txns
   - name: .ssl
   - name: .stitch
+  - name: unittest_shell_hang_analyzer_gen
   - name: push
     distros:
     - rhel70-small
-
-- &macos-debug-template
-  name: macos-debug
-  display_name: "* Shared Library macOS DEBUG"
-  batchtime: 60 # 1 hour
-  run_on:
-  - macos-1014
-  expansions: &macos-debug-expansions
-    resmoke_jobs_max: 6
-    compile_env: DEVELOPER_DIR=/Applications/Xcode10.2.app
-    compile_flags: --ssl --dbg=on --opt=on -j$(sysctl -n hw.logicalcpu) --libc++ --variables-files=etc/scons/xcode_macosx.vars --link-model=dynamic
-    num_scons_link_jobs_available: 0.99
-  tasks:
-  - name: compile_all_run_unittests_TG
-  - name: compile_build_tools_next_TG
-  - name: aggregation
-  - name: auth_gen
-  - name: causally_consistent_jscore_txns_passthrough
-  - name: disk_wiredtiger
-  - name: failpoints
-  - name: .jscore .common !.auth !.sharding
-  - name: jsCore_txns_large_txns_format
-  - name: mongosTest
-  - name: replica_sets
-  - name: replica_sets_large_txns_format_gen
-  - name: .ssl
-  - name: .stitch
-  - name: unittest_shell_hang_analyzer_gen
 
 - name: enterprise-macos
   display_name: Enterprise macOS
@@ -13396,10 +13372,3 @@ buildvariants:
   - name: visibility_test_TG
     distros:
     - windows-64-vs2019-large
-
-- <<: *macos-debug-template
-  name: macos-dynamic-visibility-test
-  display_name: "~ Shared Library macOS DEBUG (visibility test)"
-  expansions:
-    <<: *macos-debug-expansions
-    compile_flags: --ssl --dbg=on --opt=on -j$(sysctl -n hw.logicalcpu) --libc++ --variables-files=etc/scons/xcode_macosx.vars --link-model=dynamic --experimental-visibility-support=on
