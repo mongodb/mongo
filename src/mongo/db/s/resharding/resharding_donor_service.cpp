@@ -36,7 +36,9 @@
 #include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/repl_client_info.h"
@@ -252,6 +254,13 @@ void ReshardingDonorService::DonorStateMachine::
     }
 
     _insertDonorDocument(_donorDoc);
+
+    {
+        auto opCtx = cc().makeOperationContext();
+        AutoGetCollectionForRead coll(opCtx.get(), _donorDoc.getNss());
+        IndexBuildsCoordinator::get(opCtx.get())
+            ->assertNoIndexBuildInProgForCollection(_donorDoc.getExistingUUID());
+    }
 
     // Recipient shards expect to read from the donor shard's existing sharded collection
     // and the config.cache.chunks collection of the temporary resharding collection using
