@@ -96,7 +96,7 @@ private:
     bool _open{false};
 
     std::unique_ptr<SeekableRecordCursor> _cursor;
-    boost::optional<AutoGetCollectionForRead> _coll;
+    boost::optional<AutoGetCollectionForReadMaybeLockFree> _coll;
     RecordId _key;
     bool _firstGetNext{false};
 
@@ -179,7 +179,7 @@ private:
     bool _open{false};
 
     std::unique_ptr<SeekableRecordCursor> _cursor;
-    boost::optional<AutoGetCollectionForRead> _coll;
+    boost::optional<AutoGetCollectionForReadMaybeLockFree> _coll;
 };
 }  // namespace sbe
 }  // namespace mongo

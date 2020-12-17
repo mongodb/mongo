@@ -296,6 +296,32 @@ private:
 };
 
 /**
+ * This is a nested lock helper. If a higher level operation is running a lock-free read, then this
+ * helper will follow suite and instantiate a AutoGetCollectionLockFree. Otherwise, it will
+ * instantiate a regular AutoGetCollection helper.
+ */
+class AutoGetCollectionMaybeLockFree {
+    AutoGetCollectionMaybeLockFree(const AutoGetCollectionMaybeLockFree&) = delete;
+    AutoGetCollectionMaybeLockFree& operator=(const AutoGetCollectionMaybeLockFree&) = delete;
+
+public:
+    /**
+     * Decides whether to instantiate a lock-free or locked helper based on whether a lock-free
+     * operation is set on the opCtx.
+     */
+    AutoGetCollectionMaybeLockFree(
+        OperationContext* opCtx,
+        const NamespaceStringOrUUID& nsOrUUID,
+        LockMode modeColl,
+        AutoGetCollectionViewMode viewMode = AutoGetCollectionViewMode::kViewsForbidden,
+        Date_t deadline = Date_t::max());
+
+private:
+    boost::optional<AutoGetCollection> _autoGet;
+    boost::optional<AutoGetCollectionLockFree> _autoGetLockFree;
+};
+
+/**
  * RAII-style class to handle the lifetime of writable Collections.
  * It does not take any locks, concurrency needs to be handled separately using explicit locks or
  * AutoGetCollection. This class can serve as an adaptor to unify different methods of acquiring a

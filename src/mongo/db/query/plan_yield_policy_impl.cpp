@@ -104,12 +104,18 @@ void PlanYieldPolicyImpl::_yieldAllLocks(OperationContext* opCtx,
 
     Locker* locker = opCtx->lockState();
 
-    Locker::LockSnapshot snapshot;
+    if (locker->isGlobalLockedRecursively()) {
+        // No purpose in yielding if the locks are recursively held and cannot be released.
+        return;
+    }
 
+    // Since the locks are not recursively held, this is a top level operation and we can safely
+    // clear the 'yieldable' state before unlocking and then re-establish it after re-locking.
     if (yieldable) {
         yieldable->yield();
     }
 
+    Locker::LockSnapshot snapshot;
     auto unlocked = locker->saveLockStateAndUnlock(&snapshot);
 
     // Attempt to check for interrupt while locks are not held, in order to discourage the
@@ -119,8 +125,8 @@ void PlanYieldPolicyImpl::_yieldAllLocks(OperationContext* opCtx,
     }
 
     if (!unlocked) {
-        // Nothing was unlocked, just return, yielding is pointless. Restore the yieldable before
-        // returning.
+        // Nothing was unlocked. Recursively held locks are not the only reason locks cannot be
+        // released. Restore the 'yieldable' state before returning.
         if (yieldable) {
             yieldable->restore();
         }

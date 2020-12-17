@@ -195,7 +195,7 @@ PlanExecutor::ExecState PlanExecutorSBE::getNext(BSONObj* out, RecordId* dlOut) 
     // insert notifier is necessary for the notifierVersion to advance.
     //
     // Note that we need to hold a database intent lock before acquiring a notifier.
-    boost::optional<AutoGetCollectionForRead> coll;
+    boost::optional<AutoGetCollectionForReadMaybeLockFree> coll;
     insert_listener::CappedInsertNotifierData cappedInsertNotifierData;
     if (insert_listener::shouldListenForInserts(_opCtx, _cq.get())) {
         if (!_opCtx->lockState()->isCollectionLockedForMode(_nss, MODE_IS)) {

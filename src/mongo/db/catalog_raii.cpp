@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/catalog_raii.h"
@@ -36,6 +38,7 @@
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/views/view_catalog.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/fail_point.h"
 
 namespace mongo {
@@ -277,6 +280,30 @@ AutoGetCollectionLockFree::AutoGetCollectionLockFree(OperationContext* opCtx,
     uassert(ErrorCodes::CommandNotSupportedOnView,
             str::stream() << "Namespace " << _resolvedNss.ns() << " is a view, not a collection",
             !_view || viewMode == AutoGetCollectionViewMode::kViewsPermitted);
+}
+
+AutoGetCollectionMaybeLockFree::AutoGetCollectionMaybeLockFree(
+    OperationContext* opCtx,
+    const NamespaceStringOrUUID& nsOrUUID,
+    LockMode modeColl,
+    AutoGetCollectionViewMode viewMode,
+    Date_t deadline) {
+    if (opCtx->isLockFreeReadsOp()) {
+        _autoGetLockFree.emplace(opCtx,
+                                 nsOrUUID,
+                                 [](std::shared_ptr<const Collection>& collection,
+                                    OperationContext* opCtx,
+                                    CollectionUUID uuid) {
+                                     LOGV2_FATAL(
+                                         5342700,
+                                         "This is a nested lock helper and there was an attempt to "
+                                         "yield locks, which should be impossible");
+                                 },
+                                 viewMode,
+                                 deadline);
+    } else {
+        _autoGet.emplace(opCtx, nsOrUUID, modeColl, viewMode, deadline);
+    }
 }
 
 struct CollectionWriter::SharedImpl {

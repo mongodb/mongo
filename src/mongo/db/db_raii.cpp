@@ -418,9 +418,11 @@ AutoGetCollectionForReadLockFree::AutoGetCollectionForReadLockFree(
     AutoGetCollectionViewMode viewMode,
     Date_t deadline)
     : _catalogStash(opCtx) {
-    // Supported lock-free reads should never have an open storage snapshot prior to calling
-    // this helper. The storage snapshot and in-memory state fetched here must be consistent.
-    invariant(supportsLockFreeRead(opCtx) && !opCtx->recoveryUnit()->isActive());
+    // Supported lock-free reads should only ever have an open storage snapshot prior to calling
+    // this helper if it is a nested lock-free operation. The storage snapshot and in-memory state
+    // used across lock=free reads must be consistent.
+    invariant(supportsLockFreeRead(opCtx) &&
+              (!opCtx->recoveryUnit()->isActive() || opCtx->isLockFreeReadsOp()));
 
     EmplaceHelper emplaceFunc(opCtx, _catalogStash, nsOrUUID, viewMode, deadline);
     aquireCollectionAndConsistentSnapshot(

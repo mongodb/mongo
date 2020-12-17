@@ -91,7 +91,7 @@ protected:
 
     boost::intrusive_ptr<ExpressionContext> _expCtx;
 
-    boost::optional<AutoGetCollectionForRead> _autoColl;
+    boost::optional<AutoGetCollectionForReadMaybeLockFree> _autoColl;
     const IndexDescriptor* _mockGeoIndex;
 };
 

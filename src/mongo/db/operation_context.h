@@ -286,7 +286,7 @@ public:
      * Returns true if the operation is running lock-free.
      */
     bool isLockFreeReadsOp() const {
-        return _isLockFreeReadsOp;
+        return _lockFreeReadOpCount;
     }
 
     /**
@@ -587,10 +587,13 @@ private:
     }
 
     /**
-     * Set whether or not the operation is running lock-free.
+     * Increment a count to indicate that the operation is running lock-free.
      */
-    void setIsLockFreeReadsOp(bool isLockFreeReadsOp) {
-        _isLockFreeReadsOp = isLockFreeReadsOp;
+    void incrementLockFreeReadOpCount() {
+        ++_lockFreeReadOpCount;
+    }
+    void decrementLockFreeReadOpCount() {
+        --_lockFreeReadOpCount;
     }
 
     friend class WriteUnitOfWork;
@@ -648,11 +651,15 @@ private:
     Timer _elapsedTime;
 
     bool _writesAreReplicated = true;
-    bool _isLockFreeReadsOp = false;
     bool _shouldIncrementLatencyStats = true;
     bool _shouldParticipateInFlowControl = true;
     bool _inMultiDocumentTransaction = false;
     bool _isStartingMultiDocumentTransaction = false;
+
+    // Counts how many lock-free read operations are running nested.
+    // Necessary to use a counter rather than a boolean because there is existing code that
+    // destructs lock helpers out of order.
+    int _lockFreeReadOpCount = 0;
 
     // If true, this OpCtx will get interrupted during replica set stepUp and stepDown, regardless
     // of what locks it's taken.
@@ -705,20 +712,16 @@ class LockFreeReadsBlock {
     LockFreeReadsBlock& operator=(const LockFreeReadsBlock&) = delete;
 
 public:
-    LockFreeReadsBlock(OperationContext* opCtx)
-        : _opCtx(opCtx), _previousLockFreeReadsSetting(opCtx->isLockFreeReadsOp()) {
-        opCtx->setIsLockFreeReadsOp(true);
+    LockFreeReadsBlock(OperationContext* opCtx) : _opCtx(opCtx) {
+        _opCtx->incrementLockFreeReadOpCount();
     }
 
     ~LockFreeReadsBlock() {
-        _opCtx->setIsLockFreeReadsOp(_previousLockFreeReadsSetting);
+        _opCtx->decrementLockFreeReadOpCount();
     }
 
 private:
     OperationContext* _opCtx;
-
-    // Used to re-set the value on the operation context upon destruction that was originally set.
-    const bool _previousLockFreeReadsSetting;
 };
 
 }  // namespace mongo
