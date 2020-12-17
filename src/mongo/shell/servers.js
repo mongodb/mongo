@@ -1258,8 +1258,6 @@ function appendSetParameterArgs(argArray) {
                 }
             }
 
-            // TODO (SERVER-49407): Enable this parameter for 4.4 nodes after SERVER-21700 has been
-            // backported to v4.4.
             // New mongod-specific option in 4.5.
             if (programMajorMinorVersion >= 450) {
                 // Allow the parameter to be overridden if set explicitly via TestData.
