@@ -58,6 +58,8 @@ function testAbortInitialState(donorRst) {
     assert.commandWorked(migrationThread.returnData());
     tenantMigrationTest.waitForNodesToReachState(
         donorRst.nodes, migrationId, tenantId, TenantMigrationTest.State.kCommitted);
+
+    assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
 }
 
 /**
@@ -107,6 +109,8 @@ function testAbortStateTransition(donorRst, pauseFailPoint, setUpFailPoints, nex
         tenantMigrationTest.waitForNodesToReachState(
             donorRst.nodes, migrationId, tenantId, TenantMigrationTest.State.kCommitted);
     }
+
+    assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
 }
 
 const donorRst = tenantMigrationTest.getDonorRst();

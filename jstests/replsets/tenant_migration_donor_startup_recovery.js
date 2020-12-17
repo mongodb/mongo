@@ -109,6 +109,8 @@ if (donorDoc) {
                                         .getTenantMigrationAccessBlocker(donorPrimary, kTenantId)
                                         .blockTimestamp,
                                     donorDoc.blockTimestamp) == 0);
+            assert.commandWorked(
+                tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
             break;
         case TenantMigrationTest.State.kAborted:
             assert.soon(
@@ -124,6 +126,8 @@ if (donorDoc) {
                                         .getTenantMigrationAccessBlocker(donorPrimary, kTenantId)
                                         .blockTimestamp,
                                     donorDoc.blockTimestamp) == 0);
+            assert.commandWorked(
+                tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
             break;
         default:
             throw new Error(`Invalid state "${state}" from donor doc.`);

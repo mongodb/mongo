@@ -35,6 +35,8 @@ function assertMigrationCommitsIfDurableStateExists(tenantMigrationTest, migrati
     if (configDonorsColl.count({_id: migrationId}) > 0) {
         tenantMigrationTest.waitForNodesToReachState(
             donorRst.nodes, migrationId, tenantId, TenantMigrationTest.State.kCommitted);
+        assert.commandWorked(
+            tenantMigrationTest.forgetMigration(extractUUIDFromObject(migrationId)));
     }
 }
 
@@ -141,7 +143,8 @@ function testDonorForgetMigrationInterrupt(interruptFunc) {
     };
     const donorRstArgs = TenantMigrationUtil.createRstArgs(donorRst);
 
-    assert.commandWorked(tenantMigrationTest.runMigration(migrationOpts));
+    assert.commandWorked(tenantMigrationTest.runMigration(
+        migrationOpts, false /* retryOnRetryableErrors */, false /* automaticForgetMigration */));
     const forgetMigrationThread = new Thread(TenantMigrationUtil.forgetMigrationAsync,
                                              migrationOpts.migrationIdString,
                                              donorRstArgs,
@@ -164,6 +167,14 @@ function testDonorForgetMigrationInterrupt(interruptFunc) {
         ErrorCodes.NoSuchTenantMigration);
 
     assert.commandWorked(forgetMigrationThread.returnData());
+    // After forgetMigrationThread returns, check that the recipient state doc is correctly marked
+    // as garbage collectable.
+    const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
+    const recipientStateDoc =
+        recipientPrimary.getCollection(TenantMigrationTest.kConfigRecipientsNS).findOne({
+            _id: migrationId
+        });
+    assert(recipientStateDoc.expireAt);
     tenantMigrationTest.waitForMigrationGarbageCollection(
         donorRst.nodes, migrationId, migrationOpts.tenantId);
 

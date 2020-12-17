@@ -92,15 +92,23 @@ function TenantMigrationTest(
      * has completed.
      */
     this.runMigration = function(
-        migrationOpts, retryOnRetryableErrors = false, skipTenantDBHashCheck = false) {
-        const res =
-            this.startMigration(migrationOpts, retryOnRetryableErrors, skipTenantDBHashCheck);
-        if (!res.ok) {
-            return res;
+        migrationOpts, retryOnRetryableErrors = false, automaticForgetMigration = true) {
+        const startRes = this.startMigration(migrationOpts, retryOnRetryableErrors);
+        if (!startRes.ok) {
+            return startRes;
         }
 
-        return this.waitForMigrationToComplete(
-            migrationOpts, retryOnRetryableErrors, skipTenantDBHashCheck);
+        const completeRes = this.waitForMigrationToComplete(migrationOpts, retryOnRetryableErrors);
+
+        if (automaticForgetMigration &&
+            (completeRes.state === TenantMigrationTest.State.kCommitted ||
+             completeRes.state === TenantMigrationTest.State.kAborted)) {
+            jsTestLog(`Automatically forgetting ${completeRes.state} migration with migrationId: ${
+                migrationOpts.migrationIdString}`);
+            this.forgetMigration(migrationOpts.migrationIdString);
+        }
+
+        return completeRes;
     };
 
     /**
@@ -108,12 +116,9 @@ function TenantMigrationTest(
      *
      * Returns the result of the 'donorStartMigration' command.
      */
-    this.startMigration = function(
-        migrationOpts, retryOnRetryableErrors = false, skipTenantDBHashCheck = false) {
-        return this.runDonorStartMigration(migrationOpts,
-                                           false /* waitForMigrationToComplete */,
-                                           retryOnRetryableErrors,
-                                           skipTenantDBHashCheck);
+    this.startMigration = function(migrationOpts, retryOnRetryableErrors = false) {
+        return this.runDonorStartMigration(
+            migrationOpts, false /* waitForMigrationToComplete */, retryOnRetryableErrors);
     };
 
     /**
@@ -123,17 +128,14 @@ function TenantMigrationTest(
      *
      * Returns the result of the last 'donorStartMigration' command executed.
      */
-    this.waitForMigrationToComplete = function(
-        migrationOpts, retryOnRetryableErrors = false, skipTenantDBHashCheck = false) {
+    this.waitForMigrationToComplete = function(migrationOpts, retryOnRetryableErrors = false) {
         // Assert that the migration has already been started.
         const tenantId = migrationOpts.tenantId;
         assert(this.getDonorPrimary()
                    .getCollection(TenantMigrationTest.kConfigDonorsNS)
                    .findOne({tenantId}));
-        return this.runDonorStartMigration(migrationOpts,
-                                           true /* waitForMigrationToComplete */,
-                                           retryOnRetryableErrors,
-                                           skipTenantDBHashCheck);
+        return this.runDonorStartMigration(
+            migrationOpts, true /* waitForMigrationToComplete */, retryOnRetryableErrors);
     };
 
     /**
@@ -153,8 +155,7 @@ function TenantMigrationTest(
         readPreference = {mode: "primary"},
     },
                                            waitForMigrationToComplete,
-                                           retryOnRetryableErrors,
-                                           skipTenantDBHashCheck) {
+                                           retryOnRetryableErrors) {
         const cmdObj = {
             donorStartMigration: 1,
             tenantId,
@@ -200,7 +201,7 @@ function TenantMigrationTest(
 
         // If the migration has been successfully committed, check the db hashes for the tenantId
         // between the donor and recipient.
-        if (!skipTenantDBHashCheck && (stateRes.state === TenantMigrationTest.State.kCommitted)) {
+        if (stateRes.state === TenantMigrationTest.State.kCommitted) {
             this.checkTenantDBHashes(tenantId);
         }
 
@@ -240,6 +241,25 @@ function TenantMigrationTest(
                 throw e;
             }
         });
+
+        // If the command succeeded, we expect that the migration is marked garbage collectiable on
+        // the donor and the recipient. Check the state docs for expireAt.
+        if (res.ok) {
+            const recipientPrimary = this.getRecipientPrimary();
+
+            const donorStateDoc =
+                donorPrimary.getCollection(TenantMigrationTest.kConfigDonorsNS).findOne({
+                    _id: UUID(migrationIdString)
+                });
+            const recipientStateDoc =
+                recipientPrimary.getCollection(TenantMigrationTest.kConfigRecipientsNS).findOne({
+                    _id: UUID(migrationIdString)
+                });
+
+            assert(donorStateDoc.expireAt);
+            assert(recipientStateDoc.expireAt);
+        }
+
         return res;
     };
 
@@ -506,3 +526,4 @@ TenantMigrationTest.AccessState = {
 };
 
 TenantMigrationTest.kConfigDonorsNS = "config.tenantMigrationDonors";
+TenantMigrationTest.kConfigRecipientsNS = "config.tenantMigrationRecipients";

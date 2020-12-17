@@ -116,5 +116,6 @@ if (fp) {
 }
 
 assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
+assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
 tenantMigrationTest.stop();
 })();

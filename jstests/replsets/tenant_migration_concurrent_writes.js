@@ -17,9 +17,7 @@ load("jstests/libs/parallelTester.js");
 load("jstests/libs/uuid_util.js");
 load("jstests/replsets/libs/tenant_migration_test.js");
 
-// TODO SERVER-53107: Remove 'enableRecipientTesting: false'.
-const tenantMigrationTest =
-    new TenantMigrationTest({name: jsTestName(), enableRecipientTesting: false});
+const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 if (!tenantMigrationTest.isFeatureFlagEnabled()) {
     jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
     return;
@@ -251,13 +249,13 @@ function testWriteIsRejectedIfSentAfterMigrationHasCommitted(testCase, testOpts)
         tenantId,
     };
 
-    // TODO SERVER-53107: Investigate if we should not skip the DB hash check.
     const stateRes = assert.commandWorked(tenantMigrationTest.runMigration(
-        migrationOpts, false /* retryOnRetryableErrors */, true /* skipTenantDBHashCheck */));
+        migrationOpts, false /* retryOnRetryableErrors */, false /* automaticForgetMigration */));
     assert.eq(stateRes.state, TenantMigrationTest.State.kCommitted);
 
     runCommand(testOpts, ErrorCodes.TenantMigrationCommitted);
     testCase.assertCommandFailed(testOpts.primaryDB, testOpts.dbName, testOpts.collName);
+    assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
 }
 
 /**
@@ -271,9 +269,8 @@ function testWriteIsAcceptedIfSentAfterMigrationHasAborted(testCase, testOpts) {
     };
 
     let abortFp = configureFailPoint(testOpts.primaryDB, "abortTenantMigrationAfterBlockingStarts");
-    // TODO SERVER-53107: Investigate if we should not skip the DB hash check.
     const stateRes = assert.commandWorked(tenantMigrationTest.runMigration(
-        migrationOpts, false /* retryOnRetryableErrors */, true /* skipTenantDBHashCheck */));
+        migrationOpts, false /* retryOnRetryableErrors */, false /* automaticForgetMigration */));
     assert.eq(stateRes.state, TenantMigrationTest.State.kAborted);
     abortFp.off();
 
@@ -288,6 +285,7 @@ function testWriteIsAcceptedIfSentAfterMigrationHasAborted(testCase, testOpts) {
 
     runCommand(testOpts);
     testCase.assertCommandSucceeded(testOpts.primaryDB, testOpts.dbName, testOpts.collName);
+    assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
 }
 
 /**
@@ -312,12 +310,12 @@ function testWriteBlocksIfMigrationIsInBlocking(testCase, testOpts) {
 
     // Allow the migration to complete.
     blockingFp.off();
-    // TODO SERVER-53107: Investigate if we should not skip the DB hash check.
     const stateRes = assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(
-        migrationOpts, false /* retryOnRetryableErrors */, true /* skipTenantDBHashCheck */));
+        migrationOpts, false /* retryOnRetryableErrors */));
     assert.eq(stateRes.state, TenantMigrationTest.State.kCommitted);
 
     testCase.assertCommandFailed(testOpts.primaryDB, testOpts.dbName, testOpts.collName);
+    assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
 }
 
 /**
@@ -354,12 +352,12 @@ function testBlockedWriteGetsUnblockedAndRejectedIfMigrationCommits(testCase, te
 
     // Verify that the migration succeeded.
     resumeMigrationThread.join();
-    // TODO SERVER-53107: Investigate if we should not skip the DB hash check.
     const stateRes = assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(
-        migrationOpts, false /* retryOnRetryableErrors */, true /* skipTenantDBHashCheck */));
+        migrationOpts, false /* retryOnRetryableErrors */));
     assert.eq(stateRes.state, TenantMigrationTest.State.kCommitted);
 
     testCase.assertCommandFailed(testOpts.primaryDB, testOpts.dbName, testOpts.collName);
+    assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
 }
 
 /**
@@ -397,13 +395,13 @@ function testBlockedWriteGetsUnblockedAndRejectedIfMigrationAborts(testCase, tes
 
     // Verify that the migration aborted due to the simulated error.
     resumeMigrationThread.join();
-    // TODO SERVER-53107: Investigate if we should not skip the DB hash check.
     const stateRes = assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(
-        migrationOpts, false /* retryOnRetryableErrors */, true /* skipTenantDBHashCheck */));
+        migrationOpts, false /* retryOnRetryableErrors */));
     abortFp.off();
     assert.eq(stateRes.state, TenantMigrationTest.State.kAborted);
 
     testCase.assertCommandFailed(testOpts.primaryDB, testOpts.dbName, testOpts.collName);
+    assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
 }
 
 const isNotWriteCommand = "not a write command";

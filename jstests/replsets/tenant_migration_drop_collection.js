@@ -91,6 +91,7 @@ function runDropTest({failPointName, failPointData, expectedLog, createNew}) {
 
     jsTestLog("Waiting for migration to complete");
     assert.commandWorked(migrationThread.returnData());
+    assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
 
     const recipientColl = recipientPrimary.getDB(dbName).getCollection(collName);
 

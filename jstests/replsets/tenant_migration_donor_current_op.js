@@ -116,7 +116,8 @@ const kReadPreference = {
         readPreference: kReadPreference
     };
     configureFailPoint(donorPrimary, "abortTenantMigrationAfterBlockingStarts");
-    assert.commandWorked(tenantMigrationTest.runMigration(migrationOpts));
+    assert.commandWorked(tenantMigrationTest.runMigration(
+        migrationOpts, false /* retryOnRetryableErrors */, false /* automaticForgetMigration */));
 
     const res = assert.commandWorked(
         donorPrimary.adminCommand({currentOp: true, desc: "tenant donor migration"}));
@@ -150,7 +151,8 @@ const kReadPreference = {
         tenantId: kTenantId,
         readPreference: kReadPreference
     };
-    assert.commandWorked(tenantMigrationTest.runMigration(migrationOpts));
+    assert.commandWorked(tenantMigrationTest.runMigration(
+        migrationOpts, false /* retryOnRetryableErrors */, false /* automaticForgetMigration */));
 
     let res = donorPrimary.adminCommand({currentOp: true, desc: "tenant donor migration"});
     assert.eq(res.inprog.length, 1);

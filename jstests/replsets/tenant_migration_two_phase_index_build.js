@@ -79,6 +79,7 @@ assert.soon(() => {
 });
 hangIndexBuildFp.off();
 assert.commandWorked(migrationThread.returnData());
+assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
 
 // Verify that the index build failed and cleaned up correctly.
 indexBuildThread.join();

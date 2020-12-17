@@ -46,9 +46,7 @@ const donorRst = new ReplSetTest({nodes: 1, name: 'donorRst'});
 donorRst.startSet();
 donorRst.initiate();
 
-// TODO SERVER-53107: Remove 'enableRecipientTesting: false'.
-const tenantMigrationTest0 =
-    new TenantMigrationTest({name: jsTestName(), enableRecipientTesting: false, donorRst});
+const tenantMigrationTest0 = new TenantMigrationTest({name: jsTestName(), donorRst});
 if (!tenantMigrationTest0.isFeatureFlagEnabled()) {
     jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
     donorRst.stopSet();
@@ -96,6 +94,8 @@ let numRecipientSyncDataCmdSent = 0;
     // received four recipientSyncData commands instead of two.
     numRecipientSyncDataCmdSent += 2;
     checkNumRecipientSyncDataCmdExecuted(recipientPrimary, numRecipientSyncDataCmdSent);
+
+    assert.commandWorked(tenantMigrationTest0.forgetMigration(migrationOpts.migrationIdString));
 })();
 
 /**
@@ -105,7 +105,8 @@ let numRecipientSyncDataCmdSent = 0;
  */
 function testStartingConflictingMigrationAfterInitialMigrationCommitted(
     tenantMigrationTest0, migrationOpts0, tenantMigrationTest1, migrationOpts1) {
-    tenantMigrationTest0.runMigration(migrationOpts0);
+    tenantMigrationTest0.runMigration(
+        migrationOpts0, false /* retryOnRetryableErrors */, false /* automaticForgetMigration */);
     assert.commandFailedWithCode(tenantMigrationTest1.runMigration(migrationOpts1),
                                  ErrorCodes.ConflictingOperationInProgress);
 
@@ -127,6 +128,7 @@ function testStartingConflictingMigrationAfterInitialMigrationCommitted(
                          tenantId: migrationOpts1.tenantId
                      }).length);
     }
+    assert.commandWorked(tenantMigrationTest0.forgetMigration(migrationOpts0.migrationIdString));
 }
 
 /**
@@ -161,6 +163,9 @@ function testConcurrentConflictingMigrations(
                              tenantId: migrationOpts1.tenantId
                          }).length);
         }
+        assert.commandWorked(tenantMigrationTest0.waitForMigrationToComplete(migrationOpts0));
+        assert.commandWorked(
+            tenantMigrationTest0.forgetMigration(migrationOpts0.migrationIdString));
     } else {
         assert.commandFailedWithCode(res0, ErrorCodes.ConflictingOperationInProgress);
         assert.eq(1, configDonorsColl.count({_id: UUID(migrationOpts1.migrationIdString)}));
@@ -178,6 +183,9 @@ function testConcurrentConflictingMigrations(
                              tenantId: migrationOpts0.tenantId
                          }).length);
         }
+        assert.commandWorked(tenantMigrationTest1.waitForMigrationToComplete(migrationOpts1));
+        assert.commandWorked(
+            tenantMigrationTest1.forgetMigration(migrationOpts1.migrationIdString));
     }
 }
 
@@ -217,9 +225,7 @@ function testConcurrentConflictingMigrations(
 
 // Test different recipient connection strings.
 (() => {
-    // TODO SERVER-53107: Remove 'enableRecipientTesting: false'.
-    const tenantMigrationTest1 = new TenantMigrationTest(
-        {name: `${jsTestName()}1`, enableRecipientTesting: false, donorRst});
+    const tenantMigrationTest1 = new TenantMigrationTest({name: `${jsTestName()}1`, donorRst});
 
     let makeTestParams = () => {
         const migrationOpts0 = {

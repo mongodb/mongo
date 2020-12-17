@@ -89,5 +89,7 @@ assert.commandWorked(migrationThread.returnData());
 // blockingTimestamp .
 txnThread.join();
 
+assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
+
 tenantMigrationTest.stop();
 })();

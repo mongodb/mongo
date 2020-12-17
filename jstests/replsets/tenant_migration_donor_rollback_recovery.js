@@ -138,6 +138,7 @@ function testRollbackInitialState() {
                                                        migrationId,
                                                        migrationOpts.tenantId,
                                                        TenantMigrationTest.State.kCommitted);
+        assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
     };
 
     testRollBack(setUpFunc, rollbackOpsFunc, steadyStateFunc);
@@ -190,6 +191,7 @@ function testRollBackStateTransition(pauseFailPoint, setUpFailPoints, nextState)
                                                      migrationId,
                                                      migrationOpts.tenantId,
                                                      TenantMigrationTest.State.kCommitted);
+        assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
     };
 
     testRollBack(setUpFunc, rollbackOpsFunc, steadyStateFunc);
@@ -232,6 +234,13 @@ function testRollBackMarkingStateGarbageCollectable() {
     let steadyStateFunc = (tenantMigrationTest, donorPrimary, donorSecondary) => {
         // Verify that the migration state got garbage collected successfully despite the rollback.
         assert.commandWorked(forgetMigrationThread.returnData());
+        // Check that the recipient state doc is correctly marked as garbage collectable.
+        const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
+        const recipientStateDoc =
+            recipientPrimary.getCollection(TenantMigrationTest.kConfigRecipientsNS).findOne({
+                _id: migrationId
+            });
+        assert(recipientStateDoc.expireAt);
         tenantMigrationTest.waitForMigrationGarbageCollection(
             [donorPrimary, donorSecondary], migrationId, migrationOpts.tenantId);
     };
@@ -280,6 +289,8 @@ function testRollBackRandom() {
                                                          migrationId,
                                                          migrationOpts.tenantId,
                                                          TenantMigrationTest.State.kCommitted);
+            assert.commandWorked(
+                tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
         }
     };
 

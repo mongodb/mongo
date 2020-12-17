@@ -154,7 +154,8 @@ let configDonorsColl = donorPrimary.getCollection(TenantMigrationTest.kConfigDon
     };
 
     let abortFp = configureFailPoint(donorPrimary, "abortTenantMigrationAfterBlockingStarts");
-    const stateRes = assert.commandWorked(tenantMigrationTest.runMigration(migrationOpts));
+    const stateRes = assert.commandWorked(tenantMigrationTest.runMigration(
+        migrationOpts, false /* retryOnRetryableErrors */, false /* automaticForgetMigration */));
     assert.eq(stateRes.state, TenantMigrationTest.State.kAborted);
     abortFp.off();
 
@@ -198,7 +199,8 @@ configDonorsColl.dropIndex({expireAt: 1});
         donorPrimary.adminCommand({donorForgetMigration: 1, migrationId: migrationId}),
         ErrorCodes.NoSuchTenantMigration);
 
-    const stateRes = assert.commandWorked(tenantMigrationTest.runMigration(migrationOpts));
+    const stateRes = assert.commandWorked(tenantMigrationTest.runMigration(
+        migrationOpts, false /* retryOnRetryableErrors */, false /* automaticForgetMigration */));
     assert.eq(stateRes.state, TenantMigrationTest.State.kCommitted);
     assert.commandWorked(
         donorPrimary.adminCommand({donorForgetMigration: 1, migrationId: migrationId}));

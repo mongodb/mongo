@@ -16,9 +16,7 @@ load("jstests/libs/parallelTester.js");
 load("jstests/libs/uuid_util.js");
 load("jstests/replsets/libs/tenant_migration_test.js");
 
-// TODO SERVER-53107: Remove 'enableRecipientTesting: false'.
-const tenantMigrationTest =
-    new TenantMigrationTest({name: jsTestName(), enableRecipientTesting: false});
+const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 if (!tenantMigrationTest.isFeatureFlagEnabled()) {
     jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
     return;
@@ -85,7 +83,8 @@ function testReadIsRejectedIfSentAfterMigrationHasCommitted(testCase, dbName, co
     const donorRst = tenantMigrationTest.getDonorRst();
     const donorPrimary = donorRst.getPrimary();
 
-    const stateRes = assert.commandWorked(tenantMigrationTest.runMigration(migrationOpts));
+    const stateRes = assert.commandWorked(tenantMigrationTest.runMigration(
+        migrationOpts, false /* retryOnRetryableErrors */, false /* automaticForgetMigration */));
     assert.eq(stateRes.state, TenantMigrationTest.State.kCommitted);
 
     // Wait for the last oplog entry on the primary to be visible in the committed snapshot view of
@@ -116,6 +115,7 @@ function testReadIsRejectedIfSentAfterMigrationHasCommitted(testCase, dbName, co
                        testCase.isTransaction);
         }
     });
+    assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
 }
 
 /**
@@ -132,7 +132,8 @@ function testReadIsAcceptedIfSentAfterMigrationHasAborted(testCase, dbName, coll
     const donorPrimary = donorRst.getPrimary();
 
     let abortFp = configureFailPoint(donorPrimary, "abortTenantMigrationAfterBlockingStarts");
-    const stateRes = assert.commandWorked(tenantMigrationTest.runMigration(migrationOpts));
+    const stateRes = assert.commandWorked(tenantMigrationTest.runMigration(
+        migrationOpts, false /* retryOnRetryableErrors */, false /* automaticForgetMigration */));
     assert.eq(stateRes.state, TenantMigrationTest.State.kAborted);
     abortFp.off();
 
@@ -161,6 +162,7 @@ function testReadIsAcceptedIfSentAfterMigrationHasAborted(testCase, dbName, coll
             runCommand(db, testCase.command(collName), null, testCase.isTransaction);
         }
     });
+    assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
 }
 
 /**
@@ -209,6 +211,7 @@ function testReadBlocksIfMigrationIsInBlocking(testCase, dbName, collName) {
     const stateRes =
         assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
     assert.eq(stateRes.state, TenantMigrationTest.State.kCommitted);
+    assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
 }
 
 /**
@@ -271,6 +274,7 @@ function testBlockedReadGetsUnblockedAndRejectedIfMigrationCommits(testCase, dbN
     const stateRes =
         assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
     assert.eq(stateRes.state, TenantMigrationTest.State.kCommitted);
+    assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
 }
 
 /**
@@ -335,6 +339,7 @@ function testBlockedReadGetsUnblockedAndSucceedsIfMigrationAborts(testCase, dbNa
     const stateRes =
         assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
     assert.eq(stateRes.state, TenantMigrationTest.State.kAborted);
+    assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
 }
 
 const testCases = {

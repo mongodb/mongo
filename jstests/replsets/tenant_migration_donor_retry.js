@@ -34,10 +34,9 @@ const donorRst = new ReplSetTest({
 donorRst.startSet();
 donorRst.initiate();
 
-// TODO SERVER-53107: Remove 'enableRecipientTesting: false'.
-const tenantMigrationTest = new TenantMigrationTest(
-    {name: jsTestName(), enableRecipientTesting: false, donorRst: donorRst});
+const tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), donorRst: donorRst});
 const donorPrimary = tenantMigrationTest.getDonorPrimary();
+const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
 
 if (!tenantMigrationTest.isFeatureFlagEnabled()) {
     jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
@@ -85,6 +84,7 @@ function testDonorRetryRecipientSyncDataCmdOnError(errorCode, failMode) {
     const stateRes =
         assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
     assert.eq(stateRes.state, TenantMigrationTest.State.kCommitted);
+    assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
 
     return migrationId;
 }
@@ -225,6 +225,7 @@ const kWriteErrorTimeMS = 50;
     const configDonorsColl = donorPrimary.getCollection(TenantMigrationTest.kConfigDonorsNS);
     const donorStateDoc = configDonorsColl.findOne({_id: migrationId});
     assert.eq(TenantMigrationTest.State.kCommitted, donorStateDoc.state);
+    assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
 })();
 
 (() => {
@@ -265,10 +266,17 @@ const kWriteErrorTimeMS = 50;
     fp.off();
     migrationThread.join();
 
-    const configDonorsColl = donorPrimary.getCollection(TenantMigrationTest.kConfigDonorsNS);
-    const donorStateDoc = configDonorsColl.findOne({_id: migrationId});
+    const donorStateDoc =
+        donorPrimary.getCollection(TenantMigrationTest.kConfigDonorsNS).findOne({_id: migrationId});
     assert.eq(donorStateDoc.state, TenantMigrationTest.State.kCommitted);
     assert(donorStateDoc.expireAt);
+
+    // Check that the recipient state doc is also correctly marked as garbage collectable.
+    const recipientStateDoc =
+        recipientPrimary.getCollection(TenantMigrationTest.kConfigRecipientsNS).findOne({
+            _id: migrationId
+        });
+    assert(recipientStateDoc.expireAt);
 })();
 
 donorRst.stopSet();

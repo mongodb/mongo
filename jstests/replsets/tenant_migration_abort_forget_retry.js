@@ -32,7 +32,9 @@ jsTestLog("Starting a migration that is expected to abort. migrationId: " + migr
           ", tenantId: " + tenantId);
 const abortFp = configureFailPoint(donorPrimary, "abortTenantMigrationAfterBlockingStarts");
 const abortRes = assert.commandWorked(
-    tenantMigrationTest.runMigration({migrationIdString: migrationId1, tenantId}));
+    tenantMigrationTest.runMigration({migrationIdString: migrationId1, tenantId},
+                                     false /* retryOnRetryableErrors */,
+                                     false /* automaticForgetMigration */));
 assert.eq(abortRes.state, TenantMigrationTest.State.kAborted);
 abortFp.off();
 
