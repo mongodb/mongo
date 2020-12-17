@@ -128,6 +128,7 @@ public:
     }
 
     virtual void run() {
+        LOG(1) << "OplogTruncaterThread started";
         ThreadClient tc(_name, getGlobalServiceContext());
 
         while (!globalInShutdownDeprecated()) {
@@ -147,9 +148,16 @@ bool initRsOplogBackgroundThread(StringData ns) {
         return false;
     }
 
-    if (storageGlobalParams.repair || storageGlobalParams.readOnly) {
+    // When starting up with recoverFromOplogAsStandalone=true, the readOnly flag is initially set
+    // to false to allow oplog recovery to run and perform its necessary writes. After recovery is
+    // complete, the readOnly flag gets flipped to true. Because of this subtlety, we avoid
+    // calculating the oplog stones when recoverFromOplogAsStandalone=true as the RecordStore
+    // construction for the oplog happens before the readOnly flag gets flipped to true.
+    if (storageGlobalParams.repair || storageGlobalParams.readOnly ||
+        repl::ReplSettings::shouldRecoverFromOplogAsStandalone()) {
         LOG(1) << "not starting OplogTruncaterThread for " << ns
-               << " because we are either in repair or read-only mode";
+               << " because we are either in repair mode, read-only mode or recovering from the"
+               << " oplog in standalone mode";
         return false;
     }
 
