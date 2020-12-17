@@ -84,13 +84,15 @@ public:
              const std::string& db,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-        auto refreshSessionsRequest = RefreshSessionsCmdFromClient::parse(
-            IDLParserErrorContext("RefreshSessionsCmdFromClient"), cmdObj);
+        auto refreshSessionsRequest = RefreshSessionsFromClient::parse(
+            IDLParserErrorContext("refreshSessions",
+                                  APIParameters::get(opCtx).getAPIStrict().value_or(false)),
+            cmdObj);
 
         const auto lsCache = LogicalSessionCache::get(opCtx);
 
         for (const auto& lsid :
-             makeLogicalSessionIds(refreshSessionsRequest.getSessions(), opCtx)) {
+             makeLogicalSessionIds(refreshSessionsRequest.getCommandParameter(), opCtx)) {
             uassertStatusOK(lsCache->vivify(opCtx, lsid));
         }
 

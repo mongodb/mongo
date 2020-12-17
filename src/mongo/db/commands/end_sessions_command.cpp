@@ -87,11 +87,13 @@ public:
              const std::string& db,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-        auto endSessionsRequest = EndSessionsCmdFromClient::parse(
-            IDLParserErrorContext("EndSessionsCmdFromClient"), cmdObj);
+        auto endSessionsRequest = EndSessionsFromClient::parse(
+            IDLParserErrorContext("endSessions",
+                                  APIParameters::get(opCtx).getAPIStrict().value_or(false)),
+            cmdObj);
 
         LogicalSessionCache::get(opCtx)->endSessions(
-            makeLogicalSessionIds(endSessionsRequest.getSessions(), opCtx));
+            makeLogicalSessionIds(endSessionsRequest.getCommandParameter(), opCtx));
 
         return true;
     }
