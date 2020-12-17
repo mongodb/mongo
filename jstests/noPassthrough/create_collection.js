@@ -10,6 +10,9 @@
 
 load("jstests/libs/get_index_helpers.js");
 
+const conn = MongoRunner.runMongod();
+const db = conn.getDB("test");
+
 // "create" command rejects invalid options.
 db.create_collection.drop();
 assert.commandFailedWithCode(db.createCollection("create_collection", {unknown: 1}), 40415);
@@ -168,4 +171,6 @@ assert.commandFailedWithCode(db.createCollection('size_no_capped', {size: 256}),
                              ErrorCodes.InvalidOptions);
 assert.commandFailedWithCode(db.createCollection('size_capped_false', {capped: false, size: 256}),
                              ErrorCodes.InvalidOptions);
+
+MongoRunner.stopMongod(conn);
 })();
