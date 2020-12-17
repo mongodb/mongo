@@ -841,7 +841,6 @@ void TenantMigrationRecipientService::Instance::_cancelRemainingWork(WithLock lk
 
     // Interrupts running oplog applier.
     shutdownTarget(lk, _tenantOplogApplier);
-    shutdownTarget(lk, _writerPool);
 }
 
 void TenantMigrationRecipientService::Instance::_interrupt(Status status,
@@ -933,6 +932,8 @@ void TenantMigrationRecipientService::Instance::_cleanupOnDataSyncCompletion(Sta
         setPromiseErrorifNotReady(lk, _dataSyncStartedPromise, status);
         setPromiseErrorifNotReady(lk, _dataConsistentPromise, status);
         setPromiseErrorifNotReady(lk, _dataSyncCompletionPromise, status);
+
+        shutdownTarget(lk, _writerPool);
 
         // Save them to join() with it outside of _mutex.
         using std::swap;
