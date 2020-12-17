@@ -125,7 +125,7 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
 
         for i in range(self.num_nodes):
             steady_state_constraint_param = "oplogApplicationEnforcesSteadyStateConstraints"
-            # TODO (SERVER-47813): Set steady state constraint parameters on last-lts nodes.
+            # TODO (SERVER-52985): Set steady state constraint parameters on last-lts nodes.
             if (steady_state_constraint_param not in self.nodes[i].mongod_options["set_parameters"]
                     and self.mixed_bin_versions is not None
                     and self.mixed_bin_versions[i] == "new"):
