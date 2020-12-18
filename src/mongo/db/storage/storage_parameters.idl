@@ -83,7 +83,8 @@ feature_flags:
     featureFlagLockFreeReads:
         description: "Support for lock-free reads."
         cpp_varname: feature_flags::gLockFreeReads
-        default: false
+        version: 4.9
+        default: true
     featureFlagTimeseriesCollection:
         description: "When enabled, support for time-series collections"
         cpp_varname: feature_flags::gTimeseriesCollection
