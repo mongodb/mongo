@@ -62,6 +62,15 @@ const dbName = 'TestDB';
     assert.soon(() => {
         const removeRes =
             assert.commandWorked(st.s0.adminCommand({removeShard: st.shard0.shardName}));
+        if (!removeRes.ok && removeRes.code === ErrorCodes.ShardNotFound) {
+            // If the config server primary steps down right after removing the config.shards doc
+            // for the shard but before responding with "state": "completed", the mongos would retry
+            // the _configsvrRemoveShard command against the new config server primary, which would
+            // not find the removed shard in its ShardRegistry if it has done a ShardRegistry reload
+            // after the config.shards doc for the shard was removed. This would cause the command
+            // to fail with ShardNotFound.
+            return true;
+        }
         return removeRes.state === 'completed';
     });
 
@@ -127,6 +136,14 @@ const dbName = 'TestDB';
     assert.soon(() => {
         const removeRes =
             assert.commandWorked(st.s0.adminCommand({removeShard: st.shard0.shardName}));
+        if (!removeRes.code && removeRes.code === ErrorCodes.ShardNotFound) {
+            // If the config server primary steps down after removing the config.shards doc for the
+            // shard being removed but before completing the _configsvrRemoveShard command, the
+            // mongos would retry the command on the new config server primary which would not find
+            // the removed shard in its ShardRegistry causing the command to fail with
+            // ShardNotFound.
+            return true;
+        }
         return removeRes.state === 'completed';
     });
 
