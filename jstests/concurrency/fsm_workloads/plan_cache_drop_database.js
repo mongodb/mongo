@@ -32,8 +32,7 @@ var $config = (function() {
                 ErrorCodes.NoMatchingDocument,
             ]);
         } catch (ex) {
-            assert.eq(true, ex instanceof BulkWriteError, tojson(ex));
-            assert.writeErrorWithCode(ex, ErrorCodes.DatabaseDropPending, tojson(ex));
+            assert.commandFailedWithCode(ex, ErrorCodes.DatabaseDropPending, tojson(ex));
         }
     }
 
