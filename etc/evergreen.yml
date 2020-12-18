@@ -10852,7 +10852,7 @@ buildvariants:
     compile_flags: --ssl MONGO_DISTMOD=rhel82 -j$(grep -c ^processor /proc/cpuinfo) CCFLAGS="-march=armv8-a+crc -mtune=generic" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     has_packages: true
     packager_script: packager_enterprise.py
-    packager_arch: arm64
+    packager_arch: aarch64
     packager_distro: rhel82
     repo_edition: enterprise
     scons_cache_scope: shared
@@ -11220,7 +11220,7 @@ buildvariants:
     compile_flags: --ssl MONGO_DISTMOD=rhel82 -j$(grep -c ^processor /proc/cpuinfo) CCFLAGS="-march=armv8-a+crc -mtune=generic" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     has_packages: true
     packager_script: packager.py
-    packager_arch: arm64
+    packager_arch: aarch64
     packager_distro: rhel82
     repo_edition: org
     scons_cache_scope: shared
