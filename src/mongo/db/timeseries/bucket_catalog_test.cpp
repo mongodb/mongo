@@ -201,5 +201,43 @@ TEST_F(BucketCatalogWithoutMetadataTest, GetMetadataReturnsEmptyDoc) {
 
     _commit(result.bucketId, 0);
 }
+
+TEST_F(BucketCatalogWithoutMetadataTest, CommitReturnsNewFields) {
+    // Creating a new bucket should return all fields from the initial measurement.
+    auto [bucketId, _] =
+        _bucketCatalog->insert(_opCtx, _ns1, BSON(_timeField << Date_t::now() << "a" << 0));
+    auto data = _bucketCatalog->commit(bucketId);
+    ASSERT_EQ(2U, data.newFieldNamesToBeInserted.size()) << data.toBSON();
+    ASSERT(data.newFieldNamesToBeInserted.count(_timeField)) << data.toBSON();
+    ASSERT(data.newFieldNamesToBeInserted.count("a")) << data.toBSON();
+
+    // Inserting a new measurement with the same fields should return an empty set of new fields.
+    _bucketCatalog->insert(_opCtx, _ns1, BSON(_timeField << Date_t::now() << "a" << 1));
+    data = _bucketCatalog->commit(bucketId, _commitInfo);
+    ASSERT_EQ(0U, data.newFieldNamesToBeInserted.size()) << data.toBSON();
+
+    // Insert a new measurement with the a new field.
+    _bucketCatalog->insert(_opCtx, _ns1, BSON(_timeField << Date_t::now() << "a" << 2 << "b" << 2));
+    data = _bucketCatalog->commit(bucketId, _commitInfo);
+    ASSERT_EQ(1U, data.newFieldNamesToBeInserted.size()) << data.toBSON();
+    ASSERT(data.newFieldNamesToBeInserted.count("b")) << data.toBSON();
+
+    // Fill up the bucket.
+    for (auto i = 3; i < BucketCatalog::kTimeseriesBucketMaxCount; ++i) {
+        _bucketCatalog->insert(_opCtx, _ns1, BSON(_timeField << Date_t::now() << "a" << i));
+        data = _bucketCatalog->commit(bucketId, _commitInfo);
+        ASSERT_EQ(0U, data.newFieldNamesToBeInserted.size()) << i << ":" << data.toBSON();
+    }
+
+    // When a bucket overflows, committing to the new overflow bucket should return the fields of
+    // the first measurement as new fields.
+    auto [overflowBucketId, unusedCommitInfo] = _bucketCatalog->insert(
+        _opCtx,
+        _ns1,
+        BSON(_timeField << Date_t::now() << "a" << BucketCatalog::kTimeseriesBucketMaxCount));
+    ASSERT_NE(bucketId, overflowBucketId);
+    data = _bucketCatalog->commit(overflowBucketId);
+    ASSERT_EQ(0U, data.newFieldNamesToBeInserted.size()) << data.toBSON();
+}
 }  // namespace
 }  // namespace mongo

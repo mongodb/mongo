@@ -38,6 +38,11 @@
 namespace mongo {
 class BucketCatalog {
 public:
+    // This set of constants define limits on the measurements held in a bucket.
+    static constexpr int kTimeseriesBucketMaxCount = 1000;
+    static constexpr int kTimeseriesBucketMaxSizeBytes = 125 * 1024;  // 125 KB
+    static constexpr auto kTimeseriesBucketMaxTimeRange = Hours(1);
+
     struct CommitInfo {
         StatusWith<SingleWriteResult> result;
         boost::optional<repl::OpTime> opTime;
@@ -54,6 +59,9 @@ public:
         BSONObj bucketMin;
         BSONObj bucketMax;
         uint16_t numCommittedMeasurements;
+        StringSet newFieldNamesToBeInserted;
+
+        BSONObj toBSON() const;
     };
 
     static BucketCatalog& get(ServiceContext* svcCtx);

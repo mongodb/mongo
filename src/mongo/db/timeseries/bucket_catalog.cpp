@@ -39,10 +39,6 @@ namespace mongo {
 namespace {
 const auto getBucketCatalog = ServiceContext::declareDecoration<BucketCatalog>();
 
-const int kTimeseriesBucketMaxCount = 1000;
-const int kTimeseriesBucketMaxSizeBytes = 125 * 1024;  // 125 KB
-const Hours kTimeseriesBucketMaxTimeRange(1);
-
 BSONObj updateMinOrMax(const BSONObj& doc,
                        BSONObj&& minOrMax,
                        boost::optional<StringData> metaField,
@@ -107,6 +103,14 @@ BSONObj updateMinOrMax(const BSONObj& doc,
     return std::move(minOrMax);
 }
 }  // namespace
+
+BSONObj BucketCatalog::CommitData::toBSON() const {
+    return BSON("docs" << docs << "bucketMin" << bucketMin << "bucketMax" << bucketMax
+                       << "numCommittedMeasurements" << int(numCommittedMeasurements)
+                       << "newFieldNamesToBeInserted"
+                       << std::set<std::string>(newFieldNamesToBeInserted.begin(),
+                                                newFieldNamesToBeInserted.end()));
+}
 
 BucketCatalog& BucketCatalog::get(ServiceContext* svcCtx) {
     return getBucketCatalog(svcCtx);
@@ -234,6 +238,7 @@ BucketCatalog::CommitData BucketCatalog::commit(const OID& bucketId,
     invariant(!previousCommitInfo || bucket.numCommittedMeasurements != 0 ||
               bucket.numPendingCommitMeasurements != 0);
 
+    auto newFieldNamesToBeInserted = bucket.newFieldNamesToBeInserted;
     bucket.fieldNames.merge(bucket.newFieldNamesToBeInserted);
     bucket.newFieldNamesToBeInserted.clear();
 
@@ -254,8 +259,11 @@ BucketCatalog::CommitData BucketCatalog::commit(const OID& bucketId,
         std::exchange(bucket.numPendingCommitMeasurements, measurements.size());
 
     auto allCommitted = measurements.empty();
-    CommitData data = {
-        std::move(measurements), bucket.min, bucket.max, bucket.numCommittedMeasurements};
+    CommitData data = {std::move(measurements),
+                       bucket.min,
+                       bucket.max,
+                       bucket.numCommittedMeasurements,
+                       std::move(newFieldNamesToBeInserted)};
 
     if (allCommitted) {
         if (bucket.full) {
