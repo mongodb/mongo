@@ -167,6 +167,16 @@ private:
         // Whether the bucket is full. This can be due to number of measurements, size, or time
         // range.
         bool full = false;
+
+        /**
+         * Determines the effect of adding 'doc' to this bucket If adding 'doc' causes this bucket
+         * to overflow, we will create a new bucket and recalculate the change to the bucket size
+         * and data fields.
+         */
+        void calculateBucketFieldsAndSizeChange(const BSONObj& doc,
+                                                boost::optional<StringData> metaField,
+                                                StringSet* newFieldNamesToBeInserted,
+                                                uint32_t* sizeToBeAdded) const;
     };
 
     mutable Mutex _mutex = MONGO_MAKE_LATCH("BucketCatalog");

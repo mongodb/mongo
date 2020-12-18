@@ -237,7 +237,9 @@ TEST_F(BucketCatalogWithoutMetadataTest, CommitReturnsNewFields) {
         BSON(_timeField << Date_t::now() << "a" << BucketCatalog::kTimeseriesBucketMaxCount));
     ASSERT_NE(bucketId, overflowBucketId);
     data = _bucketCatalog->commit(overflowBucketId);
-    ASSERT_EQ(0U, data.newFieldNamesToBeInserted.size()) << data.toBSON();
+    ASSERT_EQ(2U, data.newFieldNamesToBeInserted.size()) << data.toBSON();
+    ASSERT(data.newFieldNamesToBeInserted.count(_timeField)) << data.toBSON();
+    ASSERT(data.newFieldNamesToBeInserted.count("a")) << data.toBSON();
 }
 }  // namespace
 }  // namespace mongo

@@ -168,24 +168,8 @@ BucketCatalog::InsertResult BucketCatalog::insert(OperationContext* opCtx,
 
     StringSet newFieldNamesToBeInserted;
     uint32_t sizeToBeAdded = 0;
-    for (const auto& elem : doc) {
-        if (elem.fieldNameStringData() == options.getMetaField()) {
-            // Ignore the metadata field since it will not be inserted.
-            continue;
-        }
-
-        // If the field name is new, add the size of an empty object with that field name.
-        if (!bucket->fieldNames.contains(elem.fieldName())) {
-            newFieldNamesToBeInserted.insert(elem.fieldName());
-            sizeToBeAdded += BSON(elem.fieldName() << BSONObj()).objsize();
-        }
-
-        // Add the element size, taking into account that the name will be changed to its positional
-        // number. Add 1 to the calculation since the element's field name size accounts for a null
-        // terminator whereas the stringified position does not.
-        sizeToBeAdded +=
-            elem.size() - elem.fieldNameSize() + std::to_string(bucket->numMeasurements).size() + 1;
-    }
+    bucket->calculateBucketFieldsAndSizeChange(
+        doc, options.getMetaField(), &newFieldNamesToBeInserted, &sizeToBeAdded);
 
     auto bucketTime = it->second.asDateT();
     if (bucket->numMeasurements == kTimeseriesBucketMaxCount ||
@@ -197,6 +181,8 @@ BucketCatalog::InsertResult BucketCatalog::insert(OperationContext* opCtx,
         setBucketTime(&it->second);
         _orderedBuckets.insert({ns, it->first.second, it->second});
         bucket = &_buckets[it->second];
+        bucket->calculateBucketFieldsAndSizeChange(
+            doc, options.getMetaField(), &newFieldNamesToBeInserted, &sizeToBeAdded);
     }
 
     bucket->numWriters++;
@@ -310,5 +296,32 @@ bool BucketCatalog::BucketMetadata::operator<(const BucketMetadata& other) const
 
 bool BucketCatalog::BucketMetadata::operator==(const BucketMetadata& other) const {
     return UnorderedFieldsBSONObjComparator().compare(metadata, other.metadata) == 0;
+}
+
+void BucketCatalog::Bucket::calculateBucketFieldsAndSizeChange(
+    const BSONObj& doc,
+    boost::optional<StringData> metaField,
+    StringSet* newFieldNamesToBeInserted,
+    uint32_t* sizeToBeAdded) const {
+    newFieldNamesToBeInserted->clear();
+    *sizeToBeAdded = 0;
+    auto numMeasurementsFieldLength = std::to_string(numMeasurements).size();
+    for (const auto& elem : doc) {
+        if (elem.fieldNameStringData() == metaField) {
+            // Ignore the metadata field since it will not be inserted.
+            continue;
+        }
+
+        // If the field name is new, add the size of an empty object with that field name.
+        if (!fieldNames.contains(elem.fieldName())) {
+            newFieldNamesToBeInserted->insert(elem.fieldName());
+            *sizeToBeAdded += BSON(elem.fieldName() << BSONObj()).objsize();
+        }
+
+        // Add the element size, taking into account that the name will be changed to its
+        // positional number. Add 1 to the calculation since the element's field name size
+        // accounts for a null terminator whereas the stringified position does not.
+        *sizeToBeAdded += elem.size() - elem.fieldNameSize() + numMeasurementsFieldLength + 1;
+    }
 }
 }  // namespace mongo
