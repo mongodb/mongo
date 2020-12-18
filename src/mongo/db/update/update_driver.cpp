@@ -144,9 +144,6 @@ void UpdateDriver::parse(
                 "arrayFilters may not be specified for delta-syle updates",
                 arrayFilters.empty());
 
-        // Delta updates should only be applied as part of oplog application.
-        invariant(_fromOplogApplication);
-
         _updateType = UpdateType::kDelta;
         _updateExecutor = std::make_unique<DeltaExecutor>(updateMod.getDiff());
         return;

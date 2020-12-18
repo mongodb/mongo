@@ -326,10 +326,7 @@ void write_ops::UpdateModification::serializeToBSON(StringData fieldName,
                 }
                 arrayBuilder.doneFast();
             },
-            [](const doc_diff::Diff& diff) {
-                // We never serialize delta style updates.
-                MONGO_UNREACHABLE;
-            }},
+            [fieldName, bob](const doc_diff::Diff& diff) { *bob << fieldName << diff; }},
         _update);
 }
 
