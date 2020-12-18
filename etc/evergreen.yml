@@ -11053,7 +11053,7 @@ buildvariants:
   - rhel62-small
   expansions: &enterprise-rhel-62-64-bit-lock-free-reads-expansions
     test_flags: >-
-      --mongodSetParameters="{disableLockFreeReads: false}" --excludeWithAnyTags=incompatible_with_lockfreereads
+      --mongodSetParameters="{featureFlagLockFreeReads: true}" --excludeWithAnyTags=incompatible_with_lockfreereads
     compile_flags: >-
       -j$(grep -c ^processor /proc/cpuinfo)
       --ssl

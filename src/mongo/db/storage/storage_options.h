@@ -122,7 +122,7 @@ struct StorageGlobalParams {
     // Disables lock-free reads, adjustable via setParameter. Can be disabled by certain user
     // settings with which lock-free reads are incompatible: standalone mode; and
     // enableMajorityReadConcern=false.
-    bool disableLockFreeReads;
+    bool disableLockFreeReads = true;
 
     // Delay in seconds between triggering the next checkpoint after the completion of the previous
     // one. A value of 0 indicates that checkpointing will be skipped.

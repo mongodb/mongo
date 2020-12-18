@@ -78,13 +78,12 @@ server_parameters:
         default: 2048
         validator:
             gte: 1
-    disableLockFreeReads:
-        description: "Disables the lock-free reads feature."
-        set_at: [ startup ]
-        cpp_varname: 'storageGlobalParams.disableLockFreeReads'
-        default: true
 
 feature_flags:
+    featureFlagLockFreeReads:
+        description: "Support for lock-free reads."
+        cpp_varname: feature_flags::gLockFreeReads
+        default: false
     featureFlagTimeseriesCollection:
         description: "When enabled, support for time-series collections"
         cpp_varname: feature_flags::gTimeseriesCollection

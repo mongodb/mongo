@@ -54,6 +54,7 @@
 #include "mongo/db/server_options_base.h"
 #include "mongo/db/server_options_nongeneral_gen.h"
 #include "mongo/db/server_options_server_helpers.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_domain_global.h"
 #include "mongo/logv2/log_manager.h"
@@ -480,6 +481,11 @@ Status storeMongodOptions(const moe::Environment& params) {
     if (params.count("notablescan")) {
         storageGlobalParams.noTableScan.store(params["notablescan"].as<bool>());
     }
+
+    // Initialize lock-free reads support from feature flag. This may be adjusted later based on
+    // replica set config.
+    storageGlobalParams.disableLockFreeReads =
+        !feature_flags::gLockFreeReads.isEnabledAndIgnoreFCV();
 
     repl::ReplSettings replSettings;
     if (params.count("replication.replSet")) {
