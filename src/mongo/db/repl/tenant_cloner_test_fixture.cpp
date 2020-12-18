@@ -64,5 +64,13 @@ Status TenantClonerTestFixture::createCollection(const NamespaceString& nss,
     return storage->createCollection(opCtx.get(), nss, options);
 }
 
+Status TenantClonerTestFixture::createIndexesOnEmptyCollection(
+    const NamespaceString& nss, const std::vector<BSONObj>& secondaryIndexSpecs) {
+    auto storage = StorageInterface::get(serviceContext);
+    auto opCtx = cc().makeOperationContext();
+    repl::createOplog(opCtx.get());
+    return storage->createIndexesOnEmptyCollection(opCtx.get(), nss, secondaryIndexSpecs);
+}
+
 }  // namespace repl
 }  // namespace mongo

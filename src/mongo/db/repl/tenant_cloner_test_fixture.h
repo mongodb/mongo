@@ -43,6 +43,8 @@ protected:
     ServiceContext* serviceContext;
     TenantMigrationSharedData* getSharedData();
     Status createCollection(const NamespaceString& nss, const CollectionOptions& options);
+    Status createIndexesOnEmptyCollection(const NamespaceString& nss,
+                                          const std::vector<BSONObj>& secondaryIndexSpecs);
 
     const Timestamp _operationTime = Timestamp(12345, 67);
     const std::string _tenantId = "tenant42";

@@ -35,6 +35,7 @@
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/commands/list_collections_filter.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/ops/write_ops_exec.h"
 #include "mongo/db/repl/cloner_utils.h"
 #include "mongo/db/repl/database_cloner_gen.h"
@@ -106,6 +107,7 @@ TenantCollectionCloner::TenantCollectionCloner(const NamespaceString& sourceNss,
       _dbWorkTaskRunner(dbPool),
       _tenantId(tenantId) {
     invariant(sourceNss.isValid());
+    invariant(ClonerUtils::isNamespaceForTenant(sourceNss, tenantId));
     invariant(collectionOptions.uuid);
     _sourceDbAndUuid = NamespaceStringOrUUID(sourceNss.db().toString(), *collectionOptions.uuid);
     _stats.ns = _sourceNss.ns();
@@ -251,21 +253,65 @@ BaseCloner::AfterStageBehavior TenantCollectionCloner::listIndexesStage() {
 BaseCloner::AfterStageBehavior TenantCollectionCloner::createCollectionStage() {
     auto opCtx = cc().makeOperationContext();
 
+    bool skipCreateIndexes = false;
+
+    // TODO SERVER-53425: Handle cases when the collection has been renamed on the donor.
     auto status =
         getStorageInterface()->createCollection(opCtx.get(), _sourceNss, _collectionOptions);
     if (status == ErrorCodes::NamespaceExists) {
-        uassert(4884501,
-                "Collection exists but does not belong to tenant",
-                ClonerUtils::isNamespaceForTenant(_sourceNss, _tenantId));
+        uassert(ErrorCodes::NamespaceExists,
+                str::stream() << "Tenant '" << _tenantId << "': collection '" << _sourceNss
+                              << "' already exists prior to data sync",
+                getSharedData()->isResuming());
+
+        // We are resuming and the collection already exists.
+        DBDirectClient client(opCtx.get());
+
+        auto fieldsToReturn = BSON("_id" << 1);
+        _lastDocId =
+            client.findOne(_sourceNss.ns(), Query().sort(BSON("_id" << -1)), &fieldsToReturn);
+        if (!_lastDocId.isEmpty()) {
+            // The collection is not empty. Skip creating indexes and resume cloning from the last
+            // document.
+            skipCreateIndexes = true;
+            _readyIndexSpecs.clear();
+            auto count = client.count(_sourceDbAndUuid);
+            {
+                stdx::lock_guard<Latch> lk(_mutex);
+                _stats.documentsCopied += count;
+                _progressMeter.hit(count);
+            }
+        } else {
+            // The collection is still empty. Create indexes that we haven't created. For the
+            // indexes that exist locally but not on the donor, we don't need to drop them because
+            // oplog application will eventually apply those dropIndex oplog entries.
+            const bool includeBuildUUIDs = false;
+            const int options = 0;
+            auto existingIndexSpecs =
+                client.getIndexSpecs(_sourceDbAndUuid, includeBuildUUIDs, options);
+            StringMap<bool> existingIndexNames;
+            for (const auto& spec : existingIndexSpecs) {
+                existingIndexNames[spec.getStringField("name")] = true;
+            }
+            for (auto it = _readyIndexSpecs.begin(); it != _readyIndexSpecs.end();) {
+                if (existingIndexNames[it->getStringField("name")]) {
+                    it = _readyIndexSpecs.erase(it);
+                } else {
+                    it++;
+                }
+            }
+        }
     } else {
         uassertStatusOKWithContext(status, "Tenant collection cloner: create collection");
     }
 
-    // This will start building the indexes whose specs we saved last stage.
-    status = getStorageInterface()->createIndexesOnEmptyCollection(
-        opCtx.get(), _sourceNss, _readyIndexSpecs);
+    if (!skipCreateIndexes) {
+        // This will start building the indexes whose specs we saved last stage.
+        status = getStorageInterface()->createIndexesOnEmptyCollection(
+            opCtx.get(), _sourceNss, _readyIndexSpecs);
 
-    uassertStatusOKWithContext(status, "Tenant collection cloner: create indexes");
+        uassertStatusOKWithContext(status, "Tenant collection cloner: create indexes");
+    }
 
     return kContinueNormally;
 }
@@ -296,7 +342,10 @@ BaseCloner::AfterStageBehavior TenantCollectionCloner::queryStage() {
 }
 
 void TenantCollectionCloner::runQuery() {
-    auto query = QUERY("query" << BSONObj());
+    auto query = _lastDocId.isEmpty()
+        ? QUERY("query" << BSONObj())
+        // Use $expr and the aggregation version of $gt to avoid type bracketing.
+        : QUERY("$expr" << BSON("$gt" << BSON_ARRAY("$_id" << _lastDocId["_id"])));
     query.hint(BSON("_id" << 1));
 
     getClient()->query([this](DBClientCursorBatchIterator& iter) { handleNextBatch(iter); },

@@ -216,6 +216,8 @@ private:
     ProgressMeter _progressMeter;           // (X) progress meter for this instance.
     std::vector<BSONObj> _readyIndexSpecs;  // (X) Except for _id_
     BSONObj _idIndexSpec;                   // (X)
+
+    BSONObj _lastDocId;  // (X)
     // Function for scheduling database work using the executor.
     ScheduleDbWorkFn _scheduleDbWorkFn;  // (R)
     // Documents read from source to insert.

@@ -148,13 +148,14 @@ protected:
         }
     }
     std::unique_ptr<TenantCollectionCloner> makeCollectionCloner(
-        CollectionOptions options = CollectionOptions()) {
+        CollectionOptions options = CollectionOptions(),
+        TenantMigrationSharedData* sharedData = nullptr) {
         options.uuid = _collUuid;
         _options = options;
         return std::make_unique<TenantCollectionCloner>(
             _nss,
             options,
-            getSharedData(),
+            sharedData ? sharedData : getSharedData(),
             _source,
             _mockClient.get(),
             repl::StorageInterface::get(getServiceContext()),
@@ -183,6 +184,10 @@ protected:
 
     BSONObj& getIdIndexSpec(TenantCollectionCloner* cloner) {
         return cloner->_idIndexSpec;
+    }
+
+    BSONObj& getLastDocId(TenantCollectionCloner* cloner) {
+        return cloner->_lastDocId;
     }
 
     long long _term = 0;
@@ -321,11 +326,6 @@ TEST_F(TenantCollectionClonerTest, ListIndexesRecordsCorrectOperationTime) {
 }
 
 TEST_F(TenantCollectionClonerTest, BeginCollection) {
-    NamespaceString collNss;
-    CollectionOptions collOptions;
-    BSONObj collIdIndexSpec;
-    std::vector<BSONObj> collSecondaryIndexSpecs;
-
     auto cloner = makeCollectionCloner();
     cloner->setStopAfterStage_forTest("createCollection");
     _mockServer->setCommandReply("count", createCountResponse(1));
@@ -352,11 +352,6 @@ TEST_F(TenantCollectionClonerTest, BeginCollection) {
 }
 
 TEST_F(TenantCollectionClonerTest, BeginCollectionFailed) {
-    _storageInterface.createCollFn =
-        [&](OperationContext* opCtx, const NamespaceString& nss, const CollectionOptions& options) {
-            return Status(ErrorCodes::OperationFailed, "");
-        };
-
     auto createCollectionFp =
         globalFailPointRegistry().find("hangAndFailAfterCreateCollectionReservesOpTime");
     auto initialTimesEntered =
@@ -631,15 +626,8 @@ TEST_F(TenantCollectionClonerTest, ListIndexesReturnedNamespaceNotFound) {
                                  Status(ErrorCodes::NamespaceNotFound, "No indexes here."));
 
     // We expect the collection to *not* be created.
-    bool collCreated = false;
-    _storageInterface.createCollFn =
-        [&](OperationContext* opCtx, const NamespaceString& nss, const CollectionOptions& options) {
-            collCreated = true;
-            return Status::OK();
-        };
-
     ASSERT_OK(cloner->run());
-    ASSERT_FALSE(collCreated);
+    ASSERT_FALSE(_opObserver->collCreated);
     ASSERT(getIdIndexSpec(cloner.get()).isEmpty());
     ASSERT(getIndexSpecs(cloner.get()).empty());
     ASSERT_EQ(0, cloner->getStats().indexes);
@@ -790,6 +778,131 @@ TEST_F(TenantCollectionClonerTest, QueryStageNamespaceNotFoundOnSubsequentBatch)
 //     beforeRetryFailPoint->setMode(FailPoint::off, 0);
 //     clonerThread.join();
 // }
+
+TEST_F(TenantCollectionClonerTest, ResumeFromEmptyCollectionMissingAllSecondaryIndexes) {
+    TenantMigrationSharedData resumingSharedData(&_clock, _migrationId, /*resuming=*/true);
+    auto cloner = makeCollectionCloner(CollectionOptions(), &resumingSharedData);
+
+    // Simulate that the collection already exists with no data and no secondary index.
+    ASSERT_OK(createCollection(_nss, _options));
+    ASSERT_TRUE(_opObserver->collCreated);
+    ASSERT_EQUALS(0, _opObserver->secondaryIndexSpecs.size());
+
+    cloner->setStopAfterStage_forTest("createCollection");
+    _mockServer->setCommandReply("count", createCountResponse(1));
+    BSONArrayBuilder indexSpecs;
+    indexSpecs.append(_idIndexSpec);
+    for (const auto& secondaryIndexSpec : _secondaryIndexSpecs) {
+        indexSpecs.append(secondaryIndexSpec);
+    }
+    _mockServer->setCommandReply("listIndexes", createCursorResponse(_nss.ns(), indexSpecs.arr()));
+    _mockServer->setCommandReply("find", createFindResponse());
+
+    ASSERT_EQUALS(Status::OK(), cloner->run());
+
+    // We should create the missing secondary indexes on the empty collection.
+    ASSERT_EQ(2, getIndexSpecs(cloner.get()).size());
+    ASSERT_BSONOBJ_EQ(_secondaryIndexSpecs[0], getIndexSpecs(cloner.get())[0]);
+    ASSERT_BSONOBJ_EQ(_secondaryIndexSpecs[1], getIndexSpecs(cloner.get())[1]);
+
+    ASSERT_EQUALS(_secondaryIndexSpecs.size(), _opObserver->secondaryIndexSpecs.size());
+    for (std::vector<BSONObj>::size_type i = 0; i < _secondaryIndexSpecs.size(); ++i) {
+        ASSERT_BSONOBJ_EQ(_secondaryIndexSpecs[i], _opObserver->secondaryIndexSpecs[i]);
+    }
+}
+
+TEST_F(TenantCollectionClonerTest, ResumeFromEmptyCollectionMissingSomeSecondaryIndexes) {
+    TenantMigrationSharedData resumingSharedData(&_clock, _migrationId, /*resuming=*/true);
+    auto cloner = makeCollectionCloner(CollectionOptions(), &resumingSharedData);
+
+    // Simulate that the collection already exists with no data and some secondary indexes.
+    ASSERT_OK(createCollection(_nss, _options));
+    ASSERT_OK(createIndexesOnEmptyCollection(_nss,
+                                             {_secondaryIndexSpecs[0],
+                                              // An index that has been dropped on the donor.
+                                              BSON("v" << 1 << "key" << BSON("c" << 1) << "name"
+                                                       << "c_1")}));
+    ASSERT_TRUE(_opObserver->collCreated);
+    ASSERT_EQUALS(2, _opObserver->secondaryIndexSpecs.size());
+
+    cloner->setStopAfterStage_forTest("createCollection");
+    _mockServer->setCommandReply("count", createCountResponse(1));
+    BSONArrayBuilder indexSpecs;
+    indexSpecs.append(_idIndexSpec);
+    for (const auto& secondaryIndexSpec : _secondaryIndexSpecs) {
+        indexSpecs.append(secondaryIndexSpec);
+    }
+    _mockServer->setCommandReply("listIndexes", createCursorResponse(_nss.ns(), indexSpecs.arr()));
+    _mockServer->setCommandReply("find", createFindResponse());
+
+    ASSERT_EQUALS(Status::OK(), cloner->run());
+
+    // We should create the other missing secondary indexes on the empty collection.
+    ASSERT_EQ(1, getIndexSpecs(cloner.get()).size());
+    ASSERT_BSONOBJ_EQ(_secondaryIndexSpecs[1], getIndexSpecs(cloner.get())[0]);
+
+    ASSERT_EQUALS(3, _opObserver->secondaryIndexSpecs.size());
+    ASSERT_BSONOBJ_EQ(_secondaryIndexSpecs[1], _opObserver->secondaryIndexSpecs[2]);
+}
+
+TEST_F(TenantCollectionClonerTest, ResumeFromEmptyCollectionMissingNoSecondaryIndexes) {
+    TenantMigrationSharedData resumingSharedData(&_clock, _migrationId, /*resuming=*/true);
+    auto cloner = makeCollectionCloner(CollectionOptions(), &resumingSharedData);
+
+    // Simulate that the collection already exists with no data and all matching secondary indexes.
+    ASSERT_OK(createCollection(_nss, _options));
+    ASSERT_OK(createIndexesOnEmptyCollection(_nss, _secondaryIndexSpecs));
+    ASSERT_TRUE(_opObserver->collCreated);
+    ASSERT_EQUALS(2, _opObserver->secondaryIndexSpecs.size());
+
+    cloner->setStopAfterStage_forTest("createCollection");
+    _mockServer->setCommandReply("count", createCountResponse(1));
+    BSONArrayBuilder indexSpecs;
+    indexSpecs.append(_idIndexSpec);
+    for (const auto& secondaryIndexSpec : _secondaryIndexSpecs) {
+        indexSpecs.append(secondaryIndexSpec);
+    }
+    _mockServer->setCommandReply("listIndexes", createCursorResponse(_nss.ns(), indexSpecs.arr()));
+    _mockServer->setCommandReply("find", createFindResponse());
+
+    ASSERT_EQUALS(Status::OK(), cloner->run());
+
+    // We shouldn't need to create any secondary index.
+    ASSERT_EQ(0, getIndexSpecs(cloner.get()).size());
+}
+
+TEST_F(TenantCollectionClonerTest, ResumeFromNonEmptyCollection) {
+    TenantMigrationSharedData resumingSharedData(&_clock, _migrationId, /*resuming=*/true);
+    auto cloner = makeCollectionCloner(CollectionOptions(), &resumingSharedData);
+
+    // Simulate that the collection already exists with some data.
+    ASSERT_OK(createCollection(_nss, _options));
+    ASSERT_OK(createIndexesOnEmptyCollection(_nss, _secondaryIndexSpecs));
+    {
+        auto storage = StorageInterface::get(serviceContext);
+        auto opCtx = cc().makeOperationContext();
+        ASSERT_OK(storage->insertDocument(opCtx.get(), _nss, {BSON("_id" << 1)}, 0));
+    }
+    ASSERT_TRUE(_opObserver->collCreated);
+    ASSERT_EQUALS(2, _opObserver->secondaryIndexSpecs.size());
+
+    cloner->setStopAfterStage_forTest("createCollection");
+    _mockServer->setCommandReply("count", createCountResponse(1));
+    BSONArrayBuilder indexSpecs;
+    indexSpecs.append(_idIndexSpec);
+    for (const auto& secondaryIndexSpec : _secondaryIndexSpecs) {
+        indexSpecs.append(secondaryIndexSpec);
+    }
+    _mockServer->setCommandReply("listIndexes", createCursorResponse(_nss.ns(), indexSpecs.arr()));
+    _mockServer->setCommandReply("find", createFindResponse());
+
+    ASSERT_EQUALS(Status::OK(), cloner->run());
+
+    // We shouldn't need to create any secondary index.
+    ASSERT_EQ(0, getIndexSpecs(cloner.get()).size());
+    // Test that we have updated the stats.
+    ASSERT_EQ(1, cloner->getStats().documentsCopied);
+}
 
 }  // namespace repl
 }  // namespace mongo
