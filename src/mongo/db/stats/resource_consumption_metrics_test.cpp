@@ -601,9 +601,15 @@ TEST_F(ResourceConsumptionMetricsTest, CpuNanos) {
 
     // Helper to busy wait.
     auto spinFor = [&](Milliseconds millis) {
-        auto deadline = Date_t::now().toDurationSinceEpoch() + millis;
-        while (Date_t::now().toDurationSinceEpoch() < deadline) {
+        AtomicWord<bool> mayJoin{false};
+        stdx::thread blocker([&] {
+            sleepFor(millis);
+            mayJoin.store(true);
+        });
+        while (!mayJoin.load()) {
+            // Busy wait for the blocker thread.
         }
+        blocker.join();
     };
 
     {
