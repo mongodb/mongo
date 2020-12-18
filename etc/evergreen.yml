@@ -11111,6 +11111,8 @@ buildvariants:
   - name: jsCore_txns
   - name: noPassthrough_gen
   - name: noPassthroughWithMongod_gen
+  - name: parallel_compatibility
+  - name: parallel_gen
   - name: .replica_sets
     distros:
     - rhel62-medium

@@ -219,6 +219,20 @@ if (typeof _threadInject != "undefined") {
             "require_api_version.js",
         ]);
 
+        // Get files, including files in subdirectories.
+        var getFilesRecursive = function(dir) {
+            var files = listFiles(dir);
+            var fileList = [];
+            files.forEach(file => {
+                if (file.isDirectory) {
+                    getFilesRecursive(file.name).forEach(subDirFile => fileList.push(subDirFile));
+                } else {
+                    fileList.push(file);
+                }
+            });
+            return fileList;
+        };
+
         // The following tests cannot run when shell readMode is legacy.
         if (db.getMongo().readMode() === "legacy") {
             var requires_find_command = [
@@ -238,21 +252,13 @@ if (typeof _threadInject != "undefined") {
                 "wildcard_index_collation.js"
             ];
             Object.assign(skipTests, makeKeys(requires_find_command));
-        }
 
-        // Get files, including files in subdirectories.
-        var getFilesRecursive = function(dir) {
-            var files = listFiles(dir);
-            var fileList = [];
-            files.forEach(file => {
-                if (file.isDirectory) {
-                    getFilesRecursive(file.name).forEach(subDirFile => fileList.push(subDirFile));
-                } else {
-                    fileList.push(file);
-                }
-            });
-            return fileList;
-        };
+            // Time-series collections require support for views, so are incompatible with legacy
+            // readMode.
+            const timeseriesTestFiles =
+                getFilesRecursive('jstests/core/timeseries').map(f => ('timeseries/' + f.baseName));
+            Object.assign(skipTests, makeKeys(timeseriesTestFiles));
+        }
 
         // Transactions are not supported on standalone nodes so we do not run them here.
         let txnsTestFiles = getFilesRecursive("jstests/core/txns").map(f => ("txns/" + f.baseName));
