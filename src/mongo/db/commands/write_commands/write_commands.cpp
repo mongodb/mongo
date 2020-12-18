@@ -138,37 +138,6 @@ void appendTimeseriesDataFields(const std::vector<BSONObj>& docs,
 }
 
 /**
- * Transforms a single time-series insert to an upsert request.
- */
-BSONObj makeTimeseriesUpsertRequest(const OID& bucketId,
-                                    const BucketCatalog::CommitData& data,
-                                    const BSONObj& metadata) {
-    BSONObjBuilder builder;
-    builder.append(write_ops::UpdateOpEntry::kQFieldName, BSON("_id" << bucketId));
-    builder.append(write_ops::UpdateOpEntry::kMultiFieldName, false);
-    builder.append(write_ops::UpdateOpEntry::kUpsertFieldName, true);
-    {
-        auto metadataElem = metadata.firstElement();
-        BSONObjBuilder updateBuilder(builder.subobjStart(write_ops::UpdateOpEntry::kUFieldName));
-        {
-            BSONObjBuilder setOnInsertOpBuilder(updateBuilder.subobjStart("$setOnInsert"));
-            setOnInsertOpBuilder.append("control.version", kTimeseriesControlVersion);
-            if (metadataElem) {
-                setOnInsertOpBuilder.appendAs(metadataElem, "meta");
-            }
-        }
-        {
-            BSONObjBuilder setOpBuilder(updateBuilder.subobjStart("$set"));
-            setOpBuilder.append("control.min", data.bucketMin);
-            setOpBuilder.append("control.max", data.bucketMax);
-            appendTimeseriesDataFields(
-                data.docs, metadataElem, data.numCommittedMeasurements, &setOpBuilder);
-        }
-    }
-    return builder.obj();
-}
-
-/**
  * Transforms a single time-series insert to an update request on an existing bucket.
  */
 write_ops::UpdateOpEntry makeTimeseriesUpdateOpEntry(const OID& bucketId,
@@ -230,6 +199,51 @@ write_ops::UpdateOpEntry makeTimeseriesUpdateOpEntry(const OID& bucketId,
     invariant(!update.getMulti(), bucketId.toString());
     invariant(!update.getUpsert(), bucketId.toString());
     return update;
+}
+
+/**
+ * Returns the single-element array to use as the vector of documents for inserting a new bucket.
+ */
+BSONArray makeTimeseriesInsertDocument(const OID& bucketId,
+                                       const BucketCatalog::CommitData& data,
+                                       const BSONObj& metadata) {
+    auto metadataElem = metadata.firstElement();
+
+    StringDataMap<BSONObjBuilder> dataBuilders;
+    uint16_t count = 0;
+    for (const auto& doc : data.docs) {
+        auto countFieldName = std::to_string(count++);
+        for (const auto& elem : doc) {
+            auto key = elem.fieldNameStringData();
+            if (metadataElem && key == metadataElem.fieldNameStringData()) {
+                continue;
+            }
+            dataBuilders[key].appendAs(elem, countFieldName);
+        }
+    }
+
+    BSONArrayBuilder builder;
+    {
+        BSONObjBuilder bucketBuilder(builder.subobjStart());
+        bucketBuilder.append("_id", bucketId);
+        {
+            BSONObjBuilder bucketControlBuilder(bucketBuilder.subobjStart("control"));
+            bucketControlBuilder.append("version", kTimeseriesControlVersion);
+            bucketControlBuilder.append("min", data.bucketMin);
+            bucketControlBuilder.append("max", data.bucketMax);
+        }
+        if (metadataElem) {
+            bucketBuilder.appendAs(metadataElem, "meta");
+        }
+        {
+            BSONObjBuilder bucketDataBuilder(bucketBuilder.subobjStart("data"));
+            for (auto& dataBuilder : dataBuilders) {
+                bucketDataBuilder.append(dataBuilder.first, dataBuilder.second.obj());
+            }
+        }
+    }
+
+    return builder.arr();
 }
 
 void appendOpTime(const repl::OpTime& opTime, BSONObjBuilder* out) {
@@ -533,27 +547,22 @@ private:
                     write_ops_exec::WriteResult reply;
                     if (data.numCommittedMeasurements == 0) {
                         BSONObjBuilder builder;
-                        builder.append(write_ops::Update::kCommandName, bucketsNs.coll());
+                        builder.append(write_ops::Insert::kCommandName, bucketsNs.coll());
                         // The schema validation configured in the bucket collection is intended for
                         // direct operations by end users and is not applicable here.
-                        builder.append(write_ops::Update::kBypassDocumentValidationFieldName, true);
-                        builder.append(write_ops::Update::kOrderedFieldName, _batch.getOrdered());
+                        builder.append(write_ops::Insert::kBypassDocumentValidationFieldName, true);
+                        builder.append(write_ops::Insert::kOrderedFieldName, _batch.getOrdered());
                         if (auto stmtId = _batch.getStmtId()) {
-                            builder.append(write_ops::Update::kStmtIdFieldName, *stmtId);
+                            builder.append(write_ops::Insert::kStmtIdFieldName, *stmtId);
                         } else if (auto stmtIds = _batch.getStmtIds()) {
-                            builder.append(write_ops::Update::kStmtIdsFieldName, *stmtIds);
+                            builder.append(write_ops::Insert::kStmtIdsFieldName, *stmtIds);
                         }
-
-                        {
-                            BSONArrayBuilder updatesBuilder(
-                                builder.subarrayStart(write_ops::Update::kUpdatesFieldName));
-                            updatesBuilder.append(
-                                makeTimeseriesUpsertRequest(bucketId, data, metadata));
-                        }
+                        builder.append(write_ops::Insert::kDocumentsFieldName,
+                                       makeTimeseriesInsertDocument(bucketId, data, metadata));
 
                         auto request = OpMsgRequest::fromDBAndBody(bucketsNs.db(), builder.obj());
-                        auto timeseriesUpsertBatch = UpdateOp::parse(request);
-                        reply = write_ops_exec::performUpdates(opCtx, timeseriesUpsertBatch);
+                        auto timeseriesInsertBatch = InsertOp::parse(request);
+                        reply = write_ops_exec::performInserts(opCtx, timeseriesInsertBatch);
                     } else {
                         auto update = makeTimeseriesUpdateOpEntry(bucketId, data, metadata);
                         write_ops::Update timeseriesUpdateBatch(bucketsNs, {update});

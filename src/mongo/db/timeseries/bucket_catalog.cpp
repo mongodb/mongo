@@ -152,14 +152,16 @@ BucketCatalog::InsertResult BucketCatalog::insert(OperationContext* opCtx,
     auto key = std::make_pair(ns, BucketMetadata{metadata.obj()});
 
     auto time = doc[options.getTimeField()].Date();
-    auto setBucketTime = [time = durationCount<Seconds>(time.toDurationSinceEpoch())](
-                             OID* bucketId) { bucketId->setTimestamp(time); };
+    auto createNewBucketId = [time = durationCount<Seconds>(time.toDurationSinceEpoch())] {
+        auto bucketId = OID::gen();
+        bucketId.setTimestamp(time);
+        return bucketId;
+    };
 
     auto it = _bucketIds.find(key);
     if (it == _bucketIds.end()) {
         // A bucket for this namespace and metadata pair does not yet exist.
-        it = _bucketIds.insert({std::move(key), OID::gen()}).first;
-        setBucketTime(&it->second);
+        it = _bucketIds.insert({std::move(key), createNewBucketId()}).first;
         _orderedBuckets.insert({ns, it->first.second, it->second});
     }
 
@@ -172,13 +174,13 @@ BucketCatalog::InsertResult BucketCatalog::insert(OperationContext* opCtx,
         doc, options.getMetaField(), &newFieldNamesToBeInserted, &sizeToBeAdded);
 
     auto bucketTime = it->second.asDateT();
-    if (bucket->numMeasurements == kTimeseriesBucketMaxCount ||
-        bucket->size + sizeToBeAdded > kTimeseriesBucketMaxSizeBytes ||
-        time - bucketTime >= kTimeseriesBucketMaxTimeRange || time < bucketTime) {
+    if (!bucket->ns.isEmpty() &&
+        (bucket->numMeasurements == kTimeseriesBucketMaxCount ||
+         bucket->size + sizeToBeAdded > kTimeseriesBucketMaxSizeBytes ||
+         time - bucketTime >= kTimeseriesBucketMaxTimeRange || time < bucketTime)) {
         // The bucket is full, so create a new one.
         bucket->full = true;
-        it->second = OID::gen();
-        setBucketTime(&it->second);
+        it->second = createNewBucketId();
         _orderedBuckets.insert({ns, it->first.second, it->second});
         bucket = &_buckets[it->second];
         bucket->calculateBucketFieldsAndSizeChange(
