@@ -118,12 +118,6 @@ public:
         uassertStatusOK(
             initializeGlobalShardingStateForMongodForTest(ConnectionString(kConfigHostAndPort)));
 
-        auto mockNetwork = std::make_unique<executor::NetworkInterfaceMock>();
-        _executor = executor::makeThreadPoolTestExecutor(std::move(mockNetwork));
-        _executor->startup();
-
-        _writerPool = repl::makeReplWriterPool(kWriterPoolSize);
-
         LogicalSessionCache::set(getServiceContext(), std::make_unique<LogicalSessionCacheNoop>());
 
         uassertStatusOK(createCollection(
@@ -138,16 +132,6 @@ public:
                                          BSON("create" << kOtherDonorStashNs.coll())));
 
         _cm = createChunkManagerForOriginalColl();
-    }
-
-    void tearDown() override {
-        _writerPool->shutdown();
-        _writerPool->join();
-
-        _executor->shutdown();
-        _executor->join();
-
-        ShardingMongodTestFixture::tearDown();
     }
 
     ChunkManager createChunkManagerForOriginalColl() {
@@ -179,10 +163,6 @@ public:
                             DatabaseVersion(UUID::gen()),
                             makeStandaloneRoutingTableHistory(std::move(rt)),
                             boost::none);
-    }
-
-    ThreadPool* writerPool() {
-        return _writerPool.get();
     }
 
     repl::OplogEntry makeOplog(const repl::OpTime& opTime,
@@ -246,10 +226,6 @@ public:
         return kStashNs;
     }
 
-    executor::ThreadPoolTaskExecutor* getExecutor() {
-        return _executor.get();
-    }
-
     const ReshardingSourceId& sourceId() {
         return _sourceId;
     }
@@ -263,6 +239,14 @@ public:
     }
 
 protected:
+    std::shared_ptr<executor::ThreadPoolTaskExecutor> makeTaskExecutorForApplier() {
+        auto executor = executor::makeThreadPoolTestExecutor(
+            std::make_unique<executor::NetworkInterfaceMock>());
+
+        executor->startup();
+        return executor;
+    }
+
     static constexpr int kWriterPoolSize = 4;
     const NamespaceString kOplogNs{"config.localReshardingOplogBuffer.xxx.yyy"};
     const NamespaceString kCrudNs{"foo.bar"};
@@ -277,32 +261,32 @@ protected:
     boost::optional<ChunkManager> _cm;
 
     const ReshardingSourceId _sourceId{UUID::gen(), kMyShardId};
-
-    std::unique_ptr<executor::ThreadPoolTaskExecutor> _executor;
-    std::unique_ptr<ThreadPool> _writerPool;
 };
 
 TEST_F(ReshardingOplogApplierTest, NothingToIterate) {
     std::queue<repl::OplogEntry> crudOps;
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
 
-    ReshardingOplogApplier applier(getServiceContext(),
-                                   sourceId(),
-                                   oplogNs(),
-                                   crudNs(),
-                                   crudUUID(),
-                                   stashCollections(),
-                                   Timestamp(6, 3),
-                                   std::move(iterator),
-                                   2 /* batchSize */,
-                                   chunkManager(),
-                                   getExecutor(),
-                                   writerPool());
+    boost::optional<ReshardingOplogApplier> applier;
+    auto executor = makeTaskExecutorForApplier();
+    auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
+    applier.emplace(getServiceContext(),
+                    sourceId(),
+                    oplogNs(),
+                    crudNs(),
+                    crudUUID(),
+                    stashCollections(),
+                    Timestamp(6, 3),
+                    std::move(iterator),
+                    2 /* batchSize */,
+                    chunkManager(),
+                    executor.get(),
+                    writerPool.get());
 
-    auto future = applier.applyUntilCloneFinishedTs();
+    auto future = applier->applyUntilCloneFinishedTs();
     future.get();
 
-    future = applier.applyUntilDone();
+    future = applier->applyUntilDone();
     future.get();
 }
 
@@ -326,20 +310,23 @@ TEST_F(ReshardingOplogApplierTest, ApplyBasicCrud) {
                            boost::none));
 
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
-    ReshardingOplogApplier applier(getServiceContext(),
-                                   sourceId(),
-                                   oplogNs(),
-                                   crudNs(),
-                                   crudUUID(),
-                                   stashCollections(),
-                                   Timestamp(6, 3),
-                                   std::move(iterator),
-                                   2 /* batchSize */,
-                                   chunkManager(),
-                                   getExecutor(),
-                                   writerPool());
+    boost::optional<ReshardingOplogApplier> applier;
+    auto executor = makeTaskExecutorForApplier();
+    auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
+    applier.emplace(getServiceContext(),
+                    sourceId(),
+                    oplogNs(),
+                    crudNs(),
+                    crudUUID(),
+                    stashCollections(),
+                    Timestamp(6, 3),
+                    std::move(iterator),
+                    2 /* batchSize */,
+                    chunkManager(),
+                    executor.get(),
+                    writerPool.get());
 
-    auto future = applier.applyUntilCloneFinishedTs();
+    auto future = applier->applyUntilCloneFinishedTs();
     future.get();
 
     DBDirectClient client(operationContext());
@@ -349,7 +336,7 @@ TEST_F(ReshardingOplogApplierTest, ApplyBasicCrud) {
     doc = client.findOne(appliedToNs().ns(), BSON("_id" << 2));
     ASSERT_BSONOBJ_EQ(BSON("_id" << 2), doc);
 
-    future = applier.applyUntilDone();
+    future = applier->applyUntilDone();
     future.get();
 
     doc = client.findOne(appliedToNs().ns(), BSON("_id" << 1));
@@ -375,20 +362,23 @@ TEST_F(ReshardingOplogApplierTest, InsertTypeOplogAppliedInMultipleBatches) {
     }
 
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
-    ReshardingOplogApplier applier(getServiceContext(),
-                                   sourceId(),
-                                   oplogNs(),
-                                   crudNs(),
-                                   crudUUID(),
-                                   stashCollections(),
-                                   Timestamp(8, 3),
-                                   std::move(iterator),
-                                   3 /* batchSize */,
-                                   chunkManager(),
-                                   getExecutor(),
-                                   writerPool());
+    boost::optional<ReshardingOplogApplier> applier;
+    auto executor = makeTaskExecutorForApplier();
+    auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
+    applier.emplace(getServiceContext(),
+                    sourceId(),
+                    oplogNs(),
+                    crudNs(),
+                    crudUUID(),
+                    stashCollections(),
+                    Timestamp(8, 3),
+                    std::move(iterator),
+                    3 /* batchSize */,
+                    chunkManager(),
+                    executor.get(),
+                    writerPool.get());
 
-    auto future = applier.applyUntilCloneFinishedTs();
+    auto future = applier->applyUntilCloneFinishedTs();
     future.get();
 
     DBDirectClient client(operationContext());
@@ -406,7 +396,7 @@ TEST_F(ReshardingOplogApplierTest, InsertTypeOplogAppliedInMultipleBatches) {
     ASSERT_EQ(Timestamp(8, 3), progressDoc->getProgress().getClusterTime());
     ASSERT_EQ(Timestamp(8, 3), progressDoc->getProgress().getTs());
 
-    future = applier.applyUntilDone();
+    future = applier->applyUntilDone();
     future.get();
 
     for (int x = 0; x < 19; x++) {
@@ -432,20 +422,23 @@ TEST_F(ReshardingOplogApplierTest, ErrorDuringBatchApplyCloningPhase) {
                            BSON("_id" << 1)));
 
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
-    ReshardingOplogApplier applier(getServiceContext(),
-                                   sourceId(),
-                                   oplogNs(),
-                                   crudNs(),
-                                   crudUUID(),
-                                   stashCollections(),
-                                   Timestamp(7, 3),
-                                   std::move(iterator),
-                                   4 /* batchSize */,
-                                   chunkManager(),
-                                   getExecutor(),
-                                   writerPool());
+    boost::optional<ReshardingOplogApplier> applier;
+    auto executor = makeTaskExecutorForApplier();
+    auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
+    applier.emplace(getServiceContext(),
+                    sourceId(),
+                    oplogNs(),
+                    crudNs(),
+                    crudUUID(),
+                    stashCollections(),
+                    Timestamp(7, 3),
+                    std::move(iterator),
+                    4 /* batchSize */,
+                    chunkManager(),
+                    executor.get(),
+                    writerPool.get());
 
-    auto future = applier.applyUntilCloneFinishedTs();
+    auto future = applier->applyUntilCloneFinishedTs();
 
     ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::FailedToParse);
 
@@ -477,23 +470,26 @@ TEST_F(ReshardingOplogApplierTest, ErrorDuringBatchApplyCatchUpPhase) {
                            BSON("_id" << 1)));
 
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
-    ReshardingOplogApplier applier(getServiceContext(),
-                                   sourceId(),
-                                   oplogNs(),
-                                   crudNs(),
-                                   crudUUID(),
-                                   stashCollections(),
-                                   Timestamp(6, 3),
-                                   std::move(iterator),
-                                   2 /* batchSize */,
-                                   chunkManager(),
-                                   getExecutor(),
-                                   writerPool());
+    boost::optional<ReshardingOplogApplier> applier;
+    auto executor = makeTaskExecutorForApplier();
+    auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
+    applier.emplace(getServiceContext(),
+                    sourceId(),
+                    oplogNs(),
+                    crudNs(),
+                    crudUUID(),
+                    stashCollections(),
+                    Timestamp(6, 3),
+                    std::move(iterator),
+                    2 /* batchSize */,
+                    chunkManager(),
+                    executor.get(),
+                    writerPool.get());
 
-    auto future = applier.applyUntilCloneFinishedTs();
+    auto future = applier->applyUntilCloneFinishedTs();
     future.get();
 
-    future = applier.applyUntilDone();
+    future = applier->applyUntilDone();
 
     ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::FailedToParse);
 
@@ -523,20 +519,23 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstOplogCloningPhase) {
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
     iterator->setThrowWhenSingleItem();
 
-    ReshardingOplogApplier applier(getServiceContext(),
-                                   sourceId(),
-                                   oplogNs(),
-                                   crudNs(),
-                                   crudUUID(),
-                                   stashCollections(),
-                                   Timestamp(6, 3),
-                                   std::move(iterator),
-                                   2 /* batchSize */,
-                                   chunkManager(),
-                                   getExecutor(),
-                                   writerPool());
+    boost::optional<ReshardingOplogApplier> applier;
+    auto executor = makeTaskExecutorForApplier();
+    auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
+    applier.emplace(getServiceContext(),
+                    sourceId(),
+                    oplogNs(),
+                    crudNs(),
+                    crudUUID(),
+                    stashCollections(),
+                    Timestamp(6, 3),
+                    std::move(iterator),
+                    2 /* batchSize */,
+                    chunkManager(),
+                    executor.get(),
+                    writerPool.get());
 
-    auto future = applier.applyUntilCloneFinishedTs();
+    auto future = applier->applyUntilCloneFinishedTs();
 
     ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::InternalError);
 
@@ -566,23 +565,26 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstOplogCatchUpPhase) {
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
     iterator->setThrowWhenSingleItem();
 
-    ReshardingOplogApplier applier(getServiceContext(),
-                                   sourceId(),
-                                   oplogNs(),
-                                   crudNs(),
-                                   crudUUID(),
-                                   stashCollections(),
-                                   Timestamp(5, 3),
-                                   std::move(iterator),
-                                   2 /* batchSize */,
-                                   chunkManager(),
-                                   getExecutor(),
-                                   writerPool());
+    boost::optional<ReshardingOplogApplier> applier;
+    auto executor = makeTaskExecutorForApplier();
+    auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
+    applier.emplace(getServiceContext(),
+                    sourceId(),
+                    oplogNs(),
+                    crudNs(),
+                    crudUUID(),
+                    stashCollections(),
+                    Timestamp(5, 3),
+                    std::move(iterator),
+                    2 /* batchSize */,
+                    chunkManager(),
+                    executor.get(),
+                    writerPool.get());
 
-    auto future = applier.applyUntilCloneFinishedTs();
+    auto future = applier->applyUntilCloneFinishedTs();
     future.get();
 
-    future = applier.applyUntilDone();
+    future = applier->applyUntilDone();
     ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::InternalError);
 
     DBDirectClient client(operationContext());
@@ -609,20 +611,23 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstBatchCloningPhase) {
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
     iterator->setThrowWhenSingleItem();
 
-    ReshardingOplogApplier applier(getServiceContext(),
-                                   sourceId(),
-                                   oplogNs(),
-                                   crudNs(),
-                                   crudUUID(),
-                                   stashCollections(),
-                                   Timestamp(8, 3),
-                                   std::move(iterator),
-                                   4 /* batchSize */,
-                                   chunkManager(),
-                                   getExecutor(),
-                                   writerPool());
+    boost::optional<ReshardingOplogApplier> applier;
+    auto executor = makeTaskExecutorForApplier();
+    auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
+    applier.emplace(getServiceContext(),
+                    sourceId(),
+                    oplogNs(),
+                    crudNs(),
+                    crudUUID(),
+                    stashCollections(),
+                    Timestamp(8, 3),
+                    std::move(iterator),
+                    4 /* batchSize */,
+                    chunkManager(),
+                    executor.get(),
+                    writerPool.get());
 
-    auto future = applier.applyUntilCloneFinishedTs();
+    auto future = applier->applyUntilCloneFinishedTs();
 
     ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::InternalError);
 
@@ -656,23 +661,26 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstBatchCatchUpPhase) {
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
     iterator->setThrowWhenSingleItem();
 
-    ReshardingOplogApplier applier(getServiceContext(),
-                                   sourceId(),
-                                   oplogNs(),
-                                   crudNs(),
-                                   crudUUID(),
-                                   stashCollections(),
-                                   Timestamp(6, 3),
-                                   std::move(iterator),
-                                   2 /* batchSize */,
-                                   chunkManager(),
-                                   getExecutor(),
-                                   writerPool());
+    boost::optional<ReshardingOplogApplier> applier;
+    auto executor = makeTaskExecutorForApplier();
+    auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
+    applier.emplace(getServiceContext(),
+                    sourceId(),
+                    oplogNs(),
+                    crudNs(),
+                    crudUUID(),
+                    stashCollections(),
+                    Timestamp(6, 3),
+                    std::move(iterator),
+                    2 /* batchSize */,
+                    chunkManager(),
+                    executor.get(),
+                    writerPool.get());
 
-    auto future = applier.applyUntilCloneFinishedTs();
+    auto future = applier->applyUntilCloneFinishedTs();
     future.get();
 
-    future = applier.applyUntilDone();
+    future = applier->applyUntilDone();
 
     ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::InternalError);
 
@@ -704,20 +712,23 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingSecondBatchCloningPhase) {
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
     iterator->setThrowWhenSingleItem();
 
-    ReshardingOplogApplier applier(getServiceContext(),
-                                   sourceId(),
-                                   oplogNs(),
-                                   crudNs(),
-                                   crudUUID(),
-                                   stashCollections(),
-                                   Timestamp(7, 3),
-                                   std::move(iterator),
-                                   2 /* batchSize */,
-                                   chunkManager(),
-                                   getExecutor(),
-                                   writerPool());
+    boost::optional<ReshardingOplogApplier> applier;
+    auto executor = makeTaskExecutorForApplier();
+    auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
+    applier.emplace(getServiceContext(),
+                    sourceId(),
+                    oplogNs(),
+                    crudNs(),
+                    crudUUID(),
+                    stashCollections(),
+                    Timestamp(7, 3),
+                    std::move(iterator),
+                    2 /* batchSize */,
+                    chunkManager(),
+                    executor.get(),
+                    writerPool.get());
 
-    auto future = applier.applyUntilCloneFinishedTs();
+    auto future = applier->applyUntilCloneFinishedTs();
 
     ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::InternalError);
 
@@ -763,23 +774,26 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingSecondBatchCatchUpPhase) {
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
     iterator->setThrowWhenSingleItem();
 
-    ReshardingOplogApplier applier(getServiceContext(),
-                                   sourceId(),
-                                   oplogNs(),
-                                   crudNs(),
-                                   crudUUID(),
-                                   stashCollections(),
-                                   Timestamp(6, 3),
-                                   std::move(iterator),
-                                   2 /* batchSize */,
-                                   chunkManager(),
-                                   getExecutor(),
-                                   writerPool());
+    boost::optional<ReshardingOplogApplier> applier;
+    auto executor = makeTaskExecutorForApplier();
+    auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
+    applier.emplace(getServiceContext(),
+                    sourceId(),
+                    oplogNs(),
+                    crudNs(),
+                    crudUUID(),
+                    stashCollections(),
+                    Timestamp(6, 3),
+                    std::move(iterator),
+                    2 /* batchSize */,
+                    chunkManager(),
+                    executor.get(),
+                    writerPool.get());
 
-    auto future = applier.applyUntilCloneFinishedTs();
+    auto future = applier->applyUntilCloneFinishedTs();
     future.get();
 
-    future = applier.applyUntilDone();
+    future = applier->applyUntilDone();
 
     ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::InternalError);
 
@@ -813,22 +827,25 @@ TEST_F(ReshardingOplogApplierTest, ExecutorIsShutDownCloningPhase) {
                            boost::none));
 
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
-    ReshardingOplogApplier applier(getServiceContext(),
-                                   sourceId(),
-                                   oplogNs(),
-                                   crudNs(),
-                                   crudUUID(),
-                                   stashCollections(),
-                                   Timestamp(5, 3),
-                                   std::move(iterator),
-                                   4 /* batchSize */,
-                                   chunkManager(),
-                                   getExecutor(),
-                                   writerPool());
+    boost::optional<ReshardingOplogApplier> applier;
+    auto executor = makeTaskExecutorForApplier();
+    auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
+    applier.emplace(getServiceContext(),
+                    sourceId(),
+                    oplogNs(),
+                    crudNs(),
+                    crudUUID(),
+                    stashCollections(),
+                    Timestamp(5, 3),
+                    std::move(iterator),
+                    4 /* batchSize */,
+                    chunkManager(),
+                    executor.get(),
+                    writerPool.get());
 
-    getExecutor()->shutdown();
+    executor->shutdown();
 
-    auto future = applier.applyUntilCloneFinishedTs();
+    auto future = applier->applyUntilCloneFinishedTs();
     ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::ShutdownInProgress);
 
     DBDirectClient client(operationContext());
@@ -855,24 +872,27 @@ TEST_F(ReshardingOplogApplierTest, ExecutorIsShutDownCatchUpPhase) {
                            boost::none));
 
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
-    ReshardingOplogApplier applier(getServiceContext(),
-                                   sourceId(),
-                                   oplogNs(),
-                                   crudNs(),
-                                   crudUUID(),
-                                   stashCollections(),
-                                   Timestamp(5, 3),
-                                   std::move(iterator),
-                                   2 /* batchSize */,
-                                   chunkManager(),
-                                   getExecutor(),
-                                   writerPool());
+    boost::optional<ReshardingOplogApplier> applier;
+    auto executor = makeTaskExecutorForApplier();
+    auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
+    applier.emplace(getServiceContext(),
+                    sourceId(),
+                    oplogNs(),
+                    crudNs(),
+                    crudUUID(),
+                    stashCollections(),
+                    Timestamp(5, 3),
+                    std::move(iterator),
+                    2 /* batchSize */,
+                    chunkManager(),
+                    executor.get(),
+                    writerPool.get());
 
-    auto future = applier.applyUntilCloneFinishedTs();
+    auto future = applier->applyUntilCloneFinishedTs();
     future.get();
 
-    getExecutor()->shutdown();
-    future = applier.applyUntilDone();
+    executor->shutdown();
+    future = applier->applyUntilDone();
 
     ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::ShutdownInProgress);
 
@@ -894,22 +914,25 @@ TEST_F(ReshardingOplogApplierTest, WriterPoolIsShutDownCloningPhase) {
                            boost::none));
 
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
-    ReshardingOplogApplier applier(getServiceContext(),
-                                   sourceId(),
-                                   oplogNs(),
-                                   crudNs(),
-                                   crudUUID(),
-                                   stashCollections(),
-                                   Timestamp(5, 3),
-                                   std::move(iterator),
-                                   4 /* batchSize */,
-                                   chunkManager(),
-                                   getExecutor(),
-                                   writerPool());
+    boost::optional<ReshardingOplogApplier> applier;
+    auto executor = makeTaskExecutorForApplier();
+    auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
+    applier.emplace(getServiceContext(),
+                    sourceId(),
+                    oplogNs(),
+                    crudNs(),
+                    crudUUID(),
+                    stashCollections(),
+                    Timestamp(5, 3),
+                    std::move(iterator),
+                    4 /* batchSize */,
+                    chunkManager(),
+                    executor.get(),
+                    writerPool.get());
 
-    writerPool()->shutdown();
+    writerPool->shutdown();
 
-    auto future = applier.applyUntilCloneFinishedTs();
+    auto future = applier->applyUntilCloneFinishedTs();
     ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::ShutdownInProgress);
 
     DBDirectClient client(operationContext());
@@ -936,24 +959,27 @@ TEST_F(ReshardingOplogApplierTest, WriterPoolIsShutDownCatchUpPhase) {
                            boost::none));
 
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
-    ReshardingOplogApplier applier(getServiceContext(),
-                                   sourceId(),
-                                   oplogNs(),
-                                   crudNs(),
-                                   crudUUID(),
-                                   stashCollections(),
-                                   Timestamp(5, 3),
-                                   std::move(iterator),
-                                   2 /* batchSize */,
-                                   chunkManager(),
-                                   getExecutor(),
-                                   writerPool());
+    boost::optional<ReshardingOplogApplier> applier;
+    auto executor = makeTaskExecutorForApplier();
+    auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
+    applier.emplace(getServiceContext(),
+                    sourceId(),
+                    oplogNs(),
+                    crudNs(),
+                    crudUUID(),
+                    stashCollections(),
+                    Timestamp(5, 3),
+                    std::move(iterator),
+                    2 /* batchSize */,
+                    chunkManager(),
+                    executor.get(),
+                    writerPool.get());
 
-    auto future = applier.applyUntilCloneFinishedTs();
+    auto future = applier->applyUntilCloneFinishedTs();
     future.get();
 
-    writerPool()->shutdown();
-    future = applier.applyUntilDone();
+    writerPool->shutdown();
+    future = applier->applyUntilDone();
 
     ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::ShutdownInProgress);
 
@@ -991,20 +1017,23 @@ TEST_F(ReshardingOplogApplierTest, InsertOpIntoOuputCollectionUseReshardingAppli
                            boost::none));
 
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
-    ReshardingOplogApplier applier(getServiceContext(),
-                                   sourceId(),
-                                   oplogNs(),
-                                   crudNs(),
-                                   crudUUID(),
-                                   stashCollections(),
-                                   Timestamp(6, 3),
-                                   std::move(iterator),
-                                   2 /* batchSize */,
-                                   chunkManager(),
-                                   getExecutor(),
-                                   writerPool());
+    boost::optional<ReshardingOplogApplier> applier;
+    auto executor = makeTaskExecutorForApplier();
+    auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
+    applier.emplace(getServiceContext(),
+                    sourceId(),
+                    oplogNs(),
+                    crudNs(),
+                    crudUUID(),
+                    stashCollections(),
+                    Timestamp(6, 3),
+                    std::move(iterator),
+                    2 /* batchSize */,
+                    chunkManager(),
+                    executor.get(),
+                    writerPool.get());
 
-    auto future = applier.applyUntilCloneFinishedTs();
+    auto future = applier->applyUntilCloneFinishedTs();
     future.get();
 
     DBDirectClient client(operationContext());
@@ -1014,7 +1043,7 @@ TEST_F(ReshardingOplogApplierTest, InsertOpIntoOuputCollectionUseReshardingAppli
     doc = client.findOne(appliedToNs().ns(), BSON("_id" << 2));
     ASSERT_BSONOBJ_EQ(BSON("_id" << 2), doc);
 
-    future = applier.applyUntilDone();
+    future = applier->applyUntilDone();
     future.get();
 
     doc = client.findOne(appliedToNs().ns(), BSON("_id" << 3));
@@ -1042,18 +1071,21 @@ TEST_F(ReshardingOplogApplierTest,
                            boost::none));
 
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
-    ReshardingOplogApplier applier(getServiceContext(),
-                                   sourceId(),
-                                   oplogNs(),
-                                   crudNs(),
-                                   crudUUID(),
-                                   stashCollections(),
-                                   Timestamp(5, 3),
-                                   std::move(iterator),
-                                   1 /* batchSize */,
-                                   chunkManager(),
-                                   getExecutor(),
-                                   writerPool());
+    boost::optional<ReshardingOplogApplier> applier;
+    auto executor = makeTaskExecutorForApplier();
+    auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
+    applier.emplace(getServiceContext(),
+                    sourceId(),
+                    oplogNs(),
+                    crudNs(),
+                    crudUUID(),
+                    stashCollections(),
+                    Timestamp(5, 3),
+                    std::move(iterator),
+                    1 /* batchSize */,
+                    chunkManager(),
+                    executor.get(),
+                    writerPool.get());
 
     // Make sure a doc with {_id: 1} exists in the output collection before applying an insert with
     // the same _id. This donor shard owns these docs under the original shard key (it owns the
@@ -1061,14 +1093,14 @@ TEST_F(ReshardingOplogApplierTest,
     DBDirectClient client(operationContext());
     client.insert(appliedToNs().toString(), BSON("_id" << 1 << "sk" << 1));
 
-    auto future = applier.applyUntilCloneFinishedTs();
+    auto future = applier->applyUntilCloneFinishedTs();
     future.get();
 
     // We should have replaced the existing doc in the output collection.
     auto doc = client.findOne(appliedToNs().ns(), BSON("_id" << 1));
     ASSERT_BSONOBJ_EQ(BSON("_id" << 1 << "sk" << 2), doc);
 
-    future = applier.applyUntilDone();
+    future = applier->applyUntilDone();
     future.get();
 
     auto progressDoc = ReshardingOplogApplier::checkStoredProgress(operationContext(), sourceId());
@@ -1094,18 +1126,21 @@ TEST_F(ReshardingOplogApplierTest,
                            boost::none));
 
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
-    ReshardingOplogApplier applier(getServiceContext(),
-                                   sourceId(),
-                                   oplogNs(),
-                                   crudNs(),
-                                   crudUUID(),
-                                   stashCollections(),
-                                   Timestamp(5, 3),
-                                   std::move(iterator),
-                                   1 /* batchSize */,
-                                   chunkManager(),
-                                   getExecutor(),
-                                   writerPool());
+    boost::optional<ReshardingOplogApplier> applier;
+    auto executor = makeTaskExecutorForApplier();
+    auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
+    applier.emplace(getServiceContext(),
+                    sourceId(),
+                    oplogNs(),
+                    crudNs(),
+                    crudUUID(),
+                    stashCollections(),
+                    Timestamp(5, 3),
+                    std::move(iterator),
+                    1 /* batchSize */,
+                    chunkManager(),
+                    executor.get(),
+                    writerPool.get());
 
     // Make sure a doc with {_id: 1} exists in the output collection before applying inserts with
     // the same _id. This donor shard does not own the doc {_id: 1, sk: -1} under the original shard
@@ -1113,7 +1148,7 @@ TEST_F(ReshardingOplogApplierTest,
     DBDirectClient client(operationContext());
     client.insert(appliedToNs().toString(), BSON("_id" << 1 << "sk" << -1));
 
-    auto future = applier.applyUntilCloneFinishedTs();
+    auto future = applier->applyUntilCloneFinishedTs();
     future.get();
 
     // The output collection should still hold the doc {_id: 1, sk: -1}, and the doc with {_id: 1,
@@ -1124,7 +1159,7 @@ TEST_F(ReshardingOplogApplierTest,
     doc = client.findOne(stashNs().ns(), BSON("_id" << 1));
     ASSERT_BSONOBJ_EQ(BSON("_id" << 1 << "sk" << 2), doc);
 
-    future = applier.applyUntilDone();
+    future = applier->applyUntilDone();
     future.get();
 
     // The output collection should still hold the doc {_id: 1, x: 1}. We should have applied rule
@@ -1159,18 +1194,21 @@ TEST_F(ReshardingOplogApplierTest,
                            boost::none));
 
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
-    ReshardingOplogApplier applier(getServiceContext(),
-                                   sourceId(),
-                                   oplogNs(),
-                                   crudNs(),
-                                   crudUUID(),
-                                   stashCollections(),
-                                   Timestamp(5, 3),
-                                   std::move(iterator),
-                                   1 /* batchSize */,
-                                   chunkManager(),
-                                   getExecutor(),
-                                   writerPool());
+    boost::optional<ReshardingOplogApplier> applier;
+    auto executor = makeTaskExecutorForApplier();
+    auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
+    applier.emplace(getServiceContext(),
+                    sourceId(),
+                    oplogNs(),
+                    crudNs(),
+                    crudUUID(),
+                    stashCollections(),
+                    Timestamp(5, 3),
+                    std::move(iterator),
+                    1 /* batchSize */,
+                    chunkManager(),
+                    executor.get(),
+                    writerPool.get());
 
     // Insert a doc {_id: 1} in the output collection before applying the insert of doc with
     // {_id: 1}. This will force the doc {_id: 1, sk: 1} to be inserted to the stash collection for
@@ -1178,7 +1216,7 @@ TEST_F(ReshardingOplogApplierTest,
     DBDirectClient client(operationContext());
     client.insert(appliedToNs().toString(), BSON("_id" << 1 << "sk" << -1));
 
-    auto future = applier.applyUntilCloneFinishedTs();
+    auto future = applier->applyUntilCloneFinishedTs();
     future.get();
 
     // The output collection should still hold the doc {_id: 1, sk: -1}, and the doc with {_id: 1,
@@ -1189,7 +1227,7 @@ TEST_F(ReshardingOplogApplierTest,
     doc = client.findOne(stashNs().ns(), BSON("_id" << 1));
     ASSERT_BSONOBJ_EQ(BSON("_id" << 1 << "sk" << 2), doc);
 
-    future = applier.applyUntilDone();
+    future = applier->applyUntilDone();
     future.get();
 
     // We should have applied rule #1 and deleted the doc with {_id : 1} from the stash collection
@@ -1224,25 +1262,28 @@ TEST_F(ReshardingOplogApplierTest,
                            boost::none));
 
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
-    ReshardingOplogApplier applier(getServiceContext(),
-                                   sourceId(),
-                                   oplogNs(),
-                                   crudNs(),
-                                   crudUUID(),
-                                   stashCollections(),
-                                   Timestamp(5, 3),
-                                   std::move(iterator),
-                                   1 /* batchSize */,
-                                   chunkManager(),
-                                   getExecutor(),
-                                   writerPool());
+    boost::optional<ReshardingOplogApplier> applier;
+    auto executor = makeTaskExecutorForApplier();
+    auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
+    applier.emplace(getServiceContext(),
+                    sourceId(),
+                    oplogNs(),
+                    crudNs(),
+                    crudUUID(),
+                    stashCollections(),
+                    Timestamp(5, 3),
+                    std::move(iterator),
+                    1 /* batchSize */,
+                    chunkManager(),
+                    executor.get(),
+                    writerPool.get());
 
     // Make sure a doc with {_id: 1} exists in the output collection that does not belong to this
     // donor shard before applying the deletes.
     DBDirectClient client(operationContext());
     client.insert(appliedToNs().ns(), BSON("_id" << 1 << "sk" << -1));
 
-    auto future = applier.applyUntilCloneFinishedTs();
+    auto future = applier->applyUntilCloneFinishedTs();
     future.get();
 
     // The doc {_id: 1, sk: -1} that exists in the output collection does not belong to this donor
@@ -1251,7 +1292,7 @@ TEST_F(ReshardingOplogApplierTest,
     auto doc = client.findOne(appliedToNs().ns(), BSON("_id" << 1));
     ASSERT_BSONOBJ_EQ(BSON("_id" << 1 << "sk" << -1), doc);
 
-    future = applier.applyUntilDone();
+    future = applier->applyUntilDone();
     future.get();
 
     // There does not exist a doc with {_id : 2} in the output collection, so we should have applied
@@ -1294,21 +1335,24 @@ TEST_F(ReshardingOplogApplierTest,
                            boost::none));
 
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
-    ReshardingOplogApplier applier(getServiceContext(),
-                                   sourceId(),
-                                   oplogNs(),
-                                   crudNs(),
-                                   crudUUID(),
-                                   stashCollections(),
-                                   Timestamp(6, 3),
-                                   std::move(iterator),
-                                   2 /* batchSize */,
-                                   chunkManager(),
-                                   getExecutor(),
-                                   writerPool());
+    boost::optional<ReshardingOplogApplier> applier;
+    auto executor = makeTaskExecutorForApplier();
+    auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
+    applier.emplace(getServiceContext(),
+                    sourceId(),
+                    oplogNs(),
+                    crudNs(),
+                    crudUUID(),
+                    stashCollections(),
+                    Timestamp(6, 3),
+                    std::move(iterator),
+                    2 /* batchSize */,
+                    chunkManager(),
+                    executor.get(),
+                    writerPool.get());
 
     // Apply the inserts first so there exists docs in the output collection
-    auto future = applier.applyUntilCloneFinishedTs();
+    auto future = applier->applyUntilCloneFinishedTs();
     future.get();
 
     DBDirectClient client(operationContext());
@@ -1318,7 +1362,7 @@ TEST_F(ReshardingOplogApplierTest,
     doc = client.findOne(appliedToNs().ns(), BSON("_id" << 2));
     ASSERT_BSONOBJ_EQ(BSON("_id" << 2 << "sk" << 2), doc);
 
-    future = applier.applyUntilDone();
+    future = applier->applyUntilDone();
     future.get();
 
     // None of the stash collections have docs with _id == [op _id], so we should not have found any
@@ -1360,25 +1404,28 @@ TEST_F(ReshardingOplogApplierTest,
                            boost::none));
 
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
-    ReshardingOplogApplier applier(getServiceContext(),
-                                   sourceId(),
-                                   oplogNs(),
-                                   crudNs(),
-                                   crudUUID(),
-                                   stashCollections(),
-                                   Timestamp(5, 3),
-                                   std::move(iterator),
-                                   1 /* batchSize */,
-                                   chunkManager(),
-                                   getExecutor(),
-                                   writerPool());
+    boost::optional<ReshardingOplogApplier> applier;
+    auto executor = makeTaskExecutorForApplier();
+    auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
+    applier.emplace(getServiceContext(),
+                    sourceId(),
+                    oplogNs(),
+                    crudNs(),
+                    crudUUID(),
+                    stashCollections(),
+                    Timestamp(5, 3),
+                    std::move(iterator),
+                    1 /* batchSize */,
+                    chunkManager(),
+                    executor.get(),
+                    writerPool.get());
 
     // Make sure a doc with {_id: 1} exists in the stash collection for the other donor shard. The
     // stash collection for this donor shard is empty.
     DBDirectClient client(operationContext());
     client.insert(stashCollections()[1].toString(), BSON("_id" << 1 << "sk" << -3));
 
-    auto future = applier.applyUntilCloneFinishedTs();
+    auto future = applier->applyUntilCloneFinishedTs();
     future.get();
 
     // The output collection should now hold the doc {_id: 1, sk: 1}.
@@ -1393,7 +1440,7 @@ TEST_F(ReshardingOplogApplierTest,
     doc = client.findOne(stashCollections()[1].toString(), BSON("_id" << 1));
     ASSERT_BSONOBJ_EQ(BSON("_id" << 1 << "sk" << -3), doc);
 
-    future = applier.applyUntilDone();
+    future = applier->applyUntilDone();
     future.get();
 
     // We should have applied rule #4 and deleted the doc that was in the output collection {_id: 1,
@@ -1446,18 +1493,21 @@ TEST_F(ReshardingOplogApplierTest, UpdateShouldModifyStashCollectionUseReshardin
                            BSON("_id" << 1)));
 
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
-    ReshardingOplogApplier applier(getServiceContext(),
-                                   sourceId(),
-                                   oplogNs(),
-                                   crudNs(),
-                                   crudUUID(),
-                                   stashCollections(),
-                                   Timestamp(5, 3),
-                                   std::move(iterator),
-                                   1 /* batchSize */,
-                                   chunkManager(),
-                                   getExecutor(),
-                                   writerPool());
+    boost::optional<ReshardingOplogApplier> applier;
+    auto executor = makeTaskExecutorForApplier();
+    auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
+    applier.emplace(getServiceContext(),
+                    sourceId(),
+                    oplogNs(),
+                    crudNs(),
+                    crudUUID(),
+                    stashCollections(),
+                    Timestamp(5, 3),
+                    std::move(iterator),
+                    1 /* batchSize */,
+                    chunkManager(),
+                    executor.get(),
+                    writerPool.get());
 
     // Insert a doc {_id: 1} in the output collection before applying the insert of doc with
     // {_id: 1}. This will force the doc {_id: 1, sk: 2} to be inserted to the stash collection for
@@ -1465,7 +1515,7 @@ TEST_F(ReshardingOplogApplierTest, UpdateShouldModifyStashCollectionUseReshardin
     DBDirectClient client(operationContext());
     client.insert(appliedToNs().toString(), BSON("_id" << 1 << "sk" << -1));
 
-    auto future = applier.applyUntilCloneFinishedTs();
+    auto future = applier->applyUntilCloneFinishedTs();
     future.get();
 
     // The output collection should still hold the doc {_id: 1, sk: -1}, and the doc with {_id: 1,
@@ -1476,7 +1526,7 @@ TEST_F(ReshardingOplogApplierTest, UpdateShouldModifyStashCollectionUseReshardin
     doc = client.findOne(stashNs().ns(), BSON("_id" << 1));
     ASSERT_BSONOBJ_EQ(BSON("_id" << 1 << "sk" << 2), doc);
 
-    future = applier.applyUntilDone();
+    future = applier->applyUntilDone();
     future.get();
 
     // We should have applied rule #1 and updated the doc with {_id : 1} in the stash collection
@@ -1510,25 +1560,28 @@ TEST_F(ReshardingOplogApplierTest, UpdateShouldDoNothingUseReshardingApplication
                            BSON("_id" << 2)));
 
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
-    ReshardingOplogApplier applier(getServiceContext(),
-                                   sourceId(),
-                                   oplogNs(),
-                                   crudNs(),
-                                   crudUUID(),
-                                   stashCollections(),
-                                   Timestamp(5, 3),
-                                   std::move(iterator),
-                                   1 /* batchSize */,
-                                   chunkManager(),
-                                   getExecutor(),
-                                   writerPool());
+    boost::optional<ReshardingOplogApplier> applier;
+    auto executor = makeTaskExecutorForApplier();
+    auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
+    applier.emplace(getServiceContext(),
+                    sourceId(),
+                    oplogNs(),
+                    crudNs(),
+                    crudUUID(),
+                    stashCollections(),
+                    Timestamp(5, 3),
+                    std::move(iterator),
+                    1 /* batchSize */,
+                    chunkManager(),
+                    executor.get(),
+                    writerPool.get());
 
     // Make sure a doc with {_id: 1} exists in the output collection that does not belong to this
     // donor shard before applying the updates.
     DBDirectClient client(operationContext());
     client.insert(appliedToNs().ns(), BSON("_id" << 1 << "sk" << -1));
 
-    auto future = applier.applyUntilCloneFinishedTs();
+    auto future = applier->applyUntilCloneFinishedTs();
     future.get();
 
     // The doc {_id: 1, sk: -1} that exists in the output collection does not belong to this donor
@@ -1537,7 +1590,7 @@ TEST_F(ReshardingOplogApplierTest, UpdateShouldDoNothingUseReshardingApplication
     auto doc = client.findOne(appliedToNs().ns(), BSON("_id" << 1));
     ASSERT_BSONOBJ_EQ(BSON("_id" << 1 << "sk" << -1), doc);
 
-    future = applier.applyUntilDone();
+    future = applier->applyUntilDone();
     future.get();
 
     // There does not exist a doc with {_id : 2} in the output collection, so we should have applied
@@ -1579,21 +1632,24 @@ TEST_F(ReshardingOplogApplierTest, UpdateOutputCollUseReshardingApplicationRules
                            BSON("_id" << 2)));
 
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
-    ReshardingOplogApplier applier(getServiceContext(),
-                                   sourceId(),
-                                   oplogNs(),
-                                   crudNs(),
-                                   crudUUID(),
-                                   stashCollections(),
-                                   Timestamp(6, 3),
-                                   std::move(iterator),
-                                   2 /* batchSize */,
-                                   chunkManager(),
-                                   getExecutor(),
-                                   writerPool());
+    boost::optional<ReshardingOplogApplier> applier;
+    auto executor = makeTaskExecutorForApplier();
+    auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
+    applier.emplace(getServiceContext(),
+                    sourceId(),
+                    oplogNs(),
+                    crudNs(),
+                    crudUUID(),
+                    stashCollections(),
+                    Timestamp(6, 3),
+                    std::move(iterator),
+                    2 /* batchSize */,
+                    chunkManager(),
+                    executor.get(),
+                    writerPool.get());
 
     // Apply the inserts first so there exists docs in the output collection.
-    auto future = applier.applyUntilCloneFinishedTs();
+    auto future = applier->applyUntilCloneFinishedTs();
     future.get();
 
     DBDirectClient client(operationContext());
@@ -1603,7 +1659,7 @@ TEST_F(ReshardingOplogApplierTest, UpdateOutputCollUseReshardingApplicationRules
     doc = client.findOne(appliedToNs().ns(), BSON("_id" << 2));
     ASSERT_BSONOBJ_EQ(BSON("_id" << 2 << "sk" << 2), doc);
 
-    future = applier.applyUntilDone();
+    future = applier->applyUntilDone();
     future.get();
 
     // We should have updated both docs in the output collection to include the new field "x".
@@ -1637,27 +1693,30 @@ TEST_F(ReshardingOplogApplierTest, UnsupportedCommandOpsShouldErrorUseResharding
                        boost::none));
 
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(ops));
-    ReshardingOplogApplier applier(getServiceContext(),
-                                   sourceId(),
-                                   oplogNs(),
-                                   crudNs(),
-                                   crudUUID(),
-                                   stashCollections(),
-                                   Timestamp(5, 3),
-                                   std::move(iterator),
-                                   1 /* batchSize */,
-                                   chunkManager(),
-                                   getExecutor(),
-                                   writerPool());
+    boost::optional<ReshardingOplogApplier> applier;
+    auto executor = makeTaskExecutorForApplier();
+    auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
+    applier.emplace(getServiceContext(),
+                    sourceId(),
+                    oplogNs(),
+                    crudNs(),
+                    crudUUID(),
+                    stashCollections(),
+                    Timestamp(5, 3),
+                    std::move(iterator),
+                    1 /* batchSize */,
+                    chunkManager(),
+                    executor.get(),
+                    writerPool.get());
 
-    auto future = applier.applyUntilCloneFinishedTs();
+    auto future = applier->applyUntilCloneFinishedTs();
     future.get();
 
     DBDirectClient client(operationContext());
     auto doc = client.findOne(appliedToNs().ns(), BSON("_id" << 1));
     ASSERT_BSONOBJ_EQ(BSON("_id" << 1), doc);
 
-    future = applier.applyUntilDone();
+    future = applier->applyUntilDone();
 
     ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::OplogOperationUnsupported);
 
@@ -1681,20 +1740,23 @@ TEST_F(ReshardingOplogApplierTest,
                        boost::none));
 
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(ops));
-    ReshardingOplogApplier applier(getServiceContext(),
-                                   sourceId(),
-                                   oplogNs(),
-                                   crudNs(),
-                                   crudUUID(),
-                                   stashCollections(),
-                                   Timestamp(5, 3),
-                                   std::move(iterator),
-                                   1 /* batchSize */,
-                                   chunkManager(),
-                                   getExecutor(),
-                                   writerPool());
+    boost::optional<ReshardingOplogApplier> applier;
+    auto executor = makeTaskExecutorForApplier();
+    auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
+    applier.emplace(getServiceContext(),
+                    sourceId(),
+                    oplogNs(),
+                    crudNs(),
+                    crudUUID(),
+                    stashCollections(),
+                    Timestamp(5, 3),
+                    std::move(iterator),
+                    1 /* batchSize */,
+                    chunkManager(),
+                    executor.get(),
+                    writerPool.get());
 
-    auto future = applier.applyUntilCloneFinishedTs();
+    auto future = applier->applyUntilCloneFinishedTs();
 
     ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::OplogOperationUnsupported);
 
@@ -1962,23 +2024,26 @@ TEST_F(ReshardingOplogApplierRetryableTest, CrudWithEmptyConfigTransactions) {
                            1));
 
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
-    ReshardingOplogApplier applier(getServiceContext(),
-                                   sourceId(),
-                                   oplogNs(),
-                                   crudNs(),
-                                   crudUUID(),
-                                   stashCollections(),
-                                   Timestamp(6, 3),
-                                   std::move(iterator),
-                                   2 /* batchSize */,
-                                   chunkManager(),
-                                   getExecutor(),
-                                   writerPool());
+    boost::optional<ReshardingOplogApplier> applier;
+    auto executor = makeTaskExecutorForApplier();
+    auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
+    applier.emplace(getServiceContext(),
+                    sourceId(),
+                    oplogNs(),
+                    crudNs(),
+                    crudUUID(),
+                    stashCollections(),
+                    Timestamp(6, 3),
+                    std::move(iterator),
+                    2 /* batchSize */,
+                    chunkManager(),
+                    executor.get(),
+                    writerPool.get());
 
-    auto future = applier.applyUntilCloneFinishedTs();
+    auto future = applier->applyUntilCloneFinishedTs();
     future.get();
 
-    future = applier.applyUntilDone();
+    future = applier->applyUntilDone();
     future.get();
 
     DBDirectClient client(operationContext());
@@ -2043,23 +2108,26 @@ TEST_F(ReshardingOplogApplierRetryableTest, MultipleTxnSameLsidInOneBatch) {
                            21));
 
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
-    ReshardingOplogApplier applier(getServiceContext(),
-                                   sourceId(),
-                                   oplogNs(),
-                                   crudNs(),
-                                   crudUUID(),
-                                   stashCollections(),
-                                   Timestamp(6, 3),
-                                   std::move(iterator),
-                                   2 /* batchSize */,
-                                   chunkManager(),
-                                   getExecutor(),
-                                   writerPool());
+    boost::optional<ReshardingOplogApplier> applier;
+    auto executor = makeTaskExecutorForApplier();
+    auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
+    applier.emplace(getServiceContext(),
+                    sourceId(),
+                    oplogNs(),
+                    crudNs(),
+                    crudUUID(),
+                    stashCollections(),
+                    Timestamp(6, 3),
+                    std::move(iterator),
+                    2 /* batchSize */,
+                    chunkManager(),
+                    executor.get(),
+                    writerPool.get());
 
-    auto future = applier.applyUntilCloneFinishedTs();
+    auto future = applier->applyUntilCloneFinishedTs();
     future.get();
 
-    future = applier.applyUntilDone();
+    future = applier->applyUntilDone();
     future.get();
 
     DBDirectClient client(operationContext());
@@ -2098,23 +2166,26 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithLowerExistingTxn) {
                            21));
 
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
-    ReshardingOplogApplier applier(getServiceContext(),
-                                   sourceId(),
-                                   oplogNs(),
-                                   crudNs(),
-                                   crudUUID(),
-                                   stashCollections(),
-                                   Timestamp(6, 3),
-                                   std::move(iterator),
-                                   2 /* batchSize */,
-                                   chunkManager(),
-                                   getExecutor(),
-                                   writerPool());
+    boost::optional<ReshardingOplogApplier> applier;
+    auto executor = makeTaskExecutorForApplier();
+    auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
+    applier.emplace(getServiceContext(),
+                    sourceId(),
+                    oplogNs(),
+                    crudNs(),
+                    crudUUID(),
+                    stashCollections(),
+                    Timestamp(6, 3),
+                    std::move(iterator),
+                    2 /* batchSize */,
+                    chunkManager(),
+                    executor.get(),
+                    writerPool.get());
 
-    auto future = applier.applyUntilCloneFinishedTs();
+    auto future = applier->applyUntilCloneFinishedTs();
     future.get();
 
-    future = applier.applyUntilDone();
+    future = applier->applyUntilDone();
     future.get();
 
     DBDirectClient client(operationContext());
@@ -2146,23 +2217,26 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithHigherExistingTxnNum) {
                            incomingStmtId));
 
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
-    ReshardingOplogApplier applier(getServiceContext(),
-                                   sourceId(),
-                                   oplogNs(),
-                                   crudNs(),
-                                   crudUUID(),
-                                   stashCollections(),
-                                   Timestamp(6, 3),
-                                   std::move(iterator),
-                                   2 /* batchSize */,
-                                   chunkManager(),
-                                   getExecutor(),
-                                   writerPool());
+    boost::optional<ReshardingOplogApplier> applier;
+    auto executor = makeTaskExecutorForApplier();
+    auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
+    applier.emplace(getServiceContext(),
+                    sourceId(),
+                    oplogNs(),
+                    crudNs(),
+                    crudUUID(),
+                    stashCollections(),
+                    Timestamp(6, 3),
+                    std::move(iterator),
+                    2 /* batchSize */,
+                    chunkManager(),
+                    executor.get(),
+                    writerPool.get());
 
-    auto future = applier.applyUntilCloneFinishedTs();
+    auto future = applier->applyUntilCloneFinishedTs();
     future.get();
 
-    future = applier.applyUntilDone();
+    future = applier->applyUntilDone();
     future.get();
 
     // Op should always be applied, even if session info was not compatible.
@@ -2204,23 +2278,26 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithLowerExistingTxnNum) {
                            incomingStmtId));
 
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
-    ReshardingOplogApplier applier(getServiceContext(),
-                                   sourceId(),
-                                   oplogNs(),
-                                   crudNs(),
-                                   crudUUID(),
-                                   stashCollections(),
-                                   Timestamp(6, 3),
-                                   std::move(iterator),
-                                   2 /* batchSize */,
-                                   chunkManager(),
-                                   getExecutor(),
-                                   writerPool());
+    boost::optional<ReshardingOplogApplier> applier;
+    auto executor = makeTaskExecutorForApplier();
+    auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
+    applier.emplace(getServiceContext(),
+                    sourceId(),
+                    oplogNs(),
+                    crudNs(),
+                    crudUUID(),
+                    stashCollections(),
+                    Timestamp(6, 3),
+                    std::move(iterator),
+                    2 /* batchSize */,
+                    chunkManager(),
+                    executor.get(),
+                    writerPool.get());
 
-    auto future = applier.applyUntilCloneFinishedTs();
+    auto future = applier->applyUntilCloneFinishedTs();
     future.get();
 
-    future = applier.applyUntilDone();
+    future = applier->applyUntilDone();
     future.get();
 
     // Op should always be applied, even if session info was not compatible.
@@ -2253,23 +2330,26 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithEqualExistingTxnNum) {
                            incomingStmtId));
 
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
-    ReshardingOplogApplier applier(getServiceContext(),
-                                   sourceId(),
-                                   oplogNs(),
-                                   crudNs(),
-                                   crudUUID(),
-                                   stashCollections(),
-                                   Timestamp(6, 3),
-                                   std::move(iterator),
-                                   2 /* batchSize */,
-                                   chunkManager(),
-                                   getExecutor(),
-                                   writerPool());
+    boost::optional<ReshardingOplogApplier> applier;
+    auto executor = makeTaskExecutorForApplier();
+    auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
+    applier.emplace(getServiceContext(),
+                    sourceId(),
+                    oplogNs(),
+                    crudNs(),
+                    crudUUID(),
+                    stashCollections(),
+                    Timestamp(6, 3),
+                    std::move(iterator),
+                    2 /* batchSize */,
+                    chunkManager(),
+                    executor.get(),
+                    writerPool.get());
 
-    auto future = applier.applyUntilCloneFinishedTs();
+    auto future = applier->applyUntilCloneFinishedTs();
     future.get();
 
-    future = applier.applyUntilDone();
+    future = applier->applyUntilDone();
     future.get();
 
     DBDirectClient client(operationContext());
@@ -2302,23 +2382,26 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithStmtIdAlreadyExecuted) 
                            incomingStmtId));
 
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
-    ReshardingOplogApplier applier(getServiceContext(),
-                                   sourceId(),
-                                   oplogNs(),
-                                   crudNs(),
-                                   crudUUID(),
-                                   stashCollections(),
-                                   Timestamp(6, 3),
-                                   std::move(iterator),
-                                   2 /* batchSize */,
-                                   chunkManager(),
-                                   getExecutor(),
-                                   writerPool());
+    boost::optional<ReshardingOplogApplier> applier;
+    auto executor = makeTaskExecutorForApplier();
+    auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
+    applier.emplace(getServiceContext(),
+                    sourceId(),
+                    oplogNs(),
+                    crudNs(),
+                    crudUUID(),
+                    stashCollections(),
+                    Timestamp(6, 3),
+                    std::move(iterator),
+                    2 /* batchSize */,
+                    chunkManager(),
+                    executor.get(),
+                    writerPool.get());
 
-    auto future = applier.applyUntilCloneFinishedTs();
+    auto future = applier->applyUntilCloneFinishedTs();
     future.get();
 
-    future = applier.applyUntilDone();
+    future = applier->applyUntilDone();
     future.get();
 
     DBDirectClient client(operationContext());
@@ -2352,23 +2435,26 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithActiveUnpreparedTxnSame
                            1));
 
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
-    ReshardingOplogApplier applier(getServiceContext(),
-                                   sourceId(),
-                                   oplogNs(),
-                                   crudNs(),
-                                   crudUUID(),
-                                   stashCollections(),
-                                   Timestamp(6, 3),
-                                   std::move(iterator),
-                                   2 /* batchSize */,
-                                   chunkManager(),
-                                   getExecutor(),
-                                   writerPool());
+    boost::optional<ReshardingOplogApplier> applier;
+    auto executor = makeTaskExecutorForApplier();
+    auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
+    applier.emplace(getServiceContext(),
+                    sourceId(),
+                    oplogNs(),
+                    crudNs(),
+                    crudUUID(),
+                    stashCollections(),
+                    Timestamp(6, 3),
+                    std::move(iterator),
+                    2 /* batchSize */,
+                    chunkManager(),
+                    executor.get(),
+                    writerPool.get());
 
-    auto future = applier.applyUntilCloneFinishedTs();
+    auto future = applier->applyUntilCloneFinishedTs();
     future.get();
 
-    future = applier.applyUntilDone();
+    future = applier->applyUntilDone();
     future.get();
 
     // Op should always be applied, even if session info was not compatible.
@@ -2404,23 +2490,26 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithActiveUnpreparedTxnWith
                            1));
 
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
-    ReshardingOplogApplier applier(getServiceContext(),
-                                   sourceId(),
-                                   oplogNs(),
-                                   crudNs(),
-                                   crudUUID(),
-                                   stashCollections(),
-                                   Timestamp(6, 3),
-                                   std::move(iterator),
-                                   2 /* batchSize */,
-                                   chunkManager(),
-                                   getExecutor(),
-                                   writerPool());
+    boost::optional<ReshardingOplogApplier> applier;
+    auto executor = makeTaskExecutorForApplier();
+    auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
+    applier.emplace(getServiceContext(),
+                    sourceId(),
+                    oplogNs(),
+                    crudNs(),
+                    crudUUID(),
+                    stashCollections(),
+                    Timestamp(6, 3),
+                    std::move(iterator),
+                    2 /* batchSize */,
+                    chunkManager(),
+                    executor.get(),
+                    writerPool.get());
 
-    auto future = applier.applyUntilCloneFinishedTs();
+    auto future = applier->applyUntilCloneFinishedTs();
     future.get();
 
-    future = applier.applyUntilDone();
+    future = applier->applyUntilDone();
     future.get();
 
     // Op should always be applied, even if session info was not compatible.
@@ -2455,20 +2544,23 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithPreparedTxnThatWillComm
                            1));
 
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
-    ReshardingOplogApplier applier(getServiceContext(),
-                                   sourceId(),
-                                   oplogNs(),
-                                   crudNs(),
-                                   crudUUID(),
-                                   stashCollections(),
-                                   Timestamp(6, 3),
-                                   std::move(iterator),
-                                   2 /* batchSize */,
-                                   chunkManager(),
-                                   getExecutor(),
-                                   writerPool());
+    boost::optional<ReshardingOplogApplier> applier;
+    auto executor = makeTaskExecutorForApplier();
+    auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
+    applier.emplace(getServiceContext(),
+                    sourceId(),
+                    oplogNs(),
+                    crudNs(),
+                    crudUUID(),
+                    stashCollections(),
+                    Timestamp(6, 3),
+                    std::move(iterator),
+                    2 /* batchSize */,
+                    chunkManager(),
+                    executor.get(),
+                    writerPool.get());
 
-    auto future = applier.applyUntilCloneFinishedTs();
+    auto future = applier->applyUntilCloneFinishedTs();
 
     // Sleep a little bit to make the applier block on the prepared transaction.
     sleepmillis(200);
@@ -2479,7 +2571,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithPreparedTxnThatWillComm
 
     future.get();
 
-    future = applier.applyUntilDone();
+    future = applier->applyUntilDone();
     future.get();
 
     // Op should always be applied, even if session info was not compatible.
@@ -2514,20 +2606,23 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithPreparedTxnThatWillAbor
                            1));
 
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
-    ReshardingOplogApplier applier(getServiceContext(),
-                                   sourceId(),
-                                   oplogNs(),
-                                   crudNs(),
-                                   crudUUID(),
-                                   stashCollections(),
-                                   Timestamp(6, 3),
-                                   std::move(iterator),
-                                   2 /* batchSize */,
-                                   chunkManager(),
-                                   getExecutor(),
-                                   writerPool());
+    boost::optional<ReshardingOplogApplier> applier;
+    auto executor = makeTaskExecutorForApplier();
+    auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
+    applier.emplace(getServiceContext(),
+                    sourceId(),
+                    oplogNs(),
+                    crudNs(),
+                    crudUUID(),
+                    stashCollections(),
+                    Timestamp(6, 3),
+                    std::move(iterator),
+                    2 /* batchSize */,
+                    chunkManager(),
+                    executor.get(),
+                    writerPool.get());
 
-    auto future = applier.applyUntilCloneFinishedTs();
+    auto future = applier->applyUntilCloneFinishedTs();
 
     // Sleep a little bit to make the applier block on the prepared transaction.
     sleepmillis(200);
@@ -2538,7 +2633,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithPreparedTxnThatWillAbor
 
     future.get();
 
-    future = applier.applyUntilDone();
+    future = applier->applyUntilDone();
     future.get();
 
     // Op should always be applied, even if session info was not compatible.
