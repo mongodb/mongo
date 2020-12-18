@@ -167,6 +167,30 @@ BSONObj makeTimeseriesUpsertRequest(const OID& bucketId,
     return builder.obj();
 }
 
+/**
+ * Transforms a single time-series insert to an update request on an existing bucket.
+ */
+BSONObj makeTimeseriesUpdateRequest(const OID& bucketId,
+                                    const BucketCatalog::CommitData& data,
+                                    const BSONObj& metadata) {
+    BSONObjBuilder builder;
+    builder.append(write_ops::UpdateOpEntry::kQFieldName, BSON("_id" << bucketId));
+    builder.append(write_ops::UpdateOpEntry::kMultiFieldName, false);
+    builder.append(write_ops::UpdateOpEntry::kUpsertFieldName, false);
+    {
+        auto metadataElem = metadata.firstElement();
+        BSONObjBuilder updateBuilder(builder.subobjStart(write_ops::UpdateOpEntry::kUFieldName));
+        {
+            BSONObjBuilder setOpBuilder(updateBuilder.subobjStart("$set"));
+            setOpBuilder.append("control.min", data.bucketMin);
+            setOpBuilder.append("control.max", data.bucketMax);
+            appendTimeseriesDataFields(
+                data.docs, metadataElem, data.numCommittedMeasurements, &setOpBuilder);
+        }
+    }
+    return builder.obj();
+}
+
 void appendOpTime(const repl::OpTime& opTime, BSONObjBuilder* out) {
     if (opTime.getTerm() == repl::OpTime::kUninitializedTerm) {
         out->append("opTime", opTime.getTimestamp());
@@ -465,28 +489,54 @@ private:
                 auto metadata = bucketCatalog.getMetadata(bucketId);
                 auto data = bucketCatalog.commit(bucketId);
                 while (!data.docs.empty()) {
-                    BSONObjBuilder builder;
-                    builder.append(write_ops::Update::kCommandName, bucketsNs.coll());
-                    // The schema validation configured in the bucket collection is intended for
-                    // direct operations by end users and is not applicable here.
-                    builder.append(write_ops::Update::kBypassDocumentValidationFieldName, true);
-                    builder.append(write_ops::Update::kOrderedFieldName, _batch.getOrdered());
-                    if (auto stmtId = _batch.getStmtId()) {
-                        builder.append(write_ops::Update::kStmtIdFieldName, *stmtId);
-                    } else if (auto stmtIds = _batch.getStmtIds()) {
-                        builder.append(write_ops::Update::kStmtIdsFieldName, *stmtIds);
-                    }
+                    write_ops_exec::WriteResult reply;
+                    if (data.numCommittedMeasurements == 0) {
+                        BSONObjBuilder builder;
+                        builder.append(write_ops::Update::kCommandName, bucketsNs.coll());
+                        // The schema validation configured in the bucket collection is intended for
+                        // direct operations by end users and is not applicable here.
+                        builder.append(write_ops::Update::kBypassDocumentValidationFieldName, true);
+                        builder.append(write_ops::Update::kOrderedFieldName, _batch.getOrdered());
+                        if (auto stmtId = _batch.getStmtId()) {
+                            builder.append(write_ops::Update::kStmtIdFieldName, *stmtId);
+                        } else if (auto stmtIds = _batch.getStmtIds()) {
+                            builder.append(write_ops::Update::kStmtIdsFieldName, *stmtIds);
+                        }
 
-                    {
-                        BSONArrayBuilder updatesBuilder(
-                            builder.subarrayStart(write_ops::Update::kUpdatesFieldName));
-                        updatesBuilder.append(
-                            makeTimeseriesUpsertRequest(bucketId, data, metadata));
-                    }
+                        {
+                            BSONArrayBuilder updatesBuilder(
+                                builder.subarrayStart(write_ops::Update::kUpdatesFieldName));
+                            updatesBuilder.append(
+                                makeTimeseriesUpsertRequest(bucketId, data, metadata));
+                        }
 
-                    auto request = OpMsgRequest::fromDBAndBody(bucketsNs.db(), builder.obj());
-                    auto timeseriesUpsertBatch = UpdateOp::parse(request);
-                    auto reply = write_ops_exec::performUpdates(opCtx, timeseriesUpsertBatch);
+                        auto request = OpMsgRequest::fromDBAndBody(bucketsNs.db(), builder.obj());
+                        auto timeseriesUpsertBatch = UpdateOp::parse(request);
+                        reply = write_ops_exec::performUpdates(opCtx, timeseriesUpsertBatch);
+                    } else {
+                        BSONObjBuilder builder;
+                        builder.append(write_ops::Update::kCommandName, bucketsNs.coll());
+                        // The schema validation configured in the bucket collection is intended for
+                        // direct operations by end users and is not applicable here.
+                        builder.append(write_ops::Update::kBypassDocumentValidationFieldName, true);
+                        builder.append(write_ops::Update::kOrderedFieldName, _batch.getOrdered());
+                        if (auto stmtId = _batch.getStmtId()) {
+                            builder.append(write_ops::Update::kStmtIdFieldName, *stmtId);
+                        } else if (auto stmtIds = _batch.getStmtIds()) {
+                            builder.append(write_ops::Update::kStmtIdsFieldName, *stmtIds);
+                        }
+
+                        {
+                            BSONArrayBuilder updatesBuilder(
+                                builder.subarrayStart(write_ops::Update::kUpdatesFieldName));
+                            updatesBuilder.append(
+                                makeTimeseriesUpdateRequest(bucketId, data, metadata));
+                        }
+
+                        auto request = OpMsgRequest::fromDBAndBody(bucketsNs.db(), builder.obj());
+                        auto timeseriesUpdateBatch = UpdateOp::parse(request);
+                        reply = write_ops_exec::performUpdates(opCtx, timeseriesUpdateBatch);
+                    }
 
                     invariant(reply.results.size() == 1,
                               str::stream()
