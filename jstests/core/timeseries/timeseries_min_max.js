@@ -5,6 +5,7 @@
  * @tags: [
  *     does_not_support_stepdowns,
  *     requires_fcv_49,
+ *     requires_find_command,
  * ]
  */
 (function() {

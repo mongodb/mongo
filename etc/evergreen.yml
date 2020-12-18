@@ -11107,6 +11107,7 @@ buildvariants:
     distros:
     - rhel62-large
   - name: jsCore
+  - name: jsCore_compatibility
   - name: jsCore_txns
   - name: noPassthrough_gen
   - name: noPassthroughWithMongod_gen
