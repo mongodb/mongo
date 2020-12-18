@@ -65,6 +65,7 @@
 #include "mongo/db/write_concern.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
 namespace {
@@ -175,16 +176,56 @@ write_ops::UpdateOpEntry makeTimeseriesUpdateOpEntry(const OID& bucketId,
                                                      const BSONObj& metadata) {
     BSONObjBuilder updateBuilder;
     {
-        BSONObjBuilder setOpBuilder(updateBuilder.subobjStart("$set"));
-        setOpBuilder.append("control.min", data.bucketMin);
-        setOpBuilder.append("control.max", data.bucketMax);
-        auto metadataElem = metadata.firstElement();
-        appendTimeseriesDataFields(
-            data.docs, metadataElem, data.numCommittedMeasurements, &setOpBuilder);
+        // doc_diff::kSubDiffSectionFieldPrefix + <field name>
+        BSONObjBuilder controlBuilder(updateBuilder.subobjStart("scontrol"));
+        {
+            // doc_diff::kUpdateSectionFieldName
+            BSONObjBuilder controlUpdateBuilder(controlBuilder.subobjStart("u"));
+            controlUpdateBuilder.append("min", data.bucketMin);
+            controlUpdateBuilder.append("max", data.bucketMax);
+        }
     }
+    {
+        // doc_diff::kSubDiffSectionFieldPrefix + <field name> => {<index_0>: ..., <index_1>: ...}
+        StringDataMap<BSONObjBuilder> dataFieldBuilders;
+        auto metadataElem = metadata.firstElement();
+        auto count = data.numCommittedMeasurements;
+        for (const auto& doc : data.docs) {
+            for (const auto& elem : doc) {
+                auto key = elem.fieldNameStringData();
+                if (metadataElem && key == metadataElem.fieldNameStringData()) {
+                    continue;
+                }
+                auto& builder = dataFieldBuilders[key];
+                builder.appendAs(elem, std::to_string(count));
+            }
+            count++;
+        }
 
-    write_ops::UpdateModification u(updateBuilder.obj(),
-                                    write_ops::UpdateModification::ClassicTag{});
+        // doc_diff::kSubDiffSectionFieldPrefix + <field name>
+        BSONObjBuilder dataBuilder(updateBuilder.subobjStart("sdata"));
+        BSONObjBuilder newDataFieldsBuilder;
+        for (auto& pair : dataFieldBuilders) {
+            // Existing 'data' fields with measurements require different treatment from fields
+            // not observed before (missing from control.min and control.max).
+            if (data.newFieldNamesToBeInserted.count(pair.first)) {
+                newDataFieldsBuilder.append(pair.first, pair.second.obj());
+            }
+        }
+        auto newDataFields = newDataFieldsBuilder.obj();
+        if (!newDataFields.isEmpty()) {
+            dataBuilder.append(doc_diff::kInsertSectionFieldName, newDataFields);
+        }
+        for (auto& pair : dataFieldBuilders) {
+            // Existing 'data' fields with measurements require different treatment from fields
+            // not observed before (missing from control.min and control.max).
+            if (!data.newFieldNamesToBeInserted.count(pair.first)) {
+                dataBuilder.append(doc_diff::kSubDiffSectionFieldPrefix + pair.first.toString(),
+                                   BSON(doc_diff::kInsertSectionFieldName << pair.second.obj()));
+            }
+        }
+    }
+    write_ops::UpdateModification u(updateBuilder.obj(), write_ops::UpdateModification::DiffTag{});
     write_ops::UpdateOpEntry update(BSON("_id" << bucketId), std::move(u));
     invariant(!update.getMulti(), bucketId.toString());
     invariant(!update.getUpsert(), bucketId.toString());
