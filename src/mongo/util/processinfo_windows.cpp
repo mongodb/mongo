@@ -113,12 +113,29 @@ ProcessInfo::~ProcessInfo() {}
 boost::optional<unsigned long> ProcessInfo::getNumCoresForProcess() {
     DWORD_PTR process_mask, system_mask;
 
-    if (GetProcessAffinityMask(GetCurrentProcess(), &process_mask, &system_mask)) {
-        std::bitset<sizeof(process_mask) * 8> mask(process_mask);
-        if (mask.count() > 0)
-            return mask.count();
+    if (!GetProcessAffinityMask(GetCurrentProcess(), &process_mask, &system_mask))
+        return boost::none;
+
+    std::bitset<sizeof(process_mask) * 8> mask(process_mask);
+    auto num = mask.count();
+    if (num == 0)
+        return boost::none;
+
+    // If we are running in a Windows Container using process isolation this process is
+    // associated with a job object we can query for the cpu limit
+    // https://docs.microsoft.com/en-us/virtualization/windowscontainers/manage-containers/resource-controls
+    // https://docs.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-jobobject_cpu_rate_control_information
+    JOBOBJECT_CPU_RATE_CONTROL_INFORMATION cpuInfo;
+    ZeroMemory(&cpuInfo, sizeof(cpuInfo));
+    if (QueryInformationJobObject(
+            NULL, JobObjectCpuRateControlInformation, &cpuInfo, sizeof(cpuInfo), NULL) &&
+        (cpuInfo.ControlFlags & JOB_OBJECT_CPU_RATE_CONTROL_ENABLE) &&
+        (cpuInfo.ControlFlags & JOB_OBJECT_CPU_RATE_CONTROL_HARD_CAP)) {
+        // CpuRate is a percentage times 100
+        num = std::ceil(num * (static_cast<double>(cpuInfo.CpuRate) / 10000));
     }
-    return boost::none;
+
+    return num;
 }
 
 bool ProcessInfo::supported() {
@@ -276,7 +293,21 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
     mse.dwLength = sizeof(mse);
     if (GlobalMemoryStatusEx(&mse)) {
         memSize = mse.ullTotalPhys;
-        memLimit = memSize;
+
+        // If we are running in a Windows Container using process isolation this process is
+        // associated with a job object we can query for the memory limit
+        // https://docs.microsoft.com/en-us/virtualization/windowscontainers/manage-containers/resource-controls
+        // https://docs.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-jobobject_extended_limit_information
+        JOBOBJECT_EXTENDED_LIMIT_INFORMATION jobInfo;
+        ZeroMemory(&jobInfo, sizeof(jobInfo));
+        if (QueryInformationJobObject(
+                NULL, JobObjectExtendedLimitInformation, &jobInfo, sizeof(jobInfo), NULL) &&
+            (jobInfo.BasicLimitInformation.LimitFlags & JOB_OBJECT_LIMIT_JOB_MEMORY) &&
+            jobInfo.JobMemoryLimit != 0) {
+            memLimit = jobInfo.JobMemoryLimit;
+        } else {
+            memLimit = memSize;
+        }
     }
 
     // get OS version info
