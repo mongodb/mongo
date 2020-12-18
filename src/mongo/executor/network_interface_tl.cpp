@@ -901,6 +901,8 @@ auto NetworkInterfaceTL::ExhaustCommandState::make(NetworkInterfaceTL* interface
 
 Future<RemoteCommandResponse> NetworkInterfaceTL::ExhaustCommandState::sendRequest(
     std::shared_ptr<RequestState> requestState) {
+    auto [promise, future] = makePromiseFuture<RemoteCommandResponse>();
+    finalResponsePromise = std::move(promise);
 
     setTimer();
     requestState->getClient(requestState->conn)
@@ -909,9 +911,6 @@ Future<RemoteCommandResponse> NetworkInterfaceTL::ExhaustCommandState::sendReque
         .getAsync([this, requestState](StatusWith<RemoteCommandResponse> swResponse) mutable {
             continueExhaustRequest(std::move(requestState), swResponse);
         });
-
-    auto [promise, future] = makePromiseFuture<RemoteCommandResponse>();
-    finalResponsePromise = std::move(promise);
     return std::move(future).then([this](const auto& finalResponse) { return finalResponse; });
 }
 
