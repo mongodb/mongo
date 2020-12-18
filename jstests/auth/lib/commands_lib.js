@@ -5450,21 +5450,6 @@ var authCommandsLib = {
           ]
         },
         {
-          testname: "unsetSharding",
-          command: {unsetSharding: "x"},
-          skipSharded: true,
-          testcases: [
-              {
-                runOnDb: adminDbName,
-                roles: {__system: 1},
-                privileges: [{resource: {cluster: true}, actions: ["internal"]}],
-                expectFail: true
-              },
-              {runOnDb: firstDbName, roles: {}},
-              {runOnDb: secondDbName, roles: {}}
-          ]
-        },
-        {
           testname: "updateRole_authenticationRestrictions",
           command: {updateRole: "testRole", authenticationRestrictions: []},
           setup: function(db) {

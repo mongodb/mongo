@@ -300,7 +300,6 @@ const allCommands = {
     testVersions1And2: {skip: isNotAUserDataRead},
     testVersion2: {skip: isNotAUserDataRead},
     top: {skip: isNotAUserDataRead},
-    unsetSharding: {skip: isNotAUserDataRead},
     update: {skip: isPrimaryOnly},
     updateRole: {skip: isPrimaryOnly},
     updateUser: {skip: isPrimaryOnly},

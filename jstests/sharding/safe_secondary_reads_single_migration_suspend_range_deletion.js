@@ -377,7 +377,6 @@ let testCases = {
     testVersions1And2: {skip: "does not return user data"},
     testVersion2: {skip: "does not return user data"},
     top: {skip: "does not return user data"},
-    unsetSharding: {skip: "does not return user data"},
     update: {skip: "primary only"},
     updateRole: {skip: "primary only"},
     updateUser: {skip: "primary only"},

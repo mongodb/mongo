@@ -885,7 +885,6 @@ const testCases = {
     startSession: {skip: isNotRunOnUserDatabase},
     stopRecordingTraffic: {skip: isNotRunOnUserDatabase},
     top: {skip: isNotRunOnUserDatabase},
-    unsetSharding: {skip: isNotRunOnUserDatabase},
     update: {
         testInTransaction: true,
         testAsRetryableWrite: true,

@@ -555,7 +555,6 @@ let viewsCommandTests = {
     testVersion2: {skip: isAnInternalCommand},
     testVersions1And2: {skip: isAnInternalCommand},
     top: {skip: "tested in views/views_stats.js"},
-    unsetSharding: {skip: isAnInternalCommand},
     update: {command: {update: "view", updates: [{q: {x: 1}, u: {x: 2}}]}, expectFailure: true},
     updateRole: {
         command: {
