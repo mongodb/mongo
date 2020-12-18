@@ -51,6 +51,15 @@ assert(checkShardName('repl', shardsArray),
 // remove 'repl' shard
 assert.soon(function() {
     var res = shardTest.admin.runCommand({removeShard: 'repl'});
+    if (!res.ok && res.code === ErrorCodes.ShardNotFound) {
+        // If the config server primary steps down right after removing the config.shards doc
+        // for the shard but before responding with "state": "completed", the mongos would retry
+        // the _configsvrRemoveShard command against the new config server primary, which would
+        // not find the removed shard in its ShardRegistry if it has done a ShardRegistry reload
+        // after the config.shards doc for the shard was removed. This would cause the command
+        // to fail with ShardNotFound.
+        return true;
+    }
     assert.commandWorked(res, 'removeShard command failed');
     return res.state === 'completed';
 }, 'failed to remove the replica set shard');
