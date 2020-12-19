@@ -1084,12 +1084,12 @@ void DurableCatalogImpl::setRecordPreImages(OperationContext* opCtx, RecordId ca
 void DurableCatalogImpl::updateValidator(OperationContext* opCtx,
                                          RecordId catalogId,
                                          const BSONObj& validator,
-                                         StringData validationLevel,
-                                         StringData validationAction) {
+                                         boost::optional<ValidationLevelEnum> newLevel,
+                                         boost::optional<ValidationActionEnum> newAction) {
     BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, catalogId);
     md.options.validator = validator;
-    md.options.validationLevel = validationLevel.toString();
-    md.options.validationAction = validationAction.toString();
+    md.options.validationLevel = newLevel;
+    md.options.validationAction = newAction;
     putMetaData(opCtx, catalogId, md);
 }
 

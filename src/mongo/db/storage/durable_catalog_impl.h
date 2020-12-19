@@ -158,8 +158,8 @@ public:
     void updateValidator(OperationContext* opCtx,
                          RecordId catalogId,
                          const BSONObj& validator,
-                         StringData validationLevel,
-                         StringData validationAction);
+                         boost::optional<ValidationLevelEnum> newLevel,
+                         boost::optional<ValidationActionEnum> newAction);
 
     void removeIndex(OperationContext* opCtx, RecordId catalogId, StringData indexName);
 

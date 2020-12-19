@@ -224,7 +224,8 @@ public:
                                 "Could not parse catalog entry while replying to listIndexes",
                                 "entry"_attr = nextDoc,
                                 "error"_attr = exc);
-                    fassertFailed(5254501);
+                    uasserted(5254501,
+                              "Could not parse catalog entry while replying to listIndexes");
                 }
                 bytesBuffered += nextDoc.objsize();
             }

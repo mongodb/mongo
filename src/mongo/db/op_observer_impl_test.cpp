@@ -269,8 +269,8 @@ TEST_F(OpObserverTest, CollModWithCollectionOptionsAndTTLInfo) {
                                         << "indexData");
 
     CollectionOptions oldCollOpts;
-    oldCollOpts.validationLevel = "strict";
-    oldCollOpts.validationAction = "error";
+    oldCollOpts.validationLevel = ValidationLevelEnum::strict;
+    oldCollOpts.validationAction = ValidationActionEnum::error;
 
     IndexCollModInfo indexInfo;
     indexInfo.expireAfterSeconds = Seconds(10);
@@ -301,12 +301,13 @@ TEST_F(OpObserverTest, CollModWithCollectionOptionsAndTTLInfo) {
 
     // Ensure that the old collection metadata was saved.
     auto o2 = oplogEntry.getObjectField("o2");
-    auto o2Expected =
-        BSON("collectionOptions_old"
-             << BSON("validationLevel" << oldCollOpts.validationLevel << "validationAction"
-                                       << oldCollOpts.validationAction)
-             << "expireAfterSeconds_old"
-             << durationCount<Seconds>(indexInfo.oldExpireAfterSeconds.get()));
+    auto o2Expected = BSON("collectionOptions_old"
+                           << BSON("validationLevel"
+                                   << ValidationLevel_serializer(*oldCollOpts.validationLevel)
+                                   << "validationAction"
+                                   << ValidationAction_serializer(*oldCollOpts.validationAction))
+                           << "expireAfterSeconds_old"
+                           << durationCount<Seconds>(indexInfo.oldExpireAfterSeconds.get()));
 
     ASSERT_BSONOBJ_EQ(o2Expected, o2);
 }
@@ -324,8 +325,8 @@ TEST_F(OpObserverTest, CollModWithOnlyCollectionOptions) {
                                         << "warn");
 
     CollectionOptions oldCollOpts;
-    oldCollOpts.validationLevel = "strict";
-    oldCollOpts.validationAction = "error";
+    oldCollOpts.validationLevel = ValidationLevelEnum::strict;
+    oldCollOpts.validationAction = ValidationActionEnum::error;
 
     // Write to the oplog.
     {
@@ -344,10 +345,12 @@ TEST_F(OpObserverTest, CollModWithOnlyCollectionOptions) {
 
     // Ensure that the old collection metadata was saved and that TTL info is not present.
     auto o2 = oplogEntry.getObjectField("o2");
-    auto o2Expected =
-        BSON("collectionOptions_old"
-             << BSON("validationLevel" << oldCollOpts.validationLevel << "validationAction"
-                                       << oldCollOpts.validationAction));
+    auto o2Expected = BSON("collectionOptions_old"
+                           << BSON("validationLevel"
+                                   << ValidationLevel_serializer(*oldCollOpts.validationLevel)
+                                   << "validationAction"
+                                   << ValidationAction_serializer(*oldCollOpts.validationAction)));
+
     ASSERT_BSONOBJ_EQ(o2Expected, o2);
 }
 

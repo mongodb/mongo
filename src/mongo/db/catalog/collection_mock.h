@@ -203,24 +203,24 @@ public:
         std::abort();
     }
 
-    Status setValidationLevel(OperationContext* opCtx, StringData newLevel) {
+    Status setValidationLevel(OperationContext* opCtx, ValidationLevelEnum newLevel) {
         std::abort();
     }
-    Status setValidationAction(OperationContext* opCtx, StringData newAction) {
+    Status setValidationAction(OperationContext* opCtx, ValidationActionEnum newAction) {
         std::abort();
     }
 
-    StringData getValidationLevel() const {
+    boost::optional<ValidationLevelEnum> getValidationLevel() const {
         std::abort();
     }
-    StringData getValidationAction() const {
+    boost::optional<ValidationActionEnum> getValidationAction() const {
         std::abort();
     }
 
     Status updateValidator(OperationContext* opCtx,
                            BSONObj newValidator,
-                           StringData newLevel,
-                           StringData newAction) {
+                           boost::optional<ValidationLevelEnum> newLevel,
+                           boost::optional<ValidationActionEnum> newAction) {
         std::abort();
     }
 

@@ -127,37 +127,4 @@ void Collection::Factory::set(ServiceContext* service,
     auto& factory = getFactory(service);
     factory = std::move(newFactory);
 }
-
-// static
-Status Collection::parseValidationLevel(StringData newLevel) {
-    if (newLevel == "") {
-        // default
-        return Status::OK();
-    } else if (newLevel == "off") {
-        return Status::OK();
-    } else if (newLevel == "moderate") {
-        return Status::OK();
-    } else if (newLevel == "strict") {
-        return Status::OK();
-    } else {
-        return Status(ErrorCodes::BadValue,
-                      str::stream() << "invalid validation level: " << newLevel);
-    }
-}
-
-// static
-Status Collection::parseValidationAction(StringData newAction) {
-    if (newAction == "") {
-        // default
-        return Status::OK();
-    } else if (newAction == "warn") {
-        return Status::OK();
-    } else if (newAction == "error") {
-        return Status::OK();
-    } else {
-        return Status(ErrorCodes::BadValue,
-                      str::stream() << "invalid validation action: " << newAction);
-    }
-}
-
 }  // namespace mongo

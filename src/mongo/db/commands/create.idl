@@ -54,6 +54,7 @@ commands:
                               _id field."
                 type: safeBool
                 optional: true
+                unstable: true
             idIndex:
                 description: "Specify the default _id index specification."
                 type: object
@@ -65,6 +66,7 @@ commands:
                 validator:
                     gte: 1
                     lte: 1125899906842624  # 1 PB
+                unstable: true
             max:
                 description: "The maximum number of documents allowed in the capped collection. The
                               'size' limit takes precedence over this limit."
@@ -72,13 +74,13 @@ commands:
                 optional: true
                 validator:
                     lt: 2147483648  # 2^31
-            # TODO (SERVER-52538): Create a StorageEngineOptions struct.
+                unstable: true
             storageEngine:
                 description: "Specify a configuration to the storage engine on a per-collection
                               basis when creating a collection."
                 type: object
                 optional: true
-            # TODO (SERVER-52538): Create a Validator struct.
+                unstable: true
             validator:
                 description: "Specify validation rules or expressions for the collection."
                 type: object
@@ -100,6 +102,7 @@ commands:
                               creating a collection."
                 type: IndexOptionDefaults
                 optional: true
+                unstable: true
             viewOn:
                 description: "The name of the source collection or view from which to create the 
                               view."

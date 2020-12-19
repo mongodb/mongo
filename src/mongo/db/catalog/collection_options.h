@@ -85,7 +85,10 @@ struct CollectionOptions {
     static StatusWith<CollectionOptions> parse(const BSONObj& options,
                                                ParseKind kind = parseForCommand);
 
-    static CollectionOptions parse(const CreateCommand& cmd);
+    /**
+     * Converts a client "create" command invocation.
+     */
+    static CollectionOptions fromCreateCommand(const CreateCommand& cmd);
 
     void appendBSON(BSONObjBuilder* builder) const;
     BSONObj toBSON() const;
@@ -131,8 +134,8 @@ struct CollectionOptions {
 
     // Always owned or empty.
     BSONObj validator;
-    std::string validationAction;
-    std::string validationLevel;
+    boost::optional<ValidationActionEnum> validationAction;
+    boost::optional<ValidationLevelEnum> validationLevel;
 
     // The namespace's default collation.
     BSONObj collation;

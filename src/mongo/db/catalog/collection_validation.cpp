@@ -318,6 +318,26 @@ void addErrorIfUnequal(T stored, T cached, StringData name, ValidateResults* res
     }
 }
 
+void addErrorIfUnequal(boost::optional<ValidationLevelEnum> stored,
+                       boost::optional<ValidationLevelEnum> cached,
+                       StringData name,
+                       ValidateResults* results) {
+    addErrorIfUnequal(ValidationLevel_serializer(validationLevelOrDefault(stored)),
+                      ValidationLevel_serializer(validationLevelOrDefault(cached)),
+                      name,
+                      results);
+}
+
+void addErrorIfUnequal(boost::optional<ValidationActionEnum> stored,
+                       boost::optional<ValidationActionEnum> cached,
+                       StringData name,
+                       ValidateResults* results) {
+    addErrorIfUnequal(ValidationAction_serializer(validationActionOrDefault(stored)),
+                      ValidationAction_serializer(validationActionOrDefault(cached)),
+                      name,
+                      results);
+}
+
 std::string multikeyPathsToString(MultikeyPaths paths) {
     str::stream builder;
     builder << "[";
@@ -371,14 +391,12 @@ void _validateCatalogEntry(OperationContext* opCtx,
     BSONObj validatorDoc = collection->getValidatorDoc();
     addErrorIfUnequal(options.validator.toString(), validatorDoc.toString(), "validator", results);
     if (!options.validator.isEmpty() && !validatorDoc.isEmpty()) {
-        addErrorIfUnequal(options.validationAction.length() ? options.validationAction : "error",
-                          collection->getValidationAction().toString(),
+        addErrorIfUnequal(options.validationAction,
+                          collection->getValidationAction(),
                           "validation action",
                           results);
-        addErrorIfUnequal(options.validationLevel.length() ? options.validationLevel : "strict",
-                          collection->getValidationLevel().toString(),
-                          "validation level",
-                          results);
+        addErrorIfUnequal(
+            options.validationLevel, collection->getValidationLevel(), "validation level", results);
     }
 
     addErrorIfUnequal(options.isView(), false, "is a view", results);

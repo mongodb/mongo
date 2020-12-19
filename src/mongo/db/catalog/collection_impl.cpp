@@ -163,46 +163,6 @@ std::unique_ptr<CollatorInterface> parseCollation(OperationContext* opCtx,
     return std::move(collator.getValue());
 }
 
-// TODO (SERVER-52538): Remove, rely on IDL-generated enum.
-StatusWith<CollectionImpl::ValidationLevel> _parseValidationLevel(StringData newLevel) {
-    auto status = Collection::parseValidationLevel(newLevel);
-    if (!status.isOK()) {
-        return status;
-    }
-
-    if (newLevel == "") {
-        // default
-        return CollectionImpl::ValidationLevel::STRICT_V;
-    } else if (newLevel == "off") {
-        return CollectionImpl::ValidationLevel::OFF;
-    } else if (newLevel == "moderate") {
-        return CollectionImpl::ValidationLevel::MODERATE;
-    } else if (newLevel == "strict") {
-        return CollectionImpl::ValidationLevel::STRICT_V;
-    }
-
-    MONGO_UNREACHABLE;
-}
-
-// TODO (SERVER-52538): Remove, rely on IDL-generated enum.
-StatusWith<CollectionImpl::ValidationAction> _parseValidationAction(StringData newAction) {
-    auto status = Collection::parseValidationAction(newAction);
-    if (!status.isOK()) {
-        return status;
-    }
-
-    if (newAction == "") {
-        // default
-        return CollectionImpl::ValidationAction::ERROR_V;
-    } else if (newAction == "warn") {
-        return CollectionImpl::ValidationAction::WARN;
-    } else if (newAction == "error") {
-        return CollectionImpl::ValidationAction::ERROR_V;
-    }
-
-    MONGO_UNREACHABLE;
-}
-
 Status checkValidatorCanBeUsedOnNs(const BSONObj& validator,
                                    const NamespaceString& nss,
                                    const UUID& uuid) {
@@ -345,10 +305,10 @@ void CollectionImpl::init(OperationContext* opCtx) {
     // Enforce that the validator can be used on this namespace.
     uassertStatusOK(checkValidatorCanBeUsedOnNs(validatorDoc, ns(), _uuid));
 
-    // Make sure to parse the action and level before the MatchExpression, since certain features
+    // Make sure to copy the action and level before parsing MatchExpression, since certain features
     // are not supported with certain combinations of action and level.
-    _validationAction = uassertStatusOK(_parseValidationAction(collectionOptions.validationAction));
-    _validationLevel = uassertStatusOK(_parseValidationLevel(collectionOptions.validationLevel));
+    _validationAction = collectionOptions.validationAction;
+    _validationLevel = collectionOptions.validationLevel;
     if (collectionOptions.recordPreImages) {
         uassertStatusOK(validatePreImageRecording(opCtx, _ns));
         _recordPreImages = true;
@@ -438,7 +398,7 @@ Status CollectionImpl::checkValidation(OperationContext* opCtx, const BSONObj& d
     if (!validatorMatchExpr)
         return Status::OK();
 
-    if (_validationLevel == ValidationLevel::OFF)
+    if (validationLevelOrDefault(_validationLevel) == ValidationLevelEnum::off)
         return Status::OK();
 
     if (DocumentValidationSettings::get(opCtx).isSchemaValidationDisabled())
@@ -465,7 +425,8 @@ Status CollectionImpl::checkValidation(OperationContext* opCtx, const BSONObj& d
         // errors. As such, we simply add extra context to the error and rethrow. Note that
         // writes which result in the validator throwing an exception are accepted when we're in
         // warn mode.
-        if (!isFCVAtLeast47 && _validationAction == ValidationAction::ERROR_V) {
+        if (!isFCVAtLeast47 &&
+            validationActionOrDefault(_validationAction) == ValidationActionEnum::error) {
             e.addContext("Document validation failed");
             throw;
         }
@@ -476,7 +437,7 @@ Status CollectionImpl::checkValidation(OperationContext* opCtx, const BSONObj& d
         generatedError = doc_validation_error::generateError(*validatorMatchExpr, document);
     }
 
-    if (_validationAction == ValidationAction::WARN) {
+    if (validationActionOrDefault(_validationAction) == ValidationActionEnum::warn) {
         LOGV2_WARNING(20294,
                       "Document would fail validation",
                       "namespace"_attr = ns(),
@@ -528,8 +489,8 @@ Collection::Validator CollectionImpl::parseValidator(
 
     // If the validation action is "warn" or the level is "moderate", then disallow any encryption
     // keywords. This is to prevent any plaintext data from showing up in the logs.
-    if (_validationAction == CollectionImpl::ValidationAction::WARN ||
-        _validationLevel == CollectionImpl::ValidationLevel::MODERATE)
+    if (validationActionOrDefault(_validationAction) == ValidationActionEnum::warn ||
+        validationLevelOrDefault(_validationLevel) == ValidationLevelEnum::moderate)
         allowedFeatures &= ~MatchExpressionParser::AllowedFeatures::kEncryptKeywords;
 
     auto statusWithMatcher =
@@ -860,7 +821,7 @@ RecordId CollectionImpl::updateDocument(OperationContext* opCtx,
     {
         auto status = checkValidation(opCtx, newDoc);
         if (!status.isOK()) {
-            if (_validationLevel == ValidationLevel::STRICT_V) {
+            if (validationLevelOrDefault(_validationLevel) == ValidationLevelEnum::strict) {
                 uassertStatusOK(status);
             }
             // moderate means we have to check the old doc
@@ -1138,48 +1099,29 @@ void CollectionImpl::setValidator(OperationContext* opCtx, Validator validator) 
     DurableCatalog::get(opCtx)->updateValidator(opCtx,
                                                 getCatalogId(),
                                                 validator.validatorDoc.getOwned(),
-                                                getValidationLevel(),
-                                                getValidationAction());
+                                                _validationLevel,
+                                                _validationAction);
 
     _validator = std::move(validator);
 }
 
-StringData CollectionImpl::getValidationLevel() const {
-    switch (_validationLevel) {
-        case ValidationLevel::STRICT_V:
-            return "strict";
-        case ValidationLevel::OFF:
-            return "off";
-        case ValidationLevel::MODERATE:
-            return "moderate";
-    }
-    MONGO_UNREACHABLE;
+boost::optional<ValidationLevelEnum> CollectionImpl::getValidationLevel() const {
+    return _validationLevel;
 }
 
-StringData CollectionImpl::getValidationAction() const {
-    switch (_validationAction) {
-        case ValidationAction::ERROR_V:
-            return "error";
-        case ValidationAction::WARN:
-            return "warn";
-    }
-    MONGO_UNREACHABLE;
+boost::optional<ValidationActionEnum> CollectionImpl::getValidationAction() const {
+    return _validationAction;
 }
 
-Status CollectionImpl::setValidationLevel(OperationContext* opCtx, StringData newLevel) {
+Status CollectionImpl::setValidationLevel(OperationContext* opCtx, ValidationLevelEnum newLevel) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(ns(), MODE_X));
 
-    auto levelSW = _parseValidationLevel(newLevel);
-    if (!levelSW.isOK()) {
-        return levelSW.getStatus();
-    }
-
-    _validationLevel = levelSW.getValue();
+    _validationLevel = newLevel;
 
     // Reparse the validator as there are some features which are only supported with certain
     // validation levels.
     auto allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures;
-    if (_validationLevel == CollectionImpl::ValidationLevel::MODERATE)
+    if (validationLevelOrDefault(_validationLevel) == ValidationLevelEnum::moderate)
         allowedFeatures &= ~MatchExpressionParser::AllowedFeatures::kEncryptKeywords;
 
     _validator = parseValidator(opCtx, _validator.validatorDoc, allowedFeatures);
@@ -1187,29 +1129,22 @@ Status CollectionImpl::setValidationLevel(OperationContext* opCtx, StringData ne
         return _validator.getStatus();
     }
 
-    DurableCatalog::get(opCtx)->updateValidator(opCtx,
-                                                getCatalogId(),
-                                                _validator.validatorDoc,
-                                                getValidationLevel(),
-                                                getValidationAction());
+    DurableCatalog::get(opCtx)->updateValidator(
+        opCtx, getCatalogId(), _validator.validatorDoc, _validationLevel, _validationAction);
 
     return Status::OK();
 }
 
-Status CollectionImpl::setValidationAction(OperationContext* opCtx, StringData newAction) {
+Status CollectionImpl::setValidationAction(OperationContext* opCtx,
+                                           ValidationActionEnum newAction) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(ns(), MODE_X));
 
-    auto actionSW = _parseValidationAction(newAction);
-    if (!actionSW.isOK()) {
-        return actionSW.getStatus();
-    }
-
-    _validationAction = actionSW.getValue();
+    _validationAction = newAction;
 
     // Reparse the validator as there are some features which are only supported with certain
     // validation actions.
     auto allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures;
-    if (_validationAction == CollectionImpl::ValidationAction::WARN)
+    if (validationActionOrDefault(_validationAction) == ValidationActionEnum::warn)
         allowedFeatures &= ~MatchExpressionParser::AllowedFeatures::kEncryptKeywords;
 
     _validator = parseValidator(opCtx, _validator.validatorDoc, allowedFeatures);
@@ -1217,19 +1152,16 @@ Status CollectionImpl::setValidationAction(OperationContext* opCtx, StringData n
         return _validator.getStatus();
     }
 
-    DurableCatalog::get(opCtx)->updateValidator(opCtx,
-                                                getCatalogId(),
-                                                _validator.validatorDoc,
-                                                getValidationLevel(),
-                                                getValidationAction());
+    DurableCatalog::get(opCtx)->updateValidator(
+        opCtx, getCatalogId(), _validator.validatorDoc, _validationLevel, _validationAction);
 
     return Status::OK();
 }
 
 Status CollectionImpl::updateValidator(OperationContext* opCtx,
                                        BSONObj newValidator,
-                                       StringData newLevel,
-                                       StringData newAction) {
+                                       boost::optional<ValidationLevelEnum> newLevel,
+                                       boost::optional<ValidationActionEnum> newAction) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(ns(), MODE_X));
 
     DurableCatalog::get(opCtx)->updateValidator(
@@ -1241,19 +1173,8 @@ Status CollectionImpl::updateValidator(OperationContext* opCtx,
         return validator.getStatus();
     }
     _validator = std::move(validator);
-
-    auto levelSW = _parseValidationLevel(newLevel);
-    if (!levelSW.isOK()) {
-        return levelSW.getStatus();
-    }
-    _validationLevel = levelSW.getValue();
-
-    auto actionSW = _parseValidationAction(newAction);
-    if (!actionSW.isOK()) {
-        return actionSW.getStatus();
-    }
-    _validationAction = actionSW.getValue();
-
+    _validationLevel = newLevel;
+    _validationAction = newAction;
     return Status::OK();
 }
 

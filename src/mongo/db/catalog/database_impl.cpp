@@ -908,8 +908,8 @@ Status DatabaseImpl::userCreateNS(OperationContext* opCtx,
         // If the validation action is "warn" or the level is "moderate", then disallow any
         // encryption keywords. This is to prevent any plaintext data from showing up in the logs.
         auto allowedFeatures = MatchExpressionParser::kDefaultSpecialFeatures;
-        if (collectionOptions.validationAction == "warn" ||
-            collectionOptions.validationLevel == "moderate")
+        if (collectionOptions.validationAction == ValidationActionEnum::warn ||
+            collectionOptions.validationLevel == ValidationLevelEnum::moderate)
             allowedFeatures &= ~MatchExpressionParser::AllowedFeatures::kEncryptKeywords;
 
         auto statusWithMatcher = MatchExpressionParser::parse(collectionOptions.validator,

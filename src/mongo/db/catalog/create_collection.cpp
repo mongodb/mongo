@@ -452,7 +452,7 @@ Status createCollection(OperationContext* opCtx,
 Status createCollection(OperationContext* opCtx,
                         const NamespaceString& ns,
                         const CreateCommand& cmd) {
-    auto options = CollectionOptions::parse(cmd);
+    auto options = CollectionOptions::fromCreateCommand(cmd);
     auto idIndex = std::exchange(options.idIndex, {});
     return createCollection(opCtx, ns, std::move(options), idIndex);
 }

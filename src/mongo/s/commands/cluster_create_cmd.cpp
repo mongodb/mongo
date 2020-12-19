@@ -145,7 +145,7 @@ public:
         if (createStatus == ErrorCodes::NamespaceExists && !opCtx->inMultiDocumentTransaction()) {
             // NamespaceExists will cause multi-document transactions to implicitly abort, so
             // mongos should surface this error to the client.
-            CollectionOptions options = uassertStatusOK(CollectionOptions::parse(cmdObj));
+            auto options = CollectionOptions::fromCreateCommand(cmd);
             checkCollectionOptions(opCtx, cmd.getNamespace(), options);
         } else {
             uassertStatusOK(createStatus);

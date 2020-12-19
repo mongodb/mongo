@@ -166,13 +166,23 @@ StatusWith<CollectionOptions> CollectionOptions::parse(const BSONObj& options, P
                 return Status(ErrorCodes::BadValue, "'validationAction' has to be a string.");
             }
 
-            collectionOptions.validationAction = e.String();
+            try {
+                collectionOptions.validationAction =
+                    ValidationAction_parse({"validationAction"}, e.String());
+            } catch (const DBException& exc) {
+                return exc.toStatus();
+            }
         } else if (fieldName == "validationLevel") {
             if (e.type() != mongo::String) {
                 return Status(ErrorCodes::BadValue, "'validationLevel' has to be a string.");
             }
 
-            collectionOptions.validationLevel = e.String();
+            try {
+                collectionOptions.validationLevel =
+                    ValidationLevel_parse({"validationLevel"}, e.String());
+            } catch (const DBException& exc) {
+                return exc.toStatus();
+            }
         } else if (fieldName == "collation") {
             if (e.type() != mongo::Object) {
                 return Status(ErrorCodes::BadValue, "'collation' has to be a document.");
@@ -235,9 +245,11 @@ StatusWith<CollectionOptions> CollectionOptions::parse(const BSONObj& options, P
     return collectionOptions;
 }
 
-CollectionOptions CollectionOptions::parse(const CreateCommand& cmd) {
+CollectionOptions CollectionOptions::fromCreateCommand(const CreateCommand& cmd) {
     CollectionOptions options;
 
+    options.validationLevel = cmd.getValidationLevel();
+    options.validationAction = cmd.getValidationAction();
     options.capped = cmd.getCapped();
     if (auto size = cmd.getSize()) {
         options.cappedSize = adjustCappedSize(*size);
@@ -256,14 +268,6 @@ CollectionOptions CollectionOptions::parse(const CreateCommand& cmd) {
     }
     if (auto validator = cmd.getValidator()) {
         options.validator = std::move(*validator);
-    }
-    if (auto validationLevel = cmd.getValidationLevel()) {
-        // TODO (SERVER-52538): Don't convert to string, maintain IDL-generated enum value.
-        options.validationLevel = ValidationLevel_serializer(*validationLevel).toString();
-    }
-    if (auto validationAction = cmd.getValidationAction()) {
-        // TODO (SERVER-52538): Don't convert to string, maintain IDL-generated enum value.
-        options.validationAction = ValidationAction_serializer(*validationAction).toString();
     }
     if (auto indexOptionDefaults = cmd.getIndexOptionDefaults()) {
         options.indexOptionDefaults = std::move(*indexOptionDefaults);
@@ -335,12 +339,12 @@ void CollectionOptions::appendBSON(BSONObjBuilder* builder) const {
         builder->append("validator", validator);
     }
 
-    if (!validationLevel.empty()) {
-        builder->append("validationLevel", validationLevel);
+    if (validationLevel) {
+        builder->append("validationLevel", ValidationLevel_serializer(*validationLevel));
     }
 
-    if (!validationAction.empty()) {
-        builder->append("validationAction", validationAction);
+    if (validationAction) {
+        builder->append("validationAction", ValidationAction_serializer(*validationAction));
     }
 
     if (!collation.isEmpty()) {

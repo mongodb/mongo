@@ -235,8 +235,8 @@ public:
     virtual void updateValidator(OperationContext* opCtx,
                                  RecordId catalogId,
                                  const BSONObj& validator,
-                                 StringData validationLevel,
-                                 StringData validationAction) = 0;
+                                 boost::optional<ValidationLevelEnum> newLevel,
+                                 boost::optional<ValidationActionEnum> newAction) = 0;
 
     /**
      * Removes the index 'indexName' from the persisted collection catalog entry identified by

@@ -1563,14 +1563,14 @@ TEST_F(RSRollbackTest, RollbackRenamingCollectionsToEachOtherWithValidationOptio
     CollectionOptions coll1Options;
     coll1Options.uuid = UUID::gen();
     coll1Options.validator = BSON("x" << BSON("$exists" << 1));
-    coll1Options.validationLevel = "moderate";
-    coll1Options.validationAction = "warn";
+    coll1Options.validationLevel = ValidationLevelEnum::moderate;
+    coll1Options.validationAction = ValidationActionEnum::warn;
 
     CollectionOptions coll2Options;
     coll2Options.uuid = UUID::gen();
     coll2Options.validator = BSON("y" << BSON("$exists" << 1));
-    coll2Options.validationLevel = "strict";
-    coll2Options.validationAction = "error";
+    coll2Options.validationLevel = ValidationLevelEnum::strict;
+    coll2Options.validationAction = ValidationActionEnum::error;
 
     // renameOutOfTheWay() uses a temporary namespace to rename either of the two collections
     // affected by rollback. The temporary namespace should be able to support collections with
@@ -2060,8 +2060,8 @@ TEST_F(RollbackResyncsCollectionOptionsTest,
     CollectionOptions localCollOptions;
     localCollOptions.uuid = UUID::gen();
     localCollOptions.validator = BSON("x" << BSON("$exists" << 1));
-    localCollOptions.validationLevel = "moderate";
-    localCollOptions.validationAction = "warn";
+    localCollOptions.validationLevel = ValidationLevelEnum::moderate;
+    localCollOptions.validationAction = ValidationActionEnum::warn;
 
     BSONObj remoteCollOptionsObj = BSON("validationLevel"
                                         << "strict"
@@ -2087,8 +2087,8 @@ TEST_F(RollbackResyncsCollectionOptionsTest,
     CollectionOptions localCollOptions;
     localCollOptions.uuid = UUID::gen();
     localCollOptions.validator = BSON("x" << BSON("$exists" << 1));
-    localCollOptions.validationLevel = "moderate";
-    localCollOptions.validationAction = "warn";
+    localCollOptions.validationLevel = ValidationLevelEnum::moderate;
+    localCollOptions.validationAction = ValidationActionEnum::warn;
 
     BSONObj remoteCollOptionsObj = BSONObj();
 

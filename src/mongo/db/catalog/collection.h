@@ -470,9 +470,6 @@ public:
         boost::optional<ServerGlobalParams::FeatureCompatibility::Version>
             maxFeatureCompatibilityVersion) const = 0;
 
-    static Status parseValidationLevel(StringData level);
-    static Status parseValidationAction(StringData action);
-
     /**
      * Sets the validator for this collection.
      *
@@ -481,17 +478,18 @@ public:
      */
     virtual void setValidator(OperationContext* const opCtx, Validator validator) = 0;
 
-    virtual Status setValidationLevel(OperationContext* const opCtx, const StringData newLevel) = 0;
+    virtual Status setValidationLevel(OperationContext* const opCtx,
+                                      ValidationLevelEnum newLevel) = 0;
     virtual Status setValidationAction(OperationContext* const opCtx,
-                                       const StringData newAction) = 0;
+                                       ValidationActionEnum newAction) = 0;
 
-    virtual StringData getValidationLevel() const = 0;
-    virtual StringData getValidationAction() const = 0;
+    virtual boost::optional<ValidationLevelEnum> getValidationLevel() const = 0;
+    virtual boost::optional<ValidationActionEnum> getValidationAction() const = 0;
 
     virtual Status updateValidator(OperationContext* opCtx,
                                    BSONObj newValidator,
-                                   StringData newLevel,
-                                   StringData newAction) = 0;
+                                   boost::optional<ValidationLevelEnum> newLevel,
+                                   boost::optional<ValidationActionEnum> newAction) = 0;
 
     virtual bool getRecordPreImages() const = 0;
     virtual void setRecordPreImages(OperationContext* opCtx, bool val) = 0;
@@ -690,4 +688,12 @@ inline std::ostream& operator<<(std::ostream& os, const CollectionPtr& coll) {
     return os;
 }
 
+inline ValidationActionEnum validationActionOrDefault(
+    boost::optional<ValidationActionEnum> action) {
+    return action.value_or(ValidationActionEnum::error);
+}
+
+inline ValidationLevelEnum validationLevelOrDefault(boost::optional<ValidationLevelEnum> level) {
+    return level.value_or(ValidationLevelEnum::strict);
+}
 }  // namespace mongo

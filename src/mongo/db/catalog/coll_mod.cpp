@@ -40,6 +40,7 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/client.h"
+#include "mongo/db/commands/create_gen.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/db_raii.h"
@@ -105,8 +106,8 @@ struct CollModRequest {
     BSONElement viewPipeLine = {};
     std::string viewOn = {};
     boost::optional<Collection::Validator> collValidator;
-    boost::optional<std::string> collValidationAction;
-    boost::optional<std::string> collValidationLevel;
+    boost::optional<ValidationActionEnum> collValidationAction;
+    boost::optional<ValidationLevelEnum> collValidationLevel;
     bool recordPreImages = false;
 };
 
@@ -253,17 +254,17 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
                 return cmr.collValidator->getStatus();
             }
         } else if (fieldName == "validationLevel" && !isView) {
-            auto status = coll->parseValidationLevel(e.String());
-            if (!status.isOK())
-                return status;
-
-            cmr.collValidationLevel = e.String();
+            try {
+                cmr.collValidationLevel = ValidationLevel_parse({"validationLevel"}, e.String());
+            } catch (const DBException& exc) {
+                return exc.toStatus();
+            }
         } else if (fieldName == "validationAction" && !isView) {
-            auto status = coll->parseValidationAction(e.String());
-            if (!status.isOK())
-                return status;
-
-            cmr.collValidationAction = e.String();
+            try {
+                cmr.collValidationAction = ValidationAction_parse({"validationAction"}, e.String());
+            } catch (const DBException& exc) {
+                return exc.toStatus();
+            }
         } else if (fieldName == "pipeline") {
             if (!isView) {
                 return Status(ErrorCodes::InvalidOptions,
