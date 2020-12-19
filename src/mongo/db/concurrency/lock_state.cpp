@@ -752,6 +752,11 @@ bool LockerImpl::saveLockStateAndUnlock(Locker::LockSnapshot* stateOut) {
         return false;
     }
 
+    // If the RSTL is exclusive, then this operation should not yield.
+    if (rstlRequest && rstlRequest->mode != MODE_IX) {
+        return false;
+    }
+
     // The global lock must have been acquired just once
     stateOut->globalMode = globalRequest->mode;
     invariant(unlock(resourceIdGlobal));

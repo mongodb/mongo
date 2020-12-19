@@ -53,13 +53,14 @@ const auto allowSecondaryReadsDuringBatchApplication_DONT_USE =
 
 /**
  * Performs some checks to determine whether the operation is compatible with a lock-free read.
- * The DBDirectClient and multi-doc transactions are not supported.
+ * Multi-doc transactions are not supported, nor are operations holding an exclusive lock.
  */
 bool supportsLockFreeRead(OperationContext* opCtx) {
-    // Lock-free reads are only supported for external queries, not internal via DBDirectClient.
     // Lock-free reads are not supported in multi-document transactions.
-    return !storageGlobalParams.disableLockFreeReads && !opCtx->getClient()->isInDirectClient() &&
-        !opCtx->inMultiDocumentTransaction();
+    // Lock-free reads are not supported under an exclusive lock (nested reads under exclusive lock
+    // holding operations).
+    return !storageGlobalParams.disableLockFreeReads && !opCtx->inMultiDocumentTransaction() &&
+        !opCtx->lockState()->isWriteLocked();
 }
 
 /**
@@ -78,8 +79,9 @@ bool supportsLockFreeRead(OperationContext* opCtx) {
 template <typename GetCollectionAndEstablishReadSourceFunc,
           typename GetCollectionAfterSnapshotFunc,
           typename ResetFunc>
-auto aquireCollectionAndConsistentSnapshot(
+auto acquireCollectionAndConsistentSnapshot(
     OperationContext* opCtx,
+    bool isLockFreeReadSubOperation,
     CollectionCatalogStasher& catalogStasher,
     GetCollectionAndEstablishReadSourceFunc getCollectionAndEstablishReadSource,
     GetCollectionAfterSnapshotFunc getCollectionAfterSnapshot,
@@ -102,6 +104,12 @@ auto aquireCollectionAndConsistentSnapshot(
         // A lock request does not always find a collection to lock.
         if (!collection)
             break;
+
+        // If this is a nested lock acquisition, then we already have a consistent stashed catalog
+        // and snapshot from which to read and we can skip the below logic.
+        if (isLockFreeReadSubOperation) {
+            return collection;
+        }
 
         // We must open a storage snapshot consistent with the fetched in-memory Collection instance
         // and chosen read source. The Collection instance and replication state after opening a
@@ -363,12 +371,14 @@ AutoGetCollectionForReadLockFree::EmplaceHelper::EmplaceHelper(
     CollectionCatalogStasher& catalogStasher,
     const NamespaceStringOrUUID& nsOrUUID,
     AutoGetCollectionViewMode viewMode,
-    Date_t deadline)
+    Date_t deadline,
+    bool isLockFreeReadSubOperation)
     : _opCtx(opCtx),
       _catalogStasher(catalogStasher),
       _nsOrUUID(nsOrUUID),
       _viewMode(viewMode),
-      _deadline(deadline) {}
+      _deadline(deadline),
+      _isLockFreeReadSubOperation(isLockFreeReadSubOperation) {}
 
 void AutoGetCollectionForReadLockFree::EmplaceHelper::emplace(
     boost::optional<AutoGetCollectionLockFree>& autoColl) const {
@@ -376,14 +386,18 @@ void AutoGetCollectionForReadLockFree::EmplaceHelper::emplace(
         _opCtx,
         _nsOrUUID,
         /* restoreFromYield */
-        [& catalogStasher = _catalogStasher](std::shared_ptr<const Collection>& collection,
-                                             OperationContext* opCtx,
-                                             CollectionUUID uuid) {
-            collection = aquireCollectionAndConsistentSnapshot(
+        [& catalogStasher = _catalogStasher, isSubOperation = _isLockFreeReadSubOperation](
+            std::shared_ptr<const Collection>& collection,
+            OperationContext* opCtx,
+            CollectionUUID uuid) {
+            collection = acquireCollectionAndConsistentSnapshot(
                 opCtx,
+                /* isLockFreeReadSubOperation */
+                isSubOperation,
+                /* CollectionCatalogStasher */
                 catalogStasher,
                 /* GetCollectionAndEstablishReadSourceFunc */
-                [uuid](OperationContext* opCtx, const CollectionCatalog& catalog) {
+                [uuid, isSubOperation](OperationContext* opCtx, const CollectionCatalog& catalog) {
                     auto coll = catalog.lookupCollectionByUUIDForRead(opCtx, uuid);
 
                     // After yielding and reacquiring locks, the preconditions that were used to
@@ -418,15 +432,21 @@ AutoGetCollectionForReadLockFree::AutoGetCollectionForReadLockFree(
     AutoGetCollectionViewMode viewMode,
     Date_t deadline)
     : _catalogStash(opCtx) {
+    bool isLockFreeReadSubOperation = opCtx->isLockFreeReadsOp();
+
     // Supported lock-free reads should only ever have an open storage snapshot prior to calling
     // this helper if it is a nested lock-free operation. The storage snapshot and in-memory state
     // used across lock=free reads must be consistent.
     invariant(supportsLockFreeRead(opCtx) &&
-              (!opCtx->recoveryUnit()->isActive() || opCtx->isLockFreeReadsOp()));
+              (!opCtx->recoveryUnit()->isActive() || isLockFreeReadSubOperation));
 
-    EmplaceHelper emplaceFunc(opCtx, _catalogStash, nsOrUUID, viewMode, deadline);
-    aquireCollectionAndConsistentSnapshot(
+    EmplaceHelper emplaceFunc(
+        opCtx, _catalogStash, nsOrUUID, viewMode, deadline, isLockFreeReadSubOperation);
+    acquireCollectionAndConsistentSnapshot(
         opCtx,
+        /* isLockFreeReadSubOperation */
+        isLockFreeReadSubOperation,
+        /* CollectionCatalogStasher */
         _catalogStash,
         /* GetCollectionAndEstablishReadSourceFunc */
         [this, &emplaceFunc](OperationContext* opCtx, const CollectionCatalog&) {
@@ -495,7 +515,8 @@ AutoGetCollectionForReadCommandBase<AutoGetCollectionForReadType>::
           deadline) {
 
     if (!_autoCollForRead.getView()) {
-        auto* const css = CollectionShardingState::get(opCtx, _autoCollForRead.getNss());
+        auto css =
+            CollectionShardingState::getSharedForLockFreeReads(opCtx, _autoCollForRead.getNss());
         css->checkShardVersionOrThrow(opCtx);
     }
 }

@@ -83,6 +83,8 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
               !nsOrUUID.dbname().empty() ? nsOrUUID.dbname() : nsOrUUID.nss()->db(),
               isSharedLockMode(modeColl) ? MODE_IS : MODE_IX,
               deadline) {
+    invariant(!opCtx->isLockFreeReadsOp());
+
     auto& nss = nsOrUUID.nss();
     if (nss) {
         uassert(ErrorCodes::InvalidNamespace,

@@ -227,7 +227,8 @@ private:
                       CollectionCatalogStasher& catalogStasher,
                       const NamespaceStringOrUUID& nsOrUUID,
                       AutoGetCollectionViewMode viewMode,
-                      Date_t deadline);
+                      Date_t deadline,
+                      bool isLockFreeReadSubOperation);
 
         void emplace(boost::optional<AutoGetCollectionLockFree>& autoColl) const;
 
@@ -237,6 +238,10 @@ private:
         const NamespaceStringOrUUID& _nsOrUUID;
         AutoGetCollectionViewMode _viewMode;
         Date_t _deadline;
+
+        // Set to true if the lock helper using this EmplaceHelper is nested under another lock-free
+        // helper.
+        bool _isLockFreeReadSubOperation;
     };
 
     boost::optional<AutoGetCollectionForReadBase<AutoGetCollectionLockFree, EmplaceHelper>>

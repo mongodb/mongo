@@ -289,7 +289,7 @@ CommonMongodProcessInterface::attachCursorSourceToPipelineForLocalRead(Pipeline*
     invariant(pipeline->getSources().empty() ||
               !dynamic_cast<DocumentSourceCursor*>(pipeline->getSources().front().get()));
 
-    boost::optional<AutoGetCollectionForReadCommand> autoColl;
+    boost::optional<AutoGetCollectionForReadCommandMaybeLockFree> autoColl;
     const NamespaceStringOrUUID nsOrUUID = expCtx->uuid
         ? NamespaceStringOrUUID{expCtx->ns.db().toString(), *expCtx->uuid}
         : expCtx->ns;

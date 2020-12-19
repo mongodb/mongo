@@ -334,9 +334,6 @@ PipelineD::buildInnerQueryExecutor(const CollectionPtr& collection,
         return {};
     }
 
-    // We are going to generate an input cursor, so we need to be holding the collection lock.
-    dassert(expCtx->opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IS));
-
     if (!sources.empty()) {
         auto sampleStage = dynamic_cast<DocumentSourceSample*>(sources.front().get());
         // Optimize an initial $sample stage if possible.
