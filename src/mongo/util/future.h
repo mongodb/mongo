@@ -268,6 +268,8 @@ private:
     friend class future_details::FutureImpl;
     template <typename>
     friend class SharedSemiFuture;
+    template <typename>
+    friend class SemiFuture;
 
 
     explicit SemiFuture(future_details::SharedStateHolder<T_unless_void>&& impl)

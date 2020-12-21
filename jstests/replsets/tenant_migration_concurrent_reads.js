@@ -49,7 +49,7 @@ function runCommand(db, cmd, expectedError, isTransaction) {
     const res = db.runCommand(cmd);
 
     if (expectedError) {
-        assert.commandFailedWithCode(res, expectedError);
+        assert.commandFailedWithCode(res, expectedError, tojson(cmd));
         // The 'TransientTransactionError' label is attached only in a scope of a transaction.
         if (isTransaction &&
             (expectedError == ErrorCodes.TenantMigrationAborted ||

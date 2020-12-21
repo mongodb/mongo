@@ -56,6 +56,7 @@ TenantMigrationDonorDocument parseDonorStateDocument(const BSONObj& doc);
  * If the operation has read concern "snapshot" or includes afterClusterTime, and the database is
  * in the read blocking state at the given atClusterTime or afterClusterTime or the selected read
  * timestamp, blocks until the migration is committed or aborted.
+ * TODO SERVER-53505: Change this to return SharedSemiFuture<TenantMigrationAccessBlocker::State>.
  */
 void checkIfCanReadOrBlock(OperationContext* opCtx, StringData dbName);
 

@@ -95,6 +95,8 @@ class OperationContext : public Interruptible, public Decorable<OperationContext
     OperationContext& operator=(const OperationContext&) = delete;
 
 public:
+    static constexpr auto kDefaultOperationContextTimeoutError = ErrorCodes::ExceededTimeLimit;
+
     OperationContext(Client* client, OperationId opId);
     virtual ~OperationContext();
 
@@ -644,7 +646,7 @@ private:
     // The timepoint at which this operation exceeds its time limit.
     Date_t _deadline = Date_t::max();
 
-    ErrorCodes::Error _timeoutError = ErrorCodes::ExceededTimeLimit;
+    ErrorCodes::Error _timeoutError = kDefaultOperationContextTimeoutError;
     bool _ignoreInterrupts = false;
     bool _hasArtificialDeadline = false;
     bool _markKillOnClientDisconnect = false;

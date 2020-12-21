@@ -44,6 +44,7 @@
 #include "mongo/db/repl/tenant_migration_donor_util.h"
 #include "mongo/db/repl/tenant_migration_state_machine_gen.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
+#include "mongo/executor/connection_pool.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/logv2/log.h"

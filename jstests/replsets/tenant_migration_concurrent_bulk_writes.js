@@ -249,7 +249,8 @@ function retryFailedWrites(primaryDB, collName, writeErrors, ops) {
     writeErrors.forEach((err, index) => {
         assert.eq(err.code, ErrorCodes.TenantMigrationCommitted);
         if (index == 0) {
-            assert.eq(err.errmsg, "Write must be re-routed to the new owner of this tenant");
+            assert.eq(err.errmsg,
+                      "Write or read must be re-routed to the new owner of this tenant");
         } else {
             assert.eq(err.errmsg, "");
         }

@@ -43,9 +43,11 @@
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/logv2/log.h"
+#include "mongo/transport/service_executor.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/future_util.h"
 
 namespace mongo {
 
@@ -56,9 +58,9 @@ namespace tenant_migration_donor {
 
 namespace {
 
-const char kThreadNamePrefix[] = "TenantMigrationWorker-";
-const char kPoolName[] = "TenantMigrationWorkerThreadPool";
-const char kNetName[] = "TenantMigrationWorkerNetwork";
+constexpr char kThreadNamePrefix[] = "TenantMigrationWorker-";
+constexpr char kPoolName[] = "TenantMigrationWorkerThreadPool";
+constexpr char kNetName[] = "TenantMigrationWorkerNetwork";
 
 const auto donorStateDocToDeleteDecoration = OperationContext::declareDecoration<BSONObj>();
 
@@ -116,22 +118,37 @@ void checkIfCanReadOrBlock(OperationContext* opCtx, StringData dbName) {
         return;
     }
 
-    auto readConcernArgs = repl::ReadConcernArgs::get(opCtx);
-    auto targetTimestamp = [&]() -> boost::optional<Timestamp> {
-        if (auto afterClusterTime = readConcernArgs.getArgsAfterClusterTime()) {
-            return afterClusterTime->asTimestamp();
-        }
-        if (auto atClusterTime = readConcernArgs.getArgsAtClusterTime()) {
-            return atClusterTime->asTimestamp();
-        }
-        if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern) {
-            return repl::StorageInterface::get(opCtx)->getPointInTimeReadTimestamp(opCtx);
-        }
-        return boost::none;
-    }();
+    // Source to cancel the timeout if the operation completed in time.
+    CancelationSource cancelTimeoutSource;
+    std::vector<ExecutorFuture<void>> futures;
 
-    if (targetTimestamp) {
-        mtab->checkIfCanDoClusterTimeReadOrBlock(opCtx, targetTimestamp.get());
+    auto executor = mtab->getAsyncBlockingOperationsExecutor();
+    futures.emplace_back(mtab->getCanReadFuture(opCtx).semi().thenRunOn(executor));
+
+    // Optimisation: if the future is already ready, we are done.
+    if (futures[0].isReady()) {
+        futures[0].get();  // Throw if error.
+        return;
+    }
+
+    if (opCtx->hasDeadline()) {
+        auto deadlineReachedFuture =
+            executor->sleepUntil(opCtx->getDeadline(), cancelTimeoutSource.token());
+        // The timeout condition is optional with index #1.
+        futures.push_back(std::move(deadlineReachedFuture));
+    }
+
+    const auto& [status, idx] = whenAny(std::move(futures)).get();
+
+    if (idx == 0) {
+        // Read unblock condition finished first.
+        cancelTimeoutSource.cancel();
+        uassertStatusOK(status);
+    } else if (idx == 1) {
+        // Deadline finished first, throw error.
+        uassertStatusOK(Status(opCtx->getTimeoutError(),
+                               "Read timed out waiting for tenant migration blocker",
+                               mtab->getDebugInfo()));
     }
 }
 
