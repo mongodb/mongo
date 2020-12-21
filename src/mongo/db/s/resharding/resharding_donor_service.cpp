@@ -161,13 +161,8 @@ SemiFuture<void> ReshardingDonorService::DonorStateMachine::run(
         .then([this, executor] {
             return _awaitCoordinatorHasCommittedThenTransitionToDropping(executor);
         })
-        .then([this, self = shared_from_this()] {
-            // After this line, the shared_ptr stored in the PrimaryOnlyService's map for
-            // the ReshardingDonorService Instance is removed. It is necessary to use
-            // shared_from_this() to extend the lifetime for the remaining callbacks.
-            return _dropOriginalCollectionThenDeleteLocalState();
-        })
-        .onError([this, self = shared_from_this()](Status status) {
+        .then([this] { return _dropOriginalCollection(); })
+        .onError([this](Status status) {
             LOGV2(4956400,
                   "Resharding operation donor state machine failed",
                   "namespace"_attr = _donorDoc.getNss().ns(),
@@ -186,6 +181,10 @@ SemiFuture<void> ReshardingDonorService::DonorStateMachine::run(
             }
 
             if (status.isOK()) {
+                // The shared_ptr stored in the PrimaryOnlyService's map for the
+                // ReshardingDonorService Instance is removed when the donor state document tied to
+                // the instance is deleted. It is necessary to use shared_from_this() to extend the
+                // lifetime so the code can safely finish executing.
                 _removeDonorDocument();
                 _completionPromise.emplaceValue();
             } else {
@@ -395,7 +394,7 @@ ReshardingDonorService::DonorStateMachine::_awaitCoordinatorHasCommittedThenTran
     });
 }
 
-void ReshardingDonorService::DonorStateMachine::_dropOriginalCollectionThenDeleteLocalState() {
+void ReshardingDonorService::DonorStateMachine::_dropOriginalCollection() {
     if (_donorDoc.getState() > DonorStateEnum::kDropping) {
         return;
     }
@@ -406,7 +405,15 @@ void ReshardingDonorService::DonorStateMachine::_dropOriginalCollectionThenDelet
         getCollectionUUIDFromChunkManger(_donorDoc.getNss(), origNssRoutingInfo);
 
     if (currentCollectionUUID == _donorDoc.getExistingUUID()) {
-        _dropOriginalCollection();
+        DBDirectClient client(cc().makeOperationContext().get());
+        BSONObj dropResult;
+        if (!client.dropCollection(
+                _donorDoc.getNss().toString(), WriteConcerns::kMajorityWriteConcern, &dropResult)) {
+            auto dropStatus = getStatusFromCommandResult(dropResult);
+            if (dropStatus != ErrorCodes::NamespaceNotFound) {
+                uassertStatusOK(dropStatus);
+            }
+        }
     } else {
         uassert(ErrorCodes::InvalidUUID,
                 "Expected collection {} to have either the original UUID {} or the resharding UUID"
@@ -419,18 +426,6 @@ void ReshardingDonorService::DonorStateMachine::_dropOriginalCollectionThenDelet
     }
 
     _transitionStateAndUpdateCoordinator(DonorStateEnum::kDone);
-}
-
-void ReshardingDonorService::DonorStateMachine::_dropOriginalCollection() {
-    DBDirectClient client(cc().makeOperationContext().get());
-    BSONObj dropResult;
-    if (!client.dropCollection(
-            _donorDoc.getNss().toString(), WriteConcerns::kMajorityWriteConcern, &dropResult)) {
-        auto dropStatus = getStatusFromCommandResult(dropResult);
-        if (dropStatus != ErrorCodes::NamespaceNotFound) {
-            uassertStatusOK(dropStatus);
-        }
-    }
 }
 
 void ReshardingDonorService::DonorStateMachine::_transitionState(

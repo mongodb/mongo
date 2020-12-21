@@ -189,13 +189,8 @@ SemiFuture<void> ReshardingRecipientService::RecipientStateMachine::run(
         .then([this, executor] {
             return _awaitCoordinatorHasCommittedThenTransitionToRenaming(executor);
         })
-        .then([this, self = shared_from_this()] {
-            // After this line, the shared_ptr stored in the PrimaryOnlyService's map for
-            // the ReshardingRecipientService Instance is removed. It is necessary to use
-            // shared_from_this() to extend the lifetime for the remaining callbacks.
-            _renameTemporaryReshardingCollectionThenDeleteLocalState();
-        })
-        .onError([this, self = shared_from_this()](Status status) {
+        .then([this] { _renameTemporaryReshardingCollection(); })
+        .onError([this](Status status) {
             LOGV2(4956500,
                   "Resharding operation recipient state machine failed",
                   "namespace"_attr = _recipientDoc.getNss().ns(),
@@ -216,6 +211,10 @@ SemiFuture<void> ReshardingRecipientService::RecipientStateMachine::run(
             removeRecipientDocFailpoint.pauseWhileSet();
 
             if (status.isOK()) {
+                // The shared_ptr stored in the PrimaryOnlyService's map for the
+                // ReshardingRecipientService Instance is removed when the recipient state document
+                // tied to the instance is deleted. It is necessary to use shared_from_this() to
+                // extend the lifetime so the code can safely finish executing.
                 _removeRecipientDocument();
                 _completionPromise.emplaceValue();
             } else {
@@ -491,8 +490,7 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
     });
 }
 
-void ReshardingRecipientService::RecipientStateMachine::
-    _renameTemporaryReshardingCollectionThenDeleteLocalState() {
+void ReshardingRecipientService::RecipientStateMachine::_renameTemporaryReshardingCollection() {
 
     if (_recipientDoc.getState() > RecipientStateEnum::kRenaming) {
         return;

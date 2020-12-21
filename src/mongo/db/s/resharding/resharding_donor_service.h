@@ -116,8 +116,6 @@ private:
     ExecutorFuture<void> _awaitCoordinatorHasCommittedThenTransitionToDropping(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
-    void _dropOriginalCollectionThenDeleteLocalState();
-
     // Drops the original collection and throws if the returned status is not either Status::OK()
     // or NamespaceNotFound.
     void _dropOriginalCollection();

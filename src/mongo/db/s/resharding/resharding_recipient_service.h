@@ -136,7 +136,7 @@ private:
     ExecutorFuture<void> _awaitCoordinatorHasCommittedThenTransitionToRenaming(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
-    void _renameTemporaryReshardingCollectionThenDeleteLocalState();
+    void _renameTemporaryReshardingCollection();
 
     void _fulfillAllDonorsPreparedToDonate(Timestamp);
 
