@@ -834,7 +834,7 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
      * We do need to update it before clearing the checkpoint's entry out of the transaction table,
      * or a thread evicting in a tree could ignore the checkpoint's transaction.
      */
-    generation = __wt_gen_next(session, WT_GEN_CHECKPOINT);
+    __wt_gen_next(session, WT_GEN_CHECKPOINT, &generation);
     WT_STAT_CONN_SET(session, txn_checkpoint_generation, generation);
 
     /*

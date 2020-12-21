@@ -1621,7 +1621,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
      * have to be refreshed.
      */
     if (!readonly)
-        WT_IGNORE_RET(__wt_gen_next(session, WT_GEN_COMMIT));
+        __wt_gen_next(session, WT_GEN_COMMIT, NULL);
 
     /* First check if we've made something durable in the future. */
     update_durable_ts = false;

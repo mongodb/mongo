@@ -1133,6 +1133,9 @@ __evict_lru_pages(WT_SESSION_IMPL *session, bool is_server)
         if ((ret = __evict_page(session, is_server)) == EBUSY)
             ret = 0;
 
+    /* If any resources are pinned, release them now. */
+    WT_TRET(__wt_session_release_resources(session));
+
     /* If a worker thread found the queue empty, pause. */
     if (ret == WT_NOTFOUND && !is_server && F_ISSET(conn, WT_CONN_EVICTION_RUN))
         __wt_cond_wait(session, conn->evict_threads.wait_cond, 10000, NULL);
