@@ -408,12 +408,12 @@ void MirrorMaestroImpl::_mirror(const std::vector<HostAndPort>& hosts,
         auto status =
             _executor->scheduleRemoteCommand(newRequest, std::move(mirrorResponseCallback))
                 .getStatus();
-        uassertStatusOK(status);
+        tassert(status);
 
         gMirroredReadsSection.sent.fetchAndAdd(1);
     }
 } catch (const DBException& e) {
-    tassert(e.toStatus());
+    LOGV2_DEBUG(31456, 2, "Mirroring failed", "reason"_attr = e);
 }
 
 void MirrorMaestroImpl::init(ServiceContext* serviceContext) noexcept {
