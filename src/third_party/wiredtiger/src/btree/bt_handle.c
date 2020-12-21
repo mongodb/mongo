@@ -408,34 +408,6 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
     else
         btree->checksum = CKSUM_UNCOMPRESSED;
 
-    /* Debugging information */
-    WT_RET(__wt_config_gets(session, cfg, "assert.commit_timestamp", &cval));
-    btree->assert_flags = 0;
-    if (WT_STRING_MATCH("always", cval.str, cval.len))
-        FLD_SET(btree->assert_flags, WT_ASSERT_COMMIT_TS_ALWAYS);
-    else if (WT_STRING_MATCH("key_consistent", cval.str, cval.len))
-        FLD_SET(btree->assert_flags, WT_ASSERT_COMMIT_TS_KEYS);
-    else if (WT_STRING_MATCH("never", cval.str, cval.len))
-        FLD_SET(btree->assert_flags, WT_ASSERT_COMMIT_TS_NEVER);
-
-    /*
-     * A durable timestamp always implies a commit timestamp. But never having a durable timestamp
-     * does not imply anything about a commit timestamp.
-     */
-    WT_RET(__wt_config_gets(session, cfg, "assert.durable_timestamp", &cval));
-    if (WT_STRING_MATCH("always", cval.str, cval.len))
-        FLD_SET(btree->assert_flags, WT_ASSERT_COMMIT_TS_ALWAYS | WT_ASSERT_DURABLE_TS_ALWAYS);
-    else if (WT_STRING_MATCH("key_consistent", cval.str, cval.len))
-        FLD_SET(btree->assert_flags, WT_ASSERT_DURABLE_TS_KEYS);
-    else if (WT_STRING_MATCH("never", cval.str, cval.len))
-        FLD_SET(btree->assert_flags, WT_ASSERT_DURABLE_TS_NEVER);
-
-    WT_RET(__wt_config_gets(session, cfg, "assert.read_timestamp", &cval));
-    if (WT_STRING_MATCH("always", cval.str, cval.len))
-        FLD_SET(btree->assert_flags, WT_ASSERT_READ_TS_ALWAYS);
-    else if (WT_STRING_MATCH("never", cval.str, cval.len))
-        FLD_SET(btree->assert_flags, WT_ASSERT_READ_TS_NEVER);
-
     /* Huffman encoding */
     WT_RET(__wt_btree_huffman_open(session));
 

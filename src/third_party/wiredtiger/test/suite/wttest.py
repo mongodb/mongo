@@ -113,6 +113,14 @@ class CapturedFd(object):
                       contents + '"')
         self.expectpos = os.path.getsize(self.filename)
 
+    def ignorePreviousOutput(self):
+        """
+        Ignore any output up to this point.
+        """
+        if self.file != None:
+            self.file.flush()
+        self.expectpos = os.path.getsize(self.filename)
+
     def checkAdditional(self, testcase, expect):
         """
         Check to see that an additional string has been added to the
@@ -127,7 +135,7 @@ class CapturedFd(object):
                              gotstr + '"')
         self.expectpos = os.path.getsize(self.filename)
 
-    def checkAdditionalPattern(self, testcase, pat):
+    def checkAdditionalPattern(self, testcase, pat, re_flags = 0):
         """
         Check to see that an additional string has been added to the
         output file.  If it has not, raise it as a test failure.
@@ -136,7 +144,7 @@ class CapturedFd(object):
         if self.file != None:
             self.file.flush()
         gotstr = self.readFileFrom(self.filename, self.expectpos, 1500)
-        if re.search(pat, gotstr) == None:
+        if re.search(pat, gotstr, re_flags) == None:
             testcase.fail('in ' + self.desc +
                           ', expected pattern "' + pat + '", but got "' +
                           gotstr + '"')
@@ -419,6 +427,18 @@ class WiredTigerTestCase(unittest.TestCase):
         if exc_list and exc_list[-1][0] is self:
             return exc_list[-1][1]
 
+    def cleanStderr(self):
+        self.captureerr.ignorePreviousOutput()
+
+    def cleanStdout(self):
+        self.captureout.ignorePreviousOutput()
+
+    def checkStderr(self):
+        self.captureerr.check(self)
+
+    def checkStdout(self):
+        self.captureout.check(self)
+
     def tearDown(self):
         # This approach works for all our support Python versions and
         # is suggested by one of the answers in:
@@ -512,24 +532,24 @@ class WiredTigerTestCase(unittest.TestCase):
         self.captureerr.checkAdditional(self, expect)
 
     @contextmanager
-    def expectedStdoutPattern(self, pat):
+    def expectedStdoutPattern(self, pat, re_flags=0):
         self.captureout.check(self)
         yield
-        self.captureout.checkAdditionalPattern(self, pat)
+        self.captureout.checkAdditionalPattern(self, pat, re_flags)
 
     @contextmanager
-    def expectedStderrPattern(self, pat):
+    def expectedStderrPattern(self, pat, re_flags=0):
         self.captureerr.check(self)
         yield
-        self.captureerr.checkAdditionalPattern(self, pat)
+        self.captureerr.checkAdditionalPattern(self, pat, re_flags)
 
-    def ignoreStdoutPatternIfExists(self, pat):
+    def ignoreStdoutPatternIfExists(self, pat, re_flags=0):
         if self.captureout.hasUnexpectedOutput(self):
-            self.captureout.checkAdditionalPattern(self, pat)
+            self.captureout.checkAdditionalPattern(self, pat, re_flags)
 
-    def ignoreStderrPatternIfExists(self, pat):
+    def ignoreStderrPatternIfExists(self, pat, re_flags=0):
         if self.captureerr.hasUnexpectedOutput(self):
-            self.captureerr.checkAdditionalPattern(self, pat)
+            self.captureerr.checkAdditionalPattern(self, pat, re_flags)
 
     def assertRaisesWithMessage(self, exceptionType, expr, message):
         """

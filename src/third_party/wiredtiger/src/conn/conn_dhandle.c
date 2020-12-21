@@ -410,6 +410,57 @@ err:
 }
 
 /*
+ * __conn_dhandle_config_parse --
+ *     Parse out configuration settings relevant for the data handle.
+ */
+static int
+__conn_dhandle_config_parse(WT_SESSION_IMPL *session)
+{
+    WT_CONFIG_ITEM cval, sval;
+    WT_DATA_HANDLE *dhandle;
+    WT_DECL_RET;
+    const char **cfg;
+
+    dhandle = session->dhandle;
+    cfg = dhandle->cfg;
+
+    /* Clear all the flags. */
+    dhandle->ts_flags = 0;
+
+    /* Debugging information */
+    WT_RET(__wt_config_gets(session, cfg, "assert.write_timestamp", &cval));
+    if (WT_STRING_MATCH("on", cval.str, cval.len))
+        FLD_SET(dhandle->ts_flags, WT_DHANDLE_ASSERT_TS_WRITE);
+
+    WT_RET(__wt_config_gets(session, cfg, "assert.read_timestamp", &cval));
+    if (WT_STRING_MATCH("always", cval.str, cval.len))
+        FLD_SET(dhandle->ts_flags, WT_DHANDLE_ASSERT_TS_READ_ALWAYS);
+    else if (WT_STRING_MATCH("never", cval.str, cval.len))
+        FLD_SET(dhandle->ts_flags, WT_DHANDLE_ASSERT_TS_READ_NEVER);
+
+    /* Setup verbose options */
+    WT_RET(__wt_config_gets(session, cfg, "verbose", &cval));
+    if ((ret = __wt_config_subgets(session, &cval, "write_timestamp", &sval)) == 0 && sval.val != 0)
+        FLD_SET(dhandle->ts_flags, WT_DHANDLE_VERB_TS_WRITE);
+    WT_RET_NOTFOUND_OK(ret);
+
+    /* Setup timestamp usage hints */
+    WT_RET(__wt_config_gets(session, cfg, "write_timestamp_usage", &cval));
+    if (WT_STRING_MATCH("always", cval.str, cval.len))
+        FLD_SET(dhandle->ts_flags, WT_DHANDLE_TS_ALWAYS);
+    else if (WT_STRING_MATCH("key_consistent", cval.str, cval.len))
+        FLD_SET(dhandle->ts_flags, WT_DHANDLE_TS_KEY_CONSISTENT);
+    else if (WT_STRING_MATCH("mixed_mode", cval.str, cval.len))
+        FLD_SET(dhandle->ts_flags, WT_DHANDLE_TS_MIXED_MODE);
+    else if (WT_STRING_MATCH("never", cval.str, cval.len))
+        FLD_SET(dhandle->ts_flags, WT_DHANDLE_TS_NEVER);
+    else if (WT_STRING_MATCH("ordered", cval.str, cval.len))
+        FLD_SET(dhandle->ts_flags, WT_DHANDLE_TS_ORDERED);
+
+    return (0);
+}
+
+/*
  * __wt_conn_dhandle_open --
  *     Open the current data handle.
  */
@@ -447,6 +498,7 @@ __wt_conn_dhandle_open(WT_SESSION_IMPL *session, const char *cfg[], uint32_t fla
     /* Discard any previous configuration, set up the new configuration. */
     __conn_dhandle_config_clear(session);
     WT_ERR(__conn_dhandle_config_set(session));
+    WT_ERR(__conn_dhandle_config_parse(session));
 
     switch (dhandle->type) {
     case WT_DHANDLE_TYPE_BTREE:
@@ -465,7 +517,7 @@ __wt_conn_dhandle_open(WT_SESSION_IMPL *session, const char *cfg[], uint32_t fla
         WT_ERR(__wt_btree_open(session, cfg));
         break;
     case WT_DHANDLE_TYPE_TABLE:
-        WT_ERR(__wt_schema_open_table(session, cfg));
+        WT_ERR(__wt_schema_open_table(session));
         break;
     }
 

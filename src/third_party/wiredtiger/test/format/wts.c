@@ -232,6 +232,8 @@ create_database(const char *home, WT_CONNECTION **connp)
         CONFIG_APPEND(p, ",prepare_checkpoint_delay");
     if (g.c_timing_stress_hs_checkpoint_delay)
         CONFIG_APPEND(p, ",history_store_checkpoint_delay");
+    if (g.c_timing_stress_hs_search)
+        CONFIG_APPEND(p, ",history_store_search");
     if (g.c_timing_stress_hs_sweep)
         CONFIG_APPEND(p, ",history_store_sweep_race");
     if (g.c_timing_stress_split_1)
@@ -362,7 +364,7 @@ create_object(WT_CONNECTION *conn)
      * Assertions. Assertions slow down the code for additional diagnostic checking.
      */
     if (g.c_txn_timestamps && g.c_assert_commit_timestamp)
-        CONFIG_APPEND(p, ",assert=(commit_timestamp=key_consistent)");
+        CONFIG_APPEND(p, ",write_timestamp_usage=key_consistent,assert=(write_timestamp=on)");
     if (g.c_txn_timestamps && g.c_assert_read_timestamp)
         CONFIG_APPEND(p, ",assert=(read_timestamp=always)");
 

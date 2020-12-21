@@ -1834,12 +1834,6 @@ __wt_debug_mode_config(WT_SESSION_IMPL *session, const char *cfg[])
     return (0);
 }
 
-/* Simple structure for name and flag configuration searches. */
-typedef struct {
-    const char *name;
-    uint64_t flag;
-} WT_NAME_FLAG;
-
 /*
  * __wt_verbose_config --
  *     Set verbose configuration.
@@ -1993,6 +1987,7 @@ __wt_timing_stress_config(WT_SESSION_IMPL *session, const char *cfg[])
       {"backup_rename", WT_TIMING_STRESS_BACKUP_RENAME},
       {"checkpoint_slow", WT_TIMING_STRESS_CHECKPOINT_SLOW},
       {"history_store_checkpoint_delay", WT_TIMING_STRESS_HS_CHECKPOINT_DELAY},
+      {"history_store_search", WT_TIMING_STRESS_HS_SEARCH},
       {"history_store_sweep_race", WT_TIMING_STRESS_HS_SWEEP},
       {"prepare_checkpoint_delay", WT_TIMING_STRESS_PREPARE_CHECKPOINT_DELAY},
       {"split_1", WT_TIMING_STRESS_SPLIT_1}, {"split_2", WT_TIMING_STRESS_SPLIT_2},

@@ -921,7 +921,7 @@ __curfile_update_check(WT_CURSOR_BTREE *cbt)
     else if (btree->type != BTREE_COL_VAR)
         return (0);
 
-    return (__wt_txn_update_check(session, cbt, upd));
+    return (__wt_txn_update_check(session, cbt, upd, NULL));
 }
 
 /*

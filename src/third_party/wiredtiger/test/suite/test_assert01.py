@@ -44,10 +44,10 @@ class test_assert01(wttest.WiredTigerTestCase, suite_subprocess):
     uri_never = base_uri + '.never.wt'
     uri_none = base_uri + '.none.wt'
     cfg = 'key_format=S,value_format=S,'
-    cfg_always = 'assert=(commit_timestamp=always)'
+    cfg_always = 'verbose=[write_timestamp],write_timestamp_usage=always,assert=(write_timestamp=on)'
     cfg_def = ''
-    cfg_never = 'assert=(commit_timestamp=never)'
-    cfg_none = 'assert=(commit_timestamp=none)'
+    cfg_never = 'verbose=(write_timestamp=true),write_timestamp_usage=never,assert=(write_timestamp=on)'
+    cfg_none = 'assert=(write_timestamp=off)'
     session_config = 'isolation=snapshot'
 
     count = 1
@@ -94,9 +94,6 @@ class test_assert01(wttest.WiredTigerTestCase, suite_subprocess):
         c.close()
 
     def test_commit_timestamp(self):
-        #if not wiredtiger.diagnostic_build():
-        #    self.skipTest('requires a diagnostic build')
-
         # Create a data item at a timestamp
         self.session.create(self.uri_always, self.cfg + self.cfg_always)
         self.session.create(self.uri_def, self.cfg + self.cfg_def)

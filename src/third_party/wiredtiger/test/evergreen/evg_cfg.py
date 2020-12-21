@@ -30,6 +30,7 @@ CSUITE_TEST_SEARCH_STR = "  # End of csuite test tasks"
 # They are not expected to trigger any 'make check' testing.
 make_check_subdir_skips = [
     "test/csuite",  # csuite has its own set of Evergreen tasks, skip the checking here
+    "test/cppsuite"
 ]
 
 prog=sys.argv[0]

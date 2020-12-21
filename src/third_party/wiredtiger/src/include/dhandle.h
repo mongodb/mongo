@@ -112,4 +112,17 @@ struct __wt_data_handle {
 #define WT_DHANDLE_OPEN 0x80u         /* Handle is open */
                                       /* AUTOMATIC FLAG VALUE GENERATION STOP */
     uint32_t flags;
+
+/* AUTOMATIC FLAG VALUE GENERATION START */
+#define WT_DHANDLE_ASSERT_TS_READ_ALWAYS 0x001u /* Assert read always checking. */
+#define WT_DHANDLE_ASSERT_TS_READ_NEVER 0x002u  /* Assert read never checking. */
+#define WT_DHANDLE_ASSERT_TS_WRITE 0x004u       /* Assert write checking. */
+#define WT_DHANDLE_TS_ALWAYS 0x008u             /* Handle using always checking. */
+#define WT_DHANDLE_TS_KEY_CONSISTENT 0x010u     /* Handle using key consistency checking. */
+#define WT_DHANDLE_TS_MIXED_MODE 0x020u         /* Handle using mixed mode timestamps checking. */
+#define WT_DHANDLE_TS_NEVER 0x040u              /* Handle never using timestamps checking. */
+#define WT_DHANDLE_TS_ORDERED 0x080u            /* Handle using ordered timestamps checking. */
+#define WT_DHANDLE_VERB_TS_WRITE 0x100u         /* Handle verbose logging for timestamps usage. */
+                                                /* AUTOMATIC FLAG VALUE GENERATION STOP */
+    uint32_t ts_flags;
 };

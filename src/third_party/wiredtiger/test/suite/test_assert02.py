@@ -51,7 +51,7 @@ class test_assert02(wttest.WiredTigerTestCase, suite_subprocess):
         uri_none = base_uri + '.none.wt'
 
         cfg = 'key_format=S,value_format=S'
-        cfg_always = cfg + ',assert=(read_timestamp=always)'
+        cfg_always = cfg + ',write_timestamp_usage=always,assert=(read_timestamp=always)'
         cfg_def = cfg
         cfg_never = cfg + ',assert=(read_timestamp=never)'
         cfg_none = cfg + ',assert=(read_timestamp=none)'

@@ -30,12 +30,11 @@
 #define WT_REC_CHECKPOINT 0x004u
 #define WT_REC_CLEAN_AFTER_REC 0x008u
 #define WT_REC_EVICT 0x010u
-#define WT_REC_EVICTION_THREAD 0x020u
-#define WT_REC_HS 0x040u
-#define WT_REC_IN_MEMORY 0x080u
-#define WT_REC_SCRUB 0x100u
-#define WT_REC_VISIBILITY_ERR 0x200u
-#define WT_REC_VISIBLE_ALL 0x400u
+#define WT_REC_HS 0x020u
+#define WT_REC_IN_MEMORY 0x040u
+#define WT_REC_SCRUB 0x080u
+#define WT_REC_VISIBILITY_ERR 0x100u
+#define WT_REC_VISIBLE_ALL 0x200u
 /* AUTOMATIC FLAG VALUE GENERATION STOP */
 
 /*
@@ -1054,6 +1053,9 @@ struct __wt_update {
 
     wt_timestamp_t durable_ts; /* timestamps */
     wt_timestamp_t start_ts;
+#ifdef HAVE_DIAGNOSTIC
+    wt_timestamp_t prev_durable_ts;
+#endif
 
     WT_UPDATE *next; /* forward-linked list */
 
@@ -1099,7 +1101,11 @@ struct __wt_update {
  * WT_UPDATE_SIZE is the expected structure size excluding the payload data -- we verify the build
  * to ensure the compiler hasn't inserted padding.
  */
+#ifdef HAVE_DIAGNOSTIC
+#define WT_UPDATE_SIZE 47
+#else
 #define WT_UPDATE_SIZE 39
+#endif
 
 /*
  * The memory size of an update: include some padding because this is such a common case that

@@ -241,6 +241,8 @@ struct __wt_multi;
 typedef struct __wt_multi WT_MULTI;
 struct __wt_myslot;
 typedef struct __wt_myslot WT_MYSLOT;
+struct __wt_name_flag;
+typedef struct __wt_name_flag WT_NAME_FLAG;
 struct __wt_named_collator;
 typedef struct __wt_named_collator WT_NAMED_COLLATOR;
 struct __wt_named_compressor;

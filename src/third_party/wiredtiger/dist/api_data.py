@@ -45,6 +45,43 @@ class Config:
 common_runtime_config = [
     Config('app_metadata', '', r'''
         application-owned metadata for this object'''),
+    Config('assert', '', r'''
+        enable enhanced checking. ''',
+        type='category', subconfig= [
+        Config('write_timestamp', 'off', r'''
+            verify that commit timestamps are used per the configured
+            \c write_timestamp_usage option for this table''',
+            choices=['off', 'on']),
+        Config('read_timestamp', 'none', r'''
+            verify that timestamps should \c always or \c never be used
+            on reads with this table.  Verification is \c none
+            if mixed read use is allowed''',
+            choices=['always', 'never', 'none'])
+        ], undoc=True),
+    Config('verbose', '[]', r'''
+        enable messages for various events. Options are given as a
+        list, such as <code>"verbose=[write_timestamp]"</code>''',
+        type='list', choices=[
+            'write_timestamp',
+        ]),
+    Config('write_timestamp_usage', 'none', r'''
+        describe how timestamps are expected to be used on modifications to
+        the table. This option should be used in conjunction with the
+        corresponding \c write_timestamp configuration under the \c assert and
+        \c verbose options to provide logging and assertions for incorrect
+        timestamp usage. The choices are \c always which ensures a timestamp is
+        used for every operation on a table, \c key_consistent to ensure that
+        once timestamps are used for a key, they are always used, \c ordered is
+        like \c key_consistent except it also enforces that subsequent updates
+        to each key must use increasing timestamps, \c mixed_mode is like
+        \c ordered except that updates with no timestamp are allowed and have
+        the effect of resetting the chain of updates once the transaction ID
+        based snapshot is no longer relevant, \c never enforces that timestamps
+        are never used for a table and \c none does not enforce any expectation
+        on timestamp usage meaning that no log message or assertions will be
+        produced regardless of the corresponding \c assert and \c verbose
+        settings''',
+        choices=['always', 'key_consistent', 'mixed_mode', 'never', 'none', 'ordered']),
 ]
 
 # Metadata shared by all schema objects
@@ -169,26 +206,6 @@ file_runtime_config = common_runtime_config + [
         option leads to an advisory call to an appropriate operating
         system API where available''',
         choices=['none', 'random', 'sequential']),
-    Config('assert', '', r'''
-        enable enhanced checking. ''',
-        type='category', subconfig= [
-        Config('commit_timestamp', 'none', r'''
-            verify that timestamps should 'always' or 'never' be used
-            on modifications with this table.  Verification is 'none'
-            if mixed update use is allowed. If 'key_consistent' is
-            set then all updates to a specific key must be the same
-            with respect to timestamp usage or not.''',
-            choices=['always', 'key_consistent', 'never', 'none']),
-        Config('durable_timestamp', 'none', r'''
-            verify that durable timestamps should 'always' or 'never' be used
-            on modifications with this table.''',
-            choices=['always', 'key_consistent', 'never', 'none']),
-        Config('read_timestamp', 'none', r'''
-            verify that timestamps should 'always' or 'never' be used
-            on reads with this table.  Verification is 'none'
-            if mixed read use is allowed.''',
-            choices=['always', 'never', 'none'])
-        ], undoc=True),
     Config('cache_resident', 'false', r'''
         do not ever evict the object's pages from cache. Not compatible with
         LSM tables; see @ref tuning_cache_resident for more information''',
@@ -695,9 +712,9 @@ connection_runtime_config = [
         type='list', undoc=True,
         choices=[
         'aggressive_sweep', 'backup_rename', 'checkpoint_slow', 'history_store_checkpoint_delay',
-        'history_store_sweep_race', 'prepare_checkpoint_delay', 'split_1', 'split_2',
-        'split_3', 'split_4', 'split_5', 'split_6', 'split_7', 'split_8']),
-    Config('verbose', '', r'''
+        'history_store_search', 'history_store_sweep_race', 'prepare_checkpoint_delay', 'split_1',
+        'split_2', 'split_3', 'split_4', 'split_5', 'split_6', 'split_7', 'split_8']),
+    Config('verbose', '[]', r'''
         enable messages for various events. Options are given as a
         list, such as <code>"verbose=[evictserver,read]"</code>''',
         type='list', choices=[

@@ -398,6 +398,12 @@ config_backward_compatible(void)
               EINVAL, "stress.hs_checkpoint_delay not supported in backward compatibility mode");
         config_single("stress.hs_checkpoint_delay=off", false);
     }
+
+    if (g.c_timing_stress_hs_search) {
+        if (config_is_perm("stress.hs_search"))
+            testutil_die(EINVAL, "stress.hs_search not supported in backward compatibility mode");
+        config_single("stress.hs_search=off", false);
+    }
 }
 
 /*
