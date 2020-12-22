@@ -32,6 +32,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/client/remote_command_targeter_rs.h"
 #include "mongo/db/repl/primary_only_service.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/tenant_migration_donor_util.h"
 #include "mongo/util/cancelation.h"
 #include "mongo/util/string_map.h"
@@ -57,8 +58,9 @@ public:
     }
 
     ThreadPool::Limits getThreadPoolLimits() const override {
-        // TODO (SERVER-50438): Limit the size of TenantMigrationDonorService thread pool.
-        return ThreadPool::Limits();
+        ThreadPool::Limits limits;
+        limits.maxThreads = repl::maxTenantMigrationDonorThreadPoolSize;
+        return limits;
     }
 
     std::shared_ptr<PrimaryOnlyService::Instance> constructInstance(
