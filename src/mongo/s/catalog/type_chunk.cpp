@@ -211,7 +211,7 @@ ChunkType::ChunkType(NamespaceString nss, ChunkRange range, ChunkVersion version
     : _nss(std::move(nss)),
       _min(range.getMin()),
       _max(range.getMax()),
-      _version(version),
+      _version(std::move(version)),
       _shard(std::move(shardId)) {}
 
 ChunkType::ChunkType(NamespaceString nss,
@@ -223,7 +223,7 @@ ChunkType::ChunkType(NamespaceString nss,
       _collectionUUID(collectionUUID),
       _min(range.getMin()),
       _max(range.getMax()),
-      _version(version),
+      _version(std::move(version)),
       _shard(std::move(shardId)) {}
 
 StatusWith<ChunkType> ChunkType::parseFromConfigBSONCommand(const BSONObj& source) {

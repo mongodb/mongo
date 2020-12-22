@@ -642,6 +642,10 @@ void ShardingCatalogManager::_upgradeCollectionsAndChunksMetadataFor49(Operation
             .docs;
 
     for (const auto& doc : collectionDocs) {
+        // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk splits, merges, and
+        // migrations.
+        Lock::ExclusiveLock lk(opCtx->lockState(), _kChunkOpLock);
+
         const CollectionType coll(doc);
         const auto uuid = coll.getUuid();
         const auto nss = coll.getNss();
@@ -677,6 +681,10 @@ void ShardingCatalogManager::_downgradeCollectionsAndChunksMetadataToPre49(
 
     auto const catalogCache = Grid::get(opCtx)->catalogCache();
     for (const auto& doc : collectionDocs) {
+        // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk splits, merges, and
+        // migrations.
+        Lock::ExclusiveLock lk(opCtx->lockState(), _kChunkOpLock);
+
         const CollectionType coll(doc);
         const auto nss = coll.getNss();
 
