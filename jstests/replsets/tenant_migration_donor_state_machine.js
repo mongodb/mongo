@@ -134,7 +134,7 @@ let configDonorsColl = donorPrimary.getCollection(TenantMigrationTest.kConfigDon
         mtabs = donorPrimary.adminCommand({serverStatus: 1}).tenantMigrationAccessBlocker;
         return mtabs[kTenantId].state === TenantMigrationTest.AccessState.kReject;
     });
-    assert(mtabs[kTenantId].commitOrAbortOpTime);
+    assert(mtabs[kTenantId].commitOpTime);
 
     expectedNumRecipientSyncDataCmdSent += 2;
     const recipientSyncDataMetrics =
@@ -171,7 +171,7 @@ let configDonorsColl = donorPrimary.getCollection(TenantMigrationTest.kConfigDon
         mtabs = donorPrimary.adminCommand({serverStatus: 1}).tenantMigrationAccessBlocker;
         return mtabs[kTenantId].state === TenantMigrationTest.AccessState.kAborted;
     });
-    assert(mtabs[kTenantId].commitOrAbortOpTime);
+    assert(mtabs[kTenantId].abortOpTime);
 
     expectedNumRecipientSyncDataCmdSent += 2;
     const recipientSyncDataMetrics =

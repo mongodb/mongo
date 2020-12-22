@@ -108,26 +108,6 @@ TenantMigrationDonorDocument parseDonorStateDocument(const BSONObj& doc) {
     return donorStateDoc;
 }
 
-std::shared_ptr<executor::TaskExecutor> getTenantMigrationDonorExecutor() {
-    static Mutex mutex = MONGO_MAKE_LATCH("TenantMigrationDonorUtilExecutor::_mutex");
-    static std::shared_ptr<executor::TaskExecutor> executor;
-
-    stdx::lock_guard<Latch> lg(mutex);
-    if (!executor) {
-        ThreadPool::Options tpOptions;
-        tpOptions.threadNamePrefix = kThreadNamePrefix;
-        tpOptions.poolName = kPoolName;
-        tpOptions.minThreads = 0;
-        tpOptions.maxThreads = 16;
-
-        executor = std::make_shared<executor::ThreadPoolTaskExecutor>(
-            std::make_unique<ThreadPool>(tpOptions), executor::makeNetworkInterface(kNetName));
-        executor->startup();
-    }
-
-    return executor;
-}
-
 void checkIfCanReadOrBlock(OperationContext* opCtx, StringData dbName) {
     auto mtab = TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
                     .getTenantMigrationAccessBlockerForDbName(dbName);
@@ -193,7 +173,6 @@ void recoverTenantMigrationAccessBlockers(OperationContext* opCtx) {
 
         auto mtab = std::make_shared<TenantMigrationAccessBlocker>(
             opCtx->getServiceContext(),
-            getTenantMigrationDonorExecutor(),
             doc.getTenantId().toString(),
             doc.getRecipientConnectionString().toString());
 
@@ -212,14 +191,14 @@ void recoverTenantMigrationAccessBlockers(OperationContext* opCtx) {
                 invariant(doc.getBlockTimestamp());
                 mtab->startBlockingWrites();
                 mtab->startBlockingReadsAfter(doc.getBlockTimestamp().get());
-                mtab->commit(doc.getCommitOrAbortOpTime().get());
+                mtab->setCommitOpTime(opCtx, doc.getCommitOrAbortOpTime().get());
                 break;
             case TenantMigrationDonorStateEnum::kAborted:
                 if (doc.getBlockTimestamp()) {
                     mtab->startBlockingWrites();
                     mtab->startBlockingReadsAfter(doc.getBlockTimestamp().get());
                 }
-                mtab->abort(doc.getCommitOrAbortOpTime().get());
+                mtab->setAbortOpTime(opCtx, doc.getCommitOrAbortOpTime().get());
                 break;
             default:
                 MONGO_UNREACHABLE;

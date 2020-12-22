@@ -53,12 +53,6 @@ namespace tenant_migration_donor {
 TenantMigrationDonorDocument parseDonorStateDocument(const BSONObj& doc);
 
 /**
- * Returns a task executor to be used for tenant migration donor tasks that need to run even while
- * the node is not primary, creating it if needed.
- */
-std::shared_ptr<executor::TaskExecutor> getTenantMigrationDonorExecutor();
-
-/**
  * If the operation has read concern "snapshot" or includes afterClusterTime, and the database is
  * in the read blocking state at the given atClusterTime or afterClusterTime or the selected read
  * timestamp, blocks until the migration is committed or aborted.

@@ -1176,14 +1176,6 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
                       "Shutting down all TenantMigrationAccessBlockers on global shutdown");
         TenantMigrationAccessBlockerRegistry::get(serviceContext).shutDown();
 
-        LOGV2_OPTIONS(5093808,
-                      {LogComponent::kTenantMigration},
-                      "Shutting down and joining the tenant migration donor executor");
-        auto tenantMigrationDonorExecutor =
-            tenant_migration_donor::getTenantMigrationDonorExecutor();
-        tenantMigrationDonorExecutor->shutdown();
-        tenantMigrationDonorExecutor->join();
-
         // Terminate the index consistency check.
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
             LOGV2_OPTIONS(4784904,

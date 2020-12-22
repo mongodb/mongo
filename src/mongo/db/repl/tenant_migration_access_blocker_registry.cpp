@@ -97,9 +97,6 @@ TenantMigrationAccessBlockerRegistry::getTenantMigrationAccessBlockerForTenantId
 
 void TenantMigrationAccessBlockerRegistry::shutDown() {
     stdx::lock_guard<Latch> lg(_mutex);
-    std::for_each(_tenantMigrationAccessBlockers.begin(),
-                  _tenantMigrationAccessBlockers.end(),
-                  [](auto& it) { it.second->shutDown(); });
     _tenantMigrationAccessBlockers.clear();
 }
 
@@ -112,6 +109,18 @@ void TenantMigrationAccessBlockerRegistry::appendInfoForServerStatus(BSONObjBuil
         [builder](
             const std::pair<std::string, std::shared_ptr<TenantMigrationAccessBlocker>>& blocker) {
             blocker.second->appendInfoForServerStatus(builder);
+        });
+}
+
+void TenantMigrationAccessBlockerRegistry::onMajorityCommitPointUpdate(repl::OpTime opTime) {
+    stdx::lock_guard<Latch> lg(_mutex);
+
+    std::for_each(
+        _tenantMigrationAccessBlockers.begin(),
+        _tenantMigrationAccessBlockers.end(),
+        [opTime](
+            const std::pair<std::string, std::shared_ptr<TenantMigrationAccessBlocker>>& blocker) {
+            blocker.second->onMajorityCommitPointUpdate(opTime);
         });
 }
 

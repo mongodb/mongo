@@ -83,7 +83,7 @@ if (donorDoc) {
             assert.soon(
                 () => bsonWoCompare(tenantMigrationTest
                                         .getTenantMigrationAccessBlocker(initialSyncNode, kTenantId)
-                                        .commitOrAbortOpTime,
+                                        .commitOpTime,
                                     donorDoc.commitOrAbortOpTime) == 0);
             assert.soon(
                 () => bsonWoCompare(tenantMigrationTest
@@ -98,7 +98,7 @@ if (donorDoc) {
             assert.soon(
                 () => bsonWoCompare(tenantMigrationTest
                                         .getTenantMigrationAccessBlocker(initialSyncNode, kTenantId)
-                                        .commitOrAbortOpTime,
+                                        .abortOpTime,
                                     donorDoc.commitOrAbortOpTime) == 0);
             assert.soon(
                 () => bsonWoCompare(tenantMigrationTest

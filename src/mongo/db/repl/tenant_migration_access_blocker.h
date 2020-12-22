@@ -34,7 +34,6 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/executor/task_executor.h"
 
 namespace mongo {
 
@@ -120,11 +119,9 @@ public:
     enum class State { kAllow, kBlockWrites, kBlockWritesAndReads, kReject, kAborted };
 
     TenantMigrationAccessBlocker(ServiceContext* serviceContext,
-                                 std::shared_ptr<executor::TaskExecutor> executor,
                                  std::string tenantId,
                                  std::string recipientConnString)
         : _serviceContext(serviceContext),
-          _executor(std::move(executor)),
           _tenantId(std::move(tenantId)),
           _recipientConnString(std::move(recipientConnString)) {}
 
@@ -147,14 +144,24 @@ public:
     void startBlockingReadsAfter(const Timestamp& timestamp);
     void rollBackStartBlocking();
 
-    void commit(repl::OpTime opTime);
-    void abort(repl::OpTime opTime);
+    /**
+     * Stores the commit opTime and calls _onMajorityCommitCommitOpTime if the opTime is already
+     * majority-committed.
+     */
+    void setCommitOpTime(OperationContext* opCtx, repl::OpTime opTime);
 
     /**
-     * Sets an internal flag indicating this TenantMigrationAccessBlocker should stop retrying
-     * internal tasks and interrupts internal tasks if any are running.
+     * Stores the abort opTime and calls _onMajorityCommitAbortOpTime if the opTime is already
+     * majority-committed.
      */
-    void shutDown();
+    void setAbortOpTime(OperationContext* opCtx, repl::OpTime opTime);
+
+    /**
+     * If the given opTime is the commit or abort opTime and the completion promise has not been
+     * fulfilled, calls _onMajorityCommitCommitOpTime or _onMajorityCommitAbortOpTime to transition
+     * out of blocking and fulfill the promise.
+     */
+    void onMajorityCommitPointUpdate(repl::OpTime opTime);
 
     SharedSemiFuture<void> onCompletion();
 
@@ -163,12 +170,12 @@ public:
     std::string stateToString(State state) const;
 
 private:
-    ExecutorFuture<void> _waitForOpTimeToMajorityCommit(repl::OpTime opTime);
+    void _onMajorityCommitCommitOpTime(stdx::unique_lock<Latch>& lk);
+    void _onMajorityCommitAbortOpTime(stdx::unique_lock<Latch>& lk);
 
     ServiceContext* _serviceContext;
-    std::shared_ptr<executor::TaskExecutor> _executor;
-    std::string _tenantId;
-    std::string _recipientConnString;
+    const std::string _tenantId;
+    const std::string _recipientConnString;
 
     // Protects the state below.
     mutable Mutex _mutex = MONGO_MAKE_LATCH("TenantMigrationAccessBlocker::_mutex");
@@ -176,10 +183,8 @@ private:
     State _state{State::kAllow};
 
     boost::optional<Timestamp> _blockTimestamp;
-    boost::optional<repl::OpTime> _commitOrAbortOpTime;
-
-    bool _inShutdown{false};
-    OperationContext* _waitForCommitOrAbortToMajorityCommitOpCtx{nullptr};
+    boost::optional<repl::OpTime> _commitOpTime;
+    boost::optional<repl::OpTime> _abortOpTime;
 
     stdx::condition_variable _transitionOutOfBlockingCV;
     SharedPromise<void> _completionPromise;

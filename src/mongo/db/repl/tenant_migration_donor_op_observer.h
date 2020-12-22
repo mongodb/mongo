@@ -196,7 +196,7 @@ public:
     void onReplicationRollback(OperationContext* opCtx, const RollbackObserverInfo& rbInfo) final{};
 
     void onMajorityCommitPointUpdate(ServiceContext* service,
-                                     const repl::OpTime& newCommitPoint) final {}
+                                     const repl::OpTime& newCommitPoint) final;
 };
 
 }  // namespace repl

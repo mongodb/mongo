@@ -55,7 +55,6 @@ void onTransitionToDataSync(OperationContext* opCtx,
 
     auto mtab = std::make_shared<TenantMigrationAccessBlocker>(
         opCtx->getServiceContext(),
-        tenant_migration_donor::getTenantMigrationDonorExecutor(),
         donorStateDoc.getTenantId().toString(),
         donorStateDoc.getRecipientConnectionString().toString());
 
@@ -109,7 +108,7 @@ void onTransitionToCommitted(OperationContext* opCtx,
                     .getTenantMigrationAccessBlockerForTenantId(donorStateDoc.getTenantId());
     invariant(mtab);
 
-    mtab->commit(donorStateDoc.getCommitOrAbortOpTime().get());
+    mtab->setCommitOpTime(opCtx, donorStateDoc.getCommitOrAbortOpTime().get());
 }
 
 /**
@@ -123,7 +122,7 @@ void onTransitionToAborted(OperationContext* opCtx,
     auto mtab = TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
                     .getTenantMigrationAccessBlockerForTenantId(donorStateDoc.getTenantId());
     invariant(mtab);
-    mtab->abort(donorStateDoc.getCommitOrAbortOpTime().get());
+    mtab->setAbortOpTime(opCtx, donorStateDoc.getCommitOrAbortOpTime().get());
 }
 
 /**
@@ -292,6 +291,11 @@ void TenantMigrationDonorOpObserver::onDelete(OperationContext* opCtx,
         opCtx->recoveryUnit()->registerChange(std::make_unique<TenantMigrationDonorDeleteHandler>(
             opCtx, tenantIdToDeleteDecoration(opCtx).get()));
     }
+}
+
+void TenantMigrationDonorOpObserver::onMajorityCommitPointUpdate(
+    ServiceContext* service, const repl::OpTime& newCommitPoint) {
+    TenantMigrationAccessBlockerRegistry::get(service).onMajorityCommitPointUpdate(newCommitPoint);
 }
 
 }  // namespace repl
