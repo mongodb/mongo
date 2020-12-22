@@ -216,72 +216,61 @@ public:
 } cmdRepairDatabase;
 
 /* drop collection */
-class CmdDrop : public ErrmsgCommandDeprecated {
+class CmdDrop : public DropCmdVersion1Gen<CmdDrop> {
 public:
-    CmdDrop() : ErrmsgCommandDeprecated("drop") {}
-
-    virtual const std::set<std::string>& apiVersions() const {
-        return kApiVersions1;
-    }
-
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const final {
         return AllowedOnSecondary::kNever;
     }
-    virtual bool adminOnly() const {
+    bool adminOnly() const final {
         return false;
     }
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) const {
-        ActionSet actions;
-        actions.addAction(ActionType::dropCollection);
-        out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
-    }
-    std::string help() const override {
+    std::string help() const final {
         return "drop a collection\n{drop : <collectionName>}";
     }
-
-
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool collectsResourceConsumptionMetrics() const final {
         return true;
     }
-
-    bool collectsResourceConsumptionMetrics() const override {
-        return true;
-    }
-
-    virtual bool errmsgRun(OperationContext* opCtx,
-                           const string& dbname,
-                           const BSONObj& cmdObj,
-                           string& errmsg,
-                           BSONObjBuilder& result) {
-        auto parsed = Drop::parse(IDLParserErrorContext("drop"), cmdObj);
-        if (parsed.getNamespace().isOplog()) {
-            if (repl::ReplicationCoordinator::get(opCtx)->isReplEnabled()) {
-                errmsg = "can't drop live oplog while replicating";
-                return false;
-            }
-
-            auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-            invariant(storageEngine);
-            if (storageEngine->supportsRecoveryTimestamp()) {
+    class Invocation final : public InvocationBaseGen {
+    public:
+        using InvocationBaseGen::InvocationBaseGen;
+        bool supportsWriteConcern() const final {
+            return true;
+        }
+        NamespaceString ns() const final {
+            return request().getNamespace();
+        }
+        void doCheckAuthorization(OperationContext* opCtx) const final {
+            auto ns = request().getNamespace();
+            uassert(ErrorCodes::Unauthorized,
+                    str::stream() << "Not authorized to drop collection '" << ns << "'",
+                    AuthorizationSession::get(opCtx->getClient())
+                        ->isAuthorizedForActionsOnNamespace(ns, ActionType::dropCollection));
+        }
+        Reply typedRun(OperationContext* opCtx) final {
+            if (request().getNamespace().isOplog()) {
+                uassert(5255000,
+                        "can't drop live oplog while replicating",
+                        !repl::ReplicationCoordinator::get(opCtx)->isReplEnabled());
+                auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+                invariant(storageEngine);
                 // We use the method supportsRecoveryTimestamp() to detect whether we are using
                 // the WiredTiger storage engine, which is currently only storage engine that
                 // supports the replSetResizeOplog command.
-                errmsg =
-                    "can't drop oplog on storage engines that support replSetResizeOplog command";
-                return false;
+                uassert(
+                    5255001,
+                    "can't drop oplog on storage engines that support replSetResizeOplog command",
+                    !storageEngine->supportsRecoveryTimestamp());
             }
+
+            Reply reply;
+            uassertStatusOK(
+                dropCollection(opCtx,
+                               request().getNamespace(),
+                               &reply,
+                               DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops));
+            return reply;
         }
-
-        uassertStatusOK(
-            dropCollection(opCtx,
-                           parsed.getNamespace(),
-                           result,
-                           DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops));
-        return true;
-    }
-
+    };
 } cmdDrop;
 
 /* create collection */

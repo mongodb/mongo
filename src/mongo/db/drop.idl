@@ -34,6 +34,24 @@ global:
 imports:
     - "mongo/idl/basic_types.idl"
 
+structs:
+    DropReply:
+        description: "The drop command's reply."
+        fields:
+            nIndexesWas:
+                type: int
+                optional: true
+            ns:
+                type: namespacestring
+                optional: true
+            info:
+                type: string
+                optional: true
+            # Include "ok" so mongos can use this struct to parse shard replies.
+            ok:
+                type: safeDouble
+                optional: true
+
 commands:
     drop:
         description: "Parser for the drop command"
@@ -42,4 +60,4 @@ commands:
         cpp_name: drop
         strict: true
         api_version: "1"
-        reply_type: OkReply
+        reply_type: DropReply

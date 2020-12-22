@@ -32,6 +32,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/base/status.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/drop_gen.h"
 #include "mongo/db/operation_context.h"
@@ -46,86 +47,82 @@
 namespace mongo {
 namespace {
 
-class DropCmd : public BasicCommand {
+class DropCmd : public DropCmdVersion1Gen<DropCmd> {
 public:
-    DropCmd() : BasicCommand("drop") {}
-
-    virtual const std::set<std::string>& apiVersions() const {
-        return kApiVersions1;
-    }
-
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const final {
         return AllowedOnSecondary::kAlways;
     }
 
-    bool adminOnly() const override {
+    bool adminOnly() const final {
         return false;
     }
 
-    bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return true;
-    }
-
-    void addRequiredPrivileges(const std::string& dbname,
-                               const BSONObj& cmdObj,
-                               std::vector<Privilege>* out) const override {
-        ActionSet actions;
-        actions.addAction(ActionType::dropCollection);
-        out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
-    }
-
-    bool run(OperationContext* opCtx,
-             const std::string& dbname,
-             const BSONObj& cmdObj,
-             BSONObjBuilder& result) override {
-        auto parsed = Drop::parse(IDLParserErrorContext("drop"), cmdObj);
-        const auto& nss = parsed.getNamespace();
-
-        uassert(ErrorCodes::IllegalOperation,
-                "Cannot drop collection in config database",
-                nss.db() != NamespaceString::kConfigDb);
-
-        uassert(ErrorCodes::IllegalOperation,
-                "Cannot drop collection in admin database",
-                nss.db() != NamespaceString::kAdminDb);
-
-        try {
-            // Invalidate the routing table cache entry for this collection so that we reload it the
-            // next time it is accessed, even if sending the command to the config server fails due
-            // to e.g. a NetworkError.
-            ON_BLOCK_EXIT([opCtx, nss] {
-                Grid::get(opCtx)->catalogCache()->invalidateCollectionEntry_LINEARIZABLE(nss);
-            });
-
-            const auto dbInfo =
-                uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbname));
-
-            // Send it to the primary shard
-            ShardsvrDropCollection dropCollectionCommand(nss);
-            dropCollectionCommand.setDbName(dbname);
-
-            auto cmdResponse = executeCommandAgainstDatabasePrimary(
-                opCtx,
-                dbname,
-                dbInfo,
-                CommandHelpers::appendMajorityWriteConcern(dropCollectionCommand.toBSON({}),
-                                                           opCtx->getWriteConcern()),
-                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                Shard::RetryPolicy::kIdempotent);
-
-            const auto remoteResponse = uassertStatusOK(cmdResponse.swResponse);
-
-            CommandHelpers::filterCommandReplyForPassthrough(remoteResponse.data, &result);
-
-            return true;
-        } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-            // If the namespace isn't found, treat the drop as a success but inform about the
-            // failure.
-            result.append("info", "database does not exist");
+    class Invocation final : public InvocationBaseGen {
+    public:
+        using InvocationBaseGen::InvocationBaseGen;
+        bool supportsWriteConcern() const final {
             return true;
         }
-    }
+        NamespaceString ns() const final {
+            return request().getNamespace();
+        }
+        void doCheckAuthorization(OperationContext* opCtx) const final {
+            auto ns = request().getNamespace();
+            uassert(ErrorCodes::Unauthorized,
+                    str::stream() << "Not authorized to drop collection '" << ns << "'",
+                    AuthorizationSession::get(opCtx->getClient())
+                        ->isAuthorizedForActionsOnNamespace(ns, ActionType::dropCollection));
+        }
+        Reply typedRun(OperationContext* opCtx) final {
+            auto nss = request().getNamespace();
+            uassert(ErrorCodes::IllegalOperation,
+                    "Cannot drop collection in config database",
+                    nss.db() != NamespaceString::kConfigDb);
 
+            uassert(ErrorCodes::IllegalOperation,
+                    "Cannot drop collection in admin database",
+                    nss.db() != NamespaceString::kAdminDb);
+
+            try {
+                // Invalidate the routing table cache entry for this collection so that we reload it
+                // the next time it is accessed, even if sending the command to the config server
+                // fails due to e.g. a NetworkError.
+                ON_BLOCK_EXIT([opCtx, nss] {
+                    Grid::get(opCtx)->catalogCache()->invalidateCollectionEntry_LINEARIZABLE(nss);
+                });
+
+                const auto dbInfo =
+                    uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, nss.db()));
+
+                // Send it to the primary shard
+                ShardsvrDropCollection dropCollectionCommand(nss);
+                dropCollectionCommand.setDbName(nss.db());
+
+                auto cmdResponse = executeCommandAgainstDatabasePrimary(
+                    opCtx,
+                    nss.db(),
+                    dbInfo,
+                    CommandHelpers::appendMajorityWriteConcern(dropCollectionCommand.toBSON({}),
+                                                               opCtx->getWriteConcern()),
+                    ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                    Shard::RetryPolicy::kIdempotent);
+
+                const auto remoteResponse = uassertStatusOK(cmdResponse.swResponse);
+                BSONObjBuilder result;
+                CommandHelpers::filterCommandReplyForPassthrough(remoteResponse.data, &result);
+                auto resultObj = result.obj();
+                uassertStatusOK(getStatusFromCommandResult(resultObj));
+                // Ensure our reply conforms to the IDL-defined reply structure.
+                return DropReply::parse({"drop"}, resultObj);
+            } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+                // If the namespace isn't found, treat the drop as a success but inform about the
+                // failure.
+                DropReply reply;
+                reply.setInfo("database does not exist"_sd);
+                return reply;
+            }
+        }
+    };
 } clusterDropCmd;
 
 }  // namespace

@@ -71,7 +71,7 @@ Status _checkNssAndReplState(OperationContext* opCtx, const CollectionPtr& coll)
 Status _dropView(OperationContext* opCtx,
                  Database* db,
                  const NamespaceString& collectionName,
-                 BSONObjBuilder* result,
+                 DropReply* reply,
                  bool clearBucketCatalog = false) {
     if (!db) {
         return Status(ErrorCodes::NamespaceNotFound, "ns not found");
@@ -120,7 +120,7 @@ Status _dropView(OperationContext* opCtx,
         BucketCatalog::get(opCtx).clear(collectionName);
     }
 
-    result->append("ns", collectionName.ns());
+    reply->setNs(collectionName);
     return Status::OK();
 }
 
@@ -128,7 +128,7 @@ Status _abortIndexBuildsAndDrop(OperationContext* opCtx,
                                 AutoGetDb&& autoDb,
                                 const NamespaceString& startingNss,
                                 std::function<Status(Database*, const NamespaceString&)>&& dropFn,
-                                BSONObjBuilder* result,
+                                DropReply* reply,
                                 bool appendNs = true) {
     // We only need to hold an intent lock to send abort signals to the active index builder on this
     // collection.
@@ -223,9 +223,9 @@ Status _abortIndexBuildsAndDrop(OperationContext* opCtx,
         return status;
     }
 
-    result->append("nIndexesWas", numIndexes);
+    reply->setNIndexesWas(numIndexes);
     if (appendNs) {
-        result->append("ns", resolvedNss.ns());
+        reply->setNs(resolvedNss);
     }
 
     return Status::OK();
@@ -236,7 +236,7 @@ Status _dropCollection(OperationContext* opCtx,
                        const NamespaceString& collectionName,
                        const repl::OpTime& dropOpTime,
                        DropCollectionSystemCollectionMode systemCollectionMode,
-                       BSONObjBuilder* result) {
+                       DropReply* reply) {
     Lock::CollectionLock collLock(opCtx, collectionName, MODE_X);
     const CollectionPtr& coll =
         CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, collectionName);
@@ -273,15 +273,15 @@ Status _dropCollection(OperationContext* opCtx,
     }
     wunit.commit();
 
-    result->append("nIndexesWas", numIndexes);
-    result->append("ns", collectionName.ns());
+    reply->setNIndexesWas(numIndexes);
+    reply->setNs(collectionName);
 
     return Status::OK();
 }
 
 Status dropCollection(OperationContext* opCtx,
                       const NamespaceString& collectionName,
-                      BSONObjBuilder& result,
+                      DropReply* reply,
                       DropCollectionSystemCollectionMode systemCollectionMode) {
     if (!serverGlobalParams.quiet.load()) {
         LOGV2(518070, "CMD: drop", logAttrs(collectionName));
@@ -319,7 +319,7 @@ Status dropCollection(OperationContext* opCtx,
                         wuow.commit();
                         return Status::OK();
                     },
-                    &result);
+                    reply);
             }
 
             auto view = ViewCatalog::get(db)->lookupWithoutValidatingDurableViews(
@@ -329,16 +329,16 @@ Status dropCollection(OperationContext* opCtx,
             }
 
             if (!view->timeseries()) {
-                return _dropView(opCtx, db, collectionName, &result);
+                return _dropView(opCtx, db, collectionName, reply);
             }
 
             return _abortIndexBuildsAndDrop(
                 opCtx,
                 std::move(autoDb),
                 view->viewOn(),
-                [opCtx, &collectionName, &result](Database* db, const NamespaceString& bucketsNs) {
-                    auto status = _dropView(
-                        opCtx, db, collectionName, &result, true /* clearBucketCatalog */);
+                [opCtx, &collectionName, &reply](Database* db, const NamespaceString& bucketsNs) {
+                    auto status =
+                        _dropView(opCtx, db, collectionName, reply, true /* clearBucketCatalog */);
                     if (!status.isOK()) {
                         return status;
                     }
@@ -353,7 +353,7 @@ Status dropCollection(OperationContext* opCtx,
 
                     return Status::OK();
                 },
-                &result,
+                reply,
                 false /* appendNs */);
         });
     } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
@@ -385,12 +385,12 @@ Status dropCollectionForApplyOps(OperationContext* opCtx,
         const CollectionPtr& coll =
             CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, collectionName);
 
-        BSONObjBuilder unusedBuilder;
+        DropReply unusedReply;
         if (!coll) {
-            return _dropView(opCtx, db, collectionName, &unusedBuilder);
+            return _dropView(opCtx, db, collectionName, &unusedReply);
         } else {
             return _dropCollection(
-                opCtx, db, collectionName, dropOpTime, systemCollectionMode, &unusedBuilder);
+                opCtx, db, collectionName, dropOpTime, systemCollectionMode, &unusedReply);
         }
     });
 }
