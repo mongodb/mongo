@@ -34,6 +34,20 @@ else
 		exit 1;
 	fi
 
+	# For files in the src directory, camel case style is not allowed.
+	# Ignore styling errors of external libraries.
+	if expr "$f" : 'src/' > /dev/null &&
+	  ! expr "$f" : 'src/os_win/' > /dev/null &&
+	  ! expr "$f" : 'src/docs/' > /dev/null &&
+	  ! expr "$f" : 'src/tags' > /dev/null &&
+	  ! expr "$f" : 'src/.*/hash_city.*' > /dev/null &&
+	  ! expr "$f" : 'src/.*/huffman.*' > /dev/null &&
+	  ! expr "$f" : 'src/checksum.*' > /dev/null; then
+		if egrep -r -n '\b[a-z]+[A-Z]' $f | egrep -v ':[     ]+\*|"|UNCHECKED_STRING'; then
+			echo "$f: Styling requires variables that use underscores to separate parts of a name instead of camel casing.";
+		fi
+	fi
+
 	egrep -w 'a a|an an|and and|are are|be be|by by|for for|from from|if if|in in[^-]|is is|it it|of of|the the|this this|to to|was was|were were|when when|with with|a an|an a|a the|the a' $f > $t
 	test -s $t && {
 		echo "paired typo"

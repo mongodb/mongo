@@ -1061,8 +1061,12 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 
     WT_RET(__wt_txn_config(session, cfg));
 
-    /* Allocate a snapshot if required. */
-    if (txn->isolation == WT_ISO_SNAPSHOT) {
+    /*
+     * Allocate a snapshot if required or update the existing snapshot. Do not update the existing
+     * snapshot of autocommit transactions because they are committed at the end of the operation.
+     */
+    if (txn->isolation == WT_ISO_SNAPSHOT &&
+      !(F_ISSET(txn, WT_TXN_AUTOCOMMIT) && F_ISSET(txn, WT_TXN_HAS_SNAPSHOT))) {
         if (session->ncursors > 0)
             WT_RET(__wt_session_copy_values(session));
 
@@ -1090,14 +1094,15 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 static inline int
 __wt_txn_autocommit_check(WT_SESSION_IMPL *session)
 {
+    WT_DECL_RET;
     WT_TXN *txn;
 
     txn = session->txn;
     if (F_ISSET(txn, WT_TXN_AUTOCOMMIT)) {
+        ret = __wt_txn_begin(session, NULL);
         F_CLR(txn, WT_TXN_AUTOCOMMIT);
-        return (__wt_txn_begin(session, NULL));
     }
-    return (0);
+    return (ret);
 }
 
 /*

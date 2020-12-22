@@ -1696,6 +1696,27 @@ struct __wt_session {
 	int __F(prepare_transaction)(WT_SESSION *session, const char *config);
 
 	/*!
+	 * Reset the snapshot.
+	 *
+	 * This method resets snapshots for snapshot isolation transactions to
+	 * update their existing snapshot. It raises an error when this API
+	 * is used for isolation other than snapshot isolation mode or when the session
+	 * has performed any write operations.
+	 * This API internally releases the current snapshot and gets the new running
+	 * transactions snapshot to avoid pinning the content in the database that is no
+	 * longer needed. Applications that don't use read_timestamp for the search may
+	 * see different results compared to earlier with the updated snapshot.
+	 *
+	 * @requires_transaction
+	 *
+	 * @snippet ex_all.c reset snapshot
+	 *
+	 * @param session the session handle
+	 * @errors
+	 */
+	int __F(reset_snapshot)(WT_SESSION *session);
+
+	/*!
 	 * Roll back the current transaction.
 	 *
 	 * A transaction must be in progress when this method is called.

@@ -135,7 +135,7 @@ struct __wt_reconcile {
         size_t min_offset; /* byte offset */
 
         WT_ITEM image; /* disk-image */
-    } chunkA, chunkB, *cur_ptr, *prev_ptr;
+    } chunk_A, chunk_B, *cur_ptr, *prev_ptr;
 
     size_t disk_img_buf_size; /* Base size needed for a chunk memory image */
 

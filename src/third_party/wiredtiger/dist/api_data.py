@@ -1404,6 +1404,7 @@ methods = {
         choices=['commit', 'first_commit', 'prepare', 'read']),
 ]),
 
+'WT_SESSION.reset_snapshot' : Method([]),
 'WT_SESSION.rename' : Method([]),
 'WT_SESSION.reset' : Method([]),
 'WT_SESSION.salvage' : Method([

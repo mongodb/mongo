@@ -39,9 +39,16 @@ class test_backup13(wttest.WiredTigerTestCase, suite_subprocess):
     conn_config='cache_size=1G,log=(enabled,file_max=100K)'
     dir='backup.dir'                    # Backup directory name
     logmax="100K"
-    uri="table:test"
-    nops=1000
     mult=0
+    nops=1000
+    uri="table:test"
+
+    scenarios = make_scenarios([
+        ('default', dict(sess_cfg='')),
+        ('read-committed', dict(sess_cfg='isolation=read-committed')),
+        ('read-uncommitted', dict(sess_cfg='isolation=read-uncommitted')),
+        ('snapshot', dict(sess_cfg='isolation=snapshot')),
+    ])
 
     pfx = 'test_backup'
     # Set the key and value big enough that we modify a few blocks.
@@ -78,8 +85,10 @@ class test_backup13(wttest.WiredTigerTestCase, suite_subprocess):
         # Increase the multiplier so that later calls insert unique items.
         self.mult += 1
 
-    def test_backup13(self):
+    def session_config(self):
+        return self.sess_cfg
 
+    def test_backup13(self):
         self.session.create(self.uri, "key_format=S,value_format=S")
         self.add_data(self.uri)
 

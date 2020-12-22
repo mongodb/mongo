@@ -493,8 +493,8 @@ __rec_init(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags, WT_SALVAGE_COO
         r->last = &r->_last;
 
         /* Disk buffers need to be aligned for writing. */
-        F_SET(&r->chunkA.image, WT_ITEM_ALIGNED);
-        F_SET(&r->chunkB.image, WT_ITEM_ALIGNED);
+        F_SET(&r->chunk_A.image, WT_ITEM_ALIGNED);
+        F_SET(&r->chunk_B.image, WT_ITEM_ALIGNED);
     }
 
     /* Remember the configuration. */
@@ -706,12 +706,12 @@ __rec_destroy(WT_SESSION_IMPL *session, void *reconcilep)
         return;
     *(WT_RECONCILE **)reconcilep = NULL;
 
-    __wt_buf_free(session, &r->chunkA.key);
-    __wt_buf_free(session, &r->chunkA.min_key);
-    __wt_buf_free(session, &r->chunkA.image);
-    __wt_buf_free(session, &r->chunkB.key);
-    __wt_buf_free(session, &r->chunkB.min_key);
-    __wt_buf_free(session, &r->chunkB.image);
+    __wt_buf_free(session, &r->chunk_A.key);
+    __wt_buf_free(session, &r->chunk_A.min_key);
+    __wt_buf_free(session, &r->chunk_A.image);
+    __wt_buf_free(session, &r->chunk_B.key);
+    __wt_buf_free(session, &r->chunk_B.min_key);
+    __wt_buf_free(session, &r->chunk_B.image);
 
     __wt_free(session, r->supd);
 
@@ -955,8 +955,8 @@ __wt_rec_split_init(
     r->disk_img_buf_size = WT_ALIGN(WT_MAX(corrected_page_size, r->split_size), btree->allocsize);
 
     /* Initialize the first split chunk. */
-    WT_RET(__rec_split_chunk_init(session, r, &r->chunkA));
-    r->cur_ptr = &r->chunkA;
+    WT_RET(__rec_split_chunk_init(session, r, &r->chunk_A));
+    r->cur_ptr = &r->chunk_A;
     r->prev_ptr = NULL;
 
     /* Starting record number, entries, first free byte. */
@@ -1194,11 +1194,11 @@ __wt_rec_split(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t next_len, bool 
         if (forced) {
             WT_RET(__rec_split_write(session, r, r->cur_ptr, NULL, false));
             r->prev_ptr = NULL;
-            r->cur_ptr = &r->chunkA;
+            r->cur_ptr = &r->chunk_A;
         } else {
             if (r->prev_ptr == NULL) {
-                WT_RET(__rec_split_chunk_init(session, r, &r->chunkB));
-                r->prev_ptr = &r->chunkB;
+                WT_RET(__rec_split_chunk_init(session, r, &r->chunk_B));
+                r->prev_ptr = &r->chunk_B;
             }
             tmp = r->prev_ptr;
             r->prev_ptr = r->cur_ptr;
