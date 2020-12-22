@@ -96,6 +96,7 @@ env.Library(
         'shard_server_catalog_cache_loader.cpp',
         'shard_server_op_observer.cpp',
         'sharding_config_optime_gossip.cpp',
+        'sharding_ddl_util.cpp',
         'sharding_initialization_mongod.cpp',
         'sharding_state_recovery.cpp',
         'sharding_statistics.cpp',
@@ -543,6 +544,7 @@ env.CppUnitTest(
         'resharding/resharding_coordinator_test.cpp',
         'resharding/resharding_util_refresh_test.cpp',
         'resharding/resharding_util_test.cpp',
+        'sharding_ddl_util_test.cpp',
         'vector_clock_config_server_test.cpp',
     ],
     LIBDEPS=[
