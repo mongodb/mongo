@@ -392,19 +392,40 @@ TenantOplogApplier::OpTimePair TenantOplogApplier::_writeNoOpEntries(
                 "numOplogThreads"_attr = numOplogThreads,
                 "numOpsPerThread"_attr = numOpsPerThread);
     size_t numOpsRemaining = batch.ops.size();
+    std::vector<Status> statusVector(numOplogThreads, Status::OK());
     for (size_t thread = 0; thread < numOplogThreads && opsIter != batch.ops.end(); thread++) {
         auto numOps = std::min(numOpsPerThread, numOpsRemaining);
         if (thread == numOplogThreads - 1) {
             numOps = numOpsRemaining;
         }
-        _writerPool->schedule([=](Status status) {
-            invariant(status);
-            _writeNoOpsForRange(opObserver, opsIter, opsIter + numOps, slotIter);
+        _writerPool->schedule([=, &status = statusVector.at(thread)](auto scheduleStatus) {
+            if (!scheduleStatus.isOK()) {
+                status = scheduleStatus;
+            } else {
+                try {
+                    _writeNoOpsForRange(opObserver, opsIter, opsIter + numOps, slotIter);
+                } catch (const DBException& e) {
+                    status = e.toStatus();
+                }
+            }
         });
         slotIter += numOps;
         opsIter += numOps;
         numOpsRemaining -= numOps;
     }
+
+    // Make sure all the workers succeeded.
+    for (const auto& status : statusVector) {
+        if (!status.isOK()) {
+            LOGV2_ERROR(5333900,
+                        "Failed to write noop in tenant migration",
+                        "tenant"_attr = _tenantId,
+                        "migrationUuid"_attr = _migrationUuid,
+                        "error"_attr = redact(status));
+        }
+        uassertStatusOK(status);
+    }
+
     invariant(opsIter == batch.ops.end());
     _writerPool->waitForIdle();
     return {batch.ops.back().entry.getOpTime(), greatestOplogSlotUsed};
