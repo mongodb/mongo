@@ -41,61 +41,23 @@
 namespace mongo {
 namespace {
 
-class EndSessionsCommand final : public BasicCommand {
+class EndSessionsCommand final : public EndSessionsCmdVersion1Gen<EndSessionsCommand> {
     EndSessionsCommand(const EndSessionsCommand&) = delete;
     EndSessionsCommand& operator=(const EndSessionsCommand&) = delete;
 
 public:
-    EndSessionsCommand() : BasicCommand("endSessions") {}
+    EndSessionsCommand() = default;
 
-    const std::set<std::string>& apiVersions() const {
-        return kApiVersions1;
-    }
-
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const final {
         return AllowedOnSecondary::kAlways;
     }
 
-    bool adminOnly() const override {
+    bool adminOnly() const final {
         return false;
     }
 
-    bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return false;
-    }
-
-    std::string help() const override {
+    std::string help() const final {
         return "end a set of logical sessions";
-    }
-
-    Status checkAuthForOperation(OperationContext* opCtx,
-                                 const std::string& dbname,
-                                 const BSONObj& cmdObj) const override {
-        // It is always ok to run this command, as long as you are authenticated
-        // as some user, if auth is enabled.
-        AuthorizationSession* authSession = AuthorizationSession::get(opCtx->getClient());
-        try {
-            auto user = authSession->getSingleUser();
-            invariant(user);
-            return Status::OK();
-        } catch (...) {
-            return exceptionToStatus();
-        }
-    }
-
-    bool run(OperationContext* opCtx,
-             const std::string& db,
-             const BSONObj& cmdObj,
-             BSONObjBuilder& result) override {
-        auto endSessionsRequest = EndSessionsFromClient::parse(
-            IDLParserErrorContext("endSessions",
-                                  APIParameters::get(opCtx).getAPIStrict().value_or(false)),
-            cmdObj);
-
-        LogicalSessionCache::get(opCtx)->endSessions(
-            makeLogicalSessionIds(endSessionsRequest.getCommandParameter(), opCtx));
-
-        return true;
     }
 
     /**
@@ -105,6 +67,34 @@ public:
     bool auditAuthorizationFailure() const final {
         return false;
     }
+
+    class Invocation final : public InvocationBaseGen {
+    public:
+        using InvocationBaseGen::InvocationBaseGen;
+
+        bool supportsWriteConcern() const final {
+            return false;
+        }
+
+        NamespaceString ns() const final {
+            return NamespaceString(request().getDbName());
+        }
+
+        void doCheckAuthorization(OperationContext* opCtx) const final {
+            // It is always ok to run this command, as long as you are authenticated
+            // as some user, if auth is enabled.
+            uassert(ErrorCodes::Unauthorized,
+                    "Not authorized to run endSessions command",
+                    AuthorizationSession::get(opCtx->getClient())->getSingleUser());
+        }
+
+        virtual Reply typedRun(OperationContext* opCtx) final {
+            LogicalSessionCache::get(opCtx)->endSessions(
+                makeLogicalSessionIds(request().getCommandParameter(), opCtx));
+
+            return Reply();
+        }
+    };
 
 } endSessionsCommand;
 
