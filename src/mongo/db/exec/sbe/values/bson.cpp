@@ -95,7 +95,7 @@ std::pair<value::TypeTags, value::Value> convertFrom(bool view,
                                                      const char* be,
                                                      const char* end,
                                                      size_t fieldNameSize) {
-    auto type = static_cast<BSONType>(*be);
+    auto type = static_cast<BSONType>(static_cast<signed char>(*be));
     // Advance the 'be' pointer;
     be += 1 + fieldNameSize + 1;
 
