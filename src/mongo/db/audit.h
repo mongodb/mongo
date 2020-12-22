@@ -262,6 +262,14 @@ void logStartupOptions(Client* client, const BSONObj& startupOptions);
 void logShutdown(Client* client);
 
 /**
+ * Logs the users authenticated to a session before and after a logout command.
+ */
+void logLogout(Client* client,
+               StringData reason,
+               const BSONArray& initialUsers,
+               const BSONArray& updatedUsers);
+
+/**
  * Logs the result of a createIndex command.
  */
 void logCreateIndex(Client* client,

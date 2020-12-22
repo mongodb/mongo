@@ -41,14 +41,13 @@ namespace mongo {
  * synchronizing access.
  */
 class UserSet {
-    UserSet(const UserSet&) = delete;
-    UserSet& operator=(const UserSet&) = delete;
-
 public:
     using iterator = std::list<UserHandle>::iterator;
     using const_iterator = std::list<UserHandle>::const_iterator;
 
     UserSet();
+    UserSet(const UserSet&) = default;
+    UserSet& operator=(const UserSet&) = default;
 
     /**
      * Adds a User to the UserSet.
@@ -103,6 +102,20 @@ public:
 
     iterator end() {
         return _users.end();
+    }
+
+    // Returns the number of users stored in the set.
+    std::size_t count() const {
+        return _users.size();
+    }
+
+    // Generates a BSONArray representation of the UserSet.
+    BSONArray toBSON() const {
+        BSONArrayBuilder userNamesArray;
+        for (const auto& userHandle : _users) {
+            userHandle->getName().serializeToBSON(&userNamesArray);
+        }
+        return userNamesArray.arr();
     }
 
 private:
