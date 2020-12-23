@@ -88,7 +88,7 @@ public:
                     AuthorizationSession::get(opCtx->getClient())->getSingleUser());
         }
 
-        virtual Reply typedRun(OperationContext* opCtx) final {
+        Reply typedRun(OperationContext* opCtx) final {
             LogicalSessionCache::get(opCtx)->endSessions(
                 makeLogicalSessionIds(request().getCommandParameter(), opCtx));
 
