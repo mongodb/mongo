@@ -449,6 +449,12 @@ StatusWith<BSONObj> validateIndexSpec(
                     str::stream()
                         << "The 'bucketSize' parameter is disallowed because "
                            "geoHaystack indexes are no longer supported in version 4.9 and above"};
+        } else if (IndexDescriptor::kBackgroundFieldName == indexSpecElemFieldName &&
+                   !indexSpecElem.isNumber() && !indexSpecElem.isBoolean()) {
+            return {ErrorCodes::BadValue,
+                    str::stream() << "The field '" << IndexDescriptor::kBackgroundFieldName
+                                  << " has value " << indexSpecElem.toString()
+                                  << ", which is not convertible to bool"};
         } else {
             // We can assume field name is valid at this point. Validation of fieldname is handled
             // prior to this in validateIndexSpecFieldNames().

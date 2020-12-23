@@ -297,5 +297,32 @@ TEST(IndexKeyValidateTest, CompoundHashedIndex) {
         ServerGlobalParams::FeatureCompatibility()));
 }
 
+TEST(IndexKeyValidateTest, Background) {
+    ASSERT_OK(index_key_validate::validateIndexSpec(
+        nullptr,
+        fromjson("{key: {a: 1}, name: 'index', background: true}"),
+        ServerGlobalParams::FeatureCompatibility()));
+
+    ASSERT_OK(index_key_validate::validateIndexSpec(
+        nullptr,
+        fromjson("{key: {a: 1}, name: 'index', background: 1}"),
+        ServerGlobalParams::FeatureCompatibility()));
+
+    ASSERT_OK(index_key_validate::validateIndexSpec(
+        nullptr,
+        fromjson("{key: {a: 1}, name: 'index', background: 0}"),
+        ServerGlobalParams::FeatureCompatibility()));
+
+    ASSERT_NOT_OK(index_key_validate::validateIndexSpec(
+        nullptr,
+        fromjson("{key: {a: 1}, name: 'index', background: 'foo'}"),
+        ServerGlobalParams::FeatureCompatibility()));
+
+    ASSERT_NOT_OK(index_key_validate::validateIndexSpec(
+        nullptr,
+        fromjson("{key: {a: 1}, name: 'index', background: []}"),
+        ServerGlobalParams::FeatureCompatibility()));
+}
+
 }  // namespace
 }  // namespace mongo
