@@ -41,63 +41,52 @@
 namespace mongo {
 namespace {
 
-class RefreshSessionsCommand final : public BasicCommand {
+class RefreshSessionsCommand final : public RefreshSessionsCmdVersion1Gen<RefreshSessionsCommand> {
 public:
-    RefreshSessionsCommand() : BasicCommand("refreshSessions") {}
+    RefreshSessionsCommand() = default;
 
-    const std::set<std::string>& apiVersions() const {
-        return kApiVersions1;
-    }
-
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const final {
         return AllowedOnSecondary::kAlways;
     }
 
-    bool adminOnly() const override {
+    bool adminOnly() const final {
         return false;
     }
 
-    bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return false;
-    }
-
-    std::string help() const override {
+    std::string help() const final {
         return "renew a set of logical sessions";
     }
 
-    Status checkAuthForOperation(OperationContext* opCtx,
-                                 const std::string& dbname,
-                                 const BSONObj& cmdObj) const override {
-        // It is always ok to run this command, as long as you are authenticated
-        // as some user, if auth is enabled.
-        AuthorizationSession* authSession = AuthorizationSession::get(opCtx->getClient());
-        try {
-            auto user = authSession->getSingleUser();
-            invariant(user);
-            return Status::OK();
-        } catch (...) {
-            return exceptionToStatus();
-        }
-    }
+    class Invocation final : public InvocationBaseGen {
+    public:
+        using InvocationBaseGen::InvocationBaseGen;
 
-    bool run(OperationContext* opCtx,
-             const std::string& db,
-             const BSONObj& cmdObj,
-             BSONObjBuilder& result) override {
-        auto refreshSessionsRequest = RefreshSessionsFromClient::parse(
-            IDLParserErrorContext("refreshSessions",
-                                  APIParameters::get(opCtx).getAPIStrict().value_or(false)),
-            cmdObj);
-
-        const auto lsCache = LogicalSessionCache::get(opCtx);
-
-        for (const auto& lsid :
-             makeLogicalSessionIds(refreshSessionsRequest.getCommandParameter(), opCtx)) {
-            uassertStatusOK(lsCache->vivify(opCtx, lsid));
+        bool supportsWriteConcern() const final {
+            return false;
         }
 
-        return true;
-    }
+        NamespaceString ns() const final {
+            return NamespaceString(request().getDbName());
+        }
+
+        void doCheckAuthorization(OperationContext* opCtx) const final {
+            // It is always ok to run this command, as long as you are authenticated
+            // as some user, if auth is enabled.
+            uassert(ErrorCodes::Unauthorized,
+                    "Not authorized to run refreshSessions command",
+                    AuthorizationSession::get(opCtx->getClient())->getSingleUser());
+        }
+
+        Reply typedRun(OperationContext* opCtx) final {
+            const auto lsCache = LogicalSessionCache::get(opCtx);
+
+            for (const auto& lsid : makeLogicalSessionIds(request().getCommandParameter(), opCtx)) {
+                uassertStatusOK(lsCache->vivify(opCtx, lsid));
+            }
+
+            return Reply();
+        }
+    };
 
 } refreshSessionsCommand;
 
