@@ -111,21 +111,21 @@ void createTemporaryReshardingCollectionLocally(OperationContext* opCtx,
     auto catalogCache = Grid::get(opCtx)->catalogCache();
 
     // Load the original collection's options from the database's primary shard.
-    auto [collOptions, uuid] =
-        shardVersionRetry(opCtx,
-                          catalogCache,
-                          reshardingNss,
-                          "loading collection options to create temporary resharding collection"_sd,
-                          [&]() -> MigrationDestinationManager::CollectionOptionsAndUUID {
-                              auto originalCm = uassertStatusOK(
-                                  catalogCache->getCollectionRoutingInfo(opCtx, originalNss));
-                              return MigrationDestinationManager::getCollectionOptions(
-                                  opCtx,
-                                  NamespaceStringOrUUID(originalNss.db().toString(), existingUUID),
-                                  originalCm.dbPrimary(),
-                                  originalCm,
-                                  fetchTimestamp);
-                          });
+    auto [collOptions, uuid] = shardVersionRetry(
+        opCtx,
+        catalogCache,
+        reshardingNss,
+        "loading collection options to create temporary resharding collection"_sd,
+        [&]() -> MigrationDestinationManager::CollectionOptionsAndUUID {
+            auto originalCm = uassertStatusOK(
+                catalogCache->getShardedCollectionRoutingInfoWithRefresh(opCtx, originalNss));
+            return MigrationDestinationManager::getCollectionOptions(
+                opCtx,
+                NamespaceStringOrUUID(originalNss.db().toString(), existingUUID),
+                originalCm.dbPrimary(),
+                originalCm,
+                fetchTimestamp);
+        });
 
     // Load the original collection's indexes from the shard that owns the global minimum chunk.
     auto [indexes, idIndex] =
@@ -393,14 +393,6 @@ void ReshardingRecipientService::RecipientStateMachine::_applyThenTransitionToSt
     // _cloneThenTransitionToApplying() to call _transitionStateAndUpdateCoordinator(kSteadyState).
 
     _transitionStateAndUpdateCoordinator(RecipientStateEnum::kSteadyState);
-
-    // Unless a test is prepared to write the final oplog entries itself, without this interrupt(),
-    // the futures returned by ReshardingOplogFetcher::schedule() would never become ready.
-    //
-    // TODO SERVER-53372: Remove once the donor shards write the final oplog entry themselves.
-    if (resharding::gReshardingTempInterruptBeforeOplogApplication) {
-        interrupt({ErrorCodes::InternalError, "Artificial interruption to enable jsTests"});
-    }
 }
 
 ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::

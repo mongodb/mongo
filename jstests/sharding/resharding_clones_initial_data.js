@@ -31,13 +31,6 @@ CreateShardedCollectionUtil.shardCollectionWithChunks(inputCollection, {oldKey: 
     {min: {oldKey: 0}, max: {oldKey: MaxKey}, shard: st.shard1.shardName},
 ]);
 
-const inputCollectionUUID =
-    getUUIDFromListCollections(inputCollection.getDB(), inputCollection.getName());
-const inputCollectionUUIDString = extractUUIDFromObject(inputCollectionUUID);
-
-const temporaryReshardingCollection =
-    st.s.getCollection(`reshardingDb.system.resharding.${inputCollectionUUIDString}`);
-
 assert.commandWorked(inputCollection.insert(
     [
         {_id: "stays on shard0", oldKey: -10, newKey: -10},
@@ -60,7 +53,7 @@ function assertClonedContents(shard, expectedDocs) {
     // We sort by oldKey so the order of `expectedDocs` can be deterministic.
     assert.eq(expectedDocs,
               shard.rs.getPrimary()
-                  .getCollection(temporaryReshardingCollection.getFullName())
+                  .getCollection(inputCollection.getFullName())
                   .find()
                   .sort({oldKey: 1})
                   .toArray());

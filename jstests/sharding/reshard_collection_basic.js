@@ -64,42 +64,26 @@ let verifyTemporaryReshardingChunksMatchExpected = (expectedChunks) => {
     }
 };
 
-let verifyTemporaryReshardingCollectionExistsWithCorrectOptionsForConn =
-    (expectedCollInfo, tempCollName, conn) => {
-        const tempReshardingCollInfo =
-            conn.getDB(kDbName).getCollectionInfos({name: tempCollName})[0];
-        assert.neq(tempReshardingCollInfo, null);
-        assert.eq(expectedCollInfo.options, tempReshardingCollInfo.options);
-    };
+let verifyCollectionExistenceForConn = (collName, expectedToExist, conn) => {
+    const doesExist = Boolean(conn.getDB(kDbName)[collName].exists());
+    assert.eq(doesExist, expectedToExist);
+};
 
 let verifyTemporaryReshardingCollectionExistsWithCorrectOptions = (expectedRecipientShards) => {
     const originalCollInfo = mongos.getDB(kDbName).getCollectionInfos({name: collName})[0];
-    assert.neq(originalCollInfo, null);
+    assert.neq(originalCollInfo, undefined);
 
     const tempReshardingCollName =
         constructTemporaryReshardingCollName(kDbName, collName, originalCollInfo);
-
-    verifyTemporaryReshardingCollectionExistsWithCorrectOptionsForConn(
-        originalCollInfo, tempReshardingCollName, mongos);
+    verifyCollectionExistenceForConn(tempReshardingCollName, false, mongos);
 
     expectedRecipientShards.forEach(shardId => {
-        verifyTemporaryReshardingCollectionExistsWithCorrectOptionsForConn(
-            originalCollInfo, tempReshardingCollName, shardToRSMap[shardId].getPrimary());
+        const rsPrimary = shardToRSMap[shardId].getPrimary();
+        verifyCollectionExistenceForConn(collName, true, rsPrimary);
+        verifyCollectionExistenceForConn(tempReshardingCollName, false, rsPrimary);
         ShardedIndexUtil.assertIndexExistsOnShard(
-            shardIdToShardMap[shardId], kDbName, tempReshardingCollName, {newKey: 1});
+            shardIdToShardMap[shardId], kDbName, collName, {newKey: 1});
     });
-};
-
-let removeAllReshardingCollections = () => {
-    const tempReshardingCollName = constructTemporaryReshardingCollName(kDbName, collName);
-    mongos.getDB(kDbName).foo.drop();
-    mongos.getDB(kDbName)[tempReshardingCollName].drop();
-    mongosConfig.reshardingOperations.remove({nss: ns});
-    mongosConfig.collections.remove({reshardingFields: {$exists: true}});
-    st.rs0.getPrimary().getDB('config').localReshardingOperations.donor.remove({nss: ns});
-    st.rs0.getPrimary().getDB('config').localReshardingOperations.recipient.remove({nss: ns});
-    st.rs1.getPrimary().getDB('config').localReshardingOperations.donor.remove({nss: ns});
-    st.rs1.getPrimary().getDB('config').localReshardingOperations.recipient.remove({nss: ns});
 };
 
 let verifyAllShardingCollectionsRemoved = (tempReshardingCollName) => {
@@ -150,11 +134,7 @@ let assertSuccessfulReshardCollection = (commandObj, presetReshardedChunks) => {
     verifyTemporaryReshardingChunksMatchExpected(presetReshardedChunks);
 
     const tempReshardingCollName = constructTemporaryReshardingCollName(kDbName, collName);
-
-    // TODO(SERVER-53173): remove this call so that verifyAllShardingCollectionsRemoved() can verify
-    // that the resharding artifacts have been cleaned up by the server code.
-    removeAllReshardingCollections();
-
+    mongos.getDB(kDbName)[collName].drop();
     verifyAllShardingCollectionsRemoved(tempReshardingCollName);
 };
 
@@ -234,7 +214,7 @@ assert.commandFailedWithCode(mongos.adminCommand({
  * Success cases
  */
 
-removeAllReshardingCollections();
+mongos.getDB(kDbName)[collName].drop();
 
 jsTest.log("Succeed when correct locale is provided.");
 assertSuccessfulReshardCollection(

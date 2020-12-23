@@ -51,13 +51,11 @@ var ReshardingTest = class {
         this._st = new ShardingTest({
             mongos: 1,
             config: 1,
-            configOptions: {setParameter: {"reshardingTempInterruptBeforeOplogApplication": false}},
             shards: this._numShards,
             rs: {nodes: 2},
             rsOptions: {
                 setParameter: {
                     "failpoint.WTPreserveSnapshotHistoryIndefinitely": tojson({mode: "alwaysOn"}),
-                    "reshardingTempInterruptBeforeOplogApplication": false,
                 }
             },
             manualAddShard: true,

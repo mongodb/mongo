@@ -92,15 +92,6 @@ server_parameters:
         cpp_varname: gUseReshardingOplogApplicationRules
         default: false
 
-    reshardingTempInterruptBeforeOplogApplication:
-        description: >-
-            Whether or not the resharding operation will be interrupted on the recipient before the
-            ReshardingOplogApplier runs.
-        set_at: startup
-        cpp_vartype: bool
-        cpp_varname: gReshardingTempInterruptBeforeOplogApplication
-        default: true
-
     reshardingOplogApplierMaxLockRequestTimeoutMillis:
         description: >-
             The max number of milliseconds that the resharding oplog applier will wait for lock
