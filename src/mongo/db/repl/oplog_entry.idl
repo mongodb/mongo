@@ -147,7 +147,3 @@ structs:
                 optional: true
                 description: "The optime of another oplog entry that contains the document
                               after an update was applied."
-            prePostImageOps:
-                type: array<object>
-                optional: true
-                description: "Contains the oplog entries for the pre/post image related to this op"

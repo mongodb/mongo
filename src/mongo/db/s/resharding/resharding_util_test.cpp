@@ -468,16 +468,22 @@ protected:
                                              oplog.get_id()->getDocument().toBson());
     }
 
-    BSONObj addExpectedFields(const repl::MutableOplogEntry& oplog,
-                              const boost::optional<repl::MutableOplogEntry>& chainedEntry) {
-        BSONObjBuilder builder(oplog.toBSON());
+    BSONObj addExpectedFields(const repl::MutableOplogEntry& op,
+                              const boost::optional<repl::MutableOplogEntry>& preImageOp,
+                              const boost::optional<repl::MutableOplogEntry>& postImageOp) {
+        BSONObjBuilder builder;
 
-        BSONArrayBuilder arrayBuilder(
-            builder.subarrayStart(ReshardingDonorOplogIterator::kReshardingOplogPrePostImageOps));
-        if (chainedEntry) {
-            arrayBuilder.append(chainedEntry->toBSON());
+        builder.append(ReshardingDonorOplogIterator::kActualOpFieldName, op.toBSON());
+
+        if (preImageOp) {
+            builder.append(ReshardingDonorOplogIterator::kPreImageOpFieldName,
+                           preImageOp->toBSON());
         }
-        arrayBuilder.done();
+
+        if (postImageOp) {
+            builder.append(ReshardingDonorOplogIterator::kPostImageOpFieldName,
+                           postImageOp->toBSON());
+        }
 
         return builder.obj();
     }
@@ -505,13 +511,16 @@ TEST_F(ReshardingAggTest, OplogPipelineBasicCRUDOnly) {
 
     auto pipeline = makePipelineForReshardingDonorOplogIterator(std::move(mockResults));
     auto next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(insertOplog, boost::none), next->toBson());
+    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(insertOplog, boost::none, boost::none),
+                             next->toBson());
 
     next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(updateOplog, boost::none), next->toBson());
+    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(updateOplog, boost::none, boost::none),
+                             next->toBson());
 
     next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(deleteOplog, boost::none), next->toBson());
+    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(deleteOplog, boost::none, boost::none),
+                             next->toBson());
 
     ASSERT(!pipeline->getNext());
 }
@@ -532,10 +541,12 @@ TEST_F(ReshardingAggTest, OplogPipelineWithResumeToken) {
     auto pipeline = makePipelineForReshardingDonorOplogIterator(std::move(mockResults),
                                                                 getOplogId(insertOplog));
     auto next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(updateOplog, boost::none), next->toBson());
+    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(updateOplog, boost::none, boost::none),
+                             next->toBson());
 
     next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(deleteOplog, boost::none), next->toBson());
+    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(deleteOplog, boost::none, boost::none),
+                             next->toBson());
 
     ASSERT(!pipeline->getNext());
 }
@@ -565,10 +576,12 @@ TEST_F(ReshardingAggTest, OplogPipelineWithResumeTokenClusterTimeNotEqualTs) {
     auto pipeline = makePipelineForReshardingDonorOplogIterator(std::move(mockResults),
                                                                 getOplogId(insertOplog));
     auto next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(updateOplog, boost::none), next->toBson());
+    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(updateOplog, boost::none, boost::none),
+                             next->toBson());
 
     next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(deleteOplog, boost::none), next->toBson());
+    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(deleteOplog, boost::none, boost::none),
+                             next->toBson());
 
     ASSERT(!pipeline->getNext());
 }
@@ -586,13 +599,15 @@ TEST_F(ReshardingAggTest, OplogPipelineWithPostImage) {
 
     auto pipeline = makePipelineForReshardingDonorOplogIterator(std::move(mockResults));
     auto next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(postImageOplog, boost::none), next->toBson());
+    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(postImageOplog, boost::none, boost::none),
+                             next->toBson());
 
     next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(insertOplog, boost::none), next->toBson());
+    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(insertOplog, boost::none, boost::none),
+                             next->toBson());
 
     next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(updateWithPostOplog, postImageOplog),
+    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(updateWithPostOplog, boost::none, postImageOplog),
                              next->toBson());
 
     ASSERT(!pipeline->getNext());
@@ -619,16 +634,25 @@ TEST_F(ReshardingAggTest, OplogPipelineWithLargeBSONPostImage) {
 
     // Check only _id because attempting to call toBson will trigger BSON too large assertion.
     auto next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(postImageOplog.get_id()->getDocument().toBson(),
-                             next->getField("_id").getDocument().toBson());
+    ASSERT_BSONOBJ_BINARY_EQ(
+        postImageOplog.get_id()->getDocument().toBson(),
+        next->getNestedField(ReshardingDonorOplogIterator::kActualOpFieldName + "._id")
+            .getDocument()
+            .toBson());
 
     next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(insertOplog.get_id()->getDocument().toBson(),
-                             next->getField("_id").getDocument().toBson());
+    ASSERT_BSONOBJ_BINARY_EQ(
+        insertOplog.get_id()->getDocument().toBson(),
+        next->getNestedField(ReshardingDonorOplogIterator::kActualOpFieldName + "._id")
+            .getDocument()
+            .toBson());
 
     next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(updateWithPostOplog.get_id()->getDocument().toBson(),
-                             next->getField("_id").getDocument().toBson());
+    ASSERT_BSONOBJ_BINARY_EQ(
+        updateWithPostOplog.get_id()->getDocument().toBson(),
+        next->getNestedField(ReshardingDonorOplogIterator::kActualOpFieldName + "._id")
+            .getDocument()
+            .toBson());
 
     ASSERT(!pipeline->getNext());
 }
@@ -650,10 +674,11 @@ TEST_F(ReshardingAggTest, OplogPipelineResumeAfterPostImage) {
     auto pipeline = makePipelineForReshardingDonorOplogIterator(std::move(mockResults),
                                                                 getOplogId(postImageOplog));
     auto next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(insertOplog, boost::none), next->toBson());
+    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(insertOplog, boost::none, boost::none),
+                             next->toBson());
 
     next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(updateWithPostOplog, postImageOplog),
+    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(updateWithPostOplog, boost::none, postImageOplog),
                              next->toBson());
 
     ASSERT(!pipeline->getNext());
@@ -672,13 +697,16 @@ TEST_F(ReshardingAggTest, OplogPipelineWithPreImage) {
 
     auto pipeline = makePipelineForReshardingDonorOplogIterator(std::move(mockResults));
     auto next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(preImageOplog, boost::none), next->toBson());
+    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(preImageOplog, boost::none, boost::none),
+                             next->toBson());
 
     next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(insertOplog, boost::none), next->toBson());
+    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(insertOplog, boost::none, boost::none),
+                             next->toBson());
 
     next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(deleteWithPreOplog, preImageOplog), next->toBson());
+    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(deleteWithPreOplog, preImageOplog, boost::none),
+                             next->toBson());
 
     ASSERT(!pipeline->getNext());
 }
@@ -703,20 +731,24 @@ TEST_F(ReshardingAggTest, OplogPipelineWithPreAndPostImage) {
 
     auto pipeline = makePipelineForReshardingDonorOplogIterator(std::move(mockResults));
     auto next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(preImageOplog, boost::none), next->toBson());
-
-    next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(postImageOplog, boost::none), next->toBson());
-
-    next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(insertOplog, boost::none), next->toBson());
-
-    next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(updateWithPostOplog, postImageOplog),
+    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(preImageOplog, boost::none, boost::none),
                              next->toBson());
 
     next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(deleteWithPreOplog, preImageOplog), next->toBson());
+    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(postImageOplog, boost::none, boost::none),
+                             next->toBson());
+
+    next = pipeline->getNext();
+    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(insertOplog, boost::none, boost::none),
+                             next->toBson());
+
+    next = pipeline->getNext();
+    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(updateWithPostOplog, boost::none, postImageOplog),
+                             next->toBson());
+
+    next = pipeline->getNext();
+    ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(deleteWithPreOplog, preImageOplog, boost::none),
+                             next->toBson());
 
     ASSERT(!pipeline->getNext());
 }

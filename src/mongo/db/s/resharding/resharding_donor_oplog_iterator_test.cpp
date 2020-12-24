@@ -31,6 +31,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <utility>
+
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/s/resharding/resharding_donor_oplog_iterator.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
@@ -93,13 +95,52 @@ private:
 
 class ReshardingDonorOplogIterTest : public ShardingMongodTestFixture {
 public:
-    repl::MutableOplogEntry makeInsertOplog(const Timestamp& id, BSONObj doc) {
-        ReshardingDonorOplogId oplogId(id, id);
-        return makeOplog(_crudNss, _uuid, repl::OpTypeEnum::kInsert, BSON("x" << 1), {}, oplogId);
+    repl::MutableOplogEntry makeInsertOplog(Timestamp ts, BSONObj doc) {
+        ReshardingDonorOplogId oplogId(ts, ts);
+        return makeOplog(_crudNss, _uuid, repl::OpTypeEnum::kInsert, std::move(doc), {}, oplogId);
     }
 
-    repl::MutableOplogEntry makeFinalOplog(const Timestamp& id) {
-        ReshardingDonorOplogId oplogId(id, id);
+    /**
+     * Returns (postImageOplog, updateOplog) pair.
+     */
+    auto makeUpdateWithPostImage(Timestamp postImageTs,
+                                 BSONObj postImage,
+                                 Timestamp updateTs,
+                                 BSONObj update) {
+        auto postImageOp = makeOplog(
+            _crudNss, _uuid, repl::OpTypeEnum::kNoop, postImage, {}, {postImageTs, postImageTs});
+
+        auto updateOp = makeOplog(_crudNss,
+                                  _uuid,
+                                  repl::OpTypeEnum::kUpdate,
+                                  std::move(update),
+                                  postImage["_id"].wrap(),
+                                  {updateTs, updateTs});
+        updateOp.setPostImageOpTime(repl::OpTime{postImageTs, 1});
+
+        return std::make_pair(postImageOp, updateOp);
+    }
+
+    /**
+     * Returns (preImageOplog, deleteOplog) pair.
+     */
+    auto makeDeleteWithPreImage(Timestamp preImageTs, BSONObj doc, Timestamp deleteTs) {
+        auto preImageOp =
+            makeOplog(_crudNss, _uuid, repl::OpTypeEnum::kNoop, doc, {}, {preImageTs, preImageTs});
+
+        auto deleteOp = makeOplog(_crudNss,
+                                  _uuid,
+                                  repl::OpTypeEnum::kUpdate,
+                                  doc["_id"].wrap(),
+                                  {},
+                                  {deleteTs, deleteTs});
+        deleteOp.setPreImageOpTime(repl::OpTime{preImageTs, 1});
+
+        return std::make_pair(preImageOp, deleteOp);
+    }
+
+    repl::MutableOplogEntry makeFinalOplog(Timestamp ts) {
+        ReshardingDonorOplogId oplogId(ts, ts);
         const BSONObj oField(BSON("msg"
                                   << "Created temporary resharding collection"));
         const BSONObj o2Field(
@@ -112,6 +153,10 @@ public:
     }
 
     BSONObj getId(const repl::MutableOplogEntry& oplog) {
+        return oplog.get_id()->getDocument().toBson();
+    }
+
+    BSONObj getId(const repl::DurableOplogEntry& oplog) {
         return oplog.get_id()->getDocument().toBson();
     }
 
@@ -289,6 +334,72 @@ TEST_F(ReshardingDonorOplogIterTest, ExhaustWithIncomingInserts) {
     ASSERT_TRUE(next.empty());
 
     ASSERT_EQ(insertNotifier.numCalls, 2U);
+}
+
+TEST_F(ReshardingDonorOplogIterTest, FillsInPreImageOplogEntry) {
+    const auto& preImageDoc = BSON("_id" << 0 << "x" << 1);
+    const auto& [preImageOp, deleteOp] =
+        makeDeleteWithPreImage(Timestamp(2, 4), preImageDoc, Timestamp(2, 5));
+    const auto& finalOplog = makeFinalOplog(Timestamp(43, 24));
+
+    DBDirectClient client(operationContext());
+    const auto& ns = oplogNss().ns();
+    client.insert(ns, preImageOp.toBSON());
+    client.insert(ns, deleteOp.toBSON());
+    client.insert(ns, finalOplog.toBSON());
+
+    ReshardingDonorOplogIterator iter(oplogNss(), kResumeFromBeginning, &onInsertAlwaysReady);
+    auto executor = makeTaskExecutorForIterator();
+    auto altClient = makeKillableClient();
+    AlternativeClientRegion acr(altClient);
+
+    auto next = getNextBatch(&iter, executor);
+    ASSERT_EQ(next.size(), 1U);
+    ASSERT_BSONOBJ_EQ(getId(preImageOp), getId(next[0]));
+    ASSERT_BSONOBJ_BINARY_EQ(preImageDoc, next[0].getObject());
+
+    next = getNextBatch(&iter, executor);
+    ASSERT_EQ(next.size(), 1U);
+    ASSERT_BSONOBJ_EQ(getId(deleteOp), getId(next[0]));
+    ASSERT_TRUE(bool(next[0].getPreImageOp()));
+    ASSERT_BSONOBJ_BINARY_EQ(getId(preImageOp), getId(*next[0].getPreImageOp()));
+    ASSERT_BSONOBJ_BINARY_EQ(preImageDoc, next[0].getPreImageOp()->getObject());
+
+    next = getNextBatch(&iter, executor);
+    ASSERT_TRUE(next.empty());
+}
+
+TEST_F(ReshardingDonorOplogIterTest, FillsInPostImageOplogEntry) {
+    const auto& postImageDoc = BSON("_id" << 0 << "x" << 1);
+    const auto& [postImageOp, updateOp] = makeUpdateWithPostImage(
+        Timestamp(2, 4), postImageDoc, Timestamp(2, 5), BSON("$set" << BSON("x" << 1)));
+    const auto& finalOplog = makeFinalOplog(Timestamp(43, 24));
+
+    DBDirectClient client(operationContext());
+    const auto& ns = oplogNss().ns();
+    client.insert(ns, postImageOp.toBSON());
+    client.insert(ns, updateOp.toBSON());
+    client.insert(ns, finalOplog.toBSON());
+
+    ReshardingDonorOplogIterator iter(oplogNss(), kResumeFromBeginning, &onInsertAlwaysReady);
+    auto executor = makeTaskExecutorForIterator();
+    auto altClient = makeKillableClient();
+    AlternativeClientRegion acr(altClient);
+
+    auto next = getNextBatch(&iter, executor);
+    ASSERT_EQ(next.size(), 1U);
+    ASSERT_BSONOBJ_EQ(getId(postImageOp), getId(next[0]));
+    ASSERT_BSONOBJ_BINARY_EQ(postImageDoc, next[0].getObject());
+
+    next = getNextBatch(&iter, executor);
+    ASSERT_EQ(next.size(), 1U);
+    ASSERT_BSONOBJ_EQ(getId(updateOp), getId(next[0]));
+    ASSERT_TRUE(bool(next[0].getPostImageOp()));
+    ASSERT_BSONOBJ_BINARY_EQ(getId(postImageOp), getId(*next[0].getPostImageOp()));
+    ASSERT_BSONOBJ_BINARY_EQ(postImageDoc, next[0].getPostImageOp()->getObject());
+
+    next = getNextBatch(&iter, executor);
+    ASSERT_TRUE(next.empty());
 }
 
 }  // anonymous namespace

@@ -96,7 +96,9 @@ public:
     ExecutorFuture<std::vector<repl::OplogEntry>> getNextBatch(
         std::shared_ptr<executor::TaskExecutor> executor) override;
 
-    static constexpr auto kReshardingOplogPrePostImageOps = "prePostImageOps"_sd;
+    static constexpr auto kActualOpFieldName = "actualOp"_sd;
+    static constexpr auto kPreImageOpFieldName = "preImageOp"_sd;
+    static constexpr auto kPostImageOpFieldName = "postImageOp"_sd;
 
 private:
     template <typename Callable>

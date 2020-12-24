@@ -520,6 +520,30 @@ void OplogEntry::setIsForCappedCollection(bool isForCappedCollection) {
     _isForCappedCollection = isForCappedCollection;
 }
 
+const boost::optional<DurableOplogEntry>& OplogEntry::getPreImageOp() const {
+    return _preImageOp;
+}
+
+void OplogEntry::setPreImageOp(boost::optional<DurableOplogEntry> preImageOp) {
+    _preImageOp = std::move(preImageOp);
+}
+
+void OplogEntry::setPreImageOp(const BSONObj& preImageOp) {
+    setPreImageOp(uassertStatusOK(DurableOplogEntry::parse(preImageOp)));
+}
+
+const boost::optional<DurableOplogEntry>& OplogEntry::getPostImageOp() const {
+    return _postImageOp;
+}
+
+void OplogEntry::setPostImageOp(boost::optional<DurableOplogEntry> postImageOp) {
+    _postImageOp = std::move(postImageOp);
+}
+
+void OplogEntry::setPostImageOp(const BSONObj& postImageOp) {
+    setPostImageOp(uassertStatusOK(DurableOplogEntry::parse(postImageOp)));
+}
+
 const boost::optional<mongo::Value>& OplogEntry::get_id() const& {
     return _entry.get_id();
 }
