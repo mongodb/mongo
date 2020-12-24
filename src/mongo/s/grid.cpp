@@ -123,32 +123,33 @@ void Grid::setAllowLocalHost(bool allow) {
 
 repl::ReadConcernArgs Grid::readConcernWithConfigTime(
     repl::ReadConcernLevel readConcernLevel) const {
+    auto configTime = configOpTime();
     if (fcvGreaterThanOrEqualTo47()) {
         const auto currentTime = VectorClock::get(grid.owner(this))->getTime();
-        if (auto configTime = currentTime.configTime(); !configTime.asTimestamp().isNull()) {
+        const auto vcConfigTimeTs = currentTime.configTime().asTimestamp();
+        if (!vcConfigTimeTs.isNull() && vcConfigTimeTs > configTime.getTimestamp()) {
             // TODO SERVER-44097: investigate why not using a term (e.g. with a LogicalTime)
             // can lead - upon CSRS stepdowns - to a last applied opTime lower than the
             // previous primary's committed opTime
-            auto opTime = mongo::repl::OpTime(configTime.asTimestamp(),
-                                              mongo::repl::OpTime::kUninitializedTerm);
-            return ReadConcernArgs(opTime, readConcernLevel);
+            configTime =
+                mongo::repl::OpTime(vcConfigTimeTs, mongo::repl::OpTime::kUninitializedTerm);
         }
     }
-    return ReadConcernArgs(configOpTime(), readConcernLevel);
+    return ReadConcernArgs(configTime, readConcernLevel);
 }
 
 ReadPreferenceSetting Grid::readPreferenceWithConfigTime(
     const ReadPreferenceSetting& readPreference) const {
+    auto configTimeTs = configOpTime().getTimestamp();
     if (fcvGreaterThanOrEqualTo47()) {
         const auto currentTime = VectorClock::get(grid.owner(this))->getTime();
-        if (auto configTime = currentTime.configTime(); !configTime.asTimestamp().isNull()) {
-            ReadPreferenceSetting readPrefToReturn(readPreference);
-            readPrefToReturn.minClusterTime = configTime.asTimestamp();
-            return readPrefToReturn;
+        const auto vcConfigTimeTs = currentTime.configTime().asTimestamp();
+        if (!vcConfigTimeTs.isNull() && vcConfigTimeTs > configTimeTs) {
+            configTimeTs = vcConfigTimeTs;
         }
     }
     ReadPreferenceSetting readPrefToReturn(readPreference);
-    readPrefToReturn.minClusterTime = configOpTime().getTimestamp();
+    readPrefToReturn.minClusterTime = configTimeTs;
     return readPrefToReturn;
 }
 
