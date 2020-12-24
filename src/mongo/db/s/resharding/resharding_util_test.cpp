@@ -42,6 +42,7 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
+#include "mongo/db/s/resharding/resharding_donor_oplog_iterator.h"
 #include "mongo/db/s/resharding/resharding_txn_cloner.h"
 #include "mongo/db/s/resharding_util.h"
 #include "mongo/db/session_txn_record_gen.h"
@@ -356,6 +357,24 @@ protected:
         return expCtx;
     }
 
+    auto makePipelineForReshardingDonorOplogIterator(
+        std::deque<DocumentSource::GetNextResult> mockResults,
+        ReshardingDonorOplogId resumeToken = {Timestamp::min(), Timestamp::min()}) {
+        ReshardingDonorOplogIterator iterator(
+            localOplogBufferNss(), std::move(resumeToken), nullptr /* insertNotifier */);
+
+        // Mock lookup collection document source.
+        auto pipeline =
+            iterator.makePipeline(getOpCtx(), std::make_shared<MockMongoInterface>(mockResults));
+
+        // Mock non-lookup collection document source.
+        auto mockSource =
+            DocumentSourceMock::createForTest(std::move(mockResults), pipeline->getContext());
+        pipeline->addInitialSource(mockSource);
+
+        return pipeline;
+    }
+
     /************************************************************************************
      * These set of helper function generate pre-made oplogs with the following timestamps:
      *
@@ -453,7 +472,8 @@ protected:
                               const boost::optional<repl::MutableOplogEntry>& chainedEntry) {
         BSONObjBuilder builder(oplog.toBSON());
 
-        BSONArrayBuilder arrayBuilder(builder.subarrayStart(kReshardingOplogPrePostImageOps));
+        BSONArrayBuilder arrayBuilder(
+            builder.subarrayStart(ReshardingDonorOplogIterator::kReshardingOplogPrePostImageOps));
         if (chainedEntry) {
             arrayBuilder.append(chainedEntry->toBSON());
         }
@@ -483,17 +503,7 @@ TEST_F(ReshardingAggTest, OplogPipelineBasicCRUDOnly) {
     mockResults.emplace_back(Document(updateOplog.toBSON()));
     mockResults.emplace_back(Document(deleteOplog.toBSON()));
 
-    // Mock lookup collection document souce.
-    auto expCtx = createExpressionContext();
-    expCtx->ns = localOplogBufferNss();
-    expCtx->mongoProcessInterface = std::make_shared<MockMongoInterface>(mockResults);
-
-    auto pipeline = createAggForReshardingOplogBuffer(expCtx, boost::none, false);
-
-    // Mock non-lookup collection document source.
-    auto mockSource = DocumentSourceMock::createForTest(mockResults, expCtx);
-    pipeline->addInitialSource(mockSource);
-
+    auto pipeline = makePipelineForReshardingDonorOplogIterator(std::move(mockResults));
     auto next = pipeline->getNext();
     ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(insertOplog, boost::none), next->toBson());
 
@@ -519,17 +529,8 @@ TEST_F(ReshardingAggTest, OplogPipelineWithResumeToken) {
     mockResults.emplace_back(Document(updateOplog.toBSON()));
     mockResults.emplace_back(Document(deleteOplog.toBSON()));
 
-    // Mock lookup collection document souce.
-    auto expCtx = createExpressionContext();
-    expCtx->ns = localOplogBufferNss();
-    expCtx->mongoProcessInterface = std::make_shared<MockMongoInterface>(mockResults);
-
-    auto pipeline = createAggForReshardingOplogBuffer(expCtx, getOplogId(insertOplog), false);
-
-    // Mock non-lookup collection document source.
-    auto mockSource = DocumentSourceMock::createForTest(mockResults, expCtx);
-    pipeline->addInitialSource(mockSource);
-
+    auto pipeline = makePipelineForReshardingDonorOplogIterator(std::move(mockResults),
+                                                                getOplogId(insertOplog));
     auto next = pipeline->getNext();
     ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(updateOplog, boost::none), next->toBson());
 
@@ -561,17 +562,8 @@ TEST_F(ReshardingAggTest, OplogPipelineWithResumeTokenClusterTimeNotEqualTs) {
     mockResults.emplace_back(Document(updateOplog.toBSON()));
     mockResults.emplace_back(Document(deleteOplog.toBSON()));
 
-    // Mock lookup collection document souce.
-    auto expCtx = createExpressionContext();
-    expCtx->ns = localOplogBufferNss();
-    expCtx->mongoProcessInterface = std::make_shared<MockMongoInterface>(mockResults);
-
-    auto pipeline = createAggForReshardingOplogBuffer(expCtx, getOplogId(insertOplog), false);
-
-    // Mock non-lookup collection document source.
-    auto mockSource = DocumentSourceMock::createForTest(mockResults, expCtx);
-    pipeline->addInitialSource(mockSource);
-
+    auto pipeline = makePipelineForReshardingDonorOplogIterator(std::move(mockResults),
+                                                                getOplogId(insertOplog));
     auto next = pipeline->getNext();
     ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(updateOplog, boost::none), next->toBson());
 
@@ -592,17 +584,7 @@ TEST_F(ReshardingAggTest, OplogPipelineWithPostImage) {
     mockResults.emplace_back(Document(postImageOplog.toBSON()));
     mockResults.emplace_back(Document(updateWithPostOplog.toBSON()));
 
-    // Mock lookup collection document souce.
-    auto expCtx = createExpressionContext();
-    expCtx->ns = localOplogBufferNss();
-    expCtx->mongoProcessInterface = std::make_shared<MockMongoInterface>(mockResults);
-
-    auto pipeline = createAggForReshardingOplogBuffer(expCtx, boost::none, false);
-
-    // Mock non-lookup collection document source.
-    auto mockSource = DocumentSourceMock::createForTest(mockResults, expCtx);
-    pipeline->addInitialSource(mockSource);
-
+    auto pipeline = makePipelineForReshardingDonorOplogIterator(std::move(mockResults));
     auto next = pipeline->getNext();
     ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(postImageOplog, boost::none), next->toBson());
 
@@ -633,16 +615,7 @@ TEST_F(ReshardingAggTest, OplogPipelineWithLargeBSONPostImage) {
     mockResults.emplace_back(Document(postImageOplog.toBSON()));
     mockResults.emplace_back(Document(updateWithPostOplog.toBSON()));
 
-    // Mock lookup collection document souce.
-    auto expCtx = createExpressionContext();
-    expCtx->ns = localOplogBufferNss();
-    expCtx->mongoProcessInterface = std::make_shared<MockMongoInterface>(mockResults);
-
-    auto pipeline = createAggForReshardingOplogBuffer(expCtx, boost::none, false);
-
-    // Mock non-lookup collection document source.
-    auto mockSource = DocumentSourceMock::createForTest(mockResults, expCtx);
-    pipeline->addInitialSource(mockSource);
+    auto pipeline = makePipelineForReshardingDonorOplogIterator(std::move(mockResults));
 
     // Check only _id because attempting to call toBson will trigger BSON too large assertion.
     auto next = pipeline->getNext();
@@ -674,17 +647,8 @@ TEST_F(ReshardingAggTest, OplogPipelineResumeAfterPostImage) {
     mockResults.emplace_back(Document(postImageOplog.toBSON()));
     mockResults.emplace_back(Document(updateWithPostOplog.toBSON()));
 
-    // Mock lookup collection document souce.
-    auto expCtx = createExpressionContext();
-    expCtx->ns = localOplogBufferNss();
-    expCtx->mongoProcessInterface = std::make_shared<MockMongoInterface>(mockResults);
-
-    auto pipeline = createAggForReshardingOplogBuffer(expCtx, getOplogId(postImageOplog), false);
-
-    // Mock non-lookup collection document source.
-    auto mockSource = DocumentSourceMock::createForTest(mockResults, expCtx);
-    pipeline->addInitialSource(mockSource);
-
+    auto pipeline = makePipelineForReshardingDonorOplogIterator(std::move(mockResults),
+                                                                getOplogId(postImageOplog));
     auto next = pipeline->getNext();
     ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(insertOplog, boost::none), next->toBson());
 
@@ -706,17 +670,7 @@ TEST_F(ReshardingAggTest, OplogPipelineWithPreImage) {
     mockResults.emplace_back(Document(preImageOplog.toBSON()));
     mockResults.emplace_back(Document(deleteWithPreOplog.toBSON()));
 
-    // Mock lookup collection document souce.
-    auto expCtx = createExpressionContext();
-    expCtx->ns = localOplogBufferNss();
-    expCtx->mongoProcessInterface = std::make_shared<MockMongoInterface>(mockResults);
-
-    auto pipeline = createAggForReshardingOplogBuffer(expCtx, boost::none, false);
-
-    // Mock non-lookup collection document source.
-    auto mockSource = DocumentSourceMock::createForTest(mockResults, expCtx);
-    pipeline->addInitialSource(mockSource);
-
+    auto pipeline = makePipelineForReshardingDonorOplogIterator(std::move(mockResults));
     auto next = pipeline->getNext();
     ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(preImageOplog, boost::none), next->toBson());
 
@@ -747,17 +701,7 @@ TEST_F(ReshardingAggTest, OplogPipelineWithPreAndPostImage) {
     mockResults.emplace_back(Document(preImageOplog.toBSON()));
     mockResults.emplace_back(Document(deleteWithPreOplog.toBSON()));
 
-    // Mock lookup collection document souce.
-    auto expCtx = createExpressionContext();
-    expCtx->ns = localOplogBufferNss();
-    expCtx->mongoProcessInterface = std::make_shared<MockMongoInterface>(mockResults);
-
-    auto pipeline = createAggForReshardingOplogBuffer(expCtx, boost::none, false);
-
-    // Mock non-lookup collection document source.
-    auto mockSource = DocumentSourceMock::createForTest(mockResults, expCtx);
-    pipeline->addInitialSource(mockSource);
-
+    auto pipeline = makePipelineForReshardingDonorOplogIterator(std::move(mockResults));
     auto next = pipeline->getNext();
     ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(preImageOplog, boost::none), next->toBson());
 

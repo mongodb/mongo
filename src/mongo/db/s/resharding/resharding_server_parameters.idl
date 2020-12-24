@@ -77,11 +77,26 @@ server_parameters:
         set_at: startup
         cpp_vartype: int
         cpp_varname: gReshardingBatchLimitOperations
-        default: 1
+        default:
+            expr: 5 * 1000
         validator:
             gte: 1
             lte:
                 expr: 1000 * 1000
+
+    reshardingBatchLimitBytes:
+        description: >-
+            The maximum size in bytes for ReshardingOplogApplier to apply in a single batch.
+        set_at: startup
+        cpp_vartype: int
+        cpp_varname: gReshardingBatchLimitBytes
+        default:
+            expr: 100 * 1024 * 1024
+        validator:
+            gte:
+                expr: 16 * 1024 * 1024
+            lte:
+                expr: 100 * 1024 * 1024
 
     useReshardingOplogApplicationRules:
         description: >-

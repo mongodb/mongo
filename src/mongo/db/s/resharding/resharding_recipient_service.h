@@ -125,7 +125,8 @@ private:
     void _createTemporaryReshardingCollectionThenTransitionToCloning();
 
     ExecutorFuture<void> _cloneThenTransitionToApplying(
-        const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+        const CancelationToken& cancelToken);
 
     void _applyThenTransitionToSteadyState();
 
@@ -167,14 +168,13 @@ private:
     std::unique_ptr<ReshardingCollectionCloner> _collectionCloner;
 
     std::vector<std::unique_ptr<ReshardingOplogApplier>> _oplogAppliers;
-    std::shared_ptr<executor::TaskExecutor> _oplogApplierExecutor;
     std::vector<std::unique_ptr<ThreadPool>> _oplogApplierWorkers;
 
     // The ReshardingOplogFetcher must be destructed before the corresponding ReshardingOplogApplier
     // to ensure the future returned by awaitInsert() is always eventually readied.
     std::vector<std::unique_ptr<ReshardingOplogFetcher>> _oplogFetchers;
     std::shared_ptr<executor::TaskExecutor> _oplogFetcherExecutor;
-    std::vector<Future<void>> _oplogFetcherFutures;
+    std::vector<ExecutorFuture<void>> _oplogFetcherFutures;
 
     // Protects the promises below
     Mutex _mutex = MONGO_MAKE_LATCH("ReshardingRecipient::_mutex");

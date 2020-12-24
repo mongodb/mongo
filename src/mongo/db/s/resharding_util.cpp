@@ -256,52 +256,6 @@ void validateZones(const std::vector<mongo::BSONObj>& zones,
     checkForOverlappingZones(validZones);
 }
 
-std::unique_ptr<Pipeline, PipelineDeleter> createAggForReshardingOplogBuffer(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const boost::optional<ReshardingDonorOplogId>& resumeToken,
-    bool doAttachDocumentCursor) {
-    Pipeline::SourceContainer stages;
-
-    if (resumeToken) {
-        stages.emplace_back(DocumentSourceMatch::create(
-            BSON("_id" << BSON("$gt" << resumeToken->toBSON())), expCtx));
-    }
-
-    stages.emplace_back(DocumentSourceSort::create(expCtx, BSON("_id" << 1)));
-
-    BSONObjBuilder lookupBuilder;
-    lookupBuilder.append("from", expCtx->ns.coll());
-    lookupBuilder.append("let",
-                         BSON("preImageId" << BSON("clusterTime"
-                                                   << "$preImageOpTime.ts"
-                                                   << "ts"
-                                                   << "$preImageOpTime.ts")
-                                           << "postImageId"
-                                           << BSON("clusterTime"
-                                                   << "$postImageOpTime.ts"
-                                                   << "ts"
-                                                   << "$postImageOpTime.ts")));
-    lookupBuilder.append("as", kReshardingOplogPrePostImageOps);
-
-    BSONArrayBuilder lookupPipelineBuilder(lookupBuilder.subarrayStart("pipeline"));
-    lookupPipelineBuilder.append(
-        BSON("$match" << BSON(
-                 "$expr" << BSON("$in" << BSON_ARRAY("$_id" << BSON_ARRAY("$$preImageId"
-                                                                          << "$$postImageId"))))));
-    lookupPipelineBuilder.done();
-
-    BSONObj lookupBSON(BSON("" << lookupBuilder.obj()));
-    stages.emplace_back(DocumentSourceLookUp::createFromBson(lookupBSON.firstElement(), expCtx));
-
-    auto pipeline = Pipeline::create(std::move(stages), expCtx);
-    if (doAttachDocumentCursor) {
-        pipeline = expCtx->mongoProcessInterface->attachCursorSourceToPipeline(
-            pipeline.release(), false /* allowTargetingShards */);
-    }
-
-    return pipeline;
-}
-
 void createSlimOplogView(OperationContext* opCtx, Database* db) {
     writeConflictRetry(
         opCtx, "createReshardingSlimOplog", "local.system.resharding.slimOplogForGraphLookup", [&] {

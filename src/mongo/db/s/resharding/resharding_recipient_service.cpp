@@ -175,11 +175,13 @@ ReshardingRecipientService::RecipientStateMachine::~RecipientStateMachine() {
 
 SemiFuture<void> ReshardingRecipientService::RecipientStateMachine::run(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
-    const CancelationToken& token) noexcept {
+    const CancelationToken& cancelToken) noexcept {
     return ExecutorFuture<void>(**executor)
         .then([this] { _transitionToCreatingTemporaryReshardingCollection(); })
         .then([this] { _createTemporaryReshardingCollectionThenTransitionToCloning(); })
-        .then([this, executor] { return _cloneThenTransitionToApplying(executor); })
+        .then([this, executor, cancelToken] {
+            return _cloneThenTransitionToApplying(executor, cancelToken);
+        })
         .then([this] { return _applyThenTransitionToSteadyState(); })
         .then([this, executor] {
             return _awaitAllDonorsMirroringThenTransitionToStrictConsistency(executor);
@@ -232,8 +234,8 @@ void ReshardingRecipientService::RecipientStateMachine::interrupt(Status status)
         _oplogFetcherExecutor->shutdown();
     }
 
-    if (_oplogApplierExecutor) {
-        _oplogApplierExecutor->shutdown();
+    for (auto&& fetcher : _oplogFetchers) {
+        fetcher->interrupt(status);
     }
 
     for (auto&& threadPool : _oplogApplierWorkers) {
@@ -318,7 +320,8 @@ void ReshardingRecipientService::RecipientStateMachine::
 
 ExecutorFuture<void>
 ReshardingRecipientService::RecipientStateMachine::_cloneThenTransitionToApplying(
-    const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+    const CancelationToken& cancelToken) {
     if (_recipientDoc.getState() > RecipientStateEnum::kCloning) {
         return ExecutorFuture(**executor);
     }
@@ -352,6 +355,7 @@ ReshardingRecipientService::RecipientStateMachine::_cloneThenTransitionToApplyin
 
     const auto& recipientId = ShardingState::get(serviceContext)->shardId();
     for (const auto& donor : _recipientDoc.getDonorShardsMirroring()) {
+        stdx::lock_guard<Latch> lk(_mutex);
         _oplogFetchers.emplace_back(std::make_unique<ReshardingOplogFetcher>(
             _recipientDoc.get_id(),
             _recipientDoc.getExistingUUID(),
@@ -366,10 +370,12 @@ ReshardingRecipientService::RecipientStateMachine::_cloneThenTransitionToApplyin
             getLocalOplogBufferNamespace(_recipientDoc.get_id(), donor.getId())));
 
         _oplogFetcherFutures.emplace_back(
-            _oplogFetchers.back()->schedule(_oplogFetcherExecutor.get()).onError([](Status status) {
-                LOGV2(5259300, "Error fetching oplog entries", "error"_attr = redact(status));
-                return status;
-            }));
+            _oplogFetchers.back()
+                ->schedule(_oplogFetcherExecutor, cancelToken)
+                .onError([](Status status) {
+                    LOGV2(5259300, "Error fetching oplog entries", "error"_attr = redact(status));
+                    return status;
+                }));
     }
 
     return _collectionCloner->run(serviceContext, **executor).then([this] {
@@ -405,11 +411,6 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
     auto numDonors = _recipientDoc.getDonorShardsMirroring().size();
     _oplogAppliers.reserve(numDonors);
     _oplogApplierWorkers.reserve(numDonors);
-
-    {
-        stdx::lock_guard<Latch> lk(_mutex);
-        _oplogApplierExecutor = makeTaskExecutor("ReshardingOplogApplier"_sd, numDonors);
-    }
 
     auto* serviceContext = Client::getCurrent()->getServiceContext();
     const auto& sourceChunkMgr = [&] {
@@ -457,9 +458,8 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
                 ReshardingDonorOplogId{*_recipientDoc.getFetchTimestamp(),
                                        *_recipientDoc.getFetchTimestamp()},
                 _oplogFetchers[i].get()),
-            resharding::gReshardingBatchLimitOperations,
             sourceChunkMgr,
-            _oplogApplierExecutor.get(),
+            **executor,
             _oplogApplierWorkers.back().get()));
 
         // The contents of the temporary resharding collection are already consistent because the

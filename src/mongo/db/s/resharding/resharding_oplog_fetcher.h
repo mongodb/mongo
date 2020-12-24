@@ -42,7 +42,9 @@
 #include "mongo/s/client/shard.h"
 #include "mongo/s/shard_id.h"
 #include "mongo/util/background.h"
+#include "mongo/util/cancelation.h"
 #include "mongo/util/future.h"
+#include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
@@ -60,6 +62,8 @@ public:
 
     Future<void> awaitInsert(const ReshardingDonorOplogId& lastSeen) override;
 
+    void interrupt(Status status);
+
     /**
      * Schedules a task that will do the following:
      *
@@ -74,7 +78,8 @@ public:
      * oplog, this is thrown as a fatal resharding exception.  In the last circumstance, the task
      * will be rescheduled in a way that resumes where it had left off from.
      */
-    Future<void> schedule(executor::TaskExecutor* executor);
+    ExecutorFuture<void> schedule(std::shared_ptr<executor::TaskExecutor> executor,
+                                  const CancelationToken& cancelToken);
 
     /**
      * Given a shard, fetches and copies oplog entries until
@@ -115,7 +120,8 @@ private:
      */
     void _ensureCollection(Client* client, const NamespaceString nss);
     AggregationRequest _makeAggregationRequest(Client* client);
-    void _reschedule(executor::TaskExecutor* executor);
+    ExecutorFuture<void> _reschedule(std::shared_ptr<executor::TaskExecutor> executor,
+                                     const CancelationToken& cancelToken);
 
     const UUID _reshardingUUID;
     const UUID _collUUID;
@@ -125,12 +131,12 @@ private:
     const bool _doesDonorOwnMinKeyChunk;
     const NamespaceString _toWriteInto;
 
-    Promise<void> _fetchedFinishPromise;
     int _numOplogEntriesCopied = 0;
 
     Mutex _mutex = MONGO_MAKE_LATCH("ReshardingOplogFetcher::_mutex");
     Promise<void> _onInsertPromise;
     Future<void> _onInsertFuture;
+    boost::optional<Status> _interruptStatus;
 
     // For testing to control behavior.
 

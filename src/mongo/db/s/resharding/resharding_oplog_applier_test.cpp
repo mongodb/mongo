@@ -42,7 +42,7 @@
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/operation_sharding_state.h"
-#include "mongo/db/s/resharding/resharding_donor_oplog_iterator_interface.h"
+#include "mongo/db/s/resharding/resharding_donor_oplog_iterator.h"
 #include "mongo/db/s/resharding/resharding_oplog_applier.h"
 #include "mongo/db/s/resharding_util.h"
 #include "mongo/db/s/sharding_mongod_test_fixture.h"
@@ -63,37 +63,43 @@ using namespace fmt::literals;
 
 class OplogIteratorMock : public ReshardingDonorOplogIteratorInterface {
 public:
-    OplogIteratorMock(std::queue<repl::OplogEntry> oplogToReturn)
-        : _oplogToReturn(std::move(oplogToReturn)) {}
+    OplogIteratorMock(std::deque<repl::OplogEntry> oplogToReturn, size_t batchSize)
+        : _oplogToReturn(std::move(oplogToReturn)), _batchSize(batchSize) {
+        invariant(batchSize > 0);
+    }
 
-    Future<boost::optional<repl::OplogEntry>> getNext(OperationContext* opCtx) override {
-        boost::optional<repl::OplogEntry> ret;
-        if (!_oplogToReturn.empty()) {
-            if (_oplogToReturn.size() <= 1 && _doThrow) {
+    ExecutorFuture<std::vector<repl::OplogEntry>> getNextBatch(
+        std::shared_ptr<executor::TaskExecutor> executor) override {
+        // This operation context is unused by the function but confirms that the Client calling
+        // getNextBatch() doesn't already have an operation context.
+        auto opCtx = cc().makeOperationContext();
+
+        return ExecutorFuture(std::move(executor)).then([this] {
+            std::vector<repl::OplogEntry> ret;
+
+            auto end = _oplogToReturn.begin() + std::min(_batchSize, _oplogToReturn.size());
+            std::copy(_oplogToReturn.begin(), end, std::back_inserter(ret));
+            _oplogToReturn.erase(_oplogToReturn.begin(), end);
+
+            if (_oplogToReturn.empty() && _doThrow) {
                 uasserted(ErrorCodes::InternalError, "OplogIteratorMock simulating error");
             }
 
-            ret = _oplogToReturn.front();
-            _oplogToReturn.pop();
-        }
-
-        return Future<boost::optional<repl::OplogEntry>>::makeReady(ret);
+            return ret;
+        });
     }
 
     /**
-     * Makes this iterator throw an error when calling getNext with only a single item left in the
-     * buffer. This allows simulating an exception being thrown at different points in time.
+     * Makes this iterator throw an error when calling getNextBatch with only a single item left in
+     * the buffer. This allows simulating an exception being thrown at different points in time.
      */
     void setThrowWhenSingleItem() {
         _doThrow = true;
     }
 
-    bool hasMore() const override {
-        return !_oplogToReturn.empty();
-    }
-
 private:
-    std::queue<repl::OplogEntry> _oplogToReturn;
+    std::deque<repl::OplogEntry> _oplogToReturn;
+    const size_t _batchSize;
     bool _doThrow{false};
 };
 
@@ -264,8 +270,8 @@ protected:
 };
 
 TEST_F(ReshardingOplogApplierTest, NothingToIterate) {
-    std::queue<repl::OplogEntry> crudOps;
-    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
+    std::deque<repl::OplogEntry> crudOps;
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 2 /* batchSize */);
 
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
@@ -278,9 +284,8 @@ TEST_F(ReshardingOplogApplierTest, NothingToIterate) {
                     stashCollections(),
                     Timestamp(6, 3),
                     std::move(iterator),
-                    2 /* batchSize */,
                     chunkManager(),
-                    executor.get(),
+                    executor,
                     writerPool.get());
 
     auto future = applier->applyUntilCloneFinishedTs();
@@ -291,25 +296,25 @@ TEST_F(ReshardingOplogApplierTest, NothingToIterate) {
 }
 
 TEST_F(ReshardingOplogApplierTest, ApplyBasicCrud) {
-    std::queue<repl::OplogEntry> crudOps;
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
-                           repl::OpTypeEnum::kInsert,
-                           BSON("_id" << 1),
-                           boost::none));
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(6, 3), 1),
-                           repl::OpTypeEnum::kInsert,
-                           BSON("_id" << 2),
-                           boost::none));
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(7, 3), 1),
-                           repl::OpTypeEnum::kUpdate,
-                           BSON("$set" << BSON("x" << 1)),
-                           BSON("_id" << 2)));
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(8, 3), 1),
-                           repl::OpTypeEnum::kDelete,
-                           BSON("_id" << 1),
-                           boost::none));
+    std::deque<repl::OplogEntry> crudOps;
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 1),
+                                boost::none));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(6, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 2),
+                                boost::none));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(7, 3), 1),
+                                repl::OpTypeEnum::kUpdate,
+                                BSON("$set" << BSON("x" << 1)),
+                                BSON("_id" << 2)));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(8, 3), 1),
+                                repl::OpTypeEnum::kDelete,
+                                BSON("_id" << 1),
+                                boost::none));
 
-    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 2 /* batchSize */);
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
@@ -321,9 +326,8 @@ TEST_F(ReshardingOplogApplierTest, ApplyBasicCrud) {
                     stashCollections(),
                     Timestamp(6, 3),
                     std::move(iterator),
-                    2 /* batchSize */,
                     chunkManager(),
-                    executor.get(),
+                    executor,
                     writerPool.get());
 
     auto future = applier->applyUntilCloneFinishedTs();
@@ -352,16 +356,16 @@ TEST_F(ReshardingOplogApplierTest, ApplyBasicCrud) {
 }
 
 TEST_F(ReshardingOplogApplierTest, InsertTypeOplogAppliedInMultipleBatches) {
-    std::queue<repl::OplogEntry> crudOps;
+    std::deque<repl::OplogEntry> crudOps;
 
     for (int x = 0; x < 20; x++) {
-        crudOps.push(makeOplog(repl::OpTime(Timestamp(x, 3), 1),
-                               repl::OpTypeEnum::kInsert,
-                               BSON("_id" << x),
-                               boost::none));
+        crudOps.push_back(makeOplog(repl::OpTime(Timestamp(x, 3), 1),
+                                    repl::OpTypeEnum::kInsert,
+                                    BSON("_id" << x),
+                                    boost::none));
     }
 
-    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 3 /* batchSize */);
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
@@ -373,9 +377,8 @@ TEST_F(ReshardingOplogApplierTest, InsertTypeOplogAppliedInMultipleBatches) {
                     stashCollections(),
                     Timestamp(8, 3),
                     std::move(iterator),
-                    3 /* batchSize */,
                     chunkManager(),
-                    executor.get(),
+                    executor,
                     writerPool.get());
 
     auto future = applier->applyUntilCloneFinishedTs();
@@ -411,17 +414,17 @@ TEST_F(ReshardingOplogApplierTest, InsertTypeOplogAppliedInMultipleBatches) {
 }
 
 TEST_F(ReshardingOplogApplierTest, ErrorDuringBatchApplyCloningPhase) {
-    std::queue<repl::OplogEntry> crudOps;
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
-                           repl::OpTypeEnum::kInsert,
-                           BSON("_id" << 1),
-                           boost::none));
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(7, 3), 1),
-                           repl::OpTypeEnum::kUpdate,
-                           BSON("$invalidOperator" << BSON("x" << 1)),
-                           BSON("_id" << 1)));
+    std::deque<repl::OplogEntry> crudOps;
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 1),
+                                boost::none));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(7, 3), 1),
+                                repl::OpTypeEnum::kUpdate,
+                                BSON("$invalidOperator" << BSON("x" << 1)),
+                                BSON("_id" << 1)));
 
-    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 4 /* batchSize */);
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
@@ -433,9 +436,8 @@ TEST_F(ReshardingOplogApplierTest, ErrorDuringBatchApplyCloningPhase) {
                     stashCollections(),
                     Timestamp(7, 3),
                     std::move(iterator),
-                    4 /* batchSize */,
                     chunkManager(),
-                    executor.get(),
+                    executor,
                     writerPool.get());
 
     auto future = applier->applyUntilCloneFinishedTs();
@@ -451,25 +453,25 @@ TEST_F(ReshardingOplogApplierTest, ErrorDuringBatchApplyCloningPhase) {
 }
 
 TEST_F(ReshardingOplogApplierTest, ErrorDuringBatchApplyCatchUpPhase) {
-    std::queue<repl::OplogEntry> crudOps;
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
-                           repl::OpTypeEnum::kInsert,
-                           BSON("_id" << 1),
-                           boost::none));
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(6, 3), 1),
-                           repl::OpTypeEnum::kInsert,
-                           BSON("_id" << 2),
-                           boost::none));
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(7, 3), 1),
-                           repl::OpTypeEnum::kInsert,
-                           BSON("_id" << 3),
-                           boost::none));
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(8, 3), 1),
-                           repl::OpTypeEnum::kUpdate,
-                           BSON("$invalidOperator" << BSON("x" << 1)),
-                           BSON("_id" << 1)));
+    std::deque<repl::OplogEntry> crudOps;
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 1),
+                                boost::none));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(6, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 2),
+                                boost::none));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(7, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 3),
+                                boost::none));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(8, 3), 1),
+                                repl::OpTypeEnum::kUpdate,
+                                BSON("$invalidOperator" << BSON("x" << 1)),
+                                BSON("_id" << 1)));
 
-    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 2 /* batchSize */);
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
@@ -481,9 +483,8 @@ TEST_F(ReshardingOplogApplierTest, ErrorDuringBatchApplyCatchUpPhase) {
                     stashCollections(),
                     Timestamp(6, 3),
                     std::move(iterator),
-                    2 /* batchSize */,
                     chunkManager(),
-                    executor.get(),
+                    executor,
                     writerPool.get());
 
     auto future = applier->applyUntilCloneFinishedTs();
@@ -510,13 +511,13 @@ TEST_F(ReshardingOplogApplierTest, ErrorDuringBatchApplyCatchUpPhase) {
 }
 
 TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstOplogCloningPhase) {
-    std::queue<repl::OplogEntry> crudOps;
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
-                           repl::OpTypeEnum::kInsert,
-                           BSON("_id" << 1),
-                           boost::none));
+    std::deque<repl::OplogEntry> crudOps;
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 1),
+                                boost::none));
 
-    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 2 /* batchSize */);
     iterator->setThrowWhenSingleItem();
 
     boost::optional<ReshardingOplogApplier> applier;
@@ -530,9 +531,8 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstOplogCloningPhase) {
                     stashCollections(),
                     Timestamp(6, 3),
                     std::move(iterator),
-                    2 /* batchSize */,
                     chunkManager(),
-                    executor.get(),
+                    executor,
                     writerPool.get());
 
     auto future = applier->applyUntilCloneFinishedTs();
@@ -548,21 +548,21 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstOplogCloningPhase) {
 }
 
 TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstOplogCatchUpPhase) {
-    std::queue<repl::OplogEntry> crudOps;
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
-                           repl::OpTypeEnum::kInsert,
-                           BSON("_id" << 1),
-                           boost::none));
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(6, 3), 1),
-                           repl::OpTypeEnum::kInsert,
-                           BSON("_id" << 2),
-                           boost::none));
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(7, 3), 1),
-                           repl::OpTypeEnum::kInsert,
-                           BSON("_id" << 3),
-                           boost::none));
+    std::deque<repl::OplogEntry> crudOps;
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 1),
+                                boost::none));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(6, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 2),
+                                boost::none));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(7, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 3),
+                                boost::none));
 
-    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 2 /* batchSize */);
     iterator->setThrowWhenSingleItem();
 
     boost::optional<ReshardingOplogApplier> applier;
@@ -576,9 +576,8 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstOplogCatchUpPhase) {
                     stashCollections(),
                     Timestamp(5, 3),
                     std::move(iterator),
-                    2 /* batchSize */,
                     chunkManager(),
-                    executor.get(),
+                    executor,
                     writerPool.get());
 
     auto future = applier->applyUntilCloneFinishedTs();
@@ -598,17 +597,17 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstOplogCatchUpPhase) {
 }
 
 TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstBatchCloningPhase) {
-    std::queue<repl::OplogEntry> crudOps;
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
-                           repl::OpTypeEnum::kInsert,
-                           BSON("_id" << 1),
-                           boost::none));
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(6, 3), 1),
-                           repl::OpTypeEnum::kInsert,
-                           BSON("_id" << 2),
-                           boost::none));
+    std::deque<repl::OplogEntry> crudOps;
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 1),
+                                boost::none));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(6, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 2),
+                                boost::none));
 
-    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 4 /* batchSize */);
     iterator->setThrowWhenSingleItem();
 
     boost::optional<ReshardingOplogApplier> applier;
@@ -622,9 +621,8 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstBatchCloningPhase) {
                     stashCollections(),
                     Timestamp(8, 3),
                     std::move(iterator),
-                    4 /* batchSize */,
                     chunkManager(),
-                    executor.get(),
+                    executor,
                     writerPool.get());
 
     auto future = applier->applyUntilCloneFinishedTs();
@@ -640,25 +638,25 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstBatchCloningPhase) {
 }
 
 TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstBatchCatchUpPhase) {
-    std::queue<repl::OplogEntry> crudOps;
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
-                           repl::OpTypeEnum::kInsert,
-                           BSON("_id" << 1),
-                           boost::none));
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(6, 3), 1),
-                           repl::OpTypeEnum::kInsert,
-                           BSON("_id" << 2),
-                           boost::none));
+    std::deque<repl::OplogEntry> crudOps;
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 1),
+                                boost::none));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(6, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 2),
+                                boost::none));
 
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(7, 3), 1),
-                           repl::OpTypeEnum::kInsert,
-                           BSON("_id" << 3),
-                           boost::none));
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(8, 3), 1),
-                           repl::OpTypeEnum::kInsert,
-                           BSON("_id" << 2),
-                           boost::none));
-    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(7, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 3),
+                                boost::none));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(8, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 2),
+                                boost::none));
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 2 /* batchSize */);
     iterator->setThrowWhenSingleItem();
 
     boost::optional<ReshardingOplogApplier> applier;
@@ -672,9 +670,8 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstBatchCatchUpPhase) {
                     stashCollections(),
                     Timestamp(6, 3),
                     std::move(iterator),
-                    2 /* batchSize */,
                     chunkManager(),
-                    executor.get(),
+                    executor,
                     writerPool.get());
 
     auto future = applier->applyUntilCloneFinishedTs();
@@ -695,21 +692,21 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstBatchCatchUpPhase) {
 }
 
 TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingSecondBatchCloningPhase) {
-    std::queue<repl::OplogEntry> crudOps;
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
-                           repl::OpTypeEnum::kInsert,
-                           BSON("_id" << 1),
-                           boost::none));
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(6, 3), 1),
-                           repl::OpTypeEnum::kInsert,
-                           BSON("_id" << 2),
-                           boost::none));
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(7, 3), 1),
-                           repl::OpTypeEnum::kInsert,
-                           BSON("_id" << 3),
-                           boost::none));
+    std::deque<repl::OplogEntry> crudOps;
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 1),
+                                boost::none));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(6, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 2),
+                                boost::none));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(7, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 3),
+                                boost::none));
 
-    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 2 /* batchSize */);
     iterator->setThrowWhenSingleItem();
 
     boost::optional<ReshardingOplogApplier> applier;
@@ -723,9 +720,8 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingSecondBatchCloningPhase) {
                     stashCollections(),
                     Timestamp(7, 3),
                     std::move(iterator),
-                    2 /* batchSize */,
                     chunkManager(),
-                    executor.get(),
+                    executor,
                     writerPool.get());
 
     auto future = applier->applyUntilCloneFinishedTs();
@@ -749,29 +745,29 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingSecondBatchCloningPhase) {
 }
 
 TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingSecondBatchCatchUpPhase) {
-    std::queue<repl::OplogEntry> crudOps;
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
-                           repl::OpTypeEnum::kInsert,
-                           BSON("_id" << 1),
-                           boost::none));
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(6, 3), 1),
-                           repl::OpTypeEnum::kInsert,
-                           BSON("_id" << 2),
-                           boost::none));
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(7, 3), 1),
-                           repl::OpTypeEnum::kInsert,
-                           BSON("_id" << 3),
-                           boost::none));
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(8, 3), 1),
-                           repl::OpTypeEnum::kInsert,
-                           BSON("_id" << 4),
-                           boost::none));
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(9, 3), 1),
-                           repl::OpTypeEnum::kInsert,
-                           BSON("_id" << 5),
-                           boost::none));
+    std::deque<repl::OplogEntry> crudOps;
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 1),
+                                boost::none));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(6, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 2),
+                                boost::none));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(7, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 3),
+                                boost::none));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(8, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 4),
+                                boost::none));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(9, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 5),
+                                boost::none));
 
-    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 2 /* batchSize */);
     iterator->setThrowWhenSingleItem();
 
     boost::optional<ReshardingOplogApplier> applier;
@@ -785,9 +781,8 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingSecondBatchCatchUpPhase) {
                     stashCollections(),
                     Timestamp(6, 3),
                     std::move(iterator),
-                    2 /* batchSize */,
                     chunkManager(),
-                    executor.get(),
+                    executor,
                     writerPool.get());
 
     auto future = applier->applyUntilCloneFinishedTs();
@@ -820,13 +815,13 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingSecondBatchCatchUpPhase) {
 }
 
 TEST_F(ReshardingOplogApplierTest, ExecutorIsShutDownCloningPhase) {
-    std::queue<repl::OplogEntry> crudOps;
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
-                           repl::OpTypeEnum::kInsert,
-                           BSON("_id" << 1),
-                           boost::none));
+    std::deque<repl::OplogEntry> crudOps;
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 1),
+                                boost::none));
 
-    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 4 /* batchSize */);
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
@@ -838,9 +833,8 @@ TEST_F(ReshardingOplogApplierTest, ExecutorIsShutDownCloningPhase) {
                     stashCollections(),
                     Timestamp(5, 3),
                     std::move(iterator),
-                    4 /* batchSize */,
                     chunkManager(),
-                    executor.get(),
+                    executor,
                     writerPool.get());
 
     executor->shutdown();
@@ -857,21 +851,21 @@ TEST_F(ReshardingOplogApplierTest, ExecutorIsShutDownCloningPhase) {
 }
 
 TEST_F(ReshardingOplogApplierTest, ExecutorIsShutDownCatchUpPhase) {
-    std::queue<repl::OplogEntry> crudOps;
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
-                           repl::OpTypeEnum::kInsert,
-                           BSON("_id" << 1),
-                           boost::none));
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(6, 3), 1),
-                           repl::OpTypeEnum::kInsert,
-                           BSON("_id" << 2),
-                           boost::none));
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(7, 3), 1),
-                           repl::OpTypeEnum::kInsert,
-                           BSON("_id" << 3),
-                           boost::none));
+    std::deque<repl::OplogEntry> crudOps;
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 1),
+                                boost::none));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(6, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 2),
+                                boost::none));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(7, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 3),
+                                boost::none));
 
-    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 2 /* batchSize */);
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
@@ -883,9 +877,8 @@ TEST_F(ReshardingOplogApplierTest, ExecutorIsShutDownCatchUpPhase) {
                     stashCollections(),
                     Timestamp(5, 3),
                     std::move(iterator),
-                    2 /* batchSize */,
                     chunkManager(),
-                    executor.get(),
+                    executor,
                     writerPool.get());
 
     auto future = applier->applyUntilCloneFinishedTs();
@@ -907,13 +900,13 @@ TEST_F(ReshardingOplogApplierTest, ExecutorIsShutDownCatchUpPhase) {
 }
 
 TEST_F(ReshardingOplogApplierTest, WriterPoolIsShutDownCloningPhase) {
-    std::queue<repl::OplogEntry> crudOps;
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
-                           repl::OpTypeEnum::kInsert,
-                           BSON("_id" << 1),
-                           boost::none));
+    std::deque<repl::OplogEntry> crudOps;
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 1),
+                                boost::none));
 
-    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 4 /* batchSize */);
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
@@ -925,9 +918,8 @@ TEST_F(ReshardingOplogApplierTest, WriterPoolIsShutDownCloningPhase) {
                     stashCollections(),
                     Timestamp(5, 3),
                     std::move(iterator),
-                    4 /* batchSize */,
                     chunkManager(),
-                    executor.get(),
+                    executor,
                     writerPool.get());
 
     writerPool->shutdown();
@@ -944,21 +936,21 @@ TEST_F(ReshardingOplogApplierTest, WriterPoolIsShutDownCloningPhase) {
 }
 
 TEST_F(ReshardingOplogApplierTest, WriterPoolIsShutDownCatchUpPhase) {
-    std::queue<repl::OplogEntry> crudOps;
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
-                           repl::OpTypeEnum::kInsert,
-                           BSON("_id" << 1),
-                           boost::none));
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(6, 3), 1),
-                           repl::OpTypeEnum::kInsert,
-                           BSON("_id" << 2),
-                           boost::none));
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(7, 3), 1),
-                           repl::OpTypeEnum::kInsert,
-                           BSON("_id" << 3),
-                           boost::none));
+    std::deque<repl::OplogEntry> crudOps;
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 1),
+                                boost::none));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(6, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 2),
+                                boost::none));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(7, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 3),
+                                boost::none));
 
-    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 2 /* batchSize */);
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
@@ -970,9 +962,8 @@ TEST_F(ReshardingOplogApplierTest, WriterPoolIsShutDownCatchUpPhase) {
                     stashCollections(),
                     Timestamp(5, 3),
                     std::move(iterator),
-                    2 /* batchSize */,
                     chunkManager(),
-                    executor.get(),
+                    executor,
                     writerPool.get());
 
     auto future = applier->applyUntilCloneFinishedTs();
@@ -998,25 +989,25 @@ TEST_F(ReshardingOplogApplierTest, InsertOpIntoOuputCollectionUseReshardingAppli
     // ReshardingOplogApplicationRules::_applyInsert_inlock.
     setReshardingOplogApplicationServerParameterTrue();
 
-    std::queue<repl::OplogEntry> crudOps;
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
-                           repl::OpTypeEnum::kInsert,
-                           BSON("_id" << 1),
-                           boost::none));
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(6, 3), 1),
-                           repl::OpTypeEnum::kInsert,
-                           BSON("_id" << 2),
-                           boost::none));
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(7, 3), 1),
-                           repl::OpTypeEnum::kInsert,
-                           BSON("_id" << 3),
-                           boost::none));
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(8, 3), 1),
-                           repl::OpTypeEnum::kInsert,
-                           BSON("_id" << 4),
-                           boost::none));
+    std::deque<repl::OplogEntry> crudOps;
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 1),
+                                boost::none));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(6, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 2),
+                                boost::none));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(7, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 3),
+                                boost::none));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(8, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 4),
+                                boost::none));
 
-    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 2 /* batchSize */);
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
@@ -1028,9 +1019,8 @@ TEST_F(ReshardingOplogApplierTest, InsertOpIntoOuputCollectionUseReshardingAppli
                     stashCollections(),
                     Timestamp(6, 3),
                     std::move(iterator),
-                    2 /* batchSize */,
                     chunkManager(),
-                    executor.get(),
+                    executor,
                     writerPool.get());
 
     auto future = applier->applyUntilCloneFinishedTs();
@@ -1064,13 +1054,13 @@ TEST_F(ReshardingOplogApplierTest,
     // ReshardingOplogApplicationRules::_applyInsert_inlock.
     setReshardingOplogApplicationServerParameterTrue();
 
-    std::queue<repl::OplogEntry> crudOps;
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
-                           repl::OpTypeEnum::kInsert,
-                           BSON("_id" << 1 << "sk" << 2),
-                           boost::none));
+    std::deque<repl::OplogEntry> crudOps;
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 1 << "sk" << 2),
+                                boost::none));
 
-    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 1 /* batchSize */);
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
@@ -1082,9 +1072,8 @@ TEST_F(ReshardingOplogApplierTest,
                     stashCollections(),
                     Timestamp(5, 3),
                     std::move(iterator),
-                    1 /* batchSize */,
                     chunkManager(),
-                    executor.get(),
+                    executor,
                     writerPool.get());
 
     // Make sure a doc with {_id: 1} exists in the output collection before applying an insert with
@@ -1115,17 +1104,17 @@ TEST_F(ReshardingOplogApplierTest,
     // ReshardingOplogApplicationRules::_applyInsert_inlock.
     setReshardingOplogApplicationServerParameterTrue();
 
-    std::queue<repl::OplogEntry> crudOps;
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
-                           repl::OpTypeEnum::kInsert,
-                           BSON("_id" << 1 << "sk" << 2),
-                           boost::none));
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(6, 3), 1),
-                           repl::OpTypeEnum::kInsert,
-                           BSON("_id" << 1 << "sk" << 3),
-                           boost::none));
+    std::deque<repl::OplogEntry> crudOps;
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 1 << "sk" << 2),
+                                boost::none));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(6, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 1 << "sk" << 3),
+                                boost::none));
 
-    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 1 /* batchSize */);
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
@@ -1137,9 +1126,8 @@ TEST_F(ReshardingOplogApplierTest,
                     stashCollections(),
                     Timestamp(5, 3),
                     std::move(iterator),
-                    1 /* batchSize */,
                     chunkManager(),
-                    executor.get(),
+                    executor,
                     writerPool.get());
 
     // Make sure a doc with {_id: 1} exists in the output collection before applying inserts with
@@ -1183,17 +1171,17 @@ TEST_F(ReshardingOplogApplierTest,
     // ReshardingOplogApplicationRules::_applyDelete_inlock.
     setReshardingOplogApplicationServerParameterTrue();
 
-    std::queue<repl::OplogEntry> crudOps;
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
-                           repl::OpTypeEnum::kInsert,
-                           BSON("_id" << 1 << "sk" << 2),
-                           boost::none));
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(6, 3), 1),
-                           repl::OpTypeEnum::kDelete,
-                           BSON("_id" << 1),
-                           boost::none));
+    std::deque<repl::OplogEntry> crudOps;
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 1 << "sk" << 2),
+                                boost::none));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(6, 3), 1),
+                                repl::OpTypeEnum::kDelete,
+                                BSON("_id" << 1),
+                                boost::none));
 
-    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 1 /* batchSize */);
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
@@ -1205,9 +1193,8 @@ TEST_F(ReshardingOplogApplierTest,
                     stashCollections(),
                     Timestamp(5, 3),
                     std::move(iterator),
-                    1 /* batchSize */,
                     chunkManager(),
-                    executor.get(),
+                    executor,
                     writerPool.get());
 
     // Insert a doc {_id: 1} in the output collection before applying the insert of doc with
@@ -1251,17 +1238,17 @@ TEST_F(ReshardingOplogApplierTest,
     // ReshardingOplogApplicationRules::_applyDelete_inlock.
     setReshardingOplogApplicationServerParameterTrue();
 
-    std::queue<repl::OplogEntry> crudOps;
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
-                           repl::OpTypeEnum::kDelete,
-                           BSON("_id" << 1 << "sk" << -1),
-                           boost::none));
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(6, 3), 1),
-                           repl::OpTypeEnum::kDelete,
-                           BSON("_id" << 2),
-                           boost::none));
+    std::deque<repl::OplogEntry> crudOps;
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
+                                repl::OpTypeEnum::kDelete,
+                                BSON("_id" << 1 << "sk" << -1),
+                                boost::none));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(6, 3), 1),
+                                repl::OpTypeEnum::kDelete,
+                                BSON("_id" << 2),
+                                boost::none));
 
-    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 1 /* batchSize */);
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
@@ -1273,9 +1260,8 @@ TEST_F(ReshardingOplogApplierTest,
                     stashCollections(),
                     Timestamp(5, 3),
                     std::move(iterator),
-                    1 /* batchSize */,
                     chunkManager(),
-                    executor.get(),
+                    executor,
                     writerPool.get());
 
     // Make sure a doc with {_id: 1} exists in the output collection that does not belong to this
@@ -1316,25 +1302,25 @@ TEST_F(ReshardingOplogApplierTest,
     // ReshardingOplogApplicationRules::_applyDelete_inlock.
     setReshardingOplogApplicationServerParameterTrue();
 
-    std::queue<repl::OplogEntry> crudOps;
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
-                           repl::OpTypeEnum::kInsert,
-                           BSON("_id" << 1 << "sk" << 1),
-                           boost::none));
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(6, 3), 1),
-                           repl::OpTypeEnum::kInsert,
-                           BSON("_id" << 2 << "sk" << 2),
-                           boost::none));
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(7, 3), 1),
-                           repl::OpTypeEnum::kDelete,
-                           BSON("_id" << 1),
-                           boost::none));
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(8, 3), 1),
-                           repl::OpTypeEnum::kDelete,
-                           BSON("_id" << 2),
-                           boost::none));
+    std::deque<repl::OplogEntry> crudOps;
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 1 << "sk" << 1),
+                                boost::none));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(6, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 2 << "sk" << 2),
+                                boost::none));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(7, 3), 1),
+                                repl::OpTypeEnum::kDelete,
+                                BSON("_id" << 1),
+                                boost::none));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(8, 3), 1),
+                                repl::OpTypeEnum::kDelete,
+                                BSON("_id" << 2),
+                                boost::none));
 
-    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 2 /* batchSize */);
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
@@ -1346,9 +1332,8 @@ TEST_F(ReshardingOplogApplierTest,
                     stashCollections(),
                     Timestamp(6, 3),
                     std::move(iterator),
-                    2 /* batchSize */,
                     chunkManager(),
-                    executor.get(),
+                    executor,
                     writerPool.get());
 
     // Apply the inserts first so there exists docs in the output collection
@@ -1393,17 +1378,17 @@ TEST_F(ReshardingOplogApplierTest,
     // ReshardingOplogApplicationRules::_applyDelete_inlock.
     setReshardingOplogApplicationServerParameterTrue();
 
-    std::queue<repl::OplogEntry> crudOps;
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
-                           repl::OpTypeEnum::kInsert,
-                           BSON("_id" << 1 << "sk" << 1),
-                           boost::none));
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(6, 3), 1),
-                           repl::OpTypeEnum::kDelete,
-                           BSON("_id" << 1),
-                           boost::none));
+    std::deque<repl::OplogEntry> crudOps;
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 1 << "sk" << 1),
+                                boost::none));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(6, 3), 1),
+                                repl::OpTypeEnum::kDelete,
+                                BSON("_id" << 1),
+                                boost::none));
 
-    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 1 /* batchSize */);
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
@@ -1415,9 +1400,8 @@ TEST_F(ReshardingOplogApplierTest,
                     stashCollections(),
                     Timestamp(5, 3),
                     std::move(iterator),
-                    1 /* batchSize */,
                     chunkManager(),
-                    executor.get(),
+                    executor,
                     writerPool.get());
 
     // Make sure a doc with {_id: 1} exists in the stash collection for the other donor shard. The
@@ -1482,17 +1466,17 @@ TEST_F(ReshardingOplogApplierTest, UpdateShouldModifyStashCollectionUseReshardin
     // ReshardingOplogApplicationRules::_applyUpdate_inlock.
     setReshardingOplogApplicationServerParameterTrue();
 
-    std::queue<repl::OplogEntry> crudOps;
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
-                           repl::OpTypeEnum::kInsert,
-                           BSON("_id" << 1 << "sk" << 2),
-                           boost::none));
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(6, 3), 1),
-                           repl::OpTypeEnum::kUpdate,
-                           BSON("$set" << BSON("x" << 1)),
-                           BSON("_id" << 1)));
+    std::deque<repl::OplogEntry> crudOps;
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 1 << "sk" << 2),
+                                boost::none));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(6, 3), 1),
+                                repl::OpTypeEnum::kUpdate,
+                                BSON("$set" << BSON("x" << 1)),
+                                BSON("_id" << 1)));
 
-    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 1 /* batchSize */);
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
@@ -1504,9 +1488,8 @@ TEST_F(ReshardingOplogApplierTest, UpdateShouldModifyStashCollectionUseReshardin
                     stashCollections(),
                     Timestamp(5, 3),
                     std::move(iterator),
-                    1 /* batchSize */,
                     chunkManager(),
-                    executor.get(),
+                    executor,
                     writerPool.get());
 
     // Insert a doc {_id: 1} in the output collection before applying the insert of doc with
@@ -1549,17 +1532,17 @@ TEST_F(ReshardingOplogApplierTest, UpdateShouldDoNothingUseReshardingApplication
     // ReshardingOplogApplicationRules::_applyUpdate_inlock.
     setReshardingOplogApplicationServerParameterTrue();
 
-    std::queue<repl::OplogEntry> crudOps;
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
-                           repl::OpTypeEnum::kUpdate,
-                           BSON("$set" << BSON("x" << 1)),
-                           BSON("_id" << 1)));
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(6, 3), 1),
-                           repl::OpTypeEnum::kUpdate,
-                           BSON("$set" << BSON("x" << 2)),
-                           BSON("_id" << 2)));
+    std::deque<repl::OplogEntry> crudOps;
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
+                                repl::OpTypeEnum::kUpdate,
+                                BSON("$set" << BSON("x" << 1)),
+                                BSON("_id" << 1)));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(6, 3), 1),
+                                repl::OpTypeEnum::kUpdate,
+                                BSON("$set" << BSON("x" << 2)),
+                                BSON("_id" << 2)));
 
-    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 1 /* batchSize */);
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
@@ -1571,9 +1554,8 @@ TEST_F(ReshardingOplogApplierTest, UpdateShouldDoNothingUseReshardingApplication
                     stashCollections(),
                     Timestamp(5, 3),
                     std::move(iterator),
-                    1 /* batchSize */,
                     chunkManager(),
-                    executor.get(),
+                    executor,
                     writerPool.get());
 
     // Make sure a doc with {_id: 1} exists in the output collection that does not belong to this
@@ -1613,25 +1595,25 @@ TEST_F(ReshardingOplogApplierTest, UpdateOutputCollUseReshardingApplicationRules
     // ReshardingOplogApplicationRules::_applyUpdate_inlock.
     setReshardingOplogApplicationServerParameterTrue();
 
-    std::queue<repl::OplogEntry> crudOps;
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
-                           repl::OpTypeEnum::kInsert,
-                           BSON("_id" << 1 << "sk" << 1),
-                           boost::none));
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(6, 3), 1),
-                           repl::OpTypeEnum::kInsert,
-                           BSON("_id" << 2 << "sk" << 2),
-                           boost::none));
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(7, 3), 1),
-                           repl::OpTypeEnum::kUpdate,
-                           BSON("$set" << BSON("x" << 1)),
-                           BSON("_id" << 1)));
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(8, 3), 1),
-                           repl::OpTypeEnum::kUpdate,
-                           BSON("$set" << BSON("x" << 2)),
-                           BSON("_id" << 2)));
+    std::deque<repl::OplogEntry> crudOps;
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 1 << "sk" << 1),
+                                boost::none));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(6, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 2 << "sk" << 2),
+                                boost::none));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(7, 3), 1),
+                                repl::OpTypeEnum::kUpdate,
+                                BSON("$set" << BSON("x" << 1)),
+                                BSON("_id" << 1)));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(8, 3), 1),
+                                repl::OpTypeEnum::kUpdate,
+                                BSON("$set" << BSON("x" << 2)),
+                                BSON("_id" << 2)));
 
-    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 2 /* batchSize */);
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
@@ -1643,9 +1625,8 @@ TEST_F(ReshardingOplogApplierTest, UpdateOutputCollUseReshardingApplicationRules
                     stashCollections(),
                     Timestamp(6, 3),
                     std::move(iterator),
-                    2 /* batchSize */,
                     chunkManager(),
-                    executor.get(),
+                    executor,
                     writerPool.get());
 
     // Apply the inserts first so there exists docs in the output collection.
@@ -1678,21 +1659,22 @@ TEST_F(ReshardingOplogApplierTest, UpdateOutputCollUseReshardingApplicationRules
 TEST_F(ReshardingOplogApplierTest, UnsupportedCommandOpsShouldErrorUseReshardingApplicationRules) {
     setReshardingOplogApplicationServerParameterTrue();
 
-    std::queue<repl::OplogEntry> ops;
-    ops.push(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
-                       repl::OpTypeEnum::kInsert,
-                       BSON("_id" << 1),
-                       boost::none));
-    ops.push(makeOplog(repl::OpTime(Timestamp(6, 3), 1),
-                       repl::OpTypeEnum::kCommand,
-                       BSON("renameCollection" << appliedToNs().ns() << "to" << stashNs().ns()),
-                       boost::none));
-    ops.push(makeOplog(repl::OpTime(Timestamp(7, 3), 1),
-                       repl::OpTypeEnum::kInsert,
-                       BSON("_id" << 2),
-                       boost::none));
+    std::deque<repl::OplogEntry> ops;
+    ops.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
+                            repl::OpTypeEnum::kInsert,
+                            BSON("_id" << 1),
+                            boost::none));
+    ops.push_back(
+        makeOplog(repl::OpTime(Timestamp(6, 3), 1),
+                  repl::OpTypeEnum::kCommand,
+                  BSON("renameCollection" << appliedToNs().ns() << "to" << stashNs().ns()),
+                  boost::none));
+    ops.push_back(makeOplog(repl::OpTime(Timestamp(7, 3), 1),
+                            repl::OpTypeEnum::kInsert,
+                            BSON("_id" << 2),
+                            boost::none));
 
-    auto iterator = std::make_unique<OplogIteratorMock>(std::move(ops));
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(ops), 1 /* batchSize */);
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
@@ -1704,9 +1686,8 @@ TEST_F(ReshardingOplogApplierTest, UnsupportedCommandOpsShouldErrorUseResharding
                     stashCollections(),
                     Timestamp(5, 3),
                     std::move(iterator),
-                    1 /* batchSize */,
                     chunkManager(),
-                    executor.get(),
+                    executor,
                     writerPool.get());
 
     auto future = applier->applyUntilCloneFinishedTs();
@@ -1733,13 +1714,13 @@ TEST_F(ReshardingOplogApplierTest,
        DropSourceCollectionCmdShouldErrorUseReshardingApplicationRules) {
     setReshardingOplogApplicationServerParameterTrue();
 
-    std::queue<repl::OplogEntry> ops;
-    ops.push(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
-                       repl::OpTypeEnum::kCommand,
-                       BSON("drop" << appliedToNs().ns()),
-                       boost::none));
+    std::deque<repl::OplogEntry> ops;
+    ops.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
+                            repl::OpTypeEnum::kCommand,
+                            BSON("drop" << appliedToNs().ns()),
+                            boost::none));
 
-    auto iterator = std::make_unique<OplogIteratorMock>(std::move(ops));
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(ops), 1 /* batchSize */);
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
@@ -1751,9 +1732,8 @@ TEST_F(ReshardingOplogApplierTest,
                     stashCollections(),
                     Timestamp(5, 3),
                     std::move(iterator),
-                    1 /* batchSize */,
                     chunkManager(),
-                    executor.get(),
+                    executor,
                     writerPool.get());
 
     auto future = applier->applyUntilCloneFinishedTs();
@@ -1982,48 +1962,48 @@ public:
 };
 
 TEST_F(ReshardingOplogApplierRetryableTest, CrudWithEmptyConfigTransactions) {
-    std::queue<repl::OplogEntry> crudOps;
+    std::deque<repl::OplogEntry> crudOps;
 
     OperationSessionInfo session1;
     session1.setSessionId(makeLogicalSessionIdForTest());
     session1.setTxnNumber(1);
 
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
-                           repl::OpTypeEnum::kInsert,
-                           BSON("_id" << 1),
-                           boost::none,
-                           session1,
-                           1));
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(6, 3), 1),
-                           repl::OpTypeEnum::kInsert,
-                           BSON("_id" << 2),
-                           boost::none,
-                           session1,
-                           2));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 1),
+                                boost::none,
+                                session1,
+                                1));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(6, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 2),
+                                boost::none,
+                                session1,
+                                2));
 
     OperationSessionInfo session2;
     session2.setSessionId(makeLogicalSessionIdForTest());
     session2.setTxnNumber(1);
 
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(7, 3), 1),
-                           repl::OpTypeEnum::kUpdate,
-                           BSON("$set" << BSON("x" << 1)),
-                           BSON("_id" << 2),
-                           session2,
-                           1));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(7, 3), 1),
+                                repl::OpTypeEnum::kUpdate,
+                                BSON("$set" << BSON("x" << 1)),
+                                BSON("_id" << 2),
+                                session2,
+                                1));
 
     OperationSessionInfo session3;
     session3.setSessionId(makeLogicalSessionIdForTest());
     session3.setTxnNumber(1);
 
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(8, 3), 1),
-                           repl::OpTypeEnum::kDelete,
-                           BSON("_id" << 1),
-                           boost::none,
-                           session3,
-                           1));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(8, 3), 1),
+                                repl::OpTypeEnum::kDelete,
+                                BSON("_id" << 1),
+                                boost::none,
+                                session3,
+                                1));
 
-    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 2 /* batchSize */);
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
@@ -2035,9 +2015,8 @@ TEST_F(ReshardingOplogApplierRetryableTest, CrudWithEmptyConfigTransactions) {
                     stashCollections(),
                     Timestamp(6, 3),
                     std::move(iterator),
-                    2 /* batchSize */,
                     chunkManager(),
-                    executor.get(),
+                    executor,
                     writerPool.get());
 
     auto future = applier->applyUntilCloneFinishedTs();
@@ -2068,46 +2047,46 @@ TEST_F(ReshardingOplogApplierRetryableTest, CrudWithEmptyConfigTransactions) {
 }
 
 TEST_F(ReshardingOplogApplierRetryableTest, MultipleTxnSameLsidInOneBatch) {
-    std::queue<repl::OplogEntry> crudOps;
+    std::deque<repl::OplogEntry> crudOps;
 
     OperationSessionInfo session1;
     session1.setSessionId(makeLogicalSessionIdForTest());
     session1.setTxnNumber(1);
 
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
-                           repl::OpTypeEnum::kInsert,
-                           BSON("_id" << 1),
-                           boost::none,
-                           session1,
-                           1));
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(6, 3), 1),
-                           repl::OpTypeEnum::kInsert,
-                           BSON("_id" << 2),
-                           boost::none,
-                           session1,
-                           2));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 1),
+                                boost::none,
+                                session1,
+                                1));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(6, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 2),
+                                boost::none,
+                                session1,
+                                2));
 
     OperationSessionInfo session2;
     session2.setSessionId(makeLogicalSessionIdForTest());
     session2.setTxnNumber(1);
 
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(7, 3), 1),
-                           repl::OpTypeEnum::kInsert,
-                           BSON("_id" << 3),
-                           boost::none,
-                           session2,
-                           1));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(7, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 3),
+                                boost::none,
+                                session2,
+                                1));
 
     session1.setTxnNumber(2);
 
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(8, 3), 1),
-                           repl::OpTypeEnum::kInsert,
-                           BSON("_id" << 4),
-                           boost::none,
-                           session1,
-                           21));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(8, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 4),
+                                boost::none,
+                                session1,
+                                21));
 
-    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 2 /* batchSize */);
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
@@ -2119,9 +2098,8 @@ TEST_F(ReshardingOplogApplierRetryableTest, MultipleTxnSameLsidInOneBatch) {
                     stashCollections(),
                     Timestamp(6, 3),
                     std::move(iterator),
-                    2 /* batchSize */,
                     chunkManager(),
-                    executor.get(),
+                    executor,
                     writerPool.get());
 
     auto future = applier->applyUntilCloneFinishedTs();
@@ -2152,20 +2130,20 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithLowerExistingTxn) {
 
     writeTxnRecord(lsid, 2, 1, {}, boost::none);
 
-    std::queue<repl::OplogEntry> crudOps;
+    std::deque<repl::OplogEntry> crudOps;
 
     OperationSessionInfo session;
     session.setSessionId(lsid);
     session.setTxnNumber(5);
 
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
-                           repl::OpTypeEnum::kInsert,
-                           BSON("_id" << 1),
-                           boost::none,
-                           session,
-                           21));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 1),
+                                boost::none,
+                                session,
+                                21));
 
-    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 2 /* batchSize */);
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
@@ -2177,9 +2155,8 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithLowerExistingTxn) {
                     stashCollections(),
                     Timestamp(6, 3),
                     std::move(iterator),
-                    2 /* batchSize */,
                     chunkManager(),
-                    executor.get(),
+                    executor,
                     writerPool.get());
 
     auto future = applier->applyUntilCloneFinishedTs();
@@ -2207,16 +2184,16 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithHigherExistingTxnNum) {
     session.setSessionId(lsid);
     session.setTxnNumber(incomingTxnNum);
 
-    std::queue<repl::OplogEntry> crudOps;
+    std::deque<repl::OplogEntry> crudOps;
 
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
-                           repl::OpTypeEnum::kInsert,
-                           BSON("_id" << 1),
-                           boost::none,
-                           session,
-                           incomingStmtId));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 1),
+                                boost::none,
+                                session,
+                                incomingStmtId));
 
-    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 2 /* batchSize */);
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
@@ -2228,9 +2205,8 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithHigherExistingTxnNum) {
                     stashCollections(),
                     Timestamp(6, 3),
                     std::move(iterator),
-                    2 /* batchSize */,
                     chunkManager(),
-                    executor.get(),
+                    executor,
                     writerPool.get());
 
     auto future = applier->applyUntilCloneFinishedTs();
@@ -2268,16 +2244,16 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithLowerExistingTxnNum) {
     session.setSessionId(lsid);
     session.setTxnNumber(incomingTxnNum);
 
-    std::queue<repl::OplogEntry> crudOps;
+    std::deque<repl::OplogEntry> crudOps;
 
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
-                           repl::OpTypeEnum::kInsert,
-                           BSON("_id" << 1),
-                           boost::none,
-                           session,
-                           incomingStmtId));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 1),
+                                boost::none,
+                                session,
+                                incomingStmtId));
 
-    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 2 /* batchSize */);
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
@@ -2289,9 +2265,8 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithLowerExistingTxnNum) {
                     stashCollections(),
                     Timestamp(6, 3),
                     std::move(iterator),
-                    2 /* batchSize */,
                     chunkManager(),
-                    executor.get(),
+                    executor,
                     writerPool.get());
 
     auto future = applier->applyUntilCloneFinishedTs();
@@ -2320,16 +2295,16 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithEqualExistingTxnNum) {
     session.setSessionId(lsid);
     session.setTxnNumber(incomingTxnNum);
 
-    std::queue<repl::OplogEntry> crudOps;
+    std::deque<repl::OplogEntry> crudOps;
 
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
-                           repl::OpTypeEnum::kInsert,
-                           BSON("_id" << 1),
-                           boost::none,
-                           session,
-                           incomingStmtId));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 1),
+                                boost::none,
+                                session,
+                                incomingStmtId));
 
-    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 2 /* batchSize */);
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
@@ -2341,9 +2316,8 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithEqualExistingTxnNum) {
                     stashCollections(),
                     Timestamp(6, 3),
                     std::move(iterator),
-                    2 /* batchSize */,
                     chunkManager(),
-                    executor.get(),
+                    executor,
                     writerPool.get());
 
     auto future = applier->applyUntilCloneFinishedTs();
@@ -2372,16 +2346,16 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithStmtIdAlreadyExecuted) 
     session.setSessionId(lsid);
     session.setTxnNumber(incomingTxnNum);
 
-    std::queue<repl::OplogEntry> crudOps;
+    std::deque<repl::OplogEntry> crudOps;
 
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
-                           repl::OpTypeEnum::kInsert,
-                           BSON("_id" << 1),
-                           boost::none,
-                           session,
-                           incomingStmtId));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 1),
+                                boost::none,
+                                session,
+                                incomingStmtId));
 
-    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 2 /* batchSize */);
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
@@ -2393,9 +2367,8 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithStmtIdAlreadyExecuted) 
                     stashCollections(),
                     Timestamp(6, 3),
                     std::move(iterator),
-                    2 /* batchSize */,
                     chunkManager(),
-                    executor.get(),
+                    executor,
                     writerPool.get());
 
     auto future = applier->applyUntilCloneFinishedTs();
@@ -2425,16 +2398,16 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithActiveUnpreparedTxnSame
     session.setSessionId(lsid);
     session.setTxnNumber(txnNum);
 
-    std::queue<repl::OplogEntry> crudOps;
+    std::deque<repl::OplogEntry> crudOps;
 
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
-                           repl::OpTypeEnum::kInsert,
-                           BSON("_id" << 1),
-                           boost::none,
-                           session,
-                           1));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 1),
+                                boost::none,
+                                session,
+                                1));
 
-    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 2 /* batchSize */);
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
@@ -2446,9 +2419,8 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithActiveUnpreparedTxnSame
                     stashCollections(),
                     Timestamp(6, 3),
                     std::move(iterator),
-                    2 /* batchSize */,
                     chunkManager(),
-                    executor.get(),
+                    executor,
                     writerPool.get());
 
     auto future = applier->applyUntilCloneFinishedTs();
@@ -2480,16 +2452,16 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithActiveUnpreparedTxnWith
     session.setSessionId(lsid);
     session.setTxnNumber(txnNum);
 
-    std::queue<repl::OplogEntry> crudOps;
+    std::deque<repl::OplogEntry> crudOps;
 
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
-                           repl::OpTypeEnum::kInsert,
-                           BSON("_id" << 1),
-                           boost::none,
-                           session,
-                           1));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 1),
+                                boost::none,
+                                session,
+                                1));
 
-    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 2 /* batchSize */);
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
@@ -2501,9 +2473,8 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithActiveUnpreparedTxnWith
                     stashCollections(),
                     Timestamp(6, 3),
                     std::move(iterator),
-                    2 /* batchSize */,
                     chunkManager(),
-                    executor.get(),
+                    executor,
                     writerPool.get());
 
     auto future = applier->applyUntilCloneFinishedTs();
@@ -2534,16 +2505,16 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithPreparedTxnThatWillComm
     session.setSessionId(lsid);
     session.setTxnNumber(txnNum);
 
-    std::queue<repl::OplogEntry> crudOps;
+    std::deque<repl::OplogEntry> crudOps;
 
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
-                           repl::OpTypeEnum::kInsert,
-                           BSON("_id" << 1),
-                           boost::none,
-                           session,
-                           1));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 1),
+                                boost::none,
+                                session,
+                                1));
 
-    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 2 /* batchSize */);
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
@@ -2555,9 +2526,8 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithPreparedTxnThatWillComm
                     stashCollections(),
                     Timestamp(6, 3),
                     std::move(iterator),
-                    2 /* batchSize */,
                     chunkManager(),
-                    executor.get(),
+                    executor,
                     writerPool.get());
 
     auto future = applier->applyUntilCloneFinishedTs();
@@ -2596,16 +2566,16 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithPreparedTxnThatWillAbor
     session.setSessionId(lsid);
     session.setTxnNumber(txnNum);
 
-    std::queue<repl::OplogEntry> crudOps;
+    std::deque<repl::OplogEntry> crudOps;
 
-    crudOps.push(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
-                           repl::OpTypeEnum::kInsert,
-                           BSON("_id" << 1),
-                           boost::none,
-                           session,
-                           1));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 1),
+                                boost::none,
+                                session,
+                                1));
 
-    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 2 /* batchSize */);
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
@@ -2617,9 +2587,8 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithPreparedTxnThatWillAbor
                     stashCollections(),
                     Timestamp(6, 3),
                     std::move(iterator),
-                    2 /* batchSize */,
                     chunkManager(),
-                    executor.get(),
+                    executor,
                     writerPool.get());
 
     auto future = applier->applyUntilCloneFinishedTs();

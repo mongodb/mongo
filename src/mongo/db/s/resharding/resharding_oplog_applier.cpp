@@ -43,7 +43,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/oplog_applier_utils.h"
-#include "mongo/db/s/resharding/resharding_donor_oplog_iterator_interface.h"
+#include "mongo/db/s/resharding/resharding_donor_oplog_iterator.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding_util.h"
 #include "mongo/db/session_catalog_mongod.h"
@@ -201,9 +201,8 @@ ReshardingOplogApplier::ReshardingOplogApplier(
     std::vector<NamespaceString> stashCollections,
     Timestamp reshardingCloneFinishedTs,
     std::unique_ptr<ReshardingDonorOplogIteratorInterface> oplogIterator,
-    size_t batchSize,
     const ChunkManager& sourceChunkMgr,
-    OutOfLineExecutor* executor,
+    std::shared_ptr<executor::TaskExecutor> executor,
     ThreadPool* writerPool)
     : _sourceId(std::move(sourceId)),
       _oplogNs(std::move(oplogNs)),
@@ -215,161 +214,97 @@ ReshardingOplogApplier::ReshardingOplogApplier(
       // with any user collections.
       _stashNs(_nsBeingResharded.db(), "{}.{}"_format(_nsBeingResharded.coll(), _oplogNs.coll())),
       _reshardingCloneFinishedTs(std::move(reshardingCloneFinishedTs)),
-      _batchSize(batchSize),
       _applicationRules(ReshardingOplogApplicationRules(
           _outputNs, _stashNs, _sourceId.getShardId(), sourceChunkMgr, stashCollections)),
       _service(service),
-      _executor(executor),
+      _executor(std::move(executor)),
       _writerPool(writerPool),
-      _oplogIter(std::move(oplogIterator)) {
-    invariant(_batchSize > 0);
-}
+      _oplogIter(std::move(oplogIterator)) {}
 
-Future<void> ReshardingOplogApplier::applyUntilCloneFinishedTs() {
+ExecutorFuture<void> ReshardingOplogApplier::applyUntilCloneFinishedTs() {
     invariant(_stage == ReshardingOplogApplier::Stage::kStarted);
 
-    auto pf = makePromiseFuture<void>();
-    _appliedCloneFinishTsPromise = std::move(pf.promise);
+    // It is safe to capture `this` because PrimaryOnlyService and RecipientStateMachine
+    // collectively guarantee that the ReshardingOplogApplier instances will outlive `_executor` and
+    // `_writerPool`.
+    return ExecutorFuture(_executor)
+        .then([this] {
+            auto createStashCollectionClient = makeKillableClient(_service, kClientName);
+            AlternativeClientRegion acr(createStashCollectionClient);
+            auto opCtx = makeInterruptibleOperationContext();
 
-    _executor->schedule([this](Status status) {
-        if (!status.isOK()) {
-            _onError(status);
-            return;
-        }
-
-        auto scheduleNextBatchClient = makeKillableClient(_service, kClientName);
-        AlternativeClientRegion acr(scheduleNextBatchClient);
-        auto opCtx = makeInterruptibleOperationContext();
-
-        try {
             uassertStatusOK(createCollection(
                 opCtx.get(), _stashNs.db().toString(), BSON("create" << _stashNs.coll())));
-
-            _scheduleNextBatch();
-        } catch (const DBException& ex) {
-            _onError(ex.toStatus());
-            return;
-        }
-    });
-
-    return std::move(pf.future);
+        })
+        .then([this] { return _scheduleNextBatch(); })
+        .onError([this](Status status) { return _onError(status); });
 }
 
-Future<void> ReshardingOplogApplier::applyUntilDone() {
+ExecutorFuture<void> ReshardingOplogApplier::applyUntilDone() {
     invariant(_stage == ReshardingOplogApplier::Stage::kReachedCloningTS);
 
-    auto pf = makePromiseFuture<void>();
-    _donePromise = std::move(pf.promise);
-
-    _executor->schedule([this](Status status) {
-        if (!status.isOK()) {
-            _onError(status);
-            return;
-        }
-
-        try {
-            _scheduleNextBatch();
-        } catch (const DBException& ex) {
-            _onError(ex.toStatus());
-            return;
-        }
-    });
-
-    return std::move(pf.future);
+    // It is safe to capture `this` because PrimaryOnlyService and RecipientStateMachine
+    // collectively guarantee that the ReshardingOplogApplier instances will outlive `_executor` and
+    // `_writerPool`.
+    return ExecutorFuture(_executor)
+        .then([this] { return _scheduleNextBatch(); })
+        .onError([this](Status status) { return _onError(status); });
 }
 
-void ReshardingOplogApplier::_scheduleNextBatch() {
-    if (!_oplogIter->hasMore()) {
-        // It is possible that there are no more oplog entries from the last point we resumed from.
-        if (_stage == ReshardingOplogApplier::Stage::kStarted) {
-            _stage = ReshardingOplogApplier::Stage::kReachedCloningTS;
-            _appliedCloneFinishTsPromise.emplaceValue();
-            return;
-        } else {
-            _stage = ReshardingOplogApplier::Stage::kFinished;
-            _donePromise.emplaceValue();
-            return;
-        }
-    }
-
-    auto scheduleBatchClient = makeKillableClient(_service, kClientName);
-    AlternativeClientRegion acr(scheduleBatchClient);
-    auto opCtx = makeInterruptibleOperationContext();
-
-    auto future = _oplogIter->getNext(opCtx.get());
-    // It is possible for the future returned by ReshardingDonorOplogIterator::getNext() to only
-    // become ready after `opCtx` would have been destructed. This can happen due to how the
-    // returned future may not be immediately ready if the donor iterator has reached the end of the
-    // oplog buffer and is waiting for an insert notification from the ReshardingOplogFetcher.
-    // Calling wait() here blocks the current thread but keeps `opCtx` alive while we're waiting.
-    // This situation also prevents using a _batchSize > 1 in production.
-    //
-    // TODO SERVER-53108: Remove this call to future.wait() and change
-    // resharding::gReshardingBatchLimitOperations to a value > 1 by default.
-    future.wait(opCtx.get());
-
-    for (size_t count = 1; count < _batchSize; count++) {
-        future = std::move(future).then([this](boost::optional<repl::OplogEntry> oplogEntry) {
-            if (oplogEntry) {
-                _preProcessAndPushOpsToBuffer(std::move(*oplogEntry));
-            }
-
+ExecutorFuture<void> ReshardingOplogApplier::_scheduleNextBatch() {
+    return ExecutorFuture(_executor)
+        .then([this] {
             auto batchClient = makeKillableClient(_service, kClientName);
             AlternativeClientRegion acr(batchClient);
-            auto getNextOpCtx = makeInterruptibleOperationContext();
 
-            return _oplogIter->getNext(getNextOpCtx.get());
-        });
-    }
-
-    std::move(future)
-        .then([this](boost::optional<repl::OplogEntry> oplogEntry) {
-            // Don't forget to push the last oplog in the batch.
-            if (oplogEntry) {
-                _preProcessAndPushOpsToBuffer(std::move(*oplogEntry));
+            return _oplogIter->getNextBatch(_executor);
+        })
+        .then([this](OplogBatch batch) {
+            for (auto&& entry : batch) {
+                _preProcessAndPushOpsToBuffer(entry);
             }
-
+        })
+        .then([this] {
             auto applyBatchClient = makeKillableClient(_service, kClientName);
             AlternativeClientRegion acr(applyBatchClient);
             auto applyBatchOpCtx = makeInterruptibleOperationContext();
 
             return _applyBatch(applyBatchOpCtx.get());
         })
-        .then([this]() {
-            if (!_currentBatchToApply.empty()) {
-                auto lastApplied = _currentBatchToApply.back();
-
-                auto scheduleBatchClient = makeKillableClient(_service, kClientName);
-                AlternativeClientRegion acr(scheduleBatchClient);
-                auto opCtx = makeInterruptibleOperationContext();
-
-                auto lastAppliedTs = _clearAppliedOpsAndStoreProgress(opCtx.get());
-
-                if (_stage == ReshardingOplogApplier::Stage::kStarted &&
-                    lastAppliedTs >= _reshardingCloneFinishedTs) {
+        .then([this] {
+            if (_currentBatchToApply.empty()) {
+                // It is possible that there are no more oplog entries from the last point we
+                // resumed from.
+                if (_stage == ReshardingOplogApplier::Stage::kStarted) {
                     _stage = ReshardingOplogApplier::Stage::kReachedCloningTS;
-                    // TODO: SERVER-51741 preemptively schedule next batch
-                    _appliedCloneFinishTsPromise.emplaceValue();
-                    return;
+                } else if (_stage == ReshardingOplogApplier::Stage::kReachedCloningTS) {
+                    _stage = ReshardingOplogApplier::Stage::kFinished;
                 }
+                return false;
             }
 
-            _executor->schedule([this](Status scheduleNextBatchStatus) {
-                if (!scheduleNextBatchStatus.isOK()) {
-                    _onError(scheduleNextBatchStatus);
-                    return;
-                }
+            auto lastApplied = _currentBatchToApply.back();
 
-                try {
-                    _scheduleNextBatch();
-                } catch (const DBException& ex) {
-                    _onError(ex.toStatus());
-                }
-            });
+            auto scheduleBatchClient = makeKillableClient(_service, kClientName);
+            AlternativeClientRegion acr(scheduleBatchClient);
+            auto opCtx = makeInterruptibleOperationContext();
+
+            auto lastAppliedTs = _clearAppliedOpsAndStoreProgress(opCtx.get());
+
+            if (_stage == ReshardingOplogApplier::Stage::kStarted &&
+                lastAppliedTs >= _reshardingCloneFinishedTs) {
+                _stage = ReshardingOplogApplier::Stage::kReachedCloningTS;
+                // TODO: SERVER-51741 preemptively schedule next batch
+                return false;
+            }
+
+            return true;
         })
-        .onError([this](Status status) { _onError(status); })
-        .getAsync([](Status status) {
-            // Do nothing.
+        .then([this](bool moreToApply) {
+            if (!moreToApply) {
+                return ExecutorFuture(_executor);
+            }
+            return _scheduleNextBatch();
         });
 }
 
@@ -588,14 +523,9 @@ void ReshardingOplogApplier::_preProcessAndPushOpsToBuffer(repl::OplogEntry oplo
     _currentBatchToApply.push_back(std::move(newOplog));
 }
 
-void ReshardingOplogApplier::_onError(Status status) {
-    if (_stage == ReshardingOplogApplier::Stage::kStarted) {
-        _appliedCloneFinishTsPromise.setError(status);
-    } else {
-        _donePromise.setError(status);
-    }
-
+Status ReshardingOplogApplier::_onError(Status status) {
     _stage = ReshardingOplogApplier::Stage::kErrorOccurred;
+    return status;
 }
 
 void ReshardingOplogApplier::_onWriterVectorDone(Status status) {

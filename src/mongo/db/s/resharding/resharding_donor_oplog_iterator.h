@@ -35,7 +35,7 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/s/resharding/donor_oplog_id_gen.h"
-#include "mongo/db/s/resharding/resharding_donor_oplog_iterator_interface.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/util/future.h"
 
 namespace mongo {
@@ -57,43 +57,56 @@ public:
 
 }  // namespace resharding
 
+class ReshardingDonorOplogIteratorInterface {
+public:
+    virtual ~ReshardingDonorOplogIteratorInterface() = default;
+
+    /**
+     * Returns the next batch of oplog entries to apply.
+     *
+     *  - An empty vector is returned when there are no more oplog entries left to apply.
+     *  - A non-immediately ready future is returned when the iterator has been exhausted, but the
+     *    final oplog entry hasn't been returned yet.
+     */
+    virtual ExecutorFuture<std::vector<repl::OplogEntry>> getNextBatch(
+        std::shared_ptr<executor::TaskExecutor> executor) = 0;
+};
+
 /**
- * Iterator for extracting oplog entries from the resharding donor oplog buffer. This is not
- * thread safe.
+ * Iterator for fetching batches of oplog entries from the oplog buffer collection for a particular
+ * donor shard.
+ *
+ * Instances of this class are not thread-safe.
  */
 class ReshardingDonorOplogIterator : public ReshardingDonorOplogIteratorInterface {
 public:
-    ReshardingDonorOplogIterator(NamespaceString donorOplogBufferNs,
-                                 boost::optional<ReshardingDonorOplogId> resumeToken,
+    ReshardingDonorOplogIterator(NamespaceString oplogBufferNss,
+                                 ReshardingDonorOplogId resumeToken,
                                  resharding::OnInsertAwaitable* insertNotifier);
 
     /**
-     * Returns the next oplog entry. Returns boost::none when there are no more entries to return.
-     * Calling getNext() when the previously returned future is not ready is undefined.
+     * Returns a pipeline for iterating the buffered copy of the donor's oplog.
+     *
+     * The documents returned by the pipeline have the oplog entries linked together with their
+     * preImage/postImage entries.
      */
-    Future<boost::optional<repl::OplogEntry>> getNext(OperationContext* opCtx) override;
+    std::unique_ptr<Pipeline, PipelineDeleter> makePipeline(
+        OperationContext* opCtx, std::shared_ptr<MongoProcessInterface> mongoProcessInterface);
 
-    /**
-     * Returns false if this iterator has seen the final oplog entry. Since this is not thread safe,
-     * should not be called while there is a pending future from getNext() that is not ready.
-     */
-    bool hasMore() const override;
+    ExecutorFuture<std::vector<repl::OplogEntry>> getNextBatch(
+        std::shared_ptr<executor::TaskExecutor> executor) override;
+
+    static constexpr auto kReshardingOplogPrePostImageOps = "prePostImageOps"_sd;
 
 private:
-    /**
-     * Returns a future to wait until a new oplog entry is inserted to the target oplog collection.
-     */
-    Future<void> _waitForNewOplog();
+    template <typename Callable>
+    auto _withTemporaryOperationContext(Callable&& callable);
 
-    /**
-     * Creates a new expression context that can be used to make a new pipeline to query the target
-     * oplog collection.
-     */
-    boost::intrusive_ptr<ExpressionContext> _makeExpressionContext(OperationContext* opCtx);
+    std::vector<repl::OplogEntry> _fillBatch(Pipeline& pipeline);
 
-    const NamespaceString _oplogBufferNs;
+    const NamespaceString _oplogBufferNss;
 
-    boost::optional<ReshardingDonorOplogId> _resumeToken;
+    ReshardingDonorOplogId _resumeToken;
 
     // _insertNotifier is used to asynchronously wait for a document to be inserted into the oplog
     // buffer collection by the ReshardingOplogFetcher after _pipeline is exhausted and the final

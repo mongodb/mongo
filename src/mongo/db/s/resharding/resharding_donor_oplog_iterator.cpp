@@ -33,12 +33,16 @@
 
 #include "mongo/db/s/resharding/resharding_donor_oplog_iterator.h"
 
-#include <fmt/format.h>
-
-#include "mongo/db/pipeline/pipeline_d.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/json.h"
+#include "mongo/db/client.h"
+#include "mongo/db/pipeline/document_source_lookup.h"
+#include "mongo/db/pipeline/document_source_match.h"
+#include "mongo/db/pipeline/document_source_sort.h"
+#include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
+#include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding_util.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
@@ -58,81 +62,143 @@ ReshardingDonorOplogId getId(const repl::OplogEntry& oplog) {
 }  // anonymous namespace
 
 ReshardingDonorOplogIterator::ReshardingDonorOplogIterator(
-    NamespaceString donorOplogBufferNs,
-    boost::optional<ReshardingDonorOplogId> resumeToken,
+    NamespaceString oplogBufferNss,
+    ReshardingDonorOplogId resumeToken,
     resharding::OnInsertAwaitable* insertNotifier)
-    : _oplogBufferNs(std::move(donorOplogBufferNs)),
+    : _oplogBufferNss(std::move(oplogBufferNss)),
       _resumeToken(std::move(resumeToken)),
       _insertNotifier(insertNotifier) {}
 
-Future<boost::optional<repl::OplogEntry>> ReshardingDonorOplogIterator::getNext(
-    OperationContext* opCtx) {
-    boost::optional<repl::OplogEntry> oplogToReturn;
+std::unique_ptr<Pipeline, PipelineDeleter> ReshardingDonorOplogIterator::makePipeline(
+    OperationContext* opCtx, std::shared_ptr<MongoProcessInterface> mongoProcessInterface) {
+    using Doc = Document;
+    using Arr = std::vector<Value>;
+    using V = Value;
 
-    if (_hasSeenFinalOplogEntry) {
-        return Future<boost::optional<repl::OplogEntry>>::makeReady(oplogToReturn);
+    StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
+    resolvedNamespaces[_oplogBufferNss.coll()] = {_oplogBufferNss, std::vector<BSONObj>{}};
+
+    auto expCtx = make_intrusive<ExpressionContext>(opCtx,
+                                                    boost::none, /* explain */
+                                                    false,       /* fromMongos */
+                                                    false,       /* needsMerge */
+                                                    false,       /* allowDiskUse */
+                                                    false,       /* bypassDocumentValidation */
+                                                    false,       /* isMapReduceCommand */
+                                                    _oplogBufferNss,
+                                                    boost::none, /* runtimeConstants */
+                                                    nullptr,     /* collator */
+                                                    std::move(mongoProcessInterface),
+                                                    std::move(resolvedNamespaces),
+                                                    boost::none /* collUUID */);
+
+    Pipeline::SourceContainer stages;
+
+    stages.emplace_back(
+        DocumentSourceMatch::create(BSON("_id" << BSON("$gt" << _resumeToken.toBSON())), expCtx));
+
+    stages.emplace_back(DocumentSourceSort::create(expCtx, BSON("_id" << 1)));
+
+    stages.emplace_back(DocumentSourceLookUp::createFromBson(
+        Doc{{"$lookup",
+             Doc{{"from", _oplogBufferNss.coll()},
+                 {"let", fromjson("{\
+                        preImageId: {\
+                            clusterTime: '$preImageOpTime.ts',\
+                            ts: '$preImageOpTime.ts'\
+                        },\
+                        postImageId: {\
+                            clusterTime: '$postImageOpTime.ts',\
+                            ts: '$postImageOpTime.ts'\
+                        }}")},
+                 {"pipeline", Arr{V{Doc(fromjson("{$match: {$expr: {\
+                        $in: ['$_id', ['$$preImageId', '$$postImageId']]}}}"))}}},
+                 {"as", kReshardingOplogPrePostImageOps}}}}
+            .toBson()
+            .firstElement(),
+        expCtx));
+
+    return Pipeline::create(std::move(stages), std::move(expCtx));
+}
+
+template <typename Callable>
+auto ReshardingDonorOplogIterator::_withTemporaryOperationContext(Callable&& callable) {
+    auto& client = cc();
+    {
+        stdx::lock_guard<Client> lk(client);
+        invariant(client.canKillSystemOperationInStepdown(lk));
     }
 
-    if (!_pipeline) {
-        auto expCtx = _makeExpressionContext(opCtx);
-        _pipeline = createAggForReshardingOplogBuffer(std::move(expCtx), _resumeToken, true);
-        _pipeline->detachFromOperationContext();
-    }
+    auto opCtx = client.makeOperationContext();
+    opCtx->setAlwaysInterruptAtStepDownOrUp();
 
-    _pipeline->reattachToOperationContext(opCtx);
-    ON_BLOCK_EXIT([this] {
-        if (_pipeline) {
-            _pipeline->detachFromOperationContext();
+    return callable(opCtx.get());
+}
+
+std::vector<repl::OplogEntry> ReshardingDonorOplogIterator::_fillBatch(Pipeline& pipeline) {
+    std::vector<repl::OplogEntry> batch;
+
+    int numBytes = 0;
+    do {
+        auto doc = pipeline.getNext();
+        if (!doc) {
+            break;
         }
+
+        auto obj = doc->toBson();
+        batch.emplace_back(obj.getOwned());
+        numBytes += obj.objsize();
+    } while (numBytes < resharding::gReshardingBatchLimitBytes &&
+             batch.size() < std::size_t(resharding::gReshardingBatchLimitOperations));
+
+    return batch;
+}
+
+ExecutorFuture<std::vector<repl::OplogEntry>> ReshardingDonorOplogIterator::getNextBatch(
+    std::shared_ptr<executor::TaskExecutor> executor) {
+    if (_hasSeenFinalOplogEntry) {
+        invariant(!_pipeline);
+        return ExecutorFuture(std::move(executor), std::vector<repl::OplogEntry>{});
+    }
+
+    auto batch = _withTemporaryOperationContext([&](auto* opCtx) {
+        if (_pipeline) {
+            _pipeline->reattachToOperationContext(opCtx);
+        } else {
+            auto pipeline = makePipeline(opCtx, MongoProcessInterface::create(opCtx));
+            _pipeline = pipeline->getContext()
+                            ->mongoProcessInterface->attachCursorSourceToPipelineForLocalRead(
+                                pipeline.release());
+        }
+
+        auto batch = _fillBatch(*_pipeline);
+
+        if (batch.empty()) {
+            _pipeline.reset();
+        } else {
+            const auto& lastEntryInBatch = batch.back();
+            _resumeToken = getId(lastEntryInBatch);
+
+            if (isFinalOplog(lastEntryInBatch)) {
+                _hasSeenFinalOplogEntry = true;
+                // Skip returning the final oplog entry because it is known to be a no-op.
+                batch.pop_back();
+                _pipeline.reset();
+            } else {
+                _pipeline->detachFromOperationContext();
+            }
+        }
+
+        return batch;
     });
 
-    auto next = _pipeline->getNext();
-
-    if (!next) {
-        _pipeline.reset();
-        return _waitForNewOplog().then([this, opCtx] { return getNext(opCtx); });
+    if (batch.empty() && !_hasSeenFinalOplogEntry) {
+        return ExecutorFuture(executor)
+            .then([this] { return _insertNotifier->awaitInsert(_resumeToken); })
+            .then([this, executor] { return getNextBatch(std::move(executor)); });
     }
 
-    auto nextOplog = uassertStatusOK(repl::OplogEntry::parse(next->toBson()));
-    if (isFinalOplog(nextOplog)) {
-        _hasSeenFinalOplogEntry = true;
-        _pipeline.reset();
-        return Future<boost::optional<repl::OplogEntry>>::makeReady(oplogToReturn);
-    }
-
-    _resumeToken = getId(nextOplog);
-
-    oplogToReturn = std::move(nextOplog);
-    return Future<boost::optional<repl::OplogEntry>>::makeReady(std::move(oplogToReturn));
-}
-
-bool ReshardingDonorOplogIterator::hasMore() const {
-    return !_hasSeenFinalOplogEntry;
-}
-
-Future<void> ReshardingDonorOplogIterator::_waitForNewOplog() {
-    return _insertNotifier->awaitInsert(*_resumeToken);
-}
-
-boost::intrusive_ptr<ExpressionContext> ReshardingDonorOplogIterator::_makeExpressionContext(
-    OperationContext* opCtx) {
-    StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
-    resolvedNamespaces.emplace(_oplogBufferNs.coll(),
-                               ExpressionContext::ResolvedNamespace{_oplogBufferNs, {}});
-
-    return make_intrusive<ExpressionContext>(opCtx,
-                                             boost::none /* explain */,
-                                             false /* fromMongos */,
-                                             false /* needsMerge */,
-                                             false /* allowDiskUse */,
-                                             false /* bypassDocumentValidation */,
-                                             false /* isMapReduceCommand */,
-                                             _oplogBufferNs,
-                                             boost::none /* runtimeConstants */,
-                                             nullptr /* collator */,
-                                             MongoProcessInterface::create(opCtx),
-                                             std::move(resolvedNamespaces),
-                                             boost::none /* collUUID */);
+    return ExecutorFuture(std::move(executor), std::move(batch));
 }
 
 }  // namespace mongo

@@ -47,7 +47,6 @@
 
 namespace mongo {
 
-constexpr auto kReshardingOplogPrePostImageOps = "prePostImageOps"_sd;
 constexpr auto kReshardFinalOpLogType = "reshardFinalOp"_sd;
 
 /**
@@ -189,19 +188,6 @@ void checkForOverlappingZones(std::vector<TagsType>& zones);
  */
 void validateZones(const std::vector<mongo::BSONObj>& zones,
                    const std::vector<TagsType>& authoritativeTags);
-
-/**
- * Create pipeline stages for iterating the buffered copy of the donor oplog and link together the
- * oplog entries with their preImage/postImage oplog. Note that caller is responsible for making
- * sure that the donorOplogNS is properly resolved and ns is set in the expCtx.
- *
- * If doAttachDocumentCursor is false, the caller will need to manually set the initial stage of the
- * pipeline with a source. This is mostly useful for testing.
- */
-std::unique_ptr<Pipeline, PipelineDeleter> createAggForReshardingOplogBuffer(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const boost::optional<ReshardingDonorOplogId>& resumeToken,
-    bool doAttachDocumentCursor);
 
 /**
  * Creates a view on the oplog that facilitates the specialized oplog tailing a resharding
