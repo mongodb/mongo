@@ -389,10 +389,12 @@ DBClientBase* DBConnectionPool::_finishCreate(const string& ident,
 
 DBClientBase* DBConnectionPool::get(const ConnectionString& url, double socketTimeout) {
     auto connect = [&]() {
-        string errmsg;
-        auto c = url.connect(StringData(), errmsg, socketTimeout).release();
-        uassert(13328, _name + ": connect failed " + url.toString() + " : " + errmsg, c);
-        return c;
+        auto c = url.connect(StringData(), socketTimeout);
+        uassert(13328,
+                fmt::format(
+                    "{}: connect failed {} : {}", _name, url.toString(), c.getStatus().reason()),
+                c.isOK());
+        return c.getValue().release();
     };
 
     return Detail::get(this, url.toString(), socketTimeout, connect);
@@ -402,15 +404,14 @@ DBClientBase* DBConnectionPool::get(const string& host, double socketTimeout) {
     auto connect = [&] {
         const ConnectionString cs(uassertStatusOK(ConnectionString::parse(host)));
 
-        string errmsg;
-        auto c = cs.connect(StringData(), errmsg, socketTimeout).release();
-        if (!c) {
+        auto swConn = cs.connect(StringData(), socketTimeout);
+        if (!swConn.isOK()) {
             throwSocketError(SocketErrorKind::CONNECT_ERROR,
                              host,
-                             str::stream() << _name << " error: " << errmsg);
+                             fmt::format("{} error: {}", _name, swConn.getStatus().reason()));
         }
 
-        return c;
+        return swConn.getValue().release();
     };
 
     return Detail::get(this, host, socketTimeout, connect);
@@ -420,7 +421,7 @@ DBClientBase* DBConnectionPool::get(const MongoURI& uri, double socketTimeout) {
     auto connect = [&] {
         string errmsg;
         std::unique_ptr<DBClientBase> c(uri.connect(uri.getAppName().get(), errmsg, socketTimeout));
-        uassert(40356, _name + ": connect failed " + uri.toString() + " : " + errmsg, c);
+        uassert(40356, fmt::format("{}: connect failed {} : {}", _name, uri.toString(), errmsg), c);
         return c.release();
     };
 

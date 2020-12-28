@@ -146,9 +146,8 @@ public:
     bool operator==(const ConnectionString& other) const;
     bool operator!=(const ConnectionString& other) const;
 
-    std::unique_ptr<DBClientBase> connect(
+    StatusWith<std::unique_ptr<DBClientBase>> connect(
         StringData applicationName,
-        std::string& errmsg,
         double socketTimeout = 0,
         const MongoURI* uri = nullptr,
         const ClientAPIVersionParameters* apiParameters = nullptr,

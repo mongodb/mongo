@@ -424,9 +424,15 @@ Status DBClientConnection::connectSocketOnly(
         _socketTimeout.value_or(Milliseconds{5000}),
         transientSSLParams);
     if (!sws.isOK()) {
-        return Status(ErrorCodes::HostUnreachable,
+        auto connectStatus = sws.getStatus();
+        // InvalidSSLConfiguration error needs to be propagated up since it is not a retriable
+        // error.
+        auto code = connectStatus == ErrorCodes::InvalidSSLConfiguration
+            ? ErrorCodes::InvalidSSLConfiguration
+            : ErrorCodes::HostUnreachable;
+        return Status(code,
                       str::stream() << "couldn't connect to server " << _serverAddress.toString()
-                                    << ", connection attempt failed: " << sws.getStatus());
+                                    << ", connection attempt failed: " << connectStatus);
     }
 
     {
