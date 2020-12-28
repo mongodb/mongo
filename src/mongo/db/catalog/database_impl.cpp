@@ -404,7 +404,7 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
         _dropCollectionIndexes(opCtx, nss, collection.getWritableCollection());
         opObserver->onDropCollection(
             opCtx, nss, uuid, numRecords, OpObserver::CollectionDropType::kOnePhase);
-        return _finishDropCollection(opCtx, nss, collection.get());
+        return _finishDropCollection(opCtx, nss, collection.getWritableCollection());
     }
 
     // Replicated collections should be dropped in two phases.
@@ -441,7 +441,7 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
                       str::stream() << "OpTime is not null. OpTime: " << opTime.toString());
         }
 
-        return _finishDropCollection(opCtx, nss, collection.get());
+        return _finishDropCollection(opCtx, nss, collection.getWritableCollection());
     }
 
     // Old two-phase drop: Replicated collections will be renamed with a special drop-pending
@@ -501,7 +501,7 @@ void DatabaseImpl::_dropCollectionIndexes(OperationContext* opCtx,
 
 Status DatabaseImpl::_finishDropCollection(OperationContext* opCtx,
                                            const NamespaceString& nss,
-                                           const CollectionPtr& collection) const {
+                                           Collection* collection) const {
     UUID uuid = collection->uuid();
     LOGV2(20318,
           "Finishing collection drop for {namespace} ({uuid}).",
@@ -514,12 +514,8 @@ Status DatabaseImpl::_finishDropCollection(OperationContext* opCtx,
     if (!status.isOK())
         return status;
 
-    std::shared_ptr<Collection> removedColl;
-    CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
-        removedColl = catalog.deregisterCollection(opCtx, uuid);
-    });
-    opCtx->recoveryUnit()->registerChange(
-        CollectionCatalog::makeFinishDropCollectionChange(opCtx, std::move(removedColl), uuid));
+    CollectionCatalog::get(opCtx)->dropCollection(opCtx, collection);
+
 
     return Status::OK();
 }
@@ -567,6 +563,13 @@ Status DatabaseImpl::renameCollection(OperationContext* opCtx,
 
     CollectionCatalog::get(opCtx)->setCollectionNamespace(
         opCtx, writableCollection, fromNss, toNss);
+
+    opCtx->recoveryUnit()->onCommit([writableCollection](boost::optional<Timestamp> commitTime) {
+        // Ban reading from this collection on committed reads on snapshots before now.
+        if (commitTime) {
+            writableCollection->setMinimumVisibleSnapshot(commitTime.get());
+        }
+    });
 
     return status;
 }

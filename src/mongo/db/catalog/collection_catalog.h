@@ -161,23 +161,29 @@ public:
                                 const NamespaceString& fromCollection,
                                 const NamespaceString& toCollection) const;
 
+    /**
+     * Marks a collection as dropped for this OperationContext. Will cause the collection
+     * to appear dropped for this OperationContext. The drop will be committed into the catalog on
+     * commit.
+     *
+     * Must be called within a WriteUnitOfWork.
+     */
+    void dropCollection(OperationContext* opCtx, Collection* coll) const;
+    void dropCollection(OperationContext* opCtx, const CollectionPtr& coll) const;
+
     void onCloseDatabase(OperationContext* opCtx, std::string dbName);
 
     /**
      * Register the collection with `uuid`.
      */
-    void registerCollection(CollectionUUID uuid, std::shared_ptr<Collection> collection);
+    void registerCollection(OperationContext* opCtx,
+                            CollectionUUID uuid,
+                            std::shared_ptr<Collection> collection);
 
     /**
      * Deregister the collection.
      */
     std::shared_ptr<Collection> deregisterCollection(OperationContext* opCtx, CollectionUUID uuid);
-
-    /**
-     * Returns the RecoveryUnit's Change for dropping the collection
-     */
-    static std::unique_ptr<RecoveryUnit::Change> makeFinishDropCollectionChange(
-        OperationContext* opCtx, std::shared_ptr<Collection>, CollectionUUID uuid);
 
     /**
      * Deregister all the collection objects.
@@ -355,20 +361,9 @@ public:
 
 private:
     friend class CollectionCatalog::iterator;
-    class PublishWritableCollection;
+    class PublishCatalogUpdates;
 
     std::shared_ptr<Collection> _lookupCollectionByUUID(CollectionUUID uuid) const;
-
-    /**
-     * Helper to commit a cloned Collection into the catalog. It takes a vector of commit handlers
-     * that are executed in the same critical section that is used to install the Collection into
-     * the catalog.
-     */
-    void _commitWritableClone(
-        std::shared_ptr<Collection> cloned,
-        boost::optional<Timestamp> commitTime,
-        const std::vector<std::function<void(CollectionCatalog&, boost::optional<Timestamp>)>>&
-            commitHandlers);
 
     /**
      * When present, indicates that the catalog is in closed state, and contains a map from UUID

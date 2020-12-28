@@ -71,7 +71,7 @@ public:
         }
         std::shared_ptr<Collection> coll = std::make_shared<CollectionMock>(ns, catalogId);
         CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
-            catalog.registerCollection(options.uuid.get(), std::move(coll));
+            catalog.registerCollection(opCtx, options.uuid.get(), std::move(coll));
         });
 
         return {{_storageEngine->getCatalog()->getEntry(catalogId)}};

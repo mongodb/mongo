@@ -288,7 +288,7 @@ void StorageEngineImpl::_initCollection(OperationContext* opCtx,
     auto collection = collectionFactory->make(opCtx, nss, catalogId, uuid, std::move(rs));
 
     CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
-        catalog.registerCollection(uuid, std::move(collection));
+        catalog.registerCollection(opCtx, uuid, std::move(collection));
     });
 }
 
@@ -779,12 +779,7 @@ Status StorageEngineImpl::_dropCollectionsNoTimestamp(OperationContext* opCtx,
             firstError = result;
         }
 
-        std::shared_ptr<Collection> removedColl;
-        CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
-            removedColl = catalog.deregisterCollection(opCtx, coll->uuid());
-        });
-        opCtx->recoveryUnit()->registerChange(CollectionCatalog::makeFinishDropCollectionChange(
-            opCtx, std::move(removedColl), coll->uuid()));
+        CollectionCatalog::get(opCtx)->dropCollection(opCtx, coll);
     }
 
     untimestampedDropWuow.commit();
