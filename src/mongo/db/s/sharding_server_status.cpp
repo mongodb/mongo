@@ -33,6 +33,7 @@
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/s/active_migrations_registry.h"
 #include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_statistics.h"
 #include "mongo/s/balancer_configuration.h"
@@ -102,17 +103,20 @@ public:
         if (!isClusterNode())
             return {};
 
-        auto const shardingState = ShardingState::get(opCtx);
-        if (!shardingState->enabled())
-            return {};
-
-        auto const grid = Grid::get(opCtx);
-        auto const catalogCache = grid->catalogCache();
-
         BSONObjBuilder result;
-        ShardingStatistics::get(opCtx).report(&result);
-        catalogCache->report(&result);
-        CollectionShardingState::appendInfoForServerStatus(opCtx, &result);
+        if (auto const shardingState = ShardingState::get(opCtx); shardingState->enabled()) {
+            auto const grid = Grid::get(opCtx);
+            auto const catalogCache = grid->catalogCache();
+
+            ShardingStatistics::get(opCtx).report(&result);
+            catalogCache->report(&result);
+            CollectionShardingState::appendInfoForServerStatus(opCtx, &result);
+        }
+
+        {
+            BSONObjBuilder subObjBuilder(result.subobjStart("resharding"));
+            ReshardingMetrics::get(opCtx->getServiceContext())->serialize(&subObjBuilder);
+        }
 
         return result.obj();
     }
