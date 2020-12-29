@@ -644,8 +644,6 @@ public:
                 exec->detachFromOperationContext();
 
                 cursorPin->setLeftoverMaxTimeMicros(opCtx->getRemainingMaxTimeMicros());
-                cursorPin->incNReturnedSoFar(numResults);
-                cursorPin->incNBatches();
 
                 if (opCtx->isExhaust() && !clientsLastKnownCommittedOpTime(opCtx).isNull()) {
                     // Set the commit point of the latest batch.
@@ -662,6 +660,8 @@ public:
             // documents.
             auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
             metricsCollector.incrementDocUnitsReturned(docUnitsReturned);
+            cursorPin->incNReturnedSoFar(numResults);
+            cursorPin->incNBatches();
 
             // Ensure log and profiler include the number of results returned in this getMore's
             // response batch.

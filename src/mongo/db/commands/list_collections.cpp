@@ -436,6 +436,9 @@ public:
              uassertStatusOK(AuthorizationSession::get(opCtx->getClient())
                                  ->checkAuthorizedToListCollections(dbname, jsobj))});
 
+        pinnedCursor->incNBatches();
+        pinnedCursor->incNReturnedSoFar(firstBatch.size());
+
         appendListCollectionsCursorReply(
             pinnedCursor.getCursor()->cursorid(), cursorNss, std::move(firstBatch), result);
         return true;

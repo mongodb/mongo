@@ -240,7 +240,7 @@ public:
         }  // Drop collection lock. Global cursor registration must be done without holding any
            // locks.
 
-        const auto pinnedCursor = CursorManager::get(opCtx)->registerCursor(
+        auto pinnedCursor = CursorManager::get(opCtx)->registerCursor(
             opCtx,
             {std::move(exec),
              nss,
@@ -250,6 +250,9 @@ public:
              repl::ReadConcernArgs::get(opCtx),
              cmdObj,
              {Privilege(ResourcePattern::forExactNamespace(nss), ActionType::listIndexes)}});
+
+        pinnedCursor->incNBatches();
+        pinnedCursor->incNReturnedSoFar(firstBatch.size());
 
         appendListIndexesCursorReply(
             pinnedCursor.getCursor()->cursorid(), nss, std::move(firstBatch), result);

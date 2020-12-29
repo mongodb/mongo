@@ -65,6 +65,8 @@ static Counter64 cursorStatsOpen;           // gauge
 static Counter64 cursorStatsOpenPinned;     // gauge
 static Counter64 cursorStatsOpenNoTimeout;  // gauge
 static Counter64 cursorStatsTimedOut;
+static Counter64 cursorStatsTotalOpened;
+static Counter64 cursorStatsMoreThanOneBatch;
 
 static ServerStatusMetricField<Counter64> dCursorStatsOpen("cursor.open.total", &cursorStatsOpen);
 static ServerStatusMetricField<Counter64> dCursorStatsOpenPinned("cursor.open.pinned",
@@ -73,6 +75,10 @@ static ServerStatusMetricField<Counter64> dCursorStatsOpenNoTimeout("cursor.open
                                                                     &cursorStatsOpenNoTimeout);
 static ServerStatusMetricField<Counter64> dCursorStatusTimedout("cursor.timedOut",
                                                                 &cursorStatsTimedOut);
+static ServerStatusMetricField<Counter64> dCursorStatsTotalOpened("cursor.totalOpened",
+                                                                  &cursorStatsTotalOpened);
+static ServerStatusMetricField<Counter64> dCursorStatsMoreThanOneBatch(
+    "cursor.moreThanOneBatch", &cursorStatsMoreThanOneBatch);
 
 ClientCursor::ClientCursor(ClientCursorParams params,
                            CursorId cursorId,
@@ -99,6 +105,7 @@ ClientCursor::ClientCursor(ClientCursorParams params,
     invariant(_operationUsingCursor);
 
     cursorStatsOpen.increment();
+    cursorStatsTotalOpened.increment();
 
     if (isNoTimeout()) {
         // cursors normally timeout after an inactivity period to prevent excess memory use
@@ -116,6 +123,9 @@ ClientCursor::~ClientCursor() {
     if (isNoTimeout()) {
         cursorStatsOpenNoTimeout.decrement();
     }
+
+    if (_nBatchesReturned > 1)
+        cursorStatsMoreThanOneBatch.increment();
 }
 
 void ClientCursor::markAsKilled(Status killStatus) {
