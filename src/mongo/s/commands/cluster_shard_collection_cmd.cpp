@@ -71,9 +71,7 @@ void createCollection(OperationContext* opCtx,
 
     ShardId shardId;
     if (nss.db() == NamespaceString::kConfigDb) {
-        std::vector<ShardId> shardIds;
-        auto shardRegistry = Grid::get(opCtx)->shardRegistry();
-        shardRegistry->getAllShardIds(opCtx, &shardIds);
+        const auto shardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
         uassert(ErrorCodes::IllegalOperation, "there are no shards to target", !shardIds.empty());
         shardId = shardIds[0];
     } else {

@@ -162,8 +162,7 @@ public:
         _dropDatabaseFromShard(opCtx, dbType.getPrimary(), dbname);
 
         // Drop the database from each of the remaining shards.
-        std::vector<ShardId> allShardIds;
-        Grid::get(opCtx)->shardRegistry()->getAllShardIdsNoReload(&allShardIds);
+        const auto allShardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIdsNoReload();
         for (const ShardId& shardId : allShardIds) {
             _dropDatabaseFromShard(opCtx, shardId, dbname);
         }

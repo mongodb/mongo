@@ -125,8 +125,7 @@ CreateCollectionResponse createCollectionLegacy(OperationContext* opCtx,
         // chunks in total to limit the amount of memory this command consumes so there is less
         // danger of an OOM error.
 
-        std::vector<ShardId> shardIds;
-        Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx, &shardIds);
+        const auto shardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
         const int maxNumInitialChunksForShards = shardIds.size() * 8192;
         const int maxNumInitialChunksTotal = 1000 * 1000;  // Arbitrary limit to memory consumption
         int numChunks = optNumInitialChunks.value();

@@ -122,8 +122,7 @@ public:
         std::map<std::string, long long> sizes;
         std::map<std::string, std::unique_ptr<BSONObjBuilder>> dbShardInfo;
 
-        std::vector<ShardId> shardIds;
-        shardRegistry->getAllShardIdsNoReload(&shardIds);
+        auto shardIds = shardRegistry->getAllShardIdsNoReload();
         shardIds.emplace_back(ShardId::kConfigServerId);
 
         // { filter: matchExpression }.

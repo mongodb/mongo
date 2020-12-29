@@ -60,11 +60,9 @@ const ReadPreferenceSetting kConfigReadSelector(ReadPreference::Nearest, TagSet{
  * shards. Will return ShardNotFound if shard could not be found.
  */
 ShardId selectShardForNewDatabase(OperationContext* opCtx, ShardRegistry* shardRegistry) {
-    std::vector<ShardId> allShardIds;
-
     // Ensure the shard registry contains the most up-to-date list of available shards
     shardRegistry->reload(opCtx);
-    shardRegistry->getAllShardIds(opCtx, &allShardIds);
+    const auto allShardIds = shardRegistry->getAllShardIds(opCtx);
     uassert(ErrorCodes::ShardNotFound, "No shards found", !allShardIds.empty());
 
     ShardId candidateShardId = allShardIds[0];

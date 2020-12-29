@@ -53,8 +53,7 @@ namespace {
 std::vector<HostAndPort> getAllClusterHosts(OperationContext* opCtx) {
     auto registry = Grid::get(opCtx)->shardRegistry();
 
-    std::vector<ShardId> shardIds;
-    registry->getAllShardIds(opCtx, &shardIds);
+    const auto shardIds = registry->getAllShardIds(opCtx);
 
     std::vector<HostAndPort> servers;
     for (const auto& shardId : shardIds) {

@@ -111,14 +111,14 @@ public:
     std::shared_ptr<Shard> findByHostAndPort(const HostAndPort&) const;
 
     /**
-     * Returns the set of all known shard ids.
+     * Returns an unsorted vector of all known shard ids.
      */
-    void getAllShardIds(std::set<ShardId>& result) const;
+    std::vector<ShardId> getAllShardIds() const;
 
     /**
-     * Returns the set of all known shard objects.
+     * Returns an unsorted vector of all known shard objects.
      */
-    void getAllShards(std::vector<std::shared_ptr<Shard>>& result) const;
+    std::vector<std::shared_ptr<Shard>> getAllShards() const;
 
     void toBSON(BSONObjBuilder* result) const;
     void toBSON(BSONObjBuilder* map, BSONObjBuilder* hosts, BSONObjBuilder* connStrings) const;
@@ -238,9 +238,9 @@ public:
     StatusWith<std::shared_ptr<Shard>> getShard(OperationContext* opCtx, const ShardId& shardId);
 
     /**
-     * Populates all known shard ids into the given vector.
+     * Return a sorted vector containing all known shard ids.
      */
-    void getAllShardIds(OperationContext* opCtx, std::vector<ShardId>* all);
+    std::vector<ShardId> getAllShardIds(OperationContext* opCtx);
 
     /**
      * Returns the number of shards.
@@ -314,7 +314,7 @@ public:
      */
     std::shared_ptr<Shard> getShardForHostNoReload(const HostAndPort& shardHost) const;
 
-    void getAllShardIdsNoReload(std::vector<ShardId>* all) const;
+    std::vector<ShardId> getAllShardIdsNoReload() const;
 
     int getNumShardsNoReload() const;
 

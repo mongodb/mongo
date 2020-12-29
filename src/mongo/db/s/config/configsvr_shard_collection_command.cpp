@@ -269,8 +269,7 @@ public:
         auto proposedKey(request.getKey().getOwned());
         ShardKeyPattern shardKeyPattern(proposedKey);
 
-        std::vector<ShardId> shardIds;
-        shardRegistry->getAllShardIds(opCtx, &shardIds);
+        const auto shardIds = shardRegistry->getAllShardIds(opCtx);
         uassert(ErrorCodes::IllegalOperation,
                 "cannot shard collections before there are shards",
                 !shardIds.empty());

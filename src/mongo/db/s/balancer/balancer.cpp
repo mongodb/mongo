@@ -525,8 +525,7 @@ void Balancer::_sleepFor(OperationContext* opCtx, Milliseconds waitTimeout) {
 bool Balancer::_checkOIDs(OperationContext* opCtx) {
     auto shardingContext = Grid::get(opCtx);
 
-    vector<ShardId> all;
-    shardingContext->shardRegistry()->getAllShardIdsNoReload(&all);
+    const auto all = shardingContext->shardRegistry()->getAllShardIdsNoReload();
 
     // map of OID machine ID => shardId
     map<int, ShardId> oids;

@@ -337,11 +337,8 @@ InitialSplitPolicy::ShardCollectionConfig UnoptimizedSplitPolicy::createFirstChu
 InitialSplitPolicy::ShardCollectionConfig SplitPointsBasedSplitPolicy::createFirstChunks(
     OperationContext* opCtx, const ShardKeyPattern& shardKeyPattern, SplitPolicyParams params) {
 
-    const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
-
     // On which shards are the generated chunks allowed to be placed.
-    std::vector<ShardId> shardIds;
-    shardRegistry->getAllShardIdsNoReload(&shardIds);
+    const auto shardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIdsNoReload();
 
     const auto currentTime = VectorClock::get(opCtx)->getTime();
     return generateShardCollectionInitialChunks(params,
@@ -373,10 +370,7 @@ InitialSplitPolicy::ShardCollectionConfig AbstractTagsBasedSplitPolicy::createFi
     OperationContext* opCtx, const ShardKeyPattern& shardKeyPattern, SplitPolicyParams params) {
     invariant(!_tags.empty());
 
-    const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
-
-    std::vector<ShardId> shardIds;
-    shardRegistry->getAllShardIdsNoReload(&shardIds);
+    const auto shardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIdsNoReload();
     const auto currentTime = VectorClock::get(opCtx)->getTime();
     const auto validAfter = currentTime.clusterTime().asTimestamp();
     const auto& keyPattern = shardKeyPattern.getKeyPattern();

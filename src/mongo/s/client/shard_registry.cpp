@@ -349,23 +349,19 @@ StatusWith<std::shared_ptr<Shard>> ShardRegistry::getShard(OperationContext* opC
     return {ErrorCodes::ShardNotFound, str::stream() << "Shard " << shardId << " not found"};
 }
 
-void ShardRegistry::getAllShardIds(OperationContext* opCtx, std::vector<ShardId>* all) {
-    std::set<ShardId> seen;
-    auto data = _getData(opCtx);
-    data->getAllShardIds(seen);
-    if (seen.empty()) {
+std::vector<ShardId> ShardRegistry::getAllShardIds(OperationContext* opCtx) {
+    auto shardIds = _getData(opCtx)->getAllShardIds();
+    if (shardIds.empty()) {
         reload(opCtx);
-        data = _getData(opCtx);
-        data->getAllShardIds(seen);
+        shardIds = _getData(opCtx)->getAllShardIds();
     }
-    all->assign(seen.begin(), seen.end());
+    // Many logic in the codebase rely on this vector to be sorted.
+    std::sort(shardIds.begin(), shardIds.end());
+    return shardIds;
 }
 
 int ShardRegistry::getNumShards(OperationContext* opCtx) {
-    std::set<ShardId> seen;
-    auto data = _getData(opCtx);
-    data->getAllShardIds(seen);
-    return seen.size();
+    return _getData(opCtx)->getAllShardIds().size();
 }
 
 std::pair<std::vector<ShardRegistry::LatestConnStrings::value_type>, ShardRegistry::Increment>
@@ -581,18 +577,15 @@ std::shared_ptr<Shard> ShardRegistry::getShardForHostNoReload(const HostAndPort&
     return data->findByHostAndPort(host);
 }
 
-void ShardRegistry::getAllShardIdsNoReload(std::vector<ShardId>* all) const {
-    std::set<ShardId> seen;
-    auto data = _getCachedData();
-    data->getAllShardIds(seen);
-    all->assign(seen.begin(), seen.end());
+std::vector<ShardId> ShardRegistry::getAllShardIdsNoReload() const {
+    auto shardIds = _getCachedData()->getAllShardIds();
+    // Many logic in the codebase rely on this vector to be sorted.
+    std::sort(shardIds.begin(), shardIds.end());
+    return shardIds;
 }
 
 int ShardRegistry::getNumShardsNoReload() const {
-    std::set<ShardId> seen;
-    auto data = _getCachedData();
-    data->getAllShardIds(seen);
-    return seen.size();
+    return _getCachedData()->getAllShardIds().size();
 }
 
 std::shared_ptr<Shard> ShardRegistry::_getShardForRSNameNoReload(const std::string& name) const {
@@ -775,21 +768,23 @@ std::shared_ptr<Shard> ShardRegistryData::findShard(const ShardId& shardId) cons
     return nullptr;
 }
 
-void ShardRegistryData::getAllShards(std::vector<std::shared_ptr<Shard>>& result) const {
+std::vector<std::shared_ptr<Shard>> ShardRegistryData::getAllShards() const {
+    std::vector<std::shared_ptr<Shard>> result;
     result.reserve(_shardIdLookup.size());
     for (auto&& shard : _shardIdLookup) {
         result.emplace_back(shard.second);
     }
+    return result;
 }
 
-void ShardRegistryData::getAllShardIds(std::set<ShardId>& seen) const {
-    for (auto i = _shardIdLookup.begin(); i != _shardIdLookup.end(); ++i) {
-        const auto& s = i->second;
-        if (s->getId().toString() == "config") {
-            continue;
-        }
-        seen.insert(s->getId());
-    }
+std::vector<ShardId> ShardRegistryData::getAllShardIds() const {
+    std::vector<ShardId> shardIds;
+    shardIds.reserve(_shardIdLookup.size());
+    std::transform(_shardIdLookup.begin(),
+                   _shardIdLookup.end(),
+                   std::back_inserter(shardIds),
+                   [](const auto& shard) { return shard.second->getId(); });
+    return shardIds;
 }
 
 void ShardRegistryData::_addShard(std::shared_ptr<Shard> shard) {
@@ -833,8 +828,7 @@ void ShardRegistryData::_addShard(std::shared_ptr<Shard> shard) {
 void ShardRegistryData::toBSON(BSONObjBuilder* map,
                                BSONObjBuilder* hosts,
                                BSONObjBuilder* connStrings) const {
-    std::vector<std::shared_ptr<Shard>> shards;
-    getAllShards(shards);
+    auto shards = getAllShards();
 
     std::sort(std::begin(shards),
               std::end(shards),
@@ -862,8 +856,7 @@ void ShardRegistryData::toBSON(BSONObjBuilder* map,
 }
 
 void ShardRegistryData::toBSON(BSONObjBuilder* result) const {
-    std::vector<std::shared_ptr<Shard>> shards;
-    getAllShards(shards);
+    auto shards = getAllShards();
 
     std::sort(std::begin(shards),
               std::end(shards),

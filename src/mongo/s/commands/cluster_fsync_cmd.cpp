@@ -82,8 +82,7 @@ public:
         bool ok = true;
 
         auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
-        std::vector<ShardId> shardIds;
-        shardRegistry->getAllShardIdsNoReload(&shardIds);
+        const auto shardIds = shardRegistry->getAllShardIdsNoReload();
 
         for (const ShardId& shardId : shardIds) {
             auto shardStatus = shardRegistry->getShard(opCtx, shardId);

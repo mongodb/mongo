@@ -330,10 +330,7 @@ bool checkIfCollectionIsEmpty(OperationContext* opCtx, const NamespaceString& ns
 int getNumShards(OperationContext* opCtx) {
     const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
     shardRegistry->reload(opCtx);
-
-    std::vector<ShardId> shardIds;
-    shardRegistry->getAllShardIds(opCtx, &shardIds);
-    return shardIds.size();
+    return shardRegistry->getAllShardIds(opCtx).size();
 }
 
 ShardCollectionTargetState calculateTargetState(OperationContext* opCtx,
