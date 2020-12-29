@@ -184,20 +184,36 @@ TenantMigrationRecipientService::Instance::Instance(
       _donorConnectionString(_stateDoc.getDonorConnectionString().toString()),
       _readPreference(_stateDoc.getReadPreference()) {}
 
-// TODO(SERVER-50974) Extend this basic implementation.
 boost::optional<BSONObj> TenantMigrationRecipientService::Instance::reportForCurrentOp(
     MongoProcessInterface::CurrentOpConnectionsMode connMode,
     MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept {
 
     BSONObjBuilder bob;
+
+    stdx::lock_guard lk(_mutex);
     bob.append("desc", "tenant recipient migration");
-    bob.append("migrationCompleted", _taskCompletionPromise.getFuture().isReady());
     bob.append("instanceID", _stateDoc.getId().toBSON());
     bob.append("tenantId", _stateDoc.getTenantId());
+    bob.append("donorConnectionString", _stateDoc.getDonorConnectionString());
     bob.append("readPreference", _stateDoc.getReadPreference().toInnerBSON());
-    if (_stateDoc.getExpireAt()) {
+    bob.append("state", _stateDoc.getState());
+    bob.append("dataSyncCompleted", _dataSyncCompletionPromise.getFuture().isReady());
+    bob.append("migrationCompleted", _taskCompletionPromise.getFuture().isReady());
+
+    if (_stateDoc.getStartFetchingDonorOpTime())
+        bob.append("startFetchingDonorOpTime", _stateDoc.getStartFetchingDonorOpTime()->toBSON());
+    if (_stateDoc.getStartApplyingDonorOpTime())
+        bob.append("startApplyingDonorOpTime", _stateDoc.getStartApplyingDonorOpTime()->toBSON());
+    if (_stateDoc.getDataConsistentStopDonorOpTime())
+        bob.append("dataConsistentStopDonorOpTime",
+                   _stateDoc.getDataConsistentStopDonorOpTime()->toBSON());
+    if (_stateDoc.getCloneFinishedRecipientOpTime())
+        bob.append("cloneFinishedRecipientOpTime",
+                   _stateDoc.getCloneFinishedRecipientOpTime()->toBSON());
+
+    if (_stateDoc.getExpireAt())
         bob.append("expireAt", _stateDoc.getExpireAt()->toString());
-    }
+
     return bob.obj();
 }
 
@@ -1010,7 +1026,6 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancelationToken& token) noexcept {
     _scopedExecutor = executor;
-    pauseBeforeRunTenantMigrationRecipientInstance.pauseWhileSet();
 
     LOGV2(4879607,
           "Starting tenant migration recipient instance: ",
@@ -1018,6 +1033,8 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
           "tenantId"_attr = getTenantId(),
           "connectionString"_attr = _donorConnectionString,
           "readPreference"_attr = _readPreference);
+
+    pauseBeforeRunTenantMigrationRecipientInstance.pauseWhileSet();
 
     return ExecutorFuture(**executor)
         .then([this, self = shared_from_this()] {

@@ -6,8 +6,8 @@
 (function() {
 
 "use strict";
+load("jstests/libs/fail_point_util.js");
 load("jstests/libs/parallel_shell_helpers.js");
-load("jstests/libs/curop_helpers.js");  // for waitForCurOpByFailPoint().
 load("jstests/replsets/libs/tenant_migration_util.js");
 
 var rst =
@@ -23,7 +23,6 @@ if (!TenantMigrationUtil.isFeatureFlagEnabled(rst.getPrimary())) {
 const primary = rst.getPrimary();
 const configDB = primary.getDB("config");
 const tenantMigrationRecipientStateColl = configDB["tenantMigrationRecipients"];
-const tenantMigrationRecipientStateCollNss = tenantMigrationRecipientStateColl.getFullName();
 
 const tenantId = "test";
 const connectionString = "foo/bar:12345";
@@ -74,13 +73,12 @@ assert.commandWorked(primary.adminCommand({
 }));
 
 {
-    // Enable the failpoint before inserting the state document by upsert command.
-    assert.commandWorked(primary.adminCommand(
-        {configureFailPoint: "hangBeforeUpsertPerformsInsert", mode: "alwaysOn"}));
+    // Enable failPoint to pause the migration just as it starts.
+    const fpPauseBeforeRunTenantMigrationRecipientInstance =
+        configureFailPoint(primary, "pauseBeforeRunTenantMigrationRecipientInstance");
 
     // Sanity check : 'config.tenantMigrationRecipients' collection count should be empty.
     checkTenantMigrationRecipientStateCollCount(0);
-
     // Start the  conflicting recipientSyncData cmds.
     const recipientSyncDataCmd1 = startParallelShell(
         funWithArgs(startRecipientSyncDataCmd, UUID(), tenantId, connectionString, readPreference),
@@ -89,23 +87,21 @@ assert.commandWorked(primary.adminCommand({
         funWithArgs(startRecipientSyncDataCmd, UUID(), tenantId, connectionString, readPreference),
         primary.port);
 
-    // Wait until both the conflicting instances got started.
-    checkLog.containsWithCount(primary, "Starting tenant migration recipient instance", 2);
+    jsTestLog("Waiting until both conflicting instances get started and hit the failPoint.");
+    assert.commandWorked(primary.adminCommand({
+        waitForFailPoint: "pauseBeforeRunTenantMigrationRecipientInstance",
+        timesEntered: fpPauseBeforeRunTenantMigrationRecipientInstance.timesEntered + 2,
+        maxTimeMS: kDefaultWaitForFailPointTimeout
+    }));
 
-    jsTestLog("Waiting for 'hangBeforeUpsertPerformsInsert' failpoint to reach");
-    waitForCurOpByFailPoint(
-        configDB, tenantMigrationRecipientStateCollNss, "hangBeforeUpsertPerformsInsert");
-
-    // These are the instances before the "insert" operation is attempted. The insert will fail
-    // after the failpoint is unblocked for one of the recipientSyncDataCmds. However, two instances
-    // will have been created at first.
+    // Two instances are expected as the tenantId conflict is still unresolved.
+    jsTestLog("Fetching current operations before conflict is resolved.");
     const currentOpEntriesBeforeInsert = getTenantMigrationRecipientCurrentOpEntries(
         primary, {desc: "tenant recipient migration", tenantId});
     assert.eq(2, currentOpEntriesBeforeInsert.length, tojson(currentOpEntriesBeforeInsert));
 
-    // Unblock the tenant migration instance from persisting the state doc.
-    assert.commandWorked(
-        primary.adminCommand({configureFailPoint: "hangBeforeUpsertPerformsInsert", mode: "off"}));
+    jsTestLog("Unblocking the tenant migration instance from persisting the state doc.");
+    fpPauseBeforeRunTenantMigrationRecipientInstance.off();
 
     // Wait for both the conflicting instances to complete. Although both will "complete", one will
     // return with ErrorCodes.ConflictingOperationInProgress, and the other with a
