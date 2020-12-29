@@ -133,7 +133,7 @@ var $config = (function() {
 
     return {
         threadCount: 50,
-        iterations: 50,
+        iterations: 10,
         states: states,
         transitions: transitions,
         setup: setup,

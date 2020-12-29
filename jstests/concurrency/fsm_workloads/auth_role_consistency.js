@@ -48,7 +48,7 @@ var $config = (function() {
 
     return {
         threadCount: 50,
-        iterations: 50,
+        iterations: 10,
         data: {},
         states: states,
         transitions: {init: {shuffle: 1}, shuffle: {shuffle: 1}},

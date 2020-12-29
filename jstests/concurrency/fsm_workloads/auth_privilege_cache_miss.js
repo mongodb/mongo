@@ -14,7 +14,7 @@ load('jstests/concurrency/fsm_workloads/auth_privilege_consistency.js');
 
 var $config = extendWorkload($config, function($config, $super) {
     // Override setup() to also set cache-miss and slow load failpoints.
-    const kResolveRolesDelayMS = 250;
+    const kResolveRolesDelayMS = 100;
 
     const originalSetup = $config.setup;
     $config.setup = function(db, collName, cluster) {
@@ -35,11 +35,6 @@ var $config = extendWorkload($config, function($config, $super) {
             }));
         });
     };
-
-    // That 250ms per auth delay makes this take too long on a loaded system.
-    // Pull the iteration count back to something manageable.
-    const kMinimumIterations = 10;
-    $config.iterations = Math.max(Math.floor($config.iterations / 3), kMinimumIterations);
 
     return $config;
 });
