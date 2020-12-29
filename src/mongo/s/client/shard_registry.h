@@ -274,14 +274,10 @@ public:
     void toBSON(BSONObjBuilder* result) const;
 
     /**
-     * Reloads the ShardRegistry based on the contents of the config server's config.shards
-     * collection. Returns true if this call performed a reload and false if this call only waited
-     * for another thread to perform the reload and did not actually reload. Because of this, it is
-     * possible that calling reload once may not result in the most up to date view. If strict
-     * reloading is required, the caller should call this method one more time if the first call
-     * returned false.
+     * Force a reload of the ShardRegistry based on the contents of the config server's
+     * config.shards collection.
      */
-    bool reload(OperationContext* opCtx);
+    void reload(OperationContext* opCtx);
 
     /**
      * Clears all entries from the shard registry entries, which will force the registry to do a

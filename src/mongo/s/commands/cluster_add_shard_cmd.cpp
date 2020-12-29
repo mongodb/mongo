@@ -90,9 +90,8 @@ public:
                 opCtx->getWriteConcern()),
             Shard::RetryPolicy::kIdempotent);
 
-        if (!Grid::get(opCtx)->shardRegistry()->reload(opCtx)) {
-            Grid::get(opCtx)->shardRegistry()->reload(opCtx);
-        }
+        Grid::get(opCtx)->shardRegistry()->reload(opCtx);
+
         auto cmdResponse = uassertStatusOK(cmdResponseWithStatus);
         CommandHelpers::filterCommandReplyForPassthrough(cmdResponse.response, &result);
         return true;

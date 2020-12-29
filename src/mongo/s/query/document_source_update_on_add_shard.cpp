@@ -98,15 +98,9 @@ void DocumentSourceUpdateOnAddShard::addNewShardCursors(const Document& newShard
 
 std::vector<RemoteCursor> DocumentSourceUpdateOnAddShard::establishShardCursorsOnNewShards(
     const Document& newShardDetectedObj) {
-    // Reload the shard registry. We need to ensure a reload initiated after calling this method
-    // caused the reload, otherwise we may not see the new shard, so we perform a "hard" reload.
+    // Reload the shard registry to see the new shard.
     auto* opCtx = pExpCtx->opCtx;
-    if (!Grid::get(opCtx)->shardRegistry()->reload(opCtx)) {
-        // A 'false' return from shardRegistry.reload() means a reload was already in progress and
-        // it completed before reload() returned. So another reload(), regardless of return value,
-        // will ensure a reload started after the first call to reload().
-        Grid::get(opCtx)->shardRegistry()->reload(opCtx);
-    }
+    Grid::get(opCtx)->shardRegistry()->reload(opCtx);
 
     // Parse the new shard's information from the document inserted into 'config.shards'.
     auto newShardSpec = newShardDetectedObj[DocumentSourceChangeStream::kFullDocumentField];

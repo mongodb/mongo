@@ -925,10 +925,7 @@ DispatchShardPipelineResults dispatchShardPipeline(
     const auto currentTime = VectorClock::get(opCtx)->getTime();
     auto shardRegistryReloadTime = currentTime.clusterTime().asTimestamp();
     if (hasChangeStream) {
-        auto* shardRegistry = Grid::get(opCtx)->shardRegistry();
-        if (!shardRegistry->reload(opCtx)) {
-            shardRegistry->reload(opCtx);
-        }
+        Grid::get(opCtx)->shardRegistry()->reload(opCtx);
         // Rebuild the set of shards as the shard registry might have changed.
         shardIds = getTargetedShards(
             expCtx, mustRunOnAll, executionNsRoutingInfo, shardQuery, collationObj);

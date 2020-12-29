@@ -459,15 +459,13 @@ void ShardRegistry::toBSON(BSONObjBuilder* result) const {
     result->append("connStrings", connStrings.obj());
 }
 
-bool ShardRegistry::reload(OperationContext* opCtx) {
+void ShardRegistry::reload(OperationContext* opCtx) {
     // Make the next acquire do a lookup.
     auto value = _forceReloadIncrement.addAndFetch(1);
     LOGV2_DEBUG(4620253, 2, "Forcing ShardRegistry reload", "newForceReloadIncrement"_attr = value);
 
     // Force it to actually happen now.
     _getData(opCtx);
-
-    return true;
 }
 
 void ShardRegistry::clearEntries() {
