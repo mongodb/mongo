@@ -32,6 +32,7 @@
 #include "mongo/db/pipeline/plan_explainer_pipeline.h"
 
 #include "mongo/db/pipeline/document_source_cursor.h"
+#include "mongo/db/pipeline/document_source_lookup.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/plan_executor_pipeline.h"
 #include "mongo/db/query/explain.h"
@@ -55,12 +56,18 @@ void PlanExplainerPipeline::getSummaryStats(PlanSummaryStats* statsOut) const {
     }
 
     for (auto&& source : _pipeline->getSources()) {
-        if (dynamic_cast<DocumentSourceSort*>(source.get()))
-            statsOut->hasSortStage = true;
-
         statsOut->usedDisk = statsOut->usedDisk || source->usedDisk();
-        if (statsOut->usedDisk && statsOut->hasSortStage)
-            break;
+
+        if (dynamic_cast<DocumentSourceSort*>(source.get())) {
+            statsOut->hasSortStage = true;
+        } else if (auto docSourceLookUp = dynamic_cast<DocumentSourceLookUp*>(source.get())) {
+            auto specificStats = docSourceLookUp->getSpecificStats();
+            invariant(specificStats);
+            auto lookupSpecificStats =
+                dynamic_cast<const DocumentSourceLookupStats*>(specificStats);
+            invariant(lookupSpecificStats);
+            statsOut->accumulate(lookupSpecificStats->planSummaryStats);
+        }
     }
 
     if (_nReturned) {

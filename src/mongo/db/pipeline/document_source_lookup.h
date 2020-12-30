@@ -115,6 +115,10 @@ public:
 
     bool usedDisk() final;
 
+    const SpecificStats* getSpecificStats() const final {
+        return &_stats;
+    }
+
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
@@ -267,7 +271,13 @@ private:
         _cache.emplace(maxCacheSizeBytes);
     }
 
-    bool _usedDisk = false;
+    /**
+     * Method to accumulate the plan summary stats from all stages of the pipeline.
+     */
+    void recordPlanSummaryStats(const Pipeline& pipeline);
+
+    DocumentSourceLookupStats _stats;
+
     NamespaceString _fromNs;
     NamespaceString _resolvedNs;
     FieldPath _as;

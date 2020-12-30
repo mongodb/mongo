@@ -34,8 +34,6 @@
 #include <string>
 #include <vector>
 
-#include "mongo/db/exec/document_value/document.h"
-#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/plan_summary_stats.h"
@@ -858,6 +856,41 @@ struct GroupStats : public SpecificStats {
 
     // Flag to specify if data was spilled to disk while grouping the data.
     bool usedDisk = false;
+};
+
+struct DocumentSourceCursorStats : public SpecificStats {
+    SpecificStats* clone() const final {
+        return new DocumentSourceCursorStats(*this);
+    }
+
+    uint64_t estimateObjectSizeInBytes() const {
+        return sizeof(*this) +
+            (planSummaryStats.estimateObjectSizeInBytes() - sizeof(planSummaryStats));
+    }
+
+    void accumulate(PlanSummaryStats& summary) const final {
+        summary.accumulate(planSummaryStats);
+    }
+
+    PlanSummaryStats planSummaryStats;
+};
+
+struct DocumentSourceLookupStats : public SpecificStats {
+    SpecificStats* clone() const final {
+        return new DocumentSourceLookupStats(*this);
+    }
+
+    uint64_t estimateObjectSizeInBytes() const {
+        return sizeof(*this) +
+            (planSummaryStats.estimateObjectSizeInBytes() - sizeof(planSummaryStats));
+    }
+
+    void accumulate(PlanSummaryStats& summary) const final {
+        summary.accumulate(planSummaryStats);
+    }
+
+    // Tracks the summary stats in aggregate across all executions of the subpipeline.
+    PlanSummaryStats planSummaryStats;
 };
 
 }  // namespace mongo

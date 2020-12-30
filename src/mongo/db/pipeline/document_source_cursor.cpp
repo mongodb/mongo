@@ -195,7 +195,7 @@ void DocumentSourceCursor::_updateOplogTimestamp() {
 
 void DocumentSourceCursor::recordPlanSummaryStats() {
     invariant(_exec);
-    _exec->getPlanExplainer().getSummaryStats(&_planSummaryStats);
+    _exec->getPlanExplainer().getSummaryStats(&_stats.planSummaryStats);
 }
 
 Value DocumentSourceCursor::serialize(boost::optional<ExplainOptions::Verbosity> verbosity) const {
@@ -314,7 +314,7 @@ DocumentSourceCursor::DocumentSourceCursor(
 
     if (collection) {
         CollectionQueryInfo::get(collection)
-            .notifyOfQuery(pExpCtx->opCtx, collection, _planSummaryStats);
+            .notifyOfQuery(pExpCtx->opCtx, collection, _stats.planSummaryStats);
     }
 }
 
