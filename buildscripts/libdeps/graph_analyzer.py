@@ -486,10 +486,9 @@ class UnusedPublicLinter(Analyzer):
 
             if (edge_attribs.get(EdgeProps.direct.name)
                     and edge_attribs.get(EdgeProps.visibility.name) == int(deptype.Public)
-                    and self.graph[edge[0]].get(NodeProps.shim.name)
-                    and self.graph[edge[0]].get(NodeProps.bin_type.name) == 'SharedLibrary'):
-
-                # First we will get all the transitive libdeps the dependnet node
+                    and not self.graph.nodes()[edge[0]].get(NodeProps.shim.name) and
+                    self.graph.nodes()[edge[1]].get(NodeProps.bin_type.name) == 'SharedLibrary'):
+                # First we will get all the transitive libdeps the dependent node
                 # induces, while we are getting those we also check if the depender
                 # node has any symbol dependencies to that transitive libdep.
                 trans_pub_nodes = set([edge[0]])
