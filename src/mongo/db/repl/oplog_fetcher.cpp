@@ -459,26 +459,26 @@ Status OplogFetcher::_connect() {
 void OplogFetcher::_setMetadataWriterAndReader() {
     invariant(_conn);
 
-    _logicalTimeMetadataHook =
-        std::make_unique<rpc::LogicalTimeMetadataHook>(getGlobalServiceContext());
+    _vectorClockMetadataHook =
+        std::make_unique<rpc::VectorClockMetadataHook>(getGlobalServiceContext());
 
     _conn->setRequestMetadataWriter([this](OperationContext* opCtx, BSONObjBuilder* metadataBob) {
         *metadataBob << rpc::kReplSetMetadataFieldName << 1;
         *metadataBob << rpc::kOplogQueryMetadataFieldName << 1;
         metadataBob->appendElements(ReadPreferenceSetting::secondaryPreferredMetadata());
 
-        // Run LogicalTimeMetadataHook on request metadata so this matches the behavior of the
+        // Run VectorClockMetadataHook on request metadata so this matches the behavior of the
         // connections in the replication coordinator thread pool.
-        return _logicalTimeMetadataHook->writeRequestMetadata(opCtx, metadataBob);
+        return _vectorClockMetadataHook->writeRequestMetadata(opCtx, metadataBob);
     });
 
     _conn->setReplyMetadataReader(
         [this](OperationContext* opCtx, const BSONObj& metadataObj, StringData source) {
             _metadataObj = metadataObj.getOwned();
 
-            // Run LogicalTimeMetadataHook on reply metadata so this matches the behavior of the
+            // Run VectorClockMetadataHook on reply metadata so this matches the behavior of the
             // connections in the replication coordinator thread pool.
-            return _logicalTimeMetadataHook->readReplyMetadata(opCtx, source, _metadataObj);
+            return _vectorClockMetadataHook->readReplyMetadata(opCtx, source, _metadataObj);
         });
 }
 

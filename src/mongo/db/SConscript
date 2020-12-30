@@ -1746,7 +1746,7 @@ env.Library(
 env.Library(
     target= 'logical_time_metadata_hook',
     source= [
-        'logical_time_metadata_hook.cpp',
+        'vector_clock_metadata_hook.cpp',
     ],
     LIBDEPS= [
         '$BUILD_DIR/mongo/rpc/metadata',

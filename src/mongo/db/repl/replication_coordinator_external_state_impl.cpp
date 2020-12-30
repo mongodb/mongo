@@ -56,7 +56,6 @@
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/kill_sessions_local.h"
-#include "mongo/db/logical_time_metadata_hook.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/repl/always_allow_non_local_writes.h"
@@ -93,6 +92,7 @@
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/system_index.h"
 #include "mongo/db/vector_clock.h"
+#include "mongo/db/vector_clock_metadata_hook.h"
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/executor/network_interface_factory.h"
@@ -161,7 +161,7 @@ auto makeTaskExecutor(ServiceContext* service,
                       const std::string& poolName,
                       const std::string& threadName) {
     auto hookList = std::make_unique<rpc::EgressMetadataHookList>();
-    hookList->addHook(std::make_unique<rpc::LogicalTimeMetadataHook>(service));
+    hookList->addHook(std::make_unique<rpc::VectorClockMetadataHook>(service));
     auto networkName = threadName + "Network";
     return std::make_unique<executor::ThreadPoolTaskExecutor>(
         makeThreadPool(poolName, threadName),

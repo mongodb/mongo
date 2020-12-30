@@ -41,12 +41,12 @@
 #include "mongo/db/client.h"
 #include "mongo/db/client_metadata_propagation_egress_hook.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/logical_time_metadata_hook.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/query/collation/collator_factory_mock.h"
 #include "mongo/db/query/query_request.h"
 #include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/vector_clock_metadata_hook.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
@@ -107,7 +107,7 @@ ShardingTestFixture::ShardingTestFixture()
     // Set up executor pool used for most operations.
     auto makeMetadataHookList = [&] {
         auto hookList = std::make_unique<rpc::EgressMetadataHookList>();
-        hookList->addHook(std::make_unique<rpc::LogicalTimeMetadataHook>(service));
+        hookList->addHook(std::make_unique<rpc::VectorClockMetadataHook>(service));
         hookList->addHook(std::make_unique<rpc::CommittedOpTimeMetadataHook>(service));
         hookList->addHook(std::make_unique<rpc::ClientMetadataPropagationEgressHook>());
         hookList->addHook(std::make_unique<rpc::ShardingEgressMetadataHookForMongos>(service));

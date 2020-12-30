@@ -27,37 +27,53 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/platform/basic.h"
+
+#include "mongo/db/vector_clock_metadata_hook.h"
 
 #include <memory>
-#include <vector>
 
-#include "mongo/rpc/metadata/metadata_hook.h"
+#include "mongo/db/operation_time_tracker.h"
+#include "mongo/db/vector_clock.h"
 
 namespace mongo {
 
-class BSONObj;
-class BSONObjBuilder;
-struct HostAndPort;
-class OperationContext;
-class ServiceContext;
-class Status;
-
 namespace rpc {
 
-class LogicalTimeMetadataHook : public EgressMetadataHook {
-public:
-    explicit LogicalTimeMetadataHook(ServiceContext* service);
+namespace {
+const char kOperationTimeFieldName[] = "operationTime";
+}
 
-    Status writeRequestMetadata(OperationContext* opCtx, BSONObjBuilder* metadataBob) override;
+VectorClockMetadataHook::VectorClockMetadataHook(ServiceContext* service) : _service(service) {}
 
-    Status readReplyMetadata(OperationContext* opCtx,
-                             StringData replySource,
-                             const BSONObj& metadataObj) override;
+Status VectorClockMetadataHook::writeRequestMetadata(OperationContext* opCtx,
+                                                     BSONObjBuilder* metadataBob) {
+    VectorClock::get(_service)->gossipOut(opCtx, metadataBob, transport::Session::kInternalClient);
+    return Status::OK();
+}
 
-private:
-    ServiceContext* _service;
-};
+Status VectorClockMetadataHook::readReplyMetadata(OperationContext* opCtx,
+                                                  StringData replySource,
+                                                  const BSONObj& metadataObj) {
+    if (!VectorClock::get(_service)->isEnabled()) {
+        return Status::OK();
+    }
+
+    if (opCtx) {
+        auto timeTracker = OperationTimeTracker::get(opCtx);
+        auto operationTime = metadataObj[kOperationTimeFieldName];
+        if (!operationTime.eoo()) {
+            tassert(4457010,
+                    "operationTime must be a timestamp if present",
+                    operationTime.type() == BSONType::bsonTimestamp);
+            timeTracker->updateOperationTime(LogicalTime(operationTime.timestamp()));
+        }
+    }
+
+    VectorClock::get(_service)->gossipIn(
+        opCtx, metadataObj, false /* couldBeUnauthorized */, transport::Session::kInternalClient);
+    return Status::OK();
+}
 
 }  // namespace rpc
 }  // namespace mongo

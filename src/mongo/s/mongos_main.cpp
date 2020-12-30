@@ -60,7 +60,6 @@
 #include "mongo/db/lasterror.h"
 #include "mongo/db/log_process_details.h"
 #include "mongo/db/logical_session_cache_impl.h"
-#include "mongo/db/logical_time_metadata_hook.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/server_options.h"
@@ -68,6 +67,7 @@
 #include "mongo/db/service_liaison_mongos.h"
 #include "mongo/db/session_killer.h"
 #include "mongo/db/startup_warnings_common.h"
+#include "mongo/db/vector_clock_metadata_hook.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/logv2/log.h"
@@ -437,7 +437,7 @@ Status initializeSharding(OperationContext* opCtx) {
         [opCtx]() {
             auto hookList = std::make_unique<rpc::EgressMetadataHookList>();
             hookList->addHook(
-                std::make_unique<rpc::LogicalTimeMetadataHook>(opCtx->getServiceContext()));
+                std::make_unique<rpc::VectorClockMetadataHook>(opCtx->getServiceContext()));
             hookList->addHook(
                 std::make_unique<rpc::CommittedOpTimeMetadataHook>(opCtx->getServiceContext()));
             hookList->addHook(std::make_unique<rpc::ClientMetadataPropagationEgressHook>());
@@ -682,7 +682,7 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
     serviceContext->setTransportLayer(std::move(tl));
 
     auto unshardedHookList = std::make_unique<rpc::EgressMetadataHookList>();
-    unshardedHookList->addHook(std::make_unique<rpc::LogicalTimeMetadataHook>(serviceContext));
+    unshardedHookList->addHook(std::make_unique<rpc::VectorClockMetadataHook>(serviceContext));
     unshardedHookList->addHook(std::make_unique<rpc::ClientMetadataPropagationEgressHook>());
     unshardedHookList->addHook(
         std::make_unique<rpc::ShardingEgressMetadataHookForMongos>(serviceContext));
@@ -692,7 +692,7 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
     globalConnPool.addHook(new ShardingConnectionHook(std::move(unshardedHookList)));
 
     auto shardedHookList = std::make_unique<rpc::EgressMetadataHookList>();
-    shardedHookList->addHook(std::make_unique<rpc::LogicalTimeMetadataHook>(serviceContext));
+    shardedHookList->addHook(std::make_unique<rpc::VectorClockMetadataHook>(serviceContext));
     shardedHookList->addHook(std::make_unique<rpc::ClientMetadataPropagationEgressHook>());
     shardedHookList->addHook(
         std::make_unique<rpc::ShardingEgressMetadataHookForMongos>(serviceContext));

@@ -98,7 +98,6 @@
 #include "mongo/db/log_process_details.h"
 #include "mongo/db/logical_session_cache.h"
 #include "mongo/db/logical_session_cache_factory_mongod.h"
-#include "mongo/db/logical_time_metadata_hook.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/mirror_maestro.h"
 #include "mongo/db/mongod_options.h"
@@ -165,6 +164,7 @@
 #include "mongo/db/system_index.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/db/ttl.h"
+#include "mongo/db/vector_clock_metadata_hook.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface_factory.h"
@@ -928,7 +928,7 @@ auto makeReplicaSetNodeExecutor(ServiceContext* serviceContext) {
         Client::initThread(threadName.c_str());
     };
     auto hookList = std::make_unique<rpc::EgressMetadataHookList>();
-    hookList->addHook(std::make_unique<rpc::LogicalTimeMetadataHook>(serviceContext));
+    hookList->addHook(std::make_unique<rpc::VectorClockMetadataHook>(serviceContext));
     hookList->addHook(std::make_unique<rpc::ClientMetadataPropagationEgressHook>());
     return std::make_unique<executor::ThreadPoolTaskExecutor>(
         std::make_unique<ThreadPool>(tpOptions),
@@ -944,7 +944,7 @@ auto makeReplicationExecutor(ServiceContext* serviceContext) {
         Client::initThread(threadName.c_str());
     };
     auto hookList = std::make_unique<rpc::EgressMetadataHookList>();
-    hookList->addHook(std::make_unique<rpc::LogicalTimeMetadataHook>(serviceContext));
+    hookList->addHook(std::make_unique<rpc::VectorClockMetadataHook>(serviceContext));
     return std::make_unique<executor::ThreadPoolTaskExecutor>(
         std::make_unique<ThreadPool>(tpOptions),
         executor::makeNetworkInterface("ReplNetwork", nullptr, std::move(hookList)));

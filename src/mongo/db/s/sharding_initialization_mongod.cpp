@@ -42,7 +42,6 @@
 #include "mongo/db/client_metadata_propagation_egress_hook.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/logical_time_metadata_hook.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/update.h"
@@ -55,6 +54,7 @@
 #include "mongo/db/s/sharding_config_optime_gossip.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/vector_clock_metadata_hook.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
@@ -77,7 +77,7 @@ const auto getInstance = ServiceContext::declareDecoration<ShardingInitializatio
 
 auto makeEgressHooksList(ServiceContext* service) {
     auto unshardedHookList = std::make_unique<rpc::EgressMetadataHookList>();
-    unshardedHookList->addHook(std::make_unique<rpc::LogicalTimeMetadataHook>(service));
+    unshardedHookList->addHook(std::make_unique<rpc::VectorClockMetadataHook>(service));
     unshardedHookList->addHook(std::make_unique<rpc::ClientMetadataPropagationEgressHook>());
     unshardedHookList->addHook(std::make_unique<rpc::ShardingEgressMetadataHookForMongod>(service));
 

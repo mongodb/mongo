@@ -36,7 +36,6 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/logical_session_cache_noop.h"
-#include "mongo/db/logical_time_metadata_hook.h"
 #include "mongo/db/pipeline/process_interface/shardsvr_process_interface.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
@@ -48,6 +47,7 @@
 #include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/session_txn_record_gen.h"
 #include "mongo/db/transaction_participant.h"
+#include "mongo/db/vector_clock_metadata_hook.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
@@ -342,7 +342,7 @@ protected:
         };
 
         auto hookList = std::make_unique<rpc::EgressMetadataHookList>();
-        hookList->addHook(std::make_unique<rpc::LogicalTimeMetadataHook>(getServiceContext()));
+        hookList->addHook(std::make_unique<rpc::VectorClockMetadataHook>(getServiceContext()));
 
         auto executor = std::make_shared<executor::ThreadPoolTaskExecutor>(
             std::make_unique<ThreadPool>(std::move(threadPoolOptions)),

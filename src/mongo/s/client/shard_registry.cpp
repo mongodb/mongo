@@ -35,8 +35,8 @@
 
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/client.h"
-#include "mongo/db/logical_time_metadata_hook.h"
 #include "mongo/db/vector_clock.h"
+#include "mongo/db/vector_clock_metadata_hook.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/network_interface_thread_pool.h"
 #include "mongo/executor/task_executor_pool.h"
@@ -219,7 +219,7 @@ void ShardRegistry::startupPeriodicReloader(OperationContext* opCtx) {
     invariant(!_executor);
 
     auto hookList = std::make_unique<rpc::EgressMetadataHookList>();
-    hookList->addHook(std::make_unique<rpc::LogicalTimeMetadataHook>(opCtx->getServiceContext()));
+    hookList->addHook(std::make_unique<rpc::VectorClockMetadataHook>(opCtx->getServiceContext()));
 
     // construct task executor
     auto net = executor::makeNetworkInterface("ShardRegistryUpdater", nullptr, std::move(hookList));

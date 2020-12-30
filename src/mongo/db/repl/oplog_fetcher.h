@@ -36,12 +36,12 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/client/dbclient_connection.h"
 #include "mongo/client/dbclient_cursor.h"
-#include "mongo/db/logical_time_metadata_hook.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/abstract_async_component.h"
 #include "mongo/db/repl/data_replicator_external_state.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_process.h"
+#include "mongo/db/vector_clock_metadata_hook.h"
 #include "mongo/util/fail_point.h"
 
 namespace mongo {
@@ -454,7 +454,7 @@ private:
     OpTime _lastFetched;
 
     // Logical time metadata handling hook for the DBClientConnection.
-    std::unique_ptr<rpc::LogicalTimeMetadataHook> _logicalTimeMetadataHook;
+    std::unique_ptr<rpc::VectorClockMetadataHook> _vectorClockMetadataHook;
 
     // Set by the ReplyMetadataReader upon receiving a new batch.
     BSONObj _metadataObj;
