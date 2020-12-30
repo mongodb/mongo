@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/util/container_size_helper.h"
 #include <string>
 
 namespace mongo {
@@ -39,39 +38,6 @@ namespace mongo {
  * other non-explain debug mechanisms may want to collect.
  */
 struct PlanSummaryStats {
-    /**
-     * Helper method to accumulate the plan summary stats from the input source.
-     */
-    void accumulate(const PlanSummaryStats& statsIn) {
-        // Attributes replanReason and fromMultiPlanner have been intentionally skipped as they
-        // always describe the left-hand side (or "local") collection.
-        // Consider $lookup case. $lookup runtime plan selection may happen against the foreign
-        // collection an arbitrary number of times. A single value of 'replanReason' and
-        // 'fromMultiPlanner' can't really report correctly on the behavior of arbitrarily many
-        // occurrences of runtime planning for a single query.
-
-        nReturned += statsIn.nReturned;
-        totalKeysExamined += statsIn.totalKeysExamined;
-        totalDocsExamined += statsIn.totalDocsExamined;
-        collectionScans += statsIn.collectionScans;
-        collectionScansNonTailable += statsIn.collectionScansNonTailable;
-        hasSortStage |= statsIn.hasSortStage;
-        usedDisk |= statsIn.usedDisk;
-        planFailed |= statsIn.planFailed;
-        indexesUsed.insert(statsIn.indexesUsed.begin(), statsIn.indexesUsed.end());
-    }
-
-    uint64_t estimateObjectSizeInBytes() const {
-        auto strSize = [](const std::string& str) {
-            return str.capacity() * sizeof(std::string::value_type);
-        };
-
-        return sizeof(*this) +
-            container_size_helper::estimateObjectSizeInBytes(
-                   indexesUsed, strSize, false /* includeShallowSize */) +
-            (replanReason ? strSize(*replanReason) : 0);
-    }
-
     // The number of results returned by the plan.
     size_t nReturned = 0U;
 
