@@ -56,6 +56,7 @@ public:
     static RoleName parseFromBSON(const BSONElement& elem);
     void serializeToBSON(StringData fieldName, BSONObjBuilder* bob) const;
     void serializeToBSON(BSONArrayBuilder* bob) const;
+    void appendToBSON(BSONObjBuilder* sub) const;
     BSONObj toBSON() const;
 
     /**
@@ -100,8 +101,6 @@ public:
 private:
     std::string _fullName;  // The full name, stored as a string.  "role@db".
     size_t _splitPoint;     // The index of the "@" separating the role and db name parts.
-
-    void _serializeToSubObj(BSONObjBuilder* sub) const;
 };
 
 static inline bool operator==(const RoleName& lhs, const RoleName& rhs) {

@@ -77,22 +77,22 @@ RoleName RoleName::parseFromBSON(const BSONElement& elem) {
 
 void RoleName::serializeToBSON(StringData fieldName, BSONObjBuilder* bob) const {
     BSONObjBuilder sub(bob->subobjStart(fieldName));
-    _serializeToSubObj(&sub);
+    appendToBSON(&sub);
 }
 
 void RoleName::serializeToBSON(BSONArrayBuilder* bob) const {
     BSONObjBuilder sub(bob->subobjStart());
-    _serializeToSubObj(&sub);
+    appendToBSON(&sub);
 }
 
-void RoleName::_serializeToSubObj(BSONObjBuilder* sub) const {
-    sub->append(AuthorizationManager::ROLE_NAME_FIELD_NAME, getRole());
-    sub->append(AuthorizationManager::ROLE_DB_FIELD_NAME, getDB());
+void RoleName::appendToBSON(BSONObjBuilder* bob) const {
+    bob->append(AuthorizationManager::ROLE_NAME_FIELD_NAME, getRole());
+    bob->append(AuthorizationManager::ROLE_DB_FIELD_NAME, getDB());
 }
 
 BSONObj RoleName::toBSON() const {
     BSONObjBuilder bob;
-    _serializeToSubObj(&bob);
+    appendToBSON(&bob);
     return bob.obj();
 }
 

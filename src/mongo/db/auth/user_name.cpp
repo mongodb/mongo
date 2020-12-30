@@ -93,22 +93,22 @@ UserName UserName::parseFromBSON(const BSONElement& elem) {
 
 void UserName::serializeToBSON(StringData fieldName, BSONObjBuilder* bob) const {
     BSONObjBuilder sub(bob->subobjStart(fieldName));
-    _serializeToSubObj(&sub);
+    appendToBSON(&sub);
 }
 
 void UserName::serializeToBSON(BSONArrayBuilder* bab) const {
     BSONObjBuilder sub(bab->subobjStart());
-    _serializeToSubObj(&sub);
+    appendToBSON(&sub);
 }
 
-void UserName::_serializeToSubObj(BSONObjBuilder* sub) const {
-    *sub << AuthorizationManager::USER_NAME_FIELD_NAME << getUser()
+void UserName::appendToBSON(BSONObjBuilder* bob) const {
+    *bob << AuthorizationManager::USER_NAME_FIELD_NAME << getUser()
          << AuthorizationManager::USER_DB_FIELD_NAME << getDB();
 }
 
 BSONObj UserName::toBSON() const {
     BSONObjBuilder ret;
-    _serializeToSubObj(&ret);
+    appendToBSON(&ret);
     return ret.obj();
 }
 

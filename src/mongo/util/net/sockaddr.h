@@ -48,6 +48,7 @@
 #include "mongo/base/string_data.h"
 
 namespace mongo {
+class BSONObjBuilder;
 
 #if defined(_WIN32)
 
@@ -148,6 +149,8 @@ struct SockAddr {
     }
 
     socklen_t addressSize;
+
+    void serializeToBSON(StringData fieldName, BSONObjBuilder* builder) const;
 
 private:
     void initUnixDomainSocket(const std::string& path, int port);

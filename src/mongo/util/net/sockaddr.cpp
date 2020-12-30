@@ -53,6 +53,7 @@
 #endif
 #endif
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/itoa.h"
@@ -309,6 +310,27 @@ std::string SockAddr::getAddr() const {
         default:
             massert(SOCK_FAMILY_UNKNOWN_ERROR, "unsupported address family", false);
             return "";
+    }
+}
+
+namespace {
+constexpr auto kIPField = "ip"_sd;
+constexpr auto kPortField = "port"_sd;
+constexpr auto kUnixField = "unix"_sd;
+constexpr auto kAnonymous = "anonymous"_sd;
+}  // namespace
+
+void SockAddr::serializeToBSON(StringData fieldName, BSONObjBuilder* builder) const {
+    BSONObjBuilder bob(builder->subobjStart(fieldName));
+    if (isIP()) {
+        bob.append(kIPField, getAddr());
+        bob.append(kPortField, static_cast<int>(getPort()));
+    } else if (getType() == AF_UNIX) {
+        if (isAnonymousUNIXSocket()) {
+            bob.append(kUnixField, kAnonymous);
+        } else {
+            bob.append(kUnixField, getAddr());
+        }
     }
 }
 
