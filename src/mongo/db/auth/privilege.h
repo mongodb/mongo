@@ -66,10 +66,17 @@ public:
                                        mutablebson::Element resultArray);
 
 
-    Privilege(){};
+    Privilege() = default;
+    ~Privilege() = default;
+
+    Privilege(const Privilege&) = default;
+    Privilege& operator=(const Privilege&) = default;
+
+    Privilege(Privilege&&) = default;
+    Privilege& operator=(Privilege&&) = default;
+
     Privilege(const ResourcePattern& resource, const ActionType& action);
     Privilege(const ResourcePattern& resource, const ActionSet& actions);
-    ~Privilege() {}
 
     const ResourcePattern& getResourcePattern() const {
         return _resource;
