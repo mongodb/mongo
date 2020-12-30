@@ -34,7 +34,7 @@ from pathlib import Path
 
 import networkx
 import graph_analyzer
-
+from libdeps_graph_enums import CountTypes, LinterTypes
 
 class LinterSplitArgs(argparse.Action):
     """Custom argument action for checking multiple choice comma separated list."""
@@ -58,17 +58,13 @@ class LinterSplitArgs(argparse.Action):
 class CountSplitArgs(LinterSplitArgs):
     """Special case of common custom arg action for Count types."""
 
-    valid_choices = [
-        name[0].replace('_', '-') for name in graph_analyzer.CountTypes.__members__.items()
-    ]
+    valid_choices = [name[0].replace('_', '-') for name in CountTypes.__members__.items()]
 
 
 class LintSplitArgs(LinterSplitArgs):
     """Special case of common custom arg action for Count types."""
 
-    valid_choices = [
-        name[0].replace('_', '-') for name in graph_analyzer.LinterTypes.__members__.items()
-    ]
+    valid_choices = [name[0].replace('_', '-') for name in LinterTypes.__members__.items()]
 
 
 class CustomFormatter(argparse.RawTextHelpFormatter, argparse.ArgumentDefaultsHelpFormatter):
@@ -85,30 +81,30 @@ class CustomFormatter(argparse.RawTextHelpFormatter, argparse.ArgumentDefaultsHe
     def _get_help_string(self, action):
 
         if isinstance(action, CountSplitArgs):
-            count_help = self._get_help_length(graph_analyzer.CountTypes)
+            count_help = self._get_help_length(CountTypes)
             return textwrap.dedent(f"""\
                 {action.help}
                 default: all, choices:
-                    {count_help[graph_analyzer.CountTypes.all.name]}perform all counts
-                    {count_help[graph_analyzer.CountTypes.node.name]}count nodes
-                    {count_help[graph_analyzer.CountTypes.edge.name]}count edges
-                    {count_help[graph_analyzer.CountTypes.dir_edge.name]}count edges declared directly on a node
-                    {count_help[graph_analyzer.CountTypes.trans_edge.name]}count edges induced by direct public edges
-                    {count_help[graph_analyzer.CountTypes.dir_pub_edge.name]}count edges that are directly public
-                    {count_help[graph_analyzer.CountTypes.pub_edge.name]}count edges that are public
-                    {count_help[graph_analyzer.CountTypes.priv_edge.name]}count edges that are private
-                    {count_help[graph_analyzer.CountTypes.if_edge.name]}count edges that are interface
-                    {count_help[graph_analyzer.CountTypes.shim.name]}count shim nodes
-                    {count_help[graph_analyzer.CountTypes.lib.name]}count library nodes
-                    {count_help[graph_analyzer.CountTypes.prog.name]}count program nodes
+                    {count_help[CountTypes.all.name]}perform all counts
+                    {count_help[CountTypes.node.name]}count nodes
+                    {count_help[CountTypes.edge.name]}count edges
+                    {count_help[CountTypes.dir_edge.name]}count edges declared directly on a node
+                    {count_help[CountTypes.trans_edge.name]}count edges induced by direct public edges
+                    {count_help[CountTypes.dir_pub_edge.name]}count edges that are directly public
+                    {count_help[CountTypes.pub_edge.name]}count edges that are public
+                    {count_help[CountTypes.priv_edge.name]}count edges that are private
+                    {count_help[CountTypes.if_edge.name]}count edges that are interface
+                    {count_help[CountTypes.shim.name]}count shim nodes
+                    {count_help[CountTypes.lib.name]}count library nodes
+                    {count_help[CountTypes.prog.name]}count program nodes
                 """)
         elif isinstance(action, LintSplitArgs):
-            count_help = self._get_help_length(graph_analyzer.LinterTypes)
+            count_help = self._get_help_length(LinterTypes)
             return textwrap.dedent(f"""\
                 {action.help}
                 default: all, choices:
-                    {count_help[graph_analyzer.LinterTypes.all.name]}perform all linters
-                    {count_help[graph_analyzer.LinterTypes.node.name]}find unnecessary public libdeps
+                    {count_help[LinterTypes.all.name]}perform all linters
+                    {count_help[LinterTypes.node.name]}find unnecessary public libdeps
                 """)
         return super()._get_help_string(action)
 
@@ -124,23 +120,27 @@ def setup_args_parser():
     parser.add_argument('--format', choices=['pretty', 'json'], default='pretty',
                         help="The output format type.")
 
-    parser.add_argument('--build-data', action='store_true',
+    parser.add_argument('--build-data', choices=['on', 'off'], default='on',
                         help="Print the invocation and git hash used to build the graph")
 
-    parser.add_argument('--counts', metavar='COUNT,', nargs='*', action=CountSplitArgs,
-                        help="Output various counts from the graph. Comma separated list.")
+    parser.add_argument(
+        '--counts', metavar='COUNT,', nargs='*', action=CountSplitArgs,
+        default=[name[0] for name in CountTypes.__members__.items() if name[0] != 'all'],
+        help="Output various counts from the graph. Comma separated list.")
 
-    parser.add_argument('--lint', metavar='LINTER,', nargs='*', action=LintSplitArgs,
-                        help="Perform various linters on the graph. Comma separated list.")
+    parser.add_argument(
+        '--lint', metavar='LINTER,', nargs='*', action=LintSplitArgs,
+        default=[name[0] for name in LinterTypes.__members__.items() if name[0] != 'all'],
+        help="Perform various linters on the graph. Comma separated list.")
 
-    parser.add_argument('--direct-depends', action='append',
+    parser.add_argument('--direct-depends', action='append', default=[],
                         help="Print the nodes which depends on a given node.")
 
-    parser.add_argument('--common-depends', nargs='+', action='append',
+    parser.add_argument('--common-depends', nargs='+', action='append', default=[],
                         help="Print the nodes which have a common dependency on all N nodes.")
 
     parser.add_argument(
-        '--exclude-depends', nargs='+', action='append', help=
+        '--exclude-depends', nargs='+', action='append', default=[], help=
         "Print nodes which depend on the first node of N nodes, but exclude all nodes listed there after."
     )
 

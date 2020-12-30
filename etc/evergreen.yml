@@ -3428,6 +3428,62 @@ tasks:
         targets:
           install-core
 
+- name: libdeps_graph_linting
+  commands:
+    - command: shell.exec
+      params:
+        working_dir: src
+        shell: bash
+        script: |
+          ${activate_virtualenv}
+          python -m pip install networkx
+
+    - func: "scons compile"
+      vars:
+        task_install_action:
+            default
+        task_compile_flags: >-
+          --link-model=dynamic
+          --build-tools=next
+        targets:
+          generate-libdeps-graph
+
+    - command: shell.exec
+      params:
+        working_dir: src
+        shell: bash
+        script: |
+          set -o errexit
+          set -o verbose
+
+          ${activate_virtualenv}
+          GRAPH_FILE=$(find build -name "libdeps.graphml")
+          python buildscripts/libdeps/gacli.py --graph-file $GRAPH_FILE | gzip > results.txt.gz
+          gzip $GRAPH_FILE
+          mv $GRAPH_FILE.gz .
+
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: src/results.txt.gz
+        remote_file: ${project}/${build_variant}/${revision}/sources/libdeps-${build_id}-results.txt.gz
+        bucket: mciuploads
+        permissions: public-read
+        content_type: ${content_type|application/gzip}
+        display_name: libdeps results tarball
+
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: src/libdeps.graphml.gz
+        remote_file: ${project}/${build_variant}/${revision}/sources/libdeps-${build_id}-graph.graphml.gz
+        bucket: mciuploads
+        permissions: public-read
+        content_type: ${content_type|application/gzip}
+        display_name: libdeps graph tarball
+
 ## compile_all - build all scons targets ##
 - name: compile_all
   depends_on:
@@ -8265,6 +8321,11 @@ task_groups:
   - compile_build_tools_next
 
 - <<: *compile_task_group_template
+  name: libdeps_graph_linting_TG
+  tasks:
+  - libdeps_graph_linting
+
+- <<: *compile_task_group_template
   name: compile_ninja_TG
   tasks:
   - compile_ninja
@@ -8685,6 +8746,9 @@ buildvariants:
   - name: compile_ninja_next_TG
     distros:
     - ubuntu1804-build
+  - name: libdeps_graph_linting_TG
+    distros:
+      - ubuntu1804-build
   - name: compile_ninja_TG
   - name: .aggfuzzer .common
   - name: audit
