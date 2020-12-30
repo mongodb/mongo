@@ -455,8 +455,13 @@ Status ShardRemote::runAggregation(
             }
         }
 
-        if (!callback(data.documents)) {
-            *nextAction = Fetcher::NextAction::kNoAction;
+        try {
+            if (!callback(data.documents)) {
+                *nextAction = Fetcher::NextAction::kNoAction;
+            }
+        } catch (...) {
+            status = exceptionToStatus();
+            return;
         }
 
         status = Status::OK();

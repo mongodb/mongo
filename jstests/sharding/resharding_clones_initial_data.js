@@ -9,65 +9,60 @@
 (function() {
 "use strict";
 
-load("jstests/libs/uuid_util.js");
-load("jstests/sharding/libs/create_sharded_collection_util.js");
+load("jstests/libs/discover_topology.js");
+load("jstests/sharding/libs/resharding_test_fixture.js");
 
-const st = new ShardingTest({
-    mongos: 1,
-    config: 1,
-    shards: 2,
-    rs: {nodes: 1},
-    rsOptions: {
-        setParameter: {
-            "failpoint.WTPreserveSnapshotHistoryIndefinitely": tojson({mode: "alwaysOn"}),
-        }
-    }
+const reshardingTest = new ReshardingTest({numDonors: 2, numRecipients: 2, reshardInPlace: true});
+
+reshardingTest.setup();
+
+const donorShardNames = reshardingTest.donorShardNames;
+const inputCollection = reshardingTest.createShardedCollection({
+    ns: "reshardingDb.coll",
+    shardKeyPattern: {oldKey: 1},
+    chunks: [
+        {min: {oldKey: MinKey}, max: {oldKey: 0}, shard: donorShardNames[0]},
+        {min: {oldKey: 0}, max: {oldKey: MaxKey}, shard: donorShardNames[1]},
+    ],
 });
 
-const inputCollection = st.s.getCollection("reshardingDb.coll");
+assert.commandWorked(inputCollection.insert([
+    {_id: "stays on shard0", oldKey: -10, newKey: -10},
+    {_id: "moves to shard0", oldKey: 10, newKey: -10},
+    {_id: "moves to shard1", oldKey: -10, newKey: 10},
+    {_id: "stays on shard1", oldKey: 10, newKey: 10},
+]));
 
-CreateShardedCollectionUtil.shardCollectionWithChunks(inputCollection, {oldKey: 1}, [
-    {min: {oldKey: MinKey}, max: {oldKey: 0}, shard: st.shard0.shardName},
-    {min: {oldKey: 0}, max: {oldKey: MaxKey}, shard: st.shard1.shardName},
-]);
-
-assert.commandWorked(inputCollection.insert(
-    [
-        {_id: "stays on shard0", oldKey: -10, newKey: -10},
-        {_id: "moves to shard0", oldKey: 10, newKey: -10},
-        {_id: "moves to shard1", oldKey: -10, newKey: 10},
-        {_id: "stays on shard1", oldKey: 10, newKey: 10},
+const recipientShardNames = reshardingTest.recipientShardNames;
+reshardingTest.withReshardingInBackground({
+    newShardKeyPattern: {newKey: 1},
+    newChunks: [
+        {min: {newKey: MinKey}, max: {newKey: 0}, shard: recipientShardNames[0]},
+        {min: {newKey: 0}, max: {newKey: MaxKey}, shard: recipientShardNames[1]},
     ],
-    {writeConcern: {w: "majority"}}));
+});
 
-assert.commandWorked(st.s.adminCommand({
-    reshardCollection: inputCollection.getFullName(),
-    key: {newKey: 1},
-    _presetReshardedChunks: [
-        {min: {newKey: MinKey}, max: {newKey: 0}, recipientShardId: st.shard0.shardName},
-        {min: {newKey: 0}, max: {newKey: MaxKey}, recipientShardId: st.shard1.shardName},
-    ],
-}));
-
-function assertClonedContents(shard, expectedDocs) {
+function assertClonedContents(shardConn, expectedDocs) {
     // We sort by oldKey so the order of `expectedDocs` can be deterministic.
-    assert.eq(expectedDocs,
-              shard.rs.getPrimary()
-                  .getCollection(inputCollection.getFullName())
-                  .find()
-                  .sort({oldKey: 1})
-                  .toArray());
+    assert.eq(
+        expectedDocs,
+        shardConn.getCollection(inputCollection.getFullName()).find().sort({oldKey: 1}).toArray());
 }
 
-assertClonedContents(st.shard0, [
+const mongos = inputCollection.getMongo();
+const topology = DiscoverTopology.findConnectedNodes(mongos);
+const recipient0 = new Mongo(topology.shards[recipientShardNames[0]].primary);
+const recipient1 = new Mongo(topology.shards[recipientShardNames[1]].primary);
+
+assertClonedContents(recipient0, [
     {_id: "stays on shard0", oldKey: -10, newKey: -10},
     {_id: "moves to shard0", oldKey: 10, newKey: -10},
 ]);
 
-assertClonedContents(st.shard1, [
+assertClonedContents(recipient1, [
     {_id: "moves to shard1", oldKey: -10, newKey: 10},
     {_id: "stays on shard1", oldKey: 10, newKey: 10},
 ]);
 
-st.stop();
+reshardingTest.teardown();
 })();

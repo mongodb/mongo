@@ -12,53 +12,39 @@
 
 load("jstests/sharding/libs/resharding_test_fixture.js");
 
-const reshardingTest = new ReshardingTest({numDonors: 2, numRecipients: 2, reshardInPlace: true});
+const reshardingTest = new ReshardingTest({numDonors: 2});
 reshardingTest.setup();
 
-const db = 'reshardingDb';
-const col = 'coll';
-const ns = `${db}.${col}`;
 const donorShardNames = reshardingTest.donorShardNames;
 const sourceCollection = reshardingTest.createShardedCollection({
-    ns,
+    ns: "reshardingDb.coll",
     shardKeyPattern: {oldKey: 1},
-    chunks: [
-        {min: {oldKey: MinKey}, max: {oldKey: 0}, shard: donorShardNames[0]},
-        {min: {oldKey: 0}, max: {oldKey: MaxKey}, shard: donorShardNames[1]},
-    ],
+    chunks: [{min: {oldKey: MinKey}, max: {oldKey: MaxKey}, shard: donorShardNames[0]}],
 });
-
-// Perform some inserts before resharding starts so there's data to clone.
-assert.commandWorked(sourceCollection.insert(
-    [
-        {_id: "stays on shard0", oldKey: -10, newKey: -10},
-        {_id: "moves to shard0", oldKey: 10, newKey: -10},
-        {_id: "moves to shard1", oldKey: -10, newKey: 10},
-        {_id: "stays on shard1", oldKey: 10, newKey: 10},
-    ],
-    {writeConcern: {w: "majority"}}));
 
 const recipientShardNames = reshardingTest.recipientShardNames;
-reshardingTest.startReshardingInBackground({
-    newShardKeyPattern: {newKey: 1},
-    newChunks: [
-        {min: {newKey: MinKey}, max: {newKey: 0}, shard: recipientShardNames[0]},
-        {min: {newKey: 0}, max: {newKey: MaxKey}, shard: recipientShardNames[1]},
-    ],
-});
+reshardingTest.withReshardingInBackground(
+    {
+        newShardKeyPattern: {newKey: 1},
+        newChunks: [{min: {newKey: MinKey}, max: {newKey: MaxKey}, shard: recipientShardNames[0]}],
+    },
+    (tempNs) => {
+        const mongos = sourceCollection.getMongo();
+        const ns = sourceCollection.getFullName();
 
-const mongos = sourceCollection.getMongo();
-const tempns = `${db}.${reshardingTest.temporaryReshardingCollectionName}`;
-assert.soon(() => {
-    return mongos.getDB("config").collections.findOne({_id: ns}).allowMigrations === false;
-});
-assert.soon(() => {
-    return mongos.getDB("config").collections.findOne({_id: tempns}).allowMigrations === false;
-});
+        let res;
+        assert.soon(() => {
+            res = mongos.getCollection("config.collections")
+                      .find({_id: {$in: [ns, tempNs]}})
+                      .toArray();
 
-assert.commandFailedWithCode(
-    mongos.adminCommand({moveChunk: ns, find: {oldKey: -10}, to: donorShardNames[1]}),
-    ErrorCodes.ConflictingOperationInProgress);
+            return res.length === 2 && res.every(collEntry => collEntry.allowMigrations === false);
+        }, () => `timed out waiting for collections to have allowMigrations=false: ${tojson(res)}`);
+
+        assert.commandFailedWithCode(
+            mongos.adminCommand({moveChunk: ns, find: {oldKey: -10}, to: donorShardNames[1]}),
+            ErrorCodes.ConflictingOperationInProgress);
+    });
 
 reshardingTest.teardown();
 })();

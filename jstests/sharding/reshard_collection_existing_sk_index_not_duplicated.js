@@ -9,82 +9,62 @@
 //
 
 (function() {
-'use strict';
+"use strict";
 
 load("jstests/sharding/libs/resharding_test_fixture.js");
 
-const dbName = "reshardingDb";
-const collName = "coll";
-const ns = dbName + "." + collName;
+const reshardingTest = new ReshardingTest();
+reshardingTest.setup();
 
-let getIndexes = (dbName, collName, conn) => {
-    const indexRes = conn.getDB(dbName).runCommand({listIndexes: collName});
-    assert.commandWorked(indexRes);
-    return indexRes.cursor.firstBatch;
-};
+const testCases = [
+    {ns: "reshardingDb.no_compatible_index"},
+    {ns: "reshardingDb.has_compatible_index", indexToCreateBeforeResharding: {newKey: 1}},
+    {
+        ns: "reshardingDb.compatible_index_with_extra",
+        indexToCreateBeforeResharding: {newKey: 1, extra: 1}
+    },
+];
 
-let createShardedCollection = (reshardingTest) => {
+for (let {ns, indexToCreateBeforeResharding} of testCases) {
     const donorShardNames = reshardingTest.donorShardNames;
-    return reshardingTest.createShardedCollection({
+    const sourceCollection = reshardingTest.createShardedCollection({
         ns,
         shardKeyPattern: {oldKey: 1},
-        chunks: [
-            {min: {oldKey: MinKey}, max: {oldKey: 0}, shard: donorShardNames[0]},
-            {min: {oldKey: 0}, max: {oldKey: MaxKey}, shard: donorShardNames[1]},
-        ],
+        chunks: [{min: {oldKey: MinKey}, max: {oldKey: MaxKey}, shard: donorShardNames[0]}],
     });
-};
 
-let startReshardingInBackground = (reshardingTest) => {
-    const recipientShardNames = reshardingTest.recipientShardNames;
-    reshardingTest.startReshardingInBackground({
-        newShardKeyPattern: {newKey: 1},
-        newChunks: [
-            {min: {newKey: MinKey}, max: {newKey: 0}, shard: recipientShardNames[0]},
-            {min: {newKey: 0}, max: {newKey: MaxKey}, shard: recipientShardNames[1]},
-        ],
-    });
-};
-
-let awaitReshardingInState = (sourceCollection, state) => {
-    const mongos = sourceCollection.getMongo();
-    assert.soon(() => {
-        const coordinatorDoc = mongos.getCollection("config.reshardingOperations").findOne();
-        return coordinatorDoc !== null && coordinatorDoc.state === state;
-    });
-};
-
-let runReshardingCollectionVerifyIndexConsistency = (indexToCreateBeforeResharding) => {
-    // reshardInPlace is required for this test so that the primary shard is guaranteed to know
-    // about the indexes on the temporary resharding collection.
-    const reshardingTest =
-        new ReshardingTest({numDonors: 2, numRecipients: 2, reshardInPlace: true});
-    reshardingTest.setup();
-
-    let sourceCollection = createShardedCollection(reshardingTest);
-    let mongos = sourceCollection.getMongo();
-
-    let indexesBeforeResharding;
-    if (indexToCreateBeforeResharding) {
-        sourceCollection.createIndex(indexToCreateBeforeResharding);
-        indexesBeforeResharding = getIndexes(dbName, collName, mongos);
+    if (indexToCreateBeforeResharding !== undefined) {
+        assert.commandWorked(sourceCollection.createIndex(indexToCreateBeforeResharding));
     }
 
-    startReshardingInBackground(reshardingTest);
-    awaitReshardingInState(sourceCollection, "applying");
+    // Create an index which won't be compatible with the {newKey: 1} shard key pattern but should
+    // still exist post-resharding.
+    assert.commandWorked(sourceCollection.createIndex({extra: 1}));
+    const indexesBeforeResharding = sourceCollection.getIndexes();
 
-    if (indexToCreateBeforeResharding) {
-        let indexesAfterResharding = getIndexes(dbName, collName, mongos);
+    const recipientShardNames = reshardingTest.recipientShardNames;
+    reshardingTest.withReshardingInBackground({
+        newShardKeyPattern: {newKey: 1},
+        newChunks: [{min: {newKey: MinKey}, max: {newKey: MaxKey}, shard: recipientShardNames[0]}],
+    });
+
+    const indexesAfterResharding = sourceCollection.getIndexes();
+    if (indexToCreateBeforeResharding !== undefined) {
         assert.sameMembers(indexesBeforeResharding, indexesAfterResharding);
     } else {
-        ShardedIndexUtil.assertIndexExistsOnShard(
-            mongos, dbName, reshardingTest.temporaryReshardingCollectionName, {newKey: 1});
+        const shardKeyIndexPos = indexesAfterResharding.findIndex(
+            indexInfo => bsonBinaryEqual(indexInfo.key, {newKey: 1}));
+
+        assert.lte(0,
+                   shardKeyIndexPos,
+                   `resharding didn't create index on new shard key pattern: ${
+                       tojson(indexesAfterResharding)}`);
+
+        const indexesAfterReshardingToCompare = indexesAfterResharding.slice();
+        indexesAfterReshardingToCompare.splice(shardKeyIndexPos, 1);
+        assert.sameMembers(indexesBeforeResharding, indexesAfterReshardingToCompare);
     }
+}
 
-    reshardingTest.teardown();
-};
-
-runReshardingCollectionVerifyIndexConsistency();
-runReshardingCollectionVerifyIndexConsistency({newKey: 1});
-runReshardingCollectionVerifyIndexConsistency({newKey: 1, extra: 1});
+reshardingTest.teardown();
 })();
