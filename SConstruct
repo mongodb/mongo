@@ -4384,7 +4384,7 @@ if get_option('ninja') != 'disabled':
             pool="local_pool",
             use_depfile=False,
             use_response_file=True,
-            response_file_content="$in_newline $rspc")
+            response_file_content="$rspc $in_newline")
 
         # Setup the response file content generation to use our workaround rule
         # for LINK commands.
@@ -4403,18 +4403,18 @@ if get_option('ninja') != 'disabled':
             if ninja_build and 'rspc' in ninja_build["variables"]:
 
                 rsp_content = []
-                ninja_build["inputs"] = []
+                inputs = []
                 for opt in ninja_build["variables"]["rspc"].split():
 
                     # if its a candidate to go in the inputs add it, else keep it in the non-newline
                     # rsp_content list
                     if opt.startswith(str(env.Dir("$BUILD_DIR"))) and opt != str(node):
-                        ninja_build["inputs"].append(opt)
+                        inputs.append(opt)
                     else:
                         rsp_content.append(opt)
 
                 ninja_build["variables"]["rspc"] = ' '.join(rsp_content)
-                ninja_build["inputs"] += [infile for infile in ninja_build["inputs"] if infile not in ninja_build["inputs"]]
+                ninja_build["inputs"] += [infile for infile in inputs if infile not in ninja_build["inputs"]]
 
         # We apply the workaround to all Program nodes as they have potential
         # response files that have lines that are too long.
