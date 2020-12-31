@@ -12,7 +12,7 @@
 load("jstests/libs/uuid_util.js");
 load("jstests/sharding/libs/create_sharded_collection_util.js");
 
-const st = new ShardingTest({mongos: 1, config: 1, shards: 2, rs: {nodes: 1}});
+const st = new ShardingTest({mongos: 1, config: 1, shards: 2, rs: {nodes: 3}});
 
 const inputCollection = st.s.getCollection("reshardingDb.coll");
 
@@ -33,25 +33,28 @@ CreateShardedCollectionUtil.shardCollectionWithChunks(temporaryReshardingCollect
     {min: {newKey: 0}, max: {newKey: MaxKey}, shard: st.shard1.shardName},
 ]);
 
-assert.commandWorked(inputCollection.insert(
-    [
-        {_id: "stays on shard0", oldKey: -10, newKey: -10},
-        {_id: "moves to shard0", oldKey: 10, newKey: -10},
-        {_id: "moves to shard1", oldKey: -10, newKey: 10},
-        {_id: "stays on shard1", oldKey: 10, newKey: 10},
-    ],
-    {writeConcern: {w: "majority"}}));
+assert.commandWorked(inputCollection.insert([
+    {_id: "stays on shard0", oldKey: -10, newKey: -10},
+    {_id: "moves to shard0", oldKey: 10, newKey: -10},
+    {_id: "moves to shard1", oldKey: -10, newKey: 10},
+    {_id: "stays on shard1", oldKey: 10, newKey: 10},
+]));
 
 const atClusterTime = inputCollection.getDB().getSession().getOperationTime();
 
-assert.commandWorked(inputCollection.insert(
-    [
-        {_id: "not visible, but would stay on shard0", oldKey: -10, newKey: -10},
-        {_id: "not visible, but would move to shard0", oldKey: 10, newKey: -10},
-        {_id: "not visible, but would move to shard1", oldKey: -10, newKey: 10},
-        {_id: "not visible, but would stay on shard1", oldKey: 10, newKey: 10},
-    ],
-    {writeConcern: {w: "majority"}}));
+assert.commandWorked(inputCollection.insert([
+    {_id: "not visible, but would stay on shard0", oldKey: -10, newKey: -10},
+    {_id: "not visible, but would move to shard0", oldKey: 10, newKey: -10},
+    {_id: "not visible, but would move to shard1", oldKey: -10, newKey: 10},
+    {_id: "not visible, but would stay on shard1", oldKey: 10, newKey: 10},
+]));
+
+// We wait for the "not visible" inserts to become majority-committed on all members of the replica
+// set shards. This isn't necessary for the test's correctness but makes it more likely that the
+// test would fail if ReshardingCollectionCloner wasn't specifying atClusterTime in its read
+// concern.
+st.shard0.rs.awaitLastOpCommitted();
+st.shard1.rs.awaitLastOpCommitted();
 
 function testReshardCloneCollection(shard, expectedDocs) {
     assert.commandWorked(shard.rs.getPrimary().adminCommand({

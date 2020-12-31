@@ -28,14 +28,12 @@ const sourceCollection = reshardingTest.createShardedCollection({
 });
 
 // Perform some inserts before resharding starts so there's data to clone.
-assert.commandWorked(sourceCollection.insert(
-    [
-        {_id: "stays on shard0", oldKey: -10, newKey: -10},
-        {_id: "moves to shard0", oldKey: 10, newKey: -10},
-        {_id: "moves to shard1", oldKey: -10, newKey: 10},
-        {_id: "stays on shard1", oldKey: 10, newKey: 10},
-    ],
-    {writeConcern: {w: "majority"}}));
+assert.commandWorked(sourceCollection.insert([
+    {_id: "stays on shard0", oldKey: -10, newKey: -10},
+    {_id: "moves to shard0", oldKey: 10, newKey: -10},
+    {_id: "moves to shard1", oldKey: -10, newKey: 10},
+    {_id: "stays on shard1", oldKey: 10, newKey: 10},
+]));
 
 const recipientShardNames = reshardingTest.recipientShardNames;
 reshardingTest.startReshardingInBackground({

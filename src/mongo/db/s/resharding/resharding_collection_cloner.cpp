@@ -167,8 +167,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> ReshardingCollectionCloner::_targetAg
                                 << repl::readConcernLevels::kSnapshotName
                                 << repl::ReadConcernArgs::kAtClusterTimeFieldName
                                 << _atClusterTime));
-    // TODO SERVER-52692: Set read preference to nearest.
-    // request.setUnwrappedReadPref();
+    request.setUnwrappedReadPref(ReadPreferenceSetting{ReadPreference::Nearest}.toContainingBSON());
 
     return shardVersionRetry(opCtx,
                              Grid::get(opCtx)->catalogCache(),
