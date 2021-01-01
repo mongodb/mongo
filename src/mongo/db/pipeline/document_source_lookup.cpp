@@ -328,8 +328,8 @@ DocumentSource::GetNextResult DocumentSourceLookUp::doGetNext() {
         objsize = safeSum;
         results.emplace_back(std::move(*result));
     }
-    _usedDisk = _usedDisk || pipeline->usedDisk();
 
+    recordPlanSummaryStats(*pipeline);
     MutableDocument output(std::move(inputDoc));
     output.setNestedField(_as, Value(std::move(results)));
     return output.freeze();
@@ -529,13 +529,15 @@ Pipeline::SourceContainer::iterator DocumentSourceLookUp::doOptimizeAt(
 
 bool DocumentSourceLookUp::usedDisk() {
     if (_pipeline)
-        _usedDisk = _usedDisk || _pipeline->usedDisk();
-    return _usedDisk;
+        _stats.planSummaryStats.usedDisk =
+            _stats.planSummaryStats.usedDisk || _pipeline->usedDisk();
+
+    return _stats.planSummaryStats.usedDisk;
 }
 
 void DocumentSourceLookUp::doDispose() {
     if (_pipeline) {
-        _usedDisk = _usedDisk || _pipeline->usedDisk();
+        recordPlanSummaryStats(*_pipeline);
         _pipeline->dispose(pExpCtx->opCtx);
         _pipeline.reset();
     }
@@ -648,7 +650,7 @@ DocumentSource::GetNextResult DocumentSourceLookUp::unwindResult() {
         }
 
         if (_pipeline) {
-            _usedDisk = _usedDisk || _pipeline->usedDisk();
+            recordPlanSummaryStats(*_pipeline);
             _pipeline->dispose(pExpCtx->opCtx);
         }
 
@@ -705,6 +707,14 @@ void DocumentSourceLookUp::initializeResolvedIntrospectionPipeline() {
     _variables.copyToExpCtx(_variablesParseState, _fromExpCtx.get());
     _resolvedIntrospectionPipeline =
         Pipeline::parse(_resolvedPipeline, _fromExpCtx, lookupPipeValidator);
+}
+
+void DocumentSourceLookUp::recordPlanSummaryStats(const Pipeline& pipeline) {
+    for (auto&& source : pipeline.getSources()) {
+        if (auto specificStats = source->getSpecificStats()) {
+            specificStats->accumulate(_stats.planSummaryStats);
+        }
+    }
 }
 
 void DocumentSourceLookUp::serializeToArray(

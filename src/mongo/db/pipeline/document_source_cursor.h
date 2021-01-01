@@ -104,11 +104,15 @@ public:
     }
 
     const PlanSummaryStats& getPlanSummaryStats() const {
-        return _planSummaryStats;
+        return _stats.planSummaryStats;
     }
 
     bool usedDisk() final {
-        return _planSummaryStats.usedDisk;
+        return _stats.planSummaryStats.usedDisk;
+    }
+
+    const SpecificStats* getSpecificStats() const final {
+        return &_stats;
     }
 
 protected:
@@ -229,7 +233,6 @@ private:
     Status _execStatus = Status::OK();
 
     std::string _planSummary;
-    PlanSummaryStats _planSummaryStats;
 
     // Used only for explain() queries. Stores the stats of the winning plan when a plan was
     // selected by the multi-planner. When the query is executed (with exec->executePlan()), it will
@@ -242,6 +245,9 @@ private:
     // If we are tailing the oplog and tracking the latest observed oplog time, this is the latest
     // timestamp seen in the collection. Otherwise, this is a null timestamp.
     Timestamp _latestOplogTimestamp;
+
+    // Specific stats for $cursor stage.
+    DocumentSourceCursorStats _stats;
 };
 
 }  // namespace mongo
