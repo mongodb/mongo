@@ -289,30 +289,6 @@ var BackupRestoreTest = function(options) {
         // Wait up to 5 minutes until restarted node is in state secondary.
         rst.waitForState(rst.getSecondaries(), ReplSetTest.State.SECONDARY);
 
-        // Add new hidden node to replSetTest
-        jsTestLog('Starting new hidden node (but do not add to replica set) with dbpath ' +
-                  hiddenDbpath + '.');
-        var nodesBeforeAddingHiddenMember = rst.nodes.slice();
-        // ReplSetTest.add() will use default values for --oplogSize and --replSet consistent with
-        // existing nodes.
-        var hiddenCfg = {noCleanData: true, dbpath: hiddenDbpath};
-        var hiddenNode = rst.add(hiddenCfg);
-        var hiddenHost = hiddenNode.host;
-
-        // Add new hidden secondary to replica set
-        jsTestLog('Adding new hidden node ' + hiddenHost + ' to replica set.');
-        rst.awaitNodesAgreeOnPrimary(ReplSetTest.kDefaultTimeoutMS, nodesBeforeAddingHiddenMember);
-        primary = rst.getPrimary();
-        var rsConfig = primary.getDB("local").system.replset.findOne();
-        rsConfig.version += 1;
-        var hiddenMember = {_id: numNodes, host: hiddenHost, priority: 0, hidden: true};
-        rsConfig.members.push(hiddenMember);
-        assert.commandWorked(primary.adminCommand({replSetReconfig: rsConfig}),
-                             testName + ' failed to reconfigure replSet ' + tojson(rsConfig));
-
-        // Wait up to 5 minutes until the new hidden node is in state RECOVERING.
-        rst.waitForState(hiddenNode, [ReplSetTest.State.RECOVERING, ReplSetTest.State.SECONDARY]);
-
         jsTestLog('Stopping CRUD and FSM clients');
 
         // Stop CRUD client and FSM client.
@@ -353,6 +329,29 @@ var BackupRestoreTest = function(options) {
             assert.commandWorked(primary.getDB(dbName).afterClientKills.insert(
                 {'a': 1}, {writeConcern: {w: 'majority'}}));
         });
+
+        // Add the new hidden node to replSetTest.
+        jsTestLog('Starting new hidden node (but do not add to replica set) with dbpath ' +
+                  hiddenDbpath + '.');
+        var nodesBeforeAddingHiddenMember = rst.nodes.slice();
+        // ReplSetTest.add() will use default values for --oplogSize and --replSet consistent with
+        // existing nodes.
+        var hiddenCfg = {noCleanData: true, dbpath: hiddenDbpath};
+        var hiddenNode = rst.add(hiddenCfg);
+        var hiddenHost = hiddenNode.host;
+
+        // Add the new hidden secondary to the replica set. This triggers an election, so it must be
+        // done after stopping the background workloads to prevent the workloads from failing if a
+        // new primary is elected.
+        jsTestLog('Adding new hidden node ' + hiddenHost + ' to replica set.');
+        rst.awaitNodesAgreeOnPrimary(ReplSetTest.kDefaultTimeoutMS, nodesBeforeAddingHiddenMember);
+        primary = rst.getPrimary();
+        var rsConfig = primary.getDB("local").system.replset.findOne();
+        rsConfig.version += 1;
+        var hiddenMember = {_id: numNodes, host: hiddenHost, priority: 0, hidden: true};
+        rsConfig.members.push(hiddenMember);
+        assert.commandWorked(primary.adminCommand({replSetReconfig: rsConfig}),
+                             testName + ' failed to reconfigure replSet ' + tojson(rsConfig));
 
         // Wait up to 5 minutes until the new hidden node is in state SECONDARY.
         jsTestLog('CRUD and FSM clients stopped. Waiting for hidden node ' + hiddenHost +
