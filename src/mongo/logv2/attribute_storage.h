@@ -34,6 +34,7 @@
 #include "mongo/logv2/constants.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/stdx/variant.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 
 #include <boost/container/small_vector.hpp>
@@ -380,8 +381,21 @@ public:
                 if constexpr (std::is_same_v<decltype(val), CustomAttributeValue&&>) {
                     if (val.stringSerialize) {
                         val.stringSerialize(buffer);
-                    } else {
+                    } else if (val.toString) {
                         fmt::format_to(buffer, "{}", val.toString());
+                    } else if (val.BSONSerialize) {
+                        BSONObjBuilder objBuilder;
+                        val.BSONSerialize(objBuilder);
+                        objBuilder.done().jsonStringBuffer(
+                            JsonStringFormat::ExtendedRelaxedV2_0_0, 0, false, buffer);
+                    } else if (val.BSONAppend) {
+                        BSONObjBuilder objBuilder;
+                        val.BSONAppend(objBuilder, ""_sd);
+                        objBuilder.done().getField(""_sd).jsonStringBuffer(
+                            JsonStringFormat::ExtendedRelaxedV2_0_0, false, false, 0, buffer);
+                    } else {
+                        val.toBSONArray().jsonStringBuffer(
+                            JsonStringFormat::ExtendedRelaxedV2_0_0, 0, true, buffer);
                     }
 
                 } else if constexpr (isDuration<std::decay_t<decltype(val)>>) {
@@ -481,8 +495,24 @@ public:
                     if (val.stringSerialize) {
                         fmt::format_to(buffer, "{}: ", key);
                         val.stringSerialize(buffer);
-                    } else {
+                    } else if (val.toString) {
                         fmt::format_to(buffer, "{}: {}", key, val.toString());
+                    } else if (val.BSONSerialize) {
+                        BSONObjBuilder objBuilder;
+                        val.BSONSerialize(objBuilder);
+                        fmt::format_to(buffer, "{}: ", key);
+                        objBuilder.done().jsonStringBuffer(
+                            JsonStringFormat::ExtendedRelaxedV2_0_0, 0, false, buffer);
+                    } else if (val.BSONAppend) {
+                        BSONObjBuilder objBuilder;
+                        val.BSONAppend(objBuilder, ""_sd);
+                        fmt::format_to(buffer, "{}: ", key);
+                        objBuilder.done().getField(""_sd).jsonStringBuffer(
+                            JsonStringFormat::ExtendedRelaxedV2_0_0, false, false, 0, buffer);
+                    } else {
+                        fmt::format_to(buffer, "{}: ", key);
+                        val.toBSONArray().jsonStringBuffer(
+                            JsonStringFormat::ExtendedRelaxedV2_0_0, 0, true, buffer);
                     }
                 } else if constexpr (isDuration<std::decay_t<decltype(val)>>) {
                     fmt::format_to(buffer, "{}: {}", key, val.toString());

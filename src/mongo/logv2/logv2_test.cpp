@@ -1814,5 +1814,31 @@ TEST_F(UnstructuredLoggingTest, UserBothStringAndBSON) {
     });
 }
 
+TEST_F(UnstructuredLoggingTest, VectorBSON) {
+    std::vector<BSONObj> vectorBSON = {BSON("str1"
+                                            << "str2"),
+                                       BSON("str3"
+                                            << "str4")};
+    logd("{}", vectorBSON);  // NOLINT
+    validate([&vectorBSON](const BSONObj& obj) {
+        ASSERT_EQUALS(obj.getField(kMessageFieldName).String(),
+                      "({\"str1\":\"str2\"}, {\"str3\":\"str4\"})");
+    });
+}
+
+TEST_F(UnstructuredLoggingTest, MapBSON) {
+    std::map<std::string, BSONObj> mapBSON = {{"key1",
+                                               BSON("str1"
+                                                    << "str2")},
+                                              {"key2",
+                                               BSON("str3"
+                                                    << "str4")}};
+    logd("{}", mapBSON);  // NOLINT
+    validate([&mapBSON](const BSONObj& obj) {
+        ASSERT_EQUALS(obj.getField(kMessageFieldName).String(),
+                      "(key1: {\"str1\":\"str2\"}, key2: {\"str3\":\"str4\"})");
+    });
+}
+
 }  // namespace
 }  // namespace mongo::logv2
