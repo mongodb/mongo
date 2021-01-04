@@ -32,30 +32,36 @@
 #define WT_SINGLE_THREAD_CHECK_STOP(s)
 #endif
 
-#define API_SESSION_PUSH(s, h, n, dh)       \
-    WT_DATA_HANDLE *__olddh = (s)->dhandle; \
-    const char *__oldname = (s)->name;      \
-    (s)->dhandle = (dh);                    \
+#define API_SESSION_PUSH(s, h, n, dh)                                                        \
+    WT_DATA_HANDLE *__olddh = (s)->dhandle;                                                  \
+    const char *__oldname;                                                                   \
+    /* If this isn't an API reentry, the name should be NULL and the counter should be 0. */ \
+    WT_ASSERT(session, (s)->name != NULL || s->api_call_counter == 0);                       \
+    __oldname = (s)->name;                                                                   \
+    ++s->api_call_counter;                                                                   \
+    (s)->dhandle = (dh);                                                                     \
     (s)->name = (s)->lastop = #h "." #n
 #define API_SESSION_POP(s)  \
     (s)->dhandle = __olddh; \
-    (s)->name = __oldname
+    (s)->name = __oldname;  \
+    --s->api_call_counter
 
 /* Standard entry points to the API: declares/initializes local variables. */
-#define API_SESSION_INIT(s, h, n, dh)                              \
-    WT_TRACK_OP_DECL;                                              \
-    API_SESSION_PUSH(s, h, n, dh);                                 \
-    /*                                                             \
-     * No code before this line, otherwise error handling won't be \
-     * correct.                                                    \
-     */                                                            \
-    WT_ERR(WT_SESSION_CHECK_PANIC(s));                             \
-    WT_SINGLE_THREAD_CHECK_START(s);                               \
-    WT_TRACK_OP_INIT(s);                                           \
-    __wt_op_timer_start(s);                                        \
-    /* Reset wait time if this isn't an API reentry. */            \
-    if (__oldname == NULL)                                         \
-        (s)->cache_wait_us = 0;                                    \
+#define API_SESSION_INIT(s, h, n, dh)                                 \
+    WT_TRACK_OP_DECL;                                                 \
+    API_SESSION_PUSH(s, h, n, dh);                                    \
+    /*                                                                \
+     * No code before this line, otherwise error handling won't be    \
+     * correct.                                                       \
+     */                                                               \
+    WT_ERR(WT_SESSION_CHECK_PANIC(s));                                \
+    WT_SINGLE_THREAD_CHECK_START(s);                                  \
+    WT_TRACK_OP_INIT(s);                                              \
+    if (s->api_call_counter == 1 && !F_ISSET(s, WT_SESSION_INTERNAL)) \
+        __wt_op_timer_start(s);                                       \
+    /* Reset wait time if this isn't an API reentry. */               \
+    if (s->api_call_counter == 1)                                     \
+        (s)->cache_wait_us = 0;                                       \
     __wt_verbose((s), WT_VERB_API, "%s", "CALL: " #h ":" #n)
 
 #define API_CALL_NOCONF(s, h, n, dh) \
@@ -69,20 +75,21 @@
         if ((config) != NULL)                                             \
     WT_ERR(__wt_config_check((s), WT_CONFIG_REF(session, h##_##n), (config), 0))
 
-#define API_END(s, ret)                                      \
-    if ((s) != NULL) {                                       \
-        WT_TRACK_OP_END(s);                                  \
-        WT_SINGLE_THREAD_CHECK_STOP(s);                      \
-        if ((ret) != 0)                                      \
-            __wt_txn_err_set(s, ret);                        \
-        __wt_op_timer_stop(s);                               \
-        /*                                                   \
-         * No code after this line, otherwise error handling \
-         * won't be correct.                                 \
-         */                                                  \
-        API_SESSION_POP(s);                                  \
-    }                                                        \
-    }                                                        \
+#define API_END(s, ret)                                                         \
+    if ((s) != NULL) {                                                          \
+        WT_TRACK_OP_END(s);                                                     \
+        WT_SINGLE_THREAD_CHECK_STOP(s);                                         \
+        if ((ret) != 0)                                                         \
+            __wt_txn_err_set(s, ret);                                           \
+        if (s->api_call_counter == 1 && !F_ISSET(session, WT_SESSION_INTERNAL)) \
+            __wt_op_timer_stop(s);                                              \
+        /*                                                                      \
+         * No code after this line, otherwise error handling                    \
+         * won't be correct.                                                    \
+         */                                                                     \
+        API_SESSION_POP(s);                                                     \
+    }                                                                           \
+    }                                                                           \
     while (0)
 
 /* An API call wrapped in a transaction if necessary. */

@@ -798,6 +798,10 @@ __wt_cursor_cache_get(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *to_d
         if (cval.val)
             return (WT_NOTFOUND);
 
+        WT_RET(__wt_config_gets_def(session, cfg, "debug", 0, &cval));
+        if (cval.len != 0)
+            return (WT_NOTFOUND);
+
         WT_RET(__wt_config_gets_def(session, cfg, "dump", 0, &cval));
         if (cval.len != 0)
             return (WT_NOTFOUND);

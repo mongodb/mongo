@@ -59,7 +59,7 @@ class suite_random:
 
         self.seedz = (36969 * (z & 65535) + (z >> 16)) & 0xffffffff
         self.seedw = (18000 * (w & 65535) + (w >> 16)) & 0xffffffff
-        return ((z << 16) + w & 65535) & 0xffffffff
+        return ((z << 16) + (w & 65535)) & 0xffffffff
 
     def rand_range(self, n, m):
         """

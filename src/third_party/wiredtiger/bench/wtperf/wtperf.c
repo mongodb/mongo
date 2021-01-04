@@ -1425,9 +1425,9 @@ execute_populate(WTPERF *wtperf)
         wtperf->totalsec += opts->report_interval;
         wtperf->insert_ops = sum_pop_ops(wtperf);
         lprintf(wtperf, 0, 1,
-          "%" PRIu64 " populate inserts (%" PRIu64 " of %" PRIu32 ") in %" PRIu32 " secs (%" PRIu32
+          "%" PRIu64 " populate inserts (%" PRIu64 " of %" PRIu64 ") in %" PRIu32 " secs (%" PRIu32
           " total secs)",
-          wtperf->insert_ops - last_ops, wtperf->insert_ops, opts->icount, opts->report_interval,
+          wtperf->insert_ops - last_ops, wtperf->insert_ops, max_key, opts->report_interval,
           wtperf->totalsec);
         last_ops = wtperf->insert_ops;
     }

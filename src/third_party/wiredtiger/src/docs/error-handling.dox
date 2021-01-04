@@ -51,9 +51,9 @@ required to use the database.
 
 @par <code>WT_CACHE_FULL</code>
 This error is only generated when wiredtiger_open is configured to run in-memory, and an insert or
-update operation requires more than the configured cache size to complete. The operation may be
-retried; if a transaction is in progress, it should be rolled back and the operation retried in a
-new transaction.
+update operation requires more than the configured cache size to complete, or when an application
+thread fails to do eviction within cache_max_wait_ms. The operation may be retried; if a transaction
+is in progress, it should be rolled back and the operation retried in a new transaction.
 
 @par <code>WT_PREPARE_CONFLICT</code>
 This error is generated when the application attempts to update an already updated record which is
