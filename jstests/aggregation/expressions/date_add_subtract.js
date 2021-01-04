@@ -1,7 +1,6 @@
 /**
  * Tests for $dateAdd and $dateSubtract expressions.
  * @tags: [
- *    sbe_incompatible,
  *    requires_fcv_49
  * ]
  */
@@ -9,7 +8,8 @@
 (function() {
 "use strict";
 
-load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
+load("jstests/aggregation/extras/utils.js");        // For assertErrorCode.
+load("jstests/libs/sbe_assert_error_override.js");  // For mapping of error codes in SBE.
 
 const coll = db.date_add_subtract;
 coll.drop();

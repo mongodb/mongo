@@ -37,6 +37,9 @@ namespace mongo {
 namespace sbe {
 namespace vm {
 
+bool isValidTimezone(value::TypeTags timezoneTag,
+                     value::Value timezoneValue,
+                     const TimeZoneDatabase* timezoneDB);
 /**
  * Returns true if a timezone represented by 'timezoneTag' and 'timezoneValue' is valid and exists
  * in database 'timezoneDB', meaning that it can be retrieved by function 'getTimezone()'.
@@ -63,7 +66,6 @@ Date_t getDate(value::TypeTags dateTag, value::Value dateVal);
  * 'getDate()', otherwise returns false.
  */
 bool coercibleToDate(value::TypeTags typeTag);
-
 }  // namespace vm
 
 }  // namespace sbe

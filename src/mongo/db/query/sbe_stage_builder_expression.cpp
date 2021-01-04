@@ -2574,11 +2574,11 @@ public:
     }
 
     void visit(ExpressionDateAdd* expr) final {
-        unsupportedExpression("$dateAdd");
+        generateDateArithmeticsExpression(expr, "dateAdd");
     }
 
     void visit(ExpressionDateSubtract* expr) final {
-        unsupportedExpression("$dateSubtract");
+        generateDateArithmeticsExpression(expr, "dateSubtract");
     }
 
 private:
@@ -3118,6 +3118,117 @@ private:
 
         _context->pushExpr(sbe::makeE<sbe::ELocalBind>(
             outerFrameId, std::move(outerBinds), std::move(regexWithErrorCheck)));
+    }
+
+    /**
+     * Generic logic for building $dateAdd and $dateSubtract expressions.
+     */
+    void generateDateArithmeticsExpression(ExpressionDateArithmetics* expr,
+                                           const std::string& dateExprName) {
+        auto children = expr->getChildren();
+        auto arity = children.size();
+        invariant(arity == 4);
+        _context->ensureArity(children[3] ? 4 : 3);
+
+        auto timezoneExpr = [&]() {
+            if (children[3]) {
+                return _context->popExpr();
+            }
+            return makeConstant("UTC");
+        }();
+        auto amountExpr = _context->popExpr();
+        auto unitExpr = _context->popExpr();
+        auto startDateExpr = _context->popExpr();
+
+        std::vector<std::unique_ptr<sbe::EExpression>> binds;
+        binds.push_back(std::move(startDateExpr));
+        binds.push_back(std::move(unitExpr));
+        binds.push_back(std::move(amountExpr));
+        binds.push_back(std::move(timezoneExpr));
+
+        auto frameId = _context->frameIdGenerator->generate();
+        sbe::EVariable startDateRef{frameId, 0};
+        sbe::EVariable unitRef{frameId, 1};
+        sbe::EVariable origAmountRef{frameId, 2};
+        sbe::EVariable tzRef{frameId, 3};
+        sbe::EVariable amountRef{frameId, 4};
+
+        auto convertedAmountInt64 = [&]() {
+            if (dateExprName == "dateAdd") {
+                return sbe::makeE<sbe::ENumericConvert>(origAmountRef.clone(),
+                                                        sbe::value::TypeTags::NumberInt64);
+            } else if (dateExprName == "dateSubtract") {
+                return sbe::makeE<sbe::ENumericConvert>(
+                    sbe::makeE<sbe::EPrimUnary>(sbe::EPrimUnary::negate, origAmountRef.clone()),
+                    sbe::value::TypeTags::NumberInt64);
+            } else {
+                MONGO_UNREACHABLE;
+            }
+        }();
+        binds.push_back(std::move(convertedAmountInt64));
+
+        std::vector<std::unique_ptr<sbe::EExpression>> args;
+        auto timeZoneDBSlot = _context->runtimeEnvironment->getSlot("timeZoneDB"_sd);
+        args.push_back(sbe::makeE<sbe::EVariable>(timeZoneDBSlot));
+        args.push_back(startDateRef.clone());
+        args.push_back(unitRef.clone());
+        args.push_back(amountRef.clone());
+        args.push_back(tzRef.clone());
+
+        std::vector<std::unique_ptr<sbe::EExpression>> checkNullArg;
+        sbe::value::SlotId slot{0};
+        for (size_t idx = 0; idx < arity; ++idx, ++slot) {
+            checkNullArg.push_back(generateNullOrMissing(frameId, slot));
+        }
+
+        using iter_t = std::vector<std::unique_ptr<sbe::EExpression>>::iterator;
+        auto checkNullAnyArgument =
+            std::accumulate(std::move_iterator<iter_t>(checkNullArg.begin() + 1),
+                            std::move_iterator<iter_t>(checkNullArg.end()),
+                            std::move(checkNullArg.front()),
+                            [](auto&& acc, auto&& ex) {
+                                return sbe::makeE<sbe::EPrimBinary>(
+                                    sbe::EPrimBinary::logicOr, std::move(acc), std::move(ex));
+                            });
+
+        auto dateAddExpr = buildMultiBranchConditional(
+            CaseValuePair{std::move(checkNullAnyArgument),
+                          makeConstant(sbe::value::TypeTags::Null, 0)},
+            CaseValuePair{generateNonStringCheck(tzRef),
+                          sbe::makeE<sbe::EFail>(
+                              ErrorCodes::Error{5166601},
+                              str::stream() << "$" << dateExprName
+                                            << " expects timezone argument of type string")},
+            CaseValuePair{makeNot(makeFunction("isTimezone",
+                                               sbe::makeE<sbe::EVariable>(timeZoneDBSlot),
+                                               tzRef.clone())),
+                          sbe::makeE<sbe::EFail>(ErrorCodes::Error{5166602},
+                                                 str::stream() << "$" << dateExprName
+                                                               << " expects a valid timezone")},
+            CaseValuePair{
+                makeNot(sbe::makeE<sbe::ETypeMatch>(startDateRef.clone(), dateTypeMask())),
+                sbe::makeE<sbe::EFail>(ErrorCodes::Error{5166603},
+                                       str::stream()
+                                           << "$" << dateExprName
+                                           << " must have startDate argument convertable to date")},
+            CaseValuePair{generateNonStringCheck(unitRef),
+                          sbe::makeE<sbe::EFail>(ErrorCodes::Error{5166604},
+                                                 str::stream()
+                                                     << "$" << dateExprName
+                                                     << " expects unit argument of type string")},
+            CaseValuePair{makeNot(makeFunction("isTimeUnit", unitRef.clone())),
+                          sbe::makeE<sbe::EFail>(ErrorCodes::Error{5166605},
+                                                 str::stream() << "$" << dateExprName
+                                                               << " expects a valid time unit")},
+            CaseValuePair{makeNot(makeFunction("exists", amountRef.clone())),
+                          sbe::makeE<sbe::EFail>(
+                              ErrorCodes::Error{5166606},
+                              str::stream() << "$" << dateExprName
+                                            << " expects amount argument to be an integer number")},
+            sbe::makeE<sbe::EFunction>("dateAdd", std::move(args)));
+
+        _context->pushExpr(
+            sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(dateAddExpr)));
     }
 
     void unsupportedExpression(const char* op) const {

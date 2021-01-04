@@ -117,6 +117,7 @@ env.CppUnitTest(
         'expressions/sbe_bson_size_test.cpp',
         'expressions/sbe_coerce_to_string_test.cpp',
         'expressions/sbe_concat_test.cpp',
+        'expressions/sbe_date_add_test.cpp',
         'expressions/sbe_date_diff_test.cpp',
         'expressions/sbe_date_to_parts_test.cpp',
         'expressions/sbe_day_of_expressions_test.cpp',
