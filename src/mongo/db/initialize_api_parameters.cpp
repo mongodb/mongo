@@ -75,6 +75,14 @@ const APIParametersFromClient initializeAPIParameters(const BSONObj& requestBody
                 str::stream() << "Provided apiStrict:true, but the command " << command->getName()
                               << " is not in API Version " << apiVersionFromClient,
                 strictAssert);
+        bool strictDoesntWriteToSystemJS =
+            !(command->getReadWriteType() == BasicCommand::ReadWriteType::kWrite &&
+              requestBody.firstElementType() == BSONType::String &&
+              requestBody.firstElement().String() == "system.js");
+        uassert(ErrorCodes::APIStrictError,
+                str::stream() << "Provided apiStrict:true, but the command " << command->getName()
+                              << " attempts to write to system.js",
+                strictDoesntWriteToSystemJS);
     }
 
     if (apiParamsFromClient.getApiDeprecationErrors().get_value_or(false)) {
