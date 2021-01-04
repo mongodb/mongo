@@ -46,7 +46,7 @@ namespace mongo {
 namespace {
 
 const auto getAuthenticationSession =
-    Client::declareDecoration<std::unique_ptr<AuthenticationSession>>();
+    Client::declareDecoration<boost::optional<AuthenticationSession>>();
 
 const auto getAuthorizationManager =
     ServiceContext::declareDecoration<std::unique_ptr<AuthorizationManager>>();
@@ -96,13 +96,8 @@ ServiceContext::ConstructorActionRegisterer destroyAuthorizationManagerRegistere
 
 }  // namespace
 
-void AuthenticationSession::set(Client* client, std::unique_ptr<AuthenticationSession> newSession) {
-    getAuthenticationSession(client) = std::move(newSession);
-}
-
-void AuthenticationSession::swap(Client* client, std::unique_ptr<AuthenticationSession>& other) {
-    using std::swap;
-    swap(getAuthenticationSession(client), other);
+boost::optional<AuthenticationSession>& AuthenticationSession::_get(Client* client) {
+    return getAuthenticationSession(client);
 }
 
 AuthorizationManager* AuthorizationManager::get(ServiceContext* service) {

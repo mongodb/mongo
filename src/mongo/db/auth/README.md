@@ -74,10 +74,12 @@ at runtime. `SASL` mechanisms define a method of communication between a client 
 does not, however, define where the user credentials can be stored. With some `SASL` mechanisms,
 `PLAIN` for example, the credentials can be stored in the database itself or in `LDAP`.
 
-Before running authentication, the server sets an empty
-[`AuthenticationSession`](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/authentication_session.h)
-on the `Client`. During the first step of authentication, the client invokes `{saslStart: ...}`,
-which reaches
+Before running authentication, the server initializes an
+[`AuthenticationSession`](https://github.com/mongodb/mongo/blob/master/src/mongo/db/auth/authentication_session.h)
+on the `Client`. This session persists information between authentications steps and is released
+when authentication concludes, either successfully or unsuccessfully.
+
+During the first step of authentication, the client invokes `{saslStart: ...}`, which reaches
 [`doSaslStart`](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/sasl_commands.cpp#L237-L242)
 which gets the mechanism used and performs the actual authentication by calling the step function
 (inherited from
@@ -91,12 +93,10 @@ closes the session.
 
 If, after the first SASL step, there is more work to be done, the client sends a
 [`CMDSaslContinue`](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/sasl_commands.cpp#L98)
-to the server with whatever extra information the server requested. The server then retrieves the
-former
-[`AuthenticationSession`](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/authentication_session.h)
-from the current client and performs another SASL step. The server then sends the client a similar
-reply as it did from the `SASLStart` command. The `SASLContinue` phase repeats until the client is
-either authenticated or an error is encountered.
+to the server with whatever extra information the server requested. The server then performs another
+SASL step. The server then sends the client a similar reply as it did from the `SASLStart` command.
+The `SASLContinue` phase repeats until the client is either authenticated or an error is
+encountered.
 
 #### Speculative Authentication
 
@@ -639,6 +639,7 @@ Refer to the following links for definitions of the Classes referenced in this d
 | Class | File | Description |
 | --- | --- | --- |
 | `ActionType` | [mongo/db/auth/action\_type.h](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/action_type.h) | High level categories of actions which may be performed against a given resource (e.g. `find`, `insert`, `update`, etc...) |
+| `AuthenticationSession` | [mongo/db/auth/authentication\_session.h](https://github.com/mongodb/mongo/blob/master/src/mongo/db/auth/authentication_session.h) | Session object to persist Authentication state |
 | `AuthorizationManager` | [mongo/db/auth/authorization\_manager.h](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/authorization_manager.h) | Interface to external state providers |
 | `AuthorizationSession` | [mongo/db/auth/authorization\_session.h](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/authorization_session.h) | Representation of currently authenticated and authorized users on the `Client` connection |
 | `AuthzManagerExternalStateLocal` | [.../authz\_manager\_external\_state\_local.h](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/authz_manager_external_state_local.h) | `Local` implementation of user/role provider |

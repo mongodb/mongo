@@ -138,7 +138,9 @@ public:
 StatusWith<SaslReply> doSaslStep(OperationContext* opCtx,
                                  const SaslPayload& payload,
                                  AuthenticationSession* session) try {
-    auto& mechanism = session->getMechanism();
+    auto mechanismPtr = session->getMechanism();
+    invariant(mechanismPtr);
+    auto& mechanism = *mechanismPtr;
 
     // Passing in a payload and extracting a responsePayload
     StatusWith<std::string> swResponse = mechanism.step(opCtx, payload.get());
@@ -182,6 +184,8 @@ StatusWith<SaslReply> doSaslStep(OperationContext* opCtx,
                   "authenticationDatabase"_attr = mechanism.getAuthenticationDatabase(),
                   "remote"_attr = opCtx->getClient()->session()->remote());
         }
+
+        session->markSuccessful();
     }
 
     SaslReply reply;
@@ -198,41 +202,36 @@ StatusWith<SaslReply> doSaslStep(OperationContext* opCtx,
 }
 
 SaslReply doSaslStart(OperationContext* opCtx,
+                      AuthenticationSession* session,
                       const SaslStartCommand& request,
-                      bool speculative,
-                      std::string* principalName,
-                      std::unique_ptr<AuthenticationSession>* session) {
+                      std::string* principalName) {
     auto mechanism = uassertStatusOK(
         SASLServerMechanismRegistry::get(opCtx->getServiceContext())
             .getServerMechanism(request.getMechanism(), request.getDbName().toString()));
 
     uassert(ErrorCodes::BadValue,
             "Plaintext mechanisms may not be used with speculativeSaslStart",
-            !speculative ||
+            !session->isSpeculative() ||
                 mechanism->properties().hasAllProperties(
                     SecurityPropertySet({SecurityProperty::kNoPlainText})));
 
-    auto newSession = std::make_unique<AuthenticationSession>(std::move(mechanism), speculative);
+    session->setMechanism(std::move(mechanism), request.getOptions());
 
-    if (auto options = request.getOptions()) {
-        uassertStatusOK(newSession->setOptions(options->getOwned()));
-    }
-
-    auto swReply = doSaslStep(opCtx, request.getPayload(), newSession.get());
-    if (!swReply.isOK() || newSession->getMechanism().isSuccess()) {
+    auto swReply = doSaslStep(opCtx, request.getPayload(), session);
+    if (!swReply.isOK() || session->getMechanism()->isSuccess()) {
         // Only attempt to populate principal name if we're done (successfully or not).
-        *principalName = newSession->getMechanism().getPrincipalName().toString();
+        *principalName = session->getMechanism()->getPrincipalName().toString();
     }
 
     auto reply = uassertStatusOK(swReply);
-    session->reset(newSession.release());
     return reply;
 }
 
-SaslReply runSaslStart(OperationContext* opCtx, const SaslStartCommand& request, bool speculative) {
+SaslReply runSaslStart(OperationContext* opCtx,
+                       AuthenticationSession* session,
+                       const SaslStartCommand& request) {
     opCtx->markKillOnClientDisconnect();
     auto client = opCtx->getClient();
-    AuthenticationSession::set(client, std::unique_ptr<AuthenticationSession>());
 
     auto db = request.getDbName();
     auto mechanismName = request.getMechanism().toString();
@@ -240,32 +239,27 @@ SaslReply runSaslStart(OperationContext* opCtx, const SaslStartCommand& request,
     SaslReply reply;
     std::string principalName;
     try {
-        std::unique_ptr<AuthenticationSession> session;
-
         auto mechCounter = authCounter.getMechanismCounter(mechanismName);
         mechCounter.incAuthenticateReceived();
-        if (speculative) {
+        if (session->isSpeculative()) {
             mechCounter.incSpeculativeAuthenticateReceived();
         }
 
-        reply = doSaslStart(opCtx, request, speculative, &principalName, &session);
+        reply = doSaslStart(opCtx, session, request, &principalName);
 
-        const bool isClusterMember = session->getMechanism().isClusterMember();
-        if (isClusterMember) {
+        if (session->isClusterMember()) {
             mechCounter.incClusterAuthenticateReceived();
         }
-        if (session->getMechanism().isSuccess()) {
+        if (session->getMechanism()->isSuccess()) {
             mechCounter.incAuthenticateSuccessful();
-            if (isClusterMember) {
+            if (session->isClusterMember()) {
                 mechCounter.incClusterAuthenticateSuccessful();
             }
-            if (speculative) {
+            if (session->isSpeculative()) {
                 mechCounter.incSpeculativeAuthenticateSuccessful();
             }
             audit::logAuthentication(
                 client, mechanismName, UserName(principalName, db), ErrorCodes::OK);
-        } else {
-            AuthenticationSession::swap(client, session);
         }
     } catch (const AssertionException& ex) {
         audit::logAuthentication(client, mechanismName, UserName(principalName, db), ex.code());
@@ -275,25 +269,34 @@ SaslReply runSaslStart(OperationContext* opCtx, const SaslStartCommand& request,
     return reply;
 }
 
+SaslReply runSaslContinue(OperationContext* opCtx,
+                          AuthenticationSession* session,
+                          const SaslContinueCommand& request);
+
 SaslReply CmdSaslStart::Invocation::typedRun(OperationContext* opCtx) {
-    return runSaslStart(opCtx, request(), false);
+    return AuthenticationSession::doStep(
+        opCtx, AuthenticationSession::StepType::kSaslStart, [&](auto session) {
+            return runSaslStart(opCtx, session, request());
+        });
 }
 
 SaslReply CmdSaslContinue::Invocation::typedRun(OperationContext* opCtx) {
-    auto cmd = request();
+    return AuthenticationSession::doStep(
+        opCtx, AuthenticationSession::StepType::kSaslContinue, [&](auto session) {
+            return runSaslContinue(opCtx, session, request());
+        });
+}
 
+SaslReply runSaslContinue(OperationContext* opCtx,
+                          AuthenticationSession* session,
+                          const SaslContinueCommand& cmd) {
     opCtx->markKillOnClientDisconnect();
     auto* client = Client::getCurrent();
-    std::unique_ptr<AuthenticationSession> sessionGuard;
-    AuthenticationSession::swap(client, sessionGuard);
 
-    if (!sessionGuard) {
-        uasserted(ErrorCodes::ProtocolError, "No SASL session state found");
-    }
+    auto mechanismPtr = session->getMechanism();
+    invariant(mechanismPtr);
+    auto& mechanism = *mechanismPtr;
 
-    auto* session = static_cast<AuthenticationSession*>(sessionGuard.get());
-
-    auto& mechanism = session->getMechanism();
     // Authenticating the __system@local user to the admin database on mongos is required
     // by the auth passthrough test suite.
     if (mechanism.getAuthenticationDatabase() != cmd.getDbName() && !getTestCommandsEnabled()) {
@@ -324,8 +327,6 @@ SaslReply CmdSaslContinue::Invocation::typedRun(OperationContext* opCtx) {
                 mechCounter.incSpeculativeAuthenticateSuccessful();
             }
         }
-    } else {
-        AuthenticationSession::swap(client, sessionGuard);
     }
 
     return uassertStatusOK(swReply);
@@ -353,11 +354,13 @@ void doSpeculativeSaslStart(OperationContext* opCtx, BSONObj cmdObj, BSONObjBuil
         return;
     }
 
-    auto reply = auth::runSaslStart(
-        opCtx,
-        auth::SaslStartCommand::parse(IDLParserErrorContext("speculative saslStart"), cmd.obj()),
-        true);
-    result->append(auth::kSpeculativeAuthenticate, reply.toBSON());
+    AuthenticationSession::doStep(
+        opCtx, AuthenticationSession::StepType::kSpeculativeSaslStart, [&](auto session) {
+            auto request = auth::SaslStartCommand::parse(
+                IDLParserErrorContext("speculative saslStart"), cmd.obj());
+            auto reply = auth::runSaslStart(opCtx, session, request);
+            result->append(auth::kSpeculativeAuthenticate, reply.toBSON());
+        });
 } catch (...) {
     // Treat failure like we never even got a speculative start.
 }

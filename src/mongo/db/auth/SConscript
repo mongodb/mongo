@@ -38,6 +38,20 @@ env.Library(
 )
 
 env.Library(
+    target='authentication_session',
+    source=[
+        'authentication_session.cpp',
+    ],
+    LIBDEPS=[
+        'auth',
+        'saslauth',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/stats/counters',
+    ],
+)
+
+env.Library(
     target='auth_op_observer',
     source=[
         "auth_op_observer.cpp",
@@ -258,8 +272,10 @@ env.Library(
         '$BUILD_DIR/mongo/db/audit',
         '$BUILD_DIR/mongo/db/commands',
         '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
+        '$BUILD_DIR/mongo/db/stats/counters',
         'auth',
         'auth_impl_internal',
+        'authentication_session',
         'authorization_manager_global',
         'saslauth',
     ],

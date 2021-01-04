@@ -162,6 +162,18 @@ std::vector<std::string> SASLServerMechanismRegistry::getMechanismNames() const 
     return names;
 }
 
+StringData ServerMechanismBase::getAuthenticationDatabase() const {
+    if (getTestCommandsEnabled() && _authenticationDatabase == "admin" &&
+        getPrincipalName() == internalSecurity.user->getName().getUser()) {
+        // Allows authenticating as the internal user against the admin database.  This is to
+        // support the auth passthrough test framework on mongos (since you can't use the local
+        // database on a mongos, so you can't auth as the internal user without this).
+        return internalSecurity.user->getName().getDB();
+    } else {
+        return _authenticationDatabase;
+    }
+}
+
 namespace {
 ServiceContext::ConstructorActionRegisterer SASLServerMechanismRegistryInitializer{
     "CreateSASLServerMechanismRegistry", {"EndStartupOptionStorage"}, [](ServiceContext* service) {

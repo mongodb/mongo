@@ -30,6 +30,7 @@
 #include "mongo/db/repl/hello_auth.h"
 
 #include "mongo/client/authenticate.h"
+#include "mongo/db/auth/authentication_session.h"
 #include "mongo/db/auth/sasl_command_constants.h"
 #include "mongo/db/auth/sasl_commands.h"
 #include "mongo/db/auth/sasl_mechanism_registry.h"
@@ -41,12 +42,14 @@ namespace mongo {
 void handleHelloAuth(OperationContext* opCtx, BSONObj cmdObj, BSONObjBuilder* result) {
     auto ssme = cmdObj[auth::kSaslSupportedMechanisms];
     if (ssme.type() == BSONType::String) {
-        UserName userName = uassertStatusOK(UserName::parse(ssme.String()));
+        AuthenticationSession::doStep(
+            opCtx, AuthenticationSession::StepType::kSaslSupportedMechanisms, [&](auto session) {
+                UserName userName = uassertStatusOK(UserName::parse(ssme.String()));
 
-        authCounter.incSaslSupportedMechanismsReceived();
-
-        auto& saslMechanismRegistry = SASLServerMechanismRegistry::get(opCtx->getServiceContext());
-        saslMechanismRegistry.advertiseMechanismNamesForUser(opCtx, userName, result);
+                auto& saslMechanismRegistry =
+                    SASLServerMechanismRegistry::get(opCtx->getServiceContext());
+                saslMechanismRegistry.advertiseMechanismNamesForUser(opCtx, userName, result);
+            });
     }
 
     auto sae = cmdObj[auth::kSpeculativeAuthenticate];

@@ -187,7 +187,10 @@ constexpr auto kX509AuthenticationDisabledMessage = "x.509 authentication is dis
  * mechanism, and ProtocolError, indicating an error in the use of the authentication
  * protocol.
  */
-void _authenticateX509(OperationContext* opCtx, UserName& user, StringData dbname) {
+void _authenticateX509(OperationContext* opCtx,
+                       AuthenticationSession* session,
+                       UserName& user,
+                       StringData dbname) {
     if (user.getUser().empty()) {
         auto& sslPeerInfo = SSLPeerInfo::forSession(opCtx->getClient()->session());
         user = UserName(sslPeerInfo.subjectName.toString(), dbname);
@@ -259,18 +262,21 @@ void _authenticateX509(OperationContext* opCtx, UserName& user, StringData dbnam
 #endif  // MONGO_CONFIG_SSL
 
 void _authenticate(OperationContext* opCtx,
+                   AuthenticationSession* session,
                    StringData mechanism,
                    UserName& user,
                    StringData dbname) {
 #ifdef MONGO_CONFIG_SSL
     if (mechanism == kX509AuthMechanism) {
-        return _authenticateX509(opCtx, user, dbname);
+        return _authenticateX509(opCtx, session, user, dbname);
     }
 #endif
     uasserted(ErrorCodes::BadValue, "Unsupported mechanism: " + mechanism);
 }
 
-AuthenticateReply authCommand(OperationContext* opCtx, const AuthenticateCommand& cmd) {
+AuthenticateReply authCommand(OperationContext* opCtx,
+                              AuthenticationSession* session,
+                              const AuthenticateCommand& cmd) {
     auto dbname = cmd.getDbName();
     UserName user(cmd.getUser().value_or(""), dbname);
     const std::string mechanism(cmd.getMechanism());
@@ -300,7 +306,7 @@ AuthenticateReply authCommand(OperationContext* opCtx, const AuthenticateCommand
         auto mechCounter = authCounter.getMechanismCounter("MONGODB-X509");
         mechCounter.incAuthenticateReceived();
 
-        _authenticate(opCtx, mechanism, user, dbname);
+        _authenticate(opCtx, session, mechanism, user, dbname);
         audit::logAuthentication(opCtx->getClient(), mechanism, user, ErrorCodes::OK);
 
         if (!serverGlobalParams.quiet.load()) {
@@ -312,6 +318,7 @@ AuthenticateReply authCommand(OperationContext* opCtx, const AuthenticateCommand
                   "remote"_attr = opCtx->getClient()->session()->remote());
         }
 
+        session->markSuccessful();
         mechCounter.incAuthenticateSuccessful();
 
         return AuthenticateReply(user.getUser().toString(), user.getDB().toString());
@@ -354,8 +361,11 @@ public:
         void doCheckAuthorization(OperationContext*) const final {}
 
         Reply typedRun(OperationContext* opCtx) final {
-            CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
-            return authCommand(opCtx, request());
+            return AuthenticationSession::doStep(
+                opCtx, AuthenticationSession::StepType::kAuthenticate, [&](auto session) {
+                    CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
+                    return authCommand(opCtx, session, request());
+                });
         }
     };
 
@@ -386,18 +396,20 @@ void doSpeculativeAuthenticate(OperationContext* opCtx,
     auto authCmdObj = AuthenticateCommand::parse(
         IDLParserErrorContext("speculative X509 Authenticate"), cmd.obj());
 
+    AuthenticationSession::doStep(
+        opCtx, AuthenticationSession::StepType::kSpeculativeAuthenticate, [&](auto session) {
+            const auto mechanism = authCmdObj.getMechanism().toString();
+            try {
+                authCounter.getMechanismCounter(mechanism).incSpeculativeAuthenticateReceived();
+            } catch (...) {
+                // Run will make sure an audit entry happens. Let it reach that point.
+            }
 
-    const auto mechanism = authCmdObj.getMechanism().toString();
-    try {
-        authCounter.getMechanismCounter(mechanism).incSpeculativeAuthenticateReceived();
-    } catch (...) {
-        // Run will make sure an audit entry happens. Let it reach that point.
-    }
+            auto authReply = authCommand(opCtx, session, authCmdObj);
 
-    auto authReply = authCommand(opCtx, authCmdObj);
-
-    authCounter.getMechanismCounter(mechanism).incSpeculativeAuthenticateSuccessful();
-    result->append(auth::kSpeculativeAuthenticate, authReply.toBSON());
+            authCounter.getMechanismCounter(mechanism).incSpeculativeAuthenticateSuccessful();
+            result->append(auth::kSpeculativeAuthenticate, authReply.toBSON());
+        });
 } catch (...) {
     // Treat failure like we never even got a speculative start.
 }

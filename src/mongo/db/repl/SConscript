@@ -1742,8 +1742,8 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/auth/authentication_session',
         '$BUILD_DIR/mongo/db/auth/authservercommon',
-        '$BUILD_DIR/mongo/db/stats/counters',
     ],
 )
 

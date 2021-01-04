@@ -188,17 +188,7 @@ public:
     }
 
     /** Returns which database contains the user which authentication is being performed against. */
-    StringData getAuthenticationDatabase() const {
-        if (getTestCommandsEnabled() && _authenticationDatabase == "admin" &&
-            getPrincipalName() == internalSecurity.user->getName().getUser()) {
-            // Allows authenticating as the internal user against the admin database.  This is to
-            // support the auth passthrough test framework on mongos (since you can't use the local
-            // database on a mongos, so you can't auth as the internal user without this).
-            return internalSecurity.user->getName().getDB();
-        } else {
-            return _authenticationDatabase;
-        }
-    }
+    StringData getAuthenticationDatabase() const;
 
     /**
      * Flexible bag of options for a saslStart command.

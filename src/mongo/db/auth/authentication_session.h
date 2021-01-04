@@ -32,6 +32,7 @@
 #include <memory>
 
 #include "mongo/db/auth/sasl_mechanism_registry.h"
+#include "mongo/db/stats/counters.h"
 
 namespace mongo {
 
@@ -45,40 +46,169 @@ class AuthenticationSession {
     AuthenticationSession& operator=(const AuthenticationSession&) = delete;
 
 public:
-    explicit AuthenticationSession(std::unique_ptr<ServerMechanismBase> mech, bool speculative)
-        : _mech(std::move(mech)), _speculative(speculative) {}
+    /**
+     * This enum enumerates the various steps that need access to the AuthenticationSession.
+     */
+    enum class StepType {
+        kSaslSupportedMechanisms,
+        kSaslStart,
+        kSaslContinue,
+        kAuthenticate,
+        kSpeculativeSaslStart,
+        kSpeculativeAuthenticate,
+    };
+
+    AuthenticationSession(Client* client) : _client(client) {}
 
     /**
-     * Sets the authentication session for the given "client" to "newSession".
+     * This guard creates and destroys the session as appropriate for the currentStep.
      */
-    static void set(Client* client, std::unique_ptr<AuthenticationSession> newSession);
+    class StepGuard {
+    public:
+        StepGuard(OperationContext* opCtx, StepType currentStep);
+        ~StepGuard();
+
+        AuthenticationSession* getSession() {
+            return _session;
+        }
+
+    private:
+        OperationContext* const _opCtx;
+        const StepType _currentStep;
+
+        AuthenticationSession* _session;
+    };
 
     /**
-     * Swaps "client"'s current authentication session with "other".
+     * Gets the authentication session for the given "client".
+     *
+     * This function always returns a valid pointer.
      */
-    static void swap(Client* client, std::unique_ptr<AuthenticationSession>& other);
+    static AuthenticationSession* get(Client* client);
+    static AuthenticationSession* get(OperationContext* opCtx) {
+        return get(opCtx->getClient());
+    }
 
     /**
      * Return an identifer of the type of session, so that a caller can safely cast it and
      * extract the type-specific data stored within.
+     *
+     * If a mechanism has not already been set, this may return nullptr.
      */
-    ServerMechanismBase& getMechanism() const {
-        invariant(_mech);
-        return *_mech;
+    ServerMechanismBase* getMechanism() const {
+        return _mech.get();
     }
 
-    Status setOptions(BSONObj options) {
-        invariant(_mech);
-        return _mech->setOptions(options);
-    }
-
+    /**
+     * This returns true if the session started with StepType::kSpeculativeSaslStart or
+     * StepType::kSpeculativeAuthenticate.
+     */
     bool isSpeculative() const {
-        return _speculative;
+        return _isSpeculative;
+    }
+
+    /**
+     * This returns true if the session currently believes itself to be a cluster member.
+     */
+    bool isClusterMember() const {
+        if (_mech && _mech->isClusterMember()) {
+            // If we're doing sasl and we have a mechanism, then we know.
+            return true;
+        }
+
+        // Otherwise, rely on what the implementation has told us directly.
+        return _isClusterMember;
+    }
+
+    /**
+     * This returns true once either markFailed or markSuccessful is invoked.
+     */
+    bool isFinished() const {
+        return _isFinished;
+    }
+
+    /**
+     * Mark the session as a cluster member.
+     *
+     * This is used for x509 authentication since it lacks a mechanism in the traditional sense.
+     */
+    void setAsClusterMember();
+
+    /**
+     * Set the mechanism for the session.
+     *
+     * This function is only valid to invoke when there is no current mechanism.
+     */
+    void setMechanism(std::unique_ptr<ServerMechanismBase> mech, boost::optional<BSONObj> options);
+
+    /**
+     * Mark the session as succssfully authenticated.
+     *
+     * TODO(SERVER-52862) This should increment counters and log.
+     */
+    void markSuccessful();
+
+    /**
+     * Mark the session as unable to authenticate.
+     *
+     * TODO(SERVER-52862) This should increment counters and log.
+     */
+    void markFailed(const Status& status);
+
+    /**
+     * This function invokes a functor with a StepGuard on the stack and observes any exceptions
+     * emitted.
+     */
+    template <typename F>
+    static auto doStep(OperationContext* opCtx, StepType state, F&& f) {
+        auto guard = StepGuard(opCtx, state);
+        auto session = guard.getSession();
+
+        try {
+            return std::forward<F>(f)(session);
+        } catch (const DBException& ex) {
+            session->markFailed(ex.toStatus());
+            throw;
+        } catch (...) {
+            // Swallow other errors.
+            session->markFailed(
+                Status(ErrorCodes::InternalError, "Encountered an unhandleable error"));
+            throw;
+        }
+    }
+
+    /**
+     * Convert a StepType to a constant string.
+     */
+    friend constexpr StringData toString(StepType step) {
+        switch (step) {
+            case StepType::kSaslSupportedMechanisms:
+                return "SaslSupportedMechanisms"_sd;
+            case StepType::kSaslStart:
+                return "SaslStart"_sd;
+            case StepType::kSaslContinue:
+                return "SaslContinue"_sd;
+            case StepType::kAuthenticate:
+                return "Authenticate"_sd;
+            case StepType::kSpeculativeSaslStart:
+                return "SpeculativeSaslStart"_sd;
+            case StepType::kSpeculativeAuthenticate:
+                return "SpeculativeAuthenticate"_sd;
+        }
+
+        return "Unknown"_sd;
     }
 
 private:
+    static boost::optional<AuthenticationSession>& _get(Client* client);
+
+    Client* const _client;
+
+    bool _isSpeculative = false;
+    bool _isClusterMember = false;
+    bool _isFinished = false;
+
     std::unique_ptr<ServerMechanismBase> _mech;
-    bool _speculative{false};
 };
 
 }  // namespace mongo
