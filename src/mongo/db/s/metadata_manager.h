@@ -286,8 +286,6 @@ private:
 
     // Ranges being deleted, or scheduled to be deleted, by a background task.
     std::list<std::pair<ChunkRange, SharedSemiFuture<void>>> _rangesScheduledForDeletion;
-
-    static constexpr int kDefaultRangeDeleterBatchSize{128};
 };
 
 }  // namespace mongo
