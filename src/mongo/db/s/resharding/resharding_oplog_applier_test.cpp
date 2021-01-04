@@ -132,11 +132,15 @@ public:
         uassertStatusOK(createCollection(operationContext(),
                                          kAppliedToNs.db().toString(),
                                          BSON("create" << kAppliedToNs.coll())));
+        uassertStatusOK(createCollection(
+            operationContext(), kStashNs.db().toString(), BSON("create" << kStashNs.coll())));
         uassertStatusOK(createCollection(operationContext(),
                                          kOtherDonorStashNs.db().toString(),
                                          BSON("create" << kOtherDonorStashNs.coll())));
 
         _cm = createChunkManagerForOriginalColl();
+
+        setReshardingOplogApplicationServerParameter(false);
     }
 
     ChunkManager createChunkManagerForOriginalColl() {
@@ -204,11 +208,15 @@ public:
                                         Value(id.toBSON()))};
     }
 
-    void setReshardingOplogApplicationServerParameterTrue() {
+    void setReshardingOplogApplicationServerParameter(bool value) {
         const ServerParameter::Map& parameterMap = ServerParameterSet::getGlobal()->getMap();
         invariant(parameterMap.size());
         const auto param = parameterMap.find("useReshardingOplogApplicationRules");
-        uassertStatusOK(param->second->setFromString("true"));
+        uassertStatusOK(param->second->setFromString(value ? "true" : "false"));
+    }
+
+    void setReshardingOplogApplicationServerParameterTrue() {
+        setReshardingOplogApplicationServerParameter(true);
     }
 
     const NamespaceString& oplogNs() {
@@ -281,6 +289,7 @@ TEST_F(ReshardingOplogApplierTest, NothingToIterate) {
                     crudNs(),
                     crudUUID(),
                     stashCollections(),
+                    0U, /* myStashIdx */
                     Timestamp(6, 3),
                     std::move(iterator),
                     chunkManager(),
@@ -323,6 +332,7 @@ TEST_F(ReshardingOplogApplierTest, ApplyBasicCrud) {
                     crudNs(),
                     crudUUID(),
                     stashCollections(),
+                    0U, /* myStashIdx */
                     Timestamp(6, 3),
                     std::move(iterator),
                     chunkManager(),
@@ -374,6 +384,7 @@ TEST_F(ReshardingOplogApplierTest, InsertTypeOplogAppliedInMultipleBatches) {
                     crudNs(),
                     crudUUID(),
                     stashCollections(),
+                    0U, /* myStashIdx */
                     Timestamp(8, 3),
                     std::move(iterator),
                     chunkManager(),
@@ -433,6 +444,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorDuringBatchApplyCloningPhase) {
                     crudNs(),
                     crudUUID(),
                     stashCollections(),
+                    0U, /* myStashIdx */
                     Timestamp(7, 3),
                     std::move(iterator),
                     chunkManager(),
@@ -480,6 +492,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorDuringBatchApplyCatchUpPhase) {
                     crudNs(),
                     crudUUID(),
                     stashCollections(),
+                    0U, /* myStashIdx */
                     Timestamp(6, 3),
                     std::move(iterator),
                     chunkManager(),
@@ -528,6 +541,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstOplogCloningPhase) {
                     crudNs(),
                     crudUUID(),
                     stashCollections(),
+                    0U, /* myStashIdx */
                     Timestamp(6, 3),
                     std::move(iterator),
                     chunkManager(),
@@ -573,6 +587,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstOplogCatchUpPhase) {
                     crudNs(),
                     crudUUID(),
                     stashCollections(),
+                    0U, /* myStashIdx */
                     Timestamp(5, 3),
                     std::move(iterator),
                     chunkManager(),
@@ -618,6 +633,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstBatchCloningPhase) {
                     crudNs(),
                     crudUUID(),
                     stashCollections(),
+                    0U, /* myStashIdx */
                     Timestamp(8, 3),
                     std::move(iterator),
                     chunkManager(),
@@ -667,6 +683,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstBatchCatchUpPhase) {
                     crudNs(),
                     crudUUID(),
                     stashCollections(),
+                    0U, /* myStashIdx */
                     Timestamp(6, 3),
                     std::move(iterator),
                     chunkManager(),
@@ -717,6 +734,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingSecondBatchCloningPhase) {
                     crudNs(),
                     crudUUID(),
                     stashCollections(),
+                    0U, /* myStashIdx */
                     Timestamp(7, 3),
                     std::move(iterator),
                     chunkManager(),
@@ -778,6 +796,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingSecondBatchCatchUpPhase) {
                     crudNs(),
                     crudUUID(),
                     stashCollections(),
+                    0U, /* myStashIdx */
                     Timestamp(6, 3),
                     std::move(iterator),
                     chunkManager(),
@@ -830,6 +849,7 @@ TEST_F(ReshardingOplogApplierTest, ExecutorIsShutDownCloningPhase) {
                     crudNs(),
                     crudUUID(),
                     stashCollections(),
+                    0U, /* myStashIdx */
                     Timestamp(5, 3),
                     std::move(iterator),
                     chunkManager(),
@@ -874,6 +894,7 @@ TEST_F(ReshardingOplogApplierTest, ExecutorIsShutDownCatchUpPhase) {
                     crudNs(),
                     crudUUID(),
                     stashCollections(),
+                    0U, /* myStashIdx */
                     Timestamp(5, 3),
                     std::move(iterator),
                     chunkManager(),
@@ -915,6 +936,7 @@ TEST_F(ReshardingOplogApplierTest, WriterPoolIsShutDownCloningPhase) {
                     crudNs(),
                     crudUUID(),
                     stashCollections(),
+                    0U, /* myStashIdx */
                     Timestamp(5, 3),
                     std::move(iterator),
                     chunkManager(),
@@ -959,6 +981,7 @@ TEST_F(ReshardingOplogApplierTest, WriterPoolIsShutDownCatchUpPhase) {
                     crudNs(),
                     crudUUID(),
                     stashCollections(),
+                    0U, /* myStashIdx */
                     Timestamp(5, 3),
                     std::move(iterator),
                     chunkManager(),
@@ -1016,6 +1039,7 @@ TEST_F(ReshardingOplogApplierTest, InsertOpIntoOuputCollectionUseReshardingAppli
                     crudNs(),
                     crudUUID(),
                     stashCollections(),
+                    0U, /* myStashIdx */
                     Timestamp(6, 3),
                     std::move(iterator),
                     chunkManager(),
@@ -1069,6 +1093,7 @@ TEST_F(ReshardingOplogApplierTest,
                     crudNs(),
                     crudUUID(),
                     stashCollections(),
+                    0U, /* myStashIdx */
                     Timestamp(5, 3),
                     std::move(iterator),
                     chunkManager(),
@@ -1123,6 +1148,7 @@ TEST_F(ReshardingOplogApplierTest,
                     crudNs(),
                     crudUUID(),
                     stashCollections(),
+                    0U, /* myStashIdx */
                     Timestamp(5, 3),
                     std::move(iterator),
                     chunkManager(),
@@ -1190,6 +1216,7 @@ TEST_F(ReshardingOplogApplierTest,
                     crudNs(),
                     crudUUID(),
                     stashCollections(),
+                    0U, /* myStashIdx */
                     Timestamp(5, 3),
                     std::move(iterator),
                     chunkManager(),
@@ -1257,6 +1284,7 @@ TEST_F(ReshardingOplogApplierTest,
                     crudNs(),
                     crudUUID(),
                     stashCollections(),
+                    0U, /* myStashIdx */
                     Timestamp(5, 3),
                     std::move(iterator),
                     chunkManager(),
@@ -1329,6 +1357,7 @@ TEST_F(ReshardingOplogApplierTest,
                     crudNs(),
                     crudUUID(),
                     stashCollections(),
+                    0U, /* myStashIdx */
                     Timestamp(6, 3),
                     std::move(iterator),
                     chunkManager(),
@@ -1397,6 +1426,7 @@ TEST_F(ReshardingOplogApplierTest,
                     crudNs(),
                     crudUUID(),
                     stashCollections(),
+                    0U, /* myStashIdx */
                     Timestamp(5, 3),
                     std::move(iterator),
                     chunkManager(),
@@ -1485,6 +1515,7 @@ TEST_F(ReshardingOplogApplierTest, UpdateShouldModifyStashCollectionUseReshardin
                     crudNs(),
                     crudUUID(),
                     stashCollections(),
+                    0U, /* myStashIdx */
                     Timestamp(5, 3),
                     std::move(iterator),
                     chunkManager(),
@@ -1551,6 +1582,7 @@ TEST_F(ReshardingOplogApplierTest, UpdateShouldDoNothingUseReshardingApplication
                     crudNs(),
                     crudUUID(),
                     stashCollections(),
+                    0U, /* myStashIdx */
                     Timestamp(5, 3),
                     std::move(iterator),
                     chunkManager(),
@@ -1622,6 +1654,7 @@ TEST_F(ReshardingOplogApplierTest, UpdateOutputCollUseReshardingApplicationRules
                     crudNs(),
                     crudUUID(),
                     stashCollections(),
+                    0U, /* myStashIdx */
                     Timestamp(6, 3),
                     std::move(iterator),
                     chunkManager(),
@@ -1683,6 +1716,7 @@ TEST_F(ReshardingOplogApplierTest, UnsupportedCommandOpsShouldErrorUseResharding
                     crudNs(),
                     crudUUID(),
                     stashCollections(),
+                    0U, /* myStashIdx */
                     Timestamp(5, 3),
                     std::move(iterator),
                     chunkManager(),
@@ -1729,6 +1763,7 @@ TEST_F(ReshardingOplogApplierTest,
                     crudNs(),
                     crudUUID(),
                     stashCollections(),
+                    0U, /* myStashIdx */
                     Timestamp(5, 3),
                     std::move(iterator),
                     chunkManager(),
@@ -2012,6 +2047,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, CrudWithEmptyConfigTransactions) {
                     crudNs(),
                     crudUUID(),
                     stashCollections(),
+                    0U, /* myStashIdx */
                     Timestamp(6, 3),
                     std::move(iterator),
                     chunkManager(),
@@ -2095,6 +2131,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, MultipleTxnSameLsidInOneBatch) {
                     crudNs(),
                     crudUUID(),
                     stashCollections(),
+                    0U, /* myStashIdx */
                     Timestamp(6, 3),
                     std::move(iterator),
                     chunkManager(),
@@ -2152,6 +2189,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithLowerExistingTxn) {
                     crudNs(),
                     crudUUID(),
                     stashCollections(),
+                    0U, /* myStashIdx */
                     Timestamp(6, 3),
                     std::move(iterator),
                     chunkManager(),
@@ -2202,6 +2240,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithHigherExistingTxnNum) {
                     crudNs(),
                     crudUUID(),
                     stashCollections(),
+                    0U, /* myStashIdx */
                     Timestamp(6, 3),
                     std::move(iterator),
                     chunkManager(),
@@ -2262,6 +2301,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithLowerExistingTxnNum) {
                     crudNs(),
                     crudUUID(),
                     stashCollections(),
+                    0U, /* myStashIdx */
                     Timestamp(6, 3),
                     std::move(iterator),
                     chunkManager(),
@@ -2313,6 +2353,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithEqualExistingTxnNum) {
                     crudNs(),
                     crudUUID(),
                     stashCollections(),
+                    0U, /* myStashIdx */
                     Timestamp(6, 3),
                     std::move(iterator),
                     chunkManager(),
@@ -2364,6 +2405,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithStmtIdAlreadyExecuted) 
                     crudNs(),
                     crudUUID(),
                     stashCollections(),
+                    0U, /* myStashIdx */
                     Timestamp(6, 3),
                     std::move(iterator),
                     chunkManager(),
@@ -2416,6 +2458,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithActiveUnpreparedTxnSame
                     crudNs(),
                     crudUUID(),
                     stashCollections(),
+                    0U, /* myStashIdx */
                     Timestamp(6, 3),
                     std::move(iterator),
                     chunkManager(),
@@ -2470,6 +2513,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithActiveUnpreparedTxnWith
                     crudNs(),
                     crudUUID(),
                     stashCollections(),
+                    0U, /* myStashIdx */
                     Timestamp(6, 3),
                     std::move(iterator),
                     chunkManager(),
@@ -2523,6 +2567,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithPreparedTxnThatWillComm
                     crudNs(),
                     crudUUID(),
                     stashCollections(),
+                    0U, /* myStashIdx */
                     Timestamp(6, 3),
                     std::move(iterator),
                     chunkManager(),
@@ -2584,6 +2629,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithPreparedTxnThatWillAbor
                     crudNs(),
                     crudUUID(),
                     stashCollections(),
+                    0U, /* myStashIdx */
                     Timestamp(6, 3),
                     std::move(iterator),
                     chunkManager(),

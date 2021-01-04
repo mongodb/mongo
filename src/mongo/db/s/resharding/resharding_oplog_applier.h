@@ -57,7 +57,8 @@ public:
                            NamespaceString oplogNs,
                            NamespaceString nsBeingResharded,
                            UUID collUUIDBeingResharded,
-                           std::vector<NamespaceString> stashCollections,
+                           std::vector<NamespaceString> allStashNss,
+                           size_t myStashIdx,
                            Timestamp reshardingCloneFinishedTs,
                            std::unique_ptr<ReshardingDonorOplogIteratorInterface> oplogIterator,
                            const ChunkManager& sourceChunkMgr,
@@ -82,6 +83,10 @@ public:
 
     static boost::optional<ReshardingOplogApplierProgress> checkStoredProgress(
         OperationContext* opCtx, const ReshardingSourceId& id);
+
+    static NamespaceString ensureStashCollectionExists(OperationContext* opCtx,
+                                                       const UUID& existingUUID,
+                                                       const ShardId& donorShardId);
 
 private:
     using OplogBatch = std::vector<repl::OplogEntry>;
@@ -166,9 +171,6 @@ private:
 
     // Namespace of collection where operations are going to get applied.
     const NamespaceString _outputNs;
-
-    // Namespace for temp collection used by this applier.
-    const NamespaceString _stashNs;
 
     // The timestamp of the latest oplog entry on the source shard at the time when resharding
     // finished cloning from it.

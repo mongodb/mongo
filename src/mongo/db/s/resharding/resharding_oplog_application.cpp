@@ -99,17 +99,17 @@ void runWithTransaction(OperationContext* opCtx, unique_function<void(OperationC
 }  // namespace
 
 ReshardingOplogApplicationRules::ReshardingOplogApplicationRules(
-    const NamespaceString& outputNss,
-    const NamespaceString& stashNss,
-    const ShardId& donorShardId,
-    ChunkManager sourceChunkMgr,
-    std::vector<NamespaceString> stashColls)
-    : _outputNss(outputNss),
-      _stashNss(stashNss),
-      _donorShardId(donorShardId),
-      _sourceChunkMgr(std::move(sourceChunkMgr)) {
-    _stashColls = std::move(stashColls);
-}
+    NamespaceString outputNss,
+    std::vector<NamespaceString> allStashNss,
+    size_t myStashIdx,
+    ShardId donorShardId,
+    ChunkManager sourceChunkMgr)
+    : _outputNss(std::move(outputNss)),
+      _allStashNss(std::move(allStashNss)),
+      _myStashIdx(myStashIdx),
+      _myStashNss(_allStashNss.at(_myStashIdx)),
+      _donorShardId(std::move(donorShardId)),
+      _sourceChunkMgr(std::move(sourceChunkMgr)) {}
 
 Status ReshardingOplogApplicationRules::applyOperation(
     OperationContext* opCtx, const repl::OplogEntryOrGroupedInserts& opOrGroupedInserts) {
@@ -136,14 +136,14 @@ Status ReshardingOplogApplicationRules::applyOperation(
                 autoCollOutput);
 
             AutoGetCollection autoCollStash(opCtx,
-                                            _stashNss,
+                                            _myStashNss,
                                             MODE_IX,
                                             AutoGetCollectionViewMode::kViewsForbidden,
                                             getDeadline(opCtx));
             uassert(
                 ErrorCodes::NamespaceNotFound,
                 str::stream() << "Failed to apply op during resharding due to missing collection "
-                              << _stashNss.ns(),
+                              << _myStashNss.ns(),
                 autoCollStash);
 
             auto opType = op.getOpType();
@@ -276,7 +276,7 @@ void ReshardingOplogApplicationRules::_applyInsert_inlock(
     auto stashCollDoc = _queryStashCollById(opCtx, db, stashColl, idQuery);
     if (!stashCollDoc.isEmpty()) {
         auto request = UpdateRequest();
-        request.setNamespaceString(_stashNss);
+        request.setNamespaceString(_myStashNss);
         request.setQuery(idQuery);
         request.setUpdateModification(updateMod);
         request.setUpsert(false);
@@ -373,7 +373,7 @@ void ReshardingOplogApplicationRules::_applyUpdate_inlock(
     auto stashCollDoc = _queryStashCollById(opCtx, db, stashColl, idQuery);
     if (!stashCollDoc.isEmpty()) {
         auto request = UpdateRequest();
-        request.setNamespaceString(_stashNss);
+        request.setNamespaceString(_myStashNss);
         request.setQuery(idQuery);
         request.setUpdateModification(std::move(updateMod));
         request.setUpsert(false);
@@ -458,7 +458,7 @@ void ReshardingOplogApplicationRules::_applyDelete_inlock(
     // apply rule #1 and delete the doc from the stash collection.
     auto stashCollDoc = _queryStashCollById(opCtx, db, stashColl, idQuery);
     if (!stashCollDoc.isEmpty()) {
-        auto nDeleted = deleteObjects(opCtx, stashColl, _stashNss, idQuery, true /* justOne */);
+        auto nDeleted = deleteObjects(opCtx, stashColl, _myStashNss, idQuery, true /* justOne */);
         invariant(nDeleted != 0);
         return;
     }
@@ -510,8 +510,10 @@ void ReshardingOplogApplicationRules::_applyDelete_inlock(
         // Attempt to delete a doc from one of the stash collections. Once we've matched a doc in
         // one collection, we'll break.
         BSONObj doc;
-        for (const auto& coll : _stashColls) {
-            if (coll == _stashNss) {
+        size_t i = 0;
+        for (const auto& coll : _allStashNss) {
+            if (i == _myStashIdx) {
+                ++i;
                 continue;
             }
 
@@ -548,6 +550,7 @@ void ReshardingOplogApplicationRules::_applyDelete_inlock(
             }
 
             invariant(state == PlanExecutor::IS_EOF);
+            ++i;
         }
 
         // Insert the doc we just deleted from one of the stash collections into the output
@@ -565,11 +568,11 @@ BSONObj ReshardingOplogApplicationRules::_queryStashCollById(OperationContext* o
                                                              const BSONObj& idQuery) {
     const IndexCatalog* indexCatalog = coll->getIndexCatalog();
     uassert(4990100,
-            str::stream() << "Missing _id index for collection " << _stashNss.ns(),
+            str::stream() << "Missing _id index for collection " << _myStashNss.ns(),
             indexCatalog->haveIdIndex(opCtx));
 
     BSONObj result;
-    Helpers::findById(opCtx, db, _stashNss.ns(), idQuery, result);
+    Helpers::findById(opCtx, db, _myStashNss.ns(), idQuery, result);
     return result;
 }
 }  // namespace mongo

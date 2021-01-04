@@ -419,15 +419,14 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
     }();
 
     std::vector<NamespaceString> stashCollections;
-    std::vector<NamespaceString> oplogBuffers;
-    for (const auto& donor : _recipientDoc.getDonorShardsMirroring()) {
-        auto oplogBufferNss = getLocalOplogBufferNamespace(_recipientDoc.get_id(), donor.getId());
-        oplogBuffers.push_back(oplogBufferNss);
-        // TODO: Also make the stash collection a system collection to guarantee it won't conflict
-        // with any user collections.
-        stashCollections.emplace_back(
-            _recipientDoc.getNss().db(),
-            "{}.{}"_format(_recipientDoc.getNss().coll(), oplogBufferNss.coll()));
+    stashCollections.reserve(numDonors);
+
+    {
+        auto opCtx = cc().makeOperationContext();
+        for (const auto& donor : _recipientDoc.getDonorShardsMirroring()) {
+            stashCollections.emplace_back(ReshardingOplogApplier::ensureStashCollectionExists(
+                opCtx.get(), _recipientDoc.getExistingUUID(), donor.getId()));
+        }
     }
 
     size_t i = 0;
@@ -441,7 +440,8 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
                                          true /* isKillableByStepdown */));
         }
 
-        const auto& oplogBufferNss = oplogBuffers[i];
+        const auto& oplogBufferNss =
+            getLocalOplogBufferNamespace(_recipientDoc.get_id(), donor.getId());
         _oplogAppliers.emplace_back(std::make_unique<ReshardingOplogApplier>(
             serviceContext,
             ReshardingSourceId{_recipientDoc.get_id(), donor.getId()},
@@ -449,6 +449,7 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
             _recipientDoc.getNss(),
             _recipientDoc.getExistingUUID(),
             stashCollections,
+            i,
             *_recipientDoc.getFetchTimestamp(),
             // The recipient applies oplog entries from the donor starting from the fetchTimestamp,
             // which corresponds to {clusterTime: fetchTimestamp, ts: fetchTimestamp} as a resume

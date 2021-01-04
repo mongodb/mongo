@@ -43,6 +43,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/oplog_applier_utils.h"
+#include "mongo/db/s/resharding/resharding_data_copy_util.h"
 #include "mongo/db/s/resharding/resharding_donor_oplog_iterator.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding_util.h"
@@ -198,7 +199,8 @@ ReshardingOplogApplier::ReshardingOplogApplier(
     NamespaceString oplogNs,
     NamespaceString nsBeingResharded,
     UUID collUUIDBeingResharded,
-    std::vector<NamespaceString> stashCollections,
+    std::vector<NamespaceString> allStashNss,
+    size_t myStashIdx,
     Timestamp reshardingCloneFinishedTs,
     std::unique_ptr<ReshardingDonorOplogIteratorInterface> oplogIterator,
     const ChunkManager& sourceChunkMgr,
@@ -210,12 +212,9 @@ ReshardingOplogApplier::ReshardingOplogApplier(
       _uuidBeingResharded(std::move(collUUIDBeingResharded)),
       _outputNs(_nsBeingResharded.db(),
                 "system.resharding.{}"_format(_uuidBeingResharded.toString())),
-      // TODO: Also make the stash collection a system collection to guarantee it won't conflict
-      // with any user collections.
-      _stashNs(_nsBeingResharded.db(), "{}.{}"_format(_nsBeingResharded.coll(), _oplogNs.coll())),
       _reshardingCloneFinishedTs(std::move(reshardingCloneFinishedTs)),
       _applicationRules(ReshardingOplogApplicationRules(
-          _outputNs, _stashNs, _sourceId.getShardId(), sourceChunkMgr, stashCollections)),
+          _outputNs, std::move(allStashNss), myStashIdx, _sourceId.getShardId(), sourceChunkMgr)),
       _service(service),
       _executor(std::move(executor)),
       _writerPool(writerPool),
@@ -228,14 +227,6 @@ ExecutorFuture<void> ReshardingOplogApplier::applyUntilCloneFinishedTs() {
     // collectively guarantee that the ReshardingOplogApplier instances will outlive `_executor` and
     // `_writerPool`.
     return ExecutorFuture(_executor)
-        .then([this] {
-            auto createStashCollectionClient = makeKillableClient(_service, kClientName);
-            AlternativeClientRegion acr(createStashCollectionClient);
-            auto opCtx = makeInterruptibleOperationContext();
-
-            uassertStatusOK(createCollection(
-                opCtx.get(), _stashNs.db().toString(), BSON("create" << _stashNs.coll())));
-        })
         .then([this] { return _scheduleNextBatch(); })
         .onError([this](Status status) { return _onError(status); });
 }
@@ -598,6 +589,17 @@ Timestamp ReshardingOplogApplier::_clearAppliedOpsAndStoreProgress(OperationCont
     _currentDerivedOps.clear();
 
     return lastAppliedTs;
+}
+
+NamespaceString ReshardingOplogApplier::ensureStashCollectionExists(OperationContext* opCtx,
+                                                                    const UUID& existingUUID,
+                                                                    const ShardId& donorShardId) {
+    auto nss = NamespaceString{NamespaceString::kConfigDb,
+                               "localReshardingConflictStash.{}.{}"_format(
+                                   existingUUID.toString(), donorShardId.toString())};
+
+    resharding::data_copy::ensureCollectionExists(opCtx, nss);
+    return nss;
 }
 
 }  // namespace mongo

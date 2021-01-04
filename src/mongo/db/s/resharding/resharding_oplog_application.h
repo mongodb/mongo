@@ -55,11 +55,11 @@ class OperationContext;
  */
 class ReshardingOplogApplicationRules {
 public:
-    ReshardingOplogApplicationRules(const NamespaceString& outputNss,
-                                    const NamespaceString& stashNss,
-                                    const ShardId& donorShardId,
-                                    ChunkManager sourceChunkMgr,
-                                    std::vector<NamespaceString> stashColls);
+    ReshardingOplogApplicationRules(NamespaceString outputNss,
+                                    std::vector<NamespaceString> allStashNss,
+                                    size_t myStashIdx,
+                                    ShardId donorShardId,
+                                    ChunkManager sourceChunkMgr);
 
     /**
      * Wraps the op application in a writeConflictRetry loop and is responsible for creating and
@@ -106,17 +106,21 @@ private:
     // Namespace where operations should be applied, unless there is an _id conflict.
     const NamespaceString _outputNss;
 
+    // The namespaces of all stash collections, including the stash collection for this donor.
+    const std::vector<NamespaceString> _allStashNss;
+
+    // Index into _allStashNss for the namespace where operations are applied if there is an _id
+    // conflict.
+    const size_t _myStashIdx;
+
     // Namespace where operations are applied if there is an _id conflict.
-    const NamespaceString _stashNss;
+    const NamespaceString& _myStashNss;
 
     // ShardId of the donor shard that the operations being applied originate from.
     const ShardId _donorShardId;
 
     // The chunk manager for the source namespace and original shard key.
     const ChunkManager _sourceChunkMgr;
-
-    // The namespaces of all stash collections, including the stash collection for this donor.
-    std::vector<NamespaceString> _stashColls;
 };
 
 }  // namespace mongo
