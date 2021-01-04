@@ -32,12 +32,12 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/base/status.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/drop_database_gen.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog_cache.h"
-#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
@@ -46,89 +46,82 @@
 namespace mongo {
 namespace {
 
-class DropDatabaseCmd : public BasicCommand {
+class DropDatabaseCmd : public DropDatabaseCmdVersion1Gen<DropDatabaseCmd> {
 public:
-    DropDatabaseCmd() : BasicCommand("dropDatabase") {}
-
-    const std::set<std::string>& apiVersions() const {
-        return kApiVersions1;
-    }
-
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const final {
         return AllowedOnSecondary::kAlways;
     }
-
-    bool adminOnly() const override {
-        return false;
-    }
-
-    bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return true;
-    }
-
-    void addRequiredPrivileges(const std::string& dbname,
-                               const BSONObj& cmdObj,
-                               std::vector<Privilege>* out) const override {
-        ActionSet actions;
-        actions.addAction(ActionType::dropDatabase);
-        out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
-    }
-
-    bool run(OperationContext* opCtx,
-             const std::string& dbname,
-             const BSONObj& cmdObj,
-             BSONObjBuilder& result) override {
-        uassert(ErrorCodes::IllegalOperation,
-                "Cannot drop the config database",
-                dbname != NamespaceString::kConfigDb);
-        uassert(ErrorCodes::IllegalOperation,
-                "Cannot drop the admin database",
-                dbname != NamespaceString::kAdminDb);
-
-        auto request = DropDatabase::parse(IDLParserErrorContext("dropDatabase"), cmdObj);
-        uassert(ErrorCodes::BadValue,
-                "have to pass 1 as db parameter",
-                request.getCommandParameter() == 1);
-
-        try {
-
-            const CachedDatabaseInfo dbInfo =
-                uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbname));
-
-            // Invalidate the database metadata so the next access kicks off a full reload, even if
-            // sending the command to the config server fails due to e.g. a NetworkError.
-            ON_BLOCK_EXIT(
-                [opCtx, dbname] { Grid::get(opCtx)->catalogCache()->purgeDatabase(dbname); });
-
-            // Send it to the primary shard
-            ShardsvrDropDatabase dropDatabaseCommand(1);
-            dropDatabaseCommand.setDbName(dbname);
-
-            auto cmdResponse = executeCommandAgainstDatabasePrimary(
-                opCtx,
-                dbname,
-                dbInfo,
-                CommandHelpers::appendMajorityWriteConcern(dropDatabaseCommand.toBSON({}),
-                                                           opCtx->getWriteConcern()),
-                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                Shard::RetryPolicy::kIdempotent);
-
-            const auto remoteResponse = uassertStatusOK(cmdResponse.swResponse);
-            uassertStatusOK(getStatusFromCommandResult(remoteResponse.data));
-
-            auto reply = DropDatabaseReply::parse(IDLParserErrorContext("dropDatabase-reply"),
-                                                  remoteResponse.data);
-            CommandHelpers::appendGenericReplyFields(remoteResponse.data, reply.toBSON(), &result);
-
-            return true;
-        } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-            // If the namespace isn't found, treat the drop as a success but inform about the
-            // failure.
-            result.append("info", "database does not exist");
+    class Invocation final : public InvocationBaseGen {
+    public:
+        using InvocationBaseGen::InvocationBaseGen;
+        bool supportsWriteConcern() const final {
             return true;
         }
-    }
+        NamespaceString ns() const final {
+            return NamespaceString(request().getDbName());
+        }
+        void doCheckAuthorization(OperationContext* opCtx) const final {
+            uassert(ErrorCodes::Unauthorized,
+                    str::stream() << "Not authorized to drop database '" << request().getDbName()
+                                  << "'",
+                    AuthorizationSession::get(opCtx->getClient())
+                        ->isAuthorizedForActionsOnNamespace(NamespaceString(request().getDbName()),
+                                                            ActionType::dropDatabase));
+        }
+        Reply typedRun(OperationContext* opCtx) final {
+            auto dbName = request().getDbName();
+            auto nss = NamespaceString(dbName);
 
+            uassert(ErrorCodes::IllegalOperation,
+                    "Cannot drop the config database",
+                    dbName != NamespaceString::kConfigDb);
+            uassert(ErrorCodes::IllegalOperation,
+                    "Cannot drop the admin database",
+                    dbName != NamespaceString::kAdminDb);
+            uassert(ErrorCodes::BadValue,
+                    "Must pass 1 as the 'dropDatabase' parameter",
+                    request().getCommandParameter() == 1);
+
+            try {
+                const CachedDatabaseInfo dbInfo =
+                    uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbName));
+
+                // Invalidate the database metadata so the next access kicks off a full reload, even
+                // if sending the command to the config server fails due to e.g. a NetworkError.
+                ON_BLOCK_EXIT(
+                    [opCtx, dbName] { Grid::get(opCtx)->catalogCache()->purgeDatabase(dbName); });
+
+                // Send it to the primary shard
+                ShardsvrDropDatabase dropDatabaseCommand(1);
+                dropDatabaseCommand.setDbName(dbName);
+
+                auto cmdResponse = executeCommandAgainstDatabasePrimary(
+                    opCtx,
+                    dbName,
+                    dbInfo,
+                    CommandHelpers::appendMajorityWriteConcern(dropDatabaseCommand.toBSON({}),
+                                                               opCtx->getWriteConcern()),
+                    ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                    Shard::RetryPolicy::kIdempotent);
+
+                const auto remoteResponse = uassertStatusOK(cmdResponse.swResponse);
+                uassertStatusOK(getStatusFromCommandResult(remoteResponse.data));
+
+                BSONObjBuilder result;
+                CommandHelpers::filterCommandReplyForPassthrough(remoteResponse.data, &result);
+                auto resultObj = result.obj();
+                uassertStatusOK(getStatusFromCommandResult(resultObj));
+                // Ensure our reply conforms to the IDL-defined reply structure.
+                return DropDatabaseReply::parse({"dropDatabase"}, resultObj);
+            } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+                // If the namespace isn't found, treat the drop as a success but inform about the
+                // failure.
+                DropDatabaseReply reply;
+                reply.setInfo("database does not exist"_sd);
+                return reply;
+            }
+        }
+    };
 } clusterDropDatabaseCmd;
 
 }  // namespace

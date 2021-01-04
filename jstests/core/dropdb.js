@@ -29,4 +29,5 @@ assert.commandWorked(res);
 assert.eq(res.dropped,
           undefined,
           "dropped field was populated even though nothing should have been dropped");
+assert.eq('database does not exist', res.info);
 check(false);

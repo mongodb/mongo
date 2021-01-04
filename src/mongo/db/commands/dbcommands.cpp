@@ -109,75 +109,68 @@ using std::unique_ptr;
 
 namespace {
 
-class CmdDropDatabase : public BasicCommand {
+class CmdDropDatabase : public DropDatabaseCmdVersion1Gen<CmdDropDatabase> {
 public:
-    const std::set<std::string>& apiVersions() const {
-        return kApiVersions1;
-    }
-
-    std::string help() const override {
+    std::string help() const final {
         return "drop (delete) this database";
     }
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const final {
         return AllowedOnSecondary::kNever;
     }
-
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) const {
-        ActionSet actions;
-        actions.addAction(ActionType::dropDatabase);
-        out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
-    }
-
-
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool collectsResourceConsumptionMetrics() const final {
         return true;
     }
-
-    bool collectsResourceConsumptionMetrics() const override {
-        return true;
-    }
-
-    CmdDropDatabase() : BasicCommand("dropDatabase") {}
-
-    bool run(OperationContext* opCtx,
-             const string& dbname,
-             const BSONObj& cmdObj,
-             BSONObjBuilder& result) {
-        // disallow dropping the config database
-        if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer &&
-            (dbname == NamespaceString::kConfigDb)) {
-            uasserted(ErrorCodes::IllegalOperation,
-                      "Cannot drop 'config' database if mongod started "
-                      "with --configsvr");
+    class Invocation final : public InvocationBaseGen {
+    public:
+        using InvocationBaseGen::InvocationBaseGen;
+        bool supportsWriteConcern() const final {
+            return true;
         }
-
-        if ((repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() !=
-             repl::ReplicationCoordinator::modeNone) &&
-            (dbname == NamespaceString::kLocalDb)) {
-            uasserted(ErrorCodes::IllegalOperation,
-                      str::stream()
-                          << "Cannot drop '" << dbname << "' database while replication is active");
+        NamespaceString ns() const final {
+            return NamespaceString(request().getDbName());
         }
-
-        auto request = DropDatabase::parse(IDLParserErrorContext("dropDatabase"), cmdObj);
-        if (request.getCommandParameter() != 1) {
-            uasserted(ErrorCodes::IllegalOperation, "have to pass 1 as db parameter");
+        void doCheckAuthorization(OperationContext* opCtx) const final {
+            uassert(ErrorCodes::Unauthorized,
+                    str::stream() << "Not authorized to drop database '" << request().getDbName()
+                                  << "'",
+                    AuthorizationSession::get(opCtx->getClient())
+                        ->isAuthorizedForActionsOnNamespace(NamespaceString(request().getDbName()),
+                                                            ActionType::dropDatabase));
         }
+        Reply typedRun(OperationContext* opCtx) final {
+            auto dbName = request().getDbName();
+            // disallow dropping the config database
+            if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer &&
+                (dbName == NamespaceString::kConfigDb)) {
+                uasserted(ErrorCodes::IllegalOperation,
+                          "Cannot drop 'config' database if mongod started "
+                          "with --configsvr");
+            }
 
-        Status status = dropDatabase(opCtx, dbname);
-        if (status != ErrorCodes::NamespaceNotFound) {
-            uassertStatusOK(status);
-        }
-        DropDatabaseReply reply;
-        if (status.isOK()) {
-            reply.setDropped(request.getDbName());
-        }
-        reply.serialize(&result);
-        return true;
-    }
+            if ((repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() !=
+                 repl::ReplicationCoordinator::modeNone) &&
+                (dbName == NamespaceString::kLocalDb)) {
+                uasserted(ErrorCodes::IllegalOperation,
+                          str::stream() << "Cannot drop '" << dbName
+                                        << "' database while replication is active");
+            }
 
+            if (request().getCommandParameter() != 1) {
+                uasserted(5255100, "Have to pass 1 as 'drop' parameter");
+            }
+
+            Status status = dropDatabase(opCtx, dbName.toString());
+            DropDatabaseReply reply;
+            if (status == ErrorCodes::NamespaceNotFound) {
+                reply.setInfo("database does not exist"_sd);
+            } else {
+                uassertStatusOK(status);
+                reply.setDropped(request().getDbName());
+            }
+
+            return reply;
+        }
+    };
 } cmdDropDatabase;
 
 static const char* repairRemovedMessage =
