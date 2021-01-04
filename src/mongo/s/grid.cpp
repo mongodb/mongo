@@ -46,13 +46,6 @@
 namespace mongo {
 namespace {
 const auto grid = ServiceContext::declareDecoration<Grid>();
-
-// TODO SERVER-50675: Remove this FVC function when 5.0 becomes last-lts.
-bool fcvGreaterThanOrEqualTo47() {
-    auto& fcv = serverGlobalParams.featureCompatibility;
-    return fcv.isVersionInitialized() &&
-        fcv.isGreaterThanOrEqualTo(ServerGlobalParams::FeatureCompatibility::Version::kVersion47);
-}
 }  // namespace
 
 Grid::Grid() = default;
@@ -123,11 +116,31 @@ void Grid::setAllowLocalHost(bool allow) {
 
 repl::ReadConcernArgs Grid::readConcernWithConfigTime(
     repl::ReadConcernLevel readConcernLevel) const {
-    auto configTime = configOpTime();
-    if (fcvGreaterThanOrEqualTo47()) {
+    return ReadConcernArgs(configOpTime(), readConcernLevel);
+}
+
+ReadPreferenceSetting Grid::readPreferenceWithConfigTime(
+    const ReadPreferenceSetting& readPreference) const {
+    ReadPreferenceSetting readPrefToReturn(readPreference);
+    readPrefToReturn.minClusterTime = configOpTime().getTimestamp();
+    return readPrefToReturn;
+}
+
+// TODO SERVER-50675: directly use VectorClock's configTime once 5.0 becomes last-lts.
+repl::OpTime Grid::configOpTime() const {
+    invariant(serverGlobalParams.clusterRole != ClusterRole::ConfigServer);
+
+    auto configTime = [this] {
+        stdx::lock_guard<Latch> lk(_mutex);
+        return _configOpTime;
+    }();
+
+    const auto& fcv = serverGlobalParams.featureCompatibility;
+    if (fcv.isVersionInitialized() &&
+        fcv.isGreaterThanOrEqualTo(ServerGlobalParams::FeatureCompatibility::Version::kVersion47)) {
         const auto currentTime = VectorClock::get(grid.owner(this))->getTime();
         const auto vcConfigTimeTs = currentTime.configTime().asTimestamp();
-        if (!vcConfigTimeTs.isNull() && vcConfigTimeTs > configTime.getTimestamp()) {
+        if (!vcConfigTimeTs.isNull() && vcConfigTimeTs >= configTime.getTimestamp()) {
             // TODO SERVER-44097: investigate why not using a term (e.g. with a LogicalTime)
             // can lead - upon CSRS stepdowns - to a last applied opTime lower than the
             // previous primary's committed opTime
@@ -135,29 +148,8 @@ repl::ReadConcernArgs Grid::readConcernWithConfigTime(
                 mongo::repl::OpTime(vcConfigTimeTs, mongo::repl::OpTime::kUninitializedTerm);
         }
     }
-    return ReadConcernArgs(configTime, readConcernLevel);
-}
 
-ReadPreferenceSetting Grid::readPreferenceWithConfigTime(
-    const ReadPreferenceSetting& readPreference) const {
-    auto configTimeTs = configOpTime().getTimestamp();
-    if (fcvGreaterThanOrEqualTo47()) {
-        const auto currentTime = VectorClock::get(grid.owner(this))->getTime();
-        const auto vcConfigTimeTs = currentTime.configTime().asTimestamp();
-        if (!vcConfigTimeTs.isNull() && vcConfigTimeTs > configTimeTs) {
-            configTimeTs = vcConfigTimeTs;
-        }
-    }
-    ReadPreferenceSetting readPrefToReturn(readPreference);
-    readPrefToReturn.minClusterTime = configTimeTs;
-    return readPrefToReturn;
-}
-
-repl::OpTime Grid::configOpTime() const {
-    invariant(serverGlobalParams.clusterRole != ClusterRole::ConfigServer);
-
-    stdx::lock_guard<Latch> lk(_mutex);
-    return _configOpTime;
+    return configTime;
 }
 
 boost::optional<repl::OpTime> Grid::advanceConfigOpTime(OperationContext* opCtx,
