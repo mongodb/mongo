@@ -39,6 +39,7 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/query/establish_cursors.h"
 #include "mongo/s/sharding_router_test_fixture.h"
+#include "mongo/unittest/barrier.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -169,12 +170,7 @@ TEST_F(EstablishCursorsTest, SingleRemoteInterruptedWhileCommandInFlight) {
         {kTestShardIds[0], cmdObj},
     };
 
-    // Hang before sending the command but after resolving the host to send it to.
-    auto fp = globalFailPointRegistry().find("hangBeforeSchedulingRemoteCommand");
-    invariant(fp);
-    auto startCount =
-        fp->setMode(FailPoint::alwaysOn, 0, BSON("hostAndPort" << kTestShardHosts[0].toString()));
-
+    auto barrier = std::make_shared<unittest::Barrier>(2);
     auto future = launchAsync([&] {
         ASSERT_THROWS(establishCursors(operationContext(),
                                        executor(),
@@ -183,43 +179,29 @@ TEST_F(EstablishCursorsTest, SingleRemoteInterruptedWhileCommandInFlight) {
                                        remotes,
                                        false),  // allowPartialResults
                       ExceptionFor<ErrorCodes::CursorKilled>);
+        barrier->countDownAndWait();
     });
 
-    // Verify that the failpoint is hit.
-    fp->waitForTimesEntered(startCount + 1);
-
-    // Now interrupt the opCtx which the cursor is running under.
-    {
-        stdx::lock_guard<Client> lk(*operationContext()->getClient());
-        operationContext()->getServiceContext()->killOperation(
-            lk, operationContext(), ErrorCodes::CursorKilled);
-    }
-
-    // Disable the failpoint to enable the ARS to continue. Once interrupted, it will then trigger a
-    // killOperations for the two remotes.
-    fp->setMode(FailPoint::off);
-
-    // The OperationContext was marked as killed before the request was scheduled, however the exact
-    // timing of when the interrupt condition is detected is not deterministic in this test.
-    // However, since the failpoint is in a position where the remote hostAndPort is resolved, we
-    // are guaranteed to get a killOperation for it but we may first see the original remote
-    // request.
-    auto killOpSeen = false;
     onCommand([&](const RemoteCommandRequest& request) {
-        if (request.dbname == "admin" && request.cmdObj.hasField("_killOperations")) {
-            killOpSeen = true;
-            return BSON("ok" << 1);
+        ASSERT_EQ(_nss.coll(), request.cmdObj.firstElement().valueStringData());
+
+        // Now that our "remote" has recieved the request, interrupt the opCtx which the cursor is
+        // running under.
+        {
+            stdx::lock_guard<Client> lk(*operationContext()->getClient());
+            operationContext()->getServiceContext()->killOperation(
+                lk, operationContext(), ErrorCodes::CursorKilled);
         }
 
-        // Otherwise expect the original request and mock the response.
-        ASSERT_EQ(_nss.coll(), request.cmdObj.firstElement().valueStringData());
+        // Wait for the kill to take since there is a race between response and kill.
+        barrier->countDownAndWait();
+
         CursorResponse cursorResponse(_nss, CursorId(123), {});
         return cursorResponse.toBSON(CursorResponse::ResponseType::InitialResponse);
     });
 
-    if (!killOpSeen) {
-        expectKillOperations(1);
-    }
+    // We were interrupted so establishCursors is forced to send a killOperations out of paranoia.
+    expectKillOperations(1);
 
     future.default_timed_get();
 }
