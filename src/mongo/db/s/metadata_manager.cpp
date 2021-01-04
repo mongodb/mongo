@@ -495,7 +495,7 @@ SharedSemiFuture<void> MetadataManager::_submitRangeForDeletion(
 
     int maxToDelete = rangeDeleterBatchSize.load();
     if (maxToDelete <= 0) {
-        maxToDelete = std::max(int(internalQueryExecYieldIterations.load()), 1);
+        maxToDelete = kDefaultRangeDeleterBatchSize;
     }
 
     auto cleanupComplete =
