@@ -86,6 +86,8 @@
 namespace mongo {
 namespace {
 
+constexpr auto kOne = "1"_sd;
+
 Status useDefaultCode(const Status& status, ErrorCodes::Error defaultCode) {
     if (status.code() != ErrorCodes::UnknownError)
         return status;
@@ -878,6 +880,11 @@ private:
         if (_isReplSet) {
             // Append logical session (transaction) metadata.
             _sessionInfo.serialize(cmdBuilder);
+        }
+
+        if (_state == TransactionState::kInit) {
+            // Set a default apiVersion for all UMC commands
+            cmdBuilder->append("apiVersion", kOne);
         }
 
         auto svcCtx = _client->getServiceContext();

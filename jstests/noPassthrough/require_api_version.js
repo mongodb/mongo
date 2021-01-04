@@ -16,6 +16,12 @@ function runTest(db, isMongos) {
     assert.commandWorked(db.runCommand({ping: 1, apiVersion: "1"}));
     assert.commandFailed(db.runCommand({ping: 1, apiVersion: "not a real API version"}));
 
+    // User management commands loop back into the system so make sure they set apiVersion
+    // internally
+    assert.commandWorked(
+        db.adminCommand({createRole: 'testRole', apiVersion: "1", privileges: [], roles: []}));
+    assert.commandWorked(db.adminCommand({dropRole: 'testRole', apiVersion: "1"}));
+
     /*
      * "getMore" never accepts or requires apiVersion.
      */
