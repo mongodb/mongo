@@ -567,9 +567,10 @@ backup(void *arg)
                 else
                     active_now = &active[0];
                 src_id = g.backup_id - 1;
+                /* Use consolidation too. */
                 testutil_check(__wt_snprintf(cfg, sizeof(cfg),
-                  "incremental=(enabled,src_id=%" PRIu64 ",this_id=%" PRIu64 ")", src_id,
-                  g.backup_id));
+                  "incremental=(enabled,consolidate=true,src_id=%" PRIu64 ",this_id=%" PRIu64 ")",
+                  src_id, g.backup_id));
                 /* Restart a full incremental every once in a while. */
                 full = false;
                 incr_full = mmrand(NULL, 1, 8) == 1;

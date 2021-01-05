@@ -22,8 +22,9 @@ Some administrative tasks can be accomplished using the following special
 cursor types that give access to data managed by WiredTiger:
 <table>
 @hrow{URI, Type, Notes}
-@row{<tt>backup:</tt>,
-	backup cursor,
+@row{<tt>backup:[query_id]</tt>,
+	backup cursor (optionally only returning block incremental ids if
+	<code>query_id</code> is appended),
 	key=<code>string</code>\, see @ref backup for details}
 @row{<code>log:</code>,
 	log cursor,
@@ -34,7 +35,7 @@ cursor types that give access to data managed by WiredTiger:
 	see @ref cursor_log for details}
 @row{<tt>metadata:[create]</tt>,
 	metadata cursor (optionally only returning configuration strings for
-	WT_SESSION::create if <code>create</code> is appended,
+	WT_SESSION::create if <code>create</code> is appended),
 	key=<code>string</code>\, value=<code>string</code>\,<br>
 	see @ref metadata for details}
 @row{<tt>statistics:[\<data source URI\>]</tt>,

@@ -51,7 +51,6 @@ class test_backup12(wttest.WiredTigerTestCase, suite_subprocess):
     bigval = 'Value' * 100
 
     def add_data(self, uri):
-
         c = self.session.open_cursor(uri)
         for i in range(0, self.nops):
             num = i + (self.mult * self.nops)

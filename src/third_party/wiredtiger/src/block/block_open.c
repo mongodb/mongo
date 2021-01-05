@@ -207,6 +207,13 @@ __wt_block_open(WT_SESSION_IMPL *session, const char *filename, const char *cfg[
 
     /* Set the file's size. */
     WT_ERR(__wt_filesize(session, block->fh, &block->size));
+    /*
+     * If we're opening a file and it only contains a header and we're doing incremental backup
+     * indicate this so that the first checkpoint is sure to set all the bits as dirty to cover the
+     * header so that the header gets copied.
+     */
+    if (block->size == allocsize && F_ISSET(conn, WT_CONN_INCR_BACKUP))
+        block->created_during_backup = true;
 
     /* Initialize the live checkpoint's lock. */
     WT_ERR(__wt_spin_init(session, &block->live_lock, "block manager"));

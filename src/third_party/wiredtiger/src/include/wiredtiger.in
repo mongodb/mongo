@@ -1067,29 +1067,33 @@ struct __wt_session {
 	 * @config{incremental = (, configure the cursor for block incremental backup usage.  These
 	 * formats are only compatible with the backup data source; see @ref backup., a set of
 	 * related configuration options defined below.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled,
-	 * whether to configure this backup as the starting point for a subsequent incremental
-	 * backup., a boolean flag; default \c false.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;file, the
-	 * file name when opening a duplicate incremental backup cursor.  That duplicate cursor will
-	 * return the block modifications relevant to the given file name., a string; default
-	 * empty.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;force_stop, causes all block incremental backup
-	 * information to be released.  This is on an open_cursor call and the resources will be
-	 * released when this cursor is closed.  No other operations should be done on this open
-	 * cursor., a boolean flag; default \c false.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;granularity,
-	 * this setting manages the granularity of how WiredTiger maintains modification maps
-	 * internally.  The larger the granularity\, the smaller amount of information WiredTiger
-	 * need to maintain., an integer between 4KB and 2GB; default \c 16MB.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;src_id, a string that identifies a previous checkpoint
-	 * backup source as the source of this incremental backup.  This identifier must have
-	 * already been created by use of the 'this_id' configuration in an earlier backup.  A
-	 * source id is required to begin an incremental backup., a string; default empty.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;this_id, a string that identifies the current system
-	 * state as a future backup source for an incremental backup via 'src_id'. This identifier
-	 * is required when opening an incremental backup cursor and an error will be returned if
-	 * one is not provided., a string; default empty.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;
+	 * consolidate, causes block incremental backup information to be consolidated if adjacent
+	 * granularity blocks are modified.  If false\, information will be returned in granularity
+	 * sized blocks only.  This must be set on the primary backup cursor and it applies to all
+	 * files for this backup., a boolean flag; default \c false.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled, whether to configure this backup as the starting
+	 * point for a subsequent incremental backup., a boolean flag; default \c false.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;file, the file name when opening a duplicate incremental
+	 * backup cursor.  That duplicate cursor will return the block modifications relevant to the
+	 * given file name., a string; default empty.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;force_stop,
+	 * causes all block incremental backup information to be released.  This is on an
+	 * open_cursor call and the resources will be released when this cursor is closed.  No other
+	 * operations should be done on this open cursor., a boolean flag; default \c false.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;granularity, this setting manages the granularity of how
+	 * WiredTiger maintains modification maps internally.  The larger the granularity\, the
+	 * smaller amount of information WiredTiger need to maintain., an integer between 4KB and
+	 * 2GB; default \c 16MB.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;src_id, a string that identifies a
+	 * previous checkpoint backup source as the source of this incremental backup.  This
+	 * identifier must have already been created by use of the 'this_id' configuration in an
+	 * earlier backup.  A source id is required to begin an incremental backup., a string;
+	 * default empty.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;this_id, a string that identifies the
+	 * current system state as a future backup source for an incremental backup via 'src_id'.
+	 * This identifier is required when opening an incremental backup cursor and an error will
+	 * be returned if one is not provided., a string; default empty.}
 	 * @config{ ),,}
 	 * @config{next_random, configure the cursor to return a pseudo-random record from the
 	 * object when the WT_CURSOR::next method is called; valid only for row-store cursors.  See
