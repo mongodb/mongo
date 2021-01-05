@@ -426,7 +426,6 @@ Status initializeSharding(OperationContext* opCtx) {
 
     Status status = initializeGlobalShardingState(
         opCtx,
-        generateDistLockProcessId(opCtx),
         std::move(catalogCache),
         std::move(shardRegistry),
         [opCtx]() {

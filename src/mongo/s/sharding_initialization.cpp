@@ -160,16 +160,7 @@ std::unique_ptr<executor::TaskExecutor> makeShardingTaskExecutor(
     return std::make_unique<executor::ShardingTaskExecutor>(std::move(executor));
 }
 
-std::string generateDistLockProcessId(OperationContext* opCtx) {
-    return str::stream()
-        << HostAndPort(getHostName(), serverGlobalParams.port).toString() << ':'
-        << durationCount<Seconds>(
-               opCtx->getServiceContext()->getPreciseClockSource()->now().toDurationSinceEpoch())
-        << ':' << SecureRandom().nextInt64();
-}
-
 Status initializeGlobalShardingState(OperationContext* opCtx,
-                                     StringData distLockProcessId,
                                      std::unique_ptr<CatalogCache> catalogCache,
                                      std::unique_ptr<ShardRegistry> shardRegistry,
                                      rpc::ShardingEgressMetadataHookBuilder hookBuilder,

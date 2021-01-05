@@ -71,23 +71,21 @@ protected:
                                     std::make_unique<ConfigServerCatalogCacheLoader>()));
 
         ShardingInitializationMongoD::get(getServiceContext())
-            ->setGlobalInitMethodForTest([&](OperationContext* opCtx,
-                                             const ShardIdentity& shardIdentity,
-                                             StringData distLockProcessId) {
-                const auto& configConnStr = shardIdentity.getConfigsvrConnectionString();
+            ->setGlobalInitMethodForTest(
+                [&](OperationContext* opCtx, const ShardIdentity& shardIdentity) {
+                    const auto& configConnStr = shardIdentity.getConfigsvrConnectionString();
 
-                uassertStatusOK(initializeGlobalShardingStateForMongodForTest(configConnStr));
+                    uassertStatusOK(initializeGlobalShardingStateForMongodForTest(configConnStr));
 
-                // Set the ConnectionString return value on the mock targeter so that later calls to
-                // the
-                // targeter's getConnString() return the appropriate value
-                auto configTargeter = RemoteCommandTargeterMock::get(
-                    shardRegistry()->getConfigShard()->getTargeter());
-                configTargeter->setConnectionStringReturnValue(configConnStr);
-                configTargeter->setFindHostReturnValue(configConnStr.getServers()[0]);
+                    // Set the ConnectionString return value on the mock targeter so that later
+                    // calls to the targeter's getConnString() return the appropriate value
+                    auto configTargeter = RemoteCommandTargeterMock::get(
+                        shardRegistry()->getConfigShard()->getTargeter());
+                    configTargeter->setConnectionStringReturnValue(configConnStr);
+                    configTargeter->setFindHostReturnValue(configConnStr.getServers()[0]);
 
-                return Status::OK();
-            });
+                    return Status::OK();
+                });
 
         _dbDirectClient = std::make_unique<DBDirectClient>(operationContext());
     }
@@ -185,19 +183,18 @@ TEST_F(ShardingInitializationMongoDTest, InitWhilePreviouslyInErrorStateWillStay
     shardIdentity.setShardName(kShardName);
     shardIdentity.setClusterId(OID::gen());
 
-    shardingInitialization()->setGlobalInitMethodForTest([](OperationContext* opCtx,
-                                                            const ShardIdentity& shardIdentity,
-                                                            StringData distLockProcessId) {
-        uasserted(ErrorCodes::ShutdownInProgress, "Not an actual shutdown");
-    });
+    shardingInitialization()->setGlobalInitMethodForTest(
+        [](OperationContext* opCtx, const ShardIdentity& shardIdentity) {
+            uasserted(ErrorCodes::ShutdownInProgress, "Not an actual shutdown");
+        });
 
     shardingInitialization()->initializeFromShardIdentity(operationContext(), shardIdentity);
 
     // ShardingState is now in error state, attempting to call it again will still result in error.
     shardingInitialization()->setGlobalInitMethodForTest(
-        [](OperationContext* opCtx,
-           const ShardIdentity& shardIdentity,
-           StringData distLockProcessId) { FAIL("Should not be invoked!"); });
+        [](OperationContext* opCtx, const ShardIdentity& shardIdentity) {
+            FAIL("Should not be invoked!");
+        });
 
     ASSERT_THROWS_CODE(
         shardingInitialization()->initializeFromShardIdentity(operationContext(), shardIdentity),
@@ -227,9 +224,9 @@ TEST_F(ShardingInitializationMongoDTest, InitializeAgainWithMatchingShardIdentit
     shardIdentity2.setClusterId(clusterID);
 
     shardingInitialization()->setGlobalInitMethodForTest(
-        [](OperationContext* opCtx,
-           const ShardIdentity& shardIdentity,
-           StringData distLockProcessId) { FAIL("Should not be invoked!"); });
+        [](OperationContext* opCtx, const ShardIdentity& shardIdentity) {
+            FAIL("Should not be invoked!");
+        });
 
     shardingInitialization()->initializeFromShardIdentity(operationContext(), shardIdentity2);
 
@@ -260,9 +257,9 @@ TEST_F(ShardingInitializationMongoDTest, InitializeAgainWithMatchingReplSetNameS
     shardIdentity2.setClusterId(clusterID);
 
     shardingInitialization()->setGlobalInitMethodForTest(
-        [](OperationContext* opCtx,
-           const ShardIdentity& shardIdentity,
-           StringData distLockProcessId) { FAIL("Should not be invoked!"); });
+        [](OperationContext* opCtx, const ShardIdentity& shardIdentity) {
+            FAIL("Should not be invoked!");
+        });
 
     shardingInitialization()->initializeFromShardIdentity(operationContext(), shardIdentity2);
 

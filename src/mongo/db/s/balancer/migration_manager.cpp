@@ -644,8 +644,7 @@ void MigrationManager::_abandonActiveMigrationsAndEnableManager(OperationContext
     invariant(_state == State::kRecovering);
 
     // Unlock all balancer distlocks we aren't using anymore.
-    auto distLockManager = DistLockManager::get(opCtx);
-    distLockManager->unlockAll(opCtx, distLockManager->getProcessID());
+    DistLockManager::get(opCtx)->unlockAll(opCtx);
 
     // Clear the config.migrations collection so that those chunks can be scheduled for migration
     // again.

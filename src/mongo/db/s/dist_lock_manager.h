@@ -177,7 +177,7 @@ public:
     /**
      * Makes a best-effort attempt to unlock all locks owned by the given processID.
      */
-    virtual void unlockAll(OperationContext* opCtx, const std::string& processID) = 0;
+    virtual void unlockAll(OperationContext* opCtx) = 0;
 
 private:
     /**

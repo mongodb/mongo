@@ -862,8 +862,7 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
         }
 
         // Free any leftover locks from previous instantiations.
-        auto distLockManager = DistLockManager::get(opCtx);
-        distLockManager->unlockAll(opCtx, distLockManager->getProcessID());
+        DistLockManager::get(opCtx)->unlockAll(opCtx);
 
         if (auto validator = LogicalTimeValidator::get(_service)) {
             validator->enableKeyGenerator(opCtx, true);

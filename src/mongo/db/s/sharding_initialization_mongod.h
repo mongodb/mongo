@@ -35,6 +35,7 @@
 #include "mongo/client/replica_set_change_notifier.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/type_shard_identity.h"
+#include "mongo/s/sharding_initialization.h"
 
 namespace mongo {
 
@@ -49,8 +50,8 @@ class ShardingInitializationMongoD {
     ShardingInitializationMongoD& operator=(const ShardingInitializationMongoD&) = delete;
 
 public:
-    using ShardingEnvironmentInitFunc = std::function<void(
-        OperationContext* opCtx, const ShardIdentity& shardIdentity, StringData distLockProcessId)>;
+    using ShardingEnvironmentInitFunc =
+        std::function<void(OperationContext* opCtx, const ShardIdentity& shardIdentity)>;
 
     ShardingInitializationMongoD();
     ~ShardingInitializationMongoD();
@@ -105,8 +106,7 @@ public:
 
 private:
     void _initializeShardingEnvironmentOnShardServer(OperationContext* opCtx,
-                                                     const ShardIdentity& shardIdentity,
-                                                     StringData distLockProcessId);
+                                                     const ShardIdentity& shardIdentity);
 
     // This mutex ensures that only one thread at a time executes the sharding
     // initialization/teardown sequence
@@ -126,7 +126,7 @@ private:
  * NOTE: This does not initialize ShardingState, which should only be done for shard servers.
  */
 void initializeGlobalShardingStateForMongoD(OperationContext* opCtx,
-                                            const ConnectionString& configCS,
-                                            StringData distLockProcessId);
+                                            const ShardId& shardId,
+                                            const ConnectionString& configCS);
 
 }  // namespace mongo

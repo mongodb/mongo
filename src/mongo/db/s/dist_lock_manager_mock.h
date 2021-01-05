@@ -57,7 +57,7 @@ public:
                                                             StringData whyMessage,
                                                             const OID& lockSessionID) override;
 
-    void unlockAll(OperationContext* opCtx, const std::string& processID) override;
+    void unlockAll(OperationContext* opCtx) override;
 
     using LockFunc =
         std::function<void(StringData name, StringData whyMessage, Milliseconds waitFor)>;

@@ -519,8 +519,7 @@ TEST_F(MigrationManagerTest, MigrationRecovery) {
     setUpMigration(chunk2, kShardId3.toString());
 
     // Mimic all config distlocks being released on config server stepup to primary.
-    auto distLockManager = DistLockManager::get(operationContext());
-    distLockManager->unlockAll(operationContext(), distLockManager->getProcessID());
+    DistLockManager::get(operationContext())->unlockAll(operationContext());
 
     _migrationManager->startRecoveryAndAcquireDistLocks(operationContext());
 

@@ -586,14 +586,14 @@ void ReplSetDistLockManager::unlock(OperationContext* opCtx,
     }
 }
 
-void ReplSetDistLockManager::unlockAll(OperationContext* opCtx, const std::string& processID) {
-    Status status = _catalog->unlockAll(opCtx, processID);
+void ReplSetDistLockManager::unlockAll(OperationContext* opCtx) {
+    Status status = _catalog->unlockAll(opCtx, getProcessID());
     if (!status.isOK()) {
         LOGV2_WARNING(
             22672,
             "Error unlocking all distributed locks for process {processId} caused by {error}",
             "Error unlocking all existing distributed locks for a process",
-            "processId"_attr = processID,
+            "processId"_attr = getProcessID(),
             "error"_attr = redact(status));
     }
 }

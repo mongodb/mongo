@@ -65,7 +65,6 @@
 #include "mongo/s/client/sharding_connection_hook.h"
 #include "mongo/s/config_server_catalog_cache_loader.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/sharding_initialization.h"
 
 namespace mongo {
 
@@ -429,7 +428,7 @@ void ShardingInitializationMongoD::initializeFromShardIdentity(
             !initializationStatus);
 
     try {
-        _initFunc(opCtx, shardIdentity, shardIdentity.getShardName().toString());
+        _initFunc(opCtx, shardIdentity);
         shardingState->setInitialized(shardIdentity.getShardName().toString(),
                                       shardIdentity.getClusterId());
     } catch (const DBException& ex) {
@@ -482,8 +481,8 @@ void ShardingInitializationMongoD::updateShardIdentityConfigString(
 }
 
 void initializeGlobalShardingStateForMongoD(OperationContext* opCtx,
-                                            const ConnectionString& configCS,
-                                            StringData distLockProcessId) {
+                                            const ShardId& shardId,
+                                            const ConnectionString& configCS) {
     uassert(ErrorCodes::BadValue, "Unrecognized connection string.", configCS);
 
     auto targeterFactory = std::make_unique<RemoteCommandTargeterFactoryImpl>();
@@ -549,7 +548,6 @@ void initializeGlobalShardingStateForMongoD(OperationContext* opCtx,
 
     uassertStatusOK(
         initializeGlobalShardingState(opCtx,
-                                      distLockProcessId,
                                       std::move(catalogCache),
                                       std::move(shardRegistry),
                                       [service] { return makeEgressHooksList(service); },
@@ -560,7 +558,7 @@ void initializeGlobalShardingStateForMongoD(OperationContext* opCtx,
     DistLockManager::create(
         service,
         std::make_unique<ReplSetDistLockManager>(service,
-                                                 distLockProcessId,
+                                                 shardId,
                                                  std::make_unique<DistLockCatalogImpl>(),
                                                  ReplSetDistLockManager::kDistLockPingInterval,
                                                  ReplSetDistLockManager::kDistLockExpirationTime));
@@ -574,15 +572,15 @@ void initializeGlobalShardingStateForMongoD(OperationContext* opCtx,
 }
 
 void ShardingInitializationMongoD::_initializeShardingEnvironmentOnShardServer(
-    OperationContext* opCtx, const ShardIdentity& shardIdentity, StringData distLockProcessId) {
+    OperationContext* opCtx, const ShardIdentity& shardIdentity) {
 
     _replicaSetChangeListener =
         ReplicaSetMonitor::getNotifier().makeListener<ShardingReplicaSetChangeListener>(
             opCtx->getServiceContext());
 
-    initializeGlobalShardingStateForMongoD(
-        opCtx, shardIdentity.getConfigsvrConnectionString(), distLockProcessId);
-
+    initializeGlobalShardingStateForMongoD(opCtx,
+                                           shardIdentity.getShardName().toString(),
+                                           shardIdentity.getConfigsvrConnectionString());
 
     // Determine primary/secondary/standalone state in order to properly initialize sharding
     // components.

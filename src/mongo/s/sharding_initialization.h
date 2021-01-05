@@ -57,16 +57,6 @@ using ShardingEgressMetadataHookBuilder = std::function<std::unique_ptr<EgressMe
 }  // namespace rpc
 
 /**
- * Fixed process identifier for the dist lock manager running on a config server.
- */
-constexpr auto kDistLockProcessIdForConfigServer = "ConfigServer"_sd;
-
-/**
- * Generates a uniform string to be used as a process id for the distributed lock manager.
- */
-std::string generateDistLockProcessId(OperationContext* opCtx);
-
-/**
  * Constructs a TaskExecutor which contains the required configuration for the sharding subsystem.
  */
 std::unique_ptr<executor::TaskExecutor> makeShardingTaskExecutor(
@@ -76,7 +66,6 @@ std::unique_ptr<executor::TaskExecutor> makeShardingTaskExecutor(
  * Initializes the global ShardingCatalogClient, ShardingCatalogManager, and Grid objects.
  */
 Status initializeGlobalShardingState(OperationContext* opCtx,
-                                     StringData distLockProcessId,
                                      std::unique_ptr<CatalogCache> catalogCache,
                                      std::unique_ptr<ShardRegistry> shardRegistry,
                                      rpc::ShardingEgressMetadataHookBuilder hookBuilder,

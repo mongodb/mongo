@@ -64,12 +64,11 @@ public:
         // NOTE: this assumes that globalInit will always be called on the same thread as the main
         // test thread
         ShardingInitializationMongoD::get(operationContext())
-            ->setGlobalInitMethodForTest([this](OperationContext* opCtx,
-                                                const ShardIdentity& shardIdentity,
-                                                StringData distLockProcessId) {
-                _initCallCount++;
-                return Status::OK();
-            });
+            ->setGlobalInitMethodForTest(
+                [this](OperationContext* opCtx, const ShardIdentity& shardIdentity) {
+                    _initCallCount++;
+                    return Status::OK();
+                });
     }
 
     void tearDown() override {

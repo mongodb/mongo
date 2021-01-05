@@ -176,7 +176,6 @@
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/sharding_initialization.h"
 #include "mongo/scripting/dbdirectclient_factory.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/stdx/future.h"
@@ -650,9 +649,8 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
                 }
             }
         } else if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-            initializeGlobalShardingStateForMongoD(startupOpCtx.get(),
-                                                   ConnectionString::forLocal(),
-                                                   kDistLockProcessIdForConfigServer);
+            initializeGlobalShardingStateForMongoD(
+                startupOpCtx.get(), ShardId::kConfigServerId, ConnectionString::forLocal());
 
             ShardingCatalogManager::create(
                 startupOpCtx->getServiceContext(),

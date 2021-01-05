@@ -79,7 +79,7 @@ public:
                 const DistLockHandle& lockSessionID,
                 StringData name) override;
 
-    void unlockAll(OperationContext* opCtx, const std::string& processID) override;
+    void unlockAll(OperationContext* opCtx) override;
 
 private:
     Status checkStatus(OperationContext* opCtx, const DistLockHandle& lockSessionID) override;
