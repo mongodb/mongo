@@ -343,6 +343,30 @@ structs:
                 type: bindata_uuid
                 optional: true
 
+    always_serialize_field:
+        description: UnitTest for always_serialize fields
+        fields:
+            field1:
+                type: string
+                always_serialize: true
+                optional: true
+            field2:
+                type: int
+                always_serialize: true
+                optional: true
+            field3:
+                type: object
+                always_serialize: true
+                optional: true
+            field4:
+                type: object
+                always_serialize: true
+                optional: true
+            field5:
+                type: object
+                always_serialize: false
+                optional: true
+
 ##################################################################################################
 #
 # Test array of simple types
@@ -829,6 +853,14 @@ commands:
         reply_type: OkReply
         fields:
             anyTypeField: IDLAnyType
+    
+    CommandWithAnyTypeOwnedMember:
+        description: "A mock command to test IDLAnyTypeOwned"
+        command_name: CommandWithValueTypeMember
+        namespace: ignored
+        reply_type: OkReply
+        fields:
+            anyTypeField: IDLAnyTypeOwned
 
     # Test that we correctly generate C++ base classes for versioned API commands with different
     # key names, command names, and C++ names.

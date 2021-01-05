@@ -37,6 +37,36 @@ imports:
     - "mongo/idl/basic_types.idl"
     - "mongo/db/query/hint.idl"
 
+structs:
+    FindAndModifyLastError:
+        description: "Contains execution details for the findAndModify command"
+        fields:
+            n:
+                type: int
+                cpp_name: numDocs
+                description: "The number of documents that were inserted/deleted or matched the 
+                              update predicate."
+            updatedExisting:
+                type: bool
+                description: "Whether an existing document was updated."
+                optional: true
+            upserted:
+                type: IDLAnyTypeOwned
+                description: "The _id of the inserted document."
+                optional: true
+
+    FindAndModifyReply:
+        description: "The findAndModify command's reply."
+        fields:
+            lastErrorObject:
+                type: FindAndModifyLastError
+            value: 
+                type: object
+                optional: true
+                always_serialize: true
+                description: "The document after the write, if the 'new' field of the request is
+                              true. Otherwise, the document before the write."
+
 commands:
     findAndModify:
         description: "Parser for the 'findAndModify' command."
@@ -87,7 +117,7 @@ commands:
                 type: safeBool
                 optional: true
             new:
-                description: "Removes the document specified in the query field."
+                description: "When true, returns the modified document rather than the original."
                 type: safeBool
                 optional: true
             bypassDocumentValidation:
@@ -110,3 +140,4 @@ commands:
                 description: "Describes the write concern."
                 type: object
                 optional: true
+        reply_type: FindAndModifyReply

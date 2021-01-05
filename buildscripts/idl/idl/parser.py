@@ -368,6 +368,8 @@ def _parse_field(ctxt, name, node):
                 _RuleDesc("bool_scalar"),
             "unstable":
                 _RuleDesc("bool_scalar"),
+            "always_serialize":
+                _RuleDesc("bool_scalar"),
         })
 
     return field

@@ -53,7 +53,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/delete_request_gen.h"
-#include "mongo/db/ops/find_and_modify_result.h"
+#include "mongo/db/ops/find_and_modify_command_gen.h"
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/ops/parsed_delete.h"
 #include "mongo/db/ops/parsed_update.h"
@@ -196,25 +196,28 @@ void makeDeleteRequest(OperationContext* opCtx,
                                    : PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
 }
 
-void appendCommandResponse(const PlanExecutor* exec,
-                           bool isRemove,
-                           const boost::optional<BSONObj>& value,
-                           BSONObjBuilder* result) {
+write_ops::FindAndModifyReply buildResponse(const PlanExecutor* exec,
+                                            bool isRemove,
+                                            const boost::optional<BSONObj>& value) {
+    write_ops::FindAndModifyLastError lastError;
     if (isRemove) {
-        find_and_modify::serializeRemove(value, result);
+        lastError.setNumDocs(value ? 1 : 0);
     } else {
         const auto updateResult = exec->getUpdateResult();
+        lastError.setNumDocs(!updateResult.upsertedId.isEmpty() ? 1 : updateResult.numMatched);
+        lastError.setUpdatedExisting(updateResult.numMatched > 0);
 
-        // Note we have to use the objInserted from the stats here, rather than 'value' because the
-        // _id field could have been excluded by a projection.
-        find_and_modify::serializeUpsert(
-            !updateResult.upsertedId.isEmpty() ? 1 : updateResult.numMatched,
-            value,
-            updateResult.numMatched > 0,
-            updateResult.upsertedId.isEmpty() ? BSONElement{}
-                                              : updateResult.upsertedId.firstElement(),
-            result);
+        // Note we have to use the upsertedId from the update result here, rather than 'value'
+        // because the _id field could have been excluded by a projection.
+        if (!updateResult.upsertedId.isEmpty()) {
+            lastError.setUpserted(IDLAnyTypeOwned(updateResult.upsertedId.firstElement()));
+        }
     }
+
+    write_ops::FindAndModifyReply result;
+    result.setLastErrorObject(std::move(lastError));
+    result.setValue(value);
+    return result;
 }
 
 void assertCanWrite(OperationContext* opCtx, const NamespaceString& nsString) {
@@ -402,7 +405,8 @@ public:
             if (auto entry = txnParticipant.checkStatementExecuted(opCtx, stmtId)) {
                 RetryableWritesStats::get(opCtx)->incrementRetriedCommandsCount();
                 RetryableWritesStats::get(opCtx)->incrementRetriedStatementsCount();
-                parseOplogEntryForFindAndModify(opCtx, request, *entry, &result);
+                auto findAndModifyReply = parseOplogEntryForFindAndModify(opCtx, request, *entry);
+                findAndModifyReply.serialize(&result);
 
                 // Make sure to wait for writeConcern on the opTime that will include this write.
                 // Needs to set to the system last opTime to get the latest term in an event when
@@ -562,7 +566,9 @@ public:
             metricsCollector.incrementDocUnitsReturned(docUnitsReturned);
         }
 
-        appendCommandResponse(exec.get(), request.getRemove().value_or(false), docFound, &result);
+        auto findAndModifyReply =
+            buildResponse(exec.get(), request.getRemove().value_or(false), docFound);
+        findAndModifyReply.serialize(&result);
 
         return true;
     }
@@ -657,7 +663,9 @@ public:
             metricsCollector.incrementDocUnitsReturned(docUnitsReturned);
         }
 
-        appendCommandResponse(exec.get(), request.getRemove().value_or(false), docFound, &result);
+        auto findAndModifyReply =
+            buildResponse(exec.get(), request.getRemove().value_or(false), docFound);
+        findAndModifyReply.serialize(&result);
 
         return true;
     }

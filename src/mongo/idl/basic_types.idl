@@ -221,6 +221,14 @@ types:
         cpp_type: "mongo::IDLAnyType"
         serializer: mongo::IDLAnyType::serializeToBSON
         deserializer: mongo::IDLAnyType::parseFromBSON
+    
+    IDLAnyTypeOwned:
+        bson_serialization_type: any
+        description: "Holds a BSONElement of any type. Does not require the backing BSON to stay
+                      alive."
+        cpp_type: "mongo::IDLAnyTypeOwned"
+        serializer: mongo::IDLAnyTypeOwned::serializeToBSON
+        deserializer: mongo::IDLAnyTypeOwned::parseFromBSON
 
     writeConcernW:
         bson_serialization_type:

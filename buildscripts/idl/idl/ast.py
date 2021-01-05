@@ -200,6 +200,7 @@ class Field(common.SourceLocation):
         self.unstable = False  # type: bool
         self.default = None  # type: str
         self.type = None  # type: Type
+        self.always_serialize = False  # type: bool
 
         # Properties specific to fields which are structs.
         self.struct_type = None  # type: str

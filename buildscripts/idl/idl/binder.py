@@ -608,6 +608,9 @@ def _validate_field_properties(ctxt, ast_field):
         if ast_field.type.bson_serialization_type == ['bindata']:
             ctxt.add_bindata_no_default(ast_field, ast_field.type.name, ast_field.name)
 
+    if ast_field.always_serialize and not ast_field.optional:
+        ctxt.add_bad_field_always_serialize_not_optional(ast_field, ast_field.name)
+
     # A "chain" type should never appear as a field.
     if ast_field.type.bson_serialization_type == ['chain']:
         ctxt.add_bad_array_of_chain(ast_field, ast_field.name)
@@ -770,6 +773,7 @@ def _bind_field(ctxt, parsed_spec, field):
     ast_field.comparison_order = field.comparison_order
     ast_field.non_const_getter = field.non_const_getter
     ast_field.unstable = field.unstable
+    ast_field.always_serialize = field.always_serialize
 
     ast_field.cpp_name = field.name
     if field.cpp_name:

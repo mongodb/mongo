@@ -34,8 +34,11 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/oid.h"
 #include "mongo/idl/unittest_gen.h"
 #include "mongo/rpc/op_msg.h"
+#include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/unittest.h"
 
 using namespace mongo::idl::test;
@@ -798,6 +801,36 @@ TEST(IDLFieldTests, TestOptionalFields) {
         auto testDoc = BSON("field2" << 123);
         ASSERT_BSONOBJ_EQ(testDoc, loopbackDoc);
     }
+}
+
+TEST(IDLFieldTests, TestAlwaysSerializeFields) {
+    IDLParserErrorContext ctxt("root");
+
+    auto testDoc = BSON("field1"
+                        << "Foo"
+                        << "field3" << BSON("a" << 1234));
+    auto testStruct = Always_serialize_field::parse(ctxt, testDoc);
+
+    assert_same_types<decltype(testStruct.getField1()), const boost::optional<mongo::StringData>>();
+    assert_same_types<decltype(testStruct.getField2()), const boost::optional<std::int32_t>>();
+    assert_same_types<decltype(testStruct.getField3()), const boost::optional<mongo::BSONObj>&>();
+    assert_same_types<decltype(testStruct.getField4()), const boost::optional<mongo::BSONObj>&>();
+    assert_same_types<decltype(testStruct.getField5()), const boost::optional<mongo::BSONObj>&>();
+
+    ASSERT_EQUALS("Foo", testStruct.getField1().get());
+    ASSERT_FALSE(testStruct.getField2().is_initialized());
+    ASSERT_BSONOBJ_EQ(BSON("a" << 1234), testStruct.getField3().get());
+    ASSERT_FALSE(testStruct.getField4().is_initialized());
+    ASSERT_FALSE(testStruct.getField5().is_initialized());
+
+    BSONObjBuilder builder;
+    testStruct.serialize(&builder);
+    auto loopbackDoc = builder.obj();
+    auto docWithNulls = BSON("field1"
+                             << "Foo"
+                             << "field2" << BSONNULL << "field3" << BSON("a" << 1234) << "field4"
+                             << BSONNULL);
+    ASSERT_BSONOBJ_EQ(docWithNulls, loopbackDoc);
 }
 
 template <typename TestT>
@@ -3110,6 +3143,64 @@ TEST(IDLCommand, BasicNamespaceConstGetterCommand_TestNonConstGetterGeneration) 
                           BSON(BasicNamespaceConstGetterCommand::kCommandName << "coll"
                                                                               << "field1" << 3));
     }
+}
+
+TEST(IDLTypeCommand, TestCommandWithIDLAnyTypeOwnedField) {
+    IDLParserErrorContext ctxt("root");
+
+    auto parsed = CommandWithAnyTypeOwnedMember::parse(
+        ctxt,
+        BSON(CommandWithAnyTypeOwnedMember::kCommandName << 1 << "anyTypeField"
+                                                         << "string literal"
+                                                         << "$db"
+                                                         << "db"));
+    ASSERT_EQ(parsed.getAnyTypeField().getElement().type(), String);
+    ASSERT_EQ(parsed.getAnyTypeField().getElement().str(), "string literal");
+
+    parsed = CommandWithAnyTypeOwnedMember::parse(ctxt,
+                                                  BSON(CommandWithAnyTypeOwnedMember::kCommandName
+                                                       << 1 << "anyTypeField" << 1234 << "$db"
+                                                       << "db"));
+    ASSERT_EQ(parsed.getAnyTypeField().getElement().type(), NumberInt);
+    ASSERT_EQ(parsed.getAnyTypeField().getElement().numberInt(), 1234);
+
+    parsed = CommandWithAnyTypeOwnedMember::parse(ctxt,
+                                                  BSON(CommandWithAnyTypeOwnedMember::kCommandName
+                                                       << 1 << "anyTypeField" << 1234.5 << "$db"
+                                                       << "db"));
+    ASSERT_EQ(parsed.getAnyTypeField().getElement().type(), NumberDouble);
+    ASSERT_EQ(parsed.getAnyTypeField().getElement().numberDouble(), 1234.5);
+
+    parsed = CommandWithAnyTypeOwnedMember::parse(ctxt,
+                                                  BSON(CommandWithAnyTypeOwnedMember::kCommandName
+                                                       << 1 << "anyTypeField" << OID::max() << "$db"
+                                                       << "db"));
+    ASSERT_EQ(parsed.getAnyTypeField().getElement().type(), jstOID);
+    ASSERT_EQ(parsed.getAnyTypeField().getElement().OID(), OID::max());
+
+    parsed = CommandWithAnyTypeOwnedMember::parse(ctxt,
+                                                  BSON(CommandWithAnyTypeOwnedMember::kCommandName
+                                                       << 1 << "anyTypeField"
+                                                       << BSON("a"
+                                                               << "b")
+                                                       << "$db"
+                                                       << "db"));
+    ASSERT_EQ(parsed.getAnyTypeField().getElement().type(), Object);
+    ASSERT_BSONOBJ_EQ(parsed.getAnyTypeField().getElement().Obj(),
+                      BSON("a"
+                           << "b"));
+
+    parsed = CommandWithAnyTypeOwnedMember::parse(ctxt,
+                                                  BSON(CommandWithAnyTypeOwnedMember::kCommandName
+                                                       << 1 << "anyTypeField"
+                                                       << BSON_ARRAY("a"
+                                                                     << "b")
+                                                       << "$db"
+                                                       << "db"));
+    ASSERT_EQ(parsed.getAnyTypeField().getElement().type(), Array);
+    ASSERT_BSONELT_EQ(parsed.getAnyTypeField().getElement(),
+                      BSON("anyTypeField" << BSON_ARRAY("a"
+                                                        << "b"))["anyTypeField"]);
 }
 
 }  // namespace

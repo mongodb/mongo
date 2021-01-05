@@ -1899,7 +1899,6 @@ env.Library(
     target='write_ops',
     source=[
         'ops/delete.cpp',
-        'ops/find_and_modify_result.cpp',
         'ops/insert.cpp',
         'ops/update.cpp',
         'ops/write_ops_retryability.cpp',

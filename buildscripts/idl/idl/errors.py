@@ -116,6 +116,7 @@ ERROR_ID_UNSTABLE_NO_API_VERSION = "ID0073"
 ERROR_ID_MISSING_REPLY_TYPE = "ID0074"
 ERROR_ID_API_VERSION_NO_STRICT = "ID0075"
 ERROR_ID_USELESS_VARIANT = "ID0076"
+ERROR_ID_ILLEGAL_FIELD_ALWAYS_SERIALIZE_NOT_OPTIONAL = "ID0077"
 
 
 class IDLError(Exception):
@@ -855,6 +856,14 @@ class ParserContext(object):
         self._add_error(
             location, ERROR_ID_API_VERSION_NO_STRICT,
             ("Command '%s' specifies 'api_version' but 'strict' isn't true" % (command_name, )))
+
+    def add_bad_field_always_serialize_not_optional(self, location, field_name):
+        # type: (common.SourceLocation, str) -> None
+        """Add an error about a field with 'always_serialize' but 'optional' isn't set to true."""
+        # pylint: disable=invalid-name
+        self._add_error(
+            location, ERROR_ID_ILLEGAL_FIELD_ALWAYS_SERIALIZE_NOT_OPTIONAL,
+            ("Field '%s' specifies 'always_serialize' but 'optional' isn't true.") % (field_name))
 
 
 def _assert_unique_error_messages():

@@ -693,6 +693,19 @@ class TestBinder(testcase.IDLTestcase):
                         arrayOfString: arrayfake
             """))
 
+        # Test always_serialize with optional
+        self.assert_bind(test_preamble + textwrap.dedent("""
+            structs:
+                foo:
+                    description: foo
+                    strict: true
+                    fields:
+                        foo:
+                            type: string
+                            optional: true
+                            always_serialize: true
+            """))
+
     def test_field_negative(self):
         # type: () -> None
         """Negative field tests."""
@@ -813,6 +826,20 @@ class TestBinder(testcase.IDLTestcase):
                             default: 42
                             optional: true
             """), idl.errors.ERROR_ID_ILLEGAL_FIELD_DEFAULT_AND_OPTIONAL)
+
+        # Test always_serialize without optional for the same field
+        self.assert_bind_fail(
+            test_preamble + textwrap.dedent("""
+            structs:
+                foo:
+                    description: foo
+                    strict: true
+                    fields:
+                        foo:
+                            type: string
+                            default: 42
+                            always_serialize: true
+            """), idl.errors.ERROR_ID_ILLEGAL_FIELD_ALWAYS_SERIALIZE_NOT_OPTIONAL)
 
         # Test duplicate comparison order
         self.assert_bind_fail(

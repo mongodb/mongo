@@ -32,6 +32,7 @@
 #include <boost/optional.hpp>
 
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/stdx/variant.h"
 
@@ -130,9 +131,33 @@ public:
         return _element;
     }
 
-private:
+protected:
     BSONElement _element;
 };
+
+/**
+ * Class to represent a BSON element with any type from IDL. Unlike IDLAnyType, here the caller
+ * does not need to ensure the backing BSON stays alive; it is handled by the class.
+ */
+class IDLAnyTypeOwned : public IDLAnyType {
+public:
+    static IDLAnyTypeOwned parseFromBSON(const BSONElement& element) {
+        return IDLAnyTypeOwned(element);
+    }
+
+    IDLAnyTypeOwned() = default;
+    IDLAnyTypeOwned(const BSONElement& element) {
+        _obj = element.wrap();
+        _element = _obj.firstElement();
+    }
+    // This constructor can be used to avoid copying the contents of 'element'.
+    IDLAnyTypeOwned(const BSONElement& element, BSONObj owningBSONObj)
+        : IDLAnyType(element), _obj(std::move(owningBSONObj)) {}
+
+private:
+    BSONObj _obj;
+};
+
 class WriteConcernW {
 public:
     static WriteConcernW deserializeWriteConcernW(BSONElement wEl) {

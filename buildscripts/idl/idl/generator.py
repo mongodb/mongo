@@ -1891,6 +1891,13 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             else:
                 self._gen_serializer_method_struct(field)
 
+        if field.always_serialize:
+            # If using field.always_serialize, field.optional must also be true. Add an else block
+            # that appends null when the optional field is not initialized.
+            with self._block('else {', '}'):
+                self._writer.write_line(
+                    'builder->appendNull(%s);' % (_get_field_constant_name(field)))
+
     def _gen_serializer_methods_common(self, struct, is_op_msg_request):
         # type: (ast.Struct, bool) -> None
         """Generate the serialize method definition."""
