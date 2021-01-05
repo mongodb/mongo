@@ -2661,79 +2661,68 @@ functions:
         kitchen destroy "${packager_distro}"\$ || true
         test "$verified" = "true"
 
-  "copy ec2 monitor files": &copy_ec2_monitor_files
-    command: shell.exec
-    params:
-      background: true
-      system_log: true
-      working_dir: src
-      silent: false
-      script: |
-        while [ 1 ]
-        do
-          # Tar/zip monitor files on remote host.
-          if [ -z "${ec2_monitor_files}" ] || [ -z "${instance_id}" ]; then
-            exit 0
-          fi
-          # Ensure we use the latest private_ip_address, as it could change if the EC2 instance
-          # has been stopped and started.
-          ${activate_virtualenv}
-          # Specify '--mode start' to ensure the remote instance is running.
-          monitor_ec2_yml=monitor_ec2.yml
-          $python buildscripts/aws_ec2.py --imageId ${instance_id} --mode start --yamlFile $monitor_ec2_yml
-          echo "AMI EC2 instance ${instance_id} status: $(cat $monitor_ec2_yml)"
-          private_ip_address=$($python buildscripts/yaml_key_value.py --yamlFile $monitor_ec2_yml --yamlKey private_ip_address)
-          if [ -z "$private_ip_address" ]; then
-            echo "Cannot determine the IP address for the remote monitor."
-            continue
-          fi
-
-          $python buildscripts/powercycle_operations.py copyEC2MonitorFiles
-          sleep 30
-        done
-
   "set up EC2 instance": &set_up_ec2_instance
+    - command: expansions.write
+      params:
+        file: src/expansions.yml
+
     - command: shell.exec
       params:
-        working_dir: src
         script: |
+          cat src/expansions.yml
 
-          set -o errexit
-          ${activate_virtualenv}
+    - command: host.create
+      params:
+        provider: ec2
+        distro: ${distro_id}
+        security_group_ids:
+        - sg-097bff6dd0d1d31d0
 
-          if [ ! -z "${subnet_id}" ]; then
-            subnet_id="-n ${subnet_id}"
-          fi
+    - command: host.list
+      params:
+        wait: true
+        timeout_seconds: 3000
+        num_hosts: 1
+        path: src/hosts.yml
 
-          for security_group_id in ${security_group_ids}
+    - command: shell.exec
+      params:
+        script: |
+          identity_file=${private_key_file}
+          echo "${__project_aws_ssh_key_value}" > "$identity_file"
+          chmod 0600 "$identity_file"
+
+          user=$USER
+          hostname=$(tr -d '"[]{}' < src/hosts.yml | cut -d , -f 1 | awk -F : '{print $2}')
+
+          # compat with old aws_ec2.yml file
+          echo "private_ip_address: $hostname" >> src/${aws_ec2_yml}
+          echo "instance_id: dummy_id" >> src/${aws_ec2_yml}
+
+          echo $hostname
+          echo $user
+          echo $identity_file
+
+          attempts=0
+          connection_attempts=${connection_attempts|25}
+
+          # Check for remote connectivity
+          while ! ssh \
+            -i "$identity_file" \
+            -o ConnectTimeout=10 \
+            -o ForwardAgent=yes \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=no \
+            "$(printf "%s@%s" "$user" "$hostname")" \
+            exit 2> /dev/null
           do
-            security_group_ids="$security_group_ids -g $security_group_id"
+            [ "$attempts" -ge "$connection_attempts" ] && exit 1
+            ((attempts++))
+            printf "SSH connection attempt %d/%d failed. Retrying...\n" "$attempts" "$connection_attempts"
+            # sleep for Permission denied (publickey) errors
+            sleep 10
           done
-
-          if [ -z "${security_group_ids}" ]; then
-            for security_group in ${security_groups}
-            do
-              security_groups="$security_groups -s $security_group"
-            done
-          fi
-
-          if [ -n "${ec2_expire_hours}" ]; then
-            expire_hours="-e ${ec2_expire_hours}"
-            # Since Windows hosts are expensive to keep running we'll expire it after 3 hours.
-            if [ "Windows_NT" = "$OS" ]; then
-              expire_hours="-e 3"
-            fi
-          fi
-
-          # Clone another instance of this host in EC2.
-          buildscripts/launch_evergreen_ec2_instance.sh \
-            $expire_hours                               \
-            -k ${ssh_key_id}                            \
-            $security_groups                            \
-            $security_group_ids                         \
-            $subnet_id                                  \
-            -t "AMI Evergreen ${task_id}"               \
-            -y ${aws_ec2_yml}
+        shell: bash
 
     - command: expansions.update
       params:
@@ -2753,38 +2742,6 @@ functions:
 
           ${activate_virtualenv}
           $python buildscripts/powercycle_operations.py setUpEC2Instance
-
-    - *copy_ec2_monitor_files
-
-  ### Determine & set remote EC2 IP address ###
-  "get EC2 address": &get_ec2_address
-    command: shell.exec
-    params:
-      shell: bash
-      working_dir: src
-      script: |
-        if [ -z "${instance_id}" ]; then
-          exit 0
-        fi
-        # Ensure we use the latest private_ip_address, as it could change if the EC2 instance
-        # has been stopped and started.
-        ${activate_virtualenv}
-        # Specify '--mode start' to ensure the remote instance is running.
-        now=$(date +'%Y%m%d%H%M%S')
-        aws_ec2_status_yml=aws_ec2_status.yml
-        $python buildscripts/aws_ec2.py            \
-          --imageId ${instance_id}                 \
-          --mode start                             \
-          --yamlFile $aws_ec2_status_yml           \
-          --consoleOutputFile ec2_console_$now.log \
-          --consoleScreenshotFile ec2_console_screen_shot_$now.jpg
-        private_ip_address=$($python buildscripts/yaml_key_value.py --yamlFile $aws_ec2_status_yml --yamlKey private_ip_address)
-        echo "private_ip_address: $private_ip_address" > private_ip_address.yml
-
-  "update EC2 address": &update_ec2_address
-    command: expansions.update
-    params:
-      file: src/private_ip_address.yml
 
   ### Process & archive remote EC2 artifacts ###
   "tar EC2 artifacts": &tar_ec2_artifacts
@@ -2815,20 +2772,20 @@ functions:
         ${activate_virtualenv}
         $python buildscripts/powercycle_operations.py copyEC2Artifacts
 
-  "cleanup EC2 instance": &cleanup_ec2_instance
+  "copy ec2 monitor files": &copy_ec2_monitor_files
     command: shell.exec
     params:
       shell: bash
       working_dir: src
       script: |
-        # We do not terminate the EC2 instance if there was an ec2_ssh_failure.
-        if [[ -z ${instance_id|""} || -n "${ec2_ssh_failure}" ]]; then
-          exit 0
-        fi
-        ${activate_virtualenv}
-        echo "Terminating $instance_id"
-        aws_ec2=$($python buildscripts/aws_ec2.py --imageId ${instance_id} --mode terminate)
-        echo "Terminated AMI EC2 instance: $aws_ec2"
+       set -o verbose
+
+       if [ -z "${ec2_monitor_files}" ] || [ -z "${instance_id}" ]; then
+        exit 0
+       fi
+
+       ${activate_virtualenv}
+       $python buildscripts/powercycle_operations.py copyEC2MonitorFiles
 
   # The event logs on Windows are a useful diagnostic to have when determining if something bad
   # happened to the remote machine after it was repeatedly crashed during powercycle testing. For
@@ -2900,40 +2857,13 @@ functions:
       display_name: Remote EC2 Monitor - Execution ${execution}
       optional: true
 
-  "gather EC2 console artifacts": &gather_ec2_console_artifacts
-    command: shell.exec
-    params:
-      working_dir: src
-      script: |
-        ec2_console_files=$(ls ec2_console* 2> /dev/null)
-        if [ -n "$ec2_console_files" ]; then
-          ${tar|tar} czf ec2_console_files.tgz $ec2_console_files
-        fi
-
-  "archive EC2 console artifacts": &archive_ec2_console_artifacts
-    command: s3.put
-    params:
-      aws_key: ${aws_key}
-      aws_secret: ${aws_secret}
-      local_file: src/ec2_console_files.tgz
-      remote_file: ${project}/${build_variant}/${revision}/ec2/ec2_console-${task_id}-${execution}.tgz
-      bucket: mciuploads
-      permissions: public-read
-      content_type: ${content_type|application/x-gzip}
-      display_name: EC2 Console files - Execution ${execution}
-      optional: true
-
   "save ec2 task artifacts":
-    - *get_ec2_address
-    - *update_ec2_address
     - *gather_remote_event_logs
     - *tar_ec2_artifacts
     - *copy_ec2_artifacts
+    - *copy_ec2_monitor_files
     - *gather_remote_mongo_coredumps
     - *copy_remote_mongo_coredumps
-    - *gather_ec2_console_artifacts
-    - *archive_ec2_console_artifacts
-    - *cleanup_ec2_instance
     - *archive_remote_ec2_artifacts
     - *archive_remote_ec2_monitor_files
 
@@ -3503,8 +3433,6 @@ post:
 
 # Timeout steps
 timeout:
-  - func: "get EC2 address"
-  - func: "update EC2 address"
   - func: "run hang analyzer"
   - func: "wait for resmoke to shutdown"
 
@@ -7625,6 +7553,7 @@ tasks:
       timeout_secs: 1800 # 30 minute timeout for no output
       vars:
         <<: *powercycle_test
+        test_options: --testLoops=3 --seedDocNum=1000 --rsync --rsyncExcludeFiles=diagnostic.data/metrics.interim* --validate=local --canary=local
         mongod_extra_options: --mongodOptions=\"--setParameter enableTestCommands=1 --setParameter logComponentVerbosity='{storage:{recovery:2}}' --storageEngine wiredTiger --wiredTigerEngineConfigString 'debug_mode=[table_logging=true]'\"
 
 

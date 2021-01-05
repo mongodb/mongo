@@ -1969,7 +1969,7 @@ def main(parser, parser_actions, options):  # pylint: disable=too-many-branches,
     # The remote mongod host comes from the ssh_user_host,
     # which may be specified as user@host.
     ssh_user_host = options.ssh_user_host
-    ssh_user, ssh_host = get_user_host(ssh_user_host)
+    _, ssh_host = get_user_host(ssh_user_host)
     mongod_host = ssh_host
 
     # As described in http://man7.org/linux/man-pages/man5/ssh_config.5.html, ssh uses the value of
@@ -1982,19 +1982,6 @@ def main(parser, parser_actions, options):  # pylint: disable=too-many-branches,
     # see https://stackoverflow.com/questions/10310299/proper-way-to-sudo-over-ssh.
     # Note - the ssh option RequestTTY was added in OpenSSH 5.9, so we use '-tt'.
     ssh_options = "-tt" if options.remote_sudo else None
-
-    # Establish EC2 connection if an instance_id is specified.
-    if options.instance_id:
-        ec2 = aws_ec2.AwsEc2()
-        # Determine address_type if not using 'aws_ec2' crash_method.
-        if options.crash_method != "aws_ec2":
-            address_type = "public_ip_address"
-            ret, aws_status = ec2.control_instance(mode="status", image_id=options.instance_id)
-            if not is_instance_running(ret, aws_status):
-                LOGGER.error("AWS instance is not running:  %d %s", ret, aws_status)
-                local_exit(1)
-            if ssh_host in (aws_status.private_ip_address, aws_status.private_dns_name):
-                address_type = "private_ip_address"
 
     # Instantiate the local handler object.
     local_ops = LocalToRemoteOperations(user_host=ssh_user_host,
@@ -2227,29 +2214,6 @@ def main(parser, parser_actions, options):  # pylint: disable=too-many-branches,
         Processes.kill_all()
         for temp_file in temp_client_files:
             NamedTempFile.delete(temp_file)
-
-        instance_running = True
-        if options.instance_id:
-            ret, aws_status = ec2.control_instance(mode="status", image_id=options.instance_id)
-            LOGGER.info("AWS EC2 instance status: %d %s****", ret, aws_status)
-            instance_running = is_instance_running(ret, aws_status)
-
-        # The EC2 instance address changes if the instance is restarted.
-        if options.crash_method == "aws_ec2" or not instance_running:
-            ret, aws_status = ec2.control_instance(mode="start", image_id=options.instance_id,
-                                                   wait_time_secs=600, show_progress=True)
-            LOGGER.info("Start instance: %d %s****", ret, aws_status)
-            if ret:
-                raise Exception("Start instance failed: {}".format(aws_status))
-            if not hasattr(aws_status, address_type):
-                raise Exception("Cannot determine address_type {} from AWS EC2 status {}".format(
-                    address_type, aws_status))
-            ssh_host = getattr(aws_status, address_type)
-            if ssh_user is None:
-                ssh_user_host = ssh_host
-            else:
-                ssh_user_host = "{}@{}".format(ssh_user, ssh_host)
-            mongod_host = ssh_host
 
         # Reestablish remote access after crash.
         local_ops = LocalToRemoteOperations(user_host=ssh_user_host,

@@ -72,48 +72,32 @@ class SetUpEC2Instance(PowercycleCommand):
 
     def execute(self) -> None:  # pylint: disable=too-many-instance-attributes, too-many-locals, too-many-statements
         """:return: None."""
+
         # First operation -
-        # Copy mount_drives.sh script to remote host.
-        # last arg is "operation_dir", which for the COPY_TO action, is the remote
-        # directory. We just have it default to the home directory instead of setting
-        # one explicitly.
-        self.remote_op.operation(SSHOperation.COPY_TO, 'buildscripts/mount_drives.sh', None)
-
-        # Second operation -
-        # Mount /data on the attached drive(s), more than 1 indicates a RAID set.
-        script_opts = f"-d '{self.expansions['data_device_names']}'"
-        if "raid_data_device_name" in self.expansions:
-            script_opts = f"{script_opts} -r {self.expansions['raid_data_device_name']}"
-        if "fstype" in self.expansions:
-            script_opts = f"{script_opts} -t {self.expansions['fstype']}"
-        if "fs_options" in self.expansions:
-            script_opts = f"{script_opts} -o '{self.expansions['fs_options']}'"
-        script_opts = f"{script_opts} -l '{self.expansions['log_device_name']}'"
-
-        log = "/log"
-        group_cmd = f"id -Gn {self.user}"
-        _, group = self._call(group_cmd)
-        group = group.split(" ")[0]
-        user_group = f"{self.user}:{group}"
-        script_opts = f"{script_opts} -u {user_group}"
-        data_db = "/data/db"
-        cmds = f"{self.sudo} bash mount_drives.sh {script_opts}; mount; ls -ld {data_db} {log}; df"
-        self.remote_op.operation(SSHOperation.SHELL, cmds, None)
-
-        # Third operation -
         # Create remote_dir, if not '.' (pwd).
         if 'remote_dir' not in self.expansions:
             raise ValueError("The 'remote_dir' expansion must be set.")
 
+        group_cmd = f"id -Gn {self.user}"
+        _, group = self._call(group_cmd)
+        group = group.split(" ")[0]
+        user_group = f"{self.user}:{group}"
+
         remote_dir = self.expansions['remote_dir']
+        log_path = "/log"
+        db_path = '/data/db'
+
         if self.expansions['remote_dir'] != ".":
-            set_permission = f"chmod 777 {self.expansions['remote_dir']}"
+            set_permission_stmt = f"chmod -R 777"
+            # set_permission = f"chmod 777 {self.expansions['remote_dir']}"
             if self.is_windows():
-                set_permission = f"setfacl -s user::rwx,group::rwx,other::rwx {remote_dir}"
-            cmds = f"{self.sudo} mkdir -p {remote_dir}; {self.sudo} chown {user_group} {remote_dir}; {set_permission}; ls -ld {remote_dir}"
+                set_permission_stmt = f"setfacl -s user::rwx,group::rwx,other::rwx"
+            cmds = f"{self.sudo} mkdir -p {log_path}/powercycle; {self.sudo} chown -R {user_group} {log_path}; {set_permission_stmt} {log_path}; ls -ld {log_path}"
+            cmds = f"{cmds}; {self.sudo} mkdir -p {db_path}; {self.sudo} chown -R {user_group} {db_path}; {set_permission_stmt} {db_path}; ls -ld {db_path}"
+
             self.remote_op.operation(SSHOperation.SHELL, cmds, None)
 
-        # Fourth operation -
+        # Second operation -
         # Copy buildscripts and mongoDB executables to the remote host.
         files = ['etc', 'buildscripts']
         mongo_executables = ["mongo", "mongod", "mongos"]
@@ -122,7 +106,7 @@ class SetUpEC2Instance(PowercycleCommand):
 
         self.remote_op.operation(SSHOperation.COPY_TO, files, remote_dir)
 
-        # Fifth operation -
+        # Third operation -
         # Set up virtualenv on remote.
         venv = "venv" if "virtualenv_dir" not in self.expansions else self.expansions[
             "virtualenv_dir"]
@@ -139,7 +123,7 @@ class SetUpEC2Instance(PowercycleCommand):
 
         self.remote_op.operation(SSHOperation.SHELL, cmds, None)
 
-        # Sixth operation -
+        # Fourth operation -
         # Enable core dumps on non-Windows remote hosts.
         # The core pattern must specify a director, since mongod --fork will chdir("/")
         # and cannot generate a core dump there (see SERVER-21635).
@@ -163,7 +147,7 @@ class SetUpEC2Instance(PowercycleCommand):
             cmds = f"{cmds}; nohup {self.sudo} reboot &>/dev/null & exit"
             self.remote_op.operation(SSHOperation.SHELL, cmds, None)
 
-        # Seventh operation -
+        # Fifth operation -
         # Print the ulimit & kernel.core_pattern
         if not self.is_windows():
             # Always exit successfully, as this is just informational.
@@ -175,9 +159,9 @@ class SetUpEC2Instance(PowercycleCommand):
 
             self.remote_op.operation(SSHOperation.SHELL, cmds, None, True)
 
-        # Eighth operation -
+        # Sixth operation -
         # Set up curator to collect system & process stats on remote.
-        variant = "windows" if self.is_windows() else "ubuntu1604"
+        variant = "windows-64" if self.is_windows() else "ubuntu1604"
         curator_hash = "117d1a65256ff78b6d15ab79a1c7088443b936d0"
         curator_url = f"https://s3.amazonaws.com/boxes.10gen.com/build/curator/curator-dist-{variant}-{curator_hash}.tar.gz"
         cmds = f"curl -s {curator_url} | tar -xzv"
@@ -192,6 +176,7 @@ class SetUpEC2Instance(PowercycleCommand):
             cmds = f"{cmds}; cygrunsrv --start curator_sys"
             cmds = f"{cmds}; cygrunsrv --start curator_proc"
         else:
+            cmds = f"{cmds}; touch {monitor_system_file} {monitor_proc_file}"
             cmds = f"{cmds}; cmd=\"@reboot cd $HOME && {self.sudo} ./curator stat system >> {monitor_system_file}\""
             cmds = f"{cmds}; (crontab -l ; echo \"$cmd\") | crontab -"
             cmds = f"{cmds}; cmd=\"@reboot cd $HOME && $sudo ./curator stat process-all >> {monitor_proc_file}\""
@@ -201,7 +186,7 @@ class SetUpEC2Instance(PowercycleCommand):
 
         self.remote_op.operation(SSHOperation.SHELL, cmds, retry=True)
 
-        # Ninth operation -
+        # Seventh operation -
         def configure_firewall():
             # Many systems have the firewall disabled, by default. In case the firewall is
             # enabled we add rules for the mongod ports on the remote.
@@ -262,7 +247,7 @@ class SetUpEC2Instance(PowercycleCommand):
 
         configure_firewall()
 
-        # Tenth operation -
+        # Eighth operation -
         # Install NotMyFault, used to crash Windows.
         if self.is_windows() and "windows_crash_zip" in self.expansions:
             windows_crash_zip = self.expansions["windows_crash_zip"]
