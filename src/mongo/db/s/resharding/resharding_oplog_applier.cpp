@@ -67,6 +67,48 @@ namespace {
 const BSONObj kReshardingOplogTag(BSON("$resharding" << 1));
 
 /**
+ * Insert a no-op oplog entry that contains the pre/post image document from a retryable write.
+ */
+repl::OpTime insertPrePostImageOplogEntry(OperationContext* opCtx,
+                                          const repl::DurableOplogEntry& prePostImageOp) {
+    uassert(4990408,
+            str::stream() << "expected a no-op oplog for pre/post image oplog: "
+                          << redact(prePostImageOp.toBSON()),
+            prePostImageOp.getOpType() == repl::OpTypeEnum::kNoop);
+
+    auto noOpOplog = uassertStatusOK(repl::MutableOplogEntry::parse(prePostImageOp.toBSON()));
+    // Reset OpTime so logOp() can assign a new one.
+    noOpOplog.setOpTime(OplogSlot());
+    noOpOplog.setWallClockTime(Date_t::now());
+
+    return writeConflictRetry(
+        opCtx,
+        "InsertPrePostImageOplogEntryForResharding",
+        NamespaceString::kSessionTransactionsTableNamespace.ns(),
+        [&] {
+            // Need to take global lock here so repl::logOp will not unlock it and trigger the
+            // invariant that disallows unlocking global lock while inside a WUOW. Take the
+            // transaction table db lock to ensure the same lock ordering with normal replicated
+            // updates to the table.
+            Lock::DBLock lk(
+                opCtx, NamespaceString::kSessionTransactionsTableNamespace.db(), MODE_IX);
+            WriteUnitOfWork wunit(opCtx);
+
+            const auto& oplogOpTime = repl::logOp(opCtx, &noOpOplog);
+
+            uassert(4990409,
+                    str::stream() << "Failed to create new oplog entry for oplog with opTime: "
+                                  << noOpOplog.getOpTime().toString() << ": "
+                                  << redact(noOpOplog.toBSON()),
+                    !oplogOpTime.isNull());
+
+            wunit.commit();
+
+            return oplogOpTime;
+        });
+}
+
+/**
  * Writes the oplog entries and updates to config.transactions for enabling retrying the write
  * described in the oplog entry.
  */
@@ -112,14 +154,25 @@ Status insertOplogAndUpdateConfigForRetryable(OperationContext* opCtx,
         throw;
     }
 
-    // TODO: handle pre/post image
+    repl::OpTime prePostImageOpTime;
+    if (auto preImageOp = oplog.getPreImageOp()) {
+        prePostImageOpTime = insertPrePostImageOplogEntry(opCtx, *preImageOp);
+    } else if (auto postImageOp = oplog.getPostImageOp()) {
+        prePostImageOpTime = insertPrePostImageOplogEntry(opCtx, *postImageOp);
+    }
 
     auto rawOplogBSON = oplog.getEntry().toBSON();
     auto noOpOplog = uassertStatusOK(repl::MutableOplogEntry::parse(rawOplogBSON));
     noOpOplog.setObject2(rawOplogBSON);
     noOpOplog.setNss({});
     noOpOplog.setObject(BSON("$reshardingOplogApply" << 1));
-    // TODO: link pre/post image
+
+    if (oplog.getPreImageOp()) {
+        noOpOplog.setPreImageOpTime(prePostImageOpTime);
+    } else if (oplog.getPostImageOp()) {
+        noOpOplog.setPostImageOpTime(prePostImageOpTime);
+    }
+
     noOpOplog.setPrevWriteOpTimeInTransaction(txnParticipant.getLastWriteOpTime());
     noOpOplog.setOpType(repl::OpTypeEnum::kNoop);
     // Reset OpTime so logOp() can assign a new one.
@@ -331,26 +384,36 @@ Future<void> ReshardingOplogApplier::_applyBatch(OperationContext* opCtx) {
     return std::move(pf.future);
 }
 
+/**
+ * Convert the given oplog entry into a pseudo oplog that is going to be used for updating the
+ * config.transactions and inserting the necessary oplog entries during resharing oplog application
+ * for this oplog.
+ */
 repl::OplogEntry convertToNoOpWithReshardingTag(const repl::OplogEntry& oplog) {
-    return {repl::DurableOplogEntry(oplog.getOpTime(),
-                                    oplog.getHash(),
-                                    repl::OpTypeEnum::kNoop,
-                                    oplog.getNss(),
-                                    boost::none /* uuid */,
-                                    oplog.getFromMigrate(),
-                                    oplog.getVersion(),
-                                    kReshardingOplogTag,
-                                    // Set the o2 field with the original oplog.
-                                    oplog.getEntry().toBSON(),
-                                    oplog.getOperationSessionInfo(),
-                                    oplog.getUpsert(),
-                                    oplog.getWallClockTime(),
-                                    oplog.getStatementId(),
-                                    oplog.getPrevWriteOpTimeInTransaction(),
-                                    oplog.getPreImageOpTime(),
-                                    oplog.getPostImageOpTime(),
-                                    oplog.getDestinedRecipient(),
-                                    oplog.get_id())};
+    repl::OplogEntry newOplog(repl::DurableOplogEntry(oplog.getOpTime(),
+                                                      oplog.getHash(),
+                                                      repl::OpTypeEnum::kNoop,
+                                                      oplog.getNss(),
+                                                      boost::none /* uuid */,
+                                                      oplog.getFromMigrate(),
+                                                      oplog.getVersion(),
+                                                      kReshardingOplogTag,
+                                                      // Set the o2 field with the original oplog.
+                                                      oplog.getEntry().toBSON(),
+                                                      oplog.getOperationSessionInfo(),
+                                                      oplog.getUpsert(),
+                                                      oplog.getWallClockTime(),
+                                                      oplog.getStatementId(),
+                                                      oplog.getPrevWriteOpTimeInTransaction(),
+                                                      oplog.getPreImageOpTime(),
+                                                      oplog.getPostImageOpTime(),
+                                                      oplog.getDestinedRecipient(),
+                                                      oplog.get_id()));
+
+    newOplog.setPreImageOp(oplog.getPreImageOp());
+    newOplog.setPostImageOp(oplog.getPostImageOp());
+
+    return newOplog;
 }
 
 void addDerivedOpsToWriterVector(std::vector<std::vector<const repl::OplogEntry*>>* writerVectors,
@@ -464,8 +527,6 @@ Status ReshardingOplogApplier::_applyOplogEntryOrGroupedInserts(
     MONGO_UNREACHABLE;
 }
 
-// TODO: use MutableOplogEntry to handle prePostImageOps? Because OplogEntry tries to create BSON
-// and can cause size too big.
 void ReshardingOplogApplier::_preProcessAndPushOpsToBuffer(repl::OplogEntry oplog) {
     uassert(5012002,
             str::stream() << "trying to apply oplog not belonging to ns " << _nsBeingResharded
@@ -495,6 +556,8 @@ void ReshardingOplogApplier::_preProcessAndPushOpsToBuffer(repl::OplogEntry oplo
                                                       oplog.getPostImageOpTime(),
                                                       oplog.getDestinedRecipient(),
                                                       oplog.get_id()));
+    newOplog.setPreImageOp(oplog.getPreImageOp());
+    newOplog.setPostImageOp(oplog.getPostImageOp());
 
     _currentBatchToApply.push_back(std::move(newOplog));
 }

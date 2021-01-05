@@ -1834,6 +1834,11 @@ public:
     }
 
     bool isWriteAlreadyExecuted(const OperationSessionInfo& session, StmtId stmtId) {
+        return checkWriteAlreadyExecuted(session, stmtId).is_initialized();
+    }
+
+    boost::optional<repl::OplogEntry> checkWriteAlreadyExecuted(const OperationSessionInfo& session,
+                                                                StmtId stmtId) {
         auto newClient =
             operationContext()->getServiceContext()->makeClient("testCheckStmtExecuted");
         AlternativeClientRegion acr(newClient);
@@ -1847,7 +1852,33 @@ public:
         txnParticipant.refreshFromStorageIfNeeded(opCtx);
         txnParticipant.beginOrContinue(opCtx, *session.getTxnNumber(), boost::none, boost::none);
 
-        return txnParticipant.checkStatementExecuted(opCtx, stmtId).is_initialized();
+        return txnParticipant.checkStatementExecuted(opCtx, stmtId);
+    }
+
+    /**
+     * Extract the pre or post image document for the oplog operation if it exists.
+     */
+    BSONObj extractPreOrPostImage(const repl::OplogEntry& oplog) {
+        repl::OpTime opTime;
+
+        if (oplog.getPreImageOpTime()) {
+            opTime = oplog.getPreImageOpTime().value();
+        } else if (oplog.getPostImageOpTime()) {
+            opTime = oplog.getPostImageOpTime().value();
+        } else {
+            return {};
+        }
+
+        DBDirectClient client(operationContext());
+        auto oplogDoc =
+            client.findOne(NamespaceString::kRsOplogNamespace.ns(), opTime.asQuery(), nullptr);
+
+        if (oplogDoc.isEmpty()) {
+            return {};
+        }
+
+        auto oplogEntry = uassertStatusOK(repl::OplogEntry::parse(oplogDoc));
+        return oplogEntry.getObject().getOwned();
     }
 
     /**
@@ -2628,6 +2659,133 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithPreparedTxnThatWillAbor
     ASSERT_BSONOBJ_EQ(BSON("_id" << 1), doc);
 
     ASSERT_TRUE(isWriteAlreadyExecuted(session, 1));
+}
+
+TEST_F(ReshardingOplogApplierRetryableTest, RetryableWriteWithPreImage) {
+    std::deque<repl::OplogEntry> crudOps;
+
+    OperationSessionInfo session1;
+    session1.setSessionId(makeLogicalSessionIdForTest());
+    session1.setTxnNumber(1);
+
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 1),
+                                boost::none,
+                                {},
+                                boost::none));
+
+    auto preImageOplog = makeOplog(repl::OpTime(Timestamp(6, 3), 1),
+                                   repl::OpTypeEnum::kNoop,
+                                   BSON("_id" << 1),
+                                   boost::none,
+                                   session1,
+                                   boost::none);
+
+    auto updateOplog = makeOplog(repl::OpTime(Timestamp(8, 3), 1),
+                                 repl::OpTypeEnum::kUpdate,
+                                 BSON("$set" << BSON("x" << 1)),
+                                 BSON("_id" << 1),
+                                 session1,
+                                 1);
+    updateOplog.setPreImageOp(std::make_shared<repl::DurableOplogEntry>(preImageOplog.getEntry()));
+    crudOps.push_back(updateOplog);
+
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 2 /* batchSize */);
+    boost::optional<ReshardingOplogApplier> applier;
+    auto executor = makeTaskExecutorForApplier();
+    auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
+    applier.emplace(getServiceContext(),
+                    sourceId(),
+                    oplogNs(),
+                    crudNs(),
+                    crudUUID(),
+                    stashCollections(),
+                    0U, /* myStashIdx */
+                    Timestamp(6, 3),
+                    std::move(iterator),
+                    chunkManager(),
+                    executor,
+                    writerPool.get());
+
+    auto future = applier->applyUntilCloneFinishedTs();
+    future.get();
+
+    future = applier->applyUntilDone();
+    future.get();
+
+    DBDirectClient client(operationContext());
+    auto doc = client.findOne(appliedToNs().ns(), BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 1 << "x" << 1), doc);
+
+    auto oplogEntry = checkWriteAlreadyExecuted(session1, 1);
+    ASSERT_TRUE(oplogEntry);
+
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 1), extractPreOrPostImage(*oplogEntry));
+}
+
+TEST_F(ReshardingOplogApplierRetryableTest, RetryableWriteWithPostImage) {
+    std::deque<repl::OplogEntry> crudOps;
+
+    OperationSessionInfo session1;
+    session1.setSessionId(makeLogicalSessionIdForTest());
+    session1.setTxnNumber(1);
+
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 1),
+                                boost::none,
+                                {},
+                                boost::none));
+
+    auto postImageOplog = makeOplog(repl::OpTime(Timestamp(6, 3), 1),
+                                    repl::OpTypeEnum::kNoop,
+                                    BSON("_id" << 1 << "x" << 1),
+                                    boost::none,
+                                    session1,
+                                    boost::none);
+
+    auto updateOplog = makeOplog(repl::OpTime(Timestamp(8, 3), 1),
+                                 repl::OpTypeEnum::kUpdate,
+                                 BSON("$set" << BSON("x" << 1)),
+                                 BSON("_id" << 1),
+                                 session1,
+                                 1);
+    updateOplog.setPostImageOp(
+        std::make_shared<repl::DurableOplogEntry>(postImageOplog.getEntry()));
+    crudOps.push_back(updateOplog);
+
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 2 /* batchSize */);
+    boost::optional<ReshardingOplogApplier> applier;
+    auto executor = makeTaskExecutorForApplier();
+    auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
+    applier.emplace(getServiceContext(),
+                    sourceId(),
+                    oplogNs(),
+                    crudNs(),
+                    crudUUID(),
+                    stashCollections(),
+                    0U, /* myStashIdx */
+                    Timestamp(6, 3),
+                    std::move(iterator),
+                    chunkManager(),
+                    executor,
+                    writerPool.get());
+
+    auto future = applier->applyUntilCloneFinishedTs();
+    future.get();
+
+    future = applier->applyUntilDone();
+    future.get();
+
+    DBDirectClient client(operationContext());
+    auto doc = client.findOne(appliedToNs().ns(), BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 1 << "x" << 1), doc);
+
+    auto oplogEntry = checkWriteAlreadyExecuted(session1, 1);
+    ASSERT_TRUE(oplogEntry);
+
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 1 << "x" << 1), extractPreOrPostImage(*oplogEntry));
 }
 
 }  // unnamed namespace

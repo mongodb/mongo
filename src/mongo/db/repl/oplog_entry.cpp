@@ -503,10 +503,35 @@ std::string OplogEntry::toStringForLogging() const {
 }
 BSONObj OplogEntry::toBSONForLogging() const {
     BSONObjBuilder builder;
-    builder.append("oplogEntry", _entry.toBSON());
+    auto entry = _entry.toBSON();
+    auto estimatedTotalSize = entry.objsize();
+
+    const auto sizeTooBig = 0.9 * BSONObj::DefaultSizeTrait::MaxSize;
+
+    builder.append("oplogEntry", entry);
 
     if (_isForCappedCollection) {
         builder.append("isForCappedCollection", *_isForCappedCollection);
+    }
+
+    if (_preImageOp) {
+        auto op = _preImageOp->toBSON();
+        if (estimatedTotalSize + op.objsize() > sizeTooBig) {
+            builder.append("preImageOp", "<too large to display>");
+        } else {
+            builder.append("preImageOp", op);
+            estimatedTotalSize += op.objsize();
+        }
+    }
+
+    if (_postImageOp) {
+        auto op = _postImageOp->toBSON();
+        if (estimatedTotalSize + op.objsize() > sizeTooBig) {
+            builder.append("postImageOp", "<too large to display>");
+        } else {
+            builder.append("postImageOp", op);
+            estimatedTotalSize += op.objsize();
+        }
     }
 
     return builder.obj();
@@ -520,8 +545,8 @@ void OplogEntry::setIsForCappedCollection(bool isForCappedCollection) {
     _isForCappedCollection = isForCappedCollection;
 }
 
-const DurableOplogEntry* OplogEntry::getPreImageOp() const {
-    return _preImageOp.get();
+std::shared_ptr<DurableOplogEntry> OplogEntry::getPreImageOp() const {
+    return _preImageOp;
 }
 
 void OplogEntry::setPreImageOp(std::shared_ptr<DurableOplogEntry> preImageOp) {
@@ -533,8 +558,8 @@ void OplogEntry::setPreImageOp(const BSONObj& preImageOp) {
         std::make_shared<DurableOplogEntry>(uassertStatusOK(DurableOplogEntry::parse(preImageOp))));
 }
 
-const DurableOplogEntry* OplogEntry::getPostImageOp() const {
-    return _postImageOp.get();
+std::shared_ptr<DurableOplogEntry> OplogEntry::getPostImageOp() const {
+    return _postImageOp;
 }
 
 void OplogEntry::setPostImageOp(std::shared_ptr<DurableOplogEntry> postImageOp) {

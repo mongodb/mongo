@@ -483,11 +483,11 @@ public:
     bool isForCappedCollection() const;
     void setIsForCappedCollection(bool isForCappedCollection);
 
-    const DurableOplogEntry* getPreImageOp() const;
+    std::shared_ptr<DurableOplogEntry> getPreImageOp() const;
     void setPreImageOp(std::shared_ptr<DurableOplogEntry> preImageOp);
     void setPreImageOp(const BSONObj& preImageOp);
 
-    const DurableOplogEntry* getPostImageOp() const;
+    std::shared_ptr<DurableOplogEntry> getPostImageOp() const;
     void setPostImageOp(std::shared_ptr<DurableOplogEntry> postImageOp);
     void setPostImageOp(const BSONObj& postImageOp);
 
