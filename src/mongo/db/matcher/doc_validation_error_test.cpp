@@ -1532,8 +1532,24 @@ TEST(GeoMatchExpression, GeneratesValidationErrorGeoIntersects) {
         BSON("operatorName"
              << "$geoIntersects"
              << "specifiedAs" << query << "reason"
-             << "none of considered geometries intersected the expression’s geometry"
+             << "none of the considered geometries intersected the expression’s geometry"
              << "consideredValue" << point);
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+// Verifies that $geoIntersects expression correctly generates a missing field validation error.
+TEST(GeoMatchExpression, GeneratesValidationErrorGeoIntersectsMissingField) {
+    BSONObj query = fromjson(
+        "{'a': {$geoIntersects: {$geometry: {type: 'Polygon', coordinates: [[[0, 0], [0, 3], [3, "
+        "0], [0, 0]]]}}}}");
+    BSONObj point = BSON("type"
+                         << "Point"
+                         << "coordinates" << BSON_ARRAY(3 << 3));
+    BSONObj document = BSON("b" << point);
+    BSONObj expectedError = BSON("operatorName"
+                                 << "$geoIntersects"
+                                 << "specifiedAs" << query << "reason"
+                                 << "field was missing");
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -1574,13 +1590,38 @@ TEST(GeoMatchExpression, GeneratesValidationErrorGeoIntersectsOnTypeMismatch) {
     BSONObj expectedError = BSON("operatorName"
                                  << "$geoIntersects"
                                  << "specifiedAs" << query << "reason"
-                                 << "type did not match"
-                                 << "consideredType"
-                                 << "int"
-                                 << "expectedTypes"
-                                 << BSON_ARRAY("array"
-                                               << "object")
+                                 << "could not find a valid geometry at the given path"
                                  << "consideredValue" << 2);
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(GeoMatchExpression, GeneratesValidationErrorForGeoWithin) {
+    BSONObj query = fromjson(
+        "{coordinates: {$geoWithin: {$centerSphere: [[-79.9081268,9.3547792], 0.02523]}}}");
+    BSONArray coordinates = BSON_ARRAY(-72.5419922 << 18.2312794);
+    BSONObj document = BSON("coordinates" << coordinates);
+    BSONObj expectedError = BSON("operatorName"
+                                 << "$geoWithin"
+                                 << "specifiedAs" << query << "reason"
+                                 << "none of the considered geometries were contained within the "
+                                    "expression’s geometry"
+                                 << "consideredValues" << coordinates);
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(GeoMatchExpression, GeneratesValidationErrorForGeoWithinTypeMismatch) {
+    BSONObj query = fromjson(
+        "{coordinates: {$geoWithin: {$centerSphere: [[-79.9081268,9.3547792], 0.02523]}}}");
+    // 'arr' is of $geoWithin's expected type (an array), but is not a valid geometry.
+    BSONArray arr = BSON_ARRAY("foo"
+                               << "bar"
+                               << "baz");
+    BSONObj document = BSON("coordinates" << arr);
+    BSONObj expectedError = BSON("operatorName"
+                                 << "$geoWithin"
+                                 << "specifiedAs" << query << "reason"
+                                 << "could not find a valid geometry at the given path"
+                                 << "consideredValues" << arr);
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -1602,7 +1643,7 @@ TEST(GeoMatchExpression, GeneratesValidationErrorGeoIntersectsOnValueArray) {
         BSON("operatorName"
              << "$geoIntersects"
              << "specifiedAs" << query << "reason"
-             << "none of considered geometries intersected the expression’s geometry"
+             << "none of the considered geometries intersected the expression’s geometry"
              << "consideredValues" << points);
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
@@ -1620,7 +1661,7 @@ TEST(GeoMatchExpression, GeneratesValidationErrorGeoWithin) {
         BSON("operatorName"
              << "$geoWithin"
              << "specifiedAs" << query << "reason"
-             << "none of considered geometries was contained within the expression’s geometry"
+             << "none of the considered geometries were contained within the expression’s geometry"
              << "consideredValue" << point);
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }

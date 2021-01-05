@@ -35,6 +35,7 @@
 
 #include "mongo/base/init.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/geo/geoparser.h"
 #include "mongo/db/matcher/doc_validation_util.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_array.h"
@@ -766,25 +767,34 @@ public:
         generateComparisonError(expr);
     }
     void visit(const GeoMatchExpression* expr) final {
-        static const std::set<BSONType> kExpectedTypes{BSONType::Array, BSONType::Object};
-        switch (expr->getGeoExpression().getPred()) {
-            case GeoExpression::Predicate::WITHIN: {
-                static constexpr auto kNormalReason =
-                    "none of considered geometries was contained within the expression’s geometry";
-                static constexpr auto kInvertedReason =
-                    "at least one of considered geometries was contained within the expression’s "
-                    "geometry";
-                generatePathError(*expr, kNormalReason, kInvertedReason, &kExpectedTypes);
-            } break;
-            case GeoExpression::Predicate::INTERSECT: {
-                static constexpr auto kNormalReason =
-                    "none of considered geometries intersected the expression’s geometry";
-                static constexpr auto kInvertedReason =
-                    "at least one of considered geometries intersected the expression’s geometry";
-                generatePathError(*expr, kNormalReason, kInvertedReason, &kExpectedTypes);
-            } break;
-            default:
-                MONGO_UNREACHABLE;
+        _context->pushNewFrame(*expr);
+        if (_context->shouldGenerateError(*expr)) {
+            appendErrorDetails(*expr);
+            auto arr = createValuesArray(expr->path(), LeafArrayBehavior::kTraverseOmitArray);
+            appendMissingField(arr);
+            appendGeoTypeError(*expr, arr);
+            switch (expr->getGeoExpression().getPred()) {
+                case GeoExpression::Predicate::WITHIN: {
+                    static constexpr auto kNormalReason =
+                        "none of the considered geometries were contained within the expression’s "
+                        "geometry";
+                    static constexpr auto kInvertedReason =
+                        "at least one of considered geometries was contained within the "
+                        "expression’s geometry";
+                    appendErrorReason(kNormalReason, kInvertedReason);
+                } break;
+                case GeoExpression::Predicate::INTERSECT: {
+                    static constexpr auto kNormalReason =
+                        "none of the considered geometries intersected the expression’s geometry";
+                    static constexpr auto kInvertedReason =
+                        "at least one of considered geometries intersected the expression’s "
+                        "geometry";
+                    appendErrorReason(kNormalReason, kInvertedReason);
+                } break;
+                default:
+                    MONGO_UNREACHABLE;
+            }
+            appendConsideredValues(arr);
         }
     }
     void visit(const GeoNearMatchExpression* expr) final {
@@ -1412,6 +1422,34 @@ private:
         static constexpr auto kNormalReason = "array did not satisfy the child predicate";
         static constexpr auto kInvertedReason = "array did satisfy the child predicate";
         generateArrayError(expr, kNormalReason, kInvertedReason);
+    }
+
+    /**
+     * Examines the values in 'valuesArray' and the value at the path of 'expr' in the current
+     * document and appends a type error if a valid geometry is not found.
+     */
+    void appendGeoTypeError(const GeoMatchExpression& expr,
+                            const boost::optional<BSONArray>& valuesArray) {
+        if (!valuesArray) {
+            return;
+        }
+
+        GeometryContainer geo;
+        for (auto&& elem : *valuesArray) {
+            if (auto parseStatus = geo.parseFromStorage(elem); parseStatus.isOK()) {
+                return;
+            }
+        }
+
+        if (auto parseStatus =
+                geo.parseFromStorage(_context->getCurrentDocument().getField(expr.path()));
+            parseStatus.isOK()) {
+            return;
+        }
+
+        BSONObjBuilder& bob = _context->getCurrentObjBuilder();
+        static constexpr auto kGeoTypeError = "could not find a valid geometry at the given path";
+        bob.append("reason", kGeoTypeError);
     }
 
     void generateArrayError(const ArrayMatchingMatchExpression* expr,
