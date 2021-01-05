@@ -5989,6 +5989,7 @@ var authCommandsLib = {
                 privileges: [
                     {resource: {cluster: true}, actions: ["operationMetrics"]},
                 ],
+                expectFail: true,
               },
             ]
         },

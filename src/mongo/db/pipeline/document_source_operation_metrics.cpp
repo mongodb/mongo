@@ -88,6 +88,11 @@ intrusive_ptr<DocumentSource> DocumentSourceOperationMetrics::createFromBson(
                   "The aggregateOperationResourceConsumption server parameter is not set");
     }
 
+    const NamespaceString& nss = pExpCtx->ns;
+    uassert(ErrorCodes::InvalidNamespace,
+            "$operationMetrics must be run against the 'admin' database with {aggregate: 1}",
+            nss.db() == NamespaceString::kAdminDb && nss.isCollectionlessAggregateNS());
+
     uassert(ErrorCodes::BadValue,
             "The $operationMetrics stage specification must be an object",
             elem.type() == Object);

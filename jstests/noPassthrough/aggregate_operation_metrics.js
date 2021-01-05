@@ -63,9 +63,24 @@ let getServerStatusMetrics = (db) => {
     return ss.resourceConsumption;
 };
 
+const primary = rst.getPrimary();
+
+// $operationMetrics may only be run against the admin database and in a 'collectionless' form.
+assert.commandFailedWithCode(primary.getDB('invalid').runCommand({
+    aggregate: 1,
+    pipeline: [{$operationMetrics: {}}],
+    cursor: {},
+}),
+                             ErrorCodes.InvalidNamespace);
+assert.commandFailedWithCode(primary.getDB('admin').runCommand({
+    aggregate: 'test',
+    pipeline: [{$operationMetrics: {}}],
+    cursor: {},
+}),
+                             ErrorCodes.InvalidNamespace);
+
 // Perform very basic reads and writes on two different databases.
 const db1Name = 'db1';
-const primary = rst.getPrimary();
 const db1 = primary.getDB(db1Name);
 assert.commandWorked(db1.coll1.insert({a: 1}));
 assert.commandWorked(db1.coll2.insert({a: 1}));

@@ -26,8 +26,8 @@ const secondaryDB = secondary.getDB(dbName);
 
 const nDocs = 100;
 
-const clearMetrics = (db) => {
-    db.aggregate([{$operationMetrics: {clearMetrics: true}}]);
+const clearMetrics = (conn) => {
+    conn.getDB('admin').aggregate([{$operationMetrics: {clearMetrics: true}}]);
 };
 
 // Get aggregated metrics keyed by database name.
@@ -60,7 +60,7 @@ assert.commandWorked(primaryDB.createCollection(collName));
  * primary node.
  */
 (function loadCollection() {
-    clearMetrics(primaryDB);
+    clearMetrics(primary);
 
     let bulk = primaryDB[collName].initializeUnorderedBulkOp();
     for (let i = 0; i < nDocs; i++) {
@@ -92,7 +92,7 @@ assert.commandWorked(primaryDB.createCollection(collName));
  * Build an index. Expect that metrics are reasonable and only reported on the primary node.
  */
 (function buildIndex() {
-    clearMetrics(primaryDB);
+    clearMetrics(primary);
     assert.commandWorked(primaryDB[collName].createIndex({a: 1}));
 
     assertMetrics(primary, (metrics) => {
@@ -134,7 +134,7 @@ assert.commandWorked(primaryDB[collName].dropIndex({a: 1}));
  * Build an index. Expect that metrics are reasonable and only reported on the primary node.
  */
 (function buildUniqueIndex() {
-    clearMetrics(primaryDB);
+    clearMetrics(primary);
     assert.commandWorked(primaryDB[collName].createIndex({a: 1}, {unique: true}));
 
     assertMetrics(primary, (metrics) => {
@@ -180,7 +180,7 @@ assert.commandWorked(primaryDB[collName].dropIndex({a: 1}));
     // Insert a document at the end that makes the index non-unique.
     assert.commandWorked(primaryDB[collName].insert({a: (nDocs - 1)}));
 
-    clearMetrics(primaryDB);
+    clearMetrics(primary);
     assert.commandFailedWithCode(primaryDB[collName].createIndex({a: 1}, {unique: true}),
                                  ErrorCodes.DuplicateKey);
 
@@ -222,7 +222,7 @@ assert.commandWorked(primaryDB[collName].dropIndex({a: 1}));
  * and reports read metrics.
  */
 (function buildIndexInterrupt() {
-    clearMetrics(primaryDB);
+    clearMetrics(primary);
 
     // Hang the index build after kicking off the build on the primary, but before scanning the
     // collection.
@@ -298,8 +298,8 @@ assert.commandWorked(primaryDB[collName].dropIndex({a: 1}));
  * The the stepped-down node should not collect anything.
  */
 (function buildIndexWithStepDown() {
-    clearMetrics(primaryDB);
-    clearMetrics(secondaryDB);
+    clearMetrics(primary);
+    clearMetrics(secondary);
 
     // Hang the index build after kicking off the build on the secondary, but before scanning the
     // collection.
