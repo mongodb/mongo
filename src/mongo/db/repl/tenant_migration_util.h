@@ -33,6 +33,7 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/client/mongo_uri.h"
+#include "mongo/config.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/util/net/ssl_util.h"
 #include "mongo/util/str.h"
@@ -100,15 +101,25 @@ inline Status validateConnectionString(const StringData& donorOrRecipientConnect
 }
 
 inline Status validateCertificatePEMPayload(const StringData& payload) {
+#ifndef MONGO_CONFIG_SSL
+    return {ErrorCodes::InternalError,
+            "Could not validate certificate field as SSL is not supported"};
+#else
     auto swBlob =
         ssl_util::findPEMBlob(payload, "CERTIFICATE"_sd, 0 /* position */, false /* allowEmpty */);
     return swBlob.getStatus().withContext("Invalid certificate field");
+#endif
 }
 
 inline Status validatePrivateKeyPEMPayload(const StringData& payload) {
+#ifndef MONGO_CONFIG_SSL
+    return {ErrorCodes::InternalError,
+            "Could not validate certificate field as SSL is not supported"};
+#else
     auto swBlob =
         ssl_util::findPEMBlob(payload, "PRIVATE KEY"_sd, 0 /* position */, false /* allowEmpty */);
     return swBlob.getStatus().withContext("Invalid private key field");
+#endif
 }
 
 }  // namespace mongo

@@ -31,6 +31,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/config.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog.h"
@@ -103,6 +104,7 @@ protected:
     }
 };
 
+#ifdef MONGO_CONFIG_SSL
 TEST_F(TenantMigrationRecipientEntryHelpersTest, AddTenantMigrationRecipientStateDoc) {
     auto opCtx = cc().makeOperationContext();
 
@@ -209,6 +211,7 @@ TEST_F(TenantMigrationRecipientEntryHelpersTest,
     ASSERT_OK(insertStateDoc(opCtx.get(), stateDoc4));
     ASSERT_TRUE(checkStateDocPersisted(opCtx.get(), stateDoc4));
 }
+#endif
 
 }  // namespace repl
 }  // namespace mongo

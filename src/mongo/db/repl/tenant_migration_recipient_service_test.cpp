@@ -36,6 +36,7 @@
 #include "mongo/client/connpool.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/client/replica_set_monitor_protocol_test_util.h"
+#include "mongo/config.h"
 #include "mongo/db/client.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/op_observer_impl.h"
@@ -325,7 +326,7 @@ private:
         logv2::LogComponent::kTenantMigration, logv2::LogSeverity::Debug(1)};
 };
 
-
+#ifdef MONGO_CONFIG_SSL
 TEST_F(TenantMigrationRecipientServiceTest, BasicTenantMigrationRecipientServiceInstanceCreation) {
     stopFailPointEnableBlock fp("fpAfterPersistingTenantMigrationRecipientInstanceStateDoc");
 
@@ -1591,5 +1592,6 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientForgetMigration_FailToMarkG
         checkStateDocPersisted(opCtx.get(), instance.get());
     }
 }
+#endif
 }  // namespace repl
 }  // namespace mongo
