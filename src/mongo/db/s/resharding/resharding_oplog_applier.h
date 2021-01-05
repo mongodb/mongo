@@ -127,9 +127,7 @@ private:
      * Apply the oplog entries.
      */
     Status _applyOplogEntryOrGroupedInserts(
-        OperationContext* opCtx,
-        const repl::OplogEntryOrGroupedInserts& entryOrGroupedInserts,
-        repl::OplogApplication::Mode oplogApplicationMode);
+        OperationContext* opCtx, const repl::OplogEntryOrGroupedInserts& entryOrGroupedInserts);
 
     /**
      * Perform necessary adjustments to the oplog entry so it will be ready to be applied.

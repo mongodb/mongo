@@ -139,19 +139,26 @@ public:
                                          BSON("create" << kOtherDonorStashNs.coll())));
 
         _cm = createChunkManagerForOriginalColl();
-
-        setReshardingOplogApplicationServerParameter(false);
     }
 
     ChunkManager createChunkManagerForOriginalColl() {
-        // Create two chunks, one that is owned by this donor shard and the other owned by some
-        // other shard.
+        // Create three chunks, two that are owned by this donor shard and one owned by some other
+        // shard. The chunk for {sk: null} is owned by this donor shard to allow test cases to omit
+        // the shard key field when it isn't relevant.
         const OID epoch = OID::gen();
         std::vector<ChunkType> chunks = {
-            ChunkType{kCrudNs,
-                      ChunkRange{BSON(kOriginalShardKey << MINKEY), BSON(kOriginalShardKey << 0)},
-                      ChunkVersion(1, 0, epoch, boost::none /* timestamp */),
-                      kOtherShardId},
+            ChunkType{
+                kCrudNs,
+                ChunkRange{BSON(kOriginalShardKey << MINKEY),
+                           BSON(kOriginalShardKey << -std::numeric_limits<double>::infinity())},
+                ChunkVersion(1, 0, epoch, boost::none /* timestamp */),
+                _sourceId.getShardId()},
+            ChunkType{
+                kCrudNs,
+                ChunkRange{BSON(kOriginalShardKey << -std::numeric_limits<double>::infinity()),
+                           BSON(kOriginalShardKey << 0)},
+                ChunkVersion(1, 0, epoch, boost::none /* timestamp */),
+                kOtherShardId},
             ChunkType{kCrudNs,
                       ChunkRange{BSON(kOriginalShardKey << 0), BSON(kOriginalShardKey << MAXKEY)},
                       ChunkVersion(1, 0, epoch, boost::none /* timestamp */),
@@ -206,17 +213,6 @@ public:
                                         boost::none /* postImage */,
                                         kMyShardId,
                                         Value(id.toBSON()))};
-    }
-
-    void setReshardingOplogApplicationServerParameter(bool value) {
-        const ServerParameter::Map& parameterMap = ServerParameterSet::getGlobal()->getMap();
-        invariant(parameterMap.size());
-        const auto param = parameterMap.find("useReshardingOplogApplicationRules");
-        uassertStatusOK(param->second->setFromString(value ? "true" : "false"));
-    }
-
-    void setReshardingOplogApplicationServerParameterTrue() {
-        setReshardingOplogApplicationServerParameter(true);
     }
 
     const NamespaceString& oplogNs() {
@@ -1009,8 +1005,6 @@ TEST_F(ReshardingOplogApplierTest, WriterPoolIsShutDownCatchUpPhase) {
 TEST_F(ReshardingOplogApplierTest, InsertOpIntoOuputCollectionUseReshardingApplicationRules) {
     // This case tests applying rule #2 described in
     // ReshardingOplogApplicationRules::_applyInsert_inlock.
-    setReshardingOplogApplicationServerParameterTrue();
-
     std::deque<repl::OplogEntry> crudOps;
     crudOps.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
                                 repl::OpTypeEnum::kInsert,
@@ -1075,8 +1069,6 @@ TEST_F(ReshardingOplogApplierTest,
        InsertOpShouldTurnIntoReplacementUpdateOnOutputCollectionUseReshardingApplicationRules) {
     // This case tests applying rule #3 described in
     // ReshardingOplogApplicationRules::_applyInsert_inlock.
-    setReshardingOplogApplicationServerParameterTrue();
-
     std::deque<repl::OplogEntry> crudOps;
     crudOps.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
                                 repl::OpTypeEnum::kInsert,
@@ -1126,8 +1118,6 @@ TEST_F(ReshardingOplogApplierTest,
        InsertOpShouldWriteToStashCollectionUseReshardingApplicationRules) {
     // This case tests applying rules #1 and #4 described in
     // ReshardingOplogApplicationRules::_applyInsert_inlock.
-    setReshardingOplogApplicationServerParameterTrue();
-
     std::deque<repl::OplogEntry> crudOps;
     crudOps.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
                                 repl::OpTypeEnum::kInsert,
@@ -1194,8 +1184,6 @@ TEST_F(ReshardingOplogApplierTest,
        DeleteFromOutputCollNonEmptyStashCollForThisDonorUseReshardingApplicationRules) {
     // This case tests applying rule #1 described in
     // ReshardingOplogApplicationRules::_applyDelete_inlock.
-    setReshardingOplogApplicationServerParameterTrue();
-
     std::deque<repl::OplogEntry> crudOps;
     crudOps.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
                                 repl::OpTypeEnum::kInsert,
@@ -1262,8 +1250,6 @@ TEST_F(ReshardingOplogApplierTest,
        DeleteFromOutputCollShouldDoNothingUseReshardingApplicationRules) {
     // This case tests applying rules #2 and #3 described in
     // ReshardingOplogApplicationRules::_applyDelete_inlock.
-    setReshardingOplogApplicationServerParameterTrue();
-
     std::deque<repl::OplogEntry> crudOps;
     crudOps.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
                                 repl::OpTypeEnum::kDelete,
@@ -1327,8 +1313,6 @@ TEST_F(ReshardingOplogApplierTest,
        DeleteFromOutputCollAllStashCollsEmptyUseReshardingApplicationRules) {
     // This case tests applying rule #4 described in
     // ReshardingOplogApplicationRules::_applyDelete_inlock.
-    setReshardingOplogApplicationServerParameterTrue();
-
     std::deque<repl::OplogEntry> crudOps;
     crudOps.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
                                 repl::OpTypeEnum::kInsert,
@@ -1404,8 +1388,6 @@ TEST_F(ReshardingOplogApplierTest,
        DeleteFromOutputCollNonEmptyStashCollForOtherDonorUseReshardingApplicationRules) {
     // This case tests applying rule #4 described in
     // ReshardingOplogApplicationRules::_applyDelete_inlock.
-    setReshardingOplogApplicationServerParameterTrue();
-
     std::deque<repl::OplogEntry> crudOps;
     crudOps.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
                                 repl::OpTypeEnum::kInsert,
@@ -1493,8 +1475,6 @@ TEST_F(ReshardingOplogApplierTest,
 TEST_F(ReshardingOplogApplierTest, UpdateShouldModifyStashCollectionUseReshardingApplicationRules) {
     // This case tests applying rule #1 described in
     // ReshardingOplogApplicationRules::_applyUpdate_inlock.
-    setReshardingOplogApplicationServerParameterTrue();
-
     std::deque<repl::OplogEntry> crudOps;
     crudOps.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
                                 repl::OpTypeEnum::kInsert,
@@ -1560,8 +1540,6 @@ TEST_F(ReshardingOplogApplierTest, UpdateShouldModifyStashCollectionUseReshardin
 TEST_F(ReshardingOplogApplierTest, UpdateShouldDoNothingUseReshardingApplicationRules) {
     // This case tests applying rules #2 and #3 described in
     // ReshardingOplogApplicationRules::_applyUpdate_inlock.
-    setReshardingOplogApplicationServerParameterTrue();
-
     std::deque<repl::OplogEntry> crudOps;
     crudOps.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
                                 repl::OpTypeEnum::kUpdate,
@@ -1624,8 +1602,6 @@ TEST_F(ReshardingOplogApplierTest, UpdateShouldDoNothingUseReshardingApplication
 TEST_F(ReshardingOplogApplierTest, UpdateOutputCollUseReshardingApplicationRules) {
     // This case tests applying rule #4 described in
     // ReshardingOplogApplicationRules::_applyUpdate_inlock.
-    setReshardingOplogApplicationServerParameterTrue();
-
     std::deque<repl::OplogEntry> crudOps;
     crudOps.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
                                 repl::OpTypeEnum::kInsert,
@@ -1689,8 +1665,6 @@ TEST_F(ReshardingOplogApplierTest, UpdateOutputCollUseReshardingApplicationRules
 }
 
 TEST_F(ReshardingOplogApplierTest, UnsupportedCommandOpsShouldErrorUseReshardingApplicationRules) {
-    setReshardingOplogApplicationServerParameterTrue();
-
     std::deque<repl::OplogEntry> ops;
     ops.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
                             repl::OpTypeEnum::kInsert,
@@ -1745,8 +1719,6 @@ TEST_F(ReshardingOplogApplierTest, UnsupportedCommandOpsShouldErrorUseResharding
 
 TEST_F(ReshardingOplogApplierTest,
        DropSourceCollectionCmdShouldErrorUseReshardingApplicationRules) {
-    setReshardingOplogApplicationServerParameterTrue();
-
     std::deque<repl::OplogEntry> ops;
     ops.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
                             repl::OpTypeEnum::kCommand,

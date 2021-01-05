@@ -45,7 +45,6 @@
 #include "mongo/db/repl/oplog_applier_utils.h"
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
 #include "mongo/db/s/resharding/resharding_donor_oplog_iterator.h"
-#include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding_util.h"
 #include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/transaction_participant.h"
@@ -435,24 +434,17 @@ Status ReshardingOplogApplier::_applyOplogBatchPerWorker(
         [this](OperationContext* opCtx,
                const repl::OplogEntryOrGroupedInserts& opOrInserts,
                repl::OplogApplication::Mode mode) {
-            return _applyOplogEntryOrGroupedInserts(opCtx, opOrInserts, mode);
+            invariant(mode == repl::OplogApplication::Mode::kInitialSync);
+            return _applyOplogEntryOrGroupedInserts(opCtx, opOrInserts);
         });
 }
 
 Status ReshardingOplogApplier::_applyOplogEntryOrGroupedInserts(
-    OperationContext* opCtx,
-    const repl::OplogEntryOrGroupedInserts& entryOrGroupedInserts,
-    repl::OplogApplication::Mode oplogApplicationMode) {
+    OperationContext* opCtx, const repl::OplogEntryOrGroupedInserts& entryOrGroupedInserts) {
     // Unlike normal secondary replication, we want the write to generate it's own oplog entry.
     invariant(opCtx->writesAreReplicated());
 
-    // Ensure context matches that of _applyOplogBatchPerWorker.
-    invariant(oplogApplicationMode == repl::OplogApplication::Mode::kInitialSync);
-
     auto op = entryOrGroupedInserts.getOp();
-
-    // We don't care about applied stats in resharding.
-    auto incrementOpsAppliedStats = [] {};
 
     if (isRetryableNoOp(entryOrGroupedInserts)) {
         return insertOplogAndUpdateConfigForRetryable(opCtx, entryOrGroupedInserts.getOp());
@@ -463,17 +455,10 @@ Status ReshardingOplogApplier::_applyOplogEntryOrGroupedInserts(
     auto opType = op.getOpType();
     if (opType == repl::OpTypeEnum::kNoop) {
         return Status::OK();
-    } else if (resharding::gUseReshardingOplogApplicationRules) {
-        if (repl::DurableOplogEntry::isCrudOpType(opType)) {
-            return _applicationRules.applyOperation(opCtx, entryOrGroupedInserts);
-        } else if (opType == repl::OpTypeEnum::kCommand) {
-            return _applicationRules.applyCommand(opCtx, entryOrGroupedInserts);
-        }
-    } else {
-        // We always use oplog application mode 'kInitialSync', because we're applying oplog entries
-        // to a cloned database the way initial sync does.
-        return repl::OplogApplierUtils::applyOplogEntryOrGroupedInsertsCommon(
-            opCtx, entryOrGroupedInserts, oplogApplicationMode, incrementOpsAppliedStats, nullptr);
+    } else if (repl::DurableOplogEntry::isCrudOpType(opType)) {
+        return _applicationRules.applyOperation(opCtx, entryOrGroupedInserts);
+    } else if (opType == repl::OpTypeEnum::kCommand) {
+        return _applicationRules.applyCommand(opCtx, entryOrGroupedInserts);
     }
 
     MONGO_UNREACHABLE;

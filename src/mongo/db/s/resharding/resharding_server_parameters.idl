@@ -98,15 +98,6 @@ server_parameters:
             lte:
                 expr: 100 * 1024 * 1024
 
-    useReshardingOplogApplicationRules:
-        description: >-
-            Whether or not the ReshardingOplogApplier should use ReshardingOplogApplicationRules
-            when applying operations during. If false, will use standard oplog application rules.
-        set_at: "startup"
-        cpp_vartype: bool
-        cpp_varname: gUseReshardingOplogApplicationRules
-        default: false
-
     reshardingOplogApplierMaxLockRequestTimeoutMillis:
         description: >-
             The max number of milliseconds that the resharding oplog applier will wait for lock
