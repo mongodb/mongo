@@ -91,6 +91,8 @@ one argument, the connection object.
 
 */
 
+load("jstests/replsets/libs/tenant_migration_util.js");
+
 // constants
 
 // All roles that are specific to one database will be given only for 'firstDbName'. For example,
@@ -103,6 +105,7 @@ var adminDbName = "admin";
 var authErrCode = 13;
 var commandNotSupportedCode = 115;
 var shard0name = "shard0000";
+const migrationCertificates = TenantMigrationUtil.makeMigrationCertificatesForTest();
 
 // useful shorthand when defining the tests below
 var roles_write =
@@ -3380,6 +3383,8 @@ var authCommandsLib = {
               migrationId: UUID(),
               recipientConnectionString: "recipient-rs/localhost:1234",
               readPreference: {mode: "primary"},
+              donorCertificateForRecipient: migrationCertificates.donorCertificateForRecipient,
+              recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor,
           },
           skipSharded: true,
           testcases: [
