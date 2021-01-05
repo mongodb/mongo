@@ -8,13 +8,14 @@
 const name = jsTestName();
 
 // We need to have at least 2 nodes to run the data consistency checks.
-const rst =
-    new ReplSetTest({name: name, nodes: 2, nodeOptions: {enableMajorityReadConcern: "false"}});
+const rst = new ReplSetTest({name: name, nodes: 2});
 rst.startSet();
 rst.initiate();
 
-// Deliberately set an unsatisfiable default read and write concern so any operations run in the
-// shutdown hooks will fail if they inherit either.
+// Deliberately set a write concern and read concern that are different from the default w:1 and
+// local values.
+// The write concern is unsatisfiable, so any operations run in the shutdown hooks will fail if
+// they inherit it.
 assert.commandWorked(rst.getPrimary().adminCommand({
     setDefaultRWConcern: 1,
     defaultWriteConcern: {w: 42},
@@ -22,6 +23,6 @@ assert.commandWorked(rst.getPrimary().adminCommand({
 }));
 
 // It should always be possible to successfully stop the replset (including running consistency
-// checks) even when the default read and write concerns are unsatisfiable.
+// checks) even when the default write concern is unsatisfiable.
 rst.stopSet();
 })();

@@ -1078,41 +1078,6 @@ TEST_F(ReplicationRecoveryTest, AbortTransactionOplogEntryCorrectlyUpdatesConfig
     ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(Timestamp(3, 0), 1));
 }
 
-DEATH_TEST_REGEX_F(ReplicationRecoveryTest,
-                   RecoveryFailsWithPrepareAndEnableReadConcernMajorityFalse,
-                   "Fatal assertion.*51146") {
-    ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
-    auto opCtx = getOperationContext();
-
-    const auto appliedThrough = OpTime(Timestamp(1, 1), 1);
-    getStorageInterfaceRecovery()->setSupportsRecoverToStableTimestamp(true);
-    getStorageInterfaceRecovery()->setRecoveryTimestamp(appliedThrough.getTimestamp());
-    getConsistencyMarkers()->setAppliedThrough(opCtx, appliedThrough);
-    _setUpOplog(opCtx, getStorageInterface(), {1});
-
-    const auto sessionId = makeLogicalSessionIdForTest();
-    OperationSessionInfo sessionInfo;
-    sessionInfo.setSessionId(sessionId);
-    sessionInfo.setTxnNumber(3);
-
-    const auto lastDate = Date_t::now();
-    const auto prepareOp =
-        _makeTransactionOplogEntry({Timestamp(2, 0), 1},
-                                   repl::OpTypeEnum::kCommand,
-                                   BSON("applyOps" << BSONArray() << "prepare" << true),
-                                   OpTime(Timestamp(0, 0), -1),
-                                   0,
-                                   sessionInfo,
-                                   lastDate);
-
-    ASSERT_OK(getStorageInterface()->insertDocument(
-        opCtx, oplogNs, {prepareOp.getEntry().toBSON(), Timestamp(2, 0)}, 1));
-
-    serverGlobalParams.enableMajorityReadConcern = false;
-
-    recovery.recoverFromOplog(opCtx, boost::none);
-}
-
 TEST_F(ReplicationRecoveryTest, CommitTransactionOplogEntryCorrectlyUpdatesConfigTransactions) {
     ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
     auto opCtx = getOperationContext();

@@ -101,6 +101,7 @@ assert(conn);
 runReadAgainstLock(conn.host, dbName, collName, false);
 MongoRunner.stopMongod(conn);
 
+// TODO SERVER-53247: Remove this test case once emrc defaults to true.
 jsTest.log(
     "Starting server with featureFlagLockFreeReads=true and enableMajorityReadConcern=false: " +
     "this should override the setting to false.");

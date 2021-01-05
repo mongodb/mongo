@@ -155,21 +155,4 @@ rst.stopSet();
     session.endSession();
     rst.stopSet();
 }
-
-// readConcern with 'atClusterTime' is not allowed when enableMajorityReadConcern=false.
-{
-    let rst = new ReplSetTest({nodes: [{"enableMajorityReadConcern": "false"}]});
-    rst.startSet();
-    rst.initiate();
-    let session =
-        rst.getPrimary().getDB(dbName).getMongo().startSession({causalConsistency: false});
-    let sessionDb = session.getDatabase(dbName);
-    session.startTransaction(
-        {readConcern: {level: "snapshot", atClusterTime: _getClusterTime(rst)}});
-    assert.commandFailedWithCode(sessionDb.runCommand({find: collName}), ErrorCodes.InvalidOptions);
-    assert.commandFailedWithCode(session.abortTransaction_forTesting(),
-                                 ErrorCodes.NoSuchTransaction);
-    session.endSession();
-    rst.stopSet();
-}
 }());

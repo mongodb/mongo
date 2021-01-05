@@ -24,8 +24,6 @@ all:
     test_file: jstests/replsets/apply_prepare_txn_write_conflict_robustness.js
   - ticket: SERVER-47645
     test_file: jstests/replsets/invalidate_sessions_on_stepdown.js
-  - ticket: SERVER-48518
-    test_file: jstests/replsets/rollback_via_refetch_anomaly.js
   - ticket: SERVER-47773
     test_file: jstests/core/geo_near_tailable.js
   - ticket: SERVER-47469

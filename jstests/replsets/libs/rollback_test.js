@@ -533,6 +533,8 @@ function RollbackTest(name = "RollbackTest", replSet) {
 
         lastRBID = assert.commandWorked(curSecondary.adminCommand("replSetGetRBID")).rbid;
 
+        // TODO SERVER-53247: Once we remove support for emrc=false in the server, remove this
+        // check.
         const isMajorityReadConcernEnabledOnRollbackNode =
             assert.commandWorked(curSecondary.adminCommand({serverStatus: 1}))
                 .storageEngine.supportsCommittedReads;
