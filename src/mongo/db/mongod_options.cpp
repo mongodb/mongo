@@ -542,13 +542,6 @@ Status storeMongodOptions(const moe::Environment& params) {
         }
     }
 
-    // TODO (SERVER-49464): remove this development only extra logging.
-    if (storageGlobalParams.disableLockFreeReads) {
-        LOGV2(4788402, "Lock-free reads is disabled.");
-    } else {
-        LOGV2(4788403, "Lock-free reads is enabled.");
-    }
-
     if (params.count("replication.oplogSizeMB")) {
         long long x = params["replication.oplogSizeMB"].as<int>();
         if (x <= 0) {
