@@ -2202,6 +2202,15 @@ private:
         if (!current->_trieKey.empty())
             trieKeyIndex.push_back(current->_trieKey.at(0));
 
+        auto hasParent = [](std::vector<Node*>& context) { return context.size() >= 2; };
+
+        auto getParent = [&](std::vector<Node*>& context) {
+            // We should never get here unless we are at sufficient depth already, so the invariant
+            // should indeed actually hold. If coverity complains, treat as a false alarm.
+            invariant(hasParent(context));
+            return context[context.size() - 2];
+        };
+
         auto currentHasBeenCompressed = [&]() {
             // This can only happen when conflict resolution erases nodes that causes compression on
             // the current node.
@@ -2218,7 +2227,7 @@ private:
             size_t mismatchIdx =
                 _comparePrefix(current->_trieKey, other->_trieKey.data(), other->_trieKey.size());
 
-            auto parent = context[context.size() - 2];
+            auto parent = getParent(context);
             auto key = current->_trieKey.front();
             auto newTrieKeyBegin = current->_trieKey.begin();
             auto newTrieKeyEnd = current->_trieKey.begin() + mismatchIdx;
@@ -2267,8 +2276,8 @@ private:
                     // merge in the other's branch.
                     current = _makeBranchUnique(context);
 
-                    if (current->needGrow()) {
-                        current = _grow(context.at(context.size() - 2), current).get();
+                    if (current->needGrow() && hasParent(context)) {
+                        current = _grow(getParent(context), current).get();
                     }
 
                     // Need to rebuild our context to have updated pointers due to the
@@ -2287,10 +2296,9 @@ private:
 
                     // Other has a deleted branch that must also be removed from current tree.
                     current = _makeBranchUnique(context);
-                    int prevIdx = context.size() - 2;
                     _setChildPtr(current, key, nullptr);
-                    if (prevIdx >= 0 && current->needShrink()) {
-                        current = _shrink(context.at(prevIdx), current).get();
+                    if (current->needShrink() && hasParent(context)) {
+                        current = _shrink(getParent(context), current).get();
                     }
                     _rebuildContext(context, trieKeyIndex);
                 } else if (baseNode && otherNode && baseNode == node) {
@@ -2298,8 +2306,8 @@ private:
 
                     // If base and current point to the same node, then master changed.
                     current = _makeBranchUnique(context);
-                    if (current->needGrow()) {
-                        current = _grow(context.at(context.size() - 2), current).get();
+                    if (current->needGrow() && hasParent(context)) {
+                        current = _grow(getParent(context), current).get();
                     }
                     _rebuildContext(context, trieKeyIndex);
                     _setChildPtr(current, key, _findChild(other, key));
@@ -2345,10 +2353,9 @@ private:
                         // need to compress if we have only one child.
                         if (node->isLeaf()) {
                             _setChildPtr(current, key, nullptr);
-                            int prevIdx = context.size() - 2;
                             // Don't shrink the root node.
-                            if (prevIdx >= 0 && current->needShrink()) {
-                                current = _shrink(context.at(prevIdx), current).get();
+                            if (current->needShrink() && hasParent(context)) {
+                                current = _shrink(getParent(context), current).get();
                             }
                             _rebuildContext(context, trieKeyIndex);
                         } else {
@@ -2359,11 +2366,12 @@ private:
                     }
                 }
                 if (resolveConflict) {
-                    auto curParent = context.size() > 1 ? context.at(context.size() - 2) : nullptr;
                     Node* nodeToResolve = node;
-                    if (auto compressed = _compressOnlyChild(curParent, current)) {
-                        current = compressed;
-                        nodeToResolve = current;
+                    if (hasParent(context)) {
+                        if (auto compressed = _compressOnlyChild(getParent(context), current)) {
+                            current = compressed;
+                            nodeToResolve = current;
+                        }
                     }
                     _mergeResolveConflict(nodeToResolve, baseNode, otherNode);
                     _rebuildContext(context, trieKeyIndex);
