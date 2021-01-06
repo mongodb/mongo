@@ -94,8 +94,9 @@ public:
 
     /**
      * Appends the accumulated stats to a transactions stats object.
+     * Include the 'lastCommittedTransactions' field if 'includeLastCommitted' is true.
      */
-    void updateStats(TransactionsStats* stats);
+    void updateStats(TransactionsStats* stats, bool includeLastCommitted);
 
 private:
     // The number of multi-document transactions currently active.
