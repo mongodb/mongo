@@ -34,7 +34,7 @@
 #include <string>
 #include <vector>
 
-#include "mongo/db/keys_collection_document.h"
+#include "mongo/db/keys_collection_document_gen.h"
 #include "mongo/db/repl/optime_with.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/s/client/shard.h"

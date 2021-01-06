@@ -369,7 +369,7 @@ std::vector<KeysCollectionDocument> ConfigServerTestFixture::getKeys(OperationCo
     auto findStatus = config->exhaustiveFindOnConfig(opCtx,
                                                      kReadPref,
                                                      repl::ReadConcernLevel::kMajorityReadConcern,
-                                                     KeysCollectionDocument::ConfigNS,
+                                                     NamespaceString::kKeysCollectionNamespace,
                                                      BSONObj(),
                                                      BSON("expiresAt" << 1),
                                                      boost::none);
@@ -378,9 +378,8 @@ std::vector<KeysCollectionDocument> ConfigServerTestFixture::getKeys(OperationCo
     std::vector<KeysCollectionDocument> keys;
     const auto& docs = findStatus.getValue().docs;
     for (const auto& doc : docs) {
-        auto keyStatus = KeysCollectionDocument::fromBSON(doc);
-        ASSERT_OK(keyStatus.getStatus());
-        keys.push_back(keyStatus.getValue());
+        auto key = KeysCollectionDocument::parse(IDLParserErrorContext("keyDoc"), doc);
+        keys.push_back(std::move(key));
     }
 
     return keys;

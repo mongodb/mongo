@@ -31,9 +31,10 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/keys_collection_client_sharded.h"
-#include "mongo/db/keys_collection_document.h"
+#include "mongo/db/keys_collection_document_gen.h"
 #include "mongo/db/keys_collection_manager.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
+#include "mongo/db/time_proof_service.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
@@ -97,7 +98,7 @@ TEST_F(KeysManagerShardedTest, GetKeyWithSingleKey) {
     KeysCollectionDocument origKey1(
         1, "dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0)));
     ASSERT_OK(insertToConfigCollection(
-        operationContext(), KeysCollectionDocument::ConfigNS, origKey1.toBSON()));
+        operationContext(), NamespaceString::kKeysCollectionNamespace, origKey1.toBSON()));
 
     auto keyStatus =
         keyManager()->getKeyForValidation(operationContext(), 1, LogicalTime(Timestamp(100, 0)));
@@ -115,12 +116,12 @@ TEST_F(KeysManagerShardedTest, GetKeyWithMultipleKeys) {
     KeysCollectionDocument origKey1(
         1, "dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0)));
     ASSERT_OK(insertToConfigCollection(
-        operationContext(), KeysCollectionDocument::ConfigNS, origKey1.toBSON()));
+        operationContext(), NamespaceString::kKeysCollectionNamespace, origKey1.toBSON()));
 
     KeysCollectionDocument origKey2(
         2, "dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(205, 0)));
     ASSERT_OK(insertToConfigCollection(
-        operationContext(), KeysCollectionDocument::ConfigNS, origKey2.toBSON()));
+        operationContext(), NamespaceString::kKeysCollectionNamespace, origKey2.toBSON()));
 
     auto keyStatus =
         keyManager()->getKeyForValidation(operationContext(), 1, LogicalTime(Timestamp(100, 0)));
@@ -147,7 +148,7 @@ TEST_F(KeysManagerShardedTest, GetKeyShouldErrorIfKeyIdMismatchKey) {
     KeysCollectionDocument origKey1(
         1, "dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0)));
     ASSERT_OK(insertToConfigCollection(
-        operationContext(), KeysCollectionDocument::ConfigNS, origKey1.toBSON()));
+        operationContext(), NamespaceString::kKeysCollectionNamespace, origKey1.toBSON()));
 
     auto keyStatus =
         keyManager()->getKeyForValidation(operationContext(), 2, LogicalTime(Timestamp(100, 0)));
@@ -160,11 +161,11 @@ TEST_F(KeysManagerShardedTest, GetKeyWithoutRefreshShouldReturnRightKey) {
     KeysCollectionDocument origKey1(
         1, "dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0)));
     ASSERT_OK(insertToConfigCollection(
-        operationContext(), KeysCollectionDocument::ConfigNS, origKey1.toBSON()));
+        operationContext(), NamespaceString::kKeysCollectionNamespace, origKey1.toBSON()));
     KeysCollectionDocument origKey2(
         2, "dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(110, 0)));
     ASSERT_OK(insertToConfigCollection(
-        operationContext(), KeysCollectionDocument::ConfigNS, origKey2.toBSON()));
+        operationContext(), NamespaceString::kKeysCollectionNamespace, origKey2.toBSON()));
 
     {
         auto keyStatus = keyManager()->getKeyForValidation(
@@ -195,7 +196,7 @@ TEST_F(KeysManagerShardedTest, GetKeyForSigningShouldReturnRightKey) {
     KeysCollectionDocument origKey1(
         1, "dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0)));
     ASSERT_OK(insertToConfigCollection(
-        operationContext(), KeysCollectionDocument::ConfigNS, origKey1.toBSON()));
+        operationContext(), NamespaceString::kKeysCollectionNamespace, origKey1.toBSON()));
 
     keyManager()->refreshNow(operationContext());
 
@@ -214,11 +215,11 @@ TEST_F(KeysManagerShardedTest, GetKeyForSigningShouldReturnRightOldKey) {
     KeysCollectionDocument origKey1(
         1, "dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0)));
     ASSERT_OK(insertToConfigCollection(
-        operationContext(), KeysCollectionDocument::ConfigNS, origKey1.toBSON()));
+        operationContext(), NamespaceString::kKeysCollectionNamespace, origKey1.toBSON()));
     KeysCollectionDocument origKey2(
         2, "dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(110, 0)));
     ASSERT_OK(insertToConfigCollection(
-        operationContext(), KeysCollectionDocument::ConfigNS, origKey2.toBSON()));
+        operationContext(), NamespaceString::kKeysCollectionNamespace, origKey2.toBSON()));
 
     keyManager()->refreshNow(operationContext());
 
@@ -285,7 +286,7 @@ TEST_F(KeysManagerShardedTest, ShouldStillBeAbleToUpdateCacheEvenIfItCantCreateK
     KeysCollectionDocument origKey1(
         1, "dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0)));
     ASSERT_OK(insertToConfigCollection(
-        operationContext(), KeysCollectionDocument::ConfigNS, origKey1.toBSON()));
+        operationContext(), NamespaceString::kKeysCollectionNamespace, origKey1.toBSON()));
 
     // Set the time to be very ahead so the updater will be forced to create new keys.
     const LogicalTime fakeTime(Timestamp(20000, 0));

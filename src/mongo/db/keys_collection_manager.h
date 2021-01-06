@@ -35,7 +35,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/db/key_generator.h"
 #include "mongo/db/keys_collection_cache.h"
-#include "mongo/db/keys_collection_document.h"
+#include "mongo/db/keys_collection_document_gen.h"
 #include "mongo/db/keys_collection_manager_gen.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"

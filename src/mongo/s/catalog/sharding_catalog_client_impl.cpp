@@ -902,7 +902,7 @@ StatusWith<std::vector<KeysCollectionDocument>> ShardingCatalogClientImpl::getNe
     auto findStatus = config->exhaustiveFindOnConfig(opCtx,
                                                      kConfigReadSelector,
                                                      readConcernLevel,
-                                                     KeysCollectionDocument::ConfigNS,
+                                                     NamespaceString::kKeysCollectionNamespace,
                                                      queryBuilder.obj(),
                                                      BSON("expiresAt" << 1),
                                                      boost::none);
@@ -914,12 +914,13 @@ StatusWith<std::vector<KeysCollectionDocument>> ShardingCatalogClientImpl::getNe
     const auto& keyDocs = findStatus.getValue().docs;
     std::vector<KeysCollectionDocument> keys;
     for (auto&& keyDoc : keyDocs) {
-        auto parseStatus = KeysCollectionDocument::fromBSON(keyDoc);
-        if (!parseStatus.isOK()) {
-            return parseStatus.getStatus();
+        KeysCollectionDocument key;
+        try {
+            key = KeysCollectionDocument::parse(IDLParserErrorContext("keyDoc"), keyDoc);
+        } catch (...) {
+            return exceptionToStatus();
         }
-
-        keys.push_back(std::move(parseStatus.getValue()));
+        keys.push_back(std::move(key));
     }
 
     return keys;

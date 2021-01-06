@@ -40,7 +40,7 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/keys_collection_document.h"
+#include "mongo/db/keys_collection_document_gen.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
@@ -91,7 +91,7 @@ StatusWith<std::vector<KeysCollectionDocument>> KeysCollectionClientDirect::getN
     auto findStatus = _query(opCtx,
                              ReadPreferenceSetting(ReadPreference::Nearest, TagSet{}),
                              readConcern,
-                             KeysCollectionDocument::ConfigNS,
+                             NamespaceString::kKeysCollectionNamespace,
                              queryBuilder.obj(),
                              BSON("expiresAt" << 1),
                              boost::none);
@@ -103,12 +103,13 @@ StatusWith<std::vector<KeysCollectionDocument>> KeysCollectionClientDirect::getN
     const auto& keyDocs = findStatus.getValue().docs;
     std::vector<KeysCollectionDocument> keys;
     for (auto&& keyDoc : keyDocs) {
-        auto parseStatus = KeysCollectionDocument::fromBSON(keyDoc);
-        if (!parseStatus.isOK()) {
-            return parseStatus.getStatus();
+        KeysCollectionDocument key;
+        try {
+            key = KeysCollectionDocument::parse(IDLParserErrorContext("keyDoc"), keyDoc);
+        } catch (...) {
+            return exceptionToStatus();
         }
-
-        keys.push_back(std::move(parseStatus.getValue()));
+        keys.push_back(std::move(key));
     }
 
     return keys;
@@ -173,8 +174,10 @@ Status KeysCollectionClientDirect::_insert(OperationContext* opCtx,
 }
 
 Status KeysCollectionClientDirect::insertNewKey(OperationContext* opCtx, const BSONObj& doc) {
-    return _insert(
-        opCtx, KeysCollectionDocument::ConfigNS, doc, ShardingCatalogClient::kMajorityWriteConcern);
+    return _insert(opCtx,
+                   NamespaceString::kKeysCollectionNamespace,
+                   doc,
+                   ShardingCatalogClient::kMajorityWriteConcern);
 }
 
 }  // namespace mongo

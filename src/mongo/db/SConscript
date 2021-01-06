@@ -1640,7 +1640,7 @@ env.Library(
 env.Library(
     target='keys_collection_document',
     source=[
-        'keys_collection_document.cpp',
+        'keys_collection_document.idl',
     ],
     LIBDEPS=[
         'logical_time',
@@ -1673,6 +1673,7 @@ env.Library(
         '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client',
         'keys_collection_document',
         'logical_time',
+        'namespace_string',
     ],
 )
 

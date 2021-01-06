@@ -32,7 +32,7 @@
 #include "mongo/db/keys_collection_cache.h"
 
 #include "mongo/db/keys_collection_client.h"
-#include "mongo/db/keys_collection_document.h"
+#include "mongo/db/keys_collection_document_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/util/str.h"
 

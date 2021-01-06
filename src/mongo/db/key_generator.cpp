@@ -34,6 +34,7 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/db/keys_collection_client.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/time_proof_service.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/util/fail_point.h"

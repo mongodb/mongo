@@ -50,8 +50,10 @@ StatusWith<std::vector<KeysCollectionDocument>> KeysCollectionClientSharded::get
 }
 
 Status KeysCollectionClientSharded::insertNewKey(OperationContext* opCtx, const BSONObj& doc) {
-    return _catalogClient->insertConfigDocument(
-        opCtx, KeysCollectionDocument::ConfigNS, doc, ShardingCatalogClient::kMajorityWriteConcern);
+    return _catalogClient->insertConfigDocument(opCtx,
+                                                NamespaceString::kKeysCollectionNamespace,
+                                                doc,
+                                                ShardingCatalogClient::kMajorityWriteConcern);
 }
 
 }  // namespace mongo

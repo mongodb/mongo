@@ -46,7 +46,8 @@ LogicalTime LogicalTime::fromOperationTime(const BSONObj& obj) {
     const auto opTimeElem(obj[kOperationTimeFieldName]);
     uassert(ErrorCodes::FailedToParse, "No operationTime found", !opTimeElem.eoo());
     uassert(ErrorCodes::BadValue,
-            "Operation time is of the wrong value",
+            str::stream() << kOperationTimeFieldName << " is of the wrong type '"
+                          << typeName(opTimeElem.type()) << "'",
             opTimeElem.type() == bsonTimestamp);
     return LogicalTime(opTimeElem.timestamp());
 }
@@ -77,6 +78,14 @@ BSONObj LogicalTime::toBSON() const {
     BSONObjBuilder bldr;
     bldr.append("ts", asTimestamp());
     return bldr.obj();
+}
+
+void LogicalTime::serializeToBSON(StringData fieldName, BSONObjBuilder* bob) const {
+    bob->appendElements(BSON(fieldName << asTimestamp()));
+}
+
+LogicalTime LogicalTime::parseFromBSON(const BSONElement& elem) {
+    return LogicalTime(elem.timestamp());
 }
 
 }  // namespace mongo

@@ -32,9 +32,10 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/keys_collection_cache.h"
 #include "mongo/db/keys_collection_client_sharded.h"
-#include "mongo/db/keys_collection_document.h"
+#include "mongo/db/keys_collection_document_gen.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
+#include "mongo/db/time_proof_service.h"
 #include "mongo/s/grid.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
@@ -79,7 +80,7 @@ TEST_F(CacheTest, GetKeyShouldReturnCorrectKeyAfterRefresh) {
     KeysCollectionDocument origKey1(
         1, "test", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0)));
     ASSERT_OK(insertToConfigCollection(
-        operationContext(), KeysCollectionDocument::ConfigNS, origKey1.toBSON()));
+        operationContext(), NamespaceString::kKeysCollectionNamespace, origKey1.toBSON()));
 
     auto refreshStatus = cache.refresh(operationContext());
     ASSERT_OK(refreshStatus.getStatus());
@@ -110,7 +111,7 @@ TEST_F(CacheTest, GetKeyShouldReturnErrorIfNoKeyIsValidForGivenTime) {
     KeysCollectionDocument origKey1(
         1, "test", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0)));
     ASSERT_OK(insertToConfigCollection(
-        operationContext(), KeysCollectionDocument::ConfigNS, origKey1.toBSON()));
+        operationContext(), NamespaceString::kKeysCollectionNamespace, origKey1.toBSON()));
 
     auto refreshStatus = cache.refresh(operationContext());
     ASSERT_OK(refreshStatus.getStatus());
@@ -133,17 +134,17 @@ TEST_F(CacheTest, GetKeyShouldReturnOldestKeyPossible) {
     KeysCollectionDocument origKey0(
         0, "test", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(100, 0)));
     ASSERT_OK(insertToConfigCollection(
-        operationContext(), KeysCollectionDocument::ConfigNS, origKey0.toBSON()));
+        operationContext(), NamespaceString::kKeysCollectionNamespace, origKey0.toBSON()));
 
     KeysCollectionDocument origKey1(
         1, "test", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0)));
     ASSERT_OK(insertToConfigCollection(
-        operationContext(), KeysCollectionDocument::ConfigNS, origKey1.toBSON()));
+        operationContext(), NamespaceString::kKeysCollectionNamespace, origKey1.toBSON()));
 
     KeysCollectionDocument origKey2(
         2, "test", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(110, 0)));
     ASSERT_OK(insertToConfigCollection(
-        operationContext(), KeysCollectionDocument::ConfigNS, origKey2.toBSON()));
+        operationContext(), NamespaceString::kKeysCollectionNamespace, origKey2.toBSON()));
 
     auto refreshStatus = cache.refresh(operationContext());
     ASSERT_OK(refreshStatus.getStatus());
@@ -174,7 +175,7 @@ TEST_F(CacheTest, RefreshShouldNotGetKeysForOtherPurpose) {
     KeysCollectionDocument origKey0(
         0, "dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(100, 0)));
     ASSERT_OK(insertToConfigCollection(
-        operationContext(), KeysCollectionDocument::ConfigNS, origKey0.toBSON()));
+        operationContext(), NamespaceString::kKeysCollectionNamespace, origKey0.toBSON()));
 
     {
         auto refreshStatus = cache.refresh(operationContext());
@@ -187,7 +188,7 @@ TEST_F(CacheTest, RefreshShouldNotGetKeysForOtherPurpose) {
     KeysCollectionDocument origKey1(
         1, "test", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0)));
     ASSERT_OK(insertToConfigCollection(
-        operationContext(), KeysCollectionDocument::ConfigNS, origKey1.toBSON()));
+        operationContext(), NamespaceString::kKeysCollectionNamespace, origKey1.toBSON()));
 
     {
         auto refreshStatus = cache.refresh(operationContext());
@@ -218,7 +219,7 @@ TEST_F(CacheTest, RefreshCanIncrementallyGetNewKeys) {
     KeysCollectionDocument origKey0(
         0, "test", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(100, 0)));
     ASSERT_OK(insertToConfigCollection(
-        operationContext(), KeysCollectionDocument::ConfigNS, origKey0.toBSON()));
+        operationContext(), NamespaceString::kKeysCollectionNamespace, origKey0.toBSON()));
 
     {
         auto refreshStatus = cache.refresh(operationContext());
@@ -238,12 +239,12 @@ TEST_F(CacheTest, RefreshCanIncrementallyGetNewKeys) {
     KeysCollectionDocument origKey1(
         1, "test", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0)));
     ASSERT_OK(insertToConfigCollection(
-        operationContext(), KeysCollectionDocument::ConfigNS, origKey1.toBSON()));
+        operationContext(), NamespaceString::kKeysCollectionNamespace, origKey1.toBSON()));
 
     KeysCollectionDocument origKey2(
         2, "test", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(110, 0)));
     ASSERT_OK(insertToConfigCollection(
-        operationContext(), KeysCollectionDocument::ConfigNS, origKey2.toBSON()));
+        operationContext(), NamespaceString::kKeysCollectionNamespace, origKey2.toBSON()));
 
     {
         auto refreshStatus = cache.refresh(operationContext());
