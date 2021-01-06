@@ -61,6 +61,13 @@ assert(!res.transactions.hasOwnProperty("lastCommittedTransaction"), () => tojso
 assert.commandWorked(PrepareHelpers.commitTransaction(session, prepareTimestampForCommit));
 checkLastCommittedTransaction(1, {});
 
+// Check that we are able to exclude 'lastCommittedTransaction'. FTDC uses this to filter out
+// the section as it frequently triggers scheme changes.
+let filteredRes = assert.commandWorked(
+    primary.adminCommand({serverStatus: 1, transactions: {includeLastCommitted: false}}));
+assert(!filteredRes.transactions.hasOwnProperty("lastCommittedTransaction"),
+       () => tojson(filteredRes));
+
 function runTests(prepare) {
     jsTestLog("Testing server transaction metrics with prepare=" + prepare);
 

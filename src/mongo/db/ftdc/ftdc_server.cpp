@@ -229,8 +229,8 @@ void startFTDC(boost::filesystem::path& path,
         "serverStatus",
         "serverStatus",
         "",
-        BSON("serverStatus" << 1 << "tcMalloc" << true << "sharding" << false << "timing"
-                            << false)));
+        BSON("serverStatus" << 1 << "tcMalloc" << true << "sharding" << false << "timing" << false
+                            << "transactions" << BSON("includeLastCommitted" << false))));
 
     registerCollectors(controller.get());
 
