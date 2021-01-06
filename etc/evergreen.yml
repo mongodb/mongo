@@ -343,7 +343,6 @@ variables:
   - enterprise-rhel-62-64-bit-inmem
   - enterprise-rhel-62-64-bit-logv2
   - enterprise-rhel-62-64-bit-flow-control-off
-  - enterprise-rhel-62-64-bit-majority-read-concern-off
   - enterprise-rhel-62-64-bit-multiversion
   - enterprise-rhel-62-64-bit-multi-txn-oplog-entries
   - enterprise-rhel-62-64-bit-required-inmem
@@ -10537,7 +10536,7 @@ buildvariants:
     target_resmoke_time: 10
     max_sub_suites: 5
     large_distro_name: rhel62-medium
-    burn_in_tag_buildvariants: enterprise-rhel-62-64-bit-majority-read-concern-off enterprise-rhel-62-64-bit-inmem linux-64-duroff enterprise-rhel-62-64-bit-multiversion
+    burn_in_tag_buildvariants: enterprise-rhel-62-64-bit-inmem linux-64-duroff enterprise-rhel-62-64-bit-multiversion
     num_scons_link_jobs_available: 0.99
   tasks:
   - name: compile_parallel_TG
@@ -10656,7 +10655,7 @@ buildvariants:
     target_resmoke_time: 10
     max_sub_suites: 5
     large_distro_name: rhel62-medium
-    burn_in_tag_buildvariants: enterprise-rhel-62-64-bit-majority-read-concern-off enterprise-rhel-62-64-bit-inmem linux-64-duroff enterprise-rhel-62-64-bit-multiversion
+    burn_in_tag_buildvariants: enterprise-rhel-62-64-bit-inmem linux-64-duroff enterprise-rhel-62-64-bit-multiversion
     num_scons_link_jobs_available: 0.99
     test_flags: >-
         --mongodSetParameters="{featureFlagToaster: true, featureFlagSpoon: true, featureFlagTenantMigrations: true, featureFlagImprovedAuditing: true}"
@@ -10815,89 +10814,6 @@ buildvariants:
   - name: sharded_multi_stmt_txn_jscore_passthrough
     distros:
     - rhel62-medium
-
-- name: enterprise-rhel-62-64-bit-majority-read-concern-off
-  display_name: "Enterprise RHEL 6.2 (majority read concern off)"
-  modules:
-  - enterprise
-  run_on:
-  - rhel62-small
-  expansions: &enterprise-rhel-62-64-bit-majority-read-concern-off-expansions
-    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
-    # Ban tests that run prepareTransaction or multi-shard transactions (which use
-    # prepareTransaction). prepareTransaction is rejected on nodes with
-    # enableMajorityReadConcern:"false" (SERVER-37559).
-    # We also relax oplog constraints so that applying oplog entries after a rollbackViaRefetch
-    # works correctly.
-    # TODO (SERVER-47022): Re-enable oplog constraint enforcement once we set the application mode
-    # correctly after rollbackViaRefetch.
-    test_flags: >-
-      --majorityReadConcern=off
-      --excludeWithAnyTags=requires_majority_read_concern,uses_prepare_transaction,uses_multi_shard_transaction,uses_atclustertime
-      --mongodSetParameters="{oplogApplicationEnforcesSteadyStateConstraints: false}"
-    compile_flags: >-
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --ssl
-      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-      MONGO_DISTMOD=rhel62
-    multiversion_platform: rhel62
-    multiversion_edition: enterprise
-    repo_edition: enterprise
-    scons_cache_scope: shared
-    large_distro_name: rhel62-medium
-  tasks:
-  - name: compile_all_run_unittests_TG
-    distros:
-    - rhel62-large
-  - name: .aggfuzzer !.wildcard
-  - name: .aggregation !.read_write_concern
-  - name: audit
-  - name: .auth !.multiversion
-  - name: buildscripts_test
-  - name: .causally_consistent !.txns !.read_write_concern
-  - name: causally_consistent_jscore_txns_passthrough
-  - name: .change_streams
-  - name: .misc_js !.non_read_maj
-  - name: .concurrency .common !.read_concern_maj
-  - name: .concurrency .no_txns
-  - name: concurrency_sharded_causal_consistency_gen
-  - name: concurrency_sharded_causal_consistency_and_balancer_gen
-  - name: concurrency_replication_causal_consistency_gen
-  - name: disk_wiredtiger
-  - name: .encrypt
-  - name: .integration
-    distros:
-    - rhel62-medium
-  - name: .jscore .common
-  - name: jsCore_minimum_batch_size
-  - name: jsCore_op_query
-  - name: jsonSchema
-  - name: .jstestfuzz !.flow_control
-  - name: .logical_session_cache .repl
-  - name: multiversion_gen
-  - name: .random_multiversion_ds
-  - name: .read_write_concern .large
-    distros:
-    - rhel62-medium
-  - name: .replica_sets !.auth !.encrypt !.non_maj_read
-    distros:
-    - rhel62-medium
-  - name: retryable_writes_jscore_passthrough_gen
-  - name: .read_only
-  - name: .rollbackfuzzer
-  - name: sasl
-  - name: search
-  - name: search_auth
-  - name: search_ssl
-  - name: secondary_reads_passthrough_gen
-  - name: session_jscore_passthrough
-  # Sharded transactions suites exclude tests that use snapshot read concern, since snapshot read
-  # concern uses 'atClusterTime' in sharded clusters, and this is not supported with
-  # enableMajorityReadConcern=false.
-  - name: .sharding .jscore !.txns
-  - name: .sharding .common
-  - name: snmp
-  - name: .updatefuzzer
 
 - name: enterprise-rhel-62-64-bit-non-resumable-index-builds
   display_name: "Enterprise RHEL 6.2 (non-resumable index builds)"
