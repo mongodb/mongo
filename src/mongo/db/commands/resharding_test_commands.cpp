@@ -92,7 +92,7 @@ public:
                                               request().getAtClusterTime(),
                                               request().getOutputNs());
 
-            cloner.run(opCtx->getServiceContext(), executor).get(opCtx);
+            cloner.run(std::move(executor), opCtx->getCancelationToken()).get(opCtx);
         }
 
     private:

@@ -377,7 +377,7 @@ ReshardingRecipientService::RecipientStateMachine::_cloneThenTransitionToApplyin
                 }));
     }
 
-    return _collectionCloner->run(serviceContext, **executor).then([this] {
+    return _collectionCloner->run(**executor, cancelToken).then([this] {
         _transitionStateAndUpdateCoordinator(RecipientStateEnum::kApplying);
     });
 }

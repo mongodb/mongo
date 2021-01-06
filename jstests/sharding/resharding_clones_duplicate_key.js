@@ -36,6 +36,17 @@ assert.commandWorked(inputCollection.insert([
     {_id: 0, info: `moves from ${donorShardNames[1]}`, oldKey: 10, newKey: 10},
 ]));
 
+// The collection is cloned in ascending _id order so we insert some large documents with higher _id
+// values to guarantee there will be a cursor needing to be cleaned up on the donor shards after
+// cloning errors.
+const largeStr = "x".repeat(9 * 1024 * 1024);
+assert.commandWorked(inputCollection.insert([
+    {_id: 10, info: `moves from ${donorShardNames[0]}`, oldKey: -10, newKey: -10, pad: largeStr},
+    {_id: 11, info: `moves from ${donorShardNames[0]}`, oldKey: -10, newKey: -10, pad: largeStr},
+    {_id: 20, info: `moves from ${donorShardNames[1]}`, oldKey: 10, newKey: 10, pad: largeStr},
+    {_id: 21, info: `moves from ${donorShardNames[1]}`, oldKey: 10, newKey: 10, pad: largeStr},
+]));
+
 function assertEventuallyErrorsLocally(shardConn, shardName) {
     const localRecipientOpsCollection =
         shardConn.getCollection("config.localReshardingOperations.recipient");
@@ -77,6 +88,14 @@ reshardingTest.withReshardingInBackground(  //
     ErrorCodes.Interrupted);
 
 fp.off();
+
+const idleCursors = mongos.getDB("admin")
+                        .aggregate([
+                            {$currentOp: {allUsers: true, idleCursors: true}},
+                            {$match: {type: "idleCursor", ns: inputCollection.getFullName()}},
+                        ])
+                        .toArray();
+assert.eq([], idleCursors, "expected cloning cursors to be cleaned up, but they weren't");
 
 reshardingTest.teardown();
 })();

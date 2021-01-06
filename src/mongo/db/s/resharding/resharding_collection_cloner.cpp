@@ -55,6 +55,7 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/stale_shard_version_helpers.h"
+#include "mongo/util/future_util.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 
@@ -242,15 +243,14 @@ void ReshardingCollectionCloner::_insertBatch(OperationContext* opCtx,
  * recipient's primary-only service and therefore would never be interrupted by step-up.
  */
 template <typename Callable>
-auto ReshardingCollectionCloner::_withTemporaryOperationContext(ServiceContext* serviceContext,
-                                                                Callable&& callable) {
-    auto* client = Client::getCurrent();
+auto ReshardingCollectionCloner::_withTemporaryOperationContext(Callable&& callable) {
+    auto& client = cc();
     {
-        stdx::lock_guard<Client> lk(*client);
-        invariant(client->canKillSystemOperationInStepdown(lk));
+        stdx::lock_guard<Client> lk(client);
+        invariant(client.canKillSystemOperationInStepdown(lk));
     }
 
-    auto opCtx = client->makeOperationContext();
+    auto opCtx = client.makeOperationContext();
     opCtx->setAlwaysInterruptAtStepDownOrUp();
 
     // The BlockingResultsMerger underlying by the $mergeCursors stage records how long the
@@ -264,50 +264,64 @@ auto ReshardingCollectionCloner::_withTemporaryOperationContext(ServiceContext* 
     }
 }
 
-ExecutorFuture<void> ReshardingCollectionCloner::_insertBatchesUntilPipelineExhausted(
-    ServiceContext* serviceContext,
-    std::shared_ptr<executor::TaskExecutor> executor,
-    std::unique_ptr<Pipeline, PipelineDeleter> pipeline) {
-    bool moreToCome = _withTemporaryOperationContext(serviceContext, [&](auto* opCtx) {
-        pipeline->reattachToOperationContext(opCtx);
-        auto batch = _fillBatch(*pipeline);
-        pipeline->detachFromOperationContext();
-
-        if (batch.empty()) {
-            return false;
-        }
-
-        _insertBatch(opCtx, batch);
-        return true;
-    });
-
-    if (!moreToCome) {
-        return ExecutorFuture(std::move(executor));
-    }
-
-    return ExecutorFuture(executor, std::move(pipeline))
-        .then([this, serviceContext, executor](auto pipeline) {
-            return _insertBatchesUntilPipelineExhausted(
-                serviceContext, std::move(executor), std::move(pipeline));
-        });
-}
-
 ExecutorFuture<void> ReshardingCollectionCloner::run(
-    ServiceContext* serviceContext, std::shared_ptr<executor::TaskExecutor> executor) {
-    return ExecutorFuture(executor)
-        .then([this, serviceContext] {
-            return _withTemporaryOperationContext(serviceContext, [&](auto* opCtx) {
-                auto pipeline = _targetAggregationRequest(
-                    opCtx, *makePipeline(opCtx, MongoProcessInterface::create(opCtx)));
+    std::shared_ptr<executor::TaskExecutor> executor, CancelationToken cancelToken) {
+    struct ChainContext {
+        std::unique_ptr<Pipeline, PipelineDeleter> pipeline;
+        bool moreToCome = true;
+    };
 
-                pipeline->detachFromOperationContext();
-                return pipeline;
-            });
+    auto chainCtx = std::make_shared<ChainContext>();
+
+    return AsyncTry([this, chainCtx] {
+               if (!chainCtx->pipeline) {
+                   chainCtx->pipeline = _withTemporaryOperationContext([&](auto* opCtx) {
+                       auto pipeline = _targetAggregationRequest(
+                           opCtx, *makePipeline(opCtx, MongoProcessInterface::create(opCtx)));
+
+                       pipeline->detachFromOperationContext();
+                       pipeline.get_deleter().dismissDisposal();
+                       return pipeline;
+                   });
+               }
+
+               chainCtx->moreToCome = _withTemporaryOperationContext([&](auto* opCtx) {
+                   chainCtx->pipeline->reattachToOperationContext(opCtx);
+                   auto batch = _fillBatch(*chainCtx->pipeline);
+                   chainCtx->pipeline->detachFromOperationContext();
+
+                   if (batch.empty()) {
+                       return false;
+                   }
+
+                   _insertBatch(opCtx, batch);
+                   return true;
+               });
+           })
+        .until([this, chainCtx](Status status) {
+            if (status.isOK() && chainCtx->moreToCome) {
+                return false;
+            }
+
+            if (chainCtx->pipeline) {
+                _withTemporaryOperationContext([&](auto* opCtx) {
+                    chainCtx->pipeline->dispose(opCtx);
+                    chainCtx->pipeline.reset();
+                });
+            }
+
+            if (!status.isOK()) {
+                LOGV2(5352400,
+                      "Operation-fatal error for resharding while cloning sharded collection",
+                      "sourceNamespace"_attr = _sourceNss,
+                      "outputNamespace"_attr = _outputNss,
+                      "readTimestamp"_attr = _atClusterTime,
+                      "error"_attr = redact(status));
+            }
+
+            return true;
         })
-        .then([this, serviceContext, executor](auto pipeline) {
-            return _insertBatchesUntilPipelineExhausted(
-                serviceContext, std::move(executor), std::move(pipeline));
-        });
+        .on(std::move(executor), std::move(cancelToken));
 }
 
 }  // namespace mongo
