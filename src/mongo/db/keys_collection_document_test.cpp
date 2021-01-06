@@ -50,7 +50,8 @@ TEST(KeysCollectionDocument, Roundtrip) {
 
     const auto expiresAt = LogicalTime(Timestamp(100, 200));
 
-    KeysCollectionDocument keysCollectionDoc(keyId, purpose, key, expiresAt);
+    KeysCollectionDocument keysCollectionDoc(keyId);
+    keysCollectionDoc.setKeysCollectionDocumentBase({purpose, key, expiresAt});
 
     auto serializedObj = keysCollectionDoc.toBSON();
     auto parsedKey = KeysCollectionDocument::parse(IDLParserErrorContext("keyDoc"), serializedObj);

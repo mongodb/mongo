@@ -57,7 +57,9 @@ Status insertNewKey(OperationContext* opCtx,
                     long long keyId,
                     const std::string& purpose,
                     const LogicalTime& expiresAt) {
-    KeysCollectionDocument newKey(keyId, purpose, TimeProofService::generateRandomKey(), expiresAt);
+    KeysCollectionDocument newKey(keyId);
+    newKey.setKeysCollectionDocumentBase(
+        {purpose, TimeProofService::generateRandomKey(), expiresAt});
     return client->insertNewKey(opCtx, newKey.toBSON());
 }
 

@@ -111,6 +111,9 @@ const NamespaceString NamespaceString::kReshardingTxnClonerProgressNamespace(
 const NamespaceString NamespaceString::kKeysCollectionNamespace(NamespaceString::kAdminDb,
                                                                 "system.keys");
 
+const NamespaceString NamespaceString::kExternalKeysCollectionNamespace(
+    NamespaceString::kAdminDb, "system.external_validation_keys");
+
 bool NamespaceString::isListCollectionsCursorNS() const {
     return coll() == listCollectionsCursorCol;
 }

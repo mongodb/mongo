@@ -148,8 +148,12 @@ public:
     // Namespace for storing config.transactions cloner progress for resharding.
     static const NamespaceString kReshardingTxnClonerProgressNamespace;
 
-    // Namespace for storing keys for signing and validating cluster times.
+    // Namespace for storing keys for signing and validating cluster times created by the cluster
+    // that this node is in.
     static const NamespaceString kKeysCollectionNamespace;
+
+    // Namespace for storing keys for validating cluster times created by other clusters.
+    static const NamespaceString kExternalKeysCollectionNamespace;
 
     /**
      * Constructs an empty NamespaceString.

@@ -73,6 +73,7 @@ class UUID {
     friend class DatabaseVersion;
     friend class DbCheckOplogCollection;
     friend class EncryptionPlaceholder;
+    friend class ExternalKeysCollectionDocument;
     friend class idl::import::One_UUID;
     friend class IndexBuildEntry;
     friend class KeyStoreRecord;

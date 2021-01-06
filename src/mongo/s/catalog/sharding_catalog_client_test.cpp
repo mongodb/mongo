@@ -1288,11 +1288,13 @@ TEST_F(ShardingCatalogClientTest, GetNewKeys) {
 
     LogicalTime dummyTime(Timestamp(9876, 5432));
     auto randomKey1 = TimeProofService::generateRandomKey();
-    KeysCollectionDocument key1(1, "none", randomKey1, dummyTime);
+    KeysCollectionDocument key1(1);
+    key1.setKeysCollectionDocumentBase({"none", randomKey1, dummyTime});
 
     LogicalTime dummyTime2(Timestamp(123456, 789));
     auto randomKey2 = TimeProofService::generateRandomKey();
-    KeysCollectionDocument key2(2, "none", randomKey2, dummyTime2);
+    KeysCollectionDocument key2(2);
+    key2.setKeysCollectionDocumentBase({"none", randomKey2, dummyTime2});
 
     onFindCommand([this, key1, key2](const RemoteCommandRequest& request) {
         ASSERT_EQ("config:123", request.target.toString());

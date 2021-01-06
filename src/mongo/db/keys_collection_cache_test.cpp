@@ -77,8 +77,9 @@ TEST_F(CacheTest, RefreshErrorsIfCacheIsEmpty) {
 TEST_F(CacheTest, GetKeyShouldReturnCorrectKeyAfterRefresh) {
     KeysCollectionCache cache("test", catalogClient());
 
-    KeysCollectionDocument origKey1(
-        1, "test", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0)));
+    KeysCollectionDocument origKey1(1);
+    origKey1.setKeysCollectionDocumentBase(
+        {"test", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0))});
     ASSERT_OK(insertToConfigCollection(
         operationContext(), NamespaceString::kKeysCollectionNamespace, origKey1.toBSON()));
 
@@ -108,8 +109,9 @@ TEST_F(CacheTest, GetKeyShouldReturnCorrectKeyAfterRefresh) {
 TEST_F(CacheTest, GetKeyShouldReturnErrorIfNoKeyIsValidForGivenTime) {
     KeysCollectionCache cache("test", catalogClient());
 
-    KeysCollectionDocument origKey1(
-        1, "test", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0)));
+    KeysCollectionDocument origKey1(1);
+    origKey1.setKeysCollectionDocumentBase(
+        {"test", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0))});
     ASSERT_OK(insertToConfigCollection(
         operationContext(), NamespaceString::kKeysCollectionNamespace, origKey1.toBSON()));
 
@@ -131,18 +133,21 @@ TEST_F(CacheTest, GetKeyShouldReturnErrorIfNoKeyIsValidForGivenTime) {
 TEST_F(CacheTest, GetKeyShouldReturnOldestKeyPossible) {
     KeysCollectionCache cache("test", catalogClient());
 
-    KeysCollectionDocument origKey0(
-        0, "test", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(100, 0)));
+    KeysCollectionDocument origKey0(0);
+    origKey0.setKeysCollectionDocumentBase(
+        {"test", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(100, 0))});
     ASSERT_OK(insertToConfigCollection(
         operationContext(), NamespaceString::kKeysCollectionNamespace, origKey0.toBSON()));
 
-    KeysCollectionDocument origKey1(
-        1, "test", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0)));
+    KeysCollectionDocument origKey1(1);
+    origKey1.setKeysCollectionDocumentBase(
+        {"test", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0))});
     ASSERT_OK(insertToConfigCollection(
         operationContext(), NamespaceString::kKeysCollectionNamespace, origKey1.toBSON()));
 
-    KeysCollectionDocument origKey2(
-        2, "test", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(110, 0)));
+    KeysCollectionDocument origKey2(2);
+    origKey2.setKeysCollectionDocumentBase(
+        {"test", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(110, 0))});
     ASSERT_OK(insertToConfigCollection(
         operationContext(), NamespaceString::kKeysCollectionNamespace, origKey2.toBSON()));
 
@@ -172,8 +177,9 @@ TEST_F(CacheTest, GetKeyShouldReturnOldestKeyPossible) {
 TEST_F(CacheTest, RefreshShouldNotGetKeysForOtherPurpose) {
     KeysCollectionCache cache("test", catalogClient());
 
-    KeysCollectionDocument origKey0(
-        0, "dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(100, 0)));
+    KeysCollectionDocument origKey0(0);
+    origKey0.setKeysCollectionDocumentBase(
+        {"dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(100, 0))});
     ASSERT_OK(insertToConfigCollection(
         operationContext(), NamespaceString::kKeysCollectionNamespace, origKey0.toBSON()));
 
@@ -185,8 +191,9 @@ TEST_F(CacheTest, RefreshShouldNotGetKeysForOtherPurpose) {
         ASSERT_EQ(ErrorCodes::KeyNotFound, emptyKeyStatus.getStatus());
     }
 
-    KeysCollectionDocument origKey1(
-        1, "test", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0)));
+    KeysCollectionDocument origKey1(1);
+    origKey1.setKeysCollectionDocumentBase(
+        {"test", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0))});
     ASSERT_OK(insertToConfigCollection(
         operationContext(), NamespaceString::kKeysCollectionNamespace, origKey1.toBSON()));
 
@@ -216,8 +223,9 @@ TEST_F(CacheTest, RefreshShouldNotGetKeysForOtherPurpose) {
 TEST_F(CacheTest, RefreshCanIncrementallyGetNewKeys) {
     KeysCollectionCache cache("test", catalogClient());
 
-    KeysCollectionDocument origKey0(
-        0, "test", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(100, 0)));
+    KeysCollectionDocument origKey0(0);
+    origKey0.setKeysCollectionDocumentBase(
+        {"test", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(100, 0))});
     ASSERT_OK(insertToConfigCollection(
         operationContext(), NamespaceString::kKeysCollectionNamespace, origKey0.toBSON()));
 
@@ -236,13 +244,15 @@ TEST_F(CacheTest, RefreshCanIncrementallyGetNewKeys) {
         ASSERT_EQ(ErrorCodes::KeyNotFound, keyStatus.getStatus());
     }
 
-    KeysCollectionDocument origKey1(
-        1, "test", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0)));
+    KeysCollectionDocument origKey1(1);
+    origKey1.setKeysCollectionDocumentBase(
+        {"test", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0))});
     ASSERT_OK(insertToConfigCollection(
         operationContext(), NamespaceString::kKeysCollectionNamespace, origKey1.toBSON()));
 
-    KeysCollectionDocument origKey2(
-        2, "test", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(110, 0)));
+    KeysCollectionDocument origKey2(2);
+    origKey2.setKeysCollectionDocumentBase(
+        {"test", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(110, 0))});
     ASSERT_OK(insertToConfigCollection(
         operationContext(), NamespaceString::kKeysCollectionNamespace, origKey2.toBSON()));
 

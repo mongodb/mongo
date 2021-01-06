@@ -95,8 +95,9 @@ TEST_F(KeysManagerShardedTest, GetKeyForValidationErrorsIfKeyDoesntExist) {
 TEST_F(KeysManagerShardedTest, GetKeyWithSingleKey) {
     keyManager()->startMonitoring(getServiceContext());
 
-    KeysCollectionDocument origKey1(
-        1, "dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0)));
+    KeysCollectionDocument origKey1(1);
+    origKey1.setKeysCollectionDocumentBase(
+        {"dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0))});
     ASSERT_OK(insertToConfigCollection(
         operationContext(), NamespaceString::kKeysCollectionNamespace, origKey1.toBSON()));
 
@@ -113,13 +114,15 @@ TEST_F(KeysManagerShardedTest, GetKeyWithSingleKey) {
 TEST_F(KeysManagerShardedTest, GetKeyWithMultipleKeys) {
     keyManager()->startMonitoring(getServiceContext());
 
-    KeysCollectionDocument origKey1(
-        1, "dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0)));
+    KeysCollectionDocument origKey1(1);
+    origKey1.setKeysCollectionDocumentBase(
+        {"dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0))});
     ASSERT_OK(insertToConfigCollection(
         operationContext(), NamespaceString::kKeysCollectionNamespace, origKey1.toBSON()));
 
-    KeysCollectionDocument origKey2(
-        2, "dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(205, 0)));
+    KeysCollectionDocument origKey2(2);
+    origKey2.setKeysCollectionDocumentBase(
+        {"dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(205, 0))});
     ASSERT_OK(insertToConfigCollection(
         operationContext(), NamespaceString::kKeysCollectionNamespace, origKey2.toBSON()));
 
@@ -145,8 +148,9 @@ TEST_F(KeysManagerShardedTest, GetKeyWithMultipleKeys) {
 TEST_F(KeysManagerShardedTest, GetKeyShouldErrorIfKeyIdMismatchKey) {
     keyManager()->startMonitoring(getServiceContext());
 
-    KeysCollectionDocument origKey1(
-        1, "dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0)));
+    KeysCollectionDocument origKey1(1);
+    origKey1.setKeysCollectionDocumentBase(
+        {"dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0))});
     ASSERT_OK(insertToConfigCollection(
         operationContext(), NamespaceString::kKeysCollectionNamespace, origKey1.toBSON()));
 
@@ -158,12 +162,14 @@ TEST_F(KeysManagerShardedTest, GetKeyShouldErrorIfKeyIdMismatchKey) {
 TEST_F(KeysManagerShardedTest, GetKeyWithoutRefreshShouldReturnRightKey) {
     keyManager()->startMonitoring(getServiceContext());
 
-    KeysCollectionDocument origKey1(
-        1, "dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0)));
+    KeysCollectionDocument origKey1(1);
+    origKey1.setKeysCollectionDocumentBase(
+        {"dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0))});
     ASSERT_OK(insertToConfigCollection(
         operationContext(), NamespaceString::kKeysCollectionNamespace, origKey1.toBSON()));
-    KeysCollectionDocument origKey2(
-        2, "dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(110, 0)));
+    KeysCollectionDocument origKey2(2);
+    origKey2.setKeysCollectionDocumentBase(
+        {"dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(110, 0))});
     ASSERT_OK(insertToConfigCollection(
         operationContext(), NamespaceString::kKeysCollectionNamespace, origKey2.toBSON()));
 
@@ -193,8 +199,9 @@ TEST_F(KeysManagerShardedTest, GetKeyWithoutRefreshShouldReturnRightKey) {
 TEST_F(KeysManagerShardedTest, GetKeyForSigningShouldReturnRightKey) {
     keyManager()->startMonitoring(getServiceContext());
 
-    KeysCollectionDocument origKey1(
-        1, "dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0)));
+    KeysCollectionDocument origKey1(1);
+    origKey1.setKeysCollectionDocumentBase(
+        {"dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0))});
     ASSERT_OK(insertToConfigCollection(
         operationContext(), NamespaceString::kKeysCollectionNamespace, origKey1.toBSON()));
 
@@ -212,12 +219,14 @@ TEST_F(KeysManagerShardedTest, GetKeyForSigningShouldReturnRightKey) {
 TEST_F(KeysManagerShardedTest, GetKeyForSigningShouldReturnRightOldKey) {
     keyManager()->startMonitoring(getServiceContext());
 
-    KeysCollectionDocument origKey1(
-        1, "dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0)));
+    KeysCollectionDocument origKey1(1);
+    origKey1.setKeysCollectionDocumentBase(
+        {"dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0))});
     ASSERT_OK(insertToConfigCollection(
         operationContext(), NamespaceString::kKeysCollectionNamespace, origKey1.toBSON()));
-    KeysCollectionDocument origKey2(
-        2, "dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(110, 0)));
+    KeysCollectionDocument origKey2(2);
+    origKey2.setKeysCollectionDocumentBase(
+        {"dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(110, 0))});
     ASSERT_OK(insertToConfigCollection(
         operationContext(), NamespaceString::kKeysCollectionNamespace, origKey2.toBSON()));
 
@@ -283,8 +292,9 @@ TEST_F(KeysManagerShardedTest, EnableModeFlipFlopStressTest) {
 }
 
 TEST_F(KeysManagerShardedTest, ShouldStillBeAbleToUpdateCacheEvenIfItCantCreateKeys) {
-    KeysCollectionDocument origKey1(
-        1, "dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0)));
+    KeysCollectionDocument origKey1(1);
+    origKey1.setKeysCollectionDocumentBase(
+        {"dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0))});
     ASSERT_OK(insertToConfigCollection(
         operationContext(), NamespaceString::kKeysCollectionNamespace, origKey1.toBSON()));
 

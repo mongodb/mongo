@@ -43,16 +43,12 @@ types:
     deserializer: LogicalTime::parseFromBSON
 
 structs:
-    keysCollectionDocument:
+    keysCollectionDocumentBase:
         description: >-
-            Represents a key document stored in admin.system.keys.
+            Contains the fields shared by key documents stored in admin.system.keys and
+            admin.system.external_validation_keys.
         strict: true
         fields:
-            _id:
-                type: safeInt64
-                description: >-
-                    NumberLong representation of the cluster time at which the key was created.
-                cpp_name: keyId
             purpose:
                 type: string
                 description: "The purpose of the key."
@@ -62,3 +58,40 @@ structs:
             expiresAt:
                 type: logicalTime
                 description: "The logical time at which the key will expire."
+
+    keysCollectionDocument:
+        description: >-
+            Represents a key document stored in admin.system.keys.
+        strict: true
+        inline_chained_structs: true
+        chained_structs:
+            keysCollectionDocumentBase: keysCollectionDocumentBase
+        fields:
+            _id:
+                type: safeInt64
+                description: >-
+                    NumberLong representation of the cluster time at which the key was created.
+                cpp_name: keyId
+
+    externalKeysCollectionDocument:
+        description: >-
+            Represents a key document stored in admin.system.external_validation_keys.
+        strict: true
+        inline_chained_structs: true
+        chained_structs:
+            keysCollectionDocumentBase: keysCollectionDocumentBase
+        fields:
+            # TODO (SERVER-53406): Add ttlExpiresAt field.
+            _id:
+                type: objectid
+                description: "Unique identifier for this key document."
+                cpp_name: id
+            keyId:
+                type: safeInt64
+                description: >-
+                    NumberLong representation of the cluster time at which the key was created.
+                    Corresponds to the _id of the admin.system.keys document for this key.
+                cpp_name: keyId
+            replicaSetName:
+                type: string
+                description: "The name of the replica set that created this key."
