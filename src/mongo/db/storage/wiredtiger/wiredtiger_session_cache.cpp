@@ -363,6 +363,8 @@ void WiredTigerSessionCache::closeExpiredIdleSessions(int64_t idleTimeMillis) {
     }
 
     auto cutoffTime = _clockSource->now() - Milliseconds(idleTimeMillis);
+    SessionCache sessionsToClose;
+
     {
         stdx::lock_guard<stdx::mutex> lock(_cacheLock);
         // Discard all sessions that became idle before the cutoff time
@@ -371,11 +373,17 @@ void WiredTigerSessionCache::closeExpiredIdleSessions(int64_t idleTimeMillis) {
             invariant(session->getIdleExpireTime() != Date_t::min());
             if (session->getIdleExpireTime() < cutoffTime) {
                 it = _sessions.erase(it);
-                delete (session);
+                sessionsToClose.push_back(session);
             } else {
                 ++it;
             }
         }
+    }
+
+    // Closing expired idle sessions is expensive, so do it outside of the cache mutex. This helps
+    // to avoid periodic operation latency spikes as seen in SERVER-52879.
+    for (auto session : sessionsToClose) {
+        delete session;
     }
 }
 
