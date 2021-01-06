@@ -218,6 +218,10 @@ public:
         commandBuilder.append("defaultRWConcern", false);
         commandBuilder.append(MirrorMaestro::kServerStatusSectionName, true);
 
+        // Exclude 'serverStatus.transactions.lastCommittedTransactions' because it triggers
+        // frequent schema changes.
+        commandBuilder.append("transactions", BSON("includeLastCommitted" << false));
+
         if (gDiagnosticDataCollectionEnableLatencyHistograms.load()) {
             BSONObjBuilder subObjBuilder(commandBuilder.subobjStart("opLatencies"));
             subObjBuilder.append("histograms", true);
