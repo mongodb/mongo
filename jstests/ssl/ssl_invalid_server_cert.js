@@ -1,22 +1,39 @@
-// Test SSL Certificate Expiration Monitoring
-// This tests that a mongod with --sslMode requireSSL will not start with an
-// X.509 certificate that is not yet valid or has expired.
+// Test invalid SSL keyfile settings.
 
-// This test ensures that a mongod will not start with a certificate that is
-// not yet valid. Tested certificate will become valid 06-17-2020.
-var md = MongoRunner.runMongod({
-    sslMode: "requireSSL",
-    sslPEMKeyFile: "jstests/libs/not_yet_valid.pem",
-    sslCAFile: "jstests/libs/ca.pem"
-});
+(function() {
+'use strict';
 
-assert.eq(null, md, "Possible to start mongod with not yet valid certificate.");
+function runTest(name, config, expect) {
+    jsTest.log('Running test: ' + name);
+    clearRawMongoProgramOutput();
 
-// This test ensures that a mongod with SSL will not start with an expired certificate.
-md = MongoRunner.runMongod({
-    sslMode: "requireSSL",
-    sslPEMKeyFile: "jstests/libs/expired.pem",
-    sslCAFile: "jstests/libs/ca.pem"
-});
+    const mongod = MongoRunner.runMongod(config);
+    assert.eq(null, mongod, 'Mongod started unexpectedly');
 
-assert.eq(null, md, "Possible to start mongod with expired certificate");
+    const output = rawMongoProgramOutput();
+    assert.eq(
+        true, output.includes(expect), "Server failure message did not include '" + expect + "'");
+}
+
+const validityMessage = 'The provided SSL certificate is expired or not yet valid';
+
+// Test that startup fails with certificate that has yet to become valid.
+const notYetValid = {
+    tlsMode: 'requireTLS',
+    tlsCertificateKeyFile: 'jstests/libs/not_yet_valid.pem',
+    tlsCAFile: 'jstests/libs/ca.pem',
+};
+runTest('not-yet-valid', notYetValid, validityMessage);
+
+// Test that startup fails with expired certificate.
+const expired = {
+    tlsMode: 'requireTLS',
+    tlsCertificateKeyFile: 'jstests/libs/expired.pem',
+    tlsCAFile: 'jstests/libs/ca.pem',
+};
+runTest('expired', expired, validityMessage);
+
+// Test that startup fails with no certificate at all.
+const needKeyFile = 'need tlsCertificateKeyFile or certificateSelector when TLS is enabled';
+runTest('no-key-file', {tlsMode: 'requireTLS'}, needKeyFile);
+})();

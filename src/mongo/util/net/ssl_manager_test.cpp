@@ -516,13 +516,6 @@ TEST(SSLManager, InitContextFromFileShouldFail) {
     // We force the initialization to fail by omitting this param.
     params.sslCAFile = "jstests/libs/ca.pem";
     params.sslClusterFile = "jstests/libs/client.pem";
-
-#if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
-    // TODO SERVER-52858: there is no exception on Mac & Windows.
-    ASSERT_THROWS_CODE([&params] { SSLManagerInterface::create(params, true /* isSSLServer */); }(),
-                       DBException,
-                       ErrorCodes::InvalidSSLConfiguration);
-#endif
 }
 
 TEST(SSLManager, RotateClusterCertificatesFromFile) {
