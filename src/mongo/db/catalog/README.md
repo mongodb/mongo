@@ -79,14 +79,31 @@ cache of the [durable catalog](#durable-catalog) state. It provides the followin
  * Allow closing/reopening the catalog while still providing limited `UUID` to `NamespaceString`
    lookup to support rollback to a point in time.
 
-All catalog access is internally synchronized, and use of iterators after catalog changes generally
-results in automatic repositioning.
+### Synchronization
+Catalog access is synchronized using [read-copy-update][] where reads operate on an immutable
+instance and writes on a new instance with its contents copied from the previous immutable instance
+used for reads. Readers holding on to a catalog instance will thus not observe any writes that
+happen after requesting an instance. If it is desired to observe writes while holding a catalog
+instance then the reader must refresh it.
+
+Catalog writes are handled with the `CollectionCatalog::write(callback)` interface. It provides the
+necessary [read-copy-update][] abstractions. A writable catalog instance is created by making a
+shallow copy of the existing catalog. The actual write is implemented in the supplied callback which
+is allowed to throw. Execution of the write callbacks are serialized and may run on a different
+thread than the thread calling `CollectionCatalog::write`.
+
+To avoid a bottleneck in the case the catalog contains a large number of collections (being slow to
+copy), concurrent writes are batched together. Any thread that enters `CollectionCatalog::write`
+while a catalog instance is being copied is enqueued. When the copy finishes, all enqueued write
+jobs are run on that catalog instance by the copying thread. 
 
 ### Collection objects
-Objects of the `Collection` class provide access to a collection's main properties across some range
-of time between [DDL](#glossary) operations that may change these properties. Such operations may
-change the collection name for example, resulting in a new `Collection` object. It is possible for
-operations that read at different points in time to use different `Collection` objects.
+Objects of the `Collection` class provide access to a collection's properties between
+[DDL](#glossary) operations that modify these properties. Modifications are synchronized using
+[read-copy-update][]. Reads access immutable `Collection` instances. Writes, such as rename
+collection, apply changes to a clone of the latest `Collection` instance and then atomically install
+the new `Collection` instance in the catalog. It is possible for operations that read at different
+points in time to use different `Collection` objects.
 
 Notable properties of `Collection` objects are:
  * catalog ID - to look up or change information from the DurableCatalog.
@@ -106,14 +123,28 @@ In addition `Collection` objects have shared ownership of:
  * A `RecordStore` - an interface to access and manipulate the documents in the collection as stored
    by the storage engine.
 
+A writable `Collection` may only be requested in an active [WriteUnitOfWork](#WriteUnitOfWork). The
+new `Collection` instance is installed in the catalog when the storage transaction commits, but only
+after all other `onCommit` [Changes](#Changes) have run. This ensures `onCommit` operations can
+write to the writable `Collection` before it becomes visible to readers in the catalog. If the
+storage transaction rolls back then the writable `Collection` object is simply discarded and no
+change is ever made to the catalog.
+
+A writable `Collection` is a clone of the existing `Collection`, members are either deep or
+shallowed copied. Notably, a shallow copy is made for the [`IndexCatalog`](#index-catalog).
+
+The oplog `Collection` follows special rules, it does not use [read-copy-update][] or any other form
+of synchronization. Modifications operate directly on the instance installed in the catalog. It is
+not allowed to read concurrently with writes on the oplog `Collection`. 
+
 Finally, there are two kinds of decorations on `Collection` objects. The `Collection` object derives
-from `Decorable` and can have `Decoration`s that keep non-durable state that is discarded when DDL
-operations occur. This is used for query information. Additionally, there are
+from `DecorableCopyable` and requires `Decoration`s to implement a copy-constructor. Collection
+`Decoration`s are copied with the `Collection` when DDL operations occur. This is used for to keep
+versioned query information per Collection instance. Additionally, there are
 `SharedCollectionDecorations` for storing index usage statistics and query settings that are shared
 between `Collection` instances across DDL operations.
 
 ### Index Catalog
-
 Each `Collection` object owns an `IndexCatalog` object, which in turn has shared ownership of
 `IndexCatalogEntry` objects that each again own an `IndexDescriptor` containing an in-memory
 presentation of the data stored in the [durable catalog](#durable-catalog).
@@ -1778,3 +1809,5 @@ oplog.
 - `ops.key` and `ops.value` are the binary representations of the inserted document (`value` is omitted
   for removal).
 - `ops.key-hex` and `ops.value-bson` are specific to the pretty printing tool used.
+
+[read-copy-update]: https://en.wikipedia.org/wiki/Read-copy-update
