@@ -6,7 +6,6 @@
  *   assumes_read_concern_unchanged,
  *   assumes_write_concern_unchanged,
  *   uses_parallel_shell,
- *   incompatible_with_lockfreereads,
  * ]
  */
 (function() {
@@ -22,6 +21,9 @@ const doc = {
     _id: 1
 };
 assert.commandWorked(coll.insert(doc));
+
+const isLockFreeReadsEnabled =
+    db.adminCommand({getParameter: 1, featureFlagLockFreeReads: 1}).featureFlagLockFreeReads.value;
 
 const failpoint = 'hangAfterDatabaseLock';
 assert.commandWorked(db.adminCommand({configureFailPoint: failpoint, mode: "alwaysOn"}));
@@ -46,8 +48,12 @@ assert.commandFailedWithCode(
     db.runCommand({insert: coll.getName(), documents: [{_id: 2}], maxTimeMS: failureTimeoutMS}),
     ErrorCodes.MaxTimeMSExpired);
 
-assert.commandFailedWithCode(db.runCommand({find: coll.getName(), maxTimeMS: failureTimeoutMS}),
-                             ErrorCodes.MaxTimeMSExpired);
+// Reads are not blocked by MODE_X Collection locks with Lock Free Reads.
+const findResult = db.runCommand({find: coll.getName(), maxTimeMS: failureTimeoutMS});
+if (isLockFreeReadsEnabled)
+    assert.commandWorked(findResult);
+else
+    assert.commandFailedWithCode(findResult, ErrorCodes.MaxTimeMSExpired);
 
 assert.commandFailedWithCode(db.runCommand({
     update: coll.getName(),
