@@ -57,9 +57,9 @@ const insert = function(doc, expectedMin, expectedMax) {
     assert.docEq(expectedMax, bucketDoc.control.max, 'invalid max in bucket: ' + tojson(bucketDoc));
 };
 
-// Empty objects are not considered.
-insert({a: {}}, {}, {});
-insert({a: {x: {}}}, {}, {});
+// Empty objects are considered.
+insert({a: {}}, {a: {}}, {a: {}});
+insert({a: {x: {}}}, {a: {x: {}}}, {a: {x: {}}});
 insert({a: {x: {y: 1}}}, {a: {x: {y: 1}}}, {a: {x: {y: 1}}});
 insert({a: {x: {}}}, {a: {x: {y: 1}}}, {a: {x: {y: 1}}});
 clearColl();
@@ -76,13 +76,19 @@ insert({a: {x: 2, y: 1}, b: [2, 1]}, {a: {x: 1, y: 1}, b: [1, 1]}, {a: {x: 2, y:
 insert({a: {x: {z: [3, 4]}}, b: [{x: 3, y: 4}]},
        {a: {x: 1, y: 1}, b: [1, 1]},
        {a: {x: {z: [3, 4]}, y: 2}, b: [{x: 3, y: 4}, 2]});
-insert({a: {x: {z: [4, 3]}}, b: [{x: 4, y: 3}]},
-       {a: {x: 1, y: 1}, b: [1, 1]},
-       {a: {x: {z: [4, 4]}, y: 2}, b: [{x: 4, y: 4}, 2]});
+insert({a: {x: {z: [4, 3]}}, b: [{x: 4, y: 3}, 3, 1]},
+       {a: {x: 1, y: 1}, b: [1, 1, 1]},
+       {a: {x: {z: [4, 4]}, y: 2}, b: [{x: 4, y: 4}, 3, 1]});
 clearColl();
 
 // If the two types being compared are not both objects or both arrays, a woCompare is used.
 insert({a: 1}, {a: 1}, {a: 1});
 insert({a: {b: 1}}, {a: 1}, {a: {b: 1}});
 insert({a: []}, {a: 1}, {a: []});
+clearColl();
+
+// Sparse measurements only affect the min/max for the fields present.
+insert({a: 1, c: 1}, {a: 1, c: 1}, {a: 1, c: 1});
+insert({b: 2}, {a: 1, b: 2, c: 1}, {a: 1, b: 2, c: 1});
+insert({c: 3, d: 3}, {a: 1, b: 2, c: 1, d: 3}, {a: 1, b: 2, c: 3, d: 3});
 })();

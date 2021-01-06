@@ -145,13 +145,17 @@ write_ops::UpdateOpEntry makeTimeseriesUpdateOpEntry(const OID& bucketId,
                                                      const BSONObj& metadata) {
     BSONObjBuilder updateBuilder;
     {
-        // doc_diff::kSubDiffSectionFieldPrefix + <field name>
-        BSONObjBuilder controlBuilder(updateBuilder.subobjStart("scontrol"));
-        {
-            // doc_diff::kUpdateSectionFieldName
-            BSONObjBuilder controlUpdateBuilder(controlBuilder.subobjStart("u"));
-            controlUpdateBuilder.append("min", data.bucketMin);
-            controlUpdateBuilder.append("max", data.bucketMax);
+        if (!data.bucketMin.isEmpty() || !data.bucketMax.isEmpty()) {
+            BSONObjBuilder controlBuilder(updateBuilder.subobjStart(
+                str::stream() << doc_diff::kSubDiffSectionFieldPrefix << "control"));
+            if (!data.bucketMin.isEmpty()) {
+                controlBuilder.append(
+                    str::stream() << doc_diff::kSubDiffSectionFieldPrefix << "min", data.bucketMin);
+            }
+            if (!data.bucketMax.isEmpty()) {
+                controlBuilder.append(
+                    str::stream() << doc_diff::kSubDiffSectionFieldPrefix << "max", data.bucketMax);
+            }
         }
     }
     {

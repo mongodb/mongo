@@ -56,8 +56,8 @@ public:
 
     struct CommitData {
         std::vector<BSONObj> docs;
-        BSONObj bucketMin;
-        BSONObj bucketMax;
+        BSONObj bucketMin;  // The full min/max if this is the bucket's first commit, or the updates
+        BSONObj bucketMax;  // since the previous commit if not.
         uint16_t numCommittedMeasurements;
         StringSet newFieldNamesToBeInserted;
 
@@ -121,6 +121,59 @@ private:
         BSONObj metadata;
     };
 
+    class MinMax {
+    public:
+        /*
+         * Updates the min/max according to 'comp', ignoring the 'metaField' field.
+         */
+        void update(const BSONObj& doc,
+                    boost::optional<StringData> metaField,
+                    const std::function<bool(int, int)>& comp);
+
+        /**
+         * Returns the full min/max object.
+         */
+        BSONObj toBSON() const;
+
+        /**
+         * Returns the updates since the previous time this function was called in the format for
+         * an update op.
+         */
+        BSONObj getUpdates();
+
+    private:
+        enum class Type {
+            kObject,
+            kArray,
+            kValue,
+            kUnset,
+        };
+
+        void _update(BSONElement elem, const std::function<bool(int, int)>& comp);
+
+        void _append(BSONObjBuilder* builder) const;
+        void _append(BSONArrayBuilder* builder) const;
+
+        /*
+         * Appends updates, if any, to the builder. Returns whether any updates were appended by
+         * this MinMax or any MinMaxes below it.
+         */
+        bool _appendUpdates(BSONObjBuilder* builder);
+
+        /*
+         * Clears the '_updated' flag on this MinMax and all MinMaxes below it.
+         */
+        void _clearUpdated();
+
+        StringMap<MinMax> _object;
+        std::vector<MinMax> _array;
+        BSONObj _value;
+
+        Type _type = Type::kUnset;
+
+        bool _updated = false;
+    };
+
     struct Bucket {
         // The namespace that this bucket is used for.
         NamespaceString ns;
@@ -138,10 +191,10 @@ private:
         StringSet fieldNames;
 
         // The minimum values for each field in the bucket.
-        BSONObj min;
+        MinMax min;
 
         // The maximum values for each field in the bucket.
-        BSONObj max;
+        MinMax max;
 
         // The total size in bytes of the bucket's BSON serialization, including measurements to be
         // inserted.
