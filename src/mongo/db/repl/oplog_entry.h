@@ -483,12 +483,12 @@ public:
     bool isForCappedCollection() const;
     void setIsForCappedCollection(bool isForCappedCollection);
 
-    const boost::optional<DurableOplogEntry>& getPreImageOp() const;
-    void setPreImageOp(boost::optional<DurableOplogEntry> preImageOp);
+    const DurableOplogEntry* getPreImageOp() const;
+    void setPreImageOp(std::shared_ptr<DurableOplogEntry> preImageOp);
     void setPreImageOp(const BSONObj& preImageOp);
 
-    const boost::optional<DurableOplogEntry>& getPostImageOp() const;
-    void setPostImageOp(boost::optional<DurableOplogEntry> postImageOp);
+    const DurableOplogEntry* getPostImageOp() const;
+    void setPostImageOp(std::shared_ptr<DurableOplogEntry> postImageOp);
     void setPostImageOp(const BSONObj& postImageOp);
 
     std::string toStringForLogging() const;
@@ -545,8 +545,10 @@ private:
 
     boost::optional<bool> _isForCappedCollection;
 
-    boost::optional<DurableOplogEntry> _preImageOp;
-    boost::optional<DurableOplogEntry> _postImageOp;
+    // We use std::shared_ptr<DurableOplogEntry> rather than boost::optional<DurableOplogEntry> here
+    // so that OplogEntries are cheaper to copy.
+    std::shared_ptr<DurableOplogEntry> _preImageOp;
+    std::shared_ptr<DurableOplogEntry> _postImageOp;
 };
 
 std::ostream& operator<<(std::ostream& s, const DurableOplogEntry& o);

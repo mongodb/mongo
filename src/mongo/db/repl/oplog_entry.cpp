@@ -520,28 +520,30 @@ void OplogEntry::setIsForCappedCollection(bool isForCappedCollection) {
     _isForCappedCollection = isForCappedCollection;
 }
 
-const boost::optional<DurableOplogEntry>& OplogEntry::getPreImageOp() const {
-    return _preImageOp;
+const DurableOplogEntry* OplogEntry::getPreImageOp() const {
+    return _preImageOp.get();
 }
 
-void OplogEntry::setPreImageOp(boost::optional<DurableOplogEntry> preImageOp) {
+void OplogEntry::setPreImageOp(std::shared_ptr<DurableOplogEntry> preImageOp) {
     _preImageOp = std::move(preImageOp);
 }
 
 void OplogEntry::setPreImageOp(const BSONObj& preImageOp) {
-    setPreImageOp(uassertStatusOK(DurableOplogEntry::parse(preImageOp)));
+    setPreImageOp(
+        std::make_shared<DurableOplogEntry>(uassertStatusOK(DurableOplogEntry::parse(preImageOp))));
 }
 
-const boost::optional<DurableOplogEntry>& OplogEntry::getPostImageOp() const {
-    return _postImageOp;
+const DurableOplogEntry* OplogEntry::getPostImageOp() const {
+    return _postImageOp.get();
 }
 
-void OplogEntry::setPostImageOp(boost::optional<DurableOplogEntry> postImageOp) {
+void OplogEntry::setPostImageOp(std::shared_ptr<DurableOplogEntry> postImageOp) {
     _postImageOp = std::move(postImageOp);
 }
 
 void OplogEntry::setPostImageOp(const BSONObj& postImageOp) {
-    setPostImageOp(uassertStatusOK(DurableOplogEntry::parse(postImageOp)));
+    setPostImageOp(std::make_shared<DurableOplogEntry>(
+        uassertStatusOK(DurableOplogEntry::parse(postImageOp))));
 }
 
 const boost::optional<mongo::Value>& OplogEntry::get_id() const& {
