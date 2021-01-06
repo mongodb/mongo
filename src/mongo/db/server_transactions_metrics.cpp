@@ -125,7 +125,7 @@ void ServerTransactionsMetrics::updateLastTransaction(size_t operationCount,
     _lastCommittedTransaction->setWriteConcern(std::move(writeConcern));
 }
 
-void ServerTransactionsMetrics::updateStats(TransactionsStats* stats) {
+void ServerTransactionsMetrics::updateStats(TransactionsStats* stats, bool includeLastCommitted) {
     stats->setCurrentActive(_currentActive.load());
     stats->setCurrentInactive(_currentInactive.load());
     stats->setCurrentOpen(_currentOpen.load());
@@ -134,7 +134,7 @@ void ServerTransactionsMetrics::updateStats(TransactionsStats* stats) {
     stats->setTotalStarted(_totalStarted.load());
 
     stdx::lock_guard<stdx::mutex> lg(_mutex);
-    if (_lastCommittedTransaction) {
+    if (_lastCommittedTransaction && includeLastCommitted) {
         stats->setLastCommittedTransaction(*_lastCommittedTransaction);
     }
 }
@@ -153,12 +153,17 @@ public:
                                     const BSONElement& configElement) const {
         TransactionsStats stats;
 
+        bool includeLastCommitted = true;
+        if (configElement.type() == BSONType::Object) {
+            includeLastCommitted = configElement.Obj()["includeLastCommitted"].trueValue();
+        }
+
         // Retryable writes and multi-document transactions metrics are both included in the same
         // serverStatus section because both utilize similar internal machinery for tracking their
         // lifecycle within a session. Both are assigned transaction numbers, and so both are often
         // referred to as “transactions”.
         RetryableWritesStats::get(opCtx)->updateStats(&stats);
-        ServerTransactionsMetrics::get(opCtx)->updateStats(&stats);
+        ServerTransactionsMetrics::get(opCtx)->updateStats(&stats, includeLastCommitted);
         return stats.toBSON();
     }
 

@@ -56,6 +56,13 @@
     assert.commandWorked(session.commitTransaction_forTesting());
     checkLastCommittedTransaction(1, {});
 
+    // Check that we are able to exclude 'lastCommittedTransaction'. FTDC uses this to filter out
+    // the section as it frequently triggers scheme changes.
+    let filteredRes = assert.commandWorked(
+        primary.adminCommand({serverStatus: 1, transactions: {includeLastCommitted: false}}));
+    assert(!filteredRes.transactions.hasOwnProperty("lastCommittedTransaction"),
+           () => tojson(filteredRes));
+
     // Run a transaction with multiple write operations.
     session.startTransaction();
     assert.commandWorked(sessionColl.insert({}));
