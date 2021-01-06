@@ -4,8 +4,6 @@
 //
 // @tags: [
 //     uses_transactions,
-//     # This test expects to block a migration by hanging (failpoint) a read that holds a lock.
-//     incompatible_with_lockfreereads,
 // ]
 
 (function() {
@@ -13,6 +11,7 @@
 
 load("jstests/libs/chunk_manipulation_util.js");
 load("jstests/libs/parallelTester.js");
+load("jstests/libs/wait_for_command.js");
 
 function ShardStat() {
     this.countDonorMoveChunkStarted = 0;
@@ -91,9 +90,20 @@ function runConcurrentMoveChunk(host, ns, toShard) {
     return runMoveChunkUntilSuccessOrUnexpectedError();
 }
 
-function runConcurrentRead(host, dbName, collName) {
-    const mongos = new Mongo(host);
-    return mongos.getDB(dbName)[collName].find({_id: 5}).comment("concurrent read").itcount();
+/**
+ * Set a MODE_IS collection lock on 'collectionNs' to be held for 1 hour. This will ensure that the
+ * lock will not be released before desired. The operation can be killed later to release the lock.
+ *
+ * 'sleepComment' adds a comment so that the operation is can be identified for waitForCommand().
+ */
+function sleepFunction(host, collectionNs, sleepComment) {
+    const mongo = new Mongo(host);
+    // Set a MODE_IS collection lock to be held for 1 hours.
+    // Holding this lock for 1 hour will trigger a test timeout.
+    assert.commandFailedWithCode(
+        mongo.adminCommand(
+            {sleep: 1, secs: 3600, lockTarget: collectionNs, lock: "ir", $comment: sleepComment}),
+        ErrorCodes.Interrupted);
 }
 
 const dbName = "db";
@@ -188,27 +198,31 @@ moveChunkThread =
 moveChunkThread.start();
 waitForMoveChunkStep(donorConn, moveChunkStepNames.chunkDataCommitted);
 
-// Pause a read while it's holding locks so the migration can't commit.
-assert.commandWorked(
-    donorConn.adminCommand({configureFailPoint: "waitInFindBeforeMakingBatch", mode: "alwaysOn"}));
-const concurrentRead = new Thread(runConcurrentRead, st.s.host, dbName, collName);
-concurrentRead.start();
-assert.soon(function() {
-    const curOpResults = assert.commandWorked(donorConn.adminCommand({currentOp: 1}));
-    return curOpResults.inprog.some(op => op["command"]["comment"] === "concurrent read");
-});
+// Use the sleep cmd to acquire the collection MODE_IS lock asynchronously so that the migration
+// cannot commit.
+const sleepComment = "Lock sleep";
+const sleepCommand =
+    new Thread(sleepFunction, st.rs0.getPrimary().host, dbName + "." + collName, sleepComment);
+sleepCommand.start();
 
-// Unpause the migration and it should time out entering the commit phase.
-unpauseMoveChunkAtStep(donorConn, moveChunkStepNames.chunkDataCommitted);
-moveChunkThread.join();
-assert.commandFailedWithCode(moveChunkThread.returnData(), ErrorCodes.LockTimeout);
+// Wait for the sleep command to start.
+const sleepID =
+    waitForCommand("sleepCmd",
+                   op => (op["ns"] == "admin.$cmd" && op["command"]["$comment"] == sleepComment),
+                   donorConn.getDB("admin"));
 
-// Let the read finish and verify the counter was incremented in serverStatus.
-assert.commandWorked(
-    donorConn.adminCommand({configureFailPoint: "waitInFindBeforeMakingBatch", mode: "off"}));
-concurrentRead.join();
-assert.eq(1, concurrentRead.returnData());
+try {
+    // Unpause the migration and it should time out entering the commit phase.
+    unpauseMoveChunkAtStep(donorConn, moveChunkStepNames.chunkDataCommitted);
+    moveChunkThread.join();
+    assert.commandFailedWithCode(moveChunkThread.returnData(), ErrorCodes.LockTimeout);
+} finally {
+    // Kill the sleep command in order to release the collection MODE_IS lock.
+    assert.commandWorked(donorConn.getDB("admin").killOp(sleepID));
+    sleepCommand.join();
+}
 
+// Verify the counter was incremented in serverStatus.
 checkServerStatusMigrationLockTimeoutCount(donorConn, 2);
 
 assert.commandWorked(donorConn.adminCommand(
