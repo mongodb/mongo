@@ -202,6 +202,13 @@ public:
             // none of the collections get dropped.
             lockMode = LockMode::MODE_IS;
 
+            // We will hold open a snapshot at a timestamp for a long period of time while waiting
+            // for collection locks. This has the potential to deadlock with an index build that has
+            // just failed and is trying to write using the same timestamp we are using to read.
+            // Impose a generous maximum timeout to force dbHash to time out and allow the index
+            // build to make progress. See SERVER-53376.
+            opCtx->lockState()->setMaxLockTimeout(duration_cast<Milliseconds>(Seconds(30)));
+
             // Additionally, if we are performing a read at a timestamp, then we allow oplog
             // application to proceed concurrently with the dbHash command. This is done
             // to ensure a prepare conflict is able to eventually be resolved by processing a

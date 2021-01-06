@@ -291,6 +291,12 @@ function checkReplDbhashBackgroundThread(hosts) {
                 hasTransientError = true;
             }
 
+            // dbHash has a lock deadline to bound the amount of time it can conflict with other
+            // operations.
+            if (e.code == ErrorCodes.LockTimeout) {
+                hasTransientError = true;
+            }
+
             // Perform a no-op write to the primary if the clusterTime between each call remain
             // the same and if we encounter the SnapshotUnavailable error as the secondaries
             // minimum timestamp can be greater than the primaries minimum timestamp.
