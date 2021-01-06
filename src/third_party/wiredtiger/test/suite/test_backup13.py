@@ -79,7 +79,15 @@ class test_backup13(wttest.WiredTigerTestCase, suite_subprocess):
             num = i + (self.mult * self.nops)
             key = self.bigkey + str(num)
             val = self.bigval + str(num)
-            c[key] = val
+            c.set_key(key)
+            c.set_value(val)
+            # read committed and read uncommitted transactions are readonly, any write operations with
+            # these isolation levels should throw an error.
+            if self.sess_cfg == 'isolation=read-committed' or self.sess_cfg == 'isolation=read-uncommitted':
+                self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+                lambda: c.insert(), "/not supported in read-committed or read-uncommitted transactions/")
+            else:
+                c.insert()
         self.session.checkpoint()
         c.close()
         # Increase the multiplier so that later calls insert unique items.
