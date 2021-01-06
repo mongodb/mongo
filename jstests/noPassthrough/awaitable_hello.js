@@ -25,6 +25,10 @@ function runTest(db, cmd) {
     assert.commandWorked(
         db.runCommand({[cmd]: 1, topologyVersion: topologyVersionField, maxAwaitTimeMS: 0}));
 
+    // Check that commands with the optional awaitable flag also succeeds.
+    assert.commandWorked(db.runCommand(
+        {[cmd]: 1, awaitable: true, topologyVersion: topologyVersionField, maxAwaitTimeMS: 0}));
+
     // Ensure the command waits for at least maxAwaitTimeMS before returning, and doesn't appear in
     // slow query log even if it takes many seconds.
     assert.commandWorked(db.adminCommand({clearLog: 'global'}));
@@ -183,6 +187,18 @@ function runTest(db, cmd) {
         maxAwaitTimeMS: -1,
     }),
                                  [31373, 51759]);
+
+    // Check that the command fails if the awaitable flag is present but either the topologyVersion,
+    // the maxAwaitTimeMS, or both are missing.
+    assert.commandFailedWithCode(db.runCommand({[cmd]: 1, awaitable: true}), [5135800, 5135801]);
+    assert.commandFailedWithCode(db.runCommand({
+        [cmd]: 1,
+        awaitable: true,
+        topologyVersion: topologyVersionField,
+    }),
+                                 [5135800, 5135801]);
+    assert.commandFailedWithCode(db.runCommand({[cmd]: 1, awaitable: true, maxAwaitTimeMS: 0}),
+                                 [5135800, 5135801]);
 }
 
 // Set command log verbosity to 0 to avoid logging *all* commands in the "slow query" log.

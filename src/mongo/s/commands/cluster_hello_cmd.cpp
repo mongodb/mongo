@@ -109,6 +109,21 @@ public:
         auto topologyVersionElement = cmdObj["topologyVersion"];
         auto maxAwaitTimeMSField = cmdObj["maxAwaitTimeMS"];
         auto curOp = CurOp::get(opCtx);
+
+        // The awaitable field is optional, but if it exists, it requires both other fields.
+        // Note that the awaitable field only exists to make filtering out these operations
+        // via currentOp queries easier and is not otherwise explicitly used.
+        {
+            bool awaitable = true;
+            Status status = bsonExtractBooleanField(cmdObj, "awaitable", &awaitable);
+            if (status.isOK() && (!topologyVersionElement || !maxAwaitTimeMSField)) {
+                uassert(5135801,
+                        "A request marked awaitable must contain both 'topologyVersion' and "
+                        "'maxAwaitTimeMS'",
+                        !awaitable);
+            }
+        }
+
         boost::optional<TopologyVersion> clientTopologyVersion;
         boost::optional<Date_t> deadline;
         boost::optional<ScopeGuard<std::function<void()>>> timerGuard;
