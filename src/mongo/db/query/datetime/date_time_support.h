@@ -496,14 +496,19 @@ private:
  * TimeUnit. Throws an exception with error code ErrorCodes::FailedToParse when passed an invalid
  * name.
  */
-TimeUnit parseTimeUnit(const std::string_view unitName);
+TimeUnit parseTimeUnit(StringData unitName);
 
 /**
  * Returns true if 'unitName' is a valid time unit, meaning that it can be parsed by the
  * 'parseTimeUnit()' function into one of the units represented by the 'TimeUnit' enum. Otherwise
  * returns 'false'.
  */
-bool isValidTimeUnit(const std::string_view unitName);
+bool isValidTimeUnit(StringData unitName);
+
+/**
+ * Inverse of parseTimeUnit.
+ */
+StringData serializeTimeUnit(TimeUnit unit);
 
 /**
  * A custom-deleter which destructs a timelib_rel_time* when it goes out of scope.

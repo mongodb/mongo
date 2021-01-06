@@ -57,18 +57,15 @@ using std::vector;
 constexpr StringData DocumentSourceSort::kStageName;
 
 DocumentSourceSort::DocumentSourceSort(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
-                                       const BSONObj& sortOrder,
+                                       const SortPattern& sortOrder,
                                        uint64_t limit,
                                        uint64_t maxMemoryUsageBytes)
     : DocumentSource(kStageName, pExpCtx),
-      _sortExecutor({{sortOrder, pExpCtx},
-                     limit,
-                     maxMemoryUsageBytes,
-                     pExpCtx->tempDir,
-                     pExpCtx->allowDiskUse}),
+      _sortExecutor(
+          {sortOrder, limit, maxMemoryUsageBytes, pExpCtx->tempDir, pExpCtx->allowDiskUse}),
       // The SortKeyGenerator expects the expressions to be serialized in order to detect a sort
       // by a metadata field.
-      _sortKeyGen({{sortOrder, pExpCtx}, pExpCtx->getCollator()}) {
+      _sortKeyGen({sortOrder, pExpCtx->getCollator()}) {
     uassert(15976,
             "$sort stage must have at least one sort key",
             !_sortExecutor->sortPattern().empty());
@@ -197,14 +194,14 @@ intrusive_ptr<DocumentSource> DocumentSourceSort::createFromBson(
 
 intrusive_ptr<DocumentSourceSort> DocumentSourceSort::create(
     const intrusive_ptr<ExpressionContext>& pExpCtx,
-    BSONObj sortOrder,
+    const SortPattern& sortOrder,
     uint64_t limit,
     boost::optional<uint64_t> maxMemoryUsageBytes) {
     auto resolvedMaxBytes = maxMemoryUsageBytes
         ? *maxMemoryUsageBytes
         : internalQueryMaxBlockingSortMemoryUsageBytes.load();
     intrusive_ptr<DocumentSourceSort> pSort(
-        new DocumentSourceSort(pExpCtx, sortOrder.getOwned(), limit, resolvedMaxBytes));
+        new DocumentSourceSort(pExpCtx, sortOrder, limit, resolvedMaxBytes));
     return pSort;
 }
 

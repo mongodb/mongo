@@ -34,6 +34,7 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/window_function_expression.h"
 #include "mongo/db/query/query_knobs_gen.h"
 
 namespace mongo {
@@ -42,6 +43,7 @@ using boost::intrusive_ptr;
 using std::vector;
 
 REGISTER_ACCUMULATOR(addToSet, genericParseSingleExpressionAccumulator<AccumulatorAddToSet>);
+REGISTER_WINDOW_FUNCTION(addToSet, window_function::ExpressionFromAccumulator::parse);
 
 const char* AccumulatorAddToSet::getOpName() const {
     return "$addToSet";

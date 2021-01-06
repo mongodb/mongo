@@ -722,18 +722,40 @@ long long dateDiff(Date_t startDate, Date_t endDate, TimeUnit unit, const TimeZo
     }
 }
 
-TimeUnit parseTimeUnit(const std::string_view unitName) {
-    const StringData unitNameAsStringData{unitName.data(), unitName.length()};
-    auto iterator = timeUnitNameToTimeUnitMap.find(unitNameAsStringData);
+TimeUnit parseTimeUnit(StringData unitName) {
+    auto iterator = timeUnitNameToTimeUnitMap.find(unitName);
     uassert(ErrorCodes::FailedToParse,
-            str::stream() << "unknown time unit value: " << unitNameAsStringData,
+            str::stream() << "unknown time unit value: " << unitName,
             iterator != timeUnitNameToTimeUnitMap.end());
     return iterator->second;
 }
 
-bool isValidTimeUnit(const std::string_view unitName) {
-    return timeUnitNameToTimeUnitMap.find(StringData{unitName.data(), unitName.length()}) !=
-        timeUnitNameToTimeUnitMap.end();
+bool isValidTimeUnit(StringData unitName) {
+    return timeUnitNameToTimeUnitMap.find(unitName) != timeUnitNameToTimeUnitMap.end();
+}
+
+StringData serializeTimeUnit(TimeUnit unit) {
+    switch (unit) {
+        case TimeUnit::year:
+            return "year"_sd;
+        case TimeUnit::quarter:
+            return "quarter"_sd;
+        case TimeUnit::month:
+            return "month"_sd;
+        case TimeUnit::week:
+            return "week"_sd;
+        case TimeUnit::day:
+            return "day"_sd;
+        case TimeUnit::hour:
+            return "hour"_sd;
+        case TimeUnit::minute:
+            return "minute"_sd;
+        case TimeUnit::second:
+            return "second"_sd;
+        case TimeUnit::millisecond:
+            return "millisecond"_sd;
+    }
+    MONGO_UNREACHABLE_TASSERT(5339900);
 }
 
 void TimelibRelTimeDeleter::operator()(timelib_rel_time* relTime) {

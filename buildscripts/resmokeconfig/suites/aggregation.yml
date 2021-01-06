@@ -24,4 +24,3 @@ executor:
     mongod_options:
       set_parameters:
         enableTestCommands: 1
-        featureFlagWindowFunctions: 1

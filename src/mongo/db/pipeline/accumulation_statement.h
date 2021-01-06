@@ -43,13 +43,13 @@ namespace mongo {
  * you would add this line:
  * REGISTER_ACCUMULATOR(foo, AccumulatorFoo::create);
  */
-#define REGISTER_ACCUMULATOR(key, factory)                                            \
-    MONGO_INITIALIZER(addToAccumulatorFactoryMap_##key)(InitializerContext*) {        \
-        AccumulationStatement::registerAccumulator("$" #key, (factory), boost::none); \
-    }
+#define REGISTER_ACCUMULATOR(key, factory) \
+    REGISTER_ACCUMULATOR_WITH_MIN_VERSION(key, factory, boost::none)
 
 #define REGISTER_ACCUMULATOR_WITH_MIN_VERSION(key, factory, minVersion)                \
-    MONGO_INITIALIZER(addToAccumulatorFactoryMap_##key)(InitializerContext*) {         \
+    MONGO_INITIALIZER_GENERAL(                                                         \
+        addToAccumulatorFactoryMap_##key, ("default"), ("accumulatorParserMap"))       \
+    (InitializerContext*) {                                                            \
         AccumulationStatement::registerAccumulator("$" #key, (factory), (minVersion)); \
     }
 

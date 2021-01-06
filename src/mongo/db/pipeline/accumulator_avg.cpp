@@ -36,6 +36,7 @@
 #include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/window_function_expression.h"
 #include "mongo/platform/decimal128.h"
 
 namespace mongo {
@@ -44,6 +45,7 @@ using boost::intrusive_ptr;
 
 REGISTER_ACCUMULATOR(avg, genericParseSingleExpressionAccumulator<AccumulatorAvg>);
 REGISTER_EXPRESSION(avg, ExpressionFromAccumulator<AccumulatorAvg>::parse);
+REGISTER_WINDOW_FUNCTION(avg, window_function::ExpressionFromAccumulator::parse);
 
 const char* AccumulatorAvg::getOpName() const {
     return "$avg";

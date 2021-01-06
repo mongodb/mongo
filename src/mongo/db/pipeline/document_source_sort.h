@@ -93,14 +93,22 @@ public:
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
     /**
-     * Convenience method for creating a $sort stage. If maxMemoryUsageBytes is boost::none,
-     * then it will actually use the value of 'internalQueryMaxBlockingSortMemoryUsageBytes'.
+     * Creates a $sort stage. If maxMemoryUsageBytes is boost::none, then it will actually use the
+     * value of 'internalQueryMaxBlockingSortMemoryUsageBytes'.
      */
     static boost::intrusive_ptr<DocumentSourceSort> create(
         const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
-        BSONObj sortOrder,
+        const SortPattern& sortOrder,
         uint64_t limit = 0,
         boost::optional<uint64_t> maxMemoryUsageBytes = boost::none);
+
+    /**
+     * Convenience to create a $sort stage from BSON with no limit and the default memory limit.
+     */
+    static boost::intrusive_ptr<DocumentSourceSort> create(
+        const boost::intrusive_ptr<ExpressionContext>& pExpCtx, const BSONObj& sortOrder) {
+        return create(pExpCtx, {sortOrder, pExpCtx});
+    }
 
     /**
      * Returns the the limit, if a subsequent $limit stage has been coalesced with this $sort stage.
@@ -148,7 +156,7 @@ protected:
 
 private:
     DocumentSourceSort(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
-                       const BSONObj& sortOrder,
+                       const SortPattern& sortOrder,
                        uint64_t limit,
                        uint64_t maxMemoryUsageBytes);
 
