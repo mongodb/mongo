@@ -30,6 +30,7 @@ error_categories:
     # Codes for internal use only that must never be returned in a network response.
     - InternalOnly
     - TenantMigrationError
+    - CursorInvalidatedError
 
 error_codes:
     - {code: 0,name: OK}
@@ -75,7 +76,7 @@ error_codes:
     - {code: 40,name: ConflictingUpdateOperators}
     - {code: 41,name: FileAlreadyOpen}
     - {code: 42,name: LogWriteFailed}
-    - {code: 43,name: CursorNotFound}
+    - {code: 43,name: CursorNotFound,categories: [CursorInvalidatedError]}
     - {code: 45,name: UserDataInconsistent}
     - {code: 46,name: LockBusy}
     - {code: 47,name: NoMatchingDocument}
@@ -130,7 +131,7 @@ error_codes:
     - {code: 93,name: InvalidReplicaSetConfig}
     - {code: 94,name: NotYetInitialized}
     - {code: 95,name: NotSecondary}
-    - {code: 96,name: OperationFailed}
+    - {code: 96,name: OperationFailed,categories: [CursorInvalidatedError]}
     - {code: 97,name: NoProjectionFound}
     - {code: 98,name: DBPathInUse}
     - {code: 100,name: UnsatisfiableWriteConcern,categories: [WriteConcernError]}
@@ -215,7 +216,7 @@ error_codes:
     - {code: 172,name: TransportSessionClosed}
     - {code: 173,name: TransportSessionNotFound}
     - {code: 174,name: TransportSessionUnknown}
-    - {code: 175,name: QueryPlanKilled}
+    - {code: 175,name: QueryPlanKilled,categories: [CursorInvalidatedError]}
     - {code: 176,name: FileOpenFailed}
     - {code: 177,name: ZoneNotFound}
     - {code: 178,name: RangeOverlapConflict}
@@ -280,7 +281,7 @@ error_codes:
     - {code: 235,name: InternalErrorNotSupported}
 
     - {code: 236,name: ForTestingErrorExtraInfo,extra: ErrorExtraInfoExample}
-    - {code: 237,name: CursorKilled,categories: [Interruption]}
+    - {code: 237,name: CursorKilled,categories: [Interruption,CursorInvalidatedError]}
     - {code: 238,name: NotImplemented}
     - {code: 239,name: SnapshotTooOld,categories: [SnapshotError]}
     - {code: 240,name: DNSRecordTypeMismatch}

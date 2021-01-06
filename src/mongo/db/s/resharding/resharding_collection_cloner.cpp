@@ -310,6 +310,28 @@ ExecutorFuture<void> ReshardingCollectionCloner::run(
                 });
             }
 
+            if (status.isA<ErrorCategory::CancelationError>() ||
+                status.isA<ErrorCategory::NotPrimaryError>()) {
+                // Cancellation and NotPrimary errors indicate the primary-only service Instance
+                // will be shut down or is shutting down now. Don't retry and leave resuming to when
+                // the RecipientStateMachine is restarted on the new primary.
+                return true;
+            }
+
+            if (status.isA<ErrorCategory::RetriableError>() ||
+                status.isA<ErrorCategory::CursorInvalidatedError>() ||
+                status == ErrorCodes::Interrupted) {
+                // Do retry on any other types of retryable errors though. Also retry on errors from
+                // stray killCursors and killOp commands being run.
+                LOGV2(5269300,
+                      "Transient error while cloning sharded collection",
+                      "sourceNamespace"_attr = _sourceNss,
+                      "outputNamespace"_attr = _outputNss,
+                      "readTimestamp"_attr = _atClusterTime,
+                      "error"_attr = redact(status));
+                return false;
+            }
+
             if (!status.isOK()) {
                 LOGV2(5352400,
                       "Operation-fatal error for resharding while cloning sharded collection",
