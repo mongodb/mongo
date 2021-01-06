@@ -1099,8 +1099,8 @@ void CollectionImpl::setValidator(OperationContext* opCtx, Validator validator) 
     DurableCatalog::get(opCtx)->updateValidator(opCtx,
                                                 getCatalogId(),
                                                 validator.validatorDoc.getOwned(),
-                                                _validationLevel,
-                                                _validationAction);
+                                                validationLevelOrDefault(_validationLevel),
+                                                validationActionOrDefault(_validationAction));
 
     _validator = std::move(validator);
 }
@@ -1129,8 +1129,11 @@ Status CollectionImpl::setValidationLevel(OperationContext* opCtx, ValidationLev
         return _validator.getStatus();
     }
 
-    DurableCatalog::get(opCtx)->updateValidator(
-        opCtx, getCatalogId(), _validator.validatorDoc, _validationLevel, _validationAction);
+    DurableCatalog::get(opCtx)->updateValidator(opCtx,
+                                                getCatalogId(),
+                                                _validator.validatorDoc,
+                                                validationLevelOrDefault(_validationLevel),
+                                                validationActionOrDefault(_validationAction));
 
     return Status::OK();
 }
@@ -1152,8 +1155,11 @@ Status CollectionImpl::setValidationAction(OperationContext* opCtx,
         return _validator.getStatus();
     }
 
-    DurableCatalog::get(opCtx)->updateValidator(
-        opCtx, getCatalogId(), _validator.validatorDoc, _validationLevel, _validationAction);
+    DurableCatalog::get(opCtx)->updateValidator(opCtx,
+                                                getCatalogId(),
+                                                _validator.validatorDoc,
+                                                validationLevelOrDefault(_validationLevel),
+                                                validationActionOrDefault(_validationAction));
 
     return Status::OK();
 }
