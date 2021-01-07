@@ -279,6 +279,12 @@ void MongoBase::Functions::runCommand::call(JSContext* cx, JS::CallArgs args) {
     // Also, we make a copy here because we want a copy after we dump cmdRes
     ValueReader(cx, args.rval()).fromBSON(cmdRes.getOwned(), nullptr, false /* read only */);
     setHiddenMongo(cx, std::get<1>(resTuple), conn.get(), args);
+
+    ObjectWrapper o(cx, args.rval());
+    if (!o.hasField(InternedString::_commandObj)) {
+        o.defineProperty(
+            InternedString::_commandObj, args.get(1), JSPROP_READONLY | JSPROP_PERMANENT);
+    }
 }
 
 void MongoBase::Functions::runCommandWithMetadata::call(JSContext* cx, JS::CallArgs args) {

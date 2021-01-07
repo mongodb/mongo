@@ -688,7 +688,14 @@ assert = (function() {
 
         // Keep this as a function so we don't call tojson if not necessary.
         const makeFailMsg = () => {
-            return _buildAssertionMessage(msg, "command failed: " + tojson(res));
+            let prefix = "command failed: " + tojson(res);
+            if (typeof res._commandObj === "object" && res._commandObj !== null) {
+                prefix += " with original command request: " + tojson(res._commandObj);
+            }
+            if (typeof res._mongo === "object" && res._mongo !== null) {
+                prefix += " on connection: " + res._mongo;
+            }
+            return _buildAssertionMessage(msg, prefix);
         };
 
         if (_isWriteResultType(res)) {
