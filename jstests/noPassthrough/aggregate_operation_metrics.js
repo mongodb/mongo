@@ -188,8 +188,8 @@ const secondary = rst.getSecondary();
     // No results from the aggregation because of the $out.
     assert.eq(cursor.itcount(), 0);
 
-    // TODO (SERVER-51176): Ensure metrics are properly recorded for $out.
-    // This new database should appear with metrics, but it does not.
+    // There are no additional metrics for the new database because the command was run on the
+    // 'admin' database and it does not collect metrics.
     cursor = adminDB.aggregate([{$operationMetrics: {}}]);
     assert.eq(cursor.itcount(), 2);
 
