@@ -532,8 +532,8 @@ shared_ptr<Shard> ShardRegistryData::findByShardId(const ShardId& shardId) const
     return _findByShardId(lk, shardId);
 }
 
-shared_ptr<Shard> ShardRegistryData::_findByConnectionString(
-    WithLock, const ConnectionString& connectionString) const {
+std::shared_ptr<Shard> ShardRegistryData::_findByConnectionString(
+    WithLock, const std::string& connectionString) const {
     auto i = _connStringLookup.find(connectionString);
     return (i != _connStringLookup.end()) ? i->second : nullptr;
 }
@@ -559,12 +559,9 @@ shared_ptr<Shard> ShardRegistryData::_findShard(WithLock lk, ShardId const& shar
         return shard;
     }
 
-    StatusWith<ConnectionString> swConnString = ConnectionString::parse(shardId.toString());
-    if (swConnString.isOK()) {
-        shard = _findByConnectionString(lk, swConnString.getValue());
-        if (shard) {
-            return shard;
-        }
+    shard = _findByConnectionString(lk, shardId.toString());
+    if (shard) {
+        return shard;
     }
 
     StatusWith<HostAndPort> swHostAndPort = HostAndPort::parse(shardId.toString());
@@ -671,7 +668,8 @@ void ShardRegistryData::_addShard(WithLock lk,
         for (const auto& host : oldConnString.getServers()) {
             _hostLookup.erase(host);
         }
-        _connStringLookup.erase(oldConnString);
+
+        _connStringLookup.erase(connString.toString());
     }
 
     _shardIdLookup[shard->getId()] = shard;
@@ -693,7 +691,7 @@ void ShardRegistryData::_addShard(WithLock lk,
         _hostLookup[HostAndPort("localhost")] = shard;
     }
 
-    _connStringLookup[connString] = shard;
+    _connStringLookup[connString.toString()] = shard;
 
     for (const HostAndPort& hostAndPort : connString.getServers()) {
         _hostLookup[hostAndPort] = shard;

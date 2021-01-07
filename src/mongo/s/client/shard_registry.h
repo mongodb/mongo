@@ -116,6 +116,7 @@ public:
      */
     void shardIdSetDifference(std::set<ShardId>& diff) const;
     void toBSON(BSONObjBuilder* result) const;
+
     /**
      * If the shard with same replica set name as in the newConnString already exists then replace
      * it with the shard built for the newConnString.
@@ -133,7 +134,7 @@ private:
     auto _findByShardId(WithLock, ShardId const&) const -> std::shared_ptr<Shard>;
     auto _findByHostAndPort(WithLock, const HostAndPort& hostAndPort) const
         -> std::shared_ptr<Shard>;
-    auto _findByConnectionString(WithLock, const ConnectionString& connectionString) const
+    auto _findByConnectionString(WithLock, const std::string& connectionString) const
         -> std::shared_ptr<Shard>;
     auto _findShard(WithLock lk, ShardId const& shardId) const -> std::shared_ptr<Shard>;
     void _rebuildShard(WithLock, ConnectionString const& newConnString, ShardFactory* factory);
@@ -153,7 +154,7 @@ private:
     stdx::unordered_map<HostAndPort, std::shared_ptr<Shard>> _hostLookup;
 
     // Map of connection string to Shard
-    std::map<ConnectionString, std::shared_ptr<Shard>> _connStringLookup;
+    std::map<std::string, std::shared_ptr<Shard>> _connStringLookup;
 
     // store configShard separately to always have a reference
     std::shared_ptr<Shard> _configShard;
