@@ -5103,6 +5103,51 @@ tasks:
       resmoke_args: --storageEngine=wiredTiger
       name: resharding_fuzzer_inplace
 
+- <<: *jstestfuzz_template
+  name: resharding_fuzzer_split_gen
+  tags: ["resharding_fuzzer"]
+  commands:
+  - func: "generate fuzzer tasks"
+    vars:
+      <<: *jstestfuzz_config_vars
+      num_files: 10
+      num_tasks: 5
+      npm_command: resharding-fuzzer
+      jstestfuzz_vars: --numDonors 1 --numRecipients 2 --inPlace no
+      suite: resharding_fuzzer
+      resmoke_args: --storageEngine=wiredTiger
+      name: resharding_fuzzer_split
+
+- <<: *jstestfuzz_template
+  name: resharding_fuzzer_merge_gen
+  tags: ["resharding_fuzzer"]
+  commands:
+  - func: "generate fuzzer tasks"
+    vars:
+      <<: *jstestfuzz_config_vars
+      num_files: 10
+      num_tasks: 5
+      npm_command: resharding-fuzzer
+      jstestfuzz_vars: --numDonors 2 --numRecipients 1 --inPlace no
+      suite: resharding_fuzzer
+      resmoke_args: --storageEngine=wiredTiger
+      name: resharding_fuzzer_merge
+
+- <<: *jstestfuzz_template
+  name: resharding_fuzzer_shuffle_gen
+  tags: ["resharding_fuzzer"]
+  commands:
+  - func: "generate fuzzer tasks"
+    vars:
+      <<: *jstestfuzz_config_vars
+      num_files: 10
+      num_tasks: 5
+      npm_command: resharding-fuzzer
+      jstestfuzz_vars: --numDonors 3 --numRecipients 3 --inPlace no
+      suite: resharding_fuzzer
+      resmoke_args: --storageEngine=wiredTiger
+      name: resharding_fuzzer_shuffle
+
 ## Tests that the multiversion test generation logic is not broken.
 - name: multiversion_sanity_check_gen
   commands:
