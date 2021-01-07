@@ -14,7 +14,7 @@ import kms_http_common
 
 def main():
     """Main entry point."""
-    parser = argparse.ArgumentParser(description='MongoDB Mock AWS KMS Endpoint.')
+    parser = argparse.ArgumentParser(description='MongoDB Mock KMS Endpoint.')
 
     parser.add_argument('-p', '--port', type=int, default=8000, help="Port to listen on")
 

@@ -7,7 +7,7 @@ load('jstests/ssl/libs/ssl_helpers.js');
 (function() {
 "use strict";
 
-const mock_kms = new MockKMSServer();
+const mock_kms = new MockKMSServerAWS();
 mock_kms.start();
 
 const x509_options = {

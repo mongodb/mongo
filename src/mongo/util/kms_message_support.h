@@ -60,6 +60,8 @@ using UniqueKmsRequest =
 using UniqueKmsResponseParser =
     kms_message_support_detail::kms_message_unique_ptr<kms_response_parser_t,
                                                        kms_response_parser_destroy>;
+using UniqueKmsRequestOpts =
+    kms_message_support_detail::kms_message_unique_ptr<kms_request_opt_t, kms_request_opt_destroy>;
 using UniqueKmsResponse =
     kms_message_support_detail::kms_message_unique_ptr<kms_response_t, kms_response_destroy>;
 using UniqueKmsCharBuffer =

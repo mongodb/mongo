@@ -117,6 +117,26 @@ void getSSLParamsForNetworkKMS(SSLParams* params) {
         std::vector({SSLParams::Protocols::TLS1_0, SSLParams::Protocols::TLS1_1});
 }
 
+std::vector<uint8_t> kmsResponseToVector(const std::string& str) {
+    std::vector<uint8_t> blob;
+
+    std::transform(std::begin(str), std::end(str), std::back_inserter(blob), [](auto c) {
+        return static_cast<uint8_t>(c);
+    });
+
+    return blob;
+}
+
+SecureVector<uint8_t> kmsResponseToSecureVector(const std::string& str) {
+    SecureVector<uint8_t> blob(str.length());
+
+    std::transform(std::begin(str), std::end(str), blob->data(), [](auto c) {
+        return static_cast<uint8_t>(c);
+    });
+
+    return blob;
+}
+
 StringData KMSOAuthService::getBearerToken() {
 
     if (!_cachedToken.empty() && _expirationDateTime > Date_t::now()) {
@@ -145,18 +165,24 @@ void KMSOAuthService::makeBearerTokenRequest() {
     auto field = obj[OAuthErrorResponse::kErrorFieldName];
 
     if (!field.eoo()) {
-        OAuthErrorResponse awsErrorResponse;
+        OAuthErrorResponse oAuthErrorResponse;
         try {
-            awsErrorResponse = OAuthErrorResponse::parse(IDLParserErrorContext("oauthError"), obj);
+            oAuthErrorResponse =
+                OAuthErrorResponse::parse(IDLParserErrorContext("oauthError"), obj);
         } catch (DBException& dbe) {
-            uasserted(1,
+            uasserted(ErrorCodes::FailedToParse,
                       str::stream() << "Failed to parse error message: " << dbe.toString()
                                     << ", Response : " << obj);
         }
 
-        uasserted(2,
-                  str::stream() << "Failed to make oauth request: " << awsErrorResponse.getError()
-                                << " : " << awsErrorResponse.getError_description());
+        std::string description;
+        if (oAuthErrorResponse.getError_description().has_value()) {
+            description = str::stream()
+                << " : " << oAuthErrorResponse.getError_description().value().toString();
+        }
+        uasserted(ErrorCodes::OperationFailed,
+                  str::stream() << "Failed to make oauth request: " << oAuthErrorResponse.getError()
+                                << description);
     }
 
     auto kmsResponse = OAuthResponse::parse(IDLParserErrorContext("OAuthResponse"), obj);

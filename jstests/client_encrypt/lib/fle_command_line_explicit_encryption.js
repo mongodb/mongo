@@ -8,7 +8,7 @@ load("jstests/client_encrypt/lib/mock_kms.js");
 (function() {
 "use strict";
 
-const mock_kms = new MockKMSServer();
+const mock_kms = new MockKMSServerAWS();
 mock_kms.start();
 
 const shell = Mongo();
