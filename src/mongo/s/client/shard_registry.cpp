@@ -728,7 +728,7 @@ std::shared_ptr<Shard> ShardRegistryData::findByRSName(const std::string& name) 
 }
 
 std::shared_ptr<Shard> ShardRegistryData::_findByConnectionString(
-    const ConnectionString& connectionString) const {
+    const std::string& connectionString) const {
     auto i = _connStringLookup.find(connectionString);
     return (i != _connStringLookup.end()) ? i->second : nullptr;
 }
@@ -749,12 +749,9 @@ std::shared_ptr<Shard> ShardRegistryData::findShard(const ShardId& shardId) cons
         return shard;
     }
 
-    StatusWith<ConnectionString> swConnString = ConnectionString::parse(shardId.toString());
-    if (swConnString.isOK()) {
-        shard = _findByConnectionString(swConnString.getValue());
-        if (shard) {
-            return shard;
-        }
+    shard = _findByConnectionString(shardId.toString());
+    if (shard) {
+        return shard;
     }
 
     StatusWith<HostAndPort> swHostAndPort = HostAndPort::parse(shardId.toString());
@@ -796,7 +793,7 @@ void ShardRegistryData::_addShard(std::shared_ptr<Shard> shard) {
         for (const auto& host : connString.getServers()) {
             _hostLookup.erase(host);
         }
-        _connStringLookup.erase(connString);
+        _connStringLookup.erase(connString.toString());
     }
 
     _shardIdLookup[shard->getId()] = shard;
@@ -818,7 +815,7 @@ void ShardRegistryData::_addShard(std::shared_ptr<Shard> shard) {
         _hostLookup[HostAndPort("localhost")] = shard;
     }
 
-    _connStringLookup[connString] = shard;
+    _connStringLookup[connString.toString()] = shard;
 
     for (const HostAndPort& hostAndPort : connString.getServers()) {
         _hostLookup[hostAndPort] = shard;
@@ -850,7 +847,7 @@ void ShardRegistryData::toBSON(BSONObjBuilder* map,
 
     if (connStrings) {
         for (const auto& connStringIt : _connStringLookup) {
-            connStrings->append(connStringIt.first.toString(), connStringIt.second->getId());
+            connStrings->append(connStringIt.first, connStringIt.second->getId());
         }
     }
 }
@@ -878,7 +875,7 @@ void ShardRegistryData::toBSON(BSONObjBuilder* result) const {
 
     BSONObjBuilder connStringsBob(result->subobjStart("connStrings"));
     for (const auto& connStringIt : _connStringLookup) {
-        connStringsBob.append(connStringIt.first.toString(), connStringIt.second->getId());
+        connStringsBob.append(connStringIt.first, connStringIt.second->getId());
     }
     connStringsBob.done();
 }

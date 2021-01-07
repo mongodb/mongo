@@ -133,7 +133,7 @@ private:
     /**
      * Returns the shard with the given connection string, or nullptr if no such shard.
      */
-    std::shared_ptr<Shard> _findByConnectionString(const ConnectionString& connectionString) const;
+    std::shared_ptr<Shard> _findByConnectionString(const std::string& connectionString) const;
 
     /**
      * Puts the given shard object into the lookup maps.
@@ -150,7 +150,7 @@ private:
     stdx::unordered_map<HostAndPort, std::shared_ptr<Shard>> _hostLookup;
 
     // Map of connection string to Shard
-    std::map<ConnectionString, std::shared_ptr<Shard>> _connStringLookup;
+    std::map<std::string, std::shared_ptr<Shard>> _connStringLookup;
 };
 
 /**
