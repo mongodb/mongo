@@ -86,7 +86,9 @@ public:
         DBDirectClient client(operationContext());
         client.dropCollection(kNss.ns());
 
-        migrationutil::getMigrationUtilExecutor()->waitForIdle();
+        while (migrationutil::getMigrationUtilExecutor()->hasTasks()) {
+            continue;
+        }
 
         WaitForMajorityService::get(getServiceContext()).shutDown();
         ShardServerTestFixture::tearDown();
@@ -141,6 +143,31 @@ int countDocsInConfigRangeDeletions(PersistentTaskStore<RangeDeletionTask>& stor
     });
     return numDocsInRangeDeletionsCollection;
 };
+
+// The 'pending' field must not be set in order for a range deletion task to succeed, but the
+// ShardServerOpObserver will submit the task for deletion upon seeing an insert without the
+// 'pending' field. The tests call removeDocumentsFromRange directly, so we want to avoid having
+// the op observer also submit the task. The ShardServerOpObserver will ignore replacement
+//  updates on the range deletions namespace though, so we can get around the issue by inserting
+// the task with the 'pending' field set, and then remove the field using a replacement update
+// after.
+RangeDeletionTask insertRangeDeletionTask(OperationContext* opCtx, UUID uuid, ChunkRange range) {
+    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
+    auto migrationId = UUID::gen();
+    RangeDeletionTask t(migrationId, kNss, uuid, ShardId("donor"), range, CleanWhenEnum::kDelayed);
+    t.setPending(true);
+    store.add(opCtx, t);
+
+    // Document should be in the store.
+    ASSERT_EQUALS(countDocsInConfigRangeDeletions(store, opCtx), 1);
+
+    auto query = QUERY(RangeDeletionTask::kIdFieldName << migrationId);
+    t.setPending(boost::none);
+    auto update = t.toBSON();
+    store.update(opCtx, query, update);
+
+    return t;
+}
 
 TEST_F(RangeDeleterTest,
        RemoveDocumentsInRangeRemovesAllDocumentsInRangeWhenAllDocumentsFitInSingleBatch) {
@@ -443,13 +470,8 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeWaitsForReplicationAfterDeletingS
     }
 
     // Insert range deletion task for this collection and range.
-    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
     const ChunkRange range(BSON(kShardKey << 0), BSON(kShardKey << 10));
-    RangeDeletionTask t(
-        UUID::gen(), kNss, uuid(), ShardId("donor"), range, CleanWhenEnum::kDelayed);
-    store.add(operationContext(), t);
-    // Document should be in the store.
-    ASSERT_EQUALS(countDocsInConfigRangeDeletions(store, operationContext()), 1);
+    auto t = insertRangeDeletionTask(operationContext(), uuid(), range);
 
     int numTimesWaitedForReplication = 0;
     // Override special handler for waiting for replication to count the number of times we wait for
@@ -499,13 +521,8 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeWaitsForReplicationOnlyOnceAfterS
     }
 
     // Insert range deletion task for this collection and range.
-    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
     const ChunkRange range(BSON(kShardKey << 0), BSON(kShardKey << 10));
-    RangeDeletionTask t(
-        UUID::gen(), kNss, uuid(), ShardId("donor"), range, CleanWhenEnum::kDelayed);
-    store.add(operationContext(), t);
-    // Document should be in the store.
-    ASSERT_EQUALS(countDocsInConfigRangeDeletions(store, operationContext()), 1);
+    auto t = insertRangeDeletionTask(operationContext(), uuid(), range);
 
     int numTimesWaitedForReplication = 0;
 
@@ -549,13 +566,8 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeDoesNotWaitForReplicationIfErrorD
     }
 
     // Insert range deletion task for this collection and range.
-    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
     const ChunkRange range(BSON(kShardKey << 0), BSON(kShardKey << 10));
-    RangeDeletionTask t(
-        UUID::gen(), kNss, uuid(), ShardId("donor"), range, CleanWhenEnum::kDelayed);
-    store.add(operationContext(), t);
-    // Document should be in the store.
-    ASSERT_EQUALS(countDocsInConfigRangeDeletions(store, operationContext()), 1);
+    auto t = insertRangeDeletionTask(operationContext(), uuid(), range);
 
     int numTimesWaitedForReplication = 0;
     // Override special handler for waiting for replication to count the number of times we wait for
@@ -601,12 +613,7 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeRetriesOnWriteConflictException) 
     dbclient.insert(kNss.toString(), BSON(kShardKey << 5));
 
     // Insert range deletion task for this collection and range.
-    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
-    RangeDeletionTask t(
-        UUID::gen(), kNss, uuid(), ShardId("donor"), range, CleanWhenEnum::kDelayed);
-    store.add(operationContext(), t);
-    // Document should be in the store.
-    ASSERT_EQUALS(countDocsInConfigRangeDeletions(store, operationContext()), 1);
+    auto t = insertRangeDeletionTask(operationContext(), uuid(), range);
 
     auto cleanupComplete =
         removeDocumentsInRange(executor(),
@@ -639,12 +646,7 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeRetriesOnUnexpectedError) {
     dbclient.insert(kNss.toString(), BSON(kShardKey << 5));
 
     // Insert range deletion task for this collection and range.
-    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
-    RangeDeletionTask t(
-        UUID::gen(), kNss, uuid(), ShardId("donor"), range, CleanWhenEnum::kDelayed);
-    store.add(operationContext(), t);
-    // Document should be in the store.
-    ASSERT_EQUALS(countDocsInConfigRangeDeletions(store, operationContext()), 1);
+    auto t = insertRangeDeletionTask(operationContext(), uuid(), range);
 
     auto cleanupComplete =
         removeDocumentsInRange(executor(),
@@ -760,13 +762,7 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeRemovesRangeDeletionTaskOnSuccess
     dbclient.insert(kNss.toString(), BSON(kShardKey << 5));
 
     // Insert range deletion task for this collection and range.
-    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
-
-    RangeDeletionTask t(
-        UUID::gen(), kNss, uuid(), ShardId("donor"), range, CleanWhenEnum::kDelayed);
-    store.add(operationContext(), t);
-    // Document should be in the store.
-    ASSERT_EQUALS(countDocsInConfigRangeDeletions(store, operationContext()), 1);
+    auto t = insertRangeDeletionTask(operationContext(), uuid(), range);
 
     auto cleanupComplete =
         removeDocumentsInRange(executor(),
@@ -782,6 +778,7 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeRemovesRangeDeletionTaskOnSuccess
 
     cleanupComplete.get();
     // Document should have been deleted.
+    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
     ASSERT_EQUALS(countDocsInConfigRangeDeletions(store, operationContext()), 0);
 }
 
@@ -797,13 +794,7 @@ TEST_F(RangeDeleterTest,
     dbclient.insert(kNss.toString(), BSON(kShardKey << 5));
 
     // Insert range deletion task for this collection and range.
-    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
-
-    RangeDeletionTask t(
-        UUID::gen(), kNss, fakeUuid, ShardId("donor"), range, CleanWhenEnum::kDelayed);
-    store.add(operationContext(), t);
-    // Document should be in the store.
-    ASSERT_EQUALS(countDocsInConfigRangeDeletions(store, operationContext()), 1);
+    auto t = insertRangeDeletionTask(operationContext(), uuid(), range);
 
     auto cleanupComplete =
         removeDocumentsInRange(executor(),
@@ -822,6 +813,7 @@ TEST_F(RangeDeleterTest,
                        ErrorCodes::RangeDeletionAbandonedBecauseCollectionWithUUIDDoesNotExist);
 
     // Document should have been deleted.
+    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
     ASSERT_EQUALS(countDocsInConfigRangeDeletions(store, operationContext()), 0);
 }
 
@@ -835,13 +827,7 @@ TEST_F(RangeDeleterTest,
     dbclient.insert(kNss.toString(), BSON(kShardKey << 5));
 
     // Insert range deletion task for this collection and range.
-    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
-
-    RangeDeletionTask t(
-        UUID::gen(), kNss, uuid(), ShardId("donor"), range, CleanWhenEnum::kDelayed);
-    store.add(operationContext(), t);
-    // Document should be in the store.
-    ASSERT_EQUALS(countDocsInConfigRangeDeletions(store, operationContext()), 1);
+    auto t = insertRangeDeletionTask(operationContext(), uuid(), range);
 
     // Pretend we stepped down.
     auto replCoord = checked_cast<repl::ReplicationCoordinatorMock*>(
@@ -868,6 +854,7 @@ TEST_F(RangeDeleterTest,
     std::ignore = replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY);
 
     // Document should not have been deleted.
+    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
     ASSERT_EQUALS(countDocsInConfigRangeDeletions(store, operationContext()), 1);
 }
 

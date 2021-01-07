@@ -34,8 +34,8 @@
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/migration_coordinator_document_gen.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
+#include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/s/catalog/type_chunk.h"
-#include "mongo/util/concurrency/thread_pool.h"
 
 namespace mongo {
 
@@ -78,7 +78,7 @@ ChunkRange extendOrTruncateBoundsForMetadata(const CollectionMetadata& metadata,
  * The executor is initialized on the first call to this function. Uses a shared_ptr
  * because a shared_ptr is required to work with ExecutorFutures.
  */
-std::shared_ptr<ThreadPool> getMigrationUtilExecutor();
+std::shared_ptr<executor::ThreadPoolTaskExecutor> getMigrationUtilExecutor();
 
 /**
  * Creates a query object that can used to find overlapping ranges in the pending range deletions
