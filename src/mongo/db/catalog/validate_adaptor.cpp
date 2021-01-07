@@ -493,6 +493,13 @@ void ValidateAdaptor::validateIndexKeyCount(const IndexCatalogEntry* index,
         }
     }
 
+    // Hashed indexes may never be multikey.
+    if (desc->getAccessMethodName() == IndexNames::HASHED && index->isMultikey()) {
+        results.errors.push_back(str::stream() << "Hashed index is incorrectly marked multikey: "
+                                               << desc->indexName());
+        results.valid = false;
+    }
+
     // Confirm that the number of index entries is not greater than the number of documents in the
     // collection. This check is only valid for indexes that are not multikey (indexed arrays
     // produce an index key per array entry) and not $** indexes which can produce index keys for

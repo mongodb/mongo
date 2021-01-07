@@ -68,15 +68,6 @@ void MultikeyPathTracker::mergeMultikeyPaths(MultikeyPaths* toMergeInto,
     }
 }
 
-bool MultikeyPathTracker::isMultikeyPathsTrivial(const MultikeyPaths& paths) {
-    for (auto&& path : paths) {
-        if (!path.empty()) {
-            return false;
-        }
-    }
-    return true;
-}
-
 bool MultikeyPathTracker::covers(const MultikeyPaths& parent, const MultikeyPaths& child) {
     for (size_t idx = 0; idx < parent.size(); ++idx) {
         auto& parentPath = parent[idx];
