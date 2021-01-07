@@ -2101,7 +2101,8 @@ __conn_write_base_config(WT_SESSION_IMPL *session, const char *cfg[])
       "readonly=,"
       "timing_stress_for_test=,"
       "use_environment_priv=,"
-      "verbose=,",
+      "verbose=,"
+      "verify_metadata=,",
       &base_config));
     __wt_config_init(session, &parser, base_config);
     while ((ret = __wt_config_next(&parser, &k, &v)) == 0) {

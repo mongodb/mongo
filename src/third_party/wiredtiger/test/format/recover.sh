@@ -48,5 +48,5 @@ while true; do
 	fi
 
 	# We know we aborted, so force recovery to run.
-	$wtcmd -R -h RUNDIR verify $uri || exit 1
+	$wtcmd -m -R -h RUNDIR verify $uri || exit 1
 done

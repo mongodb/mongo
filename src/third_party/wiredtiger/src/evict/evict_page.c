@@ -166,6 +166,10 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, uint8_t previous_state, uint32
     if (inmem_split)
         goto done;
 
+    /* Check that we are not about to evict an internal page with an active split generation. */
+    if (F_ISSET(ref, WT_REF_FLAG_INTERNAL) && !closing)
+        WT_ASSERT(session, !__wt_gen_active(session, WT_GEN_SPLIT, page->pg_intl_split_gen));
+
     /* Count evictions of internal pages during normal operation. */
     if (!closing && F_ISSET(ref, WT_REF_FLAG_INTERNAL)) {
         WT_STAT_CONN_INCR(session, cache_eviction_internal);
@@ -447,8 +451,7 @@ __evict_child_check(WT_SESSION_IMPL *session, WT_REF *parent)
         }
     }
     WT_INTL_FOREACH_END;
-    WT_INTL_FOREACH_REVERSE_BEGIN(session, parent->page, child)
-    {
+    WT_INTL_FOREACH_REVERSE_BEGIN (session, parent->page, child) {
         switch (child->state) {
         case WT_REF_DISK:    /* On-disk */
         case WT_REF_DELETED: /* On-disk, deleted */
@@ -712,17 +715,6 @@ __evict_review(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_flags, bool
         __wt_txn_release_snapshot(session);
 
     WT_RET(ret);
-
-    /*
-     * Give up on eviction during a checkpoint if the page splits.
-     *
-     * We get here if checkpoint reads a page with history store entries: if more of those entries
-     * are visible now than when the original eviction happened, the page could split. In most
-     * workloads, this is very unlikely. However, since checkpoint is partway through reconciling
-     * the parent page, a split can corrupt the checkpoint.
-     */
-    if (WT_SESSION_BTREE_SYNC(session) && page->modify->rec_result == WT_PM_REC_MULTIBLOCK)
-        return (__wt_set_return(session, EBUSY));
 
     /*
      * Success: assert that the page is clean or reconciliation was configured to save updates.

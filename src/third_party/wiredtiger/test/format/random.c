@@ -75,6 +75,7 @@ random_kv(void *arg)
                 break;
             case WT_NOTFOUND:
             case WT_ROLLBACK:
+            case WT_CACHE_FULL:
             case WT_PREPARE_CONFLICT:
                 continue;
             default:

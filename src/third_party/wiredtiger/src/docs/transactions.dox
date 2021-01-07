@@ -54,6 +54,17 @@ discarding any cursor position as well as any key and value.
 
 @snippet ex_all.c transaction commit/rollback
 
+Applications can call WT_SESSION::reset_snapshot to reset snapshots for
+snapshot isolation transactions to update their existing snapshot. It raises
+an error when this API is used for isolation other than snapshot isolation mode
+or when the session has performed any write operations.
+This API internally releases the current snapshot and gets the new running
+transactions snapshot to avoid pinning the content in the database that is no
+longer needed. Applications that don't use read_timestamp for the search may
+see different results compared to earlier with the updated snapshot.
+
+@snippet ex_all.c reset snapshot
+
 @section transactions_implicit Implicit transactions
 
 If a cursor is used when no explicit transaction is active in a session,
@@ -91,7 +102,7 @@ transactional readers, an operation may fail and return ::WT_ROLLBACK.
 
 WiredTiger supports <code>read-uncommitted</code>,
 <code>read-committed</code> and  <code>snapshot</code> isolation levels;
-the default isolation level is <code>read-committed</code>.
+the default isolation level is <code>snapshot</code>.
 
 - <code>read-uncommitted</code>:
 Transactions can see changes made by other transactions before those

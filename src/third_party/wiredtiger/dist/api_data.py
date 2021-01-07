@@ -910,7 +910,7 @@ session_config = [
         option for operations that create cache pressure can starve ordinary
         sessions that obey the cache size.''',
         type='boolean'),
-    Config('isolation', 'read-committed', r'''
+    Config('isolation', 'snapshot', r'''
         the default isolation level for operations in this session''',
         choices=['read-uncommitted', 'read-committed', 'snapshot']),
 ]
@@ -1404,6 +1404,7 @@ methods = {
         choices=['commit', 'first_commit', 'prepare', 'read']),
 ]),
 
+'WT_SESSION.reset_snapshot' : Method([]),
 'WT_SESSION.rename' : Method([]),
 'WT_SESSION.reset' : Method([]),
 'WT_SESSION.salvage' : Method([

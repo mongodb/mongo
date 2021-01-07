@@ -38,6 +38,10 @@ __wt_ref_out(WT_SESSION_IMPL *session, WT_REF *ref)
      */
     WT_ASSERT(session, __wt_hazard_check_assert(session, ref, true));
 
+    WT_ASSERT(session,
+      !F_ISSET(ref, WT_REF_FLAG_INTERNAL) || F_ISSET(session->dhandle, WT_DHANDLE_EXCLUSIVE) ||
+        !__wt_gen_active(session, WT_GEN_SPLIT, ref->page->pg_intl_split_gen));
+
     __wt_page_out(session, &ref->page);
 }
 

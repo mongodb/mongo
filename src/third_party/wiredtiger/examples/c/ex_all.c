@@ -846,6 +846,22 @@ transaction_ops(WT_SESSION *session_arg)
         /*! [transaction prepare] */
     }
 
+    {
+        /*! [reset snapshot] */
+        /*
+         * Resets snapshots for snapshot isolation transactions to update their existing snapshot.
+         * It raises an error when this API is used for isolation other than snapshot isolation
+         * mode.
+         */
+        error_check(session->open_cursor(session, "table:mytable", NULL, NULL, &cursor));
+        error_check(session->begin_transaction(session, "isolation=snapshot"));
+        cursor->set_key(cursor, "some-key");
+        error_check(cursor->search(cursor));
+        error_check(session->reset_snapshot(session));
+        error_check(session->commit_transaction(session, NULL));
+        /*! [reset snapshot] */
+    }
+
     /*! [session isolation configuration] */
     /* Open a session configured for read-uncommitted isolation. */
     error_check(conn->open_session(conn, NULL, "isolation=read-uncommitted", &session));

@@ -107,7 +107,7 @@ hs_cursor(void *arg)
                   cursor, &hs_stop_durable_ts, &hs_durable_timestamp, &hs_upd_type, &hs_value));
                 continue;
             }
-            testutil_assert(ret == WT_NOTFOUND || ret == WT_ROLLBACK);
+            testutil_assert(ret == WT_NOTFOUND || ret == WT_ROLLBACK || ret == WT_CACHE_FULL);
             break;
         }
 

@@ -1061,8 +1061,12 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 
     WT_RET(__wt_txn_config(session, cfg));
 
-    /* Allocate a snapshot if required. */
-    if (txn->isolation == WT_ISO_SNAPSHOT) {
+    /*
+     * Allocate a snapshot if required or update the existing snapshot. Do not update the existing
+     * snapshot of autocommit transactions because they are committed at the end of the operation.
+     */
+    if (txn->isolation == WT_ISO_SNAPSHOT &&
+      !(F_ISSET(txn, WT_TXN_AUTOCOMMIT) && F_ISSET(txn, WT_TXN_HAS_SNAPSHOT))) {
         if (session->ncursors > 0)
             WT_RET(__wt_session_copy_values(session));
 
@@ -1090,14 +1094,15 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 static inline int
 __wt_txn_autocommit_check(WT_SESSION_IMPL *session)
 {
+    WT_DECL_RET;
     WT_TXN *txn;
 
     txn = session->txn;
     if (F_ISSET(txn, WT_TXN_AUTOCOMMIT)) {
+        ret = __wt_txn_begin(session, NULL);
         F_CLR(txn, WT_TXN_AUTOCOMMIT);
-        return (__wt_txn_begin(session, NULL));
     }
-    return (0);
+    return (ret);
 }
 
 /*
@@ -1189,6 +1194,19 @@ __wt_txn_id_check(WT_SESSION_IMPL *session)
     if (F_ISSET(txn, WT_TXN_HAS_ID))
         return (0);
 
+    /*
+     * Return error when the transactions with read committed or uncommitted isolation tries to
+     * perform any write operation. Don't return an error for any update on metadata because it uses
+     * special transaction visibility rules, search and updates on metadata happens in
+     * read-uncommitted and read-committed isolation.
+     */
+    if (session->dhandle != NULL && !WT_IS_METADATA(session->dhandle) &&
+      (txn->isolation == WT_ISO_READ_COMMITTED || txn->isolation == WT_ISO_READ_UNCOMMITTED)) {
+        WT_ASSERT(session, !F_ISSET(session, WT_SESSION_INTERNAL));
+        WT_RET_MSG(session, ENOTSUP,
+          "write operations are not supported in read-committed or read-uncommitted transactions.");
+    }
+
     /* If the transaction is idle, check that the cache isn't full. */
     WT_RET(__wt_txn_idle_cache_check(session));
 
@@ -1250,7 +1268,8 @@ __wt_txn_update_check(
     txn = session->txn;
     txn_global = &S2C(session)->txn_global;
 
-    if (txn->isolation != WT_ISO_SNAPSHOT)
+    /* Don't check if transaction isolation is not snapshot or the table is metadata. */
+    if (txn->isolation != WT_ISO_SNAPSHOT || (cbt != NULL && WT_IS_METADATA(cbt->dhandle)))
         return (0);
 
     if (txn_global->debug_rollback != 0 &&

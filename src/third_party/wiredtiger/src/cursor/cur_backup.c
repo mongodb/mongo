@@ -211,8 +211,14 @@ err:
          */
         cfg[0] = WT_CONFIG_BASE(session, WT_SESSION_checkpoint);
         cfg[1] = "force=true";
+        /*
+         * Metadata checkpoints rely on read-committed isolation. Use that here no matter what
+         * isolation the caller's session sets for isolation.
+         */
         WT_WITH_DHANDLE(session, WT_SESSION_META_DHANDLE(session),
-          WT_WITH_METADATA_LOCK(session, ret = __wt_checkpoint(session, cfg)));
+          WT_WITH_METADATA_LOCK(session,
+            WT_WITH_TXN_ISOLATION(
+              session, WT_ISO_READ_COMMITTED, ret = __wt_checkpoint(session, cfg))));
     }
 
     /*

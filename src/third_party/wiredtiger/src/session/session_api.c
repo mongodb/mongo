@@ -1683,6 +1683,31 @@ err:
 }
 
 /*
+ * __session_reset_snapshot --
+ *     WT_SESSION->reset_snapshot method.
+ */
+static int
+__session_reset_snapshot(WT_SESSION *wt_session)
+{
+    WT_SESSION_IMPL *session;
+
+    session = (WT_SESSION_IMPL *)wt_session;
+    /* Return error if the isolation mode is read committed. */
+    if (session->txn->isolation != WT_ISO_SNAPSHOT)
+        WT_RET_MSG(
+          session, ENOTSUP, "not supported in read-committed or read-uncommitted transactions.");
+
+    /* Return error if the session has performed any write operations. */
+    if (F_ISSET(session->txn, WT_TXN_HAS_ID))
+        WT_RET_MSG(session, ENOTSUP, "not supported in write transactions.");
+
+    __wt_txn_release_snapshot(session);
+    __wt_txn_get_snapshot(session);
+
+    return (0);
+}
+
+/*
  * __session_transaction_pinned_range --
  *     WT_SESSION->transaction_pinned_range method.
  */
@@ -1922,9 +1947,9 @@ __open_session(WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_handler, const 
         __session_drop, __session_join, __session_log_flush, __session_log_printf, __session_rename,
         __session_reset, __session_salvage, __session_truncate, __session_upgrade, __session_verify,
         __session_begin_transaction, __session_commit_transaction, __session_prepare_transaction,
-        __session_rollback_transaction, __session_timestamp_transaction, __session_query_timestamp,
-        __session_checkpoint, __session_transaction_pinned_range, __session_transaction_sync,
-        __wt_session_breakpoint},
+        __session_reset_snapshot, __session_rollback_transaction, __session_timestamp_transaction,
+        __session_query_timestamp, __session_checkpoint, __session_transaction_pinned_range,
+        __session_transaction_sync, __wt_session_breakpoint},
       stds_readonly = {NULL, NULL, __session_close, __session_reconfigure, __wt_session_strerror,
         __session_open_cursor, __session_alter_readonly, __session_create_readonly,
         __wt_session_compact_readonly, __session_drop_readonly, __session_join,
@@ -1932,9 +1957,10 @@ __open_session(WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_handler, const 
         __session_reset, __session_salvage_readonly, __session_truncate_readonly,
         __session_upgrade_readonly, __session_verify, __session_begin_transaction,
         __session_commit_transaction, __session_prepare_transaction_readonly,
-        __session_rollback_transaction, __session_timestamp_transaction, __session_query_timestamp,
-        __session_checkpoint_readonly, __session_transaction_pinned_range,
-        __session_transaction_sync_readonly, __wt_session_breakpoint};
+        __session_reset_snapshot, __session_rollback_transaction, __session_timestamp_transaction,
+        __session_query_timestamp, __session_checkpoint_readonly,
+        __session_transaction_pinned_range, __session_transaction_sync_readonly,
+        __wt_session_breakpoint};
     WT_DECL_RET;
     WT_SESSION_IMPL *session, *session_ret;
     uint32_t i;
@@ -2002,8 +2028,8 @@ __open_session(WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_handler, const 
         TAILQ_INIT(&session_ret->cursor_cache[i]);
     session_ret->cursor_sweep_countdown = WT_SESSION_CURSOR_SWEEP_COUNTDOWN;
 
-    /* Initialize transaction support: default to read-committed. */
-    session_ret->isolation = WT_ISO_READ_COMMITTED;
+    /* Initialize transaction support: default to snapshot. */
+    session_ret->isolation = WT_ISO_SNAPSHOT;
     WT_ERR(__wt_txn_init(session, session_ret));
 
     /*

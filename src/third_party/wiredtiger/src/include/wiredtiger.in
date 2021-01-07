@@ -793,7 +793,7 @@ struct __wt_session {
 	 * size., a boolean flag; default \c false.}
 	 * @config{isolation, the default isolation level for operations in this session., a
 	 * string\, chosen from the following options: \c "read-uncommitted"\, \c "read-committed"\,
-	 * \c "snapshot"; default \c read-committed.}
+	 * \c "snapshot"; default \c snapshot.}
 	 * @configend
 	 * @errors
 	 */
@@ -1696,6 +1696,27 @@ struct __wt_session {
 	int __F(prepare_transaction)(WT_SESSION *session, const char *config);
 
 	/*!
+	 * Reset the snapshot.
+	 *
+	 * This method resets snapshots for snapshot isolation transactions to
+	 * update their existing snapshot. It raises an error when this API
+	 * is used for isolation other than snapshot isolation mode or when the session
+	 * has performed any write operations.
+	 * This API internally releases the current snapshot and gets the new running
+	 * transactions snapshot to avoid pinning the content in the database that is no
+	 * longer needed. Applications that don't use read_timestamp for the search may
+	 * see different results compared to earlier with the updated snapshot.
+	 *
+	 * @requires_transaction
+	 *
+	 * @snippet ex_all.c reset snapshot
+	 *
+	 * @param session the session handle
+	 * @errors
+	 */
+	int __F(reset_snapshot)(WT_SESSION *session);
+
+	/*!
 	 * Roll back the current transaction.
 	 *
 	 * A transaction must be in progress when this method is called.
@@ -2248,7 +2269,7 @@ struct __wt_connection {
 	 * size., a boolean flag; default \c false.}
 	 * @config{isolation, the default isolation level for operations in this session., a
 	 * string\, chosen from the following options: \c "read-uncommitted"\, \c "read-committed"\,
-	 * \c "snapshot"; default \c read-committed.}
+	 * \c "snapshot"; default \c snapshot.}
 	 * @configend
 	 * @param[out] sessionp the new session handle
 	 * @errors
@@ -3527,8 +3548,9 @@ const char *wiredtiger_version(int *majorp, int *minorp, int *patchp)
  * Operation would overflow cache.
  * This error is only generated when wiredtiger_open is configured to run in-
  * memory, and an insert or update operation requires more than the configured
- * cache size to complete. The operation may be retried; if a transaction is in
- * progress, it should be rolled back and the operation retried in a new
+ * cache size to complete, or when an application thread fails to do eviction
+ * within cache_max_wait_ms. The operation may be retried; if a transaction is
+ * in progress, it should be rolled back and the operation retried in a new
  * transaction.
  */
 #define	WT_CACHE_FULL	(-31807)

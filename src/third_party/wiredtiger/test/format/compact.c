@@ -67,7 +67,8 @@ compact(void *arg)
          * We don't configure a timeout and occasionally exceed the default of 1200 seconds.
          */
         ret = session->compact(session, g.uri, NULL);
-        if (ret != 0 && ret != EBUSY && ret != ETIMEDOUT && ret != WT_ROLLBACK)
+        if (ret != 0 && ret != EBUSY && ret != ETIMEDOUT && ret != WT_ROLLBACK &&
+          ret != WT_CACHE_FULL)
             testutil_die(ret, "session.compact");
     }
 
