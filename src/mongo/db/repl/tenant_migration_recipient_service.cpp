@@ -271,27 +271,34 @@ std::unique_ptr<DBClientConnection> TenantMigrationRecipientService::Instance::_
     const HostAndPort& serverAddress,
     StringData applicationName,
     const TransientSSLParams* transientSSLParams) {
+    std::string errMsg;
     auto clientBase = ConnectionString(serverAddress)
                           .connect(applicationName,
+                                   errMsg,
                                    0 /* socketTimeout */,
                                    nullptr /* uri */,
                                    nullptr /* apiParameters */,
                                    transientSSLParams);
-    if (!clientBase.isOK()) {
+    if (!clientBase) {
         LOGV2_ERROR(4880400,
                     "Failed to connect to migration donor",
                     "tenantId"_attr = getTenantId(),
                     "migrationId"_attr = getMigrationUUID(),
                     "serverAddress"_attr = serverAddress,
                     "applicationName"_attr = applicationName,
-                    "error"_attr = clientBase.getStatus());
-        uassertStatusOK(clientBase.getStatus());
+                    "error"_attr = errMsg);
+        // TODO (SERVER-53423): Make ConnectString::connect return a status instead of setting error
+        // message
+        uasserted(errMsg.find("InvalidSSLConfiguration") != std::string::npos
+                      ? ErrorCodes::InvalidSSLConfiguration
+                      : ErrorCodes::HostUnreachable,
+                  errMsg);
     }
 
     // ConnectionString::connect() always returns a DBClientConnection in a unique_ptr of
     // DBClientBase type.
     std::unique_ptr<DBClientConnection> client(
-        checked_cast<DBClientConnection*>(clientBase.getValue().release()));
+        checked_cast<DBClientConnection*>(clientBase.release()));
 
     if (MONGO_likely(!skipTenantMigrationRecipientAuth.shouldFail())) {
         client->auth(auth::createInternalX509AuthDocument());

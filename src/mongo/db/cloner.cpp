@@ -462,11 +462,11 @@ Status Cloner::copyDb(OperationContext* opCtx,
     }
 
     // Set up connection.
-    auto swConn = cs.connect(StringData());
-    if (!swConn.isOK()) {
-        return swConn.getStatus();
+    std::string errmsg;
+    std::unique_ptr<DBClientBase> conn(cs.connect(StringData(), errmsg));
+    if (!conn.get()) {
+        return Status(ErrorCodes::HostUnreachable, errmsg);
     }
-    auto& conn = swConn.getValue();
 
     if (auth::isInternalAuthSet()) {
         auto authStatus = conn->authenticateInternalUser();

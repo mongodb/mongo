@@ -51,29 +51,27 @@ DBClientBase* MongoURI::connect(StringData applicationName,
         }
     }
 
-    auto swConn = _connectString.connect(
-        applicationName, socketTimeoutSecs.value_or(0.0), this, apiParameters);
-    if (!swConn.isOK()) {
-        errmsg = swConn.getStatus().reason();
+    auto ret = std::unique_ptr<DBClientBase>(_connectString.connect(
+        applicationName, errmsg, socketTimeoutSecs.value_or(0.0), this, apiParameters));
+    if (!ret) {
         return nullptr;
     }
 
     if (!getSetName().empty()) {
         // When performing initial topology discovery, don't bother authenticating
         // since we will be immediately restarting our connect loop to a single node.
-        return swConn.getValue().release();
+        return ret.release();
     }
 
-    auto connection = std::move(swConn.getValue());
-    if (!connection->authenticatedDuringConnect()) {
-        auto optAuthObj = makeAuthObjFromOptions(connection->getMaxWireVersion(),
-                                                 connection->getIsPrimarySaslMechanisms());
+    if (!ret->authenticatedDuringConnect()) {
+        auto optAuthObj =
+            makeAuthObjFromOptions(ret->getMaxWireVersion(), ret->getIsPrimarySaslMechanisms());
         if (optAuthObj) {
-            connection->auth(optAuthObj.get());
+            ret->auth(optAuthObj.get());
         }
     }
 
-    return connection.release();
+    return ret.release();
 }
 
 }  // namespace mongo

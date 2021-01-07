@@ -73,9 +73,8 @@ TEST_F(TaskExecutorCursorFixture, Basic) {
     auto opCtx = client->makeOperationContext();
 
     // Write 100 documents to "test.test" via dbclient
-    auto swConn = unittest::getFixtureConnectionString().connect("TaskExecutorCursorTest");
-    uassertStatusOK(swConn.getStatus());
-    auto dbclient = std::move(swConn.getValue());
+    std::string err;
+    auto dbclient = unittest::getFixtureConnectionString().connect("TaskExecutorCursorTest", err);
 
     const size_t numDocs = 100;
 

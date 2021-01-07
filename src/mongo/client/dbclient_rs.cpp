@@ -419,13 +419,13 @@ DBClientConnection& DBClientReplicaSet::secondaryConn() {
     return *conn;
 }
 
-Status DBClientReplicaSet::connect() {
+bool DBClientReplicaSet::connect() {
     // Returns true if there are any up hosts.
     const ReadPreferenceSetting anyUpHost(ReadPreference::Nearest, TagSet());
     return _getMonitor()
         ->getHostOrRefresh(anyUpHost, CancelationToken::uncancelable())
         .getNoThrow()
-        .getStatus();
+        .isOK();
 }
 
 template <typename Authenticate>

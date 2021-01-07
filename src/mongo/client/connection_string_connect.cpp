@@ -46,8 +46,9 @@ namespace mongo {
 Mutex ConnectionString::_connectHookMutex = MONGO_MAKE_LATCH();
 ConnectionString::ConnectionHook* ConnectionString::_connectHook = nullptr;
 
-StatusWith<std::unique_ptr<DBClientBase>> ConnectionString::connect(
+std::unique_ptr<DBClientBase> ConnectionString::connect(
     StringData applicationName,
+    std::string& errmsg,
     double socketTimeout,
     const MongoURI* uri,
     const ClientAPIVersionParameters* apiParameters,
@@ -59,9 +60,6 @@ StatusWith<std::unique_ptr<DBClientBase>> ConnectionString::connect(
 
     switch (_type) {
         case ConnectionType::kStandalone: {
-            Status lastError =
-                Status(ErrorCodes::BadValue,
-                       "Invalid standalone connection string with empty server list.");
             for (const auto& server : _servers) {
                 auto c = std::make_unique<DBClientConnection>(
                     true, 0, newURI, DBClientConnection::HandshakeValidationHook(), apiParameters);
@@ -72,17 +70,17 @@ StatusWith<std::unique_ptr<DBClientBase>> ConnectionString::connect(
                             "Creating new connection to: {hostAndPort}",
                             "Creating new connection",
                             "hostAndPort"_attr = server);
-                lastError = c->connect(
-                    server,
-                    applicationName,
-                    transientSSLParams ? boost::make_optional(*transientSSLParams) : boost::none);
-                if (!lastError.isOK()) {
+                if (!c->connect(server,
+                                applicationName,
+                                errmsg,
+                                transientSSLParams ? boost::make_optional(*transientSSLParams)
+                                                   : boost::none)) {
                     continue;
                 }
                 LOGV2_DEBUG(20110, 1, "Connected connection!");
                 return std::move(c);
             }
-            return lastError;
+            return nullptr;
         }
 
         case ConnectionType::kReplicaSet: {
@@ -92,9 +90,10 @@ StatusWith<std::unique_ptr<DBClientBase>> ConnectionString::connect(
                                                             socketTimeout,
                                                             std::move(newURI),
                                                             apiParameters);
-            auto status = set->connect();
-            if (!status.isOK()) {
-                return status.withReason(status.reason() + ", " + toString());
+            if (!set->connect()) {
+                errmsg = "connect failed to replica set ";
+                errmsg += toString();
+                return nullptr;
             }
             return std::move(set);
         }
@@ -111,7 +110,6 @@ StatusWith<std::unique_ptr<DBClientBase>> ConnectionString::connect(
                     _connectHook);
 
             // Double-checked lock, since this will never be active during normal operation
-            std::string errmsg;
             auto replacementConn =
                 _connectHook->connect(*this, errmsg, socketTimeout, apiParameters);
 
@@ -122,10 +120,7 @@ StatusWith<std::unique_ptr<DBClientBase>> ConnectionString::connect(
                   "newConnString"_attr =
                       (replacementConn ? replacementConn->getServerAddress() : "(empty)"));
 
-            if (replacementConn) {
-                return std::move(replacementConn);
-            }
-            return Status(ErrorCodes::HostUnreachable, "Connection hook error: " + errmsg);
+            return replacementConn;
         }
 
         case ConnectionType::kLocal:
