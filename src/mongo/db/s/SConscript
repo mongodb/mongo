@@ -461,6 +461,7 @@ env.CppUnitTest(
         'range_deletion_util_test.cpp',
         'resharding_collection_test.cpp',
         'resharding_destined_recipient_test.cpp',
+        'resharding/resharding_agg_test.cpp',
         'resharding/resharding_collection_cloner_test.cpp',
         'resharding/resharding_donor_oplog_iterator_test.cpp',
         'resharding/resharding_donor_recipient_common_test.cpp',
