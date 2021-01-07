@@ -877,12 +877,6 @@ Status MultiIndexBlock::commit(OperationContext* opCtx,
             auto multikeyMetadataKeys = MultikeyPathTracker::get(opCtx).getMultikeyMetadataKeys(
                 collection->ns(), _indexes[i].block->getIndexName());
             if (multikeyPaths || multikeyMetadataKeys) {
-                // Upon reaching this point, multikeyPaths must either have at least one (possibly
-                // empty) element unless it is of an index with a type that doesn't support tracking
-                // multikeyPaths via the multikeyPaths array or has "special" multikey semantics.
-                invariant(multikeyMetadataKeys || !multikeyPaths.get().empty() ||
-                          !IndexBuildInterceptor::typeCanFastpathMultikeyUpdates(
-                              _indexes[i].block->getEntry()->descriptor()->getIndexType()));
                 _indexes[i].block->getEntry()->setMultikey(
                     opCtx,
                     multikeyMetadataKeys.value_or(std::vector<BSONObj>{}),
