@@ -185,8 +185,8 @@ boost::optional<repl::OpTime> Grid::_advanceConfigOpTime(const repl::OpTime& opT
 }
 
 void Grid::clearForUnitTests() {
-    _catalogClient.reset();
     _catalogCache.reset();
+    _catalogClient.reset();
     _shardRegistry.reset();
     _cursorManager.reset();
     _balancerConfig.reset();
