@@ -12,11 +12,13 @@ const FAULT_ENCRYPT_BAD_BASE64 = "fault_encrypt_bad_base64";
 const FAULT_DECRYPT = "fault_decrypt";
 const FAULT_DECRYPT_CORRECT_FORMAT = "fault_decrypt_correct_format";
 const FAULT_DECRYPT_WRONG_KEY = "fault_decrypt_wrong_key";
+const FAULT_OAUTH = "fault_oauth";
+const FAULT_OAUTH_CORRECT_FORMAT = "fault_oauth_correct_format";
 
 const DISABLE_FAULTS = "disable_faults";
 const ENABLE_FAULTS = "enable_faults";
 
-class MockKMSServer {
+class MockKMSServerAWS {
     /**
      * Create a new webserver.
      *
@@ -157,5 +159,12 @@ class MockKMSServer {
      */
     stop() {
         stopMongoProgramByPid(this.pid);
+    }
+}
+
+class MockKMSServerGCP extends MockKMSServerAWS {
+    constructor(fault_type, disableFaultsOnStartup) {
+        super(fault_type, disableFaultsOnStartup);
+        this.web_server_py = "jstests/client_encrypt/lib/kms_http_server_gcp.py";
     }
 }

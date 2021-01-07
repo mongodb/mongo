@@ -5,7 +5,7 @@ load('jstests/ssl/libs/ssl_helpers.js');
 (function() {
 "use strict";
 
-const mock_kms = new MockKMSServer();
+const mock_kms = new MockKMSServerAWS();
 mock_kms.start();
 
 const randomAlgorithm = "AEAD_AES_256_CBC_HMAC_SHA_512-Random";

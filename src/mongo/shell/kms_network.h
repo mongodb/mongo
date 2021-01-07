@@ -71,6 +71,16 @@ private:
 void getSSLParamsForNetworkKMS(SSLParams*);
 
 /**
+ * Converts a base64 encoded KMS response to a vector of bytes.
+ */
+std::vector<uint8_t> kmsResponseToVector(const std::string& str);
+
+/**
+ * Converts a base64 encoded KMS response to a securely allocated vector of bytes.
+ */
+SecureVector<uint8_t> kmsResponseToSecureVector(const std::string& str);
+
+/**
  * Base class for KMS services that use OAuth for authorization.
  *
  * Each service only talks to one OAuth endpoint so caching bearer tokens is simple.
@@ -91,6 +101,10 @@ protected:
      */
     virtual UniqueKmsRequest getOAuthRequest() = 0;
 
+protected:
+    // OAuth Service endpoint
+    HostAndPort _oAuthEndpoint;
+
 private:
     /**
      * Make a TLS request to a service to fetch a bearer token.
@@ -98,9 +112,6 @@ private:
     void makeBearerTokenRequest();
 
 private:
-    // OAuth Service endpoint
-    HostAndPort _oAuthEndpoint;
-
     // SSL Manager
     std::shared_ptr<SSLManagerInterface> _sslManager;
 
