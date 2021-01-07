@@ -729,14 +729,14 @@ SemiFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::run(
                 return status;
             }
 
-            _updateCoordinatorDocStateAndCatalogEntries(CoordinatorStateEnum::kError,
-                                                        _coordinatorDoc);
-
             LOGV2(4956902,
                   "Resharding failed",
                   "namespace"_attr = _coordinatorDoc.getNss().ns(),
                   "newShardKeyPattern"_attr = _coordinatorDoc.getReshardingKey(),
                   "error"_attr = status);
+
+            _updateCoordinatorDocStateAndCatalogEntries(CoordinatorStateEnum::kError,
+                                                        _coordinatorDoc);
 
             // TODO wait for donors and recipients to abort the operation and clean up state
             _tellAllRecipientsToRefresh(executor);

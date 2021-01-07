@@ -115,6 +115,11 @@ bool ShardRemote::isRetriableError(ErrorCodes::Error code, RetryPolicy options) 
             return isMongosRetriableError(code);
         } break;
 
+        case RetryPolicy::kIdempotentOrCursorInvalidated: {
+            return isRetriableError(code, Shard::RetryPolicy::kIdempotent) ||
+                ErrorCodes::isCursorInvalidatedError(code);
+        } break;
+
         case RetryPolicy::kNotIdempotent: {
             return ErrorCodes::isNotPrimaryError(code);
         } break;

@@ -135,12 +135,17 @@ void tellShardsToRefresh(OperationContext* opCtx,
     }
 
     if (!requests.empty()) {
+        // The _flushRoutingTableCacheUpdatesWithWriteConcern command will fail with a
+        // QueryPlanKilled error response if the config.cache.chunks collection is dropped
+        // concurrently. The config.cache.chunks collection is dropped by the shard when it detects
+        // the sharded collection's epoch having changed. We use kIdempotentOrCursorInvalidated so
+        // the ARS automatically retries in that situation.
         AsyncRequestsSender ars(opCtx,
                                 executor,
                                 "admin",
                                 requests,
                                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                                Shard::RetryPolicy::kIdempotent);
+                                Shard::RetryPolicy::kIdempotentOrCursorInvalidated);
 
         while (!ars.done()) {
             // Retrieve the responses and throw at the first failure.

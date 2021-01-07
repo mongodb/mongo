@@ -90,6 +90,7 @@ public:
 
     enum class RetryPolicy {
         kIdempotent,
+        kIdempotentOrCursorInvalidated,
         kNotIdempotent,
         kNoRetry,
     };
