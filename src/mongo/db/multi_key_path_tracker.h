@@ -66,12 +66,6 @@ public:
     static void mergeMultikeyPaths(MultikeyPaths* toMergeInto, const MultikeyPaths& newPaths);
 
     /**
-     * Returns whether paths contains only empty sets, i.e., {{}, {}, {}}. This includes the case
-     * where the MultikeyPaths vector itself has no elements, e.g., {}.
-     */
-    static bool isMultikeyPathsTrivial(const MultikeyPaths& paths);
-
-    /**
      * Return true iff the child's paths are a subset of the parent.
      */
     static bool covers(const MultikeyPaths& parent, const MultikeyPaths& child);

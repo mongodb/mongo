@@ -55,18 +55,6 @@ namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(hangDuringIndexBuildDrainYield);
 
-bool IndexBuildInterceptor::typeCanFastpathMultikeyUpdates(IndexType indexType) {
-    // Ensure no new indexes are added without considering whether they use the multikeyPaths
-    // vector.
-    invariant(indexType == INDEX_BTREE || indexType == INDEX_2D || indexType == INDEX_HAYSTACK ||
-              indexType == INDEX_2DSPHERE || indexType == INDEX_TEXT || indexType == INDEX_HASHED ||
-              indexType == INDEX_WILDCARD);
-    // Only BTREE indexes are guaranteed to use the multikeyPaths vector. Other index types either
-    // do not track path-level multikey information or have "special" handling of multikey
-    // information.
-    return (indexType == INDEX_BTREE);
-}
-
 IndexBuildInterceptor::IndexBuildInterceptor(OperationContext* opCtx, IndexCatalogEntry* entry)
     : _indexCatalogEntry(entry),
       _sideWritesTable(
@@ -76,15 +64,6 @@ IndexBuildInterceptor::IndexBuildInterceptor(OperationContext* opCtx, IndexCatal
 
     if (entry->descriptor()->unique()) {
         _duplicateKeyTracker = std::make_unique<DuplicateKeyTracker>(opCtx, entry);
-    }
-    // `mergeMultikeyPaths` is sensitive to the two inputs having the same multikey
-    // "shape". Initialize `_multikeyPaths` with the right shape from the IndexCatalogEntry.
-    auto indexType = entry->descriptor()->getIndexType();
-    if (typeCanFastpathMultikeyUpdates(indexType)) {
-        auto numFields = entry->descriptor()->getNumFields();
-        _multikeyPaths = MultikeyPaths{};
-        auto it = _multikeyPaths->begin();
-        _multikeyPaths->insert(it, numFields, {});
     }
 }
 
@@ -388,13 +367,13 @@ Status IndexBuildInterceptor::sideWrite(OperationContext* opCtx,
     // `multikeyMetadataKeys` when inserting.
     *numKeysOut = keys.size() + (op == Op::kInsert ? multikeyMetadataKeys.size() : 0);
 
-    auto indexType = _indexCatalogEntry->descriptor()->getIndexType();
+    // Maintain parity with IndexAccessMethod's handling of whether keys could change the multikey
+    // state on the index.
+    bool isMultikey = _indexCatalogEntry->accessMethod()->shouldMarkIndexAsMultikey(
+        keys.size(), multikeyMetadataKeys, multikeyPaths);
 
-    // No need to take the multikeyPaths mutex if this is a trivial multikey update.
-    bool canBypassMultikeyMutex = typeCanFastpathMultikeyUpdates(indexType) &&
-        MultikeyPathTracker::isMultikeyPathsTrivial(multikeyPaths);
-
-    if (op == Op::kInsert && !canBypassMultikeyMutex) {
+    // No need to take the multikeyPaths mutex if this would not change any multikey state.
+    if (op == Op::kInsert && isMultikey) {
         // SERVER-39705: It's worth noting that a document may not generate any keys, but be
         // described as being multikey. This step must be done to maintain parity with `validate`s
         // expectations.
@@ -402,10 +381,6 @@ Status IndexBuildInterceptor::sideWrite(OperationContext* opCtx,
         if (_multikeyPaths) {
             MultikeyPathTracker::mergeMultikeyPaths(&_multikeyPaths.get(), multikeyPaths);
         } else {
-            // All indexes that support pre-initialization of _multikeyPaths during
-            // IndexBuildInterceptor construction time should have been initialized already.
-            invariant(!typeCanFastpathMultikeyUpdates(indexType));
-
             // `mergeMultikeyPaths` is sensitive to the two inputs having the same multikey
             // "shape". Initialize `_multikeyPaths` with the right shape from the first result.
             _multikeyPaths = multikeyPaths;

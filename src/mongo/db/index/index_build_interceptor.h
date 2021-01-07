@@ -61,8 +61,6 @@ public:
      */
     enum class TrackDuplicates { kNoTrack, kTrack };
 
-    static bool typeCanFastpathMultikeyUpdates(IndexType type);
-
     /**
      * Creates a temporary table for writes during an index build. Additionally creates a temporary
      * table to store any duplicate key constraint violations found during the build, if the index
