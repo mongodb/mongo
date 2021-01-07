@@ -6859,7 +6859,7 @@ tasks:
 
 - <<: *task_template
   name: concurrency_simultaneous_replication
-  tags: ["concurrency", "common"]
+  tags: ["concurrency", "common", "large"]
   commands:
   - func: "do setup"
   - func: "run tests"
