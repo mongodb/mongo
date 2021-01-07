@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2020-present MongoDB, Inc.
+ *    Copyright (C) 2021-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,37 +29,17 @@
 
 #pragma once
 
-#include "mongo/db/exec/sbe/expressions/expression.h"
-#include "mongo/db/exec/sbe/stages/lock_acquisition_callback.h"
-#include "mongo/db/exec/sbe/stages/stages.h"
-#include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/query/query_solution.h"
+#include <functional>
 
-namespace mongo::stage_builder {
+#include "mongo/db/db_raii.h"
+#include "mongo/db/operation_context.h"
 
-class PlanStageSlots;
-
+namespace mongo::sbe {
 /**
- * Generates an SBE plan stage sub-tree implementing an collection scan.
- *
- * On success, a tuple containing the following data is returned:
- *   * A slot to access a fetched document (a resultSlot)
- *   * A slot to access a recordId (a recordIdSlot)
- *   * An optional slot to access a latest oplog timestamp (oplogTsSlot), if we scan the oplog and
- *     were requested to track this data.
- *   * A generated PlanStage sub-tree.
- *
- * In cases of an error, throws.
+ * A callback which gets called whenever a stage which accesses the storage engine (e.g. "scan",
+ * "seek", or "ixscan") obtains or re-obtains its AutoGet*.
  */
-std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateCollScan(
-    OperationContext* opCtx,
-    const CollectionPtr& collection,
-    const CollectionScanNode* csn,
-    sbe::value::SlotIdGenerator* slotIdGenerator,
-    sbe::value::FrameIdGenerator* frameIdGenerator,
-    PlanYieldPolicy* yieldPolicy,
-    sbe::RuntimeEnvironment* env,
-    bool isTailableResumeBranch,
-    sbe::LockAcquisitionCallback lockAcquisitionCallback);
+using LockAcquisitionCallback =
+    std::function<void(OperationContext*, const AutoGetCollectionForReadMaybeLockFree&)>;
 
-}  // namespace mongo::stage_builder
+}  // namespace mongo::sbe

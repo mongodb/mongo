@@ -118,6 +118,13 @@ struct QueryPlannerParams {
         // is thought to be helpful in general, but particularly in cases where all children of the
         // $or use the same fields and have the same indexes available, as in this example.
         ENUMERATE_OR_CHILDREN_LOCKSTEP = 1 << 12,
+
+        // Instructs the planner to produce a plan which will *not* check at runtime that the node's
+        // replica set member state allows reads. Typically, replica set members will only serve
+        // reads to clients if thet are in parimary or secondary state. Client reads are disallowed
+        // in other states, e.g. during initial sync. Internal operations, on the other hand, can
+        // use this flag to exempt themselves from this repl set note state requirement.
+        OMIT_REPL_STATE_PERMITS_READS_CHECK = 1 << 13,
     };
 
     // See Options enum above.

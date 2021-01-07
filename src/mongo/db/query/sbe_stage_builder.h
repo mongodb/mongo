@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/stages/lock_acquisition_callback.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/trial_period_utils.h"
@@ -337,5 +338,9 @@ private:
 
     // A factory to construct shard filters.
     ShardFiltererFactoryInterface* _shardFiltererFactory;
+
+    // A callback that should be installed on "scan" and "ixscan" nodes. It will get invoked when
+    // these data access stages acquire their AutoGet*.
+    const sbe::LockAcquisitionCallback _lockAcquisitionCallback;
 };
 }  // namespace mongo::stage_builder

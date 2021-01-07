@@ -114,6 +114,18 @@ const QuerySolutionNode* getNodeByType(const QuerySolutionNode* root, StageType 
 
     return nullptr;
 }
+
+sbe::LockAcquisitionCallback makeLockAcquisitionCallback(bool checkNodeCanServeReads) {
+    if (!checkNodeCanServeReads) {
+        return {};
+    }
+
+    return [](OperationContext* opCtx, const AutoGetCollectionForReadMaybeLockFree& coll) {
+        uassertStatusOK(repl::ReplicationCoordinator::get(opCtx)->checkCanServeReadsFor(
+            opCtx, coll.getNss(), true));
+    };
+}
+
 }  // namespace
 
 SlotBasedStageBuilder::SlotBasedStageBuilder(OperationContext* opCtx,
@@ -125,7 +137,8 @@ SlotBasedStageBuilder::SlotBasedStageBuilder(OperationContext* opCtx,
     : StageBuilder(opCtx, collection, cq, solution),
       _yieldPolicy(yieldPolicy),
       _data(makeRuntimeEnvironment(_opCtx, &_slotIdGenerator)),
-      _shardFiltererFactory(shardFiltererFactory) {
+      _shardFiltererFactory(shardFiltererFactory),
+      _lockAcquisitionCallback(makeLockAcquisitionCallback(solution.shouldCheckCanServeReads())) {
     // SERVER-52803: In the future if we need to gather more information from the QuerySolutionNode
     // tree, rather than doing one-off scans for each piece of information, we should add a formal
     // analysis pass here.
@@ -184,7 +197,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                              &_frameIdGenerator,
                                              _yieldPolicy,
                                              _data.env,
-                                             reqs.getIsTailableCollScanResumeBranch());
+                                             reqs.getIsTailableCollScanResumeBranch(),
+                                             _lockAcquisitionCallback);
 
     if (reqs.has(kReturnKey)) {
         // Assign the 'returnKeySlot' to be the empty object.
@@ -245,8 +259,14 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     // Index scans cannot produce an oplogTsSlot, so assert that the caller doesn't need it.
     invariant(!reqs.has(kOplogTs));
 
-    return generateIndexScan(
-        _opCtx, _collection, ixn, reqs, &_slotIdGenerator, &_spoolIdGenerator, _yieldPolicy);
+    return generateIndexScan(_opCtx,
+                             _collection,
+                             ixn,
+                             reqs,
+                             &_slotIdGenerator,
+                             &_spoolIdGenerator,
+                             _yieldPolicy,
+                             _lockAcquisitionCallback);
 }
 
 std::tuple<sbe::value::SlotId, sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>>
@@ -267,7 +287,8 @@ SlotBasedStageBuilder::makeLoopJoinForFetch(std::unique_ptr<sbe::PlanStage> inpu
         seekKeySlot,
         true,
         nullptr,
-        planNodeId);
+        planNodeId,
+        _lockAcquisitionCallback);
 
     // Get the recordIdSlot from the outer side (e.g., IXSCAN) and feed it to the inner side,
     // limiting the result set to 1 row.
@@ -826,7 +847,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                             boost::none,  // recordSlot
                                             &_slotIdGenerator,
                                             _yieldPolicy,
-                                            root->nodeId());
+                                            root->nodeId(),
+                                            _lockAcquisitionCallback);
         indexScanList.push_back(std::move(ixscan));
         ixscanOutputSlots.push_back(sbe::makeSV(recordIdSlot));
     }

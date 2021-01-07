@@ -574,7 +574,8 @@ void Parser::walkScan(AstQuery& ast) {
                                  boost::none,
                                  forward,
                                  nullptr,
-                                 getCurrentPlanNodeId());
+                                 getCurrentPlanNodeId(),
+                                 LockAcquisitionCallback{});
 }
 
 void Parser::walkParallelScan(AstQuery& ast) {
@@ -642,7 +643,8 @@ void Parser::walkSeek(AstQuery& ast) {
                                  lookupSlot(ast.nodes[0]->identifier),
                                  true /* forward */,
                                  nullptr,
-                                 getCurrentPlanNodeId());
+                                 getCurrentPlanNodeId(),
+                                 LockAcquisitionCallback{});
 }
 
 void Parser::walkIndexScan(AstQuery& ast) {
@@ -692,7 +694,8 @@ void Parser::walkIndexScan(AstQuery& ast) {
                                       boost::none,
                                       boost::none,
                                       nullptr,
-                                      getCurrentPlanNodeId());
+                                      getCurrentPlanNodeId(),
+                                      LockAcquisitionCallback{});
 }
 
 void Parser::walkIndexSeek(AstQuery& ast) {
@@ -742,7 +745,8 @@ void Parser::walkIndexSeek(AstQuery& ast) {
                                       lookupSlot(ast.nodes[0]->identifier),
                                       lookupSlot(ast.nodes[1]->identifier),
                                       nullptr,
-                                      getCurrentPlanNodeId());
+                                      getCurrentPlanNodeId(),
+                                      LockAcquisitionCallback{});
 }
 
 void Parser::walkProject(AstQuery& ast) {

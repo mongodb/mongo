@@ -33,7 +33,6 @@
 
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/trial_run_tracker.h"
-#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -47,6 +46,7 @@ ScanStage::ScanStage(const NamespaceStringOrUUID& name,
                      bool forward,
                      PlanYieldPolicy* yieldPolicy,
                      PlanNodeId nodeId,
+                     LockAcquisitionCallback lockAcquisitionCallback,
                      ScanOpenCallback openCallback)
     : PlanStage(seekKeySlot ? "seek"_sd : "scan"_sd, yieldPolicy, nodeId),
       _name(name),
@@ -56,6 +56,7 @@ ScanStage::ScanStage(const NamespaceStringOrUUID& name,
       _vars(std::move(vars)),
       _seekKeySlot(seekKeySlot),
       _forward(forward),
+      _lockAcquisitionCallback(std::move(lockAcquisitionCallback)),
       _openCallback(openCallback) {
     invariant(_fields.size() == _vars.size());
     invariant(!_seekKeySlot || _forward);
@@ -71,6 +72,7 @@ std::unique_ptr<PlanStage> ScanStage::clone() const {
                                        _forward,
                                        _yieldPolicy,
                                        _commonStats.nodeId,
+                                       _lockAcquisitionCallback,
                                        _openCallback);
 }
 
@@ -130,9 +132,9 @@ void ScanStage::doRestoreState() {
     }
 
     _coll.emplace(_opCtx, _name);
-
-    uassertStatusOK(repl::ReplicationCoordinator::get(_opCtx)->checkCanServeReadsFor(
-        _opCtx, _coll->getNss(), true));
+    if (_lockAcquisitionCallback) {
+        _lockAcquisitionCallback(_opCtx, *_coll);
+    }
 
     if (_cursor) {
         const bool couldRestore = _cursor->restore();
@@ -170,9 +172,9 @@ void ScanStage::open(bool reOpen) {
         invariant(!_cursor);
         invariant(!_coll);
         _coll.emplace(_opCtx, _name);
-
-        uassertStatusOK(repl::ReplicationCoordinator::get(_opCtx)->checkCanServeReadsFor(
-            _opCtx, _coll->getNss(), true));
+        if (_lockAcquisitionCallback) {
+            _lockAcquisitionCallback(_opCtx, *_coll);
+        }
     } else {
         invariant(_cursor);
         invariant(_coll);

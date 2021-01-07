@@ -39,7 +39,7 @@
 namespace mongo {
 std::unique_ptr<QuerySolution> SbeStageBuilderTestFixture::makeQuerySolution(
     std::unique_ptr<QuerySolutionNode> root) {
-    auto querySoln = std::make_unique<QuerySolution>();
+    auto querySoln = std::make_unique<QuerySolution>(QueryPlannerParams::Options::DEFAULT);
     querySoln->setRoot(std::move(root));
     return querySoln;
 }

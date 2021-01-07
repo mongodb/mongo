@@ -122,7 +122,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateOptimizedOplo
     sbe::value::FrameIdGenerator* frameIdGenerator,
     PlanYieldPolicy* yieldPolicy,
     sbe::RuntimeEnvironment* env,
-    bool isTailableResumeBranch) {
+    bool isTailableResumeBranch,
+    sbe::LockAcquisitionCallback lockAcquisitionCallback) {
     invariant(collection->ns().isOplog());
     // The minTs and maxTs optimizations are not compatible with resumeAfterRecordId and can only
     // be done for a forward scan.
@@ -174,6 +175,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateOptimizedOplo
                                             true /* forward */,
                                             yieldPolicy,
                                             csn->nodeId(),
+                                            std::move(lockAcquisitionCallback),
                                             makeOpenCallbackIfNeeded(collection, csn));
 
     // Start the scan from the seekRecordId if we can use the oplogStartHack.
@@ -276,7 +278,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateOptimizedOplo
                                            seekRecordIdSlot,
                                            true /* forward */,
                                            yieldPolicy,
-                                           csn->nodeId()),
+                                           csn->nodeId(),
+                                           std::move(lockAcquisitionCallback)),
                 sbe::makeSV(),
                 sbe::makeSV(*seekRecordIdSlot),
                 nullptr,
@@ -311,7 +314,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateGenericCollSc
     sbe::value::FrameIdGenerator* frameIdGenerator,
     PlanYieldPolicy* yieldPolicy,
     sbe::RuntimeEnvironment* env,
-    bool isTailableResumeBranch) {
+    bool isTailableResumeBranch,
+    sbe::LockAcquisitionCallback lockAcquisitionCallback) {
     const auto forward = csn->direction == CollectionScanParams::FORWARD;
 
     invariant(!csn->shouldTrackLatestOplogTimestamp || collection->ns().isOplog());
@@ -345,6 +349,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateGenericCollSc
                                             forward,
                                             yieldPolicy,
                                             csn->nodeId(),
+                                            lockAcquisitionCallback,
                                             makeOpenCallbackIfNeeded(collection, csn));
 
     // Check if the scan should be started after the provided resume RecordId and construct a nested
@@ -376,8 +381,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateGenericCollSc
                                                                       seekSlot,
                                                                       forward,
                                                                       yieldPolicy,
-                                                                      csn->nodeId()),
-
+                                                                      csn->nodeId(),
+                                                                      lockAcquisitionCallback),
                                            sbe::makeSV(seekSlot),
                                            sbe::makeSV(seekSlot),
                                            nullptr,
@@ -461,7 +466,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateCollScan(
     sbe::value::FrameIdGenerator* frameIdGenerator,
     PlanYieldPolicy* yieldPolicy,
     sbe::RuntimeEnvironment* env,
-    bool isTailableResumeBranch) {
+    bool isTailableResumeBranch,
+    sbe::LockAcquisitionCallback lockAcquisitionCallback) {
     if (csn->minTs || csn->maxTs) {
         return generateOptimizedOplogScan(opCtx,
                                           collection,
@@ -470,7 +476,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateCollScan(
                                           frameIdGenerator,
                                           yieldPolicy,
                                           env,
-                                          isTailableResumeBranch);
+                                          isTailableResumeBranch,
+                                          std::move(lockAcquisitionCallback));
     } else {
         return generateGenericCollScan(opCtx,
                                        collection,
@@ -479,7 +486,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateCollScan(
                                        frameIdGenerator,
                                        yieldPolicy,
                                        env,
-                                       isTailableResumeBranch);
+                                       isTailableResumeBranch,
+                                       std::move(lockAcquisitionCallback));
     }
 }
 }  // namespace mongo::stage_builder

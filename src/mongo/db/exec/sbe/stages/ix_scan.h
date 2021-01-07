@@ -31,12 +31,12 @@
 
 #include "mongo/bson/ordering.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/exec/sbe/stages/lock_acquisition_callback.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 
 namespace mongo::sbe {
-
 /**
  * A stage that iterates the entries of a collection index, starting from a bound specified by the
  * value in 'seekKeySlotLow' and ending (via IS_EOF) with the 'seekKeySlotHigh' bound. (An
@@ -69,7 +69,8 @@ public:
                    boost::optional<value::SlotId> seekKeySlotLow,
                    boost::optional<value::SlotId> seekKeySlotHigh,
                    PlanYieldPolicy* yieldPolicy,
-                   PlanNodeId nodeId);
+                   PlanNodeId nodeId,
+                   LockAcquisitionCallback lockAcquisitionCallback);
 
     std::unique_ptr<PlanStage> clone() const final;
 
@@ -101,6 +102,8 @@ private:
     const value::SlotVector _vars;
     const boost::optional<value::SlotId> _seekKeySlotLow;
     const boost::optional<value::SlotId> _seekKeySlotHigh;
+
+    LockAcquisitionCallback _lockAcquisitionCallback;
 
     std::unique_ptr<value::ViewOfValueAccessor> _recordAccessor;
     std::unique_ptr<value::ViewOfValueAccessor> _recordIdAccessor;

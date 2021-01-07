@@ -36,7 +36,6 @@
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/trial_run_tracker.h"
 #include "mongo/db/index/index_access_method.h"
-#include "mongo/db/repl/replication_coordinator.h"
 
 namespace mongo::sbe {
 IndexScanStage::IndexScanStage(const NamespaceStringOrUUID& name,
@@ -49,7 +48,8 @@ IndexScanStage::IndexScanStage(const NamespaceStringOrUUID& name,
                                boost::optional<value::SlotId> seekKeySlotLow,
                                boost::optional<value::SlotId> seekKeySlotHigh,
                                PlanYieldPolicy* yieldPolicy,
-                               PlanNodeId nodeId)
+                               PlanNodeId nodeId,
+                               LockAcquisitionCallback lockAcquisitionCallback)
     : PlanStage(seekKeySlotLow ? "ixseek"_sd : "ixscan"_sd, yieldPolicy, nodeId),
       _name(name),
       _indexName(indexName),
@@ -59,7 +59,8 @@ IndexScanStage::IndexScanStage(const NamespaceStringOrUUID& name,
       _indexKeysToInclude(indexKeysToInclude),
       _vars(std::move(vars)),
       _seekKeySlotLow(seekKeySlotLow),
-      _seekKeySlotHigh(seekKeySlotHigh) {
+      _seekKeySlotHigh(seekKeySlotHigh),
+      _lockAcquisitionCallback(std::move(lockAcquisitionCallback)) {
     // The valid state is when both boundaries, or none is set, or only low key is set.
     invariant((_seekKeySlotLow && _seekKeySlotHigh) || (!_seekKeySlotLow && !_seekKeySlotHigh) ||
               (_seekKeySlotLow && !_seekKeySlotHigh));
@@ -78,7 +79,8 @@ std::unique_ptr<PlanStage> IndexScanStage::clone() const {
                                             _seekKeySlotLow,
                                             _seekKeySlotHigh,
                                             _yieldPolicy,
-                                            _commonStats.nodeId);
+                                            _commonStats.nodeId,
+                                            _lockAcquisitionCallback);
 }
 
 void IndexScanStage::prepare(CompileCtx& ctx) {
@@ -138,9 +140,9 @@ void IndexScanStage::doRestoreState() {
     }
 
     _coll.emplace(_opCtx, _name);
-
-    uassertStatusOK(repl::ReplicationCoordinator::get(_opCtx)->checkCanServeReadsFor(
-        _opCtx, _coll->getNss(), true));
+    if (_lockAcquisitionCallback) {
+        _lockAcquisitionCallback(_opCtx, *_coll);
+    }
 
     if (_cursor) {
         _cursor->restore();
@@ -175,9 +177,9 @@ void IndexScanStage::open(bool reOpen) {
         invariant(!_cursor);
         invariant(!_coll);
         _coll.emplace(_opCtx, _name);
-
-        uassertStatusOK(repl::ReplicationCoordinator::get(_opCtx)->checkCanServeReadsFor(
-            _opCtx, _coll->getNss(), true));
+        if (_lockAcquisitionCallback) {
+            _lockAcquisitionCallback(_opCtx, *_coll);
+        }
     } else {
         invariant(_cursor);
         invariant(_coll);

@@ -286,7 +286,7 @@ std::pair<CoreIndexInfo, std::unique_ptr<WildcardProjection>> makeWildcardUpdate
  */
 struct GenerateQuerySolution {
     QuerySolution* operator()() const {
-        unique_ptr<QuerySolution> qs(new QuerySolution());
+        unique_ptr<QuerySolution> qs(new QuerySolution(QueryPlannerParams::Options::DEFAULT));
         qs->cacheData.reset(new SolutionCacheData());
         qs->cacheData->solnType = SolutionCacheData::COLLSCAN_SOLN;
         qs->cacheData->tree.reset(new PlanCacheIndexTree());
@@ -349,7 +349,8 @@ void assertShouldNotCacheQuery(const char* queryStr) {
 }
 
 std::unique_ptr<QuerySolution> getQuerySolutionForCaching() {
-    std::unique_ptr<QuerySolution> qs = std::make_unique<QuerySolution>();
+    std::unique_ptr<QuerySolution> qs =
+        std::make_unique<QuerySolution>(QueryPlannerParams::Options::DEFAULT);
     qs->cacheData = std::make_unique<SolutionCacheData>();
     qs->cacheData->tree = std::make_unique<PlanCacheIndexTree>();
     return qs;
@@ -1136,7 +1137,7 @@ protected:
 
         // Create a CachedSolution the long way..
         // QuerySolution -> PlanCacheEntry -> CachedSolution
-        QuerySolution qs;
+        QuerySolution qs{QueryPlannerParams::Options::DEFAULT};
         qs.cacheData = soln.cacheData->clone();
         std::vector<QuerySolution*> solutions;
         solutions.push_back(&qs);

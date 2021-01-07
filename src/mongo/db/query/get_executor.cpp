@@ -550,7 +550,7 @@ public:
                         "namespace"_attr = _cq->ns(),
                         "canonicalQuery"_attr = redact(_cq->toStringShort()));
 
-            auto solution = std::make_unique<QuerySolution>();
+            auto solution = std::make_unique<QuerySolution>(_plannerOptions);
             solution->setRoot(std::make_unique<EofNode>());
 
             auto root = buildExecutableTree(*solution);

@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/db/db_raii.h"
+#include "mongo/db/exec/sbe/stages/lock_acquisition_callback.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/storage/record_store.h"
@@ -49,6 +49,7 @@ public:
               bool forward,
               PlanYieldPolicy* yieldPolicy,
               PlanNodeId nodeId,
+              LockAcquisitionCallback lockAcquisitionCallback,
               ScanOpenCallback openCallback = {});
 
     std::unique_ptr<PlanStage> clone() const final;
@@ -84,6 +85,7 @@ private:
     // run is complete, this pointer is reset to nullptr.
     TrialRunTracker* _tracker{nullptr};
 
+    LockAcquisitionCallback _lockAcquisitionCallback;
     ScanOpenCallback _openCallback;
 
     std::unique_ptr<value::ViewOfValueAccessor> _recordAccessor;

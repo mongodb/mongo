@@ -107,6 +107,7 @@ RecordId Helpers::findOne(OperationContext* opCtx,
     unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
     size_t options = requireIndex ? QueryPlannerParams::NO_TABLE_SCAN : QueryPlannerParams::DEFAULT;
+    options = options | QueryPlannerParams::OMIT_REPL_STATE_PERMITS_READS_CHECK;
     auto exec = uassertStatusOK(getExecutor(
         opCtx, &collection, std::move(cq), PlanYieldPolicy::YieldPolicy::NO_YIELD, options));
 

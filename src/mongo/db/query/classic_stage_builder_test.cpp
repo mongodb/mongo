@@ -59,7 +59,7 @@ public:
      * Converts a 'QuerySolutionNode' to a 'QuerySolution'.
      */
     std::unique_ptr<QuerySolution> makeQuerySolution(std::unique_ptr<QuerySolutionNode> root) {
-        auto querySoln = std::make_unique<QuerySolution>();
+        auto querySoln = std::make_unique<QuerySolution>(QueryPlannerParams::Options::DEFAULT);
         querySoln->setRoot(std::move(root));
         return querySoln;
     }

@@ -139,7 +139,7 @@ void addQueryShapeToPlanCache(OperationContext* opCtx,
     ASSERT_OK(statusWithCQ.getStatus());
     std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
-    QuerySolution qs;
+    QuerySolution qs{QueryPlannerParams::Options::DEFAULT};
     qs.cacheData.reset(new SolutionCacheData());
     qs.cacheData->tree.reset(new PlanCacheIndexTree());
     std::vector<QuerySolution*> solns;
