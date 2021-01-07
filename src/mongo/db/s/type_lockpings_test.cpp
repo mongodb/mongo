@@ -31,7 +31,7 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/s/catalog/type_lockpings.h"
+#include "mongo/db/s/type_lockpings.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/time_support.h"
 

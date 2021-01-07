@@ -32,9 +32,9 @@
 #include <functional>
 
 #include "mongo/db/s/dist_lock_catalog.h"
+#include "mongo/db/s/type_lockpings.h"
+#include "mongo/db/s/type_locks.h"
 #include "mongo/platform/mutex.h"
-#include "mongo/s/catalog/type_lockpings.h"
-#include "mongo/s/catalog/type_locks.h"
 
 namespace mongo {
 

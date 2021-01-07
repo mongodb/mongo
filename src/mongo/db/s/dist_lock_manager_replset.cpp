@@ -33,9 +33,9 @@
 
 #include "mongo/db/s/dist_lock_manager_replset.h"
 
+#include "mongo/db/s/type_lockpings.h"
+#include "mongo/db/s/type_locks.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/catalog/type_lockpings.h"
-#include "mongo/s/catalog/type_locks.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/stdx/chrono.h"

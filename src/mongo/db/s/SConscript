@@ -271,6 +271,8 @@ env.Library(
         'dist_lock_catalog.cpp',
         'dist_lock_manager_replset.cpp',
         'dist_lock_manager.cpp',
+        'type_lockpings.cpp',
+        'type_locks.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/catalog_raii',
@@ -555,6 +557,8 @@ env.CppUnitTest(
         'resharding/resharding_util_refresh_test.cpp',
         'resharding/resharding_util_test.cpp',
         'sharding_ddl_util_test.cpp',
+        'type_lockpings_test.cpp',
+        'type_locks_test.cpp',
         'vector_clock_config_server_test.cpp',
     ],
     LIBDEPS=[

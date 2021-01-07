@@ -41,8 +41,6 @@
 #include "mongo/platform/mutex.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/sharding_catalog_client_mock.h"
-#include "mongo/s/catalog/type_lockpings.h"
-#include "mongo/s/catalog/type_locks.h"
 #include "mongo/s/grid.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/unittest/unittest.h"

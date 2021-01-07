@@ -26,7 +26,9 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "mongo/s/catalog/type_lockpings.h"
+#include "mongo/platform/basic.h"
+
+#include "mongo/db/s/type_lockpings.h"
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"

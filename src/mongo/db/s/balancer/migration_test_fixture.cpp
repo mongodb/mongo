@@ -31,6 +31,8 @@
 
 #include "mongo/db/s/balancer/migration_test_fixture.h"
 
+#include "mongo/db/s/type_locks.h"
+
 namespace mongo {
 
 using unittest::assertGet;

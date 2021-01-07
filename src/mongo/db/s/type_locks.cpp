@@ -29,7 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/catalog/type_locks.h"
+#include "mongo/db/s/type_locks.h"
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
@@ -39,6 +39,7 @@
 #include "mongo/util/str.h"
 
 namespace mongo {
+
 const NamespaceString LocksType::ConfigNS("config.locks");
 
 const BSONField<std::string> LocksType::name("_id");

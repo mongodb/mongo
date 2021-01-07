@@ -31,12 +31,11 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/s/catalog/type_locks.h"
+#include "mongo/db/s/type_locks.h"
 #include "mongo/unittest/unittest.h"
 
+namespace mongo {
 namespace {
-
-using namespace mongo;
 
 TEST(Validity, Empty) {
     BSONObj emptyObj = BSONObj();
@@ -219,4 +218,5 @@ TEST(Validity, BadType) {
     ASSERT_EQUALS(ErrorCodes::TypeMismatch, locksResult.getStatus());
 }
 
-}  // unnamed namespace
+}  // namespace
+}  // namespace mongo
