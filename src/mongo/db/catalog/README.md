@@ -140,17 +140,25 @@ continue to see the catalog data. The second phase drops the collection or index
 versioned and there is no PIT access that can see it afterwards. WiredTiger versions document
 writes, but not table drops: once a table is gone, the data is gone.
 
-The first phase of drop clears the associated catalog entry, both in-memory and on-disk, and then
-registers the collection or index's ident (identifier) with the reaper. The reaper maintains a list
-of {ident, drop timestamp} pairs and drops the collection or index's data when the drop timestamp
-becomes sufficiently persisted, old and inaccessible to readers. Currently that means that the drop
-timestamp must be both older than the timestamp of the last checkpoint and the oldest_timestamp.
-Requiring the drop timestamp to reach the checkpointed time ensures that startup recovery and
-rollback via recovery to a stable timestamp, which both recover to the last checkpoint, will never
-be missing collection or index data that should still exist at the checkpoint time that is less than
-the drop timestamp. Requiring the drop timestamp to pass (become older) than the oldest_timestamp
-ensures that all reads, which are supported back to the oldest_timestamp, successfully find the
-collection or index data.
+The first phase of drop clears the associated catalog entry, both in the in-memory catalog and in
+the on-disk catalog, and then registers the collection or index's information with the reaper. No
+new operations will find the collection or index in the catalog. Pre-existing operations with
+references to the collection or index state may still be running and will retain their references
+until they complete. The reaper receives the collection or index ident (identifier), along with a
+reference to the in-memory collection or index state, and a drop timestamp.
+
+The second phase of drop deletes the data. The reaper maintains a list of {ident, drop token, drop
+timestamp} sets. A collection or index's data will be dropped when both the drop timestamp becomes
+sufficiently persisted such that the catalog change will not be rolled back and no other reference
+to the collection or index in-memory state (tracked via the drop token) remains. When no concurrent
+readers of the collection or index are left, the drop token will be the only remaining reference to
+the in-memory state. The drop timestamp must be both older than the timestamp of the last checkpoint
+and the oldest_timestamp. Requiring the drop timestamp to reach the checkpointed time ensures that
+startup recovery and rollback via recovery to a stable timestamp, which both recover to the last
+checkpoint, will never be missing collection or index data that should still exist at the checkpoint
+time that is less than the drop timestamp. Requiring the drop timestamp to pass (become older) than
+the oldest_timestamp ensures that all reads, which are supported back to the oldest_timestamp,
+successfully find the collection or index data.
 
 _Code spelunking starting points:_
 
