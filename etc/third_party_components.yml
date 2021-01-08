@@ -252,6 +252,14 @@ components:
     is_test_only: true
     team_owner: "Wiredtiger"
 
+  SchemaStore/schemastore:
+    homepage_url: https://www.schemastore.org/
+    open_hub_url: N/A
+    release_monitoring_id: -1
+    local_directory_path: src/third_party/schemastore.org
+    is_test_only: true
+    team_owner: "Query"
+
   "SCons - a Software Construction tool":
     homepage_url: https://www.scons.org/
     open_hub_url: https://www.openhub.net/p/scons
