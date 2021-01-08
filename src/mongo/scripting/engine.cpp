@@ -424,7 +424,14 @@ public:
         : _pool(pool), _real(real) {}
 
     virtual ~PooledScope() {
-        scopeCache.release(_pool, _real);
+        // SERVER-53671: Sometimes, ScopeCache::release() will generate an 'InterruptedAtShutdown'
+        // exception. We catch and ignore such exceptions here to prevent them from crashing the
+        // server while it is shutting down.
+        try {
+            scopeCache.release(_pool, _real);
+        } catch (const ExceptionFor<ErrorCodes::InterruptedAtShutdown>&) {
+            LOGV2(5367100, "Interrupted at shutdown during ~PooledScope()");
+        }
     }
 
     // wrappers for the derived (_real) scope
