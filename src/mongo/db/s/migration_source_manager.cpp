@@ -500,7 +500,7 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig() {
           "updatedCollectionVersion"_attr = refreshedMetadata.getCollVersion(),
           "migrationId"_attr = _coordinator->getMigrationId());
 
-    _coordinator->setMigrationDecision(migrationutil::MigrationCoordinator::Decision::kCommitted);
+    _coordinator->setMigrationDecision(DecisionEnum::kCommitted);
 
     hangBeforeLeavingCriticalSection.pauseWhileSet();
 
@@ -567,17 +567,7 @@ void MigrationSourceManager::cleanupOnError() {
                    << _args.getFromShardId() << "to" << _args.getToShardId()),
         ShardingCatalogClient::kMajorityWriteConcern);
 
-    try {
-        _cleanup(true);
-    } catch (const DBException& ex) {
-        LOGV2_WARNING(22022,
-                      "Failed to clean up migration with request parameters "
-                      "{chunkMigrationRequestParameters} due to: {error}",
-                      "Failed to clean up migration",
-                      "chunkMigrationRequestParameters"_attr = redact(_args.toString()),
-                      "error"_attr = redact(ex),
-                      "migrationId"_attr = _coordinator->getMigrationId());
-    }
+    _cleanup(true);
 }
 
 void MigrationSourceManager::abortDueToConflictingIndexOperation(OperationContext* opCtx) {
@@ -651,7 +641,7 @@ void MigrationSourceManager::_notifyChangeStreamsOnRecipientFirstChunk(
         });
 }
 
-void MigrationSourceManager::_cleanup(bool completeMigration) {
+void MigrationSourceManager::_cleanup(bool completeMigration) noexcept {
     invariant(_state != kDone);
 
     auto cloneDriver = [&]() {
@@ -692,49 +682,66 @@ void MigrationSourceManager::_cleanup(bool completeMigration) {
         cloneDriver->cancelClone(_opCtx);
     }
 
-    if (_state == kCriticalSection || _state == kCloneCompleted || _state == kCommittingOnConfig) {
-        _stats.totalCriticalSectionTimeMillis.addAndFetch(_cloneAndCommitTimer.millis());
+    try {
+        if (_state >= kCloning) {
+            invariant(_coordinator);
+            if (_state < kCommittingOnConfig) {
+                _coordinator->setMigrationDecision(DecisionEnum::kAborted);
+            }
 
-        // NOTE: The order of the operations below is important and the comments explain the
-        // reasoning behind it
+            auto newClient = _opCtx->getServiceContext()->makeClient("MigrationCoordinator");
+            {
+                stdx::lock_guard<Client> lk(*newClient.get());
+                newClient->setSystemOperationKillableByStepdown(lk);
+            }
+            AlternativeClientRegion acr(newClient);
+            auto newOpCtxPtr = cc().makeOperationContext();
+            auto newOpCtx = newOpCtxPtr.get();
 
-        // Wait for the updates to the cache of the routing table to be fully written to disk before
-        // clearing the 'minOpTime recovery' document. This way, we ensure that all nodes from a
-        // shard, which donated a chunk will always be at the shard version of the last migration it
-        // performed.
-        //
-        // If the metadata is not persisted before clearing the 'inMigration' flag below, it is
-        // possible that the persisted metadata is rolled back after step down, but the write which
-        // cleared the 'inMigration' flag is not, a secondary node will report itself at an older
-        // shard version.
-        CatalogCacheLoader::get(_opCtx).waitForCollectionFlush(_opCtx, getNss());
+            if (_state >= kCriticalSection && _state <= kCommittingOnConfig) {
+                _stats.totalCriticalSectionTimeMillis.addAndFetch(_cloneAndCommitTimer.millis());
 
-        // Clear the 'minOpTime recovery' document so that the next time a node from this shard
-        // becomes a primary, it won't have to recover the config server optime.
-        ShardingStateRecovery::endMetadataOp(_opCtx);
-    }
+                // NOTE: The order of the operations below is important and the comments explain the
+                // reasoning behind it.
+                //
+                // Wait for the updates to the cache of the routing table to be fully written to
+                // disk before clearing the 'minOpTime recovery' document. This way, we ensure that
+                // all nodes from a shard, which donated a chunk will always be at the shard version
+                // of the last migration it performed.
+                //
+                // If the metadata is not persisted before clearing the 'inMigration' flag below, it
+                // is possible that the persisted metadata is rolled back after step down, but the
+                // write which cleared the 'inMigration' flag is not, a secondary node will report
+                // itself at an older shard version.
+                CatalogCacheLoader::get(newOpCtx).waitForCollectionFlush(newOpCtx, getNss());
 
-    if (completeMigration && _state >= kCloning) {
-        invariant(_coordinator);
-        if (_state < kCommittingOnConfig) {
-            _coordinator->setMigrationDecision(
-                migrationutil::MigrationCoordinator::Decision::kAborted);
+                // Clear the 'minOpTime recovery' document so that the next time a node from this
+                // shard becomes a primary, it won't have to recover the config server optime.
+                ShardingStateRecovery::endMetadataOp(newOpCtx);
+            }
+            if (completeMigration) {
+                // This can be called on an exception path after the OperationContext has been
+                // interrupted, so use a new OperationContext. Note, it's valid to call
+                // getServiceContext on an interrupted OperationContext.
+                _cleanupCompleteFuture = _coordinator->completeMigration(newOpCtx);
+            }
         }
-        // This can be called on an exception path after the OperationContext has been interrupted,
-        // so use a new OperationContext. Note, it's valid to call getServiceContext on an
-        // interrupted OperationContext.
-        auto newClient = _opCtx->getServiceContext()->makeClient("MigrationCoordinator");
-        {
-            stdx::lock_guard<Client> lk(*newClient.get());
-            newClient->setSystemOperationKillableByStepdown(lk);
-        }
-        AlternativeClientRegion acr(newClient);
-        auto newOpCtxPtr = cc().makeOperationContext();
-        auto newOpCtx = newOpCtxPtr.get();
-        _cleanupCompleteFuture = _coordinator->completeMigration(newOpCtx);
-    }
 
-    _state = kDone;
+        _state = kDone;
+    } catch (const DBException& ex) {
+        LOGV2_WARNING(5089001,
+                      "Failed to complete the migration {migrationId} with "
+                      "{chunkMigrationRequestParameters} due to: {error}",
+                      "Failed to complete the migration",
+                      "chunkMigrationRequestParameters"_attr = redact(_args.toString()),
+                      "error"_attr = redact(ex),
+                      "migrationId"_attr = _coordinator->getMigrationId());
+        // Something went really wrong when completing the migration just unset the metadata and let
+        // the next op to recover.
+        UninterruptibleLockGuard noInterrupt(_opCtx->lockState());
+        AutoGetCollection autoColl(_opCtx, getNss(), MODE_IX);
+        CollectionShardingRuntime::get(_opCtx, getNss())->clearFilteringMetadata(_opCtx);
+    }
 }
 
 BSONObj MigrationSourceManager::getMigrationStatusReport() const {

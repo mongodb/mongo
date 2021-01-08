@@ -105,10 +105,8 @@ TxnNumber MigrationCoordinator::getTxnNumber() const {
 }
 
 void MigrationCoordinator::startMigration(OperationContext* opCtx) {
-    LOGV2_DEBUG(23889,
-                2,
-                "Persisting migration coordinator doc",
-                "migrationDoc"_attr = _migrationInfo.toBSON());
+    LOGV2_DEBUG(
+        23889, 2, "Persisting migration coordinator doc", "migrationDoc"_attr = _migrationInfo);
     migrationutil::persistMigrationCoordinatorLocally(opCtx, _migrationInfo);
 
     LOGV2_DEBUG(23890,
@@ -127,19 +125,20 @@ void MigrationCoordinator::startMigration(OperationContext* opCtx) {
         opCtx, donorDeletionTask, WriteConcerns::kMajorityWriteConcern);
 }
 
-void MigrationCoordinator::setMigrationDecision(Decision decision) {
+void MigrationCoordinator::setMigrationDecision(DecisionEnum decision) {
     LOGV2_DEBUG(23891,
                 2,
                 "MigrationCoordinator setting migration decision to {decision}",
                 "MigrationCoordinator setting migration decision",
-                "decision"_attr = (decision == Decision::kCommitted ? "committed" : "aborted"),
+                "decision"_attr = (decision == DecisionEnum::kCommitted ? "committed" : "aborted"),
                 "migrationId"_attr = _migrationInfo.getId());
-    _decision = decision;
+    _migrationInfo.setDecision(decision);
 }
 
 
 boost::optional<SemiFuture<void>> MigrationCoordinator::completeMigration(OperationContext* opCtx) {
-    if (!_decision) {
+    auto decision = _migrationInfo.getDecision();
+    if (!decision) {
         LOGV2(
             23892,
             "Migration completed without setting a decision. This node might have "
@@ -153,17 +152,17 @@ boost::optional<SemiFuture<void>> MigrationCoordinator::completeMigration(Operat
     LOGV2(23893,
           "MigrationCoordinator delivering decision {decision} to self and to recipient",
           "MigrationCoordinator delivering decision to self and to recipient",
-          "decision"_attr = (_decision == Decision::kCommitted ? "committed" : "aborted"),
+          "decision"_attr = (decision == DecisionEnum::kCommitted ? "committed" : "aborted"),
           "migrationId"_attr = _migrationInfo.getId());
 
     boost::optional<SemiFuture<void>> cleanupCompleteFuture = boost::none;
 
-    switch (*_decision) {
-        case Decision::kAborted:
+    switch (*decision) {
+        case DecisionEnum::kAborted:
             _abortMigrationOnDonorAndRecipient(opCtx);
             hangBeforeForgettingMigrationAfterAbortDecision.pauseWhileSet();
             break;
-        case Decision::kCommitted:
+        case DecisionEnum::kCommitted:
             cleanupCompleteFuture = _commitMigrationOnDonorAndRecipient(opCtx);
             hangBeforeForgettingMigrationAfterCommitDecision.pauseWhileSet();
             break;
@@ -180,7 +179,7 @@ SemiFuture<void> MigrationCoordinator::_commitMigrationOnDonorAndRecipient(
 
     LOGV2_DEBUG(
         23894, 2, "Making commit decision durable", "migrationId"_attr = _migrationInfo.getId());
-    migrationutil::persistCommitDecision(opCtx, _migrationInfo.getId());
+    migrationutil::persistCommitDecision(opCtx, _migrationInfo);
 
     LOGV2_DEBUG(
         23895,
@@ -233,7 +232,17 @@ void MigrationCoordinator::_abortMigrationOnDonorAndRecipient(OperationContext* 
 
     LOGV2_DEBUG(
         23899, 2, "Making abort decision durable", "migrationId"_attr = _migrationInfo.getId());
-    migrationutil::persistAbortDecision(opCtx, _migrationInfo.getId());
+    migrationutil::persistAbortDecision(opCtx, _migrationInfo);
+
+    hangBeforeSendingAbortDecision.pauseWhileSet();
+
+    // Ensure removing the local range deletion document to prevent incoming migrations with
+    // overlapping ranges to hang.
+    LOGV2_DEBUG(23901,
+                2,
+                "Deleting range deletion task on donor",
+                "migrationId"_attr = _migrationInfo.getId());
+    migrationutil::deleteRangeDeletionTaskLocally(opCtx, _migrationInfo.getId());
 
     try {
         LOGV2_DEBUG(23900,
@@ -254,21 +263,14 @@ void MigrationCoordinator::_abortMigrationOnDonorAndRecipient(OperationContext* 
     } catch (const ExceptionFor<ErrorCodes::ShardNotFound>& exShardNotFound) {
         LOGV2_DEBUG(4620231,
                     1,
-                    "Failed to advance transaction number on recipient shard for abort",
+                    "Failed to advance transaction number on recipient shard for abort and/or "
+                    "marking range deletion task on recipient as ready for processing",
                     "namespace"_attr = _migrationInfo.getNss(),
                     "migrationId"_attr = _migrationInfo.getId(),
                     "recipientShardId"_attr = _migrationInfo.getRecipientShardId(),
                     "currentTxnNumber"_attr = _migrationInfo.getTxnNumber(),
                     "error"_attr = exShardNotFound);
     }
-
-    hangBeforeSendingAbortDecision.pauseWhileSet();
-
-    LOGV2_DEBUG(23901,
-                2,
-                "Deleting range deletion task on donor",
-                "migrationId"_attr = _migrationInfo.getId());
-    migrationutil::deleteRangeDeletionTaskLocally(opCtx, _migrationInfo.getId());
 
     LOGV2_DEBUG(23902,
                 2,

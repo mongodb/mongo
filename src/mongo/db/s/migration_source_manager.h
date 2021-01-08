@@ -214,7 +214,7 @@ private:
      * Called when any of the states fails. May only be called once and will put the migration
      * manager into the kDone state.
      */
-    void _cleanup(bool completeMigration);
+    void _cleanup(bool completeMigration) noexcept;
 
     // This is the opCtx of the moveChunk request that constructed the MigrationSourceManager.
     // The caller must guarantee it outlives the MigrationSourceManager.

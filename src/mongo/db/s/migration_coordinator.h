@@ -42,8 +42,6 @@ namespace migrationutil {
  */
 class MigrationCoordinator {
 public:
-    enum class Decision { kAborted, kCommitted };
-
     MigrationCoordinator(MigrationSessionId sessionId,
                          ShardId donorShard,
                          ShardId recipientShard,
@@ -80,7 +78,7 @@ public:
      *
      * This method is non-blocking and does not perform any I/O.
      */
-    void setMigrationDecision(Decision decision);
+    void setMigrationDecision(DecisionEnum decision);
 
     /**
      * If a decision has been set, makes the decision durable, then communicates the decision by
@@ -109,9 +107,6 @@ private:
      * recipient node as ready to be processed.
      */
     void _abortMigrationOnDonorAndRecipient(OperationContext* opCtx);
-
-    // The decision of the migration commit against the config server.
-    boost::optional<Decision> _decision;
 
     MigrationCoordinatorDocument _migrationInfo;
     bool _waitForDelete = false;
