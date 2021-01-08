@@ -224,6 +224,8 @@ env.Library(
     source=[
         'authz_session_external_state_server_common.cpp',
         'sasl_commands.cpp',
+        'sasl_commands.idl',
+        'sasl_payload.cpp',
         'enable_localhost_auth_bypass_parameter.idl',
     ],
     LIBDEPS=[
