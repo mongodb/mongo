@@ -14,7 +14,7 @@ load("jstests/replsets/libs/tenant_migration_test.js");
 load("jstests/replsets/libs/tenant_migration_util.js");
 
 const recipientRst = new ReplSetTest({
-    nodes: 3,
+    nodes: 2,
     name: jsTestName() + "_recipient",
     // Use a batch size of 1 so that collection cloner requires more than a single batch to
     // complete. This is needed to make the failpoint tenantMigrationHangDuringCollectionClone work.
@@ -68,6 +68,7 @@ assert.eq(2, recipientColl.find().itcount());
 // Step up a new node in the recipient set and trigger a failover. The new primary should resume
 // cloning starting from the third document.
 const newRecipientPrimary = recipientRst.getSecondaries()[0];
+recipientRst.awaitLastOpCommitted();
 assert.commandWorked(newRecipientPrimary.adminCommand({replSetStepUp: 1}));
 hangDuringCollectionClone.off();
 recipientRst.getPrimary();
