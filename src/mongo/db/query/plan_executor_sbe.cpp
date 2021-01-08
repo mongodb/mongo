@@ -51,15 +51,13 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
       _nss(std::move(nss)),
       _env{candidates.winner().data.env},
       _ctx{std::move(candidates.winner().data.ctx)},
+      _root{std::move(candidates.winner().root)},
       _cq{std::move(cq)},
       _yieldPolicy(std::move(yieldPolicy)) {
-
     invariant(!_nss.isEmpty());
+    invariant(_root);
 
     auto winner = std::move(candidates.plans[candidates.winnerIdx]);
-
-    _root = std::move(winner.root);
-    invariant(_root);
     _solution = std::move(winner.solution);
 
     if (auto slot = winner.data.outputs.getIfExists(stage_builder::PlanStageSlots::kResult); slot) {
@@ -112,25 +110,21 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
 }
 
 void PlanExecutorSBE::saveState() {
-    invariant(_root);
     _root->saveState();
 }
 
 void PlanExecutorSBE::restoreState(const RestoreContext& context) {
-    invariant(_root);
     _root->restoreState();
 }
 
 void PlanExecutorSBE::detachFromOperationContext() {
     invariant(_opCtx);
-    invariant(_root);
     _root->detachFromOperationContext();
     _opCtx = nullptr;
 }
 
 void PlanExecutorSBE::reattachToOperationContext(OperationContext* opCtx) {
     invariant(!_opCtx);
-    invariant(_root);
     _root->attachToOperationContext(opCtx);
     _opCtx = opCtx;
 }
@@ -144,21 +138,22 @@ void PlanExecutorSBE::markAsKilled(Status killStatus) {
 }
 
 void PlanExecutorSBE::dispose(OperationContext* opCtx) {
-    if (_root && _state != State::kClosed) {
+    if (_state != State::kClosed) {
         _root->close();
         _state = State::kClosed;
     }
 
-    _root.reset();
+    _isDisposed = true;
 }
 
 void PlanExecutorSBE::enqueue(const BSONObj& obj) {
     invariant(_state == State::kOpened);
+    invariant(!_isDisposed);
     _stash.push({obj.getOwned(), boost::none});
 }
 
 PlanExecutor::ExecState PlanExecutorSBE::getNextDocument(Document* objOut, RecordId* dlOut) {
-    invariant(_root);
+    invariant(!_isDisposed);
 
     BSONObj obj;
     auto result = getNext(&obj, dlOut);
@@ -169,7 +164,7 @@ PlanExecutor::ExecState PlanExecutorSBE::getNextDocument(Document* objOut, Recor
 }
 
 PlanExecutor::ExecState PlanExecutorSBE::getNext(BSONObj* out, RecordId* dlOut) {
-    invariant(_root);
+    invariant(!_isDisposed);
 
     if (!_stash.empty()) {
         auto&& [doc, recordId] = _stash.front();

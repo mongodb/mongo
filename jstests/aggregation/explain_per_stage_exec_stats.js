@@ -2,9 +2,6 @@
  * Tests that aggregation stages report the number of documents returned (nReturned) and
  * execution time (executionTimeMillisEstimate) when explain is run with verbosities
  * "executionStats" and "allPlansExecution".
- * @tags: [
- *   sbe_incompatible,
- * ]
  */
 (function() {
 "use strict";

@@ -2,7 +2,6 @@
 // designed to reproduce SERVER-33084.
 // @tags: [
 //   do_not_wrap_aggregations_in_facets,
-//   sbe_incompatible,
 // ]
 (function() {
 "use strict";

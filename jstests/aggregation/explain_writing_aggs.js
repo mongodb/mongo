@@ -6,7 +6,6 @@
  * @tags: [
  *   assumes_unsharded_collection,
  *   assumes_write_concern_unchanged,
- *   sbe_incompatible,
  * ]
  */
 (function() {

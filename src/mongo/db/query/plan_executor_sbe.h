@@ -110,7 +110,7 @@ public:
     }
 
     bool isDisposed() const override {
-        return !_root;
+        return _isDisposed;
     }
 
     Timestamp getLatestOplogTimestamp() const override;
@@ -137,7 +137,7 @@ private:
     // CompileCtx owns the instance pointed by _env, so we must keep it around.
     sbe::RuntimeEnvironment* _env{nullptr};
     sbe::CompileCtx _ctx;
-    std::unique_ptr<sbe::PlanStage> _root;
+    const std::unique_ptr<sbe::PlanStage> _root;
     std::unique_ptr<QuerySolution> _solution;
 
     sbe::value::SlotAccessor* _result{nullptr};
@@ -158,6 +158,8 @@ private:
     std::unique_ptr<PlanYieldPolicySBE> _yieldPolicy;
 
     std::unique_ptr<PlanExplainer> _planExplainer;
+
+    bool _isDisposed{false};
 };
 
 /**

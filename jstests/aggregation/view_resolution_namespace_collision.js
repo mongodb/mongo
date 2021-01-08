@@ -2,7 +2,7 @@
  * Tests that view resolution works correctly when a cross-database aggregation targets a
  * collection and a view with the same name on different databases.
  *
- * @tags: [assumes_no_implicit_collection_creation_after_drop, sbe_incompatible]
+ * @tags: [assumes_no_implicit_collection_creation_after_drop]
  */
 (function() {
 "use strict";
