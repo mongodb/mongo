@@ -375,7 +375,8 @@ private:
     void _initCollection(OperationContext* opCtx,
                          RecordId catalogId,
                          const NamespaceString& nss,
-                         bool forRepair);
+                         bool forRepair,
+                         Timestamp minVisibleTs);
 
     Status _dropCollectionsNoTimestamp(OperationContext* opCtx,
                                        std::vector<NamespaceString>& toDrop);

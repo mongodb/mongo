@@ -147,6 +147,14 @@ public:
         return boost::none;
     }
 
+    virtual Timestamp getOldestTimestamp() const override {
+        return Timestamp();
+    }
+
+    virtual boost::optional<Timestamp> getRecoveryTimestamp() const {
+        return boost::none;
+    }
+
 private:
     std::shared_ptr<void> _catalogInfo;
 

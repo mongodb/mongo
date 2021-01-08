@@ -189,6 +189,10 @@ public:
 
     std::map<Timestamp, std::shared_ptr<StringStore>> getHistory_forTest();
 
+    boost::optional<Timestamp> getRecoveryTimestamp() const override {
+        return boost::none;
+    }
+
     static bool instanceExists();
 
 private:

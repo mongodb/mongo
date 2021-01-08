@@ -452,9 +452,7 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    virtual Timestamp getOldestTimestamp() const {
-        MONGO_UNREACHABLE;
-    }
+    virtual Timestamp getOldestTimestamp() const = 0;
 
     virtual Timestamp getStableTimestamp() const {
         MONGO_UNREACHABLE;

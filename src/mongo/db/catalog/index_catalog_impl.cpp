@@ -115,6 +115,12 @@ Status IndexCatalogImpl::init(OperationContext* opCtx) {
     const bool replSetMemberInStandaloneMode =
         getReplSetMemberInStandaloneMode(opCtx->getServiceContext());
 
+    boost::optional<Timestamp> recoveryTs = boost::none;
+    if (auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+        storageEngine->supportsRecoveryTimestamp()) {
+        recoveryTs = storageEngine->getRecoveryTimestamp();
+    }
+
     for (size_t i = 0; i < indexNames.size(); i++) {
         const string& indexName = indexNames[i];
         BSONObj spec =
@@ -162,6 +168,13 @@ Status IndexCatalogImpl::init(OperationContext* opCtx) {
             auto flags = CreateIndexEntryFlags::kInitFromDisk | CreateIndexEntryFlags::kIsReady;
             IndexCatalogEntry* entry = createIndexEntry(opCtx, std::move(descriptor), flags);
             fassert(17340, entry->isReady(opCtx));
+
+            // When initializing indexes from disk, we conservatively set the minimumVisibleSnapshot
+            // to non _id indexes to the recovery timestamp. The _id index is left visible. It's
+            // assumed if the collection is visible, it's _id is valid to be used.
+            if (recoveryTs && !entry->descriptor()->isIdIndex()) {
+                entry->setMinimumVisibleSnapshot(recoveryTs.get());
+            }
         }
     }
 

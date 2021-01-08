@@ -116,6 +116,14 @@ public:
         return boost::none;
     }
 
+    Timestamp getOldestTimestamp() const override {
+        return Timestamp();
+    }
+
+    boost::optional<Timestamp> getRecoveryTimestamp() const {
+        return boost::none;
+    }
+
     // List of ident names removed using dropIdent().
     std::vector<std::string> droppedIdents;
 

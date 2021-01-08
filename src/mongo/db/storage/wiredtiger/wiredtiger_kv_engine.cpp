@@ -120,6 +120,8 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(WTPreserveSnapshotHistoryIndefinitely);
 MONGO_FAIL_POINT_DEFINE(WTSetOldestTSToStableTS);
 
+const std::string kPinOldestTimestampAtStartupName = "_wt_startup";
+
 }  // namespace
 
 bool WiredTigerFileVersion::shouldDowngrade(bool readOnly,
@@ -474,6 +476,35 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
                            "recoveryTimestamp"_attr = _recoveryTimestamp);
     }
 
+    {
+        char buf[(2 * 8 /*bytes in hex*/) + 1 /*nul terminator*/];
+        int ret = _conn->query_timestamp(_conn, buf, "get=oldest");
+        if (ret != WT_NOTFOUND) {
+            invariantWTOK(ret);
+
+            std::uint64_t tmp;
+            fassert(5380107, NumberParser().base(16)(buf, &tmp));
+            LOGV2_FOR_RECOVERY(
+                5380106, 0, "WiredTiger oldestTimestamp", "oldestTimestamp"_attr = Timestamp(tmp));
+            // The oldest timestamp is set in WT. Only set the in-memory variable.
+            _oldestTimestamp.store(tmp);
+            setInitialDataTimestamp(Timestamp(tmp));
+        }
+    }
+
+    // If there's no recovery timestamp, MDB has not produced a consistent snapshot of
+    // data. `_oldestTimestamp` and `_initialDataTimestamp` are only meaningful when there's a
+    // consistent snapshot of data.
+    //
+    // Note, this code is defensive (i.e: protects against a theorized, unobserved case) and is
+    // primarily concerned with restarts of a process that was performing an eMRC=off rollback via
+    // refetch.
+    if (_recoveryTimestamp.isNull() && _oldestTimestamp.load() > 0) {
+        LOGV2_FOR_RECOVERY(5380108, 0, "There is an oldestTimestamp without a recoveryTimestamp");
+        _oldestTimestamp.store(0);
+        _initialDataTimestamp.store(0);
+    }
+
     _sessionCache.reset(new WiredTigerSessionCache(this));
 
     _sessionSweeper = std::make_unique<WiredTigerSessionSweeper>(_sessionCache.get());
@@ -485,8 +516,25 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
 
     if (!_readOnly && !_ephemeral) {
         if (!_recoveryTimestamp.isNull()) {
-            setInitialDataTimestamp(_recoveryTimestamp);
-            setOldestTimestamp(_recoveryTimestamp, false);
+            // If the oldest/initial data timestamps were unset (there was no persisted durable
+            // history), initialize them to the recovery timestamp.
+            if (_oldestTimestamp.load() == 0) {
+                setInitialDataTimestamp(_recoveryTimestamp);
+                // Communicate the oldest timestamp to WT.
+                setOldestTimestamp(_recoveryTimestamp, false);
+            }
+
+            // Pin the oldest timestamp prior to calling `setStableTimestamp` as that attempts to
+            // advance the oldest timestamp. We do this pinning to give features such as resharding
+            // an opportunity to re-pin the oldest timestamp after a restart. The assumptions this
+            // relies on are that:
+            //
+            // 1) The feature stores the desired pin timestamp in some local collection.
+            // 2) This temporary pinning lasts long enough for the catalog to be loaded and
+            //    accessed.
+            uassertStatusOK(pinOldestTimestamp(
+                kPinOldestTimestampAtStartupName, Timestamp(_oldestTimestamp.load()), false));
+
             setStableTimestamp(_recoveryTimestamp, false);
 
             _sessionCache->snapshotManager().setLastApplied(_recoveryTimestamp);
@@ -534,6 +582,7 @@ WiredTigerKVEngine::~WiredTigerKVEngine() {
 }
 
 void WiredTigerKVEngine::notifyStartupComplete() {
+    unpinOldestTimestamp(kPinOldestTimestampAtStartupName);
     WiredTigerUtil::notifyStartupComplete();
 }
 
@@ -666,7 +715,8 @@ void WiredTigerKVEngine::cleanShutdown() {
                        2,
                        "Shutdown timestamps.",
                        "Stable Timestamp"_attr = Timestamp(_stableTimestamp.load()),
-                       "Initial Data Timestamp"_attr = Timestamp(_initialDataTimestamp.load()));
+                       "Initial Data Timestamp"_attr = Timestamp(_initialDataTimestamp.load()),
+                       "Oldest Timestamp"_attr = Timestamp(_oldestTimestamp.load()));
 
     _sizeStorer.reset();
     _sessionCache->shuttingDown();
@@ -2070,6 +2120,11 @@ Timestamp WiredTigerKVEngine::_calculateHistoryLagFromStableTimestamp(Timestamp 
         return Timestamp();
     }
 
+    // The oldest timestamp cannot be set behind the `_initialDataTimestamp`.
+    if (calculatedOldestTimestamp.asULL() <= _initialDataTimestamp.load()) {
+        calculatedOldestTimestamp = Timestamp(_initialDataTimestamp.load());
+    }
+
     return calculatedOldestTimestamp;
 }
 
@@ -2322,7 +2377,10 @@ void WiredTigerKVEngine::unpinOldestTimestamp(const std::string& requestingServi
     stdx::lock_guard<Latch> lock(_oldestTimestampPinRequestsMutex);
     auto it = _oldestTimestampPinRequests.find(requestingServiceName);
     if (it == _oldestTimestampPinRequests.end()) {
-        LOGV2_FATAL(5380105, "Missing pin request", "service"_attr = requestingServiceName);
+        LOGV2_WARNING(5380105,
+                      "The requested service had nothing to unpin",
+                      "service"_attr = requestingServiceName);
+        return;
     }
     LOGV2(5380103,
           "Unpin oldest timestamp request",
