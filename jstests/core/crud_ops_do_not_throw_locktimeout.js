@@ -22,8 +22,11 @@ const doc = {
 };
 assert.commandWorked(coll.insert(doc));
 
-const isLockFreeReadsEnabled =
-    db.adminCommand({getParameter: 1, featureFlagLockFreeReads: 1}).featureFlagLockFreeReads.value;
+// Take enableMajorityReadConcern setting into account when checking featureFlagLockFreeReads as it
+// will disable the feature even when the flag is enabled.
+const isLockFreeReadsEnabled = db.adminCommand({getParameter: 1, featureFlagLockFreeReads: 1})
+                                   .featureFlagLockFreeReads.value &&
+    jsTest.options().enableMajorityReadConcern;
 
 const failpoint = 'hangAfterDatabaseLock';
 assert.commandWorked(db.adminCommand({configureFailPoint: failpoint, mode: "alwaysOn"}));
