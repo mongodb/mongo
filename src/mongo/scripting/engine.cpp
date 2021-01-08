@@ -355,66 +355,30 @@ class ScopeCache {
 public:
     void release(const string& poolName, const std::shared_ptr<Scope>& scope) {
         stdx::lock_guard<Latch> lk(_mutex);
-        // Catch, log, and rethrow any exception, but catch under the lock so we can read our fields
-        // when writing the log message. Also, track a few pieces of info for the log message.
-        bool didClearPools = false;
-        bool wasScopeTooOld = false;
-        bool didScopeHaveError = false;
-        bool hitPoolSizeLimit = false;
-        bool successfullyResetScope = false;
-        try {
-            if (scope->hasOutOfMemoryException()) {
-                // make some room
-                didClearPools = true;
-                LOGV2_INFO(22777, "Clearing all idle JS contexts due to out of memory");
-                _pools.clear();
-                return;
-            }
 
-            if (Date_t::now() - scope->getCreateTime() > kMaxScopeReuseTime) {
-                wasScopeTooOld = true;
-                return;  // too old to save
-            }
-
-            if (!scope->getError().empty()) {
-                didScopeHaveError = true;
-                return;  // not saving errored scopes
-            }
-
-            if (_pools.size() >= kMaxPoolSize) {
-                hitPoolSizeLimit = true;
-                // prefer to keep recently-used scopes
-                _pools.pop_back();
-            }
-
-            scope->reset();
-            successfullyResetScope = true;
-            ScopeAndPool toStore = {scope, poolName};
-            _pools.push_front(toStore);
-        } catch (const DBException& e) {
-            LOGV2_ERROR(5182700,
-                        "DBException in ScopeCache::release",
-                        "exception"_attr = e,
-                        "_pools.size()"_attr = _pools.size(),
-                        "poolName"_attr = poolName,
-                        "didClearPools"_attr = didClearPools,
-                        "wasScopeTooOld"_attr = wasScopeTooOld,
-                        "didScopeHaveError"_attr = didScopeHaveError,
-                        "hitPoolSizeLimit"_attr = hitPoolSizeLimit,
-                        "successfullyResetScope"_attr = successfullyResetScope);
-            std::terminate();
-        } catch (...) {
-            LOGV2_ERROR(5182701,
-                        "Exception (not a DBException) in ScopeCache::release",
-                        "_pools.size()"_attr = _pools.size(),
-                        "poolName"_attr = poolName,
-                        "didClearPools"_attr = didClearPools,
-                        "wasScopeTooOld"_attr = wasScopeTooOld,
-                        "didScopeHaveError"_attr = didScopeHaveError,
-                        "hitPoolSizeLimit"_attr = hitPoolSizeLimit,
-                        "successfullyResetScope"_attr = successfullyResetScope);
-            std::terminate();
+        if (scope->hasOutOfMemoryException()) {
+            // make some room
+            LOGV2_INFO(22777, "Clearing all idle JS contexts due to out of memory");
+            _pools.clear();
+            return;
         }
+
+        if (Date_t::now() - scope->getCreateTime() > kMaxScopeReuseTime) {
+            return;  // too old to save
+        }
+
+        if (!scope->getError().empty()) {
+            return;  // not saving errored scopes
+        }
+
+        if (_pools.size() >= kMaxPoolSize) {
+            // prefer to keep recently-used scopes
+            _pools.pop_back();
+        }
+
+        scope->reset();
+        ScopeAndPool toStore = {scope, poolName};
+        _pools.push_front(toStore);
     }
 
     std::shared_ptr<Scope> tryAcquire(OperationContext* opCtx, const string& poolName) {
@@ -467,16 +431,13 @@ public:
         : _pool(pool), _real(real) {}
 
     virtual ~PooledScope() {
+        // SERVER-53671: Sometimes, ScopeCache::release() will generate an 'InterruptedAtShutdown'
+        // exception. We catch and ignore such exceptions here to prevent them from crashing the
+        // server while it is shutting down.
         try {
             scopeCache.release(_pool, _real);
-        } catch (const DBException& e) {
-            LOGV2_ERROR(
-                5182702, "DBException in ~PooledScope", "exception"_attr = e, "_pool"_attr = _pool);
-            std::terminate();
-        } catch (...) {
-            LOGV2_ERROR(
-                5182703, "Exception (not DBException) in ~PooledScope", "_pool"_attr = _pool);
-            std::terminate();
+        } catch (const ExceptionFor<ErrorCodes::InterruptedAtShutdown>&) {
+            LOGV2(5367100, "Interrupted at shutdown during ~PooledScope()");
         }
     }
 
