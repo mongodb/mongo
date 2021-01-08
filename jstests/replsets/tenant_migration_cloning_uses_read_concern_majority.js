@@ -27,13 +27,11 @@ const collName = "testColl";
 const donorPrimary = tenantMigrationTest.getDonorPrimary();
 const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
 const donorRst = tenantMigrationTest.getDonorRst();
+const donorTestColl = donorPrimary.getDB(dbName).getCollection(collName);
 
 // Populate the donor replica set with some initial data and make sure it is majority committed.
 const majorityCommittedDocs = [{_id: 0, x: 0}, {_id: 1, x: 1}];
-tenantMigrationTest.insertDonorDB(dbName, collName, majorityCommittedDocs);
-donorRst.awaitReplication();
-
-const donorTestColl = donorPrimary.getDB(dbName).getCollection(collName);
+assert.commandWorked(donorTestColl.insert(majorityCommittedDocs, {writeConcern: {w: "majority"}}));
 assert.eq(2, donorTestColl.find().readConcern("majority").itcount());
 
 const migrationId = UUID();
