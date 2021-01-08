@@ -224,19 +224,24 @@ that all locks are held while a Change's `commit()` or `rollback()` function run
 
 # Read Operations
 
-All read operations on collections and indexes are required to take collection locks. Storage
-engines that provide document-level concurrency require all operations to hold at least a collection
-IS lock. With the WiredTiger storage engine, the MongoDB integration layer implicitly starts a
-storage transaction on the first attempt to read from a collection or index. Unless a read operation
-is part of a larger write operation, the transaction is rolled-back automatically when the last
-GlobalLock is released, explicitly during query yielding, or from a call to abandonSnapshot();
+External reads via the find, count, distint, aggregation and mapReduce cmds do not take collection
+MODE_IS locks (mapReduce does continue to take MODE_IX collection locks for writes). Internal
+operations continue to take collection locks. Lock-free reads (only take the global lock in MODE_IS)
+achieve this by establishing consistent in-memory and storage engine on-disk state at the start of
+their operations. Lock-free reads explicitly open a storage transaction while setting up consistent
+in-memory and on-disk read state. Internal reads with collection level locks implicitly start
+storage transactions later via the MongoDB integration layer on the first attempt to read from a
+collection or index. Unless a read operation is part of a larger write operation, the transaction
+is rolled-back automatically when the last GlobalLock is released, explicitly during query yielding,
+or from a call to abandonSnapshot(). Lock-free read operations must re-establish consistent state
+after a query yield, just as at the start of a read operation.
 
 See
 [WiredTigerCursor](https://github.com/mongodb/mongo/blob/r4.4.0-rc13/src/mongo/db/storage/wiredtiger/wiredtiger_cursor.cpp#L48),
-[WiredTigerRecoveryUnit::getSession](https://github.com/mongodb/mongo/blob/r4.4.0-rc13/src/mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.cpp#L303-L305),
-[GlobalLock dtor](https://github.com/mongodb/mongo/blob/r4.4.0-rc13/src/mongo/db/concurrency/d_concurrency.h#L228-L239),
-[PlanYieldPolicy::_yieldAllLocks](https://github.com/mongodb/mongo/blob/r4.4.0-rc13/src/mongo/db/query/plan_yield_policy.cpp#L182),
-[RecoveryUnit::abandonSnapshot](https://github.com/mongodb/mongo/blob/r4.4.0-rc13/src/mongo/db/storage/recovery_unit.h#L217).
+[WiredTigerRecoveryUnit::getSession()](https://github.com/mongodb/mongo/blob/r4.4.0-rc13/src/mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.cpp#L303-L305),
+[~GlobalLock](https://github.com/mongodb/mongo/blob/r4.4.0-rc13/src/mongo/db/concurrency/d_concurrency.h#L228-L239),
+[PlanYieldPolicy::_yieldAllLocks()](https://github.com/mongodb/mongo/blob/r4.4.0-rc13/src/mongo/db/query/plan_yield_policy.cpp#L182),
+[RecoveryUnit::abandonSnapshot()](https://github.com/mongodb/mongo/blob/r4.4.0-rc13/src/mongo/db/storage/recovery_unit.h#L217).
 
 ## Collection Reads
 
@@ -255,17 +260,41 @@ Index reads act directly on a
 Most readers create cursors rather than interacting with indexes through the
 [IndexAccessMethod](https://github.com/mongodb/mongo/blob/r4.4.0-rc13/src/mongo/db/index/index_access_method.h#L142).
 
-## AutoGetCollectionForRead 
+## Read Locks
+
+### Locked Reads
 
 The
-[AutoGetCollectionForRead](https://github.com/mongodb/mongo/blob/58283ca178782c4d1c4a4d2acd4313f6f6f86fd5/src/mongo/db/db_raii.cpp#L89)
-(AGCFR) RAII type is used by most client read operations. In addition to acquiring all necessary
+[`AutoGetCollectionForRead`](https://github.com/mongodb/mongo/blob/58283ca178782c4d1c4a4d2acd4313f6f6f86fd5/src/mongo/db/db_raii.cpp#L89)
+(`AGCFR`) RAII type is used by most client read operations. In addition to acquiring all necessary
 locks in the hierarchy, it ensures that operations reading at points in time are respecting the
 visibility rules of collection data and metadata.
 
-AGCFR ensures that operations reading at a timestamp do not read at times later than metadata
+`AGCFR` ensures that operations reading at a timestamp do not read at times later than metadata
 changes on the collection (see
 [here](https://github.com/mongodb/mongo/blob/58283ca178782c4d1c4a4d2acd4313f6f6f86fd5/src/mongo/db/db_raii.cpp#L158)).
+
+### Lock-Free Reads (global MODE_IS lock only)
+
+Lock-free reads use the
+[`AutoGetCollectionForReadLockFree`](https://github.com/mongodb/mongo/blob/4363473d75cab2a487c6a6066b601d52230c7e1a/src/mongo/db/db_raii.cpp#L429)
+helper, which, in addition to the logic of `AutoGetCollectionForRead`, will establish consistent
+in-memory and on-disk catalog state and data view. Locks are avoided by comparing in-memory fetched
+state before and after an on-disk storage snapshot is opened. If the in-memory state differs before
+and after, then the storage snapshot is abandoned and the code will retry until before and after
+match. Lock-free reads skip collection and RSTL locks, so
+[the repl mode/state and collection state](https://github.com/mongodb/mongo/blob/4363473d75cab2a487c6a6066b601d52230c7e1a/src/mongo/db/db_raii.cpp#L97-L102)
+are compared before and after. In general, lock-free reads work by acquiring all the 'versioned'
+state needed for the read at the beginning, rather than relying on a collection-level lock to keep
+the state from changing.
+
+Sharding `shardVersion` checks still occur in the appropriate query plan stage code when/if the
+shard filtering metadata is acquired. The `shardVersion` check after
+`AutoGetCollectionForReadLockFree` sets up combined with a read request's `shardVersion` provided
+before `AutoGetCollectionForReadLockFree` runs is effectively a before and after comparison around
+the 'versioned' state setup. The sharding protocol obviates any special changes for lock-free
+reads other than consistently using the same view of the sharding metadata
+[(acquiring it once and then passing it where needed in the read code)](https://github.com/mongodb/mongo/blob/9e1f0ea4f371a8101f96c84d2ecd3811d68cafb6/src/mongo/db/catalog_raii.cpp#L251-L273).
 
 ## Secondary Reads
 
