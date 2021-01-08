@@ -41,6 +41,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
@@ -48,6 +49,7 @@
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_replace_root.h"
 #include "mongo/db/pipeline/sharded_agg_helpers.h"
+#include "mongo/db/query/query_request.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding_util.h"
 #include "mongo/db/service_context.h"
@@ -60,6 +62,20 @@
 #include "mongo/util/str.h"
 
 namespace mongo {
+namespace {
+
+bool collectionHasSimpleCollation(OperationContext* opCtx, const NamespaceString& nss) {
+    auto catalogCache = Grid::get(opCtx)->catalogCache();
+    auto sourceChunkMgr = uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, nss));
+
+    uassert(ErrorCodes::NamespaceNotSharded,
+            str::stream() << "Expected collection " << nss << " to be sharded",
+            sourceChunkMgr.isSharded());
+
+    return !sourceChunkMgr.getDefaultCollator();
+}
+
+}  // namespace
 
 ReshardingCollectionCloner::ReshardingCollectionCloner(ShardKeyPattern newShardKeyPattern,
                                                        NamespaceString sourceNss,
@@ -75,7 +91,9 @@ ReshardingCollectionCloner::ReshardingCollectionCloner(ShardKeyPattern newShardK
       _outputNss(std::move(outputNss)) {}
 
 std::unique_ptr<Pipeline, PipelineDeleter> ReshardingCollectionCloner::makePipeline(
-    OperationContext* opCtx, std::shared_ptr<MongoProcessInterface> mongoProcessInterface) {
+    OperationContext* opCtx,
+    std::shared_ptr<MongoProcessInterface> mongoProcessInterface,
+    Value resumeId) {
     using Doc = Document;
     using Arr = std::vector<Value>;
     using V = Value;
@@ -90,6 +108,19 @@ std::unique_ptr<Pipeline, PipelineDeleter> ReshardingCollectionCloner::makePipel
     auto tempCacheChunksNss =
         NamespaceString(NamespaceString::kConfigDb, "cache.chunks." + tempNss.ns());
     resolvedNamespaces[tempCacheChunksNss.coll()] = {tempCacheChunksNss, std::vector<BSONObj>{}};
+
+    // sharded_agg_helpers::targetShardsAndAddMergeCursors() ignores the collation set on the
+    // AggregationRequest (or lack thereof) and instead only considers the collator set on the
+    // ExpressionContext. Setting nullptr as the collator on the ExpressionContext means that the
+    // aggregation pipeline is always using the "simple" collation, even when the collection default
+    // collation for _sourceNss is non-simple. The chunk ranges in the $lookup stage must be
+    // compared using the simple collation because collections are always sharded using the simple
+    // collation. However, resuming by _id is only efficient (i.e. non-blocking seek/sort) when the
+    // aggregation pipeline would be using the collection's default collation. We cannot do both so
+    // we choose to disallow automatic resuming for collections with non-simple default collations.
+    uassert(4929303,
+            "Cannot resume cloning when sharded collection has non-simple default collation",
+            resumeId.missing() || collectionHasSimpleCollation(opCtx, _sourceNss));
 
     auto expCtx = make_intrusive<ExpressionContext>(opCtx,
                                                     boost::none, /* explain */
@@ -106,6 +137,14 @@ std::unique_ptr<Pipeline, PipelineDeleter> ReshardingCollectionCloner::makePipel
                                                     _sourceUUID);
 
     Pipeline::SourceContainer stages;
+
+    if (!resumeId.missing()) {
+        stages.emplace_back(DocumentSourceMatch::create(
+            Doc{{"$expr",
+                 Doc{{"$gte", Arr{V{"$_id"_sd}, V{Doc{{"$literal", std::move(resumeId)}}}}}}}}
+                .toBson(),
+            expCtx));
+    }
 
     stages.emplace_back(DocumentSourceReplaceRoot::createFromBson(
         fromjson("{$replaceWith: {original: '$$ROOT'}}").firstElement(), expCtx));
@@ -154,16 +193,62 @@ std::unique_ptr<Pipeline, PipelineDeleter> ReshardingCollectionCloner::makePipel
 
     stages.emplace_back(
         DocumentSourceMatch::create(fromjson("{intersectingChunk: {$ne: []}}"), expCtx));
-    stages.emplace_back(DocumentSourceReplaceRoot::createFromBson(
-        fromjson("{$replaceWith: '$original'}").firstElement(), expCtx));
-    return Pipeline::create(std::move(stages), expCtx);
+
+    // We use $arrayToObject to synthesize the $sortKeys needed by the AsyncResultsMerger to merge
+    // the results from all of the donor shards by {_id: 1}. This expression wouldn't be correct if
+    // the aggregation pipeline was using a non-"simple" collation.
+    stages.emplace_back(
+        DocumentSourceReplaceRoot::createFromBson(fromjson("{$replaceWith: {$mergeObjects: [\
+            '$original',\
+            {$arrayToObject: {$concatArrays: [[{\
+                k: {$literal: '$sortKey'},\
+                v: ['$original._id']\
+            }]]}}\
+        ]}}")
+                                                      .firstElement(),
+                                                  expCtx));
+
+    return Pipeline::create(std::move(stages), std::move(expCtx));
+}
+
+Value ReshardingCollectionCloner::_findHighestInsertedId(OperationContext* opCtx) {
+    AutoGetCollection outputColl(opCtx, _outputNss, MODE_IS);
+    uassert(ErrorCodes::NamespaceNotFound,
+            str::stream() << "Resharding collection cloner's output collection '" << _outputNss
+                          << "' did not already exist",
+            outputColl);
+
+    auto qr = std::make_unique<QueryRequest>(_outputNss);
+    qr->setLimit(1);
+    qr->setSort(BSON("_id" << -1));
+
+    auto recordId = Helpers::findOne(opCtx, *outputColl, std::move(qr), true /* requireIndex */);
+    if (!recordId.isNormal()) {
+        return Value{};
+    }
+
+    auto doc = outputColl->docFor(opCtx, recordId).value();
+    auto value = Value{doc["_id"]};
+    uassert(4929300,
+            "Missing _id field for document in temporary resharding collection",
+            !value.missing());
+
+    return value;
 }
 
 std::unique_ptr<Pipeline, PipelineDeleter> ReshardingCollectionCloner::_targetAggregationRequest(
     OperationContext* opCtx, const Pipeline& pipeline) {
     AggregateCommand request(_sourceNss, pipeline.serializeToBson());
     request.setCollectionUUID(_sourceUUID);
-    request.setHint(BSON("_id" << 1));
+
+    auto hint = collectionHasSimpleCollation(opCtx, _sourceNss)
+        ? boost::optional<BSONObj>{BSON("_id" << 1)}
+        : boost::none;
+
+    if (hint) {
+        request.setHint(*hint);
+    }
+
     request.setReadConcern(BSON(repl::ReadConcernArgs::kLevelFieldName
                                 << repl::readConcernLevels::kSnapshotName
                                 << repl::ReadConcernArgs::kAtClusterTimeFieldName
@@ -175,8 +260,11 @@ std::unique_ptr<Pipeline, PipelineDeleter> ReshardingCollectionCloner::_targetAg
                              _sourceNss,
                              "targeting donor shards for resharding collection cloning"_sd,
                              [&] {
+                                 // We use the hint as an implied sort for $mergeCursors because
+                                 // the aggregation pipeline synthesizes the necessary $sortKeys
+                                 // fields in the result set.
                                  return sharded_agg_helpers::targetShardsAndAddMergeCursors(
-                                     pipeline.getContext(), request);
+                                     pipeline.getContext(), request, hint);
                              });
 }
 
@@ -276,8 +364,36 @@ ExecutorFuture<void> ReshardingCollectionCloner::run(
     return AsyncTry([this, chainCtx] {
                if (!chainCtx->pipeline) {
                    chainCtx->pipeline = _withTemporaryOperationContext([&](auto* opCtx) {
+                       auto idToResumeFrom = _findHighestInsertedId(opCtx);
                        auto pipeline = _targetAggregationRequest(
-                           opCtx, *makePipeline(opCtx, MongoProcessInterface::create(opCtx)));
+                           opCtx,
+                           *makePipeline(
+                               opCtx, MongoProcessInterface::create(opCtx), idToResumeFrom));
+
+                       if (!idToResumeFrom.missing()) {
+                           // Skip inserting the first document retrieved after resuming because
+                           // $gte was used in the aggregation pipeline.
+                           auto firstDoc = pipeline->getNext();
+                           uassert(4929301,
+                                   str::stream()
+                                       << "Expected pipeline to retrieve document with _id: "
+                                       << redact(idToResumeFrom.toString()),
+                                   firstDoc);
+
+                           // Note that the following uassert() could throw because we're using the
+                           // simple string comparator and the collection could have a non-simple
+                           // collation. However, it would still be correct to throw an exception
+                           // because it would mean the collection being resharded contains multiple
+                           // documents with the same _id value as far as global uniqueness is
+                           // concerned.
+                           const auto& firstId = (*firstDoc)["_id"];
+                           uassert(4929302,
+                                   str::stream()
+                                       << "Expected pipeline to retrieve document with _id: "
+                                       << redact(idToResumeFrom.toString())
+                                       << ", but got _id: " << redact(firstId.toString()),
+                                   ValueComparator::kInstance.evaluate(firstId == idToResumeFrom));
+                       }
 
                        pipeline->detachFromOperationContext();
                        pipeline.get_deleter().dismissDisposal();

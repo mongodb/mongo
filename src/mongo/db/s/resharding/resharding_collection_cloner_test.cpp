@@ -124,11 +124,13 @@ TEST_F(ReshardingCollectionClonerTest, MinKeyChunk) {
 
     auto next = pipeline->getNext();
     ASSERT(next);
-    ASSERT_BSONOBJ_BINARY_EQ(BSON("_id" << 1 << "x" << MINKEY), next->toBson());
+    ASSERT_BSONOBJ_BINARY_EQ(BSON("_id" << 1 << "x" << MINKEY << "$sortKey" << BSON_ARRAY(1)),
+                             next->toBson());
 
     next = pipeline->getNext();
     ASSERT(next);
-    ASSERT_BSONOBJ_BINARY_EQ(BSON("_id" << 2 << "x" << -0.001), next->toBson());
+    ASSERT_BSONOBJ_BINARY_EQ(BSON("_id" << 2 << "x" << -0.001 << "$sortKey" << BSON_ARRAY(2)),
+                             next->toBson());
 
     ASSERT_FALSE(pipeline->getNext());
 }
@@ -148,19 +150,23 @@ TEST_F(ReshardingCollectionClonerTest, MaxKeyChunk) {
 
     auto next = pipeline->getNext();
     ASSERT(next);
-    ASSERT_BSONOBJ_BINARY_EQ(BSON("_id" << 3 << "x" << 0LL), next->toBson());
+    ASSERT_BSONOBJ_BINARY_EQ(BSON("_id" << 3 << "x" << 0LL << "$sortKey" << BSON_ARRAY(3)),
+                             next->toBson());
 
     next = pipeline->getNext();
     ASSERT(next);
-    ASSERT_BSONOBJ_BINARY_EQ(BSON("_id" << 4 << "x" << 0.0), next->toBson());
+    ASSERT_BSONOBJ_BINARY_EQ(BSON("_id" << 4 << "x" << 0.0 << "$sortKey" << BSON_ARRAY(4)),
+                             next->toBson());
 
     next = pipeline->getNext();
     ASSERT(next);
-    ASSERT_BSONOBJ_BINARY_EQ(BSON("_id" << 5 << "x" << 0.001), next->toBson());
+    ASSERT_BSONOBJ_BINARY_EQ(BSON("_id" << 5 << "x" << 0.001 << "$sortKey" << BSON_ARRAY(5)),
+                             next->toBson());
 
     next = pipeline->getNext();
     ASSERT(next);
-    ASSERT_BSONOBJ_BINARY_EQ(BSON("_id" << 6 << "x" << MAXKEY), next->toBson());
+    ASSERT_BSONOBJ_BINARY_EQ(BSON("_id" << 6 << "x" << MAXKEY << "$sortKey" << BSON_ARRAY(6)),
+                             next->toBson());
 
     ASSERT_FALSE(pipeline->getNext());
 }
@@ -193,19 +199,23 @@ TEST_F(ReshardingCollectionClonerTest, HashedShardKey) {
 
     auto next = pipeline->getNext();
     ASSERT(next);
-    ASSERT_BSONOBJ_BINARY_EQ(BSON("_id" << 3 << "x" << -0.123), next->toBson());
+    ASSERT_BSONOBJ_BINARY_EQ(BSON("_id" << 3 << "x" << -0.123 << "$sortKey" << BSON_ARRAY(3)),
+                             next->toBson());
 
     next = pipeline->getNext();
     ASSERT(next);
-    ASSERT_BSONOBJ_BINARY_EQ(BSON("_id" << 4 << "x" << 0), next->toBson());
+    ASSERT_BSONOBJ_BINARY_EQ(BSON("_id" << 4 << "x" << 0 << "$sortKey" << BSON_ARRAY(4)),
+                             next->toBson());
 
     next = pipeline->getNext();
     ASSERT(next);
-    ASSERT_BSONOBJ_BINARY_EQ(BSON("_id" << 5 << "x" << 0LL), next->toBson());
+    ASSERT_BSONOBJ_BINARY_EQ(BSON("_id" << 5 << "x" << 0LL << "$sortKey" << BSON_ARRAY(5)),
+                             next->toBson());
 
     next = pipeline->getNext();
     ASSERT(next);
-    ASSERT_BSONOBJ_BINARY_EQ(BSON("_id" << 6 << "x" << 0.123), next->toBson());
+    ASSERT_BSONOBJ_BINARY_EQ(BSON("_id" << 6 << "x" << 0.123 << "$sortKey" << BSON_ARRAY(6)),
+                             next->toBson());
 
     ASSERT_FALSE(pipeline->getNext());
 }
@@ -238,7 +248,8 @@ TEST_F(ReshardingCollectionClonerTest, CompoundHashedShardKey) {
 
     auto next = pipeline->getNext();
     ASSERT(next);
-    ASSERT_BSONOBJ_BINARY_EQ(BSON("_id" << 4 << "x" << 0 << "y" << 0), next->toBson());
+    ASSERT_BSONOBJ_BINARY_EQ(
+        BSON("_id" << 4 << "x" << 0 << "y" << 0 << "$sortKey" << BSON_ARRAY(4)), next->toBson());
 
     ASSERT_FALSE(pipeline->getNext());
 }

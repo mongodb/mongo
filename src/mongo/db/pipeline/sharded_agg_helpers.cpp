@@ -600,7 +600,8 @@ void abandonCacheIfSentToShards(Pipeline* shardsPipeline) {
 
 std::unique_ptr<Pipeline, PipelineDeleter> targetShardsAndAddMergeCursors(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    stdx::variant<std::unique_ptr<Pipeline, PipelineDeleter>, AggregateCommand> targetRequest) {
+    stdx::variant<std::unique_ptr<Pipeline, PipelineDeleter>, AggregateCommand> targetRequest,
+    boost::optional<BSONObj> shardCursorsSortSpec) {
     auto&& [aggRequest, pipeline] = [&] {
         return stdx::visit(
             visit_helper::Overloaded{
@@ -642,10 +643,12 @@ std::unique_ptr<Pipeline, PipelineDeleter> targetShardsAndAddMergeCursors(
     }
 
     std::unique_ptr<Pipeline, PipelineDeleter> mergePipeline;
-    boost::optional<BSONObj> shardCursorsSortSpec = boost::none;
     if (shardDispatchResults.splitPipeline) {
         mergePipeline = std::move(shardDispatchResults.splitPipeline->mergePipeline);
-        shardCursorsSortSpec = shardDispatchResults.splitPipeline->shardCursorsSortSpec;
+        if (shardDispatchResults.splitPipeline->shardCursorsSortSpec) {
+            uassert(4929304, "Split pipeline provides its own sort already", !shardCursorsSortSpec);
+            shardCursorsSortSpec = shardDispatchResults.splitPipeline->shardCursorsSortSpec;
+        }
     } else {
         // We have not split the pipeline, and will execute entirely on the remote shards. Set up an
         // empty local pipeline which we will attach the merge cursors stage to.

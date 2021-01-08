@@ -34,6 +34,7 @@
 
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
@@ -62,12 +63,16 @@ public:
                                NamespaceString outputNss);
 
     std::unique_ptr<Pipeline, PipelineDeleter> makePipeline(
-        OperationContext* opCtx, std::shared_ptr<MongoProcessInterface> mongoProcessInterface);
+        OperationContext* opCtx,
+        std::shared_ptr<MongoProcessInterface> mongoProcessInterface,
+        Value resumeId = Value());
 
     ExecutorFuture<void> run(std::shared_ptr<executor::TaskExecutor> executor,
                              CancelationToken cancelToken);
 
 private:
+    Value _findHighestInsertedId(OperationContext* opCtx);
+
     std::unique_ptr<Pipeline, PipelineDeleter> _targetAggregationRequest(OperationContext* opCtx,
                                                                          const Pipeline& pipeline);
 
