@@ -46,6 +46,37 @@
 
 namespace mongo {
 namespace catalog {
+namespace {
+auto removeEmptyDirectory =
+    [](ServiceContext* svcCtx, StorageEngine* storageEngine, const NamespaceString& ns) {
+        // Nothing to do if not using directoryperdb or there are still collections in the
+        // database.
+        auto collectionCatalog = CollectionCatalog::get(svcCtx);
+        if (!storageEngine->isUsingDirectoryPerDb() ||
+            collectionCatalog->begin(nullptr, ns.db()) != collectionCatalog->end(nullptr)) {
+            return;
+        }
+
+        boost::system::error_code ec;
+        boost::filesystem::remove(storageEngine->getFilesystemPathForDb(ns.db().toString()), ec);
+
+        if (!ec) {
+            LOGV2(4888200, "Removed empty database directory", "db"_attr = ns.db());
+        } else if (collectionCatalog->begin(nullptr, ns.db()) == collectionCatalog->end(nullptr)) {
+            // It is possible for a new collection to be created in the database between when we
+            // check whether the database is empty and actually attempting to remove the directory.
+            // In this case, don't log that the removal failed because it is expected. However,
+            // since we attempt to remove the directory for both the collection and index ident
+            // drops, once the database is empty it will be still logged until the final of these
+            // ident drops occurs.
+            LOGV2_DEBUG(4888201,
+                        1,
+                        "Failed to remove database directory",
+                        "db"_attr = ns.db(),
+                        "error"_attr = ec.message());
+        }
+    };
+}  // namespace
 
 void removeIndex(OperationContext* opCtx,
                  StringData indexName,
@@ -76,34 +107,37 @@ void removeIndex(OperationContext* opCtx,
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
 
     // Schedule the second phase of drop to delete the data when it is no longer in use, if the
-    // first phase is successuflly committed.
-    opCtx->recoveryUnit()->onCommit([opCtx,
+    // first phase is successfully committed.
+    opCtx->recoveryUnit()->onCommit([svcCtx = opCtx->getServiceContext(),
                                      recoveryUnit,
                                      storageEngine,
                                      collectionUUID,
                                      nss,
                                      indexNameStr = indexName.toString(),
                                      ident](boost::optional<Timestamp> commitTimestamp) {
+        StorageEngine::DropIdentCallback onDrop = [svcCtx, storageEngine, nss] {
+            removeEmptyDirectory(svcCtx, storageEngine, nss);
+        };
+
         if (storageEngine->supportsPendingDrops()) {
             if (!commitTimestamp) {
                 // Standalone mode will not provide a timestamp.
                 commitTimestamp = Timestamp::min();
             }
             LOGV2(22206,
-                  "Deferring table drop for index '{index}' on collection "
-                  "'{namespace}{uuid}. Ident: '{ident}', commit timestamp: '{commitTimestamp}'",
                   "Deferring table drop for index",
                   "index"_attr = indexNameStr,
                   logAttrs(nss),
                   "uuid"_attr = collectionUUID,
                   "ident"_attr = ident->getIdent(),
                   "commitTimestamp"_attr = commitTimestamp);
-            storageEngine->addDropPendingIdent(*commitTimestamp, nss, ident);
+            storageEngine->addDropPendingIdent(*commitTimestamp, nss, ident, std::move(onDrop));
         } else {
             // Intentionally ignoring failure here. Since we've removed the metadata pointing to
             // the collection, we should never see it again anyway.
-            auto kvEngine = storageEngine->getEngine();
-            kvEngine->dropIdent(recoveryUnit, ident->getIdent()).ignore();
+            storageEngine->getEngine()
+                ->dropIdent(recoveryUnit, ident->getIdent(), std::move(onDrop))
+                .ignore();
         }
     });
 }
@@ -131,36 +165,12 @@ Status dropCollection(OperationContext* opCtx,
 
 
     // Schedule the second phase of drop to delete the data when it is no longer in use, if the
-    // first phase is successuflly committed.
+    // first phase is successfully committed.
     opCtx->recoveryUnit()->onCommit(
         [svcCtx = opCtx->getServiceContext(), recoveryUnit, storageEngine, nss, ident](
             boost::optional<Timestamp> commitTimestamp) {
-            StorageEngine::DropIdentCallback onDrop = [svcCtx, storageEngine, ns = nss] {
-                // Nothing to do if not using directoryperdb or there are still collections in the
-                // database.
-                auto collectionCatalog = CollectionCatalog::get(svcCtx);
-                if (!storageEngine->isUsingDirectoryPerDb() ||
-                    collectionCatalog->begin(nullptr, ns.db()) != collectionCatalog->end(nullptr)) {
-                    return;
-                }
-
-                boost::system::error_code ec;
-                boost::filesystem::remove(storageEngine->getFilesystemPathForDb(ns.db().toString()),
-                                          ec);
-
-                if (!ec) {
-                    LOGV2(4888200, "Removed empty database directory", "db"_attr = ns.db());
-                } else if (collectionCatalog->begin(nullptr, ns.db()) ==
-                           collectionCatalog->end(nullptr)) {
-                    // It is possible for a new collection to be created in the database between
-                    // when we check whether the database is empty and actually attempting to
-                    // remove the directory. In this case, don't log that the removal failed
-                    // because it is expected.
-                    LOGV2(4888201,
-                          "Failed to remove database directory",
-                          "db"_attr = ns.db(),
-                          "error"_attr = ec.message());
-                }
+            StorageEngine::DropIdentCallback onDrop = [svcCtx, storageEngine, nss] {
+                removeEmptyDirectory(svcCtx, storageEngine, nss);
             };
 
             if (storageEngine->supportsPendingDrops()) {
