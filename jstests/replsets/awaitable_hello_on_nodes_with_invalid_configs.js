@@ -127,7 +127,13 @@ awaitPrimaryHelloBeforeNodeRemoval();
 assert.soonNoExcept(
     () => assert.commandFailedWithCode(secondaryDB.adminCommand({replSetGetStatus: 1}),
                                        ErrorCodes.InvalidReplicaSetConfig));
-connectionsClosedAfterRemoved.wait();
+
+// It is possible that 'waitForFailpoint' is called as connections are being closed, triggering
+// an exception. In this case, retry until we are sure connections are finished closing.
+assert.soonNoExcept(function() {
+    connectionsClosedAfterRemoved.wait();
+    return true;
+});
 
 const primaryRespAfterRemoval = assert.commandWorked(primaryDB.runCommand({hello: 1}));
 const secondaryRespAfterRemoval = assert.commandWorked(secondaryDB.runCommand({hello: 1}));
