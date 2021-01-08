@@ -261,6 +261,11 @@ public:
     // ================== Test support API ===================
 
     /**
+     * Returns the StartingPoint defined in the OplogFetcher::Config.
+     */
+    StartingPoint getStartingPoint_forTest() const;
+
+    /**
      * Returns the `find` query run on the sync source's oplog.
      */
     BSONObj getFindQuery_forTest(long long findTimeout) const;

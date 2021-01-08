@@ -44,6 +44,7 @@
 #include "mongo/db/repl/oplog_applier.h"
 #include "mongo/db/repl/oplog_buffer_collection.h"
 #include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/oplog_interface_local.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
@@ -56,6 +57,7 @@
 #include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/future_util.h"
 
 namespace mongo {
@@ -69,6 +71,7 @@ MONGO_FAIL_POINT_DEFINE(pauseBeforeRunTenantMigrationRecipientInstance);
 MONGO_FAIL_POINT_DEFINE(pauseAfterRunTenantMigrationRecipientInstance);
 MONGO_FAIL_POINT_DEFINE(skipTenantMigrationRecipientAuth);
 MONGO_FAIL_POINT_DEFINE(autoRecipientForgetMigration);
+MONGO_FAIL_POINT_DEFINE(pauseAfterCreatingOplogBuffer);
 
 // Fails before waiting for the state doc to be majority replicated.
 MONGO_FAIL_POINT_DEFINE(failWhilePersistingTenantMigrationRecipientInstanceStateDoc);
@@ -484,7 +487,12 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::_initializeStateDoc(
         .semi();
 }
 
-void TenantMigrationRecipientService::Instance::_getStartOpTimesFromDonor(WithLock) {
+void TenantMigrationRecipientService::Instance::_getStartOpTimesFromDonor(WithLock lk) {
+    if (_isCloneCompletedMarkerSet(lk)) {
+        invariant(_stateDoc.getStartApplyingDonorOpTime().has_value());
+        invariant(_stateDoc.getStartFetchingDonorOpTime().has_value());
+        return;
+    }
     // Get the last oplog entry at the read concern majority optime in the remote oplog.  It
     // does not matter which tenant it is for.
     auto oplogOpTimeFields =
@@ -572,9 +580,21 @@ void TenantMigrationRecipientService::Instance::_startOplogFetcher() {
     _donorOplogBuffer = std::make_unique<OplogBufferCollection>(
         StorageInterface::get(opCtx.get()), oplogBufferNs, options);
     _donorOplogBuffer->startup(opCtx.get());
+
+    pauseAfterCreatingOplogBuffer.pauseWhileSet();
+
     _dataReplicatorExternalState = std::make_unique<DataReplicatorExternalStateTenantMigration>();
+    auto startFetchOpTime = *_stateDoc.getStartFetchingDonorOpTime();
+    auto resumingFromOplogBuffer = false;
+    if (_isCloneCompletedMarkerSet(lk)) {
+        auto topOfOplogBuffer = _donorOplogBuffer->lastObjectPushed(opCtx.get());
+        if (topOfOplogBuffer) {
+            startFetchOpTime = uassertStatusOK(OpTime::parseFromOplogEntry(topOfOplogBuffer.get()));
+            resumingFromOplogBuffer = true;
+        }
+    }
     OplogFetcher::Config oplogFetcherConfig(
-        *_stateDoc.getStartFetchingDonorOpTime(),
+        startFetchOpTime,
         _oplogFetcherClient->getServerHostAndPort(),
         // The config is only used for setting the awaitData timeout; the defaults are fine.
         ReplSetConfig::parse(BSON("_id"
@@ -590,7 +610,9 @@ void TenantMigrationRecipientService::Instance::_startOplogFetcher() {
     oplogFetcherConfig.requestResumeToken = true;
     oplogFetcherConfig.name =
         "TenantOplogFetcher_" + getTenantId() + "_" + getMigrationUUID().toString();
-    oplogFetcherConfig.startingPoint = OplogFetcher::StartingPoint::kEnqueueFirstDoc;
+    oplogFetcherConfig.startingPoint = resumingFromOplogBuffer
+        ? OplogFetcher::StartingPoint::kSkipFirstDoc
+        : OplogFetcher::StartingPoint::kEnqueueFirstDoc;
 
     _donorOplogFetcher = (*_createOplogFetcherFn)(
         (**_scopedExecutor).get(),
@@ -703,6 +725,54 @@ void TenantMigrationRecipientService::Instance::_stopOrHangOnFailPoint(FailPoint
 
 bool TenantMigrationRecipientService::Instance::_isCloneCompletedMarkerSet(WithLock) const {
     return _stateDoc.getCloneFinishedRecipientOpTime().has_value();
+}
+
+OpTime TenantMigrationRecipientService::Instance::_getOplogResumeApplyingDonorOptime(
+    const OpTime startApplyingDonorOpTime, const OpTime cloneFinishedRecipientOpTime) const {
+    invariant(_stateDoc.getCloneFinishedRecipientOpTime().has_value());
+    auto opCtx = cc().makeOperationContext();
+    OplogInterfaceLocal oplog(opCtx.get());
+    auto oplogIter = oplog.makeIterator();
+    auto result = oplogIter->next();
+
+    while (result.isOK()) {
+        const auto oplogObj = result.getValue().first;
+        auto swRecipientOpTime = repl::OpTime::parseFromOplogEntry(oplogObj);
+        uassert(5272311,
+                str::stream() << "Unable to parse opTime from oplog entry: " << redact(oplogObj)
+                              << ", error: " << swRecipientOpTime.getStatus(),
+                swRecipientOpTime.isOK());
+        if (swRecipientOpTime.getValue() <= cloneFinishedRecipientOpTime) {
+            break;
+        }
+        const bool isFromCurrentMigration = oplogObj.hasField("fromTenantMigration") &&
+            (uassertStatusOK(UUID::parse(oplogObj.getField("fromTenantMigration"))) ==
+             getMigrationUUID());
+        // Find the most recent no-op oplog entry from the current migration.
+        if (isFromCurrentMigration &&
+            (oplogObj.getStringField("op") == OpType_serializer(repl::OpTypeEnum::kNoop))) {
+            const auto migratedEntryObj = oplogObj.getObjectField("o");
+            const auto swDonorOpTime = repl::OpTime::parseFromOplogEntry(migratedEntryObj);
+            uassert(5272305,
+                    str::stream() << "Unable to parse opTime from tenant migration oplog entry: "
+                                  << redact(oplogObj) << ", error: " << swDonorOpTime.getStatus(),
+                    swDonorOpTime.isOK());
+            if (swDonorOpTime.getValue() < startApplyingDonorOpTime) {
+                break;
+            }
+            LOGV2_DEBUG(5272302,
+                        1,
+                        "Found an optime to resume oplog application from",
+                        "opTime"_attr = swDonorOpTime.getValue());
+            return swDonorOpTime.getValue();
+        }
+        result = oplogIter->next();
+    }
+    LOGV2_DEBUG(5272304,
+                1,
+                "Resuming oplog application from startApplyingDonorOpTime",
+                "opTime"_attr = startApplyingDonorOpTime);
+    return startApplyingDonorOpTime;
 }
 
 Future<void> TenantMigrationRecipientService::Instance::_startTenantAllDatabaseCloner(WithLock lk) {
@@ -1096,7 +1166,7 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
         .then([this, self = shared_from_this()] {
             _stopOrHangOnFailPoint(&fpAfterStartingOplogFetcherMigrationRecipientInstance);
 
-            stdx::lock_guard lk(_mutex);
+            stdx::unique_lock lk(_mutex);
 
             {
                 // Throwing error when cloner is canceled externally via interrupt(), makes the
@@ -1110,20 +1180,37 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
 
             // Create the oplog applier but do not start it yet.
             invariant(_stateDoc.getStartApplyingDonorOpTime());
+
+            OpTime beginApplyingAfterOpTime;
+            bool isResuming = false;
+            if (_isCloneCompletedMarkerSet(lk)) {
+                const auto startApplyingDonorOpTime = *_stateDoc.getStartApplyingDonorOpTime();
+                const auto cloneFinishedRecipientOptime =
+                    *_stateDoc.getCloneFinishedRecipientOpTime();
+                lk.unlock();
+                // We avoid holding the mutex while scanning the local oplog which acquires the RSTL
+                // in IX mode. This is to allow us to be interruptable via a concurrent stepDown
+                // which acquires the RSTL in X mode.
+                beginApplyingAfterOpTime = _getOplogResumeApplyingDonorOptime(
+                    startApplyingDonorOpTime, cloneFinishedRecipientOptime);
+                isResuming = beginApplyingAfterOpTime > startApplyingDonorOpTime;
+                lk.lock();
+            } else {
+                beginApplyingAfterOpTime = *_stateDoc.getStartApplyingDonorOpTime();
+            }
             LOGV2_DEBUG(4881202,
                         1,
                         "Recipient migration service creating oplog applier",
                         "tenantId"_attr = getTenantId(),
                         "migrationId"_attr = getMigrationUUID(),
-                        "startApplyingDonorOpTime"_attr = *_stateDoc.getStartApplyingDonorOpTime());
-
-            _tenantOplogApplier =
-                std::make_shared<TenantOplogApplier>(_migrationUuid,
-                                                     _tenantId,
-                                                     *_stateDoc.getStartApplyingDonorOpTime(),
-                                                     _donorOplogBuffer.get(),
-                                                     **_scopedExecutor,
-                                                     _writerPool.get());
+                        "startApplyingDonorOpTime"_attr = beginApplyingAfterOpTime);
+            _tenantOplogApplier = std::make_shared<TenantOplogApplier>(_migrationUuid,
+                                                                       _tenantId,
+                                                                       beginApplyingAfterOpTime,
+                                                                       _donorOplogBuffer.get(),
+                                                                       **_scopedExecutor,
+                                                                       _writerPool.get(),
+                                                                       isResuming);
 
             // Start the cloner.
             auto clonerFuture = _startTenantAllDatabaseCloner(lk);

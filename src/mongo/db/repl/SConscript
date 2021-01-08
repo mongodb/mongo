@@ -1318,6 +1318,7 @@ env.Library(
         'oplog_buffer_collection',
         'oplog_entry',
         'oplog_fetcher',
+        'oplog_interface_local',
         'repl_server_parameters',
         'replication_auth',
         'tenant_migration_cloners',

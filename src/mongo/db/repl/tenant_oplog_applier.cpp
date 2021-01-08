@@ -55,19 +55,23 @@
 namespace mongo {
 namespace repl {
 
+MONGO_FAIL_POINT_DEFINE(hangInTenantOplogApplication);
+
 TenantOplogApplier::TenantOplogApplier(const UUID& migrationUuid,
                                        const std::string& tenantId,
                                        OpTime applyFromOpTime,
                                        RandomAccessOplogBuffer* oplogBuffer,
                                        std::shared_ptr<executor::TaskExecutor> executor,
-                                       ThreadPool* writerPool)
+                                       ThreadPool* writerPool,
+                                       const bool isResuming)
     : AbstractAsyncComponent(executor.get(), std::string("TenantOplogApplier_") + tenantId),
       _migrationUuid(migrationUuid),
       _tenantId(tenantId),
       _beginApplyingAfterOpTime(applyFromOpTime),
       _oplogBuffer(oplogBuffer),
       _executor(std::move(executor)),
-      _writerPool(writerPool) {}
+      _writerPool(writerPool),
+      _isResuming(isResuming) {}
 
 TenantOplogApplier::~TenantOplogApplier() {
     shutdown();
@@ -93,8 +97,17 @@ SemiFuture<TenantOplogApplier::OpTimePair> TenantOplogApplier::getNotificationFo
     return iter->second.getFuture().semi();
 }
 
+OpTime TenantOplogApplier::getBeginApplyingOpTime_forTest() const {
+    return _beginApplyingAfterOpTime;
+}
+
 Status TenantOplogApplier::_doStartup_inlock() noexcept {
-    _oplogBatcher = std::make_shared<TenantOplogBatcher>(_tenantId, _oplogBuffer, _executor);
+    Timestamp resumeTs;
+    if (_isResuming) {
+        resumeTs = _beginApplyingAfterOpTime.getTimestamp();
+    }
+    _oplogBatcher =
+        std::make_shared<TenantOplogBatcher>(_tenantId, _oplogBuffer, _executor, resumeTs);
     auto status = _oplogBatcher->startup();
     if (!status.isOK())
         return status;
@@ -288,6 +301,18 @@ void TenantOplogApplier::_applyOplogBatch(TenantOplogBatch* batch) {
         iter->second.emplaceValue(_lastAppliedOpTimesUpToLastBatch);
     }
     _opTimeNotificationList.erase(_opTimeNotificationList.begin(), firstUnexpiredIter);
+
+    hangInTenantOplogApplication.executeIf(
+        [&](const BSONObj& data) {
+            LOGV2(
+                5272315,
+                "hangInTenantOplogApplication failpoint enabled -- blocking until it is disabled.",
+                "tenant"_attr = _tenantId,
+                "migrationUuid"_attr = _migrationUuid,
+                "lastBatchCompletedOpTimes"_attr = lastBatchCompletedOpTimes);
+            hangInTenantOplogApplication.pauseWhileSet(opCtx.get());
+        },
+        [&](const BSONObj& data) { return !lastBatchCompletedOpTimes.recipientOpTime.isNull(); });
 }
 
 void TenantOplogApplier::_checkNsAndUuidsBelongToTenant(OperationContext* opCtx,

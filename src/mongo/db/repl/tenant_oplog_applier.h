@@ -76,7 +76,8 @@ public:
                        OpTime applyFromOpTime,
                        RandomAccessOplogBuffer* oplogBuffer,
                        std::shared_ptr<executor::TaskExecutor> executor,
-                       ThreadPool* writerPool);
+                       ThreadPool* writerPool,
+                       const bool isResuming = false);
 
     virtual ~TenantOplogApplier();
 
@@ -88,6 +89,11 @@ public:
      * entries) till that batch.
      */
     SemiFuture<OpTimePair> getNotificationForOpTime(OpTime donorOpTime);
+
+    /**
+     * Returns the optime the applier will start applying from. Used for testing.
+     */
+    OpTime getBeginApplyingOpTime_forTest() const;
 
 private:
     Status _doStartup_inlock() noexcept final;
@@ -153,6 +159,7 @@ private:
     Status _finalStatus = Status::OK();                                   // (M)
     stdx::unordered_set<UUID, UUID::Hash> _knownGoodUuids;                // (X)
     bool _applyLoopApplyingBatch = false;                                 // (M)
+    const bool _isResuming;                                               // (R)
 };
 
 /**

@@ -129,7 +129,6 @@ StatusWith<OplogFetcher::DocumentsInfo> OplogFetcher::validateDocuments(
                                        "least 1 document matching ts: "
                                     << lastTS.toString());
     }
-
     DocumentsInfo info;
     // The count of the bytes of the documents read off the network.
     info.networkDocumentBytes = 0;
@@ -250,6 +249,10 @@ std::string OplogFetcher::toString() {
     output << " retried find timeout: " << _getRetriedFindMaxTime();
     output << " awaitData timeout: " << _awaitDataTimeout;
     return output;
+}
+
+OplogFetcher::StartingPoint OplogFetcher::getStartingPoint_forTest() const {
+    return _config.startingPoint;
 }
 
 OpTime OplogFetcher::getLastOpTimeFetched_forTest() const {

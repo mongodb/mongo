@@ -41,10 +41,12 @@ namespace mongo {
 namespace repl {
 TenantOplogBatcher::TenantOplogBatcher(const std::string& tenantId,
                                        RandomAccessOplogBuffer* oplogBuffer,
-                                       std::shared_ptr<executor::TaskExecutor> executor)
+                                       std::shared_ptr<executor::TaskExecutor> executor,
+                                       Timestamp resumeBatchingTs)
     : AbstractAsyncComponent(executor.get(), std::string("TenantOplogBatcher_") + tenantId),
       _oplogBuffer(oplogBuffer),
-      _executor(executor) {}
+      _executor(executor),
+      _resumeBatchingTs(resumeBatchingTs) {}
 
 TenantOplogBatcher::~TenantOplogBatcher() {
     shutdown();
@@ -208,6 +210,27 @@ SemiFuture<TenantOplogBatch> TenantOplogBatcher::getNextBatch(BatchLimits limits
 Status TenantOplogBatcher::_doStartup_inlock() noexcept {
     LOGV2_DEBUG(
         4885604, 1, "Tenant Oplog Batcher starting up", "component"_attr = _getComponentName());
+    if (!_resumeBatchingTs.isNull()) {
+        auto opCtx = cc().makeOperationContext();
+        uassert(5272303,
+                str::stream() << "Error resuming oplog batcher",
+                _oplogBuffer
+                    ->seekToTimestamp(opCtx.get(),
+                                      _resumeBatchingTs,
+                                      RandomAccessOplogBuffer::SeekStrategy::kInexact)
+                    .isOK());
+        // Doing a 'seekToTimestamp' will not set the '_lastPoppedKey' on its own if a document
+        // with '_resumeBatchingTs' exists in the buffer collection. We do a 'tryPop' here to set
+        // '_lastPoppedKey' to equal '_resumeBatchingTs'.
+        if (_oplogBuffer->findByTimestamp(opCtx.get(), _resumeBatchingTs).isOK()) {
+            BSONObj opToPopAndDiscard;
+            _oplogBuffer->tryPop(opCtx.get(), &opToPopAndDiscard);
+        }
+        LOGV2_DEBUG(5272306,
+                    1,
+                    "Tenant Oplog Batcher will resume batching from after timestamp",
+                    "timestamp"_attr = _resumeBatchingTs);
+    }
     return Status::OK();
 }
 

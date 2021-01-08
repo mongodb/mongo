@@ -306,7 +306,7 @@ public:
         /**
          * Retrieves the start optimes from the donor and updates the in-memory state accordingly.
          */
-        void _getStartOpTimesFromDonor(WithLock);
+        void _getStartOpTimesFromDonor(WithLock lk);
 
         /**
          * Pushes documents from oplog fetcher to oplog buffer.
@@ -338,6 +338,14 @@ public:
          * Indicates that the recipient has completed the tenant cloning phase.
          */
         bool _isCloneCompletedMarkerSet(WithLock) const;
+
+        /*
+         * Traverse backwards through the oplog to find the optime which tenant oplog application
+         * should resume from. The oplog applier should resume applying entries that have a greater
+         * optime than the returned value.
+         */
+        OpTime _getOplogResumeApplyingDonorOptime(const OpTime startApplyingDonorOpTime,
+                                                  const OpTime cloneFinishedRecipientOpTime) const;
 
         /*
          * Starts the tenant cloner.
