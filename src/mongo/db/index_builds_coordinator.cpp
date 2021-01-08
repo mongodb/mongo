@@ -393,11 +393,6 @@ bool isIndexBuildResumable(OperationContext* opCtx,
         return false;
     }
 
-    // TODO(SERVER-50479): Remove this check when resumable index builds work with ESE in GCM mode.
-    if (EncryptionHooks::get(opCtx->getServiceContext())->enabled()) {
-        return false;
-    }
-
     if (!opCtx->getServiceContext()->getStorageEngine()->supportsResumableIndexBuilds()) {
         return false;
     }

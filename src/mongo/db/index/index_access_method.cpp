@@ -84,11 +84,12 @@ bool isMultikeyFromPaths(const MultikeyPaths& multikeyPaths) {
                        [](const MultikeyComponents& components) { return !components.empty(); });
 }
 
-SortOptions makeSortOptions(size_t maxMemoryUsageBytes) {
+SortOptions makeSortOptions(size_t maxMemoryUsageBytes, StringData dbName) {
     return SortOptions()
         .TempDir(storageGlobalParams.dbpath + "/_tmp")
         .ExtSortAllowed()
-        .MaxMemoryUsageBytes(maxMemoryUsageBytes);
+        .MaxMemoryUsageBytes(maxMemoryUsageBytes)
+        .DBName(dbName.toString());
 }
 
 MultikeyPaths createMultikeyPaths(const std::vector<MultikeyPath>& multikeyPathsVec) {
@@ -479,11 +480,14 @@ Status AbstractIndexAccessMethod::compact(OperationContext* opCtx) {
 
 class AbstractIndexAccessMethod::BulkBuilderImpl : public IndexAccessMethod::BulkBuilder {
 public:
-    BulkBuilderImpl(IndexCatalogEntry* indexCatalogEntry, size_t maxMemoryUsageBytes);
+    BulkBuilderImpl(IndexCatalogEntry* indexCatalogEntry,
+                    size_t maxMemoryUsageBytes,
+                    StringData dbName);
 
     BulkBuilderImpl(IndexCatalogEntry* index,
                     size_t maxMemoryUsageBytes,
-                    const IndexStateInfo& stateInfo);
+                    const IndexStateInfo& stateInfo,
+                    StringData dbName);
 
     Status insert(OperationContext* opCtx,
                   const BSONObj& obj,
@@ -513,6 +517,7 @@ private:
 
     Sorter* _makeSorter(
         size_t maxMemoryUsageBytes,
+        StringData dbName,
         boost::optional<StringData> fileName = boost::none,
         const boost::optional<std::vector<SorterRange>>& ranges = boost::none) const;
 
@@ -536,21 +541,27 @@ private:
 };
 
 std::unique_ptr<IndexAccessMethod::BulkBuilder> AbstractIndexAccessMethod::initiateBulk(
-    size_t maxMemoryUsageBytes, const boost::optional<IndexStateInfo>& stateInfo) {
+    size_t maxMemoryUsageBytes,
+    const boost::optional<IndexStateInfo>& stateInfo,
+    StringData dbName) {
     return stateInfo
-        ? std::make_unique<BulkBuilderImpl>(_indexCatalogEntry, maxMemoryUsageBytes, *stateInfo)
-        : std::make_unique<BulkBuilderImpl>(_indexCatalogEntry, maxMemoryUsageBytes);
+        ? std::make_unique<BulkBuilderImpl>(
+              _indexCatalogEntry, maxMemoryUsageBytes, *stateInfo, dbName)
+        : std::make_unique<BulkBuilderImpl>(_indexCatalogEntry, maxMemoryUsageBytes, dbName);
 }
 
 AbstractIndexAccessMethod::BulkBuilderImpl::BulkBuilderImpl(IndexCatalogEntry* index,
-                                                            size_t maxMemoryUsageBytes)
-    : _indexCatalogEntry(index), _sorter(_makeSorter(maxMemoryUsageBytes)) {}
+                                                            size_t maxMemoryUsageBytes,
+                                                            StringData dbName)
+    : _indexCatalogEntry(index), _sorter(_makeSorter(maxMemoryUsageBytes, dbName)) {}
 
 AbstractIndexAccessMethod::BulkBuilderImpl::BulkBuilderImpl(IndexCatalogEntry* index,
                                                             size_t maxMemoryUsageBytes,
-                                                            const IndexStateInfo& stateInfo)
+                                                            const IndexStateInfo& stateInfo,
+                                                            StringData dbName)
     : _indexCatalogEntry(index),
-      _sorter(_makeSorter(maxMemoryUsageBytes, stateInfo.getFileName(), stateInfo.getRanges())),
+      _sorter(
+          _makeSorter(maxMemoryUsageBytes, dbName, stateInfo.getFileName(), stateInfo.getRanges())),
       _keysInserted(stateInfo.getNumKeys().value_or(0)),
       _isMultiKey(stateInfo.getIsMultikey()),
       _indexMultikeyPaths(createMultikeyPaths(stateInfo.getMultikeyPaths())) {}
@@ -663,14 +674,15 @@ AbstractIndexAccessMethod::BulkBuilderImpl::_makeSorterSettings() const {
 AbstractIndexAccessMethod::BulkBuilderImpl::Sorter*
 AbstractIndexAccessMethod::BulkBuilderImpl::_makeSorter(
     size_t maxMemoryUsageBytes,
+    StringData dbName,
     boost::optional<StringData> fileName,
     const boost::optional<std::vector<SorterRange>>& ranges) const {
     return fileName ? Sorter::makeFromExistingRanges(fileName->toString(),
                                                      *ranges,
-                                                     makeSortOptions(maxMemoryUsageBytes),
+                                                     makeSortOptions(maxMemoryUsageBytes, dbName),
                                                      BtreeExternalSortComparison(),
                                                      _makeSorterSettings())
-                    : Sorter::make(makeSortOptions(maxMemoryUsageBytes),
+                    : Sorter::make(makeSortOptions(maxMemoryUsageBytes, dbName),
                                    BtreeExternalSortComparison(),
                                    _makeSorterSettings());
 }

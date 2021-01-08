@@ -197,12 +197,14 @@ public:
                  std::streampos fileStartOffset,
                  std::streampos fileEndOffset,
                  const Settings& settings,
+                 const boost::optional<std::string>& dbName,
                  const uint32_t checksum)
         : _settings(settings),
           _done(false),
           _fileFullPath(fileFullPath),
           _fileStartOffset(fileStartOffset),
           _fileEndOffset(fileEndOffset),
+          _dbName(dbName),
           _originalChecksum(checksum) {
         uassert(16815,
                 str::stream() << "unexpected empty file: " << _fileFullPath,
@@ -309,11 +311,12 @@ private:
             std::unique_ptr<char[]> out(new char[blockSize]);
             size_t outLen;
             Status status =
-                encryptionHooks->unprotectTmpData(reinterpret_cast<uint8_t*>(_buffer.get()),
+                encryptionHooks->unprotectTmpData(reinterpret_cast<const uint8_t*>(_buffer.get()),
                                                   blockSize,
                                                   reinterpret_cast<uint8_t*>(out.get()),
                                                   blockSize,
-                                                  &outLen);
+                                                  &outLen,
+                                                  _dbName);
             uassert(28841,
                     str::stream() << "Failed to unprotect data: " << status.toString(),
                     status.isOK());
@@ -380,6 +383,7 @@ private:
     std::streampos _fileStartOffset;  // File offset at which the sorted data range starts.
     std::streampos _fileEndOffset;    // File offset at which the sorted data range ends.
     std::ifstream _file;
+    boost::optional<std::string> _dbName;
 
     // Checksum value that is updated with each read of a data object from disk. We can compare
     // this value with _originalChecksum to check for data corruption if and only if the
@@ -574,6 +578,7 @@ public:
                                range.getStartOffset(),
                                range.getEndOffset(),
                                this->_settings,
+                               this->_opts.dbName,
                                range.getChecksum());
                        });
     }
@@ -1025,7 +1030,8 @@ SortedFileWriter<Key, Value>::SortedFileWriter(const SortOptions& opts,
       // The file descriptor is positioned at the end of a file when opened in append mode, but
       // _file.tellp() is not initialized on all systems to reflect this. Therefore, we must also
       // pass in the expected offset to this constructor.
-      _fileStartOffset(fileStartOffset) {
+      _fileStartOffset(fileStartOffset),
+      _dbName(opts.dbName) {
 
     // This should be checked by consumers, but if we get here don't allow writes.
     uassert(
@@ -1096,7 +1102,8 @@ void SortedFileWriter<Key, Value>::spill() {
                                                         size,
                                                         reinterpret_cast<uint8_t*>(out.get()),
                                                         protectedSizeMax,
-                                                        &resultLen);
+                                                        &resultLen,
+                                                        _dbName);
         uassert(28842,
                 str::stream() << "Failed to compress data: " << status.toString(),
                 status.isOK());
@@ -1133,7 +1140,7 @@ SortIteratorInterface<Key, Value>* SortedFileWriter<Key, Value>::done() {
     _file.close();
 
     return new sorter::FileIterator<Key, Value>(
-        _fileFullPath, _fileStartOffset, _fileEndOffset, _settings, _checksum);
+        _fileFullPath, _fileStartOffset, _fileEndOffset, _settings, _dbName, _checksum);
 }
 
 //

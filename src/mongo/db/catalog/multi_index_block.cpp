@@ -282,7 +282,8 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
             if (!status.isOK())
                 return status;
 
-            index.bulk = index.real->initiateBulk(eachIndexBuildMaxMemoryUsageBytes, stateInfo);
+            index.bulk = index.real->initiateBulk(
+                eachIndexBuildMaxMemoryUsageBytes, stateInfo, collection->ns().db());
 
             const IndexDescriptor* descriptor = indexCatalogEntry->descriptor();
 
@@ -1142,8 +1143,8 @@ Status MultiIndexBlock::_scanReferenceIdxInsertAndCommit(OperationContext* opCtx
     // comes to the child index. As a result, we need to sort each set of keys that differ only in
     // their record IDs. We're calling this set of keys a key class.
     auto refreshSorter = [&]() {
-        _indexes[0].bulk =
-            _indexes[0].real->initiateBulk(_eachIndexBuildMaxMemoryUsageBytes, boost::none);
+        _indexes[0].bulk = _indexes[0].real->initiateBulk(
+            _eachIndexBuildMaxMemoryUsageBytes, boost::none, collection->ns().db());
     };
 
     auto addToSorter = [&](const KeyString::Value& keyString) {
