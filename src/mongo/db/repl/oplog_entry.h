@@ -491,6 +491,9 @@ public:
     void setPostImageOp(std::shared_ptr<DurableOplogEntry> postImageOp);
     void setPostImageOp(const BSONObj& postImageOp);
 
+    bool isForReshardingSessionApplication() const;
+    void setIsForReshardingSessionApplication(bool isForReshardingSessionApplication = true);
+
     std::string toStringForLogging() const;
 
     /**
@@ -543,12 +546,15 @@ public:
 private:
     DurableOplogEntry _entry;
 
-    boost::optional<bool> _isForCappedCollection;
 
     // We use std::shared_ptr<DurableOplogEntry> rather than boost::optional<DurableOplogEntry> here
     // so that OplogEntries are cheaper to copy.
     std::shared_ptr<DurableOplogEntry> _preImageOp;
     std::shared_ptr<DurableOplogEntry> _postImageOp;
+
+    bool _isForCappedCollection = false;
+
+    bool _isForReshardingSessionApplication = false;
 };
 
 std::ostream& operator<<(std::ostream& s, const DurableOplogEntry& o);
