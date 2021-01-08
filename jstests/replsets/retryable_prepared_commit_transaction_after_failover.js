@@ -47,6 +47,9 @@ assert.commandFailedWithCode(
     priSessionDB.adminCommand({commitTransaction: 1, commitTimestamp: tooEarlyTS1}),
     ErrorCodes.InvalidOptions);
 
+// Wait for the commit point to be propagated to the secondary before stepping it up.
+rst.awaitLastOpCommitted();
+
 jsTestLog("Step up the secondary");
 rst.stepUp(secConn);
 assert.eq(secConn, rst.getPrimary());
