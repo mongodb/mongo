@@ -257,7 +257,11 @@ TEST_F(CatalogTestFixture, ConcurrentCatalogWritesSerialized) {
  */
 class CatalogReadCopyUpdateTest : public CatalogTestFixture {
 public:
-    static constexpr size_t NumCollections = 10000;
+    // Number of collection instances in the catalog. We want to have a large number to make the
+    // CollectionCatalog copy constructor slow enough to trigger the batching behavior. All threads
+    // need to enter CollectionCatalog::write() to be batched before the first thread finishes its
+    // write.
+    static constexpr size_t NumCollections = 100000;
 
     void setUp() override {
         CatalogTestFixture::setUp();
@@ -284,6 +288,14 @@ TEST_F(CatalogReadCopyUpdateTest, ConcurrentCatalogWriteBatches) {
         auto index = threadIndex.fetchAndAdd(1);
         barrier.countDownAndWait();
 
+        // The first thread that enters write() will begin copying the catalog instance, other
+        // threads that enter while this copy is being made will be enqueued. When the thread
+        // copying the catalog instance finishes the copy it will execute all writes using the same
+        // writable catalog instance.
+        //
+        // To minimize the risk of this test being flaky we need to make the catalog copy slow
+        // enough so the other threads properly enter the queue state. We achieve this by having a
+        // large numbers of collections in the catalog.
         CollectionCatalog::write(getServiceContext(), [&](CollectionCatalog& writableCatalog) {
             catalogInstancesObserved[index] = &writableCatalog;
         });
