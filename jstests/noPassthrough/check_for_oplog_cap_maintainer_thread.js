@@ -6,7 +6,7 @@
  *     - repair
  *     - recoverFromOplogAsStandalone
  *
- * @tags: [requires_replication, requires_persistence]
+ * @tags: [requires_replication, requires_persistence, requires_majority_read_concern]
  */
 (function() {
     "use strict";
