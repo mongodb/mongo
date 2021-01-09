@@ -184,6 +184,49 @@ Status ReshardingOplogApplicationRules::applyOperation(
     });
 }
 
+Status ReshardingOplogApplicationRules::ReshardingOplogApplicationRules::applyCommand(
+    OperationContext* opCtx, const repl::OplogEntryOrGroupedInserts& opOrGroupedInserts) {
+    LOGV2_DEBUG(49909,
+                3,
+                "Applying command op for resharding",
+                "opl"_attr = redact(opOrGroupedInserts.toBSON()));
+
+    auto op = opOrGroupedInserts.getOp();
+
+    invariant(op.getOpType() == repl::OpTypeEnum::kCommand);
+    invariant(!opCtx->lockState()->inAWriteUnitOfWork());
+    invariant(opCtx->writesAreReplicated());
+
+    return writeConflictRetry(opCtx, "applyOplogEntryCommandOpResharding", op.getNss().ns(), [&] {
+        OpCounters* opCounters = &globalOpCounters;
+        opCounters->gotCommand();
+
+        invariant(op.getNss() == _outputNss);
+        BSONObj oField = op.getObject();
+
+        // Only applyOps, commitTransaction, and abortTransaction are allowed.
+        std::vector<std::string> supportedCmds{"applyOps", "commitTransaction", "abortTransaction"};
+        if (std::find(supportedCmds.begin(), supportedCmds.end(), oField.firstElementFieldName()) ==
+            supportedCmds.end()) {
+            if (oField.firstElementFieldName() == "drop"_sd) {
+                return Status(ErrorCodes::OplogOperationUnsupported,
+                              str::stream()
+                                  << "Received drop command for resharding source collection "
+                                  << redact(op.toBSONForLogging()));
+            }
+
+            return Status(ErrorCodes::OplogOperationUnsupported,
+                          str::stream() << "Command not supported during resharding: "
+                                        << redact(op.toBSONForLogging()));
+        }
+
+        // TODO SERVER-49907 implement applyOps write rule
+        // TODO SERVER-49905 handle commit and abort transaction rules
+        return repl::OplogApplierUtils::applyOplogEntryOrGroupedInsertsCommon(
+            opCtx, opOrGroupedInserts, repl::OplogApplication::Mode::kInitialSync, [] {}, nullptr);
+    });
+}
+
 void ReshardingOplogApplicationRules::_applyInsert_inlock(
     OperationContext* opCtx,
     Database* db,

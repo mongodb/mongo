@@ -42,7 +42,6 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/persistent_task_store.h"
-#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/repl/oplog_applier_utils.h"
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
 #include "mongo/db/s/resharding/resharding_donor_oplog_iterator.h"
@@ -61,6 +60,11 @@ namespace mongo {
 using namespace fmt::literals;
 
 namespace {
+
+// Used for marking intermediate oplog entries created by the resharding applier that will require
+// special handling in the repl writer thread. These intermediate oplog entries serve as a message
+// container and will never be written to an actual collection.
+const BSONObj kReshardingOplogTag(BSON("$resharding" << 1));
 
 /**
  * Insert a no-op oplog entry that contains the pre/post image document from a retryable write.
@@ -209,6 +213,23 @@ Status insertOplogAndUpdateConfigForRetryable(OperationContext* opCtx,
     return Status::OK();
 }
 
+/**
+ * Returns true if the given oplog is a special no-op oplog entry that contains the information for
+ * retryable writes.
+ */
+bool isRetryableNoOp(const repl::OplogEntryOrGroupedInserts& oplogOrGroupedInserts) {
+    if (oplogOrGroupedInserts.isGroupedInserts()) {
+        return false;
+    }
+
+    const auto& op = oplogOrGroupedInserts.getOp();
+    if (op.getOpType() != repl::OpTypeEnum::kNoop) {
+        return false;
+    }
+
+    return op.getObject().woCompare(kReshardingOplogTag) == 0;
+}
+
 ServiceContext::UniqueClient makeKillableClient(ServiceContext* serviceContext, StringData name) {
     auto client = serviceContext->makeClient(name.toString());
     stdx::lock_guard<Client> lk(*client);
@@ -244,7 +265,6 @@ ReshardingOplogApplier::ReshardingOplogApplier(
       _outputNs(_nsBeingResharded.db(),
                 "system.resharding.{}"_format(_uuidBeingResharded.toString())),
       _reshardingCloneFinishedTs(std::move(reshardingCloneFinishedTs)),
-      _batchPreparer{CollatorInterface::cloneCollator(sourceChunkMgr.getDefaultCollator())},
       _applicationRules(ReshardingOplogApplicationRules(
           _outputNs, std::move(allStashNss), myStashIdx, _sourceId.getShardId(), sourceChunkMgr)),
       _service(service),
@@ -283,20 +303,16 @@ ExecutorFuture<void> ReshardingOplogApplier::_scheduleNextBatch() {
             return _oplogIter->getNextBatch(_executor);
         })
         .then([this](OplogBatch batch) {
-            _currentBatchToApply = std::move(batch);
-
-            auto applyBatchClient = makeKillableClient(_service, kClientName);
-            AlternativeClientRegion acr(applyBatchClient);
-            auto applyBatchOpCtx = makeInterruptibleOperationContext();
-
-            return _applyBatch(applyBatchOpCtx.get(), false /* isForSessionApplication */);
+            for (auto&& entry : batch) {
+                _preProcessAndPushOpsToBuffer(entry);
+            }
         })
         .then([this] {
             auto applyBatchClient = makeKillableClient(_service, kClientName);
             AlternativeClientRegion acr(applyBatchClient);
             auto applyBatchOpCtx = makeInterruptibleOperationContext();
 
-            return _applyBatch(applyBatchOpCtx.get(), true /* isForSessionApplication */);
+            return _applyBatch(applyBatchOpCtx.get());
         })
         .then([this] {
             if (_currentBatchToApply.empty()) {
@@ -335,14 +351,11 @@ ExecutorFuture<void> ReshardingOplogApplier::_scheduleNextBatch() {
         });
 }
 
-Future<void> ReshardingOplogApplier::_applyBatch(OperationContext* opCtx,
-                                                 bool isForSessionApplication) {
-    if (isForSessionApplication) {
-        _currentWriterVectors = _batchPreparer.makeSessionOpWriterVectors(_currentBatchToApply);
-    } else {
-        _currentWriterVectors =
-            _batchPreparer.makeCrudOpWriterVectors(_currentBatchToApply, _currentDerivedOps);
-    }
+Future<void> ReshardingOplogApplier::_applyBatch(OperationContext* opCtx) {
+    // TODO: handle config.transaction updates with derivedOps
+
+    auto writerVectors = _fillWriterVectors(opCtx, &_currentBatchToApply, &_currentDerivedOps);
+    _currentWriterVectors.swap(writerVectors);
 
     auto pf = makePromiseFuture<void>();
 
@@ -371,6 +384,107 @@ Future<void> ReshardingOplogApplier::_applyBatch(OperationContext* opCtx,
     return std::move(pf.future);
 }
 
+/**
+ * Convert the given oplog entry into a pseudo oplog that is going to be used for updating the
+ * config.transactions and inserting the necessary oplog entries during resharing oplog application
+ * for this oplog.
+ */
+repl::OplogEntry convertToNoOpWithReshardingTag(const repl::OplogEntry& oplog) {
+    repl::OplogEntry newOplog(repl::DurableOplogEntry(oplog.getOpTime(),
+                                                      oplog.getHash(),
+                                                      repl::OpTypeEnum::kNoop,
+                                                      oplog.getNss(),
+                                                      boost::none /* uuid */,
+                                                      oplog.getFromMigrate(),
+                                                      oplog.getVersion(),
+                                                      kReshardingOplogTag,
+                                                      // Set the o2 field with the original oplog.
+                                                      oplog.getEntry().toBSON(),
+                                                      oplog.getOperationSessionInfo(),
+                                                      oplog.getUpsert(),
+                                                      oplog.getWallClockTime(),
+                                                      oplog.getStatementId(),
+                                                      oplog.getPrevWriteOpTimeInTransaction(),
+                                                      oplog.getPreImageOpTime(),
+                                                      oplog.getPostImageOpTime(),
+                                                      oplog.getDestinedRecipient(),
+                                                      oplog.get_id()));
+
+    newOplog.setPreImageOp(oplog.getPreImageOp());
+    newOplog.setPostImageOp(oplog.getPostImageOp());
+
+    return newOplog;
+}
+
+void addDerivedOpsToWriterVector(std::vector<std::vector<const repl::OplogEntry*>>* writerVectors,
+                                 const std::vector<repl::OplogEntry>& derivedOps) {
+    for (auto&& op : derivedOps) {
+        invariant(op.getObject().woCompare(kReshardingOplogTag) == 0);
+        uassert(4990403,
+                "expected resharding derived oplog to have session id: {}"_format(
+                    redact(op.toBSONForLogging()).toString()),
+                op.getSessionId());
+
+        LogicalSessionIdHash hasher;
+        auto writerId = hasher(*op.getSessionId()) % writerVectors->size();
+        (*writerVectors)[writerId].push_back(&op);
+    }
+}
+
+std::vector<std::vector<const repl::OplogEntry*>> ReshardingOplogApplier::_fillWriterVectors(
+    OperationContext* opCtx, OplogBatch* batch, OplogBatch* derivedOps) {
+    std::vector<std::vector<const repl::OplogEntry*>> writerVectors(
+        _writerPool->getStats().numThreads);
+    repl::CachedCollectionProperties collPropertiesCache;
+
+    LogicalSessionIdMap<RetryableOpsList> sessionTracker;
+
+    for (auto&& op : *batch) {
+        uassert(5012000,
+                "Resharding oplog application does not support prepared transactions.",
+                !op.shouldPrepare());
+        uassert(5012001,
+                "Resharding oplog application does not support prepared transactions.",
+                !op.isPreparedCommit());
+
+        if (op.getOpType() == repl::OpTypeEnum::kNoop)
+            continue;
+
+        repl::OplogApplierUtils::addToWriterVector(
+            opCtx, &op, &writerVectors, &collPropertiesCache);
+
+        if (auto sessionId = op.getSessionId()) {
+            auto& retryableOpList = sessionTracker[*sessionId];
+            auto txnNumber = *op.getTxnNumber();
+
+            if (retryableOpList.txnNum == txnNumber) {
+                retryableOpList.ops.push_back(&op);
+            } else if (retryableOpList.txnNum < txnNumber) {
+                retryableOpList.ops.clear();
+                retryableOpList.ops.push_back(&op);
+                retryableOpList.txnNum = txnNumber;
+            } else {
+                uasserted(4990401,
+                          str::stream() << "retryable oplog applier for " << _sourceId.toBSON()
+                                        << " encountered out of order txnNum, saw "
+                                        << redact(op.toBSONForLogging()) << " after "
+                                        << redact(retryableOpList.ops.front()->toBSONForLogging()));
+            }
+        }
+    }
+
+    for (const auto& sessionsToUpdate : sessionTracker) {
+        for (const auto& op : sessionsToUpdate.second.ops) {
+            auto noOpWithPrePost = convertToNoOpWithReshardingTag(*op);
+            derivedOps->push_back(std::move(noOpWithPrePost));
+        }
+    }
+
+    addDerivedOpsToWriterVector(&writerVectors, _currentDerivedOps);
+
+    return writerVectors;
+}
+
 Status ReshardingOplogApplier::_applyOplogBatchPerWorker(
     std::vector<const repl::OplogEntry*>* ops) {
     auto opCtx = makeInterruptibleOperationContext();
@@ -395,14 +509,57 @@ Status ReshardingOplogApplier::_applyOplogEntryOrGroupedInserts(
 
     auto op = entryOrGroupedInserts.getOp();
 
-    if (op.isForReshardingSessionApplication()) {
+    if (isRetryableNoOp(entryOrGroupedInserts)) {
         return insertOplogAndUpdateConfigForRetryable(opCtx, entryOrGroupedInserts.getOp());
     }
 
     invariant(DocumentValidationSettings::get(opCtx).isSchemaValidationDisabled());
 
-    invariant(op.isCrudOpType());
-    return _applicationRules.applyOperation(opCtx, entryOrGroupedInserts);
+    auto opType = op.getOpType();
+    if (opType == repl::OpTypeEnum::kNoop) {
+        return Status::OK();
+    } else if (repl::DurableOplogEntry::isCrudOpType(opType)) {
+        return _applicationRules.applyOperation(opCtx, entryOrGroupedInserts);
+    } else if (opType == repl::OpTypeEnum::kCommand) {
+        return _applicationRules.applyCommand(opCtx, entryOrGroupedInserts);
+    }
+
+    MONGO_UNREACHABLE;
+}
+
+void ReshardingOplogApplier::_preProcessAndPushOpsToBuffer(repl::OplogEntry oplog) {
+    uassert(5012002,
+            str::stream() << "trying to apply oplog not belonging to ns " << _nsBeingResharded
+                          << " during resharding: " << redact(oplog.toBSONForLogging()),
+            _nsBeingResharded == oplog.getNss());
+    uassert(5012005,
+            str::stream() << "trying to apply oplog with a different UUID from "
+                          << _uuidBeingResharded
+                          << " during resharding: " << redact(oplog.toBSONForLogging()),
+            _uuidBeingResharded == oplog.getUuid());
+
+    repl::OplogEntry newOplog(repl::DurableOplogEntry(oplog.getOpTime(),
+                                                      oplog.getHash(),
+                                                      oplog.getOpType(),
+                                                      _outputNs,
+                                                      boost::none /* uuid */,
+                                                      oplog.getFromMigrate(),
+                                                      oplog.getVersion(),
+                                                      oplog.getObject(),
+                                                      oplog.getObject2(),
+                                                      oplog.getOperationSessionInfo(),
+                                                      oplog.getUpsert(),
+                                                      oplog.getWallClockTime(),
+                                                      oplog.getStatementId(),
+                                                      oplog.getPrevWriteOpTimeInTransaction(),
+                                                      oplog.getPreImageOpTime(),
+                                                      oplog.getPostImageOpTime(),
+                                                      oplog.getDestinedRecipient(),
+                                                      oplog.get_id()));
+    newOplog.setPreImageOp(oplog.getPreImageOp());
+    newOplog.setPostImageOp(oplog.getPostImageOp());
+
+    _currentBatchToApply.push_back(std::move(newOplog));
 }
 
 Status ReshardingOplogApplier::_onError(Status status) {

@@ -36,7 +36,6 @@
 #include "mongo/db/s/resharding/resharding_donor_oplog_iterator.h"
 #include "mongo/db/s/resharding/resharding_oplog_application.h"
 #include "mongo/db/s/resharding/resharding_oplog_applier_progress_gen.h"
-#include "mongo/db/s/resharding/resharding_oplog_batch_preparer.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/util/future.h"
@@ -94,6 +93,12 @@ private:
 
     enum class Stage { kStarted, kErrorOccurred, kReachedCloningTS, kFinished };
 
+    struct RetryableOpsList {
+    public:
+        TxnNumber txnNum{kUninitializedTxnNumber};
+        std::vector<repl::OplogEntry*> ops;
+    };
+
     /**
      * Returns a future that becomes ready when the next batch of oplog entries have been collected
      * and applied.
@@ -104,7 +109,14 @@ private:
      * Setup the worker threads to apply the ops in the current buffer in parallel. Waits for all
      * worker threads to finish (even when some of them finished early due to an error).
      */
-    Future<void> _applyBatch(OperationContext* opCtx, bool isForSessionApplication);
+    Future<void> _applyBatch(OperationContext* opCtx);
+
+    /**
+     * Partition the currently buffered oplog entries so they can be applied in parallel.
+     */
+    std::vector<std::vector<const repl::OplogEntry*>> _fillWriterVectors(OperationContext* opCtx,
+                                                                         OplogBatch* batch,
+                                                                         OplogBatch* derivedOps);
 
     /**
      * Apply a slice of oplog entries from the current batch for a worker thread.
@@ -116,6 +128,11 @@ private:
      */
     Status _applyOplogEntryOrGroupedInserts(
         OperationContext* opCtx, const repl::OplogEntryOrGroupedInserts& entryOrGroupedInserts);
+
+    /**
+     * Perform necessary adjustments to the oplog entry so it will be ready to be applied.
+     */
+    void _preProcessAndPushOpsToBuffer(repl::OplogEntry oplog);
 
     /**
      * Record results from a writer vector for the current batch being applied.
@@ -157,8 +174,6 @@ private:
     // finished cloning from it.
     const Timestamp _reshardingCloneFinishedTs;
 
-    const ReshardingOplogBatchPreparer _batchPreparer;
-
     // Actually applies the ops, using special rules that apply only to resharding. Only used when
     // the 'useReshardingOplogApplicationRules' server parameter is set to true.
     ReshardingOplogApplicationRules _applicationRules;
@@ -185,7 +200,7 @@ private:
     OplogBatch _currentBatchToApply;
 
     // (R) Buffer for internally generated oplog entries that needs to be processed for this batch.
-    std::list<repl::OplogEntry> _currentDerivedOps;
+    OplogBatch _currentDerivedOps;
 
     // (R) A temporary scratch pad that contains pointers to oplog entries in _currentBatchToApply
     // that is used by the writer vector when applying oplog in parallel.

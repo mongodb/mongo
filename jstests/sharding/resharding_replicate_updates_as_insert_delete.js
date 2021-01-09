@@ -116,7 +116,12 @@ reshardingTest.withReshardingInBackground(  //
             session.abortTransaction();
             return false;
         }, () => `was unable to update value under new shard key in transaction: ${tojson(res)}`);
-    });
+
+        // TODO SERVER-49907: Remove the call to interruptReshardingThread() from this test once
+        // recipient shards no longer error on applyOps oplog entries.
+        reshardingTest.interruptReshardingThread();
+    },
+    ErrorCodes.Interrupted);
 
 const topology = DiscoverTopology.findConnectedNodes(mongos);
 const donor0 = new Mongo(topology.shards[donorShardNames[0]].primary);
