@@ -160,18 +160,20 @@ runDropTest({
     createNew: true
 });
 
-// TODO(SERVER-53282): Enable this test case and add an expectedLog for it.
-// jsTestLog("[7] Testing dropping between getMore calls.");
-// runDropTest({
-//     // Will trigger right after the first batch.
-//     failPointName: "tenantMigrationHangCollectionClonerAfterHandlingBatchResponse"
-// });
+jsTestLog("[7] Testing dropping between getMore calls.");
+runDropTest({
+    // Will trigger right after the first batch.
+    failPointName: "tenantMigrationHangCollectionClonerAfterHandlingBatchResponse",
+    expectedLog:
+        '{code: 5289701, attr: { namespace: nss, uuid: (x)=>(x.uuid.$uuid === uuid), tenantId: tenantId}}',
+});
 
-// TODO(SERVER-53282): Enable this test case and add an expectedLog for it.
-// jsTestLog("[8] Testing dropping between getMore calls, with same-name collection created");
-// runDropTest({
-//     // Will trigger right after the first batch.
-//     failPointName: "tenantMigrationHangCollectionClonerAfterHandlingBatchResponse",
-//     createNew: true
-// });
+jsTestLog("[8] Testing dropping between getMore calls, with same-name collection created");
+runDropTest({
+    // Will trigger right after the first batch.
+    failPointName: "tenantMigrationHangCollectionClonerAfterHandlingBatchResponse",
+    expectedLog:
+        '{code: 5289701, attr: { namespace: nss, uuid: (x)=>(x.uuid.$uuid === uuid), tenantId: tenantId}}',
+    createNew: true
+});
 })();

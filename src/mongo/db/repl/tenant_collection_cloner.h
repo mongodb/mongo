@@ -138,6 +138,31 @@ private:
         }
     };
 
+    class TenantCollectionClonerQueryStage : public TenantCollectionClonerStage {
+    public:
+        TenantCollectionClonerQueryStage(std::string name,
+                                         TenantCollectionCloner* cloner,
+                                         ClonerRunFn stageFunc)
+            : TenantCollectionClonerStage(name, cloner, stageFunc) {}
+
+        bool isTransientError(const Status& status) override {
+            if (isCursorError(status)) {
+                return true;
+            }
+            return TenantCollectionClonerStage::isTransientError(status);
+        }
+
+        static bool isCursorError(const Status& status) {
+            // Our cursor was killed due to changes on the remote collection.
+            // We do not expect the connection to have been closed so we try to resume the stage.
+            if ((status == ErrorCodes::CursorNotFound) || (status == ErrorCodes::OperationFailed) ||
+                (status == ErrorCodes::QueryPlanKilled)) {
+                return true;
+            }
+            return false;
+        }
+    };
+
     /**
      * The preStage sets the start time in _stats.
      */
@@ -215,7 +240,7 @@ private:
     TenantCollectionClonerStage _countStage;             // (R)
     TenantCollectionClonerStage _listIndexesStage;       // (R)
     TenantCollectionClonerStage _createCollectionStage;  // (R)
-    TenantCollectionClonerStage _queryStage;             // (R)
+    TenantCollectionClonerQueryStage _queryStage;        // (R)
 
     ProgressMeter _progressMeter;           // (X) progress meter for this instance.
     std::vector<BSONObj> _readyIndexSpecs;  // (X) Except for _id_

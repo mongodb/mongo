@@ -725,59 +725,118 @@ TEST_F(TenantCollectionClonerTest, QueryStageNamespaceNotFoundOnSubsequentBatch)
     ASSERT_EQUALS(2, _opObserver->numDocsInserted);
 }
 
-// TODO(SERVER-53282): Enable this test.
-// // We receive a QueryPlanKilled error, then a NamespaceNotFound error, indicating that the
-// // collection no longer exists in the database.
-// TEST_F(TenantCollectionClonerTest, QueryStageCursorDropOK) {
-//     // Set up data for preliminary stages.
-//     _mockServer->setCommandReply("count", createCountResponse(2));
-//     _mockServer->setCommandReply("listIndexes",
-//                                  createCursorResponse(_nss.ns(), BSON_ARRAY(_idIndexSpec)));
-//     _mockServer->setCommandReply("find", createFindResponse());  // maj read after listIndexes
+// We receive a QueryPlanKilled error, then a NamespaceNotFound error, indicating that the
+// collection no longer exists in the database.
+TEST_F(TenantCollectionClonerTest, QueryPlanKilledThenNamespaceNotFoundFirstBatch) {
+    // Set up data for preliminary stages.
+    _mockServer->setCommandReply("count", createCountResponse(3));
+    _mockServer->setCommandReply("listIndexes",
+                                 createCursorResponse(_nss.ns(), BSON_ARRAY(_idIndexSpec)));
+    _mockServer->setCommandReply("find", createFindResponse());  // majority read after listIndexes
 
-//     auto beforeStageFailPoint = globalFailPointRegistry().find("hangBeforeClonerStage");
-//     auto timesEnteredBeforeStage = beforeStageFailPoint->setMode(
-//         FailPoint::alwaysOn, 0, fromjson("{cloner: 'CollectionCloner', stage: 'query'}"));
+    // Set up failpoints.
+    auto beforeStageFailPoint = globalFailPointRegistry().find("hangBeforeClonerStage");
+    auto timesEnteredBeforeStage = beforeStageFailPoint->setMode(
+        FailPoint::alwaysOn, 0, fromjson("{cloner: 'TenantCollectionCloner', stage: 'query'}"));
+    auto beforeRetryFailPoint = globalFailPointRegistry().find("hangBeforeRetryingClonerStage");
+    auto timesEnteredBeforeRetry = beforeRetryFailPoint->setMode(
+        FailPoint::alwaysOn, 0, fromjson("{cloner: 'TenantCollectionCloner', stage: 'query'}"));
 
-//     auto beforeRetryFailPoint = globalFailPointRegistry().find("hangBeforeRetryingClonerStage");
-//     auto timesEnteredBeforeRetry = beforeRetryFailPoint->setMode(
-//         FailPoint::alwaysOn, 0, fromjson("{cloner: 'TenantCollectionCloner', stage: 'query'}"));
+    // Set up documents to be returned from upstream node.
+    _mockServer->insert(_nss.ns(), BSON("_id" << 1));
+    _mockServer->insert(_nss.ns(), BSON("_id" << 2));
+    _mockServer->insert(_nss.ns(), BSON("_id" << 3));
 
-//     // Set up documents to be returned from upstream node.
-//     _mockServer->insert(_nss.ns(), BSON("_id" << 1));
-//     _mockServer->insert(_nss.ns(), BSON("_id" << 2));
-//     _mockServer->insert(_nss.ns(), BSON("_id" << 3));
+    auto cloner = makeCollectionCloner();
+    cloner->setBatchSize_forTest(2);
 
-//     auto cloner = makeCollectionCloner();
+    // Run the cloner in a separate thread. The cloner should detect the drop at the beginning
+    // of the query stage and exit normally, without copying over any documents.
+    stdx::thread clonerThread([&] {
+        Client::initThread("ClonerRunner");
+        ASSERT_OK(cloner->run());
+        ASSERT_EQ(0, cloner->getStats().documentsCopied);
+    });
 
-//     // Run the cloner in a separate thread. The cloner should detect the drop at the beginning
-//     // of the query stage and exit normally, without copying over any documents.
-//     stdx::thread clonerThread([&] {
-//         Client::initThread("ClonerRunner");
-//         ASSERT_OK(cloner->run());
-//     });
+    // Wait until we get to the query stage.
+    beforeStageFailPoint->waitForTimesEntered(timesEnteredBeforeStage + 1);
 
-//     // Wait until we get to the query stage.
-//     beforeStageFailPoint->waitForTimesEntered(timesEnteredBeforeStage + 1);
+    // Verify we've made no progress yet.
+    auto stats = cloner->getStats();
+    ASSERT_EQUALS(0, stats.receivedBatches);
 
-//     // Verify we've processed exactly one batch.
-//     auto stats = cloner->getStats();
-//     ASSERT_EQUALS(1, stats.receivedBatches);
+    // Despite the name, this will also trigger on the initial batch.
+    auto failNextBatch = globalFailPointRegistry().find("mockCursorThrowErrorOnGetMore");
+    failNextBatch->setMode(FailPoint::nTimes, 1, fromjson("{errorType: 'QueryPlanKilled'}"));
 
-//     // Trigger drop after this batch. This is the error we will observe.
-//     auto failNextBatch = globalFailPointRegistry().find("mockCursorThrowErrorOnGetMore");
-//     failNextBatch->setMode(FailPoint::nTimes, 1, fromjson("{errorType: 'NamespaceNotFound'}"));
+    // Proceed with the query stage.
+    beforeStageFailPoint->setMode(FailPoint::off, 0);
+    beforeRetryFailPoint->waitForTimesEntered(timesEnteredBeforeRetry + 1);
 
-//     // Resume cloning.
-//     beforeStageFailPoint->setMode(FailPoint::off, 0);
-//     beforeRetryFailPoint->waitForTimesEntered(timesEnteredBeforeRetry + 1);
+    // Follow-up the QueryPlanKilled error with a NamespaceNotFound.
+    failNextBatch->setMode(FailPoint::nTimes, 1, fromjson("{errorType: 'NamespaceNotFound'}"));
 
-//     // Follow-up the QueryPlanKilled error with a NamespaceNotFound.
-//     failNextBatch->setMode(FailPoint::nTimes, 1, fromjson("{errorType: 'NamespaceNotFound'}"));
+    beforeRetryFailPoint->setMode(FailPoint::off, 0);
+    clonerThread.join();
 
-//     beforeRetryFailPoint->setMode(FailPoint::off, 0);
-//     clonerThread.join();
-// }
+    ASSERT_EQUALS(0, _opObserver->numDocsInserted);
+}
+
+// We receive a QueryPlanKilled error, then a NamespaceNotFound error, indicating that the
+// collection no longer exists in the database.
+TEST_F(TenantCollectionClonerTest, QueryPlanKilledThenNamespaceNotFoundSubsequentBatch) {
+    // Set up data for preliminary stages.
+    _mockServer->setCommandReply("count", createCountResponse(3));
+    _mockServer->setCommandReply("listIndexes",
+                                 createCursorResponse(_nss.ns(), BSON_ARRAY(_idIndexSpec)));
+    _mockServer->setCommandReply("find", createFindResponse());  // majority read after listIndexes
+
+    // Set up failpoints.
+    auto beforeRetryFailPoint = globalFailPointRegistry().find("hangBeforeRetryingClonerStage");
+    auto timesEnteredBeforeRetry = beforeRetryFailPoint->setMode(
+        FailPoint::alwaysOn, 0, fromjson("{cloner: 'TenantCollectionCloner', stage: 'query'}"));
+    auto afterBatchFailpoint = globalFailPointRegistry().find(
+        "tenantMigrationHangCollectionClonerAfterHandlingBatchResponse");
+    auto timesEnteredAfterBatch = afterBatchFailpoint->setMode(FailPoint::alwaysOn, 0);
+
+    // Set up documents to be returned from upstream node.
+    _mockServer->insert(_nss.ns(), BSON("_id" << 1));
+    _mockServer->insert(_nss.ns(), BSON("_id" << 2));
+    _mockServer->insert(_nss.ns(), BSON("_id" << 3));
+
+    auto cloner = makeCollectionCloner();
+    cloner->setBatchSize_forTest(2);
+
+    // Run the cloner in a separate thread. The cloner should detect the drop during the query
+    // stage. It will have copied over some documents before that.
+    stdx::thread clonerThread([&] {
+        Client::initThread("ClonerRunner");
+        ASSERT_OK(cloner->run());
+        ASSERT_EQ(2, cloner->getStats().documentsCopied);
+    });
+
+    // Wait for us to process the first batch.
+    afterBatchFailpoint->waitForTimesEntered(timesEnteredAfterBatch + 1);
+
+    // Verify we've only managed to store one batch.
+    auto stats = cloner->getStats();
+    ASSERT_EQUALS(1, stats.receivedBatches);
+
+    // This will cause the next batch to fail once (transiently).
+    auto failNextBatch = globalFailPointRegistry().find("mockCursorThrowErrorOnGetMore");
+    failNextBatch->setMode(FailPoint::nTimes, 1, fromjson("{errorType: 'QueryPlanKilled'}"));
+
+    afterBatchFailpoint->setMode(FailPoint::off, 0);
+    beforeRetryFailPoint->waitForTimesEntered(timesEnteredBeforeRetry + 1);
+
+    // Follow-up the previous error with NamespaceNotFound.
+    failNextBatch->setMode(FailPoint::nTimes, 1, fromjson("{errorType: 'NamespaceNotFound'}"));
+    beforeRetryFailPoint->setMode(FailPoint::off, 0);
+
+    afterBatchFailpoint->waitForTimesEntered(timesEnteredAfterBatch + 1);
+    afterBatchFailpoint->setMode(FailPoint::off, 0);
+    clonerThread.join();
+}
 
 TEST_F(TenantCollectionClonerTest, ResumeFromEmptyCollectionMissingAllSecondaryIndexes) {
     TenantMigrationSharedData resumingSharedData(&_clock, _migrationId, /*resuming=*/true);
