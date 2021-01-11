@@ -27,8 +27,13 @@
  *    it in the license file.
  */
 
-#include "mongo/db/commands.h"
+#include "mongo/db/audit.h"
+#include "mongo/db/client.h"
 #include "mongo/db/cursor_id.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/query/kill_cursors_gen.h"
+#include "mongo/db/read_concern_support_result.h"
 
 namespace mongo {
 
@@ -36,18 +41,13 @@ namespace mongo {
  * Base class for the killCursors command, which attempts to kill all given cursors.  Contains code
  * common to mongos and mongod implementations.
  */
-class KillCursorsCmdBase : public BasicCommand {
+template <typename Impl>
+class KillCursorsCmdBase : public KillCursorsCmdVersion1Gen<KillCursorsCmdBase<Impl>> {
 public:
-    KillCursorsCmdBase() : BasicCommand("killCursors") {}
+    using KCV1Gen = KillCursorsCmdVersion1Gen<KillCursorsCmdBase<Impl>>;
 
-    virtual ~KillCursorsCmdBase() {}
-
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return false;
-    }
-
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return AllowedOnSecondary::kAlways;
+    BasicCommand::AllowedOnSecondary secondaryAllowed(ServiceContext*) const final {
+        return BasicCommand::AllowedOnSecondary::kAlways;
     }
 
     bool maintenanceOk() const final {
@@ -59,39 +59,80 @@ public:
     }
 
     std::string help() const final {
-        return "kill a list of cursor ids";
+        return "Kill a list of cursor ids";
     }
 
     bool shouldAffectCommandCounter() const final {
         return true;
     }
 
-    Status checkAuthForCommand(Client* client,
-                               const std::string& dbname,
-                               const BSONObj& cmdObj) const final;
+    class Invocation : public KCV1Gen::InvocationBaseGen {
+    public:
+        using KCV1Gen::InvocationBaseGen::InvocationBaseGen;
 
-    bool runImpl(OperationContext* opCtx,
-                 const std::string& dbname,
-                 const BSONObj& cmdObj,
-                 BSONObjBuilder& result);
+        bool supportsWriteConcern() const final {
+            return false;
+        }
 
-private:
-    /**
-     * Verify the cursor exists, is unpinned, and can be killed by the current user(s).
-     */
-    virtual Status _checkAuth(Client* client,
-                              const NamespaceString& nss,
-                              CursorId cursorId) const = 0;
+        ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level) const final {
+            if constexpr (Impl::supportsReadConcern) {
+                return ReadConcernSupportResult::allSupportedAndDefaultPermitted();
+            } else {
+                return KCV1Gen::InvocationBaseGen::supportsReadConcern(level);
+            }
+        }
 
-    /**
-     * Kill the cursor with id 'cursorId' in namespace 'nss'. Use 'opCtx' if necessary.
-     *
-     * Returns Status::OK() if the cursor was killed, or ErrorCodes::CursorNotFound if there is no
-     * such cursor, or ErrorCodes::OperationFailed if the cursor cannot be killed.
-     */
-    virtual Status _killCursor(OperationContext* opCtx,
-                               const NamespaceString& nss,
-                               CursorId cursorId) const = 0;
+        NamespaceString ns() const final {
+            return this->request().getNamespace();
+        }
+
+        void doCheckAuthorization(OperationContext* opCtx) const final {
+            auto killCursorsRequest = this->request();
+
+            const auto& nss = killCursorsRequest.getNamespace();
+            for (CursorId id : killCursorsRequest.getCursorIds()) {
+                auto status = Impl::doCheckAuth(opCtx, nss, id);
+                if (!status.isOK()) {
+                    if (status.code() == ErrorCodes::CursorNotFound) {
+                        // Not found isn't an authorization issue.
+                        // run() will raise it as a return value.
+                        continue;
+                    }
+                    audit::logKillCursorsAuthzCheck(opCtx->getClient(), nss, id, status.code());
+                    uassertStatusOK(status);  // throws
+                }
+            }
+        }
+
+        KillCursorsReply typedRun(OperationContext* opCtx) final {
+            auto killCursorsRequest = this->request();
+
+            std::vector<CursorId> cursorsKilled;
+            std::vector<CursorId> cursorsNotFound;
+            std::vector<CursorId> cursorsAlive;
+
+            for (CursorId id : killCursorsRequest.getCursorIds()) {
+                auto status = Impl::doKillCursor(opCtx, killCursorsRequest.getNamespace(), id);
+                if (status.isOK()) {
+                    cursorsKilled.push_back(id);
+                } else if (status.code() == ErrorCodes::CursorNotFound) {
+                    cursorsNotFound.push_back(id);
+                } else {
+                    cursorsAlive.push_back(id);
+                }
+
+                audit::logKillCursorsAuthzCheck(
+                    opCtx->getClient(), killCursorsRequest.getNamespace(), id, status.code());
+            }
+
+            KillCursorsReply reply;
+            reply.setCursorsKilled(std::move(cursorsKilled));
+            reply.setCursorsNotFound(std::move(cursorsNotFound));
+            reply.setCursorsAlive(std::move(cursorsAlive));
+            reply.setCursorsUnknown({});
+            return reply;
+        }
+    };
 };
 
 }  // namespace mongo

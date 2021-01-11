@@ -41,10 +41,31 @@ types:
         cpp_type: mongo::CursorId
         deserializer: "mongo::BSONElement::_numberLong"
 
+structs:
+    KillCursorsReply:
+        description: 'Response from killCursors command'
+        strict: false
+        fields:
+            cursorsKilled:
+                description: 'Cursors successfully killed'
+                type: array<cursorId>
+            cursorsNotFound:
+                description: 'Cursors not found'
+                type: array<cursorId>
+            cursorsAlive:
+                description: 'Cursors still alive'
+                type: array<cursorId>
+            cursorsUnknown:
+                # This is a legacy field and always returns an empty array.
+                description: 'Unknown cursors'
+                type: array<cursorId>
+
 commands:
     killCursors:
         description: "Kills a specified set of cursors by ID."
         command_name: killCursors
+        api_version: "1"
+        reply_type: KillCursorsReply
         cpp_name: KillCursorsRequest
         strict: true
         namespace: concatenate_with_db

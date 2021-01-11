@@ -30,44 +30,20 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/commands/killcursors_common.h"
-#include "mongo/db/curop.h"
 #include "mongo/db/cursor_manager.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/query/kill_cursors_gen.h"
 #include "mongo/db/stats/top.h"
-#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
-class KillCursorsCmd final : public KillCursorsCmdBase {
-    KillCursorsCmd(const KillCursorsCmd&) = delete;
-    KillCursorsCmd& operator=(const KillCursorsCmd&) = delete;
-
-public:
-    KillCursorsCmd() = default;
-
-    const std::set<std::string>& apiVersions() const {
-        return kApiVersions1;
-    }
-
-    bool run(OperationContext* opCtx,
-             const std::string& dbname,
-             const BSONObj& cmdObj,
-             BSONObjBuilder& result) final {
-        return runImpl(opCtx, dbname, cmdObj, result);
-    }
-
-private:
-    Status _checkAuth(Client* client, const NamespaceString& nss, CursorId id) const final {
-        auto opCtx = client->getOperationContext();
+struct KillCursorsCmd {
+    static constexpr bool supportsReadConcern = false;
+    static Status doCheckAuth(OperationContext* opCtx, const NamespaceString& nss, CursorId id) {
         return CursorManager::get(opCtx)->checkAuthForKillCursors(opCtx, id);
     }
-
-    Status _killCursor(OperationContext* opCtx,
-                       const NamespaceString& nss,
-                       CursorId id) const final {
+    static Status doKillCursor(OperationContext* opCtx, const NamespaceString& nss, CursorId id) {
         boost::optional<AutoStatsTracker> statsTracker;
         if (!nss.isCollectionlessCursorNamespace()) {
             statsTracker.emplace(opCtx,
@@ -80,6 +56,7 @@ private:
         auto cursorManager = CursorManager::get(opCtx);
         return cursorManager->killCursor(opCtx, id, true /* shouldAudit */);
     }
-} killCursorsCmd;
+};
+KillCursorsCmdBase<KillCursorsCmd> cmdKillCursors;
 
 }  // namespace mongo

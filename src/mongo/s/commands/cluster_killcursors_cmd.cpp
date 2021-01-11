@@ -38,46 +38,26 @@
 namespace mongo {
 namespace {
 
-class ClusterKillCursorsCmd final : public KillCursorsCmdBase {
-public:
-    ClusterKillCursorsCmd() = default;
-
-    const std::set<std::string>& apiVersions() const {
-        return kApiVersions1;
-    }
-
-    ReadConcernSupportResult supportsReadConcern(const BSONObj& cmdObj,
-                                                 repl::ReadConcernLevel level) const final {
-        // killCursors must support read concerns in order to be run in transactions.
-        return ReadConcernSupportResult::allSupportedAndDefaultPermitted();
-    }
-
-    bool run(OperationContext* opCtx,
-             const std::string& dbname,
-             const BSONObj& cmdObj,
-             BSONObjBuilder& result) final {
-        return runImpl(opCtx, dbname, cmdObj, result);
-    }
-
-private:
-    Status _checkAuth(Client* client, const NamespaceString& nss, CursorId cursorId) const final {
-        auto const authzSession = AuthorizationSession::get(client);
+struct ClusterKillCursorsCmd {
+    static constexpr bool supportsReadConcern = true;
+    static Status doCheckAuth(OperationContext* opCtx,
+                              const NamespaceString& nss,
+                              CursorId cursorId) {
+        auto const authzSession = AuthorizationSession::get(opCtx->getClient());
         auto authChecker = [&authzSession, &nss](UserNameIterator userNames) -> Status {
             return authzSession->checkAuthForKillCursors(nss, userNames);
         };
 
-        return Grid::get(client->getOperationContext())
-            ->getCursorManager()
-            ->checkAuthForKillCursors(client->getOperationContext(), nss, cursorId, authChecker);
+        return Grid::get(opCtx)->getCursorManager()->checkAuthForKillCursors(
+            opCtx, nss, cursorId, authChecker);
     }
-
-    Status _killCursor(OperationContext* opCtx,
-                       const NamespaceString& nss,
-                       CursorId cursorId) const final {
+    static Status doKillCursor(OperationContext* opCtx,
+                               const NamespaceString& nss,
+                               CursorId cursorId) {
         return Grid::get(opCtx)->getCursorManager()->killCursor(opCtx, nss, cursorId);
     }
-
-} clusterKillCursorsCmd;
+};
+KillCursorsCmdBase<ClusterKillCursorsCmd> clusterKillCursorsCmd;
 
 }  // namespace
 }  // namespace mongo

@@ -513,7 +513,6 @@ env.Library(
 env.Library(
     target='kill_common',
     source=[
-        'killcursors_common.cpp',
         'kill_op_cmd_base.cpp',
         'kill_operations.idl',
     ],
