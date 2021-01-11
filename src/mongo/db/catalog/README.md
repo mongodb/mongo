@@ -296,6 +296,26 @@ the 'versioned' state setup. The sharding protocol obviates any special changes 
 reads other than consistently using the same view of the sharding metadata
 [(acquiring it once and then passing it where needed in the read code)](https://github.com/mongodb/mongo/blob/9e1f0ea4f371a8101f96c84d2ecd3811d68cafb6/src/mongo/db/catalog_raii.cpp#L251-L273).
 
+### Consistent Data View with Operations Running Nested Lock-Free Reads
+
+Currently commands that support lock-free reads are `find`, `count`, `distinct`, `aggregate` and
+`mapReduce` --`mapReduce` still takes collection IX locks for its writes. These commands may use
+nested `AutoGetCollection*LockFree` helpers in sub-operations. Therefore, the first lock-free lock
+helper will establish a consistent in-memory and on-disk metadata and data view, and sub-operations
+will use the higher level state rather than establishing their own. This is achieved by the first
+lock helper fetching a complete immutable copy of the `CollectionCatalog` and saving it on the
+`OperationContext`. Subsequent lock free helpers will check an `isLockFreeReadsOp()` flag on the
+`OperationContext` and skip establishing their own state: instead, the `CollectionCatalog` saved on
+the `OperationContext` will be accessed and no new storage snapshot will be opened. Saving a
+complete copy of the entire in-memory catalog provides flexibility for sub-operations that may need
+access to any collection.
+
+_Code spelunking starting points:_
+
+* [_AutoGetCollectionForReadLockFree preserves an immutable CollectionCatalog_](https://github.com/mongodb/mongo/blob/dcf844f384803441b5393664e500008fc6902346/src/mongo/db/db_raii.cpp#L141)
+* [_AutoGetCollectionForReadLockFree returns early if already running lock-free_](https://github.com/mongodb/mongo/blob/dcf844f384803441b5393664e500008fc6902346/src/mongo/db/db_raii.cpp#L108-L112)
+* [_The lock-free operation flag on the OperationContext_](https://github.com/mongodb/mongo/blob/dcf844f384803441b5393664e500008fc6902346/src/mongo/db/operation_context.h#L298-L300)
+
 ## Secondary Reads
 
 The oplog applier applies entries out-of-order to provide parallelism for data replication. This
