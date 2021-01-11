@@ -460,9 +460,12 @@ void CollectionCatalog::write(ServiceContext* svcCtx, CatalogWriteFn job) {
             const bool& completed = completion->completed;
             completion->cv.wait(completionLock, [&completed]() { return completed; });
 
-            // Throw any exception that was caught during execution of our job
-            if (completion->exception)
-                std::rethrow_exception(completion->exception);
+            // Throw any exception that was caught during execution of our job. Make sure we destroy
+            // the exception_ptr on the same thread that throws the exception to avoid a data race
+            // between destroying the exception_ptr and reading the exception.
+            auto ex = std::move(completion->exception);
+            if (ex)
+                std::rethrow_exception(ex);
             return;
         }
 
