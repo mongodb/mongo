@@ -156,7 +156,7 @@ std::vector<Document> CommonMongodProcessInterface::getIndexStats(OperationConte
                                                                   const NamespaceString& ns,
                                                                   StringData host,
                                                                   bool addShardName) {
-    AutoGetCollectionForReadCommand collection(opCtx, ns);
+    AutoGetCollectionForReadCommandMaybeLockFree collection(opCtx, ns);
 
     std::vector<Document> indexStats;
     if (!collection) {
