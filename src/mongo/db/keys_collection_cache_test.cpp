@@ -29,8 +29,10 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/keys_collection_cache.h"
+#include "mongo/db/keys_collection_client_direct.h"
 #include "mongo/db/keys_collection_client_sharded.h"
 #include "mongo/db/keys_collection_document_gen.h"
 #include "mongo/db/operation_context.h"
@@ -50,31 +52,72 @@ protected:
 
         _catalogClient = std::make_unique<KeysCollectionClientSharded>(
             Grid::get(operationContext())->catalogClient());
+
+        _directClient = std::make_unique<KeysCollectionClientDirect>();
     }
 
     KeysCollectionClient* catalogClient() const {
         return _catalogClient.get();
     }
 
+    KeysCollectionClient* directClient() const {
+        return _directClient.get();
+    }
+
+    void insertDocument(OperationContext* opCtx, const NamespaceString& nss, const BSONObj& doc) {
+        AutoGetCollection coll(opCtx, nss, MODE_IX);
+        auto updateResult = Helpers::upsert(opCtx, nss.toString(), doc);
+        ASSERT_EQ(0, updateResult.numDocsModified);
+    }
+
 private:
     std::unique_ptr<KeysCollectionClient> _catalogClient;
+    std::unique_ptr<KeysCollectionClient> _directClient;
 };
 
-TEST_F(CacheTest, ErrorsIfCacheIsEmpty) {
+TEST_F(CacheTest, GetInternalKeyErrorsIfInternalKeysCacheIsEmpty) {
     KeysCollectionCache cache("test", catalogClient());
-    auto status = cache.getKey(LogicalTime(Timestamp(1, 0))).getStatus();
+    auto status = cache.getInternalKey(LogicalTime(Timestamp(1, 0))).getStatus();
     ASSERT_EQ(ErrorCodes::KeyNotFound, status.code());
     ASSERT_FALSE(status.reason().empty());
 }
 
-TEST_F(CacheTest, RefreshErrorsIfCacheIsEmpty) {
+TEST_F(CacheTest, GetInternalKeyByIdErrorsIfInternalKeysCacheIsEmpty) {
+    KeysCollectionCache cache("test", catalogClient());
+    auto status = cache.getInternalKeyById(1, LogicalTime(Timestamp(1, 0))).getStatus();
+    ASSERT_EQ(ErrorCodes::KeyNotFound, status.code());
+    ASSERT_FALSE(status.reason().empty());
+}
+
+TEST_F(CacheTest, GetExternalKeysByIdErrorsIfExternalKeysCacheIsEmpty) {
+    KeysCollectionCache cache("test", catalogClient());
+    auto status = cache.getExternalKeysById(1, LogicalTime(Timestamp(1, 0))).getStatus();
+    ASSERT_EQ(ErrorCodes::KeyNotFound, status.code());
+    ASSERT_FALSE(status.reason().empty());
+}
+
+TEST_F(CacheTest, RefreshErrorsIfInternalCacheIsEmpty) {
     KeysCollectionCache cache("test", catalogClient());
     auto status = cache.refresh(operationContext()).getStatus();
     ASSERT_EQ(ErrorCodes::KeyNotFound, status.code());
     ASSERT_FALSE(status.reason().empty());
 }
 
-TEST_F(CacheTest, GetKeyShouldReturnCorrectKeyAfterRefresh) {
+TEST_F(CacheTest, RefreshDoesNotErrorIfExternalKeysCacheIsEmpty) {
+    KeysCollectionCache cache("test", catalogClient());
+
+    KeysCollectionDocument origKey1(1);
+    origKey1.setKeysCollectionDocumentBase(
+        {"test", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0))});
+    ASSERT_OK(insertToConfigCollection(
+        operationContext(), NamespaceString::kKeysCollectionNamespace, origKey1.toBSON()));
+
+    auto status = cache.refresh(operationContext()).getStatus();
+    ASSERT_OK(status);
+}
+
+
+TEST_F(CacheTest, GetKeyShouldReturnCorrectKeyAfterRefreshSharded) {
     KeysCollectionCache cache("test", catalogClient());
 
     KeysCollectionDocument origKey1(1);
@@ -94,19 +137,114 @@ TEST_F(CacheTest, GetKeyShouldReturnCorrectKeyAfterRefresh) {
         ASSERT_EQ(Timestamp(105, 0), key.getExpiresAt().asTimestamp());
     }
 
-    auto status = cache.getKey(LogicalTime(Timestamp(1, 0)));
-    ASSERT_OK(status.getStatus());
+    auto swInternalKey = cache.getInternalKey(LogicalTime(Timestamp(1, 0)));
+    ASSERT_OK(swInternalKey.getStatus());
 
     {
-        auto key = status.getValue();
+        auto key = swInternalKey.getValue();
         ASSERT_EQ(1, key.getKeyId());
         ASSERT_EQ(origKey1.getKey(), key.getKey());
         ASSERT_EQ("test", key.getPurpose());
         ASSERT_EQ(Timestamp(105, 0), key.getExpiresAt().asTimestamp());
     }
+
+    swInternalKey = cache.getInternalKeyById(1, LogicalTime(Timestamp(1, 0)));
+    ASSERT_OK(swInternalKey.getStatus());
+
+    {
+        auto key = swInternalKey.getValue();
+        ASSERT_EQ(1, key.getKeyId());
+        ASSERT_EQ(origKey1.getKey(), key.getKey());
+        ASSERT_EQ("test", key.getPurpose());
+        ASSERT_EQ(Timestamp(105, 0), key.getExpiresAt().asTimestamp());
+    }
+
+    auto swExternalKeys = cache.getExternalKeysById(1, LogicalTime(Timestamp(1, 0)));
+    ASSERT_EQ(ErrorCodes::KeyNotFound, swExternalKeys.getStatus());
 }
 
-TEST_F(CacheTest, GetKeyShouldReturnErrorIfNoKeyIsValidForGivenTime) {
+TEST_F(CacheTest, GetKeyShouldReturnCorrectKeysAfterRefreshDirectClient) {
+    KeysCollectionCache cache("test", directClient());
+
+    KeysCollectionDocument origKey0(1);
+    origKey0.setKeysCollectionDocumentBase(
+        {"test", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0))});
+    insertDocument(
+        operationContext(), NamespaceString::kKeysCollectionNamespace, origKey0.toBSON());
+
+    // Use external keys with the same keyId and expiresAt as the internal key to test that the
+    // cache correctly tackles key collisions.
+    ExternalKeysCollectionDocument origKey1(OID::gen(), 1, "replicaSetName1");
+    origKey1.setKeysCollectionDocumentBase(
+        {"test", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0))});
+    insertDocument(
+        operationContext(), NamespaceString::kExternalKeysCollectionNamespace, origKey1.toBSON());
+
+    ExternalKeysCollectionDocument origKey2(OID::gen(), 1, "replicaSetName2");
+    origKey2.setKeysCollectionDocumentBase(
+        {"test", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0))});
+    insertDocument(
+        operationContext(), NamespaceString::kExternalKeysCollectionNamespace, origKey2.toBSON());
+
+    auto refreshStatus = cache.refresh(operationContext());
+    ASSERT_OK(refreshStatus.getStatus());
+
+    // refresh() should return the internal key.
+    {
+        auto key = refreshStatus.getValue();
+        ASSERT_EQ(1, key.getKeyId());
+        ASSERT_EQ(origKey0.getKey(), key.getKey());
+        ASSERT_EQ("test", key.getPurpose());
+        ASSERT_EQ(Timestamp(105, 0), key.getExpiresAt().asTimestamp());
+    }
+
+    auto swInternalKey = cache.getInternalKey(LogicalTime(Timestamp(1, 0)));
+    ASSERT_OK(swInternalKey.getStatus());
+
+    {
+        auto key = swInternalKey.getValue();
+        ASSERT_EQ(1, key.getKeyId());
+        ASSERT_EQ(origKey0.getKey(), key.getKey());
+        ASSERT_EQ("test", key.getPurpose());
+        ASSERT_EQ(Timestamp(105, 0), key.getExpiresAt().asTimestamp());
+    }
+
+    swInternalKey = cache.getInternalKeyById(1, LogicalTime(Timestamp(1, 0)));
+    ASSERT_OK(swInternalKey.getStatus());
+
+    {
+        auto key = swInternalKey.getValue();
+        ASSERT_EQ(1, key.getKeyId());
+        ASSERT_EQ(origKey0.getKey(), key.getKey());
+        ASSERT_EQ("test", key.getPurpose());
+        ASSERT_EQ(Timestamp(105, 0), key.getExpiresAt().asTimestamp());
+    }
+
+    auto swExternalKeys = cache.getExternalKeysById(1, LogicalTime(Timestamp(1, 0)));
+    ASSERT_OK(swExternalKeys.getStatus());
+
+    {
+        std::map<OID, ExternalKeysCollectionDocument> expectedKeys = {
+            {origKey1.getId(), origKey1},
+            {origKey2.getId(), origKey2},
+        };
+
+        auto keys = swExternalKeys.getValue();
+        ASSERT_EQ(expectedKeys.size(), keys.size());
+
+        for (const auto& key : keys) {
+            auto iter = expectedKeys.find(key.getId());
+            ASSERT(iter != expectedKeys.end());
+
+            auto expectedKey = iter->second;
+            ASSERT_EQ(expectedKey.getId(), key.getId());
+            ASSERT_EQ(expectedKey.getPurpose(), key.getPurpose());
+            ASSERT_EQ(expectedKey.getExpiresAt().asTimestamp(), key.getExpiresAt().asTimestamp());
+        }
+    }
+}
+
+TEST_F(CacheTest, GetInternalKeyShouldReturnErrorIfNoKeyIsValidForGivenTime) {
     KeysCollectionCache cache("test", catalogClient());
 
     KeysCollectionDocument origKey1(1);
@@ -126,11 +264,11 @@ TEST_F(CacheTest, GetKeyShouldReturnErrorIfNoKeyIsValidForGivenTime) {
         ASSERT_EQ(Timestamp(105, 0), key.getExpiresAt().asTimestamp());
     }
 
-    auto status = cache.getKey(LogicalTime(Timestamp(110, 0)));
-    ASSERT_EQ(ErrorCodes::KeyNotFound, status.getStatus());
+    auto swKey = cache.getInternalKey(LogicalTime(Timestamp(110, 0)));
+    ASSERT_EQ(ErrorCodes::KeyNotFound, swKey.getStatus());
 }
 
-TEST_F(CacheTest, GetKeyShouldReturnOldestKeyPossible) {
+TEST_F(CacheTest, GetInternalKeyShouldReturnOldestKeyPossible) {
     KeysCollectionCache cache("test", catalogClient());
 
     KeysCollectionDocument origKey0(0);
@@ -162,11 +300,11 @@ TEST_F(CacheTest, GetKeyShouldReturnOldestKeyPossible) {
         ASSERT_EQ(Timestamp(110, 0), key.getExpiresAt().asTimestamp());
     }
 
-    auto keyStatus = cache.getKey(LogicalTime(Timestamp(103, 1)));
-    ASSERT_OK(keyStatus.getStatus());
+    auto swKey = cache.getInternalKey(LogicalTime(Timestamp(103, 1)));
+    ASSERT_OK(swKey.getStatus());
 
     {
-        auto key = keyStatus.getValue();
+        auto key = swKey.getValue();
         ASSERT_EQ(1, key.getKeyId());
         ASSERT_EQ(origKey1.getKey(), key.getKey());
         ASSERT_EQ("test", key.getPurpose());
@@ -174,7 +312,7 @@ TEST_F(CacheTest, GetKeyShouldReturnOldestKeyPossible) {
     }
 }
 
-TEST_F(CacheTest, RefreshShouldNotGetKeysForOtherPurpose) {
+TEST_F(CacheTest, RefreshShouldNotGetInternalKeysForOtherPurpose) {
     KeysCollectionCache cache("test", catalogClient());
 
     KeysCollectionDocument origKey0(0);
@@ -187,8 +325,8 @@ TEST_F(CacheTest, RefreshShouldNotGetKeysForOtherPurpose) {
         auto refreshStatus = cache.refresh(operationContext());
         ASSERT_EQ(ErrorCodes::KeyNotFound, refreshStatus.getStatus());
 
-        auto emptyKeyStatus = cache.getKey(LogicalTime(Timestamp(50, 0)));
-        ASSERT_EQ(ErrorCodes::KeyNotFound, emptyKeyStatus.getStatus());
+        auto swKey = cache.getInternalKey(LogicalTime(Timestamp(50, 0)));
+        ASSERT_EQ(ErrorCodes::KeyNotFound, swKey.getStatus());
     }
 
     KeysCollectionDocument origKey1(1);
@@ -208,15 +346,63 @@ TEST_F(CacheTest, RefreshShouldNotGetKeysForOtherPurpose) {
         ASSERT_EQ(Timestamp(105, 0), key.getExpiresAt().asTimestamp());
     }
 
-    auto keyStatus = cache.getKey(LogicalTime(Timestamp(60, 1)));
-    ASSERT_OK(keyStatus.getStatus());
+    auto swKey = cache.getInternalKey(LogicalTime(Timestamp(60, 1)));
+    ASSERT_OK(swKey.getStatus());
 
     {
-        auto key = keyStatus.getValue();
+        auto key = swKey.getValue();
         ASSERT_EQ(1, key.getKeyId());
         ASSERT_EQ(origKey1.getKey(), key.getKey());
         ASSERT_EQ("test", key.getPurpose());
         ASSERT_EQ(Timestamp(105, 0), key.getExpiresAt().asTimestamp());
+    }
+}
+
+TEST_F(CacheTest, RefreshShouldNotGetExternalKeysForOtherPurpose) {
+    KeysCollectionCache cache("test", directClient());
+
+    KeysCollectionDocument origKey0(0);
+    origKey0.setKeysCollectionDocumentBase(
+        {"test", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(100, 0))});
+    insertDocument(
+        operationContext(), NamespaceString::kKeysCollectionNamespace, origKey0.toBSON());
+
+    ExternalKeysCollectionDocument origKey1(OID::gen(), 1, "replicaSetName1");
+    origKey1.setKeysCollectionDocumentBase(
+        {"dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0))});
+    insertDocument(
+        operationContext(), NamespaceString::kExternalKeysCollectionNamespace, origKey1.toBSON());
+
+    {
+        auto refreshStatus = cache.refresh(operationContext());
+        ASSERT_OK(refreshStatus.getStatus());
+
+        auto swKey = cache.getExternalKeysById(1, LogicalTime(Timestamp(1, 0)));
+        ASSERT_EQ(ErrorCodes::KeyNotFound, swKey.getStatus());
+    }
+
+    ExternalKeysCollectionDocument origKey2(OID::gen(), 2, "replicaSetName1");
+    origKey2.setKeysCollectionDocumentBase(
+        {"test", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(110, 0))});
+    insertDocument(
+        operationContext(), NamespaceString::kExternalKeysCollectionNamespace, origKey2.toBSON());
+
+    {
+        auto refreshStatus = cache.refresh(operationContext());
+        ASSERT_OK(refreshStatus.getStatus());
+
+        auto swKeys = cache.getExternalKeysById(2, LogicalTime(Timestamp(1, 0)));
+        ASSERT_OK(swKeys.getStatus());
+
+        auto keys = swKeys.getValue();
+        ASSERT_EQ(1, keys.size());
+
+        auto key = keys.front();
+        ASSERT_EQ(2, key.getKeyId());
+        ASSERT_EQ(origKey2.getId(), key.getId());
+        ASSERT_EQ(origKey2.getKey(), key.getKey());
+        ASSERT_EQ("test", key.getPurpose());
+        ASSERT_EQ(Timestamp(110, 0), key.getExpiresAt().asTimestamp());
     }
 }
 
@@ -240,8 +426,8 @@ TEST_F(CacheTest, RefreshCanIncrementallyGetNewKeys) {
         ASSERT_EQ("test", key.getPurpose());
         ASSERT_EQ(Timestamp(100, 0), key.getExpiresAt().asTimestamp());
 
-        auto keyStatus = cache.getKey(LogicalTime(Timestamp(112, 1)));
-        ASSERT_EQ(ErrorCodes::KeyNotFound, keyStatus.getStatus());
+        auto swKey = cache.getInternalKey(LogicalTime(Timestamp(112, 1)));
+        ASSERT_EQ(ErrorCodes::KeyNotFound, swKey.getStatus());
     }
 
     KeysCollectionDocument origKey1(1);
@@ -268,9 +454,10 @@ TEST_F(CacheTest, RefreshCanIncrementallyGetNewKeys) {
     }
 
     {
-        auto keyStatus = cache.getKey(LogicalTime(Timestamp(108, 1)));
+        auto swKey = cache.getInternalKey(LogicalTime(Timestamp(108, 1)));
+        ASSERT_OK(swKey.getStatus());
 
-        auto key = keyStatus.getValue();
+        auto key = swKey.getValue();
         ASSERT_EQ(2, key.getKeyId());
         ASSERT_EQ(origKey2.getKey(), key.getKey());
         ASSERT_EQ("test", key.getPurpose());

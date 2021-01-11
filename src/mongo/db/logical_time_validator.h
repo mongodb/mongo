@@ -71,7 +71,7 @@ public:
     SignedLogicalTime signLogicalTime(OperationContext* opCtx, const LogicalTime& newTime);
 
     /**
-     * Returns true if the signature of newTime is valid.
+     * Validates the signature of newTime and returns the resulting status.
      */
     Status validate(OperationContext* opCtx, const SignedLogicalTime& newTime);
 

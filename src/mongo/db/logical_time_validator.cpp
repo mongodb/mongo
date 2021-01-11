@@ -164,23 +164,34 @@ Status LogicalTimeValidator::validate(OperationContext* opCtx, const SignedLogic
         }
     }
 
-    auto keyStatus =
-        _getKeyManagerCopy()->getKeyForValidation(opCtx, newTime.getKeyId(), newTime.getTime());
-    uassertStatusOK(keyStatus.getStatus());
+    auto keyStatusWith =
+        _getKeyManagerCopy()->getKeysForValidation(opCtx, newTime.getKeyId(), newTime.getTime());
+    auto status = keyStatusWith.getStatus();
 
-    const auto& key = keyStatus.getValue().getKey();
+    if (!status.isOK()) {
+        return status;
+    }
+
+    auto keys = keyStatusWith.getValue();
+    invariant(!keys.empty());
 
     const auto newProof = newTime.getProof();
     // Cluster time is only sent if a server's clock can verify and sign cluster times, so any
     // received cluster times should have proofs.
     invariant(newProof);
 
-    auto res = _timeProofService.checkProof(newTime.getTime(), newProof.get(), key);
-    if (res != Status::OK()) {
-        return res;
+    auto firstError = Status::OK();
+    for (const auto& key : keys) {
+        auto proofStatus =
+            _timeProofService.checkProof(newTime.getTime(), newProof.get(), key.getKey());
+        if (proofStatus.isOK()) {
+            return Status::OK();
+        } else if (firstError.isOK()) {
+            firstError = proofStatus;
+        }
     }
 
-    return Status::OK();
+    return firstError;
 }
 
 void LogicalTimeValidator::init(ServiceContext* service) {

@@ -2404,6 +2404,7 @@ envWithAsio.CppUnitTest(
     ],
     LIBDEPS=[
         'auth/authmocks',
+        'keys_collection_client_direct',
         's/config_server_test_fixture',
         'vector_clock',
     ],

@@ -80,7 +80,7 @@ TEST_F(KeysManagerShardedTest, GetKeyForValidationTimesOutIfRefresherIsNotRunnin
                                               ErrorCodes::ExceededTimeLimit);
 
     ASSERT_THROWS(
-        keyManager()->getKeyForValidation(operationContext(), 1, LogicalTime(Timestamp(100, 0))),
+        keyManager()->getKeysForValidation(operationContext(), 1, LogicalTime(Timestamp(100, 0))),
         DBException);
 }
 
@@ -88,7 +88,7 @@ TEST_F(KeysManagerShardedTest, GetKeyForValidationErrorsIfKeyDoesntExist) {
     keyManager()->startMonitoring(getServiceContext());
 
     auto keyStatus =
-        keyManager()->getKeyForValidation(operationContext(), 1, LogicalTime(Timestamp(100, 0)));
+        keyManager()->getKeysForValidation(operationContext(), 1, LogicalTime(Timestamp(100, 0)));
     ASSERT_EQ(ErrorCodes::KeyNotFound, keyStatus.getStatus());
 }
 
@@ -102,10 +102,10 @@ TEST_F(KeysManagerShardedTest, GetKeyWithSingleKey) {
         operationContext(), NamespaceString::kKeysCollectionNamespace, origKey1.toBSON()));
 
     auto keyStatus =
-        keyManager()->getKeyForValidation(operationContext(), 1, LogicalTime(Timestamp(100, 0)));
+        keyManager()->getKeysForValidation(operationContext(), 1, LogicalTime(Timestamp(100, 0)));
     ASSERT_OK(keyStatus.getStatus());
 
-    auto key = keyStatus.getValue();
+    auto key = keyStatus.getValue().front();
     ASSERT_EQ(1, key.getKeyId());
     ASSERT_EQ(origKey1.getKey(), key.getKey());
     ASSERT_EQ(Timestamp(105, 0), key.getExpiresAt().asTimestamp());
@@ -127,19 +127,19 @@ TEST_F(KeysManagerShardedTest, GetKeyWithMultipleKeys) {
         operationContext(), NamespaceString::kKeysCollectionNamespace, origKey2.toBSON()));
 
     auto keyStatus =
-        keyManager()->getKeyForValidation(operationContext(), 1, LogicalTime(Timestamp(100, 0)));
+        keyManager()->getKeysForValidation(operationContext(), 1, LogicalTime(Timestamp(100, 0)));
     ASSERT_OK(keyStatus.getStatus());
 
-    auto key = keyStatus.getValue();
+    auto key = keyStatus.getValue().front();
     ASSERT_EQ(1, key.getKeyId());
     ASSERT_EQ(origKey1.getKey(), key.getKey());
     ASSERT_EQ(Timestamp(105, 0), key.getExpiresAt().asTimestamp());
 
     keyStatus =
-        keyManager()->getKeyForValidation(operationContext(), 2, LogicalTime(Timestamp(100, 0)));
+        keyManager()->getKeysForValidation(operationContext(), 2, LogicalTime(Timestamp(100, 0)));
     ASSERT_OK(keyStatus.getStatus());
 
-    key = keyStatus.getValue();
+    key = keyStatus.getValue().front();
     ASSERT_EQ(2, key.getKeyId());
     ASSERT_EQ(origKey2.getKey(), key.getKey());
     ASSERT_EQ(Timestamp(205, 0), key.getExpiresAt().asTimestamp());
@@ -155,7 +155,7 @@ TEST_F(KeysManagerShardedTest, GetKeyShouldErrorIfKeyIdMismatchKey) {
         operationContext(), NamespaceString::kKeysCollectionNamespace, origKey1.toBSON()));
 
     auto keyStatus =
-        keyManager()->getKeyForValidation(operationContext(), 2, LogicalTime(Timestamp(100, 0)));
+        keyManager()->getKeysForValidation(operationContext(), 2, LogicalTime(Timestamp(100, 0)));
     ASSERT_EQ(ErrorCodes::KeyNotFound, keyStatus.getStatus());
 }
 
@@ -174,22 +174,22 @@ TEST_F(KeysManagerShardedTest, GetKeyWithoutRefreshShouldReturnRightKey) {
         operationContext(), NamespaceString::kKeysCollectionNamespace, origKey2.toBSON()));
 
     {
-        auto keyStatus = keyManager()->getKeyForValidation(
+        auto keyStatus = keyManager()->getKeysForValidation(
             operationContext(), 1, LogicalTime(Timestamp(100, 0)));
         ASSERT_OK(keyStatus.getStatus());
 
-        auto key = keyStatus.getValue();
+        auto key = keyStatus.getValue().front();
         ASSERT_EQ(1, key.getKeyId());
         ASSERT_EQ(origKey1.getKey(), key.getKey());
         ASSERT_EQ(Timestamp(105, 0), key.getExpiresAt().asTimestamp());
     }
 
     {
-        auto keyStatus = keyManager()->getKeyForValidation(
+        auto keyStatus = keyManager()->getKeysForValidation(
             operationContext(), 2, LogicalTime(Timestamp(105, 0)));
         ASSERT_OK(keyStatus.getStatus());
 
-        auto key = keyStatus.getValue();
+        auto key = keyStatus.getValue().front();
         ASSERT_EQ(2, key.getKeyId());
         ASSERT_EQ(origKey2.getKey(), key.getKey());
         ASSERT_EQ(Timestamp(110, 0), key.getExpiresAt().asTimestamp());
@@ -311,10 +311,10 @@ TEST_F(KeysManagerShardedTest, ShouldStillBeAbleToUpdateCacheEvenIfItCantCreateK
     }
 
     auto keyStatus =
-        keyManager()->getKeyForValidation(operationContext(), 1, LogicalTime(Timestamp(100, 0)));
+        keyManager()->getKeysForValidation(operationContext(), 1, LogicalTime(Timestamp(100, 0)));
     ASSERT_OK(keyStatus.getStatus());
 
-    auto key = keyStatus.getValue();
+    auto key = keyStatus.getValue().front();
     ASSERT_EQ(1, key.getKeyId());
     ASSERT_EQ(origKey1.getKey(), key.getKey());
     ASSERT_EQ(Timestamp(105, 0), key.getExpiresAt().asTimestamp());
@@ -330,7 +330,7 @@ TEST_F(KeysManagerShardedTest, ShouldNotCreateKeysWithDisableKeyGenerationFailPo
         keyManager()->enableKeyGenerator(operationContext(), true);
 
         keyManager()->refreshNow(operationContext());
-        auto keyStatus = keyManager()->getKeyForValidation(
+        auto keyStatus = keyManager()->getKeysForValidation(
             operationContext(), 1, LogicalTime(Timestamp(100, 0)));
         ASSERT_EQ(ErrorCodes::KeyNotFound, keyStatus.getStatus());
     }
@@ -353,7 +353,7 @@ TEST_F(KeysManagerShardedTest, HasSeenKeysIsFalseUntilKeysAreFound) {
         keyManager()->enableKeyGenerator(operationContext(), true);
 
         keyManager()->refreshNow(operationContext());
-        auto keyStatus = keyManager()->getKeyForValidation(
+        auto keyStatus = keyManager()->getKeysForValidation(
             operationContext(), 1, LogicalTime(Timestamp(100, 0)));
         ASSERT_EQ(ErrorCodes::KeyNotFound, keyStatus.getStatus());
 

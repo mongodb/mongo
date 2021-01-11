@@ -84,7 +84,7 @@ Status KeyGenerator::generateNewKeysIfNeeded(OperationContext* opCtx) {
     }
 
     const auto currentTime = VectorClock::get(opCtx)->getTime();
-    auto keyStatus = _client->getNewKeys(opCtx, _purpose, currentTime.clusterTime(), false);
+    auto keyStatus = _client->getNewInternalKeys(opCtx, _purpose, currentTime.clusterTime(), false);
 
     if (!keyStatus.isOK()) {
         return keyStatus.getStatus();

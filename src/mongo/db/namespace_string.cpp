@@ -132,6 +132,12 @@ bool NamespaceString::isLegalClientSystemNS() const {
             return true;
         if (coll() == "system.backup_users")
             return true;
+        if (coll() == kExternalKeysCollectionNamespace.coll()) {
+            // TODO (SERVER-53404): This was added to allow client in an integration test to
+            // manually insert the key document into this system collection. Remove this when the
+            // tenant migration donor does the copying by itself.
+            return true;
+        }
     } else if (db() == kConfigDb) {
         if (coll() == "system.sessions")
             return true;

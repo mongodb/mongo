@@ -72,13 +72,35 @@ bool isRetriableError(ErrorCodes::Error code, Shard::RetryPolicy options) {
 
 KeysCollectionClientDirect::KeysCollectionClientDirect() : _rsLocalClient() {}
 
-StatusWith<std::vector<KeysCollectionDocument>> KeysCollectionClientDirect::getNewKeys(
+StatusWith<std::vector<KeysCollectionDocument>> KeysCollectionClientDirect::getNewInternalKeys(
     OperationContext* opCtx,
     StringData purpose,
     const LogicalTime& newerThanThis,
     bool useMajority) {
+    return _getNewKeys<KeysCollectionDocument>(
+        opCtx, NamespaceString::kKeysCollectionNamespace, purpose, newerThanThis, useMajority);
+}
 
+StatusWith<std::vector<ExternalKeysCollectionDocument>>
+KeysCollectionClientDirect::getNewExternalKeys(OperationContext* opCtx,
+                                               StringData purpose,
+                                               const LogicalTime& newerThanThis,
+                                               bool useMajority) {
+    return _getNewKeys<ExternalKeysCollectionDocument>(
+        opCtx,
+        NamespaceString::kExternalKeysCollectionNamespace,
+        purpose,
+        newerThanThis,
+        useMajority);
+}
 
+template <typename KeyDocumentType>
+StatusWith<std::vector<KeyDocumentType>> KeysCollectionClientDirect::_getNewKeys(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    StringData purpose,
+    const LogicalTime& newerThanThis,
+    bool useMajority) {
     BSONObjBuilder queryBuilder;
     queryBuilder.append("purpose", purpose);
     queryBuilder.append("expiresAt", BSON("$gt" << newerThanThis.asTimestamp()));
@@ -91,7 +113,7 @@ StatusWith<std::vector<KeysCollectionDocument>> KeysCollectionClientDirect::getN
     auto findStatus = _query(opCtx,
                              ReadPreferenceSetting(ReadPreference::Nearest, TagSet{}),
                              readConcern,
-                             NamespaceString::kKeysCollectionNamespace,
+                             nss,
                              queryBuilder.obj(),
                              BSON("expiresAt" << 1),
                              boost::none);
@@ -101,11 +123,11 @@ StatusWith<std::vector<KeysCollectionDocument>> KeysCollectionClientDirect::getN
     }
 
     const auto& keyDocs = findStatus.getValue().docs;
-    std::vector<KeysCollectionDocument> keys;
+    std::vector<KeyDocumentType> keys;
     for (auto&& keyDoc : keyDocs) {
-        KeysCollectionDocument key;
+        KeyDocumentType key;
         try {
-            key = KeysCollectionDocument::parse(IDLParserErrorContext("keyDoc"), keyDoc);
+            key = KeyDocumentType::parse(IDLParserErrorContext("keyDoc"), keyDoc);
         } catch (...) {
             return exceptionToStatus();
         }

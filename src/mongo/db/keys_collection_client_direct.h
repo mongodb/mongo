@@ -45,13 +45,24 @@ class KeysCollectionClientDirect : public KeysCollectionClient {
 public:
     KeysCollectionClientDirect();
     /**
-     * Returns keys for the given purpose and with an expiresAt value greater than newerThanThis,
-     * using readConcern level majority if possible.
+     * Returns keys in admin.system.keys that match the given purpose and have an expiresAt value
+     * greater than newerThanThis. Uses readConcern level majority if possible.
      */
-    StatusWith<std::vector<KeysCollectionDocument>> getNewKeys(OperationContext* opCtx,
-                                                               StringData purpose,
-                                                               const LogicalTime& newerThanThis,
-                                                               bool useMajority) override;
+    StatusWith<std::vector<KeysCollectionDocument>> getNewInternalKeys(
+        OperationContext* opCtx,
+        StringData purpose,
+        const LogicalTime& newerThanThis,
+        bool useMajority) override;
+
+    /**
+     * Returns keys in admin.system.external_validation_keys that match the given purpose and have
+     * an expiresAt value greater than newerThanThis. Uses readConcern level majority if possible.
+     */
+    StatusWith<std::vector<ExternalKeysCollectionDocument>> getNewExternalKeys(
+        OperationContext* opCtx,
+        StringData purpose,
+        const LogicalTime& newerThanThis,
+        bool useMajority) override;
 
     /**
      * Directly inserts a key document to the storage
@@ -67,6 +78,17 @@ public:
     }
 
 private:
+    /**
+     * Returns keys in the given collection that match the given purpose and have an expiresAt value
+     * greater than newerThanThis, using readConcern level majority if possible.
+     */
+    template <typename KeyDocumentType>
+    StatusWith<std::vector<KeyDocumentType>> _getNewKeys(OperationContext* opCtx,
+                                                         const NamespaceString& nss,
+                                                         StringData purpose,
+                                                         const LogicalTime& newerThanThis,
+                                                         bool useMajority);
+
     StatusWith<Shard::QueryResponse> _query(OperationContext* opCtx,
                                             const ReadPreferenceSetting& readPref,
                                             const repl::ReadConcernLevel& readConcernLevel,

@@ -97,43 +97,49 @@ KeysCollectionManager::KeysCollectionManager(std::string purpose,
       _keysCache(_purpose, _client.get()) {}
 
 
-StatusWith<KeysCollectionDocument> KeysCollectionManager::getKeyForValidation(
+StatusWith<std::vector<KeysCollectionDocument>> KeysCollectionManager::getKeysForValidation(
     OperationContext* opCtx, long long keyId, const LogicalTime& forThisTime) {
-    auto keyStatus = _getKeyWithKeyIdCheck(keyId, forThisTime);
+    auto swInternalKey = _keysCache.getInternalKeyById(keyId, forThisTime);
 
-    if (keyStatus != ErrorCodes::KeyNotFound) {
-        return keyStatus;
+    if (swInternalKey == ErrorCodes::KeyNotFound) {
+        _refresher.refreshNow(opCtx);
+        swInternalKey = _keysCache.getInternalKeyById(keyId, forThisTime);
     }
 
-    _refresher.refreshNow(opCtx);
+    std::vector<KeysCollectionDocument> keys;
 
-    return _getKeyWithKeyIdCheck(keyId, forThisTime);
+    if (swInternalKey.isOK()) {
+        keys.push_back(std::move(swInternalKey.getValue()));
+    }
+
+    auto swExternalKeys = _keysCache.getExternalKeysById(keyId, forThisTime);
+
+    if (swExternalKeys.isOK()) {
+        for (auto& externalKey : swExternalKeys.getValue()) {
+            KeysCollectionDocument key(externalKey.getKeyId());
+            key.setKeysCollectionDocumentBase(externalKey.getKeysCollectionDocumentBase());
+            keys.push_back(std::move(key));
+        };
+    }
+
+    if (keys.empty()) {
+        return {ErrorCodes::KeyNotFound,
+                str::stream() << "No keys found for " << _purpose << " that is valid for time: "
+                              << forThisTime.toString() << " with id: " << keyId};
+    }
+
+    return std::move(keys);
 }
 
 StatusWith<KeysCollectionDocument> KeysCollectionManager::getKeyForSigning(
     OperationContext* opCtx, const LogicalTime& forThisTime) {
-    return _getKey(forThisTime);
-}
+    auto swKey = _keysCache.getInternalKey(forThisTime);
 
-StatusWith<KeysCollectionDocument> KeysCollectionManager::_getKeyWithKeyIdCheck(
-    long long keyId, const LogicalTime& forThisTime) {
-    auto keyStatus = _keysCache.getKeyById(keyId, forThisTime);
-
-    if (!keyStatus.isOK()) {
-        return keyStatus;
+    if (!swKey.isOK()) {
+        return swKey;
     }
 
-    return keyStatus.getValue();
-}
-
-StatusWith<KeysCollectionDocument> KeysCollectionManager::_getKey(const LogicalTime& forThisTime) {
-    auto keyStatus = _keysCache.getKey(forThisTime);
-
-    if (!keyStatus.isOK()) {
-        return keyStatus;
-    }
-
-    const auto& key = keyStatus.getValue();
+    const auto& key = swKey.getValue();
 
     if (key.getExpiresAt() < forThisTime) {
         return {ErrorCodes::KeyNotFound,

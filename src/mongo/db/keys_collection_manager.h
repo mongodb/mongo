@@ -75,20 +75,18 @@ public:
                           Seconds keyValidForInterval);
 
     /**
-     * Return a key that is valid for the given time and also matches the keyId. Note that this call
-     * can block if it will need to do a refresh.
+     * Returns the validation keys that are valid for the given time and also match the keyId. Does
+     * a blocking refresh if there is no matching internal key. If there is a matching internal key,
+     * includes it as first key in the resulting vector.
      *
-     * Throws ErrorCode::ExceededTimeLimit if it times out.
+     * Throws ExceededTimeLimit if the refresh times out, and KeyNotFound if there are no such keys.
      */
-    StatusWith<KeysCollectionDocument> getKeyForValidation(OperationContext* opCtx,
-                                                           long long keyId,
-                                                           const LogicalTime& forThisTime);
+    StatusWith<std::vector<KeysCollectionDocument>> getKeysForValidation(
+        OperationContext* opCtx, long long keyId, const LogicalTime& forThisTime);
 
     /**
-     * Returns a key that is valid for the given time. Note that unlike getKeyForValidation, this
-     * will never do a refresh.
-     *
-     * Throws ErrorCode::ExceededTimeLimit if it times out.
+     * Returns the signing key that is valid for the given time. Note that unlike
+     * getKeysForValidation, this will never do a refresh.
      */
     StatusWith<KeysCollectionDocument> getKeyForSigning(OperationContext* opCtx,
                                                         const LogicalTime& forThisTime);
@@ -193,17 +191,6 @@ private:
 
         bool _inShutdown = false;
     };
-
-    /**
-     * Return a key that is valid for the given time and also matches the keyId.
-     */
-    StatusWith<KeysCollectionDocument> _getKeyWithKeyIdCheck(long long keyId,
-                                                             const LogicalTime& forThisTime);
-
-    /**
-     * Return a key that is valid for the given time.
-     */
-    StatusWith<KeysCollectionDocument> _getKey(const LogicalTime& forThisTime);
 
     std::unique_ptr<KeysCollectionClient> _client;
     const std::string _purpose;
