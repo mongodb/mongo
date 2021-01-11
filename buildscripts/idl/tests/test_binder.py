@@ -574,6 +574,48 @@ class TestBinder(testcase.IDLTestcase):
                         foo: string
             """), idl.errors.ERROR_ID_ARRAY_NOT_VALID_TYPE)
 
+    def test_variant_negative(self):
+        # type: () -> None
+        """Negative variant test cases."""
+
+        # Setup some common types
+        test_preamble = textwrap.dedent("""
+        types:
+            string:
+                description: foo
+                cpp_type: foo
+                bson_serialization_type: string
+                serializer: foo
+                deserializer: foo
+                default: foo
+        """)
+
+        self.assert_bind_fail(
+            test_preamble + textwrap.dedent("""
+        structs:
+            foo:
+                description: foo
+                fields:
+                    my_variant_field:
+                        type:
+                            variant:
+                            - string
+            """), idl.errors.ERROR_ID_USELESS_VARIANT)
+
+        self.assert_bind_fail(
+            test_preamble + textwrap.dedent("""
+        structs:
+            foo:
+                description: foo
+                fields:
+                    my_variant_field:
+                        type:
+                            variant:
+                            - string
+                            - int
+                            - not_defined
+            """), idl.errors.ERROR_ID_UNKNOWN_TYPE)
+
     def test_field_positive(self):
         # type: () -> None
         """Positive test cases for field."""

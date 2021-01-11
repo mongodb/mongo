@@ -34,7 +34,7 @@ it follows the rules of the IDL, etc.
 """
 
 import itertools
-from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
+from typing import Any, Dict, Iterator, List, Optional, Tuple, Union, cast
 
 from . import common
 from . import errors
@@ -199,16 +199,38 @@ class SymbolTable(object):
         for idltype in imported_symbols.types:
             self.add_type(ctxt, idltype)
 
-    def resolve_field_type(self, ctxt, location, field_name, type_name):
+    def resolve_field_from_type_name(self, ctxt, location, field_name, field_type_name):
         # type: (errors.ParserContext, common.SourceLocation, str, str) -> Optional[Union[Command, Enum, Struct, Type]]
         """Find the type or struct a field refers to or log an error."""
-        return self._resolve_field_type(ctxt, location, field_name, type_name)
+        field_type = FieldTypeSingle(location.file_name, location.line, location.column)
+        field_type.type_name = field_type_name
+        return self.resolve_field_type(ctxt, location, field_name, field_type)
 
-    def _resolve_field_type(self, ctxt, location, field_name, type_name):
-        # type: (errors.ParserContext, common.SourceLocation, str, str) -> Optional[Union[Command, Enum, Struct, Type]]
+    def resolve_field_type(self, ctxt, location, field_name, field_type):
+        # type: (errors.ParserContext, common.SourceLocation, str, FieldType) -> Optional[Union[Command, Enum, Struct, Type]]
         """Find the type or struct a field refers to or log an error."""
-        # pylint: disable=too-many-return-statements
+        # pylint: disable=too-many-return-statements,too-many-branches,too-many-locals
 
+        if isinstance(field_type, FieldTypeVariant):
+            variant = Variant(field_type.file_name, field_type.line, field_type.column)
+            for alternative in field_type.variant:
+                alternative_type = self.resolve_field_type(ctxt, location, field_name, alternative)
+                if not alternative_type:
+                    # There was an error.
+                    return None
+
+                # TODO (SERVER-51369): proper error, and test it
+                assert isinstance(alternative_type, Type)
+                variant.variant_types.append(alternative_type)
+
+            variant.bson_serialization_type = [
+                v.bson_serialization_type[0] for v in variant.variant_types
+            ]
+
+            return variant
+
+        assert isinstance(field_type, FieldTypeSingle)
+        type_name = field_type.type_name
         for command in self.commands:
             if command.name == type_name:
                 return command
@@ -231,7 +253,9 @@ class SymbolTable(object):
                 ctxt.add_bad_array_type_name_error(location, field_name, type_name)
                 return None
 
-            return self._resolve_field_type(ctxt, location, field_name, array_type_name)
+            array_type = FieldTypeSingle(field_type.file_name, field_type.line, field_type.column)
+            array_type.type_name = array_type_name
+            return self.resolve_field_type(ctxt, location, field_name, array_type)
 
         ctxt.add_unknown_type_error(location, field_name, type_name)
 
@@ -299,6 +323,17 @@ class Type(common.SourceLocation):
         super(Type, self).__init__(file_name, line, column)
 
 
+class Variant(Type):
+    """Stores all type information about an IDL variant type."""
+
+    def __init__(self, file_name, line, column):
+        # type: (str, int, int) -> None
+        """Construct a Variant."""
+        super(Variant, self).__init__(file_name, line, column)
+        self.bson_serialization_type = []
+        self.variant_types = []  # type: List[Type]
+
+
 class Validator(common.SourceLocation):
     """
     An instance of a validator for a field.
@@ -340,7 +375,7 @@ class Field(common.SourceLocation):
         self.name = None  # type: str
         self.cpp_name = None  # type: str
         self.description = None  # type: str
-        self.type = None  # type: str
+        self.type = None  # type: FieldType
         self.ignore = False  # type: bool
         self.optional = False  # type: bool
         self.default = None  # type: str
@@ -440,7 +475,7 @@ class Command(Struct):
         """Construct a Command."""
         self.namespace = None  # type: str
         self.command_name = None  # type: str
-        self.type = None  # type: str
+        self.type = None  # type: FieldType
         self.reply_type = None  # type: str
         self.api_version = ""  # type: str
         self.is_deprecated = False  # type: bool
@@ -532,6 +567,44 @@ class Condition(common.SourceLocation):
         self.preprocessor = None  # type: str
 
         super(Condition, self).__init__(file_name, line, column)
+
+
+class FieldType(common.SourceLocation):
+    """A field's type, before it is resolved to a Type instance."""
+
+    def debug_string(self):
+        """Display this field type in error messages."""
+        raise NotImplementedError
+
+
+class FieldTypeSingle(FieldType):
+    """A scalar or array field's type, before it is resolved to a Type instance."""
+
+    def __init__(self, file_name, line, column):
+        # type: (str, int, int) -> None
+        """Construct a FieldTypeSingle."""
+        self.type_name = None  # type: str
+
+        super(FieldTypeSingle, self).__init__(file_name, line, column)
+
+    def debug_string(self):
+        """Display this field type in error messages."""
+        return self.type_name
+
+
+class FieldTypeVariant(FieldType):
+    """A variant field's type, before it is resolved to a Type instance."""
+
+    def __init__(self, file_name, line, column):
+        # type: (str, int, int) -> None
+        """Construct a FieldTypeVariant."""
+        self.variant = []  # type: List[FieldType]
+
+        super(FieldTypeVariant, self).__init__(file_name, line, column)
+
+    def debug_string(self):
+        """Display this field type in error messages."""
+        return 'Variant(%s)' % (', '.join(v.debug_string() for v in self.variant))
 
 
 class Expression(common.SourceLocation):
@@ -665,7 +738,7 @@ class ConfigOption(common.SourceLocation):
         self.canonicalize = None  # type: str
 
         self.duplicate_behavior = None  # type: str
-        self.positional = None  # type str
+        self.positional = None  # type: str
         self.validator = None  # type: Validator
 
         super(ConfigOption, self).__init__(file_name, line, column)

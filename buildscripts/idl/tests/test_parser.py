@@ -390,6 +390,79 @@ class TestParser(testcase.IDLTestcase):
                     foo: bar
             """), idl.errors.ERROR_ID_UNKNOWN_NODE)
 
+    def test_variant_positive(self):
+        # type: () -> None
+        """Positive variant test cases."""
+
+        # TODO (SERVER-51369): support IDL-defined struct as one of the alternative types
+        self.assert_parse(
+            textwrap.dedent("""
+        structs:
+            foo:
+                description: foo
+                fields:
+                    my_variant_field1:
+                        type:
+                            variant: [int, string]
+                    my_variant_field2:
+                        type:
+                            variant:
+                            - string
+                            - array<string>
+                            - object
+            """))
+
+    def test_variant_negative(self):
+        # type: () -> None
+        """Negative variant test cases."""
+
+        self.assert_parse_fail(
+            textwrap.dedent("""
+        structs:
+            foo:
+                description: foo
+                fields:
+                    my_variant_field:
+                        type:
+                            variant: {}
+            """), idl.errors.ERROR_ID_IS_NODE_TYPE)
+
+        self.assert_parse_fail(
+            textwrap.dedent("""
+        structs:
+            foo:
+                description: foo
+                fields:
+                    my_variant_field:
+                        type:
+                            variant: 1
+            """), idl.errors.ERROR_ID_IS_NODE_TYPE)
+
+        self.assert_parse_fail(
+            textwrap.dedent("""
+        structs:
+            foo:
+                description: foo
+                fields:
+                    my_variant_field:
+                        type:
+                            variant: []
+                            unknown_option: true
+            """), idl.errors.ERROR_ID_UNKNOWN_NODE)
+
+        self.assert_parse_fail(
+            textwrap.dedent("""
+        structs:
+            foo:
+                description: foo
+                fields:
+                    my_variant_field:
+                        type:
+                            variant:
+                            - string
+                            - {variant: [string, int]}
+            """), idl.errors.ERROR_ID_IS_NODE_TYPE)
+
     def test_field_positive(self):
         # type: () -> None
         """Positive field test cases."""

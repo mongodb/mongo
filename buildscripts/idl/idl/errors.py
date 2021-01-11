@@ -115,6 +115,7 @@ ERROR_ID_INVALID_REPLY_TYPE = "ID0072"
 ERROR_ID_UNSTABLE_NO_API_VERSION = "ID0073"
 ERROR_ID_MISSING_REPLY_TYPE = "ID0074"
 ERROR_ID_API_VERSION_NO_STRICT = "ID0075"
+ERROR_ID_USELESS_VARIANT = "ID0076"
 
 
 class IDLError(Exception):
@@ -672,6 +673,12 @@ class ParserContext(object):
             location, ERROR_ID_NON_CONST_GETTER_IN_IMMUTABLE_STRUCT,
             ("Cannot generate a non-const getter for field '%s' in struct '%s' since"
              " struct '%s' is marked as immutable.") % (field_name, struct_name, struct_name))
+
+    def add_useless_variant_error(self, location):
+        # type: (common.SourceLocation,) -> None
+        """Add an error about a variant with 0 or 1 variant types."""
+        self._add_error(location, ERROR_ID_USELESS_VARIANT,
+                        ("Cannot declare a variant with only 0 or 1 variant types"))
 
     def is_scalar_non_negative_int_node(self, node, node_name):
         # type: (Union[yaml.nodes.MappingNode, yaml.nodes.ScalarNode, yaml.nodes.SequenceNode], str) -> bool

@@ -769,6 +769,9 @@ commands:
         namespace: type
         type: array<one_string>
 
+    # TODO (SERVER-51369): Test a command with type: variant: [int, string] and
+    #   with type: variant: [int, one_string]
+
     _underscore_command:
         description: Command with custom type string
         command_name: _underscore_command

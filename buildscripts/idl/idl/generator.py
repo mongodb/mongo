@@ -84,7 +84,7 @@ def _get_field_constant_name(field):
 
 
 def _get_field_member_validator_name(field):
-    # type (ast.Field) -> str
+    # type: (ast.Field) -> str
     """Get the name of the validator method for this field."""
     return 'validate%s' % common.title_case(field.cpp_name)
 
@@ -990,7 +990,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
     def generate(self, spec):
         # type: (ast.IDLAST) -> None
         """Generate the C++ header to a stream."""
-        # pylint: disable=too-many-branches,too-many-statements
+        # pylint: disable=too-many-branches,too-many-statements,too-many-locals
         self.gen_file_header()
 
         self._writer.write_unindented_line('#pragma once')
@@ -1288,6 +1288,11 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             self._gen_usage_check(field, bson_element, field_usage_check)
 
             self._gen_array_deserializer(field, bson_element)
+            return
+
+        elif field.variant:
+            self._gen_usage_check(field, bson_element, field_usage_check)
+            # TODO (SERVER-51369): implement _gen_variant_deserializer.
             return
 
         def validate_and_assign_or_uassert(field, expression):
@@ -1771,6 +1776,9 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                         expression = bson_cpp_type.gen_serializer_expression(self._writer, 'item')
                         template_params['expression'] = expression
                         self._writer.write_template('arrayBuilder.append(${expression});')
+                elif field.variant:
+                    # TODO (SERVER-51369): Generate std::variant serializer.
+                    pass
                 else:
                     expression = bson_cpp_type.gen_serializer_expression(
                         self._writer, _access_member(field))
@@ -1843,6 +1851,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
     def _gen_serializer_method_common(self, field):
         # type: (ast.Field) -> None
+        # pylint: disable=too-many-locals
         """Generate the serialize method definition."""
         member_name = _get_field_member_name(field)
 
@@ -1864,6 +1873,9 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             if not field.struct_type:
                 if needs_custom_serializer:
                     self._gen_serializer_method_custom(field)
+                elif field.variant:
+                    # TODO (SERVER-51369): implement deserializer.
+                    return
                 else:
                     # Generate default serialization using BSONObjBuilder::append
                     # Note: BSONObjBuilder::append has overrides for std::vector also

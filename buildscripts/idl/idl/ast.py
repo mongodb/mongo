@@ -188,6 +188,10 @@ class Field(common.SourceLocation):
         self.array = False  # type: bool
         self.supports_doc_sequence = False  # type: bool
 
+        # Properties specific to fields which are variants.
+        self.variant = False  # type: bool
+        self.variant_cpp_types = []  # type: List[str]
+
         # Properties specific to fields which are enums.
         self.enum_type = False  # type: bool
 
@@ -363,7 +367,7 @@ class ServerParameter(common.SourceLocation):
         self.test_only = False  # type: bool
         self.deprecated_name = []  # type: List[str]
         self.default = None  # type: Expression
-        self.feature_flag = False  # type : bool
+        self.feature_flag = False  # type: bool
 
         # Only valid if cpp_varname is specified.
         self.validator = None  # type: Validator
