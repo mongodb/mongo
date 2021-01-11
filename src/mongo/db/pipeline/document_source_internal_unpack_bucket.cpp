@@ -55,10 +55,22 @@ void BucketUnpacker::reset(Document&& bucket) {
     }
 
     _metaValue = _bucket[kBucketMetaFieldName];
-    uassert(5346511,
-            "A metadata value cannot be undefined nor missing if metaField is specified",
-            !_spec.metaField ||
-                (_metaValue.getType() != BSONType::Undefined && !_metaValue.missing()));
+    if (_spec.metaField) {
+        // The spec indicates that there should be a metadata region. Missing metadata in this case
+        // is expressed with null, so the field is expected to be present. We also disallow
+        // undefined since the undefined BSON type is deprecated.
+        uassert(5369600,
+                "The $_internalUnpackBucket stage requires metadata to be present in a bucket if "
+                "metaField parameter is provided",
+                (_metaValue.getType() != BSONType::Undefined) && !_metaValue.missing());
+    } else {
+        // If the spec indicates that the time series collection has no metadata field, then we
+        // should not find a metadata region in the underlying bucket documents.
+        uassert(5369601,
+                "The $_internalUnpackBucket stage expects buckets to have missing metadata regions "
+                "if the metaField parameter is not provided",
+                _metaValue.missing());
+    }
 
     _timeFieldIter = _bucket[kBucketDataFieldName][_spec.timeField].getDocument().fieldIterator();
 
@@ -89,7 +101,7 @@ Document BucketUnpacker::getNext() {
         measurement.addField(_spec.timeField, timeVal);
     }
 
-    if (!_metaValue.nullish()) {
+    if (_includeMetaField && !_metaValue.nullish()) {
         measurement.addField(*_spec.metaField, _metaValue);
     }
 
@@ -165,8 +177,22 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalUnpackBucket::createF
     auto includeTimeField = (unpackerBehavior == BucketUnpacker::Behavior::kInclude) ==
         (bucketSpec.fieldSet.find(bucketSpec.timeField) != bucketSpec.fieldSet.end());
 
+    // Check the include/exclude set to determine if measurements should be materialized with
+    // metadata.
+    auto includeMetaField = false;
+    if (bucketSpec.metaField) {
+        const auto metaFieldIt = bucketSpec.fieldSet.find(*bucketSpec.metaField);
+        auto found = metaFieldIt != bucketSpec.fieldSet.end();
+        if (found) {
+            bucketSpec.fieldSet.erase(metaFieldIt);
+        }
+        includeMetaField = (unpackerBehavior == BucketUnpacker::Behavior::kInclude) == found;
+    }
+
     return make_intrusive<DocumentSourceInternalUnpackBucket>(
-        expCtx, BucketUnpacker{std::move(bucketSpec), unpackerBehavior, includeTimeField});
+        expCtx,
+        BucketUnpacker{
+            std::move(bucketSpec), unpackerBehavior, includeTimeField, includeMetaField});
 }
 
 Value DocumentSourceInternalUnpackBucket::serialize(

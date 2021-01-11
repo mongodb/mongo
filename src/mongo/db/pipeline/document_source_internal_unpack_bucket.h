@@ -47,8 +47,7 @@ struct BucketSpec {
     // after unpacking.
     boost::optional<std::string> metaField;
 
-    // The set of fields provided to the include (or exclude) argument to the
-    // $_internalUnpackBucketStage.
+    // The set of field names in the data region that should be included or excluded.
     std::set<std::string> fieldSet;
 };
 
@@ -67,10 +66,14 @@ public:
     // set difference between all fields in the bucket and the provided fields.
     enum class Behavior { kInclude, kExclude };
 
-    BucketUnpacker(BucketSpec spec, Behavior unpackerBehavior, bool includeTimeField)
+    BucketUnpacker(BucketSpec spec,
+                   Behavior unpackerBehavior,
+                   bool includeTimeField,
+                   bool includeMetaField)
         : _spec(std::move(spec)),
           _unpackerBehavior(unpackerBehavior),
-          _includeTimeField(includeTimeField) {}
+          _includeTimeField(includeTimeField),
+          _includeMetaField(includeMetaField) {}
 
     Document getNext();
     bool hasNext() const {
@@ -107,6 +110,9 @@ private:
     // Since the metadata value is the same across all materialized measurements we can cache the
     // metadata value in the reset phase and use it to materialize the metadata in each measurement.
     Value _metaValue;
+
+    // A flag used to mark that a bucket's metadata value should be materialized in measurements.
+    const bool _includeMetaField;
 
     // The bucket being unpacked.
     Document _bucket;
