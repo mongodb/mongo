@@ -86,7 +86,6 @@ config_header_substs = (
     ('@mongo_config_have_pthread_setname_np@', 'MONGO_CONFIG_HAVE_PTHREAD_SETNAME_NP'),
     ('@mongo_config_have_ssl_ec_key_new@', 'MONGO_CONFIG_HAVE_SSL_EC_KEY_NEW'),
     ('@mongo_config_have_ssl_set_ecdh_auto@', 'MONGO_CONFIG_HAVE_SSL_SET_ECDH_AUTO'),
-    ('@mongo_config_have_std_enable_if_t@', 'MONGO_CONFIG_HAVE_STD_ENABLE_IF_T'),
     ('@mongo_config_have_strnlen@', 'MONGO_CONFIG_HAVE_STRNLEN'),
     ('@mongo_config_max_extended_alignment@', 'MONGO_CONFIG_MAX_EXTENDED_ALIGNMENT'),
     ('@mongo_config_ocsp_stapling_enabled@', 'MONGO_CONFIG_OCSP_STAPLING_ENABLED'),

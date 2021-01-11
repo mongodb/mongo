@@ -33,8 +33,6 @@
 
 #include "mongo/config.h"
 
-#if defined(MONGO_CONFIG_HAVE_STD_ENABLE_IF_T)
-
 namespace mongo {
 namespace stdx {
 
@@ -42,18 +40,6 @@ using ::std::enable_if_t;
 
 }  // namespace stdx
 }  // namespace mongo
-
-#else
-
-namespace mongo {
-namespace stdx {
-
-template <bool B, class T = void>
-using enable_if_t = typename std::enable_if<B, T>::type;
-
-}  // namespace stdx
-}  // namespace mongo
-#endif
 
 // TODO: Deal with importing this from C++20, when the time comes.
 namespace mongo {

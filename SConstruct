@@ -2166,12 +2166,6 @@ elif env.TargetOSIs('windows'):
         # bool.
         "/wd4800",
 
-        # C5041: out-of-line definition for constexpr static data
-        # member is not needed and is deprecated in C++17. We still
-        # have these, but we don't want to fix them up before we roll
-        # over to C++17.
-        "/wd5041",
-
         # C4251: This warning attempts to prevent usage of CRT (C++
         # standard library) types in DLL interfaces. That is a good
         # idea for DLLs you ship to others, but in our case, we know
@@ -3014,10 +3008,10 @@ def doConfigure(myenv):
                 myenv.ConfError('Compiler does not honor -std=c++17')
 
         if not AddToCFLAGSIfSupported(myenv, '-std=c11'):
-            myenv.ConfError("C++14/17 mode selected for C++ files, but can't enable C11 for C files")
+            myenv.ConfError("C++17 mode selected for C++ files, but can't enable C11 for C files")
 
     if using_system_version_of_cxx_libraries():
-        print( 'WARNING: System versions of C++ libraries must be compiled with C++14/17 support' )
+        print( 'WARNING: System versions of C++ libraries must be compiled with C++17 support' )
 
     def CheckCxx17(context):
         test_body = """
@@ -3575,42 +3569,8 @@ def doConfigure(myenv):
         env.ConfError("Compiler must support the thread_local storage class")
     conf.Finish()
 
-    def CheckCXX14EnableIfT(context):
-        test_body = """
-        #include <cstdlib>
-        #include <type_traits>
-
-        template <typename = void>
-        struct scons {
-            bool hasSupport() { return false; }
-        };
-
-        template <>
-        struct scons<typename std::enable_if_t<true>> {
-            bool hasSupport() { return true; }
-        };
-
-        int main(int argc, char **argv) {
-            scons<> SCons;
-            return SCons.hasSupport() ? EXIT_SUCCESS : EXIT_FAILURE;
-        }
-        """
-        context.Message('Checking for C++14 std::enable_if_t support...')
-        ret = context.TryCompile(textwrap.dedent(test_body), '.cpp')
-        context.Result(ret)
-        return ret
-
-    # Check for std::enable_if_t support without using the __cplusplus macro
-    conf = Configure(myenv, help=False, custom_tests = {
-        'CheckCXX14EnableIfT' : CheckCXX14EnableIfT,
-    })
-
-    if conf.CheckCXX14EnableIfT():
-        conf.env.SetConfigHeaderDefine('MONGO_CONFIG_HAVE_STD_ENABLE_IF_T')
-
     # pthread_setname_np was added in GLIBC 2.12, and Solaris 11.3
     if posix_system:
-        myenv = conf.Finish()
 
         def CheckPThreadSetNameNP(context):
             compile_test_body = textwrap.dedent("""
@@ -3637,7 +3597,7 @@ def doConfigure(myenv):
         if conf.CheckPThreadSetNameNP():
             conf.env.SetConfigHeaderDefine("MONGO_CONFIG_HAVE_PTHREAD_SETNAME_NP")
 
-    myenv = conf.Finish()
+        myenv = conf.Finish()
 
     def CheckBoostMinVersion(context):
         compile_test_body = textwrap.dedent("""
