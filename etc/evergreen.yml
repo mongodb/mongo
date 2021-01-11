@@ -9960,9 +9960,10 @@ buildvariants:
   - name: server_discovery_and_monitoring_json_test_TG
   - name: server_selection_json_test_TG
 
-- name: enterprise-windows-required
+- &enterprise-windows-required-template
+  name: enterprise-windows-required
   display_name: "! Enterprise Windows"
-  batchtime: 60 # 1 hours
+  batchtime: 120 # 2 hours
   modules:
   - enterprise
   run_on:
@@ -10003,6 +10004,33 @@ buildvariants:
     distros:
       - windows-64-vs2019-large
   - name: unittest_shell_hang_analyzer_gen
+
+- <<: *enterprise-windows-required-template
+  name: enterprise-windows-required-disabled-feature-flags
+  display_name: "! Enterprise Windows (disabled feature flags)"
+  batchtime: 240 # 4 hours
+  expansions:
+    burn_in_tests_build_variant: enterprise-windows
+    exe: ".exe"
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug msi archive-mh archive-mh-debug
+    content_type: application/zip
+    compile_flags: --ssl MONGO_DISTMOD=windows CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --win-version-min=win10
+    num_scons_link_jobs_available: 0.5
+    python: '/cygdrive/c/python/python37/python.exe'
+    ext: zip
+    scons_cache_scope: shared
+    multiversion_platform: windows
+    multiversion_edition: enterprise
+    jstestfuzz_num_generated_files: 35
+    target_resmoke_time: 20
+    max_sub_suites: 5
+    large_distro_name: windows-64-vs2019-large
+    push_path: windows
+    push_bucket: downloads.10gen.com
+    push_name: windows
+    push_arch: x86_64-enterprise
+    test_flags: >-
+        --mongodSetParameters="{featureFlagToaster: true, featureFlagSpoon: true, featureFlagTenantMigrations: true}"
 
 - name: enterprise-windows
   display_name: "* Enterprise Windows"
