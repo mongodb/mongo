@@ -219,6 +219,36 @@ TEST_F(InternalUnpackBucketStageTest, UnpackEmptyExclude) {
     ASSERT_TRUE(next.isEOF());
 }
 
+TEST_F(InternalUnpackBucketStageTest, SparseColumnsWhereOneColumnIsExhaustedBeforeTheOther) {
+    auto expCtx = getExpCtx();
+    auto spec =
+        BSON("$_internalUnpackBucket"
+             << BSON("exclude" << BSONArray() << DocumentSourceInternalUnpackBucket::kTimeFieldName
+                               << kUserDefinedTimeName
+                               << DocumentSourceInternalUnpackBucket::kMetaFieldName
+                               << kUserDefinedMetaName));
+    auto unpack = DocumentSourceInternalUnpackBucket::createFromBson(spec.firstElement(), expCtx);
+
+    auto source = DocumentSourceMock::createForTest(
+        {"{meta: {'m1': 999, 'm2': 9999}, data: {_id: {'0':1, '1':2}, time: {'0':1, '1':2}, "
+         "a:{'0':1}, b:{'1':1}}}"},
+        expCtx);
+    unpack->setSource(source.get());
+
+    auto next = unpack->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.getDocument(),
+                       Document(fromjson("{time: 1, myMeta: {m1: 999, m2: 9999}, _id: 1, a: 1}")));
+
+    next = unpack->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.getDocument(),
+                       Document(fromjson("{time: 2, myMeta: {m1: 999, m2: 9999}, _id: 2, b: 1}")));
+
+    next = unpack->getNext();
+    ASSERT_TRUE(next.isEOF());
+}
+
 TEST_F(InternalUnpackBucketStageTest, UnpackBasicIncludeWithDollarPrefix) {
     auto expCtx = getExpCtx();
 

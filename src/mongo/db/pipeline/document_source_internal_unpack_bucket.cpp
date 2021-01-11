@@ -94,7 +94,7 @@ Document BucketUnpacker::getNext() {
     }
 
     for (auto&& [colName, colIter] : _fieldIters) {
-        if (colIter.fieldName() == currentIdx) {
+        if (colIter.more() && colIter.fieldName() == currentIdx) {
             auto&& [_, val] = colIter.next();
             measurement.addField(colName, val);
         }
