@@ -3550,25 +3550,6 @@ def doConfigure(myenv):
     if not myenv.ToolchainIs('msvc'):
         AddToCCFLAGSIfSupported(myenv, "-fno-builtin-memcmp")
 
-    def CheckThreadLocal(context):
-        test_body = """
-        thread_local int tsp_int = 1;
-        int main(int argc, char** argv) {{
-            return !(tsp_int == argc);
-        }}
-        """
-        context.Message('Checking for storage class thread_local ')
-        ret = context.TryLink(textwrap.dedent(test_body), ".cpp")
-        context.Result(ret)
-        return ret
-
-    conf = Configure(myenv, help=False, custom_tests = {
-        'CheckThreadLocal': CheckThreadLocal
-    })
-    if not conf.CheckThreadLocal():
-        env.ConfError("Compiler must support the thread_local storage class")
-    conf.Finish()
-
     # pthread_setname_np was added in GLIBC 2.12, and Solaris 11.3
     if posix_system:
 
