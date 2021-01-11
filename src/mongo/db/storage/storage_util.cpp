@@ -49,11 +49,14 @@ namespace catalog {
 namespace {
 auto removeEmptyDirectory =
     [](ServiceContext* svcCtx, StorageEngine* storageEngine, const NamespaceString& ns) {
-        // Nothing to do if not using directoryperdb or there are still collections in the
-        // database.
+        // Nothing to do if not using directoryperdb or there are still collections in the database.
+        // If we don't support supportsPendingDrops then this is executing before the collection is
+        // removed from the catalog. In that case, just blindly attempt to delete the directory, it
+        // will only succeed if it is empty which is the behavior we want.
         auto collectionCatalog = CollectionCatalog::get(svcCtx);
         if (!storageEngine->isUsingDirectoryPerDb() ||
-            collectionCatalog->begin(nullptr, ns.db()) != collectionCatalog->end(nullptr)) {
+            (storageEngine->supportsPendingDrops() &&
+             collectionCatalog->begin(nullptr, ns.db()) != collectionCatalog->end(nullptr))) {
             return;
         }
 
