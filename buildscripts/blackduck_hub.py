@@ -424,7 +424,8 @@ class Component:
     Contains a subset of information about a component extracted from Black Duck for a given project and version
     """
 
-    def __init__(self, name, version, licenses, policy_status, security_risk, newest_release):
+    def __init__(self, name, version, licenses, policy_status, security_risk, newest_release,
+                 is_manually_added):
         # pylint: disable=too-many-arguments
         """Initialize Black Duck component."""
         self.name = name
@@ -433,9 +434,11 @@ class Component:
         self.policy_status = policy_status
         self.security_risk = security_risk
         self.newest_release = newest_release
+        self.is_manually_added = is_manually_added
 
     @staticmethod
     def parse(hub, component):
+        # pylint: disable=too-many-locals
         """Parse a Black Duck component from a dictionary."""
         name = component["componentName"]
         cversion = component.get("componentVersionName", "unknown_version")
@@ -445,6 +448,8 @@ class Component:
         security_risk = _compute_security_risk(component['securityRiskProfile'])
 
         newer_releases = component["activityData"].get("newerReleases", 0)
+
+        is_manually_added = 'MANUAL_BOM_COMPONENT' in component['matchTypes']
 
         LOGGER.info("Retrievinng version information for Comp %s - %s  Releases %s", name, cversion,
                     newer_releases)
@@ -483,7 +488,8 @@ class Component:
             if ver_info:
                 newest_release = ver_info[0]
 
-        return Component(name, cversion, licenses, policy_status, security_risk, newest_release)
+        return Component(name, cversion, licenses, policy_status, security_risk, newest_release,
+                         is_manually_added)
 
 
 class BlackDuckConfig:
@@ -914,6 +920,16 @@ def _generate_report_upgrade(mgr: ReportManager, comp: Component, mcomp: ThirdPa
     if not fail:
         mgr.write_report(comp.name, "upgrade_check", "pass", "Blackduck run passed")
     else:
+
+        if comp.is_manually_added:
+            component_explanation = f"""This component requires a manual update in the Black Duck Database because it was added to
+Black Duck manually.  After the update to the third-party library is committed, please update the
+version information for this component at {BLACKDUCK_PROJECT_URL}. Click on the down arrow on the
+far right of the component, choose edit and specify the new version."""
+        else:
+            component_explanation = f"""This commponent was automatically detected by Black Duck. Black Duck should automatically detect
+the new version after the library is updated and the daily scanner task runs again."""
+
         mgr.write_report(
             comp.name, "upgrade_check", "fail", f"""{BLACKDUCK_FAILED_PREFIX}
 
@@ -935,8 +951,7 @@ To address this build failure, the next steps are as follows:
 2. Add a “upgrade_supression” to {THIRD_PARTY_COMPONENTS_FILE} with the SERVER ticket to acknowledge
    this report. Note that you do not need to immediately update the library, just file a ticket.
 
-If you believe the library is already up-to-date but Black Duck has the wrong version, please update
-version information for this component at {BLACKDUCK_PROJECT_URL}.
+{component_explanation}
 
 If the "{BLACKDUCK_DEFAULT_TEAM}" cannot do this work for any reason, the BF should be assigned to
 the component owner team "{mcomp.team_owner}".
