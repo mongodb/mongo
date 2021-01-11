@@ -556,6 +556,11 @@ void CollectionCatalog::dropCollection(OperationContext* opCtx, Collection* coll
 
     auto& uncommittedCatalogUpdates = getUncommittedCatalogUpdates(opCtx);
     uncommittedCatalogUpdates.drop(coll);
+
+    // Requesting a writable collection normally ensures we have registered PublishCatalogUpdates
+    // with the recovery unit. However, when the writable Collection was requested in Inplace mode
+    // (or is the oplog) this is not the case. So make sure we are registered in all cases.
+    PublishCatalogUpdates::ensureRegisteredWithRecoveryUnit(opCtx, uncommittedCatalogUpdates);
 }
 
 void CollectionCatalog::dropCollection(OperationContext* opCtx, const CollectionPtr& coll) const {
