@@ -53,6 +53,7 @@ selector:
   - jstests/sharding/agg_explain_fmt.js
   - jstests/sharding/change_stream_metadata_notifications.js
   - jstests/sharding/change_stream_transaction_sharded.js
+  - jstests/sharding/change_stream_empty_apply_ops.js
   - jstests/sharding/change_streams.js
   - jstests/sharding/collation_lookup.js
   - jstests/sharding/collation_targeting.js
