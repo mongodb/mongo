@@ -77,6 +77,7 @@
 namespace mongo {
 namespace {
 
+MONGO_FAIL_POINT_DEFINE(WTCompactIndexEBUSY);
 MONGO_FAIL_POINT_DEFINE(WTEmulateOutOfOrderNextIndexKey);
 
 using std::string;
@@ -556,6 +557,15 @@ Status WiredTigerIndex::compact(OperationContext* opCtx) {
         WT_SESSION* s = WiredTigerRecoveryUnit::get(opCtx)->getSession()->getSession();
         opCtx->recoveryUnit()->abandonSnapshot();
         int ret = s->compact(s, uri().c_str(), "timeout=0");
+        if (MONGO_unlikely(WTCompactIndexEBUSY.shouldFail())) {
+            ret = EBUSY;
+        }
+
+        if (ret == EBUSY) {
+            return Status(ErrorCodes::Interrupted,
+                          str::stream() << "Compaction interrupted on " << uri().c_str()
+                                        << " due to cache eviction pressure");
+        }
         invariantWTOK(ret);
     }
     return Status::OK();
