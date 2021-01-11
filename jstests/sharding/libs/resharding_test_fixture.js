@@ -176,7 +176,7 @@ var ReshardingTest = class {
 
     /** @private */
     _startReshardingInBackgroundAndAllowCommandFailure({newShardKeyPattern, newChunks},
-                                                       expectedCode) {
+                                                       expectedErrorCode) {
         newChunks = newChunks.map(
             chunk => ({min: chunk.min, max: chunk.max, recipientShardId: chunk.shard}));
 
@@ -188,7 +188,8 @@ var ReshardingTest = class {
         const commandDoneSignal = new CountDownLatch(1);
 
         this._reshardingThread = new Thread(
-            function(host, ns, newShardKeyPattern, newChunks, commandDoneSignal, expectedCode) {
+            function(
+                host, ns, newShardKeyPattern, newChunks, commandDoneSignal, expectedErrorCode) {
                 const conn = new Mongo(host);
                 const res = conn.adminCommand({
                     reshardCollection: ns,
@@ -197,10 +198,10 @@ var ReshardingTest = class {
                 });
                 commandDoneSignal.countDown();
 
-                if (expectedCode === ErrorCodes.OK) {
+                if (expectedErrorCode === ErrorCodes.OK) {
                     assert.commandWorked(res);
                 } else {
-                    assert.commandFailedWithCode(res, expectedCode);
+                    assert.commandFailedWithCode(res, expectedErrorCode);
                 }
             },
             this._st.s.host,
@@ -208,7 +209,7 @@ var ReshardingTest = class {
             newShardKeyPattern,
             newChunks,
             commandDoneSignal,
-            expectedCode);
+            expectedErrorCode);
 
         this._reshardingThread.start();
         this._isReshardingActive = true;
@@ -229,23 +230,24 @@ var ReshardingTest = class {
      * introspect the state of the donor or recipient shards if they need more specific
      * synchronization.
      *
-     * @param expectedCode - the expected response code for the reshardCollection command. Callers
-     * of interruptReshardingThread() will want to set this to ErrorCodes.Interrupted, for example.
+     * @param expectedErrorCode - the expected response code for the reshardCollection command.
+     * Callers of interruptReshardingThread() will want to set this to ErrorCodes.Interrupted, for
+     * example.
      */
     withReshardingInBackground({newShardKeyPattern, newChunks},
                                duringReshardingFn = (tempNs) => {},
-                               expectedCode = ErrorCodes.OK) {
+                               expectedErrorCode = ErrorCodes.OK) {
         const commandDoneSignal = this._startReshardingInBackgroundAndAllowCommandFailure(
-            {newShardKeyPattern, newChunks}, expectedCode);
+            {newShardKeyPattern, newChunks}, expectedErrorCode);
 
         assert.soon(() => {
             const op = this._findReshardingCommandOp();
             return op !== undefined ||
-                (expectedCode !== ErrorCodes.OK && commandDoneSignal.getCount() === 0);
+                (expectedErrorCode !== ErrorCodes.OK && commandDoneSignal.getCount() === 0);
         }, "failed to find reshardCollection in $currentOp output");
 
         this._callFunctionSafely(() => duringReshardingFn(this._tempNs));
-        this._checkConsistencyAndPostState(expectedCode);
+        this._checkConsistencyAndPostState(expectedErrorCode);
     }
 
     /** @private */
@@ -311,8 +313,8 @@ var ReshardingTest = class {
     }
 
     /** @private */
-    _checkConsistencyAndPostState(expectedCode) {
-        if (expectedCode === ErrorCodes.OK) {
+    _checkConsistencyAndPostState(expectedErrorCode) {
+        if (expectedErrorCode === ErrorCodes.OK) {
             this._callFunctionSafely(() => {
                 // We use the reshardingPauseCoordinatorInSteadyState failpoint so that any
                 // intervening writes performed on the sharded collection (from when the resharding
@@ -343,8 +345,8 @@ var ReshardingTest = class {
 
         // TODO SERVER-52838: Call _checkPostState() when donor and recipient shards clean up their
         // local metadata on error.
-        if (expectedCode === ErrorCodes.OK) {
-            this._checkPostState(expectedCode);
+        if (expectedErrorCode === ErrorCodes.OK) {
+            this._checkPostState(expectedErrorCode);
         }
     }
 
@@ -370,11 +372,11 @@ var ReshardingTest = class {
     }
 
     /** @private */
-    _checkPostState(expectedCode) {
-        this._checkCoordinatorPostState(expectedCode);
+    _checkPostState(expectedErrorCode) {
+        this._checkCoordinatorPostState(expectedErrorCode);
 
         for (let recipient of this._recipientShards()) {
-            this._checkRecipientPostState(recipient);
+            this._checkRecipientPostState(recipient, expectedErrorCode);
         }
 
         for (let donor of this._donorShards()) {
@@ -383,7 +385,7 @@ var ReshardingTest = class {
     }
 
     /** @private */
-    _checkCoordinatorPostState(expectedCode) {
+    _checkCoordinatorPostState(expectedErrorCode) {
         assert.eq([],
                   this._st.config.reshardingOperations.find({nss: this._ns}).toArray(),
                   "expected config.reshardingOperations to be empty, but found it wasn't");
@@ -404,7 +406,7 @@ var ReshardingTest = class {
         const collEntry = this._st.config.collections.findOne({_id: this._ns});
         assert.neq(null, collEntry, `didn't find config.collections entry for ${this._ns}`);
 
-        if (expectedCode === ErrorCodes.OK) {
+        if (expectedErrorCode === ErrorCodes.OK) {
             assert.eq(this._newShardKey,
                       collEntry.key,
                       "shard key pattern didn't change despite resharding having succeeded");
@@ -422,12 +424,30 @@ var ReshardingTest = class {
     }
 
     /** @private */
-    _checkRecipientPostState(recipient) {
+    _checkRecipientPostState(recipient, expectedErrorCode) {
         assert.eq(
             null,
             recipient.getCollection(this._tempNs).exists(),
             `expected the temporary resharding collection to not exist, but found it does on ${
                 recipient.shardName}`);
+
+        const collInfo = recipient.getCollection(this._ns).exists();
+        const isAlsoDonor = this._donorShards().includes(recipient);
+        if (expectedErrorCode === ErrorCodes.OK) {
+            assert.neq(null,
+                       collInfo,
+                       `collection doesn't exist on ${
+                           recipient.shardName} despite resharding having succeeded`);
+            assert.neq(this._sourceCollectionUUID,
+                       collInfo.info.uuid,
+                       `collection UUID didn't change on ${
+                           recipient.shardName} despite resharding having succeeded`);
+        } else if (expectedErrorCode !== ErrorCodes.OK && !isAlsoDonor) {
+            assert.eq(
+                null,
+                collInfo,
+                `collection exists on ${recipient.shardName} despite resharding having failed`);
+        }
 
         const localRecipientOpsNs = "config.localReshardingOperations.recipient";
         let res;
