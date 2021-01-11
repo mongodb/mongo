@@ -110,6 +110,8 @@ all:
     test_file: jstests/replsets/node_restarts_no_oplog_entry_at_stable.js
   - ticket: SERVER-50414
     test_file: jstests/replsets/not_primary_errors_returned_during_rollback_if_helloOk.js
+  - ticket: SERVER-50769
+    test_file: jstests/sharding/change_stream_empty_apply_ops.js
 
 # Tests that should only be excluded from particular suites should be listed under that suite.
 suites:
