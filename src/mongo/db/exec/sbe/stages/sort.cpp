@@ -33,6 +33,7 @@
 
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/trial_run_tracker.h"
+#include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/util/str.h"
 
 namespace {
@@ -156,6 +157,7 @@ void SortStage::doAttachToTrialRunTracker(TrialRunTracker* tracker) {
 }
 
 void SortStage::open(bool reOpen) {
+    invariant(_opCtx);
     _commonStats.opens++;
     _children[0]->open(reOpen);
 
@@ -166,14 +168,14 @@ void SortStage::open(bool reOpen) {
         value::MaterializedRow vals{_inValueAccessors.size()};
 
         size_t idx = 0;
-        for (auto accesor : _inKeyAccessors) {
-            auto [tag, val] = accesor->copyOrMoveValue();
+        for (auto accessor : _inKeyAccessors) {
+            auto [tag, val] = accessor->copyOrMoveValue();
             keys.reset(idx++, true, tag, val);
         }
 
         idx = 0;
-        for (auto accesor : _inValueAccessors) {
-            auto [tag, val] = accesor->copyOrMoveValue();
+        for (auto accessor : _inValueAccessors) {
+            auto [tag, val] = accessor->copyOrMoveValue();
             vals.reset(idx++, true, tag, val);
         }
 
@@ -197,6 +199,10 @@ void SortStage::open(bool reOpen) {
 
     _mergeIt.reset(_sorter->done());
     _specificStats.spills += _sorter->numSpills();
+    _specificStats.keysSorted += _sorter->numSorted();
+    auto& metricsCollector = ResourceConsumption::MetricsCollector::get(_opCtx);
+    metricsCollector.incrementKeysSorted(_sorter->numSorted());
+    metricsCollector.incrementSorterSpills(_sorter->numSpills());
 
     _children[0]->close();
 }
