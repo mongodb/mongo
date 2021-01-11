@@ -49,6 +49,8 @@ assert.commandWorked(st.s.adminCommand({enableSharding: kDbName}));
 assert.commandWorked(st.s.adminCommand({shardCollection: kNsName, key: {_id: 1}}));
 assert.commandWorked(st.s.getCollection(kNsName).createIndex({_id: 1, aKey: 1}));
 
+csrs.awaitReplication();
+
 let primary = csrs.getPrimary();
 let secondaries = csrs.getSecondaries();
 let newPrimary = secondaries[0];
