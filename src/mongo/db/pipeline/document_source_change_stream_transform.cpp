@@ -532,7 +532,6 @@ DocumentSourceChangeStreamTransform::TransactionOpIterator::TransactionOpIterato
     }
 
     checkValueType(_currentApplyOps, "applyOps", BSONType::Array);
-    invariant(_currentApplyOps.getArrayLength() > 0);
 
     // Initialize iterators at the beginning of the transaction.
     _currentApplyOpsIt = _currentApplyOps.getArray().begin();

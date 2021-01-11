@@ -175,8 +175,10 @@ BSONObj getTxnApplyOpsFilter(BSONElement nsMatch, const NamespaceString& nss) {
     BSONObjBuilder applyOpsBuilder;
     applyOpsBuilder.append("op", "c");
 
-    // "o.applyOps" must be an array with at least one element
-    applyOpsBuilder.append("o.applyOps.0", BSON("$exists" << true));
+    // "o.applyOps" stores the list of operations, so it must be an array.
+    applyOpsBuilder.append("o.applyOps",
+                           BSON("$type"
+                                << "array"));
     applyOpsBuilder.append("lsid", BSON("$exists" << true));
     applyOpsBuilder.append("txnNumber", BSON("$exists" << true));
     applyOpsBuilder.append("o.prepare", BSON("$not" << BSON("$eq" << true)));

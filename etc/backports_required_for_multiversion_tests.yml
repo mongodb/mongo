@@ -103,6 +103,8 @@ all:
     test_file: jstests/replsets/read_operations_during_step_up.js
   - ticket: SERVER-43904
     test_file: jstests/replsets/election_handoff_skips_unelectable_nodes.js
+  - ticket: SERVER-50769
+    test_file: jstests/sharding/change_stream_empty_apply_ops.js
 
 suites:
 
