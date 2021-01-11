@@ -796,9 +796,10 @@ std::pair<TypeTags, Value> compareValue(TypeTags lhsTag,
         return {TypeTags::NumberInt32, bitcastFrom<int32_t>(result)};
     } else {
         // Different types.
-        auto result =
-            canonicalizeBSONType(tagToType(lhsTag)) - canonicalizeBSONType(tagToType(rhsTag));
-        invariant(result != 0);
+        auto lhsType = tagToType(lhsTag);
+        auto rhsType = tagToType(rhsTag);
+        tassert(5365500, "values cannot have the same type", lhsType != rhsType);
+        auto result = canonicalizeBSONType(lhsType) - canonicalizeBSONType(rhsType);
         return {TypeTags::NumberInt32, bitcastFrom<int32_t>(compareHelper(result, 0))};
     }
 }
