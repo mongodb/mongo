@@ -481,8 +481,7 @@ subtest_main(int argc, char *argv[], bool close_test)
     struct rlimit rlim;
     TEST_OPTS *opts, _opts;
     WT_SESSION *session;
-    char config[1024], filename[1024];
-    const char *p;
+    char config[1024], filename[1024], buf[1024];
 
     opts = &_opts;
     memset(opts, 0, sizeof(*opts));
@@ -499,17 +498,13 @@ subtest_main(int argc, char *argv[], bool close_test)
     testutil_check(__wt_snprintf(filename, sizeof(filename), "%s/%s", opts->home, STDOUT_FILE));
     testutil_assert(freopen(filename, "a", stdout) != NULL);
 
-/*
- * Use $top_builddir if it's available, otherwise assume we're building in build_posix and running
- * in the test/csuite directory.
- */
 #define WT_FAIL_FS_LIB "ext/test/fail_fs/.libs/libwiredtiger_fail_fs.so"
-    if ((p = getenv("top_builddir")) == NULL)
-        p = "../../build_posix";
+
+    testutil_build_dir(buf, 1024);
     testutil_check(__wt_snprintf(config, sizeof(config),
       "create,cache_size=250M,log=(enabled),transaction_sync=(enabled,method=none),extensions=(%s/"
       "%s=(early_load,config={environment=true,verbose=true}))",
-      p, WT_FAIL_FS_LIB));
+      buf, WT_FAIL_FS_LIB));
     testutil_check(wiredtiger_open(opts->home, &event_handler, config, &opts->conn));
 
     testutil_check(opts->conn->open_session(opts->conn, NULL, NULL, &session));

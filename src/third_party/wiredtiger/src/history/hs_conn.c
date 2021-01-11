@@ -117,8 +117,8 @@ __wt_hs_config(WT_SESSION_IMPL *session, const char **cfg)
      * Test flags before setting them so updates can't race in subsequent opens (the first update is
      * safe because it's single-threaded from wiredtiger_open).
      */
-    if (!F_ISSET(btree, WT_BTREE_HS))
-        F_SET(btree, WT_BTREE_HS);
+    if (!F_ISSET(btree->dhandle, WT_DHANDLE_HS))
+        F_SET(btree->dhandle, WT_DHANDLE_HS);
     if (!F_ISSET(btree, WT_BTREE_NO_LOGGING))
         F_SET(btree, WT_BTREE_NO_LOGGING);
 

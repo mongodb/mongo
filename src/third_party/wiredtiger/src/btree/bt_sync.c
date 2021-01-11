@@ -47,7 +47,7 @@ __sync_checkpoint_can_skip(WT_SESSION_IMPL *session, WT_REF *ref)
      *     skip them,
      * 5. there's already an address for every disk block involved.
      */
-    if (WT_IS_HS(S2BT(session)))
+    if (WT_IS_HS(session->dhandle))
         return (false);
     if (F_ISSET(ref, WT_REF_FLAG_INTERNAL))
         return (false);
@@ -162,8 +162,7 @@ __sync_ref_list_pop(WT_SESSION_IMPL *session, WT_REF_LIST *rlp, uint32_t flags)
 
         /* Accumulate errors but continue till all the refs are processed. */
         WT_TRET(__wt_page_release(session, rlp->list[i], flags));
-        WT_STAT_CONN_INCR(session, cc_pages_evict);
-        WT_STAT_DATA_INCR(session, cc_pages_evict);
+        WT_STAT_CONN_DATA_INCR(session, cc_pages_evict);
         __wt_verbose(session, WT_VERB_CHECKPOINT_CLEANUP,
           "%p: is an in-memory obsolete page, added to urgent eviction queue.",
           (void *)rlp->list[i]);
@@ -247,8 +246,7 @@ __sync_ref_obsolete_check(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF_LIST *rl
 
         if (obsolete) {
             WT_REF_UNLOCK(ref, WT_REF_DELETED);
-            WT_STAT_CONN_INCR(session, cc_pages_removed);
-            WT_STAT_DATA_INCR(session, cc_pages_removed);
+            WT_STAT_CONN_DATA_INCR(session, cc_pages_removed);
 
             WT_RET(__wt_page_parent_modify_set(session, ref, true));
         } else
@@ -365,8 +363,7 @@ __sync_ref_int_obsolete_cleanup(WT_SESSION_IMPL *session, WT_REF *parent, WT_REF
         WT_RET(__sync_ref_obsolete_check(session, ref, rlp));
     }
 
-    WT_STAT_CONN_INCRV(session, cc_pages_visited, pindex->entries);
-    WT_STAT_DATA_INCRV(session, cc_pages_visited, pindex->entries);
+    WT_STAT_CONN_DATA_INCRV(session, cc_pages_visited, pindex->entries);
 
     return (0);
 }
@@ -407,8 +404,7 @@ __sync_page_skip(WT_SESSION_IMPL *session, WT_REF *ref, void *context, bool *ski
      */
     if (addr.type == WT_ADDR_LEAF_NO || addr.ta.newest_stop_durable_ts == WT_TS_NONE) {
         __wt_verbose(session, WT_VERB_CHECKPOINT_CLEANUP, "%p: page walk skipped", (void *)ref);
-        WT_STAT_CONN_INCR(session, cc_pages_walk_skipped);
-        WT_STAT_DATA_INCR(session, cc_pages_walk_skipped);
+        WT_STAT_CONN_DATA_INCR(session, cc_pages_walk_skipped);
         *skipp = true;
     }
     return (0);
@@ -542,7 +538,7 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
         btree->syncing = WT_BTREE_SYNC_WAIT;
         __wt_gen_next_drain(session, WT_GEN_EVICT);
         btree->syncing = WT_BTREE_SYNC_RUNNING;
-        is_hs = WT_IS_HS(btree);
+        is_hs = WT_IS_HS(btree->dhandle);
 
         /* Add in history store reconciliation for standard files. */
         rec_flags = WT_REC_CHECKPOINT;

@@ -721,8 +721,7 @@ __curfile_create(WT_SESSION_IMPL *session, WT_CURSOR *owner, const char *cfg[], 
 
     WT_ERR(__wt_cursor_init(cursor, cursor->internal_uri, owner, cfg, cursorp));
 
-    WT_STAT_CONN_INCR(session, cursor_create);
-    WT_STAT_DATA_INCR(session, cursor_create);
+    WT_STAT_CONN_DATA_INCR(session, cursor_create);
 
     if (0) {
 err:

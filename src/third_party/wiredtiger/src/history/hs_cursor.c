@@ -100,7 +100,7 @@ __hs_cursor_position_int(WT_SESSION_IMPL *session, WT_CURSOR *cursor, uint32_t b
     int cmp, exact;
 
     /* The session should be pointing at the history store btree. */
-    WT_ASSERT(session, WT_IS_HS(S2BT(session)));
+    WT_ASSERT(session, WT_IS_HS((S2BT(session))->dhandle));
 
     if (user_srch_key == NULL)
         WT_RET(__wt_scr_alloc(session, 0, &srch_key));
@@ -130,8 +130,7 @@ __hs_cursor_position_int(WT_SESSION_IMPL *session, WT_CURSOR *cursor, uint32_t b
          * backwards until we land on our key.
          */
         while ((ret = cursor->prev(cursor)) == 0) {
-            WT_STAT_CONN_INCR(session, cursor_skip_hs_cur_position);
-            WT_STAT_DATA_INCR(session, cursor_skip_hs_cur_position);
+            WT_STAT_CONN_DATA_INCR(session, cursor_skip_hs_cur_position);
 
             WT_ERR(__wt_compare(session, NULL, &cursor->key, srch_key, &cmp));
             if (cmp <= 0)
@@ -210,8 +209,7 @@ __hs_find_upd_int(WT_SESSION_IMPL *session, uint32_t btree_id, WT_ITEM *key,
     txn_shared = WT_SESSION_TXN_SHARED(session);
     upd_found = false;
 
-    WT_STAT_CONN_INCR(session, cursor_search_hs);
-    WT_STAT_DATA_INCR(session, cursor_search_hs);
+    WT_STAT_CONN_DATA_INCR(session, cursor_search_hs);
 
     hs_cursor = session->hs_cursor;
     hs_cbt = (WT_CURSOR_BTREE *)hs_cursor;
@@ -278,8 +276,7 @@ __hs_find_upd_int(WT_SESSION_IMPL *session, uint32_t btree_id, WT_ITEM *key,
          * we can skip it.
          */
         if (__wt_txn_tw_stop_visible_all(session, &hs_cbt->upd_value->tw)) {
-            WT_STAT_CONN_INCR(session, cursor_prev_hs_tombstone);
-            WT_STAT_DATA_INCR(session, cursor_prev_hs_tombstone);
+            WT_STAT_CONN_DATA_INCR(session, cursor_prev_hs_tombstone);
             continue;
         }
         /*
@@ -401,8 +398,7 @@ __hs_find_upd_int(WT_SESSION_IMPL *session, uint32_t btree_id, WT_ITEM *key,
             WT_ERR(__wt_modify_apply_item(session, value_format, hs_value, mod_upd->data));
             __wt_free_update_list(session, &mod_upd);
         }
-        WT_STAT_CONN_INCR(session, cache_hs_read_squash);
-        WT_STAT_DATA_INCR(session, cache_hs_read_squash);
+        WT_STAT_CONN_DATA_INCR(session, cache_hs_read_squash);
     }
 
     /*
@@ -432,13 +428,11 @@ err:
     __wt_modify_vector_free(&modifies);
 
     if (ret == 0) {
-        if (upd_found) {
-            WT_STAT_CONN_INCR(session, cache_hs_read);
-            WT_STAT_DATA_INCR(session, cache_hs_read);
-        } else {
+        if (upd_found)
+            WT_STAT_CONN_DATA_INCR(session, cache_hs_read);
+        else {
             upd_value->type = WT_UPDATE_INVALID;
-            WT_STAT_CONN_INCR(session, cache_hs_read_miss);
-            WT_STAT_DATA_INCR(session, cache_hs_read_miss);
+            WT_STAT_CONN_DATA_INCR(session, cache_hs_read_miss);
         }
     }
 

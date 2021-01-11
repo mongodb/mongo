@@ -489,8 +489,7 @@ __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
     if (btree->type != BTREE_ROW)
         WT_RET_MSG(session, ENOTSUP, "WT_CURSOR.next_random only supported by row-store tables");
 
-    WT_STAT_CONN_INCR(session, cursor_next);
-    WT_STAT_DATA_INCR(session, cursor_next);
+    WT_STAT_CONN_DATA_INCR(session, cursor_next);
 
     F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 

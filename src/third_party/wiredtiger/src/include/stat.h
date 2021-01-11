@@ -238,6 +238,24 @@ __wt_stats_clear(void *stats_arg, int slot)
     } while (0)
 
 /*
+ * Update connection and data handle statistics if statistics gathering is enabled. Updates both
+ * statistics concurrently and is useful to avoid the duplicated calls that happen in a lot of
+ * places.
+ */
+#define WT_STAT_CONN_DATA_DECRV(session, fld, value) \
+    do {                                             \
+        WT_STAT_CONN_DECRV(session, fld, value);     \
+        WT_STAT_DATA_DECRV(session, fld, value);     \
+    } while (0)
+#define WT_STAT_CONN_DATA_DECR(session, fld) WT_STAT_CONN_DATA_DECRV(session, fld, 1)
+
+#define WT_STAT_CONN_DATA_INCRV(session, fld, value) \
+    do {                                             \
+        WT_STAT_CONN_INCRV(session, fld, value);     \
+        WT_STAT_DATA_INCRV(session, fld, value);     \
+    } while (0)
+#define WT_STAT_CONN_DATA_INCR(session, fld) WT_STAT_CONN_DATA_INCRV(session, fld, 1)
+/*
  * Update per session statistics.
  */
 #define WT_STAT_SESSION_INCRV(session, fld, value) \

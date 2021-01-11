@@ -102,15 +102,16 @@ struct __wt_data_handle {
 
 /* Flags values over 0xff are reserved for WT_BTREE_* */
 /* AUTOMATIC FLAG VALUE GENERATION START */
-#define WT_DHANDLE_DEAD 0x01u         /* Dead, awaiting discard */
-#define WT_DHANDLE_DISCARD 0x02u      /* Close on release */
-#define WT_DHANDLE_DISCARD_KILL 0x04u /* Mark dead on release */
-#define WT_DHANDLE_DROPPED 0x08u      /* Handle is dropped */
-#define WT_DHANDLE_EXCLUSIVE 0x10u    /* Exclusive access */
-#define WT_DHANDLE_IS_METADATA 0x20u  /* Metadata handle */
-#define WT_DHANDLE_LOCK_ONLY 0x40u    /* Handle only used as a lock */
-#define WT_DHANDLE_OPEN 0x80u         /* Handle is open */
-                                      /* AUTOMATIC FLAG VALUE GENERATION STOP */
+#define WT_DHANDLE_DEAD 0x001u         /* Dead, awaiting discard */
+#define WT_DHANDLE_DISCARD 0x002u      /* Close on release */
+#define WT_DHANDLE_DISCARD_KILL 0x004u /* Mark dead on release */
+#define WT_DHANDLE_DROPPED 0x008u      /* Handle is dropped */
+#define WT_DHANDLE_EXCLUSIVE 0x010u    /* Exclusive access */
+#define WT_DHANDLE_HS 0x020u           /* History store table */
+#define WT_DHANDLE_IS_METADATA 0x040u  /* Metadata handle */
+#define WT_DHANDLE_LOCK_ONLY 0x080u    /* Handle only used as a lock */
+#define WT_DHANDLE_OPEN 0x100u         /* Handle is open */
+                                       /* AUTOMATIC FLAG VALUE GENERATION STOP */
     uint32_t flags;
 
 /* AUTOMATIC FLAG VALUE GENERATION START */
