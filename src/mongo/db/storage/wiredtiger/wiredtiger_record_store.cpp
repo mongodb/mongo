@@ -893,7 +893,7 @@ WiredTigerRecordStore::~WiredTigerRecordStore() {
 
     if (_isOplog) {
         // Delete oplog visibility manager on KV engine.
-        _kvEngine->haltOplogManager(this);
+        _kvEngine->haltOplogManager(this, /*shuttingDown=*/false);
     }
 }
 

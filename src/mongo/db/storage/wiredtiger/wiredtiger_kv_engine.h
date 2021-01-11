@@ -316,7 +316,7 @@ public:
      * be started and stopped multiple times as tests create and destroy the oplog record store.
      */
     void startOplogManager(OperationContext* opCtx, WiredTigerRecordStore* oplogRecordStore);
-    void haltOplogManager(WiredTigerRecordStore* oplogRecordStore);
+    void haltOplogManager(WiredTigerRecordStore* oplogRecordStore, bool shuttingDown);
 
     /*
      * Always returns a non-nil pointer. However, the WiredTigerOplogManager may not have been

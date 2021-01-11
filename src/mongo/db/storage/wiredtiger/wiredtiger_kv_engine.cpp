@@ -706,6 +706,7 @@ void WiredTigerKVEngine::cleanShutdown() {
     }
 
     // these must be the last things we do before _conn->close();
+    haltOplogManager(/*oplogRecordStore=*/nullptr, /*shuttingDown=*/true);
     if (_sessionSweeper) {
         LOGV2(22318, "Shutting down session sweeper thread");
         _sessionSweeper->shutdown();
@@ -2418,10 +2419,12 @@ void WiredTigerKVEngine::startOplogManager(OperationContext* opCtx,
     _oplogRecordStore = oplogRecordStore;
 }
 
-void WiredTigerKVEngine::haltOplogManager(WiredTigerRecordStore* oplogRecordStore) {
+void WiredTigerKVEngine::haltOplogManager(WiredTigerRecordStore* oplogRecordStore,
+                                          bool shuttingDown) {
     stdx::unique_lock<Latch> lock(_oplogManagerMutex);
-    // Halt visibility thread if the request match current
-    if (_oplogRecordStore == oplogRecordStore) {
+    // Halt the visibility thread if we're in shutdown or the request matches the current record
+    // store.
+    if (shuttingDown || _oplogRecordStore == oplogRecordStore) {
         _oplogManager->haltVisibilityThread();
         _oplogRecordStore = nullptr;
     }

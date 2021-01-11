@@ -89,7 +89,17 @@ void WiredTigerOplogManager::startVisibilityThread(OperationContext* opCtx,
 void WiredTigerOplogManager::haltVisibilityThread() {
     {
         stdx::lock_guard<Latch> lk(_oplogVisibilityStateMutex);
-        invariant(_isRunning);
+        if (!_isRunning) {
+            // This is called from two places; on clean shutdown and when the record store for the
+            // oplog is destroyed. We will perform the actual shutdown on the first call and the
+            // second call will be a no-op. Calling this on clean shutdown is necessary because the
+            // oplog manager makes calls into WiredTiger to retrieve the all durable timestamp. Lock
+            // Free Reads introduced shared collections which can offset when their respective
+            // destructors run. This created a scenario where the oplog manager visibility loop can
+            // be executed after the storage engine has shutdown.
+            return;
+        }
+
         _shuttingDown = true;
         _isRunning = false;
     }
