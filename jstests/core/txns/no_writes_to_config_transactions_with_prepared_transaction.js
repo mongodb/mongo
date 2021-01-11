@@ -93,7 +93,7 @@ assert.commandWorked(sessionColl2.insert({_id: 1}));
 PrepareHelpers.prepareTransaction(session2);
 
 assert.commandWorked(sessionDB.adminCommand(
-    {abortTransaction: 1, txnNumber: NumberLong(0), stmtid: NumberInt(2), autocommit: false}));
+    {abortTransaction: 1, txnNumber: NumberLong(0), stmtId: NumberInt(2), autocommit: false}));
 session.endSession();
 
 assert.commandWorked(session2.abortTransaction_forTesting());

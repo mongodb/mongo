@@ -33,6 +33,7 @@
 
 #include "mongo/db/commands.h"
 #include "mongo/db/transaction_validation.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/transaction_router.h"
 
@@ -47,9 +48,33 @@ static const Status kDefaultReadConcernNotPermitted{ErrorCodes::InvalidOptions,
 /**
  * Implements the abortTransaction command on mongos.
  */
-class ClusterAbortTransactionCmd : public BasicCommand {
+class ClusterAbortTransactionCmd
+    : public BasicCommandWithRequestParser<ClusterAbortTransactionCmd> {
 public:
-    ClusterAbortTransactionCmd() : BasicCommand("abortTransaction") {}
+    using BasicCommandWithRequestParser::BasicCommandWithRequestParser;
+    using Request = AbortTransaction;
+    using Reply = OkReply;
+
+    void validateResult(const BSONObj& resultObj) final {
+        auto ctx = IDLParserErrorContext("AbortReply");
+        auto status = getStatusFromCommandResult(resultObj);
+        auto wcStatus = getWriteConcernStatusFromCommandResult(resultObj);
+
+        if (!wcStatus.isOK()) {
+            if (wcStatus.code() == ErrorCodes::TypeMismatch) {
+                // Result has "writeConcerError" field but it is not valid wce object.
+                uassertStatusOK(wcStatus);
+            }
+        }
+
+        if (!status.isOK()) {
+            // Will throw if the result doesn't match the ErrorReply.
+            ErrorReply::parse(ctx, resultObj);
+        } else {
+            // Will throw if the result doesn't match the abortReply.
+            Reply::parse(ctx, resultObj);
+        }
+    }
 
     const std::set<std::string>& apiVersions() const {
         return kApiVersions1;

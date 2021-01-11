@@ -68,7 +68,7 @@ jsTestLog("Test that calling abort with invalid fields on a committed transactio
 assert.commandFailedWithCode(
     sessionDB.adminCommand(
         {abortTransaction: 1, invalidField: 1, txnNumber: txnNumber, autocommit: false}),
-    ErrorCodes.TransactionCommitted);
+    40415 /* IDL unknown field error */);
 
 session.endSession();
 }());

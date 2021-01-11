@@ -33,6 +33,7 @@
 
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/transaction_router.h"
 
@@ -42,9 +43,33 @@ namespace {
 /**
  * Implements the commitTransaction command on mongos.
  */
-class ClusterCommitTransactionCmd : public BasicCommand {
+class ClusterCommitTransactionCmd
+    : public BasicCommandWithRequestParser<ClusterCommitTransactionCmd> {
 public:
-    ClusterCommitTransactionCmd() : BasicCommand("commitTransaction") {}
+    using BasicCommandWithRequestParser::BasicCommandWithRequestParser;
+    using Request = CommitTransaction;
+    using Reply = OkReply;
+
+    void validateResult(const BSONObj& resultObj) final {
+        auto ctx = IDLParserErrorContext("CommitReply");
+        auto status = getStatusFromCommandResult(resultObj);
+        auto wcStatus = getWriteConcernStatusFromCommandResult(resultObj);
+
+        if (!wcStatus.isOK()) {
+            if (wcStatus.code() == ErrorCodes::TypeMismatch) {
+                // Result has "writeConcerError" field but it is not valid wce object.
+                uassertStatusOK(wcStatus);
+            }
+        }
+
+        if (!status.isOK()) {
+            // Will throw if the result doesn't match the ErrorReply.
+            ErrorReply::parse(ctx, resultObj);
+        } else {
+            // Will throw if the result doesn't match the committReply.
+            Reply::parse(ctx, resultObj);
+        }
+    }
 
     const std::set<std::string>& apiVersions() const {
         return kApiVersions1;

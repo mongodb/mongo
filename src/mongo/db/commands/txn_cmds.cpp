@@ -57,106 +57,100 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeAbortingTxn);
 // on stale version and snapshot errors.
 MONGO_FAIL_POINT_DEFINE(dontRemoveTxnCoordinatorOnAbort);
 
-class CmdCommitTxn : public BasicCommand {
+class CmdCommitTxn final : public CommitTransactionCmdVersion1Gen<CmdCommitTxn> {
 public:
-    CmdCommitTxn() : BasicCommand("commitTransaction") {}
+    CmdCommitTxn() = default;
 
-    const std::set<std::string>& apiVersions() const {
-        return kApiVersions1;
-    }
-
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const final {
         return AllowedOnSecondary::kNever;
     }
 
-    virtual bool adminOnly() const {
+    bool adminOnly() const final {
         return true;
     }
 
-    bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool collectsResourceConsumptionMetrics() const final {
         return true;
     }
 
-    bool collectsResourceConsumptionMetrics() const override {
-        return true;
-    }
-
-    std::string help() const override {
+    std::string help() const final {
         return "Commits a transaction";
     }
+    class Invocation final : public InvocationBaseGen {
+    public:
+        using InvocationBaseGen::InvocationBaseGen;
 
-    Status checkAuthForOperation(OperationContext* opCtx,
-                                 const std::string& dbname,
-                                 const BSONObj& cmdObj) const override {
-        return Status::OK();
-    }
+        bool supportsWriteConcern() const final {
+            return true;
+        }
 
-    bool run(OperationContext* opCtx,
-             const std::string& dbname,
-             const BSONObj& cmdObj,
-             BSONObjBuilder& result) override {
-        IDLParserErrorContext ctx("commitTransaction");
-        auto cmd = CommitTransaction::parse(ctx, cmdObj);
+        NamespaceString ns() const final {
+            return NamespaceString(request().getDbName());
+        }
 
-        auto txnParticipant = TransactionParticipant::get(opCtx);
-        uassert(ErrorCodes::CommandFailed,
-                "commitTransaction must be run within a transaction",
-                txnParticipant);
+        void doCheckAuthorization(OperationContext* opCtx) const final {}
 
-        LOGV2_DEBUG(20507,
-                    3,
-                    "Received commitTransaction for transaction with txnNumber "
-                    "{txnNumber} on session {sessionId}",
-                    "Received commitTransaction",
-                    "txnNumber"_attr = opCtx->getTxnNumber(),
-                    "sessionId"_attr = opCtx->getLogicalSessionId()->toBSON());
+        Reply typedRun(OperationContext* opCtx) final {
+            auto txnParticipant = TransactionParticipant::get(opCtx);
+            uassert(ErrorCodes::CommandFailed,
+                    "commitTransaction must be run within a transaction",
+                    txnParticipant);
 
-        // commitTransaction is retryable.
-        if (txnParticipant.transactionIsCommitted()) {
-            // We set the client last op to the last optime observed by the system to ensure that
-            // we wait for the specified write concern on an optime greater than or equal to the
-            // commit oplog entry.
-            auto& replClient = repl::ReplClientInfo::forClient(opCtx->getClient());
-            replClient.setLastOpToSystemLastOpTime(opCtx);
+            LOGV2_DEBUG(20507,
+                        3,
+                        "Received commitTransaction for transaction with txnNumber "
+                        "{txnNumber} on session {sessionId}",
+                        "Received commitTransaction",
+                        "txnNumber"_attr = opCtx->getTxnNumber(),
+                        "sessionId"_attr = opCtx->getLogicalSessionId()->toBSON());
+
+            // commitTransaction is retryable.
+            if (txnParticipant.transactionIsCommitted()) {
+                // We set the client last op to the last optime observed by the system to ensure
+                // that we wait for the specified write concern on an optime greater than or equal
+                // to the commit oplog entry.
+                auto& replClient = repl::ReplClientInfo::forClient(opCtx->getClient());
+                replClient.setLastOpToSystemLastOpTime(opCtx);
+                if (MONGO_unlikely(participantReturnNetworkErrorForCommitAfterExecutingCommitLogic
+                                       .shouldFail())) {
+                    uasserted(ErrorCodes::HostUnreachable,
+                              "returning network error because failpoint is on");
+                }
+
+                return Reply();
+            }
+
+            uassert(ErrorCodes::NoSuchTransaction,
+                    "Transaction isn't in progress",
+                    txnParticipant.transactionIsOpen());
+
+            CurOpFailpointHelpers::waitWhileFailPointEnabled(
+                &hangBeforeCommitingTxn, opCtx, "hangBeforeCommitingTxn");
+
+            auto optionalCommitTimestamp = request().getCommitTimestamp();
+            if (optionalCommitTimestamp) {
+                // commitPreparedTransaction will throw if the transaction is not prepared.
+                txnParticipant.commitPreparedTransaction(opCtx, optionalCommitTimestamp.get(), {});
+            } else {
+                if (ShardingState::get(opCtx)->canAcceptShardedCommands().isOK() ||
+                    serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+                    TransactionCoordinatorService::get(opCtx)->cancelIfCommitNotYetStarted(
+                        opCtx, *opCtx->getLogicalSessionId(), *opCtx->getTxnNumber());
+                }
+
+                // commitUnpreparedTransaction will throw if the transaction is prepared.
+                txnParticipant.commitUnpreparedTransaction(opCtx);
+            }
+
             if (MONGO_unlikely(
                     participantReturnNetworkErrorForCommitAfterExecutingCommitLogic.shouldFail())) {
                 uasserted(ErrorCodes::HostUnreachable,
                           "returning network error because failpoint is on");
             }
 
-            return true;
+            return Reply();
         }
-
-        uassert(ErrorCodes::NoSuchTransaction,
-                "Transaction isn't in progress",
-                txnParticipant.transactionIsOpen());
-
-        CurOpFailpointHelpers::waitWhileFailPointEnabled(
-            &hangBeforeCommitingTxn, opCtx, "hangBeforeCommitingTxn");
-
-        auto optionalCommitTimestamp = cmd.getCommitTimestamp();
-        if (optionalCommitTimestamp) {
-            // commitPreparedTransaction will throw if the transaction is not prepared.
-            txnParticipant.commitPreparedTransaction(opCtx, optionalCommitTimestamp.get(), {});
-        } else {
-            if (ShardingState::get(opCtx)->canAcceptShardedCommands().isOK() ||
-                serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-                TransactionCoordinatorService::get(opCtx)->cancelIfCommitNotYetStarted(
-                    opCtx, *opCtx->getLogicalSessionId(), *opCtx->getTxnNumber());
-            }
-
-            // commitUnpreparedTransaction will throw if the transaction is prepared.
-            txnParticipant.commitUnpreparedTransaction(opCtx);
-        }
-
-        if (MONGO_unlikely(
-                participantReturnNetworkErrorForCommitAfterExecutingCommitLogic.shouldFail())) {
-            uasserted(ErrorCodes::HostUnreachable,
-                      "returning network error because failpoint is on");
-        }
-
-        return true;
-    }
+    };
 
 } commitTxn;
 
@@ -165,94 +159,90 @@ static const Status kOnlyTransactionsReadConcernsSupported{
 static const Status kDefaultReadConcernNotPermitted{ErrorCodes::InvalidOptions,
                                                     "default read concern not permitted"};
 
-class CmdAbortTxn : public BasicCommand {
+class CmdAbortTxn final : public AbortTransactionCmdVersion1Gen<CmdAbortTxn> {
 public:
-    CmdAbortTxn() : BasicCommand("abortTransaction") {}
+    CmdAbortTxn() = default;
 
-    virtual const std::set<std::string>& apiVersions() const {
-        return kApiVersions1;
-    };
-
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const final {
         return AllowedOnSecondary::kNever;
     }
 
-    virtual bool adminOnly() const {
+    bool adminOnly() const final {
         return true;
     }
 
-    bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool collectsResourceConsumptionMetrics() const final {
         return true;
     }
 
-    bool collectsResourceConsumptionMetrics() const override {
-        return true;
-    }
-
-    ReadConcernSupportResult supportsReadConcern(const BSONObj& cmdObj,
-                                                 repl::ReadConcernLevel level) const override {
-        // abortTransaction commences running inside a transaction (even though the transaction will
-        // be ended by the time it completes).  Therefore it needs to accept any readConcern which
-        // is valid within a transaction.  However it is not appropriate to apply the default
-        // readConcern, since the readConcern of the transaction (set by the first operation) is
-        // what must apply.
-        return {{!isReadConcernLevelAllowedInTransaction(level),
-                 kOnlyTransactionsReadConcernsSupported},
-                {kDefaultReadConcernNotPermitted}};
-    }
-
-    std::string help() const override {
+    std::string help() const final {
         return "Aborts a transaction";
     }
 
-    Status checkAuthForOperation(OperationContext* opCtx,
-                                 const std::string& dbname,
-                                 const BSONObj& cmdObj) const override {
-        return Status::OK();
-    }
+    class Invocation final : public InvocationBaseGen {
+    public:
+        using InvocationBaseGen::InvocationBaseGen;
 
-    bool run(OperationContext* opCtx,
-             const std::string& dbname,
-             const BSONObj& cmdObj,
-             BSONObjBuilder& result) override {
-        auto txnParticipant = TransactionParticipant::get(opCtx);
-        uassert(ErrorCodes::CommandFailed,
-                "abortTransaction must be run within a transaction",
-                txnParticipant);
-
-        LOGV2_DEBUG(20508,
-                    3,
-                    "Received abortTransaction for transaction with txnNumber {txnNumber} "
-                    "on session {sessionId}",
-                    "Received abortTransaction",
-                    "txnNumber"_attr = opCtx->getTxnNumber(),
-                    "sessionId"_attr = opCtx->getLogicalSessionId()->toBSON());
-
-        uassert(ErrorCodes::NoSuchTransaction,
-                "Transaction isn't in progress",
-                txnParticipant.transactionIsOpen());
-
-        CurOpFailpointHelpers::waitWhileFailPointEnabled(
-            &hangBeforeAbortingTxn, opCtx, "hangBeforeAbortingTxn");
-
-        if (!MONGO_unlikely(dontRemoveTxnCoordinatorOnAbort.shouldFail()) &&
-            (ShardingState::get(opCtx)->canAcceptShardedCommands().isOK() ||
-             serverGlobalParams.clusterRole == ClusterRole::ConfigServer)) {
-            TransactionCoordinatorService::get(opCtx)->cancelIfCommitNotYetStarted(
-                opCtx, *opCtx->getLogicalSessionId(), *opCtx->getTxnNumber());
+        bool supportsWriteConcern() const final {
+            return true;
         }
 
-        txnParticipant.abortTransaction(opCtx);
-
-        if (MONGO_unlikely(
-                participantReturnNetworkErrorForAbortAfterExecutingAbortLogic.shouldFail())) {
-            uasserted(ErrorCodes::HostUnreachable,
-                      "returning network error because failpoint is on");
+        ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level) const final {
+            // abortTransaction commences running inside a transaction (even though the transaction
+            // will be ended by the time it completes).  Therefore it needs to accept any
+            // readConcern which is valid within a transaction.  However it is not appropriate to
+            // apply the default readConcern, since the readConcern of the transaction (set by the
+            // first operation) is what must apply.
+            return {{!isReadConcernLevelAllowedInTransaction(level),
+                     kOnlyTransactionsReadConcernsSupported},
+                    {kDefaultReadConcernNotPermitted}};
         }
 
-        return true;
-    }
+        NamespaceString ns() const final {
+            return NamespaceString(request().getDbName());
+        }
 
+        void doCheckAuthorization(OperationContext* opCtx) const final {}
+
+        Reply typedRun(OperationContext* opCtx) final {
+            auto txnParticipant = TransactionParticipant::get(opCtx);
+            uassert(ErrorCodes::CommandFailed,
+                    "abortTransaction must be run within a transaction",
+                    txnParticipant);
+
+            LOGV2_DEBUG(20508,
+                        3,
+                        "Received abortTransaction for transaction with txnNumber {txnNumber} "
+                        "on session {sessionId}",
+                        "Received abortTransaction",
+                        "txnNumber"_attr = opCtx->getTxnNumber(),
+                        "sessionId"_attr = opCtx->getLogicalSessionId()->toBSON());
+
+            uassert(ErrorCodes::NoSuchTransaction,
+                    "Transaction isn't in progress",
+                    txnParticipant.transactionIsOpen());
+
+            CurOpFailpointHelpers::waitWhileFailPointEnabled(
+                &hangBeforeAbortingTxn, opCtx, "hangBeforeAbortingTxn");
+
+            if (!MONGO_unlikely(dontRemoveTxnCoordinatorOnAbort.shouldFail()) &&
+                (ShardingState::get(opCtx)->canAcceptShardedCommands().isOK() ||
+                 serverGlobalParams.clusterRole == ClusterRole::ConfigServer)) {
+                TransactionCoordinatorService::get(opCtx)->cancelIfCommitNotYetStarted(
+                    opCtx, *opCtx->getLogicalSessionId(), *opCtx->getTxnNumber());
+            }
+
+            txnParticipant.abortTransaction(opCtx);
+
+            if (MONGO_unlikely(
+                    participantReturnNetworkErrorForAbortAfterExecutingAbortLogic.shouldFail())) {
+                uasserted(ErrorCodes::HostUnreachable,
+                          "returning network error because failpoint is on");
+            }
+
+            return Reply();
+        }
+    };
 } abortTxn;
 
 }  // namespace

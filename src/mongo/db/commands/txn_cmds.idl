@@ -82,6 +82,9 @@ commands:
         description: "commitTransaction Command"
         command_name: commitTransaction
         namespace: ignored
+        cpp_name: CommitTransaction
+        strict: true
+        api_version: "1"
         fields:
             commitTimestamp:
                 description: "Timestamp at which to commit the transaction. Required for prepared
@@ -93,8 +96,13 @@ commands:
                               progress on commit by processing using the info in the recoveryToken."
                 optional: true
                 type: TxnRecoveryToken
+        reply_type: OkReply
 
     abortTransaction:
         description: "abortTransaction Command"
         command_name: abortTransaction
         namespace: ignored
+        cpp_name: AbortTransaction
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
