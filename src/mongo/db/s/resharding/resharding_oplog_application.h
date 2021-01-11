@@ -68,13 +68,6 @@ public:
     Status applyOperation(OperationContext* opCtx,
                           const repl::OplogEntryOrGroupedInserts& opOrGroupedInserts);
 
-    /**
-     * Wraps the command application in a writeConflictRetry loop. Will return an error on any
-     * command other than "applyOps", "commitTransaction", or "abortTransaction".
-     */
-    Status applyCommand(OperationContext* opCtx,
-                        const repl::OplogEntryOrGroupedInserts& opOrGroupedInserts);
-
 private:
     // Applies an insert operation
     void _applyInsert_inlock(OperationContext* opCtx,
