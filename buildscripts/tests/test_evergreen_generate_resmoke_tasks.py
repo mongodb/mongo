@@ -856,7 +856,9 @@ class GenerateSubSuitesTest(unittest.TestCase):
     def get_test_list(n_tests):
         return [f"test{i}.js" for i in range(n_tests)]
 
-    def test_calculate_suites(self):
+    @patch(ns("read_suite_config"))
+    def test_calculate_suites(self, mock_read_suite_config):
+        mock_read_suite_config.return_value = {}
         evg = MagicMock()
         evg.test_stats_by_project.return_value = [
             tst_stat_mock(f"test{i}.js", 60, 1) for i in range(100)
@@ -943,7 +945,9 @@ class GenerateSubSuitesTest(unittest.TestCase):
         with self.assertRaises(requests.HTTPError):
             gen_sub_suites.calculate_suites(_DATE, _DATE)
 
-    def test_calculate_suites_with_selected_tests_to_run(self):
+    @patch(ns("read_suite_config"))
+    def test_calculate_suites_with_selected_tests_to_run(self, mock_read_suite_config):
+        mock_read_suite_config.return_value = {}
         evg = MagicMock()
         evg.test_stats_by_project.return_value = [
             tst_stat_mock(f"test{i}.js", 60, 1) for i in range(100)
@@ -1042,6 +1046,107 @@ class GenerateSubSuitesTest(unittest.TestCase):
             self.assertIn(tests_runtimes[2], filtered_list)
             self.assertIn(tests_runtimes[0], filtered_list)
             self.assertEqual(2, len(filtered_list))
+
+    def test_is_asan_build_on_asan_builds(self):
+        evg = MagicMock()
+        config_options = MagicMock(
+            suite="suite",
+            san_options="ASAN_OPTIONS=\"detect_leaks=1:check_initialization_order=true\"")
+
+        gen_sub_suites = under_test.GenerateSubSuites(evg, config_options)
+
+        self.assertTrue(gen_sub_suites._is_asan_build())
+
+    def test_is_asan_build_with_no_san_options(self):
+        evg = MagicMock()
+        config_options = MagicMock(suite="suite", san_options=None)
+
+        gen_sub_suites = under_test.GenerateSubSuites(evg, config_options)
+
+        self.assertFalse(gen_sub_suites._is_asan_build())
+
+    def test_is_asan_build_with_san_options_non_asan(self):
+        evg = MagicMock()
+        config_options = MagicMock(suite="suite",
+                                   san_options="SAN_OPTIONS=\"check_initialization_order=true\"")
+
+        gen_sub_suites = under_test.GenerateSubSuites(evg, config_options)
+
+        self.assertFalse(gen_sub_suites._is_asan_build())
+
+    def test_clean_every_n_cadence_on_asan(self):
+        evg = MagicMock()
+        config_options = MagicMock(
+            suite="suite",
+            san_options="ASAN_OPTIONS=\"detect_leaks=1:check_initialization_order=true\"")
+
+        gen_sub_suites = under_test.GenerateSubSuites(evg, config_options)
+
+        cadence = gen_sub_suites._get_clean_every_n_cadence()
+
+        self.assertEqual(1, cadence)
+
+    @patch(ns("read_suite_config"))
+    def test_clean_every_n_cadence_from_hook_config(self, mock_read_suite_config):
+        evg = MagicMock()
+        config_options = MagicMock(
+            suite="suite",
+            san_options=None,
+        )
+        expected_n = 42
+        mock_read_suite_config.return_value = {
+            "executor": {
+                "hooks": [{
+                    "class": "hook1",
+                }, {
+                    "class": under_test.CLEAN_EVERY_N_HOOK,
+                    "n": expected_n,
+                }]
+            }
+        }
+
+        gen_sub_suites = under_test.GenerateSubSuites(evg, config_options)
+        cadence = gen_sub_suites._get_clean_every_n_cadence()
+
+        self.assertEqual(expected_n, cadence)
+
+    @patch(ns("read_suite_config"))
+    def test_clean_every_n_cadence_no_n_in_hook_config(self, mock_read_suite_config):
+        evg = MagicMock()
+        config_options = MagicMock(
+            suite="suite",
+            san_options=None,
+        )
+        mock_read_suite_config.return_value = {
+            "executor": {
+                "hooks": [{
+                    "class": "hook1",
+                }, {
+                    "class": under_test.CLEAN_EVERY_N_HOOK,
+                }]
+            }
+        }
+
+        gen_sub_suites = under_test.GenerateSubSuites(evg, config_options)
+        cadence = gen_sub_suites._get_clean_every_n_cadence()
+
+        self.assertEqual(1, cadence)
+
+    @patch(ns("read_suite_config"))
+    def test_clean_every_n_cadence_no_hook_config(self, mock_read_suite_config):
+        evg = MagicMock()
+        config_options = MagicMock(
+            suite="suite",
+            san_options=None,
+        )
+        mock_read_suite_config.return_value = {"executor": {"hooks": [{
+            "class": "hook1",
+        }, ]}}
+
+        gen_sub_suites = under_test.GenerateSubSuites(evg, config_options)
+        cadence = gen_sub_suites._get_clean_every_n_cadence()
+
+        self.assertEqual(1, cadence)
 
 
 class TestShouldTasksBeGenerated(unittest.TestCase):
