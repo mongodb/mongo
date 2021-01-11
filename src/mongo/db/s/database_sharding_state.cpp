@@ -106,12 +106,16 @@ void DatabaseShardingState::enterCriticalSectionCommitPhase(OperationContext* op
     _critSec.enterCriticalSectionCommitPhase();
 }
 
-void DatabaseShardingState::exitCriticalSection(OperationContext* opCtx,
-                                                boost::optional<DatabaseVersion> newDbVersion,
-                                                DSSLock&) {
-    invariant(opCtx->lockState()->isDbLockedForMode(_dbName, MODE_IX));
+void DatabaseShardingState::exitCriticalSection(OperationContext* opCtx) {
+    const auto dssLock = DSSLock::lockExclusive(opCtx, this);
     _critSec.exitCriticalSection();
-    _dbVersion = newDbVersion;
+}
+
+DatabaseType DatabaseShardingState::getDatabaseInfo(OperationContext* opCtx,
+                                                    DSSLock& dssLock) const {
+    checkDbVersion(opCtx, dssLock);
+    invariant(_optDatabaseInfo);
+    return _optDatabaseInfo.get();
 }
 
 boost::optional<DatabaseVersion> DatabaseShardingState::getDbVersion(OperationContext* opCtx,
@@ -119,19 +123,25 @@ boost::optional<DatabaseVersion> DatabaseShardingState::getDbVersion(OperationCo
     if (!opCtx->lockState()->isDbLockedForMode(_dbName, MODE_X)) {
         invariant(opCtx->lockState()->isDbLockedForMode(_dbName, MODE_IS));
     }
-    return _dbVersion;
+    return (_optDatabaseInfo) ? boost::optional<DatabaseVersion>(_optDatabaseInfo->getVersion())
+                              : boost::none;
 }
 
-void DatabaseShardingState::setDbVersion(OperationContext* opCtx,
-                                         boost::optional<DatabaseVersion> newDbVersion,
-                                         DSSLock&) {
+void DatabaseShardingState::clearDatabaseInfo(OperationContext* opCtx) {
+    LOGV2(5369110, "Clearing node's cached database info", "db"_attr = _dbName);
+    const auto dssLock = DSSLock::lockExclusive(opCtx, this);
+    _optDatabaseInfo = boost::none;
+}
+
+void DatabaseShardingState::setDatabaseInfo(OperationContext* opCtx,
+                                            DatabaseType&& newDatabaseInfo,
+                                            DSSLock& dssLock) {
     invariant(opCtx->lockState()->isDbLockedForMode(_dbName, MODE_X));
-    LOGV2(21950,
-          "Setting this node's cached database version for {db} to {newDbVersion}",
-          "Setting this node's cached database version",
+    LOGV2(5369111,
+          "Setting this node's cached database info",
           "db"_attr = _dbName,
-          "newDbVersion"_attr = (newDbVersion ? newDbVersion->toBSON() : BSONObj()));
-    _dbVersion = newDbVersion;
+          "newDatabaseVersion"_attr = newDatabaseInfo.getVersion());
+    _optDatabaseInfo.emplace(std::move(newDatabaseInfo));
 }
 
 void DatabaseShardingState::checkDbVersion(OperationContext* opCtx, DSSLock&) const {
@@ -154,10 +164,11 @@ void DatabaseShardingState::checkDbVersion(OperationContext* opCtx, DSSLock&) co
 
     uassert(StaleDbRoutingVersion(_dbName, *clientDbVersion, boost::none),
             str::stream() << "don't know dbVersion for database " << _dbName,
-            _dbVersion);
-    uassert(StaleDbRoutingVersion(_dbName, *clientDbVersion, *_dbVersion),
+            _optDatabaseInfo);
+    const auto& dbVersion = _optDatabaseInfo->getVersion();
+    uassert(StaleDbRoutingVersion(_dbName, *clientDbVersion, dbVersion),
             str::stream() << "dbVersion mismatch for database " << _dbName,
-            *clientDbVersion == *_dbVersion);
+            *clientDbVersion == dbVersion);
 }
 
 MovePrimarySourceManager* DatabaseShardingState::getMovePrimarySourceManager(DSSLock&) {
@@ -174,8 +185,9 @@ void DatabaseShardingState::setMovePrimarySourceManager(OperationContext* opCtx,
     _sourceMgr = sourceMgr;
 }
 
-void DatabaseShardingState::clearMovePrimarySourceManager(OperationContext* opCtx, DSSLock&) {
+void DatabaseShardingState::clearMovePrimarySourceManager(OperationContext* opCtx) {
     invariant(opCtx->lockState()->isDbLockedForMode(_dbName, MODE_IX));
+    const auto dssLock = DSSLock::lockExclusive(opCtx, this);
     _sourceMgr = nullptr;
 }
 

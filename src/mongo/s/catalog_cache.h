@@ -44,12 +44,17 @@ class BSONObjBuilder;
 
 static constexpr int kMaxNumStaleVersionRetries = 10;
 
+using DatabaseTypeCache = ReadThroughCache<std::string, DatabaseType, ComparableDatabaseVersion>;
+using DatabaseTypeValueHandle = DatabaseTypeCache::ValueHandle;
+
 /**
- * Constructed exclusively by the CatalogCache, contains a reference to the cached information for
- * the specified database.
+ * Constructed exclusively by the CatalogCache,
+ * contains a reference to the cached information for the specified database.
  */
 class CachedDatabaseInfo {
 public:
+    DatabaseType getDatabaseType() const;
+
     const ShardId& primaryId() const;
 
     bool shardingEnabled() const;
@@ -59,9 +64,9 @@ public:
 private:
     friend class CatalogCache;
 
-    CachedDatabaseInfo(DatabaseType dbt);
+    CachedDatabaseInfo(DatabaseTypeValueHandle&& dbt);
 
-    DatabaseType _dbt;
+    DatabaseTypeValueHandle _dbt;
 };
 
 /**
@@ -224,8 +229,7 @@ public:
     void invalidateCollectionEntry_LINEARIZABLE(const NamespaceString& nss);
 
 private:
-    class DatabaseCache
-        : public ReadThroughCache<std::string, DatabaseType, ComparableDatabaseVersion> {
+    class DatabaseCache : public DatabaseTypeCache {
     public:
         DatabaseCache(ServiceContext* service,
                       ThreadPoolInterface& threadPool,

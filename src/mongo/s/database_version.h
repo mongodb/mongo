@@ -51,6 +51,7 @@ public:
     // Make getters and setters accessible
     using DatabaseVersionBase::getLastMod;
     using DatabaseVersionBase::getTimestamp;
+    using DatabaseVersionBase::serialize;
     using DatabaseVersionBase::toBSON;
 
     // It returns a new DatabaseVersion marked as fixed. A fixed database version is used to

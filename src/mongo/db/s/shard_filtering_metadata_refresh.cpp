@@ -504,20 +504,18 @@ void forceDatabaseRefresh(OperationContext* opCtx, const StringData dbName) {
     auto const shardingState = ShardingState::get(opCtx);
     invariant(shardingState->canAcceptShardedCommands());
 
-    DatabaseVersion refreshedDbVersion;
-    try {
-        refreshedDbVersion =
-            uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabaseWithRefresh(opCtx, dbName))
-                .databaseVersion();
-    } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+    const auto swRefreshedDbInfo =
+        Grid::get(opCtx)->catalogCache()->getDatabaseWithRefresh(opCtx, dbName);
+
+    if (swRefreshedDbInfo == ErrorCodes::NamespaceNotFound) {
         // db has been dropped, set the db version to boost::none
         Lock::DBLock dbLock(opCtx, dbName, MODE_X);
         auto dss = DatabaseShardingState::get(opCtx, dbName);
-        auto dssLock = DatabaseShardingState::DSSLock::lockExclusive(opCtx, dss);
-
-        dss->setDbVersion(opCtx, boost::none, dssLock);
+        dss->clearDatabaseInfo(opCtx);
         return;
     }
+
+    auto refreshedDbInfo = uassertStatusOK(std::move(swRefreshedDbInfo));
 
     // First, check under a shared lock if another thread already updated the cached version.
     // This is a best-effort optimization to make as few threads as possible to convoy on the
@@ -537,20 +535,17 @@ void forceDatabaseRefresh(OperationContext* opCtx, const StringData dbName) {
             const ComparableDatabaseVersion comparableCachedDbVersion =
                 ComparableDatabaseVersion::makeComparableDatabaseVersion(*cachedDbVersion);
             const ComparableDatabaseVersion comparableRefreshedDbVersion =
-                ComparableDatabaseVersion::makeComparableDatabaseVersion(refreshedDbVersion);
+                ComparableDatabaseVersion::makeComparableDatabaseVersion(
+                    refreshedDbInfo.databaseVersion());
 
             if (comparableRefreshedDbVersion <= comparableCachedDbVersion) {
-                LOGV2_DEBUG(
-                    22066,
-                    2,
-                    "Skipping setting cached databaseVersion for {db} to refreshed version "
-                    "{refreshedDbVersion} because current cached databaseVersion is already "
-                    "{cachedDbVersion}",
-                    "Skipping setting cached databaseVersion to refreshed version "
-                    "because current cached databaseVersion is more recent",
-                    "db"_attr = dbName,
-                    "refreshedDbVersion"_attr = refreshedDbVersion.toBSON(),
-                    "cachedDbVersion"_attr = cachedDbVersion->toBSON());
+                LOGV2_DEBUG(5369130,
+                            2,
+                            "Skipping updating cached database info from refreshed version "
+                            "because the one currently cached is more recent",
+                            "db"_attr = dbName,
+                            "refreshedDbVersion"_attr = refreshedDbInfo.databaseVersion(),
+                            "cachedDbVersion"_attr = cachedDbVersion.get());
                 return;
             }
         }
@@ -561,7 +556,7 @@ void forceDatabaseRefresh(OperationContext* opCtx, const StringData dbName) {
     auto dss = DatabaseShardingState::get(opCtx, dbName);
     auto dssLock = DatabaseShardingState::DSSLock::lockExclusive(opCtx, dss);
 
-    dss->setDbVersion(opCtx, std::move(refreshedDbVersion), dssLock);
+    dss->setDatabaseInfo(opCtx, refreshedDbInfo.getDatabaseType(), dssLock);
 }
 
 }  // namespace mongo

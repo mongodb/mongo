@@ -287,10 +287,8 @@ Status MovePrimarySourceManager::commitOnConfig(OperationContext* opCtx) {
             }
 
             if (!repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, getNss())) {
-                auto dss = DatabaseShardingState::get(opCtx, getNss().toString());
-                auto dssLock = DatabaseShardingState::DSSLock::lockExclusive(opCtx, dss);
-
-                dss->setDbVersion(opCtx, boost::none, dssLock);
+                auto dss = DatabaseShardingState::get(opCtx, getNss().db());
+                dss->clearDatabaseInfo(opCtx);
                 uassertStatusOK(validateStatus.withContext(
                     str::stream() << "Unable to verify movePrimary commit for database: "
                                   << getNss().ns()
@@ -396,13 +394,11 @@ void MovePrimarySourceManager::_cleanup(OperationContext* opCtx) {
         UninterruptibleLockGuard noInterrupt(opCtx->lockState());
         AutoGetDb autoDb(opCtx, getNss().toString(), MODE_IX);
 
-        auto dss = DatabaseShardingState::get(opCtx, getNss().toString());
-        auto dssLock = DatabaseShardingState::DSSLock::lockExclusive(opCtx, dss);
-
-        dss->clearMovePrimarySourceManager(opCtx, dssLock);
-
+        auto dss = DatabaseShardingState::get(opCtx, getNss().db());
+        dss->clearMovePrimarySourceManager(opCtx);
+        dss->clearDatabaseInfo(opCtx);
         // Leave the critical section if we're still registered.
-        dss->exitCriticalSection(opCtx, boost::none, dssLock);
+        dss->exitCriticalSection(opCtx);
     }
 
     if (_state == kCriticalSection || _state == kCloneCompleted) {

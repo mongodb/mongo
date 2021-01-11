@@ -103,7 +103,7 @@ public:
     }
     void setSharded(bool sharded);
 
-    DatabaseVersion getVersion() const {
+    const DatabaseVersion& getVersion() const {
         return _version;
     }
     void setVersion(const DatabaseVersion& version);

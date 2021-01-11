@@ -71,6 +71,24 @@ const OperationContext::Decoration<bool> operationBlockedBehindCatalogCacheRefre
 
 }  // namespace
 
+CachedDatabaseInfo::CachedDatabaseInfo(DatabaseTypeValueHandle&& dbt) : _dbt(std::move(dbt)){};
+
+DatabaseType CachedDatabaseInfo::getDatabaseType() const {
+    return *_dbt;
+}
+
+const ShardId& CachedDatabaseInfo::primaryId() const {
+    return _dbt->getPrimary();
+}
+
+bool CachedDatabaseInfo::shardingEnabled() const {
+    return _dbt->getSharded();
+}
+
+DatabaseVersion CachedDatabaseInfo::databaseVersion() const {
+    return _dbt->getVersion();
+}
+
 CatalogCache::CatalogCache(ServiceContext* const service, CatalogCacheLoader& cacheLoader)
     : _cacheLoader(cacheLoader),
       _executor(std::make_shared<ThreadPool>([] {
@@ -110,7 +128,7 @@ StatusWith<CachedDatabaseInfo> CatalogCache::getDatabase(OperationContext* opCtx
                 str::stream() << "database " << dbName << " not found",
                 dbEntry);
 
-        return {CachedDatabaseInfo(*dbEntry)};
+        return {CachedDatabaseInfo(std::move(dbEntry))};
     } catch (const DBException& ex) {
         return ex.toStatus();
     }
@@ -664,20 +682,6 @@ CatalogCache::CollectionCache::LookupResult CatalogCache::CollectionCache::_look
 
         throw;
     }
-}
-
-CachedDatabaseInfo::CachedDatabaseInfo(DatabaseType dbt) : _dbt(std::move(dbt)) {}
-
-const ShardId& CachedDatabaseInfo::primaryId() const {
-    return _dbt.getPrimary();
-}
-
-bool CachedDatabaseInfo::shardingEnabled() const {
-    return _dbt.getSharded();
-}
-
-DatabaseVersion CachedDatabaseInfo::databaseVersion() const {
-    return _dbt.getVersion();
 }
 
 }  // namespace mongo

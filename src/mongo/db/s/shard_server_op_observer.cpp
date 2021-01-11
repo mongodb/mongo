@@ -359,8 +359,7 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
         if (enterCriticalSectionCounterFieldNewVal.ok()) {
             AutoGetDb autoDb(opCtx, db, MODE_X);
             auto dss = DatabaseShardingState::get(opCtx, db);
-            auto dssLock = DatabaseShardingState::DSSLock::lockExclusive(opCtx, dss);
-            dss->setDbVersion(opCtx, boost::none, dssLock);
+            dss->clearDatabaseInfo(opCtx);
         }
     }
 
@@ -430,8 +429,7 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
 
         AutoGetDb autoDb(opCtx, deletedDatabase, MODE_X);
         auto dss = DatabaseShardingState::get(opCtx, deletedDatabase);
-        auto dssLock = DatabaseShardingState::DSSLock::lockExclusive(opCtx, dss);
-        dss->setDbVersion(opCtx, boost::none, dssLock);
+        dss->clearDatabaseInfo(opCtx);
     }
 
     if (nss == NamespaceString::kServerConfigurationNamespace) {
