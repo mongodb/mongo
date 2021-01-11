@@ -76,17 +76,6 @@ std::shared_ptr<executor::ThreadPoolTaskExecutor> makeTaskExecutor(StringData na
     return executor;
 }
 
-ChunkManager getShardedCollectionRoutingInfo(OperationContext* opCtx, const NamespaceString& nss) {
-    auto* catalogCache = Grid::get(opCtx)->catalogCache();
-    auto cm = uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, nss));
-
-    uassert(ErrorCodes::NamespaceNotSharded,
-            str::stream() << "Expected collection " << nss << " to be sharded",
-            cm.isSharded());
-
-    return cm;
-}
-
 /**
  * Fulfills the promise if it is not already. Otherwise, does nothing.
  */
@@ -134,7 +123,8 @@ void createTemporaryReshardingCollectionLocally(OperationContext* opCtx,
                           reshardingNss,
                           "loading indexes to create temporary resharding collection"_sd,
                           [&]() -> MigrationDestinationManager::IndexesAndIdIndex {
-                              auto originalCm = getShardedCollectionRoutingInfo(opCtx, originalNss);
+                              auto originalCm =
+                                  catalogCache->getShardedCollectionRoutingInfo(opCtx, originalNss);
                               auto indexShardId = originalCm.getMinKeyShardIdWithSimpleCollation();
                               return MigrationDestinationManager::getCollectionIndexes(
                                   opCtx,
@@ -347,8 +337,10 @@ ReshardingRecipientService::RecipientStateMachine::_cloneThenTransitionToApplyin
     }
 
     const auto& minKeyChunkOwningShardId = [&] {
-        auto opCtx = cc().makeOperationContext();
-        auto sourceChunkMgr = getShardedCollectionRoutingInfo(opCtx.get(), _recipientDoc.getNss());
+        auto opCtx = cc().makeOperationContext().get();
+        auto catalogCache = Grid::get(opCtx)->catalogCache();
+        const auto sourceChunkMgr =
+            catalogCache->getShardedCollectionRoutingInfo(opCtx, _recipientDoc.getNss());
         return sourceChunkMgr.getMinKeyShardIdWithSimpleCollation();
     }();
 
@@ -413,8 +405,9 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
 
     auto* serviceContext = Client::getCurrent()->getServiceContext();
     const auto& sourceChunkMgr = [&] {
-        auto opCtx = cc().makeOperationContext();
-        return getShardedCollectionRoutingInfo(opCtx.get(), _recipientDoc.getNss());
+        auto opCtx = cc().makeOperationContext().get();
+        auto catalogCache = Grid::get(opCtx)->catalogCache();
+        return catalogCache->getShardedCollectionRoutingInfo(opCtx, _recipientDoc.getNss());
     }();
 
     std::vector<NamespaceString> stashCollections;
