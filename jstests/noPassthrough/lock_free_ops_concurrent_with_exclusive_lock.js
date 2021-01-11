@@ -17,12 +17,13 @@ load('jstests/libs/parallel_shell_helpers.js');
 let conn = MongoRunner.runMongod({});
 assert(conn);
 
-// There is nothing to test if lock-free reads are not enabled. Take enableMajorityReadConcern
-// setting into account when checking featureFlagLockFreeReads as it will disable the feature even
-// when the flag is enabled.
+// Take storageEngine setting into account when checking featureFlagLockFreeReads as
+// ephemeralForTest automatically uses enableMajorityReadConcern=false and will disable the feature
+// even when the flag is enabled.
 const isLockFreeReadsEnabled = conn.adminCommand({getParameter: 1, featureFlagLockFreeReads: 1})
                                    .featureFlagLockFreeReads.value &&
-    jsTest.options().enableMajorityReadConcern;
+    jsTest.options().storageEngine !== "ephemeralForTest";
+
 if (!isLockFreeReadsEnabled) {
     jsTestLog("Exiting test because lock-free reads are not enabled.");
     MongoRunner.stopMongod(conn);

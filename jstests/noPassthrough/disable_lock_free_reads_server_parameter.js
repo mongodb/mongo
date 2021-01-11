@@ -101,25 +101,10 @@ assert(conn);
 runReadAgainstLock(conn.host, dbName, collName, false);
 MongoRunner.stopMongod(conn);
 
-// TODO SERVER-53247: Remove this test case once emrc defaults to true.
-jsTest.log(
-    "Starting server with featureFlagLockFreeReads=true and enableMajorityReadConcern=false: " +
-    "this should override the setting to false.");
-
-let rst = new ReplSetTest({
-    name: replSetName,
-    nodes: 1,
-    nodeOptions: {enableMajorityReadConcern: "false", setParameter: "featureFlagLockFreeReads=true"}
-});
-rst.startSet();
-rst.initiate();
-runReadAgainstLock(rst.getPrimary().host, dbName, collName, false);
-rst.stopSet();
-
 jsTest.log("Starting server as a replica set member with featureFlagLockFreeReads=true: this " +
            "should turn on lock-free reads.");
 
-rst = new ReplSetTest(
+let rst = new ReplSetTest(
     {name: replSetName, nodes: 1, nodeOptions: {setParameter: "featureFlagLockFreeReads=true"}});
 rst.startSet();
 rst.initiate();

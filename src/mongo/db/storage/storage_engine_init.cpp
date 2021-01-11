@@ -173,14 +173,6 @@ LastStorageEngineShutdownState initializeStorageEngine(OperationContext* opCtx,
 
     guard.dismiss();
 
-    if (serverGlobalParams.enableMajorityReadConcern) {
-        uassert(4939200,
-                str::stream() << "Cannot initialize " << storageGlobalParams.engine
-                              << " with 'enableMajorityReadConcern=true' "
-                                 "as it does not support read concern majority",
-                service->getStorageEngine()->supportsReadConcernMajority());
-    }
-
     if (lockFile && lockFile->createdByUncleanShutdown()) {
         return LastStorageEngineShutdownState::kUnclean;
     } else {

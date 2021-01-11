@@ -76,7 +76,7 @@ configs:
             callback: validateReplicaSetNameSetting
     'replication.enableMajorityReadConcern':
         section: 'Replica set options'
-        description: 'Enables majority readConcern'
+        description: 'Enables majority readConcern. enableMajorityReadConcern=false is no longer supported'
         short_name: enableMajorityReadConcern
         arg_vartype: Bool
         default: true

@@ -92,7 +92,7 @@ DEFAULTS = {
     "shuffle": None,
     "spawn_using": None,
     "stagger_jobs": None,
-    "majority_read_concern": None,  # Default is set on the commandline.
+    "majority_read_concern": "on",
     "storage_engine": None,
     "storage_engine_cache_size_gb": None,
     "suite_files": "with_server",
