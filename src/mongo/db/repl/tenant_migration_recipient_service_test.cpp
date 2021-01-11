@@ -1282,15 +1282,25 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientForgetMigration_WaitUntilSt
                        AssertionException,
                        opCtx->getTimeoutError());
 
-    // Unblock the task chain.
-    fp->setMode(FailPoint::off);
+    {
+        // Hang the chain after persisting the state doc.
+        FailPointEnableBlock fpPersistingStateDoc(
+            "fpAfterPersistingTenantMigrationRecipientInstanceStateDoc",
+            BSON("action"
+                 << "hang"));
 
-    // Make a new opCtx as the old one has expired due to timeout errors.
-    opCtx.reset();
-    opCtx = makeOperationContext();
+        // Unblock the task chain so the state doc can be persisted.
+        fp->setMode(FailPoint::off);
 
-    // The onReceiveRecipientForgetMigration should eventually go through.
-    instance->onReceiveRecipientForgetMigration(opCtx.get());
+        // Make a new opCtx as the old one has expired due to timeout errors.
+        opCtx.reset();
+        opCtx = makeOperationContext();
+
+        // Test that onReceiveRecipientForgetMigration goes through now that the state doc has been
+        // persisted.
+        instance->onReceiveRecipientForgetMigration(opCtx.get());
+    }
+
     ASSERT_EQ(instance->getDataSyncCompletionFuture().getNoThrow(),
               ErrorCodes::TenantMigrationForgotten);
     ASSERT_OK(instance->getCompletionFuture().getNoThrow());
