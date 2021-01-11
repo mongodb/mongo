@@ -49,6 +49,7 @@
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/document_source_unwind.h"
 #include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -490,6 +491,12 @@ std::unique_ptr<Pipeline, PipelineDeleter> createOplogFetchingPipelineForReshard
 boost::optional<ShardId> getDestinedRecipient(OperationContext* opCtx,
                                               const NamespaceString& sourceNss,
                                               const BSONObj& fullDocument) {
+    if (!ShardingState::get(opCtx)->enabled()) {
+        // Don't bother looking up the sharding state for the collection if the server isn't even
+        // running with sharding enabled. We know there couldn't possibly be any resharding fields.
+        return boost::none;
+    }
+
     auto css = CollectionShardingState::get(opCtx, sourceNss);
 
     auto reshardingKeyPattern =
