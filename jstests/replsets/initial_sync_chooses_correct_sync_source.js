@@ -11,7 +11,48 @@
 
 load("jstests/libs/fail_point_util.js");
 
-const delayMillis = 50;  // Adds a delay long enough to make a node not the "nearest" sync source.
+const waitForHeartbeats = initialSyncNode => {
+    // Hang the node before it undergoes sync source selection.
+    assert.commandWorked(initialSyncNode.adminCommand({
+        waitForFailPoint: "initialSyncHangBeforeChoosingSyncSource",
+        timesEntered: 1,
+        maxTimeMS: kDefaultWaitForFailPointTimeout
+    }));
+
+    // Wait for heartbeats from the primary to increase the ping time.
+    assert.soon(() => {
+        const replSetGetStatus =
+            assert.commandWorked(initialSyncNode.adminCommand({replSetGetStatus: 1}));
+        // The primary should always be node 0, since node 1 has priority 0.
+        const primaryPingTime = replSetGetStatus.members[0].pingMs;
+        return (primaryPingTime > 60);
+    });
+
+    // Allow the node to advance past the sync source selection stage.
+    assert.commandWorked(initialSyncNode.adminCommand(
+        {configureFailPoint: "initialSyncHangBeforeChoosingSyncSource", mode: "off"}));
+    assert.commandWorked(initialSyncNode.adminCommand({
+        waitForFailPoint: "initialSyncHangBeforeCreatingOplog",
+        timesEntered: 1,
+        maxTimeMS: kDefaultWaitForFailPointTimeout
+    }));
+};
+
+const restartAndWaitForHeartbeats = (rst, initialSyncNode, setParameterOpts = {}) => {
+    setParameterOpts['failpoint.initialSyncHangBeforeChoosingSyncSource'] =
+        tojson({mode: 'alwaysOn'});
+    setParameterOpts['failpoint.initialSyncHangBeforeCreatingOplog'] = tojson({mode: 'alwaysOn'});
+    setParameterOpts['numInitialSyncAttempts'] = 1;
+
+    rst.restart(initialSyncNode, {
+        startClean: true,
+        setParameter: setParameterOpts,
+    });
+
+    waitForHeartbeats(initialSyncNode);
+};
+
+const delayMillis = 300;  // Adds a delay long enough to make a node not the "nearest" sync source.
 const testName = "initial_sync_chooses_correct_sync_source";
 const rst =
     new ReplSetTest({name: testName, nodes: [{}, {rsConfig: {priority: 0}}], useBridge: true});
@@ -41,6 +82,7 @@ TestData.setParameters.logComponentVerbosity.replication =
 const initialSyncNode = rst.add({
     rsConfig: {priority: 0, votes: 0},
     setParameter: {
+        'failpoint.initialSyncHangBeforeChoosingSyncSource': tojson({mode: 'alwaysOn'}),
         'failpoint.initialSyncHangBeforeCreatingOplog': tojson({mode: 'alwaysOn'}),
         'numInitialSyncAttempts': 1
     }
@@ -48,11 +90,7 @@ const initialSyncNode = rst.add({
 primary.delayMessagesFrom(initialSyncNode, delayMillis);
 rst.reInitiate();
 
-assert.commandWorked(initialSyncNode.adminCommand({
-    waitForFailPoint: "initialSyncHangBeforeCreatingOplog",
-    timesEntered: 1,
-    maxTimeMS: kDefaultWaitForFailPointTimeout
-}));
+waitForHeartbeats(initialSyncNode);
 let res = assert.commandWorked(initialSyncNode.adminCommand({replSetGetStatus: 1}));
 
 // With zero votes and a default initialSyncSourceReadPreference, the secondary should be the sync
@@ -64,20 +102,8 @@ initialSyncNode.adminCommand(
 /*-----------------------------------------------------------------------------------------------*/
 jsTestLog(
     "Testing chaining enabled, 'primaryPreferred' initialSyncSourceReadPreference, non-voting node");
-rst.restart(initialSyncNode, {
-    startClean: true,
-    setParameter: {
-        'failpoint.initialSyncHangBeforeCreatingOplog': tojson({mode: 'alwaysOn'}),
-        'initialSyncSourceReadPreference': 'primaryPreferred',
-        'numInitialSyncAttempts': 1
-    }
-});
-
-assert.commandWorked(initialSyncNode.adminCommand({
-    waitForFailPoint: "initialSyncHangBeforeCreatingOplog",
-    timesEntered: 1,
-    maxTimeMS: kDefaultWaitForFailPointTimeout
-}));
+restartAndWaitForHeartbeats(
+    rst, initialSyncNode, {'initialSyncSourceReadPreference': 'primaryPreferred'});
 res = assert.commandWorked(initialSyncNode.adminCommand({replSetGetStatus: 1}));
 
 // With an initialSyncSourceReadPreference of 'primaryPreferred', the primary should be the sync
@@ -97,19 +123,7 @@ assert.commandWorked(primary.adminCommand({replSetReconfig: config}));
 
 jsTestLog("Testing chaining enabled, default initialSyncSourceReadPreference, voting node");
 // Ensure sync source selection is logged.
-rst.restart(initialSyncNode, {
-    startClean: true,
-    setParameter: {
-        'failpoint.initialSyncHangBeforeCreatingOplog': tojson({mode: 'alwaysOn'}),
-        'numInitialSyncAttempts': 1
-    }
-});
-
-assert.commandWorked(initialSyncNode.adminCommand({
-    waitForFailPoint: "initialSyncHangBeforeCreatingOplog",
-    timesEntered: 1,
-    maxTimeMS: kDefaultWaitForFailPointTimeout
-}));
+restartAndWaitForHeartbeats(rst, initialSyncNode);
 res = assert.commandWorked(initialSyncNode.adminCommand({replSetGetStatus: 1}));
 
 // With a voting node and a default initialSyncSourceReadPreference, the primary should be the sync
@@ -121,20 +135,8 @@ initialSyncNode.adminCommand(
 /*-----------------------------------------------------------------------------------------------*/
 jsTestLog(
     "Testing chaining enabled, 'secondaryPreferred' initialSyncSourceReadPreference, voting node");
-rst.restart(initialSyncNode, {
-    startClean: true,
-    setParameter: {
-        'failpoint.initialSyncHangBeforeCreatingOplog': tojson({mode: 'alwaysOn'}),
-        'initialSyncSourceReadPreference': 'secondaryPreferred',
-        'numInitialSyncAttempts': 1
-    }
-});
-
-assert.commandWorked(initialSyncNode.adminCommand({
-    waitForFailPoint: "initialSyncHangBeforeCreatingOplog",
-    timesEntered: 1,
-    maxTimeMS: kDefaultWaitForFailPointTimeout
-}));
+restartAndWaitForHeartbeats(
+    rst, initialSyncNode, {'initialSyncSourceReadPreference': 'secondaryPreferred'});
 res = assert.commandWorked(initialSyncNode.adminCommand({replSetGetStatus: 1}));
 
 // Even with a voting node, the secondary should be chosen when 'secondaryPreferred' is used.
@@ -153,19 +155,7 @@ assert.commandWorked(primary.adminCommand({replSetReconfig: config}));
 
 /*-----------------------------------------------------------------------------------------------*/
 jsTestLog("Testing chaining disabled, default initialSyncSourceReadPreference, non-voting node");
-rst.restart(initialSyncNode, {
-    startClean: true,
-    setParameter: {
-        'failpoint.initialSyncHangBeforeCreatingOplog': tojson({mode: 'alwaysOn'}),
-        'numInitialSyncAttempts': 1
-    }
-});
-
-assert.commandWorked(initialSyncNode.adminCommand({
-    waitForFailPoint: "initialSyncHangBeforeCreatingOplog",
-    timesEntered: 1,
-    maxTimeMS: kDefaultWaitForFailPointTimeout
-}));
+restartAndWaitForHeartbeats(rst, initialSyncNode);
 res = assert.commandWorked(initialSyncNode.adminCommand({replSetGetStatus: 1}));
 
 // With chaining disabled, the default should be to select the primary even though it is delayed.
@@ -175,20 +165,7 @@ initialSyncNode.adminCommand(
 
 /*-----------------------------------------------------------------------------------------------*/
 jsTestLog("Testing chaining disabled, 'nearest' initialSyncSourceReadPreference, non-voting node");
-rst.restart(initialSyncNode, {
-    startClean: true,
-    setParameter: {
-        'failpoint.initialSyncHangBeforeCreatingOplog': tojson({mode: 'alwaysOn'}),
-        'initialSyncSourceReadPreference': 'nearest',
-        'numInitialSyncAttempts': 1
-    }
-});
-
-assert.commandWorked(initialSyncNode.adminCommand({
-    waitForFailPoint: "initialSyncHangBeforeCreatingOplog",
-    timesEntered: 1,
-    maxTimeMS: kDefaultWaitForFailPointTimeout
-}));
+restartAndWaitForHeartbeats(rst, initialSyncNode, {'initialSyncSourceReadPreference': 'nearest'});
 res = assert.commandWorked(initialSyncNode.adminCommand({replSetGetStatus: 1}));
 
 // With chaining disabled, we choose the delayed secondary over the non-delayed primary when

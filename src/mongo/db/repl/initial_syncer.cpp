@@ -123,6 +123,9 @@ MONGO_FAIL_POINT_DEFINE(initialSyncFassertIfApplyingBatchFails);
 // Failpoint which causes the initial sync function to hang before stopping the oplog fetcher.
 MONGO_FAIL_POINT_DEFINE(initialSyncHangBeforeCompletingOplogFetching);
 
+// Failpoint which causes the initial sync function to hang before choosing a sync source.
+MONGO_FAIL_POINT_DEFINE(initialSyncHangBeforeChoosingSyncSource);
+
 // Failpoints for synchronization, shared with cloners.
 extern FailPoint initialSyncFuzzerSynchronizationPoint1;
 extern FailPoint initialSyncFuzzerSynchronizationPoint2;
@@ -676,6 +679,11 @@ void InitialSyncer::_chooseSyncSourceCallback(
     std::uint32_t chooseSyncSourceAttempt,
     std::uint32_t chooseSyncSourceMaxAttempts,
     std::shared_ptr<OnCompletionGuard> onCompletionGuard) noexcept try {
+    if (MONGO_unlikely(initialSyncHangBeforeChoosingSyncSource.shouldFail())) {
+        LOGV2(5284800, "initialSyncHangBeforeChoosingSyncSource fail point enabled");
+        initialSyncHangBeforeChoosingSyncSource.pauseWhileSet();
+    }
+
     stdx::unique_lock<Latch> lock(_mutex);
     // Cancellation should be treated the same as other errors. In this case, the most likely cause
     // of a failed _chooseSyncSourceCallback() task is a cancellation triggered by
