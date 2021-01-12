@@ -124,48 +124,17 @@ Status _createTimeseries(OperationContext* opCtx,
 
     options.viewOn = bucketsNs.coll().toString();
 
-    // The time field cannot be sparse, so we use it as the exit condition for the loop.
-    auto defaultAssembledObj = options.timeseries->getMetaField()
-        ? "(metadata !== null ? {'" + *options.timeseries->getMetaField() + "': metadata} : {})"
-        : "{}";
-    auto assembleData =
-        "function(dataArray, metadata) { \
-                const assembledData = []; \
-                if (dataArray.length === 0) { \
-                    return assembledData; \
-                } \
-                for (let i = 0;;i++) { \
-                    const assembledObj = " +
-        defaultAssembledObj +
-        "; \
-                    for (const elem of dataArray) { \
-                        if (elem.v.hasOwnProperty(i)) { \
-                            assembledObj[elem.k] = elem.v[i]; \
-                        } else if (elem.k === '" +
-        options.timeseries->getTimeField() +
-        "') { \
-                            return assembledData; \
-                        } \
-                    } \
-                    assembledData.push(assembledObj); \
-                } \
-            }";
-    options.pipeline =
-        BSON_ARRAY(BSON("$project" << BSON("dataArray" << BSON("$objectToArray"
-                                                               << "$data")
-                                                       << "metadata"
-                                                       << "$meta"))
-                   << BSON("$project"
-                           << BSON("assembledData"
-                                   << BSON("$function" << BSON("body" << assembleData << "args"
-                                                                      << BSON_ARRAY("$dataArray"
-                                                                                    << "$metadata")
-                                                                      << "lang"
-                                                                      << "js"))))
-                   << BSON("$unwind"
-                           << "$assembledData")
-                   << BSON("$replaceWith"
-                           << "$assembledData"));
+    if (options.timeseries->getMetaField()) {
+        options.pipeline =
+            BSON_ARRAY(BSON("$_internalUnpackBucket"
+                            << BSON("timeField" << options.timeseries->getTimeField() << "metaField"
+                                                << *options.timeseries->getMetaField() << "exclude"
+                                                << BSONArray())));
+    } else {
+        options.pipeline = BSON_ARRAY(
+            BSON("$_internalUnpackBucket" << BSON("timeField" << options.timeseries->getTimeField()
+                                                              << "exclude" << BSONArray())));
+    }
 
     return writeConflictRetry(opCtx, "create", ns.ns(), [&]() -> Status {
         AutoGetCollection autoColl(opCtx, ns, MODE_IX, AutoGetCollectionViewMode::kViewsPermitted);
