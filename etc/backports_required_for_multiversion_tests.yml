@@ -120,6 +120,8 @@ all:
     test_file: jstests/replsets/rollback_reconstructs_transactions_prepared_before_stable.js
   - ticket: SERVER-53431
     test_file: jstests/replsets/stepdown_kill_other_ops.js
+  - ticket: SERVER-53394
+    test_file: jstests/sharding/sharding_task_executor_pool_matching_policy.js
 
 # Tests that should only be excluded from particular suites should be listed under that suite.
 suites:

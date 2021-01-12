@@ -5,6 +5,9 @@ selector:
   - jstests/sharding/*.js
   - jstests/sharding/change_streams/*.js
   - jstests/sharding/query/*.js
+  exclude_files:
+  # Skip tests that set the matching policy internally.
+  - jstests/sharding/sharding_task_executor_pool_matching_policy.js
 
 executor:
   config:

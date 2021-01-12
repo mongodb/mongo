@@ -492,6 +492,8 @@ public:
         return _pool;
     }
 
+    virtual void updateConnectionPoolStats([[maybe_unused]] ConnectionPoolStats* cps) const = 0;
+
 protected:
     ConnectionPool* _pool = nullptr;
 };

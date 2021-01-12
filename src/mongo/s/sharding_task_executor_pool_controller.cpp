@@ -32,6 +32,8 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/client/replica_set_monitor.h"
+#include "mongo/executor/connection_pool_stats.h"
+#include "mongo/s/is_mongos.h"
 #include "mongo/s/sharding_task_executor_pool_controller.h"
 
 namespace mongo {
@@ -82,7 +84,13 @@ Status ShardingTaskExecutorPoolController::validatePendingTimeout(const int& pen
 
 Status ShardingTaskExecutorPoolController::onUpdateMatchingStrategy(const std::string& str) {
     // TODO Fix up after SERVER-40224
-    if (str == "disabled") {
+    if (str == "automatic") {
+        if (isMongos()) {
+            gParameters.matchingStrategy.store(MatchingStrategy::kMatchPrimaryNode);
+        } else {
+            gParameters.matchingStrategy.store(MatchingStrategy::kDisabled);
+        }
+    } else if (str == "disabled") {
         gParameters.matchingStrategy.store(MatchingStrategy::kDisabled);
     } else if (str == "matchPrimaryNode") {
         gParameters.matchingStrategy.store(MatchingStrategy::kMatchPrimaryNode);
@@ -309,6 +317,11 @@ Milliseconds ShardingTaskExecutorPoolController::pendingTimeout() const {
 
 Milliseconds ShardingTaskExecutorPoolController::toRefreshTimeout() const {
     return Milliseconds{gParameters.toRefreshTimeoutMS.load()};
+}
+
+void ShardingTaskExecutorPoolController::updateConnectionPoolStats(
+    executor::ConnectionPoolStats* cps) const {
+    cps->strategy = gParameters.matchingStrategy.load();
 }
 
 }  // namespace mongo
