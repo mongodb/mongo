@@ -13,7 +13,7 @@ var dbC = mongos.getDB("DropSharded_C");
 var res = assert.commandWorked(dbA.dropDatabase());
 assert.eq('database does not exist', res.info);
 
-var numDocs = 3000;
+var numDocs = 30;
 var numColls = 10;
 for (var i = 0; i < numDocs; i++) {
     dbA.getCollection("data" + (i % numColls)).insert({_id: i});

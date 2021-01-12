@@ -37,6 +37,7 @@
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/future.h"
 
 namespace mongo {
 
@@ -73,11 +74,8 @@ public:
                                                             StringData whyMessage,
                                                             const OID& lockSessionID) override;
 
-    void unlock(OperationContext* opCtx, const DistLockHandle& lockSessionID) override;
-
-    void unlock(OperationContext* opCtx,
-                const DistLockHandle& lockSessionID,
-                StringData name) override;
+    void unlock(Interruptible* intr, const DistLockHandle& lockSessionID) override;
+    void unlock(Interruptible* intr, const DistLockHandle& lockSessionID, StringData name) override;
 
     void unlockAll(OperationContext* opCtx) override;
 
@@ -85,7 +83,8 @@ private:
     /**
      * Queue a lock to be unlocked asynchronously with retry until it doesn't error.
      */
-    void queueUnlock(const DistLockHandle& lockSessionID, const boost::optional<std::string>& name);
+    SharedSemiFuture<void> queueUnlock(const DistLockHandle& lockSessionID,
+                                       const boost::optional<std::string>& name);
 
     /**
      * Periodically pings and checks if there are locks queued that needs unlocking.
@@ -153,13 +152,23 @@ private:
     Mutex _mutex = MONGO_MAKE_LATCH("ReplSetDistLockManager::_mutex");
     std::unique_ptr<stdx::thread> _execThread;  // (S)
 
-    // Contains the list of locks queued for unlocking. Cases when unlock operation can
-    // be queued include:
+    // Contains the list of locks queued for unlocking. Among regular unlocks of a properly acquired
+    // locks, cases when an unlock operation can be queued include:
     // 1. First attempt on unlocking resulted in an error.
     // 2. Attempting to grab or overtake a lock resulted in an error where we are uncertain
     //    whether the modification was actually applied or not, and call unlock to make
     //    sure that it was cleaned up.
-    std::deque<std::pair<DistLockHandle, boost::optional<std::string>>> _unlockList;  // (M)
+    struct UnlockRequest {
+        UnlockRequest(DistLockHandle lockId, boost::optional<std::string> name)
+            : lockId(std::move(lockId)), name(std::move(name)) {}
+
+        DistLockHandle lockId;
+        boost::optional<std::string> name;
+
+        // Will be signaled when the unlock request has completed
+        SharedPromise<void> unlockCompleted;
+    };
+    std::deque<UnlockRequest> _unlockList;  // (M)
 
     bool _isShutDown = false;              // (M)
     stdx::condition_variable _shutDownCV;  // (M)

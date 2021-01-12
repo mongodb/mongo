@@ -238,8 +238,8 @@ std::unique_ptr<DistLockManager> ShardingMongodTestFixture::makeDistLockManager(
                                                                 const OID& lockSessionID) override {
             return DistLockHandle::gen();
         }
-        void unlock(OperationContext* opCtx, const DistLockHandle& lockHandle) override {}
-        void unlock(OperationContext* opCtx,
+        void unlock(Interruptible* intr, const DistLockHandle& lockHandle) override {}
+        void unlock(Interruptible* intr,
                     const DistLockHandle& lockHandle,
                     StringData name) override {}
         void unlockAll(OperationContext* opCtx) override {}

@@ -57,24 +57,20 @@ DistLockManager::ScopedDistLock::~ScopedDistLock() {
     }
 }
 
-DistLockManager::ScopedDistLock::ScopedDistLock(ScopedDistLock&& other)
-    : _opCtx(nullptr), _lockManager(nullptr) {
-    *this = std::move(other);
+DistLockManager::ScopedDistLock::ScopedDistLock(ScopedDistLock&& other) {
+    _opCtx = other._opCtx;
+    other._opCtx = nullptr;
+
+    _lockID = std::move(other._lockID);
+
+    _lockManager = other._lockManager;
+    other._lockManager = nullptr;
 }
 
-DistLockManager::ScopedDistLock& DistLockManager::ScopedDistLock::operator=(
-    ScopedDistLock&& other) {
-    if (this != &other) {
-        invariant(_lockManager == nullptr);
-        invariant(_opCtx == nullptr);
-
-        _opCtx = other._opCtx;
-        _lockID = std::move(other._lockID);
-        _lockManager = other._lockManager;
-        other._lockManager = nullptr;
-    }
-
-    return *this;
+DistLockManager::ScopedDistLock DistLockManager::ScopedDistLock::moveToAnotherThread() {
+    auto unownedScopedDistLock(std::move(*this));
+    unownedScopedDistLock._opCtx = nullptr;
+    return unownedScopedDistLock;
 }
 
 DistLockManager* DistLockManager::get(OperationContext* opCtx) {

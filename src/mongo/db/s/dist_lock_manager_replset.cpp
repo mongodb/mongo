@@ -124,20 +124,21 @@ void ReplSetDistLockManager::doTask() {
           "pingInterval"_attr = _pingInterval);
 
     Timer elapsedSincelastPing(_serviceContext->getTickSource());
-    Client::initThread("replSetDistLockPinger");
+    ThreadClient tc("replSetDistLockPinger", _serviceContext);
 
     while (!isShutDown()) {
+        // Ping the actively held locks
         if (MONGO_unlikely(disableReplSetDistLockManager.shouldFail())) {
             LOGV2(426321,
                   "The distributed lock ping thread is disabled for testing",
                   "processId"_attr = _processID,
                   "pingInterval"_attr = _pingInterval);
-            return;
-        }
-        {
-            auto opCtx = cc().makeOperationContext();
-            auto pingStatus = _catalog->ping(opCtx.get(), _processID, Date_t::now());
+        } else {
+            auto opCtxHolder = tc->makeOperationContext();
+            auto* opCtx = opCtxHolder.get();
 
+            auto pingStatus =
+                _catalog->ping(opCtx, _processID, _serviceContext->getFastClockSource()->now());
             if (!pingStatus.isOK() && pingStatus != ErrorCodes::NotWritablePrimary) {
                 LOGV2_WARNING(22668,
                               "Pinging failed for distributed lock pinger caused by {error}",
@@ -154,52 +155,59 @@ void ReplSetDistLockManager::doTask() {
                               "duration"_attr = elapsed);
             }
             elapsedSincelastPing.reset();
+        }
 
-            std::deque<std::pair<DistLockHandle, boost::optional<std::string>>> toUnlockBatch;
+        // Process the unlock queue
+        {
+            auto opCtxHolder = tc->makeOperationContext();
+            auto* opCtx = opCtxHolder.get();
+
+            std::deque<UnlockRequest> toUnlockBatch;
             {
                 stdx::unique_lock<Latch> lk(_mutex);
                 toUnlockBatch.swap(_unlockList);
             }
 
-            for (const auto& toUnlock : toUnlockBatch) {
-                Status unlockStatus(ErrorCodes::NotYetInitialized,
-                                    "status unlock not initialized!");
-                if (toUnlock.second) {
-                    // A non-empty _id (name) field was provided, unlock by ts (sessionId) and _id.
-                    unlockStatus = _catalog->unlock(opCtx.get(), toUnlock.first, *toUnlock.second);
-                } else {
-                    unlockStatus = _catalog->unlock(opCtx.get(), toUnlock.first);
+            for (auto& toUnlock : toUnlockBatch) {
+                if (isShutDown()) {
+                    toUnlock.unlockCompleted.setError(
+                        {ErrorCodes::ShutdownInProgress, "Dist lock manager shutting down."});
+                    continue;
                 }
+
+                Status unlockStatus = toUnlock.name
+                    ? _catalog->unlock(opCtx, toUnlock.lockId, *toUnlock.name)
+                    : _catalog->unlock(opCtx, toUnlock.lockId);
+
+                toUnlock.unlockCompleted.setFrom(unlockStatus);
 
                 if (!unlockStatus.isOK()) {
                     LOGV2_WARNING(22670,
                                   "Error unlocking distributed lock {lockName} with sessionID "
                                   "{lockSessionId} caused by {error}",
                                   "Error unlocking distributed lock",
-                                  "lockName"_attr = toUnlock.second,
-                                  "lockSessionId"_attr = toUnlock.first,
+                                  "lockSessionId"_attr = toUnlock.lockId,
+                                  "lockName"_attr = toUnlock.name,
                                   "error"_attr = unlockStatus);
                     // Queue another attempt, unless the problem was no longer being primary.
                     if (unlockStatus != ErrorCodes::NotWritablePrimary) {
-                        queueUnlock(toUnlock.first, toUnlock.second);
+                        (void)queueUnlock(toUnlock.lockId, toUnlock.name);
                     }
                 } else {
                     LOGV2(22650,
                           "Unlocked distributed lock {lockName} with sessionID {lockSessionId}",
                           "Unlocked distributed lock",
-                          "lockName"_attr = toUnlock.second,
-                          "lockSessionId"_attr = toUnlock.first);
-                }
-
-                if (isShutDown()) {
-                    return;
+                          "lockSessionId"_attr = toUnlock.lockId,
+                          "lockName"_attr = toUnlock.name);
                 }
             }
         }
 
         MONGO_IDLE_THREAD_BLOCK;
         stdx::unique_lock<Latch> lk(_mutex);
-        _shutDownCV.wait_for(lk, _pingInterval.toSystemDuration(), [this] { return _isShutDown; });
+        _shutDownCV.wait_for(lk, _pingInterval.toSystemDuration(), [this] {
+            return _isShutDown || !_unlockList.empty();
+        });
     }
 }
 
@@ -415,7 +423,7 @@ StatusWith<DistLockHandle> ReplSetDistLockManager::lockWithSessionID(OperationCo
         if (status != ErrorCodes::LockStateChangeFailed) {
             // An error occurred but the write might have actually been applied on the
             // other side. Schedule an unlock to clean it up just in case.
-            queueUnlock(lockSessionID, name.toString());
+            (void)queueUnlock(lockSessionID, name.toString());
             return status;
         }
 
@@ -464,7 +472,7 @@ StatusWith<DistLockHandle> ReplSetDistLockManager::lockWithSessionID(OperationCo
                 if (overtakeStatus != ErrorCodes::LockStateChangeFailed) {
                     // An error occurred but the write might have actually been applied on the
                     // other side. Schedule an unlock to clean it up just in case.
-                    queueUnlock(lockSessionID, boost::none);
+                    (void)queueUnlock(lockSessionID, boost::none);
                     return overtakeStatus;
                 }
             }
@@ -557,33 +565,18 @@ StatusWith<DistLockHandle> ReplSetDistLockManager::tryLockWithLocalWriteConcern(
     return lockStatus.getStatus();
 }
 
-void ReplSetDistLockManager::unlock(OperationContext* opCtx, const DistLockHandle& lockSessionID) {
-    auto unlockStatus = _catalog->unlock(opCtx, lockSessionID);
-
-    if (!unlockStatus.isOK()) {
-        queueUnlock(lockSessionID, boost::none);
-    } else {
-        LOGV2(22665,
-              "Unlocked distributed lock with sessionID {lockSessionId}",
-              "Unlocked distributed lock",
-              "lockSessionId"_attr = lockSessionID);
-    }
+void ReplSetDistLockManager::unlock(Interruptible* intr, const DistLockHandle& lockSessionID) {
+    auto unlockFuture = queueUnlock(lockSessionID, boost::none);
+    if (intr)
+        unlockFuture.getNoThrow(intr).ignore();
 }
 
-void ReplSetDistLockManager::unlock(OperationContext* opCtx,
+void ReplSetDistLockManager::unlock(Interruptible* intr,
                                     const DistLockHandle& lockSessionID,
                                     StringData name) {
-    auto unlockStatus = _catalog->unlock(opCtx, lockSessionID, name);
-
-    if (!unlockStatus.isOK()) {
-        queueUnlock(lockSessionID, name.toString());
-    } else {
-        LOGV2(22666,
-              "Unlocked distributed lock {lockName} with sessionID {lockSessionId}",
-              "Unlocked distributed lock",
-              "lockName"_attr = name,
-              "lockSessionId"_attr = lockSessionID);
-    }
+    auto unlockFuture = queueUnlock(lockSessionID, name.toString());
+    if (intr)
+        unlockFuture.getNoThrow(intr).ignore();
 }
 
 void ReplSetDistLockManager::unlockAll(OperationContext* opCtx) {
@@ -598,10 +591,12 @@ void ReplSetDistLockManager::unlockAll(OperationContext* opCtx) {
     }
 }
 
-void ReplSetDistLockManager::queueUnlock(const DistLockHandle& lockSessionID,
-                                         const boost::optional<std::string>& name) {
+SharedSemiFuture<void> ReplSetDistLockManager::queueUnlock(
+    const DistLockHandle& lockSessionID, const boost::optional<std::string>& name) {
     stdx::unique_lock<Latch> lk(_mutex);
-    _unlockList.push_back(std::make_pair(lockSessionID, name));
+    auto& req = _unlockList.emplace_back(lockSessionID, name);
+    _shutDownCV.notify_all();
+    return req.unlockCompleted.getFuture();
 }
 
 ReplSetDistLockManager::DistLockPingInfo::DistLockPingInfo() = default;

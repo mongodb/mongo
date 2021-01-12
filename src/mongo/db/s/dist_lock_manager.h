@@ -77,7 +77,8 @@ public:
         ~ScopedDistLock();
 
         ScopedDistLock(ScopedDistLock&& other);
-        ScopedDistLock& operator=(ScopedDistLock&& other);
+
+        ScopedDistLock moveToAnotherThread();
 
     private:
         OperationContext* _opCtx;
@@ -153,18 +154,14 @@ public:
                                                                     const OID& lockSessionID) = 0;
 
     /**
-     * Unlocks the given lockHandle. Will attempt to retry again later if the config
-     * server is not reachable.
+     * Unlocks the given lockHandle. Will keep retrying (asynchronously) until the lock is freed or
+     * some terminal error occurs where a lock cannot be freed (such as a local NotWritablePrimary).
+     *
+     * The provided interruptible object can be nullptr in which case the method will not attempt to
+     * wait for the unlock to be confirmed.
      */
-    virtual void unlock(OperationContext* opCtx, const DistLockHandle& lockHandle) = 0;
-
-    /**
-     * Unlocks the lock specified by "lockHandle" and "name". Will attempt to retry again later if
-     * the config server is not reachable.
-     */
-    virtual void unlock(OperationContext* opCtx,
-                        const DistLockHandle& lockHandle,
-                        StringData name) = 0;
+    virtual void unlock(Interruptible* intr, const DistLockHandle& lockHandle) = 0;
+    virtual void unlock(Interruptible* intr, const DistLockHandle& lockHandle, StringData name) = 0;
 
     /**
      * Makes a best-effort attempt to unlock all locks owned by the given processID.
