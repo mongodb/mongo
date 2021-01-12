@@ -10125,8 +10125,6 @@ buildvariants:
     test_flags: >-
         --mongodSetParameters="{featureFlagToaster: true, featureFlagSpoon: true, featureFlagTenantMigrations: true}"
 
-
-
 - <<: *enterprise-windows-nopush-template
   name: enterprise-windows-benchmarks
   display_name: "~ Enterprise Windows (Benchmarks)"
