@@ -455,7 +455,6 @@ Status ReplicationCoordinatorExternalStateImpl::initializeReplSetStorage(Operati
                                _storageInterface->waitForAllEarlierOplogWritesToBeVisible(opCtx);
                            });
 
-        FeatureCompatibilityVersion::setIfCleanStartup(opCtx, _storageInterface);
         // Take an unstable checkpoint to ensure that the FCV document is persisted to disk.
         opCtx->recoveryUnit()->waitUntilUnjournaledWritesDurable(opCtx,
                                                                  false /* stableCheckpoint */);

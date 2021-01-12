@@ -3798,6 +3798,9 @@ Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* opCt
 
     lk.unlock();
 
+    // Initiate FCV in local storage. This will propagate to other nodes via initial sync.
+    FeatureCompatibilityVersion::setIfCleanStartup(opCtx, _storage);
+
     ReplSetConfig newConfig;
     try {
         newConfig = ReplSetConfig::parseForInitiate(configObj, OID::gen());

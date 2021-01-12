@@ -117,6 +117,18 @@ void ReplCoordTest::init() {
     _storageInterface = new StorageInterfaceMock();
     StorageInterface::set(service, std::unique_ptr<StorageInterface>(_storageInterface));
     ASSERT_TRUE(_storageInterface == StorageInterface::get(service));
+    // We define these two function mocks for _storageInterface so we can successfully store the
+    // FCV document in the replica set initiate command code path.
+    _storageInterface->insertDocumentFn = [this](OperationContext* opCtx,
+                                                 const NamespaceStringOrUUID& nsOrUUID,
+                                                 const TimestampedBSONObj& doc,
+                                                 long long term) { return Status::OK(); };
+
+    _storageInterface->createCollFn = [this](OperationContext* opCtx,
+                                             const NamespaceString& nss,
+                                             const CollectionOptions& options) {
+        return Status::OK();
+    };
 
     ReplicationProcess::set(
         service,
