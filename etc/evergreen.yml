@@ -10006,8 +10006,8 @@ buildvariants:
   - name: unittest_shell_hang_analyzer_gen
 
 - <<: *enterprise-windows-required-template
-  name: enterprise-windows-required-disabled-feature-flags
-  display_name: "! Enterprise Windows (disabled feature flags)"
+  name: enterprise-windows-required-all-feature-flags
+  display_name: "! Enterprise Windows (all feature flags)"
   batchtime: 240 # 4 hours
   expansions:
     burn_in_tests_build_variant: enterprise-windows
@@ -10100,8 +10100,8 @@ buildvariants:
         - rhel70-small
 
 - <<: *enterprise-windows-template
-  name: enterprise-windows-disabled-feature-flags
-  display_name: "* Enterprise Windows (disabled feature flags)"
+  name: enterprise-windows-all-feature-flags
+  display_name: "* Enterprise Windows (all feature flags)"
   batchtime: 360 # 6 hours
   expansions:
     exe: ".exe"
@@ -10653,15 +10653,15 @@ buildvariants:
       - rhel62-large
   - name: cst_jscore_passthrough
 
-- name: enterprise-rhel-62-64-bit-dynamic-disabled-feature-flags
-  display_name: "! Shared Library Enterprise RHEL 6.2 (disabled feature flags)"
+- name: enterprise-rhel-62-64-bit-dynamic-all-feature-flags
+  display_name: "! Shared Library Enterprise RHEL 6.2 (all feature flags)"
   batchtime: 60 # 1 hour
   stepback: false
   modules:
   - enterprise
   run_on:
   - rhel62-small
-  expansions: &enterprise-rhel-62-64-bit-dynamic-disabled-feature-flags-expansions
+  expansions: &enterprise-rhel-62-64-bit-dynamic-all-feature-flags-expansions
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
     compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
     multiversion_platform: rhel62
@@ -13144,8 +13144,8 @@ buildvariants:
   - name: unittest_shell_hang_analyzer_gen
 
 - <<: *ubuntu1804-debug-aubsan-lite-template
-  name: ubuntu1804-debug-aubsan-lite-disabled-feature-flags
-  display_name: "! Shared Library {A,UB}SAN Enterprise Ubuntu 18.04 DEBUG (disabled feature flags)"
+  name: ubuntu1804-debug-aubsan-lite-all-feature-flags
+  display_name: "! Shared Library {A,UB}SAN Enterprise Ubuntu 18.04 DEBUG (all feature flags)"
   batchtime: 240 # 4 hours
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
