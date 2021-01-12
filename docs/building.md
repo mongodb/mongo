@@ -158,3 +158,30 @@ Install the following ports:
   * `devel/libexecinfo`
   * `lang/gcc`
   * `lang/python`
+
+Building with docker
+----------------
+There is a ubuntu docker image with all the required dependencies, which can be built to run a build. 
+Following are the steps to use docker.
+
+If /mongosrc is the folder where the mongo repo is cloned.   
+* Build Docker Image.
+    <!-- The docker image needs to be built from this context to be able to copy relevant files to   docker image -->
+    ```
+    /mongosrc$ cd etc 
+    /mongosrc/etc$ docker build -f ../buildscripts/dockerbuild/Dockerfile . -t mongobuild
+    ```
+* Use Docker Image to run the build and run unit tests.
+  Binaries can be dynamically linked to save built space with --link-mode=dynamic option.
+  
+    ```
+    /mongosrc$ docker run --rm -i -t --volume $(pwd):/mongo mongobuild /bin/bash    
+    ```
+  Inside the container, /mongo is the directory mapped to the mongo source folder.
+  
+  The build and unit tests can run as following
+  ```
+  cd /mongo
+  python3 buildscripts/scons.py install-unittests --link-model=dynamic --install-action=hardlink
+  python3 buildscripts/resmoke.py run --suites=dbtest
+  ```
