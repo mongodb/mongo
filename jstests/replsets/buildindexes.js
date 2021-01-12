@@ -26,7 +26,13 @@ for (var i in secondaryConns) {
 }
 replTest.awaitReplication();
 
-primary.x.createIndex({y: 1});
+// Need to use a commitQuorum of 2 rather than the default of 'votingMembers', which includes the
+// buildIndexes:false node. The index build will otherwise fail early.
+assert.commandWorked(primary.runCommand({
+    createIndexes: 'x',
+    indexes: [{key: {y: 1}, name: 'y_1'}],
+    commitQuorum: 2,
+}));
 
 for (i = 0; i < 100; i++) {
     primary.x.insert({x: 1, y: "abc", c: 1});
