@@ -229,17 +229,6 @@ StatusWith<ChunkManager> CatalogCache::getCollectionRoutingInfoWithRefresh(
     return getCollectionRoutingInfo(opCtx, nss);
 }
 
-ChunkManager CatalogCache::getShardedCollectionRoutingInfo(OperationContext* opCtx,
-                                                           const NamespaceString& nss) {
-    auto cm = uassertStatusOK(getCollectionRoutingInfo(opCtx, nss));
-
-    uassert(ErrorCodes::NamespaceNotSharded,
-            str::stream() << "Expected collection " << nss << " to be sharded",
-            cm.isSharded());
-
-    return cm;
-}
-
 StatusWith<ChunkManager> CatalogCache::getShardedCollectionRoutingInfoWithRefresh(
     OperationContext* opCtx, const NamespaceString& nss) {
     auto routingInfoStatus = getCollectionRoutingInfoWithRefresh(opCtx, nss);

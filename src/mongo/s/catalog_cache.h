@@ -125,15 +125,6 @@ public:
     StatusWith<ChunkManager> getCollectionRoutingInfoWithRefresh(OperationContext* opCtx,
                                                                  const NamespaceString& nss);
 
-
-    /**
-     * Same as getCollectionRoutingInfo above, but throws NamespaceNotSharded error if the namespace
-     * is not sharded.
-     */
-    ChunkManager getShardedCollectionRoutingInfo(OperationContext* opCtx,
-                                                 const NamespaceString& nss);
-
-
     /**
      * Same as getCollectionRoutingInfoWithRefresh above, but in addition returns a
      * NamespaceNotSharded error if the collection is not sharded.
