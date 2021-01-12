@@ -197,6 +197,7 @@ env.Library(
     target="authentication_commands",
     source=[
         'authentication_commands.cpp',
+        'authentication_commands.idl',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/audit',
