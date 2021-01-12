@@ -10032,7 +10032,8 @@ buildvariants:
     test_flags: >-
         --mongodSetParameters="{featureFlagToaster: true, featureFlagSpoon: true, featureFlagTenantMigrations: true}"
 
-- name: enterprise-windows
+- &enterprise-windows-template
+  name: enterprise-windows
   display_name: "* Enterprise Windows"
   batchtime: 240 # 4 hours
   modules:
@@ -10097,6 +10098,34 @@ buildvariants:
     - name: push
       distros:
         - rhel70-small
+
+- <<: *enterprise-windows-template
+  name: enterprise-windows-disabled-feature-flags
+  display_name: "* Enterprise Windows (disabled feature flags)"
+  batchtime: 360 # 6 hours
+  expansions:
+    exe: ".exe"
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug msi archive-mh archive-mh-debug
+    content_type: application/zip
+    compile_flags: --ssl MONGO_DISTMOD=windows CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --win-version-min=win10
+    num_scons_link_jobs_available: 0.5
+    python: '/cygdrive/c/python/python37/python.exe'
+    ext: zip
+    scons_cache_scope: shared
+    multiversion_platform: windows
+    multiversion_edition: enterprise
+    jstestfuzz_num_generated_files: 35
+    target_resmoke_time: 20
+    max_sub_suites: 3
+    large_distro_name: windows-64-vs2019-large
+    push_path: windows
+    push_bucket: downloads.10gen.com
+    push_name: windows
+    push_arch: x86_64-enterprise
+    test_flags: >-
+        --mongodSetParameters="{featureFlagToaster: true, featureFlagSpoon: true, featureFlagTenantMigrations: true}"
+
+
 
 - <<: *enterprise-windows-nopush-template
   name: enterprise-windows-benchmarks
@@ -13085,7 +13114,8 @@ buildvariants:
   - name: server_discovery_and_monitoring_json_test_TG
   - name: server_selection_json_test_TG
 
-- name: ubuntu1804-debug-aubsan-lite
+- &ubuntu1804-debug-aubsan-lite-template
+  name: ubuntu1804-debug-aubsan-lite
   display_name: "! Shared Library {A,UB}SAN Enterprise Ubuntu 18.04 DEBUG"
   batchtime: 240 # 4 hours
   modules:
@@ -13101,6 +13131,33 @@ buildvariants:
     san_options: UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer" LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1" ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
     compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --allocator=system --sanitize=undefined,address --ssl --ocsp-stapling=off -j$(grep -c ^processor /proc/cpuinfo) --link-model=dynamic
     test_flags: --excludeWithAnyTags=requires_ocsp_stapling
+    resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under {A,UB}SAN build.
+    hang_analyzer_dump_core: false
+    scons_cache_scope: shared
+    scons_cache_mode: all
+    max_sub_suites: 3
+    num_scons_link_jobs_available: 0.99
+  tasks:
+  - name: compile_parallel_TG
+  - name: unittests_parallel_TG
+  - name: dbtest_parallel_TG
+  - name: jsCore
+  - name: jsCore_txns
+  - name: unittest_shell_hang_analyzer_gen
+
+- <<: *ubuntu1804-debug-aubsan-lite-template
+  name: ubuntu1804-debug-aubsan-lite-disabled-feature-flags
+  display_name: "! Shared Library {A,UB}SAN Enterprise Ubuntu 18.04 DEBUG (disabled feature flags)"
+  batchtime: 240 # 4 hours
+  expansions:
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
+    lang_environment: LANG=C
+    # If you add anything to san_options, make sure the appropriate changes are
+    # also made to SConstruct.
+    san_options: UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer" LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1" ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
+    compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --allocator=system --sanitize=undefined,address --ssl --ocsp-stapling=off -j$(grep -c ^processor /proc/cpuinfo) --link-model=dynamic
+    test_flags: >-
+        --mongodSetParameters="{featureFlagToaster: true, featureFlagSpoon: true, featureFlagTenantMigrations: true}" --excludeWithAnyTags=requires_ocsp_stapling
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under {A,UB}SAN build.
     hang_analyzer_dump_core: false
     scons_cache_scope: shared
