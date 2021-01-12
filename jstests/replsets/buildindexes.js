@@ -1,4 +1,7 @@
 // Check that buildIndexes config option is working
+// @tags: [
+//   requires_fcv_44
+// ]
 
 (function() {
 // Skip db hash check because secondary will have different number of indexes due to
@@ -26,7 +29,13 @@ for (var i in slaveConns) {
 }
 replTest.awaitReplication();
 
-master.x.ensureIndex({y: 1});
+// Need to use a commitQuorum of 2 rather than the default of 'votingMembers', which includes the
+// buildIndexes:false node. The index build will otherwise fail early.
+assert.commandWorked(master.runCommand({
+    createIndexes: 'x',
+    indexes: [{key: {y: 1}, name: 'y_1'}],
+    commitQuorum: 2,
+}));
 
 for (i = 0; i < 100; i++) {
     master.x.insert({x: 1, y: "abc", c: 1});

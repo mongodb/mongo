@@ -6235,35 +6235,82 @@ TEST_F(TopoCoordTest, CheckIfCommitQuorumCanBeSatisfied) {
 
     CommitQuorumOptions validNumberCQ;
     validNumberCQ.numNodes = 5;
-    ASSERT_TRUE(getTopoCoord().checkIfCommitQuorumCanBeSatisfied(validNumberCQ));
+    ASSERT_OK(getTopoCoord().checkIfCommitQuorumCanBeSatisfied(validNumberCQ));
 
     CommitQuorumOptions invalidNumberCQ;
     invalidNumberCQ.numNodes = 6;
-    ASSERT_FALSE(getTopoCoord().checkIfCommitQuorumCanBeSatisfied(invalidNumberCQ));
+    ASSERT_NOT_OK(getTopoCoord().checkIfCommitQuorumCanBeSatisfied(invalidNumberCQ));
 
     CommitQuorumOptions majorityCQ;
     majorityCQ.mode = "majority";
-    ASSERT_TRUE(getTopoCoord().checkIfCommitQuorumCanBeSatisfied(majorityCQ));
+    ASSERT_OK(getTopoCoord().checkIfCommitQuorumCanBeSatisfied(majorityCQ));
 
     CommitQuorumOptions votingMembersCQ;
     votingMembersCQ.mode = "votingMembers";
-    ASSERT_TRUE(getTopoCoord().checkIfCommitQuorumCanBeSatisfied(votingMembersCQ));
+    ASSERT_OK(getTopoCoord().checkIfCommitQuorumCanBeSatisfied(votingMembersCQ));
 
     CommitQuorumOptions validModeCQ;
     validModeCQ.mode = "valid";
-    ASSERT_TRUE(getTopoCoord().checkIfCommitQuorumCanBeSatisfied(validModeCQ));
+    ASSERT_OK(getTopoCoord().checkIfCommitQuorumCanBeSatisfied(validModeCQ));
 
     CommitQuorumOptions invalidNotEnoughNodesCQ;
     invalidNotEnoughNodesCQ.mode = "invalidNotEnoughNodes";
-    ASSERT_FALSE(getTopoCoord().checkIfCommitQuorumCanBeSatisfied(invalidNotEnoughNodesCQ));
+    ASSERT_NOT_OK(getTopoCoord().checkIfCommitQuorumCanBeSatisfied(invalidNotEnoughNodesCQ));
 
     CommitQuorumOptions invalidNotEnoughValuesCQ;
     invalidNotEnoughValuesCQ.mode = "invalidNotEnoughValues";
-    ASSERT_FALSE(getTopoCoord().checkIfCommitQuorumCanBeSatisfied(invalidNotEnoughValuesCQ));
+    ASSERT_NOT_OK(getTopoCoord().checkIfCommitQuorumCanBeSatisfied(invalidNotEnoughValuesCQ));
 
     CommitQuorumOptions fakeModeCQ;
     fakeModeCQ.mode = "fake";
-    ASSERT_FALSE(getTopoCoord().checkIfCommitQuorumCanBeSatisfied(fakeModeCQ));
+    ASSERT_NOT_OK(getTopoCoord().checkIfCommitQuorumCanBeSatisfied(fakeModeCQ));
+}
+
+TEST_F(TopoCoordTest, CommitQuorumBuildIndexesFalse) {
+    ReplSetConfig configA;
+    ASSERT_OK(
+        configA.initialize(BSON("_id"
+                                << "rs0"
+                                << "version" << 1 << "protocolVersion" << 1 << "members"
+                                << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                         << "node0")
+                                              << BSON("_id" << 1 << "host"
+                                                            << "node1")
+                                              << BSON("_id" << 2 << "host"
+                                                            << "node2")
+                                              << BSON("_id" << 3 << "host"
+                                                            << "node3")
+                                              << BSON("_id" << 4 << "host"
+                                                            << "node4"
+                                                            << "priority" << 0 << "hidden" << true
+                                                            << "buildIndexes" << false)))));
+    getTopoCoord().updateConfig(configA, -1, Date_t());
+
+    {
+        CommitQuorumOptions cq;
+        cq.numNodes = 5;
+        ASSERT_NOT_OK(getTopoCoord().checkIfCommitQuorumCanBeSatisfied(cq));
+    }
+
+    {
+        CommitQuorumOptions cq;
+        cq.numNodes = 4;
+        ASSERT_OK(getTopoCoord().checkIfCommitQuorumCanBeSatisfied(cq));
+    }
+
+    {
+        // The buildIndexes:false node can vote but not build indexes. The commit quorum should be
+        // unsatisfiable.
+        CommitQuorumOptions cq;
+        cq.mode = "votingMembers";
+        ASSERT_NOT_OK(getTopoCoord().checkIfCommitQuorumCanBeSatisfied(cq));
+    }
+
+    {
+        CommitQuorumOptions cq;
+        cq.mode = "majority";
+        ASSERT_OK(getTopoCoord().checkIfCommitQuorumCanBeSatisfied(cq));
+    }
 }
 
 TEST_F(TopoCoordTest, AdvanceCommittedOpTimeDisregardsWallTimeOrder) {

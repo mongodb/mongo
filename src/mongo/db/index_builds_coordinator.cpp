@@ -711,6 +711,12 @@ void IndexBuildsCoordinator::applyCommitIndexBuild(OperationContext* opCtx,
 
     updateCurOpForCommitOrAbort(opCtx, kCommitIndexBuildFieldName, buildUUID);
 
+    // If this node's replica set config uses buildIndexes:false, then do not attempt to commit an
+    // index that would have never been started.
+    if (!repl::ReplicationCoordinator::get(opCtx)->buildsIndexes()) {
+        return;
+    }
+
     uassert(31417,
             str::stream()
                 << "No commit timestamp set while applying commitIndexBuild operation. Build UUID: "

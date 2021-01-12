@@ -299,7 +299,6 @@ boost::optional<CommitQuorumOptions> parseAndGetCommitQuorum(OperationContext* o
                 (IndexBuildProtocol::kTwoPhase == protocol && commitQuorumEnabled));
         CommitQuorumOptions commitQuorum;
         uassertStatusOK(commitQuorum.parse(cmdObj.getField(kCommitQuorumFieldName)));
-        uassertStatusOK(replCoord->checkIfCommitQuorumCanBeSatisfied(commitQuorum));
         return commitQuorum;
     }
 
@@ -531,6 +530,9 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
         ? IndexBuildProtocol::kTwoPhase
         : IndexBuildProtocol::kSinglePhase;
     auto commitQuorum = parseAndGetCommitQuorum(opCtx, protocol, cmdObj);
+    if (commitQuorum) {
+        uassertStatusOK(replCoord->checkIfCommitQuorumCanBeSatisfied(*commitQuorum));
+    }
 
     Status validateTTL = validateTTLOptions(opCtx, cmdObj);
     uassertStatusOK(validateTTL);

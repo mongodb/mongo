@@ -748,10 +748,10 @@ public:
         const;
 
     /**
-     * Checks if the 'commitQuorum' can be satisifed by the current replica set config. Returns true
-     * if it can be satisfied.
+     * Checks if the 'commitQuorum' can be satisifed by the current replica set config. Returns an
+     * OK Status if it can be satisfied, and an error otherwise.
      */
-    bool checkIfCommitQuorumCanBeSatisfied(const CommitQuorumOptions& commitQuorum) const;
+    Status checkIfCommitQuorumCanBeSatisfied(const CommitQuorumOptions& commitQuorum) const;
 
     /**
      * Returns nullptr if there is no primary, or the MemberConfig* for the current primary.

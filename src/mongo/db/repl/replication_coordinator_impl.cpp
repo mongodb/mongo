@@ -4399,13 +4399,7 @@ Status ReplicationCoordinatorImpl::_checkIfCommitQuorumCanBeSatisfied(
 
     // We need to ensure that the 'commitQuorum' can be satisfied by all the members of this
     // replica set.
-    bool commitQuorumCanBeSatisfied = _topCoord->checkIfCommitQuorumCanBeSatisfied(commitQuorum);
-    if (!commitQuorumCanBeSatisfied) {
-        return Status(ErrorCodes::UnsatisfiableCommitQuorum,
-                      str::stream() << "Commit quorum cannot be satisfied with the current replica "
-                                    << "set configuration");
-    }
-    return Status::OK();
+    return _topCoord->checkIfCommitQuorumCanBeSatisfied(commitQuorum);
 }
 
 WriteConcernOptions ReplicationCoordinatorImpl::getGetLastErrorDefault() {
