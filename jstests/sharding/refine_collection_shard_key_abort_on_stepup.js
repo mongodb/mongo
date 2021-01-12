@@ -17,6 +17,24 @@ load("jstests/libs/fail_point_util.js");
 load('jstests/libs/parallel_shell_helpers.js');
 load("jstests/replsets/rslib.js");
 
+// On the config server the lastApplied optime can go past the atClusterTime timestamp due to pings
+// made on collection config.mongos or config.lockping by the distributed lock pinger thread and
+// sharding uptime reporter thread. Hence, it will not write the no-op oplog entry on the config
+// server as part of waiting for read concern.
+// For more deterministic testing of no-op writes to the oplog, disable pinger threads from reaching
+// out to the config server.
+const failpointParams = {
+    setParameter: {"failpoint.disableReplSetDistLockManager": "{mode: 'alwaysOn'}"}
+};
+
+// The ShardingUptimeReporter only exists on mongos.
+const shardingUptimeFailpointName = jsTestOptions().mongosBinVersion == 'last-lts'
+    ? "failpoint.disableShardingUptimeReporterPeriodicThread"
+    : "failpoint.disableShardingUptimeReporting";
+const mongosFailpointParams = {
+    setParameter: {[shardingUptimeFailpointName]: "{mode: 'alwaysOn'}"}
+};
+
 const st = new ShardingTest({
     shards: 1,
     mongos: 1,
@@ -26,9 +44,12 @@ const st = new ShardingTest({
             setParameter: {
                 // Ensure transactions have multiple oplog entries.
                 maxNumberOfTransactionOperationsInSingleOplogEntry: 1,
-                bgSyncOplogFetcherBatchSize: 1
+                bgSyncOplogFetcherBatchSize: 1,
+                "failpoint.disableReplSetDistLockManager": "{mode: 'alwaysOn'}"
             }
-        }
+        },
+        rsOptions: failpointParams,
+        mongosOptions: mongosFailpointParams
     }
 });
 jsTestLog("Reconfig CSRS to have stable primary");
