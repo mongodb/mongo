@@ -145,7 +145,9 @@ public:
         /*
          * Blocks the thread until the tenant oplog applier applied data past the given 'donorTs'
          * in an interruptible mode. Returns the majority applied donor optime which may be greater
-         * or equal to given 'donorTs'. Throws exception on error.
+         * or equal to given 'donorTs'. If the recipient's logical clock has not yet reached the
+         * 'donorTs', advance the recipient's logical clock to 'donorTs' and guarantee durability by
+         * applying a noop write. Throws exception on error.
          */
         OpTime waitUntilTimestampIsMajorityCommitted(OperationContext* opCtx,
                                                      const Timestamp& donorTs) const;

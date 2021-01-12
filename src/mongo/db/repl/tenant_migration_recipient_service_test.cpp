@@ -2797,6 +2797,62 @@ TEST_F(TenantMigrationRecipientServiceTest,
     ASSERT_OK(instance->getCompletionFuture().getNoThrow());
 }
 
+TEST_F(TenantMigrationRecipientServiceTest, WaitUntilTimestampIsMajorityCommitted) {
+    const UUID migrationUUID = UUID::gen();
+    const OpTime topOfOplogOpTime(Timestamp(5, 1), 1);
+
+    MockReplicaSet replSet("donorSet", 3, true /* hasPrimary */, true /* dollarPrefixHosts */);
+    insertTopOfOplog(&replSet, topOfOplogOpTime);
+
+    TenantMigrationRecipientDocument initialStateDocument(
+        migrationUUID,
+        replSet.getConnectionString(),
+        "tenantA",
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
+
+    // Skip the cloners in this test, so we provide an empty list of databases.
+    MockRemoteDBServer* const _donorServer =
+        mongo::MockConnRegistry::get()->getMockRemoteDBServer(replSet.getPrimary());
+    _donorServer->setCommandReply("listDatabases", makeListDatabasesResponse({}));
+    _donorServer->setCommandReply("find", makeFindResponse());
+
+    auto opCtx = makeOperationContext();
+    std::shared_ptr<TenantMigrationRecipientService::Instance> instance;
+    {
+        FailPointEnableBlock fp("pauseBeforeRunTenantMigrationRecipientInstance");
+        // Create and start the instance.
+        instance = TenantMigrationRecipientService::Instance::getOrCreate(
+            opCtx.get(), _service, initialStateDocument.toBSON());
+        ASSERT(instance.get());
+        instance->setCreateOplogFetcherFn_forTest(std::make_unique<CreateOplogFetcherMockFn>());
+    }
+
+    instance->waitUntilMigrationReachesConsistentState(opCtx.get());
+    checkStateDocPersisted(opCtx.get(), instance.get());
+
+    // Simulate recipient receiving a donor timestamp.
+    auto newTimestamp =
+        ReplicationCoordinator::get(getServiceContext())->getMyLastAppliedOpTime().getTimestamp() +
+        1;
+    const OpTime newOpTime(
+        newTimestamp,
+        ReplicationCoordinator::get(getServiceContext())->getMyLastAppliedOpTime().getTerm());
+
+    instance->waitUntilTimestampIsMajorityCommitted(opCtx.get(), newTimestamp);
+
+    auto lastAppliedOpTime =
+        ReplicationCoordinator::get(getServiceContext())->getMyLastAppliedOpTime();
+    ASSERT_GTE(lastAppliedOpTime, newOpTime);
+
+    DBDirectClient client(opCtx.get());
+    auto oplogBSON =
+        client.findOne(NamespaceString::kRsOplogNamespace.ns(), lastAppliedOpTime.asQuery());
+
+    ASSERT_FALSE(oplogBSON.isEmpty());
+    ASSERT_EQ(oplogBSON["o"]["msg"].String(), "Noop write for recipientSyncData");
+}
+
 #endif
 }  // namespace repl
 }  // namespace mongo

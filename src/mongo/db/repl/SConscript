@@ -1315,6 +1315,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/read_preference',
+        '$BUILD_DIR/mongo/db/vector_clock_mutable',
         'primary_only_service',
         'tenant_migration_utils',
     ],

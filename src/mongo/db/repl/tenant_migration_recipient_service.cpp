@@ -55,6 +55,7 @@
 #include "mongo/db/repl/tenant_migration_state_machine_gen.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/session_txn_record_gen.h"
+#include "mongo/db/vector_clock_mutable.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -347,9 +348,24 @@ OpTime TenantMigrationRecipientService::Instance::waitUntilTimestampIsMajorityCo
     };
     auto donorRecipientOpTimePair = getWaitOpTimeFuture().get(opCtx);
 
-    // Wait for the read recipient optime to be majority committed.
+    // We want to guarantee that the recipient logical clock has advanced to at least the donor
+    // timestamp before returning success for recipientSyncData by doing a majority committed noop
+    // write after ticking the recipient clock to the donor timestamp.
+    // Note: tickClusterTimeTo() will not tick the recipient clock backwards in time.
+    VectorClockMutable::get(opCtx)->tickClusterTimeTo(LogicalTime(donorTs));
+
+    BSONObj result;
+    DBDirectClient client(opCtx);
+    client.runCommand("NamespaceString::kAdminDb",
+                      BSON("appendOplogNote" << 1 << "data"
+                                             << BSON("msg"
+                                                     << "Noop write for recipientSyncData")),
+                      result);
+    uassertStatusOK(getStatusFromCommandResult(result));
+
+    // Wait for the noop write optime to be majority committed.
     WaitForMajorityService::get(opCtx->getServiceContext())
-        .waitUntilMajority(donorRecipientOpTimePair.recipientOpTime)
+        .waitUntilMajority(repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp())
         .get(opCtx);
     return donorRecipientOpTimePair.donorOpTime;
 }
