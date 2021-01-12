@@ -448,7 +448,7 @@ std::int64_t FlowControl::_approximateOpsBetween(Timestamp prevTs, Timestamp cur
             prevApplied = std::get<1>(sample);
         }
 
-        if (currApplied == -1 && currTs.asULL() <= std::get<0>(sample)) {
+        if (currTs.asULL() <= std::get<0>(sample)) {
             currApplied = std::get<1>(sample);
             break;
         }
