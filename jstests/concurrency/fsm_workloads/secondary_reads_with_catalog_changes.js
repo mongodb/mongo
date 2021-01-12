@@ -71,6 +71,9 @@ var $config = extendWorkload($config, function($config, $super) {
             const res = db[this.collName].dropIndex({x: 1});
             if (res.ok === 1) {
                 assertWhenOwnColl.commandWorked(res);
+                // Always rebuild the index because reader threads will retry until the index
+                // exists.
+                this.buildIndex(db, {x: 1});
             } else {
                 assertWhenOwnColl.commandFailedWithCode(res, [
                     ErrorCodes.IndexNotFound,
