@@ -32,10 +32,13 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/timeseries/bucket_catalog.h"
+#include "mongo/db/views/view_catalog.h"
 #include "mongo/logv2/log.h"
 
 #include "mongo/db/stats/storage_stats.h"
@@ -59,10 +62,17 @@ Status appendCollectionStorageStats(OperationContext* opCtx,
     bool verbose = param["verbose"].trueValue();
     bool waitForLock = !param.hasField("waitForLock") || param["waitForLock"].trueValue();
 
+    bool isTimeseries = false;
+    if (auto viewCatalog = DatabaseHolder::get(opCtx)->getViewCatalog(opCtx, nss.db())) {
+        if (auto viewDef = viewCatalog->lookupWithoutValidatingDurableViews(opCtx, nss.ns())) {
+            isTimeseries = viewDef->timeseries().has_value();
+        }
+    }
+
     boost::optional<AutoGetCollectionForReadCommand> autoColl;
     try {
         autoColl.emplace(opCtx,
-                         nss,
+                         isTimeseries ? nss.makeTimeseriesBucketsNamespace() : nss,
                          AutoGetCollectionViewMode::kViewsForbidden,
                          waitForLock ? Date_t::max() : Date_t::now());
     } catch (const ExceptionForCat<ErrorCategory::Interruption>&) {
@@ -89,11 +99,21 @@ Status appendCollectionStorageStats(OperationContext* opCtx,
 
     long long size = collection->dataSize(opCtx) / scale;
     result->appendNumber("size", size);
-    long long numRecords = collection->numRecords(opCtx);
-    result->appendNumber("count", numRecords);
 
-    if (numRecords)
-        result->append("avgObjSize", collection->averageObjectSize(opCtx));
+    long long numRecords = collection->numRecords(opCtx);
+    if (isTimeseries) {
+        result->append("bucketsNs", nss.makeTimeseriesBucketsNamespace().ns());
+        result->appendNumber("bucketCount", numRecords);
+        if (numRecords) {
+            result->append("avgBucketSize", collection->averageObjectSize(opCtx));
+        }
+        BucketCatalog::get(opCtx).appendExecutionStats(nss, result);
+    } else {
+        result->appendNumber("count", numRecords);
+        if (numRecords) {
+            result->append("avgObjSize", collection->averageObjectSize(opCtx));
+        }
+    }
 
     const RecordStore* recordStore = collection->getRecordStore();
     auto storageSize =

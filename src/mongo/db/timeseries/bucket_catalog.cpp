@@ -94,11 +94,14 @@ BucketCatalog::InsertResult BucketCatalog::insert(OperationContext* opCtx,
         return bucketId;
     };
 
+    auto& stats = _executionStats[ns];
+
     auto it = _bucketIds.find(key);
     if (it == _bucketIds.end()) {
         // A bucket for this namespace and metadata pair does not yet exist.
         it = _bucketIds.insert({std::move(key), createNewBucketId()}).first;
         _orderedBuckets.insert({ns, it->first.second, it->second});
+        stats.numBucketsOpenedDueToMetadata++;
     }
 
     _idleBuckets.erase(it->second);
@@ -109,11 +112,28 @@ BucketCatalog::InsertResult BucketCatalog::insert(OperationContext* opCtx,
     bucket->calculateBucketFieldsAndSizeChange(
         doc, options.getMetaField(), &newFieldNamesToBeInserted, &sizeToBeAdded);
 
-    auto bucketTime = it->second.asDateT();
-    if (!bucket->ns.isEmpty() &&
-        (bucket->numMeasurements == kTimeseriesBucketMaxCount ||
-         bucket->size + sizeToBeAdded > kTimeseriesBucketMaxSizeBytes ||
-         time - bucketTime >= kTimeseriesBucketMaxTimeRange || time < bucketTime)) {
+    auto isBucketFull = [&]() {
+        if (bucket->numMeasurements == kTimeseriesBucketMaxCount) {
+            stats.numBucketsClosedDueToCount++;
+            return true;
+        }
+        if (bucket->size + sizeToBeAdded > kTimeseriesBucketMaxSizeBytes) {
+            stats.numBucketsClosedDueToSize++;
+            return true;
+        }
+        auto bucketTime = it->second.asDateT();
+        if (time - bucketTime >= kTimeseriesBucketMaxTimeRange) {
+            stats.numBucketsClosedDueToTimeForward++;
+            return true;
+        }
+        if (time < bucketTime) {
+            stats.numBucketsClosedDueToTimeBackward++;
+            return true;
+        }
+        return false;
+    };
+
+    if (!bucket->ns.isEmpty() && isBucketFull()) {
         // The bucket is full, so create a new one.
         bucket->full = true;
         it->second = createNewBucketId();
@@ -167,12 +187,16 @@ BucketCatalog::CommitData BucketCatalog::commit(const OID& bucketId,
     std::vector<BSONObj> measurements;
     bucket.measurementsToBeInserted.swap(measurements);
 
+    auto& stats = _executionStats[bucket.ns];
+    stats.numMeasurementsCommitted += measurements.size();
+
     // Inform waiters that their measurements have been committed.
     for (uint16_t i = 0; i < bucket.numPendingCommitMeasurements; i++) {
         auto it = bucket.promises.find(i + bucket.numCommittedMeasurements);
         if (it != bucket.promises.end()) {
             it->second.emplaceValue(*previousCommitInfo);
             bucket.promises.erase(it);
+            stats.numWaits++;
         }
     }
 
@@ -205,6 +229,13 @@ BucketCatalog::CommitData BucketCatalog::commit(const OID& bucketId,
         } else if (--bucket.numWriters == 0) {
             _idleBuckets.insert(bucketId);
         }
+    } else {
+        stats.numCommits++;
+        if (bucket.numCommittedMeasurements == 0) {
+            stats.numBucketInserts++;
+        } else {
+            stats.numBucketUpdates++;
+        }
     }
 
     return data;
@@ -219,16 +250,42 @@ void BucketCatalog::clear(const NamespaceString& ns) {
 
     for (auto it = _orderedBuckets.lower_bound({ns, {}, {}});
          it != _orderedBuckets.end() && shouldClear(std::get<NamespaceString>(*it));) {
-        auto& bucketId = std::get<OID>(*it);
+        const auto& bucketId = std::get<OID>(*it);
+        const auto& bucketNs = std::get<NamespaceString>(*it);
         _buckets.erase(bucketId);
         _idleBuckets.erase(bucketId);
-        _bucketIds.erase({std::get<NamespaceString>(*it), std::get<BucketMetadata>(*it)});
+        _bucketIds.erase({bucketNs, std::get<BucketMetadata>(*it)});
+        _executionStats.erase(bucketNs);
         it = _orderedBuckets.erase(it);
     }
 }
 
 void BucketCatalog::clear(StringData dbName) {
     clear(NamespaceString(dbName, ""));
+}
+
+void BucketCatalog::appendExecutionStats(const NamespaceString& ns, BSONObjBuilder* builder) const {
+    stdx::lock_guard lk(_mutex);
+
+    auto it = _executionStats.find(ns);
+    const auto& stats = it == _executionStats.end() ? ExecutionStats() : it->second;
+
+    builder->appendNumber("numBucketInserts", stats.numBucketInserts);
+    builder->appendNumber("numBucketUpdates", stats.numBucketUpdates);
+    builder->appendNumber("numBucketsOpenedDueToMetadata", stats.numBucketsOpenedDueToMetadata);
+    builder->appendNumber("numBucketsClosedDueToCount", stats.numBucketsClosedDueToCount);
+    builder->appendNumber("numBucketsClosedDueToSize", stats.numBucketsClosedDueToSize);
+    builder->appendNumber("numBucketsClosedDueToTimeForward",
+                          stats.numBucketsClosedDueToTimeForward);
+    builder->appendNumber("numBucketsClosedDueToTimeBackward",
+                          stats.numBucketsClosedDueToTimeBackward);
+    builder->appendNumber("numCommits", stats.numCommits);
+    builder->appendNumber("numWaits", stats.numWaits);
+    builder->appendNumber("numMeasurementsCommitted", stats.numMeasurementsCommitted);
+    if (stats.numCommits) {
+        builder->appendNumber("avgNumMeasurementsPerCommit",
+                              stats.numMeasurementsCommitted / stats.numCommits);
+    }
 }
 
 bool BucketCatalog::BucketMetadata::operator<(const BucketMetadata& other) const {

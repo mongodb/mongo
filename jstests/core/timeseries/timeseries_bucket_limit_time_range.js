@@ -101,6 +101,11 @@ const runTest = function(numDocsPerInsert) {
               bucketDocs[1].control.max[timeFieldName],
               'invalid control.max for time in second bucket: ' + tojson(bucketDocs[1].control));
 
+    const stats = assert.commandWorked(coll.stats());
+    assert.eq(stats.numBucketsClosedDueToTimeForward,
+              1,
+              'invalid numBucketsClosedDueToTimeForward in collStats: ' + tojson(stats));
+
     assert(coll.drop());
 };
 

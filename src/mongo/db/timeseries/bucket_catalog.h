@@ -107,6 +107,11 @@ public:
      */
     void clear(StringData dbName);
 
+    /**
+     * Appends the execution stats for the given namespace to the builder.
+     */
+    void appendExecutionStats(const NamespaceString& ns, BSONObjBuilder* builder) const;
+
 private:
     struct BucketMetadata {
         bool operator<(const BucketMetadata& other) const;
@@ -232,6 +237,19 @@ private:
                                                 uint32_t* sizeToBeAdded) const;
     };
 
+    struct ExecutionStats {
+        long long numBucketInserts = 0;
+        long long numBucketUpdates = 0;
+        long long numBucketsOpenedDueToMetadata = 0;
+        long long numBucketsClosedDueToCount = 0;
+        long long numBucketsClosedDueToSize = 0;
+        long long numBucketsClosedDueToTimeForward = 0;
+        long long numBucketsClosedDueToTimeBackward = 0;
+        long long numCommits = 0;
+        long long numWaits = 0;
+        long long numMeasurementsCommitted = 0;
+    };
+
     mutable Mutex _mutex = MONGO_MAKE_LATCH("BucketCatalog");
 
     // All buckets currently in the catalog, including buckets which are full but not yet committed.
@@ -245,5 +263,8 @@ private:
 
     // Buckets that do not have any writers.
     std::set<OID> _idleBuckets;
+
+    // Per-collection execution stats.
+    stdx::unordered_map<NamespaceString, ExecutionStats> _executionStats;
 };
 }  // namespace mongo

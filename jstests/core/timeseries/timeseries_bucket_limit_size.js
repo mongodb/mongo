@@ -90,6 +90,11 @@ const runTest = function(numDocsPerInsert) {
     assert.eq(largeValue,
               bucketDocs[1].control.max.x,
               'invalid control.max for x in second bucket: ' + tojson(bucketDocs[1].control));
+
+    const stats = assert.commandWorked(coll.stats());
+    assert.eq(stats.numBucketsClosedDueToSize,
+              1,
+              'invalid numBucketsClosedDueToSize in collStats: ' + tojson(stats));
 };
 
 runTest(1);

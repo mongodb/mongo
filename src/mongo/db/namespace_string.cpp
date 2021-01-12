@@ -298,8 +298,7 @@ bool NamespaceString::isTimeseriesBucketsCollection() const {
 }
 
 NamespaceString NamespaceString::makeTimeseriesBucketsNamespace() const {
-    auto bucketsColl = kTimeseriesBucketsCollectionPrefix.toString() + coll();
-    return {db(), bucketsColl};
+    return {db(), kTimeseriesBucketsCollectionPrefix.toString() + coll()};
 }
 
 bool NamespaceString::isReplicated() const {
