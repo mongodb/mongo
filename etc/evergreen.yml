@@ -5615,14 +5615,15 @@ tasks:
       resmoke_jobs_max: 1
 
 - <<: *task_template
-  name: concurrency_replication_causal_consistency
+- name: concurrency_replication_causal_consistency_gen
   tags: ["concurrency", "repl", "large"]
   commands:
-  - func: "do setup"
-  - func: "run tests"
+  - func: "generate resmoke tasks"
     vars:
-      resmoke_args: --suites=concurrency_replication_causal_consistency --storageEngine=wiredTiger
+      resmoke_args: "--storageEngine=wiredTiger"
       resmoke_jobs_max: 1
+      fallback_num_sub_suites: 3
+      use_large_distro: true
 
 - <<: *task_template
   name: concurrency_replication_multi_stmt_txn
@@ -5675,54 +5676,56 @@ tasks:
       resmoke_args: --suites=concurrency_replication_wiredtiger_cursor_sweeps --storageEngine=wiredTiger
       resmoke_jobs_max: 1
 
-- <<: *task_template
-  name: concurrency_sharded_replication
+- name: concurrency_sharded_replication_gen
   tags: ["concurrency", "common", "read_concern_maj", "large"]
   commands:
-  - func: "do setup"
-  - func: "run tests"
+  - func: "generate resmoke tasks"
     vars:
-      resmoke_args: --suites=concurrency_sharded_replication --storageEngine=wiredTiger
+      resmoke_args: --storageEngine=wiredTiger
+      fallback_num_sub_suites: 3
+      use_large_distro: "true"
       resmoke_jobs_max: 1
 
-- <<: *task_template
-  name: concurrency_sharded_replication_with_balancer
+- name: concurrency_sharded_replication_with_balancer_gen
   tags: ["concurrency", "common", "read_concern_maj", "large"]
   commands:
-  - func: "do setup"
-  - func: "run tests"
+  - func: "generate resmoke tasks"
     vars:
-      resmoke_args: --suites=concurrency_sharded_replication_with_balancer --storageEngine=wiredTiger
+      resmoke_args: --storageEngine=wiredTiger
+      fallback_num_sub_suites: 3
+      use_large_distro: "true"
       resmoke_jobs_max: 1
 
-- <<: *task_template
-  name: concurrency_sharded_replication_no_txns
+- name: concurrency_sharded_replication_no_txns_gen
   tags: ["concurrency", "no_txns", "large"]
   commands:
-  - func: "do setup"
-  - func: "run tests"
+  - func: "generate resmoke tasks"
     vars:
-      resmoke_args: --suites=concurrency_sharded_replication --excludeWithAnyTags=uses_transactions --storageEngine=wiredTiger
+      suite: concurrency_sharded_replication
+      resmoke_args: --excludeWithAnyTags=uses_transactions --storageEngine=wiredTiger"
+      fallback_num_sub_suites: 3
+      use_large_distro: "true"
       resmoke_jobs_max: 1
 
-- <<: *task_template
-  name: concurrency_sharded_replication_no_txns_with_balancer
+- name: concurrency_sharded_replication_no_txns_with_balancer_gen
   tags: ["concurrency", "no_txns", "large"]
   commands:
-  - func: "do setup"
-  - func: "run tests"
+  - func: "generate resmoke tasks"
     vars:
-      resmoke_args: --suites=concurrency_sharded_replication_with_balancer --excludeWithAnyTags=uses_transactions --storageEngine=wiredTiger
+      suite: concurrency_sharded_replication_with_balancer
+      resmoke_args: "--excludeWithAnyTags=uses_transactions --storageEngine=wiredTiger"
+      fallback_num_sub_suites: 3
+      use_large_distro: "true"
       resmoke_jobs_max: 1
 
-- <<: *task_template
-  name: concurrency_sharded_clusterwide_ops_add_remove_shards
+- name: concurrency_sharded_clusterwide_ops_add_remove_shards_gen
   tags: ["concurrency", "common", "read_concern_maj", "large"]
   commands:
-  - func: "do setup"
-  - func: "run tests"
+  - func: "generate resmoke tasks"
     vars:
-      resmoke_args: --suites=concurrency_sharded_clusterwide_ops_add_remove_shards --storageEngine=wiredTiger
+      resmoke_args: --storageEngine=wiredTiger
+      fallback_num_sub_suites: 3
+      use_large_distro: "true"
       resmoke_jobs_max: 1
 
 - name: concurrency_sharded_causal_consistency_gen
@@ -5735,34 +5738,34 @@ tasks:
       use_large_distro: "true"
       resmoke_jobs_max: 1
 
-- <<: *task_template
-  name: concurrency_sharded_causal_consistency_and_balancer
+- name: concurrency_sharded_causal_consistency_and_balancer_gen
   tags: ["concurrency", "large"]
   commands:
-  - func: "do setup"
-  - func: "run tests"
+  - func: "generate resmoke tasks"
     vars:
-      resmoke_args: --suites=concurrency_sharded_causal_consistency_and_balancer --storageEngine=wiredTiger
+      resmoke_args: --storageEngine=wiredTiger
+      fallback_num_sub_suites: 3
+      use_large_distro: "true"
       resmoke_jobs_max: 1
 
-- <<: *task_template
-  name: concurrency_sharded_with_stepdowns
+- name: concurrency_sharded_with_stepdowns_gen
   tags: ["concurrency", "stepdowns", "large"]
   commands:
-  - func: "do setup"
-  - func: "run tests"
+  - func: "generate resmoke tasks"
     vars:
-      resmoke_args: --suites=concurrency_sharded_with_stepdowns --storageEngine=wiredTiger
+      resmoke_args: --storageEngine=wiredTiger
+      fallback_num_sub_suites: 3
+      use_large_distro: "true"
       resmoke_jobs_max: 1
 
-- <<: *task_template
-  name: concurrency_sharded_with_stepdowns_and_balancer
+- name: concurrency_sharded_with_stepdowns_and_balancer_gen
   tags: ["concurrency", "stepdowns", "large"]
   commands:
-  - func: "do setup"
-  - func: "run tests"
+  - func: "generate resmoke tasks"
     vars:
-      resmoke_args: --suites=concurrency_sharded_with_stepdowns_and_balancer --storageEngine=wiredTiger
+      resmoke_args: --storageEngine=wiredTiger
+      fallback_num_sub_suites: 3
+      use_large_distro: "true"
       resmoke_jobs_max: 1
 
 - <<: *task_template
@@ -5785,55 +5788,55 @@ tasks:
       resmoke_args: --suites=concurrency_sharded_kill_primary_with_balancer --storageEngine=wiredTiger
       resmoke_jobs_max: 1
 
-- <<: *task_template
-  name: concurrency_sharded_multi_stmt_txn
+- name: concurrency_sharded_multi_stmt_txn_gen
   tags: ["concurrency", "large"]
   commands:
-  - func: "do setup"
-  - func: "run tests"
+  - func: "generate resmoke tasks"
     vars:
-      resmoke_args: --suites=concurrency_sharded_multi_stmt_txn --storageEngine=wiredTiger
+      use_large_distro: "true"
+      resmoke_args: "--storageEngine=wiredTiger"
       resmoke_jobs_max: 1
+      fallback_num_sub_suites: 3
 
-- <<: *task_template
-  name: concurrency_sharded_multi_stmt_txn_with_balancer
+- name: concurrency_sharded_multi_stmt_txn_with_balancer_gen
   tags: ["concurrency", "large"]
   commands:
-  - func: "do setup"
-  - func: "run tests"
+  - func: "generate resmoke tasks"
     vars:
-      resmoke_args: --suites=concurrency_sharded_multi_stmt_txn_with_balancer --storageEngine=wiredTiger
+      use_large_distro: "true"
+      resmoke_args: "--storageEngine=wiredTiger"
       resmoke_jobs_max: 1
+      fallback_num_sub_suites: 3
 
-- <<: *task_template
-  name: concurrency_sharded_local_read_write_multi_stmt_txn
+- name: concurrency_sharded_local_read_write_multi_stmt_txn_gen
   tags: ["concurrency", "large"]
   commands:
-  - func: "do setup"
-  - func: "run tests"
+  - func: "generate resmoke tasks"
     vars:
-      resmoke_args: --suites=concurrency_sharded_local_read_write_multi_stmt_txn --storageEngine=wiredTiger
+      use_large_distro: "true"
+      resmoke_args: "--storageEngine=wiredTiger"
       resmoke_jobs_max: 1
+      fallback_num_sub_suites: 3
 
-- <<: *task_template
-  name: concurrency_sharded_local_read_write_multi_stmt_txn_with_balancer
+- name: concurrency_sharded_local_read_write_multi_stmt_txn_with_balancer_gen
   tags: ["concurrency", "large"]
   commands:
-  - func: "do setup"
-  - func: "run tests"
+  - func: "generate resmoke tasks"
     vars:
-      resmoke_args: --suites=concurrency_sharded_local_read_write_multi_stmt_txn_with_balancer --storageEngine=wiredTiger
+      use_large_distro: "true"
+      resmoke_args: "--storageEngine=wiredTiger"
       resmoke_jobs_max: 1
+      fallback_num_sub_suites: 3
 
-- <<: *task_template
-  name: concurrency_sharded_multi_stmt_txn_with_stepdowns
+- name: concurrency_sharded_multi_stmt_txn_with_stepdowns_gen
   tags: ["concurrency", "stepdowns", "large"]
   commands:
-  - func: "do setup"
-  - func: "run tests"
+  - func: "generate resmoke tasks"
     vars:
-      resmoke_args: --suites=concurrency_sharded_multi_stmt_txn_with_stepdowns --storageEngine=wiredTiger
+      use_large_distro: "true"
+      resmoke_args: "--storageEngine=wiredTiger"
       resmoke_jobs_max: 1
+      fallback_num_sub_suites: 3
 
 - <<: *task_template
   name: concurrency_sharded_multi_stmt_txn_terminate_primary
@@ -7385,9 +7388,7 @@ buildvariants:
   - name: .concurrency .common !.kill_terminate
     distros:
       - rhel62-large
-  - name: concurrency_replication_causal_consistency
-    distros:
-      - rhel62-large
+  - name: concurrency_replication_causal_consistency_gen
 
 - &linux-64-debug-template
   name: linux-64-debug
@@ -7505,9 +7506,7 @@ buildvariants:
   - name: .auth !.audit !.multiversion
   - name: .misc_js
   - name: .concurrency .common
-  - name: concurrency_replication_causal_consistency
-    distros:
-      - ubuntu1804-build
+  - name: concurrency_replication_causal_consistency_gen
   - name: disk_wiredtiger
   - name: free_monitoring
   - name: .jscore .common
@@ -7612,9 +7611,7 @@ buildvariants:
   - name: causally_consistent_jscore_txns_passthrough
   - name: .misc_js
   - name: .concurrency .common
-  - name: concurrency_replication_causal_consistency
-    distros:
-      - ubuntu1604-build
+  - name: concurrency_replication_causal_consistency_gen
   - name: disk_wiredtiger
   - name: free_monitoring
   - name: .jepsen
@@ -7679,7 +7676,7 @@ buildvariants:
   - name: causally_consistent_jscore_txns_passthrough
   - name: .misc_js
   - name: .concurrency .common
-  - name: concurrency_replication_causal_consistency
+  - name: concurrency_replication_causal_consistency_gen
   - name: fle
   - name: .jscore .common !.auth
   - name: .jstestfuzz .common
@@ -7727,7 +7724,7 @@ buildvariants:
   - name: causally_consistent_jscore_txns_passthrough
   - name: .misc_js
   - name: .concurrency .common
-  - name: concurrency_replication_causal_consistency
+  - name: concurrency_replication_causal_consistency_gen
   - name: fle
   - name: .jscore .common !.auth
   - name: .jstestfuzz .common
@@ -7809,7 +7806,7 @@ buildvariants:
   - name: causally_consistent_jscore_txns_passthrough
   - name: .misc_js
   - name: .concurrency .common
-  - name: concurrency_replication_causal_consistency
+  - name: concurrency_replication_causal_consistency_gen
     #- name: concurrency_sharded_replication_local_read_write_multi_stmt_txn # Removed until SERVER-38499 is resolved.
     #- name: concurrency_sharded_replication_local_read_write_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
     #- name: concurrency_sharded_replication_multi_stmt_txn # Removed until SERVER-38499 is resolved.
@@ -7866,7 +7863,7 @@ buildvariants:
   - name: causally_consistent_jscore_txns_passthrough
   - name: .misc_js
   - name: .concurrency .common
-  - name: concurrency_replication_causal_consistency
+  - name: concurrency_replication_causal_consistency_gen
   - name: .encrypt
   - name: .integration !.audit
     distros:
@@ -7965,6 +7962,7 @@ buildvariants:
     tooltags: "ssl"
     build_mongoreplay: true
     virtualenv: /opt/mongodbtoolchain/v3/bin/virtualenv
+    large_distro_name: amazon1-2018-build
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -7975,9 +7973,7 @@ buildvariants:
   - name: causally_consistent_jscore_txns_passthrough
   - name: .misc_js
   - name: .concurrency .common
-  - name: concurrency_replication_causal_consistency
-    distros:
-      - amazon1-2018-build
+  - name: concurrency_replication_causal_consistency_gen
   - name: disk_wiredtiger
   - name: free_monitoring
   - name: .jscore .common
@@ -8142,6 +8138,7 @@ buildvariants:
     scons_cache_scope: shared
     tooltags: "ssl"
     build_mongoreplay: true
+    large_distro_name: amazon2-build
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -8152,9 +8149,7 @@ buildvariants:
   - name: causally_consistent_jscore_txns_passthrough
   - name: .misc_js
   - name: .concurrency .common
-  - name: concurrency_replication_causal_consistency
-    distros:
-      - amazon2-build
+  - name: concurrency_replication_causal_consistency_gen
   - name: disk_wiredtiger
   - name: free_monitoring
   - name: .jscore .common
@@ -8201,6 +8196,7 @@ buildvariants:
     scons_cache_scope: shared
     tooltags: "ssl"
     build_mongoreplay: true
+    large_distro_name: amazon2-arm64-large
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -8211,9 +8207,7 @@ buildvariants:
   - name: causally_consistent_jscore_txns_passthrough
   - name: .misc_js
   - name: .concurrency .common
-  - name: concurrency_replication_causal_consistency
-    distros:
-      - amazon2-arm64-large
+  - name: concurrency_replication_causal_consistency_gen
   - name: disk_wiredtiger
   - name: free_monitoring
   - name: .jscore .common
@@ -8443,6 +8437,7 @@ buildvariants:
         --mongosSetParameters="adaptiveServiceExecutorReservedThreads: 8"
     tooltags: "ssl sasl gssapi"
     build_mongoreplay: false
+    large_distro_name: windows-64-vs2017-compile
   tasks:
   - name: compile_TG
     distros:
@@ -8485,9 +8480,7 @@ buildvariants:
   - name: auth_audit_gen
   - name: causally_consistent_jscore_txns_passthrough
   - name: .concurrency .common
-  - name: concurrency_replication_causal_consistency
-    distros:
-    - windows-64-vs2017-compile
+  - name: concurrency_replication_causal_consistency_gen
   - name: .jscore .common !.decimal !.compat !.sharding
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
@@ -8539,9 +8532,7 @@ buildvariants:
   - name: causally_consistent_jscore_txns_passthrough
   - name: .misc_js
   - name: .concurrency .common !.txn
-  - name: concurrency_replication_causal_consistency
-    distros:
-    - windows-64-vs2017-compile
+  - name: concurrency_replication_causal_consistency_gen
   - name: disk_wiredtiger
   - name: free_monitoring
   - name: .jscore .common !.auth
@@ -8913,36 +8904,16 @@ buildvariants:
   - name: change_streams_whole_cluster_passthrough
   - name: concurrency_replication
   - name: concurrency_replication_multi_stmt_txn
-  - name: concurrency_sharded_replication
-    distros:
-    - rhel62-large
-  - name: concurrency_sharded_replication_with_balancer
-    distros:
-    - rhel62-large
-  - name: concurrency_sharded_clusterwide_ops_add_remove_shards
-    distros:
-    - rhel62-large
-  - name: concurrency_sharded_local_read_write_multi_stmt_txn
-    distros:
-    - rhel62-large
-  - name: concurrency_sharded_local_read_write_multi_stmt_txn_with_balancer
-    distros:
-    - rhel62-large
-  - name: concurrency_sharded_multi_stmt_txn
-    distros:
-    - rhel62-large
-  - name: concurrency_sharded_multi_stmt_txn_with_balancer
-    distros:
-    - rhel62-large
-  - name: concurrency_sharded_multi_stmt_txn_with_stepdowns
-    distros:
-    - rhel62-large
-  - name: concurrency_sharded_with_stepdowns
-    distros:
-    - rhel62-large
-  - name: concurrency_sharded_with_stepdowns_and_balancer
-    distros:
-    - rhel62-large
+  - name: concurrency_sharded_replication_gen
+  - name: concurrency_sharded_replication_with_balancer_gen
+  - name: concurrency_sharded_clusterwide_ops_add_remove_shards_gen
+  - name: concurrency_sharded_local_read_write_multi_stmt_txn_gen
+  - name: concurrency_sharded_local_read_write_multi_stmt_txn_with_balancer_gen
+  - name: concurrency_sharded_multi_stmt_txn_gen
+  - name: concurrency_sharded_multi_stmt_txn_with_balancer_gen
+  - name: concurrency_sharded_multi_stmt_txn_with_stepdowns_gen
+  - name: concurrency_sharded_with_stepdowns_gen
+  - name: concurrency_sharded_with_stepdowns_and_balancer_gen
   - name: jsCore
   - name: jsCore_txns
   - name: logical_session_cache_replication_100ms_refresh_jscore_passthrough_gen
@@ -9041,12 +9012,8 @@ buildvariants:
   - name: .concurrency .common !.read_concern_maj
   - name: .concurrency .no_txns
   - name: concurrency_sharded_causal_consistency_gen
-  - name: concurrency_sharded_causal_consistency_and_balancer
-    distros:
-    - rhel62-large
-  - name: concurrency_replication_causal_consistency
-    distros:
-    - rhel62-large
+  - name: concurrency_sharded_causal_consistency_and_balancer_gen
+  - name: concurrency_replication_causal_consistency_gen
   - name: disk_wiredtiger
   - name: .encrypt
   - name: .integration
@@ -9422,6 +9389,7 @@ buildvariants:
     scons_cache_scope: shared
     tooltags: "ssl"
     build_mongoreplay: true
+    large_distro_name: rhel62-large
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -9435,9 +9403,7 @@ buildvariants:
   - name: .concurrency .common .large
     distros:
       - rhel62-large
-  - name: concurrency_replication_causal_consistency
-    distros:
-      - rhel62-large
+  - name: concurrency_replication_causal_consistency_gen
   - name: disk_wiredtiger
   - name: free_monitoring
   - name: .jscore .common
@@ -9477,6 +9443,7 @@ buildvariants:
     scons_cache_scope: shared
     tooltags: "ssl"
     build_mongoreplay: true
+    large_distro_name: rhel70
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -9488,9 +9455,7 @@ buildvariants:
   - name: .concurrency .common
     distros:
       - rhel70
-  - name: concurrency_replication_causal_consistency
-    distros:
-      - rhel70
+  - name: concurrency_replication_causal_consistency_gen
   - name: disk_wiredtiger
   - name: free_monitoring
   - name: .jscore .common
@@ -9531,6 +9496,7 @@ buildvariants:
     scons_cache_scope: shared
     tooltags: "ssl"
     build_mongoreplay: true
+    large_distro_name: rhel80-build
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -9542,9 +9508,7 @@ buildvariants:
   - name: .concurrency .common
     distros:
       - rhel80-build
-  - name: concurrency_replication_causal_consistency
-    distros:
-      - rhel80-build
+  - name: concurrency_replication_causal_consistency_gen
   - name: disk_wiredtiger
   - name: free_monitoring
   - name: .jscore .common
@@ -9616,7 +9580,7 @@ buildvariants:
   - name: causally_consistent_jscore_txns_passthrough
   - name: .misc_js
   - name: .concurrency .common
-  - name: concurrency_replication_causal_consistency
+  - name: concurrency_replication_causal_consistency_gen
   - name: .encrypt
   - name: .integration !.audit
     distros:
@@ -9675,7 +9639,7 @@ buildvariants:
   - name: causally_consistent_jscore_txns_passthrough
   - name: .misc_js
   - name: .concurrency .common
-  - name: concurrency_replication_causal_consistency
+  - name: concurrency_replication_causal_consistency_gen
   - name: .encrypt
   - name: .integration !.audit
     distros:
@@ -9733,7 +9697,7 @@ buildvariants:
   - name: causally_consistent_jscore_txns_passthrough
   - name: .misc_js
   - name: .concurrency .common
-  - name: concurrency_replication_causal_consistency
+  - name: concurrency_replication_causal_consistency_gen
   - name: .encrypt
   - name: .integration !.audit
     distros:
@@ -9786,7 +9750,7 @@ buildvariants:
   - name: causally_consistent_jscore_txns_passthrough
   - name: .misc_js
   - name: .concurrency .common
-  - name: concurrency_replication_causal_consistency
+  - name: concurrency_replication_causal_consistency_gen
   - name: .encrypt
   - name: .integration !.audit !.sharded
     distros:
@@ -9987,7 +9951,7 @@ buildvariants:
   - name: causally_consistent_jscore_txns_passthrough
   - name: .misc_js
   - name: .concurrency .common
-  - name: concurrency_replication_causal_consistency
+  - name: concurrency_replication_causal_consistency_gen
   - name: .encrypt
   - name: .integration !.audit
     distros:
@@ -10030,6 +9994,7 @@ buildvariants:
     scons_cache_scope: shared
     tooltags: "ssl"
     build_mongoreplay: true
+    large_distro_name: suse12-build
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -10043,9 +10008,7 @@ buildvariants:
   - name: .concurrency .common .large
     distros:
       - suse12-build
-  - name: concurrency_replication_causal_consistency
-    distros:
-      - suse12-build
+  - name: concurrency_replication_causal_consistency_gen
   - name: disk_wiredtiger
   - name: free_monitoring
   - name: .jscore .common !.decimal
@@ -10127,6 +10090,7 @@ buildvariants:
     scons_cache_scope: shared
     tooltags: "ssl"
     build_mongoreplay: true
+    large_distro_name: suse15-build
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -10137,9 +10101,7 @@ buildvariants:
   - name: causally_consistent_jscore_txns_passthrough
   - name: .misc_js
   - name: .concurrency .common
-  - name: concurrency_replication_causal_consistency
-    distros:
-      - suse15-build
+  - name: concurrency_replication_causal_consistency_gen
   - name: disk_wiredtiger
   - name: free_monitoring
   - name: .jscore .common !.decimal
@@ -10298,9 +10260,7 @@ buildvariants:
   - name: causally_consistent_jscore_txns_passthrough
   - name: .misc_js
   - name: .concurrency .common
-  - name: concurrency_replication_causal_consistency
-    distros:
-      - debian92-build
+  - name: concurrency_replication_causal_consistency_gen
   - name: disk_wiredtiger
   - name: free_monitoring
   - name: .jscore .common !.decimal
@@ -10356,9 +10316,7 @@ buildvariants:
   - name: causally_consistent_jscore_txns_passthrough
   - name: .misc_js
   - name: .concurrency .common
-  - name: concurrency_replication_causal_consistency
-    distros:
-      - debian10-build
+  - name: concurrency_replication_causal_consistency_gen
   - name: disk_wiredtiger
   - name: free_monitoring
   - name: .jscore .common !.decimal
@@ -10477,6 +10435,7 @@ buildvariants:
     scons_cache_scope: shared
     tooltags: ""
     build_mongoreplay: true
+    large_distro_name: rhel62-large
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -10489,12 +10448,10 @@ buildvariants:
     distros:
     - rhel62-large  # Some workloads require a lot of memory, use a bigger machine for this suite.
   - name: concurrency_replication
-  - name: concurrency_replication_causal_consistency
-    distros:
-    - rhel62-large
-  - name: concurrency_sharded_replication
-  - name: concurrency_sharded_replication_with_balancer
-  - name: concurrency_sharded_clusterwide_ops_add_remove_shards
+  - name: concurrency_replication_causal_consistency_gen
+  - name: concurrency_sharded_replication_gen
+  - name: concurrency_sharded_replication_with_balancer_gen
+  - name: concurrency_sharded_clusterwide_ops_add_remove_shards_gen
   - name: concurrency_simultaneous
   - name: concurrency_simultaneous_replication
     distros:
@@ -10539,7 +10496,7 @@ buildvariants:
   - name: .misc_js
   - name: .concurrency .common !.repl
   - name: concurrency_replication
-  - name: concurrency_replication_causal_consistency
+  - name: concurrency_replication_causal_consistency_gen
   - name: .integration !.audit
     distros:
     - rhel71-power8-build
@@ -10571,6 +10528,7 @@ buildvariants:
     test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_journaling
     tooltags: "ssl sasl gssapi"
     build_mongoreplay: true
+    large_distro_name: rhel72-zeries-build
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -10583,9 +10541,7 @@ buildvariants:
   - name: .concurrency .common
     distros:
     - rhel72-zseries-build
-  - name: concurrency_replication_causal_consistency
-    distros:
-    - rhel72-zseries-build
+  - name: concurrency_replication_causal_consistency_gen
   - name: .integration !.audit
     distros:
     - rhel72-zseries-build
@@ -10802,6 +10758,7 @@ buildvariants:
         --mongodSetParameters="adaptiveServiceExecutorReservedThreads: 8" \
         --mongosSetParameters="adaptiveServiceExecutorReservedThreads: 8"
     scons_cache_scope: shared
+    large_distro_name: ubuntu1804-build
   tasks:
   - name: compile_all_run_unittests_TG
   - name: .aggregation !.no_async
@@ -10810,7 +10767,7 @@ buildvariants:
   - name: .causally_consistent !.wo_snapshot
   - name: .misc_js
   - name: .concurrency .common !.kill_terminate
-  - name: concurrency_replication_causal_consistency
+  - name: concurrency_replication_causal_consistency_gen
   - name: disk_wiredtiger
   - name: .encrypt
   - name: .integration !.audit
