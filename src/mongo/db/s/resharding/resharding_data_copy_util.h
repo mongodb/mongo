@@ -29,6 +29,10 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
+
+#include "mongo/db/catalog/collection_catalog.h"
+
 namespace mongo {
 
 class NamespaceString;
@@ -37,6 +41,17 @@ class OperationContext;
 namespace resharding::data_copy {
 
 void ensureCollectionExists(OperationContext* opCtx, const NamespaceString& nss);
+
+/**
+ * Drops the specified collection or returns without error if the collection has already been
+ * dropped. A particular incarnation of the collection can be dropped by specifying its UUID.
+ *
+ * This functions assumes the collection being dropped doesn't have any two-phase index builds
+ * active on it.
+ */
+void ensureCollectionDropped(OperationContext* opCtx,
+                             const NamespaceString& nss,
+                             const boost::optional<CollectionUUID>& uuid = boost::none);
 
 }  // namespace resharding::data_copy
 }  // namespace mongo

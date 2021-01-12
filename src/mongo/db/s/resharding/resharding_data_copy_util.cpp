@@ -40,6 +40,7 @@
 namespace mongo::resharding::data_copy {
 
 void ensureCollectionExists(OperationContext* opCtx, const NamespaceString& nss) {
+    invariant(!opCtx->lockState()->isLocked());
     invariant(!opCtx->lockState()->inAWriteUnitOfWork());
 
     writeConflictRetry(opCtx, "resharding::data_copy::ensureCollectionExists", nss.toString(), [&] {
@@ -52,6 +53,27 @@ void ensureCollectionExists(OperationContext* opCtx, const NamespaceString& nss)
         coll.ensureDbExists()->createCollection(opCtx, nss);
         wuow.commit();
     });
+}
+
+void ensureCollectionDropped(OperationContext* opCtx,
+                             const NamespaceString& nss,
+                             const boost::optional<CollectionUUID>& uuid) {
+    invariant(!opCtx->lockState()->isLocked());
+    invariant(!opCtx->lockState()->inAWriteUnitOfWork());
+
+    writeConflictRetry(
+        opCtx, "resharding::data_copy::ensureCollectionDropped", nss.toString(), [&] {
+            AutoGetCollection coll(opCtx, nss, MODE_X);
+            if (!coll || (uuid && coll->uuid() != uuid)) {
+                // If the collection doesn't exist or exists with a different UUID, then the
+                // requested collection has been dropped already.
+                return;
+            }
+
+            WriteUnitOfWork wuow(opCtx);
+            uassertStatusOK(coll.getDb()->dropCollectionEvenIfSystem(opCtx, nss));
+            wuow.commit();
+        });
 }
 
 }  // namespace mongo::resharding::data_copy

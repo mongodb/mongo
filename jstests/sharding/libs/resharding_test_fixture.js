@@ -380,7 +380,7 @@ var ReshardingTest = class {
         }
 
         for (let donor of this._donorShards()) {
-            this._checkDonorPostState(donor);
+            this._checkDonorPostState(donor, expectedErrorCode);
         }
     }
 
@@ -461,7 +461,25 @@ var ReshardingTest = class {
     }
 
     /** @private */
-    _checkDonorPostState(donor) {
+    _checkDonorPostState(donor, expectedErrorCode) {
+        const collInfo = donor.getCollection(this._ns).exists();
+        const isAlsoRecipient = this._recipientShards().includes(donor);
+        if (expectedErrorCode === ErrorCodes.OK && !isAlsoRecipient) {
+            assert.eq(
+                null,
+                collInfo,
+                `collection exists on ${donor.shardName} despite resharding having succeeded`);
+        } else if (expectedErrorCode !== ErrorCodes.OK) {
+            assert.neq(
+                null,
+                collInfo,
+                `collection doesn't exist on ${donor.shardName} despite resharding having failed`);
+            assert.eq(
+                this._sourceCollectionUUID,
+                collInfo.info.uuid,
+                `collection UUID changed on ${donor.shardName} despite resharding having failed`);
+        }
+
         const localDonorOpsNs = "config.localReshardingOperations.donor";
         let res;
         assert.soon(

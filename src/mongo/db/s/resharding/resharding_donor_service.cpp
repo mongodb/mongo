@@ -42,6 +42,7 @@
 #include "mongo/db/op_observer.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/s/resharding/resharding_data_copy_util.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding_util.h"
 #include "mongo/db/s/sharding_state.h"
@@ -408,30 +409,10 @@ void ReshardingDonorService::DonorStateMachine::_dropOriginalCollection() {
         return;
     }
 
-    auto origNssRoutingInfo =
-        getShardedCollectionRoutingInfoWithRefreshAndFlush(_donorDoc.getNss());
-    auto currentCollectionUUID =
-        getCollectionUUIDFromChunkManger(_donorDoc.getNss(), origNssRoutingInfo);
-
-    if (currentCollectionUUID == _donorDoc.getExistingUUID()) {
-        DBDirectClient client(cc().makeOperationContext().get());
-        BSONObj dropResult;
-        if (!client.dropCollection(
-                _donorDoc.getNss().toString(), WriteConcerns::kMajorityWriteConcern, &dropResult)) {
-            auto dropStatus = getStatusFromCommandResult(dropResult);
-            if (dropStatus != ErrorCodes::NamespaceNotFound) {
-                uassertStatusOK(dropStatus);
-            }
-        }
-    } else {
-        uassert(ErrorCodes::InvalidUUID,
-                "Expected collection {} to have either the original UUID {} or the resharding UUID"
-                " {}, but the collection instead has UUID {}"_format(
-                    _donorDoc.getNss().toString(),
-                    _donorDoc.getExistingUUID().toString(),
-                    _donorDoc.get_id().toString(),
-                    currentCollectionUUID.toString()),
-                currentCollectionUUID == _donorDoc.get_id());
+    {
+        auto opCtx = cc().makeOperationContext();
+        resharding::data_copy::ensureCollectionDropped(
+            opCtx.get(), _donorDoc.getNss(), _donorDoc.getExistingUUID());
     }
 
     _transitionStateAndUpdateCoordinator(DonorStateEnum::kDone);
