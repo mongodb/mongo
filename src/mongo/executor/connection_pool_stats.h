@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/s/sharding_task_executor_pool_controller.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/net/hostandport.h"
 
@@ -66,6 +67,7 @@ struct ConnectionPoolStats {
     size_t totalAvailable = 0u;
     size_t totalCreated = 0u;
     size_t totalRefreshing = 0u;
+    boost::optional<ShardingTaskExecutorPoolController::MatchingStrategy> strategy;
 
     using StatsByHost = std::map<HostAndPort, ConnectionStatsPer>;
 

@@ -173,6 +173,8 @@ selector:
   - jstests/sharding/ismaster.js
   # Uses the enableShardedIndexConsistencyCheck parameter which does not exist on 4.0.
   - jstests/sharding/kill_pinned_cursor.js
+  # Uses the ShardingTaskExecutorPoolReplicaSetMatching parameter which does not exist on 4.0.
+  - jstests/sharding/sharding_task_executor_pool_matching_policy.js
 executor:
   config:
     shell_options:

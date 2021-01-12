@@ -186,6 +186,8 @@ public:
         return "LimitController"_sd;
     }
 
+    void updateConnectionPoolStats(ConnectionPoolStats* cps) const override {}
+
 protected:
     struct PoolData {
         HostAndPort host;
@@ -557,6 +559,7 @@ SemiFuture<ConnectionPool::ConnectionHandle> ConnectionPool::get(const HostAndPo
 void ConnectionPool::appendConnectionStats(ConnectionPoolStats* stats) const {
     stdx::lock_guard lk(_mutex);
 
+    _controller->updateConnectionPoolStats(stats);
     for (const auto& kv : _pools) {
         HostAndPort host = kv.first;
 

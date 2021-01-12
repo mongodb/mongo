@@ -92,6 +92,8 @@ all:
     test_file: jstests/sharding/change_stream_empty_apply_ops.js
   - ticket: SERVER-43904
     test_file: jstests/replsets/election_handoff_skips_unelectable_nodes.js
+  - ticket: SERVER-53394
+    test_file: jstests/sharding/sharding_task_executor_pool_matching_policy.js
 
 # Tests that should only be excluded from particular suites should be listed under that suite.
 suites:

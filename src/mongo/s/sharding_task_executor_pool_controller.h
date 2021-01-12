@@ -77,6 +77,19 @@ public:
         kMatchBusiestNode,
     };
 
+    friend StringData matchingStrategyToString(MatchingStrategy strategy) {
+        switch (strategy) {
+            case ShardingTaskExecutorPoolController::MatchingStrategy::kMatchPrimaryNode:
+                return "matchPrimaryNode"_sd;
+            case ShardingTaskExecutorPoolController::MatchingStrategy::kMatchBusiestNode:
+                return "matchBusiestNode"_sd;
+            case ShardingTaskExecutorPoolController::MatchingStrategy::kDisabled:
+                return "disabled"_sd;
+            default:
+                MONGO_UNREACHABLE;
+        }
+    }
+
     class Parameters {
     public:
         AtomicWord<int> minConnections;
@@ -128,6 +141,8 @@ public:
     StringData name() const override {
         return "ShardingTaskExecutorPoolController"_sd;
     }
+
+    void updateConnectionPoolStats(executor::ConnectionPoolStats* cps) const override;
 
 private:
     void _addGroup(WithLock, const ReplicaSetChangeNotifier::State& state);
