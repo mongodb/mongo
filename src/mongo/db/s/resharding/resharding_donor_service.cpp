@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kShardingMigration
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
 
 #include "mongo/db/s/resharding/resharding_donor_service.h"
 
@@ -426,13 +426,15 @@ void ReshardingDonorService::DonorStateMachine::_transitionState(
     emplaceMinFetchTimestampIfExists(replacementDoc, minFetchTimestamp);
     emplaceAbortReasonIfExists(replacementDoc, abortReason);
 
+    _updateDonorDocument(std::move(replacementDoc));
+
     LOGV2_INFO(5279505,
-               "Transition resharding donor state",
+               "Transitioned resharding donor state",
                "newState"_attr = DonorState_serializer(replacementDoc.getState()),
                "oldState"_attr = DonorState_serializer(_donorDoc.getState()),
+               "ns"_attr = _donorDoc.getNss(),
+               "collectionUUID"_attr = _donorDoc.getExistingUUID(),
                "reshardingUUID"_attr = _donorDoc.get_id());
-
-    _updateDonorDocument(std::move(replacementDoc));
 }
 
 void ReshardingDonorService::DonorStateMachine::_transitionStateAndUpdateCoordinator(

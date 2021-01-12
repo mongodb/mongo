@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
 
 #include "mongo/db/s/resharding/resharding_coordinator_service.h"
 
@@ -857,6 +857,21 @@ ReshardingCoordinatorService::ReshardingCoordinator::~ReshardingCoordinator() {
     invariant(_completionPromise.getFuture().isReady());
 }
 
+void ReshardingCoordinatorService::ReshardingCoordinator::installCoordinatorDoc(
+    const ReshardingCoordinatorDocument& doc) {
+    invariant(doc.get_id() == _coordinatorDoc.get_id());
+
+    LOGV2_INFO(5343001,
+               "Transitioned resharding coordinator state",
+               "newState"_attr = CoordinatorState_serializer(doc.getState()),
+               "oldState"_attr = CoordinatorState_serializer(_coordinatorDoc.getState()),
+               "ns"_attr = doc.getNss(),
+               "collectionUUID"_attr = doc.getCommonReshardingMetadata().getExistingUUID(),
+               "reshardingUUID"_attr = doc.get_id());
+
+    _coordinatorDoc = doc;
+}
+
 SemiFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::run(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancelationToken& token) noexcept {
@@ -945,7 +960,7 @@ void ReshardingCoordinatorService::ReshardingCoordinator::_insertCoordDocAndChan
     updatedCoordinatorDoc.setState(CoordinatorStateEnum::kInitializing);
 
     resharding::insertCoordDocAndChangeOrigCollEntry(opCtx.get(), updatedCoordinatorDoc);
-    _coordinatorDoc = updatedCoordinatorDoc;
+    installCoordinatorDoc(updatedCoordinatorDoc);
 }
 
 void ReshardingCoordinatorService::ReshardingCoordinator::
@@ -977,7 +992,7 @@ void ReshardingCoordinatorService::ReshardingCoordinator::
                                                       updatedCoordinatorDoc,
                                                       std::move(shardsAndChunks.initialChunks),
                                                       std::move(zones));
-    _coordinatorDoc = updatedCoordinatorDoc;
+    installCoordinatorDoc(updatedCoordinatorDoc);
 };
 
 ExecutorFuture<void>
@@ -1070,7 +1085,7 @@ Future<void> ReshardingCoordinatorService::ReshardingCoordinator::_persistDecisi
         opCtx.get(), updatedCoordinatorDoc, newCollectionEpoch, newCollectionTimestamp);
 
     // Update the in memory state
-    _coordinatorDoc = updatedCoordinatorDoc;
+    installCoordinatorDoc(updatedCoordinatorDoc);
 
     return Status::OK();
 };
@@ -1115,7 +1130,7 @@ void ReshardingCoordinatorService::ReshardingCoordinator::
                                                                            updatedCoordinatorDoc);
 
     // Update in-memory coordinator doc
-    _coordinatorDoc = updatedCoordinatorDoc;
+    installCoordinatorDoc(updatedCoordinatorDoc);
 }
 
 void ReshardingCoordinatorService::ReshardingCoordinator::_tellAllRecipientsToRefresh(

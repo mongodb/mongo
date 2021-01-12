@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kShardingMigration
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
 
 #include "mongo/db/s/resharding/resharding_recipient_service.h"
 
@@ -509,12 +509,6 @@ void ReshardingRecipientService::RecipientStateMachine::_transitionState(
     ReshardingRecipientDocument replacementDoc(_recipientDoc);
     replacementDoc.setState(endState);
 
-    LOGV2_INFO(5279506,
-               "Transition resharding recipient state",
-               "newState"_attr = RecipientState_serializer(replacementDoc.getState()),
-               "oldState"_attr = RecipientState_serializer(_recipientDoc.getState()),
-               "reshardingUUID"_attr = _recipientDoc.get_id());
-
     if (endState == RecipientStateEnum::kCreatingCollection) {
         _insertRecipientDocument(replacementDoc);
         return;
@@ -523,6 +517,14 @@ void ReshardingRecipientService::RecipientStateMachine::_transitionState(
     emplaceFetchTimestampIfExists(replacementDoc, std::move(fetchTimestamp));
     emplaceAbortReasonIfExists(replacementDoc, std::move(abortReason));
     _updateRecipientDocument(std::move(replacementDoc));
+
+    LOGV2_INFO(5279506,
+               "Transitioned resharding recipient state",
+               "newState"_attr = RecipientState_serializer(replacementDoc.getState()),
+               "oldState"_attr = RecipientState_serializer(_recipientDoc.getState()),
+               "ns"_attr = _recipientDoc.getNss(),
+               "collectionUUID"_attr = _recipientDoc.getExistingUUID(),
+               "reshardingUUID"_attr = _recipientDoc.get_id());
 }
 
 void ReshardingRecipientService::RecipientStateMachine::_transitionStateAndUpdateCoordinator(

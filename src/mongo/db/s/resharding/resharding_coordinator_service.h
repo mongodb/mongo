@@ -120,6 +120,11 @@ public:
     void interrupt(Status status) override;
 
     /**
+     * Replace in-memory representation of the CoordinatorDoc
+     */
+    void installCoordinatorDoc(const ReshardingCoordinatorDocument& doc);
+
+    /**
      * Returns a Future that will be resolved when all work associated with this Instance has
      * completed running.
      */
