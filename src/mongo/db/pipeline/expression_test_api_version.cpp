@@ -79,12 +79,12 @@ Value ExpressionTestApiVersion::serialize(bool explain) const {
 Value ExpressionTestApiVersion::evaluate(const Document& root, Variables* variables) const {
     APIParameters apiParams = getExpressionContext()->apiParameters;
 
-    if (apiParams.getAPIStrict() && _unstable) {
+    if (apiParams.getAPIStrict().value_or(false) && _unstable) {
         uasserted(ErrorCodes::APIStrictError,
                   "Provided apiStrict is true with an unstable command.");
     }
 
-    if (apiParams.getAPIDeprecationErrors() && _deprecated) {
+    if (apiParams.getAPIDeprecationErrors().value_or(false) && _deprecated) {
         uasserted(ErrorCodes::APIDeprecationError,
                   "Provided apiDeprecatedErrors is true with a deprecated command.");
     }

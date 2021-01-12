@@ -3,7 +3,13 @@
  * throws errors as expected.
  *
  * Tests which create views aren't expected to work when collections are implicitly sharded.
- * @tags: [requires_fcv_47, uses_api_parameters, assumes_unsharded_collection, sbe_incompatible]
+ * @tags: [
+ *   assumes_against_mongod_not_mongos,
+ *   assumes_unsharded_collection,
+ *   requires_fcv_47,
+ *   sbe_incompatible,
+ *   uses_api_parameters,
+ * ]
  */
 
 (function() {
@@ -112,4 +118,43 @@ assert.commandWorked(db[validatedCollName].runCommand({
     apiVersion: "1",
     apiDeprecationErrors: true
 }));
+
+// Test that API version parameters are inherited into the inner command of the explain command.
+function checkExplainInnerCommandGetsAPIVersionParameters(explainedCmd, errCode) {
+    let explainRes = db.runCommand(
+        {explain: explainedCmd, apiVersion: "1", apiDeprecationErrors: true, apiStrict: true});
+
+    assert(explainRes.hasOwnProperty('executionStats'), explainRes);
+    const execStats = explainRes['executionStats'];
+
+    // 'execStats' will return APIStrictError if the inner command gets the APIVersionParameters.
+    assert.eq(execStats['executionSuccess'], false, execStats);
+    assert.eq(execStats['errorCode'], errCode, execStats);
+
+    // If 'apiStrict: false' the inner aggregate command will execute successfully.
+    explainRes = db.runCommand({explain: explainedCmd, apiVersion: "1", apiStrict: false});
+    assert(explainRes.hasOwnProperty('executionStats'), explainRes);
+    assert.eq(explainRes['executionStats']['executionSuccess'], true, explainRes);
+}
+
+pipeline = [{$project: {v: {$_testApiVersion: {unstable: true}}}}];
+let aggCmd = {aggregate: collName, pipeline: pipeline, cursor: {}};
+checkExplainInnerCommandGetsAPIVersionParameters(aggCmd, ErrorCodes.APIStrictError);
+
+let findCmd = {find: collName, projection: {v: {$_testApiVersion: {unstable: true}}}};
+checkExplainInnerCommandGetsAPIVersionParameters(findCmd, ErrorCodes.APIStrictError);
+
+pipeline = [{$project: {v: {$_testApiVersion: {deprecated: true}}}}];
+aggCmd = {
+    aggregate: collName,
+    pipeline: pipeline,
+    cursor: {}
+};
+checkExplainInnerCommandGetsAPIVersionParameters(aggCmd, ErrorCodes.APIDeprecationError);
+
+findCmd = {
+    find: collName,
+    projection: {v: {$_testApiVersion: {deprecated: true}}}
+};
+checkExplainInnerCommandGetsAPIVersionParameters(findCmd, ErrorCodes.APIDeprecationError);
 })();
