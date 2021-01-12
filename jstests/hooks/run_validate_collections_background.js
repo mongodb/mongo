@@ -27,7 +27,7 @@ const topology = DiscoverTopology.findConnectedNodes(conn);
 const isIgnorableError = function ignorableError(codeName) {
     if (codeName == "NamespaceNotFound" || codeName == "Interrupted" ||
         codeName == "CommandNotSupportedOnView" || codeName == "InterruptedAtShutdown" ||
-        codeName == "InvalidViewDefinition") {
+        codeName == "InvalidViewDefinition" || codeName == "LockTimeout") {
         return true;
     }
     return false;

@@ -453,6 +453,15 @@ Status validate(OperationContext* opCtx,
         invariant(oldPrepareConflictBehavior == PrepareConflictBehavior::kEnforce);
     }
 
+    if (validateState.isBackground()) {
+        // Background validation will hold open a snapshot at a timestamp for a long period of time
+        // while yielding and reacquiring collection locks. This has the potential to deadlock with
+        // an index build that has just failed and is trying to write using the same timestamp we
+        // are using to read. Impose a generous maximum timeout to force validate to time out and
+        // allow the index build to make progress. See SERVER-53445.
+        opCtx->lockState()->setMaxLockTimeout(duration_cast<Milliseconds>(Seconds(30)));
+    }
+
     try {
         std::map<std::string, int64_t> numIndexKeysPerIndex;
         ValidateResultsMap indexNsResultsMap;
