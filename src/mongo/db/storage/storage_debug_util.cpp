@@ -130,7 +130,7 @@ void printCollectionAndIndexTableEntries(OperationContext* opCtx, const Namespac
 void printValidateResults(const ValidateResults& results) {
     BSONObjBuilder resultObj;
 
-    results.appendToResultObj(resultObj, /*debugging=*/true);
+    results.appendToResultObj(&resultObj, /*debugging=*/true);
 
     LOGV2(51812, "Results", "results"_attr = resultObj.done());
 }

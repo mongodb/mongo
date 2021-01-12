@@ -68,7 +68,7 @@ struct ValidateResults {
 
     // Takes a bool that indicates the context of the caller and a BSONObjBuilder to append with
     // validate results.
-    void appendToResultObj(BSONObjBuilder& resultObj, bool debugging) const;
+    void appendToResultObj(BSONObjBuilder* resultObj, bool debugging) const;
 };
 
 }  // namespace mongo

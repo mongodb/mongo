@@ -227,7 +227,7 @@ public:
             return CommandHelpers::appendCommandStatusNoThrow(result, status);
         }
 
-        validateResults.appendToResultObj(result, /*debugging=*/false);
+        validateResults.appendToResultObj(&result, /*debugging=*/false);
 
         if (!validateResults.valid) {
             result.append("advice",

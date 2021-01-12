@@ -31,28 +31,28 @@
 
 namespace mongo {
 
-void ValidateResults::appendToResultObj(BSONObjBuilder& resultObj, bool debugging) const {
-    resultObj.appendBool("valid", valid);
-    resultObj.appendBool("repaired", repaired);
+void ValidateResults::appendToResultObj(BSONObjBuilder* resultObj, bool debugging) const {
+    resultObj->appendBool("valid", valid);
+    resultObj->appendBool("repaired", repaired);
     if (readTimestamp) {
-        resultObj.append("readTimestamp", readTimestamp.get());
+        resultObj->append("readTimestamp", readTimestamp.get());
     }
-    resultObj.append("warnings", warnings);
-    resultObj.append("errors", errors);
-    resultObj.append("extraIndexEntries", extraIndexEntries);
-    resultObj.append("missingIndexEntries", missingIndexEntries);
+    resultObj->append("warnings", warnings);
+    resultObj->append("errors", errors);
+    resultObj->append("extraIndexEntries", extraIndexEntries);
+    resultObj->append("missingIndexEntries", missingIndexEntries);
 
     // Need to convert RecordId to int64_t to append to BSONObjBuilder
     BSONArrayBuilder builder;
     for (RecordId corruptRecord : corruptRecords) {
         builder.append(corruptRecord.repr());
     }
-    resultObj.append("corruptRecords", builder.done());
+    resultObj->append("corruptRecords", builder.arr());
 
     if (repaired || debugging) {
-        resultObj.appendNumber("numRemovedCorruptRecords", numRemovedCorruptRecords);
-        resultObj.appendNumber("numRemovedExtraIndexEntries", numRemovedExtraIndexEntries);
-        resultObj.appendNumber("numInsertedMissingIndexEntries", numInsertedMissingIndexEntries);
+        resultObj->appendNumber("numRemovedCorruptRecords", numRemovedCorruptRecords);
+        resultObj->appendNumber("numRemovedExtraIndexEntries", numRemovedExtraIndexEntries);
+        resultObj->appendNumber("numInsertedMissingIndexEntries", numInsertedMissingIndexEntries);
     }
 }
 }  // namespace mongo
