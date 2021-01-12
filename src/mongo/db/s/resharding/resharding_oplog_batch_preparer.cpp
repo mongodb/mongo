@@ -44,6 +44,35 @@
 
 namespace mongo {
 
+namespace {
+
+/**
+ * Return true if we need to update config.transactions collection for this oplog entry.
+ */
+bool shouldUpdateTxnTable(const repl::OplogEntry& op) {
+    if (op.getCommandType() == repl::OplogEntry::CommandType::kCommitTransaction ||
+        op.getCommandType() == repl::OplogEntry::CommandType::kAbortTransaction) {
+        return true;
+    }
+
+    if (!op.getSessionId()) {
+        return false;
+    }
+
+    if (!op.getTxnNumber()) {
+        return false;
+    }
+
+    if (op.getCommandType() == repl::OplogEntry::CommandType::kApplyOps) {
+        auto applyOpsInfo = repl::ApplyOpsCommandInfo::parse(op.getObject());
+        return !applyOpsInfo.getPrepare() && !applyOpsInfo.getPartialTxn();
+    }
+
+    return false;
+}
+
+}  // anonymous namespace
+
 using WriterVectors = ReshardingOplogBatchPreparer::WriterVectors;
 
 ReshardingOplogBatchPreparer::ReshardingOplogBatchPreparer(
@@ -130,38 +159,39 @@ WriterVectors ReshardingOplogBatchPreparer::makeSessionOpWriterVectors(
 
     LogicalSessionIdMap<SessionOpsList> sessionTracker;
 
+    auto updateSessionTracker = [&](OplogEntry* op) {
+        if (const auto& lsid = op->getSessionId()) {
+            uassert(4990700,
+                    str::stream() << "Missing txnNumber for oplog entry with lsid: "
+                                  << redact(op->toBSONForLogging()),
+                    op->getTxnNumber());
+
+            auto txnNumber = *op->getTxnNumber();
+
+            auto& retryableOpList = sessionTracker[*lsid];
+            if (txnNumber == retryableOpList.txnNum) {
+                retryableOpList.ops.emplace_back(op);
+            } else if (txnNumber > retryableOpList.txnNum) {
+                retryableOpList.ops = {op};
+                retryableOpList.txnNum = txnNumber;
+            } else {
+                uasserted(4990401,
+                          str::stream() << "Encountered out of order txnNumbers; batch had "
+                                        << redact(op->toBSONForLogging()) << " after "
+                                        << redact(retryableOpList.ops.back()->toBSONForLogging()));
+            }
+        }
+    };
+
     for (auto& op : batch) {
         if (op.isCrudOpType()) {
-            if (const auto& lsid = op.getSessionId()) {
-                uassert(4990700,
-                        str::stream() << "Missing txnNumber for oplog entry with lsid: "
-                                      << redact(op.toBSONForLogging()),
-                        op.getTxnNumber());
-
-                auto txnNumber = *op.getTxnNumber();
-
-                auto& retryableOpList = sessionTracker[*lsid];
-                if (txnNumber == retryableOpList.txnNum) {
-                    retryableOpList.ops.emplace_back(&op);
-                } else if (txnNumber > retryableOpList.txnNum) {
-                    retryableOpList.ops = {&op};
-                    retryableOpList.txnNum = txnNumber;
-                } else {
-                    uasserted(4990401,
-                              str::stream()
-                                  << "Encountered out of order txnNumbers; batch had "
-                                  << redact(op.toBSONForLogging()) << " after "
-                                  << redact(retryableOpList.ops.back()->toBSONForLogging()));
-                }
-            }
+            updateSessionTracker(&op);
         } else if (op.isCommand()) {
             throwIfUnsupportedCommandOp(op);
 
-            // TODO SERVER-49905: Replace ops and update txnNum for the following cases:
-            //   - a non-partialTxn:true, non-prepare:true applyOps entry = the final applyOps entry
-            //     from a non-prepared transaction,
-            //   - a commitTransaction oplog entry, or
-            //   - an abortTransaction oplog entry.
+            if (shouldUpdateTxnTable(op)) {
+                updateSessionTracker(&op);
+            }
         } else {
             invariant(repl::OpTypeEnum::kNoop == op.getOpType());
         }

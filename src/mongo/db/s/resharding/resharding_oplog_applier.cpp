@@ -120,7 +120,10 @@ Status insertOplogAndUpdateConfigForRetryable(OperationContext* opCtx,
 
     auto txnParticipant = TransactionParticipant::get(opCtx);
     uassert(4990400, "Failed to get transaction Participant", txnParticipant);
-    const auto stmtId = *oplog.getStatementId();
+
+    // If it's not a CRUD type, it's an oplog related to transaction, so convert it to
+    // incompleteHistory stmtId.
+    const auto stmtId = oplog.isCrudOpType() ? *oplog.getStatementId() : kIncompleteHistoryStmtId;
 
     try {
         txnParticipant.beginOrContinue(opCtx, txnNumber, boost::none, boost::none);
@@ -138,6 +141,8 @@ Status insertOplogAndUpdateConfigForRetryable(OperationContext* opCtx,
             // This can also occur when txnNum == activeTxnNum. This can only happen when (lsid,
             // txnNum) pair is reused. We are not going to update config.transactions and let the
             // retry error out on this shard for this case.
+            // This can also happen if we are trying to update config.transactions entry in which
+            // this node has already executed the transaction.
             return Status::OK();
         } else if (ex.code() == ErrorCodes::PreparedTransactionInProgress) {
             // TODO SERVER-53139 Change to not block here.
@@ -159,7 +164,12 @@ Status insertOplogAndUpdateConfigForRetryable(OperationContext* opCtx,
 
     auto rawOplogBSON = oplog.getEntry().toBSON();
     auto noOpOplog = uassertStatusOK(repl::MutableOplogEntry::parse(rawOplogBSON));
-    noOpOplog.setObject2(rawOplogBSON);
+
+    // We only need to store the original oplog details for retryable writes.
+    if (oplog.isCrudOpType()) {
+        noOpOplog.setObject2(rawOplogBSON);
+    }
+
     noOpOplog.setNss({});
     noOpOplog.setObject(BSON("$reshardingOplogApply" << 1));
 

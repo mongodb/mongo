@@ -79,6 +79,40 @@ protected:
         return {op.toBSON()};
     }
 
+    repl::OplogEntry makeApplyOps(BSONObj document,
+                                  bool isPrepare,
+                                  bool isPartial,
+                                  boost::optional<LogicalSessionId> lsid,
+                                  boost::optional<TxnNumber> txnNumber) {
+
+        std::vector<mongo::BSONObj> operations;
+        auto insertOp = repl::MutableOplogEntry::makeInsertOperation(
+            NamespaceString("foo.bar"), UUID::gen(), document);
+
+        BSONObjBuilder applyOpsBuilder;
+        applyOpsBuilder.append("applyOps", BSON_ARRAY(insertOp.toBSON()));
+
+        if (isPrepare) {
+            applyOpsBuilder.append(repl::ApplyOpsCommandInfoBase::kPrepareFieldName, true);
+        }
+
+        if (isPartial) {
+            applyOpsBuilder.append(repl::ApplyOpsCommandInfoBase::kPartialTxnFieldName, true);
+        }
+
+        repl::MutableOplogEntry op;
+        op.setOpType(repl::OpTypeEnum::kCommand);
+        op.setObject(applyOpsBuilder.obj());
+        op.setSessionId(std::move(lsid));
+        op.setTxnNumber(std::move(txnNumber));
+
+        // These are unused by ReshardingOplogBatchPreparer but required by IDL parsing.
+        op.setNss({});
+        op.setOpTimeAndWallTimeBase({{}, {}});
+
+        return {op.toBSON()};
+    }
+
     repl::OplogEntry makeCommandOp(BSONObj commandObj) {
         return makeCommandOp(std::move(commandObj), boost::none, boost::none);
     }
@@ -366,6 +400,79 @@ TEST_F(ReshardingOplogBatchPreparerTest, DiscardsNoops) {
     ASSERT_EQ(writerVectors.size(), kNumWriterVectors);
     ASSERT_EQ(writerVectors[0].size(), 0U);
     ASSERT_EQ(writerVectors[1].size(), 0U);
+}
+
+TEST_F(ReshardingOplogBatchPreparerTest, SessionWriteVectorsForApplyOpsWithoutTxnNumber) {
+    OplogBatch batch;
+    batch.emplace_back(makeApplyOps(BSON("_id" << 3), false, false, boost::none, boost::none));
+
+    auto writerVectors = _batchPreparer.makeSessionOpWriterVectors(batch);
+
+    for (const auto& writer : writerVectors) {
+        ASSERT_TRUE(writer.empty());
+    }
+}
+
+TEST_F(ReshardingOplogBatchPreparerTest, SessionWriteVectorsForSmallUnpreparedTxn) {
+    OplogBatch batch;
+    auto lsid = makeLogicalSessionIdForTest();
+
+    batch.emplace_back(makeApplyOps(BSON("_id" << 3), false, false, lsid, 2));
+
+    auto writerVectors = _batchPreparer.makeSessionOpWriterVectors(batch);
+    ASSERT_FALSE(writerVectors.empty());
+
+    auto writer = getNonEmptyWriterVector(writerVectors);
+    ASSERT_EQ(writer.size(), 1U);
+    ASSERT_EQ(writer[0]->getSessionId(), lsid);
+    ASSERT_EQ(*writer[0]->getTxnNumber(), 2);
+    ASSERT_TRUE(writer[0]->isForReshardingSessionApplication());
+}
+
+TEST_F(ReshardingOplogBatchPreparerTest, SessionWriteVectorsForCommittedTxn) {
+    OplogBatch batch;
+    auto lsid = makeLogicalSessionIdForTest();
+
+    batch.emplace_back(makeApplyOps(BSON("_id" << 3), true, false, lsid, 2));
+    batch.emplace_back(makeCommandOp(BSON("commitTransaction" << 1), lsid, 2));
+
+    auto writerVectors = _batchPreparer.makeSessionOpWriterVectors(batch);
+    ASSERT_FALSE(writerVectors.empty());
+
+    auto writer = getNonEmptyWriterVector(writerVectors);
+    ASSERT_EQ(writer.size(), 1U);
+    ASSERT_EQ(writer[0]->getSessionId(), lsid);
+    ASSERT_EQ(*writer[0]->getTxnNumber(), 2);
+    ASSERT_TRUE(writer[0]->isForReshardingSessionApplication());
+}
+
+TEST_F(ReshardingOplogBatchPreparerTest, SessionWriteVectorsForAbortedPreparedTxn) {
+    OplogBatch batch;
+    auto lsid = makeLogicalSessionIdForTest();
+
+    batch.emplace_back(makeCommandOp(BSON("abortTransaction" << 1), lsid, 2));
+
+    auto writerVectors = _batchPreparer.makeSessionOpWriterVectors(batch);
+    ASSERT_FALSE(writerVectors.empty());
+
+    auto writer = getNonEmptyWriterVector(writerVectors);
+    ASSERT_EQ(writer.size(), 1U);
+    ASSERT_EQ(writer[0]->getSessionId(), lsid);
+    ASSERT_EQ(*writer[0]->getTxnNumber(), 2);
+    ASSERT_TRUE(writer[0]->isForReshardingSessionApplication());
+}
+
+TEST_F(ReshardingOplogBatchPreparerTest, SessionWriteVectorsForPartialUnpreparedTxn) {
+    OplogBatch batch;
+    auto lsid = makeLogicalSessionIdForTest();
+
+    batch.emplace_back(makeApplyOps(BSON("_id" << 3), false, true, lsid, 2));
+
+    auto writerVectors = _batchPreparer.makeSessionOpWriterVectors(batch);
+
+    for (const auto& writer : writerVectors) {
+        ASSERT_TRUE(writer.empty());
+    }
 }
 
 }  // namespace
