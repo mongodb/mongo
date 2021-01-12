@@ -1239,7 +1239,10 @@ __txn_commit_timestamps_assert(WT_SESSION_IMPL *session)
     WT_TXN *txn;
     WT_TXN_OP *op;
     WT_UPDATE *upd;
-    wt_timestamp_t op_ts, prev_op_durable_ts, prev_op_ts;
+#ifdef HAVE_DIAGNOSTIC
+    wt_timestamp_t op_ts;
+#endif
+    wt_timestamp_t prev_op_durable_ts, prev_op_ts;
     u_int i;
     bool op_zero_ts, upd_zero_ts, used_ts;
 
@@ -1290,8 +1293,9 @@ __txn_commit_timestamps_assert(WT_SESSION_IMPL *session)
         else
             upd = op->u.op_upd;
 
+#ifdef HAVE_DIAGNOSTIC
         op_ts = upd->start_ts;
-
+#endif
         /*
          * Skip over any aborted update structures, internally created update structures or ones
          * from our own transaction.
@@ -1342,12 +1346,14 @@ __txn_commit_timestamps_assert(WT_SESSION_IMPL *session)
         if (op_zero_ts)
             continue;
 
+#ifdef HAVE_DIAGNOSTIC
         /*
          * Only if the update structure doesn't have a timestamp then use the one in the transaction
          * structure.
          */
         if (op_ts == WT_TS_NONE)
             op_ts = txn->commit_timestamp;
+#endif
         /*
          * Check based on the durable timestamp, but first ensure that it's a stronger check than
          * comparing commit timestamps would be.
