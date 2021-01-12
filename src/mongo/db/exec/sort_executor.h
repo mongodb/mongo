@@ -127,8 +127,6 @@ public:
             _sorter.reset(DocumentSorter::make(makeSortOptions(), Comparator(_sortPattern)));
         }
         _sorter->add(sortKey, data);
-
-        _stats.totalDataSizeBytes += data.memUsageForSorter();
     }
 
     /**
@@ -142,6 +140,7 @@ public:
         _output.reset(_sorter->done());
         _stats.keysSorted += _sorter->numSorted();
         _stats.spills += _sorter->numSpills();
+        _stats.totalDataSizeBytes += _sorter->totalDataSizeSorted();
         _sorter.reset();
     }
 

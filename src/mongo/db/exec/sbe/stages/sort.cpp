@@ -179,7 +179,6 @@ void SortStage::open(bool reOpen) {
             vals.reset(idx++, true, tag, val);
         }
 
-        // TODO SERVER-51815: count total mem usage for specificStats.
         _sorter->emplace(std::move(keys), std::move(vals));
 
         if (_tracker && _tracker->trackProgress<TrialRunTracker::kNumResults>(1)) {
@@ -197,6 +196,7 @@ void SortStage::open(bool reOpen) {
         }
     }
 
+    _specificStats.totalDataSizeBytes += _sorter->totalDataSizeSorted();
     _mergeIt.reset(_sorter->done());
     _specificStats.spills += _sorter->numSpills();
     _specificStats.keysSorted += _sorter->numSorted();
@@ -230,6 +230,7 @@ std::unique_ptr<PlanStageStats> SortStage::getStats(bool includeDebugInfo) const
 
     if (includeDebugInfo) {
         BSONObjBuilder bob;
+        bob.appendIntOrLL("memLimit", _specificStats.maxMemoryUsageBytes);
         bob.appendIntOrLL("totalDataSizeSorted", _specificStats.totalDataSizeBytes);
         bob.appendBool("usedDisk", _specificStats.spills > 0);
 

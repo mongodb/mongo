@@ -595,8 +595,9 @@ public:
 
         _data.emplace_back(key.getOwned(), val.getOwned());
 
-        _memUsed += key.memUsageForSorter();
-        _memUsed += val.memUsageForSorter();
+        auto memUsage = key.memUsageForSorter() + val.memUsageForSorter();
+        _memUsed += memUsage;
+        this->_totalDataSizeSorted += memUsage;
 
         if (_memUsed > this->_opts.maxMemoryUsageBytes)
             spill();
@@ -605,8 +606,9 @@ public:
     void emplace(Key&& key, Value&& val) override {
         invariant(!_done);
 
-        _memUsed += key.memUsageForSorter();
-        _memUsed += val.memUsageForSorter();
+        auto memUsage = key.memUsageForSorter() + val.memUsageForSorter();
+        _memUsed += memUsage;
+        this->_totalDataSizeSorted += memUsage;
 
         _data.emplace_back(std::move(key), std::move(val));
 
@@ -782,8 +784,9 @@ public:
 
             _data.emplace_back(contender.first.getOwned(), contender.second.getOwned());
 
-            _memUsed += key.memUsageForSorter();
-            _memUsed += val.memUsageForSorter();
+            auto memUsage = key.memUsageForSorter() + val.memUsageForSorter();
+            _memUsed += memUsage;
+            this->_totalDataSizeSorted += memUsage;
 
             if (_data.size() == this->_opts.limit)
                 std::make_heap(_data.begin(), _data.end(), less);
@@ -801,8 +804,9 @@ public:
 
         // Remove the old worst pair and insert the contender, adjusting _memUsed
 
-        _memUsed += key.memUsageForSorter();
-        _memUsed += val.memUsageForSorter();
+        auto memUsage = key.memUsageForSorter() + val.memUsageForSorter();
+        _memUsed += memUsage;
+        this->_totalDataSizeSorted += memUsage;
 
         _memUsed -= _data.front().first.memUsageForSorter();
         _memUsed -= _data.front().second.memUsageForSorter();

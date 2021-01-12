@@ -6,7 +6,6 @@
  * 'allowDiskUse' parameter.
  * @tags: [
  *   requires_find_command,
- *   sbe_incompatible,
  * ]
  */
 (function() {
@@ -28,6 +27,10 @@ assert.neq(null, conn, "mongod was unable to start up with options: " + tojson(o
 
 const testDb = conn.getDB("test");
 const collection = testDb.external_sort_find;
+const isSBEEnabled = (() => {
+    const getParam = testDb.adminCommand({getParameter: 1, featureFlagSBE: 1});
+    return getParam.hasOwnProperty("featureFlagSBE") && getParam.featureFlagSBE.value;
+})();
 
 // Construct a document that is just over 1 kB.
 const charToRepeat = "-";
@@ -51,8 +54,9 @@ function getSortStats(allowDiskUse) {
     if (allowDiskUse) {
         cursor = cursor.allowDiskUse();
     }
+    const stageName = isSBEEnabled ? "sort" : "SORT";
     const explain = cursor.explain("executionStats");
-    return getPlanStage(explain.executionStats.executionStages, "SORT");
+    return getPlanStage(explain.executionStats.executionStages, stageName);
 }
 
 // Explain should report that less than 100 kB of memory was used, and we did not spill to disk.
@@ -81,7 +85,13 @@ assert.eq(kNumDocsExceedingMemLimit,
 
 // Explain should report that the SORT stage failed if disk use is not allowed.
 sortStats = getSortStats(false);
-assert.eq(sortStats.failed, true);
+
+// SBE will not report the 'failed' field within sort stats.
+if (isSBEEnabled) {
+    assert(!sortStats.hasOwnProperty("failed"), sortStats);
+} else {
+    assert.eq(sortStats.failed, true, sortStats);
+}
 assert.eq(sortStats.usedDisk, false);
 assert.lt(sortStats.totalDataSizeSorted, kMaxMemoryUsageBytes);
 assert(!sortStats.inputStage.hasOwnProperty("failed"));
