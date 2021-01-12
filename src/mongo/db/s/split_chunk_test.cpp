@@ -34,7 +34,6 @@
 #include <boost/optional.hpp>
 
 #include "mongo/db/json.h"
-#include "mongo/db/s/dist_lock_manager_mock.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/db/s/sharding_initialization_mongod.h"
 #include "mongo/db/s/split_chunk.h"
@@ -97,12 +96,6 @@ public:
     }
 
     /**
-     * Tells the DistLockManagerMock instance to expect a lock, and logs the corresponding
-     * information.
-     */
-    void expectLock();
-
-    /**
      * Returns the mock response that correspond with particular requests. For example, dbResponse
      * returns a response for when a find-databases request occurs.
      *
@@ -162,16 +155,6 @@ void SplitChunkTest::setUpChunkVersions() {
         ChunkVersion(1, 1, _epoch), ChunkVersion(1, 2, _epoch), ChunkVersion(1, 3, _epoch)};
 }
 
-void SplitChunkTest::expectLock() {
-    dynamic_cast<DistLockManagerMock*>(distLock())
-        ->expectLock(
-            [this](StringData name, StringData whyMessage, Milliseconds) {
-                LOGV2(22105, "Lock name", "name"_attr = name);
-                LOGV2(22106, "Reason for lock", "reason"_attr = whyMessage);
-            },
-            Status::OK());
-}
-
 void SplitChunkTest::commitChunkSplitResponse(bool isOk) {
     onCommand([&](const RemoteCommandRequest& request) {
         return isOk ? BSON("ok" << 1) : BSON("ok" << 0);
@@ -220,8 +203,6 @@ TEST_F(SplitChunkTest, HashedKeyPatternNumberLongSplitKeys) {
         validSplitKeys.push_back(BSON("foo" << i));
     }
 
-    expectLock();
-
     // Call the splitChunk function asynchronously on a different thread, so that we do not block,
     // and so we can construct the mock responses to requests made by splitChunk below.
     auto future = launchAsync([&] {
@@ -265,8 +246,6 @@ TEST_F(SplitChunkTest, HashedKeyPatternIntegerSplitKeys) {
     std::vector<BSONObj> invalidSplitKeys{
         BSON("foo" << -1), BSON("foo" << 0), BSON("foo" << 1), BSON("foo" << 42)};
 
-    expectLock();
-
     // Call the splitChunk function asynchronously on a different thread, so that we do not block,
     // and so we can construct the mock responses to requests made by splitChunk below.
     auto future = launchAsync([&] {
@@ -302,8 +281,6 @@ TEST_F(SplitChunkTest, HashedKeyPatternDoubleSplitKeys) {
     // to be converted to NumberLong types.
     std::vector<BSONObj> invalidSplitKeys{
         BSON("foo" << 47.21230129), BSON("foo" << 1.0), BSON("foo" << 0.0), BSON("foo" << -0.001)};
-
-    expectLock();
 
     // Call the splitChunk function asynchronously on a different thread, so that we do not block,
     // and so we can construct the mock responses to requests made by splitChunk below.
@@ -347,8 +324,6 @@ TEST_F(SplitChunkTest, HashedKeyPatternStringSplitKeys) {
                                           BSON("foo"
                                                << "")};
 
-    expectLock();
-
     // Call the splitChunk function asynchronously on a different thread, so that we do not block,
     // and so we can construct the mock responses to requests made by splitChunk below.
     auto future = launchAsync([&] {
@@ -387,8 +362,6 @@ TEST_F(SplitChunkTest, ValidRangeKeyPatternSplitKeys) {
                                         BSON("foo"
                                              << ""),
                                         BSON("foo" << 3.1415926535)};
-
-    expectLock();
 
     // Call the splitChunk function asynchronously on a different thread, so that we do not block,
     // and so we can construct the mock responses to requests made by splitChunk below.
@@ -431,8 +404,6 @@ TEST_F(SplitChunkTest, SplitChunkWithNoErrors) {
     for (int i = 256; i < 1024; i += 256) {
         splitKeys.push_back(BSON("foo" << i));
     }
-
-    expectLock();
 
     // Call the splitChunk function asynchronously on a different thread, so that we do not block,
     // and so we can construct the mock responses to requests made by splitChunk below.
@@ -493,8 +464,6 @@ TEST_F(SplitChunkTest, AttemptSplitWithConfigsvrError) {
         splitKeys.push_back(BSON("foo" << i));
     }
 
-    expectLock();
-
     // Call the splitChunk function asynchronously on a different thread, so that we do not block,
     // and so we can construct the mock responses to requests made by splitChunk below.
     auto future = launchAsync([&] {
@@ -537,8 +506,6 @@ TEST_F(SplitChunkTest, AttemptSplitOnNoDatabases) {
         splitKeys.push_back(BSON("foo" << i));
     }
 
-    expectLock();
-
     // Call the splitChunk function asynchronously on a different thread, so that we do not block,
     // and so we can construct the mock responses to requests made by splitChunk below.
     auto future = launchAsync([&] {
@@ -570,8 +537,6 @@ TEST_F(SplitChunkTest, AttemptSplitOnNoCollections) {
     for (int i = 256; i < 1024; i += 256) {
         splitKeys.push_back(BSON("foo" << i));
     }
-
-    expectLock();
 
     // Call the splitChunk function asynchronously on a different thread, so that we do not block,
     // and so we can construct the mock responses to requests made by splitChunk below.
@@ -607,8 +572,6 @@ TEST_F(SplitChunkTest, AttemptSplitOnNoChunks) {
     for (int i = 256; i < 1024; i += 256) {
         splitKeys.push_back(BSON("foo" << i));
     }
-
-    expectLock();
 
     // Call the splitChunk function asynchronously on a different thread, so that we do not block,
     // and so we can construct the mock responses to requests made by splitChunk below.
@@ -651,8 +614,6 @@ TEST_F(SplitChunkTest, NoCollectionAfterSplit) {
         splitKeys.push_back(BSON("foo" << i));
     }
 
-    expectLock();
-
     // Call the splitChunk function asynchronously on a different thread, so that we do not block,
     // and so we can construct the mock responses to requests made by splitChunk below.
     auto future = launchAsync([&] {
@@ -694,8 +655,6 @@ TEST_F(SplitChunkTest, NoChunksAfterSplit) {
     for (int i = 256; i < 1024; i += 256) {
         splitKeys.push_back(BSON("foo" << i));
     }
-
-    expectLock();
 
     // Call the splitChunk function asynchronously on a different thread, so that we do not block,
     // and so we can construct the mock responses to requests made by splitChunk below.

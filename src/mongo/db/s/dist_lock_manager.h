@@ -49,9 +49,6 @@ using DistLockHandle = OID;
  *   // Did not get lock. scopedLockStatus destructor will not call unlock.
  * }
  *
- * // To check if lock is still owned:
- * auto status = scopedDistLock.getValue().checkStatus();
- *
  * if (!status.isOK()) {
  *   // Someone took over the lock! Unlock will still be called at destructor, but will
  *   // practically be a no-op since it doesn't own the lock anymore.
@@ -81,11 +78,6 @@ public:
 
         ScopedDistLock(ScopedDistLock&& other);
         ScopedDistLock& operator=(ScopedDistLock&& other);
-
-        /**
-         * Checks whether the lock is still being held by querying the config server.
-         */
-        Status checkStatus();
 
     private:
         OperationContext* _opCtx;
@@ -178,12 +170,6 @@ public:
      * Makes a best-effort attempt to unlock all locks owned by the given processID.
      */
     virtual void unlockAll(OperationContext* opCtx) = 0;
-
-private:
-    /**
-     * Checks if the lockHandle still exists in the config server.
-     */
-    virtual Status checkStatus(OperationContext* opCtx, const DistLockHandle& lockHandle) = 0;
 };
 
 }  // namespace mongo

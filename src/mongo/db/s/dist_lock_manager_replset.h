@@ -82,8 +82,6 @@ public:
     void unlockAll(OperationContext* opCtx) override;
 
 private:
-    Status checkStatus(OperationContext* opCtx, const DistLockHandle& lockSessionID) override;
-
     /**
      * Queue a lock to be unlocked asynchronously with retry until it doesn't error.
      */

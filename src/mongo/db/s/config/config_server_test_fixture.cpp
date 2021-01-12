@@ -51,8 +51,6 @@
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
-#include "mongo/db/s/dist_lock_catalog_replset.h"
-#include "mongo/db/s/dist_lock_manager_replset.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
@@ -159,15 +157,6 @@ void ConfigServerTestFixture::tearDown() {
     CatalogCacheLoader::clearForTests(getServiceContext());
 
     ShardingMongodTestFixture::tearDown();
-}
-
-std::unique_ptr<DistLockManager> ConfigServerTestFixture::makeDistLockManager() {
-    return std::make_unique<ReplSetDistLockManager>(
-        getServiceContext(),
-        "distLockProcessId",
-        std::make_unique<DistLockCatalogImpl>(),
-        ReplSetDistLockManager::kDistLockPingInterval,
-        ReplSetDistLockManager::kDistLockExpirationTime);
 }
 
 std::unique_ptr<ShardingCatalogClient> ConfigServerTestFixture::makeShardingCatalogClient() {

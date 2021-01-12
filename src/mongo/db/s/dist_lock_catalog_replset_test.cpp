@@ -37,7 +37,6 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/s/dist_lock_catalog_replset.h"
-#include "mongo/db/s/dist_lock_manager_mock.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/db/s/type_lockpings.h"
 #include "mongo/db/s/type_locks.h"

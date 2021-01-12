@@ -77,11 +77,6 @@ DistLockManager::ScopedDistLock& DistLockManager::ScopedDistLock::operator=(
     return *this;
 }
 
-Status DistLockManager::ScopedDistLock::checkStatus() {
-    invariant(_lockManager);
-    return _lockManager->checkStatus(_opCtx, _lockID);
-}
-
 DistLockManager* DistLockManager::get(OperationContext* opCtx) {
     return getDistLockManager(opCtx->getServiceContext()).get();
 }

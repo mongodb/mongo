@@ -42,14 +42,6 @@
 #include "mongo/util/time_support.h"
 
 namespace mongo {
-
-class BSONObj;
-class ShardingCatalogClientImpl;
-class DistLockManagerMock;
-class ShardRegistry;
-template <typename T>
-class StatusWith;
-
 namespace executor {
 
 /**

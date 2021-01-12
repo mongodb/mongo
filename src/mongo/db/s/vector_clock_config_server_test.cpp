@@ -33,7 +33,6 @@
 #include "mongo/db/keys_collection_manager.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
-#include "mongo/db/s/dist_lock_manager_mock.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/util/clock_source_mock.h"
@@ -66,13 +65,6 @@ protected:
         LogicalTimeValidator::get(getServiceContext())->shutDown();
 
         ConfigServerTestFixture::tearDown();
-    }
-
-    // The VectorClock tests assume nothing else ticks ClusterTime.  However,
-    // ConfigServerTestFixture installs an actual DistLockManager, which does writes (thereby
-    // ticking ClusterTime).  So for these tests, that is overridden to be a mock.
-    std::unique_ptr<DistLockManager> makeDistLockManager() override {
-        return std::make_unique<DistLockManagerMock>();
     }
 
     /**

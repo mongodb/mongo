@@ -545,13 +545,7 @@ TEST_F(DistLockManagerReplSetTest, CheckLockStatusOK) {
         },
         Status::OK());
 
-    auto& scopedLock = lockStatus.getValue();
-
     getMockCatalog()->expectNoGrabLock();
-    getMockCatalog()->expectGetLockByTS(
-        [&lockSessionID](const OID& ts) { ASSERT_EQUALS(lockSessionID, ts); }, retLockDoc);
-
-    ASSERT_OK(scopedLock.checkStatus());
 }
 
 TEST_F(DistLockManagerReplSetTest, CheckLockStatusNoLongerOwn) {
@@ -584,14 +578,7 @@ TEST_F(DistLockManagerReplSetTest, CheckLockStatusNoLongerOwn) {
         },
         Status::OK());
 
-    auto& scopedLock = lockStatus.getValue();
-
     getMockCatalog()->expectNoGrabLock();
-    getMockCatalog()->expectGetLockByTS(
-        [&lockSessionID](const OID& ts) { ASSERT_EQUALS(lockSessionID, ts); },
-        {ErrorCodes::LockNotFound, "no lock"});
-
-    ASSERT_NOT_OK(scopedLock.checkStatus());
 }
 
 TEST_F(DistLockManagerReplSetTest, CheckLockStatusError) {
@@ -624,14 +611,7 @@ TEST_F(DistLockManagerReplSetTest, CheckLockStatusError) {
         },
         Status::OK());
 
-    auto& scopedLock = lockStatus.getValue();
-
     getMockCatalog()->expectNoGrabLock();
-    getMockCatalog()->expectGetLockByTS(
-        [&lockSessionID](const OID& ts) { ASSERT_EQUALS(lockSessionID, ts); },
-        {ErrorCodes::NetworkTimeout, "bad test network"});
-
-    ASSERT_NOT_OK(scopedLock.checkStatus());
 }
 
 /**

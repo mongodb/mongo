@@ -598,11 +598,6 @@ void ReplSetDistLockManager::unlockAll(OperationContext* opCtx) {
     }
 }
 
-Status ReplSetDistLockManager::checkStatus(OperationContext* opCtx,
-                                           const DistLockHandle& lockHandle) {
-    return _catalog->getLockByTS(opCtx, lockHandle).getStatus();
-}
-
 void ReplSetDistLockManager::queueUnlock(const DistLockHandle& lockSessionID,
                                          const boost::optional<std::string>& name) {
     stdx::unique_lock<Latch> lk(_mutex);

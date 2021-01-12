@@ -54,7 +54,6 @@
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/s/collection_sharding_state_factory_shard.h"
 #include "mongo/db/s/config_server_op_observer.h"
-#include "mongo/db/s/dist_lock_manager_mock.h"
 #include "mongo/db/s/op_observer_sharding_impl.h"
 #include "mongo/db/s/shard_local.h"
 #include "mongo/db/s/shard_server_op_observer.h"
@@ -219,7 +218,33 @@ std::unique_ptr<ShardRegistry> ShardingMongodTestFixture::makeShardRegistry(
 }
 
 std::unique_ptr<DistLockManager> ShardingMongodTestFixture::makeDistLockManager() {
-    return std::make_unique<DistLockManagerMock>();
+    class DistLockManagerNoop : public DistLockManager {
+    public:
+        void startUp() override {}
+        void shutDown(OperationContext* opCtx) {}
+        std::string getProcessID() override {
+            return "DistLockManagerNoop";
+        }
+        StatusWith<DistLockHandle> lockWithSessionID(OperationContext* opCtx,
+                                                     StringData name,
+                                                     StringData whyMessage,
+                                                     const OID& lockSessionID,
+                                                     Milliseconds waitFor) override {
+            return DistLockHandle::gen();
+        }
+        StatusWith<DistLockHandle> tryLockWithLocalWriteConcern(OperationContext* opCtx,
+                                                                StringData name,
+                                                                StringData whyMessage,
+                                                                const OID& lockSessionID) override {
+            return DistLockHandle::gen();
+        }
+        void unlock(OperationContext* opCtx, const DistLockHandle& lockHandle) override {}
+        void unlock(OperationContext* opCtx,
+                    const DistLockHandle& lockHandle,
+                    StringData name) override {}
+        void unlockAll(OperationContext* opCtx) override {}
+    };
+    return std::make_unique<DistLockManagerNoop>();
 }
 
 std::unique_ptr<ClusterCursorManager> ShardingMongodTestFixture::makeClusterCursorManager() {
