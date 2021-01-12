@@ -154,6 +154,9 @@ BSONObj applyReadWriteConcern(OperationContext* opCtx,
                               CommandInvocation* invocation,
                               const BSONObj& cmdObj);
 BSONObj applyReadWriteConcern(OperationContext* opCtx, BasicCommand* cmd, const BSONObj& cmdObj);
+BSONObj applyReadWriteConcern(OperationContext* opCtx,
+                              BasicCommandWithReplyBuilderInterface* cmd,
+                              const BSONObj& cmdObj);
 
 /**
  * Returns a copy of 'cmdObj' with the writeConcern removed.

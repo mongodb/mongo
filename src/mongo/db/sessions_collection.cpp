@@ -276,16 +276,11 @@ BSONObj SessionsCollection::generateCreateIndexesCmd() {
     index.setName(kSessionsTTLIndex);
     index.setExpireAfterSeconds(localLogicalSessionTimeoutMinutes * 60);
 
-    std::vector<NewIndexSpec> indexes;
-    indexes.push_back(std::move(index));
+    CreateIndexesCommand createIndexes(NamespaceString::kLogicalSessionsNamespace);
+    createIndexes.setIndexes({index.toBSON()});
 
-    CreateIndexesCmd createIndexes;
-    createIndexes.setCreateIndexes(NamespaceString::kLogicalSessionsNamespace.coll());
-    createIndexes.setIndexes(std::move(indexes));
-
-    return BSONObjBuilder(createIndexes.toBSON())
-        .append(WriteConcernOptions::kWriteConcernField, WriteConcernOptions::kImplicitDefault)
-        .obj();
+    return createIndexes.toBSON(
+        BSON(WriteConcernOptions::kWriteConcernField << WriteConcernOptions::kImplicitDefault));
 }
 
 BSONObj SessionsCollection::generateCollModCmd() {

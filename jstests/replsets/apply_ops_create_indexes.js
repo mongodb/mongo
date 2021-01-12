@@ -30,7 +30,7 @@ cmd = {
         op: "c",
         ns: dbName + "." + collName,
         ui: uuid,
-        o: {createIndexes: collName, v: 2, key: {a: 1}, name: cmdFormatIndexNameA}
+        o: {createIndexes: collName, indexes: [{v: 2, key: {a: 1}, name: cmdFormatIndexNameA}]}
     }]
 };
 res = primaryTestDB.runCommand(cmd);

@@ -1378,7 +1378,8 @@ env.Library(
     source=[
         'create_indexes.idl',
     ],
-    LIBDEPS=[
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/catalog/commit_quorum_idl',
         '$BUILD_DIR/mongo/idl/idl_parser',
     ],
 )

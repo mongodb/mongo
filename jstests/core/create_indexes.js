@@ -1,11 +1,14 @@
 /**
  * @tags: [
+ *   requires_fcv_49,
  *   assumes_superuser_permissions,
  * ]
+ * fcv49 for the change to error code in createIndexes invalid field reply.
  */
 (function() {
 'use strict';
 
+const kUnknownIDLFieldError = 40415;
 var isMongos = ("isdbgrid" == db.runCommand("hello").msg);
 
 var extractResult = function(obj) {
@@ -148,7 +151,7 @@ assert.commandWorked(res, 'v1 index creation should succeed');
 
 // Test that index creation fails with an invalid top-level field.
 res = t.runCommand('createIndexes', {indexes: [{key: {e: 1}, name: 'e_1'}], 'invalidField': 1});
-assert.commandFailedWithCode(res, ErrorCodes.BadValue);
+assert.commandFailedWithCode(res, kUnknownIDLFieldError);
 
 // Test that index creation fails with an invalid field in the index spec for index version V2.
 res = t.runCommand('createIndexes',

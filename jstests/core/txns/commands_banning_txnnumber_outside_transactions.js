@@ -28,7 +28,7 @@ const nonRetryableWriteCommands = [
     {listCommands: 1},
     {create: "c"},
     {drop: "c"},
-    {createIndexes: 1},
+    {createIndexes: "c", indexes: []},
     {mapReduce: "c"}
 ];
 

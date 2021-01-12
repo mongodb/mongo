@@ -1,5 +1,6 @@
 /*
- *  Verifies creating the logical sessions collection TTL index retries on stale version errors.
+ * Verifies creating the logical sessions collection TTL index retries on stale version errors.
+ * @tags: [requires_fcv_49]
  */
 
 (function() {

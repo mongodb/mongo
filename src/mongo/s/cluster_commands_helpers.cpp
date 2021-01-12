@@ -359,6 +359,17 @@ BSONObj applyReadWriteConcern(OperationContext* opCtx, BasicCommand* cmd, const 
                                  cmdObj);
 }
 
+BSONObj applyReadWriteConcern(OperationContext* opCtx,
+                              BasicCommandWithReplyBuilderInterface* cmd,
+                              const BSONObj& cmdObj) {
+    const auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
+    const auto readConcernSupport = cmd->supportsReadConcern(cmdObj, readConcernArgs.getLevel());
+    return applyReadWriteConcern(opCtx,
+                                 readConcernSupport.readConcernSupport.isOK(),
+                                 cmd->supportsWriteConcern(cmdObj),
+                                 cmdObj);
+}
+
 BSONObj stripWriteConcern(const BSONObj& cmdObj) {
     BSONObjBuilder output;
     for (const auto& elem : cmdObj) {

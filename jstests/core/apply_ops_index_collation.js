@@ -32,21 +32,23 @@ let res = db.adminCommand({
         ui: uuid,
         o: {
             createIndexes: coll.getFullName(),
-            v: 2,
-            key: {a: 1},
-            name: "a_1_en",
-            collation: {
-                locale: "en_US",
-                caseLevel: false,
-                caseFirst: "off",
-                strength: 3,
-                numericOrdering: false,
-                alternate: "non-ignorable",
-                maxVariable: "punct",
-                normalization: false,
-                backwards: false,
-                version: "57.1"
-            }
+            indexes: [{
+                v: 2,
+                key: {a: 1},
+                name: "a_1_en",
+                collation: {
+                    locale: "en_US",
+                    caseLevel: false,
+                    caseFirst: "off",
+                    strength: 3,
+                    numericOrdering: false,
+                    alternate: "non-ignorable",
+                    maxVariable: "punct",
+                    normalization: false,
+                    backwards: false,
+                    version: "57.1"
+                }
+            }],
         }
     }]
 });
