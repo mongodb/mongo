@@ -8953,6 +8953,7 @@ buildvariants:
     use_wt_develop: true
     resmoke_jobs_factor: 0.5  # Avoid starting too many mongod's
     compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --enable-free-mon=off --enable-http-client=off
+    scons_cache_mode: nolinked
     test_flags: --excludeWithAnyTags=requires_http_client
 
 - name: linux-64-duroff
