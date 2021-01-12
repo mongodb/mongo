@@ -2266,6 +2266,7 @@ envWithAsio.CppUnitTest(
         'collection_index_usage_tracker_test.cpp',
         'commands_test.cpp',
         'curop_test.cpp',
+        'dbdirectclient_test.cpp',
         'dbmessage_test.cpp',
         'db_raii_test.cpp',
         'field_parser_test.cpp',

@@ -115,6 +115,9 @@ public:
     }
 #endif
 
+protected:
+    void _auth(const BSONObj& params) override;
+
 private:
     OperationContext* _opCtx;
     LastError _lastError;  // This LastError will be used for all operations on this client.

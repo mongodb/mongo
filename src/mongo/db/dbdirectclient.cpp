@@ -78,6 +78,10 @@ DBDirectClient::DBDirectClient(OperationContext* opCtx) : _opCtx(opCtx) {
     _setServerRPCProtocols(rpc::supports::kAll);
 }
 
+void DBDirectClient::_auth(const BSONObj& params) {
+    uasserted(2625701, "DBDirectClient should not authenticate");
+}
+
 bool DBDirectClient::isFailed() const {
     return false;
 }
