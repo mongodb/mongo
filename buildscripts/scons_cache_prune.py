@@ -91,7 +91,6 @@ def prune_cache(cache_path, cache_size_gb, clean_ratio):
             else:
                 try:
                     os.remove(to_remove)
-                    LOGGER.info("removed file from cache: %s", cache_item.path)
                     total_size -= cache_item.size
                 except Exception as err:  # pylint: disable=broad-except
                     # this should not happen, but who knows?
