@@ -205,6 +205,10 @@ private:
     const CollectionOptions _collectionOptions;  // (R)
     // Despite the type name, this member must always contain a UUID.
     NamespaceStringOrUUID _sourceDbAndUuid;  // (R)
+    // Namespace of the existing collection (with the same UUID as _sourceDbAndUuid) after resuming
+    // the collection cloner. This existing collection normally has the same namespace as _sourceNss
+    // except when the collection has been renamed on the donor.
+    boost::optional<NamespaceString> _existingNss;  // (R)
     // The size of the batches of documents returned in collection cloning.
     int _collectionClonerBatchSize;  // (R)
 

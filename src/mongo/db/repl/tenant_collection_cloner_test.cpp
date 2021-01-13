@@ -904,5 +904,45 @@ TEST_F(TenantCollectionClonerTest, ResumeFromNonEmptyCollection) {
     ASSERT_EQ(1, cloner->getStats().documentsCopied);
 }
 
+TEST_F(TenantCollectionClonerTest, ResumeFromRenamedCollection) {
+    TenantMigrationSharedData resumingSharedData(&_clock, _migrationId, /*resuming=*/true);
+    auto cloner = makeCollectionCloner(CollectionOptions(), &resumingSharedData);
+
+    // Simulate that the collection already exists under a different name with no index and no data.
+    const NamespaceString oldNss = {_nss.db(), "testcoll_old"};
+    ASSERT_OK(createCollection(oldNss, _options));
+
+    _mockServer->setCommandReply("count", createCountResponse(1));
+    BSONArrayBuilder indexSpecs;
+    indexSpecs.append(_idIndexSpec);
+    for (const auto& secondaryIndexSpec : _secondaryIndexSpecs) {
+        indexSpecs.append(secondaryIndexSpec);
+    }
+    _mockServer->setCommandReply("listIndexes", createCursorResponse(_nss.ns(), indexSpecs.arr()));
+    _mockServer->setCommandReply("find", createFindResponse());
+
+    // Set up documents to be returned from upstream node.
+    _mockServer->insert(_nss.ns(), BSON("_id" << 1));
+    _mockServer->insert(_nss.ns(), BSON("_id" << 2));
+
+    auto opObserver = std::make_unique<TenantCollectionClonerTestOpObserver>(oldNss);
+    auto oldNssOpObserver = opObserver.get();
+    auto opObserverRegistry = dynamic_cast<OpObserverRegistry*>(serviceContext->getOpObserver());
+    opObserverRegistry->addObserver(std::move(opObserver));
+
+    ASSERT_OK(cloner->run());
+
+    // We should re-create the secondary indexes using the old ns.
+    ASSERT_EQ(_secondaryIndexSpecs.size(), getIndexSpecs(cloner.get()).size());
+    ASSERT_EQUALS(_secondaryIndexSpecs.size(), oldNssOpObserver->secondaryIndexSpecs.size());
+    for (std::vector<BSONObj>::size_type i = 0; i < _secondaryIndexSpecs.size(); ++i) {
+        ASSERT_BSONOBJ_EQ(_secondaryIndexSpecs[i], oldNssOpObserver->secondaryIndexSpecs[i]);
+    }
+
+    // We should insert documents into the old ns.
+    ASSERT_EQ(2, oldNssOpObserver->numDocsInserted);
+    ASSERT_EQ(2, cloner->getStats().documentsCopied);
+}
+
 }  // namespace repl
 }  // namespace mongo

@@ -32,6 +32,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/base/string_data.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/commands/list_collections_filter.h"
 #include "mongo/db/db_raii.h"
@@ -251,21 +252,37 @@ BaseCloner::AfterStageBehavior TenantCollectionCloner::createCollectionStage() {
 
     bool skipCreateIndexes = false;
 
-    // TODO SERVER-53425: Handle cases when the collection has been renamed on the donor.
-    auto status =
-        getStorageInterface()->createCollection(opCtx.get(), _sourceNss, _collectionOptions);
-    if (status == ErrorCodes::NamespaceExists) {
+    auto collection =
+        CollectionCatalog::get(opCtx.get())->lookupCollectionByUUID(opCtx.get(), getSourceUuid());
+    if (collection) {
+        uassert(5342500,
+                str::stream() << "Collection uuid" << getSourceUuid()
+                              << " already exists but does not belong to tenant",
+                ClonerUtils::isNamespaceForTenant(collection->ns(), _tenantId));
+        uassert(5342501,
+                str::stream() << "Collection uuid" << getSourceUuid()
+                              << " already exists but does not belong to the same database",
+                collection->ns().db() == _sourceNss.db());
         uassert(ErrorCodes::NamespaceExists,
-                str::stream() << "Tenant '" << _tenantId << "': collection '" << _sourceNss
+                str::stream() << "Tenant '" << _tenantId << "': collection '" << collection->ns()
                               << "' already exists prior to data sync",
                 getSharedData()->isResuming());
+
+        _existingNss = collection->ns();
+        LOGV2(5342502,
+              "TenantCollectionCloner found collection with same uuid.",
+              "existingNamespace"_attr = _existingNss,
+              "sourceNamespace"_attr = getSourceNss(),
+              "uuid"_attr = getSourceUuid(),
+              "migrationId"_attr = getSharedData()->getMigrationId(),
+              "tenantId"_attr = getTenantId());
 
         // We are resuming and the collection already exists.
         DBDirectClient client(opCtx.get());
 
         auto fieldsToReturn = BSON("_id" << 1);
         _lastDocId =
-            client.findOne(_sourceNss.ns(), Query().sort(BSON("_id" << -1)), &fieldsToReturn);
+            client.findOne(_existingNss->ns(), Query().sort(BSON("_id" << -1)), &fieldsToReturn);
         if (!_lastDocId.isEmpty()) {
             // The collection is not empty. Skip creating indexes and resume cloning from the last
             // document.
@@ -298,13 +315,18 @@ BaseCloner::AfterStageBehavior TenantCollectionCloner::createCollectionStage() {
             }
         }
     } else {
+        // No collection with the same UUID exists. But if this still fails with NamespaceExists, it
+        // means that we have a collection with the same namespace but a different UUID, in which
+        // case we should also fail the migration.
+        auto status =
+            getStorageInterface()->createCollection(opCtx.get(), _sourceNss, _collectionOptions);
         uassertStatusOKWithContext(status, "Tenant collection cloner: create collection");
     }
 
     if (!skipCreateIndexes) {
         // This will start building the indexes whose specs we saved last stage.
-        status = getStorageInterface()->createIndexesOnEmptyCollection(
-            opCtx.get(), _sourceNss, _readyIndexSpecs);
+        auto status = getStorageInterface()->createIndexesOnEmptyCollection(
+            opCtx.get(), _existingNss.value_or(_sourceNss), _readyIndexSpecs);
 
         uassertStatusOKWithContext(status, "Tenant collection cloner: create indexes");
     }
@@ -425,7 +447,7 @@ void TenantCollectionCloner::insertDocumentsCallback(
         DocumentValidationSettings::kDisableSchemaValidation |
             DocumentValidationSettings::kDisableInternalValidation);
 
-    write_ops::Insert insertOp(_sourceNss);
+    write_ops::Insert insertOp(_existingNss.value_or(_sourceNss));
     insertOp.setDocuments(std::move(docs));
     insertOp.setWriteCommandBase([] {
         write_ops::WriteCommandBase wcb;
