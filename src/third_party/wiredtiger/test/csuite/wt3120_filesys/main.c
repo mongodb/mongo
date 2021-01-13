@@ -39,24 +39,18 @@ main(int argc, char *argv[])
     TEST_OPTS *opts, _opts;
     WT_CURSOR *cursor;
     WT_SESSION *session;
-    char *kstr, *vstr, buf[1024];
-    const char *p;
+    char *kstr, *vstr, buf[1024], config[1024];
 
     opts = &_opts;
     memset(opts, 0, sizeof(*opts));
     testutil_check(testutil_parse_opts(argc, argv, opts));
     testutil_make_work_dir(opts->home);
 
-/*
- * Use $top_builddir if it's available, otherwise assume we're building in build_posix and running
- * in the test/csuite directory.
- */
 #define WT_FAIL_FS_LIB "ext/test/fail_fs/.libs/libwiredtiger_fail_fs.so"
-    if ((p = getenv("top_builddir")) == NULL)
-        p = "../../build_posix";
+    testutil_build_dir(buf, 1024);
     testutil_check(__wt_snprintf(
-      buf, sizeof(buf), "create,extensions=(%s/%s=(early_load=true))", p, WT_FAIL_FS_LIB));
-    testutil_check(wiredtiger_open(opts->home, NULL, buf, &opts->conn));
+      config, sizeof(config), "create,extensions=(%s/%s=(early_load=true))", buf, WT_FAIL_FS_LIB));
+    testutil_check(wiredtiger_open(opts->home, NULL, config, &opts->conn));
     testutil_check(opts->conn->open_session(opts->conn, NULL, NULL, &session));
     testutil_check(session->create(session, opts->uri, "key_format=S,value_format=S"));
 

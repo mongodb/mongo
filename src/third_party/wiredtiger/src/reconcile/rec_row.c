@@ -904,7 +904,7 @@ __wt_rec_row_leaf(
                  * metadata, as metadata doesn't have any history.
                  */
                 if (tw.durable_stop_ts == WT_TS_NONE && F_ISSET(S2C(session), WT_CONN_HS_OPEN) &&
-                  !WT_IS_HS(btree) && !WT_IS_METADATA(btree->dhandle)) {
+                  !WT_IS_HS(btree->dhandle) && !WT_IS_METADATA(btree->dhandle)) {
                     WT_ERR(__wt_row_leaf_key(session, page, rip, tmpkey, true));
                     /*
                      * Start from WT_TS_NONE to delete all the history store content of the key.
@@ -918,8 +918,7 @@ __wt_rec_row_leaf(
                         WT_ERR(__wt_hs_delete_key_from_ts(
                           session, btree->id, tmpkey, WT_TS_NONE, false));
                         WT_ERR(__wt_hs_cursor_close(session));
-                        WT_STAT_CONN_INCR(session, cache_hs_key_truncate_onpage_removal);
-                        WT_STAT_DATA_INCR(session, cache_hs_key_truncate_onpage_removal);
+                        WT_STAT_CONN_DATA_INCR(session, cache_hs_key_truncate_onpage_removal);
                     }
                 }
 

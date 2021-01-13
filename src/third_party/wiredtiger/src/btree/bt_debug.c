@@ -1025,7 +1025,7 @@ __debug_page(WT_DBG *ds, WT_REF *ref, uint32_t flags)
      * Set up history store support, opening a history store cursor on demand. Ignore errors if that
      * doesn't work, we may be running in-memory.
      */
-    if (!WT_IS_HS(S2BT(session))) {
+    if (!WT_IS_HS(session->dhandle)) {
         if (session->hs_cursor != NULL || __wt_hs_cursor_open(session) == 0) {
             WT_RET(__wt_scr_alloc(session, 0, &ds->hs_key));
             WT_RET(__wt_scr_alloc(session, 0, &ds->hs_value));
@@ -1277,7 +1277,7 @@ __debug_page_col_var(WT_DBG *ds, WT_REF *ref)
         WT_RET(__wt_snprintf(tag, sizeof(tag), "%" PRIu64 " %" PRIu64, recno, rle));
         WT_RET(__debug_cell_kv(ds, page, WT_PAGE_COL_VAR, tag, unpack));
 
-        if (!WT_IS_HS(S2BT(session))) {
+        if (!WT_IS_HS(session->dhandle)) {
             p = ds->key->mem;
             WT_RET(__wt_vpack_uint(&p, 0, recno));
             ds->key->size = WT_PTRDIFF(p, ds->key->mem);
@@ -1364,7 +1364,7 @@ __debug_page_row_leaf(WT_DBG *ds, WT_PAGE *page)
         if ((upd = WT_ROW_UPDATE(page, rip)) != NULL)
             WT_RET(__debug_update(ds, upd, false));
 
-        if (!WT_IS_HS(S2BT(session)) && session->hs_cursor != NULL)
+        if (!WT_IS_HS(session->dhandle) && session->hs_cursor != NULL)
             WT_RET(__debug_hs_key(ds));
 
         if ((insert = WT_ROW_INSERT(page, rip)) != NULL)
@@ -1390,7 +1390,7 @@ __debug_col_skip(WT_DBG *ds, WT_INSERT_HEAD *head, const char *tag, bool hexbyte
         WT_RET(ds->f(ds, "\t%s %" PRIu64 "\n", tag, WT_INSERT_RECNO(ins)));
         WT_RET(__debug_update(ds, ins->upd, hexbyte));
 
-        if (!WT_IS_HS(S2BT(session)) && session->hs_cursor != NULL) {
+        if (!WT_IS_HS(session->dhandle) && session->hs_cursor != NULL) {
             p = ds->key->mem;
             WT_RET(__wt_vpack_uint(&p, 0, WT_INSERT_RECNO(ins)));
             ds->key->size = WT_PTRDIFF(p, ds->key->mem);
@@ -1416,7 +1416,7 @@ __debug_row_skip(WT_DBG *ds, WT_INSERT_HEAD *head)
         WT_RET(__debug_item_key(ds, "insert", WT_INSERT_KEY(ins), WT_INSERT_KEY_SIZE(ins)));
         WT_RET(__debug_update(ds, ins->upd, false));
 
-        if (!WT_IS_HS(S2BT(session)) && session->hs_cursor != NULL) {
+        if (!WT_IS_HS(session->dhandle) && session->hs_cursor != NULL) {
             WT_RET(__wt_buf_set(session, ds->key, WT_INSERT_KEY(ins), WT_INSERT_KEY_SIZE(ins)));
             WT_RET(__debug_hs_key(ds));
         }

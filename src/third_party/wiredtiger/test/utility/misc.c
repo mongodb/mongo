@@ -131,6 +131,40 @@ testutil_clean_work_dir(const char *dir)
 }
 
 /*
+ * testutil_build_dir --
+ *     Get the git top level directory and concatenate the build directory.
+ */
+void
+testutil_build_dir(char *buf, int size)
+{
+    FILE *fp;
+    char *p;
+
+    /* Get the git top level directory. */
+#ifdef _WIN32
+    fp = _popen("git rev-parse --show-toplevel", "r");
+#else
+    fp = popen("git rev-parse --show-toplevel", "r");
+#endif
+
+    if (fp == NULL)
+        testutil_die(errno, "popen");
+    p = fgets(buf, size, fp);
+    if (p == NULL)
+        testutil_die(errno, "fgets");
+
+#ifdef _WIN32
+    _pclose(fp);
+#else
+    pclose(fp);
+#endif
+
+    /* Remove the trailing newline character added by fgets. */
+    buf[strlen(buf) - 1] = '\0';
+    strcat(buf, "/build_posix");
+}
+
+/*
  * testutil_make_work_dir --
  *     Delete the existing work directory, then create a new one.
  */

@@ -396,10 +396,8 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
     uint32_t slots;
     void *p;
 
-    WT_STAT_CONN_INCR(session, cache_eviction_deepen);
-    WT_STAT_DATA_INCR(session, cache_eviction_deepen);
-    WT_STAT_CONN_INCR(session, cache_eviction_split_internal);
-    WT_STAT_DATA_INCR(session, cache_eviction_split_internal);
+    WT_STAT_CONN_DATA_INCR(session, cache_eviction_deepen);
+    WT_STAT_CONN_DATA_INCR(session, cache_eviction_split_internal);
 
     btree = S2BT(session);
     alloc_index = NULL;
@@ -905,8 +903,7 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
     uint32_t slots;
     void *p;
 
-    WT_STAT_CONN_INCR(session, cache_eviction_split_internal);
-    WT_STAT_DATA_INCR(session, cache_eviction_split_internal);
+    WT_STAT_CONN_DATA_INCR(session, cache_eviction_split_internal);
 
     /* Mark the page dirty. */
     WT_RET(__wt_page_modify_init(session, page));
@@ -1730,8 +1727,7 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
     uint8_t type;
     int i;
 
-    WT_STAT_CONN_INCR(session, cache_inmem_split);
-    WT_STAT_DATA_INCR(session, cache_inmem_split);
+    WT_STAT_CONN_DATA_INCR(session, cache_inmem_split);
 
     page = ref->page;
     right = NULL;
@@ -2092,8 +2088,7 @@ __split_multi(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
     size_t parent_incr;
     uint32_t i, new_entries;
 
-    WT_STAT_CONN_INCR(session, cache_eviction_split_leaf);
-    WT_STAT_DATA_INCR(session, cache_eviction_split_leaf);
+    WT_STAT_CONN_DATA_INCR(session, cache_eviction_split_leaf);
 
     page = ref->page;
     mod = page->modify;

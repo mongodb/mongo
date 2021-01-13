@@ -40,8 +40,7 @@ __evict_exclusive(WT_SESSION_IMPL *session, WT_REF *ref)
     if (__wt_hazard_check(session, ref, NULL) == NULL)
         return (0);
 
-    WT_STAT_DATA_INCR(session, cache_eviction_hazard);
-    WT_STAT_CONN_INCR(session, cache_eviction_hazard);
+    WT_STAT_CONN_DATA_INCR(session, cache_eviction_hazard);
     return (__wt_set_return(session, EBUSY));
 }
 
@@ -132,7 +131,7 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, uint8_t previous_state, uint32
         /*
          * Track history store pages being force evicted while holding a history store cursor open.
          */
-        if (session->hs_cursor != NULL && WT_IS_HS(S2BT(session))) {
+        if (session->hs_cursor != NULL && WT_IS_HS(session->dhandle)) {
             force_evict_hs = true;
             WT_STAT_CONN_INCR(session, cache_eviction_force_hs);
         }
@@ -171,10 +170,8 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, uint8_t previous_state, uint32
         WT_ASSERT(session, !__wt_gen_active(session, WT_GEN_SPLIT, page->pg_intl_split_gen));
 
     /* Count evictions of internal pages during normal operation. */
-    if (!closing && F_ISSET(ref, WT_REF_FLAG_INTERNAL)) {
-        WT_STAT_CONN_INCR(session, cache_eviction_internal);
-        WT_STAT_DATA_INCR(session, cache_eviction_internal);
-    }
+    if (!closing && F_ISSET(ref, WT_REF_FLAG_INTERNAL))
+        WT_STAT_CONN_DATA_INCR(session, cache_eviction_internal);
 
     /*
      * Track the largest page size seen at eviction, it tells us something about our ability to
@@ -221,13 +218,10 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, uint8_t previous_state, uint32
               session, cache_eviction_force_dirty_time, WT_CLOCKDIFF_US(time_stop, time_start));
         }
     }
-    if (clean_page) {
-        WT_STAT_CONN_INCR(session, cache_eviction_clean);
-        WT_STAT_DATA_INCR(session, cache_eviction_clean);
-    } else {
-        WT_STAT_CONN_INCR(session, cache_eviction_dirty);
-        WT_STAT_DATA_INCR(session, cache_eviction_dirty);
-    }
+    if (clean_page)
+        WT_STAT_CONN_DATA_INCR(session, cache_eviction_clean);
+    else
+        WT_STAT_CONN_DATA_INCR(session, cache_eviction_dirty);
 
     /* Count page evictions in parallel with checkpoint. */
     if (conn->txn_global.checkpoint_running)
@@ -247,8 +241,7 @@ err:
               session, cache_eviction_force_fail_time, WT_CLOCKDIFF_US(time_stop, time_start));
         }
 
-        WT_STAT_CONN_INCR(session, cache_eviction_fail);
-        WT_STAT_DATA_INCR(session, cache_eviction_fail);
+        WT_STAT_CONN_DATA_INCR(session, cache_eviction_fail);
     }
 
 done:
@@ -627,7 +620,7 @@ __evict_review(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_flags, bool
 
     if (closing)
         LF_SET(WT_REC_VISIBILITY_ERR);
-    else if (F_ISSET(ref, WT_REF_FLAG_INTERNAL) || WT_IS_HS(btree))
+    else if (F_ISSET(ref, WT_REF_FLAG_INTERNAL) || WT_IS_HS(btree->dhandle))
         ;
     else if (WT_SESSION_BTREE_SYNC(session) && !WT_IS_METADATA(btree->dhandle))
         LF_SET(WT_REC_HS);
@@ -667,7 +660,7 @@ __evict_review(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_flags, bool
     /* Make sure that both conditions above are not true at the same time. */
     WT_ASSERT(session, !use_snapshot_for_app_thread || !is_eviction_thread);
 
-    if (!conn->txn_global.checkpoint_running && !WT_IS_HS(btree) &&
+    if (!conn->txn_global.checkpoint_running && !WT_IS_HS(btree->dhandle) &&
       (use_snapshot_for_app_thread || is_eviction_thread)) {
         if (is_eviction_thread) {
             /*

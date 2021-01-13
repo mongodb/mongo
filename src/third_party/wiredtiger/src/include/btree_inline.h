@@ -1362,8 +1362,7 @@ __wt_leaf_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
             if (++count < WT_MAX_SPLIT_COUNT)
                 continue;
 
-            WT_STAT_CONN_INCR(session, cache_inmem_splittable);
-            WT_STAT_DATA_INCR(session, cache_inmem_splittable);
+            WT_STAT_CONN_DATA_INCR(session, cache_inmem_splittable);
             return (true);
         }
 
@@ -1384,8 +1383,7 @@ __wt_leaf_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
         count += WT_MIN_SPLIT_MULTIPLIER;
         size += WT_MIN_SPLIT_MULTIPLIER * (WT_INSERT_KEY_SIZE(ins) + WT_UPDATE_MEMSIZE(ins->upd));
         if (count > WT_MIN_SPLIT_COUNT && size > (size_t)btree->maxleafpage) {
-            WT_STAT_CONN_INCR(session, cache_inmem_splittable);
-            WT_STAT_DATA_INCR(session, cache_inmem_splittable);
+            WT_STAT_CONN_DATA_INCR(session, cache_inmem_splittable);
             return (true);
         }
     }
@@ -1491,8 +1489,7 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_splitp)
      * internal page already written in the checkpoint, leaving the checkpoint inconsistent.
      */
     if (modified && !__wt_btree_can_evict_dirty(session)) {
-        WT_STAT_CONN_INCR(session, cache_eviction_checkpoint);
-        WT_STAT_DATA_INCR(session, cache_eviction_checkpoint);
+        WT_STAT_CONN_DATA_INCR(session, cache_eviction_checkpoint);
         return (false);
     }
 

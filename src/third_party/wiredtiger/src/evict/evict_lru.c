@@ -1838,7 +1838,8 @@ __evict_walk_tree(WT_SESSION_IMPL *session, WT_EVICT_QUEUE *queue, u_int max_ent
          * create "deserts" in trees where no good eviction candidates can be found. Abandon the
          * walk if we get into that situation.
          */
-        give_up = !__wt_cache_aggressive(session) && !WT_IS_HS(btree) && pages_seen > min_pages &&
+        give_up = !__wt_cache_aggressive(session) && !WT_IS_HS(btree->dhandle) &&
+          pages_seen > min_pages &&
           (pages_queued == 0 || (pages_seen / pages_queued) > (min_pages / target_pages));
         if (give_up) {
             /*
@@ -2045,16 +2046,13 @@ fast:
     }
 
     WT_STAT_CONN_INCRV(session, cache_eviction_walk, refs_walked);
-    WT_STAT_CONN_INCRV(session, cache_eviction_pages_seen, pages_seen);
-    WT_STAT_DATA_INCRV(session, cache_eviction_pages_seen, pages_seen);
+    WT_STAT_CONN_DATA_INCRV(session, cache_eviction_pages_seen, pages_seen);
     WT_STAT_CONN_INCRV(session, cache_eviction_pages_already_queued, pages_already_queued);
     WT_STAT_CONN_INCRV(session, cache_eviction_internal_pages_seen, internal_pages_seen);
     WT_STAT_CONN_INCRV(
       session, cache_eviction_internal_pages_already_queued, internal_pages_already_queued);
     WT_STAT_CONN_INCRV(session, cache_eviction_internal_pages_queued, internal_pages_queued);
-    WT_STAT_CONN_INCRV(session, cache_eviction_walk_passes, 1);
-    WT_STAT_DATA_INCRV(session, cache_eviction_walk_passes, 1);
-
+    WT_STAT_CONN_DATA_INCR(session, cache_eviction_walk_passes);
     return (0);
 }
 

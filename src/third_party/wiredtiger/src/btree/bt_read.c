@@ -230,10 +230,8 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
      * Ignore reads of pages already known to be in cache, otherwise the eviction server can
      * dominate these statistics.
      */
-    if (!LF_ISSET(WT_READ_CACHE)) {
-        WT_STAT_CONN_INCR(session, cache_pages_requested);
-        WT_STAT_DATA_INCR(session, cache_pages_requested);
-    }
+    if (!LF_ISSET(WT_READ_CACHE))
+        WT_STAT_CONN_DATA_INCR(session, cache_pages_requested);
 
     for (evict_skip = stalled = wont_need = false, force_attempts = 0, sleep_usecs = yield_cnt = 0;
          ;) {

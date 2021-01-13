@@ -217,7 +217,7 @@ __wt_btree_close(WT_SESSION_IMPL *session)
      */
     WT_ASSERT(session,
       !F_ISSET(S2C(session), WT_CONN_HS_OPEN) || !btree->hs_entries ||
-        (!WT_IS_METADATA(btree->dhandle) && !WT_IS_HS(btree)));
+        (!WT_IS_METADATA(btree->dhandle) && !WT_IS_HS(btree->dhandle)));
 
     /*
      * If we turned eviction off and never turned it back on, do that now, otherwise the counter
@@ -477,7 +477,7 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 
     /* Set special flags for the history store table. */
     if (strcmp(session->dhandle->name, WT_HS_URI) == 0) {
-        F_SET(btree, WT_BTREE_HS);
+        F_SET(btree->dhandle, WT_DHANDLE_HS);
         F_SET(btree, WT_BTREE_NO_LOGGING);
     }
 

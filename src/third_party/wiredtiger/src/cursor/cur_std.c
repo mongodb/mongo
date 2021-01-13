@@ -736,8 +736,7 @@ __wt_cursor_cache_release(WT_SESSION_IMPL *session, WT_CURSOR *cursor, bool *rel
      * caching fails, we'll decrement the statistics after reopening the cursor (and getting the
      * data handle back).
      */
-    WT_STAT_CONN_INCR(session, cursor_cache);
-    WT_STAT_DATA_INCR(session, cursor_cache);
+    WT_STAT_CONN_DATA_INCR(session, cursor_cache);
     WT_ERR(cursor->cache(cursor));
     WT_ASSERT(session, F_ISSET(cursor, WT_CURSTD_CACHED));
     *released = true;
@@ -751,8 +750,7 @@ __wt_cursor_cache_release(WT_SESSION_IMPL *session, WT_CURSOR *cursor, bool *rel
 err:
         WT_TRET(cursor->reopen(cursor, false));
         WT_ASSERT(session, !F_ISSET(cursor, WT_CURSTD_CACHED));
-        WT_STAT_CONN_DECR(session, cursor_cache);
-        WT_STAT_DATA_DECR(session, cursor_cache);
+        WT_STAT_CONN_DATA_DECR(session, cursor_cache);
     }
 
     return (ret);
@@ -887,8 +885,7 @@ __wt_cursor_cache_get(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *to_d
                 }
             }
 
-            WT_STAT_CONN_INCR(session, cursor_reopen);
-            WT_STAT_DATA_INCR(session, cursor_reopen);
+            WT_STAT_CONN_DATA_INCR(session, cursor_reopen);
 
             *cursorp = cursor;
             return (0);

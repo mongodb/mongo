@@ -56,8 +56,8 @@ __wt_reconcile(WT_SESSION_IMPL *session, WT_REF *ref, WT_SALVAGE_COOKIE *salvage
         F_ISSET(session->txn, WT_TXN_HAS_SNAPSHOT));
 
     /* Can't do history store eviction for history store itself or for metadata. */
-    WT_ASSERT(
-      session, !LF_ISSET(WT_REC_HS) || (!WT_IS_HS(btree) && !WT_IS_METADATA(btree->dhandle)));
+    WT_ASSERT(session,
+      !LF_ISSET(WT_REC_HS) || (!WT_IS_HS(btree->dhandle) && !WT_IS_METADATA(btree->dhandle)));
     /* Flag as unused for non diagnostic builds. */
     WT_UNUSED(btree);
 
@@ -200,7 +200,7 @@ __reconcile(WT_SESSION_IMPL *session, WT_REF *ref, WT_SALVAGE_COOKIE *salvage, u
      * Update the global history store score. Only use observations during eviction, not checkpoints
      * and don't count eviction of the history store table itself.
      */
-    if (F_ISSET(r, WT_REC_EVICT) && !WT_IS_HS(btree))
+    if (F_ISSET(r, WT_REC_EVICT) && !WT_IS_HS(btree->dhandle))
         __wt_cache_update_hs_score(session, r->updates_seen, r->updates_unstable);
 
     /*
@@ -229,19 +229,13 @@ __reconcile(WT_SESSION_IMPL *session, WT_REF *ref, WT_SALVAGE_COOKIE *salvage, u
     /* Update statistics. */
     WT_STAT_CONN_INCR(session, rec_pages);
     WT_STAT_DATA_INCR(session, rec_pages);
-    if (LF_ISSET(WT_REC_EVICT)) {
-        WT_STAT_CONN_INCR(session, rec_pages_eviction);
-        WT_STAT_DATA_INCR(session, rec_pages_eviction);
-    }
-    if (r->cache_write_hs) {
-        WT_STAT_CONN_INCR(session, cache_write_hs);
-        WT_STAT_DATA_INCR(session, cache_write_hs);
-    }
-    if (r->cache_write_restore) {
-        WT_STAT_CONN_INCR(session, cache_write_restore);
-        WT_STAT_DATA_INCR(session, cache_write_restore);
-    }
-    if (!WT_IS_HS(btree)) {
+    if (LF_ISSET(WT_REC_EVICT))
+        WT_STAT_CONN_DATA_INCR(session, rec_pages_eviction);
+    if (r->cache_write_hs)
+        WT_STAT_CONN_DATA_INCR(session, cache_write_hs);
+    if (r->cache_write_restore)
+        WT_STAT_CONN_DATA_INCR(session, cache_write_restore);
+    if (!WT_IS_HS(btree->dhandle)) {
         if (r->rec_page_cell_with_txn_id)
             WT_STAT_CONN_INCR(session, rec_pages_with_txn);
         if (r->rec_page_cell_with_ts)
@@ -545,7 +539,7 @@ __rec_init(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags, WT_SALVAGE_COO
             r->last_running = ckpt_txn;
     }
     /* When operating on the history store table, we should never try history store eviction. */
-    WT_ASSERT(session, !F_ISSET(btree, WT_BTREE_HS) || !LF_ISSET(WT_REC_HS));
+    WT_ASSERT(session, !F_ISSET(btree->dhandle, WT_DHANDLE_HS) || !LF_ISSET(WT_REC_HS));
 
     /*
      * History store table eviction is configured when eviction gets aggressive, adjust the flags
@@ -2139,8 +2133,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 
     switch (r->multi_next) {
     case 0: /* Page delete */
-        WT_STAT_CONN_INCR(session, rec_page_delete);
-        WT_STAT_DATA_INCR(session, rec_page_delete);
+        WT_STAT_CONN_DATA_INCR(session, rec_page_delete);
 
         /*
          * If this is the root page, we need to create a sync point. For a page to be empty, it has
@@ -2286,7 +2279,7 @@ __rec_hs_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r)
      * Sanity check: Can't insert updates into history store from the history store itself or from
      * the metadata file.
      */
-    WT_ASSERT(session, !WT_IS_HS(btree) && !WT_IS_METADATA(btree->dhandle));
+    WT_ASSERT(session, !WT_IS_HS(btree->dhandle) && !WT_IS_METADATA(btree->dhandle));
     /* Flag as unused for non diagnostic builds. */
     WT_UNUSED(btree);
 
