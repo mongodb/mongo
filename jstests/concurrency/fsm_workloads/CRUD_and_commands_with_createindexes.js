@@ -18,15 +18,18 @@ var $config = extendWorkload($config, function($config, $super) {
             db[collName].createIndex({value: 1});
         },
         createIdIndex: function createIdIndex(db, collName) {
-            try {
-                assertWhenOwnColl.commandWorked(db[collName].createIndex({_id: 1}));
-            } catch (e) {
-                if (e.code == ErrorCodes.ConflictingOperationInProgress) {
-                    // createIndex concurrently with dropCollection can throw.
-                    if (TestData.runInsideTransaction) {
-                        e["errorLabels"] = ["TransientTransactionError"];
+            let created = false;
+            while (!created) {
+                try {
+                    assertWhenOwnColl.commandWorked(db[collName].createIndex({_id: 1}));
+                    created = true;
+                } catch (e) {
+                    if (e.code != ErrorCodes.ConflictingOperationInProgress) {
+                        // unexpected error, rethrow
                         throw e;
                     }
+                    // createIndex concurrently with dropCollection can throw a conflict.
+                    // fall through to retry
                 }
             }
         },
