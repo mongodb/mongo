@@ -449,12 +449,40 @@ StatusWith<BSONObj> validateIndexSpec(
                     str::stream()
                         << "The 'bucketSize' parameter is disallowed because "
                            "geoHaystack indexes are no longer supported in version 4.9 and above"};
-        } else if (IndexDescriptor::kBackgroundFieldName == indexSpecElemFieldName &&
+        } else if ((IndexDescriptor::kBackgroundFieldName == indexSpecElemFieldName ||
+                    IndexDescriptor::kUniqueFieldName == indexSpecElemFieldName ||
+                    IndexDescriptor::kSparseFieldName == indexSpecElemFieldName ||
+                    IndexDescriptor::k2dsphereCoarsestIndexedLevel == indexSpecElemFieldName ||
+                    IndexDescriptor::k2dsphereFinestIndexedLevel == indexSpecElemFieldName ||
+                    IndexDescriptor::kDropDuplicatesFieldName == indexSpecElemFieldName) &&
                    !indexSpecElem.isNumber() && !indexSpecElem.isBoolean()) {
             return {ErrorCodes::BadValue,
-                    str::stream() << "The field '" << IndexDescriptor::kBackgroundFieldName
-                                  << " has value " << indexSpecElem.toString()
+                    str::stream() << "The field '" << indexSpecElemFieldName << " has value "
+                                  << indexSpecElem.toString()
                                   << ", which is not convertible to bool"};
+        } else if ((IndexDescriptor::kWeightsFieldName == indexSpecElemFieldName) &&
+                   !indexSpecElem.isABSONObj()) {
+            return {ErrorCodes::BadValue,
+                    str::stream() << "The field '" << indexSpecElemFieldName
+                                  << "' must be an object, but got "
+                                  << typeName(indexSpecElem.type())};
+        } else if ((IndexDescriptor::kDefaultLanguageFieldName == indexSpecElemFieldName ||
+                    IndexDescriptor::kLanguageOverrideFieldName == indexSpecElemFieldName) &&
+                   indexSpecElem.type() != BSONType::String) {
+            return {ErrorCodes::BadValue,
+                    str::stream() << "The field '" << indexSpecElemFieldName
+                                  << "' must be a string, but got "
+                                  << typeName(indexSpecElem.type())};
+        } else if ((IndexDescriptor::k2dsphereVersionFieldName == indexSpecElemFieldName ||
+                    IndexDescriptor::kTextVersionFieldName == indexSpecElemFieldName ||
+                    IndexDescriptor::k2dIndexBitsFieldName == indexSpecElemFieldName ||
+                    IndexDescriptor::k2dIndexMinFieldName == indexSpecElemFieldName ||
+                    IndexDescriptor::k2dIndexMaxFieldName == indexSpecElemFieldName) &&
+                   !indexSpecElem.isNumber()) {
+            return {ErrorCodes::BadValue,
+                    str::stream() << "The field '" << indexSpecElemFieldName
+                                  << "' must be a number, but got "
+                                  << typeName(indexSpecElem.type())};
         } else {
             // We can assume field name is valid at this point. Validation of fieldname is handled
             // prior to this in validateIndexSpecFieldNames().
