@@ -34,6 +34,8 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/rename_collection.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/db_raii.h"
+#include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
@@ -41,6 +43,12 @@
 
 namespace mongo {
 namespace {
+
+bool isCollectionSharded(OperationContext* opCtx, const NamespaceString& nss) {
+    AutoGetCollectionForRead lock(opCtx, nss);
+    return opCtx->writesAreReplicated() &&
+        CollectionShardingState::get(opCtx, nss)->getCollectionDescription(opCtx).isSharded();
+}
 
 RenameCollectionResponse renameCollectionLegacy(OperationContext* opCtx,
                                                 const ShardsvrRenameCollection& request,
@@ -56,6 +64,14 @@ RenameCollectionResponse renameCollectionLegacy(OperationContext* opCtx,
     uassert(13137,
             "Source and destination collections must be on same shard",
             fromDB.primaryId() == toDB.primaryId());
+
+    // Make sure that source and target collection are not sharded
+    uassert(ErrorCodes::IllegalOperation,
+            str::stream() << "source namespace '" << fromNss << "' must not be sharded",
+            !isCollectionSharded(opCtx, fromNss));
+    uassert(ErrorCodes::IllegalOperation,
+            str::stream() << "cannot rename to sharded collection '" << toNss << "'",
+            !isCollectionSharded(opCtx, toNss));
 
     RenameCollectionOptions options;
     options.dropTarget = request.getDropTarget();

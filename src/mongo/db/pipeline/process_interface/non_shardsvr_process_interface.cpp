@@ -155,7 +155,6 @@ void NonShardServerProcessInterface::renameIfOptionsAndIndexesHaveNotChanged(
     options.dropTarget = renameCommandObj["dropTarget"].trueValue();
     options.stayTemp = renameCommandObj["stayTemp"].trueValue();
     // skip sharding validation on non sharded servers
-    options.skipSourceCollectionShardedCheck = true;
     doLocalRenameIfOptionsAndIndexesHaveNotChanged(
         opCtx, sourceNs, targetNs, options, originalIndexes, originalCollectionOptions);
 }

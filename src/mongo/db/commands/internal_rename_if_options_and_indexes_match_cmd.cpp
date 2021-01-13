@@ -35,8 +35,18 @@
 #include "mongo/db/catalog/rename_collection.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/s/collection_sharding_state.h"
 
 namespace mongo {
+namespace {
+
+bool isCollectionSharded(OperationContext* opCtx, const NamespaceString& nss) {
+    AutoGetCollectionForRead lock(opCtx, nss);
+    return opCtx->writesAreReplicated() &&
+        CollectionShardingState::get(opCtx, nss)->getCollectionDescription(opCtx).isSharded();
+}
+
+}  // namespace
 
 /**
  * Rename a collection while checking collection option and indexes.
@@ -52,15 +62,20 @@ public:
 
         void typedRun(OperationContext* opCtx) {
             auto thisRequest = request();
+            auto toNss = thisRequest.getTo();
+
+            uassert(ErrorCodes::IllegalOperation,
+                    str::stream() << "cannot rename to sharded collection '" << toNss << "'",
+                    !isCollectionSharded(opCtx, toNss));
+
             auto originalIndexes = thisRequest.getIndexes();
             auto indexList = std::list<BSONObj>(originalIndexes.begin(), originalIndexes.end());
             RenameCollectionOptions options;
             options.dropTarget = true;
             options.stayTemp = false;
-            options.skipSourceCollectionShardedCheck = true;
             doLocalRenameIfOptionsAndIndexesHaveNotChanged(opCtx,
                                                            thisRequest.getFrom(),
-                                                           thisRequest.getTo(),
+                                                           toNss,
                                                            options,
                                                            std::move(indexList),
                                                            thisRequest.getCollectionOptions());
