@@ -7625,7 +7625,11 @@ tasks:
   depends_on:
   - name: compile
   commands:
-  - func: "do setup"
+  - command: manifest.load
+  - func: "git get project"
+  - func: "set task expansion macros"
+  - func: "set up venv"
+  - func: "upload pip requirements"
   - func: "run idl tests"
 
 - name: blackduck_scanner
