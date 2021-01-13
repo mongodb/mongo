@@ -6800,11 +6800,14 @@ Value ExpressionDateArithmetics::evaluate(const Document& root, Variables* varia
     if (startDate.nullish()) {
         return Value(BSONNULL);
     }
-
-    uassert(5166403,
-            str::stream() << _opName << " requires startDate to be convertible to a date",
-            startDate.coercibleToDate());
-
+    auto unitVal = _unit->evaluate(root, variables);
+    if (unitVal.nullish()) {
+        return Value(BSONNULL);
+    }
+    auto amount = _amount->evaluate(root, variables);
+    if (amount.nullish()) {
+        return Value(BSONNULL);
+    }
     // Get the TimeZone object for the timezone parameter, if it is specified, or UTC otherwise.
     auto timezone =
         makeTimeZone(getExpressionContext()->timeZoneDatabase, root, _timeZone.get(), variables);
@@ -6812,19 +6815,13 @@ Value ExpressionDateArithmetics::evaluate(const Document& root, Variables* varia
         return Value(BSONNULL);
     }
 
-    auto unitVal = _unit->evaluate(root, variables);
-    if (unitVal.nullish()) {
-        return Value(BSONNULL);
-    }
+    uassert(5166403,
+            str::stream() << _opName << " requires startDate to be convertible to a date",
+            startDate.coercibleToDate());
     uassert(5166404,
             str::stream() << _opName << " expects string defining the time unit",
             unitVal.getType() == BSONType::String);
     auto unit = parseTimeUnit(unitVal.getString());
-
-    auto amount = _amount->evaluate(root, variables);
-    if (amount.nullish()) {
-        return Value(BSONNULL);
-    }
     uassert(5166405,
             str::stream() << _opName << " expects integer amount of time units",
             amount.integral64Bit());
