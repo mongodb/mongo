@@ -390,6 +390,10 @@ void AutoGetCollectionForReadLockFree::EmplaceHelper::emplace(
             std::shared_ptr<const Collection>& collection,
             OperationContext* opCtx,
             CollectionUUID uuid) {
+            // A sub-operation should never yield because it would break the consistent in-memory
+            // and on-disk view of the higher level operation.
+            invariant(!isSubOperation);
+
             collection = acquireCollectionAndConsistentSnapshot(
                 opCtx,
                 /* isLockFreeReadSubOperation */
@@ -397,7 +401,7 @@ void AutoGetCollectionForReadLockFree::EmplaceHelper::emplace(
                 /* CollectionCatalogStasher */
                 catalogStasher,
                 /* GetCollectionAndEstablishReadSourceFunc */
-                [uuid, isSubOperation](OperationContext* opCtx, const CollectionCatalog& catalog) {
+                [uuid](OperationContext* opCtx, const CollectionCatalog& catalog) {
                     auto coll = catalog.lookupCollectionByUUIDForRead(opCtx, uuid);
 
                     // After yielding and reacquiring locks, the preconditions that were used to
