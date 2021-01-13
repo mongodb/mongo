@@ -543,8 +543,11 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig() {
               "range"_attr = redact(range.toString()),
               "migrationId"_attr = _coordinator->getMigrationId());
 
-        invariant(_cleanupCompleteFuture);
-        auto deleteStatus = _cleanupCompleteFuture->getNoThrow(_opCtx);
+        Status deleteStatus = _cleanupCompleteFuture
+            ? _cleanupCompleteFuture->getNoThrow(_opCtx)
+            : Status(ErrorCodes::Error(5089002),
+                     "Not honouring the 'waitForDelete' request because migration coordinator "
+                     "cleanup didn't succeed");
         if (!deleteStatus.isOK()) {
             return {ErrorCodes::OrphanedRangeCleanUpFailed,
                     orphanedRangeCleanUpErrMsg + redact(deleteStatus)};
