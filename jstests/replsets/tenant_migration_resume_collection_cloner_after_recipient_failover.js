@@ -16,10 +16,10 @@ load("jstests/replsets/libs/tenant_migration_util.js");
 const recipientRst = new ReplSetTest({
     nodes: 2,
     name: jsTestName() + "_recipient",
-    // Use a batch size of 1 so that collection cloner requires more than a single batch to
-    // complete. This is needed to make the failpoint tenantMigrationHangDuringCollectionClone work.
+    // Use a batch size of 2 so that collection cloner requires more than a single batch to
+    // complete.
     nodeOptions: Object.assign(TenantMigrationUtil.makeX509OptionsForTest().recipient,
-                               {setParameter: {collectionClonerBatchSize: 1}})
+                               {setParameter: {collectionClonerBatchSize: 2}})
 });
 
 recipientRst.startSet();
@@ -54,8 +54,8 @@ const recipientDb = recipientPrimary.getDB(dbName);
 let recipientColl = recipientDb.getCollection(collName);
 const hangDuringCollectionClone =
     configureFailPoint(recipientDb,
-                       "tenantMigrationHangDuringCollectionClone",
-                       {namespace: recipientColl.getFullName(), numDocsToClone: 2});
+                       "tenantMigrationHangCollectionClonerAfterHandlingBatchResponse",
+                       {nss: recipientColl.getFullName()});
 
 // Start a migration and wait for recipient to hang after cloning 2 documents.
 const donorRstArgs = TenantMigrationUtil.createRstArgs(tenantMigrationTest.getDonorRst());

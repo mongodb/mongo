@@ -62,10 +62,6 @@ MONGO_FAIL_POINT_DEFINE(tenantCollectionClonerHangAfterGettingOperationTime);
 // DBClientConnection, optionally limited to a specific collection.
 MONGO_FAIL_POINT_DEFINE(tenantMigrationHangCollectionClonerAfterHandlingBatchResponse);
 
-// Failpoint which causes tenant migration to hang when it has cloned 'numDocsToClone' documents to
-// collection 'namespace'.
-MONGO_FAIL_POINT_DEFINE(tenantMigrationHangDuringCollectionClone);
-
 TenantCollectionCloner::TenantCollectionCloner(const NamespaceString& sourceNss,
                                                const CollectionOptions& collectionOptions,
                                                TenantMigrationSharedData* sharedData,
@@ -444,23 +440,6 @@ void TenantCollectionCloner::insertDocumentsCallback(
     // Since the writes are ordered, it's ok to check just the last writeOp result.
     uassertStatusOKWithContext(writeResult.results.back(),
                                "Tenant collection cloner: insert documents");
-
-    tenantMigrationHangDuringCollectionClone.executeIf(
-        [&](const BSONObj&) {
-            LOGV2(4884508,
-                  "initial sync - tenantMigrationHangDuringCollectionClone fail point "
-                  "enabled. Blocking until fail point is disabled",
-                  "namespace"_attr = _sourceNss.ns(),
-                  "tenantId"_attr = _tenantId);
-            while (MONGO_unlikely(tenantMigrationHangDuringCollectionClone.shouldFail()) &&
-                   !mustExit()) {
-                mongo::sleepsecs(1);
-            }
-        },
-        [&](const BSONObj& data) {
-            return data["namespace"].String() == _sourceNss.ns() &&
-                static_cast<int>(_stats.documentsCopied) >= data["numDocsToClone"].numberInt();
-        });
 }
 
 void TenantCollectionCloner::waitForDatabaseWorkToComplete() {
