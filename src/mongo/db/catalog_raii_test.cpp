@@ -206,11 +206,77 @@ TEST_F(CatalogRAIITestFixture, AutoGetCollectionDeadlineMin) {
         Milliseconds(0));
 }
 
+TEST_F(CatalogRAIITestFixture, AutoGetCollectionNotCompatibleWithRSTLExclusiveLock) {
+    Lock::GlobalLock gLock1(client1.second.get(), MODE_X);
+    ASSERT(client1.second->lockState()->isLocked());
+
+    failsWithLockTimeout(
+        [&] {
+            AutoGetCollection coll(client2.second.get(),
+                                   nss,
+                                   MODE_IX,
+                                   AutoGetCollectionViewMode::kViewsForbidden,
+                                   Date_t::now() + timeoutMs);
+        },
+        timeoutMs);
+}
+
 TEST_F(CatalogRAIITestFixture, AutoGetCollectionDBLockCompatibleX) {
     Lock::DBLock dbLock1(client1.second.get(), nss.db(), MODE_IX);
     ASSERT(client1.second->lockState()->isDbLockedForMode(nss.db(), MODE_IX));
 
     AutoGetCollection coll(client2.second.get(), nss, MODE_X);
+}
+
+TEST_F(CatalogRAIITestFixture, AutoGetCollectionLockFreeGlobalLockDeadline) {
+    Lock::GlobalLock gLock1(client1.second.get(), MODE_X);
+    ASSERT(client1.second->lockState()->isLocked());
+    failsWithLockTimeout(
+        [&] {
+            AutoGetCollectionLockFree coll(
+                client2.second.get(),
+                nss,
+                [](std::shared_ptr<const Collection>&, OperationContext*, CollectionUUID) {},
+                AutoGetCollectionViewMode::kViewsForbidden,
+                Date_t::now() + timeoutMs);
+        },
+        timeoutMs);
+}
+
+TEST_F(CatalogRAIITestFixture, AutoGetCollectionLockFreeCompatibleWithCollectionExclusiveLock) {
+    Lock::DBLock dbLock1(client1.second.get(), nss.db(), MODE_IX);
+    ASSERT(client1.second->lockState()->isDbLockedForMode(nss.db(), MODE_IX));
+    Lock::CollectionLock collLock1(client1.second.get(), nss, MODE_X);
+    ASSERT(client1.second->lockState()->isCollectionLockedForMode(nss, MODE_X));
+
+    AutoGetCollectionLockFree coll(
+        client2.second.get(),
+        nss,
+        [](std::shared_ptr<const Collection>&, OperationContext*, CollectionUUID) {});
+    ASSERT(client2.second->lockState()->isLocked());
+}
+
+TEST_F(CatalogRAIITestFixture, AutoGetCollectionLockFreeCompatibleWithDatabaseExclusiveLock) {
+    Lock::DBLock dbLock1(client1.second.get(), nss.db(), MODE_X);
+    ASSERT(client1.second->lockState()->isDbLockedForMode(nss.db(), MODE_X));
+
+    AutoGetCollectionLockFree coll(
+        client2.second.get(),
+        nss,
+        [](std::shared_ptr<const Collection>&, OperationContext*, CollectionUUID) {});
+    ASSERT(client2.second->lockState()->isLocked());
+}
+
+TEST_F(CatalogRAIITestFixture, AutoGetCollectionLockFreeCompatibleWithRSTLExclusiveLock) {
+    Lock::ResourceLock rstl(
+        client1.second->lockState(), resourceIdReplicationStateTransitionLock, MODE_X);
+    ASSERT(client1.second->lockState()->isRSTLExclusive());
+
+    AutoGetCollectionLockFree coll(
+        client2.second.get(),
+        nss,
+        [](std::shared_ptr<const Collection>&, OperationContext*, CollectionUUID) {});
+    ASSERT(client2.second->lockState()->isLocked());
 }
 
 using ReadSource = RecoveryUnit::ReadSource;
