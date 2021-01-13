@@ -1280,7 +1280,9 @@ TEST(QueryRequestTest, ConvertToAggregationSucceeds) {
     ASSERT_OK(ar.getStatus());
     ASSERT(!ar.getValue().getExplain());
     ASSERT(ar.getValue().getPipeline().empty());
-    ASSERT_EQ(ar.getValue().getBatchSize(), aggregation_request_helper::kDefaultBatchSize);
+    ASSERT_EQ(ar.getValue().getCursor().getBatchSize().value_or(
+                  aggregation_request_helper::kDefaultBatchSize),
+              aggregation_request_helper::kDefaultBatchSize);
     ASSERT_EQ(ar.getValue().getNamespace(), testns);
     ASSERT_BSONOBJ_EQ(ar.getValue().getCollation().value_or(BSONObj()), BSONObj());
 }
@@ -1414,7 +1416,9 @@ TEST(QueryRequestTest, ConvertToAggregationWithPipeline) {
     auto ar = aggregation_request_helper::parseFromBSON(testns, aggCmd);
     ASSERT_OK(ar.getStatus());
     ASSERT(!ar.getValue().getExplain());
-    ASSERT_EQ(ar.getValue().getBatchSize(), aggregation_request_helper::kDefaultBatchSize);
+    ASSERT_EQ(ar.getValue().getCursor().getBatchSize().value_or(
+                  aggregation_request_helper::kDefaultBatchSize),
+              aggregation_request_helper::kDefaultBatchSize);
     ASSERT_EQ(ar.getValue().getNamespace(), testns);
     ASSERT_BSONOBJ_EQ(ar.getValue().getCollation().value_or(BSONObj()), BSONObj());
 
@@ -1441,7 +1445,9 @@ TEST(QueryRequestTest, ConvertToAggregationWithBatchSize) {
     ASSERT_OK(ar.getStatus());
     ASSERT(!ar.getValue().getExplain());
     ASSERT_EQ(ar.getValue().getNamespace(), testns);
-    ASSERT_EQ(ar.getValue().getBatchSize(), 4LL);
+    ASSERT_EQ(ar.getValue().getCursor().getBatchSize().value_or(
+                  aggregation_request_helper::kDefaultBatchSize),
+              4LL);
     ASSERT_BSONOBJ_EQ(ar.getValue().getCollation().value_or(BSONObj()), BSONObj());
 }
 
@@ -1459,7 +1465,9 @@ TEST(QueryRequestTest, ConvertToAggregationWithMaxTimeMS) {
     auto ar = aggregation_request_helper::parseFromBSON(testns, aggCmd);
     ASSERT_OK(ar.getStatus());
     ASSERT(!ar.getValue().getExplain());
-    ASSERT_EQ(ar.getValue().getBatchSize(), aggregation_request_helper::kDefaultBatchSize);
+    ASSERT_EQ(ar.getValue().getCursor().getBatchSize().value_or(
+                  aggregation_request_helper::kDefaultBatchSize),
+              aggregation_request_helper::kDefaultBatchSize);
     ASSERT_EQ(ar.getValue().getNamespace(), testns);
     ASSERT_BSONOBJ_EQ(ar.getValue().getCollation().value_or(BSONObj()), BSONObj());
 }
@@ -1475,7 +1483,9 @@ TEST(QueryRequestTest, ConvertToAggregationWithCollationSucceeds) {
     ASSERT_OK(ar.getStatus());
     ASSERT(!ar.getValue().getExplain());
     ASSERT(ar.getValue().getPipeline().empty());
-    ASSERT_EQ(ar.getValue().getBatchSize(), aggregation_request_helper::kDefaultBatchSize);
+    ASSERT_EQ(ar.getValue().getCursor().getBatchSize().value_or(
+                  aggregation_request_helper::kDefaultBatchSize),
+              aggregation_request_helper::kDefaultBatchSize);
     ASSERT_EQ(ar.getValue().getNamespace(), testns);
     ASSERT_BSONOBJ_EQ(ar.getValue().getCollation().value_or(BSONObj()), BSON("f" << 1));
 }

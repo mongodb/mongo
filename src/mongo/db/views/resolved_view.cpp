@@ -100,7 +100,7 @@ AggregateCommand ResolvedView::asExpandedViewAggregation(const AggregateCommand&
     if (request.getExplain()) {
         expandedRequest.setExplain(request.getExplain());
     } else {
-        expandedRequest.setBatchSize(request.getBatchSize());
+        expandedRequest.setCursor(request.getCursor());
     }
 
     expandedRequest.setHint(request.getHint());

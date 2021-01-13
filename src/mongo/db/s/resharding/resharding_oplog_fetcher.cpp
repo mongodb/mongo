@@ -266,7 +266,9 @@ AggregateCommand ReshardingOplogFetcher::_makeAggregateCommand(Client* client) {
     aggRequest.setRequestReshardingResumeToken(true);
 
     if (_initialBatchSize) {
-        aggRequest.setBatchSize(_initialBatchSize);
+        SimpleCursorOptions cursor;
+        cursor.setBatchSize(_initialBatchSize);
+        aggRequest.setCursor(cursor);
     }
 
     return aggRequest;

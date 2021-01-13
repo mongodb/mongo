@@ -132,7 +132,7 @@ Document serializeToCommandDoc(const AggregateCommand& request) {
 Status validate(const BSONObj& cmdObj,
                 boost::optional<ExplainOptions::Verbosity> explainVerbosity) {
     bool hasAllowDiskUseElem = cmdObj.hasField(AggregateCommand::kAllowDiskUseFieldName);
-    bool hasCursorElem = cmdObj.hasField(AggregateCommand::kBatchSizeFieldName);
+    bool hasCursorElem = cmdObj.hasField(AggregateCommand::kCursorFieldName);
     bool hasExplainElem = cmdObj.hasField(AggregateCommand::kExplainFieldName);
     bool hasExplain =
         explainVerbosity || (hasExplainElem && cmdObj[AggregateCommand::kExplainFieldName].Bool());
@@ -144,7 +144,7 @@ Status validate(const BSONObj& cmdObj,
     if (!hasCursorElem && !hasExplainElem) {
         return {ErrorCodes::FailedToParse,
                 str::stream()
-                    << "The '" << AggregateCommand::kBatchSizeFieldName
+                    << "The '" << AggregateCommand::kCursorFieldName
                     << "' option is required, except for aggregate with the explain argument"};
     }
 
@@ -172,36 +172,6 @@ Status validate(const BSONObj& cmdObj,
 
 // Custom serializers/deserializers for AggregateCommand.
 
-long long parseBatchSizeFromBSON(const BSONElement& cursorElem) {
-    long long batchSize = 101;
-
-    if (cursorElem.eoo()) {
-        return batchSize;
-    }
-
-    uassert(ErrorCodes::TypeMismatch,
-            "cursor field must be missing or an object",
-            cursorElem.type() == mongo::Object);
-
-    BSONObj cursor = cursorElem.embeddedObject();
-    BSONElement batchSizeElem = cursor[aggregation_request_helper::kBatchSizeField];
-
-    const int expectedNumberOfCursorFields = batchSizeElem.eoo() ? 0 : 1;
-    uassert(ErrorCodes::BadValue,
-            "cursor object can't contain fields other than batchSize",
-            cursor.nFields() == expectedNumberOfCursorFields);
-
-    if (batchSizeElem.eoo()) {
-        return batchSize;
-    }
-
-    uassert(
-        ErrorCodes::TypeMismatch, "cursor.batchSize must be a number", batchSizeElem.isNumber());
-    batchSize = batchSizeElem.numberLong();
-
-    return batchSize;
-}
-
 boost::optional<mongo::ExplainOptions::Verbosity> parseExplainModeFromBSON(
     const BSONElement& explainElem) {
     uassert(ErrorCodes::TypeMismatch,
@@ -220,16 +190,38 @@ void serializeExplainToBSON(const mongo::ExplainOptions::Verbosity& explain,
                             BSONObjBuilder* builder) {
     // Note that we do not serialize 'explain' field to the command object. This serializer only
     // serializes an empty cursor object for field 'cursor' when it is an explain command.
-    builder->append(AggregateCommand::kBatchSizeFieldName, BSONObj());
+    builder->append(AggregateCommand::kCursorFieldName, BSONObj());
 
     return;
 }
 
-void serializeBatchSizeToBSON(const std::int64_t& batchSize,
-                              StringData fieldName,
-                              BSONObjBuilder* builder) {
+mongo::SimpleCursorOptions parseAggregateCursorFromBSON(const BSONElement& cursorElem) {
+    if (cursorElem.eoo()) {
+        SimpleCursorOptions cursor;
+        cursor.setBatchSize(aggregation_request_helper::kDefaultBatchSize);
+        return cursor;
+    }
+
+    uassert(ErrorCodes::TypeMismatch,
+            "cursor field must be missing or an object",
+            cursorElem.type() == mongo::Object);
+
+    SimpleCursorOptions cursor = SimpleCursorOptions::parse(
+        IDLParserErrorContext(AggregateCommand::kCursorFieldName), cursorElem.embeddedObject());
+    if (!cursor.getBatchSize())
+        cursor.setBatchSize(aggregation_request_helper::kDefaultBatchSize);
+
+    return cursor;
+}
+
+void serializeAggregateCursorToBSON(const mongo::SimpleCursorOptions& cursor,
+                                    StringData fieldName,
+                                    BSONObjBuilder* builder) {
     if (!builder->hasField(fieldName)) {
-        builder->append(fieldName, BSON(aggregation_request_helper::kBatchSizeField << batchSize));
+        builder->append(
+            fieldName,
+            BSON(aggregation_request_helper::kBatchSizeField
+                 << cursor.getBatchSize().value_or(aggregation_request_helper::kDefaultBatchSize)));
     }
 
     return;

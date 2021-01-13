@@ -40,6 +40,7 @@
 #include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/idl/basic_types_gen.h"
 
 namespace mongo {
 
@@ -109,8 +110,6 @@ Status validate(const BSONObj& cmdObj, boost::optional<ExplainOptions::Verbosity
  * Custom serializers/deserializers for AggregateCommand.
  */
 
-long long parseBatchSizeFromBSON(const BSONElement& cursorElem);
-
 boost::optional<mongo::ExplainOptions::Verbosity> parseExplainModeFromBSON(
     const BSONElement& explainElem);
 
@@ -118,9 +117,11 @@ void serializeExplainToBSON(const mongo::ExplainOptions::Verbosity& explain,
                             StringData fieldName,
                             BSONObjBuilder* builder);
 
-void serializeBatchSizeToBSON(const std::int64_t& batchSize,
-                              StringData fieldName,
-                              BSONObjBuilder* builder);
+mongo::SimpleCursorOptions parseAggregateCursorFromBSON(const BSONElement& cursorElem);
+
+void serializeAggregateCursorToBSON(const SimpleCursorOptions& cursor,
+                                    StringData fieldName,
+                                    BSONObjBuilder* builder);
 
 /**
  * Parse an aggregation pipeline definition from 'pipelineElem'.

@@ -124,7 +124,8 @@ bool handleCursorCommand(OperationContext* opCtx,
                          const BSONObj& cmdObj,
                          rpc::ReplyBuilderInterface* result) {
     invariant(!cursors.empty());
-    long long batchSize = request.getBatchSize();
+    long long batchSize =
+        request.getCursor().getBatchSize().value_or(aggregation_request_helper::kDefaultBatchSize);
 
     if (cursors.size() > 1) {
 

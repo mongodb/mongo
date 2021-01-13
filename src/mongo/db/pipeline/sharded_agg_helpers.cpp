@@ -109,7 +109,9 @@ RemoteCursor openChangeStreamNewShardMonitor(const boost::intrusive_ptr<Expressi
                       << DocumentSourceChangeStreamSpec::kAllowToRunOnConfigDBFieldName << true))});
     aggReq.setFromMongos(true);
     aggReq.setNeedsMerge(true);
-    aggReq.setBatchSize(0);
+    SimpleCursorOptions cursor;
+    cursor.setBatchSize(0);
+    aggReq.setCursor(cursor);
     auto cmdObjWithRWC =
         applyReadWriteConcern(expCtx->opCtx,
                               true,             /* appendRC */
@@ -827,7 +829,7 @@ BSONObj createCommandForTargetedShards(const boost::intrusive_ptr<ExpressionCont
         }
     }
 
-    targetedCmd[AggregateCommand::kBatchSizeFieldName] =
+    targetedCmd[AggregateCommand::kCursorFieldName] =
         Value(DOC(aggregation_request_helper::kBatchSizeField << 0));
 
     targetedCmd[AggregateCommand::kExchangeFieldName] =

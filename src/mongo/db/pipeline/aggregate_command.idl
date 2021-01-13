@@ -46,19 +46,19 @@ types:
         description: "An array of objects specifying the aggregation pipeline."
         cpp_type: "std::vector<mongo::BSONObj>" 
         deserializer: ::mongo::parsePipelineFromBSON
-    batchSize:
+    aggregateCursor:
         bson_serialization_type: any
-        description: "An int representing the cursor batch size."
-        cpp_type: "std::int64_t" 
-        serializer: ::mongo::serializeBatchSizeToBSON
-        deserializer: ::mongo::parseBatchSizeFromBSON
+        description: "A cursor type representing the cursor field of aggregate command."
+        cpp_type: SimpleCursorOptions
+        serializer: ::mongo::serializeAggregateCursorToBSON
+        deserializer: ::mongo::parseAggregateCursorFromBSON
     explainVerbosity:
         bson_serialization_type: any
         description: "The Verbosity value representing explain verbosity."
         cpp_type: "mongo::ExplainOptions::Verbosity"
         serializer: ::mongo::serializeExplainToBSON
         deserializer: ::mongo::parseExplainModeFromBSON
-        
+
 commands:
     aggregate:
         description: "Represents the user-supplied options to the aggregate command."
@@ -80,10 +80,8 @@ commands:
                 type: optionalBool
             cursor:
                 description: "To indicate a cursor with a non-default batch size."
-                cpp_name: "batchSize"
-                type: batchSize
-                default: 101
-                validator: { gte: 0 }
+                type: aggregateCursor
+                default: SimpleCursorOptions()
             maxTimeMS:
                 description: "Specifies a time limit in milliseconds for processing operations on a cursor. If you do not specify a value for maxTimeMS, operations will not time out."
                 type: safeInt64

@@ -187,7 +187,8 @@ TEST(CountCommandTest, ConvertToAggregationWithQueryAndFilterAndLimit) {
     auto cmdObj = OpMsgRequest::fromDBAndBody(testns.db(), agg).body;
 
     auto ar = uassertStatusOK(aggregation_request_helper::parseFromBSON(testns, cmdObj));
-    ASSERT_EQ(ar.getBatchSize(), aggregation_request_helper::kDefaultBatchSize);
+    ASSERT_EQ(ar.getCursor().getBatchSize().value_or(aggregation_request_helper::kDefaultBatchSize),
+              aggregation_request_helper::kDefaultBatchSize);
     ASSERT_EQ(ar.getNamespace(), testns);
     ASSERT_BSONOBJ_EQ(ar.getCollation().value_or(BSONObj()), BSONObj());
 

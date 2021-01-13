@@ -90,13 +90,17 @@ TEST(ResolvedViewTest, ExpandingAggRequestPreservesExplain) {
 TEST(ResolvedViewTest, ExpandingAggRequestWithCursorAndExplainOnlyPreservesExplain) {
     const ResolvedView resolvedView{backingNss, emptyPipeline, kSimpleCollation};
     AggregateCommand aggRequest{viewNss, {}};
-    aggRequest.setBatchSize(10);
+    SimpleCursorOptions cursor;
+    cursor.setBatchSize(10);
+    aggRequest.setCursor(cursor);
     aggRequest.setExplain(ExplainOptions::Verbosity::kExecStats);
 
     auto result = resolvedView.asExpandedViewAggregation(aggRequest);
     ASSERT(result.getExplain());
     ASSERT(*result.getExplain() == ExplainOptions::Verbosity::kExecStats);
-    ASSERT_EQ(result.getBatchSize(), aggregation_request_helper::kDefaultBatchSize);
+    ASSERT_EQ(
+        result.getCursor().getBatchSize().value_or(aggregation_request_helper::kDefaultBatchSize),
+        aggregation_request_helper::kDefaultBatchSize);
 }
 
 TEST(ResolvedViewTest, ExpandingAggRequestPreservesBypassDocumentValidation) {

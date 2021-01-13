@@ -344,7 +344,8 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
 
                 return cluster_aggregation_planner::runPipelineOnMongoS(
                     namespaces,
-                    request.getBatchSize(),
+                    request.getCursor().getBatchSize().value_or(
+                        aggregation_request_helper::kDefaultBatchSize),
                     std::move(targeter.pipeline),
                     result,
                     privileges);
@@ -355,7 +356,8 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                     opCtx,
                     std::move(targeter),
                     aggregation_request_helper::serializeToCommandDoc(request),
-                    request.getBatchSize(),
+                    request.getCursor().getBatchSize().value_or(
+                        aggregation_request_helper::kDefaultBatchSize),
                     namespaces,
                     privileges,
                     result,

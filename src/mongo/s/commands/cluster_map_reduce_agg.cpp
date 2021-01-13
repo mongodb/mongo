@@ -114,7 +114,7 @@ Document serializeToCommand(BSONObj originalCmd, const MapReduce& parsedMr, Pipe
 
     translatedCmd["aggregate"] = Value(parsedMr.getNamespace().coll());
     translatedCmd[AggregateCommand::kPipelineFieldName] = Value(pipeline->serialize());
-    translatedCmd[AggregateCommand::kBatchSizeFieldName] =
+    translatedCmd[AggregateCommand::kCursorFieldName] =
         Value(Document{{"batchSize", std::numeric_limits<long long>::max()}});
     translatedCmd[AggregateCommand::kAllowDiskUseFieldName] = Value(true);
     translatedCmd[AggregateCommand::kFromMongosFieldName] = Value(true);

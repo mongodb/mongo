@@ -63,7 +63,9 @@ TEST(ParsedDistinctTest, ConvertToAggregationNoQuery) {
     auto ar = aggregation_request_helper::parseFromBSON(testns, cmdObj);
     ASSERT_OK(ar.getStatus());
     ASSERT(!ar.getValue().getExplain());
-    ASSERT_EQ(ar.getValue().getBatchSize(), aggregation_request_helper::kDefaultBatchSize);
+    ASSERT_EQ(ar.getValue().getCursor().getBatchSize().value_or(
+                  aggregation_request_helper::kDefaultBatchSize),
+              aggregation_request_helper::kDefaultBatchSize);
     ASSERT_EQ(ar.getValue().getNamespace(), testns);
     ASSERT_BSONOBJ_EQ(ar.getValue().getCollation().value_or(BSONObj()), BSONObj());
     ASSERT(ar.getValue().getReadConcern().value_or(BSONObj()).isEmpty());
@@ -103,7 +105,9 @@ TEST(ParsedDistinctTest, ConvertToAggregationDottedPathNoQuery) {
     auto ar = aggregation_request_helper::parseFromBSON(testns, cmdObj);
     ASSERT_OK(ar.getStatus());
     ASSERT(!ar.getValue().getExplain());
-    ASSERT_EQ(ar.getValue().getBatchSize(), aggregation_request_helper::kDefaultBatchSize);
+    ASSERT_EQ(ar.getValue().getCursor().getBatchSize().value_or(
+                  aggregation_request_helper::kDefaultBatchSize),
+              aggregation_request_helper::kDefaultBatchSize);
     ASSERT_EQ(ar.getValue().getNamespace(), testns);
     ASSERT_BSONOBJ_EQ(ar.getValue().getCollation().value_or(BSONObj()), BSONObj());
     ASSERT(ar.getValue().getReadConcern().value_or(BSONObj()).isEmpty());
@@ -168,7 +172,9 @@ TEST(ParsedDistinctTest, ConvertToAggregationWithAllOptions) {
     auto ar = aggregation_request_helper::parseFromBSON(testns, cmdObj);
     ASSERT_OK(ar.getStatus());
     ASSERT(!ar.getValue().getExplain());
-    ASSERT_EQ(ar.getValue().getBatchSize(), aggregation_request_helper::kDefaultBatchSize);
+    ASSERT_EQ(ar.getValue().getCursor().getBatchSize().value_or(
+                  aggregation_request_helper::kDefaultBatchSize),
+              aggregation_request_helper::kDefaultBatchSize);
     ASSERT_EQ(ar.getValue().getNamespace(), testns);
     ASSERT_BSONOBJ_EQ(ar.getValue().getCollation().value_or(BSONObj()),
                       BSON("locale"
@@ -215,7 +221,9 @@ TEST(ParsedDistinctTest, ConvertToAggregationWithQuery) {
     auto ar = aggregation_request_helper::parseFromBSON(testns, cmdObj);
     ASSERT_OK(ar.getStatus());
     ASSERT(!ar.getValue().getExplain());
-    ASSERT_EQ(ar.getValue().getBatchSize(), aggregation_request_helper::kDefaultBatchSize);
+    ASSERT_EQ(ar.getValue().getCursor().getBatchSize().value_or(
+                  aggregation_request_helper::kDefaultBatchSize),
+              aggregation_request_helper::kDefaultBatchSize);
     ASSERT_EQ(ar.getValue().getNamespace(), testns);
     ASSERT_BSONOBJ_EQ(ar.getValue().getCollation().value_or(BSONObj()), BSONObj());
     ASSERT(ar.getValue().getReadConcern().value_or(BSONObj()).isEmpty());

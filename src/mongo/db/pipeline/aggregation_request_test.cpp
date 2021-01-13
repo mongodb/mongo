@@ -79,7 +79,9 @@ TEST(AggregationRequestTest, ShouldParseAllKnownOptions) {
     ASSERT_TRUE(request.getNeedsMerge());
     ASSERT_TRUE(request.getBypassDocumentValidation().value_or(false));
     ASSERT_TRUE(request.getRequestReshardingResumeToken());
-    ASSERT_EQ(request.getBatchSize(), 10);
+    ASSERT_EQ(
+        request.getCursor().getBatchSize().value_or(aggregation_request_helper::kDefaultBatchSize),
+        10);
     ASSERT_BSONOBJ_EQ(request.getHint().value_or(BSONObj()), BSON("a" << 1));
     ASSERT_BSONOBJ_EQ(request.getCollation().value_or(BSONObj()),
                       BSON("locale"
@@ -121,7 +123,9 @@ TEST(AggregationRequestTest, ShouldParseExplicitExplainFalseWithCursorOption) {
         "'a'}");
     auto request = unittest::assertGet(aggregation_request_helper::parseFromBSON(nss, inputBson));
     ASSERT_FALSE(request.getExplain());
-    ASSERT_EQ(request.getBatchSize(), 10);
+    ASSERT_EQ(
+        request.getCursor().getBatchSize().value_or(aggregation_request_helper::kDefaultBatchSize),
+        10);
 }
 
 TEST(AggregationRequestTest, ShouldParseWithSeparateQueryPlannerExplainModeArg) {
@@ -142,7 +146,9 @@ TEST(AggregationRequestTest, ShouldParseWithSeparateQueryPlannerExplainModeArgAn
         nss, inputBson, ExplainOptions::Verbosity::kExecStats));
     ASSERT_TRUE(request.getExplain());
     ASSERT(*request.getExplain() == ExplainOptions::Verbosity::kExecStats);
-    ASSERT_EQ(request.getBatchSize(), 10);
+    ASSERT_EQ(
+        request.getCursor().getBatchSize().value_or(aggregation_request_helper::kDefaultBatchSize),
+        10);
 }
 
 TEST(AggregationRequestTest, ShouldParseExplainFlagWithReadConcern) {
@@ -170,7 +176,7 @@ TEST(AggregationRequestTest, ShouldOnlySerializeRequiredFieldsIfNoOptionalFields
     auto expectedSerialization =
         Document{{AggregateCommand::kCommandName, nss.coll()},
                  {AggregateCommand::kPipelineFieldName, std::vector<Value>{}},
-                 {AggregateCommand::kBatchSizeFieldName, Value(kDefaultCursorOptionDocument)}};
+                 {AggregateCommand::kCursorFieldName, Value(kDefaultCursorOptionDocument)}};
     ASSERT_DOCUMENT_EQ(aggregation_request_helper::serializeToCommandDoc(request),
                        expectedSerialization);
 }
@@ -183,7 +189,9 @@ TEST(AggregationRequestTest, ShouldSerializeOptionalValuesIfSet) {
     request.setNeedsMerge(true);
     request.setBypassDocumentValidation(true);
     request.setRequestReshardingResumeToken(true);
-    request.setBatchSize(10);
+    SimpleCursorOptions cursor;
+    cursor.setBatchSize(10);
+    request.setCursor(cursor);
     request.setMaxTimeMS(10u);
     const auto hintObj = BSON("a" << 1);
     request.setHint(hintObj);
@@ -203,23 +211,23 @@ TEST(AggregationRequestTest, ShouldSerializeOptionalValuesIfSet) {
     auto uuid = UUID::gen();
     request.setCollectionUUID(uuid);
 
-    auto expectedSerialization = Document{
-        {AggregateCommand::kCommandName, nss.coll()},
-        {AggregateCommand::kPipelineFieldName, std::vector<Value>{}},
-        {AggregateCommand::kAllowDiskUseFieldName, true},
-        {AggregateCommand::kBatchSizeFieldName, Value(Document({{kBatchSizeFieldName, 10}}))},
-        {QueryRequest::cmdOptionMaxTimeMS, 10},
-        {AggregateCommand::kBypassDocumentValidationFieldName, true},
-        {repl::ReadConcernArgs::kReadConcernFieldName, readConcernObj},
-        {AggregateCommand::kCollationFieldName, collationObj},
-        {AggregateCommand::kHintFieldName, hintObj},
-        {AggregateCommand::kLetFieldName, letParamsObj},
-        {AggregateCommand::kNeedsMergeFieldName, true},
-        {AggregateCommand::kFromMongosFieldName, true},
-        {QueryRequest::kUnwrappedReadPrefField, readPrefObj},
-        {AggregateCommand::kRequestReshardingResumeTokenFieldName, true},
-        {AggregateCommand::kIsMapReduceCommandFieldName, true},
-        {AggregateCommand::kCollectionUUIDFieldName, uuid}};
+    auto expectedSerialization =
+        Document{{AggregateCommand::kCommandName, nss.coll()},
+                 {AggregateCommand::kPipelineFieldName, std::vector<Value>{}},
+                 {AggregateCommand::kAllowDiskUseFieldName, true},
+                 {AggregateCommand::kCursorFieldName, Value(Document({{kBatchSizeFieldName, 10}}))},
+                 {QueryRequest::cmdOptionMaxTimeMS, 10},
+                 {AggregateCommand::kBypassDocumentValidationFieldName, true},
+                 {repl::ReadConcernArgs::kReadConcernFieldName, readConcernObj},
+                 {AggregateCommand::kCollationFieldName, collationObj},
+                 {AggregateCommand::kHintFieldName, hintObj},
+                 {AggregateCommand::kLetFieldName, letParamsObj},
+                 {AggregateCommand::kNeedsMergeFieldName, true},
+                 {AggregateCommand::kFromMongosFieldName, true},
+                 {QueryRequest::kUnwrappedReadPrefField, readPrefObj},
+                 {AggregateCommand::kRequestReshardingResumeTokenFieldName, true},
+                 {AggregateCommand::kIsMapReduceCommandFieldName, true},
+                 {AggregateCommand::kCollectionUUIDFieldName, uuid}};
     ASSERT_DOCUMENT_EQ(aggregation_request_helper::serializeToCommandDoc(request),
                        expectedSerialization);
 }
@@ -227,12 +235,14 @@ TEST(AggregationRequestTest, ShouldSerializeOptionalValuesIfSet) {
 TEST(AggregationRequestTest, ShouldSerializeBatchSizeIfSetAndExplainFalse) {
     NamespaceString nss("a.collection");
     AggregateCommand request(nss, {});
-    request.setBatchSize(10);
+    SimpleCursorOptions cursor;
+    cursor.setBatchSize(10);
+    request.setCursor(cursor);
 
     auto expectedSerialization = Document{
         {AggregateCommand::kCommandName, nss.coll()},
         {AggregateCommand::kPipelineFieldName, std::vector<Value>{}},
-        {AggregateCommand::kBatchSizeFieldName, Value(Document({{kBatchSizeFieldName, 10}}))}};
+        {AggregateCommand::kCursorFieldName, Value(Document({{kBatchSizeFieldName, 10}}))}};
     ASSERT_DOCUMENT_EQ(aggregation_request_helper::serializeToCommandDoc(request),
                        expectedSerialization);
 }
@@ -244,7 +254,7 @@ TEST(AggregationRequestTest, ShouldSerialiseAggregateFieldToOneIfCollectionIsAgg
     auto expectedSerialization =
         Document{{AggregateCommand::kCommandName, 1},
                  {AggregateCommand::kPipelineFieldName, std::vector<Value>{}},
-                 {AggregateCommand::kBatchSizeFieldName,
+                 {AggregateCommand::kCursorFieldName,
                   Value(Document({{aggregation_request_helper::kBatchSizeField,
                                    aggregation_request_helper::kDefaultBatchSize}}))}};
 
@@ -258,7 +268,9 @@ TEST(AggregationRequestTest, ShouldSetBatchSizeToDefaultOnEmptyCursorObject) {
         "{aggregate: 'collection', pipeline: [{$match: {a: 'abc'}}], cursor: {}, $db: 'a'}");
     auto request = aggregation_request_helper::parseFromBSON(nss, inputBson);
     ASSERT_OK(request.getStatus());
-    ASSERT_EQ(request.getValue().getBatchSize(), aggregation_request_helper::kDefaultBatchSize);
+    ASSERT_EQ(request.getValue().getCursor().getBatchSize().value_or(
+                  aggregation_request_helper::kDefaultBatchSize),
+              aggregation_request_helper::kDefaultBatchSize);
 }
 
 TEST(AggregationRequestTest, ShouldAcceptHintAsString) {
@@ -276,13 +288,15 @@ TEST(AggregationRequestTest, ShouldAcceptHintAsString) {
 TEST(AggregationRequestTest, ShouldNotSerializeBatchSizeWhenExplainSet) {
     NamespaceString nss("a.collection");
     AggregateCommand request(nss, {});
-    request.setBatchSize(10);
+    SimpleCursorOptions cursor;
+    cursor.setBatchSize(10);
+    request.setCursor(cursor);
     request.setExplain(ExplainOptions::Verbosity::kQueryPlanner);
 
     auto expectedSerialization =
         Document{{AggregateCommand::kCommandName, nss.coll()},
                  {AggregateCommand::kPipelineFieldName, std::vector<Value>{}},
-                 {AggregateCommand::kBatchSizeFieldName, Value(Document())}};
+                 {AggregateCommand::kCursorFieldName, Value(Document())}};
     ASSERT_DOCUMENT_EQ(aggregation_request_helper::serializeToCommandDoc(request),
                        expectedSerialization);
 }
