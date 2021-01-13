@@ -33,10 +33,12 @@
 
 #include "mongo/db/s/sharding_ddl_util.h"
 
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
+#include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
@@ -155,6 +157,43 @@ OID shardedRenameMetadata(OperationContext* opCtx,
     }
 
     return newEpoch;
+}
+
+void checkShardedRenamePreconditions(OperationContext* opCtx,
+                                     const NamespaceString& toNss,
+                                     const RenameCollectionOptions& options) {
+    if (!options.dropTarget) {
+        // Check that the sharded target collection doesn't exist
+        auto catalogCache = Grid::get(opCtx)->catalogCache();
+        try {
+            catalogCache->getShardedCollectionRoutingInfo(opCtx, toNss);
+            // If no exception is thrown, the collection exists and is sharded
+            uasserted(ErrorCodes::CommandFailed,
+                      str::stream() << "Sharded target collection " << toNss.ns()
+                                    << " exists but dropTarget is not set");
+        } catch (const DBException& ex) {
+            auto code = ex.code();
+            if (code != ErrorCodes::NamespaceNotFound && code != ErrorCodes::NamespaceNotSharded) {
+                throw;
+            }
+        }
+
+        // Check that the unsharded target collection doesn't exist
+        auto collectionCatalog = CollectionCatalog::get(opCtx);
+        auto targetColl = collectionCatalog->lookupCollectionByNamespace(opCtx, toNss);
+        uassert(ErrorCodes::CommandFailed,
+                str::stream() << "Target collection " << toNss.ns()
+                              << " exists but dropTarget is not set",
+                !targetColl);
+    }
+
+    // Check that there are no tags associated to the target collection
+    auto catalogClient = Grid::get(opCtx)->catalogClient();
+    auto tags = uassertStatusOK(catalogClient->getTagsForCollection(opCtx, toNss));
+    uassert(ErrorCodes::CommandFailed,
+            str::stream() << "Can't rename to target collection " << toNss.ns()
+                          << " because it must not have associated tags",
+            tags.empty());
 }
 
 }  // namespace sharding_ddl_util

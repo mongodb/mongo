@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/db/catalog/rename_collection.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 
@@ -45,6 +46,15 @@ namespace sharding_ddl_util {
 OID shardedRenameMetadata(OperationContext* opCtx,
                           const NamespaceString& fromNss,
                           const NamespaceString& toNss);
+
+/**
+ * Ensures rename preconditions for sharded collections are met:
+ * - Check that `dropTarget` is true if the destination collection exists
+ * - Check that no tags exist for the destination collection
+ */
+void checkShardedRenamePreconditions(OperationContext* opCtx,
+                                     const NamespaceString& toNss,
+                                     const RenameCollectionOptions& options);
 
 }  // namespace sharding_ddl_util
 }  // namespace mongo

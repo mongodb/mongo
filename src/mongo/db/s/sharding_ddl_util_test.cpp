@@ -42,6 +42,7 @@
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_shard.h"
+#include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/unittest/unittest.h"
 
@@ -71,6 +72,8 @@ protected:
     }
 };
 
+const NamespaceString kToNss("test.to");
+
 // Test that config.collection document and config.chunks documents are properly updated from source
 // to destination collection metadata
 TEST_F(ShardingDDLUtilTest, ShardedRenameMetadata) {
@@ -85,8 +88,7 @@ TEST_F(ShardingDDLUtilTest, ShardedRenameMetadata) {
     const NamespaceString fromNss("test.from");
     const auto fromCollQuery = Query(BSON(CollectionType::kNssFieldName << fromNss.ns()));
 
-    const NamespaceString toNss("test.to");
-    const auto toCollQuery = Query(BSON(CollectionType::kNssFieldName << toNss.ns()));
+    const auto toCollQuery = Query(BSON(CollectionType::kNssFieldName << kToNss.ns()));
 
     // Initialize FROM collection chunks
     const auto fromEpoch = OID::gen();
@@ -119,7 +121,7 @@ TEST_F(ShardingDDLUtilTest, ShardedRenameMetadata) {
     client.findN(fromChunks, ChunkType::ConfigNS.ns(), fromChunksQuery, nChunks);
 
     // Perform the metadata rename and get TO epoch
-    auto toEpoch = sharding_ddl_util::shardedRenameMetadata(opCtx, fromNss, toNss);
+    auto toEpoch = sharding_ddl_util::shardedRenameMetadata(opCtx, fromNss, kToNss);
 
     // Check that the FROM config.collections entry has been deleted
     ASSERT(client.findOne(CollectionType::ConfigNS.ns(), fromCollQuery).isEmpty());
@@ -158,6 +160,93 @@ TEST_F(ShardingDDLUtilTest, ShardedRenameMetadata) {
                     toChunkDoc.removeField(epochChunkFieldName).removeField(nssChunkFieldName)),
             0);
     }
+}
+
+// Test all combinations of sharded rename acceptable preconditions:
+// (1) Target collection doesn't exist and doesn't have no associated tags
+// (2) Target collection exists and doesn't have associated tags
+TEST_F(ShardingDDLUtilTest, ShardedRenamePreconditionsAreMet) {
+    auto opCtx = operationContext();
+
+    // Initialize the shard
+    ShardType shard0;
+    shard0.setName("shard0");
+    shard0.setHost("shard0:12");
+    setupShards({shard0});
+
+    setupDatabase("test", shard0.getName(), true /* sharded */);
+
+    // No exception is thrown if the TO collection does not exist and has no associated tags
+    RenameCollectionOptions options;
+    sharding_ddl_util::checkShardedRenamePreconditions(opCtx, kToNss, options);
+
+    // Initialize a chunk
+    ChunkVersion chunkVersion(1, 1, OID::gen(), boost::none);
+    ChunkType chunk;
+    chunk.setName(OID::gen());
+    chunk.setNS(kToNss);
+    chunk.setVersion(chunkVersion);
+    chunk.setShard(shard0.getName());
+    chunk.setHistory({ChunkHistory(Timestamp(1, 1), shard0.getName())});
+    chunk.setMin(kMinBSONKey);
+    chunk.setMax(kMaxBSONKey);
+
+    // Initialize the sharded TO collection
+    setupCollection(kToNss, KeyPattern(BSON("x" << 1)), {chunk});
+
+    // When dropTarget is set, no exception is thrown if the TO collection exists with no tags
+    options.dropTarget = true;
+    sharding_ddl_util::checkShardedRenamePreconditions(opCtx, kToNss, options);
+}
+
+TEST_F(ShardingDDLUtilTest, ShardedRenamePreconditionsTargetCollectionExists) {
+    auto opCtx = operationContext();
+
+    // Initialize the shard
+    ShardType shard0;
+    shard0.setName("shard0");
+    shard0.setHost("shard0:12");
+    setupShards({shard0});
+
+    // Initialize a chunk
+    ChunkVersion chunkVersion(1, 1, OID::gen(), boost::none);
+    ChunkType chunk;
+    chunk.setName(OID::gen());
+    chunk.setNS(kToNss);
+    chunk.setVersion(chunkVersion);
+    chunk.setShard(shard0.getName());
+    chunk.setHistory({ChunkHistory(Timestamp(1, 1), shard0.getName())});
+    chunk.setMin(kMinBSONKey);
+    chunk.setMax(kMaxBSONKey);
+
+    // Initialize the sharded collection
+    setupDatabase("test", shard0.getName(), true /* sharded */);
+    setupCollection(kToNss, KeyPattern(BSON("x" << 1)), {chunk});
+
+    // Check that an exception is thrown if the target collection exists and dropTarget is not set
+    RenameCollectionOptions options; /* dropTarget is false by default */
+    options.dropTarget = false;
+    ASSERT_THROWS_CODE(sharding_ddl_util::checkShardedRenamePreconditions(opCtx, kToNss, options),
+                       AssertionException,
+                       ErrorCodes::CommandFailed);
+}
+
+TEST_F(ShardingDDLUtilTest, ShardedRenamePreconditionTargetCollectionHasTags) {
+    auto opCtx = operationContext();
+
+    // Associate a tag to the target collection
+    TagsType tagDoc;
+    tagDoc.setNS(kToNss);
+    tagDoc.setMinKey(BSON("x" << 0));
+    tagDoc.setMaxKey(BSON("x" << 1));
+    tagDoc.setTag("z");
+    ASSERT_OK(insertToConfigCollection(operationContext(), TagsType::ConfigNS, tagDoc.toBSON()));
+
+    // Check that an exception is thrown if some tag is associated to the target collection
+    RenameCollectionOptions options;
+    ASSERT_THROWS_CODE(sharding_ddl_util::checkShardedRenamePreconditions(opCtx, kToNss, options),
+                       AssertionException,
+                       ErrorCodes::CommandFailed);
 }
 
 }  // namespace
