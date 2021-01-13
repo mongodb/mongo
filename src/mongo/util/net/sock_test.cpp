@@ -82,7 +82,7 @@ void awaitConnect(SOCKET* connectSock, const struct addrinfo& where, Notificatio
 }
 }  // namespace detail
 
-SocketPair socketPair(int type, int protocol) {
+SocketPair socketPair(const int type, const int protocol) {
     const int domain = PF_INET;
 
     // Create a listen socket and a connect socket.
@@ -186,7 +186,7 @@ SocketPair socketPair(int type, int protocol) {
 }
 #else
 // We can just use ::socketpair and wrap up the result in a Socket.
-SocketPair socketPair(int type, int protocol) {
+SocketPair socketPair(const int type, const int protocol) {
     // PF_LOCAL is the POSIX name for Unix domain sockets, while PF_UNIX
     // is the name that BSD used.  We use the BSD name because it is more
     // widely supported (e.g. Solaris 10).

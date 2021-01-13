@@ -91,7 +91,8 @@ ServiceContext::UniqueOperationContext makeOpCtx() {
     return opCtx;
 }
 
-void CreateCollectionTest::validateValidator(const std::string& validatorStr, int expectedError) {
+void CreateCollectionTest::validateValidator(const std::string& validatorStr,
+                                             const int expectedError) {
     NamespaceString newNss("test.newCollWithValidation");
 
     auto opCtx = makeOpCtx();

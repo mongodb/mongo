@@ -98,8 +98,8 @@ ReplSetHeartbeatResponse ReplCoordHBV1Test::receiveHeartbeatFrom(
     const ReplSetConfig& rsConfig,
     int sourceId,
     const HostAndPort& source,
-    int term,
-    boost::optional<int> currentPrimaryId) {
+    const int term,
+    const boost::optional<int> currentPrimaryId) {
     ReplSetHeartbeatArgsV1 hbArgs;
     hbArgs.setConfigVersion(rsConfig.getConfigVersion());
     hbArgs.setConfigTerm(rsConfig.getConfigTerm());
