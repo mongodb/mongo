@@ -93,6 +93,11 @@ StatusWith<BSONObj> validateIndexSpecCollation(OperationContext* opCtx,
 Status validateIndexSpecTTL(const BSONObj& indexSpec);
 
 /**
+ * Returns whether an index is allowed in API version 1.
+ */
+bool isIndexAllowedInAPIVersion1(const IndexDescriptor& indexDesc);
+
+/**
  * Optional filtering function to adjust allowed index field names at startup.
  * Set it in a MONGO_INITIALIZER with 'FilterAllowedIndexFieldNames' as a dependant.
  */

@@ -6003,6 +6003,77 @@ var authCommandsLib = {
               },
             ]
         },
+        {
+          testname: "validate_db_metadata_command_specific_db",
+          command: {
+              validateDBMetadata: 1,
+              db: secondDbName,
+              collection: "test",
+              apiParameters: {version: "1", strict: true}
+          },
+          skipSharded: true,
+          setup: function(db) {
+              assert.commandWorked(db.getSiblingDB(firstDbName).createCollection("test"));
+              assert.commandWorked(db.getSiblingDB(secondDbName).createCollection("test"));
+              assert.commandWorked(db.getSiblingDB("ThirdDB").createCollection("test"));
+          },
+          teardown: function(db) {
+              assert.commandWorked(db.getSiblingDB(firstDbName).dropDatabase());
+              assert.commandWorked(db.getSiblingDB(secondDbName).dropDatabase());
+              assert.commandWorked(db.getSiblingDB("ThirdDB").dropDatabase());
+          },
+          testcases: [
+              {
+                  runOnDb: secondDbName,
+                  privileges: [{resource: {db: secondDbName, collection: ""}, actions: ["validate"]}]
+              },
+              {
+                  // Need to have permission on firstDBName to be able to the command on the db.
+                  runOnDb: firstDbName,
+                  privileges: [{resource: {db: secondDbName, collection: ""}, actions: ["validate"]}],
+                  expectAuthzFailure: true
+              },
+              {
+                  runOnDb: firstDbName,
+                  privileges: [
+                      {resource: {db: firstDbName, collection: ""}, actions: ["validate"]},
+                      {resource: {db: secondDbName, collection: ""}, actions: ["validate"]}
+                  ]
+              },
+          ]
+      },
+      {
+          testname: "validate_db_metadata_command_all_dbs",
+          command: {validateDBMetadata: 1, apiParameters: {version: "1", strict: true}},
+          skipSharded: true,
+          setup: function(db) {
+              assert.commandWorked(db.getSiblingDB(firstDbName).createCollection("test"));
+              assert.commandWorked(db.getSiblingDB(secondDbName).createCollection("test"));
+          },
+          teardown: function(db) {
+              assert.commandWorked(db.getSiblingDB(firstDbName).dropDatabase());
+              assert.commandWorked(db.getSiblingDB(secondDbName).dropDatabase());
+          },
+          testcases: [
+              {
+                  // Since the command didn't specify a 'db', it validates all dbs and hence require
+                  // permission to run on all dbs.
+                  runOnDb: secondDbName,
+                  privileges: [{resource: {db: secondDbName, collection: ""}, actions: ["validate"]}],
+                  expectAuthzFailure: true
+              },
+              {
+                  runOnDb: secondDbName,
+                  privileges: [
+                      {resource: {db: "admin", collection: ""}, actions: ["validate"]},
+                      {resource: {db: "config", collection: ""}, actions: ["validate"]},
+                      {resource: {db: "local", collection: ""}, actions: ["validate"]},
+                      {resource: {db: firstDbName, collection: ""}, actions: ["validate"]},
+                      {resource: {db: secondDbName, collection: ""}, actions: ["validate"]}
+                  ]
+              },
+          ]
+      },
     ],
 
     /************* SHARED TEST LOGIC ****************/

@@ -172,7 +172,7 @@ public:
     /**
      * Returns true if 'stageName' is in API Version 1.
      */
-    bool isStageInAPIVersion1(const std::string& stageName) const {
+    static bool isStageInAPIVersion1(const std::string& stageName) {
         // These stages are excluded from API Version1 with 'apiStrict: true'.
         static const stdx::unordered_set<std::string> stagesExcluded = {"$collStats",
                                                                         "$currentOp",

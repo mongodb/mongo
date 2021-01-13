@@ -269,7 +269,9 @@ void ViewCatalog::_requireValidCatalog() const {
 void ViewCatalog::iterate(OperationContext* opCtx, ViewIteratorCallback callback) const {
     _requireValidCatalog();
     for (auto&& view : _viewMap) {
-        callback(*view.second);
+        if (!callback(*view.second)) {
+            break;
+        }
     }
 }
 
@@ -338,7 +340,7 @@ Status ViewCatalog::_upsertIntoGraph(OperationContext* opCtx, const ViewDefiniti
     auto doInsert = [this, &opCtx](const ViewDefinition& viewDef, bool needsValidation) -> Status {
         // Validate that the pipeline is eligible to serve as a view definition. If it is, this
         // will also return the set of involved namespaces.
-        auto pipelineStatus = _validatePipeline(opCtx, viewDef);
+        auto pipelineStatus = validatePipeline(opCtx, viewDef);
         if (!pipelineStatus.isOK()) {
             if (needsValidation) {
                 uassertStatusOKWithContext(pipelineStatus.getStatus(),
@@ -390,8 +392,8 @@ Status ViewCatalog::_upsertIntoGraph(OperationContext* opCtx, const ViewDefiniti
     return doInsert(viewDef, true);
 }
 
-StatusWith<stdx::unordered_set<NamespaceString>> ViewCatalog::_validatePipeline(
-    OperationContext* opCtx, const ViewDefinition& viewDef) const {
+StatusWith<stdx::unordered_set<NamespaceString>> ViewCatalog::validatePipeline(
+    OperationContext* opCtx, const ViewDefinition& viewDef) {
     const LiteParsedPipeline liteParsedPipeline(viewDef.viewOn(), viewDef.pipeline());
     const auto involvedNamespaces = liteParsedPipeline.getInvolvedNamespaces();
 

@@ -703,6 +703,12 @@ Status validateIndexSpecTTL(const BSONObj& indexSpec) {
     return Status::OK();
 }
 
+bool isIndexAllowedInAPIVersion1(const IndexDescriptor& indexDesc) {
+    const auto indexName = IndexNames::findPluginName(indexDesc.keyPattern());
+    return indexName != IndexNames::TEXT && indexName != IndexNames::GEO_HAYSTACK &&
+        !indexDesc.isSparse();
+}
+
 GlobalInitializerRegisterer filterAllowedIndexFieldNamesInitializer(
     "FilterAllowedIndexFieldNames", [](InitializerContext* service) {
         if (filterAllowedIndexFieldNames)

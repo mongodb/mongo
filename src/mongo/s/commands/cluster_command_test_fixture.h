@@ -60,7 +60,7 @@ protected:
 
     DbResponse runCommand(BSONObj cmd);
 
-    void runCommandSuccessful(BSONObj cmd, bool isTargeted);
+    DbResponse runCommandSuccessful(BSONObj cmd, bool isTargeted);
 
     void runTxnCommandOneError(BSONObj cmd, ErrorCodes::Error code, bool isTargeted);
 

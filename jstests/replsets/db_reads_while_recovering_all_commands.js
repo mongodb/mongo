@@ -311,6 +311,11 @@ const allCommands = {
     updateUser: {skip: isPrimaryOnly},
     usersInfo: {skip: isPrimaryOnly},
     validate: {skip: isNotAUserDataRead},
+    validateDBMetadata: {
+        command: {validateDBMetadata: 1, apiParameters: {version: "1", strict: true}},
+        expectFailure: true,
+        expectedErrorCode: ErrorCodes.NotPrimaryOrSecondary,
+    },
     voteCommitImportCollection: {skip: isNotAUserDataRead},
     voteCommitIndexBuild: {skip: isNotAUserDataRead},
     waitForFailPoint: {skip: isNotAUserDataRead},

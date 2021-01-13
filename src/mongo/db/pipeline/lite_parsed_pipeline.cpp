@@ -132,6 +132,10 @@ void LiteParsedPipeline::validatePipelineStagesIfAPIStrict(const std::string& ve
                                   << " is not allowed with 'apiStrict: true' in API Version "
                                   << version,
                     isStageInAPIVersion1(stage->getParseTimeName()));
+
+            for (auto&& subPipeline : stage->getSubPipelines()) {
+                subPipeline.validatePipelineStagesIfAPIStrict(version);
+            }
         }
     }
 }
