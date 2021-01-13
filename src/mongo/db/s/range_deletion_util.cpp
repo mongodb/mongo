@@ -490,13 +490,12 @@ SharedSemiFuture<void> removeDocumentsInRange(
                             "namespace"_attr = nss.ns(),
                             "range"_attr = redact(range.toString()));
             } else {
-                LOGV2_ERROR(
-                    23774,
-                    "Failed to delete documents in {namespace} range {range} due to {error}",
-                    "Failed to delete documents",
-                    "namespace"_attr = nss.ns(),
-                    "range"_attr = redact(range.toString()),
-                    "error"_attr = redact(s));
+                LOGV2(23774,
+                      "Failed to delete documents in {namespace} range {range} due to {error}",
+                      "Failed to delete documents",
+                      "namespace"_attr = nss.ns(),
+                      "range"_attr = redact(range.toString()),
+                      "error"_attr = redact(s));
             }
 
             if (s.code() == ErrorCodes::RangeDeletionAbandonedBecauseTaskDocumentDoesNotExist) {
