@@ -43,29 +43,18 @@
 #include "mongo/db/storage/storage_engine.h"
 
 namespace mongo {
+
+// XXX: remove and put into storage api
+std::intmax_t dbSize(const std::string& database);
+
 namespace {
-static const StringData kFilterField{"filter"};
-static const StringData kNameField{"name"};
-static const StringData kNameOnlyField{"nameOnly"};
 
 // Failpoint which causes to hang "listDatabases" cmd after acquiring global lock in IS mode.
 MONGO_FAIL_POINT_DEFINE(hangBeforeListDatabases);
-}  // namespace
 
-using std::set;
-using std::string;
-using std::stringstream;
-using std::vector;
-
-// XXX: remove and put into storage api
-intmax_t dbSize(const string& database);
-
-class CmdListDatabases : public BasicCommand {
+constexpr auto kName = "name"_sd;
+class CmdListDatabases final : public ListDatabasesCmdVersion1Gen<CmdListDatabases> {
 public:
-    const std::set<std::string>& apiVersions() const {
-        return kApiVersions1;
-    }
-
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const final {
         return AllowedOnSecondary::kOptIn;
     }
@@ -75,123 +64,122 @@ public:
     bool maintenanceOk() const final {
         return false;
     }
-    bool supportsWriteConcern(const BSONObj& cmd) const final {
-        return false;
-    }
     std::string help() const final {
         return "{ listDatabases:1, [filter: <filterObject>] [, nameOnly: true ] }\n"
                "list databases on this server";
     }
 
-    /* listDatabases is always authorized,
-     * however the results returned will be redacted
-     * based on read privileges if auth is enabled
-     * and the current user does not have listDatabases permisison.
-     */
-    Status checkAuthForCommand(Client* client,
-                               const std::string& dbname,
-                               const BSONObj& cmdObj) const final {
-        return Status::OK();
-    }
+    class Invocation final : public InvocationBaseGen {
+    public:
+        using InvocationBaseGen::InvocationBaseGen;
 
-    CmdListDatabases() : BasicCommand("listDatabases") {}
-
-    bool run(OperationContext* opCtx,
-             const string& dbname,
-             const BSONObj& cmdObj,
-             BSONObjBuilder& result) final {
-        CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
-        IDLParserErrorContext ctx("listDatabases");
-        auto cmd = ListDatabases::parse(ctx, cmdObj);
-        auto* as = AuthorizationSession::get(opCtx->getClient());
-
-        // {nameOnly: bool} - default false.
-        const bool nameOnly = cmd.getNameOnly();
-
-        // {authorizedDatabases: bool} - Dynamic default based on permissions.
-        const bool authorizedDatabases = ([as](const boost::optional<bool>& authDB) {
-            const bool mayListAllDatabases = as->isAuthorizedForActionsOnResource(
-                ResourcePattern::forClusterResource(), ActionType::listDatabases);
-
-            if (authDB) {
-                uassert(ErrorCodes::Unauthorized,
-                        "Insufficient permissions to list all databases",
-                        authDB.get() || mayListAllDatabases);
-                return authDB.get();
-            }
-
-            // By default, list all databases if we can, otherwise
-            // only those we're allowed to find on.
-            return !mayListAllDatabases;
-        })(cmd.getAuthorizedDatabases());
-
-        // {filter: matchExpression}.
-        std::unique_ptr<MatchExpression> filter;
-        if (auto filterObj = cmd.getFilter()) {
-            // The collator is null because database metadata objects are compared using simple
-            // binary comparison.
-            auto expCtx = make_intrusive<ExpressionContext>(
-                opCtx, std::unique_ptr<CollatorInterface>(nullptr), NamespaceString(dbname));
-            auto matcher =
-                uassertStatusOK(MatchExpressionParser::parse(filterObj.get(), std::move(expCtx)));
-            filter = std::move(matcher);
+        bool supportsWriteConcern() const final {
+            return false;
         }
 
-        vector<string> dbNames;
-        StorageEngine* storageEngine = getGlobalServiceContext()->getStorageEngine();
-        {
-            Lock::GlobalLock lk(opCtx, MODE_IS);
-            CurOpFailpointHelpers::waitWhileFailPointEnabled(
-                &hangBeforeListDatabases, opCtx, "hangBeforeListDatabases", []() {});
-            dbNames = storageEngine->listDatabases();
+        void doCheckAuthorization(OperationContext*) const final {}
+
+        NamespaceString ns() const final {
+            return NamespaceString(request().getDbName(), "");
         }
 
-        vector<ListDatabasesReplyItem> items;
+        ListDatabasesReply typedRun(OperationContext* opCtx) final {
+            CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
+            auto* as = AuthorizationSession::get(opCtx->getClient());
+            auto cmd = request();
 
-        const bool filterNameOnly = filter &&
-            filter->getCategory() == MatchExpression::MatchCategory::kLeaf &&
-            filter->path() == kNameField;
-        long long totalSize = 0;
-        for (const auto& itemName : dbNames) {
-            if (authorizedDatabases && !as->isAuthorizedForAnyActionOnAnyResourceInDB(itemName)) {
-                // We don't have listDatabases on the cluser or find on this database.
-                continue;
+            // {nameOnly: bool} - default false.
+            const bool nameOnly = cmd.getNameOnly();
+
+            // {authorizedDatabases: bool} - Dynamic default based on permissions.
+            const bool authorizedDatabases = ([as](const boost::optional<bool>& authDB) {
+                const bool mayListAllDatabases = as->isAuthorizedForActionsOnResource(
+                    ResourcePattern::forClusterResource(), ActionType::listDatabases);
+
+                if (authDB) {
+                    uassert(ErrorCodes::Unauthorized,
+                            "Insufficient permissions to list all databases",
+                            authDB.get() || mayListAllDatabases);
+                    return authDB.get();
+                }
+
+                // By default, list all databases if we can, otherwise
+                // only those we're allowed to find on.
+                return !mayListAllDatabases;
+            })(cmd.getAuthorizedDatabases());
+
+            // {filter: matchExpression}.
+            std::unique_ptr<MatchExpression> filter;
+            if (auto filterObj = cmd.getFilter()) {
+                // The collator is null because database metadata objects are compared using simple
+                // binary comparison.
+                auto expCtx = make_intrusive<ExpressionContext>(
+                    opCtx, std::unique_ptr<CollatorInterface>(nullptr), ns());
+                auto matcher = uassertStatusOK(
+                    MatchExpressionParser::parse(filterObj.get(), std::move(expCtx)));
+                filter = std::move(matcher);
             }
 
-            ListDatabasesReplyItem item(itemName);
+            std::vector<std::string> dbNames;
+            StorageEngine* storageEngine = getGlobalServiceContext()->getStorageEngine();
+            {
+                Lock::GlobalLock lk(opCtx, MODE_IS);
+                CurOpFailpointHelpers::waitWhileFailPointEnabled(
+                    &hangBeforeListDatabases, opCtx, "hangBeforeListDatabases", []() {});
+                dbNames = storageEngine->listDatabases();
+            }
 
-            long long size = 0;
+            std::vector<ListDatabasesReplyItem> items;
+
+            const bool filterNameOnly = filter &&
+                filter->getCategory() == MatchExpression::MatchCategory::kLeaf &&
+                filter->path() == kName;
+            long long totalSize = 0;
+            for (const auto& itemName : dbNames) {
+                if (authorizedDatabases &&
+                    !as->isAuthorizedForAnyActionOnAnyResourceInDB(itemName)) {
+                    // We don't have listDatabases on the cluser or find on this database.
+                    continue;
+                }
+
+                ListDatabasesReplyItem item(itemName);
+
+                long long size = 0;
+                if (!nameOnly) {
+                    // Filtering on name only should not require taking locks on filtered-out names.
+                    if (filterNameOnly && !filter->matchesBSON(item.toBSON())) {
+                        continue;
+                    }
+
+                    AutoGetDb autoDb(opCtx, itemName, MODE_IS);
+                    auto* const db = autoDb.getDb();
+                    if (!db) {
+                        continue;
+                    }
+
+                    writeConflictRetry(opCtx, "sizeOnDisk", itemName, [&] {
+                        size = storageEngine->sizeOnDiskForDb(opCtx, itemName);
+                    });
+                    item.setSizeOnDisk(size);
+                    item.setEmpty(CollectionCatalog::get(opCtx)
+                                      ->getAllCollectionUUIDsFromDb(itemName)
+                                      .empty());
+                }
+                if (!filter || filter->matchesBSON(item.toBSON())) {
+                    totalSize += size;
+                    items.push_back(std::move(item));
+                }
+            }
+
+            ListDatabasesReply reply(items);
             if (!nameOnly) {
-                // Filtering on name only should not require taking locks on filtered-out names.
-                if (filterNameOnly && !filter->matchesBSON(item.toBSON()))
-                    continue;
-
-                AutoGetDb autoDb(opCtx, itemName, MODE_IS);
-                Database* const db = autoDb.getDb();
-                if (!db)
-                    continue;
-
-                writeConflictRetry(opCtx, "sizeOnDisk", itemName, [&] {
-                    size = storageEngine->sizeOnDiskForDb(opCtx, itemName);
-                });
-                item.setSizeOnDisk(size);
-                item.setEmpty(
-                    CollectionCatalog::get(opCtx)->getAllCollectionUUIDsFromDb(itemName).empty());
+                reply.setTotalSize(totalSize);
+                reply.setTotalSizeMb(totalSize / (1024 * 1024));
             }
-            if (!filter || filter->matchesBSON(item.toBSON())) {
-                totalSize += size;
-                items.push_back(std::move(item));
-            }
-        }
 
-        ListDatabasesReply reply(items);
-        if (!nameOnly) {
-            reply.setTotalSize(totalSize);
-            reply.setTotalSizeMb(totalSize / (1024 * 1024));
+            return reply;
         }
-
-        reply.serialize(&result);
-        return true;
-    }
+    };
 } cmdListDatabases;
+}  // namespace
 }  // namespace mongo

@@ -62,6 +62,7 @@ commands:
     listDatabases:
         description: "listDatabases Command"
         command_name: "listDatabases"
+        cpp_name: ListDatabasesCommand
         namespace: ignored
         api_version: "1"
         strict: true
