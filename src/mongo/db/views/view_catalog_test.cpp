@@ -653,6 +653,7 @@ TEST_F(ViewCatalogFixture, Iterate) {
         std::string name = view.name().toString();
         ASSERT(viewNames.end() != viewNames.find(name));
         viewNames.erase(name);
+        return true;
     });
 
     ASSERT(viewNames.empty());

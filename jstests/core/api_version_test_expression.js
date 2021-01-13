@@ -135,16 +135,27 @@ assert.commandFailedWithCode(
         {aggregate: "view", pipeline: pipeline, cursor: {}, apiVersion: "1", apiStrict: true}),
     ErrorCodes.APIStrictError);
 
-// Create a view with {unstable: true}.
+// Create a view with 'unstable' parameter should fail with 'apiStrict'.
 db.unstableView.drop();
-assert.commandWorked(db.runCommand({
+assert.commandFailedWithCode(db.runCommand({
     create: "unstableView",
     viewOn: collName,
     pipeline: pipeline,
     apiStrict: true,
     apiVersion: "1"
+}),
+                             ErrorCodes.APIStrictError);
+
+// Create a view with 'unstable' should be allowed without 'apiStrict'.
+assert.commandWorked(db.runCommand({
+    create: "unstableView",
+    viewOn: collName,
+    pipeline: pipeline,
+    apiVersion: "1",
+    apiStrict: false
 }));
 assert.commandWorked(db.runCommand({aggregate: "unstableView", pipeline: [], cursor: {}}));
+
 // This commmand will fail even with the empty pipeline because of the view.
 assert.commandFailedWithCode(
     db.runCommand(
@@ -198,18 +209,13 @@ assert.commandWorked(db[validatedCollName].runCommand({
 
 // Test that API version parameters are inherited into the inner command of the explain command.
 function checkExplainInnerCommandGetsAPIVersionParameters(explainedCmd, errCode) {
-    let explainRes = db.runCommand(
-        {explain: explainedCmd, apiVersion: "1", apiDeprecationErrors: true, apiStrict: true});
-
-    assert(explainRes.hasOwnProperty('executionStats'), explainRes);
-    const execStats = explainRes['executionStats'];
-
-    // 'execStats' will return APIStrictError if the inner command gets the APIVersionParameters.
-    assert.eq(execStats['executionSuccess'], false, execStats);
-    assert.eq(execStats['errorCode'], errCode, execStats);
+    assert.commandFailedWithCode(
+        db.runCommand(
+            {explain: explainedCmd, apiVersion: "1", apiDeprecationErrors: true, apiStrict: true}),
+        errCode);
 
     // If 'apiStrict: false' the inner aggregate command will execute successfully.
-    explainRes = db.runCommand({explain: explainedCmd, apiVersion: "1", apiStrict: false});
+    const explainRes = db.runCommand({explain: explainedCmd, apiVersion: "1", apiStrict: false});
     assert(explainRes.hasOwnProperty('executionStats'), explainRes);
     assert.eq(explainRes['executionStats']['executionSuccess'], true, explainRes);
 }
@@ -234,4 +240,7 @@ findCmd = {
     projection: {v: {$_testApiVersion: {deprecated: true}}}
 };
 checkExplainInnerCommandGetsAPIVersionParameters(findCmd, ErrorCodes.APIDeprecationError);
+
+db[validatedCollName].drop();
+db.unstableView.drop();
 })();

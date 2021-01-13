@@ -26,6 +26,9 @@ const pipelines = [
     [{$listLocalSessions: {}}],
     [{$listSessions: {}}],
     [{$planCacheStats: {}}],
+    [{$unionWith: {coll: "coll2", pipeline: [{$collStats: {count: {}}}]}}],
+    [{$lookup: {from: "coll2", pipeline: [{$indexStats: {}}]}}],
+    [{$facet: {field1: [], field2: [{$indexStats: {}}]}}],
 ];
 
 for (let pipeline of pipelines) {

@@ -578,6 +578,8 @@ let viewsCommandTests = {
     updateZoneKeyRange: {skip: isUnrelated},
     usersInfo: {skip: isUnrelated},
     validate: {command: {validate: "view"}, expectFailure: true},
+    validateDBMetadata:
+        {command: {validateDBMetadata: 1, apiParameters: {version: "1", strict: true}}},
     waitForOngoingChunkSplits: {skip: isUnrelated},
     voteCommitImportCollection: {skip: isUnrelated},
     voteCommitIndexBuild: {skip: isUnrelated},

@@ -282,6 +282,17 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='validate_db_metadata_command',
+    source=[
+        'validate_db_metadata.idl',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/idl/idl_parser',
+    ],
+)
+
 # Commands that are present in both mongod and embedded
 env.Library(
     target="standalone",
@@ -314,6 +325,7 @@ env.Library(
         "run_aggregate.cpp",
         "sleep_command.cpp",
         "validate.cpp",
+        "validate_db_metadata_cmd.cpp",
         "whats_my_sni_command.cpp",
         "write_commands/write_commands.cpp",
     ],
@@ -361,6 +373,7 @@ env.Library(
         'list_databases_command',
         'rename_collection_idl',
         'test_commands_enabled',
+        'validate_db_metadata_command',
         'write_commands_common',
     ],
 )

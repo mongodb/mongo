@@ -127,10 +127,10 @@ DbResponse ClusterCommandTestFixture::runCommand(BSONObj cmd) {
     return Strategy::clientCommand(std::move(rec)).get();
 }
 
-void ClusterCommandTestFixture::runCommandSuccessful(BSONObj cmd, bool isTargeted) {
+DbResponse ClusterCommandTestFixture::runCommandSuccessful(BSONObj cmd, bool isTargeted) {
     auto future = launchAsync([&] {
         // Shouldn't throw.
-        runCommand(cmd);
+        return runCommand(cmd);
     });
 
     size_t numMocks = isTargeted ? 1 : numShards;
@@ -138,7 +138,7 @@ void ClusterCommandTestFixture::runCommandSuccessful(BSONObj cmd, bool isTargete
         expectReturnsSuccess(i % numShards);
     }
 
-    future.default_timed_get();
+    return future.default_timed_get();
 }
 
 void ClusterCommandTestFixture::runTxnCommandOneError(BSONObj cmd,

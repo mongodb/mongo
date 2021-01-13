@@ -359,6 +359,7 @@ public:
                                    "downgrading. First detected time-series collection: "
                                 << view.name(),
                             !view.timeseries());
+                    return true;
                 });
             }
 

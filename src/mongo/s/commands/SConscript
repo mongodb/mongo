@@ -93,6 +93,7 @@ env.Library(
         'cluster_update_zone_key_range_cmd.cpp',
         'cluster_user_management_commands.cpp',
         'cluster_validate_cmd.cpp',
+        'cluster_validate_db_metadata_cmd.cpp',
         'cluster_whats_my_uri_cmd.cpp',
         'cluster_write_cmd.cpp',
         'document_shard_key_update_util.cpp',
@@ -123,6 +124,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/commands/set_index_commit_quorum_idl',
         '$BUILD_DIR/mongo/db/commands/shutdown_idl',
         '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
+        '$BUILD_DIR/mongo/db/commands/validate_db_metadata_command',
         '$BUILD_DIR/mongo/db/commands/write_commands_common',
         '$BUILD_DIR/mongo/db/ftdc/ftdc_server',
         '$BUILD_DIR/mongo/db/initialize_api_parameters',
@@ -165,6 +167,7 @@ env.CppUnitTest(
         "cluster_find_test.cpp",
         "cluster_insert_test.cpp",
         "cluster_update_test.cpp",
+        "cluster_validate_db_metadata_cmd_test.cpp",
         "document_shard_key_update_test.cpp",
     ],
     LIBDEPS=[

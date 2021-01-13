@@ -602,6 +602,7 @@ TEST_F(MongodbCAPITest, RunListCommands) {
                                           "startSession",
                                           "update",
                                           "validate",
+                                          "validateDBMetadata",
                                           "waitForFailPoint",
                                           "whatsmysni"};
 

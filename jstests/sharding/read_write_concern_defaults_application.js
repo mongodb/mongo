@@ -663,6 +663,7 @@ let testCases = {
     updateZoneKeyRange: {skip: "does not accept read or write concern"},
     usersInfo: {skip: "does not accept read or write concern"},
     validate: {skip: "does not accept read or write concern"},
+    validateDBMetadata: {skip: "does not accept read or write concern"},
     voteCommitImportCollection: {skip: "internal command"},
     voteCommitIndexBuild: {skip: "internal command"},
     waitForFailPoint: {skip: "does not accept read or write concern"},

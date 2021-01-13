@@ -69,6 +69,16 @@ boost::intrusive_ptr<Expression> ExpressionTestApiVersion::parse(ExpressionConte
                   str::stream() << field << " is not a valid argument for $_testApiVersion");
     }
 
+    const auto& apiParams = expCtx->apiParameters;
+    if (apiParams.getAPIStrict().value_or(false) && unstableField) {
+        uasserted(ErrorCodes::APIStrictError,
+                  "Provided apiStrict is true with an unstable command.");
+    }
+    if (apiParams.getAPIDeprecationErrors().value_or(false) && deprecatedField) {
+        uasserted(ErrorCodes::APIDeprecationError,
+                  "Provided apiDeprecatedErrors is true with a deprecated command.");
+    }
+
     return new ExpressionTestApiVersion(expCtx, unstableField, deprecatedField);
 }
 
@@ -79,18 +89,6 @@ Value ExpressionTestApiVersion::serialize(bool explain) const {
 }
 
 Value ExpressionTestApiVersion::evaluate(const Document& root, Variables* variables) const {
-    APIParameters apiParams = getExpressionContext()->apiParameters;
-
-    if (apiParams.getAPIStrict().value_or(false) && _unstable) {
-        uasserted(ErrorCodes::APIStrictError,
-                  "Provided apiStrict is true with an unstable command.");
-    }
-
-    if (apiParams.getAPIDeprecationErrors().value_or(false) && _deprecated) {
-        uasserted(ErrorCodes::APIDeprecationError,
-                  "Provided apiDeprecatedErrors is true with a deprecated command.");
-    }
-
     return Value(1);
 }
 

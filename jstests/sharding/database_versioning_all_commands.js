@@ -666,6 +666,16 @@ let testCases = {
             },
         }
     },
+    validateDBMetadata: {
+        run: {
+            // validateDBMetadata is always broadcast to all shards.
+            sendsDbVersion: false,
+            explicitlyCreateCollection: true,
+            command: function(dbName, collName) {
+                return {validateDBMetadata: 1, apiParameters: {version: "1"}};
+            },
+        }
+    },
     waitForFailPoint: {skip: "executes locally on mongos (not sent to any remote node)"},
     whatsmyuri: {skip: "executes locally on mongos (not sent to any remote node)"},
 };
