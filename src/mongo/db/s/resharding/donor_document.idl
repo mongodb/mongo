@@ -42,6 +42,7 @@ structs:
         chained_structs:
             CommonReshardingMetadata: CommonReshardingMetadata
             MinFetchTimestamp: MinFetchTimestampStruct
+            AbortReason: AbortReasonStruct
         generate_comparison_operators: false
         strict: true
         fields:

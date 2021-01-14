@@ -142,12 +142,11 @@ private:
 
     // Transitions the state on-disk and in-memory to 'endState'.
     void _transitionState(RecipientStateEnum endState,
-                          boost::optional<Timestamp> fetchTimestamp = boost::none);
+                          boost::optional<Timestamp> fetchTimestamp = boost::none,
+                          boost::optional<Status> abortReason = boost::none);
 
-    void _transitionStateAndUpdateCoordinator(RecipientStateEnum endState);
-
-    // Transitions the state on-disk and in-memory to kError.
-    void _transitionStateToError(const Status& status);
+    void _transitionStateAndUpdateCoordinator(RecipientStateEnum endState,
+                                              boost::optional<Status> abortReason = boost::none);
 
     // Inserts 'doc' on-disk and sets '_replacementDoc' in-memory.
     void _insertRecipientDocument(const ReshardingRecipientDocument& doc);

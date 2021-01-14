@@ -36,6 +36,7 @@ const recipientShardNames = reshardingTest.recipientShardNames;
 const topology = DiscoverTopology.findConnectedNodes(mongos);
 const donor_host = topology.shards[donorShardNames[0]].primary;
 const donor0 = new Mongo(donor_host);
+const configsvr = new Mongo(topology.configsvr.nodes[0]);
 
 // Create an inProgress index build.
 const createIndexThread = new Thread(function(host) {
@@ -46,13 +47,20 @@ let createIndexFailpoint = configureFailPoint(donor0, "hangIndexBuildBeforeCommi
 createIndexThread.start();
 createIndexFailpoint.wait();
 
+/**
+ * Confirms the shard's abortReason and state are written locally in
+ * config.localReshardingOperations.donor, the shard's local ReshardingDonorDocument.
+ */
 function assertEventuallyErrorsLocally(shardConn, shardName) {
     const localDonorOpsCollection =
         shardConn.getCollection("config.localReshardingOperations.donor");
 
     assert.soon(
         () => {
-            return localDonorOpsCollection.findOne({state: "error"}) !== null;
+            return localDonorOpsCollection.findOne({
+                state: "error",
+                "abortReason.code": ErrorCodes.BackgroundOperationInProgressForNamespace
+            }) !== null;
         },
         () => {
             return "donor shard " + shardName + " never transitioned to the error state: " +
@@ -60,23 +68,52 @@ function assertEventuallyErrorsLocally(shardConn, shardName) {
         });
 }
 
-// In the current implementation, the reshardCollection command won't ever complete if one of the
-// donor or recipient shards encounters an unrecoverable error. To work around this limitation, we
-// verify the recipient shard transitioned itself into the "error" state as a result of the
-// duplicate key error during resharding's collection cloning.
+/**
+ * Confirms the shard's abortReason and state are written in
+ * config.reshardingOperations.donorShards[shardName], the main CoordinatorDocument on the
+ * configsvr.
+ */
+function assertEventuallyErrorsInDonorList(configsvrConn, shardName, nss) {
+    const reshardingOperationsCollection =
+        configsvrConn.getCollection("config.reshardingOperations");
+    assert.soon(
+        () => {
+            return reshardingOperationsCollection.findOne({
+                nss,
+                donorShards: {
+                    $elemMatch: {
+                        id: shardName,
+                        "abortReason.code": ErrorCodes.BackgroundOperationInProgressForNamespace
+                    }
+                }
+            }) !== null;
+        },
+        () => {
+            return "donor shard " + shardName + " never updated its entry in the coordinator" +
+                " document to state kError and abortReason BackgroundOperationInProgressForNamespace: " +
+                tojson(reshardingOperationsCollection.find().toArray());
+        });
+}
+
+// In the current implementation, the reshardCollection command won't propagate the error to the
+// caller if the recipient/donor shard encounters an unrecoverable error. To work around this
+// limitation, we verify the recipient shard transitioned itself into the "error" state as a result
+// of the duplicate key error during resharding's collection cloning.
 //
-// TODO SERVER-50584: Remove the call to interruptReshardingThread() from this test and instead
-// directly assert that the reshardCollection command fails with an error.
+// TODO SERVER-53792: Ensure the error propagated to the user indicates
+// ErrorCodes.BackgroundOperationInProgressForNamespace.
 reshardingTest.withReshardingInBackground(  //
     {
         newShardKeyPattern: {newKey: 1},
         newChunks: [{min: {newKey: MinKey}, max: {newKey: MaxKey}, shard: recipientShardNames[0]}],
     },
     () => {
+        // TODO SERVER-51696: Review if these checks can be made in a cpp unittest instead.
         assertEventuallyErrorsLocally(donor0, donorShardNames[0]);
-        reshardingTest.interruptReshardingThread();
+        assertEventuallyErrorsInDonorList(
+            configsvr, donorShardNames[0], inputCollection.getFullName());
     },
-    ErrorCodes.Interrupted);
+    ErrorCodes.InternalError);
 
 // Resume index build.
 createIndexFailpoint.off();

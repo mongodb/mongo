@@ -50,6 +50,8 @@
 #      "reshardingFields": {                                // optional
 #          "uuid" : UUID,
 #          "state" : CoordinatorState<kInitialized>,
+#          // Only populated if the coordinator has encountered an error.
+#          "abortReason": BSONObj   
 #          // Only populated if this collection is the original sharded collection.
 #          "donorFields" : {
 #              "reshardingKey" : {

@@ -186,9 +186,7 @@ SemiFuture<void> ReshardingRecipientService::RecipientStateMachine::run(
                   "namespace"_attr = _recipientDoc.getNss().ns(),
                   "reshardingId"_attr = _id,
                   "error"_attr = status);
-            // TODO SERVER-50584 Report errors to the coordinator so that the resharding operation
-            // can be aborted.
-            _transitionStateToError(status);
+            _transitionStateAndUpdateCoordinator(RecipientStateEnum::kError, status);
             return status;
         })
         .onCompletion([this, self = shared_from_this()](Status status) {
@@ -505,7 +503,9 @@ void ReshardingRecipientService::RecipientStateMachine::_renameTemporaryReshardi
 }
 
 void ReshardingRecipientService::RecipientStateMachine::_transitionState(
-    RecipientStateEnum endState, boost::optional<Timestamp> fetchTimestamp) {
+    RecipientStateEnum endState,
+    boost::optional<Timestamp> fetchTimestamp,
+    boost::optional<Status> abortReason) {
     ReshardingRecipientDocument replacementDoc(_recipientDoc);
     replacementDoc.setState(endState);
 
@@ -521,13 +521,13 @@ void ReshardingRecipientService::RecipientStateMachine::_transitionState(
     }
 
     emplaceFetchTimestampIfExists(replacementDoc, std::move(fetchTimestamp));
-
+    emplaceAbortReasonIfExists(replacementDoc, std::move(abortReason));
     _updateRecipientDocument(std::move(replacementDoc));
 }
 
 void ReshardingRecipientService::RecipientStateMachine::_transitionStateAndUpdateCoordinator(
-    RecipientStateEnum endState) {
-    _transitionState(endState, boost::none);
+    RecipientStateEnum endState, boost::optional<Status> abortReason) {
+    _transitionState(endState, boost::none, abortReason);
 
     auto opCtx = cc().makeOperationContext();
 
@@ -535,6 +535,11 @@ void ReshardingRecipientService::RecipientStateMachine::_transitionStateAndUpdat
 
     BSONObjBuilder updateBuilder;
     updateBuilder.append("recipientShards.$.state", RecipientState_serializer(endState));
+    if (abortReason) {
+        BSONObjBuilder abortReasonBuilder;
+        abortReason.get().serializeErrorToBSON(&abortReasonBuilder);
+        updateBuilder.append("recipientShards.$.abortReason", abortReasonBuilder.obj());
+    }
 
     uassertStatusOK(
         Grid::get(opCtx.get())
@@ -546,13 +551,6 @@ void ReshardingRecipientService::RecipientStateMachine::_transitionStateAndUpdat
                 BSON("$set" << updateBuilder.done()),
                 false /* upsert */,
                 ShardingCatalogClient::kMajorityWriteConcern));
-}
-
-void ReshardingRecipientService::RecipientStateMachine::_transitionStateToError(
-    const Status& status) {
-    ReshardingRecipientDocument replacementDoc(_recipientDoc);
-    replacementDoc.setState(RecipientStateEnum::kError);
-    _updateRecipientDocument(std::move(replacementDoc));
 }
 
 void ReshardingRecipientService::RecipientStateMachine::_insertRecipientDocument(

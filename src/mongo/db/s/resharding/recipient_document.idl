@@ -53,6 +53,7 @@ structs:
             CommonReshardingMetadata: CommonReshardingMetadata
             FetchTimestamp: FetchTimestampStruct
             StrictConsistencyTimestamp: StrictConsistencyTimestampStruct
+            AbortReason: AbortReasonStruct
         generate_comparison_operators: false
         strict: true
         fields:

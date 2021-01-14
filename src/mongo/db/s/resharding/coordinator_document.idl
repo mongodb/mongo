@@ -42,6 +42,7 @@ structs:
         inline_chained_structs: true
         chained_structs:
             MinFetchTimestamp: MinFetchTimestampStruct
+            AbortReason: AbortReasonStruct
         generate_comparison_operators: false
         strict: true
         fields:
@@ -56,6 +57,7 @@ structs:
         inline_chained_structs: true
         chained_structs:
             StrictConsistencyTimestamp: StrictConsistencyTimestampStruct
+            AbortReason: AbortReasonStruct
         generate_comparison_operators: false
         strict: true
         fields:
@@ -70,6 +72,7 @@ structs:
         chained_structs:
             CommonReshardingMetadata: CommonReshardingMetadata
             FetchTimestamp: FetchTimestampStruct
+            AbortReason: AbortReasonStruct
         generate_comparison_operators: false
         strict: true
         fields:

@@ -70,6 +70,7 @@ void emplaceFetchTimestampIfExists(ClassWithFetchTimestamp& c,
     fetchTimestampStruct.setFetchTimestamp(std::move(fetchTimestamp));
     c.setFetchTimestampStruct(std::move(fetchTimestampStruct));
 }
+
 /**
  * Emplaces the 'minFetchTimestamp' onto the ClassWithFetchTimestamp if the timestamp has been
  * emplaced inside the boost::optional.
@@ -113,6 +114,30 @@ void emplaceStrictConsistencyTimestampIfExists(
     strictConsistencyTimestampStruct.setStrictConsistencyTimestamp(
         std::move(strictConsistencyTimestamp));
     c.setStrictConsistencyTimestampStruct(std::move(strictConsistencyTimestampStruct));
+}
+
+/**
+ * Emplaces the 'abortReason' onto the ClassWithAbortReason if the reason has been emplaced inside
+ * the boost::optional.
+ */
+template <class ClassWithAbortReason>
+void emplaceAbortReasonIfExists(ClassWithAbortReason& c, boost::optional<Status> abortReason) {
+    if (!abortReason) {
+        return;
+    }
+
+    invariant(!abortReason->isOK());
+
+    if (auto alreadyExistingAbortReason = c.getAbortReason()) {
+        // If there already is an abortReason, don't overwrite it.
+        return;
+    }
+
+    BSONObjBuilder bob;
+    abortReason.get().serializeErrorToBSON(&bob);
+    AbortReason abortReasonStruct;
+    abortReasonStruct.setAbortReason(bob.obj());
+    c.setAbortReasonStruct(std::move(abortReasonStruct));
 }
 
 /**

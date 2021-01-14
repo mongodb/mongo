@@ -171,9 +171,7 @@ SemiFuture<void> ReshardingDonorService::DonorStateMachine::run(
                   "namespace"_attr = _donorDoc.getNss().ns(),
                   "reshardingId"_attr = _id,
                   "error"_attr = status);
-            // TODO SERVER-50584 Report errors to the coordinator so that the resharding operation
-            // can be aborted.
-            _transitionStateToError(status);
+            _transitionStateAndUpdateCoordinator(DonorStateEnum::kError, boost::none, status);
             return status;
         })
         .onCompletion([this, self = shared_from_this()](Status status) {
@@ -419,10 +417,14 @@ void ReshardingDonorService::DonorStateMachine::_dropOriginalCollection() {
 }
 
 void ReshardingDonorService::DonorStateMachine::_transitionState(
-    DonorStateEnum endState, boost::optional<Timestamp> minFetchTimestamp) {
+    DonorStateEnum endState,
+    boost::optional<Timestamp> minFetchTimestamp,
+    boost::optional<Status> abortReason) {
     ReshardingDonorDocument replacementDoc(_donorDoc);
     replacementDoc.setState(endState);
+
     emplaceMinFetchTimestampIfExists(replacementDoc, minFetchTimestamp);
+    emplaceAbortReasonIfExists(replacementDoc, abortReason);
 
     LOGV2_INFO(5279505,
                "Transition resharding donor state",
@@ -434,8 +436,10 @@ void ReshardingDonorService::DonorStateMachine::_transitionState(
 }
 
 void ReshardingDonorService::DonorStateMachine::_transitionStateAndUpdateCoordinator(
-    DonorStateEnum endState, boost::optional<Timestamp> minFetchTimestamp) {
-    _transitionState(endState, minFetchTimestamp);
+    DonorStateEnum endState,
+    boost::optional<Timestamp> minFetchTimestamp,
+    boost::optional<Status> abortReason) {
+    _transitionState(endState, minFetchTimestamp, abortReason);
 
     auto opCtx = cc().makeOperationContext();
     auto shardId = ShardingState::get(opCtx.get())->shardId();
@@ -447,6 +451,12 @@ void ReshardingDonorService::DonorStateMachine::_transitionStateAndUpdateCoordin
         updateBuilder.append("donorShards.$.minFetchTimestamp", minFetchTimestamp.get());
     }
 
+    if (abortReason) {
+        BSONObjBuilder abortReasonBuilder;
+        abortReason.get().serializeErrorToBSON(&abortReasonBuilder);
+        updateBuilder.append("donorShards.$.abortReason", abortReasonBuilder.obj());
+    }
+
     uassertStatusOK(
         Grid::get(opCtx.get())
             ->catalogClient()
@@ -456,12 +466,6 @@ void ReshardingDonorService::DonorStateMachine::_transitionStateAndUpdateCoordin
                                    BSON("$set" << updateBuilder.done()),
                                    false /* upsert */,
                                    ShardingCatalogClient::kMajorityWriteConcern));
-}
-
-void ReshardingDonorService::DonorStateMachine::_transitionStateToError(const Status& status) {
-    ReshardingDonorDocument replacementDoc(_donorDoc);
-    replacementDoc.setState(DonorStateEnum::kError);
-    _updateDonorDocument(std::move(replacementDoc));
 }
 
 void ReshardingDonorService::DonorStateMachine::_insertDonorDocument(

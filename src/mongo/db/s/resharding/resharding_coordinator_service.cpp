@@ -127,6 +127,12 @@ void writeToCoordinatorStateNss(OperationContext* opCtx,
                                           *fetchTimestamp);
                     }
 
+                    if (auto abortReason = coordinatorDoc.getAbortReason()) {
+                        // If the abortReason exists, include it in the update.
+                        setBuilder.append(ReshardingCoordinatorDocument::kAbortReasonFieldName,
+                                          *abortReason);
+                    }
+
                     if (nextState == CoordinatorStateEnum::kPreparingToDonate) {
                         appendShardEntriesToSetBuilder(coordinatorDoc, setBuilder);
                         setBuilder.doneFast();
@@ -232,12 +238,26 @@ BSONObj createReshardingFieldsUpdateForOriginalNss(
                          << "$set"
                          << BSON(CollectionType::kUpdatedAtFieldName
                                  << opCtx->getServiceContext()->getPreciseClockSource()->now()));
-        default:
-            // Update the 'state' field in the 'reshardingFields' section
-            return BSON(
-                "$set" << BSON("reshardingFields.state"
-                               << CoordinatorState_serializer(nextState).toString() << "lastmod"
-                               << opCtx->getServiceContext()->getPreciseClockSource()->now()));
+        default: {
+            // Update the 'state' field, and 'abortReason' field if it exists, in the
+            // 'reshardingFields' section.
+            BSONObjBuilder updateBuilder;
+            {
+                BSONObjBuilder setBuilder(updateBuilder.subobjStart("$set"));
+
+                setBuilder.append("reshardingFields.state",
+                                  CoordinatorState_serializer(nextState).toString());
+                setBuilder.append("lastmod",
+                                  opCtx->getServiceContext()->getPreciseClockSource()->now());
+
+                if (auto abortReason = coordinatorDoc.getAbortReason()) {
+                    // If the abortReason exists, include it in the update.
+                    setBuilder.append("reshardingFields.abortReason", *abortReason);
+                }
+            }
+
+            return updateBuilder.obj();
+        }
     }
 }
 
@@ -302,19 +322,32 @@ void writeToConfigCollectionsForTempNss(OperationContext* opCtx,
                          << coordinatorDoc.getTempReshardingNss().ns()),
                     false  // multi
                 );
-            default:
-                // Update the 'state' field in the 'reshardingFields' section
+            default: {
+                // Update the 'state' field, and 'abortReason' field if it exists, in the
+                // 'reshardingFields' section.
+                BSONObjBuilder updateBuilder;
+                {
+                    BSONObjBuilder setBuilder(updateBuilder.subobjStart("$set"));
+
+                    setBuilder.append("reshardingFields.state",
+                                      CoordinatorState_serializer(nextState).toString());
+                    setBuilder.append("lastmod",
+                                      opCtx->getServiceContext()->getPreciseClockSource()->now());
+
+                    if (auto abortReason = coordinatorDoc.getAbortReason()) {
+                        setBuilder.append("reshardingFields.abortReason", *abortReason);
+                    }
+                }
+
                 return BatchedCommandRequest::buildUpdateOp(
                     CollectionType::ConfigNS,
                     BSON(CollectionType::kNssFieldName
                          << coordinatorDoc.getTempReshardingNss().ns()),
-                    BSON("$set" << BSON(
-                             "reshardingFields.state"
-                             << CoordinatorState_serializer(nextState).toString() << "lastmod"
-                             << opCtx->getServiceContext()->getPreciseClockSource()->now())),
+                    updateBuilder.obj(),
                     false,  // upsert
                     false   // multi
                 );
+            }
         }
     }());
 
@@ -328,7 +361,7 @@ void writeToConfigCollectionsForTempNss(OperationContext* opCtx,
     if (expectedNumModified) {
         assertNumDocsModifiedMatchesExpected(request, res, *expectedNumModified);
     }
-}
+}  // namespace
 
 void insertChunkAndTagDocsForTempNss(OperationContext* opCtx,
                                      std::vector<ChunkType> initialChunks,
@@ -821,8 +854,8 @@ SemiFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::run(
                   "newShardKeyPattern"_attr = _coordinatorDoc.getReshardingKey(),
                   "error"_attr = status);
 
-            _updateCoordinatorDocStateAndCatalogEntries(CoordinatorStateEnum::kError,
-                                                        _coordinatorDoc);
+            _updateCoordinatorDocStateAndCatalogEntries(
+                CoordinatorStateEnum::kError, _coordinatorDoc, boost::none, status);
 
             // TODO wait for donors and recipients to abort the operation and clean up state
             _tellAllRecipientsToRefresh(executor);
@@ -1029,11 +1062,13 @@ ExecutorFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::
 void ReshardingCoordinatorService::ReshardingCoordinator::
     _updateCoordinatorDocStateAndCatalogEntries(CoordinatorStateEnum nextState,
                                                 ReshardingCoordinatorDocument coordinatorDoc,
-                                                boost::optional<Timestamp> fetchTimestamp) {
+                                                boost::optional<Timestamp> fetchTimestamp,
+                                                boost::optional<Status> abortReason) {
     // Build new state doc for coordinator state update
     ReshardingCoordinatorDocument updatedCoordinatorDoc = coordinatorDoc;
     updatedCoordinatorDoc.setState(nextState);
     emplaceFetchTimestampIfExists(updatedCoordinatorDoc, std::move(fetchTimestamp));
+    emplaceAbortReasonIfExists(updatedCoordinatorDoc, abortReason);
 
     auto opCtx = cc().makeOperationContext();
     resharding::writeStateTransitionAndCatalogUpdatesThenBumpShardVersions(opCtx.get(),

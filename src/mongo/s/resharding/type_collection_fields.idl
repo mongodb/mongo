@@ -58,6 +58,9 @@ structs:
     TypeCollectionReshardingFields:
         description: "Resharding-related fields meant to be stored in a config.collections
                       document."
+        inline_chained_structs: true
+        chained_structs:
+            AbortReason: AbortReasonStruct 
         fields:
             uuid:
                 type: uuid

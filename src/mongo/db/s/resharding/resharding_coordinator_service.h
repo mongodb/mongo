@@ -223,7 +223,8 @@ private:
     void _updateCoordinatorDocStateAndCatalogEntries(
         CoordinatorStateEnum nextState,
         ReshardingCoordinatorDocument coordinatorDoc,
-        boost::optional<Timestamp> fetchTimestamp = boost::none);
+        boost::optional<Timestamp> fetchTimestamp = boost::none,
+        boost::optional<Status> abortReason = boost::none);
 
     /**
      * Sends 'flushRoutingTableCacheUpdatesWithWriteConcern' to all recipient shards.
