@@ -133,8 +133,10 @@ void ActiveIndexBuilds::unregisterIndexBuild(
 
     LOGV2_DEBUG(4656004,
                 1,
-                "Index build: Unregistering",
-                "buildUUID"_attr = replIndexBuildState->buildUUID);
+                "Index build: unregistering",
+                "buildUUID"_attr = replIndexBuildState->buildUUID,
+                "collectionUUID"_attr = replIndexBuildState->collectionUUID);
+
     indexBuildsManager->unregisterIndexBuild(replIndexBuildState->buildUUID);
     _indexBuildsCompletedGen++;
     _indexBuildsCondVar.notify_all();

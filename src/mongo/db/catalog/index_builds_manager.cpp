@@ -342,7 +342,11 @@ bool IndexBuildsManager::abortIndexBuildWithoutCleanup(OperationContext* opCtx,
         return false;
     }
 
-    LOGV2(20347, "Index build aborted without cleanup", "buildUUID"_attr = buildUUID);
+    LOGV2(20347,
+          "Index build: aborted without cleanup",
+          "buildUUID"_attr = buildUUID,
+          "collectionUUID"_attr = collection->uuid(),
+          logAttrs(collection->ns()));
 
     builder.getValue()->abortWithoutCleanup(opCtx, collection, isResumable);
 

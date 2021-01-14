@@ -552,7 +552,10 @@ const ResumableIndexBuildTest = class {
                 buildUUID: function(uuid) {
                     return uuid["uuid"]["$uuid"] === buildUUIDs[i];
                 },
-                phase: expectedResumePhases[expectedResumePhases.length === 1 ? 0 : i]
+                details: function(details) {
+                    return details.phase ===
+                        expectedResumePhases[expectedResumePhases.length === 1 ? 0 : i];
+                },
             });
 
             const resumeCheck = resumeChecks[resumeChecks.length === 1 ? 0 : i];
@@ -937,7 +940,9 @@ const ResumableIndexBuildTest = class {
         };
         checkLog.containsJson(primary, 4841700, {
             buildUUID: equalsBuildUUID,
-            phase: expectedResumePhase,
+            details: function(details) {
+                return details.phase === expectedResumePhase;
+            },
         });
 
         // Ensure that the resumed index build is paused at 'failpointAfterStartup'.

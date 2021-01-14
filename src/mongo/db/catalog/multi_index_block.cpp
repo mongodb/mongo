@@ -296,8 +296,9 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
 
             LOGV2(20384,
                   "Index build: starting",
-                  logAttrs(collection->ns()),
                   "buildUUID"_attr = _buildUUID,
+                  "collectionUUID"_attr = _collectionUUID,
+                  logAttrs(collection->ns()),
                   "properties"_attr = *descriptor,
                   "method"_attr = _method,
                   "maxTemporaryMemoryUsageMB"_attr =
@@ -320,8 +321,8 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
             LOGV2(20346,
                   "Index build: initialized",
                   "buildUUID"_attr = _buildUUID,
-                  logAttrs(ns),
                   "collectionUUID"_attr = _collectionUUID,
+                  logAttrs(ns),
                   "initializationTimestamp"_attr = commitTs);
         });
 
@@ -501,6 +502,7 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
         LOGV2(4984704,
               "Index build: collection scan stopped",
               "buildUUID"_attr = _buildUUID,
+              "collectionUUID"_attr = _collectionUUID,
               "totalRecords"_attr = n,
               "duration"_attr = duration_cast<Milliseconds>(Seconds(t.seconds())),
               "phase"_attr = IndexBuildPhase_serializer(_phase),
@@ -548,9 +550,10 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
     progress->finished();
 
     LOGV2(20391,
-          "Index build: collection scan done. scanned {n} total records in {t_seconds} seconds",
           "Index build: collection scan done",
           "buildUUID"_attr = _buildUUID,
+          "collectionUUID"_attr = _collectionUUID,
+          logAttrs(collection->ns()),
           "totalRecords"_attr = n,
           "readSource"_attr =
               RecoveryUnit::toString(opCtx->recoveryUnit()->getTimestampReadSource()),
@@ -870,13 +873,15 @@ void MultiIndexBlock::_writeStateToDisk(OperationContext* opCtx,
     auto status = rs->rs()->insertRecord(opCtx, obj.objdata(), obj.objsize(), Timestamp());
     if (!status.isOK()) {
         LOGV2_ERROR(4841501,
-                    "Failed to write resumable index build state to disk",
-                    "buildUUID"_attr = *_buildUUID,
+                    "Index build: failed to write resumable state to disk",
+                    "buildUUID"_attr = _buildUUID,
+                    "collectionUUID"_attr = _collectionUUID,
+                    logAttrs(collection->ns()),
                     "details"_attr = obj,
                     "error"_attr = status.getStatus());
         dassert(status,
                 str::stream() << "Failed to write resumable index build state to disk. UUID: "
-                              << *_buildUUID);
+                              << _buildUUID);
 
         rs->finalizeTemporaryTable(opCtx, TemporaryRecordStore::FinalizationAction::kDelete);
         return;
@@ -886,7 +891,9 @@ void MultiIndexBlock::_writeStateToDisk(OperationContext* opCtx,
 
     LOGV2(4841502,
           "Index build: wrote resumable state to disk",
-          "buildUUID"_attr = *_buildUUID,
+          "buildUUID"_attr = _buildUUID,
+          "collectionUUID"_attr = _collectionUUID,
+          logAttrs(collection->ns()),
           "details"_attr = obj);
 
     rs->finalizeTemporaryTable(opCtx, TemporaryRecordStore::FinalizationAction::kKeep);

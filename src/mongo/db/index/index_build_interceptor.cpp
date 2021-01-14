@@ -268,11 +268,13 @@ Status IndexBuildInterceptor::drainWritesIntoIndex(OperationContext* opCtx,
     int logLevel = (_numApplied - appliedAtStart > 0) ? 0 : 1;
     LOGV2_DEBUG(20689,
                 logLevel,
-                "index build: drained side writes",
+                "Index build: drained side writes",
+                "index"_attr = _indexCatalogEntry->descriptor()->indexName(),
+                "collectionUUID"_attr = coll->uuid(),
+                logAttrs(coll->ns()),
                 "numApplied"_attr = (_numApplied - appliedAtStart),
                 "totalInserted"_attr = totalInserted,
                 "totalDeleted"_attr = totalDeleted,
-                "indexName"_attr = _indexCatalogEntry->descriptor()->indexName(),
                 "durationMillis"_attr = timer.millis());
 
     return Status::OK();
