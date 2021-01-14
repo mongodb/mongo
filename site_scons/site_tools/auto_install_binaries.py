@@ -583,9 +583,11 @@ def generate(env):  # pylint: disable=too-many-statements
     env[SUFFIX_MAP] = {}
     env[ALIAS_MAP] = defaultdict(dict)
 
-    env[TASKS] = {
-        "install": auto_install_task,
-    }
+    env.AppendUnique(
+        AIB_TASKS={
+            "install": auto_install_task,
+        }
+    )
 
     env.AddMethod(
         scan_for_transitive_install_pseudobuilder, "GetTransitivelyInstalledFiles"

@@ -54,6 +54,12 @@ def build_cpp_integration_test(env, target, source, **kwargs):
     else:
         kwargs["AIB_COMPONENTS_EXTRA"] = list(integration_test_components)
 
+    # Integration tests are currently undecidable (see
+    # mongo_test_execution.py for details on undecidability) because
+    # we don't correctly express the dependency on the server
+    # components required to run them.
+    kwargs['UNDECIDABLE_TEST'] = True
+
     result = env.Program(target, source, **kwargs)
     env.RegisterTest("$INTEGRATION_TEST_LIST", result[0])
     env.Alias("$INTEGRATION_TEST_ALIAS", result[0])
