@@ -80,6 +80,10 @@ SessionCatalog::ScopedCheckedOutSession SessionCatalog::_checkOutSession(Operati
     invariant(!opCtx->lockState()->isLocked());
 
     stdx::unique_lock<Latch> ul(_mutex);
+    uassert(ErrorCodes::InterruptedDueToReplStateChange,
+            "a stepdown process started, can't checkout sessions except for killing",
+            _checkoutAllowed);
+
     auto sri = _getOrCreateSessionRuntimeInfo(ul, opCtx, *opCtx->getLogicalSessionId());
 
     // Wait until the session is no longer checked out and until the previously scheduled kill has
@@ -174,6 +178,16 @@ void SessionCatalog::scanSessions(const SessionKiller::Matcher& matcher,
             }
         }
     }
+}
+
+void SessionCatalog::_disallowCheckoutsExceptForKilling() {
+    stdx::unique_lock<Latch> ul(_mutex);
+    _checkoutAllowed = false;
+}
+
+void SessionCatalog::_allowCheckouts() {
+    stdx::lock_guard<Latch> lg(_mutex);
+    _checkoutAllowed = true;
 }
 
 SessionCatalog::KillToken SessionCatalog::killSession(const LogicalSessionId& lsid) {
@@ -323,6 +337,14 @@ void OperationContextSession::checkOut(OperationContext* opCtx) {
     // this session are safe to use while the lock is held
     stdx::lock_guard<Client> lk(*opCtx->getClient());
     checkedOutSession.emplace(std::move(scopedCheckedOutSession));
+}
+
+ScopedBlockSessionCheckouts::ScopedBlockSessionCheckouts(OperationContext* opCtx) : _opCtx(opCtx) {
+    SessionCatalog::get(_opCtx)->_disallowCheckoutsExceptForKilling();
+}
+
+ScopedBlockSessionCheckouts::~ScopedBlockSessionCheckouts() {
+    SessionCatalog::get(_opCtx)->_allowCheckouts();
 }
 
 }  // namespace mongo
