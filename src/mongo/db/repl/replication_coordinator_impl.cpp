@@ -83,6 +83,7 @@
 #include "mongo/db/repl/update_position_args.h"
 #include "mongo/db/repl/vote_requester.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/session_catalog.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/db/write_concern_options.h"
@@ -2049,6 +2050,11 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
 
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
         &stepdownHangBeforeRSTLEnqueue, opCtx, "stepdownHangBeforeRSTLEnqueue");
+
+    // To prevent a deadlock between session checkout and RSTL lock taking, disallow new sessions
+    // from being checked out. Existing sessions currently checked out will be killed by the
+    // killOpThread.
+    ScopedBlockSessionCheckouts blockSessions(opCtx);
 
     // Using 'force' sets the default for the wait time to zero, which means the stepdown will
     // fail if it does not acquire the lock immediately. In such a scenario, we use the
