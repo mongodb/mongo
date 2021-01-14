@@ -46,6 +46,7 @@
 namespace mongo {
 
 class ObservableSession;
+class ScopedBlockSessionCheckouts;
 
 /**
  * Keeps track of the transaction runtime state for every active session on this instance.
@@ -116,6 +117,7 @@ public:
     size_t size() const;
 
 private:
+    friend ScopedBlockSessionCheckouts;
     struct SessionRuntimeInfo {
         SessionRuntimeInfo(LogicalSessionId lsid) : session(std::move(lsid)) {}
         ~SessionRuntimeInfo();
@@ -153,12 +155,27 @@ private:
      */
     void _releaseSession(SessionRuntimeInfo* sri, boost::optional<KillToken> killToken);
 
+    /**
+     * Disallow checkouts that are not for killing.
+     */
+    void _disallowCheckoutsExceptForKilling();
+
+    /**
+     * Re-enable checkouts if it was disallowed earlier.
+     */
+    void _allowCheckouts();
+
     // Protects the state below
     mutable Mutex _mutex =
         MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "SessionCatalog::_mutex");
 
     // Owns the Session objects for all current Sessions.
     SessionRuntimeInfoMap _sessions;
+
+    // If false no new sessions can be checked out. Reasons why this could be true is because step
+    // down is in progress and we should not allow new sessions to get checked out in order to
+    // prevent deadlocks.
+    bool _checkoutAllowed{true};
 };
 
 /**
@@ -369,6 +386,21 @@ public:
      */
     static void checkIn(OperationContext* opCtx);
     static void checkOut(OperationContext* opCtx);
+
+private:
+    OperationContext* const _opCtx;
+};
+
+/**
+ * Scoped object, while active will prevent the checkout of sessions except for killing.
+ */
+class ScopedBlockSessionCheckouts {
+    ScopedBlockSessionCheckouts(const ScopedBlockSessionCheckouts&) = delete;
+    ScopedBlockSessionCheckouts& operator=(const ScopedBlockSessionCheckouts&) = delete;
+
+public:
+    ScopedBlockSessionCheckouts(OperationContext* opCtx);
+    ~ScopedBlockSessionCheckouts();
 
 private:
     OperationContext* const _opCtx;
