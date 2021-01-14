@@ -156,7 +156,9 @@ boost::optional<repl::OpTime> Grid::advanceConfigOpTime(OperationContext* opCtx,
                                                         repl::OpTime opTime,
                                                         StringData what) {
     const auto prevOpTime = _advanceConfigOpTime(opTime);
-    if (prevOpTime && prevOpTime->getTerm() != opTime.getTerm()) {
+    if (prevOpTime && prevOpTime->getTerm() != mongo::repl::OpTime::kUninitializedTerm &&
+        opTime.getTerm() != mongo::repl::OpTime::kUninitializedTerm &&
+        prevOpTime->getTerm() != opTime.getTerm()) {
         std::string clientAddr = "(unknown)";
         if (opCtx && opCtx->getClient()) {
             clientAddr = opCtx->getClient()->clientAddress(true);
