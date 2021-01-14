@@ -10670,7 +10670,6 @@ buildvariants:
     distros:
     - rhel62-medium
   - name: burn_in_tests_gen
-  - name: burn_in_tests_multiversion_gen
   - name: .aggfuzzer
   - name: .aggregation
   - name: audit
