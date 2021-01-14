@@ -27,6 +27,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 #define dwarf_eh_h
 
 #include "dwarf.h"
+#include "libunwind_i.h"
 
 /* This header file defines the format of a DWARF exception-header
    section (.eh_frame_hdr, pointed to by program-header

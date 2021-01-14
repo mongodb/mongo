@@ -1,7 +1,5 @@
-.\" *********************************** start of \input{common.tex}
-.\" *********************************** end of \input{common.tex}
 '\" t
-.\" Manual page created with latex2man on Fri Jan 10 15:56:07 EST 2020
+.\" Manual page created with latex2man on Thu Jan 12 06:50:29 PST 2017
 .\" NOTE: This file is generated, DO NOT EDIT.
 .de Vb
 .ft CW
@@ -12,7 +10,7 @@
 
 .fi
 ..
-.TH "LIBUNWIND" "3" "10 January 2020" "Programming Library " "Programming Library "
+.TH "LIBUNWIND" "3" "12 January 2017" "Programming Library " "Programming Library "
 .SH NAME
 libunwind
 \-\- a (mostly) platform\-independent unwind API 

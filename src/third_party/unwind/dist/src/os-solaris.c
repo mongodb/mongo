@@ -1,5 +1,6 @@
 /* libunwind - a platform-independent unwind library
-   Copyright (C) 2008 CodeSourcery
+   Copyright (C) 2003-2005 Hewlett-Packard Co
+        Contributed by David Mosberger-Tang <davidm@hpl.hp.com>
 
 This file is part of libunwind.
 
@@ -22,52 +23,51 @@ LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 
-#include <stdlib.h>
+#include <limits.h>
+#include <stdio.h>
 
-#include "unwind_i.h"
+#include "libunwind_i.h"
+#include "os-linux.h" // using linux header for map_iterator implementation
 
-unw_addr_space_t
-unw_create_addr_space (unw_accessors_t *a, int byte_order)
+int
+tdep_get_elf_image (struct elf_image *ei, pid_t pid, unw_word_t ip,
+                    unsigned long *segbase, unsigned long *mapoff,
+                    char *path, size_t pathlen)
 {
-#ifdef UNW_LOCAL_ONLY
-  return NULL;
-#else
-  unw_addr_space_t as;
+  struct map_iterator mi;
+  int found = 0, rc;
+  unsigned long hi;
 
-  /*
-   * MIPS supports only big or little-endian, not weird stuff like
-   * PDP_ENDIAN.
-   */
-  if (byte_order != 0
-      && byte_order != __LITTLE_ENDIAN
-      && byte_order != __BIG_ENDIAN)
-    return NULL;
+  if (maps_init (&mi, pid) < 0)
+    return -1;
 
-  as = malloc (sizeof (*as));
-  if (!as)
-    return NULL;
+  while (maps_next (&mi, segbase, &hi, mapoff))
+    if (ip >= *segbase && ip < hi)
+      {
+        found = 1;
+        break;
+      }
 
-  memset (as, 0, sizeof (*as));
-
-  as->acc = *a;
-
-  if (byte_order == 0)
-    /* use host default: */
-    as->big_endian = (__BYTE_ORDER == __BIG_ENDIAN);
-  else
-    as->big_endian = (byte_order == __BIG_ENDIAN);
-
-  /* FIXME!  There is no way to specify the ABI.  */
-#if _MIPS_SIM == _ABIO32
-  as->abi = UNW_MIPS_ABI_O32;
-#elif _MIPS_SIM == _ABIN32
-  as->abi = UNW_MIPS_ABI_N32;
-#elif _MIPS_SIM == _ABI64
-  as->abi = UNW_MIPS_ABI_N64;
-#else
-# error Unsupported ABI
-#endif
-
-  return as;
-#endif
+  if (!found)
+    {
+      maps_close (&mi);
+      return -1;
+    }
+  if (path)
+    {
+      strncpy(path, mi.path, pathlen);
+    }
+  rc = elf_map_image (ei, mi.path);
+  maps_close (&mi);
+  return rc;
 }
+
+#ifndef UNW_REMOTE_ONLY
+
+void
+tdep_get_exe_image_path (char *path)
+{
+  strcpy(path, getexecname());
+}
+
+#endif /* !UNW_REMOTE_ONLY */

@@ -57,11 +57,13 @@ _Ux86_64_getcontext:
 	movq %rax, UC_MCONTEXT_GREGS_RAX(%rdi)
 	movq %rcx, UC_MCONTEXT_GREGS_RCX(%rdi)
 
-#if defined __linux__
+#if defined __linux__ || defined __sun
 	/* Save fp state (not needed, except for setcontext not
 	   restoring garbage).  */
 	leaq UC_MCONTEXT_FPREGS_MEM(%rdi),%r8
+#ifdef UC_MCONTEXT_FPREGS_PTR
 	movq %r8, UC_MCONTEXT_FPREGS_PTR(%rdi)
+#endif // UC_MCONTEXT_FPREGS_PTR
 	fnstenv (%r8)
 	stmxcsr FPREGS_OFFSET_MXCSR(%r8)
 #elif defined __FreeBSD__

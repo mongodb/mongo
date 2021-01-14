@@ -49,6 +49,7 @@ local_find_proc_info (unw_addr_space_t as, unw_word_t ip, unw_proc_info_t *pi,
     return -UNW_ENOINFO;
 #endif
 
+  // Access the `_U_dyn_info_list` from `LOCAL_ONLY` library, i.e. libunwind.so.
   list = (unw_dyn_info_list_t *) (uintptr_t) _U_dyn_info_list_addr ();
   for (di = list->first; di; di = di->next)
     if (ip >= di->start_ip && ip < di->end_ip)

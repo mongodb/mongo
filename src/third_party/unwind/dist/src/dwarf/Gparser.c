@@ -440,8 +440,15 @@ fetch_proc_info (struct dwarf_cursor *c, unw_word_t ip)
      continue, and it's important we get this right, as 'ip' could be
      right at the function entry and hence FDE edge, or at instruction
      that manipulates CFA (push/pop). */
+
   if (c->use_prev_instr)
-    --ip;
+    {
+#if defined(__arm__)
+      /* On arm, the least bit denotes thumb/arm mode, clear it. */
+      ip &= ~(unw_word_t)0x1;
+#endif
+      --ip;
+    }
 
   memset (&c->pi, 0, sizeof (c->pi));
 

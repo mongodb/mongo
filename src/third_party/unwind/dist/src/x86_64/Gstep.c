@@ -104,6 +104,7 @@ unw_step (unw_cursor_t *cursor)
               via CALLQ.  Try this for all non-signal trampoline
               code.  */
 
+      unw_word_t invalid_prev_rip = 0;
       unw_word_t prev_ip = c->dwarf.ip, prev_cfa = c->dwarf.cfa;
       struct dwarf_loc rbp_loc, rsp_loc, rip_loc;
 
@@ -149,7 +150,10 @@ unw_step (unw_cursor_t *cursor)
               return ret;
             }
 
-          if (!rbp)
+          unw_word_t not_used;
+          invalid_prev_rip = dwarf_get(&c->dwarf, DWARF_MEM_LOC(c->dwarf, prev_ip), &not_used);
+
+          if (!rbp && invalid_prev_rip == 0)
             {
               /* Looks like we may have reached the end of the call-chain.  */
               rbp_loc = DWARF_NULL_LOC;
@@ -158,38 +162,90 @@ unw_step (unw_cursor_t *cursor)
             }
           else
             {
-              unw_word_t rbp1 = 0;
-              rbp_loc = DWARF_LOC(rbp, 0);
-              rsp_loc = DWARF_NULL_LOC;
-              rip_loc = DWARF_LOC (rbp + 8, 0);
-              ret = dwarf_get (&c->dwarf, rbp_loc, &rbp1);
-              Debug (1, "[RBP=0x%lx] = 0x%lx (cfa = 0x%lx) -> 0x%lx\n",
-                     (unsigned long) DWARF_GET_LOC (c->dwarf.loc[RBP]),
-                     rbp, c->dwarf.cfa, rbp1);
-
-              /* Heuristic to determine incorrect guess.  For RBP to be a
-                 valid frame it needs to be above current CFA, but don't
-                 let it go more than a little.  Note that we can't deduce
-                 anything about new RBP (rbp1) since it may not be a frame
-                 pointer in the frame above.  Just check we get the value. */
-              if (ret < 0
-                  || rbp < c->dwarf.cfa
-                  || (rbp - c->dwarf.cfa) > 0x4000)
+              /*
+               * Check if previous RIP was invalid
+               * This could happen if a bad function pointer was
+               * followed and so the stack wasn't updated by the
+               * preamble
+               */
+              int rip_fixup_success = 0;
+              if (invalid_prev_rip != 0)
                 {
-                  rip_loc = DWARF_NULL_LOC;
-                  rbp_loc = DWARF_NULL_LOC;
+                    Debug (2, "Previous RIP 0x%lx was invalid, attempting fixup\n", prev_ip);
+                    unw_word_t rsp;
+                    ret = dwarf_get (&c->dwarf, c->dwarf.loc[RSP], &rsp);
+
+                    /*Test to see if what we think is the previous RIP is valid*/
+                    unw_word_t new_ip = 0;
+                    if (dwarf_get(&c->dwarf, DWARF_MEM_LOC(c->dwarf, rsp), &new_ip) == 0)
+                      {
+                        Debug (2, "RSP 0x%lx looks valid\n", rsp);
+                        if ((ret = dwarf_get(&c->dwarf, DWARF_MEM_LOC(c->dwarf, new_ip), &not_used)) == 0)
+                          {
+                            Debug (2, "new_ip 0x%lx looks valid\n", new_ip);
+                            rip_fixup_success = 1;
+                            c->frame_info.cfa_reg_offset = 8;
+                            c->frame_info.cfa_reg_rsp = 1;
+                            c->frame_info.rbp_cfa_offset = -1;
+                            c->frame_info.rsp_cfa_offset = -1;
+                            c->frame_info.frame_type = UNW_X86_64_FRAME_OTHER;
+                            /*
+                             * The call should have pushed RIP to the stack
+                             * and since there was no preamble RSP hasn't been
+                             * touched so RIP should be at RSP.
+                             */
+                            c->dwarf.cfa += 8;
+                            /* Optimised x64 binaries don't use RBP it seems? */
+                            rbp_loc = DWARF_LOC (rbp, 0);
+                            rsp_loc = DWARF_LOC (rsp, 0);
+                            rip_loc = DWARF_LOC (rsp, 0);
+                          }
+                        else
+                          Debug (2, "new_ip 0x%lx dwarf_get(&c->dwarf, DWARF_MEM_LOC(c->dwarf, new_ip), &not_used) != 0\n", new_ip);
+                      }
+		                else
+                        Debug (2, "rsp 0x%lx dwarf_get(&c->dwarf, DWARF_MEM_LOC(c->dwarf, rsp), &new_ip) != 0\n", rsp);
+                  }
+              /*
+               * If the previous rip we found on the stack didn't look valid fall back
+               * to the previous method for finding a valid stack frame
+               */
+              if (!rip_fixup_success)
+                {
+                  Debug (2, "RIP fixup didn't work, falling back\n");
+                  unw_word_t rbp1 = 0;
+                  rbp_loc = DWARF_LOC(rbp, 0);
+                  rsp_loc = DWARF_NULL_LOC;
+                  rip_loc = DWARF_LOC (rbp + 8, 0);
+                  ret = dwarf_get (&c->dwarf, rbp_loc, &rbp1);
+                  Debug (1, "[RBP=0x%lx] = 0x%lx (cfa = 0x%lx) -> 0x%lx\n",
+                         (unsigned long) DWARF_GET_LOC (c->dwarf.loc[RBP]),
+                         rbp, c->dwarf.cfa, rbp1);
+
+                  /* Heuristic to determine incorrect guess.  For RBP to be a
+                     valid frame it needs to be above current CFA, but don't
+                     let it go more than a little.  Note that we can't deduce
+                     anything about new RBP (rbp1) since it may not be a frame
+                     pointer in the frame above.  Just check we get the value. */
+                  if (ret < 0
+                      || rbp < c->dwarf.cfa
+                      || (rbp - c->dwarf.cfa) > 0x4000)
+                    {
+                      rip_loc = DWARF_NULL_LOC;
+                      rbp_loc = DWARF_NULL_LOC;
+                    }
+
+                  c->frame_info.frame_type = UNW_X86_64_FRAME_GUESSED;
+                  c->frame_info.cfa_reg_rsp = 0;
+                  c->frame_info.cfa_reg_offset = 16;
+                  c->frame_info.rbp_cfa_offset = -16;
+                  c->dwarf.cfa += 16;
+
                 }
-
-              c->frame_info.frame_type = UNW_X86_64_FRAME_GUESSED;
-              c->frame_info.cfa_reg_rsp = 0;
-              c->frame_info.cfa_reg_offset = 16;
-              c->frame_info.rbp_cfa_offset = -16;
-              c->dwarf.cfa += 16;
             }
-
           /* Mark all registers unsaved */
           for (i = 0; i < DWARF_NUM_PRESERVED_REGS; ++i)
-            c->dwarf.loc[i] = DWARF_NULL_LOC;
+          c->dwarf.loc[i] = DWARF_NULL_LOC;
 
           c->dwarf.loc[RBP] = rbp_loc;
           c->dwarf.loc[RSP] = rsp_loc;
@@ -197,7 +253,7 @@ unw_step (unw_cursor_t *cursor)
           c->dwarf.use_prev_instr = 1;
         }
 
-      if (DWARF_IS_NULL_LOC (c->dwarf.loc[RBP]))
+      if (DWARF_IS_NULL_LOC (c->dwarf.loc[RBP]) && invalid_prev_rip == 0)
         {
           ret = 0;
           Debug (2, "NULL %%rbp loc, returning %d\n", ret);
@@ -214,6 +270,13 @@ unw_step (unw_cursor_t *cursor)
               Debug (2, "returning %d\n", ret);
               return ret;
             }
+#if __sun
+          if (c->dwarf.ip == 0)
+            {
+              Debug (2, "returning 0\n");
+              return ret;
+            }
+#endif
           ret = 1;
         }
       else

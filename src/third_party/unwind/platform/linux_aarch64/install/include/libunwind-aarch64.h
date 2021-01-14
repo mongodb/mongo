@@ -192,7 +192,7 @@ typedef struct
 	unsigned long uc_flags;
 	struct ucontext *uc_link;
 	stack_t uc_stack;
-	__sigset_t uc_sigmask;
+	sigset_t uc_sigmask;
 	struct unw_sigcontext uc_mcontext;
   } unw_tdep_context_t;
 

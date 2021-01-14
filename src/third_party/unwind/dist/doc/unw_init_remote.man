@@ -1,5 +1,7 @@
+.\" *********************************** start of \input{common.tex}
+.\" *********************************** end of \input{common.tex}
 '\" t
-.\" Manual page created with latex2man on Thu Aug 16 09:44:45 MDT 2007
+.\" Manual page created with latex2man on Wed Jan 13 17:21:43 UTC 2021
 .\" NOTE: This file is generated, DO NOT EDIT.
 .de Vb
 .ft CW
@@ -10,7 +12,7 @@
 
 .fi
 ..
-.TH "UNW\\_INIT\\_REMOTE" "3" "16 August 2007" "Programming Library " "Programming Library "
+.TH "UNW\\_INIT\\_REMOTE" "3" "13 January 2021" "Programming Library " "Programming Library "
 .SH NAME
 unw_init_remote
 \-\- initialize cursor for remote unwinding 

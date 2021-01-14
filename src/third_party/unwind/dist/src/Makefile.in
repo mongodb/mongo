@@ -194,9 +194,9 @@ LTLIBRARIES = $(lib_LTLIBRARIES) $(noinst_LTLIBRARIES)
 @ARCH_AARCH64_TRUE@	libunwind-dwarf-generic.la \
 @ARCH_AARCH64_TRUE@	libunwind-elf64.la $(am__DEPENDENCIES_1)
 am__libunwind_aarch64_la_SOURCES_DIST = os-freebsd.c os-hpux.c \
-	os-linux.c os-qnx.c mi/init.c mi/flush_cache.c mi/mempool.c \
-	mi/strerror.c aarch64/is_fpreg.c aarch64/regname.c \
-	mi/Gdyn-extract.c mi/Gdyn-remote.c \
+	os-linux.c os-qnx.c os-solaris.c mi/init.c mi/flush_cache.c \
+	mi/mempool.c mi/strerror.c aarch64/is_fpreg.c \
+	aarch64/regname.c mi/Gdyn-extract.c mi/Gdyn-remote.c \
 	mi/Gfind_dynamic_proc_info.c mi/Gget_accessors.c \
 	mi/Gget_proc_info_by_ip.c mi/Gget_proc_name.c \
 	mi/Gput_dynamic_unwind_info.c mi/Gdestroy_addr_space.c \
@@ -212,23 +212,25 @@ am__objects_1 = os-freebsd.lo
 am__objects_2 = os-hpux.lo
 am__objects_3 = os-linux.lo
 am__objects_4 = os-qnx.lo
-@OS_FREEBSD_FALSE@@OS_HPUX_FALSE@@OS_LINUX_FALSE@@OS_QNX_TRUE@am__objects_5 = $(am__objects_4)
-@OS_FREEBSD_FALSE@@OS_HPUX_FALSE@@OS_LINUX_TRUE@am__objects_5 = $(am__objects_3)
-@OS_FREEBSD_FALSE@@OS_HPUX_TRUE@am__objects_5 = $(am__objects_2)
-@OS_FREEBSD_TRUE@am__objects_5 = $(am__objects_1)
+am__objects_5 = os-solaris.lo
+@OS_FREEBSD_FALSE@@OS_HPUX_FALSE@@OS_LINUX_FALSE@@OS_QNX_FALSE@@OS_SOLARIS_TRUE@am__objects_6 = $(am__objects_5)
+@OS_FREEBSD_FALSE@@OS_HPUX_FALSE@@OS_LINUX_FALSE@@OS_QNX_TRUE@am__objects_6 = $(am__objects_4)
+@OS_FREEBSD_FALSE@@OS_HPUX_FALSE@@OS_LINUX_TRUE@am__objects_6 = $(am__objects_3)
+@OS_FREEBSD_FALSE@@OS_HPUX_TRUE@am__objects_6 = $(am__objects_2)
+@OS_FREEBSD_TRUE@am__objects_6 = $(am__objects_1)
 am__dirstamp = $(am__leading_dot)dirstamp
-am__objects_6 = $(am__objects_5) mi/init.lo mi/flush_cache.lo \
+am__objects_7 = $(am__objects_6) mi/init.lo mi/flush_cache.lo \
 	mi/mempool.lo mi/strerror.lo
-am__objects_7 = $(am__objects_6) aarch64/is_fpreg.lo \
+am__objects_8 = $(am__objects_7) aarch64/is_fpreg.lo \
 	aarch64/regname.lo
-am__objects_8 = mi/Gdyn-extract.lo mi/Gdyn-remote.lo \
+am__objects_9 = mi/Gdyn-extract.lo mi/Gdyn-remote.lo \
 	mi/Gfind_dynamic_proc_info.lo mi/Gget_accessors.lo \
 	mi/Gget_proc_info_by_ip.lo mi/Gget_proc_name.lo \
 	mi/Gput_dynamic_unwind_info.lo mi/Gdestroy_addr_space.lo \
 	mi/Gget_reg.lo mi/Gset_reg.lo mi/Gget_fpreg.lo \
 	mi/Gset_fpreg.lo mi/Gset_caching_policy.lo \
 	mi/Gset_cache_size.lo
-am__objects_9 = $(am__objects_7) $(am__objects_8) \
+am__objects_10 = $(am__objects_8) $(am__objects_9) \
 	aarch64/Gapply_reg_state.lo aarch64/Greg_states_iterate.lo \
 	aarch64/Gcreate_addr_space.lo aarch64/Gget_proc_info.lo \
 	aarch64/Gget_save_loc.lo aarch64/Gglobal.lo aarch64/Ginit.lo \
@@ -236,7 +238,8 @@ am__objects_9 = $(am__objects_7) $(am__objects_8) \
 	aarch64/Gis_signal_frame.lo aarch64/Gregs.lo \
 	aarch64/Gresume.lo aarch64/Gstash_frame.lo aarch64/Gstep.lo \
 	aarch64/Gtrace.lo
-@ARCH_AARCH64_TRUE@am_libunwind_aarch64_la_OBJECTS = $(am__objects_9)
+@ARCH_AARCH64_TRUE@am_libunwind_aarch64_la_OBJECTS =  \
+@ARCH_AARCH64_TRUE@	$(am__objects_10)
 libunwind_aarch64_la_OBJECTS = $(am_libunwind_aarch64_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
@@ -253,24 +256,25 @@ libunwind_aarch64_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
 @ARCH_AARCH64_FALSE@@ARCH_ARM_TRUE@	libunwind-elf32.la \
 @ARCH_AARCH64_FALSE@@ARCH_ARM_TRUE@	$(am__DEPENDENCIES_2)
 am__libunwind_arm_la_SOURCES_DIST = os-freebsd.c os-hpux.c os-linux.c \
-	os-qnx.c mi/init.c mi/flush_cache.c mi/mempool.c mi/strerror.c \
-	arm/is_fpreg.c arm/regname.c arm/Gos-freebsd.c arm/Gos-linux.c \
-	arm/Gos-other.c mi/Gdyn-extract.c mi/Gdyn-remote.c \
-	mi/Gfind_dynamic_proc_info.c mi/Gget_accessors.c \
-	mi/Gget_proc_info_by_ip.c mi/Gget_proc_name.c \
-	mi/Gput_dynamic_unwind_info.c mi/Gdestroy_addr_space.c \
-	mi/Gget_reg.c mi/Gset_reg.c mi/Gget_fpreg.c mi/Gset_fpreg.c \
-	mi/Gset_caching_policy.c mi/Gset_cache_size.c \
-	arm/Gapply_reg_state.c arm/Greg_states_iterate.c \
-	arm/Gcreate_addr_space.c arm/Gget_proc_info.c \
-	arm/Gget_save_loc.c arm/Gglobal.c arm/Ginit.c \
-	arm/Ginit_local.c arm/Ginit_remote.c arm/Gregs.c arm/Gresume.c \
-	arm/Gstep.c arm/Gex_tables.c arm/Gstash_frame.c arm/Gtrace.c
-am__objects_10 = $(am__objects_6) arm/is_fpreg.lo arm/regname.lo
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_QNX_TRUE@am__objects_11 = arm/Gos-other.lo
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@am__objects_11 = arm/Gos-linux.lo
-@OS_FREEBSD_TRUE@am__objects_11 = arm/Gos-freebsd.lo
-am__objects_12 = $(am__objects_10) $(am__objects_11) $(am__objects_8) \
+	os-qnx.c os-solaris.c mi/init.c mi/flush_cache.c mi/mempool.c \
+	mi/strerror.c arm/is_fpreg.c arm/regname.c arm/Gos-freebsd.c \
+	arm/Gos-linux.c arm/Gos-other.c mi/Gdyn-extract.c \
+	mi/Gdyn-remote.c mi/Gfind_dynamic_proc_info.c \
+	mi/Gget_accessors.c mi/Gget_proc_info_by_ip.c \
+	mi/Gget_proc_name.c mi/Gput_dynamic_unwind_info.c \
+	mi/Gdestroy_addr_space.c mi/Gget_reg.c mi/Gset_reg.c \
+	mi/Gget_fpreg.c mi/Gset_fpreg.c mi/Gset_caching_policy.c \
+	mi/Gset_cache_size.c arm/Gapply_reg_state.c \
+	arm/Greg_states_iterate.c arm/Gcreate_addr_space.c \
+	arm/Gget_proc_info.c arm/Gget_save_loc.c arm/Gglobal.c \
+	arm/Ginit.c arm/Ginit_local.c arm/Ginit_remote.c arm/Gregs.c \
+	arm/Gresume.c arm/Gstep.c arm/Gex_tables.c arm/Gstash_frame.c \
+	arm/Gtrace.c
+am__objects_11 = $(am__objects_7) arm/is_fpreg.lo arm/regname.lo
+@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_QNX_TRUE@am__objects_12 = arm/Gos-other.lo
+@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@am__objects_12 = arm/Gos-linux.lo
+@OS_FREEBSD_TRUE@am__objects_12 = arm/Gos-freebsd.lo
+am__objects_13 = $(am__objects_11) $(am__objects_12) $(am__objects_9) \
 	arm/Gapply_reg_state.lo arm/Greg_states_iterate.lo \
 	arm/Gcreate_addr_space.lo arm/Gget_proc_info.lo \
 	arm/Gget_save_loc.lo arm/Gglobal.lo arm/Ginit.lo \
@@ -278,7 +282,7 @@ am__objects_12 = $(am__objects_10) $(am__objects_11) $(am__objects_8) \
 	arm/Gresume.lo arm/Gstep.lo arm/Gex_tables.lo \
 	arm/Gstash_frame.lo arm/Gtrace.lo
 @ARCH_AARCH64_FALSE@@ARCH_ARM_TRUE@am_libunwind_arm_la_OBJECTS =  \
-@ARCH_AARCH64_FALSE@@ARCH_ARM_TRUE@	$(am__objects_12)
+@ARCH_AARCH64_FALSE@@ARCH_ARM_TRUE@	$(am__objects_13)
 libunwind_arm_la_OBJECTS = $(am_libunwind_arm_la_OBJECTS)
 libunwind_arm_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
 	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CCLD) \
@@ -287,7 +291,8 @@ libunwind_arm_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
 @ARCH_AARCH64_FALSE@@ARCH_ARM_TRUE@am_libunwind_arm_la_rpath = -rpath \
 @ARCH_AARCH64_FALSE@@ARCH_ARM_TRUE@	$(libdir)
 am__DEPENDENCIES_3 =
-libunwind_coredump_la_DEPENDENCIES = $(am__DEPENDENCIES_3)
+libunwind_coredump_la_DEPENDENCIES = $(am__DEPENDENCIES_3) \
+	$(am__DEPENDENCIES_3)
 am__libunwind_coredump_la_SOURCES_DIST = coredump/_UCD_accessors.c \
 	coredump/_UCD_create.c coredump/_UCD_destroy.c \
 	coredump/_UCD_access_mem.c coredump/_UCD_elf_map_image.c \
@@ -297,8 +302,8 @@ am__libunwind_coredump_la_SOURCES_DIST = coredump/_UCD_accessors.c \
 	coredump/_UPT_put_unwind_info.c coredump/_UPT_resume.c \
 	coredump/_UCD_access_reg_linux.c \
 	coredump/_UCD_access_reg_freebsd.c
-@OS_LINUX_TRUE@am__objects_13 = coredump/_UCD_access_reg_linux.lo
-@OS_FREEBSD_TRUE@am__objects_14 = coredump/_UCD_access_reg_freebsd.lo
+@OS_LINUX_TRUE@am__objects_14 = coredump/_UCD_access_reg_linux.lo
+@OS_FREEBSD_TRUE@am__objects_15 = coredump/_UCD_access_reg_freebsd.lo
 am_libunwind_coredump_la_OBJECTS = coredump/_UCD_accessors.lo \
 	coredump/_UCD_create.lo coredump/_UCD_destroy.lo \
 	coredump/_UCD_access_mem.lo coredump/_UCD_elf_map_image.lo \
@@ -306,7 +311,7 @@ am_libunwind_coredump_la_OBJECTS = coredump/_UCD_accessors.lo \
 	coredump/_UPT_elf.lo coredump/_UPT_access_fpreg.lo \
 	coredump/_UPT_get_dyn_info_list_addr.lo \
 	coredump/_UPT_put_unwind_info.lo coredump/_UPT_resume.lo \
-	$(am__objects_13) $(am__objects_14)
+	$(am__objects_14) $(am__objects_15)
 libunwind_coredump_la_OBJECTS = $(am_libunwind_coredump_la_OBJECTS)
 libunwind_coredump_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
 	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CCLD) \
@@ -333,15 +338,18 @@ am_libunwind_dwarf_local_la_OBJECTS = dwarf/Lexpr.lo dwarf/Lfde.lo \
 libunwind_dwarf_local_la_OBJECTS =  \
 	$(am_libunwind_dwarf_local_la_OBJECTS)
 @REMOTE_ONLY_FALSE@@USE_DWARF_TRUE@am_libunwind_dwarf_local_la_rpath =
-libunwind_elf32_la_DEPENDENCIES = $(am__DEPENDENCIES_3)
+libunwind_elf32_la_DEPENDENCIES = $(am__DEPENDENCIES_3) \
+	$(am__DEPENDENCIES_3)
 am_libunwind_elf32_la_OBJECTS = elf32.lo
 libunwind_elf32_la_OBJECTS = $(am_libunwind_elf32_la_OBJECTS)
 @USE_ELF32_TRUE@am_libunwind_elf32_la_rpath =
-libunwind_elf64_la_DEPENDENCIES = $(am__DEPENDENCIES_3)
+libunwind_elf64_la_DEPENDENCIES = $(am__DEPENDENCIES_3) \
+	$(am__DEPENDENCIES_3)
 am_libunwind_elf64_la_OBJECTS = elf64.lo
 libunwind_elf64_la_OBJECTS = $(am_libunwind_elf64_la_OBJECTS)
 @USE_ELF64_TRUE@am_libunwind_elf64_la_rpath =
-libunwind_elfxx_la_DEPENDENCIES = $(am__DEPENDENCIES_3)
+libunwind_elfxx_la_DEPENDENCIES = $(am__DEPENDENCIES_3) \
+	$(am__DEPENDENCIES_3)
 am_libunwind_elfxx_la_OBJECTS = elfxx.lo
 libunwind_elfxx_la_OBJECTS = $(am_libunwind_elfxx_la_OBJECTS)
 @USE_ELFXX_TRUE@am_libunwind_elfxx_la_rpath =
@@ -350,27 +358,27 @@ libunwind_elfxx_la_OBJECTS = $(am_libunwind_elfxx_la_OBJECTS)
 @ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_TRUE@@ARCH_IA64_FALSE@	libunwind-elf32.la \
 @ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_TRUE@@ARCH_IA64_FALSE@	$(am__DEPENDENCIES_4)
 am__libunwind_hppa_la_SOURCES_DIST = os-freebsd.c os-hpux.c os-linux.c \
-	os-qnx.c mi/init.c mi/flush_cache.c mi/mempool.c mi/strerror.c \
-	hppa/regname.c mi/Gdyn-extract.c mi/Gdyn-remote.c \
-	mi/Gfind_dynamic_proc_info.c mi/Gget_accessors.c \
-	mi/Gget_proc_info_by_ip.c mi/Gget_proc_name.c \
-	mi/Gput_dynamic_unwind_info.c mi/Gdestroy_addr_space.c \
-	mi/Gget_reg.c mi/Gset_reg.c mi/Gget_fpreg.c mi/Gset_fpreg.c \
-	mi/Gset_caching_policy.c mi/Gset_cache_size.c \
-	hppa/Gapply_reg_state.c hppa/Greg_states_iterate.c \
-	hppa/Gcreate_addr_space.c hppa/Gget_save_loc.c hppa/Gglobal.c \
-	hppa/Ginit.c hppa/Ginit_local.c hppa/Ginit_remote.c \
-	hppa/Gis_signal_frame.c hppa/Gget_proc_info.c hppa/Gregs.c \
-	hppa/Gresume.c hppa/Gstep.c
-am__objects_15 = $(am__objects_6) hppa/regname.lo
-am__objects_16 = $(am__objects_15) $(am__objects_8) \
+	os-qnx.c os-solaris.c mi/init.c mi/flush_cache.c mi/mempool.c \
+	mi/strerror.c hppa/regname.c mi/Gdyn-extract.c \
+	mi/Gdyn-remote.c mi/Gfind_dynamic_proc_info.c \
+	mi/Gget_accessors.c mi/Gget_proc_info_by_ip.c \
+	mi/Gget_proc_name.c mi/Gput_dynamic_unwind_info.c \
+	mi/Gdestroy_addr_space.c mi/Gget_reg.c mi/Gset_reg.c \
+	mi/Gget_fpreg.c mi/Gset_fpreg.c mi/Gset_caching_policy.c \
+	mi/Gset_cache_size.c hppa/Gapply_reg_state.c \
+	hppa/Greg_states_iterate.c hppa/Gcreate_addr_space.c \
+	hppa/Gget_save_loc.c hppa/Gglobal.c hppa/Ginit.c \
+	hppa/Ginit_local.c hppa/Ginit_remote.c hppa/Gis_signal_frame.c \
+	hppa/Gget_proc_info.c hppa/Gregs.c hppa/Gresume.c hppa/Gstep.c
+am__objects_16 = $(am__objects_7) hppa/regname.lo
+am__objects_17 = $(am__objects_16) $(am__objects_9) \
 	hppa/Gapply_reg_state.lo hppa/Greg_states_iterate.lo \
 	hppa/Gcreate_addr_space.lo hppa/Gget_save_loc.lo \
 	hppa/Gglobal.lo hppa/Ginit.lo hppa/Ginit_local.lo \
 	hppa/Ginit_remote.lo hppa/Gis_signal_frame.lo \
 	hppa/Gget_proc_info.lo hppa/Gregs.lo hppa/Gresume.lo \
 	hppa/Gstep.lo
-@ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_TRUE@@ARCH_IA64_FALSE@am_libunwind_hppa_la_OBJECTS = $(am__objects_16)
+@ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_TRUE@@ARCH_IA64_FALSE@am_libunwind_hppa_la_OBJECTS = $(am__objects_17)
 libunwind_hppa_la_OBJECTS = $(am_libunwind_hppa_la_OBJECTS)
 libunwind_hppa_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
 	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CCLD) \
@@ -382,22 +390,22 @@ libunwind_hppa_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
 @ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_IA64_TRUE@libunwind_ia64_la_DEPENDENCIES = libunwind-elf64.la \
 @ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_IA64_TRUE@	$(am__DEPENDENCIES_5)
 am__libunwind_ia64_la_SOURCES_DIST = os-freebsd.c os-hpux.c os-linux.c \
-	os-qnx.c mi/init.c mi/flush_cache.c mi/mempool.c mi/strerror.c \
-	ia64/regname.c mi/Gdyn-extract.c mi/Gdyn-remote.c \
-	mi/Gfind_dynamic_proc_info.c mi/Gget_accessors.c \
-	mi/Gget_proc_info_by_ip.c mi/Gget_proc_name.c \
-	mi/Gput_dynamic_unwind_info.c mi/Gdestroy_addr_space.c \
-	mi/Gget_reg.c mi/Gset_reg.c mi/Gget_fpreg.c mi/Gset_fpreg.c \
-	mi/Gset_caching_policy.c mi/Gset_cache_size.c \
-	ia64/Gapply_reg_state.c ia64/Greg_states_iterate.c \
-	ia64/Gcreate_addr_space.c ia64/Gget_proc_info.c \
-	ia64/Gget_save_loc.c ia64/Gglobal.c ia64/Ginit.c \
-	ia64/Ginit_local.c ia64/Ginit_remote.c ia64/Ginstall_cursor.S \
-	ia64/Gis_signal_frame.c ia64/Gparser.c ia64/Grbs.c \
-	ia64/Gregs.c ia64/Gresume.c ia64/Gscript.c ia64/Gstep.c \
-	ia64/Gtables.c ia64/Gfind_unwind_table.c
-am__objects_17 = $(am__objects_6) ia64/regname.lo
-am__objects_18 = $(am__objects_17) $(am__objects_8) \
+	os-qnx.c os-solaris.c mi/init.c mi/flush_cache.c mi/mempool.c \
+	mi/strerror.c ia64/regname.c mi/Gdyn-extract.c \
+	mi/Gdyn-remote.c mi/Gfind_dynamic_proc_info.c \
+	mi/Gget_accessors.c mi/Gget_proc_info_by_ip.c \
+	mi/Gget_proc_name.c mi/Gput_dynamic_unwind_info.c \
+	mi/Gdestroy_addr_space.c mi/Gget_reg.c mi/Gset_reg.c \
+	mi/Gget_fpreg.c mi/Gset_fpreg.c mi/Gset_caching_policy.c \
+	mi/Gset_cache_size.c ia64/Gapply_reg_state.c \
+	ia64/Greg_states_iterate.c ia64/Gcreate_addr_space.c \
+	ia64/Gget_proc_info.c ia64/Gget_save_loc.c ia64/Gglobal.c \
+	ia64/Ginit.c ia64/Ginit_local.c ia64/Ginit_remote.c \
+	ia64/Ginstall_cursor.S ia64/Gis_signal_frame.c ia64/Gparser.c \
+	ia64/Grbs.c ia64/Gregs.c ia64/Gresume.c ia64/Gscript.c \
+	ia64/Gstep.c ia64/Gtables.c ia64/Gfind_unwind_table.c
+am__objects_18 = $(am__objects_7) ia64/regname.lo
+am__objects_19 = $(am__objects_18) $(am__objects_9) \
 	ia64/Gapply_reg_state.lo ia64/Greg_states_iterate.lo \
 	ia64/Gcreate_addr_space.lo ia64/Gget_proc_info.lo \
 	ia64/Gget_save_loc.lo ia64/Gglobal.lo ia64/Ginit.lo \
@@ -406,7 +414,7 @@ am__objects_18 = $(am__objects_17) $(am__objects_8) \
 	ia64/Gparser.lo ia64/Grbs.lo ia64/Gregs.lo ia64/Gresume.lo \
 	ia64/Gscript.lo ia64/Gstep.lo ia64/Gtables.lo \
 	ia64/Gfind_unwind_table.lo
-@ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_IA64_TRUE@am_libunwind_ia64_la_OBJECTS = $(am__objects_18)
+@ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_IA64_TRUE@am_libunwind_ia64_la_OBJECTS = $(am__objects_19)
 libunwind_ia64_la_OBJECTS = $(am_libunwind_ia64_la_OBJECTS)
 libunwind_ia64_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
 	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CCLD) \
@@ -420,8 +428,8 @@ libunwind_ia64_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
 @ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_TRUE@	libunwind-elfxx.la \
 @ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_TRUE@	$(am__DEPENDENCIES_6)
 am__libunwind_mips_la_SOURCES_DIST = os-freebsd.c os-hpux.c os-linux.c \
-	os-qnx.c mi/init.c mi/flush_cache.c mi/mempool.c mi/strerror.c \
-	mips/is_fpreg.c mips/regname.c mi/Gdyn-extract.c \
+	os-qnx.c os-solaris.c mi/init.c mi/flush_cache.c mi/mempool.c \
+	mi/strerror.c mips/is_fpreg.c mips/regname.c mi/Gdyn-extract.c \
 	mi/Gdyn-remote.c mi/Gfind_dynamic_proc_info.c \
 	mi/Gget_accessors.c mi/Gget_proc_info_by_ip.c \
 	mi/Gget_proc_name.c mi/Gput_dynamic_unwind_info.c \
@@ -433,15 +441,15 @@ am__libunwind_mips_la_SOURCES_DIST = os-freebsd.c os-hpux.c os-linux.c \
 	mips/Ginit.c mips/Ginit_local.c mips/Ginit_remote.c \
 	mips/Gis_signal_frame.c mips/Gregs.c mips/Gresume.c \
 	mips/Gstep.c
-am__objects_19 = $(am__objects_6) mips/is_fpreg.lo mips/regname.lo
-am__objects_20 = $(am__objects_19) $(am__objects_8) \
+am__objects_20 = $(am__objects_7) mips/is_fpreg.lo mips/regname.lo
+am__objects_21 = $(am__objects_20) $(am__objects_9) \
 	mips/Gapply_reg_state.lo mips/Greg_states_iterate.lo \
 	mips/Gcreate_addr_space.lo mips/Gget_proc_info.lo \
 	mips/Gget_save_loc.lo mips/Gglobal.lo mips/Ginit.lo \
 	mips/Ginit_local.lo mips/Ginit_remote.lo \
 	mips/Gis_signal_frame.lo mips/Gregs.lo mips/Gresume.lo \
 	mips/Gstep.lo
-@ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_TRUE@am_libunwind_mips_la_OBJECTS = $(am__objects_20)
+@ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_TRUE@am_libunwind_mips_la_OBJECTS = $(am__objects_21)
 libunwind_mips_la_OBJECTS = $(am_libunwind_mips_la_OBJECTS)
 libunwind_mips_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
 	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CCLD) \
@@ -454,8 +462,8 @@ libunwind_mips_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
 @ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_FALSE@@ARCH_PPC32_TRUE@@ARCH_TILEGX_FALSE@@ARCH_X86_64_FALSE@@ARCH_X86_FALSE@	libunwind-elf32.la \
 @ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_FALSE@@ARCH_PPC32_TRUE@@ARCH_TILEGX_FALSE@@ARCH_X86_64_FALSE@@ARCH_X86_FALSE@	$(am__DEPENDENCIES_7)
 am__libunwind_ppc32_la_SOURCES_DIST = os-freebsd.c os-hpux.c \
-	os-linux.c os-qnx.c mi/init.c mi/flush_cache.c mi/mempool.c \
-	mi/strerror.c ppc32/is_fpreg.c ppc32/regname.c \
+	os-linux.c os-qnx.c os-solaris.c mi/init.c mi/flush_cache.c \
+	mi/mempool.c mi/strerror.c ppc32/is_fpreg.c ppc32/regname.c \
 	ppc32/get_func_addr.c mi/Gdyn-extract.c mi/Gdyn-remote.c \
 	mi/Gfind_dynamic_proc_info.c mi/Gget_accessors.c \
 	mi/Gget_proc_info_by_ip.c mi/Gget_proc_name.c \
@@ -467,15 +475,15 @@ am__libunwind_ppc32_la_SOURCES_DIST = os-freebsd.c os-hpux.c \
 	ppc32/Gapply_reg_state.c ppc32/Greg_states_iterate.c \
 	ppc32/Gcreate_addr_space.c ppc32/Gglobal.c ppc32/Ginit.c \
 	ppc32/Gregs.c ppc32/Gresume.c ppc32/Gstep.c
-am__objects_21 = $(am__objects_6) ppc32/is_fpreg.lo ppc32/regname.lo \
+am__objects_22 = $(am__objects_7) ppc32/is_fpreg.lo ppc32/regname.lo \
 	ppc32/get_func_addr.lo
-am__objects_22 = ppc/Gget_proc_info.lo ppc/Gget_save_loc.lo \
+am__objects_23 = ppc/Gget_proc_info.lo ppc/Gget_save_loc.lo \
 	ppc/Ginit_local.lo ppc/Ginit_remote.lo ppc/Gis_signal_frame.lo
-am__objects_23 = $(am__objects_21) $(am__objects_8) $(am__objects_22) \
+am__objects_24 = $(am__objects_22) $(am__objects_9) $(am__objects_23) \
 	ppc32/Gapply_reg_state.lo ppc32/Greg_states_iterate.lo \
 	ppc32/Gcreate_addr_space.lo ppc32/Gglobal.lo ppc32/Ginit.lo \
 	ppc32/Gregs.lo ppc32/Gresume.lo ppc32/Gstep.lo
-@ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_FALSE@@ARCH_PPC32_TRUE@@ARCH_TILEGX_FALSE@@ARCH_X86_64_FALSE@@ARCH_X86_FALSE@am_libunwind_ppc32_la_OBJECTS = $(am__objects_23)
+@ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_FALSE@@ARCH_PPC32_TRUE@@ARCH_TILEGX_FALSE@@ARCH_X86_64_FALSE@@ARCH_X86_FALSE@am_libunwind_ppc32_la_OBJECTS = $(am__objects_24)
 libunwind_ppc32_la_OBJECTS = $(am_libunwind_ppc32_la_OBJECTS)
 libunwind_ppc32_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
 	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CCLD) \
@@ -488,8 +496,8 @@ libunwind_ppc32_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
 @ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_FALSE@@ARCH_PPC32_FALSE@@ARCH_PPC64_TRUE@@ARCH_TILEGX_FALSE@@ARCH_X86_64_FALSE@@ARCH_X86_FALSE@	libunwind-elf64.la \
 @ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_FALSE@@ARCH_PPC32_FALSE@@ARCH_PPC64_TRUE@@ARCH_TILEGX_FALSE@@ARCH_X86_64_FALSE@@ARCH_X86_FALSE@	$(am__DEPENDENCIES_8)
 am__libunwind_ppc64_la_SOURCES_DIST = os-freebsd.c os-hpux.c \
-	os-linux.c os-qnx.c mi/init.c mi/flush_cache.c mi/mempool.c \
-	mi/strerror.c ppc64/is_fpreg.c ppc64/regname.c \
+	os-linux.c os-qnx.c os-solaris.c mi/init.c mi/flush_cache.c \
+	mi/mempool.c mi/strerror.c ppc64/is_fpreg.c ppc64/regname.c \
 	ppc64/get_func_addr.c mi/Gdyn-extract.c mi/Gdyn-remote.c \
 	mi/Gfind_dynamic_proc_info.c mi/Gget_accessors.c \
 	mi/Gget_proc_info_by_ip.c mi/Gget_proc_name.c \
@@ -501,13 +509,13 @@ am__libunwind_ppc64_la_SOURCES_DIST = os-freebsd.c os-hpux.c \
 	ppc64/Gapply_reg_state.c ppc64/Greg_states_iterate.c \
 	ppc64/Gcreate_addr_space.c ppc64/Gglobal.c ppc64/Ginit.c \
 	ppc64/Gregs.c ppc64/Gresume.c ppc64/Gstep.c
-am__objects_24 = $(am__objects_6) ppc64/is_fpreg.lo ppc64/regname.lo \
+am__objects_25 = $(am__objects_7) ppc64/is_fpreg.lo ppc64/regname.lo \
 	ppc64/get_func_addr.lo
-am__objects_25 = $(am__objects_24) $(am__objects_8) $(am__objects_22) \
+am__objects_26 = $(am__objects_25) $(am__objects_9) $(am__objects_23) \
 	ppc64/Gapply_reg_state.lo ppc64/Greg_states_iterate.lo \
 	ppc64/Gcreate_addr_space.lo ppc64/Gglobal.lo ppc64/Ginit.lo \
 	ppc64/Gregs.lo ppc64/Gresume.lo ppc64/Gstep.lo
-@ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_FALSE@@ARCH_PPC32_FALSE@@ARCH_PPC64_TRUE@@ARCH_TILEGX_FALSE@@ARCH_X86_64_FALSE@@ARCH_X86_FALSE@am_libunwind_ppc64_la_OBJECTS = $(am__objects_25)
+@ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_FALSE@@ARCH_PPC32_FALSE@@ARCH_PPC64_TRUE@@ARCH_TILEGX_FALSE@@ARCH_X86_64_FALSE@@ARCH_X86_FALSE@am_libunwind_ppc64_la_OBJECTS = $(am__objects_26)
 libunwind_ppc64_la_OBJECTS = $(am_libunwind_ppc64_la_OBJECTS)
 libunwind_ppc64_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
 	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CCLD) \
@@ -532,8 +540,8 @@ libunwind_ptrace_la_OBJECTS = $(am_libunwind_ptrace_la_OBJECTS)
 @ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_FALSE@@ARCH_PPC32_FALSE@@ARCH_PPC64_FALSE@@ARCH_S390X_TRUE@@ARCH_SH_FALSE@@ARCH_TILEGX_FALSE@@ARCH_X86_64_FALSE@@ARCH_X86_FALSE@	libunwind-elf64.la \
 @ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_FALSE@@ARCH_PPC32_FALSE@@ARCH_PPC64_FALSE@@ARCH_S390X_TRUE@@ARCH_SH_FALSE@@ARCH_TILEGX_FALSE@@ARCH_X86_64_FALSE@@ARCH_X86_FALSE@	$(am__DEPENDENCIES_9)
 am__libunwind_s390x_la_SOURCES_DIST = os-freebsd.c os-hpux.c \
-	os-linux.c os-qnx.c mi/init.c mi/flush_cache.c mi/mempool.c \
-	mi/strerror.c s390x/is_fpreg.c s390x/regname.c \
+	os-linux.c os-qnx.c os-solaris.c mi/init.c mi/flush_cache.c \
+	mi/mempool.c mi/strerror.c s390x/is_fpreg.c s390x/regname.c \
 	mi/Gdyn-extract.c mi/Gdyn-remote.c \
 	mi/Gfind_dynamic_proc_info.c mi/Gget_accessors.c \
 	mi/Gget_proc_info_by_ip.c mi/Gget_proc_name.c \
@@ -545,14 +553,14 @@ am__libunwind_s390x_la_SOURCES_DIST = os-freebsd.c os-hpux.c \
 	s390x/Gglobal.c s390x/Ginit.c s390x/Ginit_local.c \
 	s390x/Ginit_remote.c s390x/Gget_proc_info.c s390x/Gregs.c \
 	s390x/Gresume.c s390x/Gis_signal_frame.c s390x/Gstep.c
-am__objects_26 = $(am__objects_6) s390x/is_fpreg.lo s390x/regname.lo
-am__objects_27 = $(am__objects_26) $(am__objects_8) \
+am__objects_27 = $(am__objects_7) s390x/is_fpreg.lo s390x/regname.lo
+am__objects_28 = $(am__objects_27) $(am__objects_9) \
 	s390x/Gapply_reg_state.lo s390x/Greg_states_iterate.lo \
 	s390x/Gcreate_addr_space.lo s390x/Gget_save_loc.lo \
 	s390x/Gglobal.lo s390x/Ginit.lo s390x/Ginit_local.lo \
 	s390x/Ginit_remote.lo s390x/Gget_proc_info.lo s390x/Gregs.lo \
 	s390x/Gresume.lo s390x/Gis_signal_frame.lo s390x/Gstep.lo
-@ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_FALSE@@ARCH_PPC32_FALSE@@ARCH_PPC64_FALSE@@ARCH_S390X_TRUE@@ARCH_SH_FALSE@@ARCH_TILEGX_FALSE@@ARCH_X86_64_FALSE@@ARCH_X86_FALSE@am_libunwind_s390x_la_OBJECTS = $(am__objects_27)
+@ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_FALSE@@ARCH_PPC32_FALSE@@ARCH_PPC64_FALSE@@ARCH_S390X_TRUE@@ARCH_SH_FALSE@@ARCH_TILEGX_FALSE@@ARCH_X86_64_FALSE@@ARCH_X86_FALSE@am_libunwind_s390x_la_OBJECTS = $(am__objects_28)
 libunwind_s390x_la_OBJECTS = $(am_libunwind_s390x_la_OBJECTS)
 libunwind_s390x_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
 	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CCLD) \
@@ -569,29 +577,29 @@ am__libunwind_setjmp_la_SOURCES_DIST = setjmp/longjmp.c \
 	tilegx/siglongjmp.S x86/longjmp.S x86/siglongjmp.S \
 	x86_64/longjmp.S x86_64/siglongjmp.S ppc/longjmp.S \
 	ppc/siglongjmp.S sh/siglongjmp.S
-@ARCH_AARCH64_TRUE@am__objects_28 = aarch64/siglongjmp.lo
-@ARCH_AARCH64_FALSE@@ARCH_ARM_TRUE@am__objects_29 = arm/siglongjmp.lo
-@ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_IA64_TRUE@am__objects_30 = ia64/setjmp.lo \
+@ARCH_AARCH64_TRUE@am__objects_29 = aarch64/siglongjmp.lo
+@ARCH_AARCH64_FALSE@@ARCH_ARM_TRUE@am__objects_30 = arm/siglongjmp.lo
+@ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_IA64_TRUE@am__objects_31 = ia64/setjmp.lo \
 @ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_IA64_TRUE@	ia64/sigsetjmp.lo \
 @ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_IA64_TRUE@	ia64/longjmp.lo \
 @ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_IA64_TRUE@	ia64/siglongjmp.lo
-@ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_TRUE@@ARCH_IA64_FALSE@am__objects_31 = hppa/siglongjmp.lo
-@ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_TRUE@am__objects_32 = mips/siglongjmp.lo
-@ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_FALSE@@ARCH_TILEGX_TRUE@am__objects_33 = tilegx/siglongjmp.lo
-@ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_FALSE@@ARCH_TILEGX_FALSE@@ARCH_X86_TRUE@am__objects_34 = x86/longjmp.lo \
+@ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_TRUE@@ARCH_IA64_FALSE@am__objects_32 = hppa/siglongjmp.lo
+@ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_TRUE@am__objects_33 = mips/siglongjmp.lo
+@ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_FALSE@@ARCH_TILEGX_TRUE@am__objects_34 = tilegx/siglongjmp.lo
+@ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_FALSE@@ARCH_TILEGX_FALSE@@ARCH_X86_TRUE@am__objects_35 = x86/longjmp.lo \
 @ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_FALSE@@ARCH_TILEGX_FALSE@@ARCH_X86_TRUE@	x86/siglongjmp.lo
-@ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_FALSE@@ARCH_TILEGX_FALSE@@ARCH_X86_64_TRUE@@ARCH_X86_FALSE@am__objects_35 = x86_64/longjmp.lo \
+@ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_FALSE@@ARCH_TILEGX_FALSE@@ARCH_X86_64_TRUE@@ARCH_X86_FALSE@am__objects_36 = x86_64/longjmp.lo \
 @ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_FALSE@@ARCH_TILEGX_FALSE@@ARCH_X86_64_TRUE@@ARCH_X86_FALSE@	x86_64/siglongjmp.lo
-@ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_FALSE@@ARCH_PPC32_TRUE@@ARCH_TILEGX_FALSE@@ARCH_X86_64_FALSE@@ARCH_X86_FALSE@am__objects_36 = ppc/longjmp.lo \
+@ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_FALSE@@ARCH_PPC32_TRUE@@ARCH_TILEGX_FALSE@@ARCH_X86_64_FALSE@@ARCH_X86_FALSE@am__objects_37 = ppc/longjmp.lo \
 @ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_FALSE@@ARCH_PPC32_TRUE@@ARCH_TILEGX_FALSE@@ARCH_X86_64_FALSE@@ARCH_X86_FALSE@	ppc/siglongjmp.lo
-@ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_FALSE@@ARCH_PPC32_FALSE@@ARCH_PPC64_TRUE@@ARCH_TILEGX_FALSE@@ARCH_X86_64_FALSE@@ARCH_X86_FALSE@am__objects_37 = ppc/longjmp.lo \
+@ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_FALSE@@ARCH_PPC32_FALSE@@ARCH_PPC64_TRUE@@ARCH_TILEGX_FALSE@@ARCH_X86_64_FALSE@@ARCH_X86_FALSE@am__objects_38 = ppc/longjmp.lo \
 @ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_FALSE@@ARCH_PPC32_FALSE@@ARCH_PPC64_TRUE@@ARCH_TILEGX_FALSE@@ARCH_X86_64_FALSE@@ARCH_X86_FALSE@	ppc/siglongjmp.lo
-@ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_FALSE@@ARCH_PPC32_FALSE@@ARCH_PPC64_FALSE@@ARCH_SH_TRUE@@ARCH_TILEGX_FALSE@@ARCH_X86_64_FALSE@@ARCH_X86_FALSE@am__objects_38 = sh/siglongjmp.lo
+@ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_FALSE@@ARCH_PPC32_FALSE@@ARCH_PPC64_FALSE@@ARCH_SH_TRUE@@ARCH_TILEGX_FALSE@@ARCH_X86_64_FALSE@@ARCH_X86_FALSE@am__objects_39 = sh/siglongjmp.lo
 am_libunwind_setjmp_la_OBJECTS = setjmp/longjmp.lo \
-	setjmp/siglongjmp.lo $(am__objects_28) $(am__objects_29) \
-	$(am__objects_30) $(am__objects_31) $(am__objects_32) \
-	$(am__objects_33) $(am__objects_34) $(am__objects_35) \
-	$(am__objects_36) $(am__objects_37) $(am__objects_38)
+	setjmp/siglongjmp.lo $(am__objects_29) $(am__objects_30) \
+	$(am__objects_31) $(am__objects_32) $(am__objects_33) \
+	$(am__objects_34) $(am__objects_35) $(am__objects_36) \
+	$(am__objects_37) $(am__objects_38) $(am__objects_39)
 libunwind_setjmp_la_OBJECTS = $(am_libunwind_setjmp_la_OBJECTS)
 libunwind_setjmp_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
 	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CCLD) \
@@ -603,25 +611,26 @@ libunwind_setjmp_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
 @ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_FALSE@@ARCH_PPC32_FALSE@@ARCH_PPC64_FALSE@@ARCH_SH_TRUE@@ARCH_TILEGX_FALSE@@ARCH_X86_64_FALSE@@ARCH_X86_FALSE@	libunwind-elf32.la \
 @ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_FALSE@@ARCH_PPC32_FALSE@@ARCH_PPC64_FALSE@@ARCH_SH_TRUE@@ARCH_TILEGX_FALSE@@ARCH_X86_64_FALSE@@ARCH_X86_FALSE@	$(am__DEPENDENCIES_10)
 am__libunwind_sh_la_SOURCES_DIST = os-freebsd.c os-hpux.c os-linux.c \
-	os-qnx.c mi/init.c mi/flush_cache.c mi/mempool.c mi/strerror.c \
-	sh/is_fpreg.c sh/regname.c mi/Gdyn-extract.c mi/Gdyn-remote.c \
-	mi/Gfind_dynamic_proc_info.c mi/Gget_accessors.c \
-	mi/Gget_proc_info_by_ip.c mi/Gget_proc_name.c \
-	mi/Gput_dynamic_unwind_info.c mi/Gdestroy_addr_space.c \
-	mi/Gget_reg.c mi/Gset_reg.c mi/Gget_fpreg.c mi/Gset_fpreg.c \
-	mi/Gset_caching_policy.c mi/Gset_cache_size.c \
-	sh/Gapply_reg_state.c sh/Greg_states_iterate.c \
-	sh/Gcreate_addr_space.c sh/Gget_proc_info.c sh/Gget_save_loc.c \
-	sh/Gglobal.c sh/Ginit.c sh/Ginit_local.c sh/Ginit_remote.c \
-	sh/Gis_signal_frame.c sh/Gregs.c sh/Gresume.c sh/Gstep.c
-am__objects_39 = $(am__objects_6) sh/is_fpreg.lo sh/regname.lo
-am__objects_40 = $(am__objects_39) $(am__objects_8) \
+	os-qnx.c os-solaris.c mi/init.c mi/flush_cache.c mi/mempool.c \
+	mi/strerror.c sh/is_fpreg.c sh/regname.c mi/Gdyn-extract.c \
+	mi/Gdyn-remote.c mi/Gfind_dynamic_proc_info.c \
+	mi/Gget_accessors.c mi/Gget_proc_info_by_ip.c \
+	mi/Gget_proc_name.c mi/Gput_dynamic_unwind_info.c \
+	mi/Gdestroy_addr_space.c mi/Gget_reg.c mi/Gset_reg.c \
+	mi/Gget_fpreg.c mi/Gset_fpreg.c mi/Gset_caching_policy.c \
+	mi/Gset_cache_size.c sh/Gapply_reg_state.c \
+	sh/Greg_states_iterate.c sh/Gcreate_addr_space.c \
+	sh/Gget_proc_info.c sh/Gget_save_loc.c sh/Gglobal.c sh/Ginit.c \
+	sh/Ginit_local.c sh/Ginit_remote.c sh/Gis_signal_frame.c \
+	sh/Gregs.c sh/Gresume.c sh/Gstep.c
+am__objects_40 = $(am__objects_7) sh/is_fpreg.lo sh/regname.lo
+am__objects_41 = $(am__objects_40) $(am__objects_9) \
 	sh/Gapply_reg_state.lo sh/Greg_states_iterate.lo \
 	sh/Gcreate_addr_space.lo sh/Gget_proc_info.lo \
 	sh/Gget_save_loc.lo sh/Gglobal.lo sh/Ginit.lo \
 	sh/Ginit_local.lo sh/Ginit_remote.lo sh/Gis_signal_frame.lo \
 	sh/Gregs.lo sh/Gresume.lo sh/Gstep.lo
-@ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_FALSE@@ARCH_PPC32_FALSE@@ARCH_PPC64_FALSE@@ARCH_SH_TRUE@@ARCH_TILEGX_FALSE@@ARCH_X86_64_FALSE@@ARCH_X86_FALSE@am_libunwind_sh_la_OBJECTS = $(am__objects_40)
+@ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_FALSE@@ARCH_PPC32_FALSE@@ARCH_PPC64_FALSE@@ARCH_SH_TRUE@@ARCH_TILEGX_FALSE@@ARCH_X86_64_FALSE@@ARCH_X86_FALSE@am_libunwind_sh_la_OBJECTS = $(am__objects_41)
 libunwind_sh_la_OBJECTS = $(am_libunwind_sh_la_OBJECTS)
 libunwind_sh_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
 	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CCLD) \
@@ -634,8 +643,8 @@ libunwind_sh_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
 @ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_FALSE@@ARCH_TILEGX_TRUE@	libunwind-elfxx.la \
 @ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_FALSE@@ARCH_TILEGX_TRUE@	$(am__DEPENDENCIES_11)
 am__libunwind_tilegx_la_SOURCES_DIST = os-freebsd.c os-hpux.c \
-	os-linux.c os-qnx.c mi/init.c mi/flush_cache.c mi/mempool.c \
-	mi/strerror.c tilegx/is_fpreg.c tilegx/regname.c \
+	os-linux.c os-qnx.c os-solaris.c mi/init.c mi/flush_cache.c \
+	mi/mempool.c mi/strerror.c tilegx/is_fpreg.c tilegx/regname.c \
 	mi/Gdyn-extract.c mi/Gdyn-remote.c \
 	mi/Gfind_dynamic_proc_info.c mi/Gget_accessors.c \
 	mi/Gget_proc_info_by_ip.c mi/Gget_proc_name.c \
@@ -648,15 +657,15 @@ am__libunwind_tilegx_la_SOURCES_DIST = os-freebsd.c os-hpux.c \
 	tilegx/Ginit_local.c tilegx/Ginit_remote.c \
 	tilegx/Gis_signal_frame.c tilegx/Gregs.c tilegx/Gresume.c \
 	tilegx/Gstep.c
-am__objects_41 = $(am__objects_6) tilegx/is_fpreg.lo tilegx/regname.lo
-am__objects_42 = $(am__objects_41) $(am__objects_8) \
+am__objects_42 = $(am__objects_7) tilegx/is_fpreg.lo tilegx/regname.lo
+am__objects_43 = $(am__objects_42) $(am__objects_9) \
 	tilegx/Gapply_reg_state.lo tilegx/Greg_states_iterate.lo \
 	tilegx/Gcreate_addr_space.lo tilegx/Gget_proc_info.lo \
 	tilegx/Gget_save_loc.lo tilegx/Gglobal.lo tilegx/Ginit.lo \
 	tilegx/Ginit_local.lo tilegx/Ginit_remote.lo \
 	tilegx/Gis_signal_frame.lo tilegx/Gregs.lo tilegx/Gresume.lo \
 	tilegx/Gstep.lo
-@ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_FALSE@@ARCH_TILEGX_TRUE@am_libunwind_tilegx_la_OBJECTS = $(am__objects_42)
+@ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_FALSE@@ARCH_TILEGX_TRUE@am_libunwind_tilegx_la_OBJECTS = $(am__objects_43)
 libunwind_tilegx_la_OBJECTS = $(am_libunwind_tilegx_la_OBJECTS)
 libunwind_tilegx_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
 	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CCLD) \
@@ -669,9 +678,9 @@ libunwind_tilegx_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
 @ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_FALSE@@ARCH_TILEGX_FALSE@@ARCH_X86_TRUE@	libunwind-elf32.la \
 @ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_FALSE@@ARCH_TILEGX_FALSE@@ARCH_X86_TRUE@	$(am__DEPENDENCIES_12)
 am__libunwind_x86_la_SOURCES_DIST = os-freebsd.c os-hpux.c os-linux.c \
-	os-qnx.c mi/init.c mi/flush_cache.c mi/mempool.c mi/strerror.c \
-	x86/is_fpreg.c x86/regname.c x86/Gos-freebsd.c x86/Gos-linux.c \
-	mi/Gdyn-extract.c mi/Gdyn-remote.c \
+	os-qnx.c os-solaris.c mi/init.c mi/flush_cache.c mi/mempool.c \
+	mi/strerror.c x86/is_fpreg.c x86/regname.c x86/Gos-freebsd.c \
+	x86/Gos-linux.c mi/Gdyn-extract.c mi/Gdyn-remote.c \
 	mi/Gfind_dynamic_proc_info.c mi/Gget_accessors.c \
 	mi/Gget_proc_info_by_ip.c mi/Gget_proc_name.c \
 	mi/Gput_dynamic_unwind_info.c mi/Gdestroy_addr_space.c \
@@ -681,15 +690,15 @@ am__libunwind_x86_la_SOURCES_DIST = os-freebsd.c os-hpux.c os-linux.c \
 	x86/Gcreate_addr_space.c x86/Gget_save_loc.c x86/Gglobal.c \
 	x86/Ginit.c x86/Ginit_local.c x86/Ginit_remote.c \
 	x86/Gget_proc_info.c x86/Gregs.c x86/Gresume.c x86/Gstep.c
-am__objects_43 = $(am__objects_6) x86/is_fpreg.lo x86/regname.lo
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@am__objects_44 = x86/Gos-linux.lo
-@OS_FREEBSD_TRUE@am__objects_44 = x86/Gos-freebsd.lo
-am__objects_45 = $(am__objects_43) $(am__objects_44) $(am__objects_8) \
+am__objects_44 = $(am__objects_7) x86/is_fpreg.lo x86/regname.lo
+@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@am__objects_45 = x86/Gos-linux.lo
+@OS_FREEBSD_TRUE@am__objects_45 = x86/Gos-freebsd.lo
+am__objects_46 = $(am__objects_44) $(am__objects_45) $(am__objects_9) \
 	x86/Gapply_reg_state.lo x86/Greg_states_iterate.lo \
 	x86/Gcreate_addr_space.lo x86/Gget_save_loc.lo x86/Gglobal.lo \
 	x86/Ginit.lo x86/Ginit_local.lo x86/Ginit_remote.lo \
 	x86/Gget_proc_info.lo x86/Gregs.lo x86/Gresume.lo x86/Gstep.lo
-@ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_FALSE@@ARCH_TILEGX_FALSE@@ARCH_X86_TRUE@am_libunwind_x86_la_OBJECTS = $(am__objects_45)
+@ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_FALSE@@ARCH_TILEGX_FALSE@@ARCH_X86_TRUE@am_libunwind_x86_la_OBJECTS = $(am__objects_46)
 libunwind_x86_la_OBJECTS = $(am_libunwind_x86_la_OBJECTS)
 libunwind_x86_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
 	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CCLD) \
@@ -702,31 +711,33 @@ libunwind_x86_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
 @ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_FALSE@@ARCH_TILEGX_FALSE@@ARCH_X86_64_TRUE@@ARCH_X86_FALSE@	libunwind-elf64.la \
 @ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_FALSE@@ARCH_TILEGX_FALSE@@ARCH_X86_64_TRUE@@ARCH_X86_FALSE@	$(am__DEPENDENCIES_13)
 am__libunwind_x86_64_la_SOURCES_DIST = os-freebsd.c os-hpux.c \
-	os-linux.c os-qnx.c mi/init.c mi/flush_cache.c mi/mempool.c \
-	mi/strerror.c x86_64/is_fpreg.c x86_64/regname.c \
-	x86_64/Gos-freebsd.c x86_64/Gos-linux.c mi/Gdyn-extract.c \
-	mi/Gdyn-remote.c mi/Gfind_dynamic_proc_info.c \
-	mi/Gget_accessors.c mi/Gget_proc_info_by_ip.c \
-	mi/Gget_proc_name.c mi/Gput_dynamic_unwind_info.c \
-	mi/Gdestroy_addr_space.c mi/Gget_reg.c mi/Gset_reg.c \
-	mi/Gget_fpreg.c mi/Gset_fpreg.c mi/Gset_caching_policy.c \
-	mi/Gset_cache_size.c x86_64/Gapply_reg_state.c \
-	x86_64/Greg_states_iterate.c x86_64/Gcreate_addr_space.c \
-	x86_64/Gget_save_loc.c x86_64/Gglobal.c x86_64/Ginit.c \
-	x86_64/Ginit_local.c x86_64/Ginit_remote.c \
-	x86_64/Gget_proc_info.c x86_64/Gregs.c x86_64/Gresume.c \
-	x86_64/Gstash_frame.c x86_64/Gstep.c x86_64/Gtrace.c
-am__objects_46 = $(am__objects_6) x86_64/is_fpreg.lo x86_64/regname.lo
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@am__objects_47 = x86_64/Gos-linux.lo
-@OS_FREEBSD_TRUE@am__objects_47 = x86_64/Gos-freebsd.lo
-am__objects_48 = $(am__objects_46) $(am__objects_47) $(am__objects_8) \
+	os-linux.c os-qnx.c os-solaris.c mi/init.c mi/flush_cache.c \
+	mi/mempool.c mi/strerror.c x86_64/is_fpreg.c x86_64/regname.c \
+	x86_64/Gos-freebsd.c x86_64/Gos-linux.c x86_64/Gos-solaris.c \
+	mi/Gdyn-extract.c mi/Gdyn-remote.c \
+	mi/Gfind_dynamic_proc_info.c mi/Gget_accessors.c \
+	mi/Gget_proc_info_by_ip.c mi/Gget_proc_name.c \
+	mi/Gput_dynamic_unwind_info.c mi/Gdestroy_addr_space.c \
+	mi/Gget_reg.c mi/Gset_reg.c mi/Gget_fpreg.c mi/Gset_fpreg.c \
+	mi/Gset_caching_policy.c mi/Gset_cache_size.c \
+	x86_64/Gapply_reg_state.c x86_64/Greg_states_iterate.c \
+	x86_64/Gcreate_addr_space.c x86_64/Gget_save_loc.c \
+	x86_64/Gglobal.c x86_64/Ginit.c x86_64/Ginit_local.c \
+	x86_64/Ginit_remote.c x86_64/Gget_proc_info.c x86_64/Gregs.c \
+	x86_64/Gresume.c x86_64/Gstash_frame.c x86_64/Gstep.c \
+	x86_64/Gtrace.c
+am__objects_47 = $(am__objects_7) x86_64/is_fpreg.lo x86_64/regname.lo
+@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_SOLARIS_TRUE@am__objects_48 = x86_64/Gos-solaris.lo
+@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@am__objects_48 = x86_64/Gos-linux.lo
+@OS_FREEBSD_TRUE@am__objects_48 = x86_64/Gos-freebsd.lo
+am__objects_49 = $(am__objects_47) $(am__objects_48) $(am__objects_9) \
 	x86_64/Gapply_reg_state.lo x86_64/Greg_states_iterate.lo \
 	x86_64/Gcreate_addr_space.lo x86_64/Gget_save_loc.lo \
 	x86_64/Gglobal.lo x86_64/Ginit.lo x86_64/Ginit_local.lo \
 	x86_64/Ginit_remote.lo x86_64/Gget_proc_info.lo \
 	x86_64/Gregs.lo x86_64/Gresume.lo x86_64/Gstash_frame.lo \
 	x86_64/Gstep.lo x86_64/Gtrace.lo
-@ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_FALSE@@ARCH_TILEGX_FALSE@@ARCH_X86_64_TRUE@@ARCH_X86_FALSE@am_libunwind_x86_64_la_OBJECTS = $(am__objects_48)
+@ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_FALSE@@ARCH_TILEGX_FALSE@@ARCH_X86_64_TRUE@@ARCH_X86_FALSE@am_libunwind_x86_64_la_OBJECTS = $(am__objects_49)
 libunwind_x86_64_la_OBJECTS = $(am_libunwind_x86_64_la_OBJECTS)
 libunwind_x86_64_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
 	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CCLD) \
@@ -735,12 +746,13 @@ libunwind_x86_64_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
 @ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_FALSE@@ARCH_TILEGX_FALSE@@ARCH_X86_64_TRUE@@ARCH_X86_FALSE@am_libunwind_x86_64_la_rpath = -rpath \
 @ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_FALSE@@ARCH_TILEGX_FALSE@@ARCH_X86_64_TRUE@@ARCH_X86_FALSE@	$(libdir)
 libunwind_la_DEPENDENCIES = $(am__append_10) $(LIBUNWIND_ELF) \
-	$(am__DEPENDENCIES_3) $(am__DEPENDENCIES_3)
+	$(am__DEPENDENCIES_3) $(am__DEPENDENCIES_3) \
+	$(am__DEPENDENCIES_3)
 am__libunwind_la_SOURCES_DIST = os-freebsd.c os-hpux.c os-linux.c \
-	os-qnx.c mi/init.c mi/flush_cache.c mi/mempool.c mi/strerror.c \
-	s390x/is_fpreg.c s390x/regname.c mi/_ReadULEB.c mi/_ReadSLEB.c \
-	mi/backtrace.c mi/dyn-cancel.c mi/dyn-info-list.c \
-	mi/dyn-register.c mi/Ldyn-extract.c \
+	os-qnx.c os-solaris.c mi/init.c mi/flush_cache.c mi/mempool.c \
+	mi/strerror.c s390x/is_fpreg.c s390x/regname.c mi/_ReadULEB.c \
+	mi/_ReadSLEB.c mi/backtrace.c mi/dyn-cancel.c \
+	mi/dyn-info-list.c mi/dyn-register.c mi/Ldyn-extract.c \
 	mi/Lfind_dynamic_proc_info.c mi/Lget_accessors.c \
 	mi/Lget_proc_info_by_ip.c mi/Lget_proc_name.c \
 	mi/Lput_dynamic_unwind_info.c mi/Ldestroy_addr_space.c \
@@ -774,26 +786,26 @@ am__libunwind_la_SOURCES_DIST = os-freebsd.c os-hpux.c os-linux.c \
 	ppc32/Lreg_states_iterate.c ppc32/Lcreate_addr_space.c \
 	ppc32/Lglobal.c ppc32/Linit.c ppc32/Lregs.c ppc32/Lresume.c \
 	ppc32/Lstep.c x86_64/is_fpreg.c x86_64/regname.c \
-	x86_64/Los-freebsd.c x86_64/Los-linux.c x86_64/setcontext.S \
-	x86_64/Lapply_reg_state.c x86_64/Lreg_states_iterate.c \
-	x86_64/Lcreate_addr_space.c x86_64/Lget_save_loc.c \
-	x86_64/Lglobal.c x86_64/Linit.c x86_64/Linit_local.c \
-	x86_64/Linit_remote.c x86_64/Lget_proc_info.c x86_64/Lregs.c \
-	x86_64/Lresume.c x86_64/Lstash_frame.c x86_64/Lstep.c \
-	x86_64/Ltrace.c x86_64/getcontext.S x86/is_fpreg.c \
-	x86/regname.c x86/Los-freebsd.c x86/Los-linux.c \
-	x86/Lapply_reg_state.c x86/Lreg_states_iterate.c \
-	x86/Lcreate_addr_space.c x86/Lget_save_loc.c x86/Lglobal.c \
-	x86/Linit.c x86/Linit_local.c x86/Linit_remote.c \
-	x86/Lget_proc_info.c x86/Lregs.c x86/Lresume.c x86/Lstep.c \
-	x86/getcontext-freebsd.S x86/getcontext-linux.S \
-	tilegx/is_fpreg.c tilegx/regname.c tilegx/getcontext.S \
-	tilegx/Lapply_reg_state.c tilegx/Lreg_states_iterate.c \
-	tilegx/Lcreate_addr_space.c tilegx/Lget_proc_info.c \
-	tilegx/Lget_save_loc.c tilegx/Lglobal.c tilegx/Linit.c \
-	tilegx/Linit_local.c tilegx/Linit_remote.c \
-	tilegx/Lis_signal_frame.c tilegx/Lregs.c tilegx/Lresume.c \
-	tilegx/Lstep.c mips/is_fpreg.c mips/regname.c \
+	x86_64/Los-freebsd.c x86_64/Los-linux.c x86_64/Los-solaris.c \
+	x86_64/setcontext.S x86_64/Lapply_reg_state.c \
+	x86_64/Lreg_states_iterate.c x86_64/Lcreate_addr_space.c \
+	x86_64/Lget_save_loc.c x86_64/Lglobal.c x86_64/Linit.c \
+	x86_64/Linit_local.c x86_64/Linit_remote.c \
+	x86_64/Lget_proc_info.c x86_64/Lregs.c x86_64/Lresume.c \
+	x86_64/Lstash_frame.c x86_64/Lstep.c x86_64/Ltrace.c \
+	x86_64/getcontext.S x86/is_fpreg.c x86/regname.c \
+	x86/Los-freebsd.c x86/Los-linux.c x86/Lapply_reg_state.c \
+	x86/Lreg_states_iterate.c x86/Lcreate_addr_space.c \
+	x86/Lget_save_loc.c x86/Lglobal.c x86/Linit.c \
+	x86/Linit_local.c x86/Linit_remote.c x86/Lget_proc_info.c \
+	x86/Lregs.c x86/Lresume.c x86/Lstep.c x86/getcontext-freebsd.S \
+	x86/getcontext-linux.S tilegx/is_fpreg.c tilegx/regname.c \
+	tilegx/getcontext.S tilegx/Lapply_reg_state.c \
+	tilegx/Lreg_states_iterate.c tilegx/Lcreate_addr_space.c \
+	tilegx/Lget_proc_info.c tilegx/Lget_save_loc.c \
+	tilegx/Lglobal.c tilegx/Linit.c tilegx/Linit_local.c \
+	tilegx/Linit_remote.c tilegx/Lis_signal_frame.c tilegx/Lregs.c \
+	tilegx/Lresume.c tilegx/Lstep.c mips/is_fpreg.c mips/regname.c \
 	mips/getcontext.S mips/Lapply_reg_state.c \
 	mips/Lreg_states_iterate.c mips/Lcreate_addr_space.c \
 	mips/Lget_proc_info.c mips/Lget_save_loc.c mips/Lglobal.c \
@@ -827,10 +839,10 @@ am__libunwind_la_SOURCES_DIST = os-freebsd.c os-hpux.c os-linux.c \
 	aarch64/Lis_signal_frame.c aarch64/Lregs.c aarch64/Lresume.c \
 	aarch64/Lstash_frame.c aarch64/Lstep.c aarch64/Ltrace.c \
 	aarch64/getcontext.S
-@SUPPORT_CXX_EXCEPTIONS_TRUE@am__objects_49 = mi/_ReadULEB.lo \
+@SUPPORT_CXX_EXCEPTIONS_TRUE@am__objects_50 = mi/_ReadULEB.lo \
 @SUPPORT_CXX_EXCEPTIONS_TRUE@	mi/_ReadSLEB.lo
-@OS_LINUX_TRUE@am__objects_50 = $(am__objects_49)
-am__objects_51 = $(am__objects_50) mi/backtrace.lo mi/dyn-cancel.lo \
+@OS_LINUX_TRUE@am__objects_51 = $(am__objects_50)
+am__objects_52 = $(am__objects_51) mi/backtrace.lo mi/dyn-cancel.lo \
 	mi/dyn-info-list.lo mi/dyn-register.lo mi/Ldyn-extract.lo \
 	mi/Lfind_dynamic_proc_info.lo mi/Lget_accessors.lo \
 	mi/Lget_proc_info_by_ip.lo mi/Lget_proc_name.lo \
@@ -838,7 +850,7 @@ am__objects_51 = $(am__objects_50) mi/backtrace.lo mi/dyn-cancel.lo \
 	mi/Lget_reg.lo mi/Lset_reg.lo mi/Lget_fpreg.lo \
 	mi/Lset_fpreg.lo mi/Lset_caching_policy.lo \
 	mi/Lset_cache_size.lo
-@SUPPORT_CXX_EXCEPTIONS_TRUE@am__objects_52 = unwind/Backtrace.lo \
+@SUPPORT_CXX_EXCEPTIONS_TRUE@am__objects_53 = unwind/Backtrace.lo \
 @SUPPORT_CXX_EXCEPTIONS_TRUE@	unwind/DeleteException.lo \
 @SUPPORT_CXX_EXCEPTIONS_TRUE@	unwind/FindEnclosingFunction.lo \
 @SUPPORT_CXX_EXCEPTIONS_TRUE@	unwind/ForcedUnwind.lo \
@@ -853,33 +865,34 @@ am__objects_51 = $(am__objects_50) mi/backtrace.lo mi/dyn-cancel.lo \
 @SUPPORT_CXX_EXCEPTIONS_TRUE@	unwind/Resume_or_Rethrow.lo \
 @SUPPORT_CXX_EXCEPTIONS_TRUE@	unwind/SetGR.lo unwind/SetIP.lo \
 @SUPPORT_CXX_EXCEPTIONS_TRUE@	unwind/GetIPInfo.lo
-am__objects_53 = $(am__objects_51) $(am__objects_52)
-am__objects_54 = $(am__objects_26) $(am__objects_53) \
+am__objects_54 = $(am__objects_52) $(am__objects_53)
+am__objects_55 = $(am__objects_27) $(am__objects_54) \
 	s390x/Lapply_reg_state.lo s390x/Lreg_states_iterate.lo \
 	s390x/Lcreate_addr_space.lo s390x/Lget_save_loc.lo \
 	s390x/Lglobal.lo s390x/Linit.lo s390x/Linit_local.lo \
 	s390x/Linit_remote.lo s390x/Lget_proc_info.lo s390x/Lregs.lo \
 	s390x/Lresume.lo s390x/Lis_signal_frame.lo s390x/Lstep.lo \
 	s390x/getcontext.lo s390x/setcontext.lo
-am__objects_55 = $(am__objects_39) $(am__objects_53) \
+am__objects_56 = $(am__objects_40) $(am__objects_54) \
 	sh/Lapply_reg_state.lo sh/Lreg_states_iterate.lo \
 	sh/Lcreate_addr_space.lo sh/Lget_proc_info.lo \
 	sh/Lget_save_loc.lo sh/Lglobal.lo sh/Linit.lo \
 	sh/Linit_local.lo sh/Linit_remote.lo sh/Lis_signal_frame.lo \
 	sh/Lregs.lo sh/Lresume.lo sh/Lstep.lo
-am__objects_56 = ppc/Lget_proc_info.lo ppc/Lget_save_loc.lo \
+am__objects_57 = ppc/Lget_proc_info.lo ppc/Lget_save_loc.lo \
 	ppc/Linit_local.lo ppc/Linit_remote.lo ppc/Lis_signal_frame.lo
-am__objects_57 = $(am__objects_24) $(am__objects_53) $(am__objects_56) \
+am__objects_58 = $(am__objects_25) $(am__objects_54) $(am__objects_57) \
 	ppc64/Lapply_reg_state.lo ppc64/Lreg_states_iterate.lo \
 	ppc64/Lcreate_addr_space.lo ppc64/Lglobal.lo ppc64/Linit.lo \
 	ppc64/Lregs.lo ppc64/Lresume.lo ppc64/Lstep.lo
-am__objects_58 = $(am__objects_21) $(am__objects_53) $(am__objects_56) \
+am__objects_59 = $(am__objects_22) $(am__objects_54) $(am__objects_57) \
 	ppc32/Lapply_reg_state.lo ppc32/Lreg_states_iterate.lo \
 	ppc32/Lcreate_addr_space.lo ppc32/Lglobal.lo ppc32/Linit.lo \
 	ppc32/Lregs.lo ppc32/Lresume.lo ppc32/Lstep.lo
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@am__objects_59 = x86_64/Los-linux.lo
-@OS_FREEBSD_TRUE@am__objects_59 = x86_64/Los-freebsd.lo
-am__objects_60 = $(am__objects_46) $(am__objects_59) $(am__objects_53) \
+@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_SOLARIS_TRUE@am__objects_60 = x86_64/Los-solaris.lo
+@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@am__objects_60 = x86_64/Los-linux.lo
+@OS_FREEBSD_TRUE@am__objects_60 = x86_64/Los-freebsd.lo
+am__objects_61 = $(am__objects_47) $(am__objects_60) $(am__objects_54) \
 	x86_64/setcontext.lo x86_64/Lapply_reg_state.lo \
 	x86_64/Lreg_states_iterate.lo x86_64/Lcreate_addr_space.lo \
 	x86_64/Lget_save_loc.lo x86_64/Lglobal.lo x86_64/Linit.lo \
@@ -887,38 +900,38 @@ am__objects_60 = $(am__objects_46) $(am__objects_59) $(am__objects_53) \
 	x86_64/Lget_proc_info.lo x86_64/Lregs.lo x86_64/Lresume.lo \
 	x86_64/Lstash_frame.lo x86_64/Lstep.lo x86_64/Ltrace.lo \
 	x86_64/getcontext.lo
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@am__objects_61 = x86/Los-linux.lo
-@OS_FREEBSD_TRUE@am__objects_61 = x86/Los-freebsd.lo
-am__objects_62 = $(am__objects_43) $(am__objects_61) $(am__objects_53) \
+@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@am__objects_62 = x86/Los-linux.lo
+@OS_FREEBSD_TRUE@am__objects_62 = x86/Los-freebsd.lo
+am__objects_63 = $(am__objects_44) $(am__objects_62) $(am__objects_54) \
 	x86/Lapply_reg_state.lo x86/Lreg_states_iterate.lo \
 	x86/Lcreate_addr_space.lo x86/Lget_save_loc.lo x86/Lglobal.lo \
 	x86/Linit.lo x86/Linit_local.lo x86/Linit_remote.lo \
 	x86/Lget_proc_info.lo x86/Lregs.lo x86/Lresume.lo x86/Lstep.lo
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@am__objects_63 =  \
+@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@am__objects_64 =  \
 @OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	x86/getcontext-linux.lo
-@OS_FREEBSD_TRUE@am__objects_63 = x86/getcontext-freebsd.lo
-am__objects_64 = $(am__objects_41) $(am__objects_53) \
+@OS_FREEBSD_TRUE@am__objects_64 = x86/getcontext-freebsd.lo
+am__objects_65 = $(am__objects_42) $(am__objects_54) \
 	tilegx/getcontext.lo tilegx/Lapply_reg_state.lo \
 	tilegx/Lreg_states_iterate.lo tilegx/Lcreate_addr_space.lo \
 	tilegx/Lget_proc_info.lo tilegx/Lget_save_loc.lo \
 	tilegx/Lglobal.lo tilegx/Linit.lo tilegx/Linit_local.lo \
 	tilegx/Linit_remote.lo tilegx/Lis_signal_frame.lo \
 	tilegx/Lregs.lo tilegx/Lresume.lo tilegx/Lstep.lo
-am__objects_65 = $(am__objects_19) $(am__objects_53) \
+am__objects_66 = $(am__objects_20) $(am__objects_54) \
 	mips/getcontext.lo mips/Lapply_reg_state.lo \
 	mips/Lreg_states_iterate.lo mips/Lcreate_addr_space.lo \
 	mips/Lget_proc_info.lo mips/Lget_save_loc.lo mips/Lglobal.lo \
 	mips/Linit.lo mips/Linit_local.lo mips/Linit_remote.lo \
 	mips/Lis_signal_frame.lo mips/Lregs.lo mips/Lresume.lo \
 	mips/Lstep.lo
-am__objects_66 = $(am__objects_15) $(am__objects_53) \
+am__objects_67 = $(am__objects_16) $(am__objects_54) \
 	hppa/getcontext.lo hppa/setcontext.lo hppa/Lapply_reg_state.lo \
 	hppa/Lreg_states_iterate.lo hppa/Lcreate_addr_space.lo \
 	hppa/Lget_save_loc.lo hppa/Lglobal.lo hppa/Linit.lo \
 	hppa/Linit_local.lo hppa/Linit_remote.lo \
 	hppa/Lis_signal_frame.lo hppa/Lget_proc_info.lo hppa/Lregs.lo \
 	hppa/Lresume.lo hppa/Lstep.lo
-am__objects_67 = $(am__objects_17) $(am__objects_53) \
+am__objects_68 = $(am__objects_18) $(am__objects_54) \
 	ia64/dyn_info_list.lo ia64/getcontext.lo \
 	ia64/Lapply_reg_state.lo ia64/Lreg_states_iterate.lo \
 	ia64/Lcreate_addr_space.lo ia64/Lget_proc_info.lo \
@@ -928,17 +941,17 @@ am__objects_67 = $(am__objects_17) $(am__objects_53) \
 	ia64/Lparser.lo ia64/Lrbs.lo ia64/Lregs.lo ia64/Lresume.lo \
 	ia64/Lscript.lo ia64/Lstep.lo ia64/Ltables.lo \
 	ia64/Lfind_unwind_table.lo
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_QNX_TRUE@am__objects_68 = arm/Los-other.lo
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@am__objects_68 = arm/Los-linux.lo
-@OS_FREEBSD_TRUE@am__objects_68 = arm/Los-freebsd.lo
-am__objects_69 = $(am__objects_10) $(am__objects_68) $(am__objects_53) \
+@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_QNX_TRUE@am__objects_69 = arm/Los-other.lo
+@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@am__objects_69 = arm/Los-linux.lo
+@OS_FREEBSD_TRUE@am__objects_69 = arm/Los-freebsd.lo
+am__objects_70 = $(am__objects_11) $(am__objects_69) $(am__objects_54) \
 	arm/getcontext.lo arm/Lapply_reg_state.lo \
 	arm/Lreg_states_iterate.lo arm/Lcreate_addr_space.lo \
 	arm/Lget_proc_info.lo arm/Lget_save_loc.lo arm/Lglobal.lo \
 	arm/Linit.lo arm/Linit_local.lo arm/Linit_remote.lo \
 	arm/Lregs.lo arm/Lresume.lo arm/Lstep.lo arm/Lex_tables.lo \
 	arm/Lstash_frame.lo arm/Ltrace.lo
-am__objects_70 = $(am__objects_7) $(am__objects_53) \
+am__objects_71 = $(am__objects_8) $(am__objects_54) \
 	aarch64/Lapply_reg_state.lo aarch64/Lreg_states_iterate.lo \
 	aarch64/Lcreate_addr_space.lo aarch64/Lget_proc_info.lo \
 	aarch64/Lget_save_loc.lo aarch64/Lglobal.lo aarch64/Linit.lo \
@@ -946,20 +959,20 @@ am__objects_70 = $(am__objects_7) $(am__objects_53) \
 	aarch64/Lis_signal_frame.lo aarch64/Lregs.lo \
 	aarch64/Lresume.lo aarch64/Lstash_frame.lo aarch64/Lstep.lo \
 	aarch64/Ltrace.lo aarch64/getcontext.lo
-@ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_FALSE@@ARCH_PPC32_FALSE@@ARCH_PPC64_FALSE@@ARCH_S390X_TRUE@@ARCH_SH_FALSE@@ARCH_TILEGX_FALSE@@ARCH_X86_64_FALSE@@ARCH_X86_FALSE@am_libunwind_la_OBJECTS = $(am__objects_54)
-@ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_FALSE@@ARCH_PPC32_FALSE@@ARCH_PPC64_FALSE@@ARCH_SH_TRUE@@ARCH_TILEGX_FALSE@@ARCH_X86_64_FALSE@@ARCH_X86_FALSE@am_libunwind_la_OBJECTS = $(am__objects_55)
-@ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_FALSE@@ARCH_PPC32_FALSE@@ARCH_PPC64_TRUE@@ARCH_TILEGX_FALSE@@ARCH_X86_64_FALSE@@ARCH_X86_FALSE@am_libunwind_la_OBJECTS = $(am__objects_57)
-@ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_FALSE@@ARCH_PPC32_TRUE@@ARCH_TILEGX_FALSE@@ARCH_X86_64_FALSE@@ARCH_X86_FALSE@am_libunwind_la_OBJECTS = $(am__objects_58)
-@ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_FALSE@@ARCH_TILEGX_FALSE@@ARCH_X86_64_TRUE@@ARCH_X86_FALSE@am_libunwind_la_OBJECTS = $(am__objects_60)
-@ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_FALSE@@ARCH_TILEGX_FALSE@@ARCH_X86_TRUE@am_libunwind_la_OBJECTS = $(am__objects_62) \
-@ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_FALSE@@ARCH_TILEGX_FALSE@@ARCH_X86_TRUE@	$(am__objects_63)
-@ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_FALSE@@ARCH_TILEGX_TRUE@am_libunwind_la_OBJECTS = $(am__objects_64)
-@ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_TRUE@am_libunwind_la_OBJECTS = $(am__objects_65)
-@ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_TRUE@@ARCH_IA64_FALSE@am_libunwind_la_OBJECTS = $(am__objects_66)
-@ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_IA64_TRUE@am_libunwind_la_OBJECTS = $(am__objects_67)
+@ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_FALSE@@ARCH_PPC32_FALSE@@ARCH_PPC64_FALSE@@ARCH_S390X_TRUE@@ARCH_SH_FALSE@@ARCH_TILEGX_FALSE@@ARCH_X86_64_FALSE@@ARCH_X86_FALSE@am_libunwind_la_OBJECTS = $(am__objects_55)
+@ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_FALSE@@ARCH_PPC32_FALSE@@ARCH_PPC64_FALSE@@ARCH_SH_TRUE@@ARCH_TILEGX_FALSE@@ARCH_X86_64_FALSE@@ARCH_X86_FALSE@am_libunwind_la_OBJECTS = $(am__objects_56)
+@ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_FALSE@@ARCH_PPC32_FALSE@@ARCH_PPC64_TRUE@@ARCH_TILEGX_FALSE@@ARCH_X86_64_FALSE@@ARCH_X86_FALSE@am_libunwind_la_OBJECTS = $(am__objects_58)
+@ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_FALSE@@ARCH_PPC32_TRUE@@ARCH_TILEGX_FALSE@@ARCH_X86_64_FALSE@@ARCH_X86_FALSE@am_libunwind_la_OBJECTS = $(am__objects_59)
+@ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_FALSE@@ARCH_TILEGX_FALSE@@ARCH_X86_64_TRUE@@ARCH_X86_FALSE@am_libunwind_la_OBJECTS = $(am__objects_61)
+@ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_FALSE@@ARCH_TILEGX_FALSE@@ARCH_X86_TRUE@am_libunwind_la_OBJECTS = $(am__objects_63) \
+@ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_FALSE@@ARCH_TILEGX_FALSE@@ARCH_X86_TRUE@	$(am__objects_64)
+@ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_FALSE@@ARCH_TILEGX_TRUE@am_libunwind_la_OBJECTS = $(am__objects_65)
+@ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_FALSE@@ARCH_IA64_FALSE@@ARCH_MIPS_TRUE@am_libunwind_la_OBJECTS = $(am__objects_66)
+@ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_HPPA_TRUE@@ARCH_IA64_FALSE@am_libunwind_la_OBJECTS = $(am__objects_67)
+@ARCH_AARCH64_FALSE@@ARCH_ARM_FALSE@@ARCH_IA64_TRUE@am_libunwind_la_OBJECTS = $(am__objects_68)
 @ARCH_AARCH64_FALSE@@ARCH_ARM_TRUE@am_libunwind_la_OBJECTS =  \
-@ARCH_AARCH64_FALSE@@ARCH_ARM_TRUE@	$(am__objects_69)
-@ARCH_AARCH64_TRUE@am_libunwind_la_OBJECTS = $(am__objects_70)
+@ARCH_AARCH64_FALSE@@ARCH_ARM_TRUE@	$(am__objects_70)
+@ARCH_AARCH64_TRUE@am_libunwind_la_OBJECTS = $(am__objects_71)
 libunwind_la_OBJECTS = $(am_libunwind_la_OBJECTS)
 libunwind_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
@@ -1123,6 +1136,7 @@ LIBLZMA = @LIBLZMA@
 LIBOBJS = @LIBOBJS@
 LIBS = @LIBS@
 LIBTOOL = @LIBTOOL@
+LIBZ = @LIBZ@
 LIPO = @LIPO@
 LN_S = @LN_S@
 LTLIBOBJS = @LTLIBOBJS@
@@ -1297,7 +1311,7 @@ libunwind_coredump_la_SOURCES = coredump/_UCD_accessors.c \
 libunwind_coredump_la_LDFLAGS = $(COMMON_SO_LDFLAGS) \
 				-version-info $(COREDUMP_SO_VERSION)
 
-libunwind_coredump_la_LIBADD = $(LIBLZMA)
+libunwind_coredump_la_LIBADD = $(LIBLZMA) $(LIBZ)
 
 ### libunwind-setjmp:
 libunwind_setjmp_la_LDFLAGS = $(COMMON_SO_LDFLAGS)		     \
@@ -1318,7 +1332,7 @@ libunwind_setjmp_la_SOURCES = setjmp/longjmp.c setjmp/siglongjmp.c \
 
 ### libunwind:
 libunwind_la_LIBADD = $(am__append_10) $(LIBUNWIND_ELF) -lc $(LIBCRTS) \
-	$(LIBLZMA)
+	$(LIBLZMA) $(LIBZ)
 
 # List of arch-independent files needed by both local-only and generic
 # libraries:
@@ -1374,6 +1388,7 @@ libunwind_la_SOURCES_os_linux = os-linux.c
 libunwind_la_SOURCES_os_hpux = os-hpux.c
 libunwind_la_SOURCES_os_freebsd = os-freebsd.c
 libunwind_la_SOURCES_os_qnx = os-qnx.c
+libunwind_la_SOURCES_os_solaris = os-solaris.c
 libunwind_dwarf_common_la_SOURCES = dwarf/global.c
 libunwind_dwarf_local_la_SOURCES = \
 	dwarf/Lexpr.c dwarf/Lfde.c dwarf/Lparser.c dwarf/Lpe.c \
@@ -1390,9 +1405,9 @@ libunwind_dwarf_generic_la_LIBADD = libunwind-dwarf-common.la
 libunwind_elf32_la_SOURCES = elf32.c
 libunwind_elf64_la_SOURCES = elf64.c
 libunwind_elfxx_la_SOURCES = elfxx.c
-libunwind_elf32_la_LIBADD = $(LIBLZMA)
-libunwind_elf64_la_LIBADD = $(LIBLZMA)
-libunwind_elfxx_la_LIBADD = $(LIBLZMA)
+libunwind_elf32_la_LIBADD = $(LIBLZMA) $(LIBZ)
+libunwind_elf64_la_LIBADD = $(LIBLZMA) $(LIBZ)
+libunwind_elfxx_la_LIBADD = $(LIBLZMA) $(LIBZ)
 libunwind_la_SOURCES_aarch64_common = $(libunwind_la_SOURCES_common)	    \
 	aarch64/is_fpreg.c aarch64/regname.c
 
@@ -1691,6 +1706,7 @@ libunwind_s390x_la_SOURCES_s390x = $(libunwind_la_SOURCES_s390x_common)     \
 @OS_HPUX_TRUE@libunwind_la_SOURCES_os = $(libunwind_la_SOURCES_os_hpux)
 @OS_LINUX_TRUE@libunwind_la_SOURCES_os = $(libunwind_la_SOURCES_os_linux)
 @OS_QNX_TRUE@libunwind_la_SOURCES_os = $(libunwind_la_SOURCES_os_qnx)
+@OS_SOLARIS_TRUE@libunwind_la_SOURCES_os = $(libunwind_la_SOURCES_os_solaris)
 @OS_FREEBSD_TRUE@libunwind_la_SOURCES_os_local = $(libunwind_la_SOURCES_os_freebsd_local)
 @OS_HPUX_TRUE@libunwind_la_SOURCES_os_local = $(libunwind_la_SOURCES_os_hpux_local)
 @OS_LINUX_TRUE@libunwind_la_SOURCES_os_local = $(libunwind_la_SOURCES_os_linux_local)
@@ -1703,8 +1719,10 @@ libunwind_s390x_la_SOURCES_s390x = $(libunwind_la_SOURCES_s390x_common)     \
 @OS_LINUX_TRUE@libunwind_la_SOURCES_x86_os_local = x86/Los-linux.c
 @OS_FREEBSD_TRUE@libunwind_la_SOURCES_x86_64_os = x86_64/Gos-freebsd.c
 @OS_LINUX_TRUE@libunwind_la_SOURCES_x86_64_os = x86_64/Gos-linux.c
+@OS_SOLARIS_TRUE@libunwind_la_SOURCES_x86_64_os = x86_64/Gos-solaris.c
 @OS_FREEBSD_TRUE@libunwind_la_SOURCES_x86_64_os_local = x86_64/Los-freebsd.c
 @OS_LINUX_TRUE@libunwind_la_SOURCES_x86_64_os_local = x86_64/Los-linux.c
+@OS_SOLARIS_TRUE@libunwind_la_SOURCES_x86_64_os_local = x86_64/Los-solaris.c
 @OS_FREEBSD_TRUE@libunwind_la_SOURCES_arm_os = arm/Gos-freebsd.c
 @OS_LINUX_TRUE@libunwind_la_SOURCES_arm_os = arm/Gos-linux.c
 @OS_QNX_TRUE@libunwind_la_SOURCES_arm_os = arm/Gos-other.c
@@ -1805,6 +1823,7 @@ EXTRA_DIST = $(libunwind_la_SOURCES_aarch64)			\
 		$(libunwind_la_SOURCES_os_linux)		\
 		$(libunwind_la_SOURCES_os_hpux)			\
 		$(libunwind_la_SOURCES_os_qnx)			\
+		$(libunwind_la_SOURCES_os_solaris)		\
 		$(libunwind_la_SOURCES_common)			\
 		$(libunwind_la_SOURCES_local)			\
 		$(libunwind_la_SOURCES_generic)			\
@@ -2507,6 +2526,8 @@ x86_64/Gos-freebsd.lo: x86_64/$(am__dirstamp) \
 	x86_64/$(DEPDIR)/$(am__dirstamp)
 x86_64/Gos-linux.lo: x86_64/$(am__dirstamp) \
 	x86_64/$(DEPDIR)/$(am__dirstamp)
+x86_64/Gos-solaris.lo: x86_64/$(am__dirstamp) \
+	x86_64/$(DEPDIR)/$(am__dirstamp)
 x86_64/Gapply_reg_state.lo: x86_64/$(am__dirstamp) \
 	x86_64/$(DEPDIR)/$(am__dirstamp)
 x86_64/Greg_states_iterate.lo: x86_64/$(am__dirstamp) \
@@ -2685,6 +2706,8 @@ ppc32/Lstep.lo: ppc32/$(am__dirstamp) ppc32/$(DEPDIR)/$(am__dirstamp)
 x86_64/Los-freebsd.lo: x86_64/$(am__dirstamp) \
 	x86_64/$(DEPDIR)/$(am__dirstamp)
 x86_64/Los-linux.lo: x86_64/$(am__dirstamp) \
+	x86_64/$(DEPDIR)/$(am__dirstamp)
+x86_64/Los-solaris.lo: x86_64/$(am__dirstamp) \
 	x86_64/$(DEPDIR)/$(am__dirstamp)
 x86_64/setcontext.lo: x86_64/$(am__dirstamp) \
 	x86_64/$(DEPDIR)/$(am__dirstamp)
@@ -2961,6 +2984,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/os-hpux.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/os-linux.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/os-qnx.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/os-solaris.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@aarch64/$(DEPDIR)/Gapply_reg_state.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@aarch64/$(DEPDIR)/Gcreate_addr_space.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@aarch64/$(DEPDIR)/Gget_proc_info.Plo@am__quote@
@@ -3420,6 +3444,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@x86_64/$(DEPDIR)/Ginit_remote.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@x86_64/$(DEPDIR)/Gos-freebsd.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@x86_64/$(DEPDIR)/Gos-linux.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@x86_64/$(DEPDIR)/Gos-solaris.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@x86_64/$(DEPDIR)/Greg_states_iterate.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@x86_64/$(DEPDIR)/Gregs.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@x86_64/$(DEPDIR)/Gresume.Plo@am__quote@
@@ -3436,6 +3461,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@x86_64/$(DEPDIR)/Linit_remote.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@x86_64/$(DEPDIR)/Los-freebsd.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@x86_64/$(DEPDIR)/Los-linux.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@x86_64/$(DEPDIR)/Los-solaris.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@x86_64/$(DEPDIR)/Lreg_states_iterate.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@x86_64/$(DEPDIR)/Lregs.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@x86_64/$(DEPDIR)/Lresume.Plo@am__quote@

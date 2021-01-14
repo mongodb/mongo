@@ -71,6 +71,11 @@ get_list_addr (unw_addr_space_t as, unw_word_t *dil_addr, void *arg,
 
 #else
 
+/* XXX fix me: there is currently no way to locate the dyn-info list
+       by a remote unwinder.  On ia64, this is done via a special
+       unwind-table entry.  Perhaps something similar can be done with
+       DWARF2 unwind info.  */
+
 static inline int
 get_list_addr (unw_addr_space_t as, unw_word_t *dil_addr, void *arg,
                int *countp)

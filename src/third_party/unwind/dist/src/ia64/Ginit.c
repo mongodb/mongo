@@ -68,6 +68,7 @@ get_dyn_info_list_addr (unw_addr_space_t as, unw_word_t *dyn_info_list_addr,
   if (!_U_dyn_info_list_addr)
     return -UNW_ENOINFO;
 #endif
+  // Access the `_U_dyn_info_list` from `LOCAL_ONLY` library, i.e. libunwind.so.
   *dyn_info_list_addr = _U_dyn_info_list_addr ();
   return 0;
 }

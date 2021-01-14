@@ -68,7 +68,7 @@ libunwind_coredump_la_SOURCES = \
 	coredump/_UPT_resume.c
 libunwind_coredump_la_LDFLAGS = $(COMMON_SO_LDFLAGS) \
 				-version-info $(COREDUMP_SO_VERSION)
-libunwind_coredump_la_LIBADD = $(LIBLZMA)
+libunwind_coredump_la_LIBADD = $(LIBLZMA) $(LIBZ)
 noinst_HEADERS += coredump/_UCD_internal.h coredump/_UCD_lib.h
 
 ### libunwind-setjmp:
@@ -154,6 +154,8 @@ libunwind_la_SOURCES_os_freebsd = os-freebsd.c
 
 libunwind_la_SOURCES_os_qnx = os-qnx.c
 
+libunwind_la_SOURCES_os_solaris = os-solaris.c
+
 libunwind_dwarf_common_la_SOURCES = dwarf/global.c
 
 libunwind_dwarf_local_la_SOURCES = \
@@ -181,9 +183,9 @@ noinst_HEADERS += elf32.h elf64.h elfxx.h
 libunwind_elf32_la_SOURCES = elf32.c
 libunwind_elf64_la_SOURCES = elf64.c
 libunwind_elfxx_la_SOURCES = elfxx.c
-libunwind_elf32_la_LIBADD  = $(LIBLZMA)
-libunwind_elf64_la_LIBADD  = $(LIBLZMA)
-libunwind_elfxx_la_LIBADD  = $(LIBLZMA)
+libunwind_elf32_la_LIBADD  = $(LIBLZMA) $(LIBZ)
+libunwind_elf64_la_LIBADD  = $(LIBLZMA) $(LIBZ)
+libunwind_elfxx_la_LIBADD  = $(LIBLZMA) $(LIBZ)
 
 noinst_LTLIBRARIES += $(LIBUNWIND_ELF)
 libunwind_la_LIBADD += $(LIBUNWIND_ELF)
@@ -538,6 +540,12 @@ if OS_FREEBSD
  libunwind_coredump_la_SOURCES += coredump/_UCD_access_reg_freebsd.c
 endif
 
+if OS_SOLARIS
+ libunwind_la_SOURCES_os              = $(libunwind_la_SOURCES_os_solaris)
+ libunwind_la_SOURCES_x86_64_os       = x86_64/Gos-solaris.c
+ libunwind_la_SOURCES_x86_64_os_local = x86_64/Los-solaris.c
+endif
+
 if OS_QNX
  libunwind_la_SOURCES_os	= $(libunwind_la_SOURCES_os_qnx)
  libunwind_la_SOURCES_os_local	= $(libunwind_la_SOURCES_os_qnx_local)
@@ -724,7 +732,7 @@ endif
 libunwind_la_LDFLAGS =	$(COMMON_SO_LDFLAGS) -XCClinker -nostdlib \
 			$(LDFLAGS_STATIC_LIBCXA) -version-info $(SOVERSION)
 libunwind_la_LIBADD  += -lc $(LIBCRTS)
-libunwind_la_LIBADD += $(LIBLZMA)
+libunwind_la_LIBADD += $(LIBLZMA) $(LIBZ)
 
 AM_CPPFLAGS = -I$(top_srcdir)/include -I$(top_srcdir)/include/tdep-$(arch) -I.
 AM_CCASFLAGS = $(AM_CPPFLAGS)
@@ -741,6 +749,7 @@ EXTRA_DIST =	$(libunwind_la_SOURCES_aarch64)			\
 		$(libunwind_la_SOURCES_os_linux)		\
 		$(libunwind_la_SOURCES_os_hpux)			\
 		$(libunwind_la_SOURCES_os_qnx)			\
+		$(libunwind_la_SOURCES_os_solaris)		\
 		$(libunwind_la_SOURCES_common)			\
 		$(libunwind_la_SOURCES_local)			\
 		$(libunwind_la_SOURCES_generic)			\

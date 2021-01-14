@@ -37,9 +37,13 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 
 _Ux86_64_setcontext:
 
-#if defined __linux__
+#if defined __linux__ || defined __sun
         /* restore fp state */
+#ifdef UC_MCONTEXT_FPREGS_PTR
 	mov    UC_MCONTEXT_FPREGS_PTR(%rdi),%r8
+#else // UC_MCONTEXT_FPREGS_PTR
+	leaq UC_MCONTEXT_FPREGS_MEM(%rdi),%r8
+#endif // UC_MCONTEXT_FPREGS_PTR
 	fldenv (%r8)
 	ldmxcsr FPREGS_OFFSET_MXCSR(%r8)
 #elif defined __FreeBSD__

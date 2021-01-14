@@ -207,7 +207,7 @@ sighandler (int signal, void *siginfo UNUSED, void *context)
       printf (" @ %lx", (unsigned long) uc->uc_mcontext.mc_eip);
 #endif
 #elif UNW_TARGET_X86_64
-#if defined __linux__
+#if defined __linux__ || defined __sun
       printf (" @ %lx", (unsigned long) uc->uc_mcontext.gregs[REG_RIP]);
 #elif defined __FreeBSD__
       printf (" @ %lx", (unsigned long) uc->uc_mcontext.mc_rip);

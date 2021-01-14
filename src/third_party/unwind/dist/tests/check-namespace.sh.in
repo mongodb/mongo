@@ -85,6 +85,11 @@ filter_misc () {
 	ignore _ftext
 	ignore _gp
     fi
+
+    if [ ${os} == "solaris2.11" ]; then
+        ignore _PROCEDURE_LINKAGE_TABLE_
+        ignore _etext
+    fi
 }
 
 check_local_unw_abi () {
@@ -121,7 +126,7 @@ check_local_unw_abi () {
     match _U_dyn_register
 
     match unw_backtrace
-    match backtrace
+    @CONFIG_WEAK_BACKTRACE_TRUE@match backtrace
 
     case ${plat} in
 	arm)

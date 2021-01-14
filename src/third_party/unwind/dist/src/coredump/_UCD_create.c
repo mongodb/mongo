@@ -259,9 +259,13 @@ _UCD_create(const char *filename)
                                 cur->p_flags
             );
             if (cur->p_filesz < cur->p_memsz)
-              Debug(2, " partial");
+              {
+                Debug(2, " partial");
+              }
             if (cur->p_flags & PF_X)
-              Debug(2, " executable");
+              {
+                Debug(2, " executable");
+              }
           }
         Debug(2, "\n");
         i++;
@@ -338,7 +342,10 @@ int _UCD_add_backing_file_at_segment(struct UCD_info *ui, int phdr_no, const cha
   phdr->backing_filesize = (uoff_t)statbuf.st_size;
 
   if (phdr->p_flags != (PF_X | PF_R))
-    Debug(1, "Note: phdr[%u] is not r-x: flags are 0x%x\n", phdr_no, phdr->p_flags);
+    {
+      Debug(1, "Note: phdr[%u] is not r-x: flags are 0x%x\n",
+                        phdr_no, phdr->p_flags);
+    }
 
   if (phdr->backing_filesize > phdr->p_memsz)
     {

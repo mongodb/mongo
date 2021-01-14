@@ -9,6 +9,9 @@
 /* Support for Microsoft ABI extensions */
 #undef CONFIG_MSABI_SUPPORT
 
+/* Define if the weak 'backtrace' symbol is provided. */
+#undef CONFIG_WEAK_BACKTRACE
+
 /* Define to 1 if you want every memory access validated */
 #undef CONSERVATIVE_CHECKS
 
@@ -122,6 +125,9 @@
 /* Define to 1 if you have the `mincore' function. */
 #undef HAVE_MINCORE
 
+/* Define to 1 if you have the `pipe2' function. */
+#undef HAVE_PIPE2
+
 /* Define to 1 if you have the <signal.h> header file. */
 #undef HAVE_SIGNAL_H
 
@@ -178,6 +184,9 @@
 
 /* Define to 1 if you have the <unistd.h> header file. */
 #undef HAVE_UNISTD_H
+
+/* Define if you have libz */
+#undef HAVE_ZLIB
 
 /* Defined if __builtin_unreachable() is available */
 #undef HAVE__BUILTIN_UNREACHABLE

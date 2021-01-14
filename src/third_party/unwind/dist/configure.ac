@@ -1,8 +1,8 @@
 define(pkg_major, 1)
-define(pkg_minor, 4)
-define(pkg_extra, -rc1)
+define(pkg_minor, 5)
+define(pkg_extra, 0)
 define(pkg_maintainer, libunwind-devel@nongnu.org)
-define(mkvers, $1.$2$3)
+define(mkvers, $1.$2.$3)
 dnl Process this file with autoconf to produce a configure script.
 AC_INIT([libunwind],[mkvers(pkg_major, pkg_minor, pkg_extra)],[pkg_maintainer])
 AC_CONFIG_SRCDIR(src/mi/backtrace.c)
@@ -70,7 +70,7 @@ PT_STEP, PT_SYSCALL], [], [],
 
 dnl Checks for library functions.
 AC_CHECK_FUNCS(dl_iterate_phdr dl_phdr_removals_counter dlmodinfo getunwind \
-		ttrace mincore)
+		ttrace mincore pipe2)
 
 AC_MSG_CHECKING([if building with AltiVec])
 AC_COMPILE_IFELSE([AC_LANG_SOURCE([[
@@ -147,6 +147,10 @@ AC_ARG_ENABLE(tests,
  AS_HELP_STRING([--disable-tests],[Disable tests build]),,
  [enable_tests=yes])
 
+AC_ARG_ENABLE(weak-backtrace,
+ AS_HELP_STRING([--disable-weak-backtrace],[Do not provide the weak 'backtrace' symbol.]),,
+ [enable_weak_backtrace=yes])
+
 AC_MSG_CHECKING([if we should build libunwind-setjmp])
 AC_MSG_RESULT([$enable_setjmp])
 
@@ -180,6 +184,7 @@ AM_CONDITIONAL(OS_LINUX, expr x$target_os : xlinux >/dev/null)
 AM_CONDITIONAL(OS_HPUX, expr x$target_os : xhpux >/dev/null)
 AM_CONDITIONAL(OS_FREEBSD, expr x$target_os : xfreebsd >/dev/null)
 AM_CONDITIONAL(OS_QNX, expr x$target_os : xnto-qnx >/dev/null)
+AM_CONDITIONAL(OS_SOLARIS, expr x$target_os : xsolaris >/dev/null)
 
 AC_MSG_CHECKING([for ELF helper width])
 case "${target_arch}" in
@@ -301,6 +306,23 @@ fi
 AC_SUBST([LIBLZMA])
 AM_CONDITIONAL(HAVE_LZMA, test x$enable_minidebuginfo = xyes)
 
+LIBZ=
+AC_MSG_CHECKING([whether to support ZLIB-compressed symbol tables])
+AC_ARG_ENABLE(zlibdebuginfo,
+AS_HELP_STRING([--enable-zlibdebuginfo], [Enables support for ZLIB-compressed symbol tables]),, [enable_zlibdebuginfo=auto])
+AC_MSG_RESULT([$enable_zlibdebuginfo])
+if test x$enable_zlibdebuginfo != xno; then
+   AC_CHECK_LIB([z], [uncompress],
+   [LIBZ=-lz
+    AC_DEFINE([HAVE_ZLIB], [1], [Define if you have libz])
+    enable_zlibdebuginfo=yes],
+   [if test x$enable_zlibdebuginfo = xyes; then
+      AC_MSG_FAILURE([libz not found])
+    fi])
+fi
+AC_SUBST([LIBZ])
+AM_CONDITIONAL(HAVE_ZLIB, test x$enable_zlibdebuginfo = xyes)
+
 AC_MSG_CHECKING([whether to support UNW_CACHE_PER_THREAD])
 AC_ARG_ENABLE([per-thread-cache],
 AS_HELP_STRING([--enable-per-thread-cache], [build with support for UNW_CACHE_PER_THREAD (which imposes a hight TLS memory usage) (default: disabled)]))
@@ -321,6 +343,14 @@ if test x$GCC = xyes -a x$intel_compiler != xyes; then
   CFLAGS="${CFLAGS} -fexceptions -Wall -Wsign-compare"
 fi
 AC_MSG_RESULT([$intel_compiler])
+
+AC_MSG_CHECKING([if building on Solaris then define __EXTENSIONS__ macro])
+if $OS_SOLARIS; then
+  CFLAGS="${CFLAGS} -D__EXTENSIONS__"
+  AC_MSG_RESULT([yes])
+else
+  AC_MSG_RESULT([no])
+fi
 
 AC_MSG_CHECKING([for QCC compiler])
 AS_CASE([$CC], [qcc*|QCC*], [qcc_compiler=yes], [qcc_compiler=no])
@@ -436,6 +466,11 @@ AM_CONDITIONAL([CONFIG_TESTS], [test x$enable_tests = xyes])
 if test "x$enable_tests" = "xyes"; then
   AC_CONFIG_FILES(tests/Makefile tests/check-namespace.sh)
 fi
+
+AM_CONDITIONAL([CONFIG_WEAK_BACKTRACE], [test "x$enable_weak_backtrace" = xyes])
+AM_COND_IF([CONFIG_WEAK_BACKTRACE], [
+  AC_DEFINE([CONFIG_WEAK_BACKTRACE], [1], [Define if the weak 'backtrace' symbol is provided.])
+])
 
 AC_CONFIG_FILES(Makefile src/Makefile
                 include/libunwind-common.h

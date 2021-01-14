@@ -27,6 +27,7 @@ unwind_src_dir = env.Dir("dist/src")
 #       corresponding .o from that $PREREQ library.
 #     - Replace each .o with the source file (.c or .S) that generated it.
 #     - Ensure the the ${CC} arguments are preserved by SCons.
+#       Note you can skip NDEBUG defines as those should be inherited.
 unwind_sources = [
     'dwarf/global.c',
     'dwarf/Lexpr.c',
@@ -90,11 +91,9 @@ if env['TARGET_ARCH'] == 'aarch64':
 
 env.Append(
     CCFLAGS=[
-        '-fcommon',
         '-fexceptions',
         '-Wno-unused-result',
-        '-Wno-unused-value',
-        '-Wno-unused-variable',
+        '-Wno-pointer-sign'
     ])
 
 if env.ToolchainIs('clang'):

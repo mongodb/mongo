@@ -24,11 +24,24 @@ OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 
 #define UNW_VERSION_MAJOR	1
-#define UNW_VERSION_MINOR	4
-#define UNW_VERSION_EXTRA	-rc1
+#define UNW_VERSION_MINOR	5
+#define UNW_VERSION_EXTRA	0
 
 #define UNW_VERSION_CODE(maj,min)	(((maj) << 16) | (min))
 #define UNW_VERSION	UNW_VERSION_CODE(UNW_VERSION_MAJOR, UNW_VERSION_MINOR)
+
+#ifdef __sun
+// On SmartOS, gcc fails with the following error:
+//
+// ../include/libunwind-common.h:43:41: error: expected identifier or '(' before numeric constant
+// # define UNW_PREFIX UNW_PASTE(UNW_PASTE(_U,UNW_TARGET),_)
+//                                         ^
+//
+// workaround is to undefine _U explicitly.
+// see https://github.com/libunwind/libunwind/issues/118 for more details.
+//
+#undef _U
+#endif
 
 #define UNW_PASTE2(x,y)	x##y
 #define UNW_PASTE(x,y)	UNW_PASTE2(x,y)

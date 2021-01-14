@@ -95,9 +95,6 @@ tdep_uc_addr (ucontext_t *uc, int reg)
 
 # endif /* UNW_LOCAL_ONLY */
 
-HIDDEN unw_dyn_info_list_t _U_dyn_info_list;
-
-
 static void
 put_unwind_info (unw_addr_space_t as, unw_proc_info_t *proc_info, void *arg)
 {
@@ -108,7 +105,13 @@ static int
 get_dyn_info_list_addr (unw_addr_space_t as, unw_word_t *dyn_info_list_addr,
                         void *arg)
 {
-  *dyn_info_list_addr = (unw_word_t) &_U_dyn_info_list;
+#ifndef UNW_LOCAL_ONLY
+# pragma weak _U_dyn_info_list_addr
+  if (!_U_dyn_info_list_addr)
+    return -UNW_ENOINFO;
+#endif
+  // Access the `_U_dyn_info_list` from `LOCAL_ONLY` library, i.e. libunwind.so.
+  *dyn_info_list_addr = _U_dyn_info_list_addr ();
   return 0;
 }
 

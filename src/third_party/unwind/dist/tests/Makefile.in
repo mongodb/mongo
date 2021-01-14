@@ -98,7 +98,7 @@ target_triplet = @target@
 @ARCH_IA64_TRUE@@REMOTE_ONLY_FALSE@			ia64-test-setjmp ia64-test-sig
 
 @ARCH_IA64_FALSE@@ARCH_PPC64_TRUE@@REMOTE_ONLY_FALSE@@USE_ALTIVEC_TRUE@am__append_4 = ppc64-test-altivec
-@ARCH_IA64_FALSE@@ARCH_PPC64_FALSE@@ARCH_X86_64_TRUE@@REMOTE_ONLY_FALSE@am__append_5 = Gx64-test-dwarf-expressions Lx64-test-dwarf-expressions
+@ARCH_IA64_FALSE@@ARCH_PPC64_FALSE@@ARCH_X86_64_TRUE@@REMOTE_ONLY_FALSE@am__append_5 = Gx64-test-dwarf-expressions Lx64-test-dwarf-expressions x64-unwind-badjmp-signal-frame
 @REMOTE_ONLY_FALSE@am__append_6 = Gtest-bt Ltest-bt Gtest-exc Ltest-exc		 \
 @REMOTE_ONLY_FALSE@			Gtest-init Ltest-init				 \
 @REMOTE_ONLY_FALSE@			Gtest-concurrent Ltest-concurrent		 \
@@ -187,7 +187,8 @@ am__EXEEXT_7 = $(am__EXEEXT_2) $(am__EXEEXT_3) $(am__EXEEXT_4) \
 @ARCH_IA64_TRUE@@REMOTE_ONLY_FALSE@	ia64-test-setjmp$(EXEEXT) \
 @ARCH_IA64_TRUE@@REMOTE_ONLY_FALSE@	ia64-test-sig$(EXEEXT)
 @ARCH_IA64_FALSE@@ARCH_PPC64_FALSE@@ARCH_X86_64_TRUE@@REMOTE_ONLY_FALSE@am__EXEEXT_9 = Gx64-test-dwarf-expressions$(EXEEXT) \
-@ARCH_IA64_FALSE@@ARCH_PPC64_FALSE@@ARCH_X86_64_TRUE@@REMOTE_ONLY_FALSE@	Lx64-test-dwarf-expressions$(EXEEXT)
+@ARCH_IA64_FALSE@@ARCH_PPC64_FALSE@@ARCH_X86_64_TRUE@@REMOTE_ONLY_FALSE@	Lx64-test-dwarf-expressions$(EXEEXT) \
+@ARCH_IA64_FALSE@@ARCH_PPC64_FALSE@@ARCH_X86_64_TRUE@@REMOTE_ONLY_FALSE@	x64-unwind-badjmp-signal-frame$(EXEEXT)
 am__EXEEXT_10 = $(am__EXEEXT_8) $(am__EXEEXT_9)
 am__EXEEXT_11 =
 @REMOTE_ONLY_FALSE@am__EXEEXT_12 = forker$(EXEEXT) \
@@ -405,6 +406,12 @@ test_static_link_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
 test_strerror_SOURCES = test-strerror.c
 test_strerror_OBJECTS = test-strerror.$(OBJEXT)
 test_strerror_DEPENDENCIES = $(LIBUNWIND)
+am_x64_unwind_badjmp_signal_frame_OBJECTS =  \
+	x64-unwind-badjmp-signal-frame.$(OBJEXT)
+x64_unwind_badjmp_signal_frame_OBJECTS =  \
+	$(am_x64_unwind_badjmp_signal_frame_OBJECTS)
+x64_unwind_badjmp_signal_frame_DEPENDENCIES = $(LIBUNWIND) \
+	$(LIBUNWIND_local)
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
 am__v_P_0 = false
@@ -488,7 +495,8 @@ SOURCES = $(Gia64_test_nat_SOURCES) $(Gia64_test_rbs_SOURCES) \
 	test-coredump-unwind.c test-flush-cache.c test-init-remote.c \
 	test-mem.c test-proc-info.c test-ptrace.c \
 	$(test_ptrace_misc_SOURCES) test-reg-state.c test-setjmp.c \
-	$(test_static_link_SOURCES) test-strerror.c
+	$(test_static_link_SOURCES) test-strerror.c \
+	$(x64_unwind_badjmp_signal_frame_SOURCES)
 DIST_SOURCES = $(Gia64_test_nat_SOURCES) $(Gia64_test_rbs_SOURCES) \
 	$(Gia64_test_readonly_SOURCES) $(Gia64_test_stack_SOURCES) \
 	Gperf-simple.c Gperf-trace.c $(Gtest_bt_SOURCES) \
@@ -510,7 +518,8 @@ DIST_SOURCES = $(Gia64_test_nat_SOURCES) $(Gia64_test_rbs_SOURCES) \
 	test-coredump-unwind.c test-flush-cache.c test-init-remote.c \
 	test-mem.c test-proc-info.c test-ptrace.c \
 	$(test_ptrace_misc_SOURCES) test-reg-state.c test-setjmp.c \
-	$(test_static_link_SOURCES) test-strerror.c
+	$(test_static_link_SOURCES) test-strerror.c \
+	$(x64_unwind_badjmp_signal_frame_SOURCES)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -797,6 +806,7 @@ LIBLZMA = @LIBLZMA@
 LIBOBJS = @LIBOBJS@
 LIBS = @LIBS@
 LIBTOOL = @LIBTOOL@
+LIBZ = @LIBZ@
 LIPO = @LIPO@
 LN_S = @LN_S@
 LTLIBOBJS = @LTLIBOBJS@
@@ -946,6 +956,7 @@ Gtest_init_SOURCES = Gtest-init.cxx
 Ltest_init_SOURCES = Ltest-init.cxx
 Ltest_cxx_exceptions_SOURCES = Ltest-cxx-exceptions.cxx
 Ltest_init_local_signal_SOURCES = Ltest-init-local-signal.c Ltest-init-local-signal-lib.c
+x64_unwind_badjmp_signal_frame_SOURCES = x64-unwind-badjmp-signal-frame.c
 Gtest_dyn1_SOURCES = Gtest-dyn1.c flush-cache.S flush-cache.h
 Ltest_dyn1_SOURCES = Ltest-dyn1.c flush-cache.S flush-cache.h
 test_static_link_SOURCES = test-static-link-loc.c test-static-link-gen.c
@@ -982,6 +993,7 @@ Ltest_varargs_LDADD = $(LIBUNWIND_local)
 Ltest_init_local_signal_LDADD = $(LIBUNWIND) $(LIBUNWIND_local)
 Gtest_bt_LDADD = $(LIBUNWIND) $(LIBUNWIND_local)
 Gtest_concurrent_LDADD = $(LIBUNWIND) $(LIBUNWIND_local) -lpthread
+x64_unwind_badjmp_signal_frame_LDADD = $(LIBUNWIND) $(LIBUNWIND_local)
 Gtest_dyn1_LDADD = $(LIBUNWIND) $(LIBUNWIND_local)
 Gtest_exc_LDADD = $(LIBUNWIND) $(LIBUNWIND_local)
 Gtest_init_LDADD = $(LIBUNWIND) $(LIBUNWIND_local) @BACKTRACELIB@
@@ -1297,6 +1309,10 @@ test-strerror$(EXEEXT): $(test_strerror_OBJECTS) $(test_strerror_DEPENDENCIES) $
 	@rm -f test-strerror$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(test_strerror_OBJECTS) $(test_strerror_LDADD) $(LIBS)
 
+x64-unwind-badjmp-signal-frame$(EXEEXT): $(x64_unwind_badjmp_signal_frame_OBJECTS) $(x64_unwind_badjmp_signal_frame_DEPENDENCIES) $(EXTRA_x64_unwind_badjmp_signal_frame_DEPENDENCIES) 
+	@rm -f x64-unwind-badjmp-signal-frame$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(x64_unwind_badjmp_signal_frame_OBJECTS) $(x64_unwind_badjmp_signal_frame_LDADD) $(LIBS)
+
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
 
@@ -1370,6 +1386,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test-static-link-loc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test-strerror.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/x64-test-dwarf-expressions.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/x64-unwind-badjmp-signal-frame.Po@am__quote@
 
 .S.o:
 @am__fastdepCCAS_TRUE@	$(AM_V_CPPAS)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.o$$||'`;\
@@ -1953,6 +1970,13 @@ Gx64-test-dwarf-expressions.log: Gx64-test-dwarf-expressions$(EXEEXT)
 Lx64-test-dwarf-expressions.log: Lx64-test-dwarf-expressions$(EXEEXT)
 	@p='Lx64-test-dwarf-expressions$(EXEEXT)'; \
 	b='Lx64-test-dwarf-expressions'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+x64-unwind-badjmp-signal-frame.log: x64-unwind-badjmp-signal-frame$(EXEEXT)
+	@p='x64-unwind-badjmp-signal-frame$(EXEEXT)'; \
+	b='x64-unwind-badjmp-signal-frame'; \
 	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \

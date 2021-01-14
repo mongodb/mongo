@@ -35,9 +35,6 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 /* Return TRUE if the ADDR_SPACE uses big-endian byte-order.  */
 #define dwarf_is_big_endian(addr_space) ((addr_space)->big_endian)
 
-/* Return the size of an address, for DWARF purposes.  */
-#define dwarf_addr_size(addr_space) ((addr_space)->addr_size)
-
 /* Convert a pointer to a dwarf_cursor structure to a pointer to
    unw_cursor_t.  */
 #define dwarf_to_cursor(c)      ((unw_cursor_t *) (c))

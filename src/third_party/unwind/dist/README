@@ -2,7 +2,7 @@
 
 [![Build Status](https://travis-ci.org/libunwind/libunwind.svg?branch=master)](https://travis-ci.org/libunwind/libunwind)
 
-This is version 1.4 of the unwind library.  This library supports
+This is version 1.5 of the unwind library.  This library supports
 several architecture/operating-system combinations:
 
 | System  | Architecture | Status |
@@ -21,6 +21,33 @@ several architecture/operating-system combinations:
 | FreeBSD | x86-64       | ✓      |
 | FreeBSD | x86          | ✓      |
 | FreeBSD | AArch64      | ✓      |
+| Solaris | x86-64       | ✓      |
+
+## Libc Requirements
+
+libunwind depends on getcontext(), setcontext() functions which are missing
+from C libraries like musl-libc because they are considered to be "obsolescent"
+API by POSIX document.  The following table tries to track current status of
+such dependencies
+
+ - r, requires
+ - p, provides its own implementation
+ - empty, no requirement
+
+| Archtecture  | getcontext | setcontext |
+|--------------|------------|------------|
+|    aarch64   |     p      |            |
+|    arm       |     p      |            |
+|    hppa      |     p      |      p     |
+|    ia64      |     p      |      r     |
+|    mips      |     p      |            |
+|    ppc32     |     r      |            |
+|    ppc64     |     r      |      r     |
+|    s390x     |     p      |      p     |
+|    sh        |     r      |            |
+|    tilegx    |     r      |      r     |
+|    x86       |     p      |      r     |
+|    x86_64    |     p      |      p     |
 
 ## General Build Instructions
 
@@ -179,6 +206,17 @@ only test programs that are known to work at this time are:
 
 `make check` should run with no more than 10 out of 24 tests failed.
 
+### Expected results on Solaris x86-64
+
+`make check` is passing 27 out of 33 tests. The following six tests are consistently
+failing:
+
+* `Gtest-concurrent`
+* `Ltest-concurrent`
+* `Ltest-init-local-signal`
+* `Lrs-race`
+* `test-setjmp`
+* `x64-unwind-badjmp-signal-frame`
 
 ## Performance Testing
 

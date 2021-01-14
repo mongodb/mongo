@@ -10,6 +10,9 @@
 /* Support for Microsoft ABI extensions */
 /* #undef CONFIG_MSABI_SUPPORT */
 
+/* Define if the weak 'backtrace' symbol is provided. */
+#define CONFIG_WEAK_BACKTRACE 1
+
 /* Define to 1 if you want every memory access validated */
 #define CONSERVATIVE_CHECKS 1
 
@@ -123,6 +126,9 @@
 /* Define to 1 if you have the `mincore' function. */
 #define HAVE_MINCORE 1
 
+/* Define to 1 if you have the `pipe2' function. */
+#define HAVE_PIPE2 1
+
 /* Define to 1 if you have the <signal.h> header file. */
 #define HAVE_SIGNAL_H 1
 
@@ -180,6 +186,9 @@
 /* Define to 1 if you have the <unistd.h> header file. */
 #define HAVE_UNISTD_H 1
 
+/* Define if you have libz */
+#define HAVE_ZLIB 1
+
 /* Defined if __builtin_unreachable() is available */
 #define HAVE__BUILTIN_UNREACHABLE 1
 
@@ -202,7 +211,7 @@
 #define PACKAGE_NAME "libunwind"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "libunwind 1.4-rc1"
+#define PACKAGE_STRING "libunwind 1.5.0"
 
 /* Define to the one symbol short name of this package. */
 #define PACKAGE_TARNAME "libunwind"
@@ -211,7 +220,7 @@
 #define PACKAGE_URL ""
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "1.4-rc1"
+#define PACKAGE_VERSION "1.5.0"
 
 /* The size of `off_t', as computed by sizeof. */
 #define SIZEOF_OFF_T 8
@@ -220,7 +229,7 @@
 #define STDC_HEADERS 1
 
 /* Version number of package */
-#define VERSION "1.4-rc1"
+#define VERSION "1.5.0"
 
 /* Define to empty if `const' does not conform to ANSI C. */
 /* #undef const */

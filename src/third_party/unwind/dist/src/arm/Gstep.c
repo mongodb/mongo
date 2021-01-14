@@ -46,7 +46,8 @@ arm_exidx_step (struct cursor *c)
   c->dwarf.loc[UNW_ARM_R15] = DWARF_NULL_LOC;
   unw_word_t ip = c->dwarf.ip;
   if (c->dwarf.use_prev_instr)
-    --ip;
+    /* The least bit denotes thumb/arm mode, clear it. */
+    ip = (ip & ~(unw_word_t)0x1) - 1;
 
   /* check dynamic info first --- it overrides everything else */
   ret = unwi_find_dynamic_proc_info (c->dwarf.as, ip, &c->dwarf.pi, 1,

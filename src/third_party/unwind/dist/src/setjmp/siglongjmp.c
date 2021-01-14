@@ -31,8 +31,12 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 #include "jmpbuf.h"
 #include "setjmp_i.h"
 
-#if !defined(_NSIG) && defined(_SIG_MAXSIG)
-# define _NSIG (_SIG_MAXSIG - 1)
+#if !defined(_NSIG)
+# if defined(_SIG_MAXSIG)
+#  define _NSIG (_SIG_MAXSIG - 1)
+# elif defined(NSIG)
+#  define _NSIG NSIG
+# endif
 #endif
 
 #if defined(__GLIBC__)
@@ -92,7 +96,7 @@ siglongjmp (sigjmp_buf env, int val)
       if (!resume_restores_sigmask (&c, wp) && wp[JB_MASK_SAVED])
         {
           /* sigmask was saved */
-#if defined(__linux__)
+#if defined(__linux__) || defined(__sun)
           if (UNW_NUM_EH_REGS < 4 || _NSIG > 16 * sizeof (unw_word_t))
             /* signal mask doesn't fit into EH arguments and we can't
                put it on the stack without overwriting something

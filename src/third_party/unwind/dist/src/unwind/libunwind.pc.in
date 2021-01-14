@@ -7,5 +7,5 @@ Name: libunwind
 Description: libunwind base library
 Version: @VERSION@
 Libs: -L${libdir} -lunwind
-Libs.private: @LIBLZMA@
+Libs.private: @LIBLZMA@ @LIBZ@
 Cflags: -I${includedir}

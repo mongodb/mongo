@@ -36,6 +36,10 @@ elf_w (CD_get_proc_name) (struct UCD_info *ui, unw_addr_space_t as, unw_word_t i
   unsigned long segbase, mapoff;
   int ret;
 
+  /* We're about to map an elf image. If there is an elf image currently mapped,
+     then make sure to unmap it. */
+  invalidate_edi(&ui->edi);
+
   /* Used to be tdep_get_elf_image() in ptrace unwinding code */
   coredump_phdr_t *cphdr = _UCD_get_elf_image(ui, ip);
   if (!cphdr)

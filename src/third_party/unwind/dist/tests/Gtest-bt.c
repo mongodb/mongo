@@ -176,7 +176,7 @@ sighandler (int signal, void *siginfo UNUSED, void *context)
     {
       printf ("sighandler: got signal %d, sp=%p", signal, &sp);
 #if UNW_TARGET_IA64
-# if defined(__linux__)
+# if defined(__linux__) || defined __sun
       printf (" @ %lx", uc->uc_mcontext.sc_ip);
 # else
       {
@@ -189,13 +189,13 @@ sighandler (int signal, void *siginfo UNUSED, void *context)
       }
 # endif
 #elif UNW_TARGET_X86
-#if defined __linux__
+#if defined __linux__ || defined __sun
       printf (" @ %lx", (unsigned long) uc->uc_mcontext.gregs[REG_EIP]);
 #elif defined __FreeBSD__
       printf (" @ %lx", (unsigned long) uc->uc_mcontext.mc_eip);
 #endif
 #elif UNW_TARGET_X86_64
-#if defined __linux__
+#if defined __linux__ || defined __sun
       printf (" @ %lx", (unsigned long) uc->uc_mcontext.gregs[REG_RIP]);
 #elif defined __FreeBSD__
       printf (" @ %lx", (unsigned long) uc->uc_mcontext.mc_rip);
