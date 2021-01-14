@@ -78,12 +78,12 @@ public:
     boost::optional<ShardKeyPattern> getReshardingKeyIfShouldForwardOps() const;
 
     /**
-     * Writes should run in distributed transactions when
-     *      1. The coordinator is between the mirroring and committed states, OR
-     *      2. The coordinator is in the renaming state, but the UUID is still the original UUID.
+     * The caller should disallow writes when
+     *      1. The coordinator is in the mirroring state, OR
+     *      2. The coordinator is in the committed or renaming state, but the UUID is still the
+     *         original UUID.
      */
-    bool writesShouldRunInDistributedTransaction(const UUID& originalUUID,
-                                                 const UUID& reshardingUUID) const;
+    bool disallowWritesForResharding(const UUID& currentCollectionUUID) const;
 
     /**
      * Returns the current shard version for the collection or UNSHARDED if it is not sharded.

@@ -94,9 +94,11 @@ boost::optional<ShardKeyPattern> CollectionMetadata::getReshardingKeyIfShouldFor
     return ShardKeyPattern(donorFields->getReshardingKey());
 }
 
-bool CollectionMetadata::writesShouldRunInDistributedTransaction(const UUID& originalUUID,
-                                                                 const UUID& reshardingUUID) const {
-    auto reshardingFields = getReshardingFields();
+bool CollectionMetadata::disallowWritesForResharding(const UUID& currentCollectionUUID) const {
+    if (!isSharded())
+        return false;
+
+    const auto& reshardingFields = getReshardingFields();
     if (!reshardingFields)
         return false;
 
@@ -108,8 +110,9 @@ bool CollectionMetadata::writesShouldRunInDistributedTransaction(const UUID& ori
         case CoordinatorStateEnum::kApplying:
             return false;
         case CoordinatorStateEnum::kMirroring:
+            // Only return true if this is also the donor shard.
+            return reshardingFields->getDonorFields() != boost::none;
         case CoordinatorStateEnum::kCommitted:
-            return true;
         case CoordinatorStateEnum::kRenaming:
             break;
         case CoordinatorStateEnum::kDone:
@@ -117,23 +120,29 @@ bool CollectionMetadata::writesShouldRunInDistributedTransaction(const UUID& ori
             return false;
     }
 
-    // Handle kRenaming:
-    auto currentCollectionUUID = *_cm->getUUID();
+    const auto& recipientFields = reshardingFields->getRecipientFields();
+    uassert(5325800,
+            "Missing 'recipientFields' in collection metadata for resharding operation that has "
+            "committed",
+            recipientFields);
 
-    // Renaming has not completed
+    const auto& originalUUID = recipientFields->getExistingUUID();
+    const auto& reshardingUUID = reshardingFields->getUuid();
+
     if (currentCollectionUUID == originalUUID) {
+        // This shard must be both a donor and recipient. Neither the drop or renameCollection have
+        // happened yet. Writes should continue to be disallowed.
         return true;
+    } else if (currentCollectionUUID == reshardingUUID) {
+        // The renameCollection has happened. Writes no longer need be disallowed on this shard.
+        return false;
     }
 
-    // Else, renaming must have completed, and the new UUID must be equal to the resharding UUID.
-    uassert(ErrorCodes::InvalidUUID,
-            "Expected collection to have either the original UUID {} or the resharding UUID {}, "
-            "but the collection instead has UUID {}"_format(originalUUID.toString(),
-                                                            reshardingUUID.toString(),
-                                                            currentCollectionUUID.toString()),
-            currentCollectionUUID == reshardingUUID);
-
-    return false;
+    uasserted(ErrorCodes::InvalidUUID,
+              "Expected collection to have either the original UUID {} or the resharding UUID {}, "
+              "but the collection instead has UUID {}"_format(originalUUID.toString(),
+                                                              reshardingUUID.toString(),
+                                                              currentCollectionUUID.toString()));
 }
 
 BSONObj CollectionMetadata::extractDocumentKey(const BSONObj& doc) const {
