@@ -1516,6 +1516,7 @@ env.Library(
         'initialize_api_parameters.cpp',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/transport/transport_layer_common',
         'api_parameters',
         'commands',
     ],

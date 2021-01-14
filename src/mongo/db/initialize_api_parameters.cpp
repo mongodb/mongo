@@ -35,6 +35,7 @@
 
 #include "mongo/db/commands.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/transport/session.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
@@ -102,7 +103,11 @@ const APIParametersFromClient initializeAPIParameters(const BSONObj& requestBody
 }
 
 void enforceRequireAPIVersion(OperationContext* opCtx, Command* command) {
-    if (gRequireApiVersion.load() && !opCtx->getClient()->isInDirectClient() &&
+    auto client = opCtx->getClient();
+    auto isInternalClient =
+        !client->session() || (client->session()->getTags() & transport::Session::kInternalClient);
+
+    if (gRequireApiVersion.load() && !opCtx->getClient()->isInDirectClient() && !isInternalClient &&
         command->getName() != "getMore" && !opCtx->isContinuingMultiDocumentTransaction()) {
         uassert(
             498870,
