@@ -5702,7 +5702,7 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       suite: concurrency_sharded_replication
-      resmoke_args: --excludeWithAnyTags=uses_transactions --storageEngine=wiredTiger"
+      resmoke_args: "--excludeWithAnyTags=uses_transactions --storageEngine=wiredTiger"
       fallback_num_sub_suites: 3
       use_large_distro: "true"
       resmoke_jobs_max: 1
