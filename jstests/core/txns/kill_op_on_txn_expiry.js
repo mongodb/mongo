@@ -47,7 +47,8 @@ try {
     }));
 
     jsTestLog("Enabling fail point to block batch inserts");
-    let failPoint = configureFailPoint(testDB, "hangDuringBatchInsert");
+    let failPoint =
+        configureFailPoint(testDB, "hangDuringBatchInsert", {shouldCheckForInterrupt: true});
     // Clear ramlog so checkLog can't find log messages from the previous times this test was run.
     assert.commandWorked(testDB.adminCommand({clearLog: 'global'}));
 

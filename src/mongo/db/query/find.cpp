@@ -357,7 +357,6 @@ Message getMore(OperationContext* opCtx,
                                                          opCtx,
                                                          "waitAfterPinningCursorBeforeGetMoreBatch",
                                                          dropAndReaquireReadLock,
-                                                         false,
                                                          nss);
     });
 

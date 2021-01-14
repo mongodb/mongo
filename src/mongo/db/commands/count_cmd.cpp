@@ -222,7 +222,7 @@ public:
         const auto& nss = ctx->getNss();
 
         CurOpFailpointHelpers::waitWhileFailPointEnabled(
-            &hangBeforeCollectionCount, opCtx, "hangBeforeCollectionCount", []() {}, false, nss);
+            &hangBeforeCollectionCount, opCtx, "hangBeforeCollectionCount", []() {}, nss);
 
         auto request = CountCommand::parse(IDLParserErrorContext("count"), cmdObj);
 

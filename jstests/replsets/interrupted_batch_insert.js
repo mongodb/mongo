@@ -44,7 +44,8 @@ stopServerReplication(conns[2]);
 
 // Allow the primary to insert the first 5 batches of documents. After that, the fail point
 // activates, and the client thread hangs until the fail point gets turned off.
-let failPoint = configureFailPoint(primary.getDB("db"), "hangDuringBatchInsert", {}, {skip: 5});
+let failPoint = configureFailPoint(
+    primary.getDB("db"), "hangDuringBatchInsert", {shouldCheckForInterrupt: true}, {skip: 5});
 
 // In a background thread, issue an insert command to the primary that will insert 10 batches of
 // documents.

@@ -72,7 +72,7 @@ std::list<BSONObj> listIndexesInLock(OperationContext* opCtx,
     auto durableCatalog = DurableCatalog::get(opCtx);
 
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
-        &hangBeforeListIndexes, opCtx, "hangBeforeListIndexes", []() {}, false, nss);
+        &hangBeforeListIndexes, opCtx, "hangBeforeListIndexes", []() {}, nss);
 
     std::vector<std::string> indexNames;
     writeConflictRetry(opCtx, "listIndexes", nss.ns(), [&] {

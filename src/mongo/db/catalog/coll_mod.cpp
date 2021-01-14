@@ -354,7 +354,7 @@ Status _collModInternal(OperationContext* opCtx,
     Database* const db = coll.getDb();
 
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
-        &hangAfterDatabaseLock, opCtx, "hangAfterDatabaseLock", []() {}, false, nss);
+        &hangAfterDatabaseLock, opCtx, "hangAfterDatabaseLock", []() {}, nss);
 
     // May also modify a view instead of a collection.
     boost::optional<ViewDefinition> view;

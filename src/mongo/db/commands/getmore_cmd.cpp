@@ -499,7 +499,6 @@ public:
                     opCtx,
                     "waitAfterPinningCursorBeforeGetMoreBatch",
                     dropAndReacquireReadLock,
-                    false,
                     _request.nss);
             }
 
@@ -605,7 +604,6 @@ public:
                     data["shouldNotdropLock"].booleanSafe()
                         ? []() {} /*empty function*/
                         : saveAndRestoreStateWithReadLockReacquisition,
-                    false,
                     _request.nss);
             });
 

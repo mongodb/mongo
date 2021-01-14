@@ -379,7 +379,6 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
                   "Blocking until fail point is disabled",
                   "namespace"_attr = wholeOp.getNamespace());
         },
-        true,  // Check for interrupt periodically.
         wholeOp.getNamespace());
 
     if (MONGO_unlikely(failAllInserts.shouldFail())) {
@@ -647,7 +646,6 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
                   "Blocking until fail point is disabled",
                   "namespace"_attr = ns);
         },
-        false /*checkForInterrupt*/,
         ns);
 
     if (MONGO_unlikely(failAllUpdates.shouldFail())) {
@@ -900,16 +898,11 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
     uassertStatusOK(parsedDelete.parseRequest());
 
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
-        &hangDuringBatchRemove,
-        opCtx,
-        "hangDuringBatchRemove",
-        []() {
+        &hangDuringBatchRemove, opCtx, "hangDuringBatchRemove", []() {
             LOGV2(20891,
                   "Batch remove - hangDuringBatchRemove fail point enabled. Blocking until fail "
                   "point is disabled");
-        },
-        true  // Check for interrupt periodically.
-    );
+        });
     if (MONGO_unlikely(failAllRemoves.shouldFail())) {
         uasserted(ErrorCodes::InternalError, "failAllRemoves failpoint active!");
     }

@@ -56,7 +56,7 @@ function findAndKillOp(conn, comment) {
 }
 
 function testKillOp(pipeline, comment, failpointName) {
-    let fp = configureFailPoint(primary, failpointName);
+    let fp = configureFailPoint(primary, failpointName, {shouldCheckForInterrupt: true});
 
     // Run the aggregate and ensure that it is interrupted.
     const runAggregate = `

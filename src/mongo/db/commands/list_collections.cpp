@@ -305,12 +305,8 @@ public:
             AutoGetDbForReadMaybeLockFree lockFreeReadBlock(opCtx, dbname);
             auto viewCatalog = DatabaseHolder::get(opCtx)->getViewCatalog(opCtx, dbname);
 
-            CurOpFailpointHelpers::waitWhileFailPointEnabled(&hangBeforeListCollections,
-                                                             opCtx,
-                                                             "hangBeforeListCollections",
-                                                             []() {},
-                                                             false,
-                                                             cursorNss);
+            CurOpFailpointHelpers::waitWhileFailPointEnabled(
+                &hangBeforeListCollections, opCtx, "hangBeforeListCollections", []() {}, cursorNss);
 
             auto ws = std::make_unique<WorkingSet>();
             auto root = std::make_unique<QueuedDataStage>(expCtx.get(), ws.get());

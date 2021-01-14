@@ -48,15 +48,13 @@ void CurOpFailpointHelpers::waitWhileFailPointEnabled(FailPoint* failPoint,
                                                       OperationContext* opCtx,
                                                       const std::string& failpointMsg,
                                                       const std::function<void()>& whileWaiting,
-                                                      bool checkForInterrupt,
                                                       boost::optional<NamespaceString> nss) {
     invariant(failPoint);
     failPoint->executeIf(
         [&](const BSONObj& data) {
             auto origCurOpFailpointMsg = updateCurOpFailPointMsg(opCtx, failpointMsg);
 
-            const bool shouldCheckForInterrupt =
-                checkForInterrupt || data["shouldCheckForInterrupt"].booleanSafe();
+            const bool shouldCheckForInterrupt = data["shouldCheckForInterrupt"].booleanSafe();
             const bool shouldContinueOnInterrupt = data["shouldContinueOnInterrupt"].booleanSafe();
             while (MONGO_unlikely(failPoint->shouldFail())) {
                 sleepFor(Milliseconds(10));

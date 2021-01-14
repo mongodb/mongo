@@ -91,7 +91,6 @@ void FindCommon::waitInFindBeforeMakingBatch(OperationContext* opCtx, const Cano
                                                      opCtx,
                                                      "waitInFindBeforeMakingBatch",
                                                      std::move(whileWaitingFunc),
-                                                     /* checkForInterrupt = */ false,
                                                      cq.nss());
 }
 }  // namespace mongo
