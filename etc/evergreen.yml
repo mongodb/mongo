@@ -10749,6 +10749,8 @@ buildvariants:
   expansions:
     scons_cache_scope: shared
     compile_flags: MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    multiversion_platform: ubuntu1604
+    multiversion_edition: enterprise
     test_flags: |- # Set the taskExecutorPoolSize for all tests
         --mongosSetParameters="taskExecutorPoolSize: 4"
   tasks:
