@@ -4,9 +4,12 @@
 
     load("jstests/libs/change_stream_util.js");        // For assertInvalidateOp.
     load("jstests/libs/collection_drop_recreate.js");  // For assertDropAndRecreateCollection.
+    load("jstests/libs/fixture_helpers.js");           // For isSharded.
 
     // Drop and recreate the collections to be used in this set of tests.
     const coll = assertDropAndRecreateCollection(db, "include_cluster_time");
+
+    const isSharded = FixtureHelpers.isSharded(coll);
 
     const changeStream = coll.watch();
 
@@ -22,6 +25,28 @@
     const deleteClusterTime =
         assert.commandWorked(coll.runCommand("delete", {deletes: [{q: {_id: 0}, limit: 1}]}))
             .operationTime;
+
+    // Skip these DDL ops when running on a sharded collection,
+    // since it will generate multi events and we can't convertToCapped a sharded collection.
+    var createIndexClusterTime, collModClusterTime
+    var convertToCappedClusterTime,dropIndexClusterTime
+    if (!isSharded) {
+        createIndexClusterTime =
+            assert.commandWorked(coll.createIndex({createdAt:1}, {expireAfterSeconds: 3600})).operationTime;
+
+        collModClusterTime =
+            assert.commandWorked(
+                coll.runCommand(
+                    {collMod: "include_cluster_time", index: {keyPattern: {createdAt: 1}, expireAfterSeconds: 60}}))
+                .operationTime;
+
+        dropIndexClusterTime =
+            assert.commandWorked(coll.dropIndex({createdAt: 1})).operationTime;
+
+        convertToCappedClusterTime =
+            assert.commandWorked(coll.runCommand({convertToCapped: "include_cluster_time", size: 100000}))
+                .operationTime;
+    }
 
     const dropClusterTime =
         assert.commandWorked(db.runCommand({drop: coll.getName()})).operationTime;
@@ -45,6 +70,28 @@
     next = changeStream.next();
     assert.eq(next.operationType, "delete");
     assert.lte(next.clusterTime, deleteClusterTime);
+
+    if (!isSharded) {
+        assert.soon(() => changeStream.hasNext());
+        next = changeStream.next();
+        assert.eq(next.operationType, "createIndexes");
+        assert.lte(next.clusterTime, createIndexClusterTime);
+
+        assert.soon(() => changeStream.hasNext());
+        next = changeStream.next();
+        assert.eq(next.operationType, "collMod");
+        assert.lte(next.clusterTime, collModClusterTime);
+
+        assert.soon(() => changeStream.hasNext());
+        next = changeStream.next();
+        assert.eq(next.operationType, "dropIndexes");
+        assert.lte(next.clusterTime, dropIndexClusterTime);
+
+        assert.soon(() => changeStream.hasNext());
+        next = changeStream.next();
+        assert.eq(next.operationType, "convertToCapped");
+        assert.lte(next.clusterTime, convertToCappedClusterTime);
+    }
 
     assert.soon(() => changeStream.hasNext());
     next = changeStream.next();

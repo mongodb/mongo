@@ -226,6 +226,23 @@ TEST(NamespaceStringTest, IsDropPendingNamespace) {
     ASSERT_FALSE(NamespaceString{"$cmd.listCollections"}.isDropPendingNamespace());
 }
 
+TEST(NamespaceStringTest, IsTmpConvertToCapped) {
+    ASSERT_TRUE(NamespaceString{"test.tmpwxO7X.convertToCapped.foo"}.isTmpConvertToCapped());
+    ASSERT_TRUE(NamespaceString{"test.tmpwxO7X.convertToCapped.1234.foo"}.isTmpConvertToCapped());
+    ASSERT_TRUE(NamespaceString{"test.tmpwxO7X.convertToCapped.1234567i8t9.foo"}.isTmpConvertToCapped());
+
+
+    ASSERT_FALSE(NamespaceString{"test.convertToCapped"}.isTmpConvertToCapped());
+    ASSERT_FALSE(NamespaceString{"test.tmp.convertToCapped"}.isTmpConvertToCapped());
+    ASSERT_FALSE(NamespaceString{"test.tmpwx07X.convertToCapped"}.isTmpConvertToCapped());
+    ASSERT_FALSE(NamespaceString{"test.tmpwx07X.1234.foo"}.isTmpConvertToCapped());
+    ASSERT_FALSE(NamespaceString{"test.foo"}.isTmpConvertToCapped());
+    ASSERT_FALSE(NamespaceString{"test.$cmd"}.isTmpConvertToCapped());
+
+    ASSERT_FALSE(NamespaceString{"$cmd.aggregate.foo"}.isTmpConvertToCapped());
+    ASSERT_FALSE(NamespaceString{"$cmd.listCollections"}.isTmpConvertToCapped());
+}
+
 TEST(NamespaceStringTest, MakeDropPendingNamespace) {
     ASSERT_EQUALS(NamespaceString{"test.system.drop.0i0t-1.foo"},
                   NamespaceString{"test.foo"}.makeDropPendingNamespace(repl::OpTime()));

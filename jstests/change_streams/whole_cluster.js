@@ -65,7 +65,15 @@
         "_config_"
     ];
     validUserDBs.forEach(dbName => {
+        // implicit createCollection inside insert operation.
         assert.writeOK(db.getSiblingDB(dbName).test.insert({_id: 0, a: 1}));
+        expected = [
+            {
+                ns: {db:dbName, coll: "test"},
+                operationType: "create",
+            },
+        ];
+        cst.assertNextChangesEqual({cursor: cursor, expectedChanges: expected});
         expected = [
             {
               documentKey: {_id: 0},
@@ -81,7 +89,15 @@
     // includes "system" but is not considered an internal collection.
     const validSystemColls = ["system", "systems.views", "ssystem.views", "test.system"];
     validSystemColls.forEach(collName => {
+        // implicit createCollection inside insert operation.
         assert.writeOK(db.getCollection(collName).insert({_id: 0, a: 1}));
+        expected = [
+            {
+                ns: {db:db.getName(), coll: collName},
+                operationType: "create",
+            },
+        ];
+        cst.assertNextChangesEqual({cursor: cursor, expectedChanges: expected});
         expected = [
             {
               documentKey: {_id: 0},

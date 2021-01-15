@@ -24,10 +24,16 @@
     let cst = new ChangeStreamTest(adminDB);
     let aggCursor = cst.startWatchingAllChangesForCluster();
 
-    // Generate oplog entries of type insert, update, and delete across both databases.
+    // Generate oplog entries of type insert, update, createIndex, collMod, dropIndex and delete across both databases.
     for (let coll of[db1Coll, db2Coll]) {
         assert.writeOK(coll.insert({_id: 1}));
         assert.writeOK(coll.update({_id: 1}, {$set: {a: 1}}));
+        assert.commandWorked(coll.createIndex({createdAt:1},{expireAfterSeconds:3600}));
+        assert.commandWorked(coll.getDB().runCommand({
+            collMod: "test",
+            index:{keyPattern:{createdAt:1}, expireAfterSeconds: 60}
+        }));
+        assert.commandWorked(coll.dropIndex({createdAt:1}));
         assert.writeOK(coll.remove({_id: 1}));
     }
 
@@ -42,6 +48,15 @@
         assert.eq(change.ns.db, expectedDB.getName(), tojson(change));
         change = cst.getOneChange(aggCursor);
         assert.eq(change.operationType, "update", tojson(change));
+        assert.eq(change.ns.db, expectedDB.getName(), tojson(change));
+        change = cst.getOneChange(aggCursor);
+        assert.eq(change.operationType, "createIndexes", tojson(change));
+        assert.eq(change.ns.db, expectedDB.getName(), tojson(change));
+        change = cst.getOneChange(aggCursor);
+        assert.eq(change.operationType, "collMod", tojson(change));
+        assert.eq(change.ns.db, expectedDB.getName(), tojson(change));
+        change = cst.getOneChange(aggCursor);
+        assert.eq(change.operationType, "dropIndexes", tojson(change));
         assert.eq(change.ns.db, expectedDB.getName(), tojson(change));
         change = cst.getOneChange(aggCursor);
         assert.eq(change.operationType, "delete", tojson(change));
@@ -86,10 +101,13 @@
         [testDB1, testDB2].map((testDB) => assertDropAndRecreateCollection(testDB, "test"));
     let _idForTest = 0;
     for (let collToInvalidate of[db1Coll, db2Coll]) {
+        let testDB = collToInvalidate.getDB();
+
+        // clean up both collections inside two different databases.
+        assertDropAndRecreateCollection(db1Coll.getDB(), "test");
+        assertDropAndRecreateCollection(db2Coll.getDB(), "test");
         // Start watching all changes in the cluster.
         aggCursor = cst.startWatchingAllChangesForCluster();
-
-        let testDB = collToInvalidate.getDB();
 
         // Insert into the collections on both databases, and verify the change stream is able to
         // pick them up.
@@ -132,6 +150,10 @@
                 cursor: aggCursor,
                 expectedChanges: [
                     {
+                      operationType: "create", //implicit create by insert
+                      ns: {db: testDB.getName(), coll: collName},
+                    },
+                    {
                       operationType: "insert",
                       ns: {db: testDB.getName(), coll: collName},
                       documentKey: {_id: 0},
@@ -163,6 +185,9 @@
                 // Do not check the 'ns' field since it will contain the namespace of the temp
                 // collection created when renaming a collection across databases.
                 change = cst.getOneChange(aggCursor);
+                assert.eq(change.operationType, "create", tojson(change));
+
+                change = cst.getOneChange(aggCursor);
                 assert.eq(change.operationType, "rename", tojson(change));
                 assert.eq(change.to,
                           {db: otherDB.getName(), coll: collOtherDB.getName()},
@@ -183,13 +208,20 @@
             collToInvalidate.aggregate([{$out: "renamed_coll"}]);
             // Do not check the 'ns' field since it will contain the namespace of the temp
             // collection created by the $out stage, before renaming to 'renamed_coll'.
+            const create = cst.getOneChange(aggCursor);
+            assert.eq(create.operationType, "create", tojson(create));
             const rename = cst.getOneChange(aggCursor);
             assert.eq(rename.operationType, "rename", tojson(rename));
             assert.eq(rename.to, {db: testDB.getName(), coll: "renamed_coll"}, tojson(rename));
 
             // The change stream should not be invalidated by the rename(s).
+            // since old 'collToInvalidate' has already been renamed(dropped),
+            // below insert will create the collection implicitly again.
             assert.eq(0, cst.getNextBatch(aggCursor).nextBatch.length);
             assert.writeOK(collToInvalidate.insert({_id: 2}));
+            if (!FixtureHelpers.isMongos(testDB)) {
+                assert.eq(cst.getOneChange(aggCursor).operationType, "create");
+            }
             assert.eq(cst.getOneChange(aggCursor).operationType, "insert");
         }
 

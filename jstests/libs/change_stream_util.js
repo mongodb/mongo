@@ -249,6 +249,7 @@ function ChangeStreamTest(_db, name = "ChangeStreamTest") {
                 // We need to replace the cursor variable so we return the correct cursor.
                 cursor = self.getNextBatch(cursor);
                 changes[i] = getNextDocFromCursor(cursor);
+                printjson(changes[i]);
                 return changes[i] !== null;
             }, "timed out waiting for another result from the change stream");
             assertChangeIsExpected(expectedChanges, i, changes, expectInvalidate);

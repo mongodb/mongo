@@ -47,14 +47,19 @@
     assertValidChangeStreamNss(db.getName(), "system_users");
 
     // Similar test but for DB names that are not considered internal.
+    // drop collections to avoid affecting other jstests
+    // for example: 'local_.test' and '_config_.test' namespace is reused in 'whole_cluster.js'
     assert.writeOK(db.getSiblingDB("admincustomDB")["test"].insert({}));
     assertValidChangeStreamNss("admincustomDB");
+    assertDropCollection(db.getSiblingDB("admincustomDB"), "test");
 
     assert.writeOK(db.getSiblingDB("local_")["test"].insert({}));
     assertValidChangeStreamNss("local_");
+    assertDropCollection(db.getSiblingDB("local_"), "test");
 
     assert.writeOK(db.getSiblingDB("_config_")["test"].insert({}));
     assertValidChangeStreamNss("_config_");
+    assertDropCollection(db.getSiblingDB("_config_"), "test");
 
     let cst = new ChangeStreamTest(db);
     let cursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: db.t1});
@@ -71,6 +76,22 @@
         operationType: "insert",
     };
     cst.assertNextChangesEqual({cursor: cursor, expectedChanges: [expected]});
+
+    jsTestLog("Testing implicit create by insert");
+    assertDropCollection(db, "t1")
+    cursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: db.t1});
+    assert.writeOK(db.t1.insert({_id: 0, a: 1}));
+    let expectedCreate = {
+        ns: {db: "test", coll: "t1"},
+        operationType: "create",
+    };
+    let expectedInsert = {
+        documentKey: {_id: 0},
+        fullDocument: {_id: 0, a: 1},
+        ns: {db: "test", coll: "t1"},
+        operationType: "insert",
+    };
+    cst.assertNextChangesEqual({cursor:cursor, expectedChanges: [expectedCreate, expectedInsert]});
 
     // Test that if there are no changes during a subsequent 'getMore', we return an empty batch.
     cursor = cst.getNextBatch(cursor);
@@ -153,6 +174,16 @@
     ];
     cst.assertNextChangesEqual({cursor: cursor, expectedChanges: expected});
 
+    jsTestLog("Testing createIndexes");
+    cursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: db.t1});
+    assert.commandWorked(db.t1.createIndex({createdAt: 1}, {expireAfterSeconds: 3600}));
+    expected = {
+        ns: {db: "test", coll: "t1"},
+        operationType: "createIndexes",
+        spec: {key: {createdAt: 1}, name: "createdAt_1"},
+    };
+    cst.assertNextChangesEqual({cursor: cursor, expectedChanges: [expected]});
+
     jsTestLog("Testing delete");
     cursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: db.t1});
     assert.writeOK(db.t1.remove({_id: 1}));
@@ -181,6 +212,37 @@
         }
     ];
     cst.assertNextChangesEqual({cursor: cursor, expectedChanges: expected});
+
+    jsTestLog("Testing collMod");
+    cursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: db.t1});
+    assert.commandWorked(db.runCommand({
+        collMod: "t1", index: {keyPattern: {createdAt: 1}, expireAfterSeconds: 60}}));
+    expected = {
+        ns: {db: "test", coll: "t1"},
+        operationType: "collMod",
+        spec: {index: {expireAfterSeconds: NumberLong(60), name: "createdAt_1"}},
+    };
+    cst.assertNextChangesEqual({cursor: cursor, expectedChanges: [expected]});
+
+    jsTestLog("Testing dropIndexes");
+    cursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: db.t1});
+    assert.commandWorked(db.t1.dropIndex({createdAt: 1}));
+    expected = {
+        ns: {db: "test", coll: "t1"},
+        operationType: "dropIndexes",
+        spec: {key: {createdAt: 1}, name: "createdAt_1"},
+    };
+    cst.assertNextChangesEqual({cursor: cursor, expectedChanges: [expected]});
+
+    jsTestLog("Testing convertToCapped");
+    // only see rename, shouldn't see anything about 'create' or 'insert'
+    cursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: db.t1});
+    assert.commandWorked(db.runCommand({convertToCapped: "t1", size: 100000}));
+    expected = {
+        ns: {db: "test", coll: "t1"},
+        operationType: "convertToCapped",
+    };
+    cst.assertNextChangesEqual({cursor: cursor, expectedChanges: [expected]});
 
     jsTestLog("Testing intervening write on another collection");
     cursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: db.t1});

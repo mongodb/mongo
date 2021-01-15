@@ -170,6 +170,9 @@ public:
     // The target namespace of a rename operation.
     static constexpr StringData kRenameTargetNssField = "to"_sd;
 
+    // The spec of a createIndexes/dropIndexes/collMod operation.
+    static constexpr StringData kSpecField = "spec"_sd;
+
     // The different types of operations we can use for the operation type.
     static constexpr StringData kUpdateOpType = "update"_sd;
     static constexpr StringData kDeleteOpType = "delete"_sd;
@@ -177,6 +180,11 @@ public:
     static constexpr StringData kInsertOpType = "insert"_sd;
     static constexpr StringData kDropCollectionOpType = "drop"_sd;
     static constexpr StringData kRenameCollectionOpType = "rename"_sd;
+    static constexpr StringData kCreateCollectionOpType = "create"_sd;
+    static constexpr StringData kCreateIndexesOpType = "createIndexes"_sd;
+    static constexpr StringData kDropIndexesOpType = "dropIndexes"_sd;
+    static constexpr StringData kCollModOpType = "collMod"_sd;
+    static constexpr StringData kConvertToCappedOpType = "convertToCapped"_sd;
     static constexpr StringData kDropDatabaseOpType = "dropDatabase"_sd;
     static constexpr StringData kInvalidateOpType = "invalidate"_sd;
     // Internal op type to signal mongos to open cursors on new shards.
@@ -224,6 +232,7 @@ public:
 
 private:
     static constexpr StringData kRegexAllCollections = R"((?!(\$|system\.)))"_sd;
+    static constexpr StringData kRegexAllCollectionsWithoutTmp = R"((?!(\$|system\.|tmp\w{5}\.convertToCapped\.)))"_sd;
     static constexpr StringData kRegexAllDBs = R"(^(?!(admin|config|local)\.)[^.]+)"_sd;
     static constexpr StringData kRegexCmdColl = R"(\$cmd$)"_sd;
 

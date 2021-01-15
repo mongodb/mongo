@@ -244,6 +244,7 @@ Document DocumentSourceChangeStreamTransform::applyTransformation(const Document
     Value fullDocument;
     Value updateDescription;
     Value documentKey;
+    Value eventSpec;
 
     switch (opType) {
         case repl::OpTypeEnum::kInsert: {
@@ -305,23 +306,73 @@ Document DocumentSourceChangeStreamTransform::applyTransformation(const Document
                 // The "o.drop" field will contain the actual collection name.
                 nss = NamespaceString(nss.db(), input.getNestedField("o.drop").getString());
             } else if (!input.getNestedField("o.renameCollection").missing()) {
-                operationType = DocumentSourceChangeStream::kRenameCollectionOpType;
-
                 // The "o.renameCollection" field contains the namespace of the original collection.
                 nss = NamespaceString(input.getNestedField("o.renameCollection").getString());
 
-                // The "o.to" field contains the target namespace for the rename.
-                const auto renameTargetNss =
-                    NamespaceString(input.getNestedField("o.to").getString());
-                doc.addField(DocumentSourceChangeStream::kRenameTargetNssField,
-                             Value(Document{{"db", renameTargetNss.db()},
-                                            {"coll", renameTargetNss.coll()}}));
+                // if rename 'tmpxxxxx.convertToCapped.xxx' collection, then it's a convertToCapped opType
+                // instead of rename opType.
+                if (nss.isTmpConvertToCapped()) {
+                    operationType = DocumentSourceChangeStream::kConvertToCappedOpType;
+                    // transform namespace to real one based on "o.to" since we don't want tmp collection
+                    // appear in change event.
+                    nss = NamespaceString(input.getNestedField("o.to").getString());
+                } else {
+                    operationType = DocumentSourceChangeStream::kRenameCollectionOpType;
+
+                    // The "o.to" field contains the target namespace for the rename.
+                    const auto renameTargetNss = NamespaceString(input.getNestedField("o.to").getString());
+                    doc.addField(DocumentSourceChangeStream::kRenameTargetNssField,
+                                 Value(Document{{"db", renameTargetNss.db()},
+                                                {"coll", renameTargetNss.coll()}}));
+                }
             } else if (!input.getNestedField("o.dropDatabase").missing()) {
                 operationType = DocumentSourceChangeStream::kDropDatabaseOpType;
 
                 // Extract the database name from the namespace field and leave the collection name
                 // empty.
                 nss = NamespaceString(nss.db());
+            } else if (!input.getNestedField("o.create").missing()) {
+                operationType = DocumentSourceChangeStream::kCreateCollectionOpType;
+
+                // The "o.create" field contains the actual collection name.
+                nss = NamespaceString(nss.db(), input.getNestedField("o.create").getString());
+            } else if (!input.getNestedField("o.createIndexes").missing()){
+                operationType = DocumentSourceChangeStream::kCreateIndexesOpType;
+
+                // The "o.createIndexes" field contains the actual collection name.
+                nss = NamespaceString(nss.db(), input.getNestedField("o.createIndexes").getString());
+
+                // add field about index
+                const auto indexKey = input.getNestedField("o.key").getDocument();
+                const auto indexName = input.getNestedField("o.name").getString();
+                doc.addField(DocumentSourceChangeStream::kSpecField,
+                             Value(Document{{"key", indexKey.toBson()},{"name", indexName}}));
+            } else if (!input.getNestedField("o.dropIndexes").missing()){
+                operationType = DocumentSourceChangeStream::kDropIndexesOpType;
+
+                // The "o.dropIndexes" field contains the actual collection name.
+                nss = NamespaceString(nss.db(), input.getNestedField("o.dropIndexes").getString());
+
+                // add field about index
+                const auto indexKey = input.getNestedField("o2.key").getDocument();
+                const auto indexName = input.getNestedField("o2.name").getString();
+                doc.addField(DocumentSourceChangeStream::kSpecField,
+                             Value(Document{{"key", indexKey.toBson()},{"name", indexName}}));
+            } else if (!input.getNestedField("o.collMod").missing()) {
+                operationType = DocumentSourceChangeStream::kCollModOpType;
+
+                // The "o.collMod" field contains the actual collection name
+                nss = NamespaceString(nss.db(), input.getNestedField("o.collMod").getString());
+                // collMod may have different types: index(TTL, hidden), validator
+                if (!input.getNestedField("o.index").missing()) {
+                    const auto index = input.getNestedField("o.index").getDocument();
+                    doc.addField(DocumentSourceChangeStream::kSpecField,
+                                 Value(Document{{"index", index.toBson()}}));
+                } else if (!input.getNestedField("o.validator").missing()){
+                    const auto validator = input.getNestedField("o.validator").getDocument();
+                    doc.addField(DocumentSourceChangeStream::kSpecField,
+                                 Value(Document{{"validator", validator.toBson()}}));
+                }
             } else {
                 // All other commands will invalidate the stream.
                 operationType = DocumentSourceChangeStream::kInvalidateOpType;

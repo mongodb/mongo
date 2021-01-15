@@ -70,6 +70,10 @@
     assert.writeOK(db1Coll.insert({_id: 5}));
 
     let change = cst.getOneChange(resumeCursor);
+    // first should handle implicit createCollection
+    assert.eq(change.operationType, "create", tojson(change));
+    assert.eq(change.ns, {db: testDBs[0].getName(), coll: db1Coll.getName()}, tojson(change));
+    change = cst.getOneChange(resumeCursor);
     assert.eq(change.operationType, "insert", tojson(change));
     assert.eq(change.ns, {db: testDBs[0].getName(), coll: db1Coll.getName()}, tojson(change));
     assert.eq(change.fullDocument, {_id: 5}, tojson(change));
@@ -85,13 +89,18 @@
     assert.eq(change.operationType, "dropDatabase", tojson(change));
     assert.eq(change.ns, {db: testDBs[0].getName()}, tojson(change));
 
-    // Resume the change stream from the 'dropDatabase' entry.
+    // Resume the change stream from the 'dropDatabase' entry and check the following 'create' & 'insert' event.
+    // Note that no new writes have occurred here, we are justing resuming.
     resumeCursor = cst.startWatchingChanges({
         pipeline:
             [{$changeStream: {resumeAfter: dropDbChanges[1]._id, allChangesForCluster: true}}],
         collection: 1,
         aggregateOptions: {cursor: {batchSize: 0}},
     });
+    change = cst.getOneChange(resumeCursor);
+    // same reason as before
+    assert.eq(change.operationType, "create", tojson(change));
+    assert.eq(change.ns, {db: testDBs[0].getName(), coll: db1Coll.getName()}, tojson(change));
     change = cst.getOneChange(resumeCursor);
     assert.eq(change.operationType, "insert", tojson(change));
     assert.eq(change.ns, {db: testDBs[0].getName(), coll: db1Coll.getName()}, tojson(change));

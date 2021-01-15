@@ -52,9 +52,38 @@
     // After collection creation, we expect to see oplog entries for each subsequent operation.
     let coll = assertCreateCollection(db, collName);
     assert.writeOK(coll.insert({_id: 0}));
+    if (!FixtureHelpers.isSharded(coll)) {
+        change = cst.getOneChange(cursor);
+        assert.eq(change.operationType, "create", tojson(change));
+        change = cst.getOneChange(cursor);
+        assert.eq(change.operationType, "insert", tojson(change));
 
-    change = cst.getOneChange(cursor);
-    assert.eq(change.operationType, "insert", tojson(change));
+        // create oplog entries of supported DDL: create TTL index, collMod, delete index.
+        assert.commandWorked(coll.createIndex({createdAt:1},{expireAfterSeconds:3600}));
+        assert.commandWorked(coll.getDB().runCommand({
+            collMod: collName, index: {keyPattern:{createdAt:1}, expireAfterSeconds:60}}));
+        assert.commandWorked(coll.dropIndex({createdAt:1}));
+
+        let expectedChanges = [
+            {operationType: "createIndexes"},
+            {operationType: "collMod"},
+            {operationType: "dropIndexes"},
+        ];
+        cst.assertNextChangesEqual(
+            {cursor: cursor, expectedChanges: expectedChanges, expectInvalidate: false}
+        );
+    } else {
+        change = cst.getOneChange(cursor);
+        assert.eq(change.operationType, "create", tojson(change));
+        change = cst.getOneChange(cursor);
+        assert.eq(change.operationType, "createIndexes", tojson(change));
+        change = cst.getOneChange(cursor);
+        assert.eq(change.operationType, "create", tojson(change));
+        change = cst.getOneChange(cursor);
+        assert.eq(change.operationType, "insert", tojson(change));
+
+        // do not seed other DDLs.
+    }
 
     // Create oplog entries of type insert, update, delete, and drop.
     assert.writeOK(coll.insert({_id: 1}));

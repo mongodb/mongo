@@ -36,19 +36,20 @@
     // We can resumeAfter the token while the collection still does not exist.
     cmdResBeforeCollExists = assert.commandWorked(runExactCommand(db, {
         aggregate: collName,
-        pipeline: [{$changeStream: {resumeAfter: pbrtBeforeCollExists}}],
+        pipeline: [
+            {$changeStream: {resumeAfter: pbrtBeforeCollExists}},
+            {$match: {operationType: "insert"}}],
         cursor: {}
     }));
     csCursor = new DBCommandCursor(db, cmdResBeforeCollExists);
 
-    // But if the collection is created with a non-simple collation, the resumed stream invalidates.
+    // But if the collection is created with a non-simple collation, the resumed stream do not invalidates.
     const testCollationCollection =
         assertCreateCollection(db, collName, {collation: {locale: "en_US", strength: 2}});
     assert.commandWorked(testCollationCollection.insert({_id: "insert_one"}));
     assert.commandWorked(testCollationCollection.insert({_id: "INSERT_TWO"}));
     assert.soon(() => csCursor.hasNext());
-    const invalidate = csCursor.next();
-    assert.eq(invalidate.operationType, "invalidate");  // We don't see either insert.
+    assert.docEq(csCursor.next().fullDocument, {_id: "insert_one"});
     csCursor.close();
 
     // We can resume from the pre-creation high water mark if we specify an explicit collation...
@@ -163,7 +164,9 @@
     // Now resumeAfter the token that was generated before the collection was created...
     cmdResResumeFromBeforeCollCreated = assert.commandWorked(runExactCommand(db, {
         aggregate: collName,
-        pipeline: [{$changeStream: {resumeAfter: pbrtBeforeCollExists}}],
+        pipeline: [
+            {$changeStream: {resumeAfter: pbrtBeforeCollExists}},
+            {$match: {operationType: "insert"}}],
         cursor: {}
     }));
     // ... and confirm that we see all the events that have occurred since then.
@@ -226,7 +229,12 @@
     assert.soon(() => {
         if (csCursor.hasNext()) {
             relatedEvent = csCursor.next();
-            assert.eq(relatedEvent.fullDocument._id, docCount++);
+            // skip create when running on a sharded collection
+            if (relatedEvent.operationType == "create" || relatedEvent.operationType == "createIndexes") {
+                printjson(relatedEvent);
+            }else {
+                assert.eq(relatedEvent.fullDocument._id, docCount++);
+            }
         }
         return docCount === docId;
     });

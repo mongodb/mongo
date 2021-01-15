@@ -7,6 +7,7 @@
     "use strict";
 
     load("jstests/libs/change_stream_util.js");  // For 'ChangeStreamTest'.
+    load("jstests/libs/fixture_helpers.js");     // For isSharded.
 
     // Ensure that the test DB does not exist.
     const testDB = db.getSiblingDB(jsTestName());
@@ -49,8 +50,15 @@
         db.adminCommand({listDatabases: 1, nameOnly: true, filter: {name: testDB.getName()}}));
     assert.docEq(dbList.databases, [{name: testDB.getName()}]);
 
-    // ... and verify that the changes are observed by the stream.
-    const expectedChanges = [
+    let coll = testDB.getCollection(collName);
+    // Get the implicit create and other events. It differs from sharded collection and unsharded collection
+    if (!FixtureHelpers.isSharded(coll)) {
+      // ... and verify that the changes are observed by the stream.
+      const expectedChanges = [
+        {
+          ns: {db: testDB.getName(), coll: collName},
+          operationType: "create"
+        },
         {
           documentKey: {_id: 1},
           fullDocument: {_id: 1},
@@ -74,8 +82,51 @@
           ns: {db: testDB.getName(), coll: collName},
           operationType: "delete"
         },
-    ];
+      ];
 
-    cst.assertNextChangesEqual({cursor: changeStreamCursor, expectedChanges: expectedChanges});
+      cst.assertNextChangesEqual({cursor: changeStreamCursor, expectedChanges: expectedChanges});
+    } else {
+      const expectedChanges = [
+        {
+          ns: {db: testDB.getName(), coll: collName},
+          operationType: "create"
+        },
+        {
+          spec: {key: {_id: "hashed"}, name: "_id_hashed"},
+          ns: {db: testDB.getName(), coll: collName},
+          operationType: "createIndexes"
+        },
+        {
+          ns: {db: testDB.getName(), coll: collName},
+          operationType: "create"
+        },
+        {
+          documentKey: {_id: 1},
+          fullDocument: {_id: 1},
+          ns: {db: testDB.getName(), coll: collName},
+          operationType: "insert"
+        },
+        {
+          documentKey: {_id: 2},
+          fullDocument: {_id: 2},
+          ns: {db: testDB.getName(), coll: collName},
+          operationType: "insert"
+        },
+        {
+          documentKey: {_id: 1},
+          ns: {db: testDB.getName(), coll: collName},
+          updateDescription: {removedFields: [], updatedFields: {updated: true}},
+          operationType: "update"
+        },
+        {
+          documentKey: {_id: 2},
+          ns: {db: testDB.getName(), coll: collName},
+          operationType: "delete"
+        },
+      ];
+
+      cst.assertNextChangesEqual({cursor: changeStreamCursor, expectedChanges: expectedChanges});
+    }
+
     cst.cleanUp();
 })();

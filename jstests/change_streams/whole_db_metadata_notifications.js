@@ -20,23 +20,41 @@
 
     let aggCursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: 1});
 
-    // Create oplog entries of type insert, update, and delete.
+    // Create oplog entries of type insert, update, createIndex, collMod, dropIndex, delete and convertToCapped.
     assert.writeOK(coll.insert({_id: 1}));
     assert.writeOK(coll.update({_id: 1}, {$set: {a: 1}}));
+    assert.commandWorked(coll.createIndex({createdAt:1},{expireAfterSeconds:3600}));
+    assert.commandWorked(coll.getDB().runCommand({
+        collMod: "test",
+        index:{keyPattern:{createdAt:1}, expireAfterSeconds: 60}
+    }));
+    assert.commandWorked(coll.dropIndex({createdAt:1}));
     assert.writeOK(coll.remove({_id: 1}));
+    assert.commandWorked(coll.getDB().runCommand({convertToCapped: "test", size: 100000}))
 
     // Drop and recreate the collection.
     const collAgg = assertDropAndRecreateCollection(testDB, collName);
 
-    // We should get 4 oplog entries of type insert, update, delete, and drop.
+    // We should get 8(+1) oplog entries of type insert, update, createIndexes, collMod,
+    // dropIndexes, delete, convertToCapped and drop (then create again).
     let change = cst.getOneChange(aggCursor);
     assert.eq(change.operationType, "insert", tojson(change));
     change = cst.getOneChange(aggCursor);
     assert.eq(change.operationType, "update", tojson(change));
     change = cst.getOneChange(aggCursor);
+    assert.eq(change.operationType, "createIndexes", tojson(change));
+    change = cst.getOneChange(aggCursor);
+    assert.eq(change.operationType, "collMod", tojson(change));
+    change = cst.getOneChange(aggCursor);
+    assert.eq(change.operationType, "dropIndexes", tojson(change));
+    change = cst.getOneChange(aggCursor);
     assert.eq(change.operationType, "delete", tojson(change));
     change = cst.getOneChange(aggCursor);
+    assert.eq(change.operationType, "convertToCapped", tojson(change));
+    change = cst.getOneChange(aggCursor);
     assert.eq(change.operationType, "drop", tojson(change));
+    change = cst.getOneChange(aggCursor);
+    assert.eq(change.operationType, "create", tojson(change));
 
     // Get a valid resume token that the next change stream can use.
     assert.writeOK(collAgg.insert({_id: 1}));
@@ -105,6 +123,10 @@
             cursor: aggCursor,
             expectedChanges: [
                 {
+                  operationType: "create",
+                  ns: {db: testDB.getName(), coll: collName}
+                },
+                {
                   operationType: "insert",
                   ns: {db: testDB.getName(), coll: collName},
                   documentKey: {_id: 0},
@@ -144,6 +166,9 @@
             // Do not check the 'ns' field since it will contain the namespace of the temp
             // collection created when renaming a collection across databases.
             change = cst.getOneChange(aggCursor);
+            assert.eq(change.operationType, "create");
+
+            change = cst.getOneChange(aggCursor);
             assert.eq(change.operationType, "rename");
             assert.eq(change.to, {db: testDB.getName(), coll: coll.getName()});
         }
@@ -153,11 +178,15 @@
         coll.aggregate([{$out: "renamed_coll"}]);
         // Note that $out will first create a temp collection, and then rename the temp collection
         // to the target. Do not explicitly check the 'ns' field.
+        const create = cst.getOneChange(aggCursor);
+        assert.eq(create.operationType, "create", tojson(create));
         const rename = cst.getOneChange(aggCursor);
         assert.eq(rename.operationType, "rename", tojson(rename));
         assert.eq(rename.to, {db: testDB.getName(), coll: "renamed_coll"}, tojson(rename));
 
         // The change stream should not be invalidated by the rename(s).
+        // since old 'collToInvalidate' has already been renamed(dropped),
+        // below insert will create the collection implicitly again.
         assert.eq(0, cst.getNextBatch(aggCursor).nextBatch.length);
         assert.writeOK(coll.insert({_id: 2}));
         assert.eq(cst.getOneChange(aggCursor).operationType, "insert");
@@ -192,6 +221,9 @@
     // not invalidated by dropping the system collection. Instead, it correctly reports the next
     // write to the test collection.
     assert.writeOK(coll.insert({_id: 0}));
+    change = cst.getOneChange(aggCursor);
+    assert.eq(change.operationType, "create", tojson(change));
+    assert.eq(change.ns, {db: testDB.getName(), coll: coll.getName()});
     change = cst.getOneChange(aggCursor);
     assert.eq(change.operationType, "insert", tojson(change));
     assert.eq(change.ns, {db: testDB.getName(), coll: coll.getName()});

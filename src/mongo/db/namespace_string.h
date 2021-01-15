@@ -269,6 +269,9 @@ public:
     bool isOrphanCollection() const {
         return db() == kOrphanCollectionDb && coll().startsWith(kOrphanCollectionPrefix);
     }
+    bool isTmpConvertToCapped() const {
+        return (coll().find(".convertToCapped.") != std::string::npos) && (coll().find("tmp") != std::string::npos);
+    }
 
     /**
      * Returns whether the NamespaceString references a special collection that cannot be used for

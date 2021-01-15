@@ -84,17 +84,24 @@ constexpr StringData DocumentSourceChangeStream::kClusterTimeField;
 constexpr StringData DocumentSourceChangeStream::kTxnNumberField;
 constexpr StringData DocumentSourceChangeStream::kLsidField;
 constexpr StringData DocumentSourceChangeStream::kRenameTargetNssField;
+constexpr StringData DocumentSourceChangeStream::kSpecField;
 constexpr StringData DocumentSourceChangeStream::kUpdateOpType;
 constexpr StringData DocumentSourceChangeStream::kDeleteOpType;
 constexpr StringData DocumentSourceChangeStream::kReplaceOpType;
 constexpr StringData DocumentSourceChangeStream::kInsertOpType;
 constexpr StringData DocumentSourceChangeStream::kDropCollectionOpType;
 constexpr StringData DocumentSourceChangeStream::kRenameCollectionOpType;
+constexpr StringData DocumentSourceChangeStream::kCreateCollectionOpType;
+constexpr StringData DocumentSourceChangeStream::kCreateIndexesOpType;
+constexpr StringData DocumentSourceChangeStream::kDropIndexesOpType;
+constexpr StringData DocumentSourceChangeStream::kCollModOpType;
+constexpr StringData DocumentSourceChangeStream::kConvertToCappedOpType;
 constexpr StringData DocumentSourceChangeStream::kDropDatabaseOpType;
 constexpr StringData DocumentSourceChangeStream::kInvalidateOpType;
 constexpr StringData DocumentSourceChangeStream::kNewShardDetectedOpType;
 
 constexpr StringData DocumentSourceChangeStream::kRegexAllCollections;
+constexpr StringData DocumentSourceChangeStream::kRegexAllCollectionsWithoutTmp;
 constexpr StringData DocumentSourceChangeStream::kRegexAllDBs;
 constexpr StringData DocumentSourceChangeStream::kRegexCmdColl;
 
@@ -206,12 +213,12 @@ std::string DocumentSourceChangeStream::getNsRegexForChangeStream(const Namespac
             return "^" + regexEscape(nss.ns()) + "$";
         case ChangeStreamType::kSingleDatabase:
             // Match all namespaces that start with db name, followed by ".", then NOT followed by
-            // '$' or 'system.'
-            return "^" + regexEscape(nss.db().toString()) + "\\." + kRegexAllCollections;
+            // '$' or 'system.' or 'tmpXXXXX.convertToCapped.'
+            return "^" + regexEscape(nss.db().toString()) + "\\." + kRegexAllCollectionsWithoutTmp;
         case ChangeStreamType::kAllChangesForCluster:
             // Match all namespaces that start with any db name other than admin, config, or local,
-            // followed by ".", then NOT followed by '$' or 'system.'.
-            return kRegexAllDBs + "\\." + kRegexAllCollections;
+            // followed by ".", then NOT followed by '$' or 'system.' or 'tmpXXXXX.convertToCapped.'.
+            return kRegexAllDBs + "\\." + kRegexAllCollectionsWithoutTmp;
         default:
             MONGO_UNREACHABLE;
     }
@@ -242,14 +249,26 @@ BSONObj DocumentSourceChangeStream::buildMatchFilter(
             relevantCommands.append(
                 BSON("o.create" << nss.coll() << "o.collation" << BSON("$exists" << true)));
         }
+
+        // Generate 'createIndexes/dropIndexes' enties if is createIndexes/dropIndexes cmd
+        // deleteIndex(es) is already deprecated
+        relevantCommands.append(BSON("o.createIndexes" << nss.coll()));
+        relevantCommands.append(BSON("o.dropIndexes" << nss.coll()));
+        relevantCommands.append(BSON("o.create" << nss.coll()));
+        // handle 'collMod' cmd
+        relevantCommands.append(BSON("o.collMod" << nss.coll()));
     } else {
         // For change streams on an entire database, include notifications for individual collection
         // drops and renames which will not invalidate the stream. Also include the 'dropDatabase'
         // command which will invalidate the stream.
-        relevantCommands.append(BSON("o.drop" << BSONRegEx("^" + kRegexAllCollections)));
+        relevantCommands.append(BSON("o.drop" << BSONRegEx("^" + kRegexAllCollectionsWithoutTmp)));
         relevantCommands.append(BSON("o.dropDatabase" << BSON("$exists" << true)));
         relevantCommands.append(
             BSON("o.renameCollection" << BSONRegEx(getNsRegexForChangeStream(nss))));
+        relevantCommands.append(BSON("o.createIndexes" << BSONRegEx("^" + kRegexAllCollectionsWithoutTmp)));
+        relevantCommands.append(BSON("o.dropIndexes" << BSONRegEx("^" + kRegexAllCollectionsWithoutTmp)));
+        relevantCommands.append(BSON("o.create" << BSONRegEx("^" + kRegexAllCollectionsWithoutTmp)));
+        relevantCommands.append(BSON("o.collMod" << BSONRegEx("^" + kRegexAllCollectionsWithoutTmp)));
     }
 
     // For cluster-wide $changeStream, match the command namespace of any database other than admin,

@@ -2,6 +2,7 @@
 (function() {
     "use strict";
     load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
+    load("jstests/libs/fixture_helpers.js");           // For FixtureHelpers.
 
     const coll = assertDropAndRecreateCollection(db, jsTestName());
 
@@ -68,6 +69,13 @@
     // Resume the change stream from the start of the test and verify it picks up the changes to the
     // collection. Namely, it should see two inserts followed by two updates.
     changeStream = coll.watch([], {startAtOperationTime: testStartTime});
+    // if is mongos, clusterTime is behind 'create'. so it can't see create event.
+    if (!FixtureHelpers.isMongos(db)) {
+        assert.soon(() => changeStream.hasNext());
+        next = changeStream.next();
+        assert.eq(next.operationType, "create", tojson(next));
+    }
+
     assert.soon(() => changeStream.hasNext());
     next = changeStream.next();
     assert.eq(next.operationType, "insert", tojson(next));

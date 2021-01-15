@@ -711,6 +711,110 @@ TEST_F(ChangeStreamStageTest, TransformRenameTarget) {
     checkTransformation(rename, expectedRename, {}, kDefaultSpec, expectedInvalidate);
 }
 
+TEST_F(ChangeStreamStageTest, TransformCreateCollection) {
+    OplogEntry createColl = createCommand(BSON("create" << nss.coll()), testUuid());
+    Document expectedCreate{
+        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid())},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kCreateCollectionOpType},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+    };
+    checkTransformation(createColl, expectedCreate);
+}
+
+TEST_F(ChangeStreamStageTest, TransformCreateIndexByCommand) {
+    auto indexSpec =
+        D{{"createIndexes", nss.coll()},
+          {"v", 2}, {"key", D{{"a", 1}}}, {"unique", true}, {"name", "a_1"_sd}};
+    OplogEntry createIndex = createCommand(indexSpec.toBson(), testUuid());
+
+    Document expectedCreateIndex{
+        {DSChangeStream::kSpecField, D{{"key", D{{"a", 1}}}, {"name", "a_1"_sd}}}, // new field
+        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid())},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kCreateIndexesOpType},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+    };
+    checkTransformation(createIndex, expectedCreateIndex);
+}
+
+TEST_F(ChangeStreamStageTest, TransformDropIndexByCommand) {
+    auto indexSpec =
+        D{{"dropIndexes", nss.coll()},
+          {"index", "a_1"_sd}};
+    auto o2 =
+        D{{"v", 2},
+        {"key", D{{"a", 1}}},
+        {"name", "a_1"_sd},
+        {"ns", nss.ns()}};
+    OplogEntry dropIndex = makeOplogEntry(OpTypeEnum::kCommand, // op type
+                                          nss.getCommandNS(),   // namespace
+                                          indexSpec.toBson(),   // o
+                                          testUuid(),           // uuid
+                                          false,                // fromMigrate
+                                          o2.toBson(),          // o2
+                                          boost::none);         // opTime
+
+
+    Document expectedDropIndex{
+        {DSChangeStream::kSpecField, D{{"key", D{{"a", 1}}}, {"name", "a_1"_sd}}}, // new field
+        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid())},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kDropIndexesOpType},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+    };
+    checkTransformation(dropIndex, expectedDropIndex);
+}
+
+TEST_F(ChangeStreamStageTest, TransformCollMod) {
+    // change TTL index expireAfterSeconds
+    auto collModSpec =
+        D{{"collMod", nss.coll()},
+          {"index", D{{"name", "createAt_1"_sd},{"expireAfterSeconds", 60}}}};
+    OplogEntry collMod = createCommand(collModSpec.toBson(), testUuid());
+
+    Document expectedCollMod{
+        {DSChangeStream::kSpecField, D{{"index", D{{"name", "createAt_1"_sd}, {"expireAfterSeconds", 60}}}}},
+        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid())},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kCollModOpType},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+    };
+    checkTransformation(collMod, expectedCollMod);
+
+    // change validator
+    auto validator =
+        D{{"collMod", nss.coll()},
+          {"validator", D{{"$jsonSchema", D{{"bsonType", "object"_sd}}}}},
+          {"validationLevel", "moderate"_sd},
+          {"validationAction", "error"_sd}};
+    collMod = createCommand(validator.toBson(), testUuid());
+
+    Document expectedValidator{
+        {DSChangeStream::kSpecField, D{{"validator", D{{"$jsonSchema", D{{"bsonType", "object"_sd}}}}}}},
+        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid())},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kCollModOpType},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+    };
+    checkTransformation(collMod, expectedValidator);
+}
+
+TEST_F(ChangeStreamStageTest, TransformConvertToCapped) {
+    // acturally we handle with 'rename' cmd since other ops will be filtered
+    NamespaceString tmpColl(nss.db() + ".tmpwxO7X.convertToCapped.change_stream");
+    OplogEntry rename =
+        createCommand(BSON("renameCollection" << tmpColl.ns() << "to" << nss.ns()), testUuid());
+
+    Document expectedConvertToCapped{
+        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid())},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kConvertToCappedOpType},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+    };
+    checkTransformation(rename, expectedConvertToCapped);
+}
+
 TEST_F(ChangeStreamStageTest, MatchFiltersDropDatabaseCommand) {
     OplogEntry dropDB = createCommand(BSON("dropDatabase" << 1), boost::none, false);
     checkTransformation(dropDB, boost::none);
@@ -941,10 +1045,11 @@ TEST_F(ChangeStreamStageTest, ClusterTimeMatchesOplogEntry) {
     checkTransformation(rename, expectedRename);
 }
 
-TEST_F(ChangeStreamStageTest, MatchFiltersCreateCollection) {
+TEST_F(ChangeStreamStageTest, MatchFiltersCreateOtherCollection) {
+    NamespaceString otherColl(nss.db() + ".other_collection");
     auto collSpec =
-        D{{"create", "foo"_sd},
-          {"idIndex", D{{"v", 2}, {"key", D{{"_id", 1}}}, {"name", "_id_"_sd}, {"ns", nss.ns()}}}};
+        D{{"create", "other_collection"_sd},
+          {"idIndex", D{{"v", 2}, {"key", D{{"_id", 1}}}, {"name", "_id_"_sd}, {"ns", otherColl.ns()}}}};
     OplogEntry createColl = createCommand(collSpec.toBson(), testUuid());
     checkTransformation(createColl, boost::none);
 }
@@ -984,6 +1089,15 @@ TEST_F(ChangeStreamStageTest, MatchFiltersCreateIndexFromMigrate) {
                                       boost::none);         // o2
 
     checkTransformation(createIndex, boost::none);
+}
+
+TEST_F(ChangeStreamStageTest, MatchFiltersOperationsOnTmpCollection) {
+    NamespaceString tmpColl(nss.db() + ".tmpwxO7X.convertToCapped.change_stream");
+    OplogEntry insert = makeOplogEntry(OpTypeEnum::kInsert, tmpColl, BSON("_id" << 1));
+    checkTransformation(insert, boost::none);
+
+    OplogEntry dropColl = createCommand(BSON("drop" << tmpColl.coll()), testUuid());
+    checkTransformation(dropColl, boost::none);
 }
 
 TEST_F(ChangeStreamStageTest, TransformationShouldBeAbleToReParseSerializedStage) {
@@ -1518,6 +1632,30 @@ TEST_F(ChangeStreamStageDBTest, TransformDeleteFromMigrate) {
     checkTransformation(deleteEntry, boost::none);
 }
 
+TEST_F(ChangeStreamStageDBTest, TransformCreateCollection) {
+    OplogEntry createColl = createCommand(BSON("create" << nss.coll()), testUuid());
+    Document expectedCreate{
+        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid())},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kCreateCollectionOpType},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+    };
+    checkTransformation(createColl, expectedCreate);
+}
+
+TEST_F(ChangeStreamStageDBTest, TransformCreateOtherCollection) {
+    NamespaceString otherNss(nss.db() + "other_collection");
+
+    OplogEntry createColl = createCommand(BSON("create" << otherNss.coll()), testUuid());
+    Document expectedCreate{
+        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid())},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kCreateCollectionOpType},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", otherNss.coll()}}},
+    };
+    checkTransformation(createColl, expectedCreate);
+}
+
 TEST_F(ChangeStreamStageDBTest, TransformDrop) {
     OplogEntry dropColl = createCommand(BSON("drop" << nss.coll()), testUuid());
     Document expectedDrop{
@@ -1566,6 +1704,99 @@ TEST_F(ChangeStreamStageDBTest, TransformDropDatabase) {
     checkTransformation(dropDB, expectedDropDatabase, {}, kDefaultSpec, expectedInvalidate);
 }
 
+TEST_F(ChangeStreamStageDBTest, TransformCreateIndexByCommand) {
+    auto indexSpec =
+        D{{"createIndexes", nss.coll()},
+          {"v", 2}, {"key", D{{"a", 1}}}, {"unique", true}, {"name", "a_1"_sd}};
+    OplogEntry createIndex = createCommand(indexSpec.toBson(), testUuid());
+
+    Document expectedCreateIndex{
+        {DSChangeStream::kSpecField, D{{"key", D{{"a", 1}}},{"name", "a_1"_sd}}},
+        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid())},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kCreateIndexesOpType},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+    };
+    checkTransformation(createIndex, expectedCreateIndex);
+}
+
+TEST_F(ChangeStreamStageDBTest, TransformDropIndexByCommand) {
+    auto indexSpec =
+        D{{"dropIndexes", nss.coll()},
+          {"index", "a_1"_sd}};
+    auto o2 =
+        D{{"v", 2},
+        {"key", D{{"a", 1}}},
+        {"name", "a_1"_sd},
+        {"ns", nss.ns()}};
+    OplogEntry dropIndex = makeOplogEntry(OpTypeEnum::kCommand, // op type
+                                          nss.getCommandNS(),   // namespace
+                                          indexSpec.toBson(),   // o
+                                          testUuid(),           // uuid
+                                          false,                // fromMigrate
+                                          o2.toBson(),          // o2
+                                          boost::none);         // opTime
+
+
+    Document expectedDropIndex{
+        {DSChangeStream::kSpecField, D{{"key", D{{"a", 1}}}, {"name", "a_1"_sd}}},
+        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid())},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kDropIndexesOpType},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+    };
+    checkTransformation(dropIndex, expectedDropIndex);
+}
+
+TEST_F(ChangeStreamStageDBTest, TransformCollMod) {
+    // change TTL index expireAfterSeconds
+    auto collModSpec =
+        D{{"collMod", nss.coll()},
+          {"index", D{{"name", "createAt_1"_sd},{"expireAfterSeconds", 60}}}};
+    OplogEntry collMod = createCommand(collModSpec.toBson(), testUuid());
+
+    Document expectedCollMod{
+        {DSChangeStream::kSpecField, D{{"index",D{{"name", "createAt_1"_sd}, {"expireAfterSeconds", 60}}}}},
+        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid())},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kCollModOpType},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+    };
+    checkTransformation(collMod, expectedCollMod);
+
+    // change validator
+    auto validator =
+        D{{"collMod", nss.coll()},
+          {"validator", D{{"$jsonSchema",D{{"bsonType", "object"_sd}}}}},
+          {"validationLevel", "moderate"_sd},
+          {"validationAction", "error"_sd}};
+    collMod = createCommand(validator.toBson(), testUuid());
+
+    Document expectedValidator{
+        {DSChangeStream::kSpecField, D{{"validator", D{{"$jsonSchema",D{{"bsonType", "object"_sd}}}}}}},
+        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid())},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kCollModOpType},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+    };
+    checkTransformation(collMod, expectedValidator);
+}
+
+TEST_F(ChangeStreamStageDBTest, TransformConvertToCapped) {
+    // acturally we handle with 'rename' cmd since other ops will be filtered
+    NamespaceString tmpColl(nss.db() + ".tmpwxO7X.convertToCapped.change_stream");
+    OplogEntry rename =
+        createCommand(BSON("renameCollection" << tmpColl.ns() << "to" << nss.ns()), testUuid());
+
+    Document expectedConvertToCapped{
+        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid())},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kConvertToCappedOpType},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+    };
+    checkTransformation(rename, expectedConvertToCapped);
+}
+
 TEST_F(ChangeStreamStageDBTest, MatchFiltersOperationsOnSystemCollections) {
     NamespaceString systemColl(nss.db() + ".system.users");
     OplogEntry insert = makeOplogEntry(OpTypeEnum::kInsert, systemColl, BSON("_id" << 1));
@@ -1580,6 +1811,15 @@ TEST_F(ChangeStreamStageDBTest, MatchFiltersOperationsOnSystemCollections) {
     OplogEntry rename = createCommand(
         BSON("renameCollection" << systemColl.ns() << "to" << renamedSystemColl.ns()), testUuid());
     checkTransformation(rename, boost::none);
+}
+
+TEST_F(ChangeStreamStageDBTest, MatchFiltersOperationsOnTmpCollection) {
+    NamespaceString tmpColl(nss.db() + ".tmpwxO7X.convertToCapped.change_stream");
+    OplogEntry insert = makeOplogEntry(OpTypeEnum::kInsert, tmpColl, BSON("_id" << 1));
+    checkTransformation(insert, boost::none);
+
+    OplogEntry dropColl = createCommand(BSON("drop" << tmpColl.coll()), testUuid());
+    checkTransformation(dropColl, boost::none);
 }
 
 TEST_F(ChangeStreamStageDBTest, RenameFromSystemToUserCollectionShouldIncludeNotification) {
@@ -1632,6 +1872,18 @@ TEST_F(ChangeStreamStageDBTest, MatchFiltersCreateIndex) {
     NamespaceString indexNs(nss.getSystemIndexesCollection());
     OplogEntry createIndex = makeOplogEntry(OpTypeEnum::kInsert, indexNs, indexSpec.toBson());
     checkTransformation(createIndex, boost::none);
+}
+
+TEST_F(ChangeStreamStageDBTest, MatchFilterCreateTmpConvertToCapped) {
+    NamespaceString tmpNss(nss.db() + ".tmpwxO7X.convertToCapped.change_stream");
+    OplogEntry createTmpColl = createCommand(BSON("create" << tmpNss.coll()), testUuid());
+    checkTransformation(createTmpColl, boost::none);
+
+    auto collSpec =
+        D{{"create", tmpNss.coll()},
+          {"idIndex",D{{"v",2},{"key",D{{"_id",1}}},{"name","_id_"_sd},{"ns", tmpNss.ns()}}}};
+    createTmpColl = createCommand(collSpec.toBson(), testUuid());
+    checkTransformation(createTmpColl, boost::none);
 }
 
 TEST_F(ChangeStreamStageDBTest, DocumentKeyShouldIncludeShardKeyFromResumeToken) {

@@ -1,5 +1,8 @@
 /**
  * Tests that a change stream can use a user-specified, or collection-default collation.
+ * According to SERVER-39302, change streams should always use the simple collation when
+ * no explicit collation is provided.
+ * (But here doesn't backport this commit since code structure is not the same.)
  */
 (function() {
     "use strict";
@@ -35,14 +38,14 @@
             doNotModifyInPassthroughs: true
         });
 
-        // Create the collection with a non-default collation - this should invalidate the stream we
+        // Create the collection with a non-default collation - this should not invalidate the stream we
         // opened before it existed.
         caseInsensitiveCollection =
             assertCreateCollection(db, caseInsensitiveCollection, {collation: caseInsensitive});
         cst.assertNextChangesEqual({
             cursor: simpleCollationStream,
-            expectedChanges: [{operationType: "invalidate"}],
-            expectInvalidate: true
+            expectedChanges: [
+                {operationType: "create", ns: {db: db.getName(), coll: "change_stream_case_insensitive"}}],
         });
 
         const caseInsensitivePipeline = [
@@ -110,7 +113,10 @@
             assertDropCollection(db, noCollationCollection);
 
             const streamCreatedBeforeNoCollationCollection = cst.startWatchingChanges({
-                pipeline: [{$changeStream: {}}, {$project: {docId: "$documentKey._id"}}],
+                pipeline: [
+                    {$changeStream: {}},
+                    {$match: {operationType: "insert"}},
+                    {$project: {docId: "$documentKey._id"}}],
                 collection: noCollationCollection
             });
 
@@ -128,7 +134,10 @@
             assertDropCollection(db, simpleCollationCollection);
 
             const streamCreatedBeforeSimpleCollationCollection = cst.startWatchingChanges({
-                pipeline: [{$changeStream: {}}, {$project: {docId: "$documentKey._id"}}],
+                pipeline: [
+                    {$changeStream: {}},
+                    {$match: {operationType: "insert"}},
+                    {$project: {docId: "$documentKey._id"}}],
                 collection: simpleCollationCollection
             });
 
@@ -149,7 +158,10 @@
             assertDropCollection(db, frenchCollection);
 
             const frenchChangeStream = cst.startWatchingChanges({
-                pipeline: [{$changeStream: {}}, {$project: {docId: "$documentKey._id"}}],
+                pipeline: [
+                    {$changeStream: {}},
+                    {$match: {operationType: "insert"}},
+                    {$project: {docId: "$documentKey._id"}}],
                 aggregateOptions: {collation: {locale: "fr"}},
                 collection: frenchCollection
             });
