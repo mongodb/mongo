@@ -173,9 +173,13 @@ TEST_F(ReplicaSetMonitorFixture, ReplicaSetMonitorCleanup) {
     auto sets = ReplicaSetMonitorManager::get()->getAllSetNames();
     ASSERT_TRUE(std::find(sets.begin(), sets.end(), setName) == sets.end());
 
+    Mutex mutex;
     bool cleanupInvoked = false;
-    auto rsm = ReplicaSetMonitorManager::get()->getOrCreateMonitor(
-        replSetUri, [&cleanupInvoked] { cleanupInvoked = true; });
+    auto rsm =
+        ReplicaSetMonitorManager::get()->getOrCreateMonitor(replSetUri, [&cleanupInvoked, &mutex] {
+            stdx::lock_guard<Latch> lk(mutex);
+            cleanupInvoked = true;
+        });
 
     sets = ReplicaSetMonitorManager::get()->getAllSetNames();
     ASSERT_TRUE(std::find(sets.begin(), sets.end(), setName) != sets.end());
@@ -183,6 +187,7 @@ TEST_F(ReplicaSetMonitorFixture, ReplicaSetMonitorCleanup) {
     shutdownExecutor();
     rsm.reset();
 
+    stdx::lock_guard<Latch> lk(mutex);
     ASSERT_TRUE(cleanupInvoked);
 }
 
