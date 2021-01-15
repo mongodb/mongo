@@ -97,8 +97,10 @@ function CollectionValidator() {
                 return {ok: 1};
             }
 
-            const requiredFCV = jsTest.options().forceValidationWithFeatureCompatibilityVersion;
+            let requiredFCV = jsTest.options().forceValidationWithFeatureCompatibilityVersion;
             if (requiredFCV && !skipFCV) {
+                requiredFCV = new Function(`return typeof ${requiredFCV} === "string" ? ${
+                    requiredFCV} : "${requiredFCV}"`)();
                 // Make sure this node has the desired FCV as it may take time for the updates to
                 // replicate to the nodes that weren't part of the w=majority.
                 assert.soonNoExcept(() => {

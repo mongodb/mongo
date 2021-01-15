@@ -44,7 +44,7 @@ if (configPrimary) {
 }
 
 const adminDB = db.getSiblingDB('admin');
-const requiredFCV = jsTest.options().forceValidationWithFeatureCompatibilityVersion;
+let requiredFCV = jsTest.options().forceValidationWithFeatureCompatibilityVersion;
 
 let originalFCV;
 let originalTransactionLifetimeLimitSeconds;
@@ -67,6 +67,9 @@ if (requiredFCV) {
             skipFCV = true;
         }
     });
+
+    requiredFCV = new Function(
+        `return typeof ${requiredFCV} === "string" ? ${requiredFCV} : "${requiredFCV}"`)();
 
     // Running the setFeatureCompatibilityVersion command may implicitly involve running a
     // multi-statement transaction. We temporarily raise the transactionLifetimeLimitSeconds to be
