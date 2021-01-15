@@ -1616,8 +1616,8 @@ TEST_F(OplogApplierImplTest,
        OplogApplicationThreadFuncGroupsInsertOperationByNamespaceBeforeApplying) {
     int seconds = 1;
     auto makeOp = [&seconds](const NamespaceString& nss) {
-        return makeInsertDocumentOplogEntry(
-            {Timestamp(Seconds(seconds), 0), 1LL}, nss, BSON("_id" << seconds++));
+        auto t = seconds++;
+        return makeInsertDocumentOplogEntry({Timestamp(Seconds(t), 0), 1LL}, nss, BSON("_id" << t));
     };
     NamespaceString nss1("test." + _agent.getSuiteName() + "_" + _agent.getTestName() + "_1");
     NamespaceString nss2("test." + _agent.getSuiteName() + "_" + _agent.getTestName() + "_2");
@@ -1658,8 +1658,8 @@ TEST_F(OplogApplierImplTest,
        OplogApplicationThreadFuncLimitsBatchCountWhenGroupingInsertOperation) {
     int seconds = 1;
     auto makeOp = [&seconds](const NamespaceString& nss) {
-        return makeInsertDocumentOplogEntry(
-            {Timestamp(Seconds(seconds), 0), 1LL}, nss, BSON("_id" << seconds++));
+        auto t = seconds++;
+        return makeInsertDocumentOplogEntry({Timestamp(Seconds(t), 0), 1LL}, nss, BSON("_id" << t));
     };
     NamespaceString nss("test." + _agent.getSuiteName() + "_" + _agent.getTestName() + "_1");
     auto createOp = makeCreateCollectionOplogEntry({Timestamp(Seconds(seconds++), 0), 1LL}, nss);
@@ -1799,8 +1799,8 @@ TEST_F(OplogApplierImplTest,
        OplogApplicationThreadFuncAppliesInsertOpsIndividuallyWhenUnableToCreateGroupByNamespace) {
     int seconds = 1;
     auto makeOp = [&seconds](const NamespaceString& nss) {
-        return makeInsertDocumentOplogEntry(
-            {Timestamp(Seconds(seconds), 0), 1LL}, nss, BSON("_id" << seconds++));
+        auto t = seconds++;
+        return makeInsertDocumentOplogEntry({Timestamp(Seconds(t), 0), 1LL}, nss, BSON("_id" << t));
     };
 
     auto testNs = "test." + _agent.getSuiteName() + "_" + _agent.getTestName();
@@ -1839,8 +1839,8 @@ TEST_F(OplogApplierImplTest,
        OplogApplicationThreadFuncFallsBackOnApplyingInsertsIndividuallyWhenGroupedInsertFails) {
     int seconds = 1;
     auto makeOp = [&seconds](const NamespaceString& nss) {
-        return makeInsertDocumentOplogEntry(
-            {Timestamp(Seconds(seconds), 0), 1LL}, nss, BSON("_id" << seconds++));
+        auto t = seconds++;
+        return makeInsertDocumentOplogEntry({Timestamp(Seconds(t), 0), 1LL}, nss, BSON("_id" << t));
     };
     NamespaceString nss("test." + _agent.getSuiteName() + "_" + _agent.getTestName() + "_1");
     auto createOp = makeCreateCollectionOplogEntry({Timestamp(Seconds(seconds++), 0), 1LL}, nss);

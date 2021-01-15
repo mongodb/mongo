@@ -704,7 +704,7 @@ TEST_F(TenantMigrationRecipientServiceTest,
 
     // Mark all hosts as excluded.
     auto hosts = replSet.getHosts();
-    for (const auto host : hosts) {
+    for (const auto& host : hosts) {
         const auto now = opCtx->getServiceContext()->getFastClockSource()->now();
         instance->excludeDonorHost(host, now + Milliseconds(500));
     }
