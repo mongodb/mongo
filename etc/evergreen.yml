@@ -10013,7 +10013,6 @@ buildvariants:
         --mongodSetParameters="{
             featureFlagToaster: true,
             featureFlagSpoon: true,
-            featureFlagTenantMigrations: true,
             featureFlagImprovedAuditing: true,
         }"
 
@@ -10111,7 +10110,6 @@ buildvariants:
         --mongodSetParameters="{
             featureFlagToaster: true,
             featureFlagSpoon: true,
-            featureFlagTenantMigrations: true,
             featureFlagImprovedAuditing: true,
         }"
 
