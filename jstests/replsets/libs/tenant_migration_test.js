@@ -266,7 +266,7 @@ function TenantMigrationTest(
             }
         });
 
-        // If the command succeeded, we expect that the migration is marked garbage collectiable on
+        // If the command succeeded, we expect that the migration is marked garbage collectable on
         // the donor and the recipient. Check the state docs for expireAt.
         if (res.ok) {
             const recipientPrimary = this.getRecipientPrimary();
@@ -280,8 +280,12 @@ function TenantMigrationTest(
                     _id: UUID(migrationIdString)
                 });
 
-            assert(donorStateDoc.expireAt);
-            assert(recipientStateDoc.expireAt);
+            if (donorStateDoc) {
+                assert(donorStateDoc.expireAt);
+            }
+            if (recipientStateDoc) {
+                assert(recipientStateDoc.expireAt);
+            }
         }
 
         return res;
