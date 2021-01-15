@@ -529,6 +529,8 @@ function RollbackTest(name = "RollbackTest", replSet) {
 
         curSecondary = rst.getSecondary();
         assert.neq(curPrimary, curSecondary);
+
+        waitForState(curSecondary, ReplSetTest.State.SECONDARY);
     };
 
     /**
