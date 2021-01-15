@@ -266,198 +266,206 @@ public:
     };
 } cmdDrop;
 
+constexpr auto kCreateCommandHelp =
+    "explicitly creates a collection or view\n"
+    "{\n"
+    "  create: <string: collection or view name> [,\n"
+    "  capped: <bool: capped collection>,\n"
+    "  autoIndexId: <bool: automatic creation of _id index>,\n"
+    "  idIndex: <document: _id index specification>,\n"
+    "  size: <int: size in bytes of the capped collection>,\n"
+    "  max: <int: max number of documents in the capped collection>,\n"
+    "  storageEngine: <document: storage engine configuration>,\n"
+    "  validator: <document: validation rules>,\n"
+    "  validationLevel: <string: validation level>,\n"
+    "  validationAction: <string: validation action>,\n"
+    "  indexOptionDefaults: <document: default configuration for indexes>,\n"
+    "  viewOn: <string: name of source collection or view>,\n"
+    "  pipeline: <array<object>: aggregation pipeline stage>,\n"
+    "  collation: <document: default collation for the collection or view>,\n"
+    "  writeConcern: <document: write concern expression for the operation>]\n"
+    "}"_sd;
+
 /* create collection */
-class CmdCreate : public BasicCommand {
+class CmdCreate final : public CreateCmdVersion1Gen<CmdCreate> {
 public:
-    CmdCreate() : BasicCommand("create") {}
-
-    virtual const std::set<std::string>& apiVersions() const {
-        return kApiVersions1;
-    }
-
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const final {
         return AllowedOnSecondary::kNever;
     }
 
-    virtual bool adminOnly() const {
+    bool adminOnly() const final {
         return false;
     }
 
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool collectsResourceConsumptionMetrics() const final {
         return true;
     }
 
-    bool collectsResourceConsumptionMetrics() const override {
-        return true;
+    std::string help() const final {
+        return kCreateCommandHelp.toString();
     }
 
-    std::string help() const override {
-        return str::stream()
-            << "explicitly creates a collection or view\n"
-            << "{\n"
-            << "  create: <string: collection or view name> [,\n"
-            << "  capped: <bool: capped collection>,\n"
-            << "  autoIndexId: <bool: automatic creation of _id index>,\n"
-            << "  idIndex: <document: _id index specification>,\n"
-            << "  size: <int: size in bytes of the capped collection>,\n"
-            << "  max: <int: max number of documents in the capped collection>,\n"
-            << "  storageEngine: <document: storage engine configuration>,\n"
-            << "  validator: <document: validation rules>,\n"
-            << "  validationLevel: <string: validation level>,\n"
-            << "  validationAction: <string: validation action>,\n"
-            << "  indexOptionDefaults: <document: default configuration for indexes>,\n"
-            << "  viewOn: <string: name of source collection or view>,\n"
-            << "  pipeline: <array<object>: aggregation pipeline stage>,\n"
-            << "  collation: <document: default collation for the collection or view>,\n"
-            << "  writeConcern: <document: write concern expression for the operation>]\n"
-            << "}";
-    }
+    class Invocation final : public InvocationBaseGen {
+    public:
+        using InvocationBaseGen::InvocationBaseGen;
 
-    virtual Status checkAuthForCommand(Client* client,
-                                       const std::string& dbname,
-                                       const BSONObj& cmdObj) const {
-        const NamespaceString nss(parseNs(dbname, cmdObj));
-        return AuthorizationSession::get(client)->checkAuthForCreate(nss, cmdObj, false);
-    }
+        bool supportsWriteConcern() const final {
+            return true;
+        }
 
-    virtual bool run(OperationContext* opCtx,
-                     const string& dbname,
-                     const BSONObj& cmdObj,
-                     BSONObjBuilder& result) {
-        IDLParserErrorContext ctx("create");
-        CreateCommand cmd = CreateCommand::parse(ctx, cmdObj);
+        void doCheckAuthorization(OperationContext* opCtx) const final {
+            uassertStatusOK(AuthorizationSession::get(opCtx->getClient())
+                                ->checkAuthForCreate(request(), false));
+        }
 
-        if (cmd.getAutoIndexId()) {
+        NamespaceString ns() const final {
+            return request().getNamespace();
+        }
+
+        CreateCommandReply typedRun(OperationContext* opCtx) final {
+            auto cmd = request();
+
+            CreateCommandReply reply;
+            if (cmd.getAutoIndexId()) {
 #define DEPR_23800 "The autoIndexId option is deprecated and will be removed in a future release"
-            LOGV2_WARNING(23800, DEPR_23800);
-            result.append("note", DEPR_23800);
+                LOGV2_WARNING(23800, DEPR_23800);
+                reply.setNote(StringData(DEPR_23800));
 #undef DEPR_23800
-        }
+            }
 
-        // Ensure that the 'size' field is present if 'capped' is set to true.
-        if (cmd.getCapped()) {
-            uassert(ErrorCodes::InvalidOptions,
-                    str::stream() << "the 'size' field is required when 'capped' is true",
-                    cmd.getSize());
-        }
-
-        // If the 'size' or 'max' fields are present, then 'capped' must be set to true.
-        if (cmd.getSize() || cmd.getMax()) {
-            uassert(ErrorCodes::InvalidOptions,
-                    str::stream() << "the 'capped' field needs to be true when either the 'size'"
-                                  << " or 'max' fields are present",
-                    cmd.getCapped());
-        }
-
-        // The 'temp' field is only allowed to be used internally and isn't available to clients.
-        if (cmd.getTemp()) {
-            uassert(ErrorCodes::InvalidOptions,
-                    str::stream() << "the 'temp' field is an invalid option",
-                    opCtx->getClient()->isInDirectClient() ||
-                        (opCtx->getClient()->session()->getTags() &
-                         transport::Session::kInternalClient));
-        }
-
-        if (cmd.getPipeline()) {
-            uassert(ErrorCodes::InvalidOptions,
-                    "'pipeline' requires 'viewOn' to also be specified",
-                    cmd.getViewOn());
-        }
-
-        if (auto timeseries = cmd.getTimeseries()) {
-            uassert(ErrorCodes::InvalidOptions,
-                    "Time-series collection is not enabled",
-                    feature_flags::gTimeseriesCollection.isEnabled(
-                        serverGlobalParams.featureCompatibility));
-
-            const auto timeseriesNotAllowedWith = [&cmd](StringData option) -> std::string {
-                return str::stream() << cmd.getNamespace() << ": 'timeseries' is not allowed with '"
-                                     << option << "'";
-            };
-
-            uassert(
-                ErrorCodes::InvalidOptions, timeseriesNotAllowedWith("capped"), !cmd.getCapped());
-            uassert(ErrorCodes::InvalidOptions,
-                    timeseriesNotAllowedWith("autoIndexId"),
-                    !cmd.getAutoIndexId());
-            uassert(
-                ErrorCodes::InvalidOptions, timeseriesNotAllowedWith("idIndex"), !cmd.getIdIndex());
-            uassert(ErrorCodes::InvalidOptions, timeseriesNotAllowedWith("size"), !cmd.getSize());
-            uassert(ErrorCodes::InvalidOptions, timeseriesNotAllowedWith("max"), !cmd.getMax());
-            uassert(ErrorCodes::InvalidOptions,
-                    timeseriesNotAllowedWith("validator"),
-                    !cmd.getValidator());
-            uassert(ErrorCodes::InvalidOptions,
-                    timeseriesNotAllowedWith("validationLevel"),
-                    !cmd.getValidationLevel());
-            uassert(ErrorCodes::InvalidOptions,
-                    timeseriesNotAllowedWith("validationAction"),
-                    !cmd.getValidationAction());
-            uassert(
-                ErrorCodes::InvalidOptions, timeseriesNotAllowedWith("viewOn"), !cmd.getViewOn());
-            uassert(ErrorCodes::InvalidOptions,
-                    timeseriesNotAllowedWith("pipeline"),
-                    !cmd.getPipeline());
-
-            if (auto metaField = timeseries->getMetaField()) {
+            // Ensure that the 'size' field is present if 'capped' is set to true.
+            if (cmd.getCapped()) {
                 uassert(ErrorCodes::InvalidOptions,
-                        "'metaField' cannot be \"_id\"",
-                        *metaField != "_id");
+                        str::stream() << "the 'size' field is required when 'capped' is true",
+                        cmd.getSize());
+            }
+
+            // If the 'size' or 'max' fields are present, then 'capped' must be set to true.
+            if (cmd.getSize() || cmd.getMax()) {
                 uassert(ErrorCodes::InvalidOptions,
-                        "'metaField' cannot be the same as 'timeField'",
-                        *metaField != timeseries->getTimeField());
+                        str::stream()
+                            << "the 'capped' field needs to be true when either the 'size'"
+                            << " or 'max' fields are present",
+                        cmd.getCapped());
             }
+
+            // The 'temp' field is only allowed to be used internally and isn't available to
+            // clients.
+            if (cmd.getTemp()) {
+                uassert(ErrorCodes::InvalidOptions,
+                        str::stream() << "the 'temp' field is an invalid option",
+                        opCtx->getClient()->isInDirectClient() ||
+                            (opCtx->getClient()->session()->getTags() &
+                             transport::Session::kInternalClient));
+            }
+
+            if (cmd.getPipeline()) {
+                uassert(ErrorCodes::InvalidOptions,
+                        "'pipeline' requires 'viewOn' to also be specified",
+                        cmd.getViewOn());
+            }
+
+            if (auto timeseries = cmd.getTimeseries()) {
+                uassert(ErrorCodes::InvalidOptions,
+                        "Time-series collection is not enabled",
+                        feature_flags::gTimeseriesCollection.isEnabled(
+                            serverGlobalParams.featureCompatibility));
+
+                const auto timeseriesNotAllowedWith = [&cmd](StringData option) -> std::string {
+                    return str::stream() << cmd.getNamespace()
+                                         << ": 'timeseries' is not allowed with '" << option << "'";
+                };
+
+                uassert(ErrorCodes::InvalidOptions,
+                        timeseriesNotAllowedWith("capped"),
+                        !cmd.getCapped());
+                uassert(ErrorCodes::InvalidOptions,
+                        timeseriesNotAllowedWith("autoIndexId"),
+                        !cmd.getAutoIndexId());
+                uassert(ErrorCodes::InvalidOptions,
+                        timeseriesNotAllowedWith("idIndex"),
+                        !cmd.getIdIndex());
+                uassert(
+                    ErrorCodes::InvalidOptions, timeseriesNotAllowedWith("size"), !cmd.getSize());
+                uassert(ErrorCodes::InvalidOptions, timeseriesNotAllowedWith("max"), !cmd.getMax());
+                uassert(ErrorCodes::InvalidOptions,
+                        timeseriesNotAllowedWith("validator"),
+                        !cmd.getValidator());
+                uassert(ErrorCodes::InvalidOptions,
+                        timeseriesNotAllowedWith("validationLevel"),
+                        !cmd.getValidationLevel());
+                uassert(ErrorCodes::InvalidOptions,
+                        timeseriesNotAllowedWith("validationAction"),
+                        !cmd.getValidationAction());
+                uassert(ErrorCodes::InvalidOptions,
+                        timeseriesNotAllowedWith("viewOn"),
+                        !cmd.getViewOn());
+                uassert(ErrorCodes::InvalidOptions,
+                        timeseriesNotAllowedWith("pipeline"),
+                        !cmd.getPipeline());
+
+                if (auto metaField = timeseries->getMetaField()) {
+                    uassert(ErrorCodes::InvalidOptions,
+                            "'metaField' cannot be \"_id\"",
+                            *metaField != "_id");
+                    uassert(ErrorCodes::InvalidOptions,
+                            "'metaField' cannot be the same as 'timeField'",
+                            *metaField != timeseries->getTimeField());
+                }
+            }
+
+            // Validate _id index spec and fill in missing fields.
+            if (cmd.getIdIndex()) {
+                auto idIndexSpec = *cmd.getIdIndex();
+
+                uassert(ErrorCodes::InvalidOptions,
+                        str::stream() << "'idIndex' is not allowed with 'viewOn': " << idIndexSpec,
+                        !cmd.getViewOn());
+
+                uassert(ErrorCodes::InvalidOptions,
+                        str::stream()
+                            << "'idIndex' is not allowed with 'autoIndexId': " << idIndexSpec,
+                        !cmd.getAutoIndexId());
+
+                // Perform index spec validation.
+                idIndexSpec = uassertStatusOK(index_key_validate::validateIndexSpec(
+                    opCtx, idIndexSpec, serverGlobalParams.featureCompatibility));
+                uassertStatusOK(index_key_validate::validateIdIndexSpec(idIndexSpec));
+
+                // Validate or fill in _id index collation.
+                std::unique_ptr<CollatorInterface> defaultCollator;
+                if (cmd.getCollation()) {
+                    auto collatorStatus = CollatorFactoryInterface::get(opCtx->getServiceContext())
+                                              ->makeFromBSON(cmd.getCollation()->toBSON());
+                    uassertStatusOK(collatorStatus.getStatus());
+                    defaultCollator = std::move(collatorStatus.getValue());
+                }
+
+                idIndexSpec = uassertStatusOK(index_key_validate::validateIndexSpecCollation(
+                    opCtx, idIndexSpec, defaultCollator.get()));
+
+                std::unique_ptr<CollatorInterface> idIndexCollator;
+                if (auto collationElem = idIndexSpec["collation"]) {
+                    auto collatorStatus = CollatorFactoryInterface::get(opCtx->getServiceContext())
+                                              ->makeFromBSON(collationElem.Obj());
+                    // validateIndexSpecCollation() should have checked that the _id index collation
+                    // spec is valid.
+                    invariant(collatorStatus.isOK());
+                    idIndexCollator = std::move(collatorStatus.getValue());
+                }
+                if (!CollatorInterface::collatorsMatch(defaultCollator.get(),
+                                                       idIndexCollator.get())) {
+                    uasserted(ErrorCodes::BadValue,
+                              "'idIndex' must have the same collation as the collection.");
+                }
+
+                cmd.setIdIndex(idIndexSpec);
+            }
+
+            uassertStatusOK(createCollection(opCtx, cmd.getNamespace(), cmd));
+            return reply;
         }
-
-        // Validate _id index spec and fill in missing fields.
-        if (cmd.getIdIndex()) {
-            auto idIndexSpec = *cmd.getIdIndex();
-
-            uassert(ErrorCodes::InvalidOptions,
-                    str::stream() << "'idIndex' is not allowed with 'viewOn': " << idIndexSpec,
-                    !cmd.getViewOn());
-
-            uassert(ErrorCodes::InvalidOptions,
-                    str::stream() << "'idIndex' is not allowed with 'autoIndexId': " << idIndexSpec,
-                    !cmd.getAutoIndexId());
-
-            // Perform index spec validation.
-            idIndexSpec = uassertStatusOK(index_key_validate::validateIndexSpec(
-                opCtx, idIndexSpec, serverGlobalParams.featureCompatibility));
-            uassertStatusOK(index_key_validate::validateIdIndexSpec(idIndexSpec));
-
-            // Validate or fill in _id index collation.
-            std::unique_ptr<CollatorInterface> defaultCollator;
-            if (cmd.getCollation()) {
-                auto collatorStatus = CollatorFactoryInterface::get(opCtx->getServiceContext())
-                                          ->makeFromBSON(cmd.getCollation()->toBSON());
-                uassertStatusOK(collatorStatus.getStatus());
-                defaultCollator = std::move(collatorStatus.getValue());
-            }
-
-            idIndexSpec = uassertStatusOK(index_key_validate::validateIndexSpecCollation(
-                opCtx, idIndexSpec, defaultCollator.get()));
-
-            std::unique_ptr<CollatorInterface> idIndexCollator;
-            if (auto collationElem = idIndexSpec["collation"]) {
-                auto collatorStatus = CollatorFactoryInterface::get(opCtx->getServiceContext())
-                                          ->makeFromBSON(collationElem.Obj());
-                // validateIndexSpecCollation() should have checked that the _id index collation
-                // spec is valid.
-                invariant(collatorStatus.isOK());
-                idIndexCollator = std::move(collatorStatus.getValue());
-            }
-            if (!CollatorInterface::collatorsMatch(defaultCollator.get(), idIndexCollator.get())) {
-                uasserted(ErrorCodes::BadValue,
-                          "'idIndex' must have the same collation as the collection.");
-            }
-
-            cmd.setIdIndex(idIndexSpec);
-        }
-
-        uassertStatusOK(createCollection(opCtx, cmd.getNamespace(), cmd));
-        return true;
-    }
+    };
 } cmdCreate;
 
 class CmdDatasize : public ErrmsgCommandDeprecated {

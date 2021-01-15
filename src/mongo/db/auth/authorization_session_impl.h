@@ -121,9 +121,7 @@ public:
                                                           const AggregateCommand& request,
                                                           bool isMongos) override;
 
-    Status checkAuthForCreate(const NamespaceString& ns,
-                              const BSONObj& cmdObj,
-                              bool isMongos) override;
+    Status checkAuthForCreate(const CreateCommand& cmd, bool isMongos) override;
 
     Status checkAuthForCollMod(const NamespaceString& ns,
                                const BSONObj& cmdObj,

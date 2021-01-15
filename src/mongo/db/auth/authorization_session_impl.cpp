@@ -433,31 +433,32 @@ Status AuthorizationSessionImpl::checkAuthForKillCursors(const NamespaceString& 
                   str::stream() << "not authorized to kill cursor on " << ns.ns());
 }
 
-Status AuthorizationSessionImpl::checkAuthForCreate(const NamespaceString& ns,
-                                                    const BSONObj& cmdObj,
-                                                    bool isMongos) {
-    if (cmdObj["capped"].trueValue() &&
-        !isAuthorizedForActionsOnNamespace(ns, ActionType::convertToCapped)) {
-        return Status(ErrorCodes::Unauthorized, "unauthorized");
+Status AuthorizationSessionImpl::checkAuthForCreate(const CreateCommand& cmd, bool isMongos) {
+    auto ns = cmd.getNamespace();
+    if (cmd.getCapped() && !isAuthorizedForActionsOnNamespace(ns, ActionType::convertToCapped)) {
+        return {ErrorCodes::Unauthorized, "unauthorized"};
     }
 
     const bool hasCreateCollectionAction =
         isAuthorizedForActionsOnNamespace(ns, ActionType::createCollection);
 
     // If attempting to create a view, check for additional required privileges.
-    if (cmdObj["viewOn"]) {
+    if (auto optViewOn = cmd.getViewOn()) {
         // You need the createCollection action on this namespace; the insert action is not
         // sufficient.
         if (!hasCreateCollectionAction) {
-            return Status(ErrorCodes::Unauthorized, "unauthorized");
+            return {ErrorCodes::Unauthorized, "unauthorized"};
         }
 
         // Parse the viewOn namespace and the pipeline. If no pipeline was specified, use the empty
         // pipeline.
-        NamespaceString viewOnNs(ns.db(), cmdObj["viewOn"].checkAndGetStringData());
-        auto pipeline =
-            cmdObj.hasField("pipeline") ? BSONArray(cmdObj["pipeline"].Obj()) : BSONArray();
-        return checkAuthForCreateOrModifyView(this, ns, viewOnNs, pipeline, isMongos);
+        NamespaceString viewOnNs(ns.db(), optViewOn.get());
+        auto pipeline = cmd.getPipeline().get_value_or(std::vector<BSONObj>());
+        BSONArrayBuilder pipelineArray;
+        for (const auto& stage : pipeline) {
+            pipelineArray.append(stage);
+        }
+        return checkAuthForCreateOrModifyView(this, ns, viewOnNs, pipelineArray.arr(), isMongos);
     }
 
     // To create a regular collection, ActionType::createCollection or ActionType::insert are
@@ -466,7 +467,7 @@ Status AuthorizationSessionImpl::checkAuthForCreate(const NamespaceString& ns,
         return Status::OK();
     }
 
-    return Status(ErrorCodes::Unauthorized, "unauthorized");
+    return {ErrorCodes::Unauthorized, "unauthorized"};
 }
 
 Status AuthorizationSessionImpl::checkAuthForCollMod(const NamespaceString& ns,

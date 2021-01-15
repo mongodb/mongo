@@ -41,6 +41,7 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/auth/user_set.h"
+#include "mongo/db/commands/create_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops_parsers.h"
@@ -222,9 +223,7 @@ public:
 
     // Checks if this connection has the privileges necessary to create 'ns' with the options
     // supplied in 'cmdObj' either directly on mongoD or via mongoS.
-    virtual Status checkAuthForCreate(const NamespaceString& ns,
-                                      const BSONObj& cmdObj,
-                                      bool isMongos) = 0;
+    virtual Status checkAuthForCreate(const CreateCommand& cmd, bool isMongos) = 0;
 
     // Checks if this connection has the privileges necessary to modify 'ns' with the options
     // supplied in 'cmdObj' either directly on mongoD or via mongoS.

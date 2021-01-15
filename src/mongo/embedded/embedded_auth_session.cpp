@@ -144,7 +144,7 @@ public:
         return PrivilegeVector();
     }
 
-    Status checkAuthForCreate(const NamespaceString&, const BSONObj&, bool) override {
+    Status checkAuthForCreate(const CreateCommand&, bool) override {
         return Status::OK();
     }
 

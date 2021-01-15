@@ -35,6 +35,16 @@ imports:
     - "mongo/db/catalog/collection_options.idl"
     - "mongo/db/timeseries/timeseries.idl"
 
+structs:
+    CreateCommandReply:
+        description: 'Reply from the {create: ...} command'
+        strict: true
+        fields:
+            note:
+                description: 'Warnings or other additional information'
+                type: string
+                optional: true
+
 commands:
     create:
         description: "Parser for the 'create' Command"
@@ -42,6 +52,7 @@ commands:
         namespace: concatenate_with_db
         cpp_name: CreateCommand
         api_version: "1"
+        reply_type: CreateCommandReply
         strict: true
         fields:
             capped:
@@ -140,4 +151,3 @@ commands:
                 type: safeInt64
                 optional: true
                 unstable: true
-        reply_type: OkReply

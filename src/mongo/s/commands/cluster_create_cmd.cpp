@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
-
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/auth/authorization_session.h"
@@ -42,118 +40,118 @@
 namespace mongo {
 namespace {
 
-class CreateCmd : public BasicCommand {
+void checkCollectionOptions(OperationContext* opCtx,
+                            const NamespaceString& ns,
+                            const CollectionOptions& options) {
+    auto dbName = ns.db();
+    auto dbInfo = uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbName));
+    BSONObjBuilder listCollCmd;
+    listCollCmd.append("listCollections", 1);
+    listCollCmd.append("filter", BSON("name" << ns.coll()));
+
+    auto response = executeCommandAgainstDatabasePrimary(
+        opCtx,
+        dbName,
+        dbInfo,
+        CommandHelpers::filterCommandRequestForPassthrough(listCollCmd.obj()),
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+        Shard::RetryPolicy::kIdempotent);
+    uassertStatusOK(response.swResponse);
+
+    auto responseData = response.swResponse.getValue().data;
+    auto listCollectionsStatus = mongo::getStatusFromCommandResult(responseData);
+    uassertStatusOK(listCollectionsStatus);
+
+    auto cursorObj = responseData["cursor"].Obj();
+    auto collections = cursorObj["firstBatch"].Obj();
+
+    BSONObjIterator collIter(collections);
+    uassert(ErrorCodes::NamespaceNotFound,
+            str::stream() << "cannot find ns: " << ns.ns(),
+            collIter.more());
+
+    auto collectionDetails = collIter.next();
+    CollectionOptions actualOptions =
+        uassertStatusOK(CollectionOptions::parse(collectionDetails["options"].Obj()));
+    // TODO: SERVER-33048 check idIndex field
+
+    uassert(ErrorCodes::NamespaceExists,
+            str::stream() << "ns: " << ns.ns()
+                          << " already exists with different options: " << actualOptions.toBSON(),
+            options.matchesStorageOptions(
+                actualOptions, CollatorFactoryInterface::get(opCtx->getServiceContext())));
+}
+
+class CreateCmd final : public CreateCmdVersion1Gen<CreateCmd> {
 public:
-    CreateCmd() : BasicCommand("create") {}
-
-    const std::set<std::string>& apiVersions() const {
-        return kApiVersions1;
-    }
-
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const final {
         return AllowedOnSecondary::kNever;
     }
 
-    bool adminOnly() const override {
+    bool adminOnly() const final {
         return false;
     }
 
-    bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return true;
-    }
+    class Invocation final : public InvocationBaseGen {
+    public:
+        using InvocationBaseGen::InvocationBaseGen;
 
-    std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const override {
-        return CommandHelpers::parseNsCollectionRequired(dbname, cmdObj).ns();
-    }
-
-    Status checkAuthForCommand(Client* client,
-                               const std::string& dbname,
-                               const BSONObj& cmdObj) const override {
-        const NamespaceString nss(parseNs(dbname, cmdObj));
-        return AuthorizationSession::get(client)->checkAuthForCreate(nss, cmdObj, true);
-    }
-
-    void checkCollectionOptions(OperationContext* opCtx,
-                                const NamespaceString& ns,
-                                const CollectionOptions& options) {
-        auto dbName = ns.db();
-        auto dbInfo = uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbName));
-        BSONObjBuilder listCollCmd;
-        listCollCmd.append("listCollections", 1);
-        listCollCmd.append("filter", BSON("name" << ns.coll()));
-
-        auto response = executeCommandAgainstDatabasePrimary(
-            opCtx,
-            dbName,
-            dbInfo,
-            CommandHelpers::filterCommandRequestForPassthrough(listCollCmd.obj()),
-            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-            Shard::RetryPolicy::kIdempotent);
-        uassertStatusOK(response.swResponse);
-        auto responseData = response.swResponse.getValue().data;
-        auto listCollectionsStatus = mongo::getStatusFromCommandResult(responseData);
-        uassertStatusOK(listCollectionsStatus);
-        auto cursorObj = responseData["cursor"].Obj();
-        auto collections = cursorObj["firstBatch"].Obj();
-        BSONObjIterator collIter(collections);
-        uassert(ErrorCodes::NamespaceNotFound,
-                str::stream() << "cannot find ns: " << ns.ns(),
-                collIter.more());
-
-        auto collectionDetails = collIter.next();
-        CollectionOptions actualOptions =
-            uassertStatusOK(CollectionOptions::parse(collectionDetails["options"].Obj()));
-        // TODO: SERVER-33048 check idIndex field
-
-        uassert(ErrorCodes::NamespaceExists,
-                str::stream() << "ns: " << ns.ns() << " already exists with different options: "
-                              << actualOptions.toBSON(),
-                options.matchesStorageOptions(
-                    actualOptions, CollatorFactoryInterface::get(opCtx->getServiceContext())));
-    }
-
-    bool run(OperationContext* opCtx,
-             const std::string& dbName,
-             const BSONObj& cmdObj,
-             BSONObjBuilder& result) override {
-        auto cmd = CreateCommand::parse({"create"}, cmdObj);
-        createShardDatabase(opCtx, cmd.getDbName());
-
-        uassert(ErrorCodes::InvalidOptions,
-                "specify size:<n> when capped is true",
-                !cmd.getCapped() || cmd.getSize());
-        uassert(ErrorCodes::InvalidOptions,
-                "the 'temp' field is an invalid option",
-                !cmdObj.hasField("temp"));
-
-        // Manually forward the create collection command to the primary shard.
-        const auto dbInfo =
-            uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbName));
-        auto response = executeCommandAgainstDatabasePrimary(
-            opCtx,
-            dbName,
-            dbInfo,
-            applyReadWriteConcern(
-                opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
-            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-            Shard::RetryPolicy::kIdempotent);
-
-
-        uassertStatusOK(response.swResponse);
-        const auto createStatus =
-            mongo::getStatusFromCommandResult(response.swResponse.getValue().data);
-        if (createStatus == ErrorCodes::NamespaceExists && !opCtx->inMultiDocumentTransaction()) {
-            // NamespaceExists will cause multi-document transactions to implicitly abort, so
-            // mongos should surface this error to the client.
-            auto options = CollectionOptions::fromCreateCommand(cmd);
-            checkCollectionOptions(opCtx, cmd.getNamespace(), options);
-        } else {
-            uassertStatusOK(createStatus);
+        bool supportsWriteConcern() const final {
+            return true;
         }
-        uassertStatusOK(
-            getWriteConcernStatusFromCommandResult(response.swResponse.getValue().data));
-        return true;
-    }
+
+        NamespaceString ns() const final {
+            return request().getNamespace();
+        }
+
+        void doCheckAuthorization(OperationContext* opCtx) const final {
+            uassertStatusOK(
+                AuthorizationSession::get(opCtx->getClient())->checkAuthForCreate(request(), true));
+        }
+
+        CreateCommandReply typedRun(OperationContext* opCtx) final {
+            auto cmd = request();
+            auto dbName = cmd.getDbName();
+            createShardDatabase(opCtx, dbName);
+
+            uassert(ErrorCodes::InvalidOptions,
+                    "specify size:<n> when capped is true",
+                    !cmd.getCapped() || cmd.getSize());
+            uassert(ErrorCodes::InvalidOptions,
+                    "the 'temp' field is an invalid option",
+                    !cmd.getTemp());
+
+            // Manually forward the create collection command to the primary shard.
+            const auto dbInfo =
+                uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbName));
+            auto response = uassertStatusOK(
+                executeCommandAgainstDatabasePrimary(
+                    opCtx,
+                    dbName,
+                    dbInfo,
+                    applyReadWriteConcern(
+                        opCtx,
+                        this,
+                        CommandHelpers::filterCommandRequestForPassthrough(cmd.toBSON({}))),
+                    ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                    Shard::RetryPolicy::kIdempotent)
+                    .swResponse);
+
+            const auto createStatus = mongo::getStatusFromCommandResult(response.data);
+            if (createStatus == ErrorCodes::NamespaceExists &&
+                !opCtx->inMultiDocumentTransaction()) {
+                // NamespaceExists will cause multi-document transactions to implicitly abort, so
+                // mongos should surface this error to the client.
+                auto options = CollectionOptions::fromCreateCommand(cmd);
+                checkCollectionOptions(opCtx, cmd.getNamespace(), options);
+            } else {
+                uassertStatusOK(createStatus);
+            }
+
+            uassertStatusOK(getWriteConcernStatusFromCommandResult(response.data));
+            return CreateCommandReply();
+        }
+    };
 
 } createCmd;
 
