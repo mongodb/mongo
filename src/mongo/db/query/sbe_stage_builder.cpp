@@ -35,6 +35,7 @@
 #include "mongo/db/exec/sbe/stages/co_scan.h"
 #include "mongo/db/exec/sbe/stages/filter.h"
 #include "mongo/db/exec/sbe/stages/hash_agg.h"
+#include "mongo/db/exec/sbe/stages/hash_join.h"
 #include "mongo/db/exec/sbe/stages/limit_skip.h"
 #include "mongo/db/exec/sbe/stages/loop_join.h"
 #include "mongo/db/exec/sbe/stages/makeobj.h"
@@ -930,6 +931,69 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     return {std::move(stage), std::move(outputs)};
 }
 
+std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildAndHash(
+    const QuerySolutionNode* root, const PlanStageReqs& reqs) {
+    auto andHashNode = static_cast<const AndHashNode*>(root);
+
+    invariant(andHashNode->children.size() >= 2);
+
+    auto childReqs = reqs.copy().set(kResult).set(kRecordId);
+
+    auto innerChild = andHashNode->children[0];
+    auto outerChild = andHashNode->children[1];
+
+    auto [outerStage, outerOutputs] = build(outerChild, childReqs);
+    auto outerIdSlot = outerOutputs.get(kRecordId);
+    auto outerResultSlot = outerOutputs.get(kResult);
+    auto outerCondSlots = sbe::makeSV(outerIdSlot);
+    auto outerProjectSlots = sbe::makeSV(outerResultSlot);
+
+    auto [innerStage, innerOutputs] = build(innerChild, childReqs);
+    auto innerIdSlot = innerOutputs.get(kRecordId);
+    auto innerResultSlot = innerOutputs.get(kResult);
+    auto innerCondSlots = sbe::makeSV(innerIdSlot);
+    auto innerProjectSlots = sbe::makeSV(innerResultSlot);
+
+    // Designate outputs.
+    PlanStageSlots outputs(reqs, &_slotIdGenerator);
+    if (reqs.has(kRecordId)) {
+        outputs.set(kRecordId, innerIdSlot);
+    }
+    if (reqs.has(kResult)) {
+        outputs.set(kResult, innerResultSlot);
+    }
+
+    auto hashJoinStage = sbe::makeS<sbe::HashJoinStage>(std::move(outerStage),
+                                                        std::move(innerStage),
+                                                        outerCondSlots,
+                                                        outerProjectSlots,
+                                                        innerCondSlots,
+                                                        innerProjectSlots,
+                                                        root->nodeId());
+
+    // If there are more than 2 children, iterate all remaining children and hash
+    // join together.
+    for (size_t i = 2; i < andHashNode->children.size(); i++) {
+        auto [stage, outputs] = build(andHashNode->children[i], childReqs);
+        auto idSlot = outputs.get(kRecordId);
+        auto resultSlot = outputs.get(kResult);
+        auto condSlots = sbe::makeSV(idSlot);
+        auto projectSlots = sbe::makeSV(resultSlot);
+
+        // The previous HashJoinStage is always set as the inner stage, so that we can reuse the
+        // innerIdSlot and innerResultSlot that have been designated as outputs.
+        hashJoinStage = sbe::makeS<sbe::HashJoinStage>(std::move(stage),
+                                                       std::move(hashJoinStage),
+                                                       condSlots,
+                                                       projectSlots,
+                                                       innerCondSlots,
+                                                       innerProjectSlots,
+                                                       root->nodeId());
+    }
+
+    return {std::move(hashJoinStage), std::move(outputs)};
+}
+
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots>
 SlotBasedStageBuilder::makeUnionForTailableCollScan(const QuerySolutionNode* root,
                                                     const PlanStageReqs& reqs) {
@@ -1125,6 +1189,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             {STAGE_TEXT, &SlotBasedStageBuilder::buildText},
             {STAGE_RETURN_KEY, &SlotBasedStageBuilder::buildReturnKey},
             {STAGE_EOF, &SlotBasedStageBuilder::buildEof},
+            {STAGE_AND_HASH, &SlotBasedStageBuilder::buildAndHash},
             {STAGE_SORT_MERGE, &SlotBasedStageBuilder::buildSortMerge},
             {STAGE_SHARDING_FILTER, &SlotBasedStageBuilder::buildShardFilter}};
 

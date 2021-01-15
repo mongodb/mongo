@@ -327,6 +327,7 @@ env.CppUnitTest(
         "query_request_test.cpp",
         "query_settings_test.cpp",
         "query_solution_test.cpp",
+        "sbe_and_hash_test.cpp",
         "sbe_stage_builder_test_fixture.cpp",
         "sbe_stage_builder_test.cpp",
         "sbe_shard_filter_test.cpp",
