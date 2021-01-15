@@ -133,9 +133,9 @@ variables:
   aws_secret_remote: ${powercycle_aws_secret}
 
 - &powercycle_ec2_instance
-  aws_ec2_yml: aws_ec2.yml
   ec2_expire_hours: "24"
   ec2_monitor_files: proc.json system.json
+  is_powercycle: true
   monitor_proc_file: proc.json
   monitor_system_file: system.json
   remote_dir: /log/powercycle
@@ -175,7 +175,7 @@ variables:
   program_options: --exitYamlFile=${exit_file} --logLevel=info --backupPathBefore=${backup_path_before} --backupPathAfter=${backup_path_after}
   connection_options: --sshUserHost=${private_ip_address} --sshConnection=\"${ssh_identity} ${ssh_connection_options}\"
   test_options: --testLoops=15 --seedDocNum=10000 --rsync --rsyncExcludeFiles=diagnostic.data/metrics.interim* --validate=local --canary=local
-  crash_options: --crashMethod=internal --crashOption=${windows_crash_cmd} --crashWaitTime=45 --jitterForCrashWaitTime=5 --instanceId=${instance_id}
+  crash_options: --crashMethod=internal --crashOption=${windows_crash_cmd} --crashWaitTime=45 --jitterForCrashWaitTime=5
   client_options: --numCrudClients=20 --numFsmClients=20
   mongodb_options: --rootDir=${remote_dir}-${task_id} --mongodbBinDir=${remote_dir}
   mongod_options: --mongodUsablePorts ${standard_port} ${secret_port} --dbPath=${db_path} --logPath=${log_path}
@@ -2661,11 +2661,6 @@ functions:
       params:
         file: src/expansions.yml
 
-    - command: shell.exec
-      params:
-        script: |
-          cat src/expansions.yml
-
     - command: host.create
       params:
         provider: ec2
@@ -2690,9 +2685,8 @@ functions:
           user=$USER
           hostname=$(tr -d '"[]{}' < src/hosts.yml | cut -d , -f 1 | awk -F : '{print $2}')
 
-          # compat with old aws_ec2.yml file
-          echo "private_ip_address: $hostname" >> src/${aws_ec2_yml}
-          echo "instance_id: dummy_id" >> src/${aws_ec2_yml}
+          # To add the hostname to expansions.
+          echo "private_ip_address: $hostname" >> src/ip_address
 
           echo $hostname
           echo $user
@@ -2721,7 +2715,7 @@ functions:
 
     - command: expansions.update
       params:
-        file: src/${aws_ec2_yml}
+        file: src/ip_address
 
     - command: expansions.write
       params:
@@ -2745,13 +2739,13 @@ functions:
       shell: bash
       working_dir: src
       script: |
-       set -o verbose
+        set -o verbose
 
-       if [ -z "${instance_id}" ]; then
-        exit 0
-       fi
+        if [ "${is_powercycle}" != true ]; then
+          exit 0
+        fi
 
-       ${activate_virtualenv}
+        ${activate_virtualenv}
         $python buildscripts/powercycle_operations.py tarEC2Artifacts
 
   "copy EC2 artifacts": &copy_ec2_artifacts
@@ -2760,7 +2754,7 @@ functions:
       shell: bash
       working_dir: src
       script: |
-        if [ -z "${instance_id}" ]; then
+        if [ "${is_powercycle}" != true ]; then
           exit 0
         fi
 
@@ -2773,14 +2767,14 @@ functions:
       shell: bash
       working_dir: src
       script: |
-       set -o verbose
+        set -o verbose
 
-       if [ -z "${ec2_monitor_files}" ] || [ -z "${instance_id}" ]; then
-        exit 0
-       fi
+        if [ -z "${ec2_monitor_files}" ] || [ "${is_powercycle}" != true ]; then
+          exit 0
+        fi
 
-       ${activate_virtualenv}
-       $python buildscripts/powercycle_operations.py copyEC2MonitorFiles
+        ${activate_virtualenv}
+        $python buildscripts/powercycle_operations.py copyEC2MonitorFiles
 
   # The event logs on Windows are a useful diagnostic to have when determining if something bad
   # happened to the remote machine after it was repeatedly crashed during powercycle testing. For
@@ -2793,7 +2787,7 @@ functions:
       shell: bash
       working_dir: src
       script: |
-        if [ -z "${instance_id}" ]; then
+        if [ "${is_powercycle}" != true ]; then
           exit 0
         fi
 
@@ -2806,7 +2800,7 @@ functions:
       shell: bash
       working_dir: "src"
       script: |
-        if [ -z "${instance_id}" ]; then
+        if [ "${is_powercycle}" != true ]; then
           exit 0
         fi
 
@@ -2819,7 +2813,7 @@ functions:
       shell: bash
       working_dir: "src"
       script: |
-        if [ -z "${instance_id}" ]; then
+        if [ "${is_powercycle}" != true ]; then
           exit 0
         fi
 
@@ -7592,7 +7586,7 @@ tasks:
     timeout_secs: 1800 # 30 minute timeout for no output
     vars:
       <<: *powercycle_test
-      crash_options: --crashMethod=kill --crashWaitTime=45 --jitterForCrashWaitTime=5 --instanceId=${instance_id}
+      crash_options: --crashMethod=kill --crashWaitTime=45 --jitterForCrashWaitTime=5
       mongod_extra_options: --mongodOptions=\"--setParameter enableTestCommands=1 --setParameter logComponentVerbosity='{storage:{recovery:2}}' --storageEngine wiredTiger --wiredTigerEngineConfigString 'debug_mode=[table_logging=true]'\"
 
 - name: powercycle_fcv4.4
@@ -10232,7 +10226,7 @@ buildvariants:
   - name: .jstestfuzz !.initsync !.flow_control !.stepdowns
   - name: multiversion_gen
   - name: multiversion_auth_gen
-#  - name: .powercycle
+  - name: .powercycle
   - name: .query_fuzzer
   - name: .read_write_concern
   - name: replica_sets

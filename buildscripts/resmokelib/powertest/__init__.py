@@ -134,11 +134,10 @@ class PowertestPlugin(PluginInterface):
             "'majority'", default=None)
 
         # Crash options
-        crash_methods = ["aws_ec2", "internal", "kill", "mpower"]
+        crash_methods = ["internal", "kill", "mpower"]
         crash_options.add_argument(
             "--crashMethod", dest="crash_method", choices=crash_methods,
             help="Crash methods: {} [default: '%(default)s']."
-            " Select 'aws_ec2' to force-stop/start an AWS instance."
             " Select 'internal' to crash the remote server through an"
             " internal command, i.e., sys boot (Linux) or notmyfault (Windows)."
             " Select 'kill' to perform an unconditional kill of mongod,"
@@ -149,19 +148,11 @@ class PowertestPlugin(PluginInterface):
         crash_options.add_argument(
             "--crashOption", dest="crash_option",
             help="Secondary argument for the following --crashMethod:"
-            " 'aws_ec2': specify EC2 'address_type', which is one of {} and"
-            " defaults to 'public_ip_address'."
             " 'mpower': specify output<num> to turn"
             " off/on, i.e., 'output1' (REQUIRED)."
             " 'internal': for Windows, optionally specify a crash method,"
             " i.e., 'notmyfault/notmyfaultc64.exe"
-            " -accepteula crash 1'".format(powertest.AWS_ADDRESS_TYPES), default=None)
-
-        crash_options.add_argument(
-            "--instanceId", dest="instance_id",
-            help="The instance ID of an AWS EC2 host. If specified, this instance"
-            " will be started after a crash, if it is not in a running state."
-            " This is required if --crashOption is 'aws_ec2'.", default=None)
+            " -accepteula crash 1'", default=None)
 
         crash_options.add_argument(
             "--crashWaitTime", dest="crash_wait_time",

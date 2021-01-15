@@ -303,8 +303,7 @@ class GatherRemoteEventLogs(PowercycleCommand):
 
     def execute(self) -> None:
         """:return: None."""
-        if not self.is_windows() or not os.path.exists(self.expansions.get(
-                "aws_ec2_yml", "")) or self.expansions.get("ec2_ssh_failure", ""):
+        if not self.is_windows() or self.expansions.get("ec2_ssh_failure", ""):
             return
 
         cmds = f"mkdir -p {self.expansions['event_logpath']}"
@@ -322,9 +321,7 @@ class GatherRemoteMongoCoredumps(PowercycleCommand):
 
     def execute(self) -> None:
         """:return: None."""
-        aws_ec2_yml = self.expansions["aws_ec2_yml"]
-        if os.path.exists(aws_ec2_yml) and os.path.isfile(
-                aws_ec2_yml) or "ec2_ssh_failure" in self.expansions:
+        if "ec2_ssh_failure" in self.expansions:
             return
 
         remote_dir = "." if "remote_dir" not in self.expansions else self.expansions["remote_dir"]
@@ -347,8 +344,7 @@ class CopyRemoteMongoCoredumps(PowercycleCommand):
 
     def execute(self) -> None:
         """:return: None."""
-        if not os.path.exists(self.expansions.get("aws_ec2_yml", "")) or self.expansions.get(
-                "ec2_ssh_failure", ""):
+        if self.expansions.get("ec2_ssh_failure", ""):
             return
 
         if self.is_windows():

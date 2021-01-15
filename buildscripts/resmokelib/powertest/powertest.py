@@ -32,12 +32,7 @@ import pymongo
 import requests
 import yaml
 
-from buildscripts import aws_ec2
 from buildscripts.powercycle import remote_operations
-
-AWS_ADDRESS_TYPES = [
-    "private_ip_address", "public_ip_address", "private_dns_name", "public_dns_name"
-]
 
 DEFAULT_SSH_CONNECTION_OPTIONS = ("-o ServerAliveCountMax=10"
                                   " -o ServerAliveInterval=6"
@@ -618,11 +613,6 @@ def call_remote_operation(local_ops, remote_python, script_name, client_args, op
     client_call = "{} {} {} {}".format(remote_python, script_name, client_args, operation)
     ret, output = local_ops.shell(client_call)
     return ret, output
-
-
-def is_instance_running(ret, aws_status):
-    """Return true if instance is in a running state."""
-    return ret == 0 and aws_status.state["Name"] == "running"
 
 
 class Processes(object):
@@ -1486,11 +1476,6 @@ def crash_server_or_kill_mongod(  # pylint: disable=too-many-arguments,,too-many
                                                          client_args, canary, canary_cmd, crash_cmd)
         ]
 
-    elif options.crash_method == "aws_ec2":
-        ec2 = aws_ec2.AwsEc2()
-        crash_func = ec2.control_instance
-        crash_args = ["force-stop", options.instance_id, 600, True]
-
     else:
         message = "Unsupported crash method '{}' provided".format(options.crash_method)
         LOGGER.error(message)
@@ -1833,17 +1818,6 @@ def main(parser, parser_actions, options):  # pylint: disable=too-many-branches,
     if options.crash_method == "mpower" and options.crash_option is None:
         parser.error("Missing required argument --crashOption for crashMethod '{}'".format(
             options.crash_method))
-
-    if options.crash_method == "aws_ec2":
-        if not options.instance_id:
-            parser.error("Missing required argument --instanceId for crashMethod '{}'".format(
-                options.crash_method))
-        address_type = "public_ip_address"
-        if options.crash_option:
-            address_type = options.crash_option
-        if address_type not in AWS_ADDRESS_TYPES:
-            parser.error("Invalid crashOption address_type '{}' specified for crashMethod"
-                         " 'aws_ec2', specify one of {}".format(address_type, AWS_ADDRESS_TYPES))
 
     # Initialize the mongod options
     # Note - We use posixpath for Windows client to Linux server scenarios.
