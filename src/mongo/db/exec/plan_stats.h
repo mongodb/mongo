@@ -851,8 +851,8 @@ struct GroupStats : public SpecificStats {
         return sizeof(*this);
     }
 
-    // The amount of data in bytes that were the input to the group stage.
-    size_t memoryUsageBytes = 0;
+    // Tracks an estimate of the total size of all documents output by the group stage in bytes.
+    size_t totalOutputDataSizeBytes = 0;
 
     // Flag to specify if data was spilled to disk while grouping the data.
     bool usedDisk = false;

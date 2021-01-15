@@ -51,27 +51,33 @@ const facet = [{$facet: {a: pipelineShardedStages, b: pipelineNoShardedStages}}]
 // Verify behavior of $changeStream, which generates several internal stages.
 const changeStream = [{$changeStream: {}}];
 
-function assertExecutionStats(stage) {
-    assert(stage.hasOwnProperty("nReturned"));
-    assert(stage.hasOwnProperty("executionTimeMillisEstimate"));
-
+// Checks if a particular stage has expected statistics.
+function assertStageExecutionStatsPresent(stage) {
     if (stage.hasOwnProperty("$sort")) {
         assert(stage.hasOwnProperty("totalDataSizeSortedBytesEstimate"), stage);
         assert(stage.hasOwnProperty("usedDisk"), stage);
     } else if (stage.hasOwnProperty("$group")) {
-        assert(stage.hasOwnProperty("totalDataSizeGroupedBytesEstimate"), stage);
+        assert(stage.hasOwnProperty("totalOutputDataSizeBytes"), stage);
         assert(stage.hasOwnProperty("usedDisk"), stage);
     }
 }
 
-function assertStatsInOutput(explain) {
+function assertExecutionStats(stage, assertExecutionStatsCallback) {
+    assert(stage.hasOwnProperty("nReturned"));
+    assert(stage.hasOwnProperty("executionTimeMillisEstimate"));
+
+    assert.neq(assertExecutionStatsCallback, null);
+    assertExecutionStatsCallback(stage);
+}
+
+function assertStatsInOutput(explain, assertExecutionStatsCallback) {
     // Depending on how the pipeline is split, the explain output from each shard can contain either
     // of these.
     assert(explain.hasOwnProperty("stages") || explain.hasOwnProperty("queryPlanner"));
     if (explain.hasOwnProperty("stages")) {
         const stages = explain["stages"];
         for (const stage of stages) {
-            assertExecutionStats(stage);
+            assertExecutionStats(stage, assertExecutionStatsCallback);
         }
     } else {
         // If we don't have a list of stages, "executionStats" should still contain "nReturned"
@@ -88,29 +94,33 @@ function assertStatsInOutput(explain) {
     }
 }
 
-function checkResults(result) {
+function checkResults(result, assertExecutionStatsCallback) {
     // Loop over shards in sharded case.
     // Note that we do not expect execution statistics for the 'splitPipeline' or 'mergingPart'
     // of explain output in the sharded case, so we only check the 'shards' part of explain.
     if (result.hasOwnProperty("shards")) {
         const shards = result["shards"];
         for (let shardName in shards) {
-            assertStatsInOutput(shards[shardName]);
+            assertStatsInOutput(shards[shardName], assertExecutionStatsCallback);
         }
     } else {
-        assertStatsInOutput(result);
+        assertStatsInOutput(result, assertExecutionStatsCallback);
     }
 }
 
 for (let pipeline of [pipelineShardedStages, pipelineNoShardedStages, facet]) {
-    checkResults(coll.explain("executionStats").aggregate(pipeline));
-    checkResults(coll.explain("allPlansExecution").aggregate(pipeline));
+    checkResults(coll.explain("executionStats").aggregate(pipeline),
+                 assertStageExecutionStatsPresent);
+    checkResults(coll.explain("allPlansExecution").aggregate(pipeline),
+                 assertStageExecutionStatsPresent);
 }
 
 // Only test $changeStream if we are on a replica set or on a sharded cluster.
 if (FixtureHelpers.isReplSet(db) || FixtureHelpers.isSharded(coll)) {
-    checkResults(coll.explain("executionStats").aggregate(changeStream));
-    checkResults(coll.explain("allPlansExecution").aggregate(changeStream));
+    checkResults(coll.explain("executionStats").aggregate(changeStream),
+                 assertStageExecutionStatsPresent);
+    checkResults(coll.explain("allPlansExecution").aggregate(changeStream),
+                 assertStageExecutionStatsPresent);
 }
 
 // Returns the number of documents
@@ -128,4 +138,23 @@ function numberOfDocsReturnedByMatchStage(explain) {
 const matchPipeline = [{$_internalInhibitOptimization: {}}, {$match: {a: {$gte: 500}}}];
 assert.eq(numberOfDocsReturnedByMatchStage(coll.explain("executionStats").aggregate(matchPipeline)),
           500);
+
+// Checks $group totalOutputDataSizeBytes execution statistic.
+(function testGroupStatTotalDataSizeBytes() {
+    const pipeline = [{$group: {_id: null, count: {$sum: 1}}}];
+    const result = coll.explain("executionStats").aggregate(pipeline);
+
+    let assertOutputBytesSize = function(stage) {
+        if (stage.hasOwnProperty("$group")) {
+            assert(stage.hasOwnProperty("totalOutputDataSizeBytes"), stage);
+
+            // A heurisitic size in bytes processed by $group to generate the output '{ "_id" :
+            // null, "count" : 1000 }'. The size is the approximate value of internal document size
+            // used by $group.
+            const approximateOutputDocSizeBytes = 500;
+            assert(stage.totalOutputDataSizeBytes <= approximateOutputDocSizeBytes);
+        }
+    };
+    checkResults(result, assertOutputBytesSize);
+})();
 }());

@@ -134,9 +134,6 @@ public:
         return _sortExecutor->hasLimit();
     }
 
-    /**
-     * Returns specific stats for $sort stage.
-     */
     const SpecificStats* getSpecificStats() const final {
         return &_sortExecutor->stats();
     }

@@ -159,13 +159,10 @@ public:
     /**
      * Returns true if this $group stage used disk during execution and false otherwise.
      */
-    bool usedDisk() {
+    bool usedDisk() final {
         return _stats.usedDisk;
     }
 
-    /**
-     * Returns $group stage specific stats.
-     */
     const SpecificStats* getSpecificStats() const final {
         return &_stats;
     }
@@ -202,6 +199,9 @@ private:
 
         const bool allowDiskUse;
         const size_t maxMemoryUsageBytes;
+
+        // Tracks current memory used. This variable will be reset if data is spilled to disk.
+        size_t memoryUsageBytes = 0;
         // Tracks memory consumption per accumulation statement.
         std::vector<AccumStatementMemoryTracker> accumStatementMemoryBytes;
     };
