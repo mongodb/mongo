@@ -883,7 +883,7 @@ private:
             _sessionInfo.serialize(cmdBuilder);
         }
 
-        if (_state == TransactionState::kInit) {
+        if (_state == TransactionState::kInit || !_isReplSet) {
             // Set a default apiVersion for all UMC commands
             cmdBuilder->append("apiVersion", kOne);
         }
