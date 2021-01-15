@@ -2241,8 +2241,7 @@ tasks:
             fi
 
   - name: format-stress-sanitizer-lsm-test
-    # Temporarily disabled (WT-6255)
-    # tags: ["stress-test-1"]
+    tags: ["stress-test-1"]
     commands:
       - func: "get project"
       - func: "compile wiredtiger address sanitizer"
