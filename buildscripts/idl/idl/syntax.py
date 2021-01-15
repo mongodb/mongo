@@ -34,7 +34,7 @@ it follows the rules of the IDL, etc.
 """
 
 import itertools
-from typing import Any, Dict, Iterator, List, Optional, Tuple, Union, cast
+from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 
 from . import common
 from . import errors
@@ -200,19 +200,20 @@ class SymbolTable(object):
             self.add_type(ctxt, idltype)
 
     def resolve_field_from_type_name(self, ctxt, location, field_name, field_type_name):
-        # type: (errors.ParserContext, common.SourceLocation, str, str) -> Optional[Union[Command, Enum, Struct, Type]]
+        # type: (errors.ParserContext, common.SourceLocation, str, str) -> Optional[Union[Enum, Struct, Type]]
         """Find the type or struct a field refers to or log an error."""
         field_type = FieldTypeSingle(location.file_name, location.line, location.column)
         field_type.type_name = field_type_name
         return self.resolve_field_type(ctxt, location, field_name, field_type)
 
     def resolve_field_type(self, ctxt, location, field_name, field_type):
-        # type: (errors.ParserContext, common.SourceLocation, str, FieldType) -> Optional[Union[Command, Enum, Struct, Type]]
+        # type: (errors.ParserContext, common.SourceLocation, str, FieldType) -> Optional[Union[Enum, Struct, Type]]
         """Find the type or struct a field refers to or log an error."""
         # pylint: disable=too-many-return-statements,too-many-branches,too-many-locals
 
         if isinstance(field_type, FieldTypeVariant):
-            variant = Variant(field_type.file_name, field_type.line, field_type.column)
+            variant = VariantType(field_type.file_name, field_type.line, field_type.column)
+            variant.bson_serialization_type = []
             for alternative in field_type.variant:
                 alternative_type = self.resolve_field_type(ctxt, location, field_name, alternative)
                 if not alternative_type:
@@ -222,12 +223,25 @@ class SymbolTable(object):
                 # TODO (SERVER-51369): proper error, and test it
                 assert isinstance(alternative_type, Type)
                 variant.variant_types.append(alternative_type)
-
-            variant.bson_serialization_type = [
-                v.bson_serialization_type[0] for v in variant.variant_types
-            ]
+                if alternative_type.bson_serialization_type:
+                    variant.bson_serialization_type = list(
+                        set(variant.bson_serialization_type).union(
+                            set(alternative_type.bson_serialization_type)))
 
             return variant
+
+        if isinstance(field_type, FieldTypeArray):
+            element_type = self.resolve_field_type(ctxt, location, field_name,
+                                                   field_type.element_type)
+            if not element_type:
+                ctxt.add_unknown_type_error(location, field_name, field_type.element_type.type_name)
+                return None
+
+            if isinstance(element_type, Enum):
+                ctxt.add_array_enum_error(location, field_name)
+                return None
+
+            return ArrayType(element_type)
 
         assert isinstance(field_type, FieldTypeSingle)
         type_name = field_type.type_name
@@ -253,9 +267,7 @@ class SymbolTable(object):
                 ctxt.add_bad_array_type_name_error(location, field_name, type_name)
                 return None
 
-            array_type = FieldTypeSingle(field_type.file_name, field_type.line, field_type.column)
-            array_type.type_name = array_type_name
-            return self.resolve_field_type(ctxt, location, field_name, array_type)
+            return self.resolve_field_type(ctxt, location, field_name, field_type)
 
         ctxt.add_unknown_type_error(location, field_name, type_name)
 
@@ -312,25 +324,40 @@ class Type(common.SourceLocation):
         # type: (str, int, int) -> None
         """Construct a Type."""
         self.name = None  # type: str
-        self.description = None  # type: str
         self.cpp_type = None  # type: str
         self.bson_serialization_type = None  # type: List[str]
         self.bindata_subtype = None  # type: str
         self.serializer = None  # type: str
         self.deserializer = None  # type: str
+        self.description = None  # type: str
         self.default = None  # type: str
 
         super(Type, self).__init__(file_name, line, column)
 
 
-class Variant(Type):
+class ArrayType(Type):
+    """Stores all type information about an IDL array type."""
+
+    def __init__(self, element_type):
+        # type: (Union[Struct, Type]) -> None
+        """Construct an ArrayType."""
+        super(ArrayType, self).__init__(element_type.file_name, element_type.line,
+                                        element_type.column)
+        self.name = f'array<{element_type.name}>'
+        self.element_type = element_type
+        if isinstance(element_type, Type):
+            assert element_type.cpp_type
+            self.cpp_type = f'std::vector<{element_type.cpp_type}>'
+
+
+class VariantType(Type):
     """Stores all type information about an IDL variant type."""
 
     def __init__(self, file_name, line, column):
         # type: (str, int, int) -> None
-        """Construct a Variant."""
-        super(Variant, self).__init__(file_name, line, column)
-        self.bson_serialization_type = []
+        """Construct a VariantType."""
+        super(VariantType, self).__init__(file_name, line, column)
+        self.name = 'variant'
         self.variant_types = []  # type: List[Type]
 
 
@@ -578,7 +605,7 @@ class FieldType(common.SourceLocation):
 
 
 class FieldTypeSingle(FieldType):
-    """A scalar or array field's type, before it is resolved to a Type instance."""
+    """A scalar field's type, before it is resolved to a Type instance."""
 
     def __init__(self, file_name, line, column):
         # type: (str, int, int) -> None
@@ -590,6 +617,22 @@ class FieldTypeSingle(FieldType):
     def debug_string(self):
         """Display this field type in error messages."""
         return self.type_name
+
+
+class FieldTypeArray(FieldType):
+    """An array field's type, before it is resolved to a Type instance."""
+
+    def __init__(self, element_type):
+        # type: (FieldTypeSingle) -> None
+        """Construct a FieldTypeArray."""
+        self.element_type = element_type  # type: FieldTypeSingle
+
+        super(FieldTypeArray, self).__init__(element_type.file_name, element_type.line,
+                                             element_type.column)
+
+    def debug_string(self):
+        """Display this field type in error messages."""
+        return f'array<{self.element_type.type_name}>'
 
 
 class FieldTypeVariant(FieldType):
@@ -604,7 +647,7 @@ class FieldTypeVariant(FieldType):
 
     def debug_string(self):
         """Display this field type in error messages."""
-        return 'Variant(%s)' % (', '.join(v.debug_string() for v in self.variant))
+        return 'VariantType(%s)' % (', '.join(v.debug_string() for v in self.variant))
 
 
 class Expression(common.SourceLocation):

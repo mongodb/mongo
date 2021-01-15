@@ -328,6 +328,11 @@ def _parse_field_type(ctxt, node):
         assert node.id == "scalar"
         single = syntax.FieldTypeSingle(ctxt.file_name, node.start_mark.line,
                                         node.start_mark.column)
+
+        if node.value.startswith('array<'):
+            single.type_name = syntax.parse_array_type(node.value)
+            return syntax.FieldTypeArray(single)
+
         single.type_name = node.value
         return single
 
@@ -384,18 +389,26 @@ def _parse_fields(ctxt, node):
             ctxt.add_duplicate_error(first_node, first_name)
             continue
 
-        # Simple Type
         if second_node.id == "scalar":
+            # Like "fieldName: typeName".
             field = syntax.Field(ctxt.file_name, node.start_mark.line, node.start_mark.column)
             field.name = first_name
-            field.type = syntax.FieldTypeSingle(ctxt.file_name, node.start_mark.line,
-                                                node.start_mark.column)
-            field.type.type_name = second_node.value
-            fields.append(field)
-        else:
-            field = _parse_field(ctxt, first_name, second_node)
-            fields.append(field)
+            single_type = syntax.FieldTypeSingle(ctxt.file_name, node.start_mark.line,
+                                                 node.start_mark.column)
+            array_type_name = syntax.parse_array_type(second_node.value)
+            if array_type_name:
+                single_type.type_name = array_type_name
+                array_type = syntax.FieldTypeArray(single_type)
+                field.type = array_type
+            else:
+                single_type.type_name = second_node.value
+                field.type = single_type
 
+        else:
+            # Like "fieldName: { ... options ... }".
+            field = _parse_field(ctxt, first_name, second_node)
+
+        fields.append(field)
         field_name_set.add(first_name)
 
     return fields

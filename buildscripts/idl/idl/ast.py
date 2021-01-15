@@ -87,6 +87,32 @@ class Global(common.SourceLocation):
         super(Global, self).__init__(file_name, line, column)
 
 
+class Type(common.SourceLocation):
+    """
+    IDL type information.
+
+    The type of a struct field or command field, for the sake of C++ code generation.
+    """
+
+    # pylint: disable=too-many-instance-attributes
+
+    def __init__(self, file_name, line, column):
+        # type: (str, int, int) -> None
+        """Construct a Type."""
+        self.name = None  # type: str
+        self.cpp_type = None  # type: str
+        self.bson_serialization_type = None  # type: List[str]
+        self.bindata_subtype = None  # type: str
+        self.serializer = None  # type: str
+        self.deserializer = None  # type: str
+        self.is_enum = False  # type: bool
+        self.is_array = False  # type: bool
+        self.is_variant = False  # type: bool
+        self.is_struct = False  # type: bool
+        self.variant_types = []  # type: List[Type]
+        super(Type, self).__init__(file_name, line, column)
+
+
 class Struct(common.SourceLocation):
     """
     IDL struct information.
@@ -172,28 +198,14 @@ class Field(common.SourceLocation):
         self.comparison_order = -1  # type: int
         self.non_const_getter = False  # type: bool
         self.unstable = False  # type: bool
-
-        # Properties specific to fields which are types.
-        self.cpp_type = None  # type: str
-        self.bson_serialization_type = None  # type: List[str]
-        self.serializer = None  # type: str
-        self.deserializer = None  # type: str
-        self.bindata_subtype = None  # type: str
         self.default = None  # type: str
+        self.type = None  # type: Type
 
         # Properties specific to fields which are structs.
         self.struct_type = None  # type: str
 
         # Properties specific to fields which are arrays.
-        self.array = False  # type: bool
         self.supports_doc_sequence = False  # type: bool
-
-        # Properties specific to fields which are variants.
-        self.variant = False  # type: bool
-        self.variant_cpp_types = []  # type: List[str]
-
-        # Properties specific to fields which are enums.
-        self.enum_type = False  # type: bool
 
         # Properties specific to fields inlined from chained_structs
         self.chained_struct_field = None  # type: Field

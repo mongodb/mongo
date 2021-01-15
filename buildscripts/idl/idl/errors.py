@@ -35,7 +35,7 @@ Common error handling code for IDL compiler.
 import inspect
 import os
 import sys
-from typing import List, Union, Any
+from typing import List, Union
 from yaml import nodes
 import yaml
 
@@ -502,7 +502,7 @@ class ParserContext(object):
     def add_bindata_no_default(self, location, ast_type, ast_parent):
         # type: (common.SourceLocation, str, str) -> None
         # pylint: disable=invalid-name
-        """Add an error about 'any' being used in a list of bson types."""
+        """Add an error about a bindata type with a default value."""
         self._add_error(location, ERROR_ID_BAD_BINDATA_DEFAULT,
                         ("Default values are not allowed for %s '%s'") % (ast_type, ast_parent))
 
