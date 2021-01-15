@@ -137,7 +137,8 @@ UpdateStage::UpdateStage(ExpressionContext* expCtx,
     const auto request = _params.request;
 
     _isUserInitiatedWrite = opCtx()->writesAreReplicated() &&
-        !(request->isFromOplogApplication() || request->isFromMigration());
+        !(request->isFromOplogApplication() ||
+          params.driver->type() == UpdateDriver::UpdateType::kDelta || request->isFromMigration());
 
     _specificStats.isModUpdate = params.driver->type() == UpdateDriver::UpdateType::kOperator;
 }
