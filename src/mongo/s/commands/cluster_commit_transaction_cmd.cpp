@@ -97,18 +97,18 @@ public:
         return Status::OK();
     }
 
-    bool run(OperationContext* opCtx,
-             const std::string& dbName,
-             const BSONObj& cmdObj,
-             BSONObjBuilder& result) override {
+    bool runWithRequestParser(OperationContext* opCtx,
+                              const std::string& dbName,
+                              const BSONObj& cmdObj,
+                              const RequestParser& requestParser,
+                              BSONObjBuilder& result) final {
         auto txnRouter = TransactionRouter::get(opCtx);
         uassert(ErrorCodes::InvalidOptions,
                 "commitTransaction can only be run within a session",
                 txnRouter);
 
-        const auto commitCmd =
-            CommitTransaction::parse(IDLParserErrorContext("commit cmd"), cmdObj);
-        auto commitRes = txnRouter.commitTransaction(opCtx, commitCmd.getRecoveryToken());
+        auto commitRes =
+            txnRouter.commitTransaction(opCtx, requestParser.request().getRecoveryToken());
         CommandHelpers::filterCommandReplyForPassthrough(commitRes, &result);
         return true;
     }

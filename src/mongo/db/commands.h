@@ -958,10 +958,11 @@ public:
  *
  */
 template <typename Derived>
-class BasicCommandWithRequestParser : public BasicCommand {
-public:
+class BasicCommandWithRequestParser : public BasicCommandWithReplyBuilderInterface {
+protected:
     // Commands that only have a single name don't need to define any constructors.
-    BasicCommandWithRequestParser() : BasicCommand(Derived::Request::kCommandName) {}
+    BasicCommandWithRequestParser()
+        : BasicCommandWithReplyBuilderInterface(Derived::Request::kCommandName) {}
 
     bool runWithReplyBuilder(OperationContext* opCtx,
                              const std::string& db,
@@ -970,19 +971,49 @@ public:
         auto result = replyBuilder->getBodyBuilder();
 
         // To enforce API versioning
-        using RequestType = typename Derived::Request;
-        auto request = RequestType::parse(
-            IDLParserErrorContext(Derived::Request::kCommandName,
-                                  APIParameters::get(opCtx).getAPIStrict().value_or(false)),
-            cmdObj);
+        auto requestParser = RequestParser(opCtx, cmdObj);
 
-        auto cmdDone = run(opCtx, db, request.toBSON(cmdObj), result);
+        auto cmdDone = runWithRequestParser(opCtx, db, cmdObj, requestParser, result);
         validateResult(result.asTempObj());
         return cmdDone;
     }
 
+    class RequestParser;
+
+    /**
+     * Runs the given command. Returns true upon success.
+     */
+    virtual bool runWithRequestParser(OperationContext* opCtx,
+                                      const std::string& db,
+                                      const BSONObj& cmdObj,
+                                      const RequestParser& requestParser,
+                                      BSONObjBuilder& result) = 0;
+
     // Custom logic to validate results to enforce API versioning.
     virtual void validateResult(const BSONObj& resultObj) = 0;
+};
+
+template <typename Derived>
+class BasicCommandWithRequestParser<Derived>::RequestParser {
+public:
+    using RequestType = typename Derived::Request;
+
+    RequestParser(OperationContext* opCtx, const BSONObj& cmdObj)
+        : _request{_parseRequest(opCtx, cmdObj)} {}
+
+    const RequestType& request() const {
+        return _request;
+    }
+
+private:
+    static RequestType _parseRequest(OperationContext* opCtx, const BSONObj& cmdObj) {
+        return RequestType::parse(
+            IDLParserErrorContext(RequestType::kCommandName,
+                                  APIParameters::get(opCtx).getAPIStrict().value_or(false)),
+            cmdObj);
+    }
+
+    RequestType _request;
 };
 
 /**
