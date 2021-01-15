@@ -2,9 +2,13 @@
  * Typically, time-series collections use measurements that always contain data for every field.
  * This test provides coverage for when this is not the case.
  * @tags: [
+ *     assumes_unsharded_collection,         # TODO(SERVER-53816): remove
+ *     does_not_support_causal_consistency,  # TODO(SERVER-53819): remove
  *     does_not_support_stepdowns,
  *     requires_fcv_49,
  *     requires_find_command,
+ *     requires_getmore,
+ *     sbe_incompatible,
  * ]
  */
 (function() {

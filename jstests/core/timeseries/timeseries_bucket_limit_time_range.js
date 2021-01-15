@@ -1,9 +1,13 @@
 /**
  * Tests maximum time-range of measurements held in each bucket in a time-series buckets collection.
  * @tags: [
+ *     assumes_unsharded_collection,         # TODO(SERVER-53816): remove
+ *     does_not_support_causal_consistency,  # TODO(SERVER-53819): remove
  *     does_not_support_stepdowns,
  *     requires_fcv_49,
  *     requires_find_command,
+ *     requires_getmore,
+ *     sbe_incompatible,
  * ]
  */
 (function() {
@@ -105,8 +109,6 @@ const runTest = function(numDocsPerInsert) {
     assert.eq(stats.numBucketsClosedDueToTimeForward,
               1,
               'invalid numBucketsClosedDueToTimeForward in collStats: ' + tojson(stats));
-
-    assert(coll.drop());
 };
 
 runTest(1);

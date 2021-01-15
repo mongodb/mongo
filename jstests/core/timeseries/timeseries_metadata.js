@@ -2,9 +2,13 @@
  * Tests that only measurements with a binary identical meta field are included in the same bucket
  * in a time-series collection.
  * @tags: [
+ *     assumes_unsharded_collection,         # TODO(SERVER-53816): remove
+ *     does_not_support_causal_consistency,  # TODO(SERVER-53819): remove
  *     does_not_support_stepdowns,
  *     requires_fcv_49,
  *     requires_find_command,
+ *     requires_getmore,
+ *     sbe_incompatible,
  * ]
  */
 (function() {
