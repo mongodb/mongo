@@ -1588,7 +1588,8 @@ rs.add = function(hostport, arb) {
         if (res.ok) {
             return true;
         }
-        if (res.code === ErrorCodes.ConfigurationInProgress) {
+        if (res.code === ErrorCodes.ConfigurationInProgress ||
+            res.code === ErrorCodes.CurrentConfigNotCommittedYet) {
             return false;  // keep retrying
         }
         if (res.code === ErrorCodes.NewReplicaSetConfigurationIncompatible) {
