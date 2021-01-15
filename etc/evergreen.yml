@@ -10016,7 +10016,12 @@ buildvariants:
     push_name: windows
     push_arch: x86_64-enterprise
     test_flags: >-
-        --mongodSetParameters="{featureFlagToaster: true, featureFlagSpoon: true, featureFlagTenantMigrations: true, featureFlagImprovedAuditing: true}"
+        --mongodSetParameters="{
+            featureFlagToaster: true,
+            featureFlagSpoon: true,
+            featureFlagTenantMigrations: true,
+            featureFlagImprovedAuditing: true,
+        }"
 
 - &enterprise-windows-template
   name: enterprise-windows
@@ -10109,7 +10114,12 @@ buildvariants:
     push_name: windows
     push_arch: x86_64-enterprise
     test_flags: >-
-        --mongodSetParameters="{featureFlagToaster: true, featureFlagSpoon: true, featureFlagTenantMigrations: true, featureFlagImprovedAuditing: true}"
+        --mongodSetParameters="{
+            featureFlagToaster: true,
+            featureFlagSpoon: true,
+            featureFlagTenantMigrations: true,
+            featureFlagImprovedAuditing: true,
+        }"
 
 - <<: *enterprise-windows-nopush-template
   name: enterprise-windows-benchmarks
@@ -10658,7 +10668,12 @@ buildvariants:
     burn_in_tag_buildvariants: enterprise-rhel-62-64-bit-inmem linux-64-duroff enterprise-rhel-62-64-bit-multiversion
     num_scons_link_jobs_available: 0.99
     test_flags: >-
-        --mongodSetParameters="{featureFlagToaster: true, featureFlagSpoon: true, featureFlagTenantMigrations: true, featureFlagImprovedAuditing: true}"
+        --mongodSetParameters="{
+            featureFlagToaster: true,
+            featureFlagSpoon: true,
+            featureFlagTenantMigrations: true,
+            featureFlagImprovedAuditing: true,
+        }"
   tasks:
   - name: compile_parallel_TG
     distros:
@@ -13020,7 +13035,13 @@ buildvariants:
     san_options: UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer" LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1" ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
     compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --allocator=system --sanitize=undefined,address --ssl --ocsp-stapling=off -j$(grep -c ^processor /proc/cpuinfo) --link-model=dynamic
     test_flags: >-
-        --mongodSetParameters="{featureFlagToaster: true, featureFlagSpoon: true, featureFlagTenantMigrations: true, featureFlagImprovedAuditing: true}" --excludeWithAnyTags=requires_ocsp_stapling
+        --excludeWithAnyTags=requires_ocsp_stapling
+        --mongodSetParameters="{
+            featureFlagToaster: true,
+            featureFlagSpoon: true,
+            featureFlagTenantMigrations: true,
+            featureFlagImprovedAuditing: true,
+        }"
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under {A,UB}SAN build.
     hang_analyzer_dump_core: false
     scons_cache_scope: shared
