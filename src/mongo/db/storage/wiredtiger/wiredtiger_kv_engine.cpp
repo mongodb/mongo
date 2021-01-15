@@ -1573,6 +1573,10 @@ Status WiredTigerKVEngine::dropGroupedSortedDataInterface(OperationContext* opCt
 
 std::unique_ptr<SortedDataInterface> WiredTigerKVEngine::getGroupedSortedDataInterface(
     OperationContext* opCtx, StringData ident, const IndexDescriptor* desc, KVPrefix prefix) {
+    if (desc->isIdIndex()) {
+        return std::make_unique<WiredTigerIdIndex>(
+            opCtx, _uri(ident), ident, desc, prefix, _readOnly);
+    }
     if (desc->unique()) {
         return std::make_unique<WiredTigerIndexUnique>(
             opCtx, _uri(ident), ident, desc, prefix, _readOnly);

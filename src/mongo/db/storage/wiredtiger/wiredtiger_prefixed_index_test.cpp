@@ -90,7 +90,7 @@ public:
         string uri = "table:" + nss.ns();
         invariantWTOK(WiredTigerIndex::Create(&opCtx, uri, result.getValue()));
 
-        return std::make_unique<WiredTigerIndexUnique>(&opCtx, uri, "" /* ident */, &desc, prefix);
+        return std::make_unique<WiredTigerIdIndex>(&opCtx, uri, "" /* ident */, &desc, prefix);
     }
 
     std::unique_ptr<SortedDataInterface> newSortedDataInterface(bool unique, bool partial) final {

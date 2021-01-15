@@ -51,10 +51,11 @@ TEST(SortedDataInterface, BuilderAddKey) {
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         const std::unique_ptr<SortedDataBuilderInterface> builder(
-            sorted->getBulkBuilder(opCtx.get(), true));
+            sorted->makeBulkBuilder(opCtx.get(), true));
 
+        WriteUnitOfWork wuow(opCtx.get());
         ASSERT_OK(builder->addKey(makeKeyString(sorted.get(), key1, loc1)));
-        builder->commit(false);
+        wuow.commit();
     }
 
     {
@@ -81,10 +82,11 @@ TEST(SortedDataInterface, BuilderAddKeyString) {
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         const std::unique_ptr<SortedDataBuilderInterface> builder(
-            sorted->getBulkBuilder(opCtx.get(), true));
+            sorted->makeBulkBuilder(opCtx.get(), true));
 
+        WriteUnitOfWork wuow(opCtx.get());
         ASSERT_OK(builder->addKey(keyString1.getValueCopy()));
-        builder->commit(false);
+        wuow.commit();
     }
 
     {
@@ -106,13 +108,14 @@ TEST(SortedDataInterface, BuilderAddKeyWithReservedRecordId) {
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         const std::unique_ptr<SortedDataBuilderInterface> builder(
-            sorted->getBulkBuilder(opCtx.get(), true));
+            sorted->makeBulkBuilder(opCtx.get(), true));
 
         RecordId reservedLoc(RecordId::ReservedId::kWildcardMultikeyMetadataId);
         ASSERT(reservedLoc.isReserved());
 
+        WriteUnitOfWork wuow(opCtx.get());
         ASSERT_OK(builder->addKey(makeKeyString(sorted.get(), key1, reservedLoc)));
-        builder->commit(false);
+        wuow.commit();
     }
 
     {
@@ -135,10 +138,11 @@ TEST(SortedDataInterface, BuilderAddCompoundKey) {
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         const std::unique_ptr<SortedDataBuilderInterface> builder(
-            sorted->getBulkBuilder(opCtx.get(), true));
+            sorted->makeBulkBuilder(opCtx.get(), true));
 
+        WriteUnitOfWork wuow(opCtx.get());
         ASSERT_OK(builder->addKey(makeKeyString(sorted.get(), compoundKey1a, loc1)));
-        builder->commit(false);
+        wuow.commit();
     }
 
     {
@@ -163,12 +167,13 @@ TEST(SortedDataInterface, BuilderAddSameKey) {
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         const std::unique_ptr<SortedDataBuilderInterface> builder(
-            sorted->getBulkBuilder(opCtx.get(), false));
+            sorted->makeBulkBuilder(opCtx.get(), false));
 
+        WriteUnitOfWork wuow(opCtx.get());
         ASSERT_OK(builder->addKey(makeKeyString(sorted.get(), key1, loc1)));
         ASSERT_EQUALS(ErrorCodes::DuplicateKey,
                       builder->addKey(makeKeyString(sorted.get(), key1, loc2)));
-        builder->commit(false);
+        wuow.commit();
     }
 
     {
@@ -199,11 +204,12 @@ TEST(SortedDataInterface, BuilderAddSameKeyString) {
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         const std::unique_ptr<SortedDataBuilderInterface> builder(
-            sorted->getBulkBuilder(opCtx.get(), false));
+            sorted->makeBulkBuilder(opCtx.get(), false));
 
+        WriteUnitOfWork wuow(opCtx.get());
         ASSERT_OK(builder->addKey(keyStringLoc1.getValueCopy()));
         ASSERT_EQUALS(ErrorCodes::DuplicateKey, builder->addKey(keyStringLoc2.getValueCopy()));
-        builder->commit(false);
+        wuow.commit();
     }
 
     {
@@ -227,11 +233,12 @@ TEST(SortedDataInterface, BuilderAddSameKeyWithDupsAllowed) {
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         const std::unique_ptr<SortedDataBuilderInterface> builder(
-            sorted->getBulkBuilder(opCtx.get(), true /* allow duplicates */));
+            sorted->makeBulkBuilder(opCtx.get(), true /* allow duplicates */));
 
+        WriteUnitOfWork wuow(opCtx.get());
         ASSERT_OK(builder->addKey(makeKeyString(sorted.get(), key1, loc1)));
         ASSERT_OK(builder->addKey(makeKeyString(sorted.get(), key1, loc2)));
-        builder->commit(false);
+        wuow.commit();
     }
 
     {
@@ -262,11 +269,12 @@ TEST(SortedDataInterface, BuilderAddSameKeyStringWithDupsAllowed) {
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         const std::unique_ptr<SortedDataBuilderInterface> builder(
-            sorted->getBulkBuilder(opCtx.get(), true /* allow duplicates */));
+            sorted->makeBulkBuilder(opCtx.get(), true /* allow duplicates */));
 
+        WriteUnitOfWork wuow(opCtx.get());
         ASSERT_OK(builder->addKey(keyStringLoc1.getValueCopy()));
         ASSERT_OK(builder->addKey(keyStringLoc2.getValueCopy()));
-        builder->commit(false);
+        wuow.commit();
     }
 
     {
@@ -289,12 +297,13 @@ TEST(SortedDataInterface, BuilderAddMultipleKeys) {
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         const std::unique_ptr<SortedDataBuilderInterface> builder(
-            sorted->getBulkBuilder(opCtx.get(), true));
+            sorted->makeBulkBuilder(opCtx.get(), true));
 
+        WriteUnitOfWork wuow(opCtx.get());
         ASSERT_OK(builder->addKey(makeKeyString(sorted.get(), key1, loc1)));
         ASSERT_OK(builder->addKey(makeKeyString(sorted.get(), key2, loc2)));
         ASSERT_OK(builder->addKey(makeKeyString(sorted.get(), key3, loc3)));
-        builder->commit(false);
+        wuow.commit();
     }
 
     {
@@ -323,12 +332,13 @@ TEST(SortedDataInterface, BuilderAddMultipleKeyStrings) {
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         const std::unique_ptr<SortedDataBuilderInterface> builder(
-            sorted->getBulkBuilder(opCtx.get(), true));
+            sorted->makeBulkBuilder(opCtx.get(), true));
 
+        WriteUnitOfWork wuow(opCtx.get());
         ASSERT_OK(builder->addKey(keyString1.getValueCopy()));
         ASSERT_OK(builder->addKey(keyString2.getValueCopy()));
         ASSERT_OK(builder->addKey(keyString3.getValueCopy()));
-        builder->commit(false);
+        wuow.commit();
     }
 
     {
@@ -351,14 +361,15 @@ TEST(SortedDataInterface, BuilderAddMultipleCompoundKeys) {
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         const std::unique_ptr<SortedDataBuilderInterface> builder(
-            sorted->getBulkBuilder(opCtx.get(), true));
+            sorted->makeBulkBuilder(opCtx.get(), true));
 
+        WriteUnitOfWork wuow(opCtx.get());
         ASSERT_OK(builder->addKey(makeKeyString(sorted.get(), compoundKey1a, loc1)));
         ASSERT_OK(builder->addKey(makeKeyString(sorted.get(), compoundKey1b, loc2)));
         ASSERT_OK(builder->addKey(makeKeyString(sorted.get(), compoundKey1c, loc4)));
         ASSERT_OK(builder->addKey(makeKeyString(sorted.get(), compoundKey2b, loc3)));
         ASSERT_OK(builder->addKey(makeKeyString(sorted.get(), compoundKey3a, loc5)));
-        builder->commit(false);
+        wuow.commit();
     }
 
     {

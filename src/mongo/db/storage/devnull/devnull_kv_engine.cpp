@@ -172,8 +172,9 @@ public:
 
     virtual ~DevNullSortedDataInterface() {}
 
-    virtual SortedDataBuilderInterface* getBulkBuilder(OperationContext* opCtx, bool dupsAllowed) {
-        return new DevNullSortedDataBuilderInterface();
+    virtual std::unique_ptr<SortedDataBuilderInterface> makeBulkBuilder(OperationContext* opCtx,
+                                                                        bool dupsAllowed) {
+        return {};
     }
 
     virtual Status insert(OperationContext* opCtx,

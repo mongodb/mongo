@@ -692,8 +692,7 @@ Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,
             message, bulk->getKeysInserted(), 3 /* secondsBetween */));
     }
 
-    auto builder = std::unique_ptr<SortedDataBuilderInterface>(
-        _newInterface->getBulkBuilder(opCtx, dupsAllowed));
+    auto builder = _newInterface->makeBulkBuilder(opCtx, dupsAllowed);
 
     KeyString::Value previousKey;
 
@@ -779,10 +778,6 @@ Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,
           "index"_attr = _descriptor->indexName(),
           "keysInserted"_attr = bulk->getKeysInserted(),
           "duration"_attr = Milliseconds(Seconds(timer.seconds())));
-
-    WriteUnitOfWork wunit(opCtx);
-    builder->commit(true);
-    wunit.commit();
     return Status::OK();
 }
 
@@ -851,8 +846,7 @@ bool AbstractIndexAccessMethod::shouldMarkIndexAsMultikey(
 
 std::unique_ptr<SortedDataBuilderInterface> AbstractIndexAccessMethod::makeBulkBuilder(
     OperationContext* opCtx, bool dupsAllowed) {
-    return std::unique_ptr<SortedDataBuilderInterface>(
-        _newInterface->getBulkBuilder(opCtx, dupsAllowed));
+    return _newInterface->makeBulkBuilder(opCtx, dupsAllowed);
 }
 
 SortedDataInterface* AbstractIndexAccessMethod::getSortedDataInterface() const {

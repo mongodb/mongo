@@ -1184,11 +1184,6 @@ SortedDataBuilderBase::SortedDataBuilderBase(OperationContext* opCtx,
       _keyPattern(keyPattern),
       _collation(collation) {}
 
-void SortedDataBuilderBase::commit(bool mayInterrupt) {
-    WriteUnitOfWork wunit(_opCtx);
-    wunit.commit();
-}
-
 Status SortedDataBuilderUnique::addKey(const KeyString::Value& keyString) {
     dassert(KeyString::decodeRecordIdAtEnd(keyString.getBuffer(), keyString.getSize()).isValid());
     StringStore* workingCopy(RecoveryUnit::get(_opCtx)->getHead());
@@ -1247,17 +1242,17 @@ SortedDataInterfaceBase::SortedDataInterfaceBase(const Ordering& ordering, Strin
       _desc(nullptr),
       _isPartial(false) {}
 
-SortedDataBuilderInterface* SortedDataInterfaceUnique::getBulkBuilder(OperationContext* opCtx,
-                                                                      bool dupsAllowed) {
-    return new SortedDataBuilderUnique(opCtx,
-                                       dupsAllowed,
-                                       _ordering,
-                                       _prefix,
-                                       _identEnd,
-                                       _desc,
-                                       _indexName,
-                                       _keyPattern,
-                                       _collation);
+std::unique_ptr<SortedDataBuilderInterface> SortedDataInterfaceUnique::makeBulkBuilder(
+    OperationContext* opCtx, bool dupsAllowed) {
+    return std::make_unique<SortedDataBuilderUnique>(opCtx,
+                                                     dupsAllowed,
+                                                     _ordering,
+                                                     _prefix,
+                                                     _identEnd,
+                                                     _desc,
+                                                     _indexName,
+                                                     _keyPattern,
+                                                     _collation);
 }
 
 // We append \1 to all idents we get, and therefore the KeyString with ident + \0 will only be
@@ -1443,17 +1438,17 @@ Status SortedDataBuilderStandard::addKey(const KeyString::Value& keyString) {
     return Status::OK();
 }
 
-SortedDataBuilderInterface* SortedDataInterfaceStandard::getBulkBuilder(OperationContext* opCtx,
-                                                                        bool dupsAllowed) {
-    return new SortedDataBuilderStandard(opCtx,
-                                         dupsAllowed,
-                                         _ordering,
-                                         _prefix,
-                                         _identEnd,
-                                         _desc,
-                                         _indexName,
-                                         _keyPattern,
-                                         _collation);
+std::unique_ptr<SortedDataBuilderInterface> SortedDataInterfaceStandard::makeBulkBuilder(
+    OperationContext* opCtx, bool dupsAllowed) {
+    return std::make_unique<SortedDataBuilderStandard>(opCtx,
+                                                       dupsAllowed,
+                                                       _ordering,
+                                                       _prefix,
+                                                       _identEnd,
+                                                       _desc,
+                                                       _indexName,
+                                                       _keyPattern,
+                                                       _collation);
 }
 
 // We append \1 to all idents we get, and therefore the KeyString with ident + \0 will only be

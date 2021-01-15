@@ -72,11 +72,9 @@ public:
      * @param opCtx the transaction under which keys are added to 'this' index
      * @param dupsAllowed true if duplicate keys are allowed, and false
      *        otherwise
-     *
-     * @return caller takes ownership
      */
-    virtual SortedDataBuilderInterface* getBulkBuilder(OperationContext* opCtx,
-                                                       bool dupsAllowed) = 0;
+    virtual std::unique_ptr<SortedDataBuilderInterface> makeBulkBuilder(OperationContext* opCtx,
+                                                                        bool dupsAllowed) = 0;
 
     /**
      * Insert an entry into the index with the specified KeyString, which must have a RecordId
@@ -100,8 +98,8 @@ public:
      * appended to the end.
      *
      * @param opCtx the transaction under which the remove takes place
-     * @param dupsAllowed true if duplicate keys are allowed, and false
-     *        otherwise
+     * @param dupsAllowed true to enforce strict checks to ensure we only delete a key with an exact
+     *        match, false otherwise
      */
     virtual void unindex(OperationContext* opCtx,
                          const KeyString::Value& keyString,
@@ -389,19 +387,12 @@ public:
      *
      * 'keyString' must be > or >= the last key passed to this function (depends on _dupsAllowed).
      * If this is violated an error Status (ErrorCodes::InternalError) will be returned.
+     *
+     * Some storage engines require callers to manage a WriteUnitOfWork to perform these inserts
+     * transactionally. Other storage engines do not perform inserts transactionally and will ignore
+     * any parent WriteUnitOfWork.
      */
     virtual Status addKey(const KeyString::Value& keyString) = 0;
-
-    /**
-     * Do any necessary work to finish building the tree.
-     *
-     * The default implementation may be used if no commit phase is necessary because addKey
-     * always leaves the tree in a valid state.
-     *
-     * This is called outside of any WriteUnitOfWork to allow implementations to split this up
-     * into multiple units.
-     */
-    virtual void commit(bool mayInterrupt) {}
 };
 
 }  // namespace mongo

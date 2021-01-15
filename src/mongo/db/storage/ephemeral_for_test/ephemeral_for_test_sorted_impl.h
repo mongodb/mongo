@@ -48,7 +48,6 @@ public:
                           const std::string& indexName,
                           const BSONObj& keyPattern,
                           const BSONObj& collation);
-    void commit(bool mayInterrupt) override;
 
 protected:
     OperationContext* _opCtx;
@@ -110,7 +109,8 @@ public:
                               StringData ident,
                               const IndexDescriptor* desc);
     SortedDataInterfaceUnique(const Ordering& ordering, StringData ident);
-    SortedDataBuilderInterface* getBulkBuilder(OperationContext* opCtx, bool dupsAllowed) override;
+    std::unique_ptr<SortedDataBuilderInterface> makeBulkBuilder(OperationContext* opCtx,
+                                                                bool dupsAllowed) override;
     Status insert(OperationContext* opCtx,
                   const KeyString::Value& keyString,
                   bool dupsAllowed) override;
@@ -137,7 +137,8 @@ public:
                                 StringData ident,
                                 const IndexDescriptor* desc);
     SortedDataInterfaceStandard(const Ordering& ordering, StringData ident);
-    SortedDataBuilderInterface* getBulkBuilder(OperationContext* opCtx, bool dupsAllowed) override;
+    std::unique_ptr<SortedDataBuilderInterface> makeBulkBuilder(OperationContext* opCtx,
+                                                                bool dupsAllowed) override;
     Status insert(OperationContext* opCtx,
                   const KeyString::Value& keyString,
                   bool dupsAllowed) override;

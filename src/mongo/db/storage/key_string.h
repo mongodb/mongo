@@ -701,16 +701,10 @@ protected:
                 invariant(to == BuildState::kAppendedRecordID || to == BuildState::kReleased);
                 break;
             case BuildState::kAppendedRecordID:
-                // This first case is the special case in
-                // WiredTigerIndexUnique::_insertTimestampUnsafe.
-                // The third case is the case when we are appending a list of RecordIDs as in the
-                // KeyString test RecordIDs.
                 invariant(to == BuildState::kAppendedTypeBits || to == BuildState::kReleased ||
                           to == BuildState::kAppendedRecordID);
                 break;
             case BuildState::kAppendedTypeBits:
-                // This first case is the special case in
-                // WiredTigerIndexUnique::_insertTimestampUnsafe.
                 invariant(to == BuildState::kAppendedRecordID || to == BuildState::kReleased);
                 break;
             case BuildState::kReleased:
