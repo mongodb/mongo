@@ -34,12 +34,15 @@ if (topology.type === Topology.kStandalone) {
 }
 
 const adminDB = db.getSiblingDB('admin');
-const requiredFCV = jsTest.options().forceValidationWithFeatureCompatibilityVersion;
+let requiredFCV = jsTest.options().forceValidationWithFeatureCompatibilityVersion;
 
 let originalFCV;
 let originalTransactionLifetimeLimitSeconds;
 
 if (requiredFCV) {
+    requiredFCV = new Function(
+        `return typeof ${requiredFCV} === "string" ? ${requiredFCV} : "${requiredFCV}"`)();
+
     // Running the setFeatureCompatibilityVersion command may implicitly involve running a
     // multi-statement transaction. We temporarily raise the transactionLifetimeLimitSeconds to be
     // 24 hours to avoid spurious failures from it having been set to a lower value.
