@@ -115,4 +115,57 @@ expectedStats.numCommits++;
 expectedStats.numBucketsClosedDueToTimeBackward++;
 expectedStats.numMeasurementsCommitted++;
 checkCollStats();
+
+// Assumes each bucket has a limit of 1000 measurements.
+const bucketMaxCount = 1000;
+let numDocs = bucketMaxCount + 100;
+docs = Array(numDocs).fill({[timeFieldName]: ISODate(), [metaFieldName]: {a: 'limit_count'}});
+assert.commandWorked(coll.insert(docs));
+expectedStats.bucketCount += 2;
+expectedStats.numBucketInserts += 2;
+expectedStats.numBucketsOpenedDueToMetadata++;
+expectedStats.numBucketsClosedDueToCount++;
+expectedStats.numCommits += 2;
+expectedStats.numWaits += numDocs - 2;
+expectedStats.numMeasurementsCommitted += numDocs;
+expectedStats.avgNumMeasurementsPerCommit =
+    Math.floor(expectedStats.numMeasurementsCommitted / expectedStats.numCommits);
+checkCollStats();
+
+// Assumes each bucket has a limit of 125kB on the measurements stored in the 'data' field.
+const bucketMaxSizeKB = 125;
+numDocs = 2;
+// The measurement data should not take up all of the 'bucketMaxSizeKB' limit because we need
+// to leave a little room for the _id and the time fields.
+const largeValue = 'x'.repeat((bucketMaxSizeKB - 1) * 1024);
+docs = Array(numDocs).fill(
+    {[timeFieldName]: ISODate(), x: largeValue, [metaFieldName]: {a: 'limit_size'}});
+assert.commandWorked(coll.insert(docs));
+expectedStats.bucketCount += numDocs;
+expectedStats.numBucketInserts += numDocs;
+expectedStats.numBucketsOpenedDueToMetadata++;
+expectedStats.numBucketsClosedDueToSize++;
+expectedStats.numCommits += numDocs;
+expectedStats.numMeasurementsCommitted += numDocs;
+expectedStats.avgNumMeasurementsPerCommit =
+    Math.floor(expectedStats.numMeasurementsCommitted / expectedStats.numCommits);
+checkCollStats();
+
+// Assumes the measurements in each bucket span at most one hour (based on the time field).
+const docTimes = [ISODate("2020-11-13T01:00:00Z"), ISODate("2020-11-13T03:00:00Z")];
+numDocs = 2;
+docs = [];
+for (let i = 0; i < numDocs; i++) {
+    docs.push({[timeFieldName]: docTimes[i], [metaFieldName]: {a: 'limit_time_range'}});
+}
+assert.commandWorked(coll.insert(docs));
+expectedStats.bucketCount += numDocs;
+expectedStats.numBucketInserts += numDocs;
+expectedStats.numBucketsOpenedDueToMetadata++;
+expectedStats.numBucketsClosedDueToTimeForward++;
+expectedStats.numCommits += numDocs;
+expectedStats.numMeasurementsCommitted += numDocs;
+expectedStats.avgNumMeasurementsPerCommit =
+    Math.floor(expectedStats.numMeasurementsCommitted / expectedStats.numCommits);
+checkCollStats();
 })();
