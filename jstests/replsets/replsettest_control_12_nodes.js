@@ -33,6 +33,6 @@ for (let i = 0; i < numNodes; i++) {
 }
 const replTest = new ReplSetTest({name: 'replsettest_control_12_nodes', nodes: allNodes});
 replTest.startSet();
-replTest.initiate();
+replTest.initiateWithHighElectionTimeout();
 replTest.stopSet();
 }());
