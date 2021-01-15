@@ -809,17 +809,9 @@ bool ComparableChunkVersion::operator==(const ComparableChunkVersion& other) con
     if (_forcedRefreshSequenceNum == 0)
         return true;  // Only default constructed values have _forcedRefreshSequenceNum == 0 and
                       // they are always equal
-    if (_chunkVersion.is_initialized() != other._chunkVersion.is_initialized())
-        return false;  // One side is not initialised, but the other is, which can only happen if
-                       // one side is ForForcedRefresh and the other is made from
-                       // makeComparableChunkVersion
-    if (!_chunkVersion.is_initialized())
-        return true;  // Both sides are not initialised, which means these are two equivalent
-                      // ForForcedRefresh versions
 
-    return sameEpoch(other) &&
-        _chunkVersion->majorVersion() == other._chunkVersion->majorVersion() &&
-        _chunkVersion->minorVersion() == other._chunkVersion->minorVersion();
+    // Relying on the boost::optional<ChunkVersion>::operator== comparison
+    return _chunkVersion == other._chunkVersion;
 }
 
 bool ComparableChunkVersion::operator<(const ComparableChunkVersion& other) const {
@@ -847,7 +839,20 @@ bool ComparableChunkVersion::operator<(const ComparableChunkVersion& other) cons
                                                     // ForForcedRefresh. In this case, use the
                                                     // _epochDisambiguatingSequenceNum to see which
                                                     // one is more recent.
-    if (sameEpoch(other)) {
+
+    const boost::optional<Timestamp> timestamp = _chunkVersion->getTimestamp();
+    const boost::optional<Timestamp> otherTimestamp = other._chunkVersion->getTimestamp();
+    if (timestamp && otherTimestamp) {
+        if (_chunkVersion->isSet() && other._chunkVersion->isSet()) {
+            if (*timestamp == *otherTimestamp)
+                return _chunkVersion->majorVersion() < other._chunkVersion->majorVersion() ||
+                    (_chunkVersion->majorVersion() == other._chunkVersion->majorVersion() &&
+                     _chunkVersion->minorVersion() < other._chunkVersion->minorVersion());
+            else
+                return *timestamp < *otherTimestamp;
+        } else if (!_chunkVersion->isSet() && !other._chunkVersion->isSet())
+            return false;  // Both sides are the "no chunks on the shard version"
+    } else if (sameEpoch(other)) {
         if (_chunkVersion->isSet() && other._chunkVersion->isSet())
             return _chunkVersion->majorVersion() < other._chunkVersion->majorVersion() ||
                 (_chunkVersion->majorVersion() == other._chunkVersion->majorVersion() &&
