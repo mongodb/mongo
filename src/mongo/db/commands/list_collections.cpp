@@ -144,7 +144,7 @@ void _addWorkingSetMember(OperationContext* opCtx,
 BSONObj buildViewBson(const ViewDefinition& view, bool nameOnly) {
     BSONObjBuilder b;
     b.append("name", view.name().coll());
-    b.append("type", "view");
+    b.append("type", view.timeseries() ? "time-series" : "view");
 
     if (nameOnly) {
         return b.obj();
@@ -158,7 +158,7 @@ BSONObj buildViewBson(const ViewDefinition& view, bool nameOnly) {
     }
     optionsBuilder.doneFast();
 
-    BSONObj info = BSON("readOnly" << true);
+    BSONObj info = BSON("readOnly" << !view.timeseries());
     b.append("info", info);
     return b.obj();
 }
