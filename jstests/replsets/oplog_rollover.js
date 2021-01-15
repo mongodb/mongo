@@ -19,7 +19,7 @@ function doTest(storageEngine) {
         nodeOptions: {
             syncdelay: 1,
             setParameter: {
-                logComponentVerbosity: tojson({storage: 1}),
+                logComponentVerbosity: tojson({storage: 2}),
                 'failpoint.hangOplogCapMaintainerThread': tojson({mode: 'alwaysOn'})
             }
         },
