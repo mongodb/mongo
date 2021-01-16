@@ -132,53 +132,10 @@ variables:
   aws_key_remote: ${powercycle_aws_key}
   aws_secret_remote: ${powercycle_aws_secret}
 
-- &powercycle_ec2_instance
-  ec2_expire_hours: "24"
-  ec2_monitor_files: proc.json system.json
-  is_powercycle: true
-  monitor_proc_file: proc.json
-  monitor_system_file: system.json
-  remote_dir: /log/powercycle
-  secret_port: "20001"
-  security_group_ids: ${powercycle_aws_security_group_id}
-  security_groups: mci powercycle_testing
-  subnet_id: ${powercycle_aws_subnet_id}
-  ssh_identity: -i ${private_key_file}
-  ssh_key_id: ${powercycle_ssh_key_id}
-  standard_port: "20000"
-  virtualenv_dir: venv_powercycle
-  windows_crash_cmd: \"notmyfault/notmyfaultc64.exe -accepteula crash 1\"
-  windows_crash_dl: https://download.sysinternals.com/files/NotMyFault.zip
-  windows_crash_dir: notmyfault
-  windows_crash_zip: notmyfault.zip
-
-- &powercycle_expansions
-  params:
-     updates:
-     - key: backup_path_after
-       value: ${remote_dir}/afterrecovery
-     - key: backup_path_before
-       value: ${remote_dir}/beforerecovery
-     - key: backup_artifacts
-       value: ${remote_dir}/afterrecovery* ${remote_dir}/beforerecovery*
-     - key: db_path
-       value: /data/db
-     - key: log_path
-       value: ${remote_dir}/mongod.log
-     - key: event_logpath
-       value: ${remote_dir}/eventlog
-     - key: exit_file
-       value: powercycle_exit.yml
-
 - &powercycle_test
-  ec2_artifacts: ${log_path} ${db_path} ${backup_artifacts} ${event_logpath}
-  program_options: --exitYamlFile=${exit_file} --logLevel=info --backupPathBefore=${backup_path_before} --backupPathAfter=${backup_path_after}
-  connection_options: --sshUserHost=${private_ip_address} --sshConnection=\"${ssh_identity} ${ssh_connection_options}\"
-  test_options: --testLoops=15 --seedDocNum=10000 --rsync --rsyncExcludeFiles=diagnostic.data/metrics.interim* --validate=local --canary=local
-  crash_options: --crashMethod=internal --crashOption=${windows_crash_cmd} --crashWaitTime=45 --jitterForCrashWaitTime=5
+  is_powercycle: true
+  test_options: --testLoops=15 --seedDocNum=10000
   client_options: --numCrudClients=20 --numFsmClients=20
-  mongodb_options: --rootDir=${remote_dir}-${task_id} --mongodbBinDir=${remote_dir}
-  mongod_options: --mongodUsablePorts ${standard_port} ${secret_port} --dbPath=${db_path} --logPath=${log_path}
   mongod_extra_options: --mongodOptions=\"--setParameter enableTestCommands=1 --setParameter logComponentVerbosity='{storage:{recovery:2}}' --wiredTigerEngineConfigString 'debug_mode=[table_logging=true]'\"
 
 - &libfuzzertests
@@ -2409,7 +2366,7 @@ functions:
           ${activate_virtualenv}
           # The virtualenv bin_dir is different for Linux and Windows
           bin_dir=$(find $VIRTUAL_ENV -name activate | sed -e "s,$VIRTUAL_ENV,,;s,activate,,;s,/,,g")
-          cmds=". ${virtualenv_dir|venv}/$bin_dir/activate"
+          cmds=". venv_powercycle/$bin_dir/activate"
           cmds="$cmds; python -u"
           # The remote python operates in a virtualenv
           remote_python="--remotePython=\"$cmds\""
@@ -2423,7 +2380,6 @@ functions:
           end_time=$start_time
           elapsed_secs=0
           echo "{\"failures\": $failures, \"results\": [{\"status\": $status, \"exit_code\": $exit_code, \"test_file\": \"${task_name}\", \"start\": $start_time, \"end\": $end_time, \"elapsed\": $elapsed_secs}]}" > $report_json
-          generate_report_json="--reportJsonFile=$report_json"
 
           # Windows task overrides:
           #   - Execute 10 test loops
@@ -2443,9 +2399,8 @@ functions:
           config_file=powertest.yml
           eval $python buildscripts/resmoke.py powertest \
             "--saveConfigOptions=$config_file \
-            ${connection_options}  \
-            ${program_options}     \
-            $generate_report_json  \
+            --sshUserHost=${private_ip_address} \
+            --sshConnection=\"-i ${private_key_file} ${ssh_connection_options}\" \
             $remote_sudo           \
             $remote_python         \
             ${test_options}        \
@@ -2453,7 +2408,6 @@ functions:
             ${crash_options}       \
             ${client_options}      \
             $client_override       \
-            ${mongodb_options}     \
             ${mongod_options}      \
             ${mongod_extra_options}"
           set +o errexit
@@ -2462,7 +2416,7 @@ functions:
     - command: expansions.update
       params:
         ignore_missing_file: true
-        file: src/${exit_file}
+        file: src/powercycle_exit.yml
 
     - command: shell.exec
       params:
@@ -2471,7 +2425,7 @@ functions:
         script: |
           # Trigger a system failure if powertest.py failed due to ssh access.
           if [ -n "${ec2_ssh_failure}" ]; then
-            echo "ec2_ssh_failure detected - $(cat ${exit_file})"
+            echo "ec2_ssh_failure detected - $(cat powercycle_exit.yml)"
             exit ${exit_code}
           fi
 
@@ -2487,7 +2441,7 @@ functions:
           pass=$?
           # On test success, we only archive mongod.log.
           if [ $pass -eq 0 ]; then
-            echo "ec2_artifacts: ${log_path}" > ec2_artifacts.yml
+            echo "ec2_artifacts: mongod_log_only" > ec2_artifacts.yml
           fi
 
     - command: expansions.update
@@ -2686,7 +2640,7 @@ functions:
           hostname=$(tr -d '"[]{}' < src/hosts.yml | cut -d , -f 1 | awk -F : '{print $2}')
 
           # To add the hostname to expansions.
-          echo "private_ip_address: $hostname" >> src/ip_address
+          echo "private_ip_address: $hostname" >> src/ip_address.yml
 
           echo $hostname
           echo $user
@@ -2715,7 +2669,7 @@ functions:
 
     - command: expansions.update
       params:
-        file: src/ip_address
+        file: src/ip_address.yml
 
     - command: expansions.write
       params:
@@ -2769,7 +2723,7 @@ functions:
       script: |
         set -o verbose
 
-        if [ -z "${ec2_monitor_files}" ] || [ "${is_powercycle}" != true ]; then
+        if [ "${is_powercycle}" != true ]; then
           exit 0
         fi
 
@@ -7517,7 +7471,6 @@ tasks:
       resmoke_jobs_max: 1
 
 - name: powercycle_smoke
-  tags: ["powercycle"]
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   commands:
     - command: manifest.load
@@ -7534,15 +7487,11 @@ tasks:
       vars:
         <<: *powercycle_remote_credentials
     - func: "set up EC2 instance"
-      vars:
-        <<: *powercycle_ec2_instance
-    - command: expansions.update
-      <<: *powercycle_expansions
     - func: "run powercycle test"
       timeout_secs: 1800 # 30 minute timeout for no output
       vars:
         <<: *powercycle_test
-        test_options: --testLoops=3 --seedDocNum=1000 --rsync --rsyncExcludeFiles=diagnostic.data/metrics.interim* --validate=local --canary=local
+        test_options: --testLoops=3 --seedDocNum=1000
         mongod_extra_options: --mongodOptions=\"--setParameter enableTestCommands=1 --setParameter logComponentVerbosity='{storage:{recovery:2}}' --storageEngine wiredTiger --wiredTigerEngineConfigString 'debug_mode=[table_logging=true]'\"
 
 
@@ -7557,10 +7506,6 @@ tasks:
     vars:
       <<: *powercycle_remote_credentials
   - func: "set up EC2 instance"
-    vars:
-      <<: *powercycle_ec2_instance
-  - command: expansions.update
-    <<: *powercycle_expansions
   - func: "run powercycle test"
     timeout_secs: 1800 # 30 minute timeout for no output
     vars:
@@ -7578,15 +7523,11 @@ tasks:
     vars:
       <<: *powercycle_remote_credentials
   - func: "set up EC2 instance"
-    vars:
-      <<: *powercycle_ec2_instance
-  - command: expansions.update
-    <<: *powercycle_expansions
   - func: "run powercycle test"
     timeout_secs: 1800 # 30 minute timeout for no output
     vars:
       <<: *powercycle_test
-      crash_options: --crashMethod=kill --crashWaitTime=45 --jitterForCrashWaitTime=5
+      crash_options: --crashMethod=kill
       mongod_extra_options: --mongodOptions=\"--setParameter enableTestCommands=1 --setParameter logComponentVerbosity='{storage:{recovery:2}}' --storageEngine wiredTiger --wiredTigerEngineConfigString 'debug_mode=[table_logging=true]'\"
 
 - name: powercycle_fcv4.4
@@ -7600,16 +7541,11 @@ tasks:
     vars:
       <<: *powercycle_remote_credentials
   - func: "set up EC2 instance"
-    vars:
-      <<: *powercycle_ec2_instance
-  - command: expansions.update
-    <<: *powercycle_expansions
   - func: "run powercycle test"
     timeout_secs: 1800 # 30 minute timeout for no output
     vars:
       <<: *powercycle_test
-      client_options: --numCrudClients=20 --numFsmClients=20
-      mongod_options: --mongodUsablePorts ${standard_port} ${secret_port} --dbPath=${db_path} --logPath=${log_path} --fcv=4.4
+      mongod_options: --fcv=4.4
       mongod_extra_options: --mongodOptions=\"--setParameter enableTestCommands=1  --setParameter logComponentVerbosity='{storage:{recovery:2}}' --storageEngine wiredTiger --wiredTigerEngineConfigString 'debug_mode=[table_logging=true]'\"
 
 - name: powercycle_replication
@@ -7623,10 +7559,6 @@ tasks:
     vars:
       <<: *powercycle_remote_credentials
   - func: "set up EC2 instance"
-    vars:
-      <<: *powercycle_ec2_instance
-  - command: expansions.update
-    <<: *powercycle_expansions
   - func: "run powercycle test"
     timeout_secs: 1800 # 30 minute timeout for no output
     vars:
@@ -7643,10 +7575,6 @@ tasks:
     vars:
       <<: *powercycle_remote_credentials
   - func: "set up EC2 instance"
-    vars:
-      <<: *powercycle_ec2_instance
-  - command: expansions.update
-    <<: *powercycle_expansions
   - func: "run powercycle test"
     timeout_secs: 1800 # 30 minute timeout for no output
     vars:
@@ -7664,10 +7592,6 @@ tasks:
     vars:
       <<: *powercycle_remote_credentials
   - func: "set up EC2 instance"
-    vars:
-      <<: *powercycle_ec2_instance
-  - command: expansions.update
-    <<: *powercycle_expansions
   - func: "run powercycle test"
     timeout_secs: 1800 # 30 minute timeout for no output
     vars:
@@ -7684,14 +7608,10 @@ tasks:
     vars:
       <<: *powercycle_remote_credentials
   - func: "set up EC2 instance"
-    vars:
-      <<: *powercycle_ec2_instance
-  - command: expansions.update
-    <<: *powercycle_expansions
   - func: "run powercycle test"
     vars:
       <<: *powercycle_test
-      client_options: "--numCrudClients=20 --numFsmClients=20 --writeConcern='{\"w\": \"majority\"}'"
+      test_options: "--testLoops=15 --seedDocNum=10000 --writeConcern='{\"w\": \"majority\"}'"
       mongod_extra_options: --mongodOptions \"--setParameter enableTestCommands=1 --setParameter logComponentVerbosity='{storage:{recovery:2}}' --storageEngine wiredTiger --wiredTigerEngineConfigString 'debug_mode=[table_logging=true]'\"
 
 - name: idl_tests
