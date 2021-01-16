@@ -10014,6 +10014,7 @@ buildvariants:
             featureFlagToaster: true,
             featureFlagSpoon: true,
             featureFlagImprovedAuditing: true,
+            featureFlagTimeseriesCollection: true,
         }"
 
 - &enterprise-windows-template
@@ -10111,6 +10112,7 @@ buildvariants:
             featureFlagToaster: true,
             featureFlagSpoon: true,
             featureFlagImprovedAuditing: true,
+            featureFlagTimeseriesCollection: true,
         }"
 
 - <<: *enterprise-windows-nopush-template
@@ -10665,6 +10667,7 @@ buildvariants:
             featureFlagSpoon: true,
             featureFlagTenantMigrations: true,
             featureFlagImprovedAuditing: true,
+            featureFlagTimeseriesCollection: true,
         }"
   tasks:
   - name: compile_parallel_TG
@@ -13033,6 +13036,7 @@ buildvariants:
             featureFlagSpoon: true,
             featureFlagTenantMigrations: true,
             featureFlagImprovedAuditing: true,
+            featureFlagTimeseriesCollection: true,
         }"
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under {A,UB}SAN build.
     hang_analyzer_dump_core: false
