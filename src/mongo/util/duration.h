@@ -30,10 +30,12 @@
 #pragma once
 
 #include <cstdint>
-#include <fmt/format.h>
 #include <iosfwd>
 #include <limits>
 #include <ratio>
+#include <type_traits>
+
+#include <fmt/format.h>
 
 #include "mongo/base/static_assert.h"
 #include "mongo/platform/overflow_arithmetic.h"
@@ -60,6 +62,13 @@ using Minutes = Duration<std::ratio<60>>;
 using Hours = Duration<std::ratio<3600>>;
 using Days = Duration<std::ratio<86400>>;
 
+namespace duration_detail {
+template <typename>
+inline constexpr bool isMongoDuration = false;
+template <typename... Ts>
+inline constexpr bool isMongoDuration<Duration<Ts...>> = true;
+}  // namespace duration_detail
+
 //
 // Streaming output operators for common duration types. Writes the numerical value followed by
 // an abbreviated unit, without a space.
@@ -81,7 +90,9 @@ using HigherPrecisionDuration =
  * the ToDuration. For example, Seconds::max() cannot be represented as a Milliseconds, and so
  * attempting to cast that value to Milliseconds will throw an exception.
  */
-template <typename ToDuration, typename FromPeriod>
+template <typename ToDuration,
+          typename FromPeriod,
+          std::enable_if_t<duration_detail::isMongoDuration<ToDuration>, int> = 0>
 constexpr ToDuration duration_cast(const Duration<FromPeriod>& from) {
     using FromOverTo = std::ratio_divide<FromPeriod, typename ToDuration::period>;
     if (ToDuration::template isHigherPrecisionThan<Duration<FromPeriod>>()) {
@@ -94,7 +105,10 @@ constexpr ToDuration duration_cast(const Duration<FromPeriod>& from) {
     return ToDuration{from.count() / FromOverTo::den};
 }
 
-template <typename ToDuration, typename FromRep, typename FromPeriod>
+template <typename ToDuration,
+          typename FromRep,
+          typename FromPeriod,
+          std::enable_if_t<duration_detail::isMongoDuration<ToDuration>, int> = 0>
 constexpr ToDuration duration_cast(const stdx::chrono::duration<FromRep, FromPeriod>& d) {
     return duration_cast<ToDuration>(Duration<FromPeriod>{d.count()});
 }
@@ -486,6 +500,36 @@ StringBuilderImpl<Allocator>& operator<<(StringBuilderImpl<Allocator>& os, Durat
     MONGO_STATIC_ASSERT_MSG(!Duration<Period>::unit_short().empty(),
                             "Only standard Durations can logged");
     return streamPut(os, dp);
+}
+
+/**
+ * Make a std::chrono::duration from an arithmetic expression and a period ratio.
+ * This does not do any math or precision changes. It's just a type-deduced wrapper
+ * that attaches a period to a number for typesafety. The output std::chrono::duration
+ * will retain the Rep type and value of the input argument.
+ *
+ * E.g:
+ *      int waited = 123;  // unitless, type-unsafe millisecond count.
+ *      auto dur = deduceChronoDuration<std::milli>(waited);
+ *      static_assert(std::is_same_v<decltype(dur),
+ *                                   std::chrono::duration<int, std::milli>>);
+ *      invariant(dur.count() == 123);
+ *
+ * Note that std::chrono::duration<int, std::milli> is not std::milliseconds,
+ * which has a different (unspecified) Rep type.
+ *
+ * Then mongo::duration_cast can convert the deduced std::chrono::duration to
+ * mongo::Duration, or `std::chrono::duration_cast` be used to adjust the rep
+ * to create a more canonical std::chrono::duration:
+ *
+ *      auto durMongo = duration_cast<Milliseconds>(dur);
+ *      auto durChrono = duration_cast<std::milliseconds>(dur);
+ *
+ * Order the cast operations carefully to avoid losing range or precision.
+ */
+template <typename Per = std::ratio<1>, typename Rep>
+constexpr auto deduceChronoDuration(const Rep& count) {
+    return stdx::chrono::duration<Rep, Per>{count};
 }
 
 }  // namespace mongo

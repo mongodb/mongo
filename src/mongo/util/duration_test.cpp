@@ -29,12 +29,17 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/util/duration.h"
+
+#include <fmt/format.h>
+
 #include "mongo/stdx/chrono.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/duration.h"
 
 namespace mongo {
 namespace {
+
+using namespace fmt::literals;
 
 // The DurationTestSameType Compare* tests server to check the implementation of the comparison
 // operators as well as the compare() method, and so sometimes must explicitly check ASSERT_FALSE(v1
@@ -155,7 +160,7 @@ TEST(DurationCast, DurationCastConstexpr) {
         ASSERT_EQ(2, secs.count());
     }
 
-    // Converting from std::chrono::duration to Duration is constexpr.
+    // Converting from stdx::chrono::duration to Duration is constexpr.
     {
         constexpr auto ms = duration_cast<Milliseconds>(stdx::chrono::seconds(2));
         ASSERT_EQ(2000, ms.count());
@@ -245,6 +250,40 @@ TEST(DurationArithmetic, DivideNoOverflowSucceeds) {
 
 TEST(DurationArithmetic, DivideOverflowThrows) {
     ASSERT_THROWS_CODE(Milliseconds::min() / -1, AssertionException, ErrorCodes::DurationOverflow);
+}
+
+/** Calls `deduceChronoDuration<Period>(in)`, asserts that it returns `equivalent`. */
+template <typename Period = void, typename In, typename Equivalent>
+auto validateDeduce(In in, Equivalent equivalent) {
+    static constexpr bool useDefaultPeriod = std::is_same_v<Period, void>;
+    using OutPeriod = std::conditional_t<useDefaultPeriod, std::ratio<1>, Period>;
+    auto deduced = [&] {
+        if constexpr (useDefaultPeriod) {
+            return deduceChronoDuration(in);
+        } else {
+            return deduceChronoDuration<Period>(in);
+        }
+    }();
+    ASSERT((std::is_same_v<decltype(deduced), Equivalent>)) << "expected:{}got:{}"_format(
+        demangleName(typeid(Equivalent)), demangleName(typeid(deduced)));
+    ASSERT_EQ(deduced.count(), equivalent.count())
+        << "in:{}, equivalent:{}, deduced:{}"_format(in, equivalent.count(), deduced.count());
+}
+
+TEST(DeduceChronoDuration, DefaultPeriod) {
+    validateDeduce(3600, stdx::chrono::duration<int>(3600));
+    validateDeduce(3600, stdx::chrono::duration<int>(3600));
+    validateDeduce((short)3600, stdx::chrono::duration<short>(3600));
+    validateDeduce(3600u, stdx::chrono::duration<unsigned>(3600));
+    validateDeduce(3600., stdx::chrono::duration<double>(3600));
+    validateDeduce(3600.5, stdx::chrono::duration<double>(3600.5));
+    validateDeduce(-3600.5, stdx::chrono::duration<double>(-3600.5));
+}
+
+TEST(DeduceChronoDuration, ExplicitPeriod) {
+    validateDeduce<std::milli>(123, stdx::chrono::duration<int, std::milli>(123));
+    validateDeduce<std::nano>(123, stdx::chrono::duration<int, std::nano>(123));
+    validateDeduce<std::ratio<45, 123>>(50, stdx::chrono::duration<int, std::ratio<45, 123>>(50));
 }
 
 }  // namespace
