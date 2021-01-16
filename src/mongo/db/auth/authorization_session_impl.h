@@ -138,6 +138,8 @@ public:
 
     bool isAuthorizedToParseNamespaceElement(const BSONElement& elem) override;
 
+    bool isAuthorizedToParseNamespaceElement(const NamespaceStringOrUUID& nss) override;
+
     bool isAuthorizedToCreateRole(const RoleName& roleName) override;
 
     bool isAuthorizedToGrantRole(const RoleName& role) override;

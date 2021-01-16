@@ -162,6 +162,6 @@ commands:
                 optional: true
             includeBuildUUIDs:
                 type: safeBool
+                optional: true
                 unstable: true
-                default: false
         reply_type: ListIndexesReply

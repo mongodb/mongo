@@ -252,6 +252,10 @@ public:
     // given BSONElement.
     virtual bool isAuthorizedToParseNamespaceElement(const BSONElement& elem) = 0;
 
+    // Checks if this connection has the privileges necessary to parse a namespace from a
+    // given NamespaceOrUUID object.
+    virtual bool isAuthorizedToParseNamespaceElement(const NamespaceStringOrUUID& nss) = 0;
+
     // Checks if this connection has the privileges necessary to create a new role
     virtual bool isAuthorizedToCreateRole(const RoleName& roleName) = 0;
 

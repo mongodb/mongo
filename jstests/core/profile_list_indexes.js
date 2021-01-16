@@ -2,7 +2,9 @@
 //   does_not_support_stepdowns,
 //   requires_getmore,
 //   requires_profiling,
+//   requires_fcv_49,
 // ]
+// Requires fcv 4.9 for the changes to SimpleCursor
 
 // Confirms that a listIndexes command and subsequent getMores of its cursor are profiled correctly.
 
@@ -26,7 +28,7 @@ testDB.setProfilingLevel(2);
 
 const listIndexesCommand = {
     listIndexes: testColl.getName(),
-    cursor: {batchSize: 1}
+    cursor: {batchSize: NumberLong(1)}
 };
 const profileEntryFilter = {
     op: "command"

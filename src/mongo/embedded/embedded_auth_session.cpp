@@ -173,6 +173,10 @@ public:
         return true;
     }
 
+    bool isAuthorizedToParseNamespaceElement(const NamespaceStringOrUUID&) override {
+        return true;
+    }
+
     bool isAuthorizedToCreateRole(const RoleName&) override {
         return true;
     }

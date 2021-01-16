@@ -551,6 +551,15 @@ bool AuthorizationSessionImpl::isAuthorizedToParseNamespaceElement(const BSONEle
     return true;
 }
 
+bool AuthorizationSessionImpl::isAuthorizedToParseNamespaceElement(
+    const NamespaceStringOrUUID& nss) {
+    if (nss.uuid()) {
+        return isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
+                                                ActionType::useUUID);
+    }
+    return true;
+}
+
 bool AuthorizationSessionImpl::isAuthorizedToCreateRole(const RoleName& roleName) {
     // A user is allowed to create a role under either of two conditions.
 

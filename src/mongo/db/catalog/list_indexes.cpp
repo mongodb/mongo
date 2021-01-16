@@ -51,7 +51,7 @@ namespace mongo {
 
 StatusWith<std::list<BSONObj>> listIndexes(OperationContext* opCtx,
                                            const NamespaceStringOrUUID& ns,
-                                           bool includeBuildUUIDs) {
+                                           boost::optional<bool> includeBuildUUIDs) {
     AutoGetCollectionForReadCommandMaybeLockFree collection(opCtx, ns);
     auto nss = collection.getNss();
     if (!collection) {
@@ -66,7 +66,7 @@ StatusWith<std::list<BSONObj>> listIndexes(OperationContext* opCtx,
 std::list<BSONObj> listIndexesInLock(OperationContext* opCtx,
                                      const CollectionPtr& collection,
                                      const NamespaceString& nss,
-                                     bool includeBuildUUIDs) {
+                                     boost::optional<bool> includeBuildUUIDs) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IS));
 
     auto durableCatalog = DurableCatalog::get(opCtx);
@@ -84,7 +84,7 @@ std::list<BSONObj> listIndexesInLock(OperationContext* opCtx,
 
     for (size_t i = 0; i < indexNames.size(); i++) {
         auto indexSpec = writeConflictRetry(opCtx, "listIndexes", nss.ns(), [&] {
-            if (includeBuildUUIDs &&
+            if (includeBuildUUIDs.value_or(false) &&
                 !durableCatalog->isIndexReady(opCtx, collection->getCatalogId(), indexNames[i])) {
                 // The durable catalog will not have a build UUID for the given index name if it was
                 // not being built with two-phase.
@@ -110,7 +110,7 @@ std::list<BSONObj> listIndexesInLock(OperationContext* opCtx,
 }
 std::list<BSONObj> listIndexesEmptyListIfMissing(OperationContext* opCtx,
                                                  const NamespaceStringOrUUID& nss,
-                                                 bool includeBuildUUIDs) {
+                                                 boost::optional<bool> includeBuildUUIDs) {
     auto listStatus = listIndexes(opCtx, nss, includeBuildUUIDs);
     return listStatus.isOK() ? listStatus.getValue() : std::list<BSONObj>();
 }

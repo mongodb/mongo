@@ -42,13 +42,13 @@ namespace mongo {
  */
 StatusWith<std::list<BSONObj>> listIndexes(OperationContext* opCtx,
                                            const NamespaceStringOrUUID& ns,
-                                           bool includeBuildUUIDs);
+                                           boost::optional<bool> includeBuildUUIDs);
 std::list<BSONObj> listIndexesInLock(OperationContext* opCtx,
                                      const CollectionPtr& collection,
                                      const NamespaceString& nss,
-                                     bool includeBuildUUIDs);
+                                     boost::optional<bool> includeBuildUUIDs);
 std::list<BSONObj> listIndexesEmptyListIfMissing(OperationContext* opCtx,
                                                  const NamespaceStringOrUUID& nss,
-                                                 bool includeBuildUUIDs);
+                                                 boost::optional<bool> includeBuildUUIDs);
 
 }  // namespace mongo

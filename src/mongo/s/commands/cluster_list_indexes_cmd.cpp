@@ -34,18 +34,18 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/list_indexes_gen.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/query/store_possible_cursor.h"
 
 namespace mongo {
 namespace {
 
-bool cursorCommandPassthroughShardWithMinKeyChunk(OperationContext* opCtx,
-                                                  const NamespaceString& nss,
-                                                  const ChunkManager& cm,
-                                                  const BSONObj& cmdObj,
-                                                  BSONObjBuilder* out,
-                                                  const PrivilegeVector& privileges) {
+ListIndexesReply cursorCommandPassthroughShardWithMinKeyChunk(OperationContext* opCtx,
+                                                              const NamespaceString& nss,
+                                                              const ChunkManager& cm,
+                                                              const BSONObj& cmdObj,
+                                                              const PrivilegeVector& privileges) {
     auto response = executeCommandAgainstShardWithMinKeyChunk(
         opCtx,
         nss,
@@ -65,82 +65,65 @@ bool cursorCommandPassthroughShardWithMinKeyChunk(OperationContext* opCtx,
                             Grid::get(opCtx)->getCursorManager(),
                             privileges));
 
-    CommandHelpers::filterCommandReplyForPassthrough(transformedResponse, out);
-    if (out->asTempObj()["ok"].trueValue()) {
-        // The reply syntax must conform to its IDL definition.
-        ListIndexesReply::parse({"listIndexes"}, out->asTempObj());
-    }
-    return true;
+    BSONObjBuilder out;
+    CommandHelpers::filterCommandReplyForPassthrough(transformedResponse, &out);
+    const auto& resultObj = out.obj();
+    uassertStatusOK(getStatusFromCommandResult(resultObj));
+    // The reply syntax must conform to its IDL definition.
+    return ListIndexesReply::parse({"listIndexes"}, resultObj);
 }
 
-class CmdListIndexes : public BasicCommand {
+class CmdListIndexes final : public ListIndexesCmdVersion1Gen<CmdListIndexes> {
 public:
-    CmdListIndexes() : BasicCommand("listIndexes") {}
-
-    const std::set<std::string>& apiVersions() const {
-        return kApiVersions1;
-    }
-
-    std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const override {
-        return CommandHelpers::parseNsCollectionRequired(dbname, cmdObj).ns();
-    }
-
-    bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return false;
-    }
-
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const final {
         return AllowedOnSecondary::kAlways;
     }
-
-    bool maintenanceOk() const override {
+    bool maintenanceOk() const final {
+        return false;
+    }
+    bool adminOnly() const final {
         return false;
     }
 
-    bool adminOnly() const override {
-        return false;
-    }
+    class Invocation final : public InvocationBaseGen {
+    public:
+        using InvocationBaseGen::InvocationBaseGen;
 
-    Status checkAuthForCommand(Client* client,
-                               const std::string& dbname,
-                               const BSONObj& cmdObj) const override {
-        AuthorizationSession* authzSession = AuthorizationSession::get(client);
-
-        // Check for the listIndexes ActionType on the database.
-        const NamespaceString ns(parseNs(dbname, cmdObj));
-
-        if (authzSession->isAuthorizedForActionsOnResource(ResourcePattern::forExactNamespace(ns),
-                                                           ActionType::listIndexes)) {
-            return Status::OK();
+        bool supportsWriteConcern() const final {
+            return false;
         }
 
-        return Status(ErrorCodes::Unauthorized,
-                      str::stream()
-                          << "Not authorized to list indexes on collection: " << ns.coll());
-    }
+        NamespaceString ns() const final {
+            const auto& nss = request().getNamespaceOrUUID().nss();
+            uassert(
+                ErrorCodes::BadValue, "Mongos requires a namespace for listIndexes command", nss);
+            return nss.get();
+        }
 
-    bool run(OperationContext* opCtx,
-             const std::string& dbName,
-             const BSONObj& cmdObj,
-             BSONObjBuilder& result) override {
-        CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
-        // Check the command syntax before passing to shard.
-        const auto parsed = ListIndexes::parse({"listIndexes"}, cmdObj);
+        void doCheckAuthorization(OperationContext* opCtx) const final {
+            AuthorizationSession* authzSession = AuthorizationSession::get(opCtx->getClient());
+            uassert(ErrorCodes::Unauthorized,
+                    str::stream() << "Not authorized to list indexes on collection:"
+                                  << ns().toString(),
+                    authzSession->isAuthorizedForActionsOnResource(
+                        ResourcePattern::forExactNamespace(ns()), ActionType::listIndexes));
+        }
 
-        // The command's IDL definition permits namespace or UUID, but mongos requires a namespace.
-        const NamespaceString nss(parseNs(dbName, cmdObj));
-        const auto cm =
-            uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
+        ListIndexesReply typedRun(OperationContext* opCtx) final {
+            CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
+            // The command's IDL definition permits namespace or UUID, but mongos requires a
+            // namespace.
+            const auto cm = uassertStatusOK(
+                Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, ns()));
 
-        return cursorCommandPassthroughShardWithMinKeyChunk(
-            opCtx,
-            nss,
-            cm,
-            applyReadWriteConcern(opCtx, this, cmdObj),
-            &result,
-            {Privilege(ResourcePattern::forExactNamespace(nss), ActionType::listIndexes)});
-    }
-
+            return cursorCommandPassthroughShardWithMinKeyChunk(
+                opCtx,
+                ns(),
+                cm,
+                applyReadWriteConcern(opCtx, this, request().toBSON({})),
+                {Privilege(ResourcePattern::forExactNamespace(ns()), ActionType::listIndexes)});
+        }
+    };
 } cmdListIndexes;
 
 }  // namespace
