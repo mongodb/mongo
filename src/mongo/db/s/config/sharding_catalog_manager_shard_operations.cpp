@@ -739,7 +739,7 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
     // Add all databases which were discovered on the new shard
     for (const auto& dbName : dbNamesStatus.getValue()) {
         boost::optional<Timestamp> clusterTime;
-        if (feature_flags::gShardingFullDDLSupport.isEnabled(
+        if (feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabled(
                 serverGlobalParams.featureCompatibility)) {
             const auto now = VectorClock::get(opCtx)->getTime();
             clusterTime = now.clusterTime().asTimestamp();

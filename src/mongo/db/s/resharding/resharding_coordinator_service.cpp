@@ -221,8 +221,8 @@ BSONObj createReshardingFieldsUpdateForOriginalNss(
             // the new sharded collection. Set 'uuid' to the reshardingUUID, 'key' to the new shard
             // key, 'lastmodEpoch' to newCollectionEpoch, and 'timestamp' to
             // newCollectionTimestamp (if newCollectionTimestamp has a value; i.e. when the
-            // shardingFullDDLSupport feature flag is enabled). Also update the 'state' field and
-            // add the 'recipientFields' to the 'reshardingFields' section.
+            // gShardingFullDDLSupportTimestampedVersion feature flag is enabled). Also update the
+            // 'state' field and add the 'recipientFields' to the 'reshardingFields' section.
             auto recipientFields = constructRecipientFields(coordinatorDoc);
             BSONObj setFields =
                 BSON("uuid" << coordinatorDoc.get_id() << "key"
@@ -897,7 +897,8 @@ Future<void> ReshardingCoordinatorService::ReshardingCoordinator::_commit(
     // collection is a new incarnation of the namespace
     auto newCollectionEpoch = OID::gen();
     boost::optional<Timestamp> newCollectionTimestamp;
-    if (feature_flags::gShardingFullDDLSupport.isEnabled(serverGlobalParams.featureCompatibility)) {
+    if (feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
         auto now = VectorClock::get(opCtx.get())->getTime();
         newCollectionTimestamp = now.clusterTime().asTimestamp();
     }

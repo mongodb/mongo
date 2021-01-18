@@ -112,7 +112,8 @@ InitialSplitPolicy::ShardCollectionConfig createChunks(const ShardKeyPattern& sh
                                                        std::vector<BSONObj>& finalSplitPoints,
                                                        const Timestamp& validAfter) {
     boost::optional<Timestamp> timestamp;
-    if (feature_flags::gShardingFullDDLSupport.isEnabled(serverGlobalParams.featureCompatibility)) {
+    if (feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
         timestamp = validAfter;
     }
 
@@ -288,7 +289,8 @@ InitialSplitPolicy::ShardCollectionConfig SingleChunkOnPrimarySplitPolicy::creat
     const auto clusterTime = currentTime.clusterTime().asTimestamp();
 
     boost::optional<Timestamp> timestamp;
-    if (feature_flags::gShardingFullDDLSupport.isEnabled(serverGlobalParams.featureCompatibility)) {
+    if (feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
         timestamp = clusterTime;
     }
 
@@ -382,7 +384,8 @@ InitialSplitPolicy::ShardCollectionConfig AbstractTagsBasedSplitPolicy::createFi
     };
 
     boost::optional<Timestamp> timestamp;
-    if (feature_flags::gShardingFullDDLSupport.isEnabled(serverGlobalParams.featureCompatibility)) {
+    if (feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
         timestamp = validAfter;
     }
 

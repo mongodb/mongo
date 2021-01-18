@@ -550,7 +550,8 @@ void ShardingCatalogManager::refineCollectionShardKey(OperationContext* opCtx,
     collType.setEpoch(newEpoch);
     collType.setKeyPattern(newShardKeyPattern.getKeyPattern());
 
-    if (feature_flags::gShardingFullDDLSupport.isEnabled(serverGlobalParams.featureCompatibility)) {
+    if (feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
         auto now = VectorClock::get(opCtx)->getTime();
         auto newClusterTime = now.clusterTime().asTimestamp();
         collType.setTimestamp(newClusterTime);

@@ -131,7 +131,7 @@ public:
             std::vector<ChunkType> initialChunks;
 
             boost::optional<Timestamp> timestamp;
-            if (feature_flags::gShardingFullDDLSupport.isEnabled(
+            if (feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabled(
                     serverGlobalParams.featureCompatibility)) {
                 const auto now = VectorClock::get(opCtx)->getTime();
                 timestamp = now.clusterTime().asTimestamp();

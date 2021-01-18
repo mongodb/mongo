@@ -40,3 +40,9 @@ feature_flags:
     description: "Once implemented allow usage of Distributed locks on shards."
     cpp_varname: gShardingFullDDLSupportDistLocksOnStepDown
     default: false
+
+  featureFlagShardingFullDDLSupportTimestampedVersion:
+    description: "Enables the usage of timestamps in Database/Chunk versions."
+    cpp_varname: gShardingFullDDLSupportTimestampedVersion
+    default: false
+    #version: 4.9

@@ -523,7 +523,7 @@ void ShardingCatalogManager::removePre49LegacyMetadata(OperationContext* opCtx) 
 void ShardingCatalogManager::upgradeMetadataFor49(OperationContext* opCtx) {
     LOGV2(5276704, "Starting metadata upgrade to 4.9");
 
-    if (feature_flags::gShardingFullDDLSupport.isEnabledAndIgnoreFCV()) {
+    if (feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabledAndIgnoreFCV()) {
         _createDBTimestampsFor49(opCtx);
         _upgradeCollectionsAndChunksMetadataFor49(opCtx);
     }
@@ -534,7 +534,7 @@ void ShardingCatalogManager::upgradeMetadataFor49(OperationContext* opCtx) {
 void ShardingCatalogManager::downgradeMetadataToPre49(OperationContext* opCtx) {
     LOGV2(5276706, "Starting metadata downgrade to pre 4.9");
 
-    if (feature_flags::gShardingFullDDLSupport.isEnabledAndIgnoreFCV()) {
+    if (feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabledAndIgnoreFCV()) {
         _downgradeConfigDatabasesEntriesToPre49(opCtx);
         _downgradeCollectionsAndChunksMetadataToPre49(opCtx);
     }

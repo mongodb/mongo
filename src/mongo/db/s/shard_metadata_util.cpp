@@ -489,7 +489,7 @@ Status deleteDatabasesEntry(OperationContext* opCtx, StringData dbName) {
 
 void downgradeShardConfigDatabasesEntriesToPre49(OperationContext* opCtx) {
     LOGV2(5258804, "Starting downgrade of config.cache.databases");
-    if (feature_flags::gShardingFullDDLSupport.isEnabledAndIgnoreFCV()) {
+    if (feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabledAndIgnoreFCV()) {
         write_ops::Update clearFields(NamespaceString::kShardConfigDatabasesNamespace, [] {
             write_ops::UpdateOpEntry u;
             u.setQ({});
@@ -521,7 +521,7 @@ void downgradeShardConfigCollectionEntriesToPre49(OperationContext* opCtx) {
     write_ops::Update clearFields(NamespaceString::kShardConfigCollectionsNamespace, [] {
         BSONObj unsetFields =
             BSON(ShardCollectionType::kPre50CompatibleAllowMigrationsFieldName << "");
-        if (feature_flags::gShardingFullDDLSupport.isEnabledAndIgnoreFCV()) {
+        if (feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabledAndIgnoreFCV()) {
             unsetFields = unsetFields.addFields(BSON(CollectionType::kTimestampFieldName << ""));
         }
 

@@ -159,7 +159,7 @@ DatabaseType ShardingCatalogManager::createDatabase(OperationContext* opCtx,
                                        : selectShardForNewDatabase(opCtx, shardRegistry)));
 
             boost::optional<Timestamp> clusterTime;
-            if (feature_flags::gShardingFullDDLSupport.isEnabled(
+            if (feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabled(
                     serverGlobalParams.featureCompatibility)) {
                 const auto now = VectorClock::get(opCtx)->getTime();
                 clusterTime = now.clusterTime().asTimestamp();

@@ -472,7 +472,8 @@ void updateShardingCatalogEntryForCollection(
     }
 
     boost::optional<Timestamp> creationTime;
-    if (feature_flags::gShardingFullDDLSupport.isEnabled(serverGlobalParams.featureCompatibility)) {
+    if (feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
         creationTime = initialChunks.creationTime;
     }
 
@@ -576,8 +577,9 @@ CreateCollectionResponse shardCollection(OperationContext* opCtx,
     {
         invariant(!opCtx->lockState()->isLocked());
         Lock::SharedLock fcvLock(opCtx->lockState(), FeatureCompatibilityVersion::fcvLock);
-        shouldUseUUIDForChunkIndexing = feature_flags::gShardingFullDDLSupport.isEnabled(
-            serverGlobalParams.featureCompatibility);
+        shouldUseUUIDForChunkIndexing =
+            feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabled(
+                serverGlobalParams.featureCompatibility);
         // TODO SERVER-53092: persist FCV placeholder
     }
 
