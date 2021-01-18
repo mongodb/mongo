@@ -50,6 +50,11 @@ static constexpr int kMaxExplainStatsBSONSizeMB = 10 * 1024 * 1024;
 class PlanExplainer {
 public:
     /**
+     * A version of the explain format. "1" is used for the classic engine and "2" for SBE.
+     */
+    using ExplainVersion = std::string;
+
+    /**
      * This pair holds a serialized BSON document that details the plan selected by the query
      * planner, and optional summary stats for an execution tree if the verbosity level for the
      * generated stats is 'executionStats' or higher. The format of these stats are opaque to the
@@ -64,6 +69,11 @@ public:
     PlanExplainer(const PlanEnumeratorExplainInfo& info) : _enumeratorExplainInfo{info} {}
 
     virtual ~PlanExplainer() = default;
+
+    /**
+     * Returns a version of the explain format supported by this explainer.
+     */
+    virtual const ExplainVersion& getVersion() const = 0;
 
     /**
      * Returns 'true' if this PlanExplainer can provide information on the winning plan and rejected

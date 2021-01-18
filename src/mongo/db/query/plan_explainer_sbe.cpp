@@ -298,21 +298,35 @@ PlanSummaryStats collectExecutionStatsSummary(const sbe::PlanStageStats* stats) 
     return summary;
 }
 
-PlanExplainer::PlanStatsDetails buildPlanStatsDetails(const QuerySolutionNode* node,
-                                                      const sbe::PlanStageStats* stats,
-                                                      ExplainOptions::Verbosity verbosity) {
+PlanExplainer::PlanStatsDetails buildPlanStatsDetails(
+    const QuerySolutionNode* node,
+    const sbe::PlanStageStats* stats,
+    const boost::optional<BSONObj>& execPlanDebugInfo,
+    ExplainOptions::Verbosity verbosity) {
     BSONObjBuilder bob;
 
     if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
         auto summary = collectExecutionStatsSummary(stats);
         statsToBSON(stats, &bob, &bob);
+        // At the 'kQueryPlanner' verbosity level we use the QSN-derived format for the given plan,
+        // and thus the winning plan and rejected plans at this verbosity should display the
+        // stringified SBE plan, which is added below. However, at the 'kExecStats' the execution
+        // stats use the PlanStage-derived format for the SBE tree, so there is no need to repeat
+        // the stringified SBE plan and we only included what's been generated from the
+        // PlanStageStats.
         return {bob.obj(), std::move(summary)};
     }
 
     statsToBSON(node, &bob, &bob);
-    return {bob.obj(), boost::none};
+    invariant(execPlanDebugInfo);
+    return {BSON("queryPlan" << bob.obj() << "slotBasedPlan" << *execPlanDebugInfo), boost::none};
 }
 }  // namespace
+
+const PlanExplainer::ExplainVersion& PlanExplainerSBE::getVersion() const {
+    static const ExplainVersion kExplainVersion = "2";
+    return kExplainVersion;
+}
 
 std::string PlanExplainerSBE::getPlanSummary() const {
     if (!_solution) {
@@ -462,7 +476,7 @@ PlanExplainer::PlanStatsDetails PlanExplainerSBE::getWinningPlanStats(
     invariant(_root);
     invariant(_solution);
     auto stats = _root->getStats(true /* includeDebugInfo  */);
-    return buildPlanStatsDetails(_solution->root(), stats.get(), verbosity);
+    return buildPlanStatsDetails(_solution->root(), stats.get(), _execPlanDebugInfo, verbosity);
 }
 
 std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerSBE::getRejectedPlansStats(
@@ -478,7 +492,9 @@ std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerSBE::getRejectedPlansS
         invariant(candidate.solution);
 
         auto stats = candidate.root->getStats(true /* includeDebugInfo  */);
-        res.push_back(buildPlanStatsDetails(candidate.solution->root(), stats.get(), verbosity));
+        auto execPlanDebugInfo = buildExecPlanDebugInfo(candidate.root.get(), &candidate.data);
+        res.push_back(buildPlanStatsDetails(
+            candidate.solution->root(), stats.get(), execPlanDebugInfo, verbosity));
     }
     return res;
 }
@@ -491,7 +507,7 @@ std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerSBE::getCachedPlanStat
     auto&& stats = decision.getStats<mongo::sbe::PlanStageStats>();
     if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
         for (auto&& planStats : stats.candidatePlanStats) {
-            res.push_back(buildPlanStatsDetails(nullptr, planStats.get(), verbosity));
+            res.push_back(buildPlanStatsDetails(nullptr, planStats.get(), boost::none, verbosity));
         }
     } else {
         // At the "queryPlanner" verbosity we only need to provide details about the winning plan

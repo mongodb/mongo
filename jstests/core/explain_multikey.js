@@ -10,8 +10,8 @@
 
 load("jstests/libs/analyze_plan.js");
 
-var coll = db.explain_multikey;
-var keyPattern = {
+const coll = db.explain_multikey;
+const keyPattern = {
     a: 1,
     "b.c": 1,
     "b.d": 1,
@@ -35,12 +35,13 @@ function createIndexAndRunExplain(testOptions) {
     assert.commandWorked(coll.createIndex(keyPattern));
     assert.commandWorked(coll.insert(testOptions.docToInsert));
 
-    var explain = db.runCommand({explain: testOptions.commandObj});
+    const explain = db.runCommand({explain: testOptions.commandObj});
     assert.commandWorked(explain);
+    const winningPlan = getWinningPlan(explain.queryPlanner);
 
-    assert(planHasStage(db, explain.queryPlanner.winningPlan, testOptions.stage),
+    assert(planHasStage(db, winningPlan, testOptions.stage),
            "expected stage to be present: " + tojson(explain));
-    return getPlanStage(explain.queryPlanner.winningPlan, testOptions.stage);
+    return getPlanStage(winningPlan, testOptions.stage);
 }
 
 // Calls createIndexAndRunExplain() twice: once with a document that causes the created index to
@@ -51,7 +52,7 @@ function verifyMultikeyInfoInExplainOutput(testOptions) {
         a: 1,
         b: [{c: ["w", "x"], d: 3}, {c: ["y", "z"], d: 4}],
     };
-    var stage = createIndexAndRunExplain(testOptions);
+    let stage = createIndexAndRunExplain(testOptions);
 
     assert.eq(true, stage.isMultiKey, "expected index to be multikey: " + tojson(stage));
     assert.eq({a: [], "b.c": ["b", "b.c"], "b.d": ["b"]}, stage.multiKeyPaths, tojson(stage));

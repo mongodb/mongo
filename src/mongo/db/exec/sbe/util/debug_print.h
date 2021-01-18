@@ -116,7 +116,7 @@ public:
                    std::make_move_iterator(blocks.begin()),
                    std::make_move_iterator(blocks.end()));
     }
-    std::string print(PlanStage* s);
+    std::string print(const PlanStage& s);
     std::string print(const std::vector<Block>& blocks);
 
 private:

@@ -40,7 +40,7 @@ function assertIfQueryIsCovered(query, projection, isCovered, hint) {
 
     assert(explain.hasOwnProperty("queryPlanner"), tojson(explain));
     assert(explain.queryPlanner.hasOwnProperty("winningPlan"), tojson(explain));
-    const winningPlan = explain.queryPlanner.winningPlan;
+    const winningPlan = getWinningPlan(explain.queryPlanner);
     if (isCovered) {
         assert(isIndexOnly(db, winningPlan),
                "Query " + tojson(query) + " with projection " + tojson(projection) +

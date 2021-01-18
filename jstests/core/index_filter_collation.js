@@ -77,10 +77,10 @@ function assertIsIxScanOnIndex(winningPlan, keyPattern) {
 // Run the queries and be sure the correct indexes are used.
 let explain = coll.find({x: 3}).explain();
 checkIndexFilterSet(explain, true);
-assertIsIxScanOnIndex(explain.queryPlanner.winningPlan, {x: 1, y: 1});
+assertIsIxScanOnIndex(getWinningPlan(explain.queryPlanner), {x: 1, y: 1});
 
 // Run the queries and be sure the correct indexes are used.
 explain = coll.find({x: 3}).collation(caseInsensitive).explain();
 checkIndexFilterSet(explain, true);
-assertIsIxScanOnIndex(explain.queryPlanner.winningPlan, {x: 1});
+assertIsIxScanOnIndex(getWinningPlan(explain.queryPlanner), {x: 1});
 })();

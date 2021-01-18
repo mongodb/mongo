@@ -56,7 +56,7 @@ function validateIxscanOrCollscanUsed(queryShape, idxName) {
 
     if (idxName) {
         // Expect the given index was used.
-        const ixScanStage = getPlanStages(explain.queryPlanner.winningPlan, "IXSCAN")[0];
+        const ixScanStage = getPlanStages(getWinningPlan(explain.queryPlanner), "IXSCAN")[0];
         assert(ixScanStage, `Index '${idxName}' was not used.`);
         assert.eq(ixScanStage.indexName, idxName, `Index '${idxName}' was not used.`);
     } else {

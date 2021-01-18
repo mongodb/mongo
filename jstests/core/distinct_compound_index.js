@@ -21,9 +21,9 @@ assert.commandWorked(coll.createIndex({a: 1, b: 1}));
 
 const explain_distinct_with_query = coll.explain("executionStats").distinct('b', {a: 1});
 assert.commandWorked(explain_distinct_with_query);
-assert(planHasStage(db, explain_distinct_with_query.queryPlanner.winningPlan, "DISTINCT_SCAN"));
-assert(
-    planHasStage(db, explain_distinct_with_query.queryPlanner.winningPlan, "PROJECTION_COVERED"));
+assert(planHasStage(db, getWinningPlan(explain_distinct_with_query.queryPlanner), "DISTINCT_SCAN"));
+assert(planHasStage(
+    db, getWinningPlan(explain_distinct_with_query.queryPlanner), "PROJECTION_COVERED"));
 // If the collection is sharded, we expect at most 2 distinct values per shard. If the
 // collection is not sharded, we expect 2 returned.
 assert.lte(explain_distinct_with_query.executionStats.nReturned,
@@ -31,8 +31,9 @@ assert.lte(explain_distinct_with_query.executionStats.nReturned,
 
 const explain_distinct_without_query = coll.explain("executionStats").distinct('b');
 assert.commandWorked(explain_distinct_without_query);
-assert(planHasStage(db, explain_distinct_without_query.queryPlanner.winningPlan, "COLLSCAN"));
-assert(!planHasStage(db, explain_distinct_without_query.queryPlanner.winningPlan, "DISTINCT_SCAN"));
+assert(planHasStage(db, getWinningPlan(explain_distinct_without_query.queryPlanner), "COLLSCAN"));
+assert(!planHasStage(
+    db, getWinningPlan(explain_distinct_without_query.queryPlanner), "DISTINCT_SCAN"));
 assert.eq(40, explain_distinct_without_query.executionStats.nReturned);
 
 // Verify that compound special indexes such as '2dsphere' and 'text' can never use index to answer

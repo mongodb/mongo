@@ -536,6 +536,11 @@ void appendMultikeyPaths(const BSONObj& keyPattern,
     subMultikeyPaths.doneFast();
 }
 
+const PlanExplainer::ExplainVersion& PlanExplainerImpl::getVersion() const {
+    static const ExplainVersion kExplainVersion = "1";
+    return kExplainVersion;
+}
+
 bool PlanExplainerImpl::isMultiPlan() const {
     return getStageByType(_root, StageType::STAGE_MULTI_PLAN) != nullptr;
 }

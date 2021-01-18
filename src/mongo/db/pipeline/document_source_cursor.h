@@ -115,6 +115,10 @@ public:
         return &_stats;
     }
 
+    const PlanExplainer::ExplainVersion& getExplainVersion() const {
+        return _exec->getPlanExplainer().getVersion();
+    }
+
 protected:
     DocumentSourceCursor(const CollectionPtr& collection,
                          std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,

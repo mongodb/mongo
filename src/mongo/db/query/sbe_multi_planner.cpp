@@ -65,7 +65,8 @@ CandidatePlans MultiPlanner::finalizeExecutionPlans(
     LOGV2_DEBUG(
         4822875, 5, "Winning solution", "bestSolution"_attr = redact(winner.solution->toString()));
 
-    auto explainer = plan_explainer_factory::make(winner.root.get(), winner.solution.get());
+    auto explainer =
+        plan_explainer_factory::make(winner.root.get(), &winner.data, winner.solution.get());
     LOGV2_DEBUG(4822876, 2, "Winning plan", "planSummary"_attr = explainer->getPlanSummary());
 
     // Close all candidate plans but the winner.

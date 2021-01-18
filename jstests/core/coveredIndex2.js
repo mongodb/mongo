@@ -5,31 +5,34 @@
 //   assumes_unsharded_collection,
 //   requires_fastcount,
 // ]
+(function() {
+"use strict";
 
-t = db["jstests_coveredIndex2"];
+const t = db["jstests_coveredIndex2"];
 t.drop();
 
 // Include helpers for analyzing explain output.
 load("jstests/libs/analyze_plan.js");
 
-t.save({a: 1});
-t.save({a: 2});
+assert.commandWorked(t.insert({a: 1}));
+assert.commandWorked(t.insert({a: 2}));
 assert.eq(t.findOne({a: 1}).a, 1, "Cannot find right record");
 assert.eq(t.count(), 2, "Not right length");
 
 // use simple index
-t.createIndex({a: 1});
-var plan = t.find({a: 1}).explain();
-assert(!isIndexOnly(db, plan.queryPlanner.winningPlan),
+assert.commandWorked(t.createIndex({a: 1}));
+let plan = t.find({a: 1}).explain();
+assert(!isIndexOnly(db, getWinningPlan(plan.queryPlanner)),
        "Find using covered index but all fields are returned");
-var plan = t.find({a: 1}, {a: 1}).explain();
-assert(!isIndexOnly(db, plan.queryPlanner.winningPlan),
+plan = t.find({a: 1}, {a: 1}).explain();
+assert(!isIndexOnly(db, getWinningPlan(plan.queryPlanner)),
        "Find using covered index but _id is returned");
-var plan = t.find({a: 1}, {a: 1, _id: 0}).explain();
-assert(isIndexOnly(db, plan.queryPlanner.winningPlan), "Find is not using covered index");
+plan = t.find({a: 1}, {a: 1, _id: 0}).explain();
+assert(isIndexOnly(db, getWinningPlan(plan.queryPlanner)), "Find is not using covered index");
 
 // add multikey
-t.save({a: [3, 4]});
-var plan = t.find({a: 1}, {a: 1, _id: 0}).explain();
-assert(!isIndexOnly(db, plan.queryPlanner.winningPlan),
+assert.commandWorked(t.insert({a: [3, 4]}));
+plan = t.find({a: 1}, {a: 1, _id: 0}).explain();
+assert(!isIndexOnly(db, getWinningPlan(plan.queryPlanner)),
        "Find is using covered index even after multikey insert");
+}());

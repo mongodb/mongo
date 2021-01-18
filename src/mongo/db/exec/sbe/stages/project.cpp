@@ -100,9 +100,9 @@ std::unique_ptr<PlanStageStats> ProjectStage::getStats(bool includeDebugInfo) co
     if (includeDebugInfo) {
         DebugPrinter printer;
         BSONObjBuilder bob;
-        for (auto&& [slot, expr] : _projects) {
+        value::orderedSlotMapTraverse(_projects, [&](auto slot, auto&& expr) {
             bob.append(str::stream() << slot, printer.print(expr->debugPrint()));
-        }
+        });
         ret->debugInfo = BSON("projections" << bob.obj());
     }
 
@@ -116,19 +116,21 @@ const SpecificStats* ProjectStage::getSpecificStats() const {
 
 std::vector<DebugPrinter::Block> ProjectStage::debugPrint() const {
     auto ret = PlanStage::debugPrint();
+
     ret.emplace_back("[`");
     bool first = true;
-    for (auto& p : _projects) {
+    value::orderedSlotMapTraverse(_projects, [&](auto slot, auto&& expr) {
         if (!first) {
             ret.emplace_back(DebugPrinter::Block("`,"));
         }
 
-        DebugPrinter::addIdentifier(ret, p.first);
+        DebugPrinter::addIdentifier(ret, slot);
         ret.emplace_back("=");
-        DebugPrinter::addBlocks(ret, p.second->debugPrint());
+        DebugPrinter::addBlocks(ret, expr->debugPrint());
         first = false;
-    }
+    });
     ret.emplace_back("`]");
+
     DebugPrinter::addNewLine(ret);
     DebugPrinter::addBlocks(ret, _children[0]->debugPrint());
     return ret;

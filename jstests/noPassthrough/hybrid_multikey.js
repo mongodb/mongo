@@ -3,6 +3,7 @@
  * various index types.
  */
 load("jstests/noPassthrough/libs/index_build.js");
+load("jstests/libs/analyze_plan.js");  // For getWinningPlan to analyze explain() output.
 
 (function() {
 "use strict";
@@ -50,7 +51,7 @@ const runTest = (config) => {
 
     // Ensure the index is usable and has the expected multikey state.
     let explain = testColl.find({x: 1}).hint(indexName).explain();
-    let plan = explain.queryPlanner.winningPlan;
+    let plan = getWinningPlan(explain.queryPlanner);
     assert.eq("FETCH", plan.stage, explain);
     assert.eq("IXSCAN", plan.inputStage.stage, explain);
     assert.eq(

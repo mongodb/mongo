@@ -10,7 +10,7 @@ var coll = db.jstests_bitwise;
 
 function assertQueryCorrect(query, count) {
     var explain = coll.find(query).explain("executionStats");
-    assert(isCollscan(db, explain.queryPlanner.winningPlan),
+    assert(isCollscan(db, getWinningPlan(explain.queryPlanner)),
            "expected bit test query plan to be COLLSCAN");
     assert.eq(
         count, explain.executionStats.nReturned, "bit test query not returning correct documents");

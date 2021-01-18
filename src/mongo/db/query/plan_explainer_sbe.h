@@ -41,6 +41,7 @@ namespace mongo {
 class PlanExplainerSBE final : public PlanExplainer {
 public:
     PlanExplainerSBE(const sbe::PlanStage* root,
+                     const stage_builder::PlanStageData* data,
                      const QuerySolution* solution,
                      std::vector<sbe::plan_ranker::CandidatePlan> rejectedCandidates,
                      bool isMultiPlan)
@@ -48,12 +49,14 @@ public:
           _root{root},
           _solution{solution},
           _rejectedCandidates{std::move(rejectedCandidates)},
-          _isMultiPlan{isMultiPlan} {}
+          _isMultiPlan{isMultiPlan},
+          _execPlanDebugInfo{buildExecPlanDebugInfo(_root, data)} {}
 
     bool isMultiPlan() const final {
         return _isMultiPlan;
     }
 
+    const ExplainVersion& getVersion() const final;
     std::string getPlanSummary() const final;
     void getSummaryStats(PlanSummaryStats* statsOut) const final;
     PlanStatsDetails getWinningPlanStats(ExplainOptions::Verbosity verbosity) const final;
@@ -63,9 +66,25 @@ public:
                                                      ExplainOptions::Verbosity) const final;
 
 private:
+    boost::optional<BSONObj> buildExecPlanDebugInfo(
+        const sbe::PlanStage* root, const stage_builder::PlanStageData* data) const {
+        if (root && data) {
+            return BSON("slots" << data->debugString() << "stages"
+                                << sbe::DebugPrinter().print(*_root));
+        }
+        return boost::none;
+    }
+
     const sbe::PlanStage* _root{nullptr};
     const QuerySolution* _solution{nullptr};
     const std::vector<sbe::plan_ranker::CandidatePlan> _rejectedCandidates;
     const bool _isMultiPlan{false};
+    // Contains information about the slots returned by the PlanStage tree, along with the tree
+    // itself, serialized into a string. This optional object is then included into explain output
+    // and is only initialized when the _root of the PlanStage tree is available. The only case when
+    // it's not available is when PlanStatsDetails are generated from the plan cache (by
+    // calling getCachedPlanStats()), in which case this debug info is already included into the
+    // plan cache entry as part of a serialized winning plan.
+    boost::optional<BSONObj> _execPlanDebugInfo;
 };
 }  // namespace mongo

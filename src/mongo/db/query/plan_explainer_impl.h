@@ -48,6 +48,7 @@ public:
         : PlanExplainer{explainInfo}, _root{root} {}
     PlanExplainerImpl(PlanStage* root) : _root{root} {}
 
+    const ExplainVersion& getVersion() const final;
     bool isMultiPlan() const final;
     std::string getPlanSummary() const final;
     void getSummaryStats(PlanSummaryStats* statsOut) const final;

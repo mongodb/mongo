@@ -54,7 +54,7 @@ assertOneIndexFilter({x: 3}, [{x: 1, y: 1}]);
 
 let explain = assert.commandWorked(coll.find({x: 3}).explain());
 checkIndexFilterSet(explain, true);
-assertIsIxScanOnIndex(explain.queryPlanner.winningPlan, {x: 1, y: 1});
+assertIsIxScanOnIndex(getWinningPlan(explain.queryPlanner), {x: 1, y: 1});
 
 // Drop an index. The filter should not change.
 assert.commandWorked(coll.dropIndex({x: 1, y: 1}));
@@ -64,13 +64,13 @@ assertOneIndexFilter({x: 3}, [{x: 1, y: 1}]);
 // Since we dropped the {x: 1, y: 1} index, a COLLSCAN must be used.
 explain = coll.find({x: 3}).explain();
 checkIndexFilterSet(explain, true);
-assert(isCollscan(db, explain.queryPlanner.winningPlan));
+assert(isCollscan(db, getWinningPlan(explain.queryPlanner)));
 
 // Create another index. This should not change whether the index filter is applied.
 assert.commandWorked(coll.createIndex({x: 1, z: 1}));
 explain = assert.commandWorked(coll.find({x: 3}).explain());
 checkIndexFilterSet(explain, true);
-assert(isCollscan(db, explain.queryPlanner.winningPlan));
+assert(isCollscan(db, getWinningPlan(explain.queryPlanner)));
 
 // Changing the catalog and then setting an index filter should not result in duplicate entries.
 assert.commandWorked(coll.createIndex({x: 1, a: 1}));
@@ -84,5 +84,5 @@ assertOneIndexFilter({x: 3}, [{x: 1, y: 1}]);
 
 explain = assert.commandWorked(coll.find({x: 3}).explain());
 checkIndexFilterSet(explain, true);
-assertIsIxScanOnIndex(explain.queryPlanner.winningPlan, {x: 1, y: 1});
+assertIsIxScanOnIndex(getWinningPlan(explain.queryPlanner), {x: 1, y: 1});
 })();

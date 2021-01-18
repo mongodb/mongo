@@ -231,9 +231,9 @@ TEST_F(SBEParserTest, TestIdenticalDebugOutputAfterParse) {
     sbe::Parser parser;
 
     for (const auto& stage : stages) {
-        const auto stageText = printer.print(stage.get());
+        const auto stageText = printer.print(*stage);
         const auto parsedStage = parser.parse(nullptr, "testDb", stageText);
-        const auto stageTextAfterParse = printer.print(parsedStage.get());
+        const auto stageTextAfterParse = printer.print(*parsedStage);
         ASSERT_EQ(stageText, stageTextAfterParse);
     }
 }
@@ -243,7 +243,7 @@ TEST_F(SBEParserTest, TestPlanNodeIdIsParsed) {
     sbe::Parser parser;
 
     for (const auto& stage : stages) {
-        const auto stageText = printer.print(stage.get());
+        const auto stageText = printer.print(*stage);
         const auto parsedStage = parser.parse(nullptr, "testDb", stageText);
         ASSERT_EQ(parsedStage->getCommonStats()->nodeId, planNodeId);
     }

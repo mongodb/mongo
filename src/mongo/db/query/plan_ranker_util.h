@@ -84,8 +84,8 @@ StatusWith<std::unique_ptr<PlanRankingDecision>> pickBestPlan(
                                                     candidates[i].solution->_enumeratorExplainInfo);
             } else {
                 static_assert(std::is_same_v<PlanStageStatsType, mongo::sbe::PlanStageStats>);
-                return plan_explainer_factory::make(candidates[i].root.get(),
-                                                    candidates[i].solution.get());
+                return plan_explainer_factory::make(
+                    candidates[i].root.get(), &candidates[i].data, candidates[i].solution.get());
             }
         }();
 
@@ -143,8 +143,8 @@ StatusWith<std::unique_ptr<PlanRankingDecision>> pickBestPlan(
         // For SBE, we need to store a serialized winning plan within the ranking decision to be
         // able to included it into the explain output for a cached plan stats, since we cannot
         // reconstruct it from a PlanStageStats tree.
-        auto explainer =
-            plan_explainer_factory::make(candidates[0].root.get(), candidates[0].solution.get());
+        auto explainer = plan_explainer_factory::make(
+            candidates[0].root.get(), &candidates[0].data, candidates[0].solution.get());
         auto&& [stats, _] =
             explainer->getWinningPlanStats(ExplainOptions::Verbosity::kQueryPlanner);
         SBEStatsDetails details;

@@ -483,7 +483,8 @@ public:
         invariant(_roots.size() == 1);
         invariant(_solutions.size() == 1);
         invariant(_roots[0].first);
-        auto explainer = plan_explainer_factory::make(_roots[0].first.get(), _solutions[0].get());
+        auto explainer = plan_explainer_factory::make(
+            _roots[0].first.get(), &_roots[0].second, _solutions[0].get());
         return explainer->getPlanSummary();
     }
 

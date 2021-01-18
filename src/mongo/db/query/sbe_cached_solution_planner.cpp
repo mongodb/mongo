@@ -52,7 +52,8 @@ CandidatePlans CachedSolutionPlanner::plan(
         invariant(candidates.size() == 1);
         return std::move(candidates[0]);
     }();
-    auto explainer = plan_explainer_factory::make(candidate.root.get(), candidate.solution.get());
+    auto explainer = plan_explainer_factory::make(
+        candidate.root.get(), &candidate.data, candidate.solution.get());
 
     if (candidate.failed) {
         // On failure, fall back to replanning the whole query. We neither evict the existing cache
@@ -123,7 +124,7 @@ CandidatePlans CachedSolutionPlanner::replan(bool shouldCache) const {
             _opCtx, _collection, _cq, *solutions[0], _yieldPolicy);
         prepareExecutionPlan(root.get(), &data);
 
-        auto explainer = plan_explainer_factory::make(root.get(), solutions[0].get());
+        auto explainer = plan_explainer_factory::make(root.get(), &data, solutions[0].get());
         LOGV2_DEBUG(
             2058101,
             1,
@@ -153,6 +154,7 @@ CandidatePlans CachedSolutionPlanner::replan(bool shouldCache) const {
     MultiPlanner multiPlanner{_opCtx, _collection, _cq, cachingMode, _yieldPolicy};
     auto&& [candidates, winnerIdx] = multiPlanner.plan(std::move(solutions), std::move(roots));
     auto explainer = plan_explainer_factory::make(candidates[winnerIdx].root.get(),
+                                                  &candidates[winnerIdx].data,
                                                   candidates[winnerIdx].solution.get());
     LOGV2_DEBUG(2058201,
                 1,

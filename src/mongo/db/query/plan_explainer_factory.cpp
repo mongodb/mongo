@@ -43,15 +43,18 @@ std::unique_ptr<PlanExplainer> make(PlanStage* root, const PlanEnumeratorExplain
     return std::make_unique<PlanExplainerImpl>(root, explainInfo);
 }
 
-std::unique_ptr<PlanExplainer> make(sbe::PlanStage* root, const QuerySolution* solution) {
-    return make(root, solution, {}, false);
+std::unique_ptr<PlanExplainer> make(sbe::PlanStage* root,
+                                    const stage_builder::PlanStageData* data,
+                                    const QuerySolution* solution) {
+    return make(root, data, solution, {}, false);
 }
 
 std::unique_ptr<PlanExplainer> make(sbe::PlanStage* root,
+                                    const stage_builder::PlanStageData* data,
                                     const QuerySolution* solution,
                                     std::vector<sbe::plan_ranker::CandidatePlan> rejectedCandidates,
                                     bool isMultiPlan) {
     return std::make_unique<PlanExplainerSBE>(
-        root, solution, std::move(rejectedCandidates), isMultiPlan);
+        root, data, solution, std::move(rejectedCandidates), isMultiPlan);
 }
 }  // namespace mongo::plan_explainer_factory

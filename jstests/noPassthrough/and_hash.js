@@ -49,7 +49,7 @@ function assertAndHashUsed({query, expectedResult, shouldUseAndHash} = {}) {
     const expl = queryResult.explain();
 
     assertArrayEq({actual: queryResult.toArray(), expected: expectedResult});
-    assert.eq(shouldUseAndHash, planHasStage(db, expl.queryPlanner.winningPlan, "AND_HASH"));
+    assert.eq(shouldUseAndHash, planHasStage(db, getWinningPlan(expl.queryPlanner), "AND_HASH"));
 }
 
 // Test basic index intersection where we expect AND_HASH to be used.

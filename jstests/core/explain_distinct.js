@@ -12,11 +12,11 @@
 
 load("jstests/libs/analyze_plan.js");
 
-var collName = "jstests_explain_distinct";
-var coll = db[collName];
+const collName = "jstests_explain_distinct";
+const coll = db[collName];
 
 function runDistinctExplain(collection, keyString, query) {
-    var distinctCmd = {distinct: collection.getName(), key: keyString};
+    const distinctCmd = {distinct: collection.getName(), key: keyString};
 
     if (typeof query !== 'undefined') {
         distinctCmd.query = query;
@@ -28,12 +28,13 @@ function runDistinctExplain(collection, keyString, query) {
 coll.drop();
 
 // Collection doesn't exist.
-var explain = runDistinctExplain(coll, 'a', {});
+let explain = runDistinctExplain(coll, 'a', {});
 assert.commandWorked(explain);
-assert(planHasStage(db, explain.queryPlanner.winningPlan, "EOF"));
+let winningPlan = getWinningPlan(explain.queryPlanner);
+assert(planHasStage(db, winningPlan, "EOF"));
 
 // Insert the data to perform distinct() on.
-for (var i = 0; i < 10; i++) {
+for (let i = 0; i < 10; i++) {
     assert.commandWorked(coll.insert({a: 1, b: 1}));
     assert.commandWorked(coll.insert({a: 2, c: 1}));
 }
@@ -49,22 +50,24 @@ assert.commandWorked(runDistinctExplain(coll, 'a', null));
 assert.commandWorked(runDistinctExplain(coll, 'a'));
 
 assert.eq([1], coll.distinct('b'));
-var explain = runDistinctExplain(coll, 'b', {});
+explain = runDistinctExplain(coll, 'b', {});
 assert.commandWorked(explain);
+winningPlan = getWinningPlan(explain.queryPlanner);
 assert.eq(20, explain.executionStats.nReturned);
-assert(isCollscan(db, explain.queryPlanner.winningPlan));
+assert(isCollscan(db, winningPlan));
 
 assert.commandWorked(coll.createIndex({a: 1}));
 
 assert.eq([1, 2], coll.distinct('a'));
-var explain = runDistinctExplain(coll, 'a', {});
+explain = runDistinctExplain(coll, 'a', {});
 assert.commandWorked(explain);
+winningPlan = getWinningPlan(explain.queryPlanner);
 assert.eq(2, explain.executionStats.nReturned);
-assert(planHasStage(db, explain.queryPlanner.winningPlan, "PROJECTION_COVERED"));
-assert(planHasStage(db, explain.queryPlanner.winningPlan, "DISTINCT_SCAN"));
+assert(planHasStage(db, winningPlan, "PROJECTION_COVERED"));
+assert(planHasStage(db, winningPlan, "DISTINCT_SCAN"));
 
 // Check that the DISTINCT_SCAN stage has the correct stats.
-var stage = getPlanStage(explain.queryPlanner.winningPlan, "DISTINCT_SCAN");
+let stage = getPlanStage(explain.queryPlanner.winningPlan, "DISTINCT_SCAN");
 assert.eq({a: 1}, stage.keyPattern);
 assert.eq("a_1", stage.indexName);
 assert.eq(false, stage.isMultiKey);
@@ -77,17 +80,19 @@ assert("indexBounds" in stage);
 assert.commandWorked(coll.createIndex({a: 1, b: 1}));
 
 assert.eq([1], coll.distinct('a', {a: 1}));
-var explain = runDistinctExplain(coll, 'a', {a: 1});
+explain = runDistinctExplain(coll, 'a', {a: 1});
 assert.commandWorked(explain);
+winningPlan = getWinningPlan(explain.queryPlanner);
 assert.eq(1, explain.executionStats.nReturned);
-assert(planHasStage(db, explain.queryPlanner.winningPlan, "PROJECTION_COVERED"));
-assert(planHasStage(db, explain.queryPlanner.winningPlan, "DISTINCT_SCAN"));
+assert(planHasStage(db, winningPlan, "PROJECTION_COVERED"));
+assert(planHasStage(db, winningPlan, "DISTINCT_SCAN"));
 
 assert.eq([1], coll.distinct('b', {a: 1}));
-var explain = runDistinctExplain(coll, 'b', {a: 1});
+explain = runDistinctExplain(coll, 'b', {a: 1});
 assert.commandWorked(explain);
+winningPlan = getWinningPlan(explain.queryPlanner);
 assert.eq(1, explain.executionStats.nReturned);
-assert(!planHasStage(db, explain.queryPlanner.winningPlan, "FETCH"));
-assert(planHasStage(db, explain.queryPlanner.winningPlan, "PROJECTION_COVERED"));
-assert(planHasStage(db, explain.queryPlanner.winningPlan, "DISTINCT_SCAN"));
+assert(!planHasStage(db, winningPlan, "FETCH"));
+assert(planHasStage(db, winningPlan, "PROJECTION_COVERED"));
+assert(planHasStage(db, winningPlan, "DISTINCT_SCAN"));
 })();

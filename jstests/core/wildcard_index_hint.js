@@ -14,7 +14,7 @@ const assertArrayEq = (l, r) => assert(arrayEq(l, r), tojson(l) + " != " + tojso
 
 // Extracts the winning plan for the given query and hint from the explain output.
 const winningPlan = (query, hint) =>
-    assert.commandWorked(coll.find(query).hint(hint).explain()).queryPlanner.winningPlan;
+    getWinningPlan(assert.commandWorked(coll.find(query).hint(hint).explain()).queryPlanner);
 
 // Runs the given query and confirms that:
 // (1) the expected index was used to answer the query, and

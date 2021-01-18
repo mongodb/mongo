@@ -344,9 +344,6 @@ bool providesSort(const CanonicalQuery& query, const BSONObj& kp) {
     return query.getQueryRequest().getSort().isPrefixOf(kp, SimpleBSONElementComparator::kInstance);
 }
 
-// static
-const int QueryPlanner::kPlannerVersion = 1;
-
 StatusWith<std::unique_ptr<PlanCacheIndexTree>> QueryPlanner::cacheDataFromTaggedTree(
     const MatchExpression* const taggedTree, const vector<IndexEntry>& relevantIndices) {
     if (!taggedTree) {

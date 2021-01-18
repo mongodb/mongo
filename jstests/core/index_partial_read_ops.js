@@ -13,8 +13,8 @@ load("jstests/libs/analyze_plan.js");
 
 (function() {
 "use strict";
-var explain;
-var coll = db.index_partial_read_ops;
+let explain;
+const coll = db.index_partial_read_ops;
 coll.drop();
 
 assert.commandWorked(coll.createIndex({x: 1}, {partialFilterExpression: {a: {$lte: 1.5}}}));
@@ -28,21 +28,21 @@ assert.commandWorked(coll.insert({x: 6, a: 1}));  // In index.
 // find() operations that should use index.
 explain = coll.explain('executionStats').find({x: 6, a: 1}).finish();
 assert.eq(1, explain.executionStats.nReturned);
-assert(isIxscan(db, explain.queryPlanner.winningPlan));
+assert(isIxscan(db, getWinningPlan(explain.queryPlanner)));
 explain = coll.explain('executionStats').find({x: {$gt: 1}, a: 1}).finish();
 assert.eq(1, explain.executionStats.nReturned);
-assert(isIxscan(db, explain.queryPlanner.winningPlan));
+assert(isIxscan(db, getWinningPlan(explain.queryPlanner)));
 explain = coll.explain('executionStats').find({x: 6, a: {$lte: 1}}).finish();
 assert.eq(1, explain.executionStats.nReturned);
-assert(isIxscan(db, explain.queryPlanner.winningPlan));
+assert(isIxscan(db, getWinningPlan(explain.queryPlanner)));
 
 // find() operations that should not use index.
 explain = coll.explain('executionStats').find({x: 6, a: {$lt: 1.6}}).finish();
 assert.eq(1, explain.executionStats.nReturned);
-assert(isCollscan(db, explain.queryPlanner.winningPlan));
+assert(isCollscan(db, getWinningPlan(explain.queryPlanner)));
 explain = coll.explain('executionStats').find({x: 6}).finish();
 assert.eq(1, explain.executionStats.nReturned);
-assert(isCollscan(db, explain.queryPlanner.winningPlan));
+assert(isCollscan(db, getWinningPlan(explain.queryPlanner)));
 
 //
 // Verify basic functionality with the count command.
@@ -50,11 +50,11 @@ assert(isCollscan(db, explain.queryPlanner.winningPlan));
 
 // Count operation that should use index.
 explain = coll.explain('executionStats').count({x: {$gt: 1}, a: 1});
-assert(isIxscan(db, explain.queryPlanner.winningPlan));
+assert(isIxscan(db, getWinningPlan(explain.queryPlanner)));
 
 // Count operation that should not use index.
 explain = coll.explain('executionStats').count({x: {$gt: 1}, a: 2});
-assert(isCollscan(db, explain.queryPlanner.winningPlan));
+assert(isCollscan(db, getWinningPlan(explain.queryPlanner)));
 
 //
 // Verify basic functionality with the aggregate command.
@@ -62,11 +62,11 @@ assert(isCollscan(db, explain.queryPlanner.winningPlan));
 
 // Aggregate operation that should use index.
 explain = coll.aggregate([{$match: {x: {$gt: 1}, a: 1}}], {explain: true});
-assert(isIxscan(db, explain.queryPlanner.winningPlan));
+assert(isIxscan(db, getWinningPlan(explain.queryPlanner)));
 
 // Aggregate operation that should not use index.
 explain = coll.aggregate([{$match: {x: {$gt: 1}, a: 2}}], {explain: true});
-assert(isCollscan(db, explain.queryPlanner.winningPlan));
+assert(isCollscan(db, getWinningPlan(explain.queryPlanner)));
 
 //
 // Verify basic functionality with the findAndModify command.
@@ -76,13 +76,13 @@ assert(isCollscan(db, explain.queryPlanner.winningPlan));
 explain = coll.explain('executionStats')
               .findAndModify({query: {x: {$gt: 1}, a: 1}, update: {$inc: {x: 1}}});
 assert.eq(1, explain.executionStats.nReturned);
-assert(isIxscan(db, explain.queryPlanner.winningPlan));
+assert(isIxscan(db, getWinningPlan(explain.queryPlanner)));
 
 // findAndModify operation that should not use index.
 explain = coll.explain('executionStats')
               .findAndModify({query: {x: {$gt: 1}, a: 2}, update: {$inc: {x: 1}}});
 assert.eq(1, explain.executionStats.nReturned);
-assert(isCollscan(db, explain.queryPlanner.winningPlan));
+assert(isCollscan(db, getWinningPlan(explain.queryPlanner)));
 
 //
 // Verify functionality with multiple overlapping partial indexes on the same key pattern.

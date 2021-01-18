@@ -132,7 +132,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
                 5,
                 "SBE plan",
                 "slots"_attr = data.debugString(),
-                "stages"_attr = sbe::DebugPrinter{}.print(rootStage.get()));
+                "stages"_attr = sbe::DebugPrinter{}.print(*rootStage));
 
     rootStage->prepare(data.ctx);
 
@@ -164,7 +164,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
                 5,
                 "SBE plan",
                 "slots"_attr = candidates.winner().data.debugString(),
-                "stages"_attr = sbe::DebugPrinter{}.print(candidates.winner().root.get()));
+                "stages"_attr = sbe::DebugPrinter{}.print(*candidates.winner().root));
 
     return {{new PlanExecutorSBE(opCtx,
                                  std::move(cq),

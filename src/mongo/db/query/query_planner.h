@@ -80,9 +80,6 @@ public:
         std::map<IndexEntry::Identifier, size_t> indexMap;
     };
 
-    // Identifies the version of the query planner module. Reported in explain.
-    static const int kPlannerVersion;
-
     /**
      * Returns the list of possible query solutions for the provided 'query'. Uses the indices and
      * other data in 'params' to determine the set of available plans.

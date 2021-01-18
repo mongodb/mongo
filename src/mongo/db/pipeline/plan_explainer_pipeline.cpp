@@ -50,6 +50,16 @@ void collectPlanSummaryStats(const DocSourceType& source, PlanSummaryStats* stat
     statsOut->accumulate(docSpecificStats.planSummaryStats);
 }
 
+const PlanExplainer::ExplainVersion& PlanExplainerPipeline::getVersion() const {
+    static const ExplainVersion kExplainVersion = "1";
+
+    if (auto docSourceCursor =
+            dynamic_cast<DocumentSourceCursor*>(_pipeline->getSources().front().get())) {
+        return docSourceCursor->getExplainVersion();
+    }
+    return kExplainVersion;
+}
+
 std::string PlanExplainerPipeline::getPlanSummary() const {
     if (auto docSourceCursor =
             dynamic_cast<DocumentSourceCursor*>(_pipeline->getSources().front().get())) {
