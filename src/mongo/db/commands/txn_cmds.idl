@@ -105,4 +105,10 @@ commands:
         cpp_name: AbortTransaction
         strict: true
         api_version: "1"
+        fields:
+            recoveryToken:
+                description: "A mongos that doesn't know about this transaction can attempt to make
+                              progress on abort by processing using the info in the recoveryToken."
+                optional: true
+                type: TxnRecoveryToken
         reply_type: OkReply
