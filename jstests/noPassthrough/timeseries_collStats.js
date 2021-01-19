@@ -35,8 +35,7 @@ const timeFieldName = 'time';
 const metaFieldName = 'meta';
 
 const expectedStats = {
-    ns: coll.getFullName(),
-    bucketsNs: bucketsColl.getFullName(),
+    bucketsNs: bucketsColl.getFullName()
 };
 
 const clearCollection = function() {
@@ -63,20 +62,23 @@ clearCollection();
 const checkCollStats = function(empty = false) {
     const stats = assert.commandWorked(coll.stats());
 
+    assert.eq(coll.getFullName(), stats.ns);
+
     for (let [stat, value] of Object.entries(expectedStats)) {
-        assert.eq(
-            stats[stat], value, "Invalid '" + stat + "' value in collStats: " + tojson(stats));
+        assert.eq(stats.timeseries[stat],
+                  value,
+                  "Invalid 'timeseries." + stat + "' value in collStats: " + tojson(stats));
     }
 
     if (empty) {
-        assert(!stats.hasOwnProperty('avgBucketSize'));
-        assert(!stats.hasOwnProperty('avgNumMeasurementsPerCommit'));
+        assert(!stats.timeseries.hasOwnProperty('avgBucketSize'));
+        assert(!stats.timeseries.hasOwnProperty('avgNumMeasurementsPerCommit'));
     } else {
-        assert.gt(stats.avgBucketSize, 0);
+        assert.gt(stats.timeseries.avgBucketSize, 0);
     }
 
-    assert(!stats.hasOwnProperty('count'));
-    assert(!stats.hasOwnProperty('avgObjSize'));
+    assert(!stats.timeseries.hasOwnProperty('count'));
+    assert(!stats.timeseries.hasOwnProperty('avgObjSize'));
 };
 
 checkCollStats(true);

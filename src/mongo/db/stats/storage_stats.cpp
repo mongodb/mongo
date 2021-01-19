@@ -102,12 +102,13 @@ Status appendCollectionStorageStats(OperationContext* opCtx,
 
     long long numRecords = collection->numRecords(opCtx);
     if (isTimeseries) {
-        result->append("bucketsNs", nss.makeTimeseriesBucketsNamespace().ns());
-        result->appendNumber("bucketCount", numRecords);
+        BSONObjBuilder bob(result->subobjStart("timeseries"));
+        bob.append("bucketsNs", nss.makeTimeseriesBucketsNamespace().ns());
+        bob.appendNumber("bucketCount", numRecords);
         if (numRecords) {
-            result->append("avgBucketSize", collection->averageObjectSize(opCtx));
+            bob.append("avgBucketSize", collection->averageObjectSize(opCtx));
         }
-        BucketCatalog::get(opCtx).appendExecutionStats(nss, result);
+        BucketCatalog::get(opCtx).appendExecutionStats(nss, &bob);
     } else {
         result->appendNumber("count", numRecords);
         if (numRecords) {
