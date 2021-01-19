@@ -725,17 +725,6 @@ buildvariants:
     compile_flags: --ssl --separate-debug MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     mongod_exec_wrapper: &exec_wrapper "numactl --physcpubind=4,5,6,7 -i 1"
     perf_exec_wrapper: &perf_wrapper "numactl --physcpubind=1,2,3 -i 0"
-    mongod_flags: >-
-      --auth
-      --fork
-      --inMemoryEngineConfigString 'eviction=(threads_min=1),'
-      --inMemorySizeGB 60
-      --networkMessageCompressors noop
-      --setParameter diagnosticDataCollectionEnabled=false
-      --setParameter enableTestCommands=1
-      --setParameter ttlMonitorEnabled=false
-      --storageEngine inMemory
-      --syncdelay 0
     use_scons_cache: true
     platform: linux
     infrastructure_provisioning: microbenchmarks
@@ -779,19 +768,6 @@ buildvariants:
   expansions:
     mongod_exec_wrapper: *exec_wrapper
     perf_exec_wrapper: *perf_wrapper
-    mongod_flags: >-
-      --auth
-      --fork
-      --inMemoryEngineConfigString 'eviction=(threads_min=1),'
-      --inMemorySizeGB 60
-      --networkMessageCompressors noop
-      --oplogSize 30000
-      --replSet test
-      --setParameter diagnosticDataCollectionEnabled=false
-      --setParameter enableTestCommands=1
-      --setParameter ttlMonitorEnabled=false
-      --storageEngine inMemory
-      --syncdelay 0
     platform: linux
     infrastructure_provisioning: microbenchmarks
     mongodb_setup: microbenchmarks_replica
