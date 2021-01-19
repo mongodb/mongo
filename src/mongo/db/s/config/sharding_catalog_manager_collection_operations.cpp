@@ -459,7 +459,9 @@ void ShardingCatalogManager::ensureDropCollectionCompleted(OperationContext* opC
 //    }}
 //  }}]
 std::pair<std::vector<BSONObj>, std::vector<BSONObj>> makeChunkAndTagUpdatesForRefine(
-    const BSONObj& newShardKeyFields, OID newEpoch) {
+    const BSONObj& newShardKeyFields,
+    OID newEpoch,
+    const boost::optional<Timestamp>& newTimestamp) {
     // Make the $literal objects used in the $set below to add new fields to the boundaries of the
     // existing chunks and tags that may include "." characters.
     //
@@ -505,11 +507,16 @@ std::pair<std::vector<BSONObj>, std::vector<BSONObj>> makeChunkAndTagUpdatesForR
                                                      << "then" << literalMaxObject << "else"
                                                      << literalMinObject))))))));
 
-    // The chunk updates change the min and max fields, and additionally set the new epoch and unset
-    // the jumbo field.
+    // The chunk updates change the min and max fields, and additionally set the new epoch and the
+    // new timestamp and unset the jumbo field.
     std::vector<BSONObj> chunkUpdates;
     chunkUpdates.emplace_back(
         BSON("$set" << extendMinAndMaxModifier.addFields(BSON(ChunkType::epoch(newEpoch)))));
+
+    if (newTimestamp) {
+        chunkUpdates.emplace_back(BSON("$set" << extendMinAndMaxModifier.addFields(
+                                           BSON(ChunkType::timestamp(*newTimestamp)))));
+    }
     chunkUpdates.emplace_back(BSON("$unset" << ChunkType::jumbo()));
 
     // The tag updates only change the min and max fields.
@@ -550,11 +557,12 @@ void ShardingCatalogManager::refineCollectionShardKey(OperationContext* opCtx,
     collType.setEpoch(newEpoch);
     collType.setKeyPattern(newShardKeyPattern.getKeyPattern());
 
+    boost::optional<Timestamp> newTimestamp;
     if (feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabled(
             serverGlobalParams.featureCompatibility)) {
         auto now = VectorClock::get(opCtx)->getTime();
-        auto newClusterTime = now.clusterTime().asTimestamp();
-        collType.setTimestamp(newClusterTime);
+        newTimestamp = now.clusterTime().asTimestamp();
+        collType.setTimestamp(newTimestamp);
     }
 
     auto updateCollectionAndChunksFn = [&](OperationContext* opCtx, TxnNumber txnNumber) {
@@ -576,7 +584,8 @@ void ShardingCatalogManager::refineCollectionShardKey(OperationContext* opCtx,
             hangRefineCollectionShardKeyBeforeUpdatingChunks.pauseWhileSet(opCtx);
         }
 
-        auto [chunkUpdates, tagUpdates] = makeChunkAndTagUpdatesForRefine(newFields, newEpoch);
+        auto [chunkUpdates, tagUpdates] =
+            makeChunkAndTagUpdatesForRefine(newFields, newEpoch, newTimestamp);
 
         // Update all config.chunks entries for the given namespace by setting (i) their epoch
         // to the newly-generated objectid, (ii) their bounds for each new field in the refined

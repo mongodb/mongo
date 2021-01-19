@@ -209,6 +209,7 @@ public:
     static const BSONField<bool> jumbo;
     static const BSONField<Date_t> lastmod;
     static const BSONField<OID> epoch;
+    static const BSONField<Timestamp> timestamp;
     static const BSONField<BSONObj> history;
 
     ChunkType();
