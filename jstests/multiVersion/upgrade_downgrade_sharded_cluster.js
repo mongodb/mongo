@@ -209,18 +209,20 @@ function setupInitialStateOnOldVersion() {
 }
 
 function runChecksAfterUpgrade() {
-    const shardingFullDDLSupport = assert
-                                       .commandWorked(st.configRS.getPrimary().adminCommand(
-                                           {getParameter: 1, shardingFullDDLSupport: 1}))
-                                       .shardingFullDDLSupport.value;
+    const isFeatureFlagEnabled =
+        assert
+            .commandWorked(st.configRS.getPrimary().adminCommand(
+                {getParameter: 1, featureFlagShardingFullDDLSupportTimestampedVersion: 1}))
+            .featureFlagShardingFullDDLSupportTimestampedVersion.value;
 
     testDroppedAndDistributionModeFieldsChecksAfterUpgrade();
 
-    if (shardingFullDDLSupport) {
+    if (isFeatureFlagEnabled) {
         testTimestampFieldChecksAfterUpgrade();
         testChunkCollectionUuidFieldChecksAfterUpgrade();
     } else {
-        jsTest.log('Skipping tests that require shardingFullDDLSupport feature to be enabled');
+        jsTest.log(
+            'Skipping tests that require featureFlagShardingFullDDLSupportTimestampedVersion feature to be enabled');
     }
 }
 
@@ -229,18 +231,20 @@ function setupStateBeforeDowngrade() {
 }
 
 function runChecksAfterFCVDowngrade() {
-    const shardingFullDDLSupport = assert
-                                       .commandWorked(st.configRS.getPrimary().adminCommand(
-                                           {getParameter: 1, shardingFullDDLSupport: 1}))
-                                       .shardingFullDDLSupport.value;
+    const isFeatureFlagEnabled =
+        assert
+            .commandWorked(st.configRS.getPrimary().adminCommand(
+                {getParameter: 1, featureFlagShardingFullDDLSupportTimestampedVersion: 1}))
+            .featureFlagShardingFullDDLSupportTimestampedVersion.value;
 
     testAllowedMigrationsFieldChecksAfterFCVDowngrade();
 
-    if (shardingFullDDLSupport) {
+    if (isFeatureFlagEnabled) {
         testTimestampFieldChecksAfterFCVDowngrade();
         testChunkCollectionUuidFieldChecksAfterFCVDowngrade();
     } else {
-        jsTest.log('Skipping tests that require shardingFullDDLSupport feature to be enabled');
+        jsTest.log(
+            'Skipping tests that require featureFlagShardingFullDDLSupportTimestampedVersion feature to be enabled');
     }
 }
 

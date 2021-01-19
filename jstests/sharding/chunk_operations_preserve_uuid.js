@@ -18,11 +18,12 @@ var collUUID;  // Initialized after shardCollection
 {
     // Skip test if feature flag disabled
     let csrs_config_db = st.configRS.getPrimary().getDB('config');
-    const isShardingFullDDLSupportEnabled =
-        csrs_config_db.adminCommand({getParameter: 1, shardingFullDDLSupport: 1})
-            .shardingFullDDLSupport.value;
+    const isFeatureFlagEnabled =
+        csrs_config_db
+            .adminCommand({getParameter: 1, featureFlagShardingFullDDLSupportTimestampedVersion: 1})
+            .featureFlagShardingFullDDLSupportTimestampedVersion.value;
 
-    if (!isShardingFullDDLSupportEnabled) {
+    if (!isFeatureFlagEnabled) {
         st.stop();
         return;
     }

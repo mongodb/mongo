@@ -3,10 +3,11 @@
  * config.cache.collections are updated when sharding a collection, dropping and creating a
  * collection, or refining the sharding key.
  *
- * The test can only run when the shardingFullDDLSupport feature flag is enabled.
- * Tagging as multiversion_incompatible until SERVER-52588 is done.
+ * The test can only run when the featureFlagShardingFullDDLSupportTimestampedVersion feature flag
+ * is enabled. Tagging as multiversion_incompatible until SERVER-52588 is done.
  *
- * @tags: [requires_fcv_47, multiversion_incompatible, shardingFullDDLSupport]
+ * @tags: [requires_fcv_47, multiversion_incompatible,
+ * featureFlagShardingFullDDLSupportTimestampedVersion]
  */
 
 (function() {
@@ -29,11 +30,12 @@ const kNs = kDbName + '.' + kCollName;
 
 var st = new ShardingTest({shards: 1, mongos: 1});
 
-const shardingFullDDLSupportParam = assert.commandWorked(
-    st.configRS.getPrimary().adminCommand({getParameter: 1, shardingFullDDLSupport: 1}));
+const featureFlagParam = assert.commandWorked(st.configRS.getPrimary().adminCommand(
+    {getParameter: 1, featureFlagShardingFullDDLSupportTimestampedVersion: 1}));
 
-if (!shardingFullDDLSupportParam.shardingFullDDLSupport.value) {
-    jsTest.log('Skipping test because shardingFullDDLSupport feature flag is not enabled');
+if (!featureFlagParam.featureFlagShardingFullDDLSupportTimestampedVersion.value) {
+    jsTest.log(
+        'Skipping test because featureFlagShardingFullDDLSupportTimestampedVersion feature flag is not enabled');
     st.stop();
     return;
 }
