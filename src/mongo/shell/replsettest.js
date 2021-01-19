@@ -2347,7 +2347,8 @@ var ReplSetTest = function(opts) {
                                                                  msgPrefix,
                                                                  ignoreUUIDs,
                                                                  hasSecondaryIndexes,
-                                                                 collectionPrinted);
+                                                                 collectionPrinted) &&
+                        success;
 
                     if (!success) {
                         if (!hasDumpedOplog) {
