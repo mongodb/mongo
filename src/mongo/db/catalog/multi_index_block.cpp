@@ -1151,7 +1151,9 @@ Status MultiIndexBlock::_scanReferenceIdxInsertAndCommit(OperationContext* opCtx
     };
 
     auto insertBulkBypassingSorter = [&](const KeyString::Value& keyString) {
+        WriteUnitOfWork wuow(opCtx);
         uassertStatusOK(bulkLoader->addKey(keyString));
+        wuow.commit();
     };
 
     auto refIdxEntry = cursor->seek(startKeyString);
