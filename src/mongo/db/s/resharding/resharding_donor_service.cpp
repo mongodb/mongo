@@ -144,7 +144,7 @@ ReshardingDonorService::DonorStateMachine::~DonorStateMachine() {
     stdx::lock_guard<Latch> lg(_mutex);
     invariant(_allRecipientsDoneCloning.getFuture().isReady());
     invariant(_allRecipientsDoneApplying.getFuture().isReady());
-    invariant(_coordinatorHasCommitted.getFuture().isReady());
+    invariant(_coordinatorHasDecisionPersisted.getFuture().isReady());
     invariant(_completionPromise.getFuture().isReady());
 }
 
@@ -162,7 +162,7 @@ SemiFuture<void> ReshardingDonorService::DonorStateMachine::run(
         })
         .then([this] { _writeTransactionOplogEntryThenTransitionToMirroring(); })
         .then([this, executor] {
-            return _awaitCoordinatorHasCommittedThenTransitionToDropping(executor);
+            return _awaitCoordinatorHasDecisionPersistedThenTransitionToDropping(executor);
         })
         .then([this] { return _dropOriginalCollection(); })
         .onError([this](Status status) {
@@ -212,8 +212,8 @@ void ReshardingDonorService::DonorStateMachine::interrupt(Status status) {
         _finalOplogEntriesWritten.setError(status);
     }
 
-    if (!_coordinatorHasCommitted.getFuture().isReady()) {
-        _coordinatorHasCommitted.setError(status);
+    if (!_coordinatorHasDecisionPersisted.getFuture().isReady()) {
+        _coordinatorHasDecisionPersisted.setError(status);
     }
 
     if (!_completionPromise.getFuture().isReady()) {
@@ -242,8 +242,8 @@ void ReshardingDonorService::DonorStateMachine::onReshardingFieldsChanges(
         ensureFulfilledPromise(lk, _allRecipientsDoneApplying);
     }
 
-    if (coordinatorState >= CoordinatorStateEnum::kCommitted) {
-        ensureFulfilledPromise(lk, _coordinatorHasCommitted);
+    if (coordinatorState >= CoordinatorStateEnum::kDecisionPersisted) {
+        ensureFulfilledPromise(lk, _coordinatorHasDecisionPersisted);
     }
 }
 
@@ -392,14 +392,14 @@ SharedSemiFuture<void> ReshardingDonorService::DonorStateMachine::awaitFinalOplo
     return _finalOplogEntriesWritten.getFuture();
 }
 
-ExecutorFuture<void>
-ReshardingDonorService::DonorStateMachine::_awaitCoordinatorHasCommittedThenTransitionToDropping(
-    const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
+ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::
+    _awaitCoordinatorHasDecisionPersistedThenTransitionToDropping(
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
     if (_donorDoc.getState() > DonorStateEnum::kMirroring) {
         return ExecutorFuture<void>(**executor, Status::OK());
     }
 
-    return _coordinatorHasCommitted.getFuture().thenRunOn(**executor).then([this]() {
+    return _coordinatorHasDecisionPersisted.getFuture().thenRunOn(**executor).then([this]() {
         _transitionState(DonorStateEnum::kDropping);
     });
 }

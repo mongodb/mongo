@@ -48,17 +48,17 @@ CollectionType createTempReshardingCollectionType(
     const ChunkVersion& chunkVersion,
     const BSONObj& collation);
 
-void persistInitialStateAndCatalogUpdates(OperationContext* opCtx,
-                                          const ReshardingCoordinatorDocument& coordinatorDoc,
-                                          std::vector<ChunkType> initialChunks,
-                                          std::vector<TagsType> newZones);
+void writeInitialStateAndCatalogUpdates(OperationContext* opCtx,
+                                        const ReshardingCoordinatorDocument& coordinatorDoc,
+                                        std::vector<ChunkType> initialChunks,
+                                        std::vector<TagsType> newZones);
 
-void persistCommittedState(OperationContext* opCtx,
-                           const ReshardingCoordinatorDocument& coordinatorDoc,
-                           OID newCollectionEpoch,
-                           boost::optional<Timestamp> newCollectionTimestamp);
+void writeDecisionPersistedState(OperationContext* opCtx,
+                                 const ReshardingCoordinatorDocument& coordinatorDoc,
+                                 OID newCollectionEpoch,
+                                 boost::optional<Timestamp> newCollectionTimestamp);
 
-void persistStateTransitionAndCatalogUpdatesThenBumpShardVersions(
+void writeStateTransitionAndCatalogUpdatesThenBumpShardVersions(
     OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc);
 
 void removeCoordinatorDocAndReshardingFields(OperationContext* opCtx,
@@ -179,9 +179,9 @@ private:
      * 2. Updates config.chunks entries for the new sharded collection
      * 3. Updates config.tags for the new sharded collection
      *
-     * Transitions to 'kCommitted'.
+     * Transitions to 'kDecisionPersisted'.
      */
-    Future<void> _commit(const ReshardingCoordinatorDocument& updatedDoc);
+    Future<void> _persistDecision(const ReshardingCoordinatorDocument& updatedDoc);
 
     /**
      * Waits on _reshardingCoordinatorObserver to notify that:
@@ -207,9 +207,9 @@ private:
     /**
      * Sends 'flushRoutingTableCacheUpdatesWithWriteConcern' to all recipient shards.
      *
-     * When the coordinator is in a state before 'kCommitting', refreshes the temporary namespace.
-     * When the coordinator is in a state at or after 'kCommitting', refreshes the original
-     * namespace.
+     * When the coordinator is in a state before 'kDecisionPersisted', refreshes the temporary
+     * namespace. When the coordinator is in a state at or after 'kDecisionPersisted', refreshes the
+     * original namespace.
      */
     void _tellAllRecipientsToRefresh(const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 

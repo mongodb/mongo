@@ -133,7 +133,7 @@ private:
     ExecutorFuture<void> _awaitAllDonorsMirroringThenTransitionToStrictConsistency(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
-    ExecutorFuture<void> _awaitCoordinatorHasCommittedThenTransitionToRenaming(
+    ExecutorFuture<void> __awaitCoordinatorHasDecisionPersistedThenTransitionToRenaming(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
     void _renameTemporaryReshardingCollection();
@@ -181,7 +181,7 @@ private:
 
     // Each promise below corresponds to a state on the recipient state machine. They are listed in
     // ascending order, such that the first promise below will be the first promise fulfilled.
-    SharedPromise<void> _coordinatorHasCommitted;
+    SharedPromise<void> _coordinatorHasDecisionPersisted;
 
     SharedPromise<void> _completionPromise;
 };

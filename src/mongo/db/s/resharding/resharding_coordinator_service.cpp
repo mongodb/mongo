@@ -57,7 +57,7 @@ namespace {
 using namespace fmt::literals;
 
 MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorInSteadyState);
-MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforeCommit);
+MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforeDecisionPersisted);
 
 BatchedCommandRequest buildInsertOp(const NamespaceString& nss, std::vector<BSONObj> docs) {
     BatchedCommandRequest request([&] {
@@ -216,7 +216,7 @@ BSONObj createReshardingFieldsUpdateForOriginalNss(
                                        << opCtx->getServiceContext()->getPreciseClockSource()->now()
                                        << CollectionType::kAllowMigrationsFieldName << false));
         }
-        case CoordinatorStateEnum::kCommitted: {
+        case CoordinatorStateEnum::kDecisionPersisted: {
             // Update the config.collections entry for the original nss to reflect
             // the new sharded collection. Set 'uuid' to the reshardingUUID, 'key' to the new shard
             // key, 'lastmodEpoch' to newCollectionEpoch, and 'timestamp' to
@@ -308,7 +308,7 @@ void writeToConfigCollectionsForTempNss(OperationContext* opCtx,
                     false,  // upsert
                     false   // multi
                 );
-            case CoordinatorStateEnum::kCommitted:
+            case CoordinatorStateEnum::kDecisionPersisted:
                 // Remove the entry for the temporary nss
                 return buildDeleteOp(CollectionType::ConfigNS,
                                      BSON(CollectionType::kNssFieldName
@@ -433,12 +433,12 @@ void updateChunkAndTagsDocsForTempNss(OperationContext* opCtx,
 // Donors/recipients learn when to transition states by noticing a change in shard versions for one
 // of the two collections involved in the resharding operations.
 //
-// Before the resharding operation commits:
+// Before the resharding operation persists the decision whether to succeed or fail:
 // * Donors are notified when the original resharding collection's shard versions are incremented.
 // * Recipients are notified when the temporary resharding collection's shard versions are
 //   incremented.
 //
-// After the resharding operation commits:
+// After the resharding operation persists its decision:
 // * Both donors and recipients are notified when the original resharding collection's shard
 //   versions are incremented.
 //
@@ -446,7 +446,12 @@ void updateChunkAndTagsDocsForTempNss(OperationContext* opCtx,
 /**
  * Maps which participants are to be notified when the coordinator transitions into a given state.
  */
-enum class ParticipantsToNotifyEnum { kDonors, kRecipients, kAllParticipantsPostCommit, kNone };
+enum class ParticipantsToNotifyEnum {
+    kDonors,
+    kRecipients,
+    kAllParticipantsPostDecisionPersisted,
+    kNone
+};
 stdx::unordered_map<CoordinatorStateEnum, ParticipantsToNotifyEnum> notifyForStateTransition{
     {CoordinatorStateEnum::kUnused, ParticipantsToNotifyEnum::kNone},
     {CoordinatorStateEnum::kInitializing, ParticipantsToNotifyEnum::kNone},
@@ -454,8 +459,7 @@ stdx::unordered_map<CoordinatorStateEnum, ParticipantsToNotifyEnum> notifyForSta
     {CoordinatorStateEnum::kCloning, ParticipantsToNotifyEnum::kRecipients},
     {CoordinatorStateEnum::kApplying, ParticipantsToNotifyEnum::kDonors},
     {CoordinatorStateEnum::kMirroring, ParticipantsToNotifyEnum::kDonors},
-    {CoordinatorStateEnum::kCommitted, ParticipantsToNotifyEnum::kNone},
-    {CoordinatorStateEnum::kRenaming, ParticipantsToNotifyEnum::kAllParticipantsPostCommit},
+    {CoordinatorStateEnum::kDecisionPersisted, ParticipantsToNotifyEnum::kNone},
     {CoordinatorStateEnum::kDone, ParticipantsToNotifyEnum::kNone},
     {CoordinatorStateEnum::kError, ParticipantsToNotifyEnum::kNone},
 };
@@ -517,10 +521,12 @@ void bumpShardVersionsThenExecuteStateTransitionAndMetadataChangesInTxn(
             updatedCoordinatorDoc.getTempReshardingNss(),
             extractShardIds(updatedCoordinatorDoc.getRecipientShards()),
             std::move(changeMetadataFunc));
-    } else if (participantsToNotify == ParticipantsToNotifyEnum::kAllParticipantsPostCommit) {
+    } else if (participantsToNotify ==
+               ParticipantsToNotifyEnum::kAllParticipantsPostDecisionPersisted) {
         // Bump the recipient shard versions for the original resharding namespace along with
-        // updating the metadata. Only the recipient shards will have chunks for the namespace
-        // after commit, bumping chunk versions on the donor shards would not apply.
+        // updating the metadata. Only the recipient shards will have chunks for the namespace after
+        // the coordinator is in state kDecisionPersisted, bumping chunk versions on the donor
+        // shards would not apply.
         ShardingCatalogManager::get(opCtx)->bumpCollShardVersionsAndChangeMetadataInTxn(
             opCtx,
             updatedCoordinatorDoc.getNss(),
@@ -554,10 +560,10 @@ CollectionType createTempReshardingCollectionType(
     return collType;
 }
 
-void persistInitialStateAndCatalogUpdates(OperationContext* opCtx,
-                                          const ReshardingCoordinatorDocument& coordinatorDoc,
-                                          std::vector<ChunkType> initialChunks,
-                                          std::vector<TagsType> newZones) {
+void writeInitialStateAndCatalogUpdates(OperationContext* opCtx,
+                                        const ReshardingCoordinatorDocument& coordinatorDoc,
+                                        std::vector<ChunkType> initialChunks,
+                                        std::vector<TagsType> newZones) {
     auto originalCollType = Grid::get(opCtx)->catalogClient()->getCollection(
         opCtx, coordinatorDoc.getNss(), repl::ReadConcernLevel::kMajorityReadConcern);
     const auto collation = originalCollType.getDefaultCollation();
@@ -584,10 +590,10 @@ void persistInitialStateAndCatalogUpdates(OperationContext* opCtx,
         });
 }
 
-void persistCommittedState(OperationContext* opCtx,
-                           const ReshardingCoordinatorDocument& coordinatorDoc,
-                           OID newCollectionEpoch,
-                           boost::optional<Timestamp> newCollectionTimestamp) {
+void writeDecisionPersistedState(OperationContext* opCtx,
+                                 const ReshardingCoordinatorDocument& coordinatorDoc,
+                                 OID newCollectionEpoch,
+                                 boost::optional<Timestamp> newCollectionTimestamp) {
     executeStateTransitionAndMetadataChangesInTxn(
         opCtx, coordinatorDoc, [&](OperationContext* opCtx, TxnNumber txnNumber) {
             // Update the config.reshardingOperations entry
@@ -610,7 +616,7 @@ void persistCommittedState(OperationContext* opCtx,
         });
 }
 
-void persistStateTransitionAndCatalogUpdatesThenBumpShardVersions(
+void writeStateTransitionAndCatalogUpdatesThenBumpShardVersions(
     OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc) {
     // Run updates to config.reshardingOperations and config.collections in a transaction
     auto nextState = coordinatorDoc.getState();
@@ -618,7 +624,7 @@ void persistStateTransitionAndCatalogUpdatesThenBumpShardVersions(
     // TODO SERVER-51800 Remove special casing for kError.
     invariant(nextState == CoordinatorStateEnum::kError ||
                   notifyForStateTransition[nextState] != ParticipantsToNotifyEnum::kNone,
-              "failed to persist state transition with nextState {}"_format(
+              "failed to write state transition with nextState {}"_format(
                   CoordinatorState_serializer(nextState)));
 
     // Resharding metadata changes to be executed.
@@ -631,10 +637,10 @@ void persistStateTransitionAndCatalogUpdatesThenBumpShardVersions(
             opCtx, coordinatorDoc, boost::none, boost::none, txnNumber);
 
         // Update the config.collections entry for the temporary resharding collection. If we've
-        // already committed this operation, we've removed the entry for the temporary
-        // collection and updated the entry with original namespace to have the new shard key,
-        // UUID, and epoch
-        if (nextState < CoordinatorStateEnum::kCommitted ||
+        // already persisted the decision that the operation will succeed, we've removed the entry
+        // for the temporary collection and updated the entry with original namespace to have the
+        // new shard key, UUID, and epoch
+        if (nextState < CoordinatorStateEnum::kDecisionPersisted ||
             nextState == CoordinatorStateEnum::kError) {
             writeToConfigCollectionsForTempNss(
                 opCtx, coordinatorDoc, boost::none, boost::none, txnNumber);
@@ -654,7 +660,7 @@ void persistStateTransitionAndCatalogUpdatesThenBumpShardVersions(
 
 void removeCoordinatorDocAndReshardingFields(OperationContext* opCtx,
                                              const ReshardingCoordinatorDocument& coordinatorDoc) {
-    invariant(coordinatorDoc.getState() == CoordinatorStateEnum::kRenaming);
+    invariant(coordinatorDoc.getState() == CoordinatorStateEnum::kDecisionPersisted);
 
     ReshardingCoordinatorDocument updatedCoordinatorDoc = coordinatorDoc;
     updatedCoordinatorDoc.setState(CoordinatorStateEnum::kDone);
@@ -704,16 +710,7 @@ SemiFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::run(
         .then([this, executor] { _tellAllDonorsToRefresh(executor); })
         .then([this, executor] { return _awaitAllRecipientsInStrictConsistency(executor); })
         .then([this](const ReshardingCoordinatorDocument& updatedCoordinatorDoc) {
-            return _commit(updatedCoordinatorDoc);
-        })
-        .then([this] {
-            if (_coordinatorDoc.getState() > CoordinatorStateEnum::kRenaming) {
-                return;
-            }
-
-            _updateCoordinatorDocStateAndCatalogEntries(CoordinatorStateEnum::kRenaming,
-                                                        _coordinatorDoc);
-            return;
+            return _persistDecision(updatedCoordinatorDoc);
         })
         .then([this, executor] { _tellAllParticipantsToRefresh(executor); })
         .then([this, self = shared_from_this(), executor] {
@@ -809,7 +806,7 @@ ExecutorFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::_init(
             updatedCoordinatorDoc.setState(CoordinatorStateEnum::kPreparingToDonate);
 
             auto opCtx = cc().makeOperationContext();
-            resharding::persistInitialStateAndCatalogUpdates(
+            resharding::writeInitialStateAndCatalogUpdates(
                 opCtx.get(), updatedCoordinatorDoc, std::move(initialChunks), std::move(newZones));
 
             invariant(_coordinatorDoc.getState() == CoordinatorStateEnum::kInitializing);
@@ -881,17 +878,17 @@ ReshardingCoordinatorService::ReshardingCoordinator::_awaitAllRecipientsInStrict
     return _reshardingCoordinatorObserver->awaitAllRecipientsInStrictConsistency();
 }
 
-Future<void> ReshardingCoordinatorService::ReshardingCoordinator::_commit(
+Future<void> ReshardingCoordinatorService::ReshardingCoordinator::_persistDecision(
     const ReshardingCoordinatorDocument& coordinatorDoc) {
     if (_coordinatorDoc.getState() > CoordinatorStateEnum::kMirroring) {
         return Status::OK();
     }
 
     ReshardingCoordinatorDocument updatedCoordinatorDoc = coordinatorDoc;
-    updatedCoordinatorDoc.setState(CoordinatorStateEnum::kCommitted);
+    updatedCoordinatorDoc.setState(CoordinatorStateEnum::kDecisionPersisted);
 
     auto opCtx = cc().makeOperationContext();
-    reshardingPauseCoordinatorBeforeCommit.pauseWhileSet(opCtx.get());
+    reshardingPauseCoordinatorBeforeDecisionPersisted.pauseWhileSet(opCtx.get());
 
     // The new epoch and timestamp to use for the resharded collection to indicate that the
     // collection is a new incarnation of the namespace
@@ -903,7 +900,7 @@ Future<void> ReshardingCoordinatorService::ReshardingCoordinator::_commit(
         newCollectionTimestamp = now.clusterTime().asTimestamp();
     }
 
-    resharding::persistCommittedState(
+    resharding::writeDecisionPersistedState(
         opCtx.get(), updatedCoordinatorDoc, newCollectionEpoch, newCollectionTimestamp);
 
     // Update the in memory state
@@ -915,7 +912,7 @@ Future<void> ReshardingCoordinatorService::ReshardingCoordinator::_commit(
 ExecutorFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::
     _awaitAllParticipantShardsRenamedOrDroppedOriginalCollection(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
-    if (_coordinatorDoc.getState() > CoordinatorStateEnum::kRenaming) {
+    if (_coordinatorDoc.getState() > CoordinatorStateEnum::kDecisionPersisted) {
         return ExecutorFuture<void>(**executor, Status::OK());
     }
 
@@ -946,8 +943,8 @@ void ReshardingCoordinatorService::ReshardingCoordinator::
     emplaceFetchTimestampIfExists(updatedCoordinatorDoc, std::move(fetchTimestamp));
 
     auto opCtx = cc().makeOperationContext();
-    resharding::persistStateTransitionAndCatalogUpdatesThenBumpShardVersions(opCtx.get(),
-                                                                             updatedCoordinatorDoc);
+    resharding::writeStateTransitionAndCatalogUpdatesThenBumpShardVersions(opCtx.get(),
+                                                                           updatedCoordinatorDoc);
 
     // Update in-memory coordinator doc
     _coordinatorDoc = updatedCoordinatorDoc;
@@ -960,10 +957,10 @@ void ReshardingCoordinatorService::ReshardingCoordinator::_tellAllRecipientsToRe
 
     NamespaceString nssToRefresh;
     // Refresh the temporary namespace if the coordinator is in state 'kError' just in case the
-    // previous state was before 'kCommitted'. A refresh of recipients while in 'kCommitted'
-    // should be accompanied by a refresh of all participants for the original namespace to ensure
-    // correctness.
-    if (_coordinatorDoc.getState() < CoordinatorStateEnum::kCommitted ||
+    // previous state was before 'kDecisionPersisted'. A refresh of recipients while in
+    // 'kDecisionPersisted' should be accompanied by a refresh of all participants for the original
+    // namespace to ensure correctness.
+    if (_coordinatorDoc.getState() < CoordinatorStateEnum::kDecisionPersisted ||
         _coordinatorDoc.getState() == CoordinatorStateEnum::kError) {
         nssToRefresh = _coordinatorDoc.getTempReshardingNss();
     } else {

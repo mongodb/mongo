@@ -113,7 +113,7 @@ private:
 
     void _writeTransactionOplogEntryThenTransitionToMirroring();
 
-    ExecutorFuture<void> _awaitCoordinatorHasCommittedThenTransitionToDropping(
+    ExecutorFuture<void> _awaitCoordinatorHasDecisionPersistedThenTransitionToDropping(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
     // Drops the original collection and throws if the returned status is not either Status::OK()
@@ -157,7 +157,7 @@ private:
 
     SharedPromise<void> _finalOplogEntriesWritten;
 
-    SharedPromise<void> _coordinatorHasCommitted;
+    SharedPromise<void> _coordinatorHasDecisionPersisted;
 
     SharedPromise<void> _completionPromise;
 };

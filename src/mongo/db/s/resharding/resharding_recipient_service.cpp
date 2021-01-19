@@ -159,7 +159,7 @@ ReshardingRecipientService::RecipientStateMachine::RecipientStateMachine(
 
 ReshardingRecipientService::RecipientStateMachine::~RecipientStateMachine() {
     stdx::lock_guard<Latch> lg(_mutex);
-    invariant(_coordinatorHasCommitted.getFuture().isReady());
+    invariant(_coordinatorHasDecisionPersisted.getFuture().isReady());
     invariant(_completionPromise.getFuture().isReady());
 }
 
@@ -177,7 +177,7 @@ SemiFuture<void> ReshardingRecipientService::RecipientStateMachine::run(
             return _awaitAllDonorsMirroringThenTransitionToStrictConsistency(executor);
         })
         .then([this, executor] {
-            return _awaitCoordinatorHasCommittedThenTransitionToRenaming(executor);
+            return __awaitCoordinatorHasDecisionPersistedThenTransitionToRenaming(executor);
         })
         .then([this] { _renameTemporaryReshardingCollection(); })
         .onError([this](Status status) {
@@ -231,8 +231,8 @@ void ReshardingRecipientService::RecipientStateMachine::interrupt(Status status)
         threadPool->shutdown();
     }
 
-    if (!_coordinatorHasCommitted.getFuture().isReady()) {
-        _coordinatorHasCommitted.setError(status);
+    if (!_coordinatorHasDecisionPersisted.getFuture().isReady()) {
+        _coordinatorHasDecisionPersisted.setError(status);
     }
 
     if (!_completionPromise.getFuture().isReady()) {
@@ -253,8 +253,8 @@ void ReshardingRecipientService::RecipientStateMachine::onReshardingFieldsChange
     }
 
     stdx::lock_guard<Latch> lk(_mutex);
-    if (coordinatorState >= CoordinatorStateEnum::kCommitted) {
-        ensureFulfilledPromise(lk, _coordinatorHasCommitted);
+    if (coordinatorState >= CoordinatorStateEnum::kDecisionPersisted) {
+        ensureFulfilledPromise(lk, _coordinatorHasDecisionPersisted);
     }
 }
 
@@ -472,13 +472,13 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
 }
 
 ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
-    _awaitCoordinatorHasCommittedThenTransitionToRenaming(
+    __awaitCoordinatorHasDecisionPersistedThenTransitionToRenaming(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
     if (_recipientDoc.getState() > RecipientStateEnum::kStrictConsistency) {
         return ExecutorFuture<void>(**executor, Status::OK());
     }
 
-    return _coordinatorHasCommitted.getFuture().thenRunOn(**executor).then([this]() {
+    return _coordinatorHasDecisionPersisted.getFuture().thenRunOn(**executor).then([this]() {
         _transitionState(RecipientStateEnum::kRenaming);
     });
 }

@@ -47,8 +47,7 @@ enums:
             kCloning: "cloning"
             kApplying: "applying"
             kMirroring: "mirroring"
-            kCommitted: "committed"
-            kRenaming: "renaming"
+            kDecisionPersisted: "decision-persisted"
             kDone: "done"
             kError: "error"
 

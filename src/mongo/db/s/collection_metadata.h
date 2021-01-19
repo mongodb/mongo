@@ -80,7 +80,7 @@ public:
     /**
      * The caller should disallow writes when
      *      1. The coordinator is in the mirroring state, OR
-     *      2. The coordinator is in the committed or renaming state, but the UUID is still the
+     *      2. The coordinator is in the decision persisted state, but the UUID is still the
      *         original UUID.
      */
     bool disallowWritesForResharding(const UUID& currentCollectionUUID) const;

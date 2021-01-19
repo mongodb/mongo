@@ -72,8 +72,7 @@ boost::optional<ShardKeyPattern> CollectionMetadata::getReshardingKeyIfShouldFor
         case CoordinatorStateEnum::kUnused:
         case CoordinatorStateEnum::kInitializing:
         case CoordinatorStateEnum::kMirroring:
-        case CoordinatorStateEnum::kCommitted:
-        case CoordinatorStateEnum::kRenaming:
+        case CoordinatorStateEnum::kDecisionPersisted:
         case CoordinatorStateEnum::kDone:
         case CoordinatorStateEnum::kError:
             return boost::none;
@@ -112,8 +111,7 @@ bool CollectionMetadata::disallowWritesForResharding(const UUID& currentCollecti
         case CoordinatorStateEnum::kMirroring:
             // Only return true if this is also the donor shard.
             return reshardingFields->getDonorFields() != boost::none;
-        case CoordinatorStateEnum::kCommitted:
-        case CoordinatorStateEnum::kRenaming:
+        case CoordinatorStateEnum::kDecisionPersisted:
             break;
         case CoordinatorStateEnum::kDone:
         case CoordinatorStateEnum::kError:
@@ -123,7 +121,7 @@ bool CollectionMetadata::disallowWritesForResharding(const UUID& currentCollecti
     const auto& recipientFields = reshardingFields->getRecipientFields();
     uassert(5325800,
             "Missing 'recipientFields' in collection metadata for resharding operation that has "
-            "committed",
+            "decision persisted",
             recipientFields);
 
     const auto& originalUUID = recipientFields->getExistingUUID();

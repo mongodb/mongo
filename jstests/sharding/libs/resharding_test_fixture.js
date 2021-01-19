@@ -319,20 +319,20 @@ var ReshardingTest = class {
                 // We use the reshardingPauseCoordinatorInSteadyState failpoint so that any
                 // intervening writes performed on the sharded collection (from when the resharding
                 // operation had started until now) are eventually applied by the recipient shards.
-                // We then use the reshardingPauseCoordinatorBeforeCommit to wait for all of the
-                // recipient shards to have applied through all of the oplog entries from all of the
-                // donor shards.
+                // We then use the reshardingPauseCoordinatorBeforeDecisionPersisted failpoint to
+                // wait for all of the recipient shards to have applied through all of the oplog
+                // entries from all of the donor shards.
                 this._pauseCoordinatorInSteadyStateFailpoint.wait();
-                const pauseCoordinatorBeforeCommitFailpoint =
+                const pauseCoordinatorBeforeDecisionPersistedFailpoint =
                     configureFailPoint(this._pauseCoordinatorInSteadyStateFailpoint.conn,
-                                       "reshardingPauseCoordinatorBeforeCommit");
+                                       "reshardingPauseCoordinatorBeforeDecisionPersisted");
 
                 this._pauseCoordinatorInSteadyStateFailpoint.off();
-                pauseCoordinatorBeforeCommitFailpoint.wait();
+                pauseCoordinatorBeforeDecisionPersistedFailpoint.wait();
 
                 this._checkConsistency();
 
-                pauseCoordinatorBeforeCommitFailpoint.off();
+                pauseCoordinatorBeforeDecisionPersistedFailpoint.off();
             });
         } else {
             this._callFunctionSafely(() => {
