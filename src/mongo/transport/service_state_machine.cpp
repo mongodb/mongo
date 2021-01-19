@@ -308,6 +308,8 @@ private:
     boost::optional<MessageCompressorId> _compressorId;
     Message _inMessage;
     Message _outMessage;
+
+    ServiceContext::UniqueOperationContext _opCtx;
 };
 
 Future<void> ServiceStateMachine::Impl::sourceMessage() {
@@ -453,16 +455,15 @@ Future<void> ServiceStateMachine::Impl::processMessage() {
     networkCounter.hitLogicalIn(_inMessage.size());
 
     // Pass sourced Message to handler to generate response.
-    auto opCtx = Client::getCurrent()->makeOperationContext();
+    _opCtx = Client::getCurrent()->makeOperationContext();
     if (_inExhaust) {
-        opCtx->markKillOnClientDisconnect();
+        _opCtx->markKillOnClientDisconnect();
     }
 
     // The handleRequest is implemented in a subclass for mongod/mongos and actually all the
     // database work for this request.
-    return _sep->handleRequest(opCtx.get(), _inMessage)
-        .then([this, &compressorMgr = compressorMgr, opCtx = std::move(opCtx)](
-                  DbResponse dbresponse) mutable -> void {
+    return _sep->handleRequest(_opCtx.get(), _inMessage)
+        .then([this, &compressorMgr = compressorMgr](DbResponse dbresponse) mutable -> void {
             // opCtx must be killed and delisted here so that the operation cannot show up in
             // currentOp results after the response reaches the client. Destruction of the already
             // killed opCtx is postponed for later (i.e., after completion of the future-chain) to
@@ -470,7 +471,7 @@ Future<void> ServiceStateMachine::Impl::processMessage() {
             // Note that destroying futures after execution, rather that postponing the destruction
             // until completion of the future-chain, would expose the cost of destroying opCtx to
             // the critical path and result in serious performance implications.
-            _serviceContext->killAndDelistOperation(opCtx.get(),
+            _serviceContext->killAndDelistOperation(_opCtx.get(),
                                                     ErrorCodes::OperationIsKilledAndDelisted);
             // Format our response, if we have one
             Message& toSink = dbresponse.response;
@@ -563,6 +564,9 @@ void ServiceStateMachine::Impl::startNewLoop(const Status& execStatus) {
             return sinkMessage();
         })
         .getAsync([this](Status status) {
+            // We may or may not have an operation context, but it should definitely be gone now.
+            _opCtx.reset();
+
             if (!status.isOK()) {
                 _state.store(State::EndSession);
                 // The service executor failed to schedule the task. This could for example be that

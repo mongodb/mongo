@@ -88,6 +88,7 @@
 #include "mongo/transport/service_executor.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/future_util.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 #include "mongo/util/timer.h"
@@ -193,7 +194,7 @@ void addContextForTransactionAbortingError(StringData txnIdAsString,
 }
 
 // Factory class to construct a future-chain that executes the invocation against the database.
-class ExecCommandClient final : public std::enable_shared_from_this<ExecCommandClient> {
+class ExecCommandClient final {
 public:
     ExecCommandClient(ExecCommandClient&&) = delete;
     ExecCommandClient(const ExecCommandClient&) = delete;
@@ -206,7 +207,7 @@ public:
 
 private:
     // Prepare the environment for running the invocation (e.g., checking authorization).
-    Status _prologue();
+    void _prologue();
 
     // Returns a future that runs the command invocation.
     Future<void> _run();
@@ -222,7 +223,7 @@ private:
     const std::shared_ptr<CommandInvocation> _invocation;
 };
 
-Status ExecCommandClient::_prologue() {
+void ExecCommandClient::_prologue() {
     auto opCtx = _rec->getOpCtx();
     auto result = _rec->getReplyBuilder();
     const auto& request = _rec->getRequest();
@@ -243,7 +244,7 @@ Status ExecCommandClient::_prologue() {
             auto body = result->getBodyBuilder();
             body.append("help", "help for: {} {}"_format(c->getName(), c->help()));
             CommandHelpers::appendSimpleCommandStatus(body, true, "");
-            return {ErrorCodes::SkipCommandExecution, "Already served help command"};
+            iassert(Status{ErrorCodes::SkipCommandExecution, "Already served help command"});
         }
 
         uassert(ErrorCodes::FailedToParse,
@@ -256,7 +257,7 @@ Status ExecCommandClient::_prologue() {
     } catch (const DBException& e) {
         auto body = result->getBodyBuilder();
         CommandHelpers::appendCommandStatusNoThrow(body, e.toStatus());
-        return {ErrorCodes::SkipCommandExecution, "Failed to check authorization"};
+        iassert(Status{ErrorCodes::SkipCommandExecution, "Failed to check authorization"});
     }
 
     // attach tracking
@@ -268,8 +269,6 @@ Status ExecCommandClient::_prologue() {
     ReadPreferenceSetting::get(opCtx) =
         uassertStatusOK(ReadPreferenceSetting::fromContainingBSON(request.body));
     VectorClock::get(opCtx)->gossipIn(opCtx, request.body, !c->requiresAuth());
-
-    return Status::OK();
 }
 
 Future<void> ExecCommandClient::_run() {
@@ -335,20 +334,19 @@ void ExecCommandClient::_onCompletion() {
 }
 
 Future<void> ExecCommandClient::run() {
-    auto pf = makePromiseFuture<void>();
-    auto future = std::move(pf.future)
-                      .then([this, anchor = shared_from_this()] { return _prologue(); })
-                      .then([this, anchor = shared_from_this()] { return _run(); })
-                      .then([this, anchor = shared_from_this()] { _epilogue(); })
-                      .onCompletion([this, anchor = shared_from_this()](Status status) {
-                          if (!status.isOK() && status.code() != ErrorCodes::SkipCommandExecution)
-                              return status;  // Execution was interrupted due to an error.
+    return makeReadyFutureWith([&] {
+               _prologue();
 
-                          _onCompletion();
-                          return Status::OK();
-                      });
-    pf.promise.emplaceValue();
-    return future;
+               return _run();
+           })
+        .then([this] { _epilogue(); })
+        .onCompletion([this](Status status) {
+            if (!status.isOK() && status.code() != ErrorCodes::SkipCommandExecution)
+                return status;  // Execution was interrupted due to an error.
+
+            _onCompletion();
+            return Status::OK();
+        });
 }
 
 MONGO_FAIL_POINT_DEFINE(doNotRefreshShardsOnRetargettingError);
@@ -357,7 +355,7 @@ MONGO_FAIL_POINT_DEFINE(doNotRefreshShardsOnRetargettingError);
  * Produces a future-chain that parses the command, runs the parsed command, and captures the result
  * in replyBuilder.
  */
-class ParseAndRunCommand final : public std::enable_shared_from_this<ParseAndRunCommand> {
+class ParseAndRunCommand final {
 public:
     ParseAndRunCommand(const ParseAndRunCommand&) = delete;
     ParseAndRunCommand(ParseAndRunCommand&&) = delete;
@@ -377,10 +375,7 @@ private:
 
     // Prepares the environment for running the command (e.g., parsing the command to produce the
     // invocation and extracting read/write concerns).
-    Status _prologue();
-
-    // Returns a future-chain that runs the parse invocation.
-    Future<void> _runInvocation();
+    void _parseCommand();
 
     const std::shared_ptr<RequestExecutionContext> _rec;
     const std::shared_ptr<BSONObjBuilder> _errorBuilder;
@@ -397,13 +392,12 @@ private:
 /*
  * Produces a future-chain to run the invocation and capture the result in replyBuilder.
  */
-class ParseAndRunCommand::RunInvocation final
-    : public std::enable_shared_from_this<ParseAndRunCommand::RunInvocation> {
+class ParseAndRunCommand::RunInvocation final {
 public:
     RunInvocation(RunInvocation&&) = delete;
     RunInvocation(const RunInvocation&) = delete;
 
-    explicit RunInvocation(std::shared_ptr<ParseAndRunCommand> parc) : _parc(std::move(parc)) {}
+    explicit RunInvocation(ParseAndRunCommand* parc) : _parc(parc) {}
 
     ~RunInvocation() {
         if (!_shouldAffectCommandCounter)
@@ -418,13 +412,10 @@ public:
 private:
     Status _setup();
 
-    // Returns a future-chain that runs the invocation and retries if necessary.
-    Future<void> _runAndRetry();
-
-    // Logs and updates statistics if an error occurs during `_setup()` or `_runAndRetry()`.
+    // Logs and updates statistics if an error occurs.
     void _tapOnError(const Status& status);
 
-    const std::shared_ptr<ParseAndRunCommand> _parc;
+    ParseAndRunCommand* const _parc;
 
     boost::optional<RouterOperationContextSession> _routerSession;
     bool _shouldAffectCommandCounter = false;
@@ -433,13 +424,12 @@ private:
 /*
  * Produces a future-chain that runs the invocation and retries if necessary.
  */
-class ParseAndRunCommand::RunAndRetry final
-    : public std::enable_shared_from_this<ParseAndRunCommand::RunAndRetry> {
+class ParseAndRunCommand::RunAndRetry final {
 public:
     RunAndRetry(RunAndRetry&&) = delete;
     RunAndRetry(const RunAndRetry&) = delete;
 
-    explicit RunAndRetry(std::shared_ptr<ParseAndRunCommand> parc) : _parc(std::move(parc)) {}
+    explicit RunAndRetry(ParseAndRunCommand* parc) : _parc(parc) {}
 
     Future<void> run();
 
@@ -461,12 +451,12 @@ private:
     void _onStaleDbVersion(Status& status);
     void _onSnapshotError(Status& status);
 
-    const std::shared_ptr<ParseAndRunCommand> _parc;
+    ParseAndRunCommand* const _parc;
 
     int _tries = 0;
 };
 
-Status ParseAndRunCommand::_prologue() {
+void ParseAndRunCommand::_parseCommand() {
     auto opCtx = _rec->getOpCtx();
     const auto& m = _rec->getMessage();
     const auto& request = _rec->getRequest();
@@ -480,7 +470,7 @@ Status ParseAndRunCommand::_prologue() {
                                                    {ErrorCodes::CommandNotFound, errorMsg});
         globalCommandRegistry()->incrementUnknownCommands();
         appendRequiredFieldsToResponse(opCtx, &builder);
-        return {ErrorCodes::SkipCommandExecution, errorMsg};
+        iassert(Status{ErrorCodes::SkipCommandExecution, errorMsg});
     }
 
     _rec->setCommand(command);
@@ -568,10 +558,8 @@ Status ParseAndRunCommand::_prologue() {
     if (!readConcernParseStatus.isOK()) {
         auto builder = replyBuilder->getBodyBuilder();
         CommandHelpers::appendCommandStatusNoThrow(builder, readConcernParseStatus);
-        return {ErrorCodes::SkipCommandExecution, "Failed to parse read concern"};
+        iassert(Status{ErrorCodes::SkipCommandExecution, "Failed to parse read concern"});
     }
-
-    return Status::OK();
 }
 
 Status ParseAndRunCommand::RunInvocation::_setup() {
@@ -841,14 +829,15 @@ void ParseAndRunCommand::RunAndRetry::_setup() {
 }
 
 Future<void> ParseAndRunCommand::RunAndRetry::_run() {
-    auto ecc = std::make_shared<ExecCommandClient>(_parc->_rec, _parc->_invocation);
-    return ecc->run().then([rec = _parc->_rec] {
-        auto opCtx = rec->getOpCtx();
-        auto responseBuilder = rec->getReplyBuilder()->getBodyBuilder();
-        if (auto txnRouter = TransactionRouter::get(opCtx)) {
-            txnRouter.appendRecoveryToken(&responseBuilder);
-        }
-    });
+    return future_util::makeState<ExecCommandClient>(_parc->_rec, _parc->_invocation)
+        .thenWithState([](auto* runner) { return runner->run(); })
+        .then([rec = _parc->_rec] {
+            auto opCtx = rec->getOpCtx();
+            auto responseBuilder = rec->getReplyBuilder()->getBodyBuilder();
+            if (auto txnRouter = TransactionRouter::get(opCtx)) {
+                txnRouter.appendRecoveryToken(&responseBuilder);
+            }
+        });
 }
 
 void ParseAndRunCommand::RunAndRetry::_checkRetryForTransaction(Status& status) {
@@ -998,84 +987,51 @@ void ParseAndRunCommand::RunInvocation::_tapOnError(const Status& status) {
     _parc->_errorBuilder->appendElements(errorLabels);
 }
 
-Future<void> ParseAndRunCommand::RunInvocation::_runAndRetry() {
-    auto instance = std::make_shared<RunAndRetry>(_parc);
-    return instance->run();
-}
-
-Future<void> ParseAndRunCommand::_runInvocation() {
-    auto ri = std::make_shared<RunInvocation>(shared_from_this());
-    return ri->run();
-}
-
 Future<void> ParseAndRunCommand::RunAndRetry::run() {
-    // Try kMaxNumStaleVersionRetries times. On the last try, exceptions are rethrown.
-    _tries++;
+    return makeReadyFutureWith([&] {
+               // Try kMaxNumStaleVersionRetries times. On the last try, exceptions are rethrown.
+               _tries++;
 
-    auto pf = makePromiseFuture<void>();
-    auto future = std::move(pf.future)
-                      .then([this, anchor = shared_from_this()] { _setup(); })
-                      .then([this, anchor = shared_from_this()] {
-                          return _run()
-                              .onError<ErrorCodes::ShardInvalidatedForTargeting>(
-                                  [this, anchor = shared_from_this()](Status status) {
-                                      _onShardInvalidatedForTargeting(status);
-                                      return run();  // Retry
-                                  })
-                              .onErrorCategory<ErrorCategory::NeedRetargettingError>(
-                                  [this, anchor = shared_from_this()](Status status) {
-                                      _onNeedRetargetting(status);
-                                      return run();  // Retry
-                                  })
-                              .onError<ErrorCodes::StaleDbVersion>(
-                                  [this, anchor = shared_from_this()](Status status) {
-                                      _onStaleDbVersion(status);
-                                      return run();  // Retry
-                                  })
-                              .onErrorCategory<ErrorCategory::SnapshotError>(
-                                  [this, anchor = shared_from_this()](Status status) {
-                                      _onSnapshotError(status);
-                                      return run();  // Retry
-                                  });
-                      });
-    pf.promise.emplaceValue();
-    return future;
+               _setup();
+               return _run();
+           })
+        .onError<ErrorCodes::ShardInvalidatedForTargeting>([this](Status status) {
+            _onShardInvalidatedForTargeting(status);
+            return run();  // Retry
+        })
+        .onErrorCategory<ErrorCategory::NeedRetargettingError>([this](Status status) {
+            _onNeedRetargetting(status);
+            return run();  // Retry
+        })
+        .onError<ErrorCodes::StaleDbVersion>([this](Status status) {
+            _onStaleDbVersion(status);
+            return run();  // Retry
+        })
+        .onErrorCategory<ErrorCategory::SnapshotError>([this](Status status) {
+            _onSnapshotError(status);
+            return run();  // Retry
+        });
 }
 
 Future<void> ParseAndRunCommand::RunInvocation::run() {
-    auto pf = makePromiseFuture<void>();
-    auto future =
-        std::move(pf.future)
-            .then([this, anchor = shared_from_this()] { return _setup(); })
-            .then([this, anchor = shared_from_this()] { return _runAndRetry(); })
-            .tapError([this, anchor = shared_from_this()](Status status) { _tapOnError(status); });
-    pf.promise.emplaceValue();
-    return future;
+    return makeReadyFutureWith([&] {
+               iassert(_setup());
+               return future_util::makeState<RunAndRetry>(_parc).thenWithState(
+                   [](auto* runner) { return runner->run(); });
+           })
+        .tapError([this](Status status) { _tapOnError(status); });
 }
 
 Future<void> ParseAndRunCommand::run() {
-    auto pf = makePromiseFuture<void>();
-    auto future = std::move(pf.future)
-                      .then([this, anchor = shared_from_this()] { return _prologue(); })
-                      .then([this, anchor = shared_from_this()] { return _runInvocation(); })
-                      .onError([this, anchor = shared_from_this()](Status status) {
-                          if (status.code() == ErrorCodes::SkipCommandExecution)
-                              // We've already skipped execution, so no other action is required.
-                              return Status::OK();
-                          return status;
-                      });
-    pf.promise.emplaceValue();
-    return future;
-}
-
-/**
- * Executes the command for the given request, and appends the result to replyBuilder
- * and error labels, if any, to errorBuilder.
- */
-Future<void> runCommand(std::shared_ptr<RequestExecutionContext> rec,
-                        std::shared_ptr<BSONObjBuilder> errorBuilder) {
-    auto instance = std::make_shared<ParseAndRunCommand>(std::move(rec), std::move(errorBuilder));
-    return instance->run();
+    return makeReadyFutureWith([&] {
+               _parseCommand();
+               return future_util::makeState<RunInvocation>(this).thenWithState(
+                   [](auto* runner) { return runner->run(); });
+           })
+        .onError<ErrorCodes::SkipCommandExecution>([this](Status status) {
+            // We've already skipped execution, so no other action is required.
+            return Status::OK();
+        });
 }
 
 }  // namespace
@@ -1200,7 +1156,7 @@ DbResponse Strategy::queryOp(OperationContext* opCtx, const NamespaceString& nss
 
 // Maintains the state required to execute client commands, and provides the interface to construct
 // a future-chain that runs the command against the database.
-class ClientCommand final : public std::enable_shared_from_this<ClientCommand> {
+class ClientCommand final {
 public:
     ClientCommand(ClientCommand&&) = delete;
     ClientCommand(const ClientCommand&) = delete;
@@ -1208,11 +1164,10 @@ public:
     explicit ClientCommand(std::shared_ptr<RequestExecutionContext> rec)
         : _rec(std::move(rec)), _errorBuilder(std::make_shared<BSONObjBuilder>()) {}
 
-    // Returns the future-chain that produces the response by parsing and executing the command.
     Future<DbResponse> run();
 
 private:
-    void _parse();
+    void _parseMessage();
 
     Future<void> _execute();
 
@@ -1228,7 +1183,7 @@ private:
     bool _propagateException = false;
 };
 
-void ClientCommand::_parse() try {
+void ClientCommand::_parseMessage() try {
     const auto& msg = _rec->getMessage();
     _rec->setReplyBuilder(rpc::makeReplyBuilder(rpc::protocolForMessage(msg)));
     _rec->setRequest(rpc::opMsgRequestFromAnyProtocol(msg));
@@ -1253,8 +1208,9 @@ Future<void> ClientCommand::_execute() {
                 "db"_attr = _rec->getRequest().getDatabase().toString(),
                 "headerId"_attr = _rec->getMessage().header().getId());
 
-    return runCommand(_rec, _errorBuilder)
-        .then([this, anchor = shared_from_this()] {
+    return future_util::makeState<ParseAndRunCommand>(_rec, _errorBuilder)
+        .thenWithState([](auto* runner) { return runner->run(); })
+        .then([this] {
             LOGV2_DEBUG(22771,
                         3,
                         "Command end db: {db} msg id: {headerId}",
@@ -1262,7 +1218,7 @@ Future<void> ClientCommand::_execute() {
                         "db"_attr = _rec->getRequest().getDatabase().toString(),
                         "headerId"_attr = _rec->getMessage().header().getId());
         })
-        .tapError([this, anchor = shared_from_this()](Status status) {
+        .tapError([this](Status status) {
             LOGV2_DEBUG(
                 22772,
                 1,
@@ -1328,21 +1284,18 @@ DbResponse ClientCommand::_produceResponse() {
 }
 
 Future<DbResponse> ClientCommand::run() {
-    auto pf = makePromiseFuture<void>();
-    auto future = std::move(pf.future)
-                      .then([this, anchor = shared_from_this()] { _parse(); })
-                      .then([this, anchor = shared_from_this()] { return _execute(); })
-                      .onError([this, anchor = shared_from_this()](Status status) {
-                          return _handleException(std::move(status));
-                      })
-                      .then([this, anchor = shared_from_this()] { return _produceResponse(); });
-    pf.promise.emplaceValue();
-    return future;
+    return makeReadyFutureWith([&] {
+               _parseMessage();
+               return _execute();
+           })
+        .onError([this](Status status) { return _handleException(std::move(status)); })
+        .then([this] { return _produceResponse(); });
 }
 
 Future<DbResponse> Strategy::clientCommand(std::shared_ptr<RequestExecutionContext> rec) {
-    auto instance = std::make_shared<ClientCommand>(std::move(rec));
-    return instance->run();
+    return future_util::makeState<ClientCommand>(std::move(rec)).thenWithState([](auto* runner) {
+        return runner->run();
+    });
 }
 
 DbResponse Strategy::getMore(OperationContext* opCtx, const NamespaceString& nss, DbMessage* dbm) {
@@ -1483,8 +1436,9 @@ void Strategy::writeOp(std::shared_ptr<RequestExecutionContext> rec) {
     }());
 
     rec->setReplyBuilder(std::make_unique<rpc::OpMsgReplyBuilder>());
-    runCommand(std::move(rec),
-               std::make_shared<BSONObjBuilder>())  // built objects are ignored
+    auto bob = std::make_shared<BSONObjBuilder>();  // built objects are ignorned.
+    future_util::makeState<ParseAndRunCommand>(std::move(rec), std::move(bob))
+        .thenWithState([](auto* runner) { return runner->run(); })
         .get();
 }
 

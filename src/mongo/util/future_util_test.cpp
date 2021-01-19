@@ -944,6 +944,198 @@ TEST_F(WhenAnyTest, WorksWithExecutorFutures) {
     ASSERT_EQ(idx, kWhichIdxWillBeFirst);
 }
 
+class AsyncStateTest : public FutureUtilTest {
+public:
+    class SettingGuard {
+    public:
+        SettingGuard(AsyncStateTest* fixture) : _fixture(fixture) {}
+        SettingGuard(SettingGuard&& guard) : _fixture(std::exchange(guard._fixture, {})) {}
+        SettingGuard& operator=(SettingGuard&& guard) {
+            _fixture = std::exchange(guard._fixture, {});
+            return *this;
+        }
+
+        SettingGuard(const SettingGuard&) = delete;
+        SettingGuard& operator=(const SettingGuard&) = delete;
+
+        ~SettingGuard() {
+            if (_fixture) {
+                _fixture->_counter.fetchAndAdd(1);
+            }
+        }
+
+        bool isValid() const {
+            return _fixture;
+        }
+
+        size_t getCount() const {
+            return _fixture->getCount();
+        }
+
+    private:
+        AsyncStateTest* _fixture = nullptr;
+    };
+
+    auto makeAsyncGuard() {
+        return SettingGuard{this};
+    }
+
+    size_t getCount() const {
+        return _counter.load();
+    }
+
+private:
+    AtomicWord<size_t> _counter{0};
+};
+
+TEST_F(AsyncStateTest, SuccessInlineRvalue) {
+    // If we get an inline result, we immediately see the State destruct.
+    auto future = future_util::makeState<SettingGuard>(this).thenWithState([this](auto* guard) {
+        ASSERT(guard->isValid());
+        ASSERT_EQ(getCount(), 0);
+        return Status::OK();
+    });
+    ASSERT_EQ(getCount(), 1);
+
+    future.wait();
+    ASSERT_EQ(getCount(), 1);
+}
+
+TEST_F(AsyncStateTest, SuccessInlineLvalue) {
+    // The guard will not destruct while we have the AsyncState on the local stack.
+    auto state = future_util::makeState<SettingGuard>(this);
+    ASSERT_EQ(getCount(), 0);
+
+    // We don't have to use the AsyncState immediately. Imagine that we create the state under lock,
+    // do a bunch of other synchronized work, then release the lock and invoke thenWithState.
+
+    // If we get an inline result, we immediately see the State destruct.
+    auto future = std::move(state).thenWithState([this](auto* guard) {
+        ASSERT(guard->isValid());
+        ASSERT_EQ(getCount(), 0);
+        return Status::OK();
+    });
+    ASSERT_EQ(getCount(), 1);
+
+    future.wait();
+    ASSERT_EQ(getCount(), 1);
+}
+
+TEST_F(AsyncStateTest, FailInline) {
+    // If we get an inline error, we immediately see the State destruct.
+    auto future = future_util::makeState<SettingGuard>(this).thenWithState([this](auto* guard) {
+        ASSERT(guard->isValid());
+        ASSERT_EQ(getCount(), 0);
+        return Status(ErrorCodes::InternalError, "Fail");
+    });
+    ASSERT_EQ(getCount(), 1);
+
+    ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::InternalError);
+    ASSERT_EQ(getCount(), 1);
+}
+
+TEST_F(AsyncStateTest, ThrowInCtor) {
+    class ThrowingState {
+    public:
+        ThrowingState() {
+            uasserted(ErrorCodes::InternalError, "Fail");
+        }
+    };
+
+    // If we get an exception, we never invoke the callback for thenWithState().
+    auto future = future_util::makeState<ThrowingState>().thenWithState([this](auto*) {
+        // Use a different code so that we can assert we don't return from here.
+        return Status(ErrorCodes::BadValue, "This shouldn't be reached");
+    });
+    ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::InternalError);
+    ASSERT_EQ(getCount(), 0);
+}
+
+TEST_F(AsyncStateTest, ThrowInLauncher) {
+    // If we get an exception, we immediately see the State destruct.
+    auto future = future_util::makeState<SettingGuard>(this).thenWithState([this](auto* guard) {
+        ASSERT(guard->isValid());
+        ASSERT_EQ(getCount(), 0);
+        uasserted(ErrorCodes::InternalError, "Fail");
+        return Status::OK();
+    });
+    ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::InternalError);
+    ASSERT_EQ(getCount(), 1);
+}
+
+TEST_F(AsyncStateTest, Deferred) {
+    // If we delay the inline result, we see the State destruct when we emplace the promise.
+    auto pf = makePromiseFuture<void>();
+    auto future = future_util::makeState<SettingGuard>(this)
+                      .thenWithState([this, future = std::move(pf.future)](auto* guard) mutable {
+                          ASSERT(guard->isValid());
+                          ASSERT_EQ(getCount(), 0);
+                          return std::move(future);
+                      })
+                      .then([&] {
+                          // Return current counter output (post-guard) from a future continuation.
+                          return getCount();
+                      });
+
+    // Check that the guard does not run until we emplace the promise.
+    ASSERT_EQ(getCount(), 0);
+    pf.promise.emplaceValue();
+
+    // Confirm that the future continuation ran.
+    ASSERT_EQ(std::move(future).get(), 1);
+    ASSERT_EQ(getCount(), 1);
+}
+
+TEST_F(AsyncStateTest, OutOfLine) {
+    // If we delay the inline result, we see the State destruct when we emplace the promise.
+    auto pf = makePromiseFuture<void>();
+    auto future = future_util::makeState<SettingGuard>(this)
+                      .thenWithState([this, future = std::move(pf.future)](auto* guard) mutable {
+                          ASSERT(guard->isValid());
+                          ASSERT_EQ(getCount(), 0);
+                          return std::move(future);
+                      })
+                      .then([&] {
+                          // Return current counter output (post-guard) from a future continuation.
+                          return getCount();
+                      });
+
+    // Check that the guard does not run until we emplace the promise.
+    ASSERT_EQ(getCount(), 0);
+    executor()->schedule(
+        [promise = std::move(pf.promise)](Status) mutable { promise.emplaceValue(); });
+
+    // Confirm that the future continuation observed the right result.
+    ASSERT_EQ(std::move(future).get(), 1);
+    ASSERT_EQ(getCount(), 1);
+}
+
+TEST_F(AsyncStateTest, OutOfLineWithBinding) {
+    // If we delay the inline result, we see the State destruct when we emplace the promise.
+    auto pf = makePromiseFuture<void>();
+    auto future = future_util::makeState<SettingGuard>(this)
+                      .thenWithState([this, future = std::move(pf.future)](auto* guard) mutable {
+                          return std::move(future).then([this, guard]() {
+                              // We've bound the pointer to guard, which should remain valid in the
+                              // continuation.
+                              ASSERT(guard->isValid());
+                              ASSERT_EQ(getCount(), 0);
+                          });
+                      })
+                      .then([&] {
+                          // Return current counter output (post-guard) from a future continuation.
+                          return getCount();
+                      });
+
+    // Check that the guard does not run until we emplace the promise.
+    ASSERT_EQ(getCount(), 0);
+    executor()->schedule(
+        [promise = std::move(pf.promise)](Status) mutable { promise.emplaceValue(); });
+
+    // Confirm that the future continuation observed the right result.
+    ASSERT_EQ(std::move(future).get(), 1);
+    ASSERT_EQ(getCount(), 1);
+}
 
 }  // namespace
 }  // namespace mongo

@@ -541,4 +541,92 @@ SemiFuture<Result> whenAny(std::vector<FutureT>&& futures) {
 
     return std::move(future).semi();
 }
+
+namespace future_util {
+
+/**
+ * This class is a helper for ensuring RAII-like behavior in async code.
+ *
+ * This class constructs a heap allocated State object in make(), and then uses that State object
+ * with a Launcher functor to create a future. The State object is persisted until the future
+ * created by the Launcher completes. If the Launcher emits an exception, the state is destructed.
+ * If the State ctor throws, then the error Status is returned as a ready future instead of invoking
+ * the Launcher. The simplest example would be a guard that is destroyed once an async function
+ * finishes:
+ * ```
+ * auto myFuture = future_util::AsyncState::make<MyGuard>({})
+ *     .thenWithState([](MyGuard*) { return myAsyncFunc(); });
+ * ```
+ *
+ * Note that this class is not usable for ExecutorFutures because there is no tapAll() function to
+ * invoke. If you want similar behavior, simply bind your state to the final callback in the async
+ * chain, but do be mindful of TODO(SERVER-52942).
+ */
+template <typename State>
+class [[nodiscard]] AsyncState {
+public:
+    explicit AsyncState(std::unique_ptr<State> state)
+        : _status(Status::OK()), _state(std::move(state)) {}
+
+    /**
+     * Consume the AsyncState and bind the underlying state to the tail of the future returned from
+     * the launcher functor.
+     *
+     * If the AsyncState was constructed with a Status, then return the captured status instead of
+     * running the launcher.
+     */
+    template <typename Launcher>
+        auto thenWithState(Launcher && launcher) && noexcept {
+        using namespace future_details;
+        using ReturnType = FutureFor<NormalizedCallResult<Launcher, State*>>;
+
+        if (!_status.isOK()) {
+            // The factory threw, we have no state to run the launcher with.
+            return ReturnType::makeReady(std::move(_status));
+        }
+
+        auto ptr = _state.get();
+        return makeReadyFutureWith([&] {
+            auto future = coerceToFuture(std::forward<Launcher>(launcher)(ptr));
+            return std::move(future).tapAll([state = std::move(_state)](auto&&) mutable {
+                // Finally, release our state.
+                auto localState = std::move(state);
+            });
+        });
+    }
+
+    /**
+     * This function is a helper for making an AsyncState given ala make_unique.
+     *
+     * If an exception would be emitted, it is instead stored in the AsyncState.
+     */
+    template <typename... Args>
+    static auto make(Args && ... args) noexcept {
+        try {
+            auto ptr = std::make_unique<State>(std::forward<Args>(args)...);
+            return AsyncState(std::move(ptr));
+        } catch (const DBException& ex) {
+            return AsyncState(ex.toStatus());
+        }
+    }
+
+private:
+    /**
+     * This ctor allows make to capture exceptions and defer them until someone invokes
+     * thenWithState(). It is private simply because it is difficult to justify a good use case for
+     * it by an external user.
+     */
+    explicit AsyncState(Status status) : _status(std::move(status)) {}
+
+    Status _status;
+    std::unique_ptr<State> _state;
+};
+
+// This function is syntactic sugar for AsyncState<T>::make().
+template <typename T, typename... Args>
+auto makeState(Args&&... args) {
+    return AsyncState<T>::make(std::forward<Args>(args)...);
+}
+
+}  // namespace future_util
 }  // namespace mongo
