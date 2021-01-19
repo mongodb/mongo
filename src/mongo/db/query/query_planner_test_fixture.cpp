@@ -443,7 +443,8 @@ void QueryPlannerTest::runQueryAsCommand(const BSONObj& cmdObj) {
 
     // If there is no '$db', append it.
     auto cmd = OpMsgRequest::fromDBAndBody(nss.db(), cmdObj).body;
-    std::unique_ptr<QueryRequest> qr(QueryRequest::makeFromFindCommand(cmd, isExplain, nss));
+    std::unique_ptr<QueryRequest> qr(
+        QueryRequest::makeFromFindCommandForTests(cmd, isExplain, nss));
 
     auto statusWithCQ =
         CanonicalQuery::canonicalize(opCtx.get(),
@@ -468,7 +469,8 @@ void QueryPlannerTest::runInvalidQueryAsCommand(const BSONObj& cmdObj) {
 
     // If there is no '$db', append it.
     auto cmd = OpMsgRequest::fromDBAndBody(nss.db(), cmdObj).body;
-    std::unique_ptr<QueryRequest> qr(QueryRequest::makeFromFindCommand(cmd, isExplain, nss));
+    std::unique_ptr<QueryRequest> qr(
+        QueryRequest::makeFromFindCommandForTests(cmd, isExplain, nss));
 
     auto statusWithCQ =
         CanonicalQuery::canonicalize(opCtx.get(),

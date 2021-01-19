@@ -99,7 +99,7 @@ TEST(CanonicalQueryTest, IsValidSortKeyMetaProjection) {
     // Passing a sortKey meta-projection without a sort is an error.
     {
         const bool isExplain = false;
-        auto qr = QueryRequest::makeFromFindCommand(
+        auto qr = QueryRequest::makeFromFindCommandForTests(
             fromjson("{find: 'testcoll', projection: {foo: {$meta: 'sortKey'}}, '$db': 'test'}"),
             isExplain);
         auto cq = CanonicalQuery::canonicalize(opCtx.get(), std::move(qr));
@@ -109,7 +109,7 @@ TEST(CanonicalQueryTest, IsValidSortKeyMetaProjection) {
     // Should be able to successfully create a CQ when there is a sort.
     {
         const bool isExplain = false;
-        auto qr = QueryRequest::makeFromFindCommand(
+        auto qr = QueryRequest::makeFromFindCommandForTests(
             fromjson("{find: 'testcoll', projection: {foo: {$meta: 'sortKey'}}, sort: {bar: 1}, "
                      "'$db': 'test'}"),
             isExplain);
@@ -273,7 +273,7 @@ TEST(CanonicalQueryTest, CanonicalizeFromBaseQuery) {
     const std::string cmdStr =
         "{find:'bogusns', filter:{$or:[{a:1,b:1},{a:1,c:1}]}, projection:{a:1}, sort:{b:1}, '$db': "
         "'test'}";
-    auto qr = QueryRequest::makeFromFindCommand(fromjson(cmdStr), isExplain);
+    auto qr = QueryRequest::makeFromFindCommandForTests(fromjson(cmdStr), isExplain);
     auto baseCq = assertGet(CanonicalQuery::canonicalize(opCtx.get(), std::move(qr)));
 
     MatchExpression* firstClauseExpr = baseCq->root()->getChild(0);

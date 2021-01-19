@@ -1482,10 +1482,9 @@ Future<void> ExecCommandDatabase::_initiateCommand() try {
     // TODO SERVER-34277 Remove the special handling for maxTimeMS for getMores. This will require
     // introducing a new 'max await time' parameter for getMore, and eventually banning maxTimeMS
     // altogether on a getMore command.
-    const auto maxTimeMS =
-        Milliseconds{uassertStatusOK(QueryRequest::parseMaxTimeMS(cmdOptionMaxTimeMSField))};
+    const auto maxTimeMS = Milliseconds{uassertStatusOK(parseMaxTimeMS(cmdOptionMaxTimeMSField))};
     const auto maxTimeMSOpOnly =
-        Milliseconds{uassertStatusOK(QueryRequest::parseMaxTimeMS(maxTimeMSOpOnlyField))};
+        Milliseconds{uassertStatusOK(parseMaxTimeMS(maxTimeMSOpOnlyField))};
 
     if ((maxTimeMS > Milliseconds::zero() || maxTimeMSOpOnly > Milliseconds::zero()) &&
         command->getLogicalOp() != LogicalOp::opGetMore) {

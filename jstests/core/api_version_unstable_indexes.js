@@ -6,6 +6,7 @@
  * @tags: [
  *   requires_fcv_47,
  *   uses_api_parameters,
+ *   sbe_incompatible,
  * ]
  */
 

@@ -77,7 +77,7 @@ public:
                               rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
             auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
-            auto query = QueryRequest::makeFromFindCommand(opMsg.body, false);
+            auto query = QueryRequest::makeFromFindCommandForTests(opMsg.body, false);
 
             ASSERT_EQ(query->nss().ns(), "config.version");
             ASSERT_BSONOBJ_EQ(query->getFilter(), BSONObj());

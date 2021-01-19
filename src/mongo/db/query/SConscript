@@ -177,6 +177,7 @@ env.Library(
         "distinct_command.idl",
         "find_command.idl",
         "query_request.cpp",
+        "max_time_ms_parser.cpp",
         "tailable_mode.cpp",
         "tailable_mode.idl",
     ],

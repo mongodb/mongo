@@ -42,7 +42,6 @@
 #include "mongo/db/exec/document_value/value_comparator.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/javascript_execution.h"
 #include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
@@ -57,6 +56,8 @@
 #include "mongo/util/uuid.h"
 
 namespace mongo {
+
+class AggregateCommand;
 
 class ExpressionContext : public RefCountable {
 public:

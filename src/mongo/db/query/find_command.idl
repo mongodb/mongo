@@ -33,6 +33,7 @@ global:
   cpp_namespace: "mongo"
   cpp_includes:
     - "mongo/db/namespace_string.h"
+    - "mongo/db/query/max_time_ms_parser.h"
 
 imports:
     - "mongo/db/logical_session_id.idl"
@@ -59,7 +60,7 @@ types:
         bson_serialization_type: any
         description: "An int representing max time ms."
         cpp_type: "std::int32_t"
-        deserializer: "::mongo::QueryRequest::parseMaxTimeMSForIDL"
+        deserializer: "::mongo::parseMaxTimeMSForIDL"
 
 commands:
   find:
@@ -68,8 +69,8 @@ commands:
     description: "A struct representing the find command"
     strict: true
     namespace: concatenate_with_db_or_uuid
-    api_version: ""
     non_const_getter: true
+    api_version: "1"
     fields:
       filter:
         description: "The query predicate. If unspecified, then all documents in the collection
@@ -106,6 +107,7 @@ commands:
         description: "Deprecated. Should use batchSize."
         type: safeInt64
         optional: true
+        unstable: true
       singleBatch:
         description: "Determines whether to close the cursor after the first batch."
         type: optionalBool
@@ -116,33 +118,42 @@ commands:
       min:
         description: "The inclusive lower bound for a specific index."
         type: object_owned_nonempty_serialize
+        unstable: true
       max:
         description: "The exclusive upper bound for a specific index."
         type: object_owned_nonempty_serialize
+        unstable: true
       returnKey:
         description: "If true, returns only the index keys in the resulting documents."
         type: optionalBool
+        unstable: true
       showRecordId:
         description: "Determines whether to return the record identifier for each document."
         type: optionalBool
+        unstable: true
       $queryOptions:
         description: "Deprecated. A mechanism to specify readPreference."
         cpp_name: unwrappedReadPref
         type: object_owned_nonempty_serialize
+        unstable: true
       tailable:
         description: "Returns a tailable cursor for a capped collections."
         type: optionalBool
+        unstable: true
       oplogReplay:
         description: "Deprecated. An internal command for replaying a replica set’s oplog."
         type: boolNoOpSerializer
         optional: true
+        unstable: true
       noCursorTimeout:
         description: "Prevents the server from timing out idle cursors after an inactivity period."
         type: optionalBool
+        unstable: true
       awaitData:
         description: "Use in conjunction with the tailable option to block a getMore command on the
         cursor temporarily if at the end of data rather than returning no data."
         type: optionalBool
+        unstable: true
       allowPartialResults:
         description: "For queries against a sharded collection, allows the command (or subsequent
         getMore commands) to return partial results, rather than an error, if one or more queried
@@ -156,25 +167,31 @@ commands:
         description: "Deprecated."
         type: object_owned
         optional: true
+        unstable: true
       term:
         description: "Deprecated."
         type: safeInt64
         optional: true
+        unstable: true
       readOnce:
         description: "Deprecated."
         type: optionalBool
+        unstable: true
       allowSpeculativeMajorityRead:
         description: "Deprecated."
         type: optionalBool
+        unstable: true
       $_requestResumeToken:
         description: "Deprecated."
         cpp_name: requestResumeToken
         type: optionalBool
+        unstable: true
       $_resumeAfter:
         description: "Deprecated."
         cpp_name: resumeAfter
         type: object_owned_nonempty_serialize
         default: mongo::BSONObj()
+        unstable: true
       _use44SortKeys:
         description: "An internal parameter used to determine the serialization format for sort 
         keys. TODO SERVER-47065: A 4.7+ node still has to accept the '_use44SortKeys' field, since
@@ -182,6 +199,7 @@ commands:
         code to tolerate the '_use44SortKeys' field can be deleted."
         type: bool
         optional: true
+        unstable: true
       maxTimeMS:
         description: "The cumulative time limit in milliseconds for processing operations on the
         cursor."
@@ -196,3 +214,6 @@ commands:
         cpp_name: legacyRuntimeConstants
         type: LegacyRuntimeConstants
         optional: true
+    # TODO SERVER-51622: This OkReply is just used as default to be able to mark "unstable" fields,
+    # and should be replaced when converting the output of find command to IDL.
+    reply_type: OkReply

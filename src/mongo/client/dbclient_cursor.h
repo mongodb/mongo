@@ -35,13 +35,13 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/rpc/message.h"
 
 namespace mongo {
 
 class AScopedConnection;
 class DBClientBase;
+class AggregateCommand;
 
 /** Queries return a cursor object */
 class DBClientCursor {

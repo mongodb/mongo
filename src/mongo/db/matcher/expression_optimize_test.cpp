@@ -283,7 +283,7 @@ TEST(ExpressionOptimizeTest, IsValidGeoNearNaturalHint) {
 
 TEST(ExpressionOptimizeTest, IsValidNaturalSortIndexHint) {
     const bool isExplain = false;
-    auto qr = QueryRequest::makeFromFindCommand(
+    auto qr = QueryRequest::makeFromFindCommandForTests(
         fromjson("{find: 'testcoll', sort: {$natural: 1}, hint: {a: 1}, '$db': 'test'}"),
         isExplain);
 
@@ -293,7 +293,7 @@ TEST(ExpressionOptimizeTest, IsValidNaturalSortIndexHint) {
 
 TEST(ExpressionOptimizeTest, IsValidNaturalSortNaturalHint) {
     const bool isExplain = false;
-    auto qr = QueryRequest::makeFromFindCommand(
+    auto qr = QueryRequest::makeFromFindCommandForTests(
         fromjson("{find: 'testcoll', sort: {$natural: 1}, hint: {$natural: 1}, '$db': 'test'}"),
         isExplain);
 
@@ -303,7 +303,7 @@ TEST(ExpressionOptimizeTest, IsValidNaturalSortNaturalHint) {
 
 TEST(ExpressionOptimizeTest, IsValidNaturalSortNaturalHintDifferentDirections) {
     const bool isExplain = false;
-    auto qr = QueryRequest::makeFromFindCommand(
+    auto qr = QueryRequest::makeFromFindCommandForTests(
         fromjson("{find: 'testcoll', sort: {$natural: 1}, hint: {$natural: -1}, '$db': 'test'}"),
         isExplain);
 

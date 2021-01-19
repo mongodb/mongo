@@ -93,7 +93,9 @@ Status checkAuthForCreateOrModifyView(AuthorizationSession* authzSession,
     auto status = aggregation_request_helper::parseFromBSON(
         viewNs,
         BSON("aggregate" << viewOnNs.coll() << "pipeline" << viewPipeline << "cursor" << BSONObj()
-                         << "$db" << viewOnNs.db()));
+                         << "$db" << viewOnNs.db()),
+        boost::none,
+        false);
     if (!status.isOK())
         return status.getStatus();
 

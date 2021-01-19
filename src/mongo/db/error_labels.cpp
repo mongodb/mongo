@@ -98,11 +98,12 @@ bool ErrorLabelBuilder::isResumableChangeStreamError() const {
     // Get the namespace string from CurOp. We will need it to build the LiteParsedPipeline.
     const auto nss = NamespaceString{CurOp::get(_opCtx)->getNS()};
 
+    bool apiStrict = APIParameters::get(_opCtx).getAPIStrict().value_or(false);
     // Do enough parsing to confirm that this is a well-formed pipeline with a $changeStream.
-    const auto swLitePipe = [&nss, &cmdObj]() -> StatusWith<LiteParsedPipeline> {
+    const auto swLitePipe = [&nss, &cmdObj, apiStrict]() -> StatusWith<LiteParsedPipeline> {
         try {
-            auto aggRequest =
-                uassertStatusOK(aggregation_request_helper::parseFromBSON(nss, cmdObj));
+            auto aggRequest = uassertStatusOK(
+                aggregation_request_helper::parseFromBSON(nss, cmdObj, boost::none, apiStrict));
             return LiteParsedPipeline(aggRequest);
         } catch (const DBException& ex) {
             return ex.toStatus();

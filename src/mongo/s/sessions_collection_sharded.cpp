@@ -166,13 +166,14 @@ void SessionsCollectionSharded::removeRecords(OperationContext* opCtx,
 LogicalSessionIdSet SessionsCollectionSharded::findRemovedSessions(
     OperationContext* opCtx, const LogicalSessionIdSet& sessions) {
 
+    bool apiStrict = APIParameters::get(opCtx).getAPIStrict().value_or(false);
     auto send = [&](BSONObj toSend) -> BSONObj {
         // If there is no '$db', append it.
         toSend =
             OpMsgRequest::fromDBAndBody(NamespaceString::kLogicalSessionsNamespace.db(), toSend)
                 .body;
         auto qr = QueryRequest::makeFromFindCommand(
-            toSend, false, NamespaceString::kLogicalSessionsNamespace);
+            toSend, false, NamespaceString::kLogicalSessionsNamespace, apiStrict);
 
         const boost::intrusive_ptr<ExpressionContext> expCtx;
         auto cq = uassertStatusOK(

@@ -49,14 +49,32 @@ namespace aggregation_request_helper {
 StatusWith<AggregateCommand> parseFromBSON(
     const std::string& dbName,
     const BSONObj& cmdObj,
-    boost::optional<ExplainOptions::Verbosity> explainVerbosity) {
-    return parseFromBSON(parseNs(dbName, cmdObj), cmdObj, explainVerbosity);
+    boost::optional<ExplainOptions::Verbosity> explainVerbosity,
+    bool apiStrict) {
+    return parseFromBSON(parseNs(dbName, cmdObj), cmdObj, explainVerbosity, apiStrict);
+}
+
+StatusWith<AggregateCommand> parseFromBSONForTests(
+    NamespaceString nss,
+    const BSONObj& cmdObj,
+    boost::optional<ExplainOptions::Verbosity> explainVerbosity,
+    bool apiStrict) {
+    return parseFromBSON(nss, cmdObj, explainVerbosity, apiStrict);
+}
+
+StatusWith<AggregateCommand> parseFromBSONForTests(
+    const std::string& dbName,
+    const BSONObj& cmdObj,
+    boost::optional<ExplainOptions::Verbosity> explainVerbosity,
+    bool apiStrict) {
+    return parseFromBSON(dbName, cmdObj, explainVerbosity, apiStrict);
 }
 
 StatusWith<AggregateCommand> parseFromBSON(
     NamespaceString nss,
     const BSONObj& cmdObj,
-    boost::optional<ExplainOptions::Verbosity> explainVerbosity) {
+    boost::optional<ExplainOptions::Verbosity> explainVerbosity,
+    bool apiStrict) {
 
     // if the command object lacks field 'aggregate' or '$db', we will use the namespace in 'nss'.
     bool cmdObjChanged = false;
@@ -70,7 +88,7 @@ StatusWith<AggregateCommand> parseFromBSON(
 
     AggregateCommand request(nss);
     try {
-        request = AggregateCommand::parse(IDLParserErrorContext("aggregate"),
+        request = AggregateCommand::parse(IDLParserErrorContext("aggregate", apiStrict),
                                           cmdObjChanged ? cmdObjBob.obj() : cmdObj);
     } catch (const AssertionException&) {
         return exceptionToStatus();

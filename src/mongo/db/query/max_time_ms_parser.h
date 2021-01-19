@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2019-present MongoDB, Inc.
+ *    Copyright (C) 2021-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,42 +27,35 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
 
-#include "mongo/db/query/count_request.h"
+#pragma once
 
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/query/query_request.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
 
 namespace mongo {
-namespace count_request {
 
-long long countParseLimit(const BSONElement& element) {
-    uassert(ErrorCodes::BadValue, "limit value is not a valid number", element.isNumber());
-    auto limit = uassertStatusOK(element.parseIntegerElementToLong());
-    // The absolute value of the smallest long long is too large to be represented as a long
-    // long, so we fail to parse such count commands.
-    uassert(ErrorCodes::BadValue,
-            "limit value for count cannot be min long",
-            limit != std::numeric_limits<long long>::min());
+static constexpr auto kMaxTimeMSOpOnlyField = "maxTimeMSOpOnly";
 
-    // For counts, limit and -limit mean the same thing.
-    if (limit < 0) {
-        limit = -limit;
-    }
-    return limit;
-}
+// A constant by which 'maxTimeMSOpOnly' values are allowed to exceed the max allowed value for
+// 'maxTimeMS'.  This is because mongod and mongos server processes add a small amount to the
+// 'maxTimeMS' value they are given before passing it on as 'maxTimeMSOpOnly', to allow for
+// clock precision.
+static constexpr auto kMaxTimeMSOpOnlyMaxPadding = 100LL;
 
-long long countParseSkip(const BSONElement& element) {
-    uassert(ErrorCodes::BadValue, "skip value is not a valid number", element.isNumber());
-    auto skip = uassertStatusOK(element.parseIntegerElementToNonNegativeLong());
-    return skip;
-}
+/**
+ * Parses maxTimeMS from the BSONElement containing its value.
+ * The field name of the 'maxTimeMSElt' is used to determine what maximum value to enforce for
+ * the provided max time. 'maxTimeMSOpOnly' needs a slightly higher max value than regular
+ * 'maxTimeMS' to account for the case where a user provides the max possible value for
+ * 'maxTimeMS' to one server process (mongod or mongos), then that server process passes the max
+ * time on to another server as 'maxTimeMSOpOnly', but after adding a small amount to the max
+ * time to account for clock precision.  This can push the 'maxTimeMSOpOnly' sent to the mongod
+ * over the max value allowed for users to provide. This is safe because 'maxTimeMSOpOnly' is
+ * only allowed to be provided for internal intra-cluster requests.
+ */
+StatusWith<int> parseMaxTimeMS(BSONElement maxTimeMSElt);
 
-long long countParseMaxTime(const BSONElement& element) {
-    auto maxTimeVal = uassertStatusOK(parseMaxTimeMS(element));
-    return static_cast<long long>(maxTimeVal);
-}
-}  // namespace count_request
+int32_t parseMaxTimeMSForIDL(BSONElement maxTimeMSElt);
+
 }  // namespace mongo

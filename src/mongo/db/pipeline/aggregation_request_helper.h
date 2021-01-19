@@ -69,7 +69,14 @@ static constexpr long long kDefaultBatchSize = 101;
 StatusWith<AggregateCommand> parseFromBSON(
     NamespaceString nss,
     const BSONObj& cmdObj,
-    boost::optional<ExplainOptions::Verbosity> explainVerbosity = boost::none);
+    boost::optional<ExplainOptions::Verbosity> explainVerbosity,
+    bool apiStrict);
+
+StatusWith<AggregateCommand> parseFromBSONForTests(
+    NamespaceString nss,
+    const BSONObj& cmdObj,
+    boost::optional<ExplainOptions::Verbosity> explainVerbosity = boost::none,
+    bool apiStrict = false);
 
 /**
  * Convenience overload which constructs the request's NamespaceString from the given database
@@ -78,7 +85,14 @@ StatusWith<AggregateCommand> parseFromBSON(
 StatusWith<AggregateCommand> parseFromBSON(
     const std::string& dbName,
     const BSONObj& cmdObj,
-    boost::optional<ExplainOptions::Verbosity> explainVerbosity = boost::none);
+    boost::optional<ExplainOptions::Verbosity> explainVerbosity,
+    bool apiStrict);
+
+StatusWith<AggregateCommand> parseFromBSONForTests(
+    const std::string& dbName,
+    const BSONObj& cmdObj,
+    boost::optional<ExplainOptions::Verbosity> explainVerbosity = boost::none,
+    bool apiStrict = false);
 
 /*
  * The first field in 'cmdObj' must be a string representing a valid collection name, or the

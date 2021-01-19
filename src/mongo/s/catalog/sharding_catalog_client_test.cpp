@@ -101,7 +101,7 @@ TEST_F(ShardingCatalogClientTest, GetCollectionExisting) {
                               rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
             auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
-            auto query = QueryRequest::makeFromFindCommand(opMsg.body, false);
+            auto query = QueryRequest::makeFromFindCommandForTests(opMsg.body, false);
 
             // Ensure the query is correct
             ASSERT_EQ(query->nss(), CollectionType::ConfigNS);
@@ -171,7 +171,7 @@ TEST_F(ShardingCatalogClientTest, GetDatabaseExisting) {
                           rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
         auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
-        auto query = QueryRequest::makeFromFindCommand(opMsg.body, false);
+        auto query = QueryRequest::makeFromFindCommandForTests(opMsg.body, false);
 
         ASSERT_EQ(query->nss(), DatabaseType::ConfigNS);
         ASSERT_BSONOBJ_EQ(query->getFilter(), BSON(DatabaseType::name(expectedDb.getName())));
@@ -300,7 +300,7 @@ TEST_F(ShardingCatalogClientTest, GetAllShardsValid) {
                           rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
         auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
-        auto query = QueryRequest::makeFromFindCommand(opMsg.body, false);
+        auto query = QueryRequest::makeFromFindCommandForTests(opMsg.body, false);
 
         ASSERT_EQ(query->nss(), ShardType::ConfigNS);
         ASSERT_BSONOBJ_EQ(query->getFilter(), BSONObj());
@@ -397,7 +397,7 @@ TEST_F(ShardingCatalogClientTest, GetChunksForNSWithSortAndLimit) {
                               rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
             auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
-            auto query = QueryRequest::makeFromFindCommand(opMsg.body, false);
+            auto query = QueryRequest::makeFromFindCommandForTests(opMsg.body, false);
 
             ASSERT_EQ(query->nss(), ChunkType::ConfigNS);
             ASSERT_BSONOBJ_EQ(query->getFilter(), chunksQuery);
@@ -454,7 +454,7 @@ TEST_F(ShardingCatalogClientTest, GetChunksForNSNoSortNoLimit) {
                           rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
         auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
-        auto query = QueryRequest::makeFromFindCommand(opMsg.body, false);
+        auto query = QueryRequest::makeFromFindCommandForTests(opMsg.body, false);
 
         ASSERT_EQ(query->nss(), ChunkType::ConfigNS);
         ASSERT_BSONOBJ_EQ(query->getFilter(), chunksQuery);
@@ -766,7 +766,7 @@ TEST_F(ShardingCatalogClientTest, GetCollectionsValidResultsNoDb) {
                           rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
         auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
-        auto query = QueryRequest::makeFromFindCommand(opMsg.body, false);
+        auto query = QueryRequest::makeFromFindCommandForTests(opMsg.body, false);
 
         ASSERT_EQ(query->nss(), CollectionType::ConfigNS);
         ASSERT_BSONOBJ_EQ(query->getFilter(), BSONObj());
@@ -813,7 +813,7 @@ TEST_F(ShardingCatalogClientTest, GetCollectionsValidResultsWithDb) {
                           rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
         auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
-        auto query = QueryRequest::makeFromFindCommand(opMsg.body, false);
+        auto query = QueryRequest::makeFromFindCommandForTests(opMsg.body, false);
 
         ASSERT_EQ(query->nss(), CollectionType::ConfigNS);
         {
@@ -850,7 +850,7 @@ TEST_F(ShardingCatalogClientTest, GetCollectionsInvalidCollectionType) {
                           rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
         auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
-        auto query = QueryRequest::makeFromFindCommand(opMsg.body, false);
+        auto query = QueryRequest::makeFromFindCommandForTests(opMsg.body, false);
 
         ASSERT_EQ(query->nss(), CollectionType::ConfigNS);
         {
@@ -886,7 +886,7 @@ TEST_F(ShardingCatalogClientTest, GetDatabasesForShardValid) {
                           rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
         auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
-        auto query = QueryRequest::makeFromFindCommand(opMsg.body, false);
+        auto query = QueryRequest::makeFromFindCommandForTests(opMsg.body, false);
 
         ASSERT_EQ(query->nss(), DatabaseType::ConfigNS);
         ASSERT_BSONOBJ_EQ(query->getFilter(),
@@ -954,7 +954,7 @@ TEST_F(ShardingCatalogClientTest, GetTagsForCollection) {
                           rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
         auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
-        auto query = QueryRequest::makeFromFindCommand(opMsg.body, false);
+        auto query = QueryRequest::makeFromFindCommandForTests(opMsg.body, false);
 
         ASSERT_EQ(query->nss(), TagsType::ConfigNS);
         ASSERT_BSONOBJ_EQ(query->getFilter(), BSON(TagsType::ns("TestDB.TestColl")));
@@ -1301,7 +1301,7 @@ TEST_F(ShardingCatalogClientTest, GetNewKeys) {
         ASSERT_EQ("admin", request.dbname);
 
         auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
-        auto query = QueryRequest::makeFromFindCommand(opMsg.body, false);
+        auto query = QueryRequest::makeFromFindCommandForTests(opMsg.body, false);
 
 
         BSONObj expectedQuery(
@@ -1353,7 +1353,7 @@ TEST_F(ShardingCatalogClientTest, GetNewKeysWithEmptyCollection) {
         ASSERT_EQ("admin", request.dbname);
 
         auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
-        auto query = QueryRequest::makeFromFindCommand(opMsg.body, false);
+        auto query = QueryRequest::makeFromFindCommandForTests(opMsg.body, false);
 
         BSONObj expectedQuery(
             fromjson("{purpose: 'none',"

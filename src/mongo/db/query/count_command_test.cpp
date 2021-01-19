@@ -164,7 +164,7 @@ TEST(CountCommandTest, ConvertToAggregationWithHint) {
     auto agg = uassertStatusOK(countCommandAsAggregationCommand(countCmd, testns));
     auto cmdObj = OpMsgRequest::fromDBAndBody(testns.db(), agg).body;
 
-    auto ar = uassertStatusOK(aggregation_request_helper::parseFromBSON(testns, cmdObj));
+    auto ar = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(testns, cmdObj));
     ASSERT_BSONOBJ_EQ(ar.getHint().value_or(BSONObj()), BSON("x" << 1));
 
     std::vector<BSONObj> expectedPipeline{BSON("$count"
@@ -186,7 +186,7 @@ TEST(CountCommandTest, ConvertToAggregationWithQueryAndFilterAndLimit) {
     auto agg = uassertStatusOK(countCommandAsAggregationCommand(countCmd, testns));
     auto cmdObj = OpMsgRequest::fromDBAndBody(testns.db(), agg).body;
 
-    auto ar = uassertStatusOK(aggregation_request_helper::parseFromBSON(testns, cmdObj));
+    auto ar = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(testns, cmdObj));
     ASSERT_EQ(ar.getCursor().getBatchSize().value_or(aggregation_request_helper::kDefaultBatchSize),
               aggregation_request_helper::kDefaultBatchSize);
     ASSERT_EQ(ar.getNamespace(), testns);
@@ -212,7 +212,7 @@ TEST(CountCommandTest, ConvertToAggregationWithMaxTimeMS) {
     auto agg = uassertStatusOK(countCommandAsAggregationCommand(countCmd, testns));
     auto cmdObj = OpMsgRequest::fromDBAndBody(testns.db(), agg).body;
 
-    auto ar = uassertStatusOK(aggregation_request_helper::parseFromBSON(testns, cmdObj));
+    auto ar = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(testns, cmdObj));
     ASSERT_EQ(ar.getMaxTimeMS().value_or(0), 100u);
 
     std::vector<BSONObj> expectedPipeline{BSON("$count"
@@ -235,7 +235,7 @@ TEST(CountCommandTest, ConvertToAggregationWithQueryOptions) {
     auto agg = uassertStatusOK(countCommandAsAggregationCommand(countCmd, testns));
     auto cmdObj = OpMsgRequest::fromDBAndBody(testns.db(), agg).body;
 
-    auto ar = uassertStatusOK(aggregation_request_helper::parseFromBSON(testns, cmdObj));
+    auto ar = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(testns, cmdObj));
     ASSERT_BSONOBJ_EQ(ar.getUnwrappedReadPref().value_or(BSONObj()),
                       BSON("readPreference"
                            << "secondary"));
@@ -260,7 +260,7 @@ TEST(CountCommandTest, ConvertToAggregationWithReadConcern) {
     auto agg = uassertStatusOK(countCommandAsAggregationCommand(countCmd, testns));
     auto cmdObj = OpMsgRequest::fromDBAndBody(testns.db(), agg).body;
 
-    auto ar = uassertStatusOK(aggregation_request_helper::parseFromBSON(testns, cmdObj));
+    auto ar = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(testns, cmdObj));
     ASSERT_BSONOBJ_EQ(ar.getReadConcern().value_or(BSONObj()),
                       BSON("level"
                            << "linearizable"));

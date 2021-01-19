@@ -304,7 +304,7 @@ StatusWith<ParsedDistinct> ParsedDistinct::parse(OperationContext* opCtx,
     }
 
     if (auto maxTimeMSElt = cmdObj[QueryRequest::cmdOptionMaxTimeMS]) {
-        auto maxTimeMS = QueryRequest::parseMaxTimeMS(maxTimeMSElt);
+        auto maxTimeMS = parseMaxTimeMS(maxTimeMSElt);
         if (!maxTimeMS.isOK()) {
             return maxTimeMS.getStatus();
         }

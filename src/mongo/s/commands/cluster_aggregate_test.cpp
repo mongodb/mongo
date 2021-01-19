@@ -95,7 +95,7 @@ protected:
         NamespaceString nss{"a.collection"};
         auto client = getServiceContext()->makeClient("ClusterCmdClient");
         auto opCtx = client->makeOperationContext();
-        auto request = aggregation_request_helper::parseFromBSON(nss, inputBson);
+        auto request = aggregation_request_helper::parseFromBSONForTests(nss, inputBson);
         if (request.getStatus() != Status::OK()) {
             return request.getStatus();
         }

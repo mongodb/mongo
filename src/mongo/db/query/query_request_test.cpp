@@ -198,8 +198,9 @@ TEST(QueryRequestTest, ForbidTailableWithNonNaturalSort) {
         "sort: {a: 1}, '$db': 'test'}");
 
     bool isExplain = false;
-    ASSERT_THROWS_CODE(
-        QueryRequest::makeFromFindCommand(cmdObj, isExplain), DBException, ErrorCodes::BadValue);
+    ASSERT_THROWS_CODE(QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain),
+                       DBException,
+                       ErrorCodes::BadValue);
 }
 
 TEST(QueryRequestTest, ForbidTailableWithSingleBatch) {
@@ -209,8 +210,9 @@ TEST(QueryRequestTest, ForbidTailableWithSingleBatch) {
         "singleBatch: true, '$db': 'test'}");
 
     bool isExplain = false;
-    ASSERT_THROWS_CODE(
-        QueryRequest::makeFromFindCommand(cmdObj, isExplain), DBException, ErrorCodes::BadValue);
+    ASSERT_THROWS_CODE(QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain),
+                       DBException,
+                       ErrorCodes::BadValue);
 }
 
 TEST(QueryRequestTest, AllowTailableWithNaturalSort) {
@@ -220,7 +222,7 @@ TEST(QueryRequestTest, AllowTailableWithNaturalSort) {
         "sort: {$natural: 1}, '$db': 'test'}");
 
     bool isExplain = false;
-    auto qr = QueryRequest::makeFromFindCommand(cmdObj, isExplain);
+    auto qr = QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain);
     ASSERT_TRUE(qr->isTailable());
     ASSERT_BSONOBJ_EQ(qr->getSort(), BSON("$natural" << 1));
 }
@@ -383,7 +385,7 @@ TEST(QueryRequestTest, ParseFromCommandBasic) {
         "projection: {_id: 0, a: 1}, '$db': 'test'}");
 
     bool isExplain = false;
-    QueryRequest::makeFromFindCommand(cmdObj, isExplain);
+    QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain);
 }
 
 TEST(QueryRequestTest, ParseFromCommandWithOptions) {
@@ -395,7 +397,7 @@ TEST(QueryRequestTest, ParseFromCommandWithOptions) {
         "showRecordId: true, '$db': 'test'}");
 
     bool isExplain = false;
-    unique_ptr<QueryRequest> qr(QueryRequest::makeFromFindCommand(cmdObj, isExplain));
+    unique_ptr<QueryRequest> qr(QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain));
 
     // Make sure the values from the command BSON are reflected in the QR.
     ASSERT(qr->showRecordId());
@@ -408,7 +410,7 @@ TEST(QueryRequestTest, ParseFromCommandHintAsString) {
         "hint: 'foo_1', '$db': 'test'}");
 
     bool isExplain = false;
-    unique_ptr<QueryRequest> qr(QueryRequest::makeFromFindCommand(cmdObj, isExplain));
+    unique_ptr<QueryRequest> qr(QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain));
 
     BSONObj hintObj = qr->getHint();
     ASSERT_BSONOBJ_EQ(BSON("$hint"
@@ -423,7 +425,7 @@ TEST(QueryRequestTest, ParseFromCommandValidSortProj) {
         "sort: {a: 1}, '$db': 'test'}");
 
     bool isExplain = false;
-    QueryRequest::makeFromFindCommand(cmdObj, isExplain);
+    QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain);
 }
 
 TEST(QueryRequestTest, ParseFromCommandValidSortProjMeta) {
@@ -433,7 +435,7 @@ TEST(QueryRequestTest, ParseFromCommandValidSortProjMeta) {
         "sort: {a: {$meta: 'textScore'}}, '$db': 'test'}");
 
     bool isExplain = false;
-    QueryRequest::makeFromFindCommand(cmdObj, isExplain);
+    QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain);
 }
 
 TEST(QueryRequestTest, ParseFromCommandAllFlagsTrue) {
@@ -447,7 +449,7 @@ TEST(QueryRequestTest, ParseFromCommandAllFlagsTrue) {
         "allowSpeculativeMajorityRead: true, '$db': 'test'}");
 
     bool isExplain = false;
-    unique_ptr<QueryRequest> qr(QueryRequest::makeFromFindCommand(cmdObj, isExplain));
+    unique_ptr<QueryRequest> qr(QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain));
 
     // Test that all the flags got set to true.
     ASSERT(qr->isTailable());
@@ -466,7 +468,7 @@ TEST(QueryRequestTest, OplogReplayFlagIsAllowedButIgnored) {
                        << "test");
     const bool isExplain = false;
     const NamespaceString nss{"test.testns"};
-    auto qr = QueryRequest::makeFromFindCommand(cmdObj, isExplain);
+    auto qr = QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain);
 
     // Verify that the 'oplogReplay' flag does not appear if we reserialize the request.
     auto reserialized = qr->asFindCommand();
@@ -480,7 +482,7 @@ TEST(QueryRequestTest, ParseFromCommandReadOnceDefaultsToFalse) {
     BSONObj cmdObj = fromjson("{find: 'testns', '$db': 'test'}");
 
     bool isExplain = false;
-    unique_ptr<QueryRequest> qr(QueryRequest::makeFromFindCommand(cmdObj, isExplain));
+    unique_ptr<QueryRequest> qr(QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain));
     ASSERT(!qr->isReadOnce());
 }
 
@@ -492,7 +494,7 @@ TEST(QueryRequestTest, ParseFromCommandValidMinMax) {
         "max: {a: 2}, '$db': 'test'}");
 
     bool isExplain = false;
-    unique_ptr<QueryRequest> qr(QueryRequest::makeFromFindCommand(cmdObj, isExplain));
+    unique_ptr<QueryRequest> qr(QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain));
     BSONObj expectedMin = BSON("a" << 1);
     ASSERT_EQUALS(0, expectedMin.woCompare(qr->getMin()));
     BSONObj expectedMax = BSON("a" << 2);
@@ -518,7 +520,7 @@ TEST(QueryRequestTest, ParseFromCommandAllNonOptionFields) {
                          .addField(rtcObj["runtimeConstants"]);
 
     bool isExplain = false;
-    unique_ptr<QueryRequest> qr(QueryRequest::makeFromFindCommand(cmdObj, isExplain));
+    unique_ptr<QueryRequest> qr(QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain));
     // Check the values inside the QR.
     BSONObj expectedQuery = BSON("a" << 1);
     ASSERT_EQUALS(0, expectedQuery.woCompare(qr->getFilter()));
@@ -552,7 +554,7 @@ TEST(QueryRequestTest, ParseFromCommandLargeLimit) {
         "limit: 8000000000, '$db': 'test'}");  // 8 * 1000 * 1000 * 1000
 
     const bool isExplain = false;
-    unique_ptr<QueryRequest> qr(QueryRequest::makeFromFindCommand(cmdObj, isExplain));
+    unique_ptr<QueryRequest> qr(QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain));
 
     ASSERT_EQUALS(8LL * 1000 * 1000 * 1000, *qr->getLimit());
 }
@@ -564,7 +566,7 @@ TEST(QueryRequestTest, ParseFromCommandLargeBatchSize) {
         "batchSize: 8000000000, '$db': 'test'}");  // 8 * 1000 * 1000 * 1000
 
     const bool isExplain = false;
-    unique_ptr<QueryRequest> qr(QueryRequest::makeFromFindCommand(cmdObj, isExplain));
+    unique_ptr<QueryRequest> qr(QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain));
 
     ASSERT_EQUALS(8LL * 1000 * 1000 * 1000, *qr->getBatchSize());
 }
@@ -576,7 +578,7 @@ TEST(QueryRequestTest, ParseFromCommandLargeSkip) {
         "skip: 8000000000, '$db': 'test'}");  // 8 * 1000 * 1000 * 1000
 
     const bool isExplain = false;
-    unique_ptr<QueryRequest> qr(QueryRequest::makeFromFindCommand(cmdObj, isExplain));
+    unique_ptr<QueryRequest> qr(QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain));
 
     ASSERT_EQUALS(8LL * 1000 * 1000 * 1000, *qr->getSkip());
 }
@@ -591,7 +593,7 @@ TEST(QueryRequestTest, ParseFromCommandQueryWrongType) {
         "filter: 3, '$db': 'test'}");
 
     bool isExplain = false;
-    ASSERT_THROWS_CODE(QueryRequest::makeFromFindCommand(cmdObj, isExplain),
+    ASSERT_THROWS_CODE(QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain),
                        DBException,
                        ErrorCodes::TypeMismatch);
 }
@@ -603,7 +605,7 @@ TEST(QueryRequestTest, ParseFromCommandSortWrongType) {
         "sort: 3, '$db': 'test'}");
 
     bool isExplain = false;
-    ASSERT_THROWS_CODE(QueryRequest::makeFromFindCommand(cmdObj, isExplain),
+    ASSERT_THROWS_CODE(QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain),
                        DBException,
                        ErrorCodes::TypeMismatch);
 }
@@ -616,7 +618,7 @@ TEST(QueryRequestTest, ParseFromCommandProjWrongType) {
         "projection: 'foo', '$db': 'test'}");
 
     bool isExplain = false;
-    ASSERT_THROWS_CODE(QueryRequest::makeFromFindCommand(cmdObj, isExplain),
+    ASSERT_THROWS_CODE(QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain),
                        DBException,
                        ErrorCodes::TypeMismatch);
 }
@@ -630,7 +632,7 @@ TEST(QueryRequestTest, ParseFromCommandSkipWrongType) {
         "projection: {a: 1}, '$db': 'test'}");
 
     bool isExplain = false;
-    ASSERT_THROWS_CODE(QueryRequest::makeFromFindCommand(cmdObj, isExplain),
+    ASSERT_THROWS_CODE(QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain),
                        DBException,
                        ErrorCodes::TypeMismatch);
 }
@@ -644,7 +646,7 @@ TEST(QueryRequestTest, ParseFromCommandLimitWrongType) {
         "projection: {a: 1}, '$db': 'test'}");
 
     bool isExplain = false;
-    ASSERT_THROWS_CODE(QueryRequest::makeFromFindCommand(cmdObj, isExplain),
+    ASSERT_THROWS_CODE(QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain),
                        DBException,
                        ErrorCodes::TypeMismatch);
 }
@@ -658,7 +660,7 @@ TEST(QueryRequestTest, ParseFromCommandSingleBatchWrongType) {
         "projection: {a: 1}, '$db': 'test'}");
 
     bool isExplain = false;
-    ASSERT_THROWS_CODE(QueryRequest::makeFromFindCommand(cmdObj, isExplain),
+    ASSERT_THROWS_CODE(QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain),
                        DBException,
                        ErrorCodes::TypeMismatch);
 }
@@ -671,7 +673,7 @@ TEST(QueryRequestTest, ParseFromCommandUnwrappedReadPrefWrongType) {
         "$queryOptions: 1, '$db': 'test'}");
 
     bool isExplain = false;
-    ASSERT_THROWS_CODE(QueryRequest::makeFromFindCommand(cmdObj, isExplain),
+    ASSERT_THROWS_CODE(QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain),
                        DBException,
                        ErrorCodes::TypeMismatch);
 }
@@ -684,8 +686,9 @@ TEST(QueryRequestTest, ParseFromCommandMaxTimeMSWrongType) {
         "maxTimeMS: true, '$db': 'test'}");
 
     bool isExplain = false;
-    ASSERT_THROWS_CODE(
-        QueryRequest::makeFromFindCommand(cmdObj, isExplain), DBException, ErrorCodes::BadValue);
+    ASSERT_THROWS_CODE(QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain),
+                       DBException,
+                       ErrorCodes::BadValue);
 }
 
 
@@ -696,7 +699,7 @@ TEST(QueryRequestTest, ParseFromCommandMaxWrongType) {
         "max: 3, '$db': 'test'}");
 
     bool isExplain = false;
-    ASSERT_THROWS_CODE(QueryRequest::makeFromFindCommand(cmdObj, isExplain),
+    ASSERT_THROWS_CODE(QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain),
                        DBException,
                        ErrorCodes::TypeMismatch);
 }
@@ -709,7 +712,7 @@ TEST(QueryRequestTest, ParseFromCommandMinWrongType) {
         "min: 3, '$db': 'test'}");
 
     bool isExplain = false;
-    ASSERT_THROWS_CODE(QueryRequest::makeFromFindCommand(cmdObj, isExplain),
+    ASSERT_THROWS_CODE(QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain),
                        DBException,
                        ErrorCodes::TypeMismatch);
 }
@@ -721,7 +724,7 @@ TEST(QueryRequestTest, ParseFromCommandReturnKeyWrongType) {
         "returnKey: 3, '$db': 'test'}");
 
     bool isExplain = false;
-    ASSERT_THROWS_CODE(QueryRequest::makeFromFindCommand(cmdObj, isExplain),
+    ASSERT_THROWS_CODE(QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain),
                        DBException,
                        ErrorCodes::TypeMismatch);
 }
@@ -733,7 +736,7 @@ TEST(QueryRequestTest, ParseFromCommandShowRecordIdWrongType) {
         "showRecordId: 3, '$db': 'test'}");
 
     bool isExplain = false;
-    ASSERT_THROWS_CODE(QueryRequest::makeFromFindCommand(cmdObj, isExplain),
+    ASSERT_THROWS_CODE(QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain),
                        DBException,
                        ErrorCodes::TypeMismatch);
 }
@@ -745,7 +748,7 @@ TEST(QueryRequestTest, ParseFromCommandTailableWrongType) {
         "tailable: 3, '$db': 'test'}");
 
     bool isExplain = false;
-    ASSERT_THROWS_CODE(QueryRequest::makeFromFindCommand(cmdObj, isExplain),
+    ASSERT_THROWS_CODE(QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain),
                        DBException,
                        ErrorCodes::TypeMismatch);
 }
@@ -757,7 +760,8 @@ TEST(QueryRequestTest, ParseFromCommandSlaveOkWrongType) {
         "slaveOk: 3, '$db': 'test'}");
 
     bool isExplain = false;
-    ASSERT_THROWS_CODE(QueryRequest::makeFromFindCommand(cmdObj, isExplain), DBException, 40415);
+    ASSERT_THROWS_CODE(
+        QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain), DBException, 40415);
 }
 
 TEST(QueryRequestTest, ParseFromCommandOplogReplayWrongType) {
@@ -767,7 +771,7 @@ TEST(QueryRequestTest, ParseFromCommandOplogReplayWrongType) {
         "oplogReplay: 3, '$db': 'test'}");
 
     bool isExplain = false;
-    ASSERT_THROWS_CODE(QueryRequest::makeFromFindCommand(cmdObj, isExplain),
+    ASSERT_THROWS_CODE(QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain),
                        DBException,
                        ErrorCodes::TypeMismatch);
 }
@@ -779,7 +783,7 @@ TEST(QueryRequestTest, ParseFromCommandNoCursorTimeoutWrongType) {
         "noCursorTimeout: 3, '$db': 'test'}");
 
     bool isExplain = false;
-    ASSERT_THROWS_CODE(QueryRequest::makeFromFindCommand(cmdObj, isExplain),
+    ASSERT_THROWS_CODE(QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain),
                        DBException,
                        ErrorCodes::TypeMismatch);
 }
@@ -792,7 +796,7 @@ TEST(QueryRequestTest, ParseFromCommandAwaitDataWrongType) {
         "awaitData: 3, '$db': 'test'}");
 
     bool isExplain = false;
-    ASSERT_THROWS_CODE(QueryRequest::makeFromFindCommand(cmdObj, isExplain),
+    ASSERT_THROWS_CODE(QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain),
                        DBException,
                        ErrorCodes::TypeMismatch);
 }
@@ -805,7 +809,8 @@ TEST(QueryRequestTest, ParseFromCommandExhaustWrongType) {
         "exhaust: 3, '$db': 'test'}");
 
     bool isExplain = false;
-    ASSERT_THROWS_CODE(QueryRequest::makeFromFindCommand(cmdObj, isExplain), DBException, 40415);
+    ASSERT_THROWS_CODE(
+        QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain), DBException, 40415);
 }
 
 
@@ -816,7 +821,7 @@ TEST(QueryRequestTest, ParseFromCommandPartialWrongType) {
         "allowPartialResults: 3, '$db': 'test'}");
 
     bool isExplain = false;
-    ASSERT_THROWS_CODE(QueryRequest::makeFromFindCommand(cmdObj, isExplain),
+    ASSERT_THROWS_CODE(QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain),
                        DBException,
                        ErrorCodes::TypeMismatch);
 }
@@ -828,7 +833,7 @@ TEST(QueryRequestTest, ParseFromCommandReadConcernWrongType) {
         "readConcern: 'foo', '$db': 'test'}");
 
     bool isExplain = false;
-    ASSERT_THROWS_CODE(QueryRequest::makeFromFindCommand(cmdObj, isExplain),
+    ASSERT_THROWS_CODE(QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain),
                        DBException,
                        ErrorCodes::TypeMismatch);
 }
@@ -840,7 +845,7 @@ TEST(QueryRequestTest, ParseFromCommandCollationWrongType) {
         "collation: 'foo', '$db': 'test'}");
 
     bool isExplain = false;
-    ASSERT_THROWS_CODE(QueryRequest::makeFromFindCommand(cmdObj, isExplain),
+    ASSERT_THROWS_CODE(QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain),
                        DBException,
                        ErrorCodes::TypeMismatch);
 }
@@ -851,7 +856,7 @@ TEST(QueryRequestTest, ParseFromCommandReadOnceWrongType) {
         "readOnce: 1, '$db': 'test'}");
 
     bool isExplain = false;
-    ASSERT_THROWS_CODE(QueryRequest::makeFromFindCommand(cmdObj, isExplain),
+    ASSERT_THROWS_CODE(QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain),
                        DBException,
                        ErrorCodes::TypeMismatch);
 }
@@ -865,7 +870,7 @@ TEST(QueryRequestTest, ParseFromCommandLegacyRuntimeConstantsWrongType) {
                           << "test");
 
     bool isExplain = false;
-    ASSERT_THROWS_CODE(QueryRequest::makeFromFindCommand(cmdObj, isExplain),
+    ASSERT_THROWS_CODE(QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain),
                        DBException,
                        ErrorCodes::TypeMismatch);
 }
@@ -881,7 +886,7 @@ TEST(QueryRequestTest, ParseFromCommandLegacyRuntimeConstantsSubfieldsWrongType)
                           << "$db"
                           << "test");
     bool isExplain = false;
-    ASSERT_THROWS_CODE(QueryRequest::makeFromFindCommand(cmdObj, isExplain),
+    ASSERT_THROWS_CODE(QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain),
                        AssertionException,
                        ErrorCodes::TypeMismatch);
 }
@@ -896,8 +901,9 @@ TEST(QueryRequestTest, ParseFromCommandNegativeSkipError) {
         "skip: -3,"
         "filter: {a: 3}, '$db': 'test'}");
     bool isExplain = false;
-    ASSERT_THROWS_CODE(
-        QueryRequest::makeFromFindCommand(cmdObj, isExplain), DBException, ErrorCodes::BadValue);
+    ASSERT_THROWS_CODE(QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain),
+                       DBException,
+                       ErrorCodes::BadValue);
 }
 
 TEST(QueryRequestTest, ParseFromCommandSkipIsZero) {
@@ -906,7 +912,7 @@ TEST(QueryRequestTest, ParseFromCommandSkipIsZero) {
         "skip: 0,"
         "filter: {a: 3}, '$db': 'test'}");
     bool isExplain = false;
-    unique_ptr<QueryRequest> qr(QueryRequest::makeFromFindCommand(cmdObj, isExplain));
+    unique_ptr<QueryRequest> qr(QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain));
     ASSERT_BSONOBJ_EQ(BSON("a" << 3), qr->getFilter());
     ASSERT_FALSE(qr->getSkip());
 }
@@ -917,8 +923,9 @@ TEST(QueryRequestTest, ParseFromCommandNegativeLimitError) {
         "limit: -3,"
         "filter: {a: 3}, '$db': 'test'}");
     bool isExplain = false;
-    ASSERT_THROWS_CODE(
-        QueryRequest::makeFromFindCommand(cmdObj, isExplain), DBException, ErrorCodes::BadValue);
+    ASSERT_THROWS_CODE(QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain),
+                       DBException,
+                       ErrorCodes::BadValue);
 }
 
 TEST(QueryRequestTest, ParseFromCommandLimitIsZero) {
@@ -927,7 +934,7 @@ TEST(QueryRequestTest, ParseFromCommandLimitIsZero) {
         "limit: 0,"
         "filter: {a: 3}, '$db': 'test'}");
     bool isExplain = false;
-    unique_ptr<QueryRequest> qr(QueryRequest::makeFromFindCommand(cmdObj, isExplain));
+    unique_ptr<QueryRequest> qr(QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain));
     ASSERT_BSONOBJ_EQ(BSON("a" << 3), qr->getFilter());
     ASSERT_FALSE(qr->getLimit());
 }
@@ -938,14 +945,15 @@ TEST(QueryRequestTest, ParseFromCommandNegativeBatchSizeError) {
         "batchSize: -10,"
         "filter: {a: 3}, '$db': 'test'}");
     bool isExplain = false;
-    ASSERT_THROWS_CODE(
-        QueryRequest::makeFromFindCommand(cmdObj, isExplain), DBException, ErrorCodes::BadValue);
+    ASSERT_THROWS_CODE(QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain),
+                       DBException,
+                       ErrorCodes::BadValue);
 }
 
 TEST(QueryRequestTest, ParseFromCommandBatchSizeZero) {
     BSONObj cmdObj = fromjson("{find: 'testns', batchSize: 0, '$db': 'test'}");
     bool isExplain = false;
-    unique_ptr<QueryRequest> qr(QueryRequest::makeFromFindCommand(cmdObj, isExplain));
+    unique_ptr<QueryRequest> qr(QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain));
 
     ASSERT(qr->getBatchSize());
     ASSERT_EQ(0, *qr->getBatchSize());
@@ -955,7 +963,7 @@ TEST(QueryRequestTest, ParseFromCommandBatchSizeZero) {
 TEST(QueryRequestTest, ParseFromCommandDefaultBatchSize) {
     BSONObj cmdObj = fromjson("{find: 'testns', '$db': 'test'}");
     bool isExplain = false;
-    unique_ptr<QueryRequest> qr(QueryRequest::makeFromFindCommand(cmdObj, isExplain));
+    unique_ptr<QueryRequest> qr(QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain));
 
     ASSERT(!qr->getBatchSize());
     ASSERT(!qr->getLimit());
@@ -969,7 +977,7 @@ TEST(QueryRequestTest, ParseFromCommandRequestResumeToken) {
                           << "test");
 
     bool isExplain = false;
-    unique_ptr<QueryRequest> qr(QueryRequest::makeFromFindCommand(cmdObj, isExplain));
+    unique_ptr<QueryRequest> qr(QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain));
     ASSERT(qr->getRequestResumeToken());
 }
 
@@ -982,7 +990,7 @@ TEST(QueryRequestTest, ParseFromCommandResumeToken) {
                           << "test");
 
     bool isExplain = false;
-    unique_ptr<QueryRequest> qr(QueryRequest::makeFromFindCommand(cmdObj, isExplain));
+    unique_ptr<QueryRequest> qr(QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain));
     ASSERT(!qr->getResumeAfter().isEmpty());
     ASSERT(qr->getRequestResumeToken());
 }
@@ -997,7 +1005,7 @@ TEST(QueryRequestTest, ParseFromCommandEmptyResumeToken) {
              << "test");
 
     bool isExplain = false;
-    unique_ptr<QueryRequest> qr(QueryRequest::makeFromFindCommand(cmdObj, isExplain));
+    unique_ptr<QueryRequest> qr(QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain));
     ASSERT(qr->getRequestResumeToken());
     ASSERT(qr->getResumeAfter().isEmpty());
 }
@@ -1024,7 +1032,7 @@ TEST(QueryRequestTest, AsFindCommandAllNonOptionFields) {
                          .addField(storage["runtimeConstants"]);
 
     bool isExplain = false;
-    unique_ptr<QueryRequest> qr(QueryRequest::makeFromFindCommand(cmdObj, isExplain));
+    unique_ptr<QueryRequest> qr(QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain));
     ASSERT_BSONOBJ_EQ(cmdObj.removeField("$db"), qr->asFindCommand());
 }
 
@@ -1048,7 +1056,7 @@ TEST(QueryRequestTest, AsFindCommandWithUuidAllNonOptionFields) {
             .addField(storage["runtimeConstants"]);
 
     bool isExplain = false;
-    unique_ptr<QueryRequest> qr(QueryRequest::makeFromFindCommand(cmdObj, isExplain));
+    unique_ptr<QueryRequest> qr(QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain));
     ASSERT_BSONOBJ_EQ(cmdObj.removeField("$db"), qr->asFindCommand());
 }
 
@@ -1069,7 +1077,7 @@ TEST(QueryRequestTest, AsFindCommandWithResumeToken) {
                           << "test");
 
     bool isExplain = false;
-    unique_ptr<QueryRequest> qr(QueryRequest::makeFromFindCommand(cmdObj, isExplain));
+    unique_ptr<QueryRequest> qr(QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain));
     ASSERT_BSONOBJ_EQ(cmdObj.removeField("$db"), qr->asFindCommand());
 }
 
@@ -1082,7 +1090,7 @@ TEST(QueryRequestTest, AsFindCommandWithEmptyResumeToken) {
              << "$_requestResumeToken" << true << "$_resumeAfter" << resumeAfter << "$db"
              << "test");
     bool isExplain = false;
-    unique_ptr<QueryRequest> qr(QueryRequest::makeFromFindCommand(cmdObj, isExplain));
+    unique_ptr<QueryRequest> qr(QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain));
     ASSERT(qr->asFindCommand().getField("$_resumeAftr").eoo());
 }
 
@@ -1097,7 +1105,8 @@ TEST(QueryRequestTest, ParseFromCommandMinMaxDifferentFieldsError) {
         "min: {a: 3},"
         "max: {b: 4}, '$db': 'test'}");
     bool isExplain = false;
-    ASSERT_THROWS_CODE(QueryRequest::makeFromFindCommand(cmdObj, isExplain), DBException, 51176);
+    ASSERT_THROWS_CODE(
+        QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain), DBException, 51176);
 }
 
 TEST(QueryRequestTest, ParseCommandAllowNonMetaSortOnFieldWithMetaProject) {
@@ -1108,13 +1117,13 @@ TEST(QueryRequestTest, ParseCommandAllowNonMetaSortOnFieldWithMetaProject) {
         "projection: {a: {$meta: 'textScore'}},"
         "sort: {a: 1}, '$db': 'test'}");
     bool isExplain = false;
-    QueryRequest::makeFromFindCommand(cmdObj, isExplain);
+    QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain);
 
     cmdObj = fromjson(
         "{find: 'testns',"
         "projection: {a: {$meta: 'textScore'}},"
         "sort: {b: 1}, '$db': 'test'}");
-    QueryRequest::makeFromFindCommand(cmdObj, isExplain);
+    QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain);
 }
 
 TEST(QueryRequestTest, ParseCommandAllowMetaSortOnFieldWithoutMetaProject) {
@@ -1126,26 +1135,27 @@ TEST(QueryRequestTest, ParseCommandAllowMetaSortOnFieldWithoutMetaProject) {
         "sort: {a: {$meta: 'textScore'}}, '$db': 'test'}");
 
     bool isExplain = false;
-    auto qr = QueryRequest::makeFromFindCommand(cmdObj, isExplain);
+    auto qr = QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain);
 
     cmdObj = fromjson(
         "{find: 'testns',"
         "projection: {b: 1},"
         "sort: {a: {$meta: 'textScore'}}, '$db': 'test'}");
-    qr = QueryRequest::makeFromFindCommand(cmdObj, isExplain);
+    qr = QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain);
 }
 
 TEST(QueryRequestTest, ParseCommandForbidExhaust) {
     BSONObj cmdObj = fromjson("{find: 'testns', exhaust: true, '$db': 'test'}");
 
     bool isExplain = false;
-    ASSERT_THROWS_CODE(QueryRequest::makeFromFindCommand(cmdObj, isExplain), DBException, 40415);
+    ASSERT_THROWS_CODE(
+        QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain), DBException, 40415);
 }
 
 TEST(QueryRequestTest, ParseCommandIsFromFindCommand) {
     BSONObj cmdObj = fromjson("{find: 'testns', '$db': 'test'}");
     bool isExplain = false;
-    unique_ptr<QueryRequest> qr(QueryRequest::makeFromFindCommand(cmdObj, isExplain));
+    unique_ptr<QueryRequest> qr(QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain));
 
     ASSERT_FALSE(qr->getNToReturn());
 }
@@ -1153,7 +1163,7 @@ TEST(QueryRequestTest, ParseCommandIsFromFindCommand) {
 TEST(QueryRequestTest, ParseCommandAwaitDataButNotTailable) {
     BSONObj cmdObj = fromjson("{find: 'testns', awaitData: true, '$db': 'test'}");
     bool isExplain = false;
-    ASSERT_THROWS_CODE(QueryRequest::makeFromFindCommand(cmdObj, isExplain),
+    ASSERT_THROWS_CODE(QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain),
                        DBException,
                        ErrorCodes::FailedToParse);
 }
@@ -1161,20 +1171,21 @@ TEST(QueryRequestTest, ParseCommandAwaitDataButNotTailable) {
 TEST(QueryRequestTest, ParseCommandFirstFieldNotString) {
     BSONObj cmdObj = fromjson("{find: 1, '$db': 'test'}");
     bool isExplain = false;
-    ASSERT_THROWS_CODE(
-        QueryRequest::makeFromFindCommand(cmdObj, isExplain), DBException, ErrorCodes::BadValue);
+    ASSERT_THROWS_CODE(QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain),
+                       DBException,
+                       ErrorCodes::BadValue);
 }
 
 TEST(QueryRequestTest, ParseCommandIgnoreShardVersionField) {
     BSONObj cmdObj = fromjson("{find: 'test.testns', shardVersion: 'foo', '$db': 'test'}");
     bool isExplain = false;
-    QueryRequest::makeFromFindCommand(cmdObj, isExplain);
+    QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain);
 }
 
 TEST(QueryRequestTest, DefaultQueryParametersCorrect) {
     BSONObj cmdObj = fromjson("{find: 'testns', '$db': 'test'}");
 
-    std::unique_ptr<QueryRequest> qr(QueryRequest::makeFromFindCommand(cmdObj, false));
+    std::unique_ptr<QueryRequest> qr(QueryRequest::makeFromFindCommandForTests(cmdObj, false));
 
     ASSERT_FALSE(qr->getSkip());
     ASSERT_FALSE(qr->getLimit());
@@ -1200,7 +1211,7 @@ TEST(QueryRequestTest, ParseCommandAllowDiskUseTrue) {
     BSONObj cmdObj = fromjson("{find: 'testns', allowDiskUse: true, '$db': 'test'}");
 
     const bool isExplain = false;
-    auto result = QueryRequest::makeFromFindCommand(cmdObj, isExplain);
+    auto result = QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain);
 
     ASSERT_EQ(true, result->allowDiskUse());
 }
@@ -1209,7 +1220,7 @@ TEST(QueryRequestTest, ParseCommandAllowDiskUseFalse) {
     BSONObj cmdObj = fromjson("{find: 'testns', allowDiskUse: false, '$db': 'test'}");
 
     const bool isExplain = false;
-    auto result = QueryRequest::makeFromFindCommand(cmdObj, isExplain);
+    auto result = QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain);
 
     ASSERT_EQ(false, result->allowDiskUse());
 }
@@ -1224,7 +1235,8 @@ TEST(QueryRequestTest, ParseFromCommandForbidExtraField) {
         "foo: {a: 1}, '$db': 'test'}");
 
     bool isExplain = false;
-    ASSERT_THROWS_CODE(QueryRequest::makeFromFindCommand(cmdObj, isExplain), DBException, 40415);
+    ASSERT_THROWS_CODE(
+        QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain), DBException, 40415);
 }
 
 TEST(QueryRequestTest, ParseFromCommandForbidExtraOption) {
@@ -1233,39 +1245,40 @@ TEST(QueryRequestTest, ParseFromCommandForbidExtraOption) {
         "foo: true, '$db': 'test'}");
 
     bool isExplain = false;
-    ASSERT_THROWS_CODE(QueryRequest::makeFromFindCommand(cmdObj, isExplain), DBException, 40415);
+    ASSERT_THROWS_CODE(
+        QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain), DBException, 40415);
 }
 
 TEST(QueryRequestTest, ParseMaxTimeMSStringValueFails) {
     BSONObj maxTimeObj = BSON(QueryRequest::cmdOptionMaxTimeMS << "foo");
-    ASSERT_NOT_OK(QueryRequest::parseMaxTimeMS(maxTimeObj[QueryRequest::cmdOptionMaxTimeMS]));
+    ASSERT_NOT_OK(parseMaxTimeMS(maxTimeObj[QueryRequest::cmdOptionMaxTimeMS]));
 }
 
 TEST(QueryRequestTest, ParseMaxTimeMSNonIntegralValueFails) {
     BSONObj maxTimeObj = BSON(QueryRequest::cmdOptionMaxTimeMS << 100.3);
-    ASSERT_NOT_OK(QueryRequest::parseMaxTimeMS(maxTimeObj[QueryRequest::cmdOptionMaxTimeMS]));
+    ASSERT_NOT_OK(parseMaxTimeMS(maxTimeObj[QueryRequest::cmdOptionMaxTimeMS]));
 }
 
 TEST(QueryRequestTest, ParseMaxTimeMSOutOfRangeDoubleFails) {
     BSONObj maxTimeObj = BSON(QueryRequest::cmdOptionMaxTimeMS << 1e200);
-    ASSERT_NOT_OK(QueryRequest::parseMaxTimeMS(maxTimeObj[QueryRequest::cmdOptionMaxTimeMS]));
+    ASSERT_NOT_OK(parseMaxTimeMS(maxTimeObj[QueryRequest::cmdOptionMaxTimeMS]));
 }
 
 TEST(QueryRequestTest, ParseMaxTimeMSNegativeValueFails) {
     BSONObj maxTimeObj = BSON(QueryRequest::cmdOptionMaxTimeMS << -400);
-    ASSERT_NOT_OK(QueryRequest::parseMaxTimeMS(maxTimeObj[QueryRequest::cmdOptionMaxTimeMS]));
+    ASSERT_NOT_OK(parseMaxTimeMS(maxTimeObj[QueryRequest::cmdOptionMaxTimeMS]));
 }
 
 TEST(QueryRequestTest, ParseMaxTimeMSZeroSucceeds) {
     BSONObj maxTimeObj = BSON(QueryRequest::cmdOptionMaxTimeMS << 0);
-    auto maxTime = QueryRequest::parseMaxTimeMS(maxTimeObj[QueryRequest::cmdOptionMaxTimeMS]);
+    auto maxTime = parseMaxTimeMS(maxTimeObj[QueryRequest::cmdOptionMaxTimeMS]);
     ASSERT_OK(maxTime);
     ASSERT_EQ(maxTime.getValue(), 0);
 }
 
 TEST(QueryRequestTest, ParseMaxTimeMSPositiveInRangeSucceeds) {
     BSONObj maxTimeObj = BSON(QueryRequest::cmdOptionMaxTimeMS << 300);
-    auto maxTime = QueryRequest::parseMaxTimeMS(maxTimeObj[QueryRequest::cmdOptionMaxTimeMS]);
+    auto maxTime = parseMaxTimeMS(maxTimeObj[QueryRequest::cmdOptionMaxTimeMS]);
     ASSERT_OK(maxTime);
     ASSERT_EQ(maxTime.getValue(), 300);
 }
@@ -1276,7 +1289,7 @@ TEST(QueryRequestTest, ConvertToAggregationSucceeds) {
     ASSERT_OK(agg);
 
     auto aggCmd = OpMsgRequest::fromDBAndBody(testns.db(), agg.getValue()).body;
-    auto ar = aggregation_request_helper::parseFromBSON(testns, aggCmd);
+    auto ar = aggregation_request_helper::parseFromBSONForTests(testns, aggCmd);
     ASSERT_OK(ar.getStatus());
     ASSERT(!ar.getValue().getExplain());
     ASSERT(ar.getValue().getPipeline().empty());
@@ -1294,7 +1307,7 @@ TEST(QueryRequestTest, ConvertToAggregationOmitsExplain) {
     ASSERT_OK(agg);
 
     auto aggCmd = OpMsgRequest::fromDBAndBody(testns.db(), agg.getValue()).body;
-    auto ar = aggregation_request_helper::parseFromBSON(testns, aggCmd);
+    auto ar = aggregation_request_helper::parseFromBSONForTests(testns, aggCmd);
     ASSERT_OK(ar.getStatus());
     ASSERT_FALSE(ar.getValue().getExplain());
     ASSERT(ar.getValue().getPipeline().empty());
@@ -1309,7 +1322,7 @@ TEST(QueryRequestTest, ConvertToAggregationWithHintSucceeds) {
     ASSERT_OK(agg);
 
     auto aggCmd = OpMsgRequest::fromDBAndBody(testns.db(), agg.getValue()).body;
-    auto ar = aggregation_request_helper::parseFromBSON(testns, aggCmd);
+    auto ar = aggregation_request_helper::parseFromBSONForTests(testns, aggCmd);
     ASSERT_OK(ar.getStatus());
     ASSERT_BSONOBJ_EQ(qr.getHint(), ar.getValue().getHint().value_or(BSONObj()));
 }
@@ -1413,7 +1426,7 @@ TEST(QueryRequestTest, ConvertToAggregationWithPipeline) {
     ASSERT_OK(agg);
 
     auto aggCmd = OpMsgRequest::fromDBAndBody(testns.db(), agg.getValue()).body;
-    auto ar = aggregation_request_helper::parseFromBSON(testns, aggCmd);
+    auto ar = aggregation_request_helper::parseFromBSONForTests(testns, aggCmd);
     ASSERT_OK(ar.getStatus());
     ASSERT(!ar.getValue().getExplain());
     ASSERT_EQ(ar.getValue().getCursor().getBatchSize().value_or(
@@ -1441,7 +1454,7 @@ TEST(QueryRequestTest, ConvertToAggregationWithBatchSize) {
     ASSERT_OK(agg);
 
     auto aggCmd = OpMsgRequest::fromDBAndBody(testns.db(), agg.getValue()).body;
-    auto ar = aggregation_request_helper::parseFromBSON(testns, aggCmd);
+    auto ar = aggregation_request_helper::parseFromBSONForTests(testns, aggCmd);
     ASSERT_OK(ar.getStatus());
     ASSERT(!ar.getValue().getExplain());
     ASSERT_EQ(ar.getValue().getNamespace(), testns);
@@ -1462,7 +1475,7 @@ TEST(QueryRequestTest, ConvertToAggregationWithMaxTimeMS) {
     ASSERT_EQ(cmdObj["maxTimeMS"].Int(), 9);
 
     auto aggCmd = OpMsgRequest::fromDBAndBody(testns.db(), cmdObj).body;
-    auto ar = aggregation_request_helper::parseFromBSON(testns, aggCmd);
+    auto ar = aggregation_request_helper::parseFromBSONForTests(testns, aggCmd);
     ASSERT_OK(ar.getStatus());
     ASSERT(!ar.getValue().getExplain());
     ASSERT_EQ(ar.getValue().getCursor().getBatchSize().value_or(
@@ -1479,7 +1492,7 @@ TEST(QueryRequestTest, ConvertToAggregationWithCollationSucceeds) {
     ASSERT_OK(agg);
 
     auto aggCmd = OpMsgRequest::fromDBAndBody(testns.db(), agg.getValue()).body;
-    auto ar = aggregation_request_helper::parseFromBSON(testns, aggCmd);
+    auto ar = aggregation_request_helper::parseFromBSONForTests(testns, aggCmd);
     ASSERT_OK(ar.getStatus());
     ASSERT(!ar.getValue().getExplain());
     ASSERT(ar.getValue().getPipeline().empty());
@@ -1512,7 +1525,7 @@ TEST(QueryRequestTest, ConvertToAggregationWithLegacyRuntimeConstantsSucceeds) {
     ASSERT_OK(agg);
 
     auto aggCmd = OpMsgRequest::fromDBAndBody(testns.db(), agg.getValue()).body;
-    auto ar = aggregation_request_helper::parseFromBSON(testns, aggCmd);
+    auto ar = aggregation_request_helper::parseFromBSONForTests(testns, aggCmd);
     ASSERT_OK(ar.getStatus());
     ASSERT(ar.getValue().getLegacyRuntimeConstants().has_value());
     ASSERT_EQ(ar.getValue().getLegacyRuntimeConstants()->getLocalNow(), rtc.getLocalNow());
@@ -1526,7 +1539,7 @@ TEST(QueryRequestTest, ConvertToAggregationWithAllowDiskUseTrueSucceeds) {
     ASSERT_OK(agg.getStatus());
 
     auto aggCmd = OpMsgRequest::fromDBAndBody(testns.db(), agg.getValue()).body;
-    auto ar = aggregation_request_helper::parseFromBSON(testns, aggCmd);
+    auto ar = aggregation_request_helper::parseFromBSONForTests(testns, aggCmd);
     ASSERT_OK(ar.getStatus());
     ASSERT_EQ(true, ar.getValue().getAllowDiskUse());
 }
@@ -1538,7 +1551,7 @@ TEST(QueryRequestTest, ConvertToAggregationWithAllowDiskUseFalseSucceeds) {
     ASSERT_OK(agg.getStatus());
 
     auto aggCmd = OpMsgRequest::fromDBAndBody(testns.db(), agg.getValue()).body;
-    auto ar = aggregation_request_helper::parseFromBSON(testns, aggCmd);
+    auto ar = aggregation_request_helper::parseFromBSONForTests(testns, aggCmd);
     ASSERT_OK(ar.getStatus());
     ASSERT_EQ(false, ar.getValue().getAllowDiskUse());
 }

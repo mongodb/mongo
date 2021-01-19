@@ -39,7 +39,7 @@ env.Library(
     target='aggregation_request_helper',
     source=[
         'aggregation_request_helper.cpp',
-        env.Idlc('aggregate_command.idl')[0]
+        'aggregate_command.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',

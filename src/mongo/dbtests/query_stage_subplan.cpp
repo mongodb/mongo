@@ -97,7 +97,7 @@ protected:
         bool isExplain = false;
         // If there is no '$db', append it.
         auto cmd = OpMsgRequest::fromDBAndBody("test", cmdObj).body;
-        auto qr = QueryRequest::makeFromFindCommand(cmd, isExplain, NamespaceString());
+        auto qr = QueryRequest::makeFromFindCommandForTests(cmd, isExplain, NamespaceString());
 
         auto cq = unittest::assertGet(
             CanonicalQuery::canonicalize(opCtx(),

@@ -160,7 +160,8 @@ StatusWith<std::unique_ptr<QueryRequest>> transformQueryForShards(
     newQR->setSingleBatchField(false);
 
     // Any expansion of the 'showRecordId' flag should have already happened on mongos.
-    newQR->setShowRecordId(false);
+    if (newQR->showRecordId())
+        newQR->setShowRecordId(false);
 
     invariant(newQR->validate());
     return std::move(newQR);

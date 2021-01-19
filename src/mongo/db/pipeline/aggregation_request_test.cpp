@@ -72,7 +72,8 @@ TEST(AggregationRequestTest, ShouldParseAllKnownOptions) {
     uuid.appendToBuilder(&uuidBob, AggregateCommand::kCollectionUUIDFieldName);
     inputBson = inputBson.addField(uuidBob.obj().firstElement());
 
-    auto request = unittest::assertGet(aggregation_request_helper::parseFromBSON(nss, inputBson));
+    auto request =
+        unittest::assertGet(aggregation_request_helper::parseFromBSONForTests(nss, inputBson));
     ASSERT_FALSE(request.getExplain());
     ASSERT_TRUE(request.getAllowDiskUse());
     ASSERT_TRUE(request.getFromMongos());
@@ -103,7 +104,8 @@ TEST(AggregationRequestTest, ShouldParseExplicitRequestReshardingResumeTokenFals
     const BSONObj inputBson = fromjson(
         "{aggregate: 'collection', pipeline: [], $_requestReshardingResumeToken: false, cursor: "
         "{}, $db: 'a'}");
-    auto request = unittest::assertGet(aggregation_request_helper::parseFromBSON(nss, inputBson));
+    auto request =
+        unittest::assertGet(aggregation_request_helper::parseFromBSONForTests(nss, inputBson));
     ASSERT_FALSE(request.getRequestReshardingResumeToken());
 }
 
@@ -111,7 +113,8 @@ TEST(AggregationRequestTest, ShouldParseExplicitExplainTrue) {
     NamespaceString nss("a.collection");
     const BSONObj inputBson =
         fromjson("{aggregate: 'collection', pipeline: [], explain: true, cursor: {}, $db: 'a'}");
-    auto request = unittest::assertGet(aggregation_request_helper::parseFromBSON(nss, inputBson));
+    auto request =
+        unittest::assertGet(aggregation_request_helper::parseFromBSONForTests(nss, inputBson));
     ASSERT_TRUE(request.getExplain());
     ASSERT(*request.getExplain() == ExplainOptions::Verbosity::kQueryPlanner);
 }
@@ -121,7 +124,8 @@ TEST(AggregationRequestTest, ShouldParseExplicitExplainFalseWithCursorOption) {
     const BSONObj inputBson = fromjson(
         "{aggregate: 'collection', pipeline: [], explain: false, cursor: {batchSize: 10}, $db: "
         "'a'}");
-    auto request = unittest::assertGet(aggregation_request_helper::parseFromBSON(nss, inputBson));
+    auto request =
+        unittest::assertGet(aggregation_request_helper::parseFromBSONForTests(nss, inputBson));
     ASSERT_FALSE(request.getExplain());
     ASSERT_EQ(
         request.getCursor().getBatchSize().value_or(aggregation_request_helper::kDefaultBatchSize),
@@ -132,7 +136,7 @@ TEST(AggregationRequestTest, ShouldParseWithSeparateQueryPlannerExplainModeArg) 
     NamespaceString nss("a.collection");
     const BSONObj inputBson =
         fromjson("{aggregate: 'collection', pipeline: [], cursor: {}, $db: 'a'}");
-    auto request = unittest::assertGet(aggregation_request_helper::parseFromBSON(
+    auto request = unittest::assertGet(aggregation_request_helper::parseFromBSONForTests(
         nss, inputBson, ExplainOptions::Verbosity::kQueryPlanner));
     ASSERT_TRUE(request.getExplain());
     ASSERT(*request.getExplain() == ExplainOptions::Verbosity::kQueryPlanner);
@@ -142,7 +146,7 @@ TEST(AggregationRequestTest, ShouldParseWithSeparateQueryPlannerExplainModeArgAn
     NamespaceString nss("a.collection");
     const BSONObj inputBson =
         fromjson("{aggregate: 'collection', pipeline: [], cursor: {batchSize: 10}, $db: 'a'}");
-    auto request = unittest::assertGet(aggregation_request_helper::parseFromBSON(
+    auto request = unittest::assertGet(aggregation_request_helper::parseFromBSONForTests(
         nss, inputBson, ExplainOptions::Verbosity::kExecStats));
     ASSERT_TRUE(request.getExplain());
     ASSERT(*request.getExplain() == ExplainOptions::Verbosity::kExecStats);
@@ -158,7 +162,8 @@ TEST(AggregationRequestTest, ShouldParseExplainFlagWithReadConcern) {
     const BSONObj inputBson = fromjson(
         "{aggregate: 'collection', pipeline: [], explain: true, readConcern: {level: 'majority'}, "
         "$db: 'a'}");
-    auto request = unittest::assertGet(aggregation_request_helper::parseFromBSON(nss, inputBson));
+    auto request =
+        unittest::assertGet(aggregation_request_helper::parseFromBSONForTests(nss, inputBson));
     ASSERT_TRUE(request.getExplain());
     ASSERT_BSONOBJ_EQ(*request.getReadConcern(),
                       BSON("level"
@@ -266,7 +271,7 @@ TEST(AggregationRequestTest, ShouldSetBatchSizeToDefaultOnEmptyCursorObject) {
     NamespaceString nss("a.collection");
     const BSONObj inputBson = fromjson(
         "{aggregate: 'collection', pipeline: [{$match: {a: 'abc'}}], cursor: {}, $db: 'a'}");
-    auto request = aggregation_request_helper::parseFromBSON(nss, inputBson);
+    auto request = aggregation_request_helper::parseFromBSONForTests(nss, inputBson);
     ASSERT_OK(request.getStatus());
     ASSERT_EQ(request.getValue().getCursor().getBatchSize().value_or(
                   aggregation_request_helper::kDefaultBatchSize),
@@ -278,7 +283,7 @@ TEST(AggregationRequestTest, ShouldAcceptHintAsString) {
     const BSONObj inputBson = fromjson(
         "{aggregate: 'collection', pipeline: [{$match: {a: 'abc'}}], hint: 'a_1', cursor: {}, $db: "
         "'a'}");
-    auto request = aggregation_request_helper::parseFromBSON(nss, inputBson);
+    auto request = aggregation_request_helper::parseFromBSONForTests(nss, inputBson);
     ASSERT_OK(request.getStatus());
     ASSERT_BSONOBJ_EQ(request.getValue().getHint().value_or(BSONObj()),
                       BSON("$hint"
@@ -309,17 +314,17 @@ TEST(AggregationRequestTest, ShouldRejectNonArrayPipeline) {
     NamespaceString nss("a.collection");
     const BSONObj inputBson =
         fromjson("{aggregate: 'collection', pipeline: {}, cursor: {}, $db: 'a'}");
-    ASSERT_NOT_OK(aggregation_request_helper::parseFromBSON(nss, inputBson).getStatus());
+    ASSERT_NOT_OK(aggregation_request_helper::parseFromBSONForTests(nss, inputBson).getStatus());
 }
 
 TEST(AggregationRequestTest, ShouldRejectPipelineArrayIfAnElementIsNotAnObject) {
     NamespaceString nss("a.collection");
     BSONObj inputBson = fromjson("{aggregate: 'collection', pipeline: [4], cursor: {}, $db: 'a'}");
-    ASSERT_NOT_OK(aggregation_request_helper::parseFromBSON(nss, inputBson).getStatus());
+    ASSERT_NOT_OK(aggregation_request_helper::parseFromBSONForTests(nss, inputBson).getStatus());
 
     inputBson = fromjson(
         "{aggregate: 'collection', pipeline: [{$match: {a: 'abc'}}, 4], cursor: {}, $db: 'a'}");
-    ASSERT_NOT_OK(aggregation_request_helper::parseFromBSON(nss, inputBson).getStatus());
+    ASSERT_NOT_OK(aggregation_request_helper::parseFromBSONForTests(nss, inputBson).getStatus());
 }
 
 TEST(AggregationRequestTest, ShouldRejectNonObjectCollation) {
@@ -327,9 +332,9 @@ TEST(AggregationRequestTest, ShouldRejectNonObjectCollation) {
     const BSONObj inputBson = fromjson(
         "{aggregate: 'collection', pipeline: [{$match: {a: 'abc'}}], cursor: {}, collation: 1, "
         "$db: 'a'}");
-    ASSERT_NOT_OK(
-        aggregation_request_helper::parseFromBSON(NamespaceString("a.collection"), inputBson)
-            .getStatus());
+    ASSERT_NOT_OK(aggregation_request_helper::parseFromBSONForTests(NamespaceString("a.collection"),
+                                                                    inputBson)
+                      .getStatus());
 }
 
 TEST(AggregationRequestTest, ShouldRejectNonStringNonObjectHint) {
@@ -337,9 +342,9 @@ TEST(AggregationRequestTest, ShouldRejectNonStringNonObjectHint) {
     const BSONObj inputBson = fromjson(
         "{aggregate: 'collection', pipeline: [{$match: {a: 'abc'}}], cursor: {}, hint: 1, $db: "
         "'a'}");
-    ASSERT_NOT_OK(
-        aggregation_request_helper::parseFromBSON(NamespaceString("a.collection"), inputBson)
-            .getStatus());
+    ASSERT_NOT_OK(aggregation_request_helper::parseFromBSONForTests(NamespaceString("a.collection"),
+                                                                    inputBson)
+                      .getStatus());
 }
 
 TEST(AggregationRequestTest, ShouldRejectHintAsArray) {
@@ -347,9 +352,9 @@ TEST(AggregationRequestTest, ShouldRejectHintAsArray) {
     const BSONObj inputBson = fromjson(
         "{aggregate: 'collection', pipeline: [{$match: {a: 'abc'}}], cursor: {}, hint: [], $db: "
         "'a'}]}");
-    ASSERT_NOT_OK(
-        aggregation_request_helper::parseFromBSON(NamespaceString("a.collection"), inputBson)
-            .getStatus());
+    ASSERT_NOT_OK(aggregation_request_helper::parseFromBSONForTests(NamespaceString("a.collection"),
+                                                                    inputBson)
+                      .getStatus());
 }
 
 TEST(AggregationRequestTest, ShouldRejectExplainIfNumber) {
@@ -357,7 +362,7 @@ TEST(AggregationRequestTest, ShouldRejectExplainIfNumber) {
     const BSONObj inputBson = fromjson(
         "{aggregate: 'collection', pipeline: [{$match: {a: 'abc'}}], cursor: {}, explain: 1, $db: "
         "'a'}");
-    ASSERT_NOT_OK(aggregation_request_helper::parseFromBSON(nss, inputBson).getStatus());
+    ASSERT_NOT_OK(aggregation_request_helper::parseFromBSONForTests(nss, inputBson).getStatus());
 }
 
 TEST(AggregationRequestTest, ShouldRejectExplainIfObject) {
@@ -365,7 +370,7 @@ TEST(AggregationRequestTest, ShouldRejectExplainIfObject) {
     const BSONObj inputBson = fromjson(
         "{aggregate: 'collection', pipeline: [{$match: {a: 'abc'}}], cursor: {}, explain: {}, $db: "
         "'a'}");
-    ASSERT_NOT_OK(aggregation_request_helper::parseFromBSON(nss, inputBson).getStatus());
+    ASSERT_NOT_OK(aggregation_request_helper::parseFromBSONForTests(nss, inputBson).getStatus());
 }
 
 TEST(AggregationRequestTest, ShouldRejectNonBoolFromMongos) {
@@ -373,7 +378,7 @@ TEST(AggregationRequestTest, ShouldRejectNonBoolFromMongos) {
     const BSONObj inputBson = fromjson(
         "{aggregate: 'collection', pipeline: [{$match: {a: 'abc'}}], cursor: {}, fromMongos: 1, "
         "$db: 'a'}");
-    ASSERT_NOT_OK(aggregation_request_helper::parseFromBSON(nss, inputBson).getStatus());
+    ASSERT_NOT_OK(aggregation_request_helper::parseFromBSONForTests(nss, inputBson).getStatus());
 }
 
 TEST(AggregationRequestTest, ShouldRejectNonBoolNeedsMerge) {
@@ -381,7 +386,7 @@ TEST(AggregationRequestTest, ShouldRejectNonBoolNeedsMerge) {
     const BSONObj inputBson = fromjson(
         "{aggregate: 'collection', pipeline: [{$match: {a: 'abc'}}], cursor: {}, needsMerge: 1, "
         "fromMongos: true, $db: 'a'}");
-    ASSERT_NOT_OK(aggregation_request_helper::parseFromBSON(nss, inputBson).getStatus());
+    ASSERT_NOT_OK(aggregation_request_helper::parseFromBSONForTests(nss, inputBson).getStatus());
 }
 
 TEST(AggregationRequestTest, ShouldRejectNeedsMergeIfFromMongosNotPresent) {
@@ -389,7 +394,7 @@ TEST(AggregationRequestTest, ShouldRejectNeedsMergeIfFromMongosNotPresent) {
     const BSONObj inputBson = fromjson(
         "{aggregate: 'collection', pipeline: [{$match: {a: 'abc'}}], cursor: {}, needsMerge: true, "
         "$db: 'a'}");
-    ASSERT_NOT_OK(aggregation_request_helper::parseFromBSON(nss, inputBson).getStatus());
+    ASSERT_NOT_OK(aggregation_request_helper::parseFromBSONForTests(nss, inputBson).getStatus());
 }
 
 TEST(AggregationRequestTest, ShouldRejectNonBoolNeedsMerge34) {
@@ -397,7 +402,7 @@ TEST(AggregationRequestTest, ShouldRejectNonBoolNeedsMerge34) {
     const BSONObj inputBson = fromjson(
         "{aggregate: 'collection', pipeline: [{$match: {a: 'abc'}}], cursor: {}, fromRouter: 1, "
         "$db: 'a'}");
-    ASSERT_NOT_OK(aggregation_request_helper::parseFromBSON(nss, inputBson).getStatus());
+    ASSERT_NOT_OK(aggregation_request_helper::parseFromBSONForTests(nss, inputBson).getStatus());
 }
 
 TEST(AggregationRequestTest, ShouldRejectNeedsMergeIfNeedsMerge34AlsoPresent) {
@@ -406,7 +411,7 @@ TEST(AggregationRequestTest, ShouldRejectNeedsMergeIfNeedsMerge34AlsoPresent) {
         "{aggregate: 'collection', pipeline: [{$match: {a: 'abc'}}], cursor: {}, needsMerge: true, "
         "fromMongos: true, "
         "fromRouter: true, $db: 'a'}");
-    ASSERT_NOT_OK(aggregation_request_helper::parseFromBSON(nss, inputBson).getStatus());
+    ASSERT_NOT_OK(aggregation_request_helper::parseFromBSONForTests(nss, inputBson).getStatus());
 }
 
 TEST(AggregationRequestTest, ShouldRejectFromMongosIfNeedsMerge34AlsoPresent) {
@@ -414,7 +419,7 @@ TEST(AggregationRequestTest, ShouldRejectFromMongosIfNeedsMerge34AlsoPresent) {
     const BSONObj inputBson = fromjson(
         "{aggregate: 'collection', pipeline: [{$match: {a: 'abc'}}], cursor: {}, fromMongos: true, "
         "fromRouter: true, $db: 'a'}");
-    ASSERT_NOT_OK(aggregation_request_helper::parseFromBSON(nss, inputBson).getStatus());
+    ASSERT_NOT_OK(aggregation_request_helper::parseFromBSONForTests(nss, inputBson).getStatus());
 }
 
 TEST(AggregationRequestTest, ShouldRejectNonBoolAllowDiskUse) {
@@ -422,7 +427,7 @@ TEST(AggregationRequestTest, ShouldRejectNonBoolAllowDiskUse) {
     const BSONObj inputBson = fromjson(
         "{aggregate: 'collection', pipeline: [{$match: {a: 'abc'}}], cursor: {}, allowDiskUse: 1, "
         "$db: 'a'}");
-    ASSERT_NOT_OK(aggregation_request_helper::parseFromBSON(nss, inputBson).getStatus());
+    ASSERT_NOT_OK(aggregation_request_helper::parseFromBSONForTests(nss, inputBson).getStatus());
 }
 
 TEST(AggregationRequestTest, ShouldRejectNonBoolIsMapReduceCommand) {
@@ -430,21 +435,21 @@ TEST(AggregationRequestTest, ShouldRejectNonBoolIsMapReduceCommand) {
     const BSONObj inputBson = fromjson(
         "{aggregate: 'collection', pipeline: [{$match: {a: 'abc'}}], cursor: {}, "
         "isMapReduceCommand: 1, $db: 'a'}");
-    ASSERT_NOT_OK(aggregation_request_helper::parseFromBSON(nss, inputBson).getStatus());
+    ASSERT_NOT_OK(aggregation_request_helper::parseFromBSONForTests(nss, inputBson).getStatus());
 }
 
 TEST(AggregationRequestTest, ShouldRejectNoCursorNoExplain) {
     NamespaceString nss("a.collection");
     const BSONObj inputBson =
         fromjson("{aggregate: 'collection', pipeline: [{$match: {a: 'abc'}}], $db: 'a'}");
-    ASSERT_NOT_OK(aggregation_request_helper::parseFromBSON(nss, inputBson).getStatus());
+    ASSERT_NOT_OK(aggregation_request_helper::parseFromBSONForTests(nss, inputBson).getStatus());
 }
 
 TEST(AggregationRequestTest, ShouldRejectExplainTrueWithSeparateExplainArg) {
     NamespaceString nss("a.collection");
     const BSONObj inputBson =
         fromjson("{aggregate: 'collection', pipeline: [], explain: true, $db: 'a'}");
-    ASSERT_NOT_OK(aggregation_request_helper::parseFromBSON(
+    ASSERT_NOT_OK(aggregation_request_helper::parseFromBSONForTests(
                       nss, inputBson, ExplainOptions::Verbosity::kExecStats)
                       .getStatus());
 }
@@ -453,7 +458,7 @@ TEST(AggregationRequestTest, ShouldRejectExplainFalseWithSeparateExplainArg) {
     NamespaceString nss("a.collection");
     const BSONObj inputBson =
         fromjson("{aggregate: 'collection', pipeline: [], explain: false, $db: 'a'}");
-    ASSERT_NOT_OK(aggregation_request_helper::parseFromBSON(
+    ASSERT_NOT_OK(aggregation_request_helper::parseFromBSONForTests(
                       nss, inputBson, ExplainOptions::Verbosity::kExecStats)
                       .getStatus());
 }
@@ -462,7 +467,7 @@ TEST(AggregationRequestTest, ShouldRejectExplainExecStatsVerbosityWithReadConcer
     NamespaceString nss("a.collection");
     const BSONObj inputBson = fromjson(
         "{aggregate: 'collection', pipeline: [], readConcern: {level: 'majority'}, $db: 'a'}");
-    ASSERT_NOT_OK(aggregation_request_helper::parseFromBSON(
+    ASSERT_NOT_OK(aggregation_request_helper::parseFromBSONForTests(
                       nss, inputBson, ExplainOptions::Verbosity::kExecStats)
                       .getStatus());
 }
@@ -472,14 +477,14 @@ TEST(AggregationRequestTest, ShouldRejectExplainWithWriteConcernMajority) {
     const BSONObj inputBson = fromjson(
         "{aggregate: 'collection', pipeline: [], explain: true, writeConcern: {w: 'majority'}, "
         "$db: 'a'}");
-    ASSERT_NOT_OK(aggregation_request_helper::parseFromBSON(nss, inputBson).getStatus());
+    ASSERT_NOT_OK(aggregation_request_helper::parseFromBSONForTests(nss, inputBson).getStatus());
 }
 
 TEST(AggregationRequestTest, ShouldRejectExplainExecStatsVerbosityWithWriteConcernMajority) {
     NamespaceString nss("a.collection");
     const BSONObj inputBson = fromjson(
         "{aggregate: 'collection', pipeline: [], writeConcern: {w: 'majority'}, $db: 'a'}");
-    ASSERT_NOT_OK(aggregation_request_helper::parseFromBSON(
+    ASSERT_NOT_OK(aggregation_request_helper::parseFromBSONForTests(
                       nss, inputBson, ExplainOptions::Verbosity::kExecStats)
                       .getStatus());
 }
@@ -488,7 +493,7 @@ TEST(AggregationRequestTest, ShouldRejectRequestReshardingResumeTokenIfNonOplogN
     NamespaceString nss("a.collection");
     const BSONObj inputBson = fromjson(
         "{aggregate: 'collection', pipeline: [], $_requestReshardingResumeToken: true, $db: 'a'}");
-    ASSERT_NOT_OK(aggregation_request_helper::parseFromBSON(nss, inputBson).getStatus());
+    ASSERT_NOT_OK(aggregation_request_helper::parseFromBSONForTests(nss, inputBson).getStatus());
 }
 
 TEST(AggregationRequestTest, CannotParseNeedsMerge34) {
@@ -496,7 +501,7 @@ TEST(AggregationRequestTest, CannotParseNeedsMerge34) {
     const BSONObj inputBson = fromjson(
         "{aggregate: 'collection', pipeline: [{$match: {a: 'abc'}}], cursor: {}, fromRouter: true, "
         "$db: 'a'}");
-    ASSERT_NOT_OK(aggregation_request_helper::parseFromBSON(nss, inputBson).getStatus());
+    ASSERT_NOT_OK(aggregation_request_helper::parseFromBSONForTests(nss, inputBson).getStatus());
 }
 
 TEST(AggregationRequestTest, ParseNSShouldReturnAggregateOneNSIfAggregateFieldIsOne) {
@@ -545,8 +550,9 @@ TEST(AggregationRequestTest, ParseFromBSONOverloadsShouldProduceIdenticalRequest
     NamespaceString nss("a.collection");
 
     auto aggReqDBName =
-        unittest::assertGet(aggregation_request_helper::parseFromBSON("a", inputBSON));
-    auto aggReqNSS = unittest::assertGet(aggregation_request_helper::parseFromBSON(nss, inputBSON));
+        unittest::assertGet(aggregation_request_helper::parseFromBSONForTests("a", inputBSON));
+    auto aggReqNSS =
+        unittest::assertGet(aggregation_request_helper::parseFromBSONForTests(nss, inputBSON));
 
     ASSERT_DOCUMENT_EQ(aggregation_request_helper::serializeToCommandDoc(aggReqDBName),
                        aggregation_request_helper::serializeToCommandDoc(aggReqNSS));
@@ -556,14 +562,14 @@ TEST(AggregationRequestTest, ShouldRejectExchangeNotObject) {
     NamespaceString nss("a.collection");
     const BSONObj inputBson =
         fromjson("{aggregate: 'collection', pipeline: [], exchage: '42', $db: 'a'}");
-    ASSERT_NOT_OK(aggregation_request_helper::parseFromBSON(nss, inputBson).getStatus());
+    ASSERT_NOT_OK(aggregation_request_helper::parseFromBSONForTests(nss, inputBson).getStatus());
 }
 
 TEST(AggregationRequestTest, ShouldRejectExchangeInvalidSpec) {
     NamespaceString nss("a.collection");
     const BSONObj inputBson =
         fromjson("{aggregate: 'collection', pipeline: [], exchage: {}, $db: 'a'}");
-    ASSERT_NOT_OK(aggregation_request_helper::parseFromBSON(nss, inputBson).getStatus());
+    ASSERT_NOT_OK(aggregation_request_helper::parseFromBSONForTests(nss, inputBson).getStatus());
 }
 
 TEST(AggregationRequestTest, ShouldRejectInvalidWriteConcern) {
@@ -571,15 +577,16 @@ TEST(AggregationRequestTest, ShouldRejectInvalidWriteConcern) {
     const BSONObj inputBson = fromjson(
         "{aggregate: 'collection', pipeline: [{$match: {a: 'abc'}}], cursor: {}, writeConcern: "
         "'invalid', $db: 'a'}");
-    ASSERT_NOT_OK(aggregation_request_helper::parseFromBSON(nss, inputBson).getStatus());
+    ASSERT_NOT_OK(aggregation_request_helper::parseFromBSONForTests(nss, inputBson).getStatus());
 }
 
 TEST(AggregationRequestTest, ShouldRejectInvalidCollectionUUID) {
     NamespaceString nss("a.collection");
     const BSONObj inputBSON = fromjson(
         "{aggregate: 'collection', pipeline: [{$match: {}}], collectionUUID: 2, $db: 'a'}");
-    ASSERT_EQUALS(aggregation_request_helper::parseFromBSON(nss, inputBSON).getStatus().code(),
-                  ErrorCodes::TypeMismatch);
+    ASSERT_EQUALS(
+        aggregation_request_helper::parseFromBSONForTests(nss, inputBSON).getStatus().code(),
+        ErrorCodes::TypeMismatch);
 }
 
 //
@@ -591,7 +598,7 @@ TEST(AggregationRequestTest, ShouldIgnoreQueryOptions) {
     const BSONObj inputBson = fromjson(
         "{aggregate: 'collection', pipeline: [{$match: {a: 'abc'}}], cursor: {}, $queryOptions: "
         "{}, $db: 'a'}");
-    ASSERT_OK(aggregation_request_helper::parseFromBSON(nss, inputBson).getStatus());
+    ASSERT_OK(aggregation_request_helper::parseFromBSONForTests(nss, inputBson).getStatus());
 }
 
 }  // namespace

@@ -74,7 +74,10 @@ public:
         const OpMsgRequest& opMsgRequest,
         boost::optional<ExplainOptions::Verbosity> explainVerbosity) override {
         const auto aggregationRequest = uassertStatusOK(aggregation_request_helper::parseFromBSON(
-            opMsgRequest.getDatabase().toString(), opMsgRequest.body, explainVerbosity));
+            opMsgRequest.getDatabase().toString(),
+            opMsgRequest.body,
+            explainVerbosity,
+            APIParameters::get(opCtx).getAPIStrict().value_or(false)));
 
         auto privileges =
             uassertStatusOK(AuthorizationSession::get(opCtx->getClient())

@@ -133,8 +133,11 @@ public:
             }
 
             auto viewAggCmd = OpMsgRequest::fromDBAndBody(nss.db(), aggCmdOnView.getValue()).body;
-            auto aggRequestOnView =
-                aggregation_request_helper::parseFromBSON(nss, viewAggCmd, verbosity);
+            auto aggRequestOnView = aggregation_request_helper::parseFromBSON(
+                nss,
+                viewAggCmd,
+                verbosity,
+                APIParameters::get(opCtx).getAPIStrict().value_or(false));
             if (!aggRequestOnView.isOK()) {
                 return aggRequestOnView.getStatus();
             }
@@ -208,7 +211,11 @@ public:
             uassertStatusOK(aggCmdOnView.getStatus());
 
             auto viewAggCmd = OpMsgRequest::fromDBAndBody(nss.db(), aggCmdOnView.getValue()).body;
-            auto aggRequestOnView = aggregation_request_helper::parseFromBSON(nss, viewAggCmd);
+            auto aggRequestOnView = aggregation_request_helper::parseFromBSON(
+                nss,
+                viewAggCmd,
+                boost::none,
+                APIParameters::get(opCtx).getAPIStrict().value_or(false));
             uassertStatusOK(aggRequestOnView.getStatus());
 
             auto resolvedAggRequest = ex->asExpandedViewAggregation(aggRequestOnView.getValue());

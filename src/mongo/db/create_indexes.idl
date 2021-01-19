@@ -85,6 +85,7 @@ structs:
             background:
                 type: safeBool
                 optional: true
+                unstable: true
             unique:
                 type: safeBool
                 optional: true
@@ -97,12 +98,14 @@ structs:
             sparse:
                 type: safeBool
                 optional: true
+                unstable: true
             expireAfterSeconds:
                 type: safeInt
                 optional: true
             storageEngine:
                 type: object_owned
                 optional: true
+                unstable: true
             weights:
                 type: object_owned
                 optional: true
@@ -130,6 +133,7 @@ structs:
             bucketSize:
                 type: safeDouble
                 optional: true
+                unstable: true
             collation:
                 type: object_owned
                 optional: true
@@ -173,4 +177,3 @@ commands:
                 description: 'Commit Quorum options'
                 type: CommitQuorum
                 optional: true
-

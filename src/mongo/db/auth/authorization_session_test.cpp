@@ -595,7 +595,7 @@ TEST_F(AuthorizationSessionTest, AcquireUserObtainsAndValidatesAuthenticationRes
 }
 
 TEST_F(AuthorizationSessionTest, CannotAggregateEmptyPipelineWithoutFindAction) {
-    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSON(
+    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
         testFooNss,
         BSON("aggregate" << testFooNss.coll() << "pipeline" << BSONArray() << "cursor" << BSONObj()
                          << "$db" << testFooNss.db())));
@@ -607,7 +607,7 @@ TEST_F(AuthorizationSessionTest, CannotAggregateEmptyPipelineWithoutFindAction) 
 TEST_F(AuthorizationSessionTest, CanAggregateEmptyPipelineWithFindAction) {
     authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, {ActionType::find}));
 
-    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSON(
+    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
         testFooNss,
         BSON("aggregate" << testFooNss.coll() << "pipeline" << BSONArray() << "cursor" << BSONObj()
                          << "$db" << testFooNss.db())));
@@ -623,7 +623,7 @@ TEST_F(AuthorizationSessionTest, CannotAggregateWithoutFindActionIfFirstStageNot
     BSONArray pipeline = BSON_ARRAY(BSON("$limit" << 1) << BSON("$collStats" << BSONObj())
                                                         << BSON("$indexStats" << BSONObj()));
 
-    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSON(
+    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
         testFooNss,
         BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj()
                          << "$db" << testFooNss.db())));
@@ -637,7 +637,7 @@ TEST_F(AuthorizationSessionTest, CannotAggregateWithFindActionIfPipelineContains
     BSONArray pipeline = BSON_ARRAY(BSON("$limit" << 1) << BSON("$collStats" << BSONObj())
                                                         << BSON("$indexStats" << BSONObj()));
 
-    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSON(
+    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
         testFooNss,
         BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj()
                          << "$db" << testFooNss.db())));
@@ -650,7 +650,7 @@ TEST_F(AuthorizationSessionTest, CannotAggregateCollStatsWithoutCollStatsAction)
     authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, {ActionType::find}));
 
     BSONArray pipeline = BSON_ARRAY(BSON("$collStats" << BSONObj()));
-    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSON(
+    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
         testFooNss,
         BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj()
                          << "$db" << testFooNss.db())));
@@ -663,7 +663,7 @@ TEST_F(AuthorizationSessionTest, CanAggregateCollStatsWithCollStatsAction) {
     authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, {ActionType::collStats}));
 
     BSONArray pipeline = BSON_ARRAY(BSON("$collStats" << BSONObj()));
-    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSON(
+    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
         testFooNss,
         BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj()
                          << "$db" << testFooNss.db())));
@@ -676,7 +676,7 @@ TEST_F(AuthorizationSessionTest, CannotAggregateIndexStatsWithoutIndexStatsActio
     authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, {ActionType::find}));
 
     BSONArray pipeline = BSON_ARRAY(BSON("$indexStats" << BSONObj()));
-    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSON(
+    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
         testFooNss,
         BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj()
                          << "$db" << testFooNss.db())));
@@ -689,7 +689,7 @@ TEST_F(AuthorizationSessionTest, CanAggregateIndexStatsWithIndexStatsAction) {
     authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, {ActionType::indexStats}));
 
     BSONArray pipeline = BSON_ARRAY(BSON("$indexStats" << BSONObj()));
-    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSON(
+    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
         testFooNss,
         BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj()
                          << "$db" << testFooNss.db())));
@@ -702,7 +702,7 @@ TEST_F(AuthorizationSessionTest, CanAggregateCurrentOpAllUsersFalseWithoutInprog
     authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, {ActionType::find}));
 
     BSONArray pipeline = BSON_ARRAY(BSON("$currentOp" << BSON("allUsers" << false)));
-    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSON(
+    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
         testFooNss,
         BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj()
                          << "$db" << testFooNss.db())));
@@ -715,7 +715,7 @@ TEST_F(AuthorizationSessionTest, CannotAggregateCurrentOpAllUsersFalseWithoutInp
     authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, {ActionType::find}));
 
     BSONArray pipeline = BSON_ARRAY(BSON("$currentOp" << BSON("allUsers" << false)));
-    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSON(
+    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
         testFooNss,
         BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj()
                          << "$db" << testFooNss.db())));
@@ -726,7 +726,7 @@ TEST_F(AuthorizationSessionTest, CannotAggregateCurrentOpAllUsersFalseWithoutInp
 
 TEST_F(AuthorizationSessionTest, CannotAggregateCurrentOpAllUsersFalseIfNotAuthenticatedOnMongoD) {
     BSONArray pipeline = BSON_ARRAY(BSON("$currentOp" << BSON("allUsers" << false)));
-    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSON(
+    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
         testFooNss,
         BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj()
                          << "$db" << testFooNss.db())));
@@ -735,7 +735,7 @@ TEST_F(AuthorizationSessionTest, CannotAggregateCurrentOpAllUsersFalseIfNotAuthe
 
 TEST_F(AuthorizationSessionTest, CannotAggregateCurrentOpAllUsersFalseIfNotAuthenticatedOnMongoS) {
     BSONArray pipeline = BSON_ARRAY(BSON("$currentOp" << BSON("allUsers" << false)));
-    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSON(
+    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
         testFooNss,
         BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj()
                          << "$db" << testFooNss.db())));
@@ -749,7 +749,7 @@ TEST_F(AuthorizationSessionTest, CannotAggregateCurrentOpAllUsersTrueWithoutInpr
     authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, {ActionType::find}));
 
     BSONArray pipeline = BSON_ARRAY(BSON("$currentOp" << BSON("allUsers" << true)));
-    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSON(
+    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
         testFooNss,
         BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj()
                          << "$db" << testFooNss.db())));
@@ -762,7 +762,7 @@ TEST_F(AuthorizationSessionTest, CannotAggregateCurrentOpAllUsersTrueWithoutInpr
     authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, {ActionType::find}));
 
     BSONArray pipeline = BSON_ARRAY(BSON("$currentOp" << BSON("allUsers" << true)));
-    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSON(
+    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
         testFooNss,
         BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj()
                          << "$db" << testFooNss.db())));
@@ -776,7 +776,7 @@ TEST_F(AuthorizationSessionTest, CanAggregateCurrentOpAllUsersTrueWithInprogActi
         Privilege(ResourcePattern::forClusterResource(), {ActionType::inprog}));
 
     BSONArray pipeline = BSON_ARRAY(BSON("$currentOp" << BSON("allUsers" << true)));
-    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSON(
+    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
         testFooNss,
         BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj()
                          << "$db" << testFooNss.db())));
@@ -790,7 +790,7 @@ TEST_F(AuthorizationSessionTest, CanAggregateCurrentOpAllUsersTrueWithInprogActi
         Privilege(ResourcePattern::forClusterResource(), {ActionType::inprog}));
 
     BSONArray pipeline = BSON_ARRAY(BSON("$currentOp" << BSON("allUsers" << true)));
-    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSON(
+    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
         testFooNss,
         BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj()
                          << "$db" << testFooNss.db())));
@@ -804,7 +804,7 @@ TEST_F(AuthorizationSessionTest, CannotSpoofAllUsersTrueWithoutInprogActionOnMon
 
     BSONArray pipeline =
         BSON_ARRAY(BSON("$currentOp" << BSON("allUsers" << false << "allUsers" << true)));
-    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSON(
+    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
         testFooNss,
         BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj()
                          << "$db" << testFooNss.db())));
@@ -818,7 +818,7 @@ TEST_F(AuthorizationSessionTest, CannotSpoofAllUsersTrueWithoutInprogActionOnMon
 
     BSONArray pipeline =
         BSON_ARRAY(BSON("$currentOp" << BSON("allUsers" << false << "allUsers" << true)));
-    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSON(
+    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
         testFooNss,
         BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj()
                          << "$db" << testFooNss.db())));
@@ -832,7 +832,7 @@ TEST_F(AuthorizationSessionTest, AddPrivilegesForStageFailsIfOutNamespaceIsNotVa
 
     BSONArray pipeline = BSON_ARRAY(BSON("$out"
                                          << ""));
-    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSON(
+    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
         testFooNss,
         BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj()
                          << "$db" << testFooNss.db())));
@@ -846,7 +846,7 @@ TEST_F(AuthorizationSessionTest, CannotAggregateOutWithoutInsertAndRemoveOnTarge
     authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, {ActionType::find}));
 
     BSONArray pipeline = BSON_ARRAY(BSON("$out" << testBarNss.coll()));
-    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSON(
+    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
         testFooNss,
         BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj()
                          << "$db" << testFooNss.db())));
@@ -871,7 +871,7 @@ TEST_F(AuthorizationSessionTest, CanAggregateOutWithInsertAndRemoveOnTargetNames
          Privilege(testBarCollResource, {ActionType::insert, ActionType::remove})});
 
     BSONArray pipeline = BSON_ARRAY(BSON("$out" << testBarNss.coll()));
-    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSON(
+    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
         testFooNss,
         BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj()
                          << "$db" << testFooNss.db())));
@@ -880,7 +880,7 @@ TEST_F(AuthorizationSessionTest, CanAggregateOutWithInsertAndRemoveOnTargetNames
     ASSERT_TRUE(authzSession->isAuthorizedForPrivileges(privileges));
 
     auto aggNoBypassDocumentValidationReq =
-        uassertStatusOK(aggregation_request_helper::parseFromBSON(
+        uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
             testFooNss,
             BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline
                              << "bypassDocumentValidation" << false << "cursor" << BSONObj()
@@ -898,7 +898,7 @@ TEST_F(AuthorizationSessionTest,
          Privilege(testBarCollResource, {ActionType::insert, ActionType::remove})});
 
     BSONArray pipeline = BSON_ARRAY(BSON("$out" << testBarNss.coll()));
-    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSON(
+    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
         testFooNss,
         BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj()
                          << "bypassDocumentValidation" << true << "$db" << testFooNss.db())));
@@ -916,7 +916,7 @@ TEST_F(AuthorizationSessionTest,
              {ActionType::insert, ActionType::remove, ActionType::bypassDocumentValidation})});
 
     BSONArray pipeline = BSON_ARRAY(BSON("$out" << testBarNss.coll()));
-    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSON(
+    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
         testFooNss,
         BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj()
                          << "bypassDocumentValidation" << true << "$db" << testFooNss.db())));
@@ -929,7 +929,7 @@ TEST_F(AuthorizationSessionTest, CannotAggregateLookupWithoutFindOnJoinedNamespa
     authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, {ActionType::find}));
 
     BSONArray pipeline = BSON_ARRAY(BSON("$lookup" << BSON("from" << testBarNss.coll())));
-    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSON(
+    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
         testFooNss,
         BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj()
                          << "$db" << testFooNss.db())));
@@ -943,7 +943,7 @@ TEST_F(AuthorizationSessionTest, CanAggregateLookupWithFindOnJoinedNamespace) {
                                          Privilege(testBarCollResource, {ActionType::find})});
 
     BSONArray pipeline = BSON_ARRAY(BSON("$lookup" << BSON("from" << testBarNss.coll())));
-    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSON(
+    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
         testFooNss,
         BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj()
                          << "$db" << testFooNss.db())));
@@ -960,7 +960,7 @@ TEST_F(AuthorizationSessionTest, CannotAggregateLookupWithoutFindOnNestedJoinedN
     BSONArray nestedPipeline = BSON_ARRAY(BSON("$lookup" << BSON("from" << testQuxNss.coll())));
     BSONArray pipeline = BSON_ARRAY(
         BSON("$lookup" << BSON("from" << testBarNss.coll() << "pipeline" << nestedPipeline)));
-    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSON(
+    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
         testFooNss,
         BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj()
                          << "$db" << testFooNss.db())));
@@ -977,7 +977,7 @@ TEST_F(AuthorizationSessionTest, CanAggregateLookupWithFindOnNestedJoinedNamespa
     BSONArray nestedPipeline = BSON_ARRAY(BSON("$lookup" << BSON("from" << testQuxNss.coll())));
     BSONArray pipeline = BSON_ARRAY(
         BSON("$lookup" << BSON("from" << testBarNss.coll() << "pipeline" << nestedPipeline)));
-    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSON(
+    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
         testFooNss,
         BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj()
                          << "$db" << testFooNss.db())));
@@ -1024,8 +1024,8 @@ TEST_F(AuthorizationSessionTest, CheckAuthForAggregateWithDeeplyNestedLookup) {
     pipelineBuilder.doneFast();
     cmdBuilder << "cursor" << BSONObj() << "$db" << testFooNss.db();
 
-    auto aggReq =
-        uassertStatusOK(aggregation_request_helper::parseFromBSON(testFooNss, cmdBuilder.obj()));
+    auto aggReq = uassertStatusOK(
+        aggregation_request_helper::parseFromBSONForTests(testFooNss, cmdBuilder.obj()));
     PrivilegeVector privileges =
         uassertStatusOK(authzSession->getPrivilegesForAggregate(testFooNss, aggReq, false));
     ASSERT_TRUE(authzSession->isAuthorizedForPrivileges(privileges));
@@ -1036,7 +1036,7 @@ TEST_F(AuthorizationSessionTest, CannotAggregateGraphLookupWithoutFindOnJoinedNa
     authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, {ActionType::find}));
 
     BSONArray pipeline = BSON_ARRAY(BSON("$graphLookup" << BSON("from" << testBarNss.coll())));
-    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSON(
+    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
         testFooNss,
         BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj()
                          << "$db" << testFooNss.db())));
@@ -1050,7 +1050,7 @@ TEST_F(AuthorizationSessionTest, CanAggregateGraphLookupWithFindOnJoinedNamespac
                                          Privilege(testBarCollResource, {ActionType::find})});
 
     BSONArray pipeline = BSON_ARRAY(BSON("$graphLookup" << BSON("from" << testBarNss.coll())));
-    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSON(
+    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
         testFooNss,
         BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj()
                          << "$db" << testFooNss.db())));
@@ -1067,7 +1067,7 @@ TEST_F(AuthorizationSessionTest,
     BSONArray pipeline =
         BSON_ARRAY(fromjson("{$facet: {lookup: [{$lookup: {from: 'bar'}}], graphLookup: "
                             "[{$graphLookup: {from: 'qux'}}]}}"));
-    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSON(
+    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
         testFooNss,
         BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj()
                          << "$db" << testFooNss.db())));
@@ -1096,7 +1096,7 @@ TEST_F(AuthorizationSessionTest,
         BSON_ARRAY(fromjson("{$facet: {lookup: [{$lookup: {from: 'bar'}}], graphLookup: "
                             "[{$graphLookup: {from: 'qux'}}]}}"));
 
-    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSON(
+    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
         testFooNss,
         BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj()
                          << "$db" << testFooNss.db())));

@@ -1049,7 +1049,8 @@ protected:
         solns.clear();
 
         const bool isExplain = false;
-        std::unique_ptr<QueryRequest> qr(QueryRequest::makeFromFindCommand(cmdObj, isExplain));
+        std::unique_ptr<QueryRequest> qr(
+            QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain));
 
         const boost::intrusive_ptr<ExpressionContext> expCtx;
         auto statusWithCQ =

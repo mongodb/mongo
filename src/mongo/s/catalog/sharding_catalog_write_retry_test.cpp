@@ -40,6 +40,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/ops/write_ops.h"
+#include "mongo/db/query/query_request.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/executor/task_executor.h"
@@ -148,7 +149,7 @@ TEST_F(InsertRetryTest, RetryOnNetworkErrorFails) {
 void assertFindRequestHasFilter(const RemoteCommandRequest& request, BSONObj filter) {
     // If there is no '$db', append it.
     auto cmd = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj).body;
-    auto query = QueryRequest::makeFromFindCommand(cmd, false);
+    auto query = QueryRequest::makeFromFindCommandForTests(cmd, false);
     ASSERT_BSONOBJ_EQ(filter, query->getFilter());
 }
 

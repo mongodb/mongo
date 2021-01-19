@@ -161,8 +161,11 @@ public:
 
             auto viewAggCmd =
                 OpMsgRequest::fromDBAndBody(nss.db(), viewAggregation.getValue()).body;
-            auto viewAggRequest =
-                aggregation_request_helper::parseFromBSON(nss, viewAggCmd, verbosity);
+            auto viewAggRequest = aggregation_request_helper::parseFromBSON(
+                nss,
+                viewAggCmd,
+                verbosity,
+                APIParameters::get(opCtx).getAPIStrict().value_or(false));
             if (!viewAggRequest.isOK()) {
                 return viewAggRequest.getStatus();
             }

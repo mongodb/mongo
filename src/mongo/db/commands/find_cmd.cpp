@@ -70,7 +70,11 @@ std::unique_ptr<QueryRequest> parseCmdObjectToQueryRequest(OperationContext* opC
                                                            NamespaceString nss,
                                                            BSONObj cmdObj,
                                                            bool isExplain) {
-    auto qr = QueryRequest::makeFromFindCommand(std::move(cmdObj), isExplain, std::move(nss));
+    auto qr =
+        QueryRequest::makeFromFindCommand(std::move(cmdObj),
+                                          isExplain,
+                                          std::move(nss),
+                                          APIParameters::get(opCtx).getAPIStrict().value_or(false));
     if (!qr->getLegacyRuntimeConstants()) {
         qr->setLegacyRuntimeConstants(Variables::generateRuntimeConstants(opCtx));
     }
@@ -270,8 +274,11 @@ public:
                 auto viewAggCmd = OpMsgRequest::fromDBAndBody(_dbName, viewAggregationCommand).body;
                 // Create the agg request equivalent of the find operation, with the explain
                 // verbosity included.
-                auto aggRequest = uassertStatusOK(
-                    aggregation_request_helper::parseFromBSON(nss, viewAggCmd, verbosity));
+                auto aggRequest = uassertStatusOK(aggregation_request_helper::parseFromBSON(
+                    nss,
+                    viewAggCmd,
+                    verbosity,
+                    APIParameters::get(opCtx).getAPIStrict().value_or(false)));
 
                 try {
                     // An empty PrivilegeVector is acceptable because these privileges are only

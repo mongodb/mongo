@@ -78,8 +78,16 @@ public:
      * Returns a heap allocated QueryRequest on success or an error if 'cmdObj' is not well
      * formed.
      */
-    static std::unique_ptr<QueryRequest> makeFromFindCommand(
-        const BSONObj& cmdObj, bool isExplain, boost::optional<NamespaceString> nss = boost::none);
+    static std::unique_ptr<QueryRequest> makeFromFindCommand(const BSONObj& cmdObj,
+                                                             bool isExplain,
+                                                             boost::optional<NamespaceString> nss,
+                                                             bool apiStrict);
+
+    static std::unique_ptr<QueryRequest> makeFromFindCommandForTests(
+        const BSONObj& cmdObj,
+        bool isExplain,
+        boost::optional<NamespaceString> nss = boost::none,
+        bool apiStrict = false);
 
     /**
      * If _uuid exists for this QueryRequest, update the value of _nss.
@@ -107,21 +115,6 @@ public:
      * satisfied by aggregation, a non-OK status is returned and 'cmdBuilder' is not modified.
      */
     StatusWith<BSONObj> asAggregationCommand() const;
-
-    /**
-     * Parses maxTimeMS from the BSONElement containing its value.
-     * The field name of the 'maxTimeMSElt' is used to determine what maximum value to enforce for
-     * the provided max time. 'maxTimeMSOpOnly' needs a slightly higher max value than regular
-     * 'maxTimeMS' to account for the case where a user provides the max possible value for
-     * 'maxTimeMS' to one server process (mongod or mongos), then that server process passes the max
-     * time on to another server as 'maxTimeMSOpOnly', but after adding a small amount to the max
-     * time to account for clock precision.  This can push the 'maxTimeMSOpOnly' sent to the mongod
-     * over the max value allowed for users to provide. This is safe because 'maxTimeMSOpOnly' is
-     * only allowed to be provided for internal intra-cluster requests.
-     */
-    static StatusWith<int> parseMaxTimeMS(BSONElement maxTimeMSElt);
-
-    static int32_t parseMaxTimeMSForIDL(BSONElement maxTimeMSElt);
 
     /**
      * Helper function to identify text search sort key

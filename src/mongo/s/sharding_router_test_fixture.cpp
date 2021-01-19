@@ -257,7 +257,7 @@ void ShardingTestFixture::expectGetShards(const std::vector<ShardType>& shards) 
 
         // If there is no '$db', append it.
         auto cmd = OpMsgRequest::fromDBAndBody(nss.db(), request.cmdObj).body;
-        auto query = QueryRequest::makeFromFindCommand(cmd, false, nss);
+        auto query = QueryRequest::makeFromFindCommandForTests(cmd, false, nss);
         ASSERT_EQ(query->nss(), ShardType::ConfigNS);
 
         ASSERT_BSONOBJ_EQ(query->getFilter(), BSONObj());

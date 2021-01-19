@@ -36,6 +36,7 @@
 #include "mongo/db/commands/map_reduce_gen.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/pipeline.h"
 
 namespace mongo::map_reduce_common {
 

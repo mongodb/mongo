@@ -68,9 +68,10 @@ void QueryRequest::refreshNSS(const NamespaceString& nss) {
 
 // static
 std::unique_ptr<QueryRequest> QueryRequest::makeFromFindCommand(
-    const BSONObj& cmdObj, bool isExplain, boost::optional<NamespaceString> nss) {
+    const BSONObj& cmdObj, bool isExplain, boost::optional<NamespaceString> nss, bool apiStrict) {
+
     auto qr = std::make_unique<QueryRequest>(
-        FindCommand::parse(IDLParserErrorContext("FindCommand"), cmdObj));
+        FindCommand::parse(IDLParserErrorContext("FindCommand", apiStrict), cmdObj));
 
     // If there is an explicit namespace specified overwite it.
     if (nss) {
@@ -91,6 +92,11 @@ std::unique_ptr<QueryRequest> QueryRequest::makeFromFindCommand(
     }
     uassertStatusOK(qr->validate());
     return qr;
+}
+
+std::unique_ptr<QueryRequest> QueryRequest::makeFromFindCommandForTests(
+    const BSONObj& cmdObj, bool isExplain, boost::optional<NamespaceString> nss, bool apiStrict) {
+    return makeFromFindCommand(cmdObj, isExplain, nss, apiStrict);
 }
 
 BSONObj QueryRequest::asFindCommand() const {
@@ -206,38 +212,6 @@ Status QueryRequest::validate() const {
 }
 
 // static
-StatusWith<int> QueryRequest::parseMaxTimeMS(BSONElement maxTimeMSElt) {
-    if (!maxTimeMSElt.eoo() && !maxTimeMSElt.isNumber()) {
-        return StatusWith<int>(
-            ErrorCodes::BadValue,
-            (StringBuilder() << maxTimeMSElt.fieldNameStringData() << " must be a number").str());
-    }
-    long long maxTimeMSLongLong = maxTimeMSElt.safeNumberLong();  // returns 0 on EOO
-
-    const long long maxVal = maxTimeMSElt.fieldNameStringData() == kMaxTimeMSOpOnlyField
-        ? (long long)(INT_MAX) + kMaxTimeMSOpOnlyMaxPadding
-        : INT_MAX;
-    if (maxTimeMSLongLong < 0 || maxTimeMSLongLong > maxVal) {
-        return StatusWith<int>(ErrorCodes::BadValue,
-                               (StringBuilder()
-                                << maxTimeMSLongLong << " value for "
-                                << maxTimeMSElt.fieldNameStringData() << " is out of range")
-                                   .str());
-    }
-    double maxTimeMSDouble = maxTimeMSElt.numberDouble();
-    if (maxTimeMSElt.type() == mongo::NumberDouble && floor(maxTimeMSDouble) != maxTimeMSDouble) {
-        return StatusWith<int>(
-            ErrorCodes::BadValue,
-            (StringBuilder() << maxTimeMSElt.fieldNameStringData() << " has non-integral value")
-                .str());
-    }
-    return StatusWith<int>(static_cast<int>(maxTimeMSLongLong));
-}
-
-int32_t QueryRequest::parseMaxTimeMSForIDL(BSONElement maxTimeMSElt) {
-    return static_cast<int32_t>(uassertStatusOK(QueryRequest::parseMaxTimeMS(maxTimeMSElt)));
-}
-
 bool QueryRequest::isTextScoreMeta(BSONElement elt) {
     // elt must be foo: {$meta: "textScore"}
     if (mongo::Object != elt.type()) {
