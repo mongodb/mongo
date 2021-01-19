@@ -9074,7 +9074,6 @@ buildvariants:
   - name: .jscore .common !.compat !.decimal !.sharding
   - name: jsCore_auth
   - name: .jstestfuzz .common
-  - name: .jstestfuzz_multiversion_gen
   - name: libunwind_tests
   - name: .logical_session_cache .one_sec
   - name: .multiversion_fuzzer
@@ -12882,7 +12881,6 @@ buildvariants:
   - name: .aggfuzzer .common
   - name: free_monitoring
   - name: .jstestfuzz !.initsync
-  - name: .jstestfuzz_multiversion_gen
 
 - name: ubuntu1804-debug-ubsan
   display_name: ~ UBSAN Enterprise Ubuntu 18.04 DEBUG
