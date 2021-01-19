@@ -589,6 +589,9 @@ Status TenantOplogApplier::_applyOplogBatchPerWorker(std::vector<const OplogEntr
     tenantMigrationRecipientInfo(opCtx.get()) =
         boost::make_optional<TenantMigrationRecipientInfo>(_migrationUuid);
 
+    // Set this to satisfy low-level locking invariants.
+    opCtx->lockState()->setShouldConflictWithSecondaryBatchApplication(false);
+
     const bool allowNamespaceNotFoundErrorsOnCrudOps(true);
     auto status = OplogApplierUtils::applyOplogBatchCommon(
         opCtx.get(),

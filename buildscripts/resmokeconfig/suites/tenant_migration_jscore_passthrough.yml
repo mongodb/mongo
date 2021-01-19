@@ -122,9 +122,6 @@ executor:
             mode: alwaysOn
             data:
               blockTimeMS: 250
-        # TODO SERVER-53312: Remove the failpoint 'returnResponseOkForRecipientSyncDataCmd'.
-        failpoint.returnResponseOkForRecipientSyncDataCmd:
-            mode: alwaysOn
         # Set the delay before migration state machine is garbage collected to be short to avoid
         # migration conflicts since the ContinuousTenantMigration hook migrates a single tenant
         # between the replica sets in the fixture.
