@@ -1318,36 +1318,41 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogApplierFails) {
     auto opCtx = makeOperationContext();
     std::shared_ptr<TenantMigrationRecipientService::Instance> instance;
     {
-        FailPointEnableBlock fp("pauseBeforeRunTenantMigrationRecipientInstance");
-        // Create and start the instance.
-        instance = TenantMigrationRecipientService::Instance::getOrCreate(
-            opCtx.get(), _service, initialStateDocument.toBSON());
-        ASSERT(instance.get());
-        instance->setCreateOplogFetcherFn_forTest(std::make_unique<CreateOplogFetcherMockFn>());
+        // Use this failpoint to avoid races between the test thread accessing the oplogFetcher and
+        // the migration instance freeing the oplogFetcher on errors.
+        FailPointEnableBlock taskFp("hangBeforeTaskCompletion");
+        {
+            FailPointEnableBlock fp("pauseBeforeRunTenantMigrationRecipientInstance");
+            // Create and start the instance.
+            instance = TenantMigrationRecipientService::Instance::getOrCreate(
+                opCtx.get(), _service, initialStateDocument.toBSON());
+            ASSERT(instance.get());
+            instance->setCreateOplogFetcherFn_forTest(std::make_unique<CreateOplogFetcherMockFn>());
+        }
+
+        LOGV2(4881208,
+              "Waiting for recipient service to reach consistent state",
+              "suite"_attr = _agent.getSuiteName(),
+              "test"_attr = _agent.getTestName());
+        instance->waitUntilMigrationReachesConsistentState(opCtx.get());
+
+        checkStateDocPersisted(opCtx.get(), instance.get());
+        // The oplog fetcher should exist and be running.
+        auto oplogFetcher = checked_cast<OplogFetcherMock*>(getDonorOplogFetcher(instance.get()));
+        ASSERT_TRUE(oplogFetcher != nullptr);
+        ASSERT_TRUE(oplogFetcher->isActive());
+
+        // Send an oplog entry not from our tenant, which should cause the oplog applier to assert.
+        auto oplogEntry = makeOplogEntry(injectedEntryOpTime,
+                                         OpTypeEnum::kInsert,
+                                         NamespaceString("admin.bogus"),
+                                         UUID::gen(),
+                                         BSON("_id"
+                                              << "bad insert"),
+                                         boost::none /* o2 */);
+        oplogFetcher->receiveBatch(
+            1LL, {oplogEntry.getEntry().toBSON()}, injectedEntryOpTime.getTimestamp());
     }
-
-    LOGV2(4881208,
-          "Waiting for recipient service to reach consistent state",
-          "suite"_attr = _agent.getSuiteName(),
-          "test"_attr = _agent.getTestName());
-    instance->waitUntilMigrationReachesConsistentState(opCtx.get());
-
-    checkStateDocPersisted(opCtx.get(), instance.get());
-    // The oplog fetcher should exist and be running.
-    auto oplogFetcher = checked_cast<OplogFetcherMock*>(getDonorOplogFetcher(instance.get()));
-    ASSERT_TRUE(oplogFetcher != nullptr);
-    ASSERT_TRUE(oplogFetcher->isActive());
-
-    // Send an oplog entry not from our tenant, which should cause the oplog applier to assert.
-    auto oplogEntry = makeOplogEntry(injectedEntryOpTime,
-                                     OpTypeEnum::kInsert,
-                                     NamespaceString("admin.bogus"),
-                                     UUID::gen(),
-                                     BSON("_id"
-                                          << "bad insert"),
-                                     boost::none /* o2 */);
-    oplogFetcher->receiveBatch(
-        1LL, {oplogEntry.getEntry().toBSON()}, injectedEntryOpTime.getTimestamp());
 
     // Wait for task completion failure.
     ASSERT_NOT_OK(instance->getDataSyncCompletionFuture().getNoThrow());
