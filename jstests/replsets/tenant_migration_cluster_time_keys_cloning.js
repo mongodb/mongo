@@ -2,7 +2,8 @@
  * Test that tenant migration donor and recipient correctly copy each other cluster time keys into
  * their admin.system.external_validation_keys collection.
  *
- * @tags: [requires_fcv_47, requires_majority_read_concern, incompatible_with_eft]
+ * @tags: [requires_fcv_47, requires_majority_read_concern, incompatible_with_eft,
+ * incompatible_with_windows_tls]
  */
 
 (function() {

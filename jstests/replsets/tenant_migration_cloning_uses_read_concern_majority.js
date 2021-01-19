@@ -1,7 +1,7 @@
 /**
  * Tests that in a tenant migration, the recipient primary will use majority read concern when
  * cloning documents from the donor.
- * @tags: [requires_majority_read_concern, requires_fcv_49]
+ * @tags: [requires_majority_read_concern, requires_fcv_49, incompatible_with_windows_tls]
  */
 
 (function() {

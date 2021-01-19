@@ -5,7 +5,8 @@
  * commit the transaction even if the migration enters the blocking state while the applyOps oplog
  * entries are being written.
  *
- * @tags: [requires_fcv_47, requires_majority_read_concern, incompatible_with_eft]
+ * @tags: [requires_fcv_47, requires_majority_read_concern, incompatible_with_eft,
+ * incompatible_with_windows_tls]
  */
 
 (function() {

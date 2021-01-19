@@ -1,7 +1,7 @@
 /**
  * Tests a full tenant migration, assuming no failover.
  *
- * @tags: [requires_fcv_47, requires_majority_read_concern]
+ * @tags: [requires_fcv_47, requires_majority_read_concern, incompatible_with_windows_tls]
  */
 
 (function() {

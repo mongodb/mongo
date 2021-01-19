@@ -1,7 +1,7 @@
 /**
  * Tests that in tenant migration, the recipient set can resume collection cloning from the last
  * document cloned after a failover even if the collection has been renamed on the donor.
- * @tags: [requires_majority_read_concern, requires_fcv_49]
+ * @tags: [requires_majority_read_concern, requires_fcv_49, incompatible_with_windows_tls]
  */
 
 (function() {

@@ -2,7 +2,8 @@
  * Tests that the tenant migration donor authenticates as client to recipient using the
  * migration-specific x.509 certificate, and vice versa.
  *
- * @tags: [requires_fcv_47, requires_majority_read_concern, incompatible_with_eft]
+ * @tags: [requires_fcv_47, requires_majority_read_concern, incompatible_with_eft,
+ * incompatible_with_windows_tls]
  */
 
 (function() {

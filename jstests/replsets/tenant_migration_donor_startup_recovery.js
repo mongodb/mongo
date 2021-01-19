@@ -5,7 +5,7 @@
  * Tenant migrations are not expected to be run on servers with ephemeralForTest.
  *
  * @tags: [requires_fcv_47, requires_majority_read_concern, requires_persistence,
- * incompatible_with_eft]
+ * incompatible_with_eft, incompatible_with_windows_tls]
  */
 
 (function() {

@@ -4,7 +4,7 @@
  * connection string matches the donor's connection string or doesn't correspond to a replica set
  * with a least one host.
  *
- * @tags: [requires_fcv_47]
+ * @tags: [requires_fcv_47, incompatible_with_windows_tls]
  */
 
 (function() {
