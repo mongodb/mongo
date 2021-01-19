@@ -670,15 +670,6 @@ void CommandHelpers::evaluateFailCommandFailPoint(OperationContext* opCtx,
                     data.getObjectField(kErrorLabelsFieldName).getOwned());
             }
 
-            if (closeConnection) {
-                opCtx->getClient()->session()->end();
-                LOGV2(20431,
-                      "Failing {command} via 'failCommand' failpoint: closing connection",
-                      "Failing command via 'failCommand' failpoint: closing connection",
-                      "command"_attr = cmd->getName());
-                uasserted(50985, "Failing command due to 'failCommand' failpoint");
-            }
-
             if (blockConnection) {
                 long long blockTimeMS = 0;
                 uassert(ErrorCodes::InvalidOptions,
@@ -699,6 +690,15 @@ void CommandHelpers::evaluateFailCommandFailPoint(OperationContext* opCtx,
                       "Unblocking {command} via 'failCommand' failpoint",
                       "Unblocking command via 'failCommand' failpoint",
                       "command"_attr = cmd->getName());
+            }
+
+            if (closeConnection) {
+                opCtx->getClient()->session()->end();
+                LOGV2(20431,
+                      "Failing {command} via 'failCommand' failpoint: closing connection",
+                      "Failing command via 'failCommand' failpoint: closing connection",
+                      "command"_attr = cmd->getName());
+                uasserted(50985, "Failing command due to 'failCommand' failpoint");
             }
 
             if (hasExtraInfo) {
