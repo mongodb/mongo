@@ -295,18 +295,21 @@ void createSlimOplogView(OperationContext* opCtx, Database* db) {
 }
 
 BSONObj getSlimOplogPipeline() {
-    return BSON("$project" << BSON(
-                    "_id"
-                    << "$ts"
-                    << "op" << 1 << "o"
-                    << BSON("applyOps" << BSON("ui" << 1 << "destinedRecipient" << 1)) << "ts" << 1
-                    << "prevOpTime.ts"
-                    << BSON("$cond" << BSON("if" << BSON("$eq" << BSON_ARRAY(BSON("$type"
-                                                                                  << "$stmtId")
-                                                                             << "missing"))
-                                                 << "then"
-                                                 << "$prevOpTime.ts"
-                                                 << "else" << Timestamp::min()))));
+    return fromjson(
+        "{$project: {\
+            _id: '$ts',\
+            op: 1,\
+            o: {\
+                applyOps: {ui: 1, destinedRecipient: 1},\
+                abortTransaction: 1\
+            },\
+            ts: 1,\
+            'prevOpTime.ts': {$cond: {\
+                if: {$eq: [{$type: '$stmtId'}, 'missing']},\
+                then: '$prevOpTime.ts',\
+                else: Timestamp(0, 0)\
+            }}\
+        }}");
 }
 
 std::unique_ptr<Pipeline, PipelineDeleter> createOplogFetchingPipelineForResharding(

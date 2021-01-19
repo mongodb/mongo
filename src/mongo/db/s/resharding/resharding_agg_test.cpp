@@ -1025,8 +1025,7 @@ TEST_F(ReshardingAggTest, VerifyPipelinePreparedTxnAbort) {
             {"ts" : {"$timestamp" : {"t" : 1609800492, "i" : 4}}, "t" : {"$numberLong" : "1"}}
     })"))};
 
-    // TODO(SERVER-53625): uncomment the following code when this ticket is completed.
-    // auto clusterTime = pipelineSource.back().getDocument()["ts"].getTimestamp();
+    auto clusterTime = pipelineSource.back().getDocument()["ts"].getTimestamp();
     auto pipeline = createPipeline(pipelineSource);
 
     auto doc = pipeline->getNext();
@@ -1035,14 +1034,14 @@ TEST_F(ReshardingAggTest, VerifyPipelinePreparedTxnAbort) {
     auto oplogEntry = uassertStatusOK(repl::OplogEntry::parse(doc->toBson()));
 
     ASSERT(oplogEntry.isCommand());
-    // ASSERT(repl::OplogEntry::CommandType::kAbortTransaction == oplogEntry.getCommandType());
-    // ASSERT_FALSE(oplogEntry.shouldPrepare());
-    // ASSERT_FALSE(oplogEntry.isPartialTransaction());
-    // ASSERT_EQ(pipelineSource[1].getDocument()["ts"].getTimestamp(), oplogEntry.getTimestamp());
-    // ASSERT(validateOplogId(clusterTime, pipelineSource[1].getDocument(), oplogEntry));
+    ASSERT(repl::OplogEntry::CommandType::kAbortTransaction == oplogEntry.getCommandType());
+    ASSERT_FALSE(oplogEntry.shouldPrepare());
+    ASSERT_FALSE(oplogEntry.isPartialTransaction());
+    ASSERT_EQ(pipelineSource[1].getDocument()["ts"].getTimestamp(), oplogEntry.getTimestamp());
+    ASSERT(validateOplogId(clusterTime, pipelineSource[1].getDocument(), oplogEntry));
 
-    // doc = pipeline->getNext();
-    // ASSERT(!doc);
+    doc = pipeline->getNext();
+    ASSERT(!doc);
 }
 
 TEST_F(ReshardingAggTest, VerifyPipelineLargePreparedTxn) {
@@ -1259,8 +1258,7 @@ TEST_F(ReshardingAggTest, VerifyPipelineLargePreparedTxnAbort) {
         }
     })"))};
 
-    // TODO(SERVER-53625): uncomment the following code when this ticket is completed.
-    // auto clusterTime = pipelineSource.back().getDocument()["ts"].getTimestamp();
+    auto clusterTime = pipelineSource.back().getDocument()["ts"].getTimestamp();
     auto pipeline = createPipeline(pipelineSource);
 
     auto doc = pipeline->getNext();
@@ -1269,15 +1267,14 @@ TEST_F(ReshardingAggTest, VerifyPipelineLargePreparedTxnAbort) {
     auto oplogEntry = uassertStatusOK(repl::OplogEntry::parse(doc->toBson()));
 
     ASSERT(oplogEntry.isCommand());
-    // TODO(SERVER-53625): uncomment the following code when this ticket is completed.
-    // ASSERT(repl::OplogEntry::CommandType::kAbortTransaction == oplogEntry.getCommandType());
-    // ASSERT_FALSE(oplogEntry.shouldPrepare());
-    // ASSERT_FALSE(oplogEntry.isPartialTransaction());
-    // ASSERT_EQ(pipelineSource[2].getDocument()["ts"].getTimestamp(), oplogEntry.getTimestamp());
-    // ASSERT(validateOplogId(clusterTime, pipelineSource[2].getDocument(), oplogEntry));
+    ASSERT(repl::OplogEntry::CommandType::kAbortTransaction == oplogEntry.getCommandType());
+    ASSERT_FALSE(oplogEntry.shouldPrepare());
+    ASSERT_FALSE(oplogEntry.isPartialTransaction());
+    ASSERT_EQ(pipelineSource[2].getDocument()["ts"].getTimestamp(), oplogEntry.getTimestamp());
+    ASSERT(validateOplogId(clusterTime, pipelineSource[2].getDocument(), oplogEntry));
 
-    // doc = pipeline->getNext();
-    // ASSERT(!doc);
+    doc = pipeline->getNext();
+    ASSERT(!doc);
 }
 
 TEST_F(ReshardingAggTest, VerifyPipelineLargeTxn) {
@@ -1436,8 +1433,7 @@ TEST_F(ReshardingAggTest, VerifyPipelineLargeTxnAbort) {
         }
     })"))};
 
-    // TODO(SERVER-53625): uncomment the following code when this ticket is completed.
-    // auto clusterTime = pipelineSource.back().getDocument()["ts"].getTimestamp();
+    auto clusterTime = pipelineSource.back().getDocument()["ts"].getTimestamp();
     auto pipeline = createPipeline(pipelineSource);
 
     auto doc = pipeline->getNext();
@@ -1445,16 +1441,15 @@ TEST_F(ReshardingAggTest, VerifyPipelineLargeTxnAbort) {
 
     auto oplogEntry = uassertStatusOK(repl::OplogEntry::parse(doc->toBson()));
 
-    // TODO(SERVER-53625): uncomment the following code when this ticket is completed.
     ASSERT(oplogEntry.isCommand());
-    // ASSERT(repl::OplogEntry::CommandType::kAbortTransaction == oplogEntry.getCommandType());
-    // ASSERT_FALSE(oplogEntry.shouldPrepare());
-    // ASSERT_FALSE(oplogEntry.isPartialTransaction());
-    // ASSERT_EQ(pipelineSource[1].getDocument()["ts"].getTimestamp(), oplogEntry.getTimestamp());
-    // ASSERT(validateOplogId(clusterTime, pipelineSource[1].getDocument(), oplogEntry));
+    ASSERT(repl::OplogEntry::CommandType::kAbortTransaction == oplogEntry.getCommandType());
+    ASSERT_FALSE(oplogEntry.shouldPrepare());
+    ASSERT_FALSE(oplogEntry.isPartialTransaction());
+    ASSERT_EQ(pipelineSource[1].getDocument()["ts"].getTimestamp(), oplogEntry.getTimestamp());
+    ASSERT(validateOplogId(clusterTime, pipelineSource[1].getDocument(), oplogEntry));
 
-    // doc = pipeline->getNext();
-    // ASSERT(!doc);
+    doc = pipeline->getNext();
+    ASSERT(!doc);
 }
 
 TEST_F(ReshardingAggTest, VerifyPipelineLargeTxnIncomplete) {
