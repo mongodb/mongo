@@ -238,7 +238,7 @@ void TenantMigrationAccessBlocker::setCommitOpTime(OperationContext* opCtx, repl
           "tenantId"_attr = _tenantId,
           "commitOpTime"_attr = opTime);
 
-    if (opTime < repl::ReplicationCoordinator::get(opCtx)->getCurrentCommittedSnapshotOpTime()) {
+    if (opTime > repl::ReplicationCoordinator::get(opCtx)->getCurrentCommittedSnapshotOpTime()) {
         return;
     }
 
@@ -261,7 +261,7 @@ void TenantMigrationAccessBlocker::setAbortOpTime(OperationContext* opCtx, repl:
           "tenantId"_attr = _tenantId,
           "abortOpTime"_attr = opTime);
 
-    if (opTime < repl::ReplicationCoordinator::get(opCtx)->getCurrentCommittedSnapshotOpTime()) {
+    if (opTime > repl::ReplicationCoordinator::get(opCtx)->getCurrentCommittedSnapshotOpTime()) {
         return;
     }
 
