@@ -1807,8 +1807,8 @@ void initTimestampFromOplog(OperationContext* opCtx, const NamespaceString& oplo
     }
 }
 
-void clearLocalOplogPtr() {
-    LocalOplogInfo::get(getGlobalServiceContext())->resetCollection();
+void clearLocalOplogPtr(ServiceContext* service) {
+    LocalOplogInfo::get(service)->resetCollection();
 }
 
 void acquireOplogCollectionForLogging(OperationContext* opCtx) {

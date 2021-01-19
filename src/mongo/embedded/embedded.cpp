@@ -53,6 +53,7 @@
 #include "mongo/db/op_observer_impl.h"
 #include "mongo/db/op_observer_registry.h"
 #include "mongo/db/repl/storage_interface_impl.h"
+#include "mongo/db/s/collection_sharding_state_factory_standalone.h"
 #include "mongo/db/service_liaison_mongod.h"
 #include "mongo/db/session_killer.h"
 #include "mongo/db/sessions_collection_standalone.h"
@@ -135,13 +136,21 @@ GlobalInitializerRegisterer filterAllowedIndexFieldNamesEmbeddedInitializer(
     DeinitializerFunction(nullptr),
     {},
     {"FilterAllowedIndexFieldNames"});
+
+ServiceContext::ConstructorActionRegisterer collectionShardingStateFactoryRegisterer{
+    "CollectionShardingStateFactory",
+    [](ServiceContext* service) {
+        CollectionShardingStateFactory::set(
+            service, std::make_unique<CollectionShardingStateFactoryStandalone>(service));
+    },
+    [](ServiceContext* service) { CollectionShardingStateFactory::clear(service); }};
+
 }  // namespace
 
 using logv2::LogComponent;
 using std::endl;
 
 void shutdown(ServiceContext* srvContext) {
-
     {
         ThreadClient tc(srvContext);
         auto const client = Client::getCurrent();

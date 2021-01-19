@@ -107,7 +107,6 @@ void IndexCatalogImpl::setCollection(Collection* collection) {
     _collection = collection;
 }
 
-
 Status IndexCatalogImpl::init(OperationContext* opCtx) {
     vector<string> indexNames;
     auto durableCatalog = DurableCatalog::get(opCtx);

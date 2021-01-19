@@ -51,6 +51,7 @@
 #include "mongo/transport/service_entry_point_impl.h"
 
 namespace mongo {
+
 OpMsgFuzzerFixture::OpMsgFuzzerFixture(bool skipGlobalInitializers) {
     if (!skipGlobalInitializers) {
         auto ret = runGlobalInitializers(std::vector<std::string>{});
@@ -89,7 +90,7 @@ OpMsgFuzzerFixture::OpMsgFuzzerFixture(bool skipGlobalInitializers) {
 
     auto replCoord = std::make_unique<repl::ReplicationCoordinatorMock>(_serviceContext);
     invariant(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
-    repl::ReplicationCoordinator::set(getGlobalServiceContext(), std::move(replCoord));
+    repl::ReplicationCoordinator::set(_serviceContext, std::move(replCoord));
 }
 
 int OpMsgFuzzerFixture::testOneInput(const char* Data, size_t Size) {
@@ -115,4 +116,5 @@ int OpMsgFuzzerFixture::testOneInput(const char* Data, size_t Size) {
 
     return 0;
 }
+
 }  // namespace mongo

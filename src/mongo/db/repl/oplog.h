@@ -136,7 +136,7 @@ std::vector<OpTime> logInsertOps(OperationContext* opCtx,
 OpTime logOp(OperationContext* opCtx, MutableOplogEntry* oplogEntry);
 
 // Flush out the cached pointer to the oplog.
-void clearLocalOplogPtr();
+void clearLocalOplogPtr(ServiceContext* service);
 
 /**
  * Establish the cached pointer to the local oplog.

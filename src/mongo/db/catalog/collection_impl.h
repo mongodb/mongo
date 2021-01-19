@@ -449,6 +449,7 @@ private:
         AtomicWord<bool> _committed{true};
     };
 
+    ServiceContext* const _service;
 
     NamespaceString _ns;
     RecordId _catalogId;

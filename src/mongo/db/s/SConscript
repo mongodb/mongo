@@ -12,6 +12,7 @@ env.Library(
     target='sharding_api_d',
     source=[
         'collection_metadata.cpp',
+        'collection_sharding_state_factory_standalone.cpp',
         'collection_sharding_state.cpp',
         'database_sharding_state.cpp',
         'operation_sharding_state.cpp',
@@ -49,7 +50,6 @@ env.Library(
         'chunk_splitter.cpp',
         'collection_sharding_runtime.cpp',
         'collection_sharding_state_factory_shard.cpp',
-        'collection_sharding_state_factory_standalone.cpp',
         'config_server_op_observer.cpp',
         'metadata_manager.cpp',
         'migration_chunk_cloner_source_legacy.cpp',
@@ -174,16 +174,6 @@ env.Library(
         '$BUILD_DIR/mongo/s/async_requests_sender',
         '$BUILD_DIR/mongo/s/common_s',
         '$BUILD_DIR/mongo/s/grid',
-        'sharding_api_d',
-    ],
-)
-
-env.Library(
-    target='sharding_runtime_d_embedded',
-    source=[
-        'collection_sharding_state_factory_embedded.cpp',
-    ],
-    LIBDEPS=[
         'sharding_api_d',
     ],
 )
