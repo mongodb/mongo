@@ -175,7 +175,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateOptimizedOplo
                                             true /* forward */,
                                             yieldPolicy,
                                             csn->nodeId(),
-                                            std::move(lockAcquisitionCallback),
+                                            lockAcquisitionCallback,
                                             makeOpenCallbackIfNeeded(collection, csn));
 
     // Start the scan from the seekRecordId if we can use the oplogStartHack.
