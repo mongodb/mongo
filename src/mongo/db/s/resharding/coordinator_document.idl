@@ -84,3 +84,13 @@ structs:
             recipientShards:
                 type: array<RecipientShardEntry>
                 description: "The list of all recipient shards for this resharding operation."
+            zones:
+                type: array<object_owned>
+                description: "The zones associated with the new shard key."
+                optional: true
+            presetReshardedChunks:
+                type: array<object_owned>
+                description: >-
+                    Mapping of chunk ranges to be used as the initial split output. This is only
+                    for testing purposes.
+                optional: true         

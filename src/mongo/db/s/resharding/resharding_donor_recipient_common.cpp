@@ -78,11 +78,17 @@ void processReshardingFieldsForDonorCollection(OperationContext* opCtx,
         return;
     }
 
-    // If a resharding operation is past state kPreparingToDonate but does not currently have a
+    // If a resharding operation is BEFORE state kPreparingToDonate, then the config.collections
+    // entry won't have yet been created for the temporary resharding collection. The
+    // DonorStateMachine refreshes the temporary resharding collection immediately after being
+    // constructed. Accordingly, we avoid constructing the DonorStateMachine until the collection
+    // entry for the temporary resharding collection is known to exist.
+    //
+    // If a resharding operation is PAST state kPreparingToDonate, but does not currently have a
     // donor document in-memory, this means that the document will be recovered by the
-    // ReshardingDonorService, and at that time the latest instance of 'reshardingFields' will be
-    // read. Return no-op.
-    if (reshardingFields.getState() > CoordinatorStateEnum::kPreparingToDonate) {
+    // ReshardingDonorService. Accordingly, at time-of-recovery, the latest instance of
+    // 'reshardingFields' will be read. Return no-op.
+    if (reshardingFields.getState() != CoordinatorStateEnum::kPreparingToDonate) {
         return;
     }
 

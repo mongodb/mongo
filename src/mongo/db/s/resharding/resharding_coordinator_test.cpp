@@ -138,7 +138,7 @@ protected:
         // Only the chunk corresponding to shard0000 is stored as a donor in the coordinator state
         // document constructed.
         auto donorChunk = chunks[0];
-        insertChunkAndZoneEntries({donorChunk}, {});
+        insertChunkAndZoneEntries(chunks, {});
         return donorChunk;
     }
 
@@ -252,6 +252,14 @@ protected:
                           expectedCoordinatorDoc.getFetchTimestamp().get());
         } else {
             ASSERT(!coordinatorDoc.getFetchTimestamp());
+        }
+
+        if (!expectedCoordinatorDoc.getPresetReshardedChunks()) {
+            ASSERT(!coordinatorDoc.getPresetReshardedChunks());
+        }
+
+        if (!expectedCoordinatorDoc.getZones()) {
+            ASSERT(!coordinatorDoc.getZones());
         }
 
         auto expectedDonorShards = expectedCoordinatorDoc.getDonorShards();
@@ -477,6 +485,7 @@ protected:
         // Create original collection's catalog entry as well as both config.chunks and config.tags
         // collections.
         {
+            setupDatabase("db", ShardId("shard0000"), true);
             auto opCtx = operationContext();
             DBDirectClient client(opCtx);
 
@@ -496,8 +505,25 @@ protected:
             client.createCollection(TagsType::ConfigNS.ns());
         }
 
-        resharding::writeInitialStateAndCatalogUpdates(
-            opCtx, expectedCoordinatorDoc, initialChunks, newZones);
+        resharding::insertCoordDocAndChangeOrigCollEntry(opCtx, expectedCoordinatorDoc);
+
+        auto shardsAndChunks =
+            resharding::calculateParticipantShardsAndChunks(opCtx, expectedCoordinatorDoc);
+
+        expectedCoordinatorDoc.setDonorShards(std::move(shardsAndChunks.donorShards));
+        expectedCoordinatorDoc.setRecipientShards(std::move(shardsAndChunks.recipientShards));
+
+        expectedCoordinatorDoc.setState(CoordinatorStateEnum::kPreparingToDonate);
+
+        std::vector<BSONObj> zones;
+        if (expectedCoordinatorDoc.getZones()) {
+            zones = std::move(expectedCoordinatorDoc.getZones().get());
+        }
+        expectedCoordinatorDoc.setZones(boost::none);
+        expectedCoordinatorDoc.setPresetReshardedChunks(boost::none);
+
+        resharding::writeParticipantShardsAndTempCollInfo(
+            opCtx, expectedCoordinatorDoc, initialChunks, zones);
 
         // Check that config.reshardingOperations and config.collections entries are updated
         // correctly
@@ -622,11 +648,17 @@ TEST_F(ReshardingCoordinatorPersistenceTest, WriteInitialInfoSucceeds) {
 
     auto initialChunks =
         makeChunks(_tempNss, _tempEpoch, _newShardKey, std::vector{OID::gen(), OID::gen()});
+
     auto newZones = makeZones(_tempNss, _newShardKey);
+    std::vector<BSONObj> zonesBSON;
+    for (const auto& zone : newZones) {
+        zonesBSON.push_back(zone.toBSON());
+    }
 
     // Persist the updates on disk
     auto expectedCoordinatorDoc = coordinatorDoc;
-    expectedCoordinatorDoc.setState(CoordinatorStateEnum::kPreparingToDonate);
+    expectedCoordinatorDoc.setState(CoordinatorStateEnum::kInitializing);
+    expectedCoordinatorDoc.setZones(zonesBSON);
 
     writeInitialStateAndCatalogUpdatesExpectSuccess(
         operationContext(), expectedCoordinatorDoc, initialChunks, newZones);
@@ -735,18 +767,15 @@ TEST_F(ReshardingCoordinatorPersistenceTest, StateTransitionWhenCoordinatorDocDo
 TEST_F(ReshardingCoordinatorPersistenceTest,
        WriteInitialStateOriginalNamespaceCatalogEntryMissingFails) {
     auto coordinatorDoc = makeCoordinatorDoc(CoordinatorStateEnum::kInitializing);
-    auto initialChunks =
-        makeChunks(_tempNss, _tempEpoch, _newShardKey, std::vector{OID::gen(), OID::gen()});
-    auto newZones = makeZones(_tempNss, _newShardKey);
 
     auto expectedCoordinatorDoc = coordinatorDoc;
     expectedCoordinatorDoc.setState(CoordinatorStateEnum::kPreparingToDonate);
 
     // Do not create the config.collections entry for the original collection
-    ASSERT_THROWS_CODE(resharding::writeInitialStateAndCatalogUpdates(
-                           operationContext(), coordinatorDoc, initialChunks, newZones),
-                       AssertionException,
-                       ErrorCodes::NamespaceNotFound);
+    ASSERT_THROWS_CODE(
+        resharding::insertCoordDocAndChangeOrigCollEntry(operationContext(), coordinatorDoc),
+        AssertionException,
+        ErrorCodes::NamespaceNotFound);
 }
 
 }  // namespace

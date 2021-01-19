@@ -41,17 +41,31 @@
 #include "mongo/util/future.h"
 
 namespace mongo {
+
 namespace resharding {
+
+struct ParticipantShardsAndChunks {
+    std::vector<DonorShardEntry> donorShards;
+    std::vector<RecipientShardEntry> recipientShards;
+    std::vector<ChunkType> initialChunks;
+};
+
 CollectionType createTempReshardingCollectionType(
     OperationContext* opCtx,
     const ReshardingCoordinatorDocument& coordinatorDoc,
     const ChunkVersion& chunkVersion,
     const BSONObj& collation);
 
-void writeInitialStateAndCatalogUpdates(OperationContext* opCtx,
-                                        const ReshardingCoordinatorDocument& coordinatorDoc,
-                                        std::vector<ChunkType> initialChunks,
-                                        std::vector<TagsType> newZones);
+void insertCoordDocAndChangeOrigCollEntry(OperationContext* opCtx,
+                                          const ReshardingCoordinatorDocument& coordinatorDoc);
+
+ParticipantShardsAndChunks calculateParticipantShardsAndChunks(
+    OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc);
+
+void writeParticipantShardsAndTempCollInfo(OperationContext* opCtx,
+                                           const ReshardingCoordinatorDocument& coordinatorDoc,
+                                           std::vector<ChunkType> initialChunks,
+                                           std::vector<BSONObj> zones);
 
 void writeDecisionPersistedState(OperationContext* opCtx,
                                  const ReshardingCoordinatorDocument& coordinatorDoc,
@@ -122,9 +136,6 @@ public:
         return boost::none;
     }
 
-    void setInitialChunksAndZones(std::vector<ChunkType> initialChunks,
-                                  std::vector<TagsType> newZones);
-
     std::shared_ptr<ReshardingCoordinatorObserver> getObserver();
 
 private:
@@ -135,15 +146,25 @@ private:
 
     /**
      * Does the following writes:
-     * 1. Inserts coordinator state document into config.reshardingOperations
+     * 1. Inserts the coordinator document into config.reshardingOperations
      * 2. Adds reshardingFields to the config.collections entry for the original collection
+     *
+     * Transitions to 'kInitializing'.
+     */
+    void _insertCoordDocAndChangeOrigCollEntry();
+
+    /**
+     * Calculates the participant shards and target chunks under the new shard key, then does the
+     * following writes:
+     * 1. Updates the coordinator state to 'kPreparingToDonate'.
+     * 2. Updates reshardingFields to reflect the state change on the original collection entry.
      * 3. Inserts an entry into config.collections for the temporary collection
      * 4. Inserts entries into config.chunks for ranges based on the new shard key
      * 5. Upserts entries into config.tags for any zones associated with the new shard key
      *
-     * Transitions to 'kInitialized'.
+     * Transitions to 'kPreparingToDonate'.
      */
-    ExecutorFuture<void> _init(const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
+    void _calculateParticipantsAndChunksThenWriteToDisk();
 
     /**
      * Waits on _reshardingCoordinatorObserver to notify that all donors have picked a
@@ -241,11 +262,6 @@ private:
 
     // Protects promises below.
     mutable Mutex _mutex = MONGO_MAKE_LATCH("ReshardingCoordinatorService::_mutex");
-
-    // Promise containing the initial chunks and new zones based on the new shard key. These are
-    // not a part of the state document, so must be set by configsvrReshardCollection after
-    // construction.
-    SharedPromise<ChunksAndZones> _initialChunksAndZonesPromise;
 
     // Promise that is resolved when the chain of work kicked off by run() has completed.
     SharedPromise<void> _completionPromise;

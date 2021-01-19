@@ -117,13 +117,37 @@ void assertNumDocsModifiedMatchesExpected(const BatchedCommandRequest& request,
             expected == numDocsModified);
 }
 
+void appendShardEntriesToSetBuilder(const ReshardingCoordinatorDocument& coordinatorDoc,
+                                    BSONObjBuilder& setBuilder) {
+    BSONArrayBuilder donorShards(
+        setBuilder.subarrayStart(ReshardingCoordinatorDocument::kDonorShardsFieldName));
+    for (const auto& donorShard : coordinatorDoc.getDonorShards()) {
+        donorShards.append(donorShard.toBSON());
+    }
+    donorShards.doneFast();
+
+    BSONArrayBuilder recipientShards(
+        setBuilder.subarrayStart(ReshardingCoordinatorDocument::kRecipientShardsFieldName));
+    for (const auto& recipientShard : coordinatorDoc.getRecipientShards()) {
+        recipientShards.append(recipientShard.toBSON());
+    }
+    recipientShards.doneFast();
+}
+
+void unsetInitializingFields(BSONObjBuilder& updateBuilder) {
+    BSONObjBuilder unsetBuilder(updateBuilder.subobjStart("$unset"));
+    unsetBuilder.append(ReshardingCoordinatorDocument::kPresetReshardedChunksFieldName, "");
+    unsetBuilder.append(ReshardingCoordinatorDocument::kZonesFieldName, "");
+    unsetBuilder.doneFast();
+}
+
 void writeToCoordinatorStateNss(OperationContext* opCtx,
                                 const ReshardingCoordinatorDocument& coordinatorDoc,
                                 TxnNumber txnNumber) {
     BatchedCommandRequest request([&] {
         auto nextState = coordinatorDoc.getState();
         switch (nextState) {
-            case CoordinatorStateEnum::kPreparingToDonate:
+            case CoordinatorStateEnum::kInitializing:
                 // Insert the new coordinator document.
                 return buildInsertOp(NamespaceString::kConfigReshardingOperationsNamespace,
                                      std::vector<BSONObj>{coordinatorDoc.toBSON()});
@@ -142,10 +166,17 @@ void writeToCoordinatorStateNss(OperationContext* opCtx,
                     // Always update the state field.
                     setBuilder.append(ReshardingCoordinatorDocument::kStateFieldName,
                                       CoordinatorState_serializer(coordinatorDoc.getState()));
+
                     if (auto fetchTimestamp = coordinatorDoc.getFetchTimestamp()) {
                         // If the fetchTimestamp exists, include it in the update.
                         setBuilder.append(ReshardingCoordinatorDocument::kFetchTimestampFieldName,
                                           *fetchTimestamp);
+                    }
+
+                    if (nextState == CoordinatorStateEnum::kPreparingToDonate) {
+                        appendShardEntriesToSetBuilder(coordinatorDoc, setBuilder);
+                        setBuilder.doneFast();
+                        unsetInitializingFields(updateBuilder);
                     }
                 }
 
@@ -203,7 +234,7 @@ BSONObj createReshardingFieldsUpdateForOriginalNss(
     boost::optional<Timestamp> newCollectionTimestamp) {
     auto nextState = coordinatorDoc.getState();
     switch (nextState) {
-        case CoordinatorStateEnum::kPreparingToDonate: {
+        case CoordinatorStateEnum::kInitializing: {
             // Append 'reshardingFields' to the config.collections entry for the original nss
             TypeCollectionReshardingFields originalEntryReshardingFields(coordinatorDoc.get_id());
             originalEntryReshardingFields.setState(coordinatorDoc.getState());
@@ -345,7 +376,7 @@ void writeToConfigCollectionsForTempNss(OperationContext* opCtx,
 
 void insertChunkAndTagDocsForTempNss(OperationContext* opCtx,
                                      std::vector<ChunkType> initialChunks,
-                                     std::vector<TagsType> newZones,
+                                     std::vector<BSONObj> newZones,
                                      TxnNumber txnNumber) {
     // Insert new initial chunk documents for temp nss
     std::vector<BSONObj> initialChunksBSON(initialChunks.size());
@@ -357,14 +388,8 @@ void insertChunkAndTagDocsForTempNss(OperationContext* opCtx,
     ShardingCatalogManager::get(opCtx)->insertConfigDocumentsInTxn(
         opCtx, ChunkType::ConfigNS, std::move(initialChunksBSON), txnNumber);
 
-    // Insert tag documents for temp nss
-    std::vector<BSONObj> zonesBSON(newZones.size());
-    std::transform(newZones.begin(), newZones.end(), zonesBSON.begin(), [](TagsType chunk) {
-        return chunk.toBSON();
-    });
-
     ShardingCatalogManager::get(opCtx)->insertConfigDocumentsInTxn(
-        opCtx, TagsType::ConfigNS, std::move(zonesBSON), txnNumber);
+        opCtx, TagsType::ConfigNS, newZones, txnNumber);
 }
 
 void removeChunkAndTagsDocsForOriginalNss(OperationContext* opCtx,
@@ -465,6 +490,19 @@ stdx::unordered_map<CoordinatorStateEnum, ParticipantsToNotifyEnum> notifyForSta
 };
 
 /**
+ * Executes metadata changes in a transaction.
+ */
+void executeMetadataChangesInTxn(
+    OperationContext* opCtx,
+    unique_function<void(OperationContext*, TxnNumber)> changeMetadataFunc) {
+    ShardingCatalogManager::withTransaction(opCtx,
+                                            NamespaceString::kConfigReshardingOperationsNamespace,
+                                            [&](OperationContext* opCtx, TxnNumber txnNumber) {
+                                                changeMetadataFunc(opCtx, txnNumber);
+                                            });
+}
+
+/**
  * Runs resharding metadata changes in a transaction.
  *
  * This function should only be called if donor and recipient shards DO NOT need to be informed of
@@ -481,11 +519,7 @@ void executeStateTransitionAndMetadataChangesInTxn(
 
     // Neither donors nor recipients need to be informed of the transition to
     // updatedCoordinatorDoc's state.
-    ShardingCatalogManager::withTransaction(opCtx,
-                                            NamespaceString::kConfigReshardingOperationsNamespace,
-                                            [&](OperationContext* opCtx, TxnNumber txnNumber) {
-                                                changeMetadataFunc(opCtx, txnNumber);
-                                            });
+    executeMetadataChangesInTxn(opCtx, std::move(changeMetadataFunc));
 }
 
 /**
@@ -560,33 +594,130 @@ CollectionType createTempReshardingCollectionType(
     return collType;
 }
 
-void writeInitialStateAndCatalogUpdates(OperationContext* opCtx,
-                                        const ReshardingCoordinatorDocument& coordinatorDoc,
-                                        std::vector<ChunkType> initialChunks,
-                                        std::vector<TagsType> newZones) {
+void insertCoordDocAndChangeOrigCollEntry(OperationContext* opCtx,
+                                          const ReshardingCoordinatorDocument& coordinatorDoc) {
     auto originalCollType = Grid::get(opCtx)->catalogClient()->getCollection(
         opCtx, coordinatorDoc.getNss(), repl::ReadConcernLevel::kMajorityReadConcern);
     const auto collation = originalCollType.getDefaultCollation();
 
-    bumpShardVersionsThenExecuteStateTransitionAndMetadataChangesInTxn(
-        opCtx, coordinatorDoc, [&](OperationContext* opCtx, TxnNumber txnNumber) {
-            // Insert state doc to config.reshardingOperations.
-            writeToCoordinatorStateNss(opCtx, coordinatorDoc, txnNumber);
+    executeMetadataChangesInTxn(opCtx, [&](OperationContext* opCtx, TxnNumber txnNumber) {
+        // Insert the coordinator document to config.reshardingOperations.
+        writeToCoordinatorStateNss(opCtx, coordinatorDoc, txnNumber);
 
-            // Update the config.collections entry for the original collection to include
-            // 'reshardingFields'
+        // Update the config.collections entry for the original collection to include
+        // 'reshardingFields'
+        updateConfigCollectionsForOriginalNss(
+            opCtx, coordinatorDoc, boost::none, boost::none, txnNumber);
+    });
+}
+
+ChunkVersion calculateChunkVersionForInitialChunks(OperationContext* opCtx) {
+    boost::optional<Timestamp> timestamp;
+    if (feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        const auto now = VectorClock::get(opCtx)->getTime();
+        timestamp = now.clusterTime().asTimestamp();
+    }
+
+    return ChunkVersion(1, 0, OID::gen(), timestamp);
+}
+
+std::vector<DonorShardEntry> constructDonorShardEntries(const std::set<ShardId>& donorShardIds) {
+    std::vector<DonorShardEntry> donorShards;
+    std::transform(donorShardIds.begin(),
+                   donorShardIds.end(),
+                   std::back_inserter(donorShards),
+                   [](const ShardId& shardId) -> DonorShardEntry {
+                       DonorShardEntry entry{shardId};
+                       entry.setState(DonorStateEnum::kUnused);
+                       return entry;
+                   });
+    return donorShards;
+}
+
+std::vector<RecipientShardEntry> constructRecipientShardEntries(
+    const std::set<ShardId>& recipientShardIds) {
+    std::vector<RecipientShardEntry> recipientShards;
+    std::transform(recipientShardIds.begin(),
+                   recipientShardIds.end(),
+                   std::back_inserter(recipientShards),
+                   [](const ShardId& shardId) -> RecipientShardEntry {
+                       RecipientShardEntry entry{shardId};
+                       entry.setState(RecipientStateEnum::kUnused);
+                       return entry;
+                   });
+    return recipientShards;
+}
+
+ParticipantShardsAndChunks calculateParticipantShardsAndChunks(
+    OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc) {
+    const auto cm = uassertStatusOK(
+        Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(
+            opCtx, coordinatorDoc.getNss()));
+
+    std::set<ShardId> donorShardIds;
+    cm.getAllShardIds(&donorShardIds);
+
+    std::set<ShardId> recipientShardIds;
+    std::vector<ChunkType> initialChunks;
+
+    auto version = calculateChunkVersionForInitialChunks(opCtx);
+
+    if (const auto& chunks = coordinatorDoc.getPresetReshardedChunks()) {
+        // Use the provided shardIds from presetReshardedChunks to construct the
+        // recipient list.
+        for (const BSONObj& obj : *chunks) {
+            recipientShardIds.emplace(
+                obj.getStringField(ReshardedChunk::kRecipientShardIdFieldName));
+
+            auto reshardedChunk =
+                ReshardedChunk::parse(IDLParserErrorContext("ReshardedChunk"), obj);
+            initialChunks.emplace_back(coordinatorDoc.getTempReshardingNss(),
+                                       ChunkRange{reshardedChunk.getMin(), reshardedChunk.getMax()},
+                                       version,
+                                       reshardedChunk.getRecipientShardId());
+            version.incMinor();
+        }
+    } else {
+        // No presetReshardedChunks were provided, make the recipients list be the same as
+        // the donors list by default.
+        recipientShardIds = donorShardIds;
+
+        cm.forEachChunk([&](const auto& chunk) {
+            // TODO SERVER-49526 Change the range to refer to the new shard key pattern.
+            initialChunks.emplace_back(coordinatorDoc.getTempReshardingNss(),
+                                       ChunkRange{chunk.getMin(), chunk.getMax()},
+                                       version,
+                                       chunk.getShardId());
+            version.incMinor();
+            return true;
+        });
+    }
+
+    return {constructDonorShardEntries(donorShardIds),
+            constructRecipientShardEntries(recipientShardIds),
+            initialChunks};
+}
+
+void writeParticipantShardsAndTempCollInfo(
+    OperationContext* opCtx,
+    const ReshardingCoordinatorDocument& updatedCoordinatorDoc,
+    std::vector<ChunkType> initialChunks,
+    std::vector<BSONObj> zones) {
+    bumpShardVersionsThenExecuteStateTransitionAndMetadataChangesInTxn(
+        opCtx, updatedCoordinatorDoc, [&](OperationContext* opCtx, TxnNumber txnNumber) {
+            // Update on-disk state to reflect latest state transition.
+            writeToCoordinatorStateNss(opCtx, updatedCoordinatorDoc, txnNumber);
             updateConfigCollectionsForOriginalNss(
-                opCtx, coordinatorDoc, boost::none, boost::none, txnNumber);
+                opCtx, updatedCoordinatorDoc, boost::none, boost::none, txnNumber);
 
             // Insert the config.collections entry for the temporary resharding collection. The
             // chunks all have the same epoch, so picking the last chunk here is arbitrary.
             auto chunkVersion = initialChunks.back().getVersion();
             writeToConfigCollectionsForTempNss(
-                opCtx, coordinatorDoc, chunkVersion, collation, txnNumber);
+                opCtx, updatedCoordinatorDoc, chunkVersion, CollationSpec::kSimpleSpec, txnNumber);
 
-            // Insert new initial chunk and tag documents.
-            insertChunkAndTagDocsForTempNss(
-                opCtx, std::move(initialChunks), std::move(newZones), txnNumber);
+            insertChunkAndTagDocsForTempNss(opCtx, std::move(initialChunks), zones, txnNumber);
         });
 }
 
@@ -692,7 +823,6 @@ ReshardingCoordinatorService::ReshardingCoordinator::ReshardingCoordinator(const
 
 ReshardingCoordinatorService::ReshardingCoordinator::~ReshardingCoordinator() {
     stdx::lock_guard<Latch> lg(_mutex);
-    invariant(_initialChunksAndZonesPromise.getFuture().isReady());
     invariant(_completionPromise.getFuture().isReady());
 }
 
@@ -700,7 +830,8 @@ SemiFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::run(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancelationToken& token) noexcept {
     return ExecutorFuture<void>(**executor)
-        .then([this, executor] { return _init(executor); })
+        .then([this, executor] { _insertCoordDocAndChangeOrigCollEntry(); })
+        .then([this, executor] { _calculateParticipantsAndChunksThenWriteToDisk(); })
         .then([this, executor] { _tellAllDonorsToRefresh(executor); })
         .then([this, executor] { return _awaitAllDonorsReadyToDonate(executor); })
         .then([this, executor] { _tellAllRecipientsToRefresh(executor); })
@@ -760,9 +891,6 @@ SemiFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::run(
 void ReshardingCoordinatorService::ReshardingCoordinator::interrupt(Status status) {
     // Resolve any unresolved promises to avoid hanging.
     stdx::lock_guard<Latch> lg(_mutex);
-    if (!_initialChunksAndZonesPromise.getFuture().isReady()) {
-        _initialChunksAndZonesPromise.setError(status);
-    }
 
     _reshardingCoordinatorObserver->interrupt(status);
 
@@ -771,48 +899,55 @@ void ReshardingCoordinatorService::ReshardingCoordinator::interrupt(Status statu
     }
 }
 
-void ReshardingCoordinatorService::ReshardingCoordinator::setInitialChunksAndZones(
-    std::vector<ChunkType> initialChunks, std::vector<TagsType> newZones) {
-    stdx::lock_guard<Latch> lg(_mutex);
-    if (_coordinatorDoc.getState() > CoordinatorStateEnum::kInitializing ||
-        _initialChunksAndZonesPromise.getFuture().isReady()) {
-        return;
-    }
-
-    _initialChunksAndZonesPromise.emplaceValue(
-        ChunksAndZones{std::move(initialChunks), std::move(newZones)});
-}
-
 std::shared_ptr<ReshardingCoordinatorObserver>
 ReshardingCoordinatorService::ReshardingCoordinator::getObserver() {
     return _reshardingCoordinatorObserver;
 }
 
-ExecutorFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::_init(
-    const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
-    if (_coordinatorDoc.getState() > CoordinatorStateEnum::kInitializing) {
-        return ExecutorFuture<void>(**executor, Status::OK());
+void ReshardingCoordinatorService::ReshardingCoordinator::_insertCoordDocAndChangeOrigCollEntry() {
+    if (_coordinatorDoc.getState() > CoordinatorStateEnum::kUnused) {
+        return;
     }
 
-    return _initialChunksAndZonesPromise.getFuture()
-        .thenRunOn(**executor)
-        .then([this](ChunksAndZones initialChunksAndZones) {
-            auto initialChunks = std::move(initialChunksAndZones.initialChunks);
-            auto newZones = std::move(initialChunksAndZones.newZones);
+    auto opCtx = cc().makeOperationContext();
+    ReshardingCoordinatorDocument updatedCoordinatorDoc = _coordinatorDoc;
+    updatedCoordinatorDoc.setState(CoordinatorStateEnum::kInitializing);
 
-            // Create state document that will be written to disk and afterward set to the in-memory
-            // _coordinatorDoc
-            ReshardingCoordinatorDocument updatedCoordinatorDoc = _coordinatorDoc;
-            updatedCoordinatorDoc.setState(CoordinatorStateEnum::kPreparingToDonate);
-
-            auto opCtx = cc().makeOperationContext();
-            resharding::writeInitialStateAndCatalogUpdates(
-                opCtx.get(), updatedCoordinatorDoc, std::move(initialChunks), std::move(newZones));
-
-            invariant(_coordinatorDoc.getState() == CoordinatorStateEnum::kInitializing);
-            _coordinatorDoc = updatedCoordinatorDoc;
-        });
+    resharding::insertCoordDocAndChangeOrigCollEntry(opCtx.get(), updatedCoordinatorDoc);
+    _coordinatorDoc = updatedCoordinatorDoc;
 }
+
+void ReshardingCoordinatorService::ReshardingCoordinator::
+    _calculateParticipantsAndChunksThenWriteToDisk() {
+    if (_coordinatorDoc.getState() > CoordinatorStateEnum::kInitializing) {
+        return;
+    }
+
+    auto opCtx = cc().makeOperationContext();
+    ReshardingCoordinatorDocument updatedCoordinatorDoc = _coordinatorDoc;
+
+    auto shardsAndChunks =
+        resharding::calculateParticipantShardsAndChunks(opCtx.get(), updatedCoordinatorDoc);
+
+    updatedCoordinatorDoc.setDonorShards(std::move(shardsAndChunks.donorShards));
+    updatedCoordinatorDoc.setRecipientShards(std::move(shardsAndChunks.recipientShards));
+    updatedCoordinatorDoc.setState(CoordinatorStateEnum::kPreparingToDonate);
+
+    // Remove the presetReshardedChunks and zones from the coordinator document to reduce
+    // the possibility of the document reaching the BSONObj size constraint.
+    std::vector<BSONObj> zones;
+    if (updatedCoordinatorDoc.getZones()) {
+        zones = std::move(updatedCoordinatorDoc.getZones().get());
+    }
+    updatedCoordinatorDoc.setPresetReshardedChunks(boost::none);
+    updatedCoordinatorDoc.setZones(boost::none);
+
+    resharding::writeParticipantShardsAndTempCollInfo(opCtx.get(),
+                                                      updatedCoordinatorDoc,
+                                                      std::move(shardsAndChunks.initialChunks),
+                                                      std::move(zones));
+    _coordinatorDoc = updatedCoordinatorDoc;
+};
 
 ExecutorFuture<void>
 ReshardingCoordinatorService::ReshardingCoordinator::_awaitAllDonorsReadyToDonate(
