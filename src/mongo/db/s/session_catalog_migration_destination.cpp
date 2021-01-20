@@ -319,7 +319,6 @@ void SessionCatalogMigrationDestination::start(ServiceContext* service) {
         stdx::lock_guard<Latch> lk(_mutex);
         invariant(_state == State::NotStarted);
         _state = State::Migrating;
-        _isStateChanged.notify_all();
     }
 
     _thread = stdx::thread([=] {
@@ -343,7 +342,6 @@ void SessionCatalogMigrationDestination::finish() {
     stdx::lock_guard<Latch> lk(_mutex);
     if (_state != State::ErrorOccurred) {
         _state = State::Committing;
-        _isStateChanged.notify_all();
     }
 }
 
@@ -422,7 +420,6 @@ void SessionCatalogMigrationDestination::_retrieveSessionStateFromSource(Service
                     // Note: only transition to "ready to commit" if state is not error/force stop.
                     if (_state == State::Migrating) {
                         _state = State::ReadyToCommit;
-                        _isStateChanged.notify_all();
                     }
                 }
 
@@ -448,7 +445,6 @@ void SessionCatalogMigrationDestination::_retrieveSessionStateFromSource(Service
     {
         stdx::lock_guard<Latch> lk(_mutex);
         _state = State::Done;
-        _isStateChanged.notify_all();
     }
 }
 
@@ -461,8 +457,6 @@ void SessionCatalogMigrationDestination::_errorOccurred(StringData errMsg) {
     stdx::lock_guard<Latch> lk(_mutex);
     _state = State::ErrorOccurred;
     _errMsg = errMsg.toString();
-
-    _isStateChanged.notify_all();
 }
 
 SessionCatalogMigrationDestination::State SessionCatalogMigrationDestination::getState() {
