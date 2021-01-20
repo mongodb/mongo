@@ -618,44 +618,46 @@ private:
     void _downgradeCollectionsAndChunksMetadataToPre49(OperationContext* opCtx);
 
     /**
-     * Creates a 'timestamp' field for the entry matching nss in config.collections, in a
+     * Sets the 'timestamp' field for the entry matching nss in config.collections, in a
      * transaction.
      *
      * TODO SERVER-53283: Remove once 5.0 has been released.
      */
-    void _createCollectionTimestampFor49InTxn(OperationContext* opCtx,
-                                              const NamespaceString& nss,
-                                              TxnNumber txnNumber);
+    void _addTimestampToConfigCollectionsFor49InTxn(OperationContext* opCtx,
+                                                    const NamespaceString& nss,
+                                                    TxnNumber txnNumber,
+                                                    const Timestamp& newTimestamp);
 
     /**
      * Deletes the 'timestamp' from the entry in config.collections matching nss, in a transaction.
      *
      * TODO SERVER-53283: Remove once 5.0 has been released.
      */
-    void _deleteConfigCollectionsTimestampInTxn(OperationContext* opCtx,
-                                                const NamespaceString& nss,
-                                                TxnNumber txnNumber);
+    void _deleteTimestampFromConfigCollectionsInTxn(OperationContext* opCtx,
+                                                    const NamespaceString& nss,
+                                                    TxnNumber txnNumber);
 
     /**
-     * Sets the 'collectionUuid' field for the entries matching nss in config.chunks, in a
-     * transaction.
+     * Sets the 'timestamp' and the 'collectionUuid' fields for the entries matching nss in
+     * config.chunks, in a transaction.
      *
      * TODO SERVER-53283: Remove once 5.0 has been released.
      */
-    void _createChunkCollUuidFor49InTxn(OperationContext* opCtx,
-                                        const NamespaceString& nss,
-                                        const mongo::UUID& collectionUuid,
-                                        TxnNumber txnNumber);
+    void _addTimestampAndUUIDToConfigChunksFor49InTxn(OperationContext* opCtx,
+                                                      const NamespaceString& nss,
+                                                      const mongo::UUID& collectionUuid,
+                                                      TxnNumber txnNumber,
+                                                      const Timestamp& newTimestamp);
 
     /**
-     * Deletes the 'collectionUuid' field for the entries matching nss in config.chunks, in a
-     * transaction.
+     * Deletes the 'timestamp' and 'collectionUuid' field for the entries matching nss in
+     * config.chunks, in a transaction.
      *
      * TODO SERVER-53283: Remove once 5.0 has been released.
      */
-    void _deleteChunkCollUuidInTxn(OperationContext* opCtx,
-                                   const NamespaceString& nss,
-                                   TxnNumber txnNumber);
+    void _deleteTimestampAndUUIDFromConfigChunksInTxn(OperationContext* opCtx,
+                                                      const NamespaceString& nss,
+                                                      TxnNumber txnNumber);
 
     // The owning service context
     ServiceContext* const _serviceContext;

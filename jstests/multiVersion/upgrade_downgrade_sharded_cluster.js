@@ -99,6 +99,10 @@ function testAllowedMigrationsFieldChecksAfterFCVDowngrade() {
 function testTimestampFieldSetup() {
     assert.commandWorked(
         st.s.adminCommand({shardCollection: 'sharded.test3_created_before_upgrade', key: {x: 1}}));
+    assert.commandWorked(
+        st.s.adminCommand({split: 'sharded.test3_created_before_upgrade', middle: {x: 10}}));
+    assert.commandWorked(
+        st.s.adminCommand({split: 'sharded.test3_created_before_upgrade', middle: {x: -10}}));
 }
 
 function testTimestampFieldChecksAfterUpgrade() {
@@ -127,6 +131,13 @@ function testTimestampFieldChecksAfterUpgrade() {
 
     // TODO: After SERVER-52587, check that the timestamp in the shardsvr config.cache.collection
     // exists and matches collTimestampInConfigSvr
+
+    // Check that 'timestamp' has been created in config.chunks
+    var cursor = st.config.chunks.find({ns: 'sharded.test3_created_before_upgrade'});
+    assert(cursor.hasNext());
+    do {
+        assert.eq(collTimestampInConfigSvr, cursor.next().lastmodTimestamp);
+    } while (cursor.hasNext());
 }
 
 function testTimestampFieldSetupBeforeDowngrade() {
@@ -157,6 +168,13 @@ function testTimestampFieldChecksAfterFCVDowngrade() {
             .cache.collections.findOne({_id: 'sharded.test3_created_before_upgrade'})
             .timestamp;
     assert.eq(null, timestampInShard);
+
+    // Check that the 'timestamp' has been removed from config.chunks
+    var cursor = st.config.chunks.find({ns: 'sharded.test3_created_before_upgrade'});
+    assert(cursor.hasNext());
+    do {
+        assert.eq(null, cursor.next().lastmodTimestamp);
+    } while (cursor.hasNext());
 
     // TODO: After SERVER-52587, this is no longer needed as we can just check with
     // test3_created_before_upgrade.

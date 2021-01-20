@@ -6,22 +6,23 @@
  * The test can only run when the featureFlagShardingFullDDLSupportTimestampedVersion feature flag
  * is enabled. Tagging as multiversion_incompatible until SERVER-52588 is done.
  *
- * @tags: [requires_fcv_47, multiversion_incompatible,
- * featureFlagShardingFullDDLSupportTimestampedVersion]
+ * @tags: [multiversion_incompatible, featureFlagShardingFullDDLSupportTimestampedVersion]
  */
 
 (function() {
 'use strict';
 
-function checkConfigSvrAndShardCollectionTimestampConsistent(nss) {
-    let csrs_config_db = st.configRS.getPrimary().getDB('config');
-    coll = csrs_config_db.collections.findOne({_id: nss});
-    let timestampInConfigSvr = coll.timestamp;
-    assert.neq(null, timestampInConfigSvr);
+function checkTimestampConsistencyInPersistentMetadata(nss, timestampInConfig) {
+    // Checking consistency on local shard collection: config.cache.collections
     let timestampInShard =
-        st.shard0.getDB('config').cache.collections.findOne({_id: kNs}).timestamp;
+        st.shard0.getDB('config').cache.collections.findOne({_id: nss}).timestamp;
     assert.neq(null, timestampInShard);
-    assert.eq(timestampCmp(timestampInShard, timestampInConfigSvr), 0);
+    assert.eq(timestampCmp(timestampInConfig, timestampInShard), 0);
+
+    // Checking consistency on config server collection: config.chunks
+    var cursor = st.config.chunks.find({ns: nss});
+    assert(cursor.hasNext());
+    assert.eq(timestampInConfig, cursor.next().lastmodTimestamp);
 }
 
 const kDbName = 'testdb';
@@ -51,7 +52,7 @@ assert.commandWorked(st.s.adminCommand({shardCollection: kNs, key: {x: 1}}));
 let coll = csrs_config_db.collections.findOne({_id: kNs});
 assert.neq(null, coll.timestamp);
 let timestampAfterCreate = coll.timestamp;
-checkConfigSvrAndShardCollectionTimestampConsistent(kNs);
+checkTimestampConsistencyInPersistentMetadata(kNs, timestampAfterCreate);
 
 // Drop the collection and create it again. Collection timestamp should then be updated.
 st.s.getDB(kDbName).coll.drop();
@@ -60,7 +61,7 @@ coll = csrs_config_db.collections.findOne({_id: kNs});
 assert.neq(null, coll.timestamp);
 let timestampAfterDropCreate = coll.timestamp;
 assert.eq(timestampCmp(timestampAfterDropCreate, timestampAfterCreate), 1);
-checkConfigSvrAndShardCollectionTimestampConsistent(kNs);
+checkTimestampConsistencyInPersistentMetadata(kNs, timestampAfterDropCreate);
 
 // Refine sharding key. Collection timestamp should then be updated.
 assert.commandWorked(st.s.getCollection(kNs).createIndex({x: 1, y: 1}));
@@ -69,7 +70,7 @@ coll = csrs_config_db.collections.findOne({_id: kNs});
 assert.neq(null, coll.timestamp);
 let timestampAfterRefine = coll.timestamp;
 assert.eq(timestampCmp(timestampAfterRefine, timestampAfterDropCreate), 1);
-checkConfigSvrAndShardCollectionTimestampConsistent(kNs);
+checkTimestampConsistencyInPersistentMetadata(kNs, timestampAfterRefine);
 
 st.stop();
 })();

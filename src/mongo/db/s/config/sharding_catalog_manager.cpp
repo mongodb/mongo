@@ -651,8 +651,10 @@ void ShardingCatalogManager::_upgradeCollectionsAndChunksMetadataFor49(Operation
         const auto nss = coll.getNss();
 
         auto updateCollectionAndChunksFn = [&](OperationContext* opCtx, TxnNumber txnNumber) {
-            _createChunkCollUuidFor49InTxn(opCtx, nss, uuid, txnNumber);
-            _createCollectionTimestampFor49InTxn(opCtx, nss, txnNumber);
+            const auto now = VectorClock::get(opCtx)->getTime();
+            const auto newTimestamp = now.clusterTime().asTimestamp();
+            _addTimestampAndUUIDToConfigChunksFor49InTxn(opCtx, nss, uuid, txnNumber, newTimestamp);
+            _addTimestampToConfigCollectionsFor49InTxn(opCtx, nss, txnNumber, newTimestamp);
         };
 
         withTransaction(opCtx, nss, updateCollectionAndChunksFn);
@@ -689,8 +691,8 @@ void ShardingCatalogManager::_downgradeCollectionsAndChunksMetadataToPre49(
         const auto nss = coll.getNss();
 
         auto updateCollectionAndChunksFn = [&](OperationContext* opCtx, TxnNumber txnNumber) {
-            _deleteConfigCollectionsTimestampInTxn(opCtx, nss, txnNumber);
-            _deleteChunkCollUuidInTxn(opCtx, nss, txnNumber);
+            _deleteTimestampFromConfigCollectionsInTxn(opCtx, nss, txnNumber);
+            _deleteTimestampAndUUIDFromConfigChunksInTxn(opCtx, nss, txnNumber);
         };
 
         withTransaction(opCtx, nss, updateCollectionAndChunksFn);
@@ -700,19 +702,18 @@ void ShardingCatalogManager::_downgradeCollectionsAndChunksMetadataToPre49(
     LOGV2(5276703, "Successfully downgraded config.collections and config.chunks");
 }
 
-void ShardingCatalogManager::_createCollectionTimestampFor49InTxn(OperationContext* opCtx,
-                                                                  const NamespaceString& nss,
-                                                                  TxnNumber txnNumber) {
-    auto now = VectorClock::get(opCtx)->getTime();
-    auto clusterTime = now.clusterTime().asTimestamp();
-
+void ShardingCatalogManager::_addTimestampToConfigCollectionsFor49InTxn(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    TxnNumber txnNumber,
+    const Timestamp& newTimestamp) {
     try {
         writeToConfigDocumentInTxn(
             opCtx,
             CollectionType::ConfigNS,
             buildUpdateOp(CollectionType::ConfigNS,
                           BSON(CollectionType::kNssFieldName << nss.ns()),
-                          BSON("$set" << BSON(CollectionType::kTimestampFieldName << clusterTime)),
+                          BSON("$set" << BSON(CollectionType::kTimestampFieldName << newTimestamp)),
                           false, /* upsert */
                           false  /* multi */
                           ),
@@ -724,9 +725,9 @@ void ShardingCatalogManager::_createCollectionTimestampFor49InTxn(OperationConte
     }
 }
 
-void ShardingCatalogManager::_deleteConfigCollectionsTimestampInTxn(OperationContext* opCtx,
-                                                                    const NamespaceString& nss,
-                                                                    TxnNumber txnNumber) {
+void ShardingCatalogManager::_deleteTimestampFromConfigCollectionsInTxn(OperationContext* opCtx,
+                                                                        const NamespaceString& nss,
+                                                                        TxnNumber txnNumber) {
     try {
         writeToConfigDocumentInTxn(
             opCtx,
@@ -745,10 +746,12 @@ void ShardingCatalogManager::_deleteConfigCollectionsTimestampInTxn(OperationCon
     }
 }
 
-void ShardingCatalogManager::_createChunkCollUuidFor49InTxn(OperationContext* opCtx,
-                                                            const NamespaceString& nss,
-                                                            const mongo::UUID& collectionUuid,
-                                                            TxnNumber txnNumber) {
+void ShardingCatalogManager::_addTimestampAndUUIDToConfigChunksFor49InTxn(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const mongo::UUID& collectionUuid,
+    TxnNumber txnNumber,
+    const Timestamp& newTimestamp) {
     try {
         writeToConfigDocumentInTxn(
             opCtx,
@@ -756,7 +759,8 @@ void ShardingCatalogManager::_createChunkCollUuidFor49InTxn(OperationContext* op
             buildUpdateOp(
                 ChunkType::ConfigNS,
                 BSON(ChunkType::ns(nss.ns())),
-                BSON("$set" << BSON(ChunkType::collectionUUID(collectionUuid.toString()))),
+                BSON("$set" << BSON(ChunkType::timestamp(newTimestamp)
+                                    << ChunkType::collectionUUID(collectionUuid.toString()))),
                 false, /* upsert */
                 true   /* multi */
                 ),
@@ -768,16 +772,16 @@ void ShardingCatalogManager::_createChunkCollUuidFor49InTxn(OperationContext* op
     }
 }
 
-void ShardingCatalogManager::_deleteChunkCollUuidInTxn(OperationContext* opCtx,
-                                                       const NamespaceString& nss,
-                                                       TxnNumber txnNumber) {
+void ShardingCatalogManager::_deleteTimestampAndUUIDFromConfigChunksInTxn(
+    OperationContext* opCtx, const NamespaceString& nss, TxnNumber txnNumber) {
     try {
         writeToConfigDocumentInTxn(
             opCtx,
             ChunkType::ConfigNS,
             buildUpdateOp(ChunkType::ConfigNS,
                           BSON(ChunkType::ns(nss.ns())),
-                          BSON("$unset" << BSON(ChunkType::collectionUUID(""))),
+                          BSON("$unset" << BSON(ChunkType::timestamp.name()
+                                                << "" << ChunkType::collectionUUID(""))),
                           false, /* upsert */
                           true   /* multi */
                           ),
