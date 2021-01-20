@@ -35,6 +35,8 @@
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/util/string_map.h"
 
+#include <queue>
+
 namespace mongo {
 class BucketCatalog {
 public:
@@ -220,7 +222,7 @@ private:
 
         // Promises for committers to fulfill in order to signal to waiters that their measurements
         // have been committed.
-        stdx::unordered_map<uint16_t, Promise<CommitInfo>> promises;
+        std::queue<Promise<CommitInfo>> promises;
 
         // Whether the bucket is full. This can be due to number of measurements, size, or time
         // range.
@@ -249,6 +251,8 @@ private:
         long long numWaits = 0;
         long long numMeasurementsCommitted = 0;
     };
+
+    class ServerStatus;
 
     mutable Mutex _mutex = MONGO_MAKE_LATCH("BucketCatalog");
 

@@ -21,6 +21,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog/database_holder',
+        '$BUILD_DIR/mongo/db/commands/server_status',
         '$BUILD_DIR/mongo/db/views/views',
         'timeseries_idl',
     ],

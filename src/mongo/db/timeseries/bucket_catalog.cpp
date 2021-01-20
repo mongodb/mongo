@@ -32,6 +32,7 @@
 #include "mongo/db/timeseries/bucket_catalog.h"
 
 #include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/commands/server_status.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/views/view_catalog.h"
 
@@ -135,12 +136,28 @@ BucketCatalog::InsertResult BucketCatalog::insert(OperationContext* opCtx,
 
     if (!bucket->ns.isEmpty() && isBucketFull()) {
         // The bucket is full, so create a new one.
-        bucket->full = true;
+        if (bucket->numPendingCommitMeasurements == 0 &&
+            bucket->numCommittedMeasurements == bucket->numMeasurements) {
+            // The bucket does not contain any measurements that are yet to be committed, so we can
+            // remove it now. Otherwise, we must keep the bucket around until it is committed.
+            _buckets.erase(it->second);
+        } else {
+            bucket->full = true;
+        }
         it->second = createNewBucketId();
         _orderedBuckets.insert({ns, it->first.second, it->second});
         bucket = &_buckets[it->second];
         bucket->calculateBucketFieldsAndSizeChange(
             doc, options.getMetaField(), &newFieldNamesToBeInserted, &sizeToBeAdded);
+    }
+
+    // If this is the first uncommitted measurement, the caller is the committer. Otherwise, it is a
+    // waiter.
+    boost::optional<Future<CommitInfo>> commitInfoFuture;
+    if (bucket->numMeasurements > bucket->numCommittedMeasurements) {
+        auto [promise, future] = makePromiseFuture<CommitInfo>();
+        bucket->promises.push(std::move(promise));
+        commitInfoFuture = std::move(future);
     }
 
     bucket->numWriters++;
@@ -155,15 +172,6 @@ BucketCatalog::InsertResult BucketCatalog::insert(OperationContext* opCtx,
     }
     bucket->min.update(doc, options.getMetaField(), std::less<>());
     bucket->max.update(doc, options.getMetaField(), std::greater<>());
-
-    // If there is exactly 1 uncommitted measurement, the caller is the committer. Otherwise, it is
-    // a waiter.
-    boost::optional<Future<CommitInfo>> commitInfoFuture;
-    if (bucket->numMeasurements - bucket->numCommittedMeasurements > 1) {
-        auto [promise, future] = makePromiseFuture<CommitInfo>();
-        bucket->promises[bucket->numMeasurements - 1] = std::move(promise);
-        commitInfoFuture = std::move(future);
-    }
 
     return {it->second, std::move(commitInfoFuture)};
 }
@@ -191,13 +199,12 @@ BucketCatalog::CommitData BucketCatalog::commit(const OID& bucketId,
     stats.numMeasurementsCommitted += measurements.size();
 
     // Inform waiters that their measurements have been committed.
-    for (uint16_t i = 0; i < bucket.numPendingCommitMeasurements; i++) {
-        auto it = bucket.promises.find(i + bucket.numCommittedMeasurements);
-        if (it != bucket.promises.end()) {
-            it->second.emplaceValue(*previousCommitInfo);
-            bucket.promises.erase(it);
-            stats.numWaits++;
-        }
+    for (uint16_t i = 1; i < bucket.numPendingCommitMeasurements; i++) {
+        bucket.promises.front().emplaceValue(*previousCommitInfo);
+        bucket.promises.pop();
+    }
+    if (bucket.numPendingCommitMeasurements) {
+        stats.numWaits += bucket.numPendingCommitMeasurements - 1;
     }
 
     bucket.numWriters -= bucket.numPendingCommitMeasurements;
@@ -226,7 +233,7 @@ BucketCatalog::CommitData BucketCatalog::commit(const OID& bucketId,
             _orderedBuckets.erase(
                 {std::move(it->second.ns), std::move(it->second.metadata), bucketId});
             _buckets.erase(it);
-        } else if (--bucket.numWriters == 0) {
+        } else if (bucket.numWriters == 0) {
             _idleBuckets.insert(bucketId);
         }
     } else {
@@ -525,4 +532,24 @@ void BucketCatalog::MinMax::_clearUpdated() {
         }
     }
 }
+
+class BucketCatalog::ServerStatus : public ServerStatusSection {
+public:
+    ServerStatus() : ServerStatusSection("bucketCatalog") {}
+
+    bool includeByDefault() const override {
+        return false;
+    }
+
+    BSONObj generateSection(OperationContext* opCtx, const BSONElement&) const override {
+        const auto& bucketCatalog = BucketCatalog::get(opCtx);
+        stdx::lock_guard lk(bucketCatalog._mutex);
+
+        BSONObjBuilder builder;
+        builder.appendNumber("numBuckets", bucketCatalog._buckets.size());
+        builder.appendNumber("numOpenBuckets", bucketCatalog._bucketIds.size());
+        builder.appendNumber("numIdleBuckets", bucketCatalog._idleBuckets.size());
+        return builder.obj();
+    }
+} bucketCatalogServerStatus;
 }  // namespace mongo

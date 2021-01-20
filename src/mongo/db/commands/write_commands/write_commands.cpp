@@ -72,6 +72,7 @@ namespace mongo {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(hangWriteBeforeWaitingForMigrationDecision);
+MONGO_FAIL_POINT_DEFINE(hangTimeseriesInsertBeforeCommit);
 
 void redactTooLongLog(mutablebson::Document* cmdObj, StringData fieldName) {
     namespace mmb = mutablebson;
@@ -540,6 +541,8 @@ private:
                     bucketsToCommit.push_back({std::move(bucketId), i});
                 }
             }
+
+            hangTimeseriesInsertBeforeCommit.pauseWhileSet();
 
             std::vector<BSONObj> errors;
             boost::optional<repl::OpTime> opTime;
