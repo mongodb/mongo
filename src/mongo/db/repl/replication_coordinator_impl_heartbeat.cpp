@@ -277,14 +277,17 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
 
     if (action.getAction() == HeartbeatResponseAction::NoAction && hbStatusResponse.isOK() &&
         hbStatusResponse.getValue().hasState() &&
-        hbStatusResponse.getValue().getState() != MemberState::RS_PRIMARY &&
-        action.getAdvancedOpTimeOrUpdatedConfig()) {
-        // If a member's opTime has moved forward or config is newer, try to update the
-        // lastCommitted. Even if we've only updated the config, this is still safe.
-        _updateLastCommittedOpTimeAndWallTime(lk);
-
-        // Wake up replication waiters on optime changes or updated configs.
-        _wakeReadyWaiters(lk);
+        hbStatusResponse.getValue().getState() != MemberState::RS_PRIMARY) {
+        if (action.getAdvancedOpTimeOrUpdatedConfig()) {
+            // If a member's opTime has moved forward or config is newer, try to update the
+            // lastCommitted. Even if we've only updated the config, this is still safe.
+            _updateLastCommittedOpTimeAndWallTime(lk);
+            // Wake up replication waiters on optime changes or updated configs.
+            _wakeReadyWaiters(lk);
+        } else if (action.getBecameElectable() && _topCoord->isSteppingDown()) {
+            // Try to wake up the stepDown waiter when a new node becomes electable.
+            _wakeReadyWaiters(lk);
+        }
     }
 
     // Abort catchup if we have caught up to the latest known optime after heartbeat refreshing.

@@ -105,6 +105,8 @@ all:
     test_file: jstests/replsets/election_handoff_skips_unelectable_nodes.js
   - ticket: SERVER-50769
     test_file: jstests/sharding/change_stream_empty_apply_ops.js
+  - ticket: SERVER-53612
+    test_file: jstests/replsets/election_handoff_not_immediately_electable.js
 
 suites:
 
