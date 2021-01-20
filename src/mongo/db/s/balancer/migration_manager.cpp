@@ -269,10 +269,9 @@ void MigrationManager::startRecoveryAndAcquireDistLocks(OperationContext* opCtx)
             const std::string whyMessage(str::stream() << "Migrating chunk(s) in collection "
                                                        << migrateType.getNss().ns());
 
-            auto statusWithDistLockHandle =
-                DistLockManager::get(opCtx)->tryLockWithLocalWriteConcern(
-                    opCtx, migrateType.getNss().ns(), whyMessage, _lockSessionID);
-            if (!statusWithDistLockHandle.isOK()) {
+            auto status = DistLockManager::get(opCtx)->tryLockDirectWithLocalWriteConcern(
+                opCtx, migrateType.getNss().ns(), whyMessage);
+            if (!status.isOK()) {
                 LOGV2(21898,
                       "Failed to acquire distributed lock for collection {namespace} "
                       "during balancer recovery of an active migration. Abandoning balancer "
@@ -280,7 +279,7 @@ void MigrationManager::startRecoveryAndAcquireDistLocks(OperationContext* opCtx)
                       "Failed to acquire distributed lock for collection "
                       "during balancer recovery of an active migration",
                       "namespace"_attr = migrateType.getNss().ns(),
-                      "error"_attr = redact(statusWithDistLockHandle.getStatus()));
+                      "error"_attr = redact(status));
                 return;
             }
         }
@@ -373,7 +372,7 @@ void MigrationManager::finishRecovery(OperationContext* opCtx,
 
         // If no migrations were scheduled for this namespace, free the dist lock
         if (!scheduledMigrations) {
-            DistLockManager::get(opCtx)->unlock(opCtx, _lockSessionID, nss.ns());
+            DistLockManager::get(opCtx)->unlock(opCtx, nss.ns());
         }
     }
 
@@ -520,26 +519,22 @@ void MigrationManager::_schedule(WithLock lock,
         const std::string whyMessage(str::stream()
                                      << "Migrating chunk(s) in collection " << nss.ns());
 
-        // Acquire the NamespaceSerializer lock for this nss (blocking call)
-        auto scopedCollLock =
-            ShardingCatalogManager::get(opCtx)->serializeCreateOrDropCollection(opCtx, nss);
+        // Acquire the local lock for this nss (blocking call)
+        auto scopedLock = DistLockManager::get(opCtx)->lockDirectLocally(
+            opCtx, nss.ns(), DistLockManager::kSingleLockAttemptTimeout);
 
         // Acquire the collection distributed lock (blocking call)
-        auto statusWithDistLockHandle = DistLockManager::get(opCtx)->lockWithSessionID(
-            opCtx,
-            nss.ns(),
-            whyMessage,
-            _lockSessionID,
-            DistLockManager::kSingleLockAttemptTimeout);
+        auto status = DistLockManager::get(opCtx)->lockDirect(
+            opCtx, nss.ns(), whyMessage, DistLockManager::kSingleLockAttemptTimeout);
 
-        if (!statusWithDistLockHandle.isOK()) {
-            migration.completionNotification->set(statusWithDistLockHandle.getStatus().withContext(
-                str::stream() << "Could not acquire collection lock for " << nss.ns()
-                              << " to migrate chunks"));
+        if (!status.isOK()) {
+            migration.completionNotification->set(
+                status.withContext(str::stream() << "Could not acquire collection lock for "
+                                                 << nss.ns() << " to migrate chunks"));
             return;
         }
 
-        MigrationsState migrationsState(std::move(scopedCollLock));
+        MigrationsState migrationsState(std::move(scopedLock));
         it = _activeMigrations.insert(std::make_pair(nss, std::move(migrationsState))).first;
     }
 
@@ -611,7 +606,7 @@ void MigrationManager::_complete(WithLock lock,
     migrations->erase(itMigration);
 
     if (migrations->empty()) {
-        DistLockManager::get(opCtx)->unlock(opCtx, _lockSessionID, nss.ns());
+        DistLockManager::get(opCtx)->unlock(opCtx, nss.ns());
         _activeMigrations.erase(it);
         _checkDrained(lock);
     }
@@ -713,7 +708,7 @@ MigrationManager::Migration::~Migration() {
     invariant(completionNotification);
 }
 
-MigrationManager::MigrationsState::MigrationsState(NamespaceSerializer::ScopedLock lock)
-    : nsSerializerLock(std::move(lock)) {}
+MigrationManager::MigrationsState::MigrationsState(DistLockManager::ScopedLock lock)
+    : lock(std::move(lock)) {}
 
 }  // namespace mongo

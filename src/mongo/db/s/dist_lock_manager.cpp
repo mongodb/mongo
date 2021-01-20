@@ -47,23 +47,26 @@ const Seconds DistLockManager::kDefaultLockTimeout(20);
 const Milliseconds DistLockManager::kSingleLockAttemptTimeout(0);
 
 DistLockManager::ScopedDistLock::ScopedDistLock(OperationContext* opCtx,
-                                                DistLockHandle lockHandle,
+                                                StringData lockName,
+                                                ScopedLock&& scopedLock,
                                                 DistLockManager* lockManager)
-    : _opCtx(opCtx), _lockID(std::move(lockHandle)), _lockManager(lockManager) {}
+    : _opCtx(opCtx),
+      _lockName(lockName.toString()),
+      _scopedLock(std::move(scopedLock)),
+      _lockManager(lockManager) {}
 
 DistLockManager::ScopedDistLock::~ScopedDistLock() {
     if (_lockManager) {
-        _lockManager->unlock(_opCtx, _lockID);
+        _lockManager->unlock(_opCtx, _lockName);
     }
 }
 
-DistLockManager::ScopedDistLock::ScopedDistLock(ScopedDistLock&& other) {
-    _opCtx = other._opCtx;
+DistLockManager::ScopedDistLock::ScopedDistLock(ScopedDistLock&& other)
+    : ScopedDistLock(other._opCtx,
+                     std::move(other._lockName),
+                     std::move(other._scopedLock),
+                     other._lockManager) {
     other._opCtx = nullptr;
-
-    _lockID = std::move(other._lockID);
-
-    _lockManager = other._lockManager;
     other._lockManager = nullptr;
 }
 
@@ -72,6 +75,8 @@ DistLockManager::ScopedDistLock DistLockManager::ScopedDistLock::moveToAnotherTh
     unownedScopedDistLock._opCtx = nullptr;
     return unownedScopedDistLock;
 }
+
+DistLockManager::DistLockManager(OID lockSessionID) : _lockSessionID(std::move(lockSessionID)) {}
 
 DistLockManager* DistLockManager::get(ServiceContext* service) {
     return getDistLockManager(service).get();
@@ -91,12 +96,66 @@ StatusWith<DistLockManager::ScopedDistLock> DistLockManager::lock(OperationConte
                                                                   StringData name,
                                                                   StringData whyMessage,
                                                                   Milliseconds waitFor) {
-    auto distLockHandleStatus = lockWithSessionID(opCtx, name, whyMessage, OID::gen(), waitFor);
-    if (!distLockHandleStatus.isOK()) {
-        return distLockHandleStatus.getStatus();
+    boost::optional<ScopedLock> scopedLock;
+    try {
+        scopedLock.emplace(lockDirectLocally(opCtx, name, waitFor));
+    } catch (const DBException& ex) {
+        return ex.toStatus();
     }
 
-    return DistLockManager::ScopedDistLock(opCtx, std::move(distLockHandleStatus.getValue()), this);
+    auto status = lockDirect(opCtx, name, whyMessage, waitFor);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    return DistLockManager::ScopedDistLock(opCtx, name, std::move(*scopedLock), this);
+}
+
+DistLockManager::ScopedLock DistLockManager::lockDirectLocally(OperationContext* opCtx,
+                                                               StringData ns,
+                                                               Milliseconds waitFor) {
+    stdx::unique_lock<Latch> lock(_mutex);
+    auto iter = _inProgressMap.find(ns);
+
+    if (iter == _inProgressMap.end()) {
+        _inProgressMap.try_emplace(ns, std::make_shared<NSLock>());
+    } else {
+        auto nsLock = iter->second;
+        nsLock->numWaiting++;
+        auto guard = makeGuard([&] { nsLock->numWaiting--; });
+        if (!opCtx->waitForConditionOrInterruptFor(
+                nsLock->cvLocked, lock, waitFor, [nsLock]() { return !nsLock->isInProgress; })) {
+            uasserted(ErrorCodes::LockBusy,
+                      str::stream() << "Failed to acquire dist lock " << ns << " locally");
+        }
+        guard.dismiss();
+        nsLock->isInProgress = true;
+    }
+
+    return ScopedLock(ns, this);
+}
+
+DistLockManager::ScopedLock::ScopedLock(StringData ns, DistLockManager* distLockManager)
+    : _ns(ns.toString()), _lockManager(distLockManager) {}
+
+DistLockManager::ScopedLock::ScopedLock(ScopedLock&& other)
+    : _ns(std::move(other._ns)), _lockManager(other._lockManager) {
+    other._lockManager = nullptr;
+}
+
+DistLockManager::ScopedLock::~ScopedLock() {
+    if (_lockManager) {
+        stdx::unique_lock<Latch> lock(_lockManager->_mutex);
+        auto iter = _lockManager->_inProgressMap.find(_ns);
+
+        iter->second->numWaiting--;
+        iter->second->isInProgress = false;
+        iter->second->cvLocked.notify_all();
+
+        if (iter->second->numWaiting == 0) {
+            _lockManager->_inProgressMap.erase(_ns);
+        }
+    }
 }
 
 }  // namespace mongo

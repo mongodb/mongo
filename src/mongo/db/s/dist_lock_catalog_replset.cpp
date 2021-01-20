@@ -324,16 +324,6 @@ StatusWith<LocksType> DistLockCatalogImpl::overtakeLock(OperationContext* opCtx,
     return locksTypeResult.getValue();
 }
 
-Status DistLockCatalogImpl::unlock(OperationContext* opCtx, const OID& lockSessionID) {
-    auto request =
-        makeFindAndModifyRequest(_locksNS,
-                                 BSON(LocksType::lockID(lockSessionID)),
-                                 write_ops::UpdateModification::parseFromClassicUpdate(
-                                     BSON("$set" << BSON(LocksType::state(LocksType::UNLOCKED)))));
-    request.setWriteConcern(kMajorityWriteConcern.toBSON());
-    return _unlock(opCtx, request);
-}
-
 Status DistLockCatalogImpl::unlock(OperationContext* opCtx,
                                    const OID& lockSessionID,
                                    StringData name) {

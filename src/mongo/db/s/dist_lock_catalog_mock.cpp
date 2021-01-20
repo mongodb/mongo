@@ -65,9 +65,9 @@ void noOvertakeLockFuncSet(StringData lockID,
                        << ", who: " << who << ", processId: " << processId << ", why: " << why);
 }
 
-void noUnLockFuncSet(const OID& lockSessionID) {
+void noUnLockFuncSet(const OID& lockSessionID, StringData name) {
     FAIL(str::stream() << "unlock not expected to be called. "
-                       << "lockSessionID: " << lockSessionID);
+                       << "lockSessionID: " << lockSessionID << "name: " << name);
 }
 
 void noPingFuncSet(StringData processID, Date_t ping) {
@@ -193,20 +193,6 @@ StatusWith<LocksType> DistLockCatalogMock::overtakeLock(OperationContext* opCtx,
     return ret;
 }
 
-Status DistLockCatalogMock::unlock(OperationContext* opCtx, const OID& lockSessionID) {
-    auto ret = kBadRetValue;
-    UnlockFunc checkerFunc = noUnLockFuncSet;
-
-    {
-        stdx::lock_guard<Latch> lk(_mutex);
-        ret = _unlockReturnValue;
-        checkerFunc = _unlockChecker;
-    }
-
-    checkerFunc(lockSessionID);
-    return ret;
-}
-
 Status DistLockCatalogMock::unlock(OperationContext* opCtx,
                                    const OID& lockSessionID,
                                    StringData name) {
@@ -219,7 +205,7 @@ Status DistLockCatalogMock::unlock(OperationContext* opCtx,
         checkerFunc = _unlockChecker;
     }
 
-    checkerFunc(lockSessionID);
+    checkerFunc(lockSessionID, name);
 
     return ret;
 }

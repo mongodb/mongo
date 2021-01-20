@@ -586,11 +586,10 @@ TEST_F(MigrationManagerTest, FailMigrationRecovery) {
     // it fails. Any dist lock held by the config server will be released via proccessId, so the
     // session ID used here doesn't matter.
     ASSERT_OK(DistLockManager::get(operationContext())
-                  ->lockWithSessionID(operationContext(),
-                                      collName.ns(),
-                                      "MigrationManagerTest",
-                                      OID::gen(),
-                                      DistLockManager::kSingleLockAttemptTimeout));
+                  ->lockDirect(operationContext(),
+                               collName.ns(),
+                               "MigrationManagerTest",
+                               DistLockManager::kSingleLockAttemptTimeout));
 
     _migrationManager->startRecoveryAndAcquireDistLocks(operationContext());
     _migrationManager->finishRecovery(operationContext(), 0, kDefaultSecondaryThrottle);

@@ -53,86 +53,6 @@
 namespace mongo {
 namespace {
 
-void createCollection(OperationContext* opCtx,
-                      const NamespaceString& nss,
-                      const ShardCollection& shardCollRequest,
-                      const BSONObj& cmdObj,
-                      BSONObjBuilder& result) {
-    ShardsvrCreateCollection shardsvrCollRequest(nss);
-    shardsvrCollRequest.setShardKey(shardCollRequest.getKey());
-    shardsvrCollRequest.setUnique(shardCollRequest.getUnique());
-    shardsvrCollRequest.setNumInitialChunks(shardCollRequest.getNumInitialChunks());
-    shardsvrCollRequest.setPresplitHashedZones(shardCollRequest.getPresplitHashedZones());
-    shardsvrCollRequest.setCollation(shardCollRequest.getCollation());
-    shardsvrCollRequest.setDbName(nss.db());
-
-    auto catalogCache = Grid::get(opCtx)->catalogCache();
-    const auto dbInfo = uassertStatusOK(catalogCache->getDatabase(opCtx, nss.db()));
-
-    ShardId shardId;
-    if (nss.db() == NamespaceString::kConfigDb) {
-        const auto shardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
-        uassert(ErrorCodes::IllegalOperation, "there are no shards to target", !shardIds.empty());
-        shardId = shardIds[0];
-    } else {
-        shardId = dbInfo.primaryId();
-    }
-
-    auto shard = uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId));
-
-    auto cmdResponse = uassertStatusOK(shard->runCommandWithFixedRetryAttempts(
-        opCtx,
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        nss.db().toString(),
-        CommandHelpers::appendMajorityWriteConcern(
-            CommandHelpers::appendGenericCommandArgs(cmdObj, shardsvrCollRequest.toBSON({})),
-            opCtx->getWriteConcern()),
-        Shard::RetryPolicy::kIdempotent));
-
-    uassertStatusOK(cmdResponse.commandStatus);
-
-    CommandHelpers::filterCommandReplyForPassthrough(cmdResponse.response, &result);
-
-    result.append("collectionsharded", nss.toString());
-
-    auto createCollResp = CreateCollectionResponse::parse(IDLParserErrorContext("createCollection"),
-                                                          cmdResponse.response);
-    catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
-        nss, createCollResp.getCollectionVersion(), dbInfo.primaryId());
-}
-
-void shardCollection(OperationContext* opCtx,
-                     const NamespaceString& nss,
-                     const ShardCollection& shardCollRequest,
-                     const BSONObj& cmdObj,
-                     BSONObjBuilder& result) {
-    ConfigsvrShardCollectionRequest configShardCollRequest;
-    configShardCollRequest.set_configsvrShardCollection(nss);
-    configShardCollRequest.setKey(shardCollRequest.getKey());
-    configShardCollRequest.setUnique(shardCollRequest.getUnique());
-    configShardCollRequest.setNumInitialChunks(shardCollRequest.getNumInitialChunks());
-    configShardCollRequest.setPresplitHashedZones(shardCollRequest.getPresplitHashedZones());
-    configShardCollRequest.setCollation(shardCollRequest.getCollation());
-
-    // Invalidate the routing table cache entry for this collection so that we reload the
-    // collection the next time it's accessed, even if we receive a failure, e.g. NetworkError.
-    ON_BLOCK_EXIT([opCtx, nss] {
-        Grid::get(opCtx)->catalogCache()->invalidateCollectionEntry_LINEARIZABLE(nss);
-    });
-
-    auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-    auto cmdResponse = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
-        opCtx,
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        "admin",
-        CommandHelpers::appendMajorityWriteConcern(
-            CommandHelpers::appendGenericCommandArgs(cmdObj, configShardCollRequest.toBSON()),
-            opCtx->getWriteConcern()),
-        Shard::RetryPolicy::kIdempotent));
-
-    CommandHelpers::filterCommandReplyForPassthrough(cmdResponse.response, &result);
-}
-
 class ShardCollectionCmd : public BasicCommand {
 public:
     ShardCollectionCmd() : BasicCommand("shardCollection", "shardcollection") {}
@@ -179,12 +99,47 @@ public:
         auto shardCollRequest =
             ShardCollection::parse(IDLParserErrorContext("ShardCollection"), cmdObj);
 
-        if (feature_flags::gShardingFullDDLSupportDistLocksOnStepDown.isEnabled(
-                serverGlobalParams.featureCompatibility)) {
-            createCollection(opCtx, nss, shardCollRequest, cmdObj, result);
+        ShardsvrCreateCollection shardsvrCollRequest(nss);
+        shardsvrCollRequest.setShardKey(shardCollRequest.getKey());
+        shardsvrCollRequest.setUnique(shardCollRequest.getUnique());
+        shardsvrCollRequest.setNumInitialChunks(shardCollRequest.getNumInitialChunks());
+        shardsvrCollRequest.setPresplitHashedZones(shardCollRequest.getPresplitHashedZones());
+        shardsvrCollRequest.setCollation(shardCollRequest.getCollation());
+        shardsvrCollRequest.setDbName(nss.db());
+
+        auto catalogCache = Grid::get(opCtx)->catalogCache();
+        const auto dbInfo = uassertStatusOK(catalogCache->getDatabase(opCtx, nss.db()));
+
+        ShardId shardId;
+        if (nss.db() == NamespaceString::kConfigDb) {
+            const auto shardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
+            uassert(
+                ErrorCodes::IllegalOperation, "there are no shards to target", !shardIds.empty());
+            shardId = shardIds[0];
         } else {
-            shardCollection(opCtx, nss, shardCollRequest, cmdObj, result);
+            shardId = dbInfo.primaryId();
         }
+
+        auto shard = uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId));
+
+        auto cmdResponse = uassertStatusOK(shard->runCommandWithFixedRetryAttempts(
+            opCtx,
+            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+            nss.db().toString(),
+            CommandHelpers::appendMajorityWriteConcern(
+                CommandHelpers::appendGenericCommandArgs(cmdObj, shardsvrCollRequest.toBSON({})),
+                opCtx->getWriteConcern()),
+            Shard::RetryPolicy::kIdempotent));
+        uassertStatusOK(cmdResponse.commandStatus);
+
+        CommandHelpers::filterCommandReplyForPassthrough(cmdResponse.response, &result);
+        result.append("collectionsharded", nss.toString());
+
+        auto createCollResp = CreateCollectionResponse::parse(
+            IDLParserErrorContext("createCollection"), cmdResponse.response);
+
+        catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
+            nss, createCollResp.getCollectionVersion(), dbInfo.primaryId());
 
         return true;
     }

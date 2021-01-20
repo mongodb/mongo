@@ -38,6 +38,7 @@
 #include "mongo/db/s/balancer/balancer_policy.h"
 #include "mongo/db/s/balancer/type_migration.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "mongo/db/s/dist_lock_manager.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/s/request_types/migration_secondary_throttle_options.h"
@@ -48,12 +49,7 @@
 
 namespace mongo {
 
-class OperationContext;
 class ScopedMigrationRequest;
-class ServiceContext;
-class Status;
-template <typename T>
-class StatusWith;
 
 // Uniquely identifies a migration, regardless of shard and version.
 typedef std::string MigrationIdentifier;
@@ -178,12 +174,11 @@ private:
     // NamespaceSerializer lock for the corresponding nss, which will be released when all of the
     // scheduled chunk migrations for this collection have completed.
     struct MigrationsState {
-        MigrationsState(NamespaceSerializer::ScopedLock lock);
+        MigrationsState(DistLockManager::ScopedLock lock);
 
         MigrationsList migrationsList;
-        NamespaceSerializer::ScopedLock nsSerializerLock;
+        DistLockManager::ScopedLock lock;
     };
-
     using CollectionMigrationsStateMap = stdx::unordered_map<NamespaceString, MigrationsState>;
 
     using ScopedMigrationRequestsMap =
@@ -270,11 +265,6 @@ private:
 
     // The service context under which this migration manager runs.
     ServiceContext* const _serviceContext;
-
-    // Used as a constant session ID for all distributed locks that this MigrationManager holds.
-    // Currently required so that locks can be reacquired for the balancer in startRecovery and then
-    // overtaken in later operations.
-    const OID _lockSessionID{OID::gen()};
 
     // Carries migration information over from startRecovery to finishRecovery. Should only be set
     // in startRecovery and then accessed in finishRecovery.

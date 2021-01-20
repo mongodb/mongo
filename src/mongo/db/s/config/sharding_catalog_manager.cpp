@@ -207,16 +207,6 @@ void ShardingCatalogManager::create(ServiceContext* serviceContext,
     shardingCatalogManager.emplace(serviceContext, std::move(addShardExecutor));
 }
 
-NamespaceSerializer::ScopedLock ShardingCatalogManager::serializeCreateOrDropDatabase(
-    OperationContext* opCtx, StringData dbName) {
-    return _namespaceSerializer.lock(opCtx, dbName);
-}
-
-NamespaceSerializer::ScopedLock ShardingCatalogManager::serializeCreateOrDropCollection(
-    OperationContext* opCtx, const NamespaceString& nss) {
-    return _namespaceSerializer.lock(opCtx, nss.ns());
-}
-
 void ShardingCatalogManager::clearForTests(ServiceContext* serviceContext) {
     auto& shardingCatalogManager = getShardingCatalogManager(serviceContext);
     invariant(shardingCatalogManager);

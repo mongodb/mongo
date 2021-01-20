@@ -133,14 +133,6 @@ public:
                                                StringData why) = 0;
 
     /**
-     * Attempts to set the state of the lock document with lockSessionID to unlocked. Returns OK,
-     * if at the end of this call it is determined that the lock is definitely not owned by the
-     * specified session (i.e., it is not owned at all or if it is owned by a different session).
-     * Otherwise, it returns an error status. Common errors include socket errors.
-     */
-    virtual Status unlock(OperationContext* opCtx, const OID& lockSessionID) = 0;
-
-    /**
      * Same as unlock() above except that it unlocks the lock document that matches "lockSessionID"
      * AND "name", rather than just "lockSessionID". This is necessary if multiple documents have
      * been locked with the same lockSessionID.

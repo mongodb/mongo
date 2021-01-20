@@ -121,11 +121,6 @@ public:
         setDropCollDistLockWait.execute(
             [&](const BSONObj& data) { waitFor = Seconds(data["waitForSecs"].numberInt()); });
 
-        auto scopedDbLock =
-            ShardingCatalogManager::get(opCtx)->serializeCreateOrDropDatabase(opCtx, nss.db());
-        auto scopedCollLock =
-            ShardingCatalogManager::get(opCtx)->serializeCreateOrDropCollection(opCtx, nss);
-
         auto dbDistLock = uassertStatusOK(
             DistLockManager::get(opCtx)->lock(opCtx, nss.db(), "dropCollection", waitFor));
         auto collDistLock = uassertStatusOK(

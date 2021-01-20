@@ -120,8 +120,6 @@ public:
         auto const catalogClient = Grid::get(opCtx)->catalogClient();
         auto const catalogManager = ShardingCatalogManager::get(opCtx);
 
-        auto scopedLock = catalogManager->serializeCreateOrDropDatabase(opCtx, dbname);
-
         auto dbDistLock = uassertStatusOK(DistLockManager::get(opCtx)->lock(
             opCtx, dbname, "dropDatabase", DistLockManager::kDefaultLockTimeout));
 

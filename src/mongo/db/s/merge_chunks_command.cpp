@@ -82,7 +82,7 @@ void mergeChunks(OperationContext* opCtx,
                                                  << redact(minKey) << " to " << redact(maxKey);
     auto scopedDistLock = uassertStatusOKWithContext(
         DistLockManager::get(opCtx)->lock(
-            opCtx, nss.ns(), whyMessage, DistLockManager::kSingleLockAttemptTimeout),
+            opCtx, nss.ns(), whyMessage, DistLockManager::kDefaultLockTimeout),
         str::stream() << "could not acquire collection lock for " << nss.ns()
                       << " to merge chunks in [" << redact(minKey) << ", " << redact(maxKey)
                       << ")");

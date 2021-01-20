@@ -71,8 +71,6 @@ public:
                                        Date_t time,
                                        StringData why) override;
 
-    Status unlock(OperationContext* opCtx, const OID& lockSessionID) override;
-
     Status unlock(OperationContext* opCtx, const OID& lockSessionID, StringData name) override;
 
     Status unlockAll(OperationContext* opCtx, const std::string& processID) override;

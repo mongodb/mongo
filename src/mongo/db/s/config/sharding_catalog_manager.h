@@ -34,7 +34,6 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/logical_session_cache.h"
 #include "mongo/db/repl/optime_with.h"
-#include "mongo/db/s/config/namespace_serializer.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/s/catalog/type_chunk.h"
@@ -311,13 +310,6 @@ public:
                                 const ShardId& primaryShard);
 
     /**
-     * Creates a ScopedLock on the database name in _namespaceSerializer. This is to prevent
-     * timeouts waiting on the dist lock if multiple threads attempt to create or drop the same db.
-     */
-    NamespaceSerializer::ScopedLock serializeCreateOrDropDatabase(OperationContext* opCtx,
-                                                                  StringData dbName);
-
-    /**
      * Creates the database if it does not exist, then marks its entry in config.databases as
      * sharding-enabled.
      *
@@ -385,14 +377,6 @@ public:
                                                       const CollectionType& coll,
                                                       const bool upsert,
                                                       TxnNumber txnNumber);
-
-    /**
-     * Creates a ScopedLock on the collection name in _namespaceSerializer. This is to prevent
-     * timeouts waiting on the dist lock if multiple threads attempt to create or drop the same
-     * collection.
-     */
-    NamespaceSerializer::ScopedLock serializeCreateOrDropCollection(OperationContext* opCtx,
-                                                                    const NamespaceString& nss);
 
     //
     // Shard Operations
@@ -714,12 +698,6 @@ private:
      * requests).
      */
     Lock::ResourceMutex _kShardMembershipLock;
-
-    /**
-     * Optimization for DDL operations, which might be tried concurrently by multiple threads.
-     * Avoids convoying and timeouts on the database/collection distributed lock.
-     */
-    NamespaceSerializer _namespaceSerializer;
 };
 
 }  // namespace mongo

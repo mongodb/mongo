@@ -82,7 +82,7 @@ public:
                                                 StringData processId,
                                                 Date_t time,
                                                 StringData why)>;
-    using UnlockFunc = std::function<void(const OID& lockSessionID)>;
+    using UnlockFunc = std::function<void(const OID& lockSessionID, StringData name)>;
     using PingFunc = std::function<void(StringData processID, Date_t ping)>;
     using StopPingFunc = std::function<void(StringData processID)>;
     using GetPingFunc = StopPingFunc;
@@ -112,8 +112,6 @@ public:
                                                StringData processId,
                                                Date_t time,
                                                StringData why) override;
-
-    virtual Status unlock(OperationContext* opCtx, const OID& lockSessionID) override;
 
     virtual Status unlock(OperationContext* opCtx,
                           const OID& lockSessionID,

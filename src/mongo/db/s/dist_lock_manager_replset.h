@@ -33,8 +33,6 @@
 
 #include "mongo/db/s/dist_lock_catalog.h"
 #include "mongo/db/s/dist_lock_manager.h"
-#include "mongo/platform/mutex.h"
-#include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/future.h"
@@ -50,7 +48,7 @@ public:
     // How long should the lease on a distributed lock last
     static const Minutes kDistLockExpirationTime;
 
-    ReplSetDistLockManager(ServiceContext* globalContext,
+    ReplSetDistLockManager(ServiceContext* service,
                            StringData processID,
                            std::unique_ptr<DistLockCatalog> catalog,
                            Milliseconds pingInterval,
@@ -63,19 +61,16 @@ public:
 
     std::string getProcessID() override;
 
-    StatusWith<DistLockHandle> lockWithSessionID(OperationContext* opCtx,
-                                                 StringData name,
-                                                 StringData whyMessage,
-                                                 const OID& lockSessionID,
-                                                 Milliseconds waitFor) override;
+    Status lockDirect(OperationContext* opCtx,
+                      StringData name,
+                      StringData whyMessage,
+                      Milliseconds waitFor) override;
 
-    StatusWith<DistLockHandle> tryLockWithLocalWriteConcern(OperationContext* opCtx,
-                                                            StringData name,
-                                                            StringData whyMessage,
-                                                            const OID& lockSessionID) override;
+    Status tryLockDirectWithLocalWriteConcern(OperationContext* opCtx,
+                                              StringData name,
+                                              StringData whyMessage) override;
 
-    void unlock(Interruptible* intr, const DistLockHandle& lockSessionID) override;
-    void unlock(Interruptible* intr, const DistLockHandle& lockSessionID, StringData name) override;
+    void unlock(Interruptible* intr, StringData name) override;
 
     void unlockAll(OperationContext* opCtx) override;
 
@@ -83,8 +78,7 @@ private:
     /**
      * Queue a lock to be unlocked asynchronously with retry until it doesn't error.
      */
-    SharedSemiFuture<void> queueUnlock(const DistLockHandle& lockSessionID,
-                                       const boost::optional<std::string>& name);
+    SharedSemiFuture<void> queueUnlock(const OID& lockSessionID, const std::string& name);
 
     /**
      * Periodically pings and checks if there are locks queued that needs unlocking.
@@ -159,11 +153,11 @@ private:
     //    whether the modification was actually applied or not, and call unlock to make
     //    sure that it was cleaned up.
     struct UnlockRequest {
-        UnlockRequest(DistLockHandle lockId, boost::optional<std::string> name)
+        UnlockRequest(OID lockId, std::string name)
             : lockId(std::move(lockId)), name(std::move(name)) {}
 
-        DistLockHandle lockId;
-        boost::optional<std::string> name;
+        OID lockId;
+        std::string name;
 
         // Will be signaled when the unlock request has completed
         SharedPromise<void> unlockCompleted;

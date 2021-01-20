@@ -32,11 +32,11 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/service_context.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/stdx/chrono.h"
+#include "mongo/stdx/condition_variable.h"
 
 namespace mongo {
-
-using DistLockHandle = OID;
 
 /**
  * Interface for handling distributed locks.
@@ -64,7 +64,25 @@ public:
     static const Milliseconds kSingleLockAttemptTimeout;
 
     /**
-     * RAII type for distributed lock. Not meant to be shared across multiple threads.
+     * RAII type for the local lock.
+     */
+    class ScopedLock {
+        ScopedLock(const ScopedLock&) = delete;
+        ScopedLock& operator=(const ScopedLock&) = delete;
+
+    public:
+        ScopedLock(StringData lockName, DistLockManager* distLockManager);
+        ~ScopedLock();
+
+        ScopedLock(ScopedLock&& other);
+
+    private:
+        std::string _ns;
+        DistLockManager* _lockManager;
+    };
+
+    /**
+     * RAII type for the distributed lock.
      */
     class ScopedDistLock {
         ScopedDistLock(const ScopedDistLock&) = delete;
@@ -72,7 +90,8 @@ public:
 
     public:
         ScopedDistLock(OperationContext* opCtx,
-                       DistLockHandle lockHandle,
+                       StringData lockName,
+                       ScopedLock&& scopedLock,
                        DistLockManager* lockManager);
         ~ScopedDistLock();
 
@@ -82,8 +101,9 @@ public:
 
     private:
         OperationContext* _opCtx;
-        DistLockHandle _lockID;
-        DistLockManager* _lockManager;  // Not owned here.
+        std::string _lockName;
+        ScopedLock _scopedLock;
+        DistLockManager* _lockManager;
     };
 
     virtual ~DistLockManager() = default;
@@ -131,28 +151,31 @@ public:
                                     Milliseconds waitFor);
 
     /**
-     * Same behavior as lock(...) above, except takes a specific lock session ID "lockSessionID"
-     * instead of randomly generating one internally.
+     * Ensures that two dist lock within the same process will serialise with each other.
+     */
+    ScopedLock lockDirectLocally(OperationContext* opCtx, StringData ns, Milliseconds waitFor);
+
+    /**
+     * Same behavior as lock(...) above, except doesn't return a scoped object, so it is the
+     * responsibility of the caller to call unlock for the same name.
      *
      * This is useful for a process running on the config primary after a failover. A lock can be
      * immediately reacquired if "lockSessionID" matches that of the lock, rather than waiting for
      * the inactive lock to expire.
      */
-    virtual StatusWith<DistLockHandle> lockWithSessionID(OperationContext* opCtx,
-                                                         StringData name,
-                                                         StringData whyMessage,
-                                                         const OID& lockSessionID,
-                                                         Milliseconds waitFor) = 0;
+    virtual Status lockDirect(OperationContext* opCtx,
+                              StringData name,
+                              StringData whyMessage,
+                              Milliseconds waitFor) = 0;
 
     /**
      * Specialized locking method, which only succeeds if the specified lock name is not held by
      * anyone. Uses local write concern and does not attempt to overtake the lock or check whether
      * the lock lease has expired.
      */
-    virtual StatusWith<DistLockHandle> tryLockWithLocalWriteConcern(OperationContext* opCtx,
-                                                                    StringData name,
-                                                                    StringData whyMessage,
-                                                                    const OID& lockSessionID) = 0;
+    virtual Status tryLockDirectWithLocalWriteConcern(OperationContext* opCtx,
+                                                      StringData name,
+                                                      StringData whyMessage) = 0;
 
     /**
      * Unlocks the given lockHandle. Will keep retrying (asynchronously) until the lock is freed or
@@ -161,13 +184,28 @@ public:
      * The provided interruptible object can be nullptr in which case the method will not attempt to
      * wait for the unlock to be confirmed.
      */
-    virtual void unlock(Interruptible* intr, const DistLockHandle& lockHandle) = 0;
-    virtual void unlock(Interruptible* intr, const DistLockHandle& lockHandle, StringData name) = 0;
+    virtual void unlock(Interruptible* intr, StringData name) = 0;
 
     /**
      * Makes a best-effort attempt to unlock all locks owned by the given processID.
      */
     virtual void unlockAll(OperationContext* opCtx) = 0;
+
+protected:
+    friend class MigrationManager;
+
+    DistLockManager(OID lockSessionID);
+
+    const OID _lockSessionID;
+
+    struct NSLock {
+        stdx::condition_variable cvLocked;
+        int numWaiting = 1;
+        bool isInProgress = true;
+    };
+
+    Mutex _mutex = MONGO_MAKE_LATCH("NamespaceSerializer::_mutex");
+    StringMap<std::shared_ptr<NSLock>> _inProgressMap;
 };
 
 }  // namespace mongo

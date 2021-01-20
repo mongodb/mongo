@@ -1095,8 +1095,7 @@ let MongosAPIParametersUtil = (function() {
             commandName: "shardCollection",
             run: {
                 inAPIVersion1: false,
-                configServerCommandName: "_configsvrShardCollection",
-                shardCommandName: "_shardsvrShardCollection",
+                shardCommandName: "_shardsvrCreateCollection",
                 runsAgainstAdminDb: true,
                 permittedInTxn: false,
                 permittedOnShardedCollection: false,

@@ -61,19 +61,19 @@ const Seconds kJoinTimeout(30);
 const Milliseconds kPingInterval(2);
 const Seconds kLockExpiration(10);
 
-std::string mapToString(const std::map<OID, int>& map) {
+std::string mapToString(const StringMap<int>& map) {
     StringBuilder str;
     for (const auto& entry : map) {
-        str << "(" << entry.first.toString() << ": " << entry.second << ")";
+        str << "(" << entry.first << ": " << entry.second << ")";
     }
 
     return str.str();
 }
 
-std::string vectorToString(const std::vector<OID>& list) {
+std::string vectorToString(const std::vector<std::string>& list) {
     StringBuilder str;
     for (const auto& entry : list) {
-        str << "(" << entry.toString() << ")";
+        str << "(" << entry << ")";
     }
 
     return str.str();
@@ -180,7 +180,7 @@ TEST_F(DistLockManagerReplSetTest, BasicLockLifeCycle) {
 
         getMockCatalog()->expectNoGrabLock();
         getMockCatalog()->expectUnLock(
-            [&unlockCallCount, &unlockSessionIDPassed](const OID& lockSessionID) {
+            [&unlockCallCount, &unlockSessionIDPassed](const OID& lockSessionID, StringData name) {
                 unlockCallCount++;
                 unlockSessionIDPassed = lockSessionID;
             },
@@ -229,7 +229,7 @@ TEST_F(DistLockManagerReplSetTest, MustUnlockOnLockError) {
 
     getMockCatalog()->expectUnLock(
         [&unlockMutex, &unlockCV, &unlockCallCount, &unlockSessionIDPassed](
-            const OID& lockSessionID) {
+            const OID& lockSessionID, StringData name) {
             stdx::unique_lock<Latch> lk(unlockMutex);
             unlockCallCount++;
             unlockSessionIDPassed = lockSessionID;
@@ -331,13 +331,14 @@ TEST_F(DistLockManagerReplSetTest, UnlockUntilNoError) {
 
     getMockCatalog()->expectUnLock(
         [this, &unlockMutex, &unlockCV, &kUnlockErrorCount, &lockSessionIDPassed](
-            const OID& lockSessionID) {
+            const OID& lockSessionID, StringData name) {
             stdx::unique_lock<Latch> lk(unlockMutex);
             lockSessionIDPassed.push_back(lockSessionID);
 
             if (lockSessionIDPassed.size() >= kUnlockErrorCount) {
                 getMockCatalog()->expectUnLock(
-                    [&lockSessionIDPassed, &unlockMutex, &unlockCV](const OID& lockSessionID) {
+                    [&lockSessionIDPassed, &unlockMutex, &unlockCV](const OID& lockSessionID,
+                                                                    StringData name) {
                         stdx::unique_lock<Latch> lk(unlockMutex);
                         lockSessionIDPassed.push_back(lockSessionID);
                         unlockCV.notify_all();
@@ -409,14 +410,14 @@ TEST_F(DistLockManagerReplSetTest, UnlockUntilNoError) {
 TEST_F(DistLockManagerReplSetTest, MultipleQueuedUnlock) {
     auto testMutex = MONGO_MAKE_LATCH();
     stdx::condition_variable unlockCV;
-    std::vector<OID> lockSessionIDPassed;
-    std::map<OID, int> unlockIDMap;  // id -> count
+    std::vector<std::string> lockIdsPassed;
+    StringMap<int> unlockNameMap;  // id -> count
 
     /**
      * Returns true if all values in the map are greater than 2.
      */
-    auto mapEntriesGreaterThanTwo = [](const decltype(unlockIDMap)& map) -> bool {
-        auto iter = find_if(
+    auto mapEntriesGreaterThanTwo = [](const decltype(unlockNameMap)& map) -> bool {
+        auto iter = std::find_if(
             map.begin(),
             map.end(),
             [](const std::remove_reference<decltype(map)>::type::value_type& entry) -> bool {
@@ -427,15 +428,15 @@ TEST_F(DistLockManagerReplSetTest, MultipleQueuedUnlock) {
     };
 
     getMockCatalog()->expectUnLock(
-        [this, &unlockIDMap, &testMutex, &unlockCV, &mapEntriesGreaterThanTwo](
-            const OID& lockSessionID) {
+        [this, &unlockNameMap, &testMutex, &unlockCV, &mapEntriesGreaterThanTwo](
+            const OID& lockSessionID, StringData name) {
             stdx::unique_lock<Latch> lk(testMutex);
-            unlockIDMap[lockSessionID]++;
+            unlockNameMap[name]++;
 
             // Wait until we see at least 2 unique lockSessionID more than twice.
-            if (unlockIDMap.size() >= 2 && mapEntriesGreaterThanTwo(unlockIDMap)) {
+            if (unlockNameMap.size() >= 2 && mapEntriesGreaterThanTwo(unlockNameMap)) {
                 getMockCatalog()->expectUnLock(
-                    [&testMutex, &unlockCV](const OID& lockSessionID) {
+                    [&testMutex, &unlockCV](const OID& lockSessionID, StringData name) {
                         stdx::unique_lock<Latch> lk(testMutex);
                         unlockCV.notify_all();
                     },
@@ -454,14 +455,14 @@ TEST_F(DistLockManagerReplSetTest, MultipleQueuedUnlock) {
     retLockDoc.setLockID(OID::gen());
 
     getMockCatalog()->expectGrabLock(
-        [&testMutex, &lockSessionIDPassed](StringData lockID,
-                                           const OID& lockSessionIDArg,
-                                           StringData who,
-                                           StringData processId,
-                                           Date_t time,
-                                           StringData why) {
+        [&testMutex, &lockIdsPassed](StringData lockID,
+                                     const OID& lockSessionIDArg,
+                                     StringData who,
+                                     StringData processId,
+                                     Date_t time,
+                                     StringData why) {
             stdx::unique_lock<Latch> lk(testMutex);
-            lockSessionIDPassed.push_back(lockSessionIDArg);
+            lockIdsPassed.push_back(lockID.toString());
         },
         retLockDoc);
 
@@ -476,7 +477,7 @@ TEST_F(DistLockManagerReplSetTest, MultipleQueuedUnlock) {
     {
         stdx::unique_lock<Latch> lk(testMutex);
 
-        if (unlockIDMap.size() < 2 || !mapEntriesGreaterThanTwo(unlockIDMap)) {
+        if (unlockNameMap.size() < 2 || !mapEntriesGreaterThanTwo(unlockNameMap)) {
             didTimeout =
                 unlockCV.wait_for(lk, kJoinTimeout.toSystemDuration()) == stdx::cv_status::timeout;
         }
@@ -493,12 +494,11 @@ TEST_F(DistLockManagerReplSetTest, MultipleQueuedUnlock) {
     // No need to grab testMutex since there is only one thread running at this point.
 
     ASSERT_FALSE(didTimeout);
-    ASSERT_EQUALS(2u, lockSessionIDPassed.size());
+    ASSERT_EQUALS(2u, lockIdsPassed.size());
 
-    for (const auto& id : lockSessionIDPassed) {
-        ASSERT_GREATER_THAN(unlockIDMap[id], 2)
-            << "lockIDList: " << vectorToString(lockSessionIDPassed)
-            << ", map: " << mapToString(unlockIDMap);
+    for (const auto& id : lockIdsPassed) {
+        ASSERT_GREATER_THAN(unlockNameMap[id], 2) << "lockIDList: " << vectorToString(lockIdsPassed)
+                                                  << ", map: " << mapToString(unlockNameMap);
     }
 }
 
@@ -540,7 +540,7 @@ TEST_F(DistLockManagerReplSetTest, CheckLockStatusOK) {
 
     getMockCatalog()->expectNoGrabLock();
     getMockCatalog()->expectUnLock(
-        [](const OID&) {
+        [](const OID&, StringData) {
             // Don't care
         },
         Status::OK());
@@ -573,7 +573,7 @@ TEST_F(DistLockManagerReplSetTest, CheckLockStatusNoLongerOwn) {
 
     getMockCatalog()->expectNoGrabLock();
     getMockCatalog()->expectUnLock(
-        [](const OID&) {
+        [](const OID&, StringData) {
             // Don't care
         },
         Status::OK());
@@ -606,7 +606,7 @@ TEST_F(DistLockManagerReplSetTest, CheckLockStatusError) {
 
     getMockCatalog()->expectNoGrabLock();
     getMockCatalog()->expectUnLock(
-        [](const OID&) {
+        [](const OID&, StringData) {
             // Don't care
         },
         Status::OK());
@@ -695,7 +695,7 @@ TEST_F(DistLockManagerReplSetTest, LockOvertakingAfterLockExpiration) {
 
         getMockCatalog()->expectNoGrabLock();
         getMockCatalog()->expectUnLock(
-            [&unlockCallCount, &unlockSessionIDPassed](const OID& lockSessionID) {
+            [&unlockCallCount, &unlockSessionIDPassed](const OID& lockSessionID, StringData name) {
                 unlockCallCount++;
                 unlockSessionIDPassed = lockSessionID;
             },
@@ -704,66 +704,6 @@ TEST_F(DistLockManagerReplSetTest, LockOvertakingAfterLockExpiration) {
 
     ASSERT_EQUALS(1, unlockCallCount);
     ASSERT_EQUALS(lastTS, unlockSessionIDPassed);
-}
-
-/**
- * Test scenario:
- * 1. Attempt to grab lock with lockSessionID fails because lock is already owned.
- * 2. Then the the lock is overtaken because the lockSessionID matches the lock owner.
- */
-TEST_F(DistLockManagerReplSetTest, LockOvertakingWithSessionID) {
-    OID passedLockSessionID("5572007fda9e476582bf3716");
-
-    LocksType currentLockDoc;
-    currentLockDoc.setName("bar");
-    currentLockDoc.setState(LocksType::LOCKED);
-    currentLockDoc.setProcess("otherProcess");
-    currentLockDoc.setLockID(passedLockSessionID);
-    currentLockDoc.setWho("me");
-    currentLockDoc.setWhy("why");
-
-    getMockCatalog()->expectGrabLock(
-        [&passedLockSessionID, &currentLockDoc](
-            StringData, const OID& lockSessionID, StringData, StringData, Date_t, StringData) {
-            ASSERT_EQUALS(passedLockSessionID, lockSessionID);
-        },
-        {ErrorCodes::LockStateChangeFailed, "nMod 0"});
-
-    getMockCatalog()->expectGetLockByName([](StringData name) { ASSERT_EQUALS("bar", name); },
-                                          currentLockDoc);
-
-    LockpingsType pingDoc;
-    pingDoc.setProcess("otherProcess");
-    pingDoc.setPing(Date_t());
-
-    getMockCatalog()->expectGetPing(
-        [](StringData process) { ASSERT_EQUALS("otherProcess", process); }, pingDoc);
-
-    getMockCatalog()->expectGetServerInfo([]() {}, DistLockCatalog::ServerInfo(Date_t(), OID()));
-
-    getMockCatalog()->expectOvertakeLock(
-        [this, &passedLockSessionID, &currentLockDoc](StringData lockID,
-                                                      const OID& lockSessionID,
-                                                      const OID& currentHolderTS,
-                                                      StringData who,
-                                                      StringData processId,
-                                                      Date_t time,
-                                                      StringData why) {
-            ASSERT_EQUALS("bar", lockID);
-            ASSERT_EQUALS(passedLockSessionID, lockSessionID);
-            ASSERT_EQUALS(currentLockDoc.getLockID(), currentHolderTS);
-            ASSERT_EQUALS(getProcessID(), processId);
-            ASSERT_EQUALS("foo", why);
-        },
-        currentLockDoc);
-
-    auto distLockHandleStatus =
-        DistLockManager::get(operationContext())
-            ->lockWithSessionID(
-                operationContext(), "bar", "foo", passedLockSessionID, Milliseconds(0));
-    ASSERT_OK(distLockHandleStatus.getStatus());
-
-    getMockCatalog()->expectNoGrabLock();
 }
 
 TEST_F(DistLockManagerReplSetTest, CannotOvertakeIfExpirationHasNotElapsed) {
@@ -1033,7 +973,7 @@ TEST_F(DistLockManagerReplSetTest, CannotOvertakeIfPingIsActive) {
 
         getMockCatalog()->expectNoGrabLock();
         getMockCatalog()->expectUnLock(
-            [&unlockCallCount, &unlockSessionIDPassed](const OID& lockSessionID) {
+            [&unlockCallCount, &unlockSessionIDPassed](const OID& lockSessionID, StringData name) {
                 unlockCallCount++;
                 unlockSessionIDPassed = lockSessionID;
             },
@@ -1133,7 +1073,7 @@ TEST_F(DistLockManagerReplSetTest, CannotOvertakeIfOwnerJustChanged) {
 
         getMockCatalog()->expectNoGrabLock();
         getMockCatalog()->expectUnLock(
-            [&unlockCallCount, &unlockSessionIDPassed](const OID& lockSessionID) {
+            [&unlockCallCount, &unlockSessionIDPassed](const OID& lockSessionID, StringData name) {
                 unlockCallCount++;
                 unlockSessionIDPassed = lockSessionID;
             },
@@ -1236,7 +1176,7 @@ TEST_F(DistLockManagerReplSetTest, CannotOvertakeIfElectionIdChanged) {
 
         getMockCatalog()->expectNoGrabLock();
         getMockCatalog()->expectUnLock(
-            [&unlockCallCount, &unlockSessionIDPassed](const OID& lockSessionID) {
+            [&unlockCallCount, &unlockSessionIDPassed](const OID& lockSessionID, StringData name) {
                 unlockCallCount++;
                 unlockSessionIDPassed = lockSessionID;
             },
@@ -1343,7 +1283,7 @@ TEST_F(DistLockManagerReplSetTest, CannotOvertakeIfNoMaster) {
 
         getMockCatalog()->expectNoGrabLock();
         getMockCatalog()->expectUnLock(
-            [&unlockCallCount, &unlockSessionIDPassed](const OID& lockSessionID) {
+            [&unlockCallCount, &unlockSessionIDPassed](const OID& lockSessionID, StringData name) {
                 unlockCallCount++;
                 unlockSessionIDPassed = lockSessionID;
             },
@@ -1428,7 +1368,8 @@ TEST_F(DistLockManagerReplSetTest, LockOvertakingResultsInError) {
     auto unlockMutex = MONGO_MAKE_LATCH();
     stdx::condition_variable unlockCV;
     getMockCatalog()->expectUnLock(
-        [&unlockSessionIDPassed, &unlockMutex, &unlockCV](const OID& lockSessionID) {
+        [&unlockSessionIDPassed, &unlockMutex, &unlockCV](const OID& lockSessionID,
+                                                          StringData name) {
             stdx::unique_lock<Latch> lk(unlockMutex);
             unlockSessionIDPassed = lockSessionID;
             unlockCV.notify_all();
@@ -1621,7 +1562,7 @@ TEST_F(DistLockManagerReplSetTest, LockAcquisitionRetriesOnNetworkErrorSuccess) 
         },
         {ErrorCodes::NetworkTimeout, "network error"});
 
-    getMockCatalog()->expectUnLock([&](const OID& lockSessionID) {}, Status::OK());
+    getMockCatalog()->expectUnLock([&](const OID& lockSessionID, StringData name) {}, Status::OK());
 
     auto status = DistLockManager::get(operationContext())
                       ->lock(operationContext(), "LockName", "Lock reason", Milliseconds(0))
@@ -1634,7 +1575,7 @@ TEST_F(DistLockManagerReplSetTest, LockAcquisitionRetriesOnInterruptionNeverSucc
         [&](StringData, const OID&, StringData, StringData, Date_t, StringData) {},
         {ErrorCodes::Interrupted, "operation interrupted"});
 
-    getMockCatalog()->expectUnLock([&](const OID& lockSessionID) {}, Status::OK());
+    getMockCatalog()->expectUnLock([&](const OID& lockSessionID, StringData name) {}, Status::OK());
 
     auto status = DistLockManager::get(operationContext())
                       ->lock(operationContext(), "bar", "foo", Milliseconds(0))
@@ -1780,7 +1721,7 @@ TEST_F(RSDistLockMgrWithMockTickSource, LockSuccessAfterRetry) {
 
         getMockCatalog()->expectNoGrabLock();
         getMockCatalog()->expectUnLock(
-            [&unlockCallCount, &unlockSessionIDPassed](const OID& lockSessionID) {
+            [&unlockCallCount, &unlockSessionIDPassed](const OID& lockSessionID, StringData name) {
                 unlockCallCount++;
                 unlockSessionIDPassed = lockSessionID;
             },
@@ -1868,7 +1809,7 @@ TEST_F(RSDistLockMgrWithMockTickSource, LockFailsAfterRetry) {
 
     getMockCatalog()->expectUnLock(
         [&unlockMutex, &unlockCV, &unlockCallCount, &unlockSessionIDPassed](
-            const OID& lockSessionID) {
+            const OID& lockSessionID, StringData name) {
             stdx::unique_lock<Latch> lk(unlockMutex);
             unlockCallCount++;
             unlockSessionIDPassed = lockSessionID;
@@ -2056,7 +1997,7 @@ TEST_F(RSDistLockMgrWithMockTickSource, CanOvertakeIfNoPingDocument) {
         currentLockDoc);  // return arbitrary valid lock document, for testing purposes only.
 
     getMockCatalog()->expectUnLock(
-        [](const OID&) {
+        [](const OID&, StringData) {
             // Don't care
         },
         Status::OK());
@@ -2074,40 +2015,27 @@ TEST_F(DistLockManagerReplSetTest, TryLockWithLocalWriteConcernBusy) {
     Date_t now(Date_t::now());
     std::string whyMsg("because");
 
-    LocksType retLockDoc;
-    retLockDoc.setName(lockName);
-    retLockDoc.setState(LocksType::LOCKED);
-    retLockDoc.setProcess(getProcessID());
-    retLockDoc.setWho("me");
-    retLockDoc.setWhy(whyMsg);
-    // Will be different from the actual lock session id. For testing only.
-    retLockDoc.setLockID(OID::gen());
-
-    OID lockSessionIDPassed = OID::gen();
-
     getMockCatalog()->expectGrabLock(
-        [this, &lockName, &now, &whyMsg, &lockSessionIDPassed](StringData lockID,
-                                                               const OID& lockSessionID,
-                                                               StringData who,
-                                                               StringData processId,
-                                                               Date_t time,
-                                                               StringData why) {
+        [this, &lockName, &now, &whyMsg](StringData lockID,
+                                         const OID& lockSessionID,
+                                         StringData who,
+                                         StringData processId,
+                                         Date_t time,
+                                         StringData why) {
             ASSERT_EQUALS(lockName, lockID);
             ASSERT_TRUE(lockSessionID.isSet());
             ASSERT_EQUALS(getProcessID(), processId);
             ASSERT_GREATER_THAN_OR_EQUALS(time, now);
             ASSERT_EQUALS(whyMsg, why);
-            ASSERT_EQUALS(lockSessionIDPassed, lockSessionID);
 
             getMockCatalog()->expectNoGrabLock();  // Call only once.
         },
         {ErrorCodes::LockStateChangeFailed, "Unable to take lock"});
 
-    auto lockStatus = DistLockManager::get(operationContext())
-                          ->tryLockWithLocalWriteConcern(
-                              operationContext(), lockName, whyMsg, lockSessionIDPassed);
-    ASSERT_EQ(ErrorCodes::LockBusy, lockStatus.getStatus());
+    ASSERT_EQ(ErrorCodes::LockBusy,
+              DistLockManager::get(operationContext())
+                  ->tryLockDirectWithLocalWriteConcern(operationContext(), lockName, whyMsg));
 }
 
-}  // unnamed namespace
+}  // namespace
 }  // namespace mongo

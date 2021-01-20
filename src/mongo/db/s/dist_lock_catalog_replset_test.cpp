@@ -922,7 +922,8 @@ TEST_F(DistLockCatalogReplSetTest, OvertakeLockUnsupportedResponseFormat) {
 
 TEST_F(DistLockCatalogReplSetTest, BasicUnlock) {
     auto future = launchOnSeparateThread([this](OperationContext* opCtx) {
-        auto status = _distLockCatalog.unlock(operationContext(), OID("555f99712c99a78c5b083358"));
+        auto status = _distLockCatalog.unlock(
+            operationContext(), OID("555f99712c99a78c5b083358"), "TestName");
         ASSERT_OK(status);
     });
 
@@ -932,7 +933,7 @@ TEST_F(DistLockCatalogReplSetTest, BasicUnlock) {
 
         BSONObj expectedCmd(fromjson(R"({
                 findAndModify: "locks",
-                query: { ts: ObjectId("555f99712c99a78c5b083358") },
+                query: { ts: ObjectId("555f99712c99a78c5b083358"), _id: "TestName" },
                 update: { $set: { state: 0 }},
                 writeConcern: { w: "majority", wtimeout: 15000 },
                 maxTimeMS: 30000
@@ -989,7 +990,8 @@ TEST_F(DistLockCatalogReplSetTest, BasicUnlockWithName) {
 
 TEST_F(DistLockCatalogReplSetTest, UnlockWithNoNewDoc) {
     auto future = launchOnSeparateThread([this](OperationContext* opCtx) {
-        auto status = _distLockCatalog.unlock(operationContext(), OID("555f99712c99a78c5b083358"));
+        auto status = _distLockCatalog.unlock(
+            operationContext(), OID("555f99712c99a78c5b083358"), "TestName");
         ASSERT_OK(status);
     });
 
@@ -999,7 +1001,7 @@ TEST_F(DistLockCatalogReplSetTest, UnlockWithNoNewDoc) {
 
         BSONObj expectedCmd(fromjson(R"({
                 findAndModify: "locks",
-                query: { ts: ObjectId("555f99712c99a78c5b083358") },
+                query: { ts: ObjectId("555f99712c99a78c5b083358"), _id: "TestName" },
                 update: { $set: { state: 0 }},
                 writeConcern: { w: "majority", wtimeout: 15000 },
                 maxTimeMS: 30000
@@ -1048,21 +1050,21 @@ TEST_F(DistLockCatalogReplSetTest, UnlockWithNameWithNoNewDoc) {
 
 TEST_F(DistLockCatalogReplSetTest, UnlockTargetError) {
     configTargeter()->setFindHostReturnValue({ErrorCodes::InternalError, "can't target"});
-    auto status = _distLockCatalog.unlock(operationContext(), OID());
+    auto status = _distLockCatalog.unlock(operationContext(), OID(), "TestName");
     ASSERT_NOT_OK(status);
 }
 
 TEST_F(DistLockCatalogReplSetTest, UnlockRunCmdError) {
     shutdownExecutorPool();
 
-    auto status = _distLockCatalog.unlock(operationContext(), OID());
+    auto status = _distLockCatalog.unlock(operationContext(), OID(), "TestName");
     ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, status.code());
     ASSERT_FALSE(status.reason().empty());
 }
 
 TEST_F(DistLockCatalogReplSetTest, UnlockCommandError) {
     auto future = launchOnSeparateThread([this](OperationContext* opCtx) {
-        auto status = _distLockCatalog.unlock(operationContext(), OID());
+        auto status = _distLockCatalog.unlock(operationContext(), OID(), "TestName");
         ASSERT_EQUALS(ErrorCodes::FailedToParse, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -1080,7 +1082,7 @@ TEST_F(DistLockCatalogReplSetTest, UnlockCommandError) {
 
 TEST_F(DistLockCatalogReplSetTest, UnlockWriteError) {
     auto future = launchOnSeparateThread([this](OperationContext* opCtx) {
-        auto status = _distLockCatalog.unlock(operationContext(), OID());
+        auto status = _distLockCatalog.unlock(operationContext(), OID(), "TestName");
         ASSERT_EQUALS(ErrorCodes::Unauthorized, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -1098,7 +1100,7 @@ TEST_F(DistLockCatalogReplSetTest, UnlockWriteError) {
 
 TEST_F(DistLockCatalogReplSetTest, UnlockWriteConcernError) {
     auto future = launchOnSeparateThread([this](OperationContext* opCtx) {
-        auto status = _distLockCatalog.unlock(operationContext(), OID());
+        auto status = _distLockCatalog.unlock(operationContext(), OID(), "TestName");
         ASSERT_EQUALS(ErrorCodes::WriteConcernFailed, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -1123,7 +1125,7 @@ TEST_F(DistLockCatalogReplSetTest, UnlockWriteConcernError) {
 
 TEST_F(DistLockCatalogReplSetTest, UnlockUnsupportedWriteConcernResponse) {
     auto future = launchOnSeparateThread([this](OperationContext* opCtx) {
-        auto status = _distLockCatalog.unlock(operationContext(), OID());
+        auto status = _distLockCatalog.unlock(operationContext(), OID(), "TestName");
         ASSERT_EQUALS(ErrorCodes::UnsupportedFormat, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -1145,7 +1147,7 @@ TEST_F(DistLockCatalogReplSetTest, UnlockUnsupportedWriteConcernResponse) {
 
 TEST_F(DistLockCatalogReplSetTest, UnlockUnsupportedResponseFormat) {
     auto future = launchOnSeparateThread([this](OperationContext* opCtx) {
-        auto status = _distLockCatalog.unlock(operationContext(), OID());
+        auto status = _distLockCatalog.unlock(operationContext(), OID(), "TestName");
         ASSERT_EQUALS(ErrorCodes::UnsupportedFormat, status.code());
     });
 
