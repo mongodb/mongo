@@ -115,6 +115,9 @@ struct __wt_txn_shared {
     WT_CACHE_LINE_PAD_END
 };
 
+TAILQ_HEAD(__wt_txn_dts_qh, __wt_txn_shared);
+TAILQ_HEAD(__wt_txn_rts_qh, __wt_txn_shared);
+
 struct __wt_txn_global {
     volatile uint64_t current; /* Current transaction ID. */
 
@@ -150,12 +153,12 @@ struct __wt_txn_global {
 
     /* List of transactions sorted by durable timestamp. */
     WT_RWLOCK durable_timestamp_rwlock;
-    TAILQ_HEAD(__wt_txn_dts_qh, __wt_txn_shared) durable_timestamph;
+    struct __wt_txn_dts_qh durable_timestamph;
     uint32_t durable_timestampq_len;
 
     /* List of transactions sorted by read timestamp. */
     WT_RWLOCK read_timestamp_rwlock;
-    TAILQ_HEAD(__wt_txn_rts_qh, __wt_txn_shared) read_timestamph;
+    struct __wt_txn_rts_qh read_timestamph;
     uint32_t read_timestampq_len;
 
     /*
@@ -185,6 +188,24 @@ typedef enum __wt_txn_isolation {
     WT_ISO_SNAPSHOT
 } WT_TXN_ISOLATION;
 
+typedef enum __wt_txn_type {
+    WT_TXN_OP_NONE = 0,
+    WT_TXN_OP_BASIC_COL,
+    WT_TXN_OP_BASIC_ROW,
+    WT_TXN_OP_INMEM_COL,
+    WT_TXN_OP_INMEM_ROW,
+    WT_TXN_OP_REF_DELETE,
+    WT_TXN_OP_TRUNCATE_COL,
+    WT_TXN_OP_TRUNCATE_ROW
+} WT_TXN_TYPE;
+
+typedef enum {
+    WT_TXN_TRUNC_ALL,
+    WT_TXN_TRUNC_BOTH,
+    WT_TXN_TRUNC_START,
+    WT_TXN_TRUNC_STOP
+} WT_TXN_TRUNC_MODE;
+
 /*
  * WT_TXN_OP --
  *	A transactional operation.  Each transaction builds an in-memory array
@@ -193,16 +214,7 @@ typedef enum __wt_txn_isolation {
  */
 struct __wt_txn_op {
     WT_BTREE *btree;
-    enum {
-        WT_TXN_OP_NONE = 0,
-        WT_TXN_OP_BASIC_COL,
-        WT_TXN_OP_BASIC_ROW,
-        WT_TXN_OP_INMEM_COL,
-        WT_TXN_OP_INMEM_ROW,
-        WT_TXN_OP_REF_DELETE,
-        WT_TXN_OP_TRUNCATE_COL,
-        WT_TXN_OP_TRUNCATE_ROW
-    } type;
+    WT_TXN_TYPE type;
     union {
         /* WT_TXN_OP_BASIC_ROW, WT_TXN_OP_INMEM_ROW */
         struct {
@@ -230,12 +242,7 @@ struct __wt_txn_op {
         /* WT_TXN_OP_TRUNCATE_ROW */
         struct {
             WT_ITEM start, stop;
-            enum {
-                WT_TXN_TRUNC_ALL,
-                WT_TXN_TRUNC_BOTH,
-                WT_TXN_TRUNC_START,
-                WT_TXN_TRUNC_STOP
-            } mode;
+            WT_TXN_TRUNC_MODE mode;
         } truncate_row;
     } u;
 

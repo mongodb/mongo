@@ -224,14 +224,23 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 void
 __wt_ref_addr_free(WT_SESSION_IMPL *session, WT_REF *ref)
 {
-    if (ref->addr == NULL)
-        return;
+    void *ref_addr;
 
-    if (ref->home == NULL || __wt_off_page(ref->home, ref->addr)) {
-        __wt_free(session, ((WT_ADDR *)ref->addr)->addr);
-        __wt_free(session, ref->addr);
+    /*
+     * The page being discarded may be the child of a page being split, where the WT_REF.addr field
+     * is being instantiated (as it can no longer reference the on-disk image). Loop until we read
+     * and clear the address without a race, then free the read address as necessary.
+     */
+    do {
+        WT_ORDERED_READ(ref_addr, ref->addr);
+        if (ref_addr == NULL)
+            return;
+    } while (!__wt_atomic_cas_ptr(&ref->addr, ref_addr, NULL));
+
+    if (ref->home == NULL || __wt_off_page(ref->home, ref_addr)) {
+        __wt_free(session, ((WT_ADDR *)ref_addr)->addr);
+        __wt_free(session, ref_addr);
     }
-    ref->addr = NULL;
 }
 
 /*

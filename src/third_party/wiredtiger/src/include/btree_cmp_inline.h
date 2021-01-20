@@ -36,8 +36,8 @@ __wt_lex_compare(const WT_ITEM *user_item, const WT_ITEM *tree_item)
     tsz = tree_item->size;
     len = WT_MIN(usz, tsz);
 
-    userp = user_item->data;
-    treep = tree_item->data;
+    userp = (const uint8_t *)user_item->data;
+    treep = (const uint8_t *)tree_item->data;
 
 #ifdef HAVE_X86INTRIN_H
     /* Use vector instructions if we'll execute at least 2 of them. */
@@ -221,8 +221,8 @@ __wt_lex_compare_short(const WT_ITEM *user_item, const WT_ITEM *tree_item)
     tsz = tree_item->size;
     len = WT_MIN(usz, tsz);
 
-    userp = user_item->data;
-    treep = tree_item->data;
+    userp = (const uint8_t *)user_item->data;
+    treep = (const uint8_t *)tree_item->data;
 
 /*
  * The maximum packed uint64_t is 9B, catch row-store objects using packed record numbers as keys.

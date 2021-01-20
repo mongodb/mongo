@@ -59,6 +59,31 @@
  */
 #define WT_BTREE_MIN_SPLIT_PCT 50
 
+typedef enum __wt_btree_type {
+    BTREE_COL_FIX = 1, /* Fixed-length column store */
+    BTREE_COL_VAR = 2, /* Variable-length column store */
+    BTREE_ROW = 3      /* Row-store */
+} WT_BTREE_TYPE;
+
+typedef enum __wt_btree_sync {
+    WT_BTREE_SYNC_OFF,
+    WT_BTREE_SYNC_WAIT,
+    WT_BTREE_SYNC_RUNNING
+} WT_BTREE_SYNC;
+
+typedef enum {
+    CKSUM_ON = 1,          /* On */
+    CKSUM_OFF = 2,         /* Off */
+    CKSUM_UNCOMPRESSED = 3 /* Uncompressed blocks only */
+} WT_BTREE_CHECKSUM;
+
+typedef enum { /* Start position for eviction walk */
+    WT_EVICT_WALK_NEXT,
+    WT_EVICT_WALK_PREV,
+    WT_EVICT_WALK_RAND_NEXT,
+    WT_EVICT_WALK_RAND_PREV
+} WT_EVICT_WALK_TYPE;
+
 /*
  * An invalid btree file ID value. ID 0 is reserved for the metadata file.
  */
@@ -73,11 +98,7 @@ struct __wt_btree {
 
     WT_CKPT *ckpt; /* Checkpoint information */
 
-    enum {
-        BTREE_COL_FIX = 1, /* Fixed-length column store */
-        BTREE_COL_VAR = 2, /* Variable-length column store */
-        BTREE_ROW = 3      /* Row-store */
-    } type;                /* Type */
+    WT_BTREE_TYPE type; /* Type */
 
     const char *key_format;   /* Key format */
     const char *value_format; /* Value format */
@@ -102,11 +123,7 @@ struct __wt_btree {
 
     void *huffman_value; /* Value huffman encoding */
 
-    enum {
-        CKSUM_ON = 1,          /* On */
-        CKSUM_OFF = 2,         /* Off */
-        CKSUM_UNCOMPRESSED = 3 /* Uncompressed blocks only */
-    } checksum;                /* Checksum configuration */
+    WT_BTREE_CHECKSUM checksum; /* Checksum configuration */
 
     /*
      * Reconciliation...
@@ -161,11 +178,7 @@ struct __wt_btree {
 
     uint64_t checkpoint_gen;       /* Checkpoint generation */
     WT_SESSION_IMPL *sync_session; /* Syncing session */
-    volatile enum {
-        WT_BTREE_SYNC_OFF,
-        WT_BTREE_SYNC_WAIT,
-        WT_BTREE_SYNC_RUNNING
-    } syncing; /* Sync status */
+    WT_BTREE_SYNC syncing;         /* Sync status */
 
 /*
  * Helper macros: WT_BTREE_SYNCING indicates if a sync is active (either waiting to start or already
@@ -233,12 +246,7 @@ struct __wt_btree {
     int32_t evict_disabled;       /* Eviction disabled count */
     bool evict_disabled_open;     /* Eviction disabled on open */
     volatile uint32_t evict_busy; /* Count of threads in eviction */
-    enum {                        /* Start position for eviction walk */
-        WT_EVICT_WALK_NEXT,
-        WT_EVICT_WALK_PREV,
-        WT_EVICT_WALK_RAND_NEXT,
-        WT_EVICT_WALK_RAND_PREV
-    } evict_start_type;
+    WT_EVICT_WALK_TYPE evict_start_type;
 
 /*
  * Flag values up to 0xff are reserved for WT_DHANDLE_XXX. We don't automatically generate these

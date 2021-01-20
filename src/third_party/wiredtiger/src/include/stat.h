@@ -97,7 +97,7 @@ __wt_stats_aggregate(void *stats_arg, int slot)
     int64_t **stats, aggr_v;
     int i;
 
-    stats = stats_arg;
+    stats = (int64_t **)stats_arg;
     for (aggr_v = 0, i = 0; i < WT_COUNTER_SLOTS; i++)
         aggr_v += stats[i][slot];
 
@@ -128,7 +128,7 @@ __wt_stats_clear(void *stats_arg, int slot)
     int64_t **stats;
     int i;
 
-    stats = stats_arg;
+    stats = (int64_t **)stats_arg;
     for (i = 0; i < WT_COUNTER_SLOTS; i++)
         stats[i][slot] = 0;
 }

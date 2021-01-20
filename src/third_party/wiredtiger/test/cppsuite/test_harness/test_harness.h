@@ -2,8 +2,12 @@
 #ifndef TEST_HARNESS_H
 #define TEST_HARNESS_H
 
+/* Required to build using older versions of g++. */
+#include <cinttypes>
+
 extern "C" {
 #include "wiredtiger.h"
+#include "wt_internal.h"
 }
 
 namespace test_harness {
