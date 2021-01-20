@@ -854,6 +854,7 @@ HeartbeatResponseAction TopologyCoordinator::processHeartbeatResponse(
     MemberData& hbData = _memberData.at(memberIndex);
     const MemberConfig member = _rsConfig.getMemberAt(memberIndex);
     bool advancedOpTime = false;
+    bool becameElectable = false;
     if (!hbResponse.isOK()) {
         if (isUnauthorized) {
             hbData.setAuthIssue(now);
@@ -871,7 +872,9 @@ HeartbeatResponseAction TopologyCoordinator::processHeartbeatResponse(
         ReplSetHeartbeatResponse hbr = std::move(hbResponse.getValue());
         LOG(3) << "setUpValues: heartbeat response good for member _id:" << member.getId();
         pingsInConfig++;
+        auto wasUnelectable = hbData.isUnelectable();
         advancedOpTime = hbData.setUpValues(now, std::move(hbr));
+        becameElectable = wasUnelectable && !hbData.isUnelectable();
     }
 
     HeartbeatResponseAction nextAction;
@@ -879,6 +882,7 @@ HeartbeatResponseAction TopologyCoordinator::processHeartbeatResponse(
 
     nextAction.setNextHeartbeatStartDate(nextHeartbeatStartDate);
     nextAction.setAdvancedOpTime(advancedOpTime);
+    nextAction.setBecameElectable(becameElectable);
     return nextAction;
 }
 

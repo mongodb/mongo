@@ -237,9 +237,13 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
 
     if (action.getAction() == HeartbeatResponseAction::NoAction && hbStatusResponse.isOK() &&
         hbStatusResponse.getValue().hasState() &&
-        hbStatusResponse.getValue().getState() != MemberState::RS_PRIMARY &&
-        action.getAdvancedOpTime()) {
-        _updateLastCommittedOpTimeAndWallTime(lk);
+        hbStatusResponse.getValue().getState() != MemberState::RS_PRIMARY) {
+        if (action.getAdvancedOpTime()) {
+            _updateLastCommittedOpTimeAndWallTime(lk);
+        } else if (action.getBecameElectable() && _topCoord->isSteppingDown()) {
+            // Try to wake up the stepDown waiter when a new node becomes electable.
+            _wakeReadyWaiters(lk);
+        }
     }
 
     // Abort catchup if we have caught up to the latest known optime after heartbeat refreshing.

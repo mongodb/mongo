@@ -79,5 +79,9 @@ void HeartbeatResponseAction::setAdvancedOpTime(bool advanced) {
     _advancedOpTime = advanced;
 }
 
+void HeartbeatResponseAction::setBecameElectable(bool becameElectable) {
+    _becameElectable = becameElectable;
+}
+
 }  // namespace repl
 }  // namespace mongo
