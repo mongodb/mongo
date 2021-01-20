@@ -10561,7 +10561,7 @@ buildvariants:
 
 - <<: *enterprise-rhel-62-64-bit-dynamic-required-template
   name: enterprise-rhel-80-64-bit-dynamic-c4-4xlarge
-  display_name: ~ Shared Library Enterprise RHEL 8.0 - c4.4xlarge"
+  display_name: ~ Shared Library Enterprise RHEL 8.0 - c4.4xlarge
   run_on:
   - rhel80-large-c4
   expansions:
@@ -10571,17 +10571,17 @@ buildvariants:
   - name: unittests_parallel_TG
   - name: dbtest_parallel_TG
 
-- <<: *enterprise-rhel-62-64-bit-dynamic-required-template
-  name: enterprise-rhel-80-64-bit-dynamic-c5-9xlarge
-  display_name: ~ Shared Library Enterprise RHEL 8.0 - c5.9xlarge"
-  run_on:
-  - rhel80-xlarge
-  expansions:
-    <<: *enterprise-rhel-62-64-bit-dynamic-required-expansions
-  tasks:
-  - name: compile_parallel_TG
-  - name: unittests_parallel_TG
-  - name: dbtest_parallel_TG
+# - <<: *enterprise-rhel-62-64-bit-dynamic-required-template
+#   name: enterprise-rhel-80-64-bit-dynamic-c5-9xlarge
+#   display_name: ~ Shared Library Enterprise RHEL 8.0 - c5.9xlarge
+#   run_on:
+#   - rhel80-xlarge
+#   expansions:
+#     <<: *enterprise-rhel-62-64-bit-dynamic-required-expansions
+#   tasks:
+#   - name: compile_parallel_TG
+#   - name: unittests_parallel_TG
+#   - name: dbtest_parallel_TG
 
 - name: enterprise-rhel-62-64-bit-dynamic-all-feature-flags
   display_name: "! Shared Library Enterprise RHEL 6.2 (all feature flags)"
