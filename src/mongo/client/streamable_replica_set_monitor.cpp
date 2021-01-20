@@ -356,18 +356,20 @@ SemiFuture<std::vector<HostAndPort>> StreamableReplicaSetMonitor::getHostsOrRefr
             return {*immediateResult};
         }
 
-        return _enqueueOutstandingQuery(lk, criteria, cancelToken, deadline);
+        return _enqueueOutstandingQuery(lk, criteria, excludedHosts, cancelToken, deadline);
     });
 }
 
 SemiFuture<std::vector<HostAndPort>> StreamableReplicaSetMonitor::_enqueueOutstandingQuery(
     WithLock,
     const ReadPreferenceSetting& criteria,
+    const std::vector<HostAndPort>& excludedHosts,
     const CancelationToken& cancelToken,
     const Date_t& deadline) {
 
     auto query = std::make_shared<HostQuery>();
     query->criteria = criteria;
+    query->excludedHosts = excludedHosts;
 
     auto pf = makePromiseFuture<std::vector<HostAndPort>>();
     query->promise = std::move(pf.promise);
@@ -783,7 +785,7 @@ void StreamableReplicaSetMonitor::_processOutstanding(
 
         // If query has not been canceled yet, try to satisfy it.
         if (!query->hasBeenResolved()) {
-            auto result = _getHosts(topologyDescription, query->criteria);
+            auto result = _getHosts(topologyDescription, query->criteria, query->excludedHosts);
             if (result) {
                 if (query->tryResolveWithSuccess(std::move(*result))) {
                     const auto latency = _executor->now() - query->start;

@@ -453,6 +453,16 @@ server_parameters:
         cpp_varname: tenantMigrationDisableX509Auth
         default: false
 
+    tenantMigrationExcludeDonorHostTimeoutMS:
+        description: >-
+            Period of time, in milliseconds, that a donor host should be excluded for.
+        set_at: startup
+        cpp_vartype: int
+        cpp_varname: tenantMigrationExcludeDonorHostTimeoutMS
+        default: 60000
+        validator:
+            gte: 1
+
 feature_flags:
     featureFlagTenantMigrations:
         description: >-

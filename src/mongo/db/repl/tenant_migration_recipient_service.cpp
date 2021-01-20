@@ -95,6 +95,7 @@ MONGO_FAIL_POINT_DEFINE(fpAfterStartingOplogApplierMigrationRecipientInstance);
 MONGO_FAIL_POINT_DEFINE(fpAfterDataConsistentMigrationRecipientInstance);
 MONGO_FAIL_POINT_DEFINE(hangBeforeTaskCompletion);
 MONGO_FAIL_POINT_DEFINE(fpAfterReceivingRecipientForgetMigration);
+MONGO_FAIL_POINT_DEFINE(hangAfterCreatingRSM);
 
 namespace {
 // We never restart just the oplog fetcher.  If a failure occurs, we restart the whole state machine
@@ -280,6 +281,10 @@ boost::optional<BSONObj> TenantMigrationRecipientService::Instance::reportForCur
     if (_stateDoc.getExpireAt())
         bob.append("expireAt", _stateDoc.getExpireAt()->toString());
 
+    if (_client) {
+        bob.append("donorSyncSource", _client->getServerAddress());
+    }
+
     return bob.obj();
 }
 
@@ -388,6 +393,22 @@ std::unique_ptr<DBClientConnection> TenantMigrationRecipientService::Instance::_
     return client;
 }
 
+OpTime TenantMigrationRecipientService::Instance::_getDonorMajorityOpTime(
+    std::unique_ptr<mongo::DBClientConnection>& client) {
+    auto oplogOpTimeFields =
+        BSON(OplogEntry::kTimestampFieldName << 1 << OplogEntry::kTermFieldName << 1);
+    auto majorityOpTimeBson =
+        client->findOne(NamespaceString::kRsOplogNamespace.ns(),
+                        Query().sort("$natural", -1),
+                        &oplogOpTimeFields,
+                        QueryOption_SecondaryOk,
+                        ReadConcernArgs(ReadConcernLevel::kMajorityReadConcern).toBSONInner());
+    uassert(5272003, "Found no entries in the remote oplog", !majorityOpTimeBson.isEmpty());
+
+    auto majorityOpTime = uassertStatusOK(OpTime::parseFromOplogEntry(majorityOpTimeBson));
+    return majorityOpTime;
+}
+
 SemiFuture<TenantMigrationRecipientService::Instance::ConnectionPair>
 TenantMigrationRecipientService::Instance::_createAndConnectClients() {
     LOGV2_DEBUG(4880401,
@@ -414,53 +435,118 @@ TenantMigrationRecipientService::Instance::_createAndConnectClients() {
             .getAsync([getHostCancelSource](auto) mutable { getHostCancelSource.cancel(); });
     });
 
-    // Get all donor hosts that we have excluded.
-    const auto& excludedHosts = _getExcludedDonorHosts(lk);
+    if (MONGO_unlikely(hangAfterCreatingRSM.shouldFail())) {
+        LOGV2(5272004, "hangAfterCreatingRSM failpoint enabled");
+        hangAfterCreatingRSM.pauseWhileSet();
+    }
 
-    return _donorReplicaSetMonitor
-        ->getHostOrRefresh(_readPreference, excludedHosts, getHostCancelSource.token())
-        .thenRunOn(**_scopedExecutor)
-        .then([this, self = shared_from_this()](const HostAndPort& serverAddress) {
-            // Application name is constructed such that it doesn't exceeds
-            // kMaxApplicationNameByteLength (128 bytes).
-            // "TenantMigration_" (16 bytes) + <tenantId> (61 bytes) + "_" (1 byte) +
-            // <migrationUuid> (36 bytes) =  114 bytes length.
-            // Note: Since the total length of tenant database name (<tenantId>_<user provided db
-            // name>) can't exceed 63 bytes and the user provided db name should be at least one
-            // character long, the maximum length of tenantId can only be 61 bytes.
-            auto applicationName =
-                "TenantMigration_" + getTenantId() + "_" + getMigrationUUID().toString();
+    const auto kDelayedMajorityOpTimeErrorCode = 5272000;
 
-            auto client = _connectAndAuth(serverAddress, applicationName);
+    return AsyncTry([this,
+                     self = shared_from_this(),
+                     getHostCancelSource,
+                     kDelayedMajorityOpTimeErrorCode] {
+               stdx::lock_guard lk(_mutex);
 
-            // Application name is constructed such that it doesn't exceeds
-            // kMaxApplicationNameByteLength (128 bytes).
-            // "TenantMigration_" (16 bytes) + <tenantId> (61 bytes) + "_" (1 byte) +
-            // <migrationUuid> (36 bytes) + _oplogFetcher" (13 bytes) =  127 bytes length.
-            applicationName += "_oplogFetcher";
-            auto oplogFetcherClient = _connectAndAuth(serverAddress, applicationName);
-            return ConnectionPair(std::move(client), std::move(oplogFetcherClient));
-        })
-        .onError(
-            [this, self = shared_from_this()](const Status& status) -> SemiFuture<ConnectionPair> {
+               // Get all donor hosts that we have excluded.
+               const auto& excludedHosts = _getExcludedDonorHosts(lk);
+
+               return _donorReplicaSetMonitor
+                   ->getHostOrRefresh(_readPreference, excludedHosts, getHostCancelSource.token())
+                   .thenRunOn(**_scopedExecutor)
+                   .then([this, self = shared_from_this(), kDelayedMajorityOpTimeErrorCode](
+                             const HostAndPort& serverAddress) {
+                       LOGV2(5272002,
+                             "Attempting to connect to donor host",
+                             "donorHost"_attr = serverAddress,
+                             "tenantId"_attr = getTenantId(),
+                             "migrationId"_attr = getMigrationUUID());
+                       // Application name is constructed such that it doesn't exceeds
+                       // kMaxApplicationNameByteLength (128 bytes).
+                       // "TenantMigration_" (16 bytes) + <tenantId> (61 bytes) + "_" (1 byte) +
+                       // <migrationUuid> (36 bytes) =  114 bytes length.
+                       // Note: Since the total length of tenant database name (<tenantId>_<user
+                       // provided db name>) can't exceed 63 bytes and the user provided db name
+                       // should be at least one character long, the maximum length of tenantId can
+                       // only be 61 bytes.
+                       auto applicationName =
+                           "TenantMigration_" + getTenantId() + "_" + getMigrationUUID().toString();
+
+                       auto client = _connectAndAuth(serverAddress, applicationName);
+
+                       boost::optional<repl::OpTime> startApplyingOpTime;
+                       {
+                           stdx::lock_guard lk(_mutex);
+                           startApplyingOpTime = _stateDoc.getStartApplyingDonorOpTime();
+                       }
+
+                       if (startApplyingOpTime) {
+                           auto majoritySnapshotOpTime = _getDonorMajorityOpTime(client);
+
+                           if (majoritySnapshotOpTime < *startApplyingOpTime) {
+                               stdx::lock_guard lk(_mutex);
+                               const auto now =
+                                   getGlobalServiceContext()->getFastClockSource()->now();
+                               _excludeDonorHost(
+                                   lk,
+                                   serverAddress,
+                                   now + Milliseconds(tenantMigrationExcludeDonorHostTimeoutMS));
+                               uasserted(
+                                   kDelayedMajorityOpTimeErrorCode,
+                                   str::stream()
+                                       << "majoritySnapshotOpTime on donor host must not be behind "
+                                          "startApplyingDonorOpTime, majoritySnapshotOpTime: "
+                                       << majoritySnapshotOpTime.toString()
+                                       << "; startApplyingDonorOpTime: "
+                                       << (*startApplyingOpTime).toString());
+                           }
+                       }
+
+                       // Application name is constructed such that it doesn't exceed
+                       // kMaxApplicationNameByteLength (128 bytes).
+                       // "TenantMigration_" (16 bytes) + <tenantId> (61 bytes) + "_" (1 byte) +
+                       // <migrationUuid> (36 bytes) + _oplogFetcher" (13 bytes) =  127 bytes
+                       // length.
+                       applicationName += "_oplogFetcher";
+                       auto oplogFetcherClient = _connectAndAuth(serverAddress, applicationName);
+                       return ConnectionPair(std::move(client), std::move(oplogFetcherClient));
+                   });
+           })
+        .until([this, self = shared_from_this(), kDelayedMajorityOpTimeErrorCode](
+                   const StatusWith<ConnectionPair>& status) {
+            if (!status.isOK()) {
                 LOGV2_ERROR(4880404,
                             "Connecting to donor failed",
                             "tenantId"_attr = getTenantId(),
                             "migrationId"_attr = getMigrationUUID(),
-                            "error"_attr = status);
+                            "error"_attr = status.getStatus());
 
                 // Make sure we don't end up with a partially initialized set of connections.
                 stdx::lock_guard lk(_mutex);
                 _client = nullptr;
                 _oplogFetcherClient = nullptr;
-                return status;
-            })
+
+                // If the future chain has been interrupted, stop retrying.
+                if (_taskState.isInterrupted()) {
+                    return true;
+                }
+
+                // If the connection failed because the majority snapshot OpTime on the donor host
+                // was not ahead of our stored 'startApplyingDonorOpTime, choose another donor host
+                // to connect to.
+                if (status.getStatus() == ErrorCodes::Error(kDelayedMajorityOpTimeErrorCode)) {
+                    return false;
+                }
+            }
+            return true;
+        })
+        .on(**_scopedExecutor, CancelationToken::uncancelable())
         .semi();
 }
 
-void TenantMigrationRecipientService::Instance::excludeDonorHost(const HostAndPort& host,
-                                                                 Date_t until) {
-    stdx::lock_guard lk(_mutex);
+void TenantMigrationRecipientService::Instance::_excludeDonorHost(WithLock,
+                                                                  const HostAndPort& host,
+                                                                  Date_t until) {
     LOGV2_DEBUG(5271800,
                 2,
                 "Excluding donor host",
@@ -546,22 +632,13 @@ void TenantMigrationRecipientService::Instance::_getStartOpTimesFromDonor(WithLo
     invariant(!_stateDoc.getStartFetchingDonorOpTime().has_value());
     // Get the last oplog entry at the read concern majority optime in the remote oplog.  It
     // does not matter which tenant it is for.
-    auto oplogOpTimeFields =
-        BSON(OplogEntry::kTimestampFieldName << 1 << OplogEntry::kTermFieldName << 1);
-    auto lastOplogEntry1Bson =
-        _client->findOne(NamespaceString::kRsOplogNamespace.ns(),
-                         Query().sort("$natural", -1),
-                         &oplogOpTimeFields,
-                         QueryOption_SecondaryOk,
-                         ReadConcernArgs(ReadConcernLevel::kMajorityReadConcern).toBSONInner());
-    uassert(4880601, "Found no entries in the remote oplog", !lastOplogEntry1Bson.isEmpty());
+    auto lastOplogEntry1OpTime = _getDonorMajorityOpTime(_client);
     LOGV2_DEBUG(4880600,
                 2,
                 "Found last oplog entry at read concern majority optime on remote node",
                 "migrationId"_attr = getMigrationUUID(),
                 "tenantId"_attr = _stateDoc.getTenantId(),
-                "lastOplogEntry"_attr = lastOplogEntry1Bson);
-    auto lastOplogEntry1OpTime = uassertStatusOK(OpTime::parseFromOplogEntry(lastOplogEntry1Bson));
+                "lastOplogEntry"_attr = lastOplogEntry1OpTime.toBSON());
 
     // Get the optime of the earliest transaction that was open at the read concern majority optime
     // As with the last oplog entry, it does not matter that this may be for a different tenant; an
@@ -589,21 +666,14 @@ void TenantMigrationRecipientService::Instance::_getStartOpTimesFromDonor(WithLo
     // We need to fetch the last oplog entry both before and after getting the transaction
     // table entry, as otherwise there is a potential race where we may try to apply
     // a commit for which we have not fetched a previous transaction oplog entry.
-    auto lastOplogEntry2Bson =
-        _client->findOne(NamespaceString::kRsOplogNamespace.ns(),
-                         Query().sort("$natural", -1),
-                         &oplogOpTimeFields,
-                         QueryOption_SecondaryOk,
-                         ReadConcernArgs(ReadConcernLevel::kMajorityReadConcern).toBSONInner());
-    uassert(4880603, "Found no entries in the remote oplog", !lastOplogEntry2Bson.isEmpty());
+    auto lastOplogEntry2OpTime = _getDonorMajorityOpTime(_client);
     LOGV2_DEBUG(4880604,
                 2,
                 "Found last oplog entry at the read concern majority optime (after reading txn "
                 "table) on remote node",
                 "migrationId"_attr = getMigrationUUID(),
                 "tenantId"_attr = _stateDoc.getTenantId(),
-                "lastOplogEntry"_attr = lastOplogEntry2Bson);
-    auto lastOplogEntry2OpTime = uassertStatusOK(OpTime::parseFromOplogEntry(lastOplogEntry2Bson));
+                "lastOplogEntry"_attr = lastOplogEntry2OpTime.toBSON());
     _stateDoc.setStartApplyingDonorOpTime(lastOplogEntry2OpTime);
 
     OpTime startFetchingDonorOpTime = lastOplogEntry1OpTime;

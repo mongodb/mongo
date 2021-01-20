@@ -151,11 +151,6 @@ public:
                                                      const Timestamp& donorTs) const;
 
         /*
-         * Suppresses selecting 'host' as the donor sync source, until 'until'.
-         */
-        void excludeDonorHost(const HostAndPort& host, Date_t until);
-
-        /*
          *  Set the oplog creator functor, to allow use of a mock oplog fetcher.
          */
         void setCreateOplogFetcherFn_forTest(
@@ -169,6 +164,14 @@ public:
         void stopOplogApplier_forTest() {
             stdx::lock_guard lk(_mutex);
             _tenantOplogApplier->shutdown();
+        }
+
+        /*
+         * Suppresses selecting 'host' as the donor sync source, until 'until'.
+         */
+        void excludeDonorHost_forTest(const HostAndPort& host, Date_t until) {
+            stdx::lock_guard lk(_mutex);
+            _excludeDonorHost(lk, host, until);
         }
 
     private:
@@ -391,10 +394,15 @@ public:
         void _cleanupOnDataSyncCompletion(Status status);
 
         /*
+         * Suppresses selecting 'host' as the donor sync source, until 'until'.
+         */
+        void _excludeDonorHost(WithLock, const HostAndPort& host, Date_t until);
+
+        /*
          * Returns a vector of currently excluded donor hosts. Also removes hosts from the list of
          * excluded donor nodes, if the exclude duration has expired.
          */
-        std::vector<HostAndPort> _getExcludedDonorHosts(WithLock lk);
+        std::vector<HostAndPort> _getExcludedDonorHosts(WithLock);
 
         /*
          * Makes the failpoint to stop or hang based on failpoint data "action" field.
@@ -405,6 +413,11 @@ public:
          * Updates the state doc in the database and waits for that to be propagated to a majority.
          */
         SharedSemiFuture<void> _updateStateDocForMajority(WithLock lk) const;
+
+        /*
+         * Returns the majority OpTime on the donor node that 'client' is connected to.
+         */
+        OpTime _getDonorMajorityOpTime(std::unique_ptr<mongo::DBClientConnection>& client);
 
         mutable Mutex _mutex = MONGO_MAKE_LATCH("TenantMigrationRecipientService::_mutex");
 

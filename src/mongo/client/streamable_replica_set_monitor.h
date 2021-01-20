@@ -180,6 +180,8 @@ private:
 
         ReadPreferenceSetting criteria;
 
+        std::vector<HostAndPort> excludedHosts;
+
         // Used to compute latency.
         Date_t start;
 
@@ -201,6 +203,7 @@ private:
     SemiFuture<std::vector<HostAndPort>> _enqueueOutstandingQuery(
         WithLock,
         const ReadPreferenceSetting& criteria,
+        const std::vector<HostAndPort>& excludedHosts,
         const CancelationToken& cancelToken,
         const Date_t& deadline);
 

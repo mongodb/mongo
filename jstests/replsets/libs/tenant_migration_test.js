@@ -418,8 +418,7 @@ function TenantMigrationTest({
         const db = this.getDonorPrimary().getDB(dbName);
         const coll = db.getCollection(collName);
 
-        assert.commandWorked(coll.insertMany(data));
-        this.getDonorRst().awaitReplication();
+        assert.commandWorked(coll.insertMany(data, {writeConcern: {w: 'majority'}}));
     };
 
     /**
