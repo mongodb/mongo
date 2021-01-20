@@ -140,6 +140,8 @@ class EnterpriseDistro(packager.Distro):
         if arch == "aarch64":
             if self.dname == 'redhat':
                 return ["rhel82"]
+            if self.dname == 'amazon2':
+                return ["amazon2"]
             return []
 
         if re.search("(redhat|fedora|centos)", self.dname):

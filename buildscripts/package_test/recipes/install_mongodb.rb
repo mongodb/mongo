@@ -89,6 +89,9 @@ if platform_family? 'debian'
 end
 
 if platform_family? 'rhel'
+  bash 'wait for yum updates if they are running' do
+    sleep 120
+  end
   execute 'install mongod' do
     command 'yum install -y `find . -name "*server*.rpm"`'
     live_stream true

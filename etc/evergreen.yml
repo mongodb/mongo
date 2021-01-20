@@ -291,6 +291,7 @@ variables:
 # If a variant is listed here and has a push task, mongocryptd is pushed
 - mongocryptd_variants: &mongocryptd_variants
   - enterprise-amazon2
+  - enterprise-amazon2-arm64
   - enterprise-debian92-64
   - enterprise-debian10-64
   - enterprise-linux-64-amazon-ami
@@ -349,6 +350,7 @@ variables:
   - enterprise-rhel-80-64-bit-dynamic
   - enterprise-rhel-70-64-bit
   - enterprise-rhel-82-arm64
+  - enterprise-amazon2-arm64
   - enterprise-ubuntu1604-64
   - enterprise-ubuntu1804-64
   - enterprise-windows
@@ -360,6 +362,7 @@ variables:
   - enterprise-linux-64-amazon-ami
   - amazon2
   - enterprise-amazon2
+  - enterprise-amazon2-arm64
   - debian10
   - enterprise-debian10-64
   - debian92
@@ -2597,17 +2600,21 @@ functions:
         export KITCHEN_SUBNET="${kitchen_subnet}"
         export KITCHEN_VPC="${kitchen_vpc}"
 
+        if [[ "${packager_arch}" == "aarch64" || "${packager_arch}" == "arm64" ]]; then
+          kitchen_packager_distro="${packager_distro}-arm64"
+        else
+          kitchen_packager_distro="${packager_distro}-x86-64"
+        fi
+
         ${activate_virtualenv}
         # set expiration tag 2 hours in the future, since no test should take this long
         export KITCHEN_EXPIRE="$($python -c 'import datetime; print((datetime.datetime.utcnow() + datetime.timedelta(hours=2)).strftime("%Y-%m-%d %H:%M:%S"))')"
 
         for i in {1..3}
         do
-          # kitchen commands use regex so 'kitchen verify amazon' matches both amazon and amazon2
-          # that's why we pass $ at the end of "${packager_distro}"
-          if ! kitchen verify "${packager_distro}"\$; then
+          if ! kitchen verify $kitchen_packager_distro; then
             verified="false"
-            kitchen destroy "${packager_distro}"\$ || true
+            kitchen destroy $kitchen_packager_distro || true
             sleep 30
           else
             verified="true"
@@ -2615,7 +2622,7 @@ functions:
           fi
         done
 
-        kitchen destroy "${packager_distro}"\$ || true
+        kitchen destroy $kitchen_packager_distro || true
         test "$verified" = "true"
 
   "set up EC2 instance": &set_up_ec2_instance
@@ -9621,6 +9628,106 @@ buildvariants:
   - name: .publish
     distros:
     - amazon2-small
+
+- name: enterprise-amazon2-arm64
+  display_name: "Enterprise Amazon Linux 2 arm64"
+  modules:
+  - enterprise
+  run_on:
+  - amazon2-arm64-small
+  expansions:
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
+    push_path: linux
+    push_bucket: downloads.10gen.com
+    push_name: linux
+    push_arch: aarch64-enterprise-amazon2
+    compile_flags: --ssl MONGO_DISTMOD=amazon2 -j$(grep -c ^processor /proc/cpuinfo) CCFLAGS="-march=armv8-a+crc -mtune=generic" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    has_packages: true
+    packager_script: packager_enterprise.py
+    packager_arch: aarch64
+    packager_distro: amazon2
+    repo_edition: enterprise
+    scons_cache_scope: shared
+  tasks:
+  - name: compile_all_run_unittests_TG
+    distros:
+    - amazon2-arm64-large
+  - name: .aggfuzzer !.multiversion
+  - name: audit
+  - name: auth_audit_gen
+  - name: auth_gen
+  - name: causally_consistent_jscore_txns_passthrough
+  - name: .encrypt !.sharding !.replica_sets !.aggregation !.jscore
+  - name: external_auth
+  - name: external_auth_aws
+  - name: .jscore .common !.compat !.decimal !.sharding
+  - name: jsCore_txns_large_txns_format
+  - name: .jstestfuzz .common
+  - name: .logical_session_cache .one_sec
+  - name: replica_sets_auth_gen
+  - name: replica_sets_jscore_passthrough
+  - name: .replica_sets .multi_oplog
+  - name: sasl
+  - name: search
+  - name: search_auth
+  - name: search_ssl
+  - name: sharding_auth_audit_gen
+  - name: sharding_auth_gen
+  - name: snmp
+  - name: .stitch
+  - name: test_packages
+    distros:
+    - ubuntu1604-packer
+  - name: .publish
+    distros:
+    - rhel80-small
+
+- name: amazon2-arm64
+  display_name: Amazon Linux 2 arm64
+  run_on:
+  - amazon2-arm64-small
+  expansions:
+    push_path: linux
+    push_bucket: downloads.mongodb.org
+    push_name: linux
+    push_arch: aarch64-amazon2
+    compile_flags: --ssl MONGO_DISTMOD=amazon2 -j$(grep -c ^processor /proc/cpuinfo) CCFLAGS="-march=armv8-a+crc -mtune=generic" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    has_packages: true
+    packager_script: packager.py
+    packager_arch: aarch64
+    packager_distro: amazon2
+    repo_edition: org
+    scons_cache_scope: shared
+    large_distro_name: amazon2-arm64-large
+  tasks:
+  - name: compile_all_run_unittests_TG
+    distros:
+    - amazon2-arm64-large
+  - name: aggregation
+  - name: .auth !.audit !.multiversion
+  - name: causally_consistent_jscore_txns_passthrough
+  - name: .misc_js
+  - name: .concurrency .common
+    distros:
+      - amazon2-arm64-large
+  - name: concurrency_replication_causal_consistency_gen
+  - name: disk_wiredtiger
+  - name: free_monitoring
+  - name: .jscore .common
+  - name: .jstestfuzz .common
+  - name: .logical_session_cache .one_sec
+  - name: replica_sets
+  - name: .replica_sets .common
+  - name: .sharding .txns
+  - name: .sharding .common !.op_query !.csrs !.multiversion
+  - name: .ssl
+  - name: .stitch
+  - name: test_packages
+    distros:
+    - ubuntu1604-packer
+  - name: .publish
+    distros:
+    - rhel80-small
 
 - name: stm-daily-cron
   modules:
