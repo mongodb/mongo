@@ -111,7 +111,7 @@ public:
         }
 
         /**
-         * TODO(SERVER-50974) Report TenantMigrationRecipientService Instances in currentOp().
+         * Report TenantMigrationRecipientService Instances in currentOp().
          */
         boost::optional<BSONObj> reportForCurrentOp(
             MongoProcessInterface::CurrentOpConnectionsMode connMode,
