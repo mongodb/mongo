@@ -62,6 +62,8 @@ using namespace fmt::literals;
 
 namespace {
 
+const auto kReshardingOplogTag = BSON("$reshardingOplogApply" << 1);
+
 /**
  * Insert a no-op oplog entry that contains the pre/post image document from a retryable write.
  */
@@ -168,10 +170,13 @@ Status insertOplogAndUpdateConfigForRetryable(OperationContext* opCtx,
     // We only need to store the original oplog details for retryable writes.
     if (oplog.isCrudOpType()) {
         noOpOplog.setObject2(rawOplogBSON);
+    } else {
+        // Make sure o2 is not empty so SessionUpdateTracker will not ignore this oplog.
+        noOpOplog.setObject2(kReshardingOplogTag);
     }
 
     noOpOplog.setNss({});
-    noOpOplog.setObject(BSON("$reshardingOplogApply" << 1));
+    noOpOplog.setObject(kReshardingOplogTag);
 
     if (oplog.getPreImageOp()) {
         noOpOplog.setPreImageOpTime(prePostImageOpTime);
@@ -181,6 +186,7 @@ Status insertOplogAndUpdateConfigForRetryable(OperationContext* opCtx,
 
     noOpOplog.setPrevWriteOpTimeInTransaction(txnParticipant.getLastWriteOpTime());
     noOpOplog.setOpType(repl::OpTypeEnum::kNoop);
+    noOpOplog.setFromMigrate(true);
     // Reset OpTime so logOp() can assign a new one.
     noOpOplog.setOpTime(OplogSlot());
     noOpOplog.setWallClockTime(Date_t::now());

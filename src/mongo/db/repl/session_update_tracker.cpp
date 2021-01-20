@@ -168,9 +168,7 @@ void SessionUpdateTracker::_updateSessionInfo(const OplogEntry& entry) {
     const auto& lsid = sessionInfo.getSessionId();
     invariant(lsid);
 
-    // Ignore any no-op oplog entries, except for the ones generated from session migration
-    // of CRUD ops. These entries will have an o2 field that contains the original CRUD
-    // oplog entry.
+    // Ignore pre/post image no-op oplog entries. These entries will not have an o2 field.
     if (entry.getOpType() == OpTypeEnum::kNoop) {
         if (!entry.getFromMigrate() || !*entry.getFromMigrate()) {
             return;

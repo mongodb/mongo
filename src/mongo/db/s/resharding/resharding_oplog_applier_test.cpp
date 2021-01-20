@@ -39,6 +39,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/logical_session_cache_noop.h"
 #include "mongo/db/repl/oplog_applier.h"
+#include "mongo/db/repl/session_update_tracker.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/operation_sharding_state.h"
@@ -53,6 +54,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog_cache_loader_mock.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
@@ -2046,6 +2048,117 @@ public:
                                      session,
                                      boost::none));
     }
+
+    /**
+     * Extract config.transaction documents the secondaries would have tried to replicate based from
+     * the current oplog entries.
+     *
+     * Note: this will only capture secondary oplog application from derived ops and not direct
+     * writes to config.transactions.
+     */
+    std::vector<BSONObj> extractProjectedTxnDocFromSecondary(OperationContext* opCtx) {
+        SimpleBSONObjMap<BSONObj> lsidMap;
+        repl::SessionUpdateTracker updateTracker;
+
+        DBDirectClient client(opCtx);
+        auto cursor = client.query(NamespaceString::kRsOplogNamespace, {});
+
+        while (cursor->more()) {
+            if (auto newUpdates = updateTracker.updateSession(cursor->next())) {
+                for (const auto& updateOplog : *newUpdates) {
+                    // Note: the updates are replacement style so the object field should contain
+                    // the full doc.
+                    auto txnReplacementDoc = updateOplog.getObject().getOwned();
+                    auto _id = txnReplacementDoc["_id"].Obj().getOwned();
+
+                    lsidMap[_id] = txnReplacementDoc;
+                }
+            }
+        }
+
+        auto remainingUpdates = updateTracker.flushAll();
+
+        if (!remainingUpdates.empty()) {
+            for (const auto& updateOplog : remainingUpdates) {
+                auto txnReplacementDoc = updateOplog.getObject().getOwned();
+                auto _id = txnReplacementDoc["_id"].Obj().getOwned();
+
+                lsidMap[_id] = txnReplacementDoc;
+            }
+        }
+
+        std::vector<BSONObj> txnDocs;
+        for (const auto& mapEntry : lsidMap) {
+            txnDocs.push_back(mapEntry.second);
+        }
+
+        return txnDocs;
+    }
+
+    /**
+     * Checks to see if the secondary would replicate the config.transactions table correctly.
+     *
+     * See extractProjectedTxnDocFromSecondary for assumptions being made.
+     */
+    void checkSecondaryCanReplicateCorrectly() {
+        auto opCtx = operationContext();
+        auto secondaryTxnDocs = extractProjectedTxnDocFromSecondary(opCtx);
+
+        DBDirectClient client(opCtx);
+        const auto txnTableCount =
+            client.count(NamespaceString::kSessionTransactionsTableNamespace);
+
+        ASSERT_EQ(txnTableCount, secondaryTxnDocs.size())
+            << dumpTxnTable() << ", " << toString(secondaryTxnDocs);
+
+        for (auto&& secondaryTxnDoc : secondaryTxnDocs) {
+            auto idField = secondaryTxnDoc["_id"].Obj();
+
+            auto primaryTxnDoc = client.findOne(
+                NamespaceString::kSessionTransactionsTableNamespace.ns(), BSON("_id" << idField));
+
+            ASSERT_FALSE(primaryTxnDoc.isEmpty())
+                << "secondary doc: " << secondaryTxnDoc << ", " << dumpTxnTable();
+
+            ASSERT_BSONOBJ_EQ(primaryTxnDoc, secondaryTxnDoc);
+        }
+    }
+
+    /**
+     * Output the current contents of config.transactions into a string format.
+     */
+    std::string dumpTxnTable() {
+        DBDirectClient client(operationContext());
+        auto cursor = client.query(NamespaceString::kSessionTransactionsTableNamespace, {});
+
+        if (!cursor->more()) {
+            return "<no config.transaction entries>";
+        }
+
+        StringBuilder str;
+        str << "config.transaction entries:";
+
+        while (cursor->more()) {
+            str << " txnDoc: " << cursor->next();
+        }
+
+        return str.str();
+    }
+
+    std::string toString(const std::vector<BSONObj>& txnDocs) {
+        if (txnDocs.empty()) {
+            return "<no txnDocs>";
+        }
+
+        StringBuilder str;
+        str << "txnDocs:";
+
+        for (const auto& doc : txnDocs) {
+            str << " txnDocs: " << doc;
+        }
+
+        return str.str();
+    }
 };
 
 TEST_F(ReshardingOplogApplierRetryableTest, CrudWithEmptyConfigTransactions) {
@@ -2132,6 +2245,8 @@ TEST_F(ReshardingOplogApplierRetryableTest, CrudWithEmptyConfigTransactions) {
 
     ASSERT_FALSE(isWriteAlreadyExecuted(session2, 2));
     ASSERT_FALSE(isWriteAlreadyExecuted(session3, 2));
+
+    checkSecondaryCanReplicateCorrectly();
 }
 
 TEST_F(ReshardingOplogApplierRetryableTest, MultipleTxnSameLsidInOneBatch) {
@@ -2212,6 +2327,8 @@ TEST_F(ReshardingOplogApplierRetryableTest, MultipleTxnSameLsidInOneBatch) {
 
     ASSERT_TRUE(isWriteAlreadyExecuted(session1, 21));
     ASSERT_TRUE(isWriteAlreadyExecuted(session2, 1));
+
+    checkSecondaryCanReplicateCorrectly();
 }
 
 TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithLowerExistingTxn) {
@@ -2260,6 +2377,8 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithLowerExistingTxn) {
     ASSERT_BSONOBJ_EQ(BSON("_id" << 1), doc);
 
     ASSERT_TRUE(isWriteAlreadyExecuted(session, 21));
+
+    checkSecondaryCanReplicateCorrectly();
 }
 
 TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithHigherExistingTxnNum) {
@@ -2321,6 +2440,9 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithHigherExistingTxnNum) {
     origSession.setTxnNumber(existingTxnNum);
 
     ASSERT_TRUE(isWriteAlreadyExecuted(origSession, existingStmtId));
+
+    // Don't call checkSecondaryCanReplicateCorrectly since this test directly updates
+    // config.transactions and won't generate derivedOps for secondaries.
 }
 
 TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithEqualExistingTxnNum) {
@@ -2373,6 +2495,8 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithEqualExistingTxnNum) {
 
     ASSERT_TRUE(isWriteAlreadyExecuted(session, incomingStmtId));
     ASSERT_TRUE(isWriteAlreadyExecuted(session, existingStmtId));
+
+    checkSecondaryCanReplicateCorrectly();
 }
 
 TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithStmtIdAlreadyExecuted) {
@@ -2424,6 +2548,9 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithStmtIdAlreadyExecuted) 
     ASSERT_BSONOBJ_EQ(BSON("_id" << 1), doc);
 
     ASSERT_TRUE(isWriteAlreadyExecuted(session, incomingStmtId));
+
+    // Don't call checkSecondaryCanReplicateCorrectly since this test directly updates
+    // config.transactions and won't generate derivedOps for secondaries.
 }
 
 TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithActiveUnpreparedTxnSameTxn) {
@@ -2479,6 +2606,8 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithActiveUnpreparedTxnSame
 
     ASSERT_THROWS_CODE(
         isWriteAlreadyExecuted(session, 1), DBException, ErrorCodes::IncompleteTransactionHistory);
+
+    checkSecondaryCanReplicateCorrectly();
 }
 
 TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithActiveUnpreparedTxnWithLowerTxnNum) {
@@ -2533,6 +2662,8 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithActiveUnpreparedTxnWith
     ASSERT_BSONOBJ_EQ(BSON("_id" << 1), doc);
 
     ASSERT_TRUE(isWriteAlreadyExecuted(session, 1));
+
+    checkSecondaryCanReplicateCorrectly();
 }
 
 TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithPreparedTxnThatWillCommit) {
@@ -2595,6 +2726,8 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithPreparedTxnThatWillComm
     ASSERT_BSONOBJ_EQ(BSON("_id" << 1), doc);
 
     ASSERT_TRUE(isWriteAlreadyExecuted(session, 1));
+
+    checkSecondaryCanReplicateCorrectly();
 }
 
 TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithPreparedTxnThatWillAbort) {
@@ -2657,6 +2790,8 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithPreparedTxnThatWillAbor
     ASSERT_BSONOBJ_EQ(BSON("_id" << 1), doc);
 
     ASSERT_TRUE(isWriteAlreadyExecuted(session, 1));
+
+    checkSecondaryCanReplicateCorrectly();
 }
 
 TEST_F(ReshardingOplogApplierRetryableTest, RetryableWriteWithPreImage) {
@@ -2720,6 +2855,8 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWriteWithPreImage) {
     ASSERT_TRUE(oplogEntry);
 
     ASSERT_BSONOBJ_EQ(BSON("_id" << 1), extractPreOrPostImage(*oplogEntry));
+
+    checkSecondaryCanReplicateCorrectly();
 }
 
 TEST_F(ReshardingOplogApplierRetryableTest, RetryableWriteWithPostImage) {
@@ -2784,6 +2921,8 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWriteWithPostImage) {
     ASSERT_TRUE(oplogEntry);
 
     ASSERT_BSONOBJ_EQ(BSON("_id" << 1 << "x" << 1), extractPreOrPostImage(*oplogEntry));
+
+    checkSecondaryCanReplicateCorrectly();
 }
 
 TEST_F(ReshardingOplogApplierRetryableTest, ApplyTxnWithLowerExistingTxn) {
@@ -2829,6 +2968,8 @@ TEST_F(ReshardingOplogApplierRetryableTest, ApplyTxnWithLowerExistingTxn) {
 
     ASSERT_THROWS_CODE(
         isWriteAlreadyExecuted(session, 21), DBException, ErrorCodes::IncompleteTransactionHistory);
+
+    checkSecondaryCanReplicateCorrectly();
 }
 
 TEST_F(ReshardingOplogApplierRetryableTest, ApplyTxnWithHigherExistingTxnNum) {
@@ -2886,6 +3027,9 @@ TEST_F(ReshardingOplogApplierRetryableTest, ApplyTxnWithHigherExistingTxnNum) {
     origSession.setTxnNumber(existingTxnNum);
 
     ASSERT_TRUE(isWriteAlreadyExecuted(origSession, existingStmtId));
+
+    // Don't call checkSecondaryCanReplicateCorrectly since this test directly updates
+    // config.transactions and won't generate derivedOps for secondaries.
 }
 
 TEST_F(ReshardingOplogApplierRetryableTest, ApplyTxnWithEqualExistingTxnNum) {
@@ -2934,6 +3078,8 @@ TEST_F(ReshardingOplogApplierRetryableTest, ApplyTxnWithEqualExistingTxnNum) {
     ASSERT_TRUE(isWriteAlreadyExecuted(session, existingStmtId));
     ASSERT_THROWS_CODE(
         isWriteAlreadyExecuted(session, 21), DBException, ErrorCodes::IncompleteTransactionHistory);
+
+    checkSecondaryCanReplicateCorrectly();
 }
 
 TEST_F(ReshardingOplogApplierRetryableTest, ApplyTxnWithActiveUnpreparedTxnSameTxn) {
@@ -2989,6 +3135,8 @@ TEST_F(ReshardingOplogApplierRetryableTest, ApplyTxnWithActiveUnpreparedTxnSameT
     checkOutTxnParticipant(session, [](const TransactionParticipant::Participant& participant) {
         ASSERT_TRUE(participant.transactionIsInProgress());
     });
+
+    checkSecondaryCanReplicateCorrectly();
 }
 
 TEST_F(ReshardingOplogApplierRetryableTest, ApplyTxnActiveUnpreparedTxnWithLowerTxnNum) {
@@ -3044,6 +3192,8 @@ TEST_F(ReshardingOplogApplierRetryableTest, ApplyTxnActiveUnpreparedTxnWithLower
     checkOutTxnParticipant(session, [](const TransactionParticipant::Participant& participant) {
         ASSERT_FALSE(participant.transactionIsInProgress());
     });
+
+    checkSecondaryCanReplicateCorrectly();
 }
 
 TEST_F(ReshardingOplogApplierRetryableTest, ApplyTxnWithPreparedTxnThatWillCommit) {
@@ -3102,6 +3252,8 @@ TEST_F(ReshardingOplogApplierRetryableTest, ApplyTxnWithPreparedTxnThatWillCommi
 
     ASSERT_THROWS_CODE(
         isWriteAlreadyExecuted(session, 1), DBException, ErrorCodes::IncompleteTransactionHistory);
+
+    checkSecondaryCanReplicateCorrectly();
 }
 
 TEST_F(ReshardingOplogApplierRetryableTest, ApplyTxnWithPreparedTxnThatWillAbort) {
@@ -3160,6 +3312,8 @@ TEST_F(ReshardingOplogApplierRetryableTest, ApplyTxnWithPreparedTxnThatWillAbort
 
     ASSERT_THROWS_CODE(
         isWriteAlreadyExecuted(session, 1), DBException, ErrorCodes::IncompleteTransactionHistory);
+
+    checkSecondaryCanReplicateCorrectly();
 }
 
 }  // unnamed namespace
