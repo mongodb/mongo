@@ -244,9 +244,8 @@ void _authenticateX509(OperationContext* opCtx, UserName& user, StringData dbnam
                               "Client isn't a mongod or mongos, but is connecting with a "
                               "certificate with cluster membership");
             }
-
-            authCounter.getMechanismCounter("MONGODB-X509").incClusterAuthenticateSuccessful();
         }
+        authCounter.getMechanismCounter("MONGODB-X509").incClusterAuthenticateSuccessful();
 
         authorizationSession->grantInternalAuthorization(client);
     } else {
