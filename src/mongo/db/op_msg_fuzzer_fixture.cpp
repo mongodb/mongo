@@ -88,9 +88,10 @@ OpMsgFuzzerFixture::OpMsgFuzzerFixture(bool skipGlobalInitializers) {
 
     AuthorizationManager::set(_serviceContext, std::move(localAuthzManager));
 
-    auto replCoord = std::make_unique<repl::ReplicationCoordinatorMock>(_serviceContext);
-    invariant(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
-    repl::ReplicationCoordinator::set(_serviceContext, std::move(replCoord));
+    // Setup the repl coordinator in standalone mode so we don't need an oplog etc.
+    repl::ReplicationCoordinator::set(
+        _serviceContext,
+        std::make_unique<repl::ReplicationCoordinatorMock>(_serviceContext, repl::ReplSettings()));
 }
 
 int OpMsgFuzzerFixture::testOneInput(const char* Data, size_t Size) {
