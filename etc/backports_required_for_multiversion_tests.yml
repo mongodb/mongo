@@ -114,6 +114,8 @@ all:
     test_file: jstests/core/geo_near_point_query.js
   - ticket: SERVER-52547
     test_file: jstests/core/txns/errors_on_committed_transaction.js
+  - ticket: SERVER-53612
+    test_file: jstests/replsets/election_handoff_not_immediately_electable.js
 
 # Tests that should only be excluded from particular suites should be listed under that suite.
 suites:

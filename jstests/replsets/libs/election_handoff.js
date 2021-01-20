@@ -20,6 +20,9 @@ var ElectionHandoffTest = (function() {
      * are:
      *   stepDownBySignal - When this option is set, the primary will be stepped down by stopping
      *                      and restarting with sigterm, rather than with a replSetStepDown command
+     *   stepDownPeriodSecs - The number of seconds to step down the primary.
+     *   secondaryCatchUpPeriodSecs - The number of seconds that the mongod will wait for an
+     *                                electable secondary to catch up to the primary.
      */
     function testElectionHandoff(rst, initialPrimaryId, expectedCandidateId, options = {}) {
         const config = rst.getReplSetConfigFromNode();
@@ -60,8 +63,9 @@ var ElectionHandoffTest = (function() {
             rst.start(initialPrimaryId, {}, true);
         } else {
             assert.commandWorked(primary.adminCommand({
-                replSetStepDown: kStepDownPeriodSecs,
-                secondaryCatchUpPeriodSecs: kStepDownPeriodSecs / 2
+                replSetStepDown: options.stepDownPeriodSecs || kStepDownPeriodSecs,
+                secondaryCatchUpPeriodSecs:
+                    options.secondaryCatchUpPeriodSecs || kStepDownPeriodSecs / 2
             }));
         }
 
