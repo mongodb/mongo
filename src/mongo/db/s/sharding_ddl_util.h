@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/db/catalog/rename_collection.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 
@@ -40,12 +39,10 @@ namespace sharding_ddl_util {
  * Transaction:
  * - Update config.collections entry: update nss and epoch.
  * - Update config.chunks entries: change epoch/timestamp.
- *
- * Returns a status with the new collection epoch.
  */
-OID shardedRenameMetadata(OperationContext* opCtx,
-                          const NamespaceString& fromNss,
-                          const NamespaceString& toNss);
+void shardedRenameMetadata(OperationContext* opCtx,
+                           const NamespaceString& fromNss,
+                           const NamespaceString& toNss);
 
 /**
  * Ensures rename preconditions for sharded collections are met:
@@ -54,7 +51,7 @@ OID shardedRenameMetadata(OperationContext* opCtx,
  */
 void checkShardedRenamePreconditions(OperationContext* opCtx,
                                      const NamespaceString& toNss,
-                                     const RenameCollectionOptions& options);
+                                     const bool dropTarget);
 
 }  // namespace sharding_ddl_util
 }  // namespace mongo

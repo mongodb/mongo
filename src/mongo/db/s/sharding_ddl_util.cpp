@@ -101,68 +101,58 @@ BatchedCommandRequest buildUpdateOp(const NamespaceString& nss,
 
 namespace sharding_ddl_util {
 
-OID shardedRenameMetadata(OperationContext* opCtx,
-                          const NamespaceString& fromNss,
-                          const NamespaceString& toNss) {
-    auto newEpoch = OID::gen();
+void shardedRenameMetadata(OperationContext* opCtx,
+                           const NamespaceString& fromNss,
+                           const NamespaceString& toNss) {
+    // TODO SERVER-53871: enclose the following operations into a transaction
+    auto catalogClient = Grid::get(opCtx)->catalogClient();
+    auto collType = catalogClient->getCollection(opCtx, fromNss);
 
-    auto updateCollectionAndChunksFn = [&](OperationContext* opCtx, TxnNumber txnNumber) {
-        auto collType = Grid::get(opCtx)->catalogClient()->getCollection(opCtx, fromNss);
-        const auto oldEpoch = collType.getEpoch();
-        const auto shardingCatalogManager = ShardingCatalogManager::get(opCtx);
+    // Delete the FROM collection entry
+    uassertStatusOK(
+        catalogClient->removeConfigDocuments(opCtx,
+                                             CollectionType::ConfigNS,
+                                             BSON(CollectionType::kNssFieldName << fromNss.ns()),
+                                             ShardingCatalogClient::kMajorityWriteConcern));
 
-        // Delete the FROM collection entry
-        shardingCatalogManager->writeToConfigDocumentInTxn(
+    collType.setNss(toNss);
+    // Insert the TO collection entry
+    uassertStatusOK(
+        catalogClient->insertConfigDocument(opCtx,
+                                            CollectionType::ConfigNS,
+                                            collType.toBSON(),
+                                            ShardingCatalogClient::kMajorityWriteConcern));
+
+    // Super-inefficient due to limitation of the catalogClient (no multi-document update), but just
+    // temporary: TODO on SERVER-53105 completion, throw out the following scope
+    {
+        // Update all config.chunks entries for the given collection
+        repl::OpTime opTime;
+        auto chunks = uassertStatusOK(Grid::get(opCtx)->catalogClient()->getChunks(
             opCtx,
-            ChunkType::ConfigNS,
-            buildDeleteOp(CollectionType::ConfigNS,
-                          BSON(CollectionType::kNssFieldName << fromNss.ns()),
-                          false /* multi */),
-            txnNumber);
+            BSON(ChunkType::ns(fromNss.ns())),
+            BSON(ChunkType::lastmod() << 1),
+            boost::none,
+            &opTime,
+            repl::ReadConcernLevel::kMajorityReadConcern));
 
-        // Insert the TO collection entry
-        collType.setNss(toNss);
-        collType.setEpoch(newEpoch);
-        shardingCatalogManager->writeToConfigDocumentInTxn(
-            opCtx,
-            ChunkType::ConfigNS,
-            buildInsertOp(CollectionType::ConfigNS, {collType.toBSON()}),
-            txnNumber);
 
-        // Update all config.chunks entries for the given collection by setting new epoch and nss
-        shardingCatalogManager->writeToConfigDocumentInTxn(
-            opCtx,
-            ChunkType::ConfigNS,
-            buildUpdateOp(ChunkType::ConfigNS,
-                          BSON(ChunkType::epoch(oldEpoch)),
-                          // TODO SERVER-53105 don't set ns field
-                          BSON("$set" << BSON(ChunkType::epoch(newEpoch)) << "$set"
-                                      << BSON(ChunkType::ns(toNss.ns()))),
-                          false, /* upsert */
-                          true   /* useMultiUpdate */
-                          ),
-            txnNumber);
-    };
-
-    try {
-        ShardingCatalogManager::get(opCtx)->withTransaction(
-            opCtx, CollectionType::ConfigNS, updateCollectionAndChunksFn);
-    } catch (const DBException& ex) {
-        LOGV2_ERROR(5338400,
-                    "Failed to rename collection metadata in transaction",
-                    "fromNamespace"_attr = fromNss,
-                    "toNamespace"_attr = toNss,
-                    "reason"_attr = ex);
-        throw;
+        for (auto& chunk : chunks) {
+            uassertStatusOK(
+                catalogClient->updateConfigDocument(opCtx,
+                                                    ChunkType::ConfigNS,
+                                                    BSON(ChunkType::name(chunk.getName())),
+                                                    BSON("$set" << BSON(ChunkType::ns(toNss.ns()))),
+                                                    false, /* upsert */
+                                                    ShardingCatalogClient::kMajorityWriteConcern));
+        }
     }
-
-    return newEpoch;
 }
 
 void checkShardedRenamePreconditions(OperationContext* opCtx,
                                      const NamespaceString& toNss,
-                                     const RenameCollectionOptions& options) {
-    if (!options.dropTarget) {
+                                     const bool dropTarget) {
+    if (!dropTarget) {
         // Check that the sharded target collection doesn't exist
         auto catalogCache = Grid::get(opCtx)->catalogCache();
         try {
