@@ -605,7 +605,6 @@ let testCases = {
     setParameter: {skip: "does not accept read or write concern"},
     setShardVersion: {skip: "internal command"},
     shardCollection: {skip: "does not accept read or write concern"},
-    shardConnPoolStats: {skip: "does not accept read or write concern"},
     shardingState: {skip: "does not accept read or write concern"},
     shutdown: {skip: "does not accept read or write concern"},
     sleep: {skip: "does not accept read or write concern"},

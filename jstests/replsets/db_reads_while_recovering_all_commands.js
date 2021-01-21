@@ -285,7 +285,6 @@ const allCommands = {
     setFreeMonitoring: {skip: isPrimaryOnly},
     setParameter: {skip: isNotAUserDataRead},
     setShardVersion: {skip: isNotAUserDataRead},
-    shardConnPoolStats: {skip: isNotAUserDataRead},
     shardingState: {skip: isNotAUserDataRead},
     shutdown: {skip: isNotAUserDataRead},
     sleep: {skip: isNotAUserDataRead},

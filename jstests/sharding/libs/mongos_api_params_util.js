@@ -1101,10 +1101,6 @@ let MongosAPIParametersUtil = (function() {
                 command: () => ({shardCollection: "db.collection", key: {_id: 1}})
             }
         },
-        {
-            commandName: "shardConnPoolStats",
-            skip: "executes locally on mongos (not sent to any remote node)"
-        },
         {commandName: "shutdown", skip: "executes locally on mongos (not sent to any remote node)"},
         {
             commandName: "split",

@@ -512,7 +512,6 @@ let viewsCommandTests = {
         expectFailure: true,
         isAdminCommand: true,
     },
-    shardConnPoolStats: {skip: isUnrelated},
     shardingState: {skip: isUnrelated},
     shutdown: {skip: isUnrelated},
     sleep: {skip: isUnrelated},

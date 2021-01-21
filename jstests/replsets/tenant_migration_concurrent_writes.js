@@ -874,7 +874,6 @@ const testCases = {
     setIndexCommitQuorum: {skip: isNotRunOnUserDatabase},
     setParameter: {skip: isNotRunOnUserDatabase},
     setShardVersion: {skip: isNotRunOnUserDatabase},
-    shardConnPoolStats: {skip: isNotRunOnUserDatabase},
     shardingState: {skip: isNotRunOnUserDatabase},
     shutdown: {skip: isNotRunOnUserDatabase},
     sleep: {skip: isNotRunOnUserDatabase},

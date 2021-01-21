@@ -44,9 +44,8 @@ if (is32Bits && _isWindows()) {
     // Make sure we return connections back to the pool
     gc();
 
-    // Don't make test fragile by linking to format of shardConnPoolStats, but this is useful if
-    // something goes wrong.
-    var connPoolStats = mongos.getDB("admin").runCommand({shardConnPoolStats: 1});
+    // Log connPoolStats for debugging purposes.
+    var connPoolStats = mongos.getDB("admin").runCommand({connPoolStats: 1});
     printjson(connPoolStats);
 
     jsTest.log("Stepdown primary and then step back up...");

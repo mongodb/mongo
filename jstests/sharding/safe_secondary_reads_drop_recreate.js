@@ -287,7 +287,6 @@ let testCases = {
     setParameter: {skip: "does not return user data"},
     setShardVersion: {skip: "does not return user data"},
     shardCollection: {skip: "primary only"},
-    shardConnPoolStats: {skip: "does not return user data"},
     shardingState: {skip: "does not return user data"},
     shutdown: {skip: "does not return user data"},
     sleep: {skip: "does not return user data"},

@@ -43,10 +43,8 @@ for (var test = 0; test < 2; test++) {
         conns[i].close();
     }
 
-    // Don't make test fragile by linking to format of shardConnPoolStats, but this is
-    // useful if
-    // something goes wrong.
-    var connPoolStats = mongos.getDB("admin").runCommand({shardConnPoolStats: 1});
+    // Log connPoolStats for debugging purposes.
+    var connPoolStats = mongos.getDB("admin").runCommand({connPoolStats: 1});
     printjson(connPoolStats);
 
     jsTest.log("Shutdown shard " + (killWith == 9 ? "uncleanly" : "") + "...");

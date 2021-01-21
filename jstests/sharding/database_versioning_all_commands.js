@@ -620,7 +620,6 @@ let testCases = {
         {skip: "explicitly fails for mongos, primary mongod only", conditional: true},
     setParameter: {skip: "executes locally on mongos (not sent to any remote node)"},
     shardCollection: {skip: "does not forward command to primary shard"},
-    shardConnPoolStats: {skip: "does not forward command to primary shard"},
     shutdown: {skip: "does not forward command to primary shard"},
     split: {skip: "does not forward command to primary shard"},
     splitVector: {skip: "does not forward command to primary shard"},
