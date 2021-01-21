@@ -90,6 +90,12 @@ protected:
         return _vm.runPredicate(compiledExpr);
     }
 
+    void runAndAssertNothing(const vm::CodeFragment* compiledExpression) {
+        auto [resultTag, resultValue] = runCompiledExpression(compiledExpression);
+        value::ValueGuard guard(resultTag, resultValue);
+        ASSERT_EQUALS(resultTag, sbe::value::TypeTags::Nothing);
+    }
+
     static std::pair<value::TypeTags, value::Value> makeBsonArray(const BSONArray& ba) {
         return value::copyValue(value::TypeTags::bsonArray,
                                 value::bitcastFrom<const char*>(ba.objdata()));

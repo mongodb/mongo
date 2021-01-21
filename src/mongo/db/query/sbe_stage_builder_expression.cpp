@@ -1195,6 +1195,7 @@ public:
         visitConditionalExpression(expr);
     }
     void visit(ExpressionDateDiff* expr) final {
+        using namespace std::literals;
         auto frameId = _context->frameIdGenerator->generate();
         std::vector<std::unique_ptr<sbe::EExpression>> arguments;
         std::vector<std::unique_ptr<sbe::EExpression>> bindings;
@@ -1202,14 +1203,21 @@ public:
         sbe::EVariable endDateRef(frameId, 1);
         sbe::EVariable unitRef(frameId, 2);
         sbe::EVariable timezoneRef(frameId, 3);
+        sbe::EVariable startOfWeekRef(frameId, 4);
+
+        // An auxiliary boolean variable to hold a value of a common subexpression 'unit'=="week"
+        // (string).
+        sbe::EVariable unitIsWeekRef(frameId, 5);
 
         auto children = expr->getChildren();
-        invariant(children.size() == 4);
-        _context->ensureArity(expr->isTimezoneSpecified() ? 4 : 3);
+        invariant(children.size() == 5);
+        _context->ensureArity(3 + (expr->isTimezoneSpecified() ? 1 : 0) +
+                              (expr->isStartOfWeekSpecified() ? 1 : 0));
 
         // Get child expressions.
+        auto startOfWeekExpression = expr->isStartOfWeekSpecified() ? _context->popExpr() : nullptr;
         auto timezoneExpression =
-            expr->isTimezoneSpecified() ? _context->popExpr() : sbe::makeE<sbe::EConstant>("UTC");
+            expr->isTimezoneSpecified() ? _context->popExpr() : makeConstant("UTC"sv);
         auto unitExpression = _context->popExpr();
         auto endDateExpression = _context->popExpr();
         auto startDateExpression = _context->popExpr();
@@ -1222,53 +1230,95 @@ public:
         arguments.push_back(endDateRef.clone());
         arguments.push_back(unitRef.clone());
         arguments.push_back(timezoneRef.clone());
+        if (expr->isStartOfWeekSpecified()) {
+            // Parameter "startOfWeek" - if the time unit is the week, then pass value of parameter
+            // "startOfWeek" of "$dateDiff" expression, otherwise pass a valid default value, since
+            // "dateDiff" built-in function does not accept non-string type values for this
+            // parameter.
+            arguments.push_back(sbe::makeE<sbe::EIf>(
+                unitIsWeekRef.clone(), startOfWeekRef.clone(), makeConstant("sun"sv)));
+        }
 
         // Set bindings for the frame.
         bindings.push_back(std::move(startDateExpression));
         bindings.push_back(std::move(endDateExpression));
         bindings.push_back(std::move(unitExpression));
         bindings.push_back(std::move(timezoneExpression));
+        if (expr->isStartOfWeekSpecified()) {
+            bindings.push_back(std::move(startOfWeekExpression));
+            bindings.push_back(generateIsEqualToStringCheck(unitRef, "week"sv));
+        }
 
         // Create an expression to invoke built-in "dateDiff" function.
-        auto dateDiffFunctionCall = sbe::makeE<sbe::EFunction>("dateDiff", std::move(arguments));
+        auto dateDiffFunctionCall = sbe::makeE<sbe::EFunction>("dateDiff"sv, std::move(arguments));
 
         // Create expressions to check that each argument to "dateDiff" function exists, is not
         // null, and is of the correct type.
-        auto dateDiffExpression = buildMultiBranchConditional(
-            // Return null if any of the parameters is either null or missing.
-            generateReturnNullIfNullOrMissing(startDateRef),
-            generateReturnNullIfNullOrMissing(endDateRef),
-            generateReturnNullIfNullOrMissing(unitRef),
-            generateReturnNullIfNullOrMissing(timezoneRef),
+        std::vector<CaseValuePair> inputValidationCases;
 
-            // "timezone" parameter validation.
-            CaseValuePair{
-                generateNonStringCheck(timezoneRef),
-                sbe::makeE<sbe::EFail>(ErrorCodes::Error{5166504},
-                                       "$dateDiff parameter 'timezone' must be a string")},
-            CaseValuePair{
-                makeNot(makeFunction(
-                    "isTimezone", sbe::makeE<sbe::EVariable>(timezoneDBSlot), timezoneRef.clone())),
-                sbe::makeE<sbe::EFail>(ErrorCodes::Error{5166505},
-                                       "$dateDiff parameter 'timezone' must be a valid timezone")},
+        // Return null if any of the parameters is either null or missing.
+        inputValidationCases.push_back(generateReturnNullIfNullOrMissing(startDateRef));
+        inputValidationCases.push_back(generateReturnNullIfNullOrMissing(endDateRef));
+        inputValidationCases.push_back(generateReturnNullIfNullOrMissing(unitRef));
+        inputValidationCases.push_back(generateReturnNullIfNullOrMissing(timezoneRef));
+        if (expr->isStartOfWeekSpecified()) {
+            inputValidationCases.emplace_back(
+                sbe::makeE<sbe::EPrimBinary>(sbe::EPrimBinary::logicAnd,
+                                             unitIsWeekRef.clone(),
+                                             generateNullOrMissing(startOfWeekRef)),
+                makeConstant(sbe::value::TypeTags::Null, 0));
+        }
 
-            // "startDate" parameter validation.
-            generateFailIfNotCoercibleToDate(
-                startDateRef, ErrorCodes::Error{5166500}, "$dateDiff"_sd, "startDate"_sd),
+        // "timezone" parameter validation.
+        inputValidationCases.emplace_back(
+            generateNonStringCheck(timezoneRef),
+            sbe::makeE<sbe::EFail>(ErrorCodes::Error{5166504},
+                                   "$dateDiff parameter 'timezone' must be a string"));
+        inputValidationCases.emplace_back(
+            makeNot(makeFunction(
+                "isTimezone", sbe::makeE<sbe::EVariable>(timezoneDBSlot), timezoneRef.clone())),
+            sbe::makeE<sbe::EFail>(ErrorCodes::Error{5166505},
+                                   "$dateDiff parameter 'timezone' must be a valid timezone"));
 
-            // "endDate" parameter validation.
-            generateFailIfNotCoercibleToDate(
-                endDateRef, ErrorCodes::Error{5166501}, "$dateDiff"_sd, "endDate"_sd),
+        // "startDate" parameter validation.
+        inputValidationCases.emplace_back(generateFailIfNotCoercibleToDate(
+            startDateRef, ErrorCodes::Error{5166500}, "$dateDiff"_sd, "startDate"_sd));
 
-            // "unit" parameter validation.
-            CaseValuePair{generateNonStringCheck(unitRef),
-                          sbe::makeE<sbe::EFail>(ErrorCodes::Error{5166502},
-                                                 "$dateDiff parameter 'unit' must be a string")},
-            CaseValuePair{
-                makeNot(makeFunction("isTimeUnit", unitRef.clone())),
-                sbe::makeE<sbe::EFail>(ErrorCodes::Error{5166503},
-                                       "$dateDiff parameter 'unit' must be a valid time unit")},
-            std::move(dateDiffFunctionCall));
+        // "endDate" parameter validation.
+        inputValidationCases.emplace_back(generateFailIfNotCoercibleToDate(
+            endDateRef, ErrorCodes::Error{5166501}, "$dateDiff"_sd, "endDate"_sd));
+
+        // "unit" parameter validation.
+        inputValidationCases.emplace_back(
+            generateNonStringCheck(unitRef),
+            sbe::makeE<sbe::EFail>(ErrorCodes::Error{5166502},
+                                   "$dateDiff parameter 'unit' must be a string"));
+        inputValidationCases.emplace_back(
+            makeNot(makeFunction("isTimeUnit", unitRef.clone())),
+            sbe::makeE<sbe::EFail>(ErrorCodes::Error{5166503},
+                                   "$dateDiff parameter 'unit' must be a valid time unit"));
+
+        // "startOfWeek" parameter validation.
+        if (expr->isStartOfWeekSpecified()) {
+            // If 'timeUnit' value is equal to "week" then validate "startOfWeek" parameter.
+            inputValidationCases.emplace_back(
+                sbe::makeE<sbe::EPrimBinary>(sbe::EPrimBinary::logicAnd,
+                                             unitIsWeekRef.clone(),
+                                             generateNonStringCheck(startOfWeekRef)),
+                sbe::makeE<sbe::EFail>(ErrorCodes::Error{5338801},
+                                       "$dateDiff parameter 'startOfWeek' must be a string"));
+            inputValidationCases.emplace_back(
+                sbe::makeE<sbe::EPrimBinary>(
+                    sbe::EPrimBinary::logicAnd,
+                    unitIsWeekRef.clone(),
+                    makeNot(makeFunction("isDayOfWeek", startOfWeekRef.clone()))),
+                sbe::makeE<sbe::EFail>(
+                    ErrorCodes::Error{5338802},
+                    "$dateDiff parameter 'startOfWeek' must be a valid day of the week"));
+        }
+
+        auto dateDiffExpression = buildMultiBranchConditionalFromCaseValuePairs(
+            std::move(inputValidationCases), std::move(dateDiffFunctionCall));
         _context->pushExpr(sbe::makeE<sbe::ELocalBind>(
             frameId, std::move(bindings), std::move(dateDiffExpression)));
     }
@@ -2754,10 +2804,10 @@ private:
      * expressionName - a name of an expression the parameter belongs to.
      * parameterName - a name of the parameter corresponding to variable 'dateRef'.
      */
-    CaseValuePair generateFailIfNotCoercibleToDate(const sbe::EVariable& dateRef,
-                                                   ErrorCodes::Error errorCode,
-                                                   StringData expressionName,
-                                                   StringData parameterName) {
+    static CaseValuePair generateFailIfNotCoercibleToDate(const sbe::EVariable& dateRef,
+                                                          ErrorCodes::Error errorCode,
+                                                          StringData expressionName,
+                                                          StringData parameterName) {
         return {makeNot(sbe::makeE<sbe::ETypeMatch>(dateRef.clone(), dateTypeMask())),
                 sbe::makeE<sbe::EFail>(errorCode,
                                        str::stream()
@@ -2769,8 +2819,20 @@ private:
      * Creates a CaseValuePair such that Null value is returned if a value of variable denoted by
      * 'variable' is null or missing.
      */
-    CaseValuePair generateReturnNullIfNullOrMissing(const sbe::EVariable& variable) {
+    static CaseValuePair generateReturnNullIfNullOrMissing(const sbe::EVariable& variable) {
         return {generateNullOrMissing(variable), makeConstant(sbe::value::TypeTags::Null, 0)};
+    }
+
+    /**
+     * Creates a boolean expression to check if 'variable' is equal to string 'string'.
+     */
+    static std::unique_ptr<sbe::EExpression> generateIsEqualToStringCheck(
+        const sbe::EVariable& variable, std::string_view string) {
+        return sbe::makeE<sbe::EPrimBinary>(sbe::EPrimBinary::logicAnd,
+                                            makeFunction("isString", variable.clone()),
+                                            sbe::makeE<sbe::EPrimBinary>(sbe::EPrimBinary::eq,
+                                                                         variable.clone(),
+                                                                         makeConstant(string)));
     }
 
     /**

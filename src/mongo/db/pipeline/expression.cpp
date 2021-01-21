@@ -1860,13 +1860,19 @@ ExpressionDateDiff::ExpressionDateDiff(ExpressionContext* const expCtx,
                                        boost::intrusive_ptr<Expression> startDate,
                                        boost::intrusive_ptr<Expression> endDate,
                                        boost::intrusive_ptr<Expression> unit,
-                                       boost::intrusive_ptr<Expression> timezone)
+                                       boost::intrusive_ptr<Expression> timezone,
+                                       boost::intrusive_ptr<Expression> startOfWeek)
     : Expression{expCtx,
-                 {std::move(startDate), std::move(endDate), std::move(unit), std::move(timezone)}},
+                 {std::move(startDate),
+                  std::move(endDate),
+                  std::move(unit),
+                  std::move(timezone),
+                  std::move(startOfWeek)}},
       _startDate{_children[0]},
       _endDate{_children[1]},
       _unit{_children[2]},
-      _timeZone{_children[3]} {}
+      _timeZone{_children[3]},
+      _startOfWeek{_children[4]} {}
 
 boost::intrusive_ptr<Expression> ExpressionDateDiff::parse(ExpressionContext* const expCtx,
                                                            BSONElement expr,
@@ -1875,7 +1881,7 @@ boost::intrusive_ptr<Expression> ExpressionDateDiff::parse(ExpressionContext* co
     uassert(5166301,
             "$dateDiff only supports an object as its argument",
             expr.type() == BSONType::Object);
-    BSONElement startDateElement, endDateElement, unitElement, timezoneElem;
+    BSONElement startDateElement, endDateElement, unitElement, timezoneElem, startOfWeekElem;
     for (auto&& element : expr.embeddedObject()) {
         auto field = element.fieldNameStringData();
         if ("startDate"_sd == field) {
@@ -1886,6 +1892,8 @@ boost::intrusive_ptr<Expression> ExpressionDateDiff::parse(ExpressionContext* co
             unitElement = element;
         } else if ("timezone"_sd == field) {
             timezoneElem = element;
+        } else if ("startOfWeek"_sd == field) {
+            startOfWeekElem = element;
         } else {
             uasserted(5166302,
                       str::stream()
@@ -1895,12 +1903,13 @@ boost::intrusive_ptr<Expression> ExpressionDateDiff::parse(ExpressionContext* co
     uassert(5166303, "Missing 'startDate' parameter to $dateDiff", startDateElement);
     uassert(5166304, "Missing 'endDate' parameter to $dateDiff", endDateElement);
     uassert(5166305, "Missing 'unit' parameter to $dateDiff", unitElement);
-    return make_intrusive<ExpressionDateDiff>(expCtx,
-                                              parseOperand(expCtx, startDateElement, vps),
-                                              parseOperand(expCtx, endDateElement, vps),
-                                              parseOperand(expCtx, unitElement, vps),
-                                              timezoneElem ? parseOperand(expCtx, timezoneElem, vps)
-                                                           : nullptr);
+    return make_intrusive<ExpressionDateDiff>(
+        expCtx,
+        parseOperand(expCtx, startDateElement, vps),
+        parseOperand(expCtx, endDateElement, vps),
+        parseOperand(expCtx, unitElement, vps),
+        timezoneElem ? parseOperand(expCtx, timezoneElem, vps) : nullptr,
+        startOfWeekElem ? parseOperand(expCtx, startOfWeekElem, vps) : nullptr);
 }
 
 boost::intrusive_ptr<Expression> ExpressionDateDiff::optimize() {
@@ -1910,7 +1919,11 @@ boost::intrusive_ptr<Expression> ExpressionDateDiff::optimize() {
     if (_timeZone) {
         _timeZone = _timeZone->optimize();
     }
-    if (ExpressionConstant::allNullOrConstant({_startDate, _endDate, _unit, _timeZone})) {
+    if (_startOfWeek) {
+        _startOfWeek = _startOfWeek->optimize();
+    }
+    if (ExpressionConstant::allNullOrConstant(
+            {_startDate, _endDate, _unit, _timeZone, _startOfWeek})) {
         // Everything is a constant, so we can turn into a constant.
         return ExpressionConstant::create(
             getExpressionContext(), evaluate(Document{}, &(getExpressionContext()->variables)));
@@ -1919,12 +1932,13 @@ boost::intrusive_ptr<Expression> ExpressionDateDiff::optimize() {
 };
 
 Value ExpressionDateDiff::serialize(bool explain) const {
-    return Value{
-        Document{{"$dateDiff"_sd,
-                  Document{{"startDate"_sd, _startDate->serialize(explain)},
-                           {"endDate"_sd, _endDate->serialize(explain)},
-                           {"unit"_sd, _unit->serialize(explain)},
-                           {"timezone"_sd, _timeZone ? _timeZone->serialize(explain) : Value{}}}}}};
+    return Value{Document{
+        {"$dateDiff"_sd,
+         Document{{"startDate"_sd, _startDate->serialize(explain)},
+                  {"endDate"_sd, _endDate->serialize(explain)},
+                  {"unit"_sd, _unit->serialize(explain)},
+                  {"timezone"_sd, _timeZone ? _timeZone->serialize(explain) : Value{}},
+                  {"startOfWeek"_sd, _startOfWeek ? _startOfWeek->serialize(explain) : Value{}}}}}};
 };
 
 Date_t ExpressionDateDiff::convertToDate(const Value& value, StringData parameterName) {
@@ -1962,6 +1976,19 @@ TimeUnit ExpressionDateDiff::convertToTimeUnit(const Value& value) {
         "$dateDiff parameter 'unit' value parsing failed"_sd);
 }
 
+DayOfWeek ExpressionDateDiff::parseStartOfWeek(const Value& value) {
+    uassert(5338800,
+            str::stream() << "$dateDiff requires 'startOfWeek' to be a string, but got "
+                          << typeName(value.getType()),
+            BSONType::String == value.getType());
+    auto valueAsString = value.getStringData();
+    return addContextToAssertionException(
+        [&]() {
+            return parseDayOfWeek(std::string_view{valueAsString.rawData(), valueAsString.size()});
+        },
+        "$dateDiff parameter 'startOfWeek' value parsing failed"_sd);
+}
+
 Value ExpressionDateDiff::evaluate(const Document& root, Variables* variables) const {
     const Value startDateValue = _startDate->evaluate(root, variables);
     if (startDateValue.nullish()) {
@@ -1975,6 +2002,16 @@ Value ExpressionDateDiff::evaluate(const Document& root, Variables* variables) c
     if (unitValue.nullish()) {
         return Value(BSONNULL);
     }
+    const auto startOfWeekParameterActive = _startOfWeek &&
+        BSONType::String == unitValue.getType() && unitValue.getStringData() == "week"_sd;
+    Value startOfWeekValue{};
+    if (startOfWeekParameterActive) {
+        startOfWeekValue = _startOfWeek->evaluate(root, variables);
+        if (startOfWeekValue.nullish()) {
+            return Value(BSONNULL);
+        }
+    }
+
     const auto timezone = addContextToAssertionException(
         [&]() {
             return makeTimeZone(
@@ -1987,7 +2024,9 @@ Value ExpressionDateDiff::evaluate(const Document& root, Variables* variables) c
     const Date_t startDate = convertToDate(startDateValue, "startDate"_sd);
     const Date_t endDate = convertToDate(endDateValue, "endDate"_sd);
     const TimeUnit unit = convertToTimeUnit(unitValue);
-    return Value{dateDiff(startDate, endDate, unit, *timezone)};
+    const DayOfWeek startOfWeek =
+        startOfWeekParameterActive ? parseStartOfWeek(startOfWeekValue) : kStartOfWeekDefault;
+    return Value{dateDiff(startDate, endDate, unit, *timezone, startOfWeek)};
 }
 
 void ExpressionDateDiff::_doAddDependencies(DepsTracker* deps) const {
@@ -1996,6 +2035,9 @@ void ExpressionDateDiff::_doAddDependencies(DepsTracker* deps) const {
     _unit->addDependencies(deps);
     if (_timeZone) {
         _timeZone->addDependencies(deps);
+    }
+    if (_startOfWeek) {
+        _startOfWeek->addDependencies(deps);
     }
 }
 

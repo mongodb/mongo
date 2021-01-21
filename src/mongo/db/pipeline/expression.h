@@ -1372,12 +1372,15 @@ public:
      * resolves to a string Value.
      * timezone - expression defining a timezone to perform the operation in that resolves to a
      * string Value. Can be nullptr.
+     * startOfWeek - expression defining the week start day that resolves to a string Value. Can be
+     * nullptr.
      */
     ExpressionDateDiff(ExpressionContext* const expCtx,
                        boost::intrusive_ptr<Expression> startDate,
                        boost::intrusive_ptr<Expression> endDate,
                        boost::intrusive_ptr<Expression> unit,
-                       boost::intrusive_ptr<Expression> timezone);
+                       boost::intrusive_ptr<Expression> timezone,
+                       boost::intrusive_ptr<Expression> startOfWeek);
     boost::intrusive_ptr<Expression> optimize() final;
     Value serialize(bool explain) const final;
     Value evaluate(const Document& root, Variables* variables) const final;
@@ -1395,6 +1398,13 @@ public:
         return static_cast<bool>(_timeZone);
     }
 
+    /**
+     * Returns true if this expression has parameter 'startOfWeek' specified, otherwise false.
+     */
+    bool isStartOfWeekSpecified() const {
+        return static_cast<bool>(_startOfWeek);
+    }
+
 protected:
     void _doAddDependencies(DepsTracker* deps) const final;
 
@@ -1409,6 +1419,11 @@ private:
      */
     static TimeUnit convertToTimeUnit(const Value& value);
 
+    /**
+     * Converts 'value' to DayOfWeek for $dateDiff expression parameter 'startOfWeek'.
+     */
+    static DayOfWeek parseStartOfWeek(const Value& value);
+
     // Starting time instant expression. Accepted types: Date_t, Timestamp, OID.
     boost::intrusive_ptr<Expression>& _startDate;
 
@@ -1422,6 +1437,10 @@ private:
     // Timezone to use for the difference calculation. Accepted type: std::string. If not specified,
     // UTC is used.
     boost::intrusive_ptr<Expression>& _timeZone;
+
+    // First/start day of the week to use for the date difference calculation when time unit is the
+    // week. Accepted type: std::string. If not specified, "sunday" is used.
+    boost::intrusive_ptr<Expression>& _startOfWeek;
 };
 
 class ExpressionDivide final : public ExpressionFixedArity<ExpressionDivide, 2> {

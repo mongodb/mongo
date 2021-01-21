@@ -590,7 +590,7 @@ auto const kDaysInNonLeapYear = 365LL;
 auto const kHoursPerDay = 24LL;
 auto const kMinutesPerHour = 60LL;
 auto const kSecondsPerMinute = 60LL;
-auto const kDaysPerWeek = 7LL;
+auto const kDaysPerWeek = 7;
 auto const kQuartersPerYear = 4LL;
 auto const kQuarterLengthInMonths = 3LL;
 auto const kLeapYearReferencePoint = -1000000000L;
@@ -651,11 +651,27 @@ inline long long dateDiffDay(timelib_time* startInstant, timelib_time* endInstan
         timelib_day_of_year(startInstant->y, startInstant->m, startInstant->d) +
         daysBetweenYears(startInstant->y, endInstant->y);
 }
-inline long long dateDiffWeek(timelib_time* startInstant, timelib_time* endInstant) {
-    // We use 'timelib_iso_day_of_week()' since it considers Monday as the first day of the week.
-    return (dateDiffDay(startInstant, endInstant) +
-            timelib_iso_day_of_week(startInstant->y, startInstant->m, startInstant->d) -
-            timelib_iso_day_of_week(endInstant->y, endInstant->m, endInstant->d)) /
+
+/**
+ * Determines which day of the week time instant 'timeInstant' is in given that the week starts on
+ * day 'startOfWeek'. Returns 0 for the first day, and 6 - for the last.
+ */
+inline unsigned int dayOfWeek(timelib_time* timeInstant, DayOfWeek startOfWeek) {
+    // We use 'timelib_iso_day_of_week()' since it returns value 1 for Monday.
+    return (timelib_iso_day_of_week(timeInstant->y, timeInstant->m, timeInstant->d) -
+            static_cast<uint8_t>(startOfWeek) + kDaysPerWeek) %
+        kDaysPerWeek;
+}
+
+/**
+ * Determines a number of weeks between time instant 'startInstant' and 'endInstant' when the first
+ * day of the week is 'startOfWeek'.
+ */
+inline long long dateDiffWeek(timelib_time* startInstant,
+                              timelib_time* endInstant,
+                              DayOfWeek startOfWeek) {
+    return (dateDiffDay(startInstant, endInstant) + dayOfWeek(startInstant, startOfWeek) -
+            dayOfWeek(endInstant, startOfWeek)) /
         kDaysPerWeek;
 }
 inline long long dateDiffHour(timelib_time* startInstant, timelib_time* endInstant) {
@@ -690,9 +706,31 @@ static const StringMap<TimeUnit> timeUnitNameToTimeUnitMap{
     {"second", TimeUnit::second},
     {"millisecond", TimeUnit::millisecond},
 };
+
+// A mapping from string representations of a day of a week to DayOfWeek.
+static const StringMap<DayOfWeek> dayOfWeekNameToDayOfWeekMap{
+    {"monday", DayOfWeek::monday},
+    {"mon", DayOfWeek::monday},
+    {"tuesday", DayOfWeek::tuesday},
+    {"tue", DayOfWeek::tuesday},
+    {"wednesday", DayOfWeek::wednesday},
+    {"wed", DayOfWeek::wednesday},
+    {"thursday", DayOfWeek::thursday},
+    {"thu", DayOfWeek::thursday},
+    {"friday", DayOfWeek::friday},
+    {"fri", DayOfWeek::friday},
+    {"saturday", DayOfWeek::saturday},
+    {"sat", DayOfWeek::saturday},
+    {"sunday", DayOfWeek::sunday},
+    {"sun", DayOfWeek::sunday},
+};
 }  // namespace
 
-long long dateDiff(Date_t startDate, Date_t endDate, TimeUnit unit, const TimeZone& timezone) {
+long long dateDiff(Date_t startDate,
+                   Date_t endDate,
+                   TimeUnit unit,
+                   const TimeZone& timezone,
+                   DayOfWeek startOfWeek) {
     if (TimeUnit::millisecond == unit) {
         return dateDiffMillisecond(startDate, endDate);
     }
@@ -708,7 +746,7 @@ long long dateDiff(Date_t startDate, Date_t endDate, TimeUnit unit, const TimeZo
         case TimeUnit::month:
             return dateDiffMonth(startDateInTimeZone.get(), endDateInTimeZone.get());
         case TimeUnit::week:
-            return dateDiffWeek(startDateInTimeZone.get(), endDateInTimeZone.get());
+            return dateDiffWeek(startDateInTimeZone.get(), endDateInTimeZone.get(), startOfWeek);
         case TimeUnit::day:
             return dateDiffDay(startDateInTimeZone.get(), endDateInTimeZone.get());
         case TimeUnit::hour:
@@ -756,6 +794,21 @@ StringData serializeTimeUnit(TimeUnit unit) {
             return "millisecond"_sd;
     }
     MONGO_UNREACHABLE_TASSERT(5339900);
+}
+
+DayOfWeek parseDayOfWeek(StringData dayOfWeek) {
+    // Perform case-insensitive lookup.
+    auto iterator = dayOfWeekNameToDayOfWeekMap.find(str::toLower(dayOfWeek));
+    uassert(ErrorCodes::FailedToParse,
+            str::stream() << "unknown day of week value: " << dayOfWeek,
+            iterator != dayOfWeekNameToDayOfWeekMap.end());
+    return iterator->second;
+}
+
+bool isValidDayOfWeek(StringData dayOfWeek) {
+    // Perform case-insensitive lookup.
+    return dayOfWeekNameToDayOfWeekMap.find(str::toLower(dayOfWeek)) !=
+        dayOfWeekNameToDayOfWeekMap.end();
 }
 
 void TimelibRelTimeDeleter::operator()(timelib_rel_time* relTime) {

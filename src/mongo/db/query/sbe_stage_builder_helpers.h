@@ -150,6 +150,13 @@ std::unique_ptr<sbe::EExpression> buildMultiBranchConditional(
     std::unique_ptr<sbe::EExpression> defaultCase);
 
 /**
+ * Converts a std::vector of CaseValuePairs into a chain of EIf expressions in the same manner as
+ * the 'buildMultiBranchConditional()' function.
+ */
+std::unique_ptr<sbe::EExpression> buildMultiBranchConditionalFromCaseValuePairs(
+    std::vector<CaseValuePair> caseValuePairs, std::unique_ptr<sbe::EExpression> defaultValue);
+
+/**
  * Insert a limit stage on top of the 'input' stage.
  */
 std::unique_ptr<sbe::PlanStage> makeLimitTree(std::unique_ptr<sbe::PlanStage> inputStage,

@@ -1371,7 +1371,7 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinDate(ArityType 
 }
 
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinDateDiff(ArityType arity) {
-    invariant(arity == 5);
+    invariant(arity == 5 || arity == 6);  // 6th parameter is 'startOfWeek'.
 
     auto [timezoneDBOwn, timezoneDBTag, timezoneDBValue] = getFromStack(0);
     if (timezoneDBTag != value::TypeTags::timeZoneDB) {
@@ -1411,7 +1411,22 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinDateDiff(ArityT
     }
     auto timezone = getTimezone(timezoneTag, timezoneValue, timezoneDB);
 
-    auto result = dateDiff(startDate, endDate, unit, timezone);
+    // Get startOfWeek, if 'startOfWeek' parameter was passed and time unit is the week.
+    DayOfWeek startOfWeek{kStartOfWeekDefault};
+    if (6 == arity) {
+        auto [startOfWeekOwn, startOfWeekTag, startOfWeekValue] = getFromStack(5);
+        if (!value::isString(startOfWeekTag)) {
+            return {false, value::TypeTags::Nothing, 0};
+        }
+        if (TimeUnit::week == unit) {
+            auto startOfWeekString = value::getStringView(startOfWeekTag, startOfWeekValue);
+            if (!isValidDayOfWeek(startOfWeekString)) {
+                return {false, value::TypeTags::Nothing, 0};
+            }
+            startOfWeek = parseDayOfWeek(startOfWeekString);
+        }
+    }
+    auto result = dateDiff(startDate, endDate, unit, timezone, startOfWeek);
     return {false, value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(result)};
 }
 
@@ -2048,6 +2063,18 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinIsTimeUnit(Arit
             value::TypeTags::Boolean,
             value::bitcastFrom<bool>(
                 isValidTimeUnit(value::getStringView(timeUnitTag, timeUnitValue)))};
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinIsDayOfWeek(ArityType arity) {
+    invariant(arity == 1);
+    auto [dayOfWeekOwn, dayOfWeekTag, dayOfWeekValue] = getFromStack(0);
+    if (!value::isString(dayOfWeekTag)) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+    return {false,
+            value::TypeTags::Boolean,
+            value::bitcastFrom<bool>(
+                isValidDayOfWeek(value::getStringView(dayOfWeekTag, dayOfWeekValue)))};
 }
 
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinIsTimezone(ArityType arity) {
@@ -2962,6 +2989,8 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builti
             return builtinIndexOfBytes(arity);
         case Builtin::indexOfCP:
             return builtinIndexOfCP(arity);
+        case Builtin::isDayOfWeek:
+            return builtinIsDayOfWeek(arity);
         case Builtin::isTimeUnit:
             return builtinIsTimeUnit(arity);
         case Builtin::isTimezone:

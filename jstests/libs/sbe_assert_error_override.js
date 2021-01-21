@@ -21,7 +21,7 @@
 // Below is the list of known equivalent error code groups. As new groups of equivalent error codes
 // are discovered, they should be added to this list.
 const equivalentErrorCodesList = [
-    [9, 5166503, 5166605],
+    [9, 5166503, 5166605, 5338802],
     [28651, 5073201],
     [16006, 4997703, 4998202],
     [28689, 5126701],
@@ -81,6 +81,7 @@ const equivalentErrorCodesList = [
     [51111, 5073402],
     [51151, 5126606],
     [51156, 5073403],
+    [5338800, 5338801],
 ];
 
 // This map is generated based on the contents of 'equivalentErrorCodesList'. This map should _not_

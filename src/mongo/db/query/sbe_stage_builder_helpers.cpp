@@ -41,6 +41,8 @@
 #include "mongo/db/exec/sbe/stages/union.h"
 #include "mongo/db/exec/sbe/stages/unwind.h"
 #include "mongo/db/matcher/matcher_type_set.h"
+#include <iterator>
+#include <numeric>
 
 namespace mongo::stage_builder {
 
@@ -169,6 +171,17 @@ template <>
 std::unique_ptr<sbe::EExpression> buildMultiBranchConditional(
     std::unique_ptr<sbe::EExpression> defaultCase) {
     return defaultCase;
+}
+
+std::unique_ptr<sbe::EExpression> buildMultiBranchConditionalFromCaseValuePairs(
+    std::vector<CaseValuePair> caseValuePairs, std::unique_ptr<sbe::EExpression> defaultValue) {
+    return std::accumulate(
+        std::make_reverse_iterator(std::make_move_iterator(caseValuePairs.end())),
+        std::make_reverse_iterator(std::make_move_iterator(caseValuePairs.begin())),
+        std::move(defaultValue),
+        [](auto&& expression, auto&& caseValuePair) {
+            return buildMultiBranchConditional(std::move(caseValuePair), std::move(expression));
+        });
 }
 
 std::unique_ptr<sbe::PlanStage> makeLimitTree(std::unique_ptr<sbe::PlanStage> inputStage,

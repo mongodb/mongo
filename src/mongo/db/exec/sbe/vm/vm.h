@@ -282,6 +282,7 @@ enum class Builtin : uint8_t {
     collIsMember,
     indexOfBytes,
     indexOfCP,
+    isDayOfWeek,
     isTimeUnit,
     isTimezone,
     setUnion,
@@ -694,6 +695,7 @@ private:
     std::tuple<bool, value::TypeTags, value::Value> builtinCollIsMember(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinIndexOfBytes(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinIndexOfCP(ArityType arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinIsDayOfWeek(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinIsTimeUnit(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinIsTimezone(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinSetUnion(ArityType arity);

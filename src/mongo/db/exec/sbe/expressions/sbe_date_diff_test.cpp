@@ -35,19 +35,10 @@ namespace mongo::sbe {
 namespace {
 
 using SBEDateDiffTest = EExpressionTestFixture;
-
-/**
- * A fixture for SBE built-in function "isTimeUnit".
- */
-class SBEIsTimeUnitTest : public EExpressionTestFixture {
-public:
-    void runAndAssertNothing(const vm::CodeFragment* compiledExpression) {
-        auto [resultTag, resultValue] = runCompiledExpression(compiledExpression);
-        value::ValueGuard guard(resultTag, resultValue);
-        ASSERT_EQUALS(resultTag, sbe::value::TypeTags::Nothing);
-        ASSERT_EQUALS(resultValue, 0);
-    }
-};
+using SBEIsTimeUnitTest = EExpressionTestFixture;
+using SBEIsDayOfWeekTest = EExpressionTestFixture;
+const TimeZoneDatabase kDefaultTimeZoneDatabase{};
+const TimeZone kDefaultTimeZone = TimeZoneDatabase::utcZone();
 
 /**
  * Resets value accessor 'accessor' with string 'value'.
@@ -72,6 +63,24 @@ std::pair<value::TypeTags, value::Value> convertOIDToSbeValue(const OID& oid) {
 std::pair<value::TypeTags, value::Value> convertTimestampToSbeValue(const Timestamp& timestamp) {
     return {value::TypeTags::Timestamp, value::bitcastFrom<uint64_t>(timestamp.asULL())};
 }
+
+/**
+ * Makes 64-bit integer SBE value and tag pair from 'value'.
+ */
+std::pair<value::TypeTags, value::Value> makeLongValue(long long value) {
+    return {value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(value)};
+}
+
+/**
+ * Makes Date type SBE value and tag pair from date parts 'year', 'month' and so on.
+ */
+std::pair<value::TypeTags, value::Value> makeDateValue(
+    long long year, unsigned month, unsigned day, unsigned hour, unsigned minute, unsigned second) {
+    return {value::TypeTags::Date,
+            value::bitcastFrom<int64_t>(
+                kDefaultTimeZone.createFromDateParts(year, month, day, hour, minute, second, 0)
+                    .toMillisSinceEpoch())};
+}
 }  // namespace
 
 /**
@@ -88,7 +97,10 @@ TEST_F(SBEDateDiffTest, BasicDateDiff) {
     auto unitSlot = bindAccessor(&unitAccessor);
     value::OwnedValueAccessor timezoneAccessor;
     auto timezoneSlot = bindAccessor(&timezoneAccessor);
+    value::OwnedValueAccessor startOfWeekAccessor;
+    auto startOfWeekSlot = bindAccessor(&startOfWeekAccessor);
 
+    // Construct an invocation of "dateDiff" function without 'startOfWeek' parameter.
     auto dateDiffExpression =
         sbe::makeE<sbe::EFunction>("dateDiff",
                                    sbe::makeEs(makeE<EVariable>(timezoneDBSlot),
@@ -97,6 +109,16 @@ TEST_F(SBEDateDiffTest, BasicDateDiff) {
                                                makeE<EVariable>(unitSlot),
                                                makeE<EVariable>(timezoneSlot)));
     auto compiledDateDiff = compileExpression(*dateDiffExpression);
+
+    // Construct an invocation of "dateDiff" function with 'startOfWeek' parameter.
+    dateDiffExpression = sbe::makeE<sbe::EFunction>("dateDiff",
+                                                    sbe::makeEs(makeE<EVariable>(timezoneDBSlot),
+                                                                makeE<EVariable>(startDateSlot),
+                                                                makeE<EVariable>(endDateSlot),
+                                                                makeE<EVariable>(unitSlot),
+                                                                makeE<EVariable>(timezoneSlot),
+                                                                makeE<EVariable>(startOfWeekSlot)));
+    auto compiledDateDiffWithStartOfWeek = compileExpression(*dateDiffExpression);
 
     // Setup timezone database.
     auto timezoneDatabase = std::make_unique<TimeZoneDatabase>();
@@ -109,58 +131,52 @@ TEST_F(SBEDateDiffTest, BasicDateDiff) {
         std::pair<value::TypeTags, value::Value> endDate;
         std::pair<value::TypeTags, value::Value> unit;
         std::pair<value::TypeTags, value::Value> timezone;
-        std::pair<value::TypeTags, value::Value> expectedValue;
+        std::pair<value::TypeTags, value::Value> expectedValue;  // Output.
+        boost::optional<std::pair<value::TypeTags, value::Value>> startOfWeek;
     };
 
     const std::pair<value::TypeTags, value::Value> kNothing{value::TypeTags::Nothing, 0};
-    const std::pair<value::TypeTags, value::Value> kAnyDate{
-        value::TypeTags::Date, value::bitcastFrom<int64_t>(1604255016000)};  // 2020-11-01 18:23:36
+    const std::pair<value::TypeTags, value::Value> kAnyDate{makeDateValue(2020, 11, 1, 18, 23, 36)};
     const OID kOid = OID::gen();
     std::vector<TestCase> testCases{
         {// Sunny day case.
-         {value::TypeTags::Date,
-          value::bitcastFrom<int64_t>(1604255016000)},  // 2020-11-01 18:23:36
-         {value::TypeTags::Date,
-          value::bitcastFrom<int64_t>(1604260800000)},  // 2020-11-01 20:00:00
+         makeDateValue(2020, 11, 01, 18, 23, 36),
+         makeDateValue(2020, 11, 01, 20, 0, 0),
          value::makeNewString("hour"),
          value::makeNewString("GMT"),
-         {value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(2LL)}},
+         makeLongValue(2)},
         {// Accepts OID values.
          convertOIDToSbeValue(kOid),
          convertOIDToSbeValue(kOid),
          value::makeNewString("millisecond"),
          value::makeNewString("GMT"),
-         {value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(0LL)}},
+         makeLongValue(0)},
         {// Accepts Timestamp values.
          convertTimestampToSbeValue(Timestamp{Seconds{2}, 0}),
          convertTimestampToSbeValue(Timestamp{Seconds{4}, 0}),
          value::makeNewString("second"),
          value::makeNewString("America/New_York"),
-         {value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(2LL)}},
+         makeLongValue(2)},
         {// 'startDate' is Nothing.
          kNothing,
-         {value::TypeTags::Date,
-          value::bitcastFrom<int64_t>(1604260800000)},  // 2020-11-01 20:00:00
+         makeDateValue(2020, 11, 01, 20, 0, 0),
          value::makeNewString("hour"),
          value::makeNewString("GMT"),
          kNothing},
         {// 'endDate' is Nothing.
-         {value::TypeTags::Date,
-          value::bitcastFrom<int64_t>(1604260800000)},  // 2020-11-01 20:00:00
+         makeDateValue(2020, 11, 01, 20, 0, 0),
          kNothing,
          value::makeNewString("hour"),
          value::makeNewString("GMT"),
          kNothing},
         {// 'startDate' is not a valid type.
          {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(0)},
-         {value::TypeTags::Date,
-          value::bitcastFrom<int64_t>(1604260800000)},  // 2020-11-01 20:00:00
+         makeDateValue(2020, 11, 01, 20, 0, 0),
          value::makeNewString("hour"),
          value::makeNewString("GMT"),
          kNothing},
         {// 'endDate' is not a valid type.
-         {value::TypeTags::Date,
-          value::bitcastFrom<int64_t>(1604260800000)},  // 2020-11-01 20:00:00
+         makeDateValue(2020, 11, 01, 20, 0, 0),
          {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(0)},
          value::makeNewString("hour"),
          value::makeNewString("GMT"),
@@ -200,7 +216,69 @@ TEST_F(SBEDateDiffTest, BasicDateDiff) {
          kAnyDate,
          value::makeNewString("hour"),
          kNothing,
-         kNothing}};
+         kNothing},
+        {
+            // 'startOfWeek' is present and invalid type.
+            kAnyDate,
+            kAnyDate,
+            value::makeNewString("hour"),
+            value::makeNewString("GMT"),
+            kNothing,         // result
+            makeLongValue(1)  // startOfWeek
+        },
+        {
+            // 'startOfWeek' is present, valid type but invalid value, unit is not week.
+            kAnyDate,
+            kAnyDate,
+            value::makeNewString("hour"),
+            value::makeNewString("GMT"),
+            makeLongValue(0),                // result
+            value::makeNewString("INVALID")  // startOfWeek
+        },
+        {
+            // 'startOfWeek' is Nothing, unit is week.
+            kAnyDate,
+            kAnyDate,
+            value::makeNewString("week"),
+            value::makeNewString("GMT"),
+            kNothing,  // result
+            kNothing   // startOfWeek
+        },
+        {
+            // 'startOfWeek' is invalid type, unit is week.
+            kAnyDate,
+            kAnyDate,
+            value::makeNewString("week"),
+            value::makeNewString("GMT"),
+            kNothing,         // result
+            makeLongValue(0)  // startOfWeek
+        },
+        {
+            // 'startOfWeek' is invalid value, unit is week.
+            kAnyDate,
+            kAnyDate,
+            value::makeNewString("week"),
+            value::makeNewString("GMT"),
+            kNothing,                        // result
+            value::makeNewString("holiday")  // startOfWeek
+        },
+        {
+            // 'startOfWeek' is valid value, unit is week.
+            makeDateValue(2021, 01, 25, 8, 0, 0),  // Monday
+            makeDateValue(2021, 01, 26, 8, 0, 0),  // Tuesday
+            value::makeNewString("week"),
+            value::makeNewString("GMT"),
+            makeLongValue(1),                // result
+            value::makeNewString("Tuesday")  // startOfWeek
+        },
+        {
+            // 'startOfWeek' is not specified (should default to Sunday), unit is week.
+            makeDateValue(2021, 01, 23, 8, 0, 0),  // Saturday
+            makeDateValue(2021, 01, 24, 8, 0, 0),  // Sunday
+            value::makeNewString("week"),
+            value::makeNewString("GMT"),
+            makeLongValue(1)  // result
+        }};
 
     int testNumber{0};
     for (auto&& testCase : testCases) {
@@ -208,9 +286,14 @@ TEST_F(SBEDateDiffTest, BasicDateDiff) {
         endDateAccessor.reset(testCase.endDate.first, testCase.endDate.second);
         unitAccessor.reset(testCase.unit.first, testCase.unit.second);
         timezoneAccessor.reset(testCase.timezone.first, testCase.timezone.second);
+        if (testCase.startOfWeek) {
+            startOfWeekAccessor.reset(testCase.startOfWeek->first, testCase.startOfWeek->second);
+        }
 
         // Execute the "dateDiff" function.
-        auto [resultTag, resultValue] = runCompiledExpression(compiledDateDiff.get());
+        auto result = runCompiledExpression(
+            (testCase.startOfWeek ? compiledDateDiffWithStartOfWeek : compiledDateDiff).get());
+        auto [resultTag, resultValue] = result;
         value::ValueGuard resultGuard(resultTag, resultValue);
 
         auto [compResultTag, compResultValue] = compareValue(
@@ -218,7 +301,8 @@ TEST_F(SBEDateDiffTest, BasicDateDiff) {
         value::ValueGuard compResultGuard(compResultTag, compResultValue);
 
         ASSERT_EQUALS(compResultTag, value::TypeTags::NumberInt32);
-        ASSERT_EQUALS(compResultValue, 0) << "Failed test #" << testNumber;
+        ASSERT_EQUALS(compResultValue, 0) << "Failed test #" << testNumber << ", result: " << result
+                                          << ", expected: " << testCase.expectedValue;
         ++testNumber;
     }
 }
@@ -226,7 +310,7 @@ TEST_F(SBEDateDiffTest, BasicDateDiff) {
 /**
  * A test for SBE built-in function "isTimeUnit".
  */
-TEST_F(SBEIsTimeUnitTest, BasicIsTimeUnit) {
+TEST_F(SBEIsTimeUnitTest, Basic) {
     value::OwnedValueAccessor unitAccessor;
     auto unitSlot = bindAccessor(&unitAccessor);
 
@@ -249,5 +333,33 @@ TEST_F(SBEIsTimeUnitTest, BasicIsTimeUnit) {
     // Verify that when passed a valid unit returns true.
     setValue("second", unitAccessor);
     ASSERT_TRUE(runCompiledExpressionPredicate(compiledIsTimeUnitExpression.get()));
+}
+
+/**
+ * A test for SBE built-in function "isDayOfWeek".
+ */
+TEST_F(SBEIsDayOfWeekTest, Basic) {
+    value::OwnedValueAccessor dayOfWeekAccessor;
+    auto dayOfWeekSlot = bindAccessor(&dayOfWeekAccessor);
+
+    auto isDayOfWeekExpression =
+        sbe::makeE<sbe::EFunction>("isDayOfWeek", sbe::makeEs(makeE<EVariable>(dayOfWeekSlot)));
+    auto compiledIsDayOfWeekExpression = compileExpression(*isDayOfWeekExpression);
+
+    // Verify that when passed Nothing returns Nothing.
+    dayOfWeekAccessor.reset(value::TypeTags::Nothing, 0);
+    runAndAssertNothing(compiledIsDayOfWeekExpression.get());
+
+    // Verify that when passed not a string returns Nothing.
+    dayOfWeekAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(5));
+    runAndAssertNothing(compiledIsDayOfWeekExpression.get());
+
+    // Verify that when passed an invalid unit returns false.
+    setValue("m1", dayOfWeekAccessor);
+    ASSERT_FALSE(runCompiledExpressionPredicate(compiledIsDayOfWeekExpression.get()));
+
+    // Verify that when passed a valid unit returns true.
+    setValue("Wednesday", dayOfWeekAccessor);
+    ASSERT_TRUE(runCompiledExpressionPredicate(compiledIsDayOfWeekExpression.get()));
 }
 }  // namespace mongo::sbe

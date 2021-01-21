@@ -1267,46 +1267,87 @@ TEST(DateDiff, Quarter) {
 
 // Verifies 'dateDiff()' with TimeUnit::week.
 TEST(DateDiff, Week) {
+    // Cases when the first day of the week is Monday.
     ASSERT_EQ(1,
               dateDiff(kNewYorkTimeZone.createFromDateParts(2020, 11, 2, 0, 0, 0, 0),
                        kNewYorkTimeZone.createFromDateParts(2020, 11, 9, 0, 0, 0, 0),
                        TimeUnit::week,
-                       kNewYorkTimeZone));
+                       kNewYorkTimeZone,
+                       DayOfWeek::monday));
     ASSERT_EQ(1,
               dateDiff(kNewYorkTimeZone.createFromDateParts(2020, 11, 2, 0, 0, 0, 0),
                        kNewYorkTimeZone.createFromDateParts(2020, 11, 15, 0, 0, 0, 0),
                        TimeUnit::week,
-                       kNewYorkTimeZone));
+                       kNewYorkTimeZone,
+                       DayOfWeek::monday));
     ASSERT_EQ(0,
               dateDiff(kNewYorkTimeZone.createFromDateParts(2020, 11, 2, 0, 0, 0, 0),
                        kNewYorkTimeZone.createFromDateParts(2020, 11, 8, 0, 0, 0, 0),
                        TimeUnit::week,
-                       kNewYorkTimeZone));
+                       kNewYorkTimeZone,
+                       DayOfWeek::monday));
     ASSERT_EQ(0,
               dateDiff(kNewYorkTimeZone.createFromDateParts(2020, 11, 2, 0, 0, 0, 0),
                        kNewYorkTimeZone.createFromDateParts(2020, 11, 2, 0, 0, 0, 0),
                        TimeUnit::week,
-                       kNewYorkTimeZone));
+                       kNewYorkTimeZone,
+                       DayOfWeek::monday));
     ASSERT_EQ(0,
               dateDiff(kNewYorkTimeZone.createFromDateParts(2020, 11, 2, 0, 0, 0, 0),
                        kNewYorkTimeZone.createFromDateParts(2020, 11, 3, 0, 0, 0, 0),
                        TimeUnit::week,
-                       kNewYorkTimeZone));
+                       kNewYorkTimeZone,
+                       DayOfWeek::monday));
     ASSERT_EQ(1,
               dateDiff(kNewYorkTimeZone.createFromDateParts(2020, 11, 8, 0, 0, 0, 0),
                        kNewYorkTimeZone.createFromDateParts(2020, 11, 9, 0, 0, 0, 0),
                        TimeUnit::week,
-                       kNewYorkTimeZone));
+                       kNewYorkTimeZone,
+                       DayOfWeek::monday));
     ASSERT_EQ(1,
               dateDiff(kNewYorkTimeZone.createFromDateParts(2020, 11, 8, 0, 0, 0, 0),
                        kNewYorkTimeZone.createFromDateParts(2020, 11, 15, 0, 0, 0, 0),
                        TimeUnit::week,
-                       kNewYorkTimeZone));
+                       kNewYorkTimeZone,
+                       DayOfWeek::monday));
     ASSERT_EQ(-5,
               dateDiff(kNewYorkTimeZone.createFromDateParts(2020, 11, 10, 0, 0, 0, 0),
                        kNewYorkTimeZone.createFromDateParts(2020, 10, 8, 0, 0, 0, 0),
                        TimeUnit::week,
-                       kNewYorkTimeZone));
+                       kNewYorkTimeZone,
+                       DayOfWeek::monday));
+
+    // Cases when the first day of the week is not Monday.
+    ASSERT_EQ(1,
+              dateDiff(kNewYorkTimeZone.createFromDateParts(2020, 11, 13, 0, 0, 0, 0),  // Friday.
+                       kNewYorkTimeZone.createFromDateParts(2020, 11, 15, 0, 0, 0, 0),  // Sunday.
+                       TimeUnit::week,
+                       kNewYorkTimeZone,
+                       DayOfWeek::sunday));
+    ASSERT_EQ(0,
+              dateDiff(kNewYorkTimeZone.createFromDateParts(2020, 11, 13, 0, 0, 0, 0),  // Friday.
+                       kNewYorkTimeZone.createFromDateParts(2020, 11, 14, 0, 0, 0, 0),  // Saturday.
+                       TimeUnit::week,
+                       kNewYorkTimeZone,
+                       DayOfWeek::sunday));
+    ASSERT_EQ(1,
+              dateDiff(kNewYorkTimeZone.createFromDateParts(2020, 11, 8, 0, 0, 0, 0),   // Sunday.
+                       kNewYorkTimeZone.createFromDateParts(2020, 11, 15, 0, 0, 0, 0),  // Sunday.
+                       TimeUnit::week,
+                       kNewYorkTimeZone,
+                       DayOfWeek::sunday));
+    ASSERT_EQ(2,
+              dateDiff(kNewYorkTimeZone.createFromDateParts(2020, 11, 7, 0, 0, 0, 0),   // Saturday.
+                       kNewYorkTimeZone.createFromDateParts(2020, 11, 15, 0, 0, 0, 0),  // Sunday.
+                       TimeUnit::week,
+                       kNewYorkTimeZone,
+                       DayOfWeek::sunday));
+    ASSERT_EQ(0,
+              dateDiff(kNewYorkTimeZone.createFromDateParts(2020, 11, 4, 0, 0, 0, 0),  // Wednesday.
+                       kNewYorkTimeZone.createFromDateParts(2020, 11, 10, 0, 0, 0, 0),  // Tuesday.
+                       TimeUnit::week,
+                       kNewYorkTimeZone,
+                       DayOfWeek::wednesday));
 }
 
 // Verifies 'dateDiff()' with TimeUnit::day.
@@ -1818,6 +1859,21 @@ TEST(DateAdd, DateAddMillisecond) {
 
     ASSERT_EQ(dateAdd(startDate, TimeUnit::millisecond, -1500, kDefaultTimeZone),
               kDefaultTimeZone.createFromDateParts(2020, 12, 31, 23, 59, 13, 500));
+}
+
+TEST(IsValidDayOfWeek, Basic) {
+    ASSERT(isValidDayOfWeek("monday"));
+    ASSERT(isValidDayOfWeek("tue"));
+    ASSERT(isValidDayOfWeek("Wednesday"));
+    ASSERT(isValidDayOfWeek("FRIDAY"));
+    ASSERT(!isValidDayOfWeek(""));
+    ASSERT(!isValidDayOfWeek("SND"));
+}
+
+TEST(ParseDayOfWeek, Basic) {
+    ASSERT(DayOfWeek::thursday == parseDayOfWeek("thursday"));
+    ASSERT(DayOfWeek::saturday == parseDayOfWeek("SAT"));
+    ASSERT_THROWS_CODE(parseDayOfWeek(""), AssertionException, ErrorCodes::FailedToParse);
 }
 }  // namespace
 }  // namespace mongo

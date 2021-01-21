@@ -45,12 +45,15 @@ namespace {
  * endDate - end date in milliseconds from the UNIX epoch.
  * unit - a string expression of units to use for date difference calculation.
  * timezone - a string representation of timezone to use for date difference calculation.
+ * startOfWeek - a string representation of the first day of the week to use for date difference
+ * calculation when unit is a week.
  * state - benchmarking state.
  */
 void testDateDiffExpression(long long startDate,
                             long long endDate,
                             std::string unit,
                             boost::optional<std::string> timezone,
+                            boost::optional<std::string> startOfWeek,
                             benchmark::State& state) {
     QueryTestServiceContext testServiceContext;
     auto opContext = testServiceContext.makeOperationContext();
@@ -64,6 +67,9 @@ void testDateDiffExpression(long long startDate,
                << Date_t::fromMillisSinceEpoch(endDate) << "unit" << unit;
     if (timezone) {
         objBuilder << "timezone" << *timezone;
+    }
+    if (startOfWeek) {
+        objBuilder << "startOfWeek" << *startOfWeek;
     }
     auto expression = BSON("$dateDiff" << objBuilder.obj());
     auto dateDiffExpression = Expression::parseExpression(
@@ -85,6 +91,7 @@ void BM_DateDiffEvaluateMinute300Years(benchmark::State& state) {
                            7826117722000LL /* 2218-01-01*/,
                            "minute",
                            boost::none /*timezone*/,
+                           boost::none /*startOfWeek*/,
                            state);
 }
 
@@ -93,6 +100,7 @@ void BM_DateDiffEvaluateMinute2Years(benchmark::State& state) {
                            1605607121000LL /* 2020-11-17*/,
                            "minute",
                            boost::none /*timezone*/,
+                           boost::none /*startOfWeek*/,
                            state);
 }
 
@@ -101,6 +109,7 @@ void BM_DateDiffEvaluateMinute2YearsWithTimezone(benchmark::State& state) {
                            1605607121000LL /* 2020-11-17*/,
                            "minute",
                            std::string{"America/New_York"},
+                           boost::none /*startOfWeek*/,
                            state);
 }
 
@@ -109,6 +118,7 @@ void BM_DateDiffEvaluateWeek(benchmark::State& state) {
                            4761280721000LL /*2120-11-17*/,
                            "week",
                            boost::none /*timezone*/,
+                           std::string("Sunday") /*startOfWeek*/,
                            state);
 }
 

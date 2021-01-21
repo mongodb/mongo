@@ -1443,11 +1443,13 @@ public:
     /**
      * Builds a $dateDiff expression with given values of parameters.
      */
-    auto buildExpressionWithParameters(Value startDate, Value endDate, Value unit, Value timezone) {
+    auto buildExpressionWithParameters(
+        Value startDate, Value endDate, Value unit, Value timezone, Value startOfWeek = Value{}) {
         auto expCtx = getExpCtx();
         auto expression =
             BSON("$dateDiff" << BSON("startDate" << startDate << "endDate" << endDate << "unit"
-                                                 << unit << "timezone" << timezone));
+                                                 << unit << "timezone" << timezone << "startOfWeek"
+                                                 << startOfWeek));
         return Expression::parseExpression(expCtx.get(), expression, expCtx->variablesParseState);
     }
 };
@@ -1460,7 +1462,9 @@ TEST_F(ExpressionDateDiffTest, ParsesAndSerializesValidExpression) {
                                                                  << "unit"
                                                                  << "day"
                                                                  << "timezone"
-                                                                 << "America/New_York")),
+                                                                 << "America/New_York"
+                                                                 << "startOfWeek"
+                                                                 << "Monday")),
                                         BSON("$dateDiff" << BSON("startDate"
                                                                  << "$startDateField"
                                                                  << "endDate"
@@ -1470,7 +1474,10 @@ TEST_F(ExpressionDateDiffTest, ParsesAndSerializesValidExpression) {
                                                                          << "day")
                                                                  << "timezone"
                                                                  << BSON("$const"
-                                                                         << "America/New_York"))));
+                                                                         << "America/New_York")
+                                                                 << "startOfWeek"
+                                                                 << BSON("$const"
+                                                                         << "Monday"))));
     assertParsesAndSerializesExpression(BSON("$dateDiff" << BSON("startDate"
                                                                  << "$startDateField"
                                                                  << "endDate"
@@ -1538,6 +1545,7 @@ TEST_F(ExpressionDateDiffTest, EvaluatesExpression) {
         Value expectedResult;
         int expectedErrorCode{0};
         std::string expectedErrorMessage;
+        Value startOfWeek;
     };
     auto expCtx = getExpCtx();
     const auto anyDate = Value{Date_t{}};
@@ -1623,11 +1631,84 @@ TEST_F(ExpressionDateDiffTest, EvaluatesExpression) {
          Value{Timestamp{Seconds(1604260800), 0} /* 2020-11-01T20:00:00 UTC+00:00 */},
          Value{"minute"_sd},
          Value{} /* 'timezone' not specified*/,
-         Value{97}}};
+         Value{97}},
+        {
+            // Ignores 'startOfWeek' parameter value when unit is not week.
+            anyDate,
+            anyDate,
+            Value{"day"_sd},
+            Value{},             //'timezone' is not specified
+            Value{0},            // expectedResult
+            0,                   // expectedErrorCode
+            "",                  // expectedErrorMessage
+            Value{"INVALID"_sd}  // startOfWeek
+        },
+        {
+            // 'startOfWeek' is null.
+            anyDate,
+            anyDate,
+            Value{"week"_sd},  // unit
+            Value{},           //'timezone' is not specified
+            null,              // expectedResult
+            0,                 // expectedErrorCode
+            "",                // expectedErrorMessage
+            null               // startOfWeek
+        },
+        {
+            // Invalid 'startOfWeek' value type.
+            anyDate,
+            anyDate,
+            Value{"week"_sd},  // unit
+            Value{},           //'timezone' is not specified
+            null,              // expectedResult
+            5338800,           // expectedErrorCode
+            "$dateDiff requires 'startOfWeek' to be a string, but got int",  // expectedErrorMessage
+            Value{1}                                                         // startOfWeek
+        },
+        {
+            // Invalid 'startOfWeek' value.
+            anyDate,
+            anyDate,
+            Value{"week"_sd},           // unit
+            Value{},                    //'timezone' is not specified
+            null,                       // expectedResult
+            ErrorCodes::FailedToParse,  // expectedErrorCode
+            "$dateDiff parameter 'startOfWeek' value parsing failed :: caused by :: unknown day of "
+            "week value: Satur",  // expectedErrorMessage
+            Value{"Satur"_sd}     // startOfWeek
+        },
+        {
+            // Sunny day case for 'startOfWeek'.
+            Value{Date_t::fromMillisSinceEpoch(
+                1611446400000) /* 2021-01-24T00:00:00 UTC+00:00 Sunday*/},
+            Value{Date_t::fromMillisSinceEpoch(
+                1611532800000) /* 2021-01-25T00:00:00 UTC+00:00 Monday*/},
+            Value{"week"_sd},   // unit
+            Value{},            //'timezone' is not specified
+            Value{1},           // expectedResult
+            0,                  // expectedErrorCode
+            "",                 // expectedErrorMessage
+            Value{"Monday"_sd}  // startOfWeek
+        },
+        {
+            // 'startOfWeek' not specified, defaults to "Sunday".
+            Value{Date_t::fromMillisSinceEpoch(
+                1611360000000) /* 2021-01-23T00:00:00 UTC+00:00 Saturday*/},
+            Value{Date_t::fromMillisSinceEpoch(
+                1611446400000) /* 2021-01-24T00:00:00 UTC+00:00 Sunday*/},
+            Value{"week"_sd},  // unit
+            Value{},           //'timezone' is not specified
+            Value{1},          // expectedResult
+        },
+    };
 
+    // Week time unit and 'startOfWeek' specific test cases.
     for (auto&& testCase : testCases) {
-        auto dateDiffExpression = buildExpressionWithParameters(
-            testCase.startDate, testCase.endDate, testCase.unit, testCase.timezone);
+        auto dateDiffExpression = buildExpressionWithParameters(testCase.startDate,
+                                                                testCase.endDate,
+                                                                testCase.unit,
+                                                                testCase.timezone,
+                                                                testCase.startOfWeek);
         if (testCase.expectedErrorCode) {
             ASSERT_THROWS_CODE_AND_WHAT(dateDiffExpression->evaluate({}, &(expCtx->variables)),
                                         AssertionException,
@@ -1645,7 +1726,8 @@ TEST_F(ExpressionDateDiffTest, OptimizesToConstantIfAllInputsAreConstant) {
         Value{Date_t::fromMillisSinceEpoch(0)},
         Value{Date_t::fromMillisSinceEpoch(31571873000) /*1971-mm-dd*/},
         Value{"year"_sd},
-        Value{"GMT"_sd});
+        Value{"GMT"_sd},
+        Value{"Sunday"_sd});
 
     // Verify that 'optimize()' returns a constant expression when all parameters evaluate to
     // constants.
@@ -1672,13 +1754,15 @@ TEST_F(ExpressionDateDiffTest, AddsDependencies) {
     auto dateDiffExpression = buildExpressionWithParameters(Value{"$startDateField"_sd},
                                                             Value{"$endDateField"_sd},
                                                             Value{"$unitField"_sd},
-                                                            Value{"$timezoneField"_sd});
+                                                            Value{"$timezoneField"_sd},
+                                                            Value{"$startOfWeekField"_sd});
 
     // Verify that dependencies for $dateDiff expression are determined correctly.
     auto depsTracker = dateDiffExpression->getDependencies();
     ASSERT_TRUE(
         (depsTracker.fields ==
-         std::set<std::string>{"startDateField", "endDateField", "unitField", "timezoneField"}));
+         std::set<std::string>{
+             "startDateField", "endDateField", "unitField", "timezoneField", "startOfWeekField"}));
 }
 }  // namespace ExpressionDateDiffTest
 

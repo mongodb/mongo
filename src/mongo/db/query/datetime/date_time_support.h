@@ -65,6 +65,21 @@ enum class TimeUnit {
 };
 
 /**
+ * Day of a week.
+ */
+enum class DayOfWeek : uint8_t {
+    monday = 1,
+    tuesday,
+    wednesday,
+    thursday,
+    friday,
+    saturday,
+    sunday
+};
+
+static constexpr DayOfWeek kStartOfWeekDefault{DayOfWeek::sunday};
+
+/**
  * A TimeZone object represents one way of formatting/reading dates to compute things like the day
  * of the week or the hour of a given date. Different TimeZone objects may report different answers
  * for the hour, minute, or second of a date, even when given the same date.
@@ -511,6 +526,20 @@ bool isValidTimeUnit(StringData unitName);
 StringData serializeTimeUnit(TimeUnit unit);
 
 /**
+ * Parses a string 'dayOfWeek' to a DayOfWeek value. Supported day of week representations are
+ * case-insensitive full words or three letter abbreviations - for example, sunday, Sun. Throws an
+ * exception with error code ErrorCodes::FailedToParse when passed an invalid value.
+ */
+DayOfWeek parseDayOfWeek(StringData dayOfWeek);
+
+/**
+ * Returns true if 'dayOfWeek' is a valid representation of a day of a week, meaning that it can be
+ * parsed by the 'parseDayOfWeek()' function into one of the days represented by the 'DayOfWeek'
+ * enum. Otherwise returns 'false'.
+ */
+bool isValidDayOfWeek(StringData dayOfWeek);
+
+/**
  * A custom-deleter which destructs a timelib_rel_time* when it goes out of scope.
  */
 struct TimelibRelTimeDeleter {
@@ -550,8 +579,14 @@ std::unique_ptr<_timelib_rel_time, TimelibRelTimeDeleter> getTimelibRelTime(Time
  * unit - length of time intervals.
  * timezone - determines the timezone used for counting the boundaries as well as Daylight Saving
  * Time rules.
+ * startOfWeek - the first day of a week used, to determine week boundaries when 'unit' is
+ * TimeUnit::week. Otherwise, this parameter is ignored.
  */
-long long dateDiff(Date_t startDate, Date_t endDate, TimeUnit unit, const TimeZone& timezone);
+long long dateDiff(Date_t startDate,
+                   Date_t endDate,
+                   TimeUnit unit,
+                   const TimeZone& timezone,
+                   DayOfWeek startOfWeek = kStartOfWeekDefault);
 
 /**
  * Add time interval to a date. The interval duration is given in 'amount' number of 'units'.
