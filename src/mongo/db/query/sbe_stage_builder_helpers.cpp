@@ -203,6 +203,12 @@ std::unique_ptr<sbe::EExpression> makeFillEmptyFalse(std::unique_ptr<sbe::EExpre
                                                    sbe::value::bitcastFrom<bool>(false)));
 }
 
+std::unique_ptr<sbe::EExpression> makeVariable(sbe::value::SlotId slotId,
+                                               boost::optional<sbe::FrameId> frameId) {
+    return frameId ? sbe::makeE<sbe::EVariable>(*frameId, slotId)
+                   : sbe::makeE<sbe::EVariable>(slotId);
+}
+
 std::unique_ptr<sbe::EExpression> makeFillEmptyNull(std::unique_ptr<sbe::EExpression> e) {
     using namespace std::literals;
     return makeFunction(
