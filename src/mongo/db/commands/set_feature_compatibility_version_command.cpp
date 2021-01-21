@@ -258,14 +258,6 @@ public:
             if (failUpgrading.shouldFail())
                 return false;
 
-            if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
-                const auto shardingState = ShardingState::get(opCtx);
-                if (shardingState->enabled()) {
-                    LOGV2(20500, "Upgrade: submitting orphaned ranges for cleanup");
-                    migrationutil::submitOrphanRangesForCleanup(opCtx);
-                }
-            }
-
             // Delete any haystack indexes if we're upgrading to an FCV of 4.9 or higher.
             // TODO SERVER-51871: This block can removed once 5.0 becomes last-lts.
             if (requestedVersion >= FeatureCompatibilityParams::Version::kVersion49) {
