@@ -66,6 +66,7 @@ commands:
         command_name: aggregate
         strict: true
         namespace: concatenate_with_db
+        api_version: ""
         allow_global_collection_name: true
         fields:
             pipeline:

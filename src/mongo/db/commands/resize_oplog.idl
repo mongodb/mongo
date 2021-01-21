@@ -39,6 +39,7 @@ commands:
         cpp_name: ReplSetResizeOplogRequest
         strict: false
         namespace: type
+        api_version: ""
         type: safeInt64
         fields:
             size:

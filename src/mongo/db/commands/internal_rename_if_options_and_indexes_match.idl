@@ -38,6 +38,7 @@ commands:
                        command."
         command_name: internalRenameIfOptionsAndIndexesMatch
         namespace: ignored
+        api_version: ""
         fields:
             from:
                 type: namespacestring

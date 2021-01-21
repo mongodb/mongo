@@ -42,6 +42,7 @@ commands:
         description: "An internal mongod command pertaining to cross replica set index builds"
         strict: false
         namespace: type
+        api_version: ""
         type: uuid
         fields:
             hostAndPort:

@@ -39,6 +39,7 @@ commands:
         description: "An administrative command which rotates the certificates to be used by new SSL connections"
         command_name: rotateCertificates
         namespace: ignored
+        api_version: ""
         fields:
             message:
                 description: "Message to be logged upon successful rotation"

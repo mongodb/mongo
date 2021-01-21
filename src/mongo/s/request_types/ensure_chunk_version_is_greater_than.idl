@@ -42,6 +42,7 @@ commands:
         description: If a chunk matching 'requestedChunk' exists, bumps the chunk's version to one
                      greater than the current collection version.
         namespace: ignored
+        api_version: ""
         strict: false
         fields:
             minKey:

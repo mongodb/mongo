@@ -944,7 +944,7 @@ class TestParser(testcase.IDLTestcase):
                 reply_type: foo_reply_struct
             """))
 
-        # All fields with false for bools, no api_version
+        # All fields with false for bools, empty api_version
         self.assert_parse(
             textwrap.dedent("""
         commands:
@@ -953,6 +953,7 @@ class TestParser(testcase.IDLTestcase):
                 command_name: foo
                 strict: false
                 namespace: ignored
+                api_version: ""
                 is_deprecated: false
                 immutable: false
                 inline_chained_structs: false
@@ -984,6 +985,7 @@ class TestParser(testcase.IDLTestcase):
                 description: foo
                 command_name: foo
                 namespace: ignored
+                api_version: ""
                 fields:
                     foo: bar
             """))
@@ -996,6 +998,7 @@ class TestParser(testcase.IDLTestcase):
                 description: foo
                 command_name: foo
                 namespace: concatenate_with_db
+                api_version: ""
                 fields:
                     foo: bar
             """))
@@ -1008,6 +1011,7 @@ class TestParser(testcase.IDLTestcase):
                 description: foo
                 command_name: foo
                 namespace: ignored
+                api_version: ""
                 strict: true
             """))
 
@@ -1019,6 +1023,7 @@ class TestParser(testcase.IDLTestcase):
                 description: foo
                 command_name: foo
                 namespace: ignored
+                api_version: ""
                 reply_type: foo_reply_struct
             """))
 
@@ -1041,6 +1046,7 @@ class TestParser(testcase.IDLTestcase):
                 description: foo
                 command_name: foo
                 namespace: ignored
+                api_version: ""
                 foo: bar
                 fields:
                     foo: bar
@@ -1055,6 +1061,7 @@ class TestParser(testcase.IDLTestcase):
                 command_name: foo
                 strict: bar
                 namespace: ignored
+                api_version: ""
                 fields:
                     foo: bar
             """), idl.errors.ERROR_ID_IS_NODE_VALID_BOOL)
@@ -1066,6 +1073,7 @@ class TestParser(testcase.IDLTestcase):
             foo:
                 description: foo
                 namespace: ignored
+                api_version: ""
                 fields:
                     foo: bar
             """), idl.errors.ERROR_ID_MISSING_REQUIRED_FIELD)
@@ -1078,6 +1086,7 @@ class TestParser(testcase.IDLTestcase):
                 description: foo
                 command_name: [1]
                 namespace: ignored
+                api_version: ""
                 fields:
                     foo: bar
             """), idl.errors.ERROR_ID_IS_NODE_TYPE, True)
@@ -1089,6 +1098,7 @@ class TestParser(testcase.IDLTestcase):
                 description: foo
                 command_name: ["1"]
                 namespace: ignored
+                api_version: ""
                 fields:
                     foo: bar
             """), idl.errors.ERROR_ID_IS_NODE_TYPE, True)
@@ -1101,10 +1111,23 @@ class TestParser(testcase.IDLTestcase):
                 description: foo
                 command_name: foo
                 namespace: ignored
+                api_version: ""
                 is_deprecated: bar
                 fields:
                     foo: bar
             """), idl.errors.ERROR_ID_IS_NODE_VALID_BOOL)
+
+        # api_version is required
+        self.assert_parse_fail(
+            textwrap.dedent("""
+        commands:
+            foo:
+                description: foo
+                command_name: foo
+                namespace: ignored
+                fields:
+                    foo: bar
+            """), idl.errors.ERROR_ID_MISSING_REQUIRED_FIELD, True)
 
         # api_version is a scalar
         self.assert_parse_fail(
@@ -1118,7 +1141,7 @@ class TestParser(testcase.IDLTestcase):
                 fields:
                     foo: bar
                 reply_type: foo_reply_struct
-            """), idl.errors.ERROR_ID_IS_NODE_TYPE)
+            """), idl.errors.ERROR_ID_IS_NODE_TYPE, True)
 
         self.assert_parse_fail(
             textwrap.dedent("""
@@ -1131,7 +1154,7 @@ class TestParser(testcase.IDLTestcase):
                 fields:
                     foo: bar
                 reply_type: foo_reply_struct
-            """), idl.errors.ERROR_ID_IS_NODE_TYPE)
+            """), idl.errors.ERROR_ID_IS_NODE_TYPE, True)
 
         # strict:true required if api_version set
         self.assert_parse_fail(
@@ -1168,6 +1191,7 @@ class TestParser(testcase.IDLTestcase):
             foo:
                 description: foo
                 command_name: foo
+                api_version: ""
                 fields:
                     foo: bar
             """), idl.errors.ERROR_ID_MISSING_REQUIRED_FIELD)
@@ -1180,6 +1204,7 @@ class TestParser(testcase.IDLTestcase):
                 description: foo
                 command_name: foo
                 namespace: foo
+                api_version: ""
                 fields:
                     foo: bar
             """), idl.errors.ERROR_ID_BAD_COMMAND_NAMESPACE)
@@ -1204,6 +1229,7 @@ class TestParser(testcase.IDLTestcase):
                     description: foo
                     command_name: foo
                     namespace: ignored
+                    api_version: ""
                     fields:
                         foo: string
             
@@ -1222,6 +1248,7 @@ class TestParser(testcase.IDLTestcase):
                     description: foo
                     command_name: foo
                     namespace: ignored
+                    api_version: ""
                     strict: true
                     fields:
                         foo: string
@@ -1234,6 +1261,7 @@ class TestParser(testcase.IDLTestcase):
                     description: foo
                     command_name: string
                     namespace: ignored
+                    api_version: ""
                     strict: true
                     fields:
                         foo: string
@@ -1247,6 +1275,7 @@ class TestParser(testcase.IDLTestcase):
                 description: foo
                 command_name: foo
                 namespace: concatenate_with_db
+                api_version: ""
                 type: foobar
                 fields:
                     foo: bar
@@ -1260,6 +1289,7 @@ class TestParser(testcase.IDLTestcase):
                 description: foo
                 command_name: foo
                 namespace: ignored
+                api_version: ""
                 reply_type:
                     arbitrary_field: foo
             """), idl.errors.ERROR_ID_IS_NODE_TYPE)
@@ -1277,6 +1307,7 @@ class TestParser(testcase.IDLTestcase):
                 description: foo
                 command_name: foo
                 namespace: ignored
+                api_version: ""
                 fields:
                     foo:
                         type: bar
@@ -1291,6 +1322,7 @@ class TestParser(testcase.IDLTestcase):
                 description: foo
                 command_name: foo
                 namespace: ignored
+                api_version: ""
                 fields:
                     foo:
                         type: bar
@@ -1310,6 +1342,7 @@ class TestParser(testcase.IDLTestcase):
                 description: foo
                 command_name: foo
                 namespace: ignored
+                api_version: ""
                 fields:
                     foo:
                         type: bar
@@ -1328,6 +1361,7 @@ class TestParser(testcase.IDLTestcase):
                 command_name: foo
                 strict: true
                 namespace: type
+                api_version: ""
                 type: string
                 fields:
                     foo: bar
@@ -1342,6 +1376,7 @@ class TestParser(testcase.IDLTestcase):
                 command_name: foo
                 strict: true
                 namespace: type
+                api_version: ""
                 type: array<string>
                 fields:
                     foo: bar
@@ -1356,6 +1391,7 @@ class TestParser(testcase.IDLTestcase):
                 command_name: foo
                 strict: true
                 namespace: type
+                api_version: ""
                 type: string
             """))
 
@@ -1371,6 +1407,7 @@ class TestParser(testcase.IDLTestcase):
                 description: foo
                 command_name: foo
                 namespace: type
+                api_version: ""
                 fields:
                     foo: bar
             """), idl.errors.ERROR_ID_MISSING_REQUIRED_FIELD)
@@ -1404,6 +1441,7 @@ class TestParser(testcase.IDLTestcase):
                 description: foo
                 command_name: foo
                 namespace: ignored
+                api_version: ""
                 fields:
                     foo:
                         type: bar

@@ -59,6 +59,7 @@ commands:
         description: "Set the current read/write concern defaults (cluster-wide)"
         command_name: setDefaultRWConcern
         namespace: ignored
+        api_version: ""
         fields:
             defaultReadConcern:
                 description: "The new default read concern"
@@ -73,6 +74,7 @@ commands:
         description: "Get the current read/write concern defaults being applied by this node"
         command_name: getDefaultRWConcern
         namespace: ignored
+        api_version: ""
         fields:
             inMemory:
                 type: bool

@@ -67,6 +67,7 @@ commands:
         description: "The internal createCollection command for a shard."
         strict: false
         namespace: concatenate_with_db
+        api_version: ""
         fields:
             shardKey:
                 type: object
@@ -97,6 +98,7 @@ commands:
         description: "Parser for the shardDropDatabase command"
         command_name: _shardsvrDropDatabase
         namespace: type
+        api_version: ""
         type: safeInt64
         cpp_name: ShardsvrDropDatabase
         reply_type: DropDatabaseReply
@@ -105,6 +107,7 @@ commands:
         description: "Parser for the _shardsvrDropCollection command"
         command_name: _shardsvrDropCollection
         namespace: concatenate_with_db
+        api_version: ""
         cpp_name: ShardsvrDropCollection
         strict: false
 
@@ -112,6 +115,7 @@ commands:
         description: "Parser for the _shardsvrDropCollectionParticipant command"
         command_name: _shardsvrDropCollectionParticipant
         namespace: concatenate_with_db
+        api_version: ""
         cpp_name: ShardsvrDropCollectionParticipant
         strict: false
 
@@ -121,6 +125,7 @@ commands:
         description: "Internal renameCollection command for a shard."
         strict: false
         namespace: concatenate_with_db
+        api_version: ""
         fields:
             to:
                 type: namespacestring
@@ -140,6 +145,7 @@ commands:
         description: "Parser for the _shardsvrRefineCollectionShardKey command"
         command_name: _shardsvrRefineCollectionShardKey
         namespace: concatenate_with_db
+        api_version: ""
         fields:
             newShardKey:
                 type: KeyPattern

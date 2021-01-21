@@ -41,4 +41,5 @@ commands:
         description: "The internal createDatabase command on the config server"
         strict: false
         namespace: type
+        api_version: ""
         type: string

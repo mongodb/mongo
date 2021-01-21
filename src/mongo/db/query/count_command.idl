@@ -61,6 +61,7 @@ commands:
         cpp_name: CountCommand
         strict: true
         namespace: concatenate_with_db_or_uuid
+        api_version: ""
         fields:
             query:
                 description: "A query that selects which documents to count in the collection or

@@ -40,6 +40,7 @@ commands:
         command_name: waitForFailPoint
         strict: false
         namespace: type
+        api_version: ""
         type: string
         fields:
             timesEntered:

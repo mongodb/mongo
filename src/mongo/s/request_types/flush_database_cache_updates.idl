@@ -40,6 +40,7 @@ commands:
         command_name: _flushDatabaseCacheUpdates
         strict: true
         namespace: type
+        api_version: ""
         type: string
         fields:
             syncFromConfig:

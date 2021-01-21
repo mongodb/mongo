@@ -54,6 +54,7 @@ commands:
         description: "Public balancerCollectionStatus command on mongos"
         strict: true
         namespace: type
+        api_version: ""
         type: namespacestring
 
     _configsvrBalancerCollectionStatus:
@@ -62,4 +63,5 @@ commands:
         description: "Internal balancerCollectionStatus command on the config server"
         strict: true
         namespace: type
+        api_version: ""
         type: namespacestring

@@ -72,6 +72,7 @@ commands:
         description: "The MapReduce command."
         command_name: "MapReduce"
         namespace: concatenate_with_db
+        api_version: ""
         strict: true
         fields:
             map:

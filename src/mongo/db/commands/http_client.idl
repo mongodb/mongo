@@ -51,6 +51,7 @@ commands:
         description: "Fetch an HTTP(S) resource via GET"
         command_name: httpClientRequest
         namespace: ignored
+        api_version: ""
         fields:
             uri:
                 description: "Document location to fetch"

@@ -74,6 +74,7 @@ commands:
         cpp_name: FindAndModifyCommand
         strict: true
         namespace: concatenate_with_db
+        api_version: ""
         fields:
             query:
                 description: "The query that matches documents to update. Uses the same query

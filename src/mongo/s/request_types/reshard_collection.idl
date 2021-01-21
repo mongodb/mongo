@@ -40,6 +40,7 @@ commands:
     command_name: reshardCollection
     strict: false
     namespace: type
+    api_version: ""
     type: namespacestring
     fields:
       key:
@@ -73,6 +74,7 @@ commands:
     description: "The internal reshardCollection command on the config server."
     strict: false
     namespace: type
+    api_version: ""
     type: namespacestring
     fields:
       key:

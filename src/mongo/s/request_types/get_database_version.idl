@@ -39,4 +39,5 @@ commands:
         description: "An internal command to get a shard server's cached database version"
         command_name: getDatabaseVersion
         namespace: type
+        api_version: ""
         type: string

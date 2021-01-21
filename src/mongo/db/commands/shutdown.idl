@@ -38,6 +38,7 @@ commands:
         cpp_name: ShutdownRequest
         description: "Shutdown the database"
         namespace: ignored
+        api_version: ""
         strict: true
         fields:
             force:

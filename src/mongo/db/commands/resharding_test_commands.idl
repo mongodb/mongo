@@ -38,6 +38,7 @@ commands:
     command_name: testReshardCloneCollection
     description: "The 'testReshardCloneCollection' command."
     namespace: type
+    api_version: ""
     type: namespacestring
     fields:
       atClusterTime:

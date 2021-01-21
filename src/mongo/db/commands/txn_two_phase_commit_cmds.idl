@@ -46,12 +46,14 @@ commands:
         command_name: prepareTransaction
         strict: true
         namespace: ignored
+        api_version: ""
 
     coordinateCommitTransaction:
         description: "Parser for the 'coordinateCommitTransaction' command."
         command_name: coordinateCommitTransaction
         strict: false
         namespace: ignored
+        api_version: ""
         fields:
             participants:
                 description: "An array of shard participants that must be included in the commit."

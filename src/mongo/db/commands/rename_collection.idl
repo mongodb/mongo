@@ -39,6 +39,7 @@ commands:
         cpp_name: RenameCollectionCommand
         strict: true
         namespace: type
+        api_version: ""
         type: namespacestring
         fields:
             to:

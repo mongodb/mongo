@@ -48,6 +48,7 @@ commands:
         description: "Log a message on the server"
         command_name: logMessage
         namespace: type
+        api_version: ""
         type: string
         cpp_name: LogMessageCommand
         strict: true

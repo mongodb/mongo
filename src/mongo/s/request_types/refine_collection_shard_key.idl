@@ -40,6 +40,7 @@ commands:
         command_name: refineCollectionShardKey
         strict: false
         namespace: type
+        api_version: ""
         type: namespacestring
         fields:
             key:
@@ -53,6 +54,7 @@ commands:
         description: "The internal refineCollectionShardKey command on the config server"
         strict: false
         namespace: type
+        api_version: ""
         type: namespacestring
         fields:
             key:

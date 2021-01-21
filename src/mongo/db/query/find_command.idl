@@ -68,6 +68,7 @@ commands:
     description: "A struct representing the find command"
     strict: true
     namespace: concatenate_with_db_or_uuid
+    api_version: ""
     non_const_getter: true
     fields:
       filter:

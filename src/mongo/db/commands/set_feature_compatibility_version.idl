@@ -41,6 +41,7 @@ commands:
         cpp_name: SetFeatureCompatibilityVersion
         strict: true
         namespace: type
+        api_version: ""
         type: fcv_string
         fields:
             downgradeOnDiskChanges:

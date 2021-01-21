@@ -44,6 +44,7 @@ commands:
         description: "Resets the commitQuorum for an index build."
         strict: false
         namespace: concatenate_with_db
+        api_version: ""
         fields:
             indexNames:
                 type: array<string>

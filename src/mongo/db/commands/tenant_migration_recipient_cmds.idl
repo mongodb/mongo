@@ -86,6 +86,7 @@ commands:
     command_name: recipientSyncData
     strict: true
     namespace: ignored
+    api_version: ""
     inline_chained_structs: true
     chained_structs:
       MigrationRecipientCommonData: MigrationRecipientCommonData
@@ -104,6 +105,7 @@ commands:
     command_name: recipientForgetMigration
     strict: true
     namespace: ignored
+    api_version: ""
     inline_chained_structs: true
     chained_structs:
       MigrationRecipientCommonData: MigrationRecipientCommonData

@@ -57,6 +57,7 @@ commands:
     command_name: donorStartMigration
     strict: true
     namespace: ignored
+    api_version: ""
     fields:
       migrationId:
         description: "Unique identifier for the tenant migration."
@@ -90,6 +91,7 @@ commands:
     command_name: donorForgetMigration
     strict: true
     namespace: ignored
+    api_version: ""
     fields:
       migrationId:
         description: "Unique identifier for the tenant migration."
@@ -100,6 +102,7 @@ commands:
     command_name: donorAbortMigration
     strict: true
     namespace: ignored
+    api_version: ""
     fields:
       migrationId:
         description: "Unique identifier for the tenant migration."

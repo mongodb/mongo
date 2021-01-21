@@ -103,6 +103,7 @@ commands:
         description: "Create a user"
         command_name: createUser
         namespace: type
+        api_version: ""
         type: string
         cpp_name: CreateUserCommand
         strict: true
@@ -139,6 +140,7 @@ commands:
         description: "Modify a user"
         command_name: updateUser
         namespace: type
+        api_version: ""
         type: string
         cpp_name: UpdateUserCommand
         strict: true
@@ -176,6 +178,7 @@ commands:
         description: "Drop a single user"
         command_name: dropUser
         namespace: type
+        api_version: ""
         type: string
         cpp_name: DropUserCommand
         strict: true
@@ -184,6 +187,7 @@ commands:
         description: "Drop all users in the database"
         command_name: dropAllUsersFromDatabase
         namespace: ignored
+        api_version: ""
         cpp_name: DropAllUsersFromDatabaseCommand
         strict: true
 
@@ -191,6 +195,7 @@ commands:
         description: "Grant additional roles to a user"
         command_name: grantRolesToUser
         namespace: type
+        api_version: ""
         type: string
         cpp_name: GrantRolesToUserCommand
         strict: true
@@ -203,6 +208,7 @@ commands:
         description: "Revoke previously assigned roles from a user"
         command_name: revokeRolesFromUser
         namespace: type
+        api_version: ""
         type: string
         cpp_name: RevokeRolesFromUserCommand
         strict: true
@@ -215,6 +221,7 @@ commands:
         description: "Create a new role"
         command_name: createRole
         namespace: type
+        api_version: ""
         type: string
         cpp_name: CreateRoleCommand
         strict: true
@@ -234,6 +241,7 @@ commands:
         description: "Update an existing role"
         command_name: updateRole
         namespace: type
+        api_version: ""
         type: string
         cpp_name: UpdateRoleCommand
         strict: true
@@ -255,6 +263,7 @@ commands:
         description: "Grants privileges to a role"
         command_name: grantPrivilegesToRole
         namespace: type
+        api_version: ""
         type: string
         cpp_name: GrantPrivilegesToRoleCommand
         strict: true
@@ -267,6 +276,7 @@ commands:
         description: "Grants privileges to a role"
         command_name: revokePrivilegesFromRole
         namespace: type
+        api_version: ""
         type: string
         cpp_name: RevokePrivilegesFromRoleCommand
         strict: true
@@ -279,6 +289,7 @@ commands:
         description: "Grant roles to a role"
         command_name: grantRolesToRole
         namespace: type
+        api_version: ""
         type: string
         cpp_name: GrantRolesToRoleCommand
         strict: true
@@ -291,6 +302,7 @@ commands:
         description: "Revoke roles from a role"
         command_name: revokeRolesFromRole
         namespace: type
+        api_version: ""
         type: string
         cpp_name: RevokeRolesFromRoleCommand
         strict: true
@@ -307,6 +319,7 @@ commands:
             removed from some user/roles but otherwise still exists.
         command_name: dropRole
         namespace: type
+        api_version: ""
         type: string
         cpp_name: DropRoleCommand
         strict: true
@@ -319,6 +332,7 @@ commands:
             where the roles have been removed from some user/roles but otherwise still exist.
         command_name: dropAllRolesFromDatabase
         namespace: ignored
+        api_version: ""
         cpp_name: DropAllRolesFromDatabaseCommand
         strict: true
 
@@ -326,6 +340,7 @@ commands:
         description: "Returns information about users."
         command_name: usersInfo
         namespace: type
+        api_version: ""
         type: UsersInfoCommandArg
         cpp_name: UsersInfoCommand
         strict: true
@@ -359,6 +374,7 @@ commands:
         description: "returns information about roles."
         command_name: rolesInfo
         namespace: type
+        api_version: ""
         type: RolesInfoCommandArg
         cpp_name: RolesInfoCommand
         strict: true
@@ -387,6 +403,7 @@ commands:
     invalidateUserCache:
         description: "Invalidate the user cache"
         namespace: ignored
+        api_version: ""
         command_name: invalidateUserCache
         cpp_name: InvalidateUserCacheCommand
         strict: true
@@ -394,6 +411,7 @@ commands:
     _getUserCacheGeneration:
         description: "Returns the current user cache generation"
         namespace: ignored
+        api_version: ""
         command_name: _getUserCacheGeneration
         cpp_name: GetUserCacheGenerationCommand
         strict: true
@@ -401,6 +419,7 @@ commands:
     _mergeAuthzCollections:
         description: "Internal command used by mongorestore for updating user/role data"
         namespace: ignored
+        api_version: ""
         command_name: _mergeAuthzCollections
         cpp_name: MergeAuthzCollectionsCommand
         strict: true

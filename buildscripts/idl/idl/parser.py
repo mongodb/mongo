@@ -678,6 +678,8 @@ def _parse_enum(ctxt, spec, name, node):
 def _parse_command(ctxt, spec, name, node):
     # type: (errors.ParserContext, syntax.IDLSpec, str, Union[yaml.nodes.MappingNode, yaml.nodes.ScalarNode, yaml.nodes.SequenceNode]) -> None
     """Parse a command section in the IDL file."""
+    # pylint: disable=too-many-branches
+
     if not ctxt.is_mapping_node(node, "command"):
         return
 
@@ -712,6 +714,9 @@ def _parse_command(ctxt, spec, name, node):
 
     if not command.command_name:
         ctxt.add_missing_required_field_error(node, "command", "command_name")
+
+    if command.api_version is None:
+        ctxt.add_missing_required_field_error(node, "command", "api_version")
 
     if command.namespace:
         if command.namespace not in valid_commands:

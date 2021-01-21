@@ -44,6 +44,7 @@ commands:
         description: "Attempt to connect to a cluster member"
         command_name: replSetTestEgress
         namespace: ignored
+        api_version: ""
         fields:
             target:
                 description: "Member address to connect and authenticate to, empty to select random member"

@@ -1457,6 +1457,7 @@ class TestBinder(testcase.IDLTestcase):
                     description: foo
                     command_name: foo
                     namespace: ignored
+                    api_version: ""
                     strict: true
                     fields:
                         foo1: string
@@ -1487,6 +1488,7 @@ class TestBinder(testcase.IDLTestcase):
                     description: foo
                     command_name: foo
                     namespace: ignored
+                    api_version: ""
                     fields:
                         foo1: string
 
@@ -1494,6 +1496,7 @@ class TestBinder(testcase.IDLTestcase):
                     description: foo
                     command_name: bar
                     namespace: ignored
+                    api_version: ""
                     fields:
                         foo: foo
             """), idl.errors.ERROR_ID_FIELD_NO_COMMAND)
@@ -1506,6 +1509,7 @@ class TestBinder(testcase.IDLTestcase):
                     description: foo
                     command_name: foo
                     namespace: ignored
+                    api_version: ""
                     fields:
                         foo1: string
 
@@ -1524,6 +1528,7 @@ class TestBinder(testcase.IDLTestcase):
                     description: foo
                     command_name: foo
                     namespace: ignored
+                    api_version: ""
                     fields:
                         foo: string
             """), idl.errors.ERROR_ID_COMMAND_DUPLICATES_FIELD)
@@ -1536,6 +1541,7 @@ class TestBinder(testcase.IDLTestcase):
                     description: foo
                     command_name: foo
                     namespace: ignored
+                    api_version: ""
                     reply_type: not_defined
             """), idl.errors.ERROR_ID_UNKNOWN_TYPE)
 
@@ -1547,6 +1553,7 @@ class TestBinder(testcase.IDLTestcase):
                     description: foo
                     command_name: foo
                     namespace: ignored
+                    api_version: ""
                     reply_type: string
             """), idl.errors.ERROR_ID_INVALID_REPLY_TYPE)
 
@@ -1586,6 +1593,7 @@ class TestBinder(testcase.IDLTestcase):
                     description: foo
                     command_name: foo
                     namespace: ignored
+                    api_version: ""
                     fields:
                         foo1:
                             type: array<object>
@@ -1598,6 +1606,7 @@ class TestBinder(testcase.IDLTestcase):
                     description: foo
                     command_name: foo
                     namespace: ignored
+                    api_version: ""
                     fields:
                         foo1:
                             type: array<foo_struct>
@@ -1663,6 +1672,7 @@ class TestBinder(testcase.IDLTestcase):
                     description: foo
                     command_name: foo
                     namespace: ignored
+                    api_version: ""
                     fields:
                         foo:
                             type: object
@@ -1677,6 +1687,7 @@ class TestBinder(testcase.IDLTestcase):
                     description: foo
                     command_name: foo
                     namespace: ignored
+                    api_version: ""
                     fields:
                         foo1:
                             type: array<string>
@@ -1691,6 +1702,7 @@ class TestBinder(testcase.IDLTestcase):
                     description: foo
                     command_name: foo
                     namespace: ignored
+                    api_version: ""
                     fields:
                         foo1:
                             type: array<string>
@@ -1718,6 +1730,7 @@ class TestBinder(testcase.IDLTestcase):
                 command_name: foo
                 strict: true
                 namespace: type
+                api_version: ""
                 type: string
                 fields:
                     field1: string
@@ -1731,6 +1744,7 @@ class TestBinder(testcase.IDLTestcase):
                 command_name: foo
                 strict: true
                 namespace: type
+                api_version: ""
                 type: array<string>
                 fields:
                     field1: string
@@ -1757,6 +1771,7 @@ class TestBinder(testcase.IDLTestcase):
                 description: foo
                 command_name: foo
                 namespace: type
+                api_version: ""
                 type: int
                 fields:
                     field1: string

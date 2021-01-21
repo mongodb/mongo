@@ -37,18 +37,21 @@ commands:
     description: "increment an integer (TypedCommand example)"
     command_name: exampleIncrement
     namespace: concatenate_with_db
+    api_version: ""
     fields:
       i: int
   exampleVoid:
     description: "no return, just side effects"
     command_name: exampleVoid
     namespace: concatenate_with_db
+    api_version: ""
     fields:
       i: int
   exampleMinimal:
     description: "like exampleIncrement, but use MinimalInvocationBase"
     command_name: exampleMinimal
     namespace: concatenate_with_db
+    api_version: ""
     fields:
       i: int
 

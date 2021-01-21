@@ -38,6 +38,7 @@ commands:
         command_name: distinct
         cpp_name: DistinctCommand
         namespace: concatenate_with_db_or_uuid
+        api_version: ""
         strict: true
         fields:
             key:

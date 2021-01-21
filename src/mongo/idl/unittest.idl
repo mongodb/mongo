@@ -678,6 +678,7 @@ commands:
         description: UnitTest for a basic ignored command
         command_name: BasicIgnoredCommand
         namespace: ignored
+        api_version: ""
         fields:
             field1: int
             field2: string
@@ -686,6 +687,7 @@ commands:
         description: UnitTest for a basic concatenate_with_db command
         command_name: BasicConcatenateWithDbCommand
         namespace: concatenate_with_db
+        api_version: ""
         fields:
             field1: int
             field2: string
@@ -694,6 +696,7 @@ commands:
         description: UnitTest for a basic concatenate_with_db_or_uuid command
         command_name: BasicConcatenateWithDbOrUUIDCommand
         namespace: concatenate_with_db_or_uuid
+        api_version: ""
         fields:
             field1: int
             field2: string
@@ -702,6 +705,7 @@ commands:
         description: UnitTest for a basic concatenate_with_db_or_uuid command
         command_name: BasicNamespaceConstGetterCommand
         namespace: concatenate_with_db_or_uuid
+        api_version: ""
         non_const_getter: true
         fields:
             field1: int
@@ -710,6 +714,7 @@ commands:
         description: UnitTest for a command that has a field that is special known generic command field
         command_name: KnownFieldCommand
         namespace: concatenate_with_db
+        api_version: ""
         fields:
             field1: int
             maxTimeMS: int
@@ -718,6 +723,7 @@ commands:
         description: UnitTest for a basic command with fields marked with supports_doc_sequence
         command_name: DocSequenceCommand
         namespace: concatenate_with_db
+        api_version: ""
         fields:
             field1: int
             field2: string
@@ -736,6 +742,7 @@ commands:
         description: UnitTest for a basic command with fields marked with supports_doc_sequence and non-strict parsing
         command_name: DocSequenceCommandNonStrict
         namespace: concatenate_with_db
+        api_version: ""
         strict: false
         fields:
             field1: int
@@ -755,6 +762,7 @@ commands:
         description: Chained command with chained types, structs, and fields
         command_name: chained_command_type_mixed
         namespace: concatenate_with_db
+        api_version: ""
         strict: false
         chained_types:
             ChainedType : chained_type
@@ -771,6 +779,7 @@ commands:
         description: Command with custom type string
         command_name: CommandTypeStringCommand
         namespace: type
+        api_version: ""
         type: string
         fields:
             field1: int
@@ -779,18 +788,21 @@ commands:
         description: Command with just an array of object parameter
         command_name: CommandTypeArrayObjectCommand
         namespace: type
+        api_version: ""
         type: array<object>
 
     CommandTypeStructCommand:
         description: Command with just a struct parameter
         command_name: CommandTypeStructCommand
         namespace: type
+        api_version: ""
         type: one_string
 
     CommandTypeArrayStructCommand:
         description: Command with just an array of struct parameter
         command_name: CommandTypeArrayStructCommand
         namespace: type
+        api_version: ""
         type: array<one_string>
 
     # TODO (SERVER-51369): Test a command with type: variant: [int, string] and
@@ -800,6 +812,7 @@ commands:
         description: Command with custom type string
         command_name: _underscore_command
         namespace: type
+        api_version: ""
         type: string
         cpp_name: WellNamedCommand
         fields:
@@ -809,6 +822,7 @@ commands:
         description: Command with custom type int
         command_name: int_type_command
         namespace: type
+        api_version: ""
         type: int
         fields:
             field1: int
@@ -817,6 +831,7 @@ commands:
         description: Command with custom type for array of int
         command_name: int_array_type_command
         namespace: type
+        api_version: ""
         type: array<int>
         fields:
             field1: int
@@ -825,6 +840,7 @@ commands:
         description: Renamed command with validator
         command_name: validated_command
         namespace: ignored
+        api_version: ""
         cpp_name: doubleBasicRanges
         fields:
             positive_double:
@@ -838,18 +854,21 @@ commands:
         description: A command with its reply type specified by an IDL struct
         command_name: CommandWithReplyType
         namespace: ignored
+        api_version: ""
         reply_type: reply_type_struct
 
     CommandWithOkReply:
         description: "A mock command that replies with only {ok: 1}"
         command_name: CommandWithOkReply
         namespace: ignored
+        api_version: ""
         reply_type: OkReply
 
     CommandWithAnyTypeMember:
         description: "A mock command to test IDLAnyType"
         command_name: CommandWithValueTypeMember
         namespace: ignored
+        api_version: ""
         reply_type: OkReply
         fields:
             anyTypeField: IDLAnyType
@@ -858,6 +877,7 @@ commands:
         description: "A mock command to test IDLAnyTypeOwned"
         command_name: CommandWithValueTypeMember
         namespace: ignored
+        api_version: ""
         reply_type: OkReply
         fields:
             anyTypeField: IDLAnyTypeOwned

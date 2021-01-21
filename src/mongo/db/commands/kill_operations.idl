@@ -38,6 +38,7 @@ commands:
         cpp_name: KillOperationsRequest
         description: "Interrupt a list of operations on a remote server"
         namespace: ignored
+        api_version: ""
         strict: true
         fields:
             operationKeys:

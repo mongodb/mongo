@@ -39,6 +39,7 @@ commands:
         description: "clearJumboFlag command for mongos"
         command_name: clearJumboFlag
         namespace: type
+        api_version: ""
         type: namespacestring
         strict: false
         fields:
@@ -58,6 +59,7 @@ commands:
         cpp_name: ConfigsvrClearJumboFlag
         description: "internal clearJumboFlag command for config server"
         namespace: type
+        api_version: ""
         type: namespacestring
         strict: false
         fields:

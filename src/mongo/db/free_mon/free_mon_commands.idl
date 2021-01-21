@@ -47,6 +47,7 @@ commands:
         description: "setFreeMonitoring Command"
         command_name: setFreeMonitoring
         namespace: ignored
+        api_version: ""
         fields:
           action:
             description: "Action to take"
@@ -56,4 +57,5 @@ commands:
         description: "getFreeMonitoringStatus Command"
         command_name: getFreeMonitoringStatus
         namespace: ignored
+        api_version: ""
 

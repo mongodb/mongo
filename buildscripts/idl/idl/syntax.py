@@ -505,7 +505,7 @@ class Command(Struct):
         self.command_name = None  # type: str
         self.type = None  # type: FieldType
         self.reply_type = None  # type: str
-        self.api_version = ""  # type: str
+        self.api_version = None  # type: str
         self.is_deprecated = False  # type: bool
         super(Command, self).__init__(file_name, line, column)
 
