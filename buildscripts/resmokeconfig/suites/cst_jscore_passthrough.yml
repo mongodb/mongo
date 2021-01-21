@@ -26,6 +26,7 @@ selector:
   - jstests/core/wildcard_index_collation.js
   - jstests/core/wildcard_index_hint.js
   - jstests/core/wildcard_index_return_key.js
+  - jstests/core/wildcard_index_projection.js
   - jstests/core/update_array_offset_positional.js
   - jstests/core/update_arraymatch6.js
   - jstests/core/update_arraymatch8.js

@@ -305,6 +305,43 @@ TEST_F(InclusionProjectionExecutionTestWithoutFallBackToDefault,
         inclusion->serializeTransformation(ExplainOptions::Verbosity::kExecAllPlans));
 }
 
+TEST_F(InclusionProjectionExecutionTestWithoutFallBackToDefault, ShouldSerializeWithTopLevelID) {
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies(BSON("a" << 1 << "b" << 1));
+    auto serialization = inclusion->serializeTransformation(boost::none);
+    ASSERT_VALUE_EQ(serialization["a"], Value(true));
+    ASSERT_VALUE_EQ(serialization["b"], Value(true));
+    ASSERT_VALUE_EQ(serialization["_id"], Value(true));
+
+    inclusion = makeInclusionProjectionWithDefaultPolicies(
+        BSON("a" << 1 << "b" << BSON("c" << 1 << "d" << 1)));
+    serialization = inclusion->serializeTransformation(boost::none);
+    ASSERT_VALUE_EQ(serialization["a"], Value(true));
+    ASSERT_VALUE_EQ(serialization["b"]["c"], Value(true));
+    ASSERT_VALUE_EQ(serialization["b"]["d"], Value(true));
+    ASSERT_VALUE_EQ(serialization["_id"], Value(true));
+    ASSERT_VALUE_EQ(serialization["b"]["_id"], Value());
+
+    inclusion = makeInclusionProjectionWithDefaultIdExclusion(BSON("a" << true << "b" << true));
+    serialization = inclusion->serializeTransformation(boost::none);
+    ASSERT_VALUE_EQ(serialization["a"], Value(true));
+    ASSERT_VALUE_EQ(serialization["b"], Value(true));
+    ASSERT_VALUE_EQ(serialization["_id"], Value(false));
+
+    inclusion = makeInclusionProjectionWithDefaultIdExclusion(
+        BSON("a" << true << "b" << true << "_id" << false));
+    serialization = inclusion->serializeTransformation(boost::none);
+    ASSERT_VALUE_EQ(serialization["a"], Value(true));
+    ASSERT_VALUE_EQ(serialization["b"], Value(true));
+    ASSERT_VALUE_EQ(serialization["_id"], Value(false));
+
+    inclusion = makeInclusionProjectionWithDefaultIdExclusion(
+        BSON("a" << true << "b" << true << "_id" << true));
+    serialization = inclusion->serializeTransformation(boost::none);
+    ASSERT_VALUE_EQ(serialization["a"], Value(true));
+    ASSERT_VALUE_EQ(serialization["b"], Value(true));
+    ASSERT_VALUE_EQ(serialization["_id"], Value(true));
+}
+
 TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault, ShouldOptimizeTopLevelExpressions) {
     auto inclusion =
         makeInclusionProjectionWithDefaultPolicies(BSON("a" << BSON("$add" << BSON_ARRAY(1 << 2))));

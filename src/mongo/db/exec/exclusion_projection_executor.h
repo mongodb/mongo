@@ -106,7 +106,16 @@ public:
 
     Document serializeTransformation(
         boost::optional<ExplainOptions::Verbosity> explain) const final {
-        return _root->serialize(explain);
+        MutableDocument output;
+
+        // The ExclusionNode tree in '_root' will always have a top-level _id node if _id is to be
+        // excluded. If the _id node is not present, then explicitly set {_id: true} to avoid
+        // ambiguity in the expected behavior of the serialized projection.
+        _root->serialize(explain, &output);
+        if (output.peek()["_id"].missing()) {
+            output.addField("_id", Value{true});
+        }
+        return output.freeze();
     }
 
     /**

@@ -430,7 +430,7 @@ TEST_F(UnsetTest, UnsetSerializesToProject) {
     vector<Value> serializedArray;
     unsetStage->serializeToArray(serializedArray);
     auto serializedUnsetStage = serializedArray[0].getDocument().toBson();
-    ASSERT_BSONOBJ_EQ(serializedUnsetStage, fromjson("{$project: {b: {c: false}}}"));
+    ASSERT_BSONOBJ_EQ(serializedUnsetStage, fromjson("{$project: {b: {c: false}, _id: true}}"));
     auto projectStage =
         DocumentSourceProject::createFromBson(serializedUnsetStage.firstElement(), getExpCtx());
     projectStage->serializeToArray(serializedArray);

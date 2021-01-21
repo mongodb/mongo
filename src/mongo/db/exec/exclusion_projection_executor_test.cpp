@@ -106,6 +106,43 @@ TEST(ExclusionProjectionExecutionTest, ShouldSerializeToEquivalentProjection) {
     ASSERT_VALUE_EQ(serialization["x"].getDocument()["y"], Value(false));
 }
 
+TEST(ExclusionProjectionExecutionTest, ShouldSerializeWithTopLevelID) {
+    auto exclusion = makeExclusionProjectionWithDefaultPolicies(BSON("a" << 0 << "b" << 0));
+    auto serialization = exclusion->serializeTransformation(boost::none);
+    ASSERT_VALUE_EQ(serialization["a"], Value(false));
+    ASSERT_VALUE_EQ(serialization["b"], Value(false));
+    ASSERT_VALUE_EQ(serialization["_id"], Value(true));
+
+    exclusion = makeExclusionProjectionWithDefaultPolicies(
+        BSON("a" << 0 << "b" << BSON("c" << 0 << "d" << 0)));
+    serialization = exclusion->serializeTransformation(boost::none);
+    ASSERT_VALUE_EQ(serialization["a"], Value(false));
+    ASSERT_VALUE_EQ(serialization["b"]["c"], Value(false));
+    ASSERT_VALUE_EQ(serialization["b"]["d"], Value(false));
+    ASSERT_VALUE_EQ(serialization["_id"], Value(true));
+    ASSERT_VALUE_EQ(serialization["b"]["_id"], Value());
+
+    exclusion = makeExclusionProjectionWithDefaultIdExclusion(BSON("a" << false << "b" << false));
+    serialization = exclusion->serializeTransformation(boost::none);
+    ASSERT_VALUE_EQ(serialization["a"], Value(false));
+    ASSERT_VALUE_EQ(serialization["b"], Value(false));
+    ASSERT_VALUE_EQ(serialization["_id"], Value(false));
+
+    exclusion = makeExclusionProjectionWithDefaultIdExclusion(
+        BSON("a" << false << "b" << false << "_id" << false));
+    serialization = exclusion->serializeTransformation(boost::none);
+    ASSERT_VALUE_EQ(serialization["a"], Value(false));
+    ASSERT_VALUE_EQ(serialization["b"], Value(false));
+    ASSERT_VALUE_EQ(serialization["_id"], Value(false));
+
+    exclusion = makeExclusionProjectionWithDefaultIdExclusion(
+        BSON("a" << false << "b" << false << "_id" << true));
+    serialization = exclusion->serializeTransformation(boost::none);
+    ASSERT_VALUE_EQ(serialization["a"], Value(false));
+    ASSERT_VALUE_EQ(serialization["b"], Value(false));
+    ASSERT_VALUE_EQ(serialization["_id"], Value(true));
+}
+
 TEST(ExclusionProjectionExecutionTest, ShouldNotAddAnyDependencies) {
     // An exclusion projection will cause the stage to return DepsTracker::State::SEE_NEXT, meaning
     // it doesn't strictly require any fields.

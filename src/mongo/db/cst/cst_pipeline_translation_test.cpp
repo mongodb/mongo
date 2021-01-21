@@ -193,7 +193,7 @@ TEST(CstPipelineTranslationTest, TranslatesOneFieldExclusionProjectionStage) {
     auto& singleDoc = dynamic_cast<DocumentSourceSingleDocumentTransformation&>(**iter);
     // DocumenSourceSingleDocumentTransformation reorders fields so we need to be insensitive.
     ASSERT(UnorderedFieldsBSONObjComparator{}.evaluate(
-        BSON("a" << false) ==
+        BSON("a" << false << "_id" << true) ==
         singleDoc.getTransformer().serializeTransformation(boost::none).toBson()));
 }
 
@@ -244,7 +244,8 @@ TEST(CstPipelineTranslationTest, TranslatesCompoundObjectExclusionProjection) {
     auto& singleDoc = dynamic_cast<DocumentSourceSingleDocumentTransformation&>(**iter);
     // DocumenSourceSingleDocumentTransformation reorders fields so we need to be insensitive.
     ASSERT(UnorderedFieldsBSONObjComparator{}.evaluate(
-        BSON("a" << BSON("b" << BSON("c" << false << "d" << false << "e" << BSON("f" << false)))) ==
+        BSON("a" << BSON("b" << BSON("c" << false << "d" << false << "e" << BSON("f" << false)))
+                 << "_id" << true) ==
         singleDoc.getTransformer().serializeTransformation(boost::none).toBson()));
 }
 
@@ -263,7 +264,7 @@ TEST(CstPipelineTranslationTest, TranslatesMultiComponentPathExclusionProjection
     auto& singleDoc = dynamic_cast<DocumentSourceSingleDocumentTransformation&>(**iter);
     // DocumenSourceSingleDocumentTransformation reorders fields so we need to be insensitive.
     ASSERT(UnorderedFieldsBSONObjComparator{}.evaluate(
-        BSON("a" << BSON("b" << BSON("c" << BSON("d" << false)))) ==
+        BSON("a" << BSON("b" << BSON("c" << BSON("d" << false))) << "_id" << true) ==
         singleDoc.getTransformer().serializeTransformation(boost::none).toBson()));
 }
 
@@ -399,7 +400,7 @@ TEST(CstPipelineTranslationTest, TranslatesMultipleProjectionStages) {
         auto& singleDoc = dynamic_cast<DocumentSourceSingleDocumentTransformation&>(**iter++);
         // DocumenSourceSingleDocumentTransformation reorders fields so we need to be insensitive.
         ASSERT(UnorderedFieldsBSONObjComparator{}.evaluate(
-            BSON("b" << false) ==
+            BSON("b" << false << "_id" << true) ==
             singleDoc.getTransformer().serializeTransformation(boost::none).toBson()));
     }
     {
