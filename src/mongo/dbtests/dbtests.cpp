@@ -44,6 +44,7 @@
 #include "mongo/db/catalog/multi_index_block.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/test_commands_enabled.h"
+#include "mongo/db/cursor_manager.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
@@ -204,6 +205,7 @@ int dbtestsMain(int argc, char** argv) {
     auto preciseClock = std::make_unique<ClockSourceMock>();
     // See above.
     preciseClock->advance(Seconds(1));
+    CursorManager::get(service)->setPreciseClockSource(preciseClock.get());
     service->setPreciseClockSource(std::move(preciseClock));
 
     service->setTransportLayer(

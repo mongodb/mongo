@@ -57,6 +57,29 @@
 
 namespace mongo {
 
+static Counter64 cursorStatsLifespanLessThan1Second;
+static Counter64 cursorStatsLifespanLessThan5Seconds;
+static Counter64 cursorStatsLifespanLessThan15Seconds;
+static Counter64 cursorStatsLifespanLessThan30Seconds;
+static Counter64 cursorStatsLifespanLessThan1Minute;
+static Counter64 cursorStatsLifespanLessThan10Minutes;
+static Counter64 cursorStatsLifespanGreaterThanOrEqual10Minutes;
+
+static ServerStatusMetricField<Counter64> dCursorStatsLifespanLessThan1Second(
+    "cursor.lifespan.lessThan1Second", &cursorStatsLifespanLessThan1Second);
+static ServerStatusMetricField<Counter64> dCursorStatsLifespanLessThan5Seconds(
+    "cursor.lifespan.lessThan5Seconds", &cursorStatsLifespanLessThan5Seconds);
+static ServerStatusMetricField<Counter64> dCursorStatsLifespanLessThan15Seconds(
+    "cursor.lifespan.lessThan15Seconds", &cursorStatsLifespanLessThan15Seconds);
+static ServerStatusMetricField<Counter64> dCursorStatsLifespanLessThan30Seconds(
+    "cursor.lifespan.lessThan30Seconds", &cursorStatsLifespanLessThan30Seconds);
+static ServerStatusMetricField<Counter64> dCursorStatsLifespanLessThan1Minute(
+    "cursor.lifespan.lessThan1Minute", &cursorStatsLifespanLessThan1Minute);
+static ServerStatusMetricField<Counter64> dCursorStatsLifespanLessThan10Minutes(
+    "cursor.lifespan.lessThan10Minutes", &cursorStatsLifespanLessThan10Minutes);
+static ServerStatusMetricField<Counter64> dCursorStatsLifespanGreaterThanOrEqual10Minutes(
+    "cursor.lifespan.greaterThanOrEqual10Minutes", &cursorStatsLifespanGreaterThanOrEqual10Minutes);
+
 constexpr int CursorManager::kNumPartitions;
 
 namespace {
@@ -66,9 +89,29 @@ const auto serviceCursorManager =
 
 ServiceContext::ConstructorActionRegisterer cursorManagerRegisterer{
     "CursorManagerRegisterer", [](ServiceContext* svcCtx) {
-        auto cursorManager = std::make_unique<CursorManager>();
+        auto cursorManager = std::make_unique<CursorManager>(svcCtx->getPreciseClockSource());
         CursorManager::set(svcCtx, std::move(cursorManager));
     }};
+
+void incrementCursorLifespanMetric(Date_t birth, Date_t death) {
+    auto elapsed = death - birth;
+
+    if (elapsed < Seconds(1)) {
+        cursorStatsLifespanLessThan1Second.increment();
+    } else if (elapsed < Seconds(5)) {
+        cursorStatsLifespanLessThan5Seconds.increment();
+    } else if (elapsed < Seconds(15)) {
+        cursorStatsLifespanLessThan15Seconds.increment();
+    } else if (elapsed < Seconds(30)) {
+        cursorStatsLifespanLessThan30Seconds.increment();
+    } else if (elapsed < Minutes(1)) {
+        cursorStatsLifespanLessThan1Minute.increment();
+    } else if (elapsed < Minutes(10)) {
+        cursorStatsLifespanLessThan10Minutes.increment();
+    } else {
+        cursorStatsLifespanGreaterThanOrEqual10Minutes.increment();
+    }
+}
 }  // namespace
 
 CursorManager* CursorManager::get(ServiceContext* svcCtx) {
@@ -102,9 +145,10 @@ std::pair<Status, int> CursorManager::killCursorsWithMatchingSessions(
                           bySessionCursorKiller.getCursorsKilled());
 }
 
-CursorManager::CursorManager()
+CursorManager::CursorManager(ClockSource* preciseClockSource)
     : _random(std::make_unique<PseudoRandom>(SecureRandom().nextInt64())),
-      _cursorMap(std::make_unique<Partitioned<stdx::unordered_map<CursorId, ClientCursor*>>>()) {}
+      _cursorMap(std::make_unique<Partitioned<stdx::unordered_map<CursorId, ClientCursor*>>>()),
+      _preciseClockSource(preciseClockSource) {}
 
 CursorManager::~CursorManager() {
     auto allPartitions = _cursorMap->lockAllPartitions();
@@ -203,7 +247,7 @@ StatusWith<ClientCursorPin> CursorManager::pinCursor(OperationContext* opCtx,
 void CursorManager::unpin(OperationContext* opCtx,
                           std::unique_ptr<ClientCursor, ClientCursor::Deleter> cursor) {
     // Avoid computing the current time within the critical section.
-    auto now = opCtx->getServiceContext()->getPreciseClockSource()->now();
+    auto now = _preciseClockSource->now();
 
     auto partition = _cursorMap->lockOnePartition(cursor->cursorid());
     invariant(cursor->_operationUsingCursor);
@@ -341,7 +385,7 @@ CursorId CursorManager::allocateCursorId_inlock() {
 ClientCursorPin CursorManager::registerCursor(OperationContext* opCtx,
                                               ClientCursorParams&& cursorParams) {
     // Avoid computing the current time within the critical section.
-    auto now = opCtx->getServiceContext()->getPreciseClockSource()->now();
+    auto now = _preciseClockSource->now();
 
     // Make sure the PlanExecutor isn't registered, since we will register the ClientCursor wrapping
     // it.
@@ -381,6 +425,7 @@ ClientCursorPin CursorManager::registerCursor(OperationContext* opCtx,
 
 void CursorManager::deregisterCursor(ClientCursor* cursor) {
     removeCursorFromMap(_cursorMap, cursor);
+    incrementCursorLifespanMetric(cursor->_createdDate, _preciseClockSource->now());
 }
 
 void CursorManager::deregisterAndDestroyCursor(
@@ -391,6 +436,8 @@ void CursorManager::deregisterAndDestroyCursor(
         auto lockWithRestrictedScope = std::move(lk);
         removeCursorFromMap(lockWithRestrictedScope, cursor.get());
     }
+
+    incrementCursorLifespanMetric(cursor->_createdDate, _preciseClockSource->now());
     // Dispose of the cursor without holding any cursor manager mutexes. Disposal of a cursor can
     // require taking lock manager locks, which we want to avoid while holding a mutex. If we did
     // so, any caller of a CursorManager method which already held a lock manager lock could induce

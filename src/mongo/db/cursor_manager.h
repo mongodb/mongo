@@ -41,6 +41,7 @@
 #include "mongo/db/session_killer.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
+#include "mongo/util/clock_source.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/uuid.h"
@@ -84,7 +85,7 @@ public:
     static void set(ServiceContext* svcCtx, std::unique_ptr<CursorManager> newCursorManager);
 
 
-    CursorManager();
+    CursorManager(ClockSource* clockSource);
 
     /**
      * Destroys the cursor manager, deleting all managed cursors. Illegal to call if any managed
@@ -185,6 +186,13 @@ public:
     std::pair<Status, int> killCursorsWithMatchingSessions(OperationContext* opCtx,
                                                            const SessionKiller::Matcher& matcher);
 
+    /**
+     * Set the CursorManager's ClockSource*.
+     */
+    void setPreciseClockSource(ClockSource* preciseClockSource) {
+        _preciseClockSource = preciseClockSource;
+    }
+
 private:
     static constexpr int kNumPartitions = 16;
     friend class ClientCursorPin;
@@ -241,5 +249,7 @@ private:
     // registering a cursor.
     mutable Mutex _opKeyMutex = MONGO_MAKE_LATCH("CursorManager::_opKeyMutex");
     stdx::unordered_map<OperationKey, CursorId, UUID::Hash> _opKeyMap;
+
+    ClockSource* _preciseClockSource;
 };
 }  // namespace mongo

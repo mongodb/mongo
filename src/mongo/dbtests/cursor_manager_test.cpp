@@ -56,9 +56,14 @@ const NamespaceString kTestNss{"test.collection"};
 
 class CursorManagerTest : public unittest::Test {
 public:
-    CursorManagerTest() : _queryServiceContext(std::make_unique<QueryTestServiceContext>()) {
+    CursorManagerTest()
+        : _queryServiceContext(std::make_unique<QueryTestServiceContext>()),
+          _cursorManager(nullptr) {
         _queryServiceContext->getServiceContext()->setPreciseClockSource(
             std::make_unique<ClockSourceMock>());
+
+        _cursorManager.setPreciseClockSource(
+            _queryServiceContext->getServiceContext()->getPreciseClockSource());
     }
 
     void setUp() override {
