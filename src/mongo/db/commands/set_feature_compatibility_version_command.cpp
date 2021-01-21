@@ -325,10 +325,6 @@ public:
                 });
             }
 
-            auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-            const bool isReplSet =
-                replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet;
-
             checkInitialSyncFinished(opCtx);
 
             FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
@@ -349,20 +345,11 @@ public:
                 return false;
 
             if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
-                LOGV2(20502, "Downgrade: dropping config.rangeDeletions collection");
-                migrationutil::dropRangeDeletionsCollection(opCtx);
-
                 if (requestedVersion < FeatureCompatibilityParams::Version::kVersion49) {
                     // SERVER-52632: Remove once 5.0 becomes the LastLTS
                     shardmetadatautil::downgradeShardConfigDatabasesEntriesToPre49(opCtx);
                     shardmetadatautil::downgradeShardConfigCollectionEntriesToPre49(opCtx);
                 }
-
-
-            } else if (isReplSet || serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-                // The default rwc document should only be deleted on plain replica sets and the
-                // config server replica set, not on shards or standalones.
-                deletePersistedDefaultRWConcernDocument(opCtx);
             }
 
             if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
