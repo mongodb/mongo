@@ -202,6 +202,9 @@ inline auto makeConstant(std::string_view str) {
     return sbe::makeE<sbe::EConstant>(tag, value);
 }
 
+std::unique_ptr<sbe::EExpression> makeVariable(sbe::value::SlotId slotId,
+                                               boost::optional<sbe::FrameId> frameId = {});
+
 /**
  * Check if expression returns Nothing and return null if so. Otherwise, return the
  * expression.

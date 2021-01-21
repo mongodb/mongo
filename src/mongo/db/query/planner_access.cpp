@@ -273,6 +273,13 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
         }
     }
 
+    // The user may have requested 'assertMinTsHasNotFallenOffOplog' for a query that does not
+    // specify a minimum timestamp. This is not a valid request, so we throw InvalidOptions.
+    uassert(ErrorCodes::InvalidOptions,
+            str::stream() << "assertMinTsHasNotFallenOffOplog cannot be applied to a query "
+                             "which does not imply a minimum 'ts' value ",
+            !(csn->assertMinTsHasNotFallenOffOplog && !csn->minTs));
+
     return csn;
 }
 
