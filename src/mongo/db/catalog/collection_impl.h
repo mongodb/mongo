@@ -371,7 +371,7 @@ public:
     void indexBuildSuccess(OperationContext* opCtx, IndexCatalogEntry* index) final;
 
     void establishOplogCollectionForLogging(OperationContext* opCtx) final;
-    void onDeregisterFromCatalog() final;
+    void onDeregisterFromCatalog(OperationContext* opCtx) final;
 
 private:
     /**
@@ -448,8 +448,6 @@ private:
 
         AtomicWord<bool> _committed{true};
     };
-
-    ServiceContext* const _service;
 
     NamespaceString _ns;
     RecordId _catalogId;

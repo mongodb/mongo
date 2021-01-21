@@ -992,7 +992,7 @@ std::shared_ptr<Collection> CollectionCatalog::deregisterCollection(OperationCon
     _collections.erase(ns);
     _catalog.erase(uuid);
 
-    coll->onDeregisterFromCatalog();
+    coll->onDeregisterFromCatalog(opCtx);
 
     auto collRid = ResourceId(RESOURCE_COLLECTION, ns.ns());
     removeResource(collRid, ns.ns());

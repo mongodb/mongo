@@ -258,8 +258,7 @@ CollectionImpl::CollectionImpl(OperationContext* opCtx,
                                RecordId catalogId,
                                UUID uuid,
                                std::unique_ptr<RecordStore> recordStore)
-    : _service(opCtx->getServiceContext()),
-      _ns(nss),
+    : _ns(nss),
       _catalogId(catalogId),
       _uuid(uuid),
       _shared(std::make_shared<SharedState>(this, std::move(recordStore))),
@@ -269,9 +268,9 @@ CollectionImpl::~CollectionImpl() {
     _shared->instanceDeleted(this);
 }
 
-void CollectionImpl::onDeregisterFromCatalog() {
+void CollectionImpl::onDeregisterFromCatalog(OperationContext* opCtx) {
     if (ns().isOplog()) {
-        repl::clearLocalOplogPtr(_service);
+        repl::clearLocalOplogPtr(opCtx->getServiceContext());
     }
 }
 

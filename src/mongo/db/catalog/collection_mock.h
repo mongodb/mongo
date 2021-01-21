@@ -305,7 +305,7 @@ public:
         std::abort();
     }
 
-    void onDeregisterFromCatalog() {}
+    void onDeregisterFromCatalog(OperationContext* opCtx) {}
 
     UUID uuid() const {
         return _uuid;
