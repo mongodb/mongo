@@ -18,9 +18,13 @@
 const collName = "api_version_test_expression";
 const coll = db[collName];
 coll.drop();
+const collForeignName = collName + "_foreign";
+const collForeign = db[collForeignName];
+collForeign.drop();
 
 for (let i = 0; i < 5; i++) {
     assert.commandWorked(coll.insert({num: i}));
+    assert.commandWorked(collForeign.insert({num: i}));
 }
 
 // Assert error thrown when command specifies {apiStrict: true} and expression specifies {unstable:
@@ -42,6 +46,80 @@ assert.commandFailedWithCode(db.runCommand({
     apiVersion: "1"
 }),
                              ErrorCodes.APIDeprecationError);
+
+// Assert error thrown when the command specifies apiStrict:true and an inner pipeline contains an
+// unstable expression.
+const unstableInnerPipeline = [{$project: {v: {$_testApiVersion: {unstable: true}}}}];
+assert.commandFailedWithCode(db.runCommand({
+    aggregate: collName,
+    pipeline: [{$lookup: {from: collForeignName, as: "output", pipeline: unstableInnerPipeline}}],
+    cursor: {},
+    apiStrict: true,
+    apiVersion: "1"
+}),
+                             ErrorCodes.APIStrictError);
+assert.commandFailedWithCode(db.runCommand({
+    aggregate: collName,
+    pipeline: [{$unionWith: {coll: collForeignName, pipeline: unstableInnerPipeline}}],
+    cursor: {},
+    apiStrict: true,
+    apiVersion: "1"
+}),
+                             ErrorCodes.APIStrictError);
+
+// Assert command worked when the command specifies apiStrict:false and an inner pipeline contains
+// an unstable expression.
+assert.commandWorked(db.runCommand({
+    aggregate: collName,
+    pipeline: [{$lookup: {from: collForeignName, as: "output", pipeline: unstableInnerPipeline}}],
+    cursor: {},
+    apiStrict: false,
+    apiVersion: "1"
+}));
+assert.commandWorked(db.runCommand({
+    aggregate: collName,
+    pipeline: [{$unionWith: {coll: collForeignName, pipeline: unstableInnerPipeline}}],
+    cursor: {},
+    apiStrict: false,
+    apiVersion: "1"
+}));
+
+// Assert error thrown when the command specifies apiDeprecationErrors:true and an inner pipeline
+// contains a deprecated expression.
+const deprecatedInnerPipeline = [{$project: {v: {$_testApiVersion: {deprecated: true}}}}];
+assert.commandFailedWithCode(db.runCommand({
+    aggregate: collName,
+    pipeline: [{$lookup: {from: collForeignName, as: "output", pipeline: deprecatedInnerPipeline}}],
+    cursor: {},
+    apiDeprecationErrors: true,
+    apiVersion: "1"
+}),
+                             ErrorCodes.APIDeprecationError);
+assert.commandFailedWithCode(db.runCommand({
+    aggregate: collName,
+    pipeline: [{$unionWith: {coll: collForeignName, pipeline: deprecatedInnerPipeline}}],
+    cursor: {},
+    apiDeprecationErrors: true,
+    apiVersion: "1"
+}),
+                             ErrorCodes.APIDeprecationError);
+
+// Assert command worked when the command specifies apiDeprecationErrors:false and an inner pipeline
+// contains a deprecated expression.
+assert.commandWorked(db.runCommand({
+    aggregate: collName,
+    pipeline: [{$lookup: {from: collForeignName, as: "output", pipeline: deprecatedInnerPipeline}}],
+    cursor: {},
+    apiDeprecationErrors: false,
+    apiVersion: "1"
+}));
+assert.commandWorked(db.runCommand({
+    aggregate: collName,
+    pipeline: [{$unionWith: {coll: collForeignName, pipeline: deprecatedInnerPipeline}}],
+    cursor: {},
+    apiDeprecationErrors: false,
+    apiVersion: "1"
+}));
 
 // Test that command successfully runs to completion without any API parameters.
 pipeline = [{$project: {v: {$_testApiVersion: {unstable: true}}}}];
