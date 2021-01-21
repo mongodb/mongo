@@ -59,7 +59,7 @@ public:
 
     ThreadPool::Limits getThreadPoolLimits() const override {
         ThreadPool::Limits limits;
-        limits.maxThreads = repl::maxTenantMigrationDonorThreadPoolSize;
+        limits.maxThreads = repl::maxTenantMigrationDonorServiceThreadPoolSize;
         return limits;
     }
 
@@ -209,8 +209,12 @@ public:
         // Task executor used for executing commands against the recipient using SSL connection
         // created using the migration-specific certificate.
         std::shared_ptr<executor::TaskExecutor> _recipientCmdExecutor;
-        // TODO (SERVER-50438): Limit the size of TenantMigrationDonorService thread pool.
-        const ThreadPool::Limits _recipientCmdThreadPoolLimit{};
+
+        ThreadPool::Limits getRecipientCmdThreadPoolLimits() const {
+            ThreadPool::Limits recipientCmdThreadPoolLimits;
+            recipientCmdThreadPoolLimits.maxThreads = 1;
+            return recipientCmdThreadPoolLimits;
+        }
 
         boost::optional<Status> _abortReason;
 

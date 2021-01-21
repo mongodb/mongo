@@ -423,12 +423,12 @@ server_parameters:
         validator:
             gte: 1
 
-    maxTenantMigrationDonorThreadPoolSize:
+    maxTenantMigrationDonorServiceThreadPoolSize:
         description: >-
-            The maximum number of threads in the tenant migration donor's thread pool.
+            The maximum number of threads in the tenant migration donor service's thread pool.
         set_at: startup
         cpp_vartype: int
-        cpp_varname: maxTenantMigrationDonorThreadPoolSize
+        cpp_varname: maxTenantMigrationDonorServiceThreadPoolSize
         default: 8
         validator:
             gte: 1

@@ -131,7 +131,7 @@ TenantMigrationDonorService::Instance::Instance(ServiceContext* serviceContext,
       _instanceName(kServiceName + "-" + _stateDoc.getTenantId()),
       _recipientUri(
           uassertStatusOK(MongoURI::parse(_stateDoc.getRecipientConnectionString().toString()))) {
-    ThreadPool::Options threadPoolOptions(_recipientCmdThreadPoolLimit);
+    ThreadPool::Options threadPoolOptions(getRecipientCmdThreadPoolLimits());
     threadPoolOptions.threadNamePrefix = _instanceName + "-";
     threadPoolOptions.poolName = _instanceName + "ThreadPool";
     threadPoolOptions.onCreateThread = [this](const std::string& threadName) {
