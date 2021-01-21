@@ -696,6 +696,47 @@ inline uint8_t* getBSONBinData(TypeTags tag, Value val) {
     return reinterpret_cast<uint8_t*>(getRawPointerView(val) + sizeof(uint32_t) + 1);
 }
 
+/**
+ * Same as 'getBsonBinDataSize()' except when the BinData has the 'ByteArrayDeprecated' subtype,
+ * in which case it returns the size of the payload, rather than the size of the entire BinData.
+ *
+ * The BSON spec originally stipulated that BinData values with the "binary" subtype (named
+ * 'ByteArrayDeprecated' here) should structure their contents so that the first four bytes store
+ * the length of the payload, which occupies the remaining bytes. That subtype is now deprecated,
+ * but there are some callers that remain aware of it and operate on the payload rather than the
+ * whole BinData byte array. Most callers, however, should use the regular 'getBSONBinDataSize()'
+ * and 'getBSONBinData()' and remain oblivious to the BinData subtype.
+ *
+ * Note that this payload size is computed by subtracting the size of the length bytes from the
+ * overall size of BinData. Even though this function supports the deprecated subtype, it still
+ * ignores the payload length value.
+ */
+inline size_t getBSONBinDataSizeCompat(TypeTags tag, Value val) {
+    auto size = getBSONBinDataSize(tag, val);
+    if (getBSONBinDataSubtype(tag, val) != ByteArrayDeprecated) {
+        return size;
+    } else {
+        return (size >= sizeof(uint32_t)) ? size - sizeof(uint32_t) : 0;
+    }
+}
+
+/**
+ * Same as 'getBsonBinData()' except when the BinData has the 'ByteArrayDeprecated' subtype, in
+ * which case it returns a pointer to the payload, rather than a pointer to the beginning of the
+ * BinData.
+ *
+ * See the 'getBSONBinDataSizeCompat()' documentation for an explanation of the
+ * 'ByteArrayDeprecated' subtype.
+ */
+inline uint8_t* getBSONBinDataCompat(TypeTags tag, Value val) {
+    auto binData = getBSONBinData(tag, val);
+    if (getBSONBinDataSubtype(tag, val) != ByteArrayDeprecated) {
+        return binData;
+    } else {
+        return binData + sizeof(uint32_t);
+    }
+}
+
 inline bool canUseSmallString(std::string_view input) {
     auto length = input.size();
     auto ptr = input.data();

@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
 #include "mongo/unittest/unittest.h"
@@ -146,6 +147,32 @@ TEST(SBEValues, Hash) {
                   value::hashValue(tagDecimalBig, valDecimalBig));
 
     value::releaseValue(tagDecimalBig, valDecimalBig);
+
+    uint8_t byteArray1[] = {1, 2, 3, 4, 5, 6, 7, 8};
+    uint8_t byteArray2[] = {4, 3, 2, 1, 5, 6, 7, 8};
+    auto binDataOperands =
+        BSON_ARRAY(BSONBinData(byteArray1, sizeof(byteArray1), BinDataGeneral)
+                   << BSONBinData(byteArray1, sizeof(byteArray1), ByteArrayDeprecated)
+                   << BSONBinData(byteArray2, sizeof(byteArray2), ByteArrayDeprecated));
+
+    // Two BinData values with the same data but different subtypes should hash differently.
+    auto tagGeneralBinData = value::TypeTags::bsonBinData;
+    auto valGeneralBinData = value::bitcastFrom<const char*>(binDataOperands[0].value());
+
+    auto tagDeprecatedBinData1 = value::TypeTags::bsonBinData;
+    auto valDeprecatedBinData1 = value::bitcastFrom<const char*>(binDataOperands[1].value());
+
+    ASSERT_NE(value::hashValue(tagGeneralBinData, valGeneralBinData),
+              value::hashValue(tagDeprecatedBinData1, valDeprecatedBinData1));
+
+    // Two ByteArrayDeprecated BinData values with different values in the leading four bytes should
+    // hash differently, even though those four bytes are technically not part of the binary data
+    // payload.
+    auto tagDeprecatedBinData2 = value::TypeTags::bsonBinData;
+    auto valDeprecatedBinData2 = value::bitcastFrom<const char*>(binDataOperands[2].value());
+
+    ASSERT_NE(value::hashValue(tagDeprecatedBinData1, valDeprecatedBinData1),
+              value::hashValue(tagDeprecatedBinData2, valDeprecatedBinData2));
 }
 
 TEST(SBEValues, HashCompound) {
@@ -248,4 +275,131 @@ TEST(SBEVM, Add) {
     }
 }
 
+TEST(SBEVM, CompareBinData) {
+    {
+        uint8_t byteArray1[] = {1, 2, 3, 4};
+        uint8_t byteArray2[] = {1, 2, 3, 10};
+        auto operands = BSON_ARRAY(BSONBinData(byteArray1, sizeof(byteArray1), BinDataGeneral)
+                                   << BSONBinData(byteArray2, sizeof(byteArray2), BinDataGeneral));
+
+        vm::CodeFragment code;
+        code.appendConstVal(value::TypeTags::bsonBinData,
+                            value::bitcastFrom<const char*>(operands[0].value()));
+        code.appendConstVal(value::TypeTags::bsonBinData,
+                            value::bitcastFrom<const char*>(operands[1].value()));
+        code.appendCmp3w();
+
+        vm::ByteCode interpreter;
+        auto [owned, tag, val] = interpreter.run(&code);
+
+        ASSERT_EQ(tag, value::TypeTags::NumberInt32);
+        ASSERT_LT(value::bitcastTo<int32_t>(val), 0);
+        ASSERT_FALSE(owned);
+    }
+    {
+        uint8_t byteArray1[] = {1, 2, 3, 4};
+        uint8_t byteArray2[] = {1, 2, 3, 4};
+        auto operands = BSON_ARRAY(BSONBinData(byteArray1, sizeof(byteArray1), BinDataGeneral)
+                                   << BSONBinData(byteArray2, sizeof(byteArray2), BinDataGeneral));
+
+        vm::CodeFragment code;
+        code.appendConstVal(value::TypeTags::bsonBinData,
+                            value::bitcastFrom<const char*>(operands[0].value()));
+        code.appendConstVal(value::TypeTags::bsonBinData,
+                            value::bitcastFrom<const char*>(operands[1].value()));
+        code.appendCmp3w();
+
+        vm::ByteCode interpreter;
+        auto [owned, tag, val] = interpreter.run(&code);
+
+        ASSERT_EQ(tag, value::TypeTags::NumberInt32);
+        ASSERT_EQ(value::bitcastTo<int32_t>(val), 0);
+        ASSERT_FALSE(owned);
+    }
+    {
+        uint8_t byteArray1[] = {1, 2, 10, 4};
+        uint8_t byteArray2[] = {1, 2, 3, 4};
+        auto operands = BSON_ARRAY(BSONBinData(byteArray1, sizeof(byteArray1), BinDataGeneral)
+                                   << BSONBinData(byteArray2, sizeof(byteArray2), BinDataGeneral));
+
+        vm::CodeFragment code;
+        code.appendConstVal(value::TypeTags::bsonBinData,
+                            value::bitcastFrom<const char*>(operands[0].value()));
+        code.appendConstVal(value::TypeTags::bsonBinData,
+                            value::bitcastFrom<const char*>(operands[1].value()));
+        code.appendCmp3w();
+
+        vm::ByteCode interpreter;
+        auto [owned, tag, val] = interpreter.run(&code);
+
+        ASSERT_EQ(tag, value::TypeTags::NumberInt32);
+        ASSERT_GT(value::bitcastTo<int32_t>(val), 0);
+        ASSERT_FALSE(owned);
+    }
+
+    // BinData values are ordered by subtype. Values with different subtypes should compare as not
+    // equal, even if they have the same data.
+    {
+        uint8_t byteArray1[] = {1, 2, 3, 4};
+        uint8_t byteArray2[] = {1, 2, 3, 4};
+        auto operands =
+            BSON_ARRAY(BSONBinData(byteArray1, sizeof(byteArray1), BinDataGeneral)
+                       << BSONBinData(byteArray2, sizeof(byteArray2), ByteArrayDeprecated));
+
+        vm::CodeFragment code;
+        code.appendConstVal(value::TypeTags::bsonBinData,
+                            value::bitcastFrom<const char*>(operands[0].value()));
+        code.appendConstVal(value::TypeTags::bsonBinData,
+                            value::bitcastFrom<const char*>(operands[1].value()));
+        code.appendCmp3w();
+
+        vm::ByteCode interpreter;
+        auto [owned, tag, val] = interpreter.run(&code);
+
+        ASSERT_EQ(tag, value::TypeTags::NumberInt32);
+        ASSERT_LT(value::bitcastTo<int32_t>(val), 0);
+        ASSERT_FALSE(owned);
+    }
+
+    // Comparison of 'ByteArrayDeprecated' BinData values should consider the leading four bytes,
+    // even those those bytes are not part of the data payload, according to the standard.
+    {
+        uint8_t byteArray1[] = {1, 2, 3, 4, 5, 6, 7, 8};
+        uint8_t byteArray2[] = {11, 12, 13, 14, 5, 6, 7, 8};
+        auto operands =
+            BSON_ARRAY(BSONBinData(byteArray1, sizeof(byteArray1), ByteArrayDeprecated)
+                       << BSONBinData(byteArray2, sizeof(byteArray2), ByteArrayDeprecated));
+
+        vm::CodeFragment code;
+        code.appendConstVal(value::TypeTags::bsonBinData,
+                            value::bitcastFrom<const char*>(operands[0].value()));
+        code.appendConstVal(value::TypeTags::bsonBinData,
+                            value::bitcastFrom<const char*>(operands[1].value()));
+        code.appendCmp3w();
+
+        vm::ByteCode interpreter;
+        auto [owned, tag, val] = interpreter.run(&code);
+
+        ASSERT_EQ(tag, value::TypeTags::NumberInt32);
+        ASSERT_LT(value::bitcastTo<int32_t>(val), 0);
+        ASSERT_FALSE(owned);
+    }
+}
+
+TEST(SBEVM, ConvertBinDataToBsonObj) {
+    uint8_t byteArray[] = {1, 2, 3, 4, 5, 6, 7, 8};
+    auto originalBinData =
+        BSON_ARRAY(BSONBinData(byteArray, sizeof(byteArray), ByteArrayDeprecated));
+
+    value::Array array;
+    auto [binDataTag, binDataVal] = value::copyValue(
+        value::TypeTags::bsonBinData, value::bitcastFrom<const char*>(originalBinData[0].value()));
+    array.push_back(binDataTag, binDataVal);
+
+    BSONArrayBuilder builder;
+    bson::convertToBsonObj(builder, &array);
+    auto convertedBinData = builder.done();
+
+    ASSERT_EQ(originalBinData.woCompare(convertedBinData), 0);
+}
 }  // namespace mongo::sbe

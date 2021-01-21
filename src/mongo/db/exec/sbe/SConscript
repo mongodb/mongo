@@ -146,6 +146,7 @@ env.CppUnitTest(
         'sbe_sorted_merge_test.cpp',
         'sbe_test.cpp',
         'sbe_unique_test.cpp',
+        'values/value_serialize_for_sorter_test.cpp',
         'values/write_value_to_stream_test.cpp'
     ],
     LIBDEPS=[

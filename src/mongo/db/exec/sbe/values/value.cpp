@@ -387,16 +387,10 @@ void writeValueToStream(T& stream, TypeTags tag, Value val) {
             stream << "---===*** bsonObjectId ***===---";
             break;
         case value::TypeTags::bsonBinData: {
-            auto data =
-                reinterpret_cast<const char*>(getBSONBinData(value::TypeTags::bsonBinData, val));
-            auto len = getBSONBinDataSize(value::TypeTags::bsonBinData, val);
+            auto data = reinterpret_cast<const char*>(
+                getBSONBinDataCompat(value::TypeTags::bsonBinData, val));
+            auto len = getBSONBinDataSizeCompat(value::TypeTags::bsonBinData, val);
             auto type = getBSONBinDataSubtype(value::TypeTags::bsonBinData, val);
-
-            if (type == ByteArrayDeprecated) {
-                // Skip extra size
-                len -= 4;
-                data += 4;
-            }
 
             // If the BinData is a correctly sized newUUID, display it as such.
             if (type == newUUID && len == kNewUUIDLength) {

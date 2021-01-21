@@ -92,6 +92,17 @@ TEST(WriteValueToStream, ByteArrayDeprecatedBSONBinDataTest) {
     ASSERT_EQUALS(expectedString, oss.str());
 }
 
+TEST(WriteValueToStream, MalformedByteArrayDeprecatedBSONBinDataTest) {
+    uint8_t array[] = {0, 1};
+    auto bsonString = BSON("binData" << BSONBinData(array, 2, ByteArrayDeprecated));
+    auto val = value::bitcastFrom<const char*>(bsonString["binData"].value());
+    const std::pair<value::TypeTags, value::Value> value(value::TypeTags::bsonBinData, val);
+    std::ostringstream oss;
+    writeToStream(oss, value);
+    auto expectedString = "BinData(2, )";
+    ASSERT_EQUALS(expectedString, oss.str());
+}
+
 TEST(WriteValueToStream, ShortStringBigTest) {
     auto [tag, val] = value::makeNewString(kStringShort);
     value::ValueGuard guard{tag, val};
