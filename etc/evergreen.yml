@@ -9789,6 +9789,7 @@ buildvariants:
             featureFlagImprovedAuditing: true,
             featureFlagTimeseriesCollection: true,
             featureFlagShardingFullDDLSupport: true,
+            featureFlagShardingFullDDLSupportTimestampedVersion: true,
         }"
 
 - &enterprise-windows-template
@@ -9884,6 +9885,7 @@ buildvariants:
             featureFlagImprovedAuditing: true,
             featureFlagTimeseriesCollection: true,
             featureFlagShardingFullDDLSupport: true,
+            featureFlagShardingFullDDLSupportTimestampedVersion: true,
         }"
 
 - <<: *enterprise-windows-nopush-template
@@ -10545,6 +10547,7 @@ buildvariants:
             featureFlagImprovedAuditing: true,
             featureFlagTimeseriesCollection: true,
             featureFlagShardingFullDDLSupport: true,
+            featureFlagShardingFullDDLSupportTimestampedVersion: true,
         }"
   tasks:
   - name: compile_parallel_TG
@@ -11847,6 +11850,7 @@ buildvariants:
             featureFlagImprovedAuditing: true,
             featureFlagTimeseriesCollection: true,
             featureFlagShardingFullDDLSupport: true,
+            featureFlagShardingFullDDLSupportTimestampedVersion: true,
         }"
   tasks:
   - name: compile_all_run_unittests_TG
@@ -12848,6 +12852,7 @@ buildvariants:
             featureFlagImprovedAuditing: true,
             featureFlagTimeseriesCollection: true,
             featureFlagShardingFullDDLSupport: true,
+            featureFlagShardingFullDDLSupportTimestampedVersion: true,
         }"
   tasks:
   - name: compile_all_run_unittests_TG
@@ -13009,6 +13014,7 @@ buildvariants:
             featureFlagImprovedAuditing: true,
             featureFlagTimeseriesCollection: true,
             featureFlagShardingFullDDLSupport: true,
+            featureFlagShardingFullDDLSupportTimestampedVersion: true,
         }"
     multiversion_platform: ubuntu1804
     multiversion_edition: enterprise
@@ -13108,6 +13114,7 @@ buildvariants:
             featureFlagImprovedAuditing: true,
             featureFlagTimeseriesCollection: true,
             featureFlagShardingFullDDLSupport: true,
+            featureFlagShardingFullDDLSupportTimestampedVersion: true,
         }"
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under {A,UB}SAN build.
     hang_analyzer_dump_core: false
