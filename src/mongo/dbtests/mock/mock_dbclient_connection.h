@@ -109,7 +109,7 @@ public:
 
     Status connect(const HostAndPort& host,
                    StringData applicationName,
-                   boost::optional<TransientSSLParams> transientSSLParams = boost::none) override {
+                   boost::optional<TransientSSLParams> transientSSLParams) override {
         std::string errmsg;
         if (!connect(host.toString().c_str(), applicationName, errmsg)) {
             return {ErrorCodes::HostUnreachable, errmsg};

@@ -198,7 +198,7 @@ TEST(OpMsg, CloseConnectionOnFireAndForgetNotWritablePrimaryError) {
     bool foundSecondary = false;
     for (auto host : connStr.getServers()) {
         DBClientConnection conn;
-        uassertStatusOK(conn.connect(host, "integration_test"));
+        uassertStatusOK(conn.connect(host, "integration_test", boost::none));
         bool isPrimary;
         ASSERT(conn.isPrimary(isPrimary));
         if (isPrimary)
@@ -232,7 +232,7 @@ TEST(OpMsg, CloseConnectionOnFireAndForgetNotWritablePrimaryError) {
         OpMsg::removeChecksum(&request);
         ASSERT(!conn.call(request, reply, /*assertOK*/ false, nullptr));
 
-        uassertStatusOK(conn.connect(host, "integration_test"));  // Reconnect.
+        uassertStatusOK(conn.connect(host, "integration_test", boost::none));  // Reconnect.
 
         // Disable eager checking of primary to simulate a stepdown occurring after the check. This
         // should respect w:0.
@@ -245,7 +245,7 @@ TEST(OpMsg, CloseConnectionOnFireAndForgetNotWritablePrimaryError) {
                                output))
             << output;
         ON_BLOCK_EXIT([&] {
-            uassertStatusOK(conn.connect(host, "integration_test-cleanup"));
+            uassertStatusOK(conn.connect(host, "integration_test-cleanup", boost::none));
             ASSERT(conn.runCommand("admin",
                                    fromjson(R"({
                                           configureFailPoint:

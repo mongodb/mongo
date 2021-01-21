@@ -58,7 +58,7 @@ namespace mongo_test {
 TEST(MockDBClientConnTest, ServerAddress) {
     MockRemoteDBServer server("test");
     MockDBClientConnection conn(&server);
-    uassertStatusOK(conn.connect(server.getServerHostAndPort(), mongo::StringData()));
+    uassertStatusOK(conn.connect(server.getServerHostAndPort(), mongo::StringData(), boost::none));
 
     ASSERT_EQUALS("test:27017", conn.getServerAddress());
     ASSERT_EQUALS("test:27017", conn.toString());
@@ -864,7 +864,8 @@ TEST(MockDBClientConnTest, ShutdownServerBeforeCall) {
     MockRemoteDBServer server("test");
     MockDBClientConnection conn(&server);
 
-    ASSERT_OK(conn.connect(mongo::HostAndPort("localhost", 12345), mongo::StringData()));
+    ASSERT_OK(
+        conn.connect(mongo::HostAndPort("localhost", 12345), mongo::StringData(), boost::none));
     mongo::DBClientCursor cursor(&conn,
                                  mongo::NamespaceStringOrUUID(nss),
                                  Query().obj,
@@ -919,7 +920,8 @@ TEST(MockDBClientConnTest, ConnectionAutoReconnect) {
     MockRemoteDBServer server("test");
     MockDBClientConnection conn(&server, autoReconnect);
 
-    ASSERT_OK(conn.connect(mongo::HostAndPort("localhost", 12345), mongo::StringData()));
+    ASSERT_OK(
+        conn.connect(mongo::HostAndPort("localhost", 12345), mongo::StringData(), boost::none));
     mongo::DBClientCursor cursor(&conn,
                                  mongo::NamespaceStringOrUUID(nss),
                                  Query().obj,

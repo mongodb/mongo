@@ -397,6 +397,7 @@ Status DBClientConnection::connect(const HostAndPort& serverAddress,
 Status DBClientConnection::connectSocketOnly(
     const HostAndPort& serverAddress, boost::optional<TransientSSLParams> transientSSLParams) {
     _serverAddress = serverAddress;
+    _transientSSLParams = transientSSLParams;
     _markFailed(kReleaseSession);
 
 
@@ -586,7 +587,8 @@ void DBClientConnection::_checkConnection() {
                 "Trying to reconnect",
                 "connString"_attr = toString());
     string errmsg;
-    auto connectStatus = connect(_serverAddress, _applicationName);
+
+    auto connectStatus = connect(_serverAddress, _applicationName, _transientSSLParams);
     if (!connectStatus.isOK()) {
         _markFailed(kSetFlag);
         LOGV2_DEBUG(20121,

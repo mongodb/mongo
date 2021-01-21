@@ -112,7 +112,7 @@ BaseCloner::AfterStageBehavior AllDatabaseCloner::connectStage() {
             [this](const executor::RemoteCommandResponse& isMasterReply) {
                 return ensurePrimaryOrSecondary(isMasterReply);
             });
-        uassertStatusOK(client->connect(getSource(), StringData()));
+        uassertStatusOK(client->connect(getSource(), StringData(), boost::none));
     } else {
         client->checkConnection();
     }

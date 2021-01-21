@@ -436,7 +436,7 @@ Status OplogFetcher::_connect() {
                           "error"_attr = connectStatus);
                     _conn->checkConnection();
                 } else {
-                    uassertStatusOK(_conn->connect(_config.source, "OplogFetcher"));
+                    uassertStatusOK(_conn->connect(_config.source, "OplogFetcher", boost::none));
                 }
                 uassertStatusOK(replAuthenticate(_conn.get())
                                     .withContext(str::stream()

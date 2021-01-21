@@ -234,7 +234,7 @@ bool isSelf(const HostAndPort& hostAndPort, ServiceContext* const ctx) {
         // a replica set configuration document, but the 'isMaster' command requires a lock on the
         // replication coordinator to execute. As such we call we call 'connectSocketOnly', which
         // does not call 'isMaster'.
-        auto connectSocketResult = conn.connectSocketOnly(hostAndPort);
+        auto connectSocketResult = conn.connectSocketOnly(hostAndPort, boost::none);
         if (!connectSocketResult.isOK()) {
             LOGV2(4834700,
                   "isSelf could not connect via connectSocketOnly",
