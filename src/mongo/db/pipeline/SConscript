@@ -259,6 +259,7 @@ pipelineEnv.Library(
         'sequential_document_cache.cpp',
         'skip_and_limit.cpp',
         'tee_buffer.cpp',
+        'window_function/partition_iterator.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/clientdriver_minimal',
@@ -416,6 +417,7 @@ env.CppUnitTest(
         'sharded_union_test.cpp',
         'skip_and_limit_test.cpp',
         'tee_buffer_test.cpp',
+        'window_function/partition_iterator_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
