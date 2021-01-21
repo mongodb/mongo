@@ -8,13 +8,15 @@ load("jstests/core/timeseries/libs/timeseries.js");
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/parallel_shell_helpers.js");
 
-if (!TimeseriesTest.timeseriesCollectionsEnabled(db.getMongo())) {
+const conn = MongoRunner.runMongod();
+
+if (!TimeseriesTest.timeseriesCollectionsEnabled(conn)) {
     jsTestLog("Skipping test because the time-series collection feature flag is disabled");
     return;
 }
 
 const dbName = jsTestName();
-const testDB = db.getSiblingDB(dbName);
+const testDB = conn.getDB(dbName);
 assert.commandWorked(testDB.dropDatabase());
 
 const coll = testDB.getCollection('t');
@@ -44,12 +46,12 @@ const checkServerStatus = function() {
 };
 
 const testWithInsertPaused = function(docs) {
-    const fp = configureFailPoint(db.getMongo(), "hangTimeseriesInsertBeforeCommit");
+    const fp = configureFailPoint(conn, "hangTimeseriesInsertBeforeCommit");
 
     const awaitInsert = startParallelShell(
         funWithArgs(function(dbName, collName, docs) {
             assert.commandWorked(db.getSiblingDB(dbName).getCollection(collName).insert(docs));
-        }, dbName, coll.getName(), docs), db.getMongo().port);
+        }, dbName, coll.getName(), docs), conn.port);
 
     fp.wait();
     checkServerStatus();
@@ -91,4 +93,6 @@ testWithInsertPaused({[timeFieldName]: ISODate("2021-01-01T01:00:00Z"), [metaFie
 // Once the insert is complete, the new bucket becomes idle.
 expectedMetrics.numIdleBuckets++;
 checkServerStatus();
+
+MongoRunner.stopMongod(conn);
 })();
