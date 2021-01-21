@@ -41,4 +41,6 @@ build_variant_large_distro_exceptions:
   - ubuntu1604-container
   - ubuntu1604-debug
   - ubuntu1804-debug-asan
+  - ubuntu1804-debug-asan-all-feature-flags
   - ubuntu1804-debug-ubsan
+  - ubuntu1804-debug-ubsan-all-feature-flags
