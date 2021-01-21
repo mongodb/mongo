@@ -105,6 +105,7 @@ assert.commandWorked(rst1AdminDB.system.external_validation_keys.insert({
     key: rst2KeyDoc.key,
     expiresAt: rst2KeyDoc.expiresAt,
     replicaSetName: rst2.name,
+    ttlExpiresAt: new Date(),
 },
                                                                         {w: "majority"}));
 

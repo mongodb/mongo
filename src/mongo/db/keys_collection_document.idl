@@ -95,3 +95,9 @@ structs:
             replicaSetName:
                 type: string
                 description: "The name of the replica set that created this key."
+            ttlExpiresAt:
+                type: date
+                description: >-
+                    The wall-clock time at which this key document should be removed by the
+                    TTL monitor.
+                cpp_name: TTLExpiresAt
