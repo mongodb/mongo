@@ -28,6 +28,8 @@
 
 # suite_random.py
 #    A quick and predictable pseudo random number generator.
+import wttest
+
 class suite_random:
     """
     Generate random 32 bit integers that are predictable,
@@ -37,6 +39,7 @@ class suite_random:
     """
     def __init__(self, *args):
         arglen = len(args)
+        seedw, seedz = wttest.getseed()
         if arglen == 1:
             self.seedw = int(args[0]) & 0xffffffff
             self.seedz = int(args[0]) & 0xffffffff
@@ -44,8 +47,8 @@ class suite_random:
             self.seedw = int(args[0]) & 0xffffffff
             self.seedz = int(args[1]) & 0xffffffff
         else:
-            self.seedw = 521288629
-            self.seedz = 362436069
+            self.seedw = int(seedw) & 0xffffffff
+            self.seedz = int(seedz) & 0xffffffff
 
     def rand32(self):
         """
@@ -54,8 +57,9 @@ class suite_random:
         w = self.seedw
         z = self.seedz
         if w == 0 or z == 0:
-            self.seedw = 521288629
-            self.seedz = 362436069
+            seedw, seedz = wttest.getRandomSeed()
+            self.seedw = int(seedw) & 0xffffffff
+            self.seedz = int(seedz) & 0xffffffff
 
         self.seedz = (36969 * (z & 65535) + (z >> 16)) & 0xffffffff
         self.seedw = (18000 * (w & 65535) + (w >> 16)) & 0xffffffff

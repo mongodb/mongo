@@ -27,6 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import time, wiredtiger, wttest
+from wtscenario import make_scenarios
 
 def timestamp_str(t):
     return '%x' % t
@@ -36,36 +37,47 @@ def timestamp_str(t):
 class test_hs16(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=5MB'
     session_config = 'isolation=snapshot'
+    key_format_values = (
+        ('column', dict(key_format='r')),
+        ('string', dict(key_format='S'))
+    )
+    scenarios = make_scenarios(key_format_values)
+
+    def create_key(self,i):
+        if self.key_format == 'S':
+            return str(i)
+        return i
 
     def test_hs16(self):
         uri = 'table:test_hs16'
-        self.session.create(uri, 'key_format=S,value_format=S')
+        create_params = 'key_format={}, value_format=S'.format(self.key_format)
+        self.session.create(uri, create_params)
         cursor = self.session.open_cursor(uri)
 
         # Insert an update without timestamp
         self.session.begin_transaction()
-        cursor[str(0)] = 'a'
+        cursor[self.create_key(1)] = 'a'
         self.session.commit_transaction()
 
         # Update an update at timestamp 1
         self.session.begin_transaction()
-        cursor[str(0)] = 'b'
+        cursor[self.create_key(1)] = 'b'
         self.session.commit_transaction('commit_timestamp=' + timestamp_str(1))
 
         # Open anther session to make the next update without timestamp non-globally visible
         session2 = self.setUpSessionOpen(self.conn)
         cursor2 = session2.open_cursor(uri)
         session2.begin_transaction()
-        cursor[str(1)] = 'a'
+        cursor[self.create_key(2)] = 'a'
 
         # Update an update without timestamp
         self.session.begin_transaction()
-        cursor[str(0)] = 'c'
+        cursor[self.create_key(1)] = 'c'
         self.session.commit_transaction()
 
         # Update an update at timestamp 2
         self.session.begin_transaction()
-        cursor[str(0)] = 'd'
+        cursor[self.create_key(1)] = 'd'
         self.session.commit_transaction('commit_timestamp=' + timestamp_str(2))
 
         # Do a checkpoint, it should not panic

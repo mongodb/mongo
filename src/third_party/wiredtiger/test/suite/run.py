@@ -124,6 +124,9 @@ Options:\n\
   -t      | --timestamp          name WT_TEST according to timestamp\n\
   -v N    | --verbose N          set verboseness to N (0<=N<=3, default=1)\n\
   -i      | --ignore-stdout      dont fail on unexpected stdout or stderr\n\
+  -R      | --randomseed         run with random seeds for generates random numbers\n\
+  -S      | --seed               run with two seeds that generates random numbers, \n\
+                                 format "seed1.seed2", seed1 or seed2 can\'t be zero\n\
 \n\
 Tests:\n\
   may be a file name in test/suite: (e.g. test_base01.py)\n\
@@ -303,6 +306,7 @@ if __name__ == '__main__':
     parallel = 0
     random_sample = 0
     batchtotal = batchnum = 0
+    seed = seedw = seedz = 0
     configfile = None
     configwrite = False
     dirarg = None
@@ -415,6 +419,20 @@ if __name__ == '__main__':
                 configfile = args.pop(0)
                 configwrite = True
                 continue
+            if option == '-randomseed' or option == 'R':
+                seedw = random.randint(1, 0xffffffff)
+                seedz = random.randint(1, 0xffffffff)
+                continue
+            if option == '-seed' or option == 'S':
+                if seed != 0 or len(args) == 0:
+                    usage()
+                    sys.exit(2)
+                seed = args.pop(0)
+                [seedw, seedz] = seed.split('.')
+                if seedw == 0 or seedz == 0:
+                    usage()
+                    sys.exit(2)
+                continue
             print('unknown arg: ' + arg)
             usage()
             sys.exit(2)
@@ -501,7 +519,7 @@ if __name__ == '__main__':
     # That way, verbose printing can be done at the class definition level.
     wttest.WiredTigerTestCase.globalSetup(preserve, timestamp, gdbSub, lldbSub,
                                           verbose, wt_builddir, dirarg,
-                                          longtest, ignoreStdout)
+                                          longtest, ignoreStdout, seedw, seedz)
 
     # Without any tests listed as arguments, do discovery
     if len(testargs) == 0:

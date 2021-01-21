@@ -1447,6 +1447,15 @@ tasks:
           dependent_task: compile-linux-no-ftruncate
       - func: "unit test"
 
+  # Run the tests that uses suite_random with a random starting seed
+  - name: unit-test-random-seed
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "unit test"
+        vars:
+          unit_test_args: -v 2 -R cursor13 join02 join07 schema03 timestamp22
   # Break out Python unit tests into multiple buckets/tasks.  We have a fixed number of buckets,
   # and we use the -b option of the test/suite/run.py script to split up the tests.
 
@@ -2453,6 +2462,7 @@ buildvariants:
     - name: configure-combinations
     - name: checkpoint-filetypes-test
     - name: unit-test-long
+    - name: unit-test-random-seed
     - name: spinlock-gcc-test
     - name: spinlock-pthread-adaptive-test
     - name: compile-wtperf
