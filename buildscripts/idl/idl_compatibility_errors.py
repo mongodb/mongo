@@ -43,6 +43,7 @@ from typing import List
 #
 ERROR_ID_COMMAND_INVALID_API_VERSION = "ID0001"
 ERROR_ID_DUPLICATE_COMMAND_NAME = "ID0002"
+ERROR_ID_REMOVED_COMMAND = "ID0003"
 
 
 class IDLCompatibilityCheckerError(Exception):
@@ -57,6 +58,7 @@ class IDLCompatibilityError(object):
 
     An IDLCompatibilityError consists of
     - error_id - IDxxxx where xxxx is a 0 leading number.
+    - command_name - a string, the command where the error occurred.
     - msg - a string describing an error.
     - old_idl_dir - a string, the directory containing the old IDL files.
     - new_idl_dir - a string, the directory containing the new IDL files.
@@ -64,10 +66,11 @@ class IDLCompatibilityError(object):
     """
 
     #pylint: disable=too-many-arguments
-    def __init__(self, error_id: str, msg: str, old_idl_dir: str, new_idl_dir: str,
-                 file: str) -> None:
+    def __init__(self, error_id: str, command_name: str, msg: str, old_idl_dir: str,
+                 new_idl_dir: str, file: str) -> None:
         """Construct an IDLCompatibility error."""
         self.error_id = error_id
+        self.command_name = command_name
         self.msg = msg
         self.old_idl_dir = old_idl_dir
         self.new_idl_dir = new_idl_dir
@@ -95,9 +98,11 @@ class IDLCompatibilityErrorCollection(object):
         self._errors: List[IDLCompatibilityError] = []
 
     #pylint: disable=too-many-arguments
-    def add(self, error_id: str, msg: str, old_idl_dir: str, new_idl_dir: str, file: str) -> None:
+    def add(self, error_id: str, command_name: str, msg: str, old_idl_dir: str, new_idl_dir: str,
+            file: str) -> None:
         """Add an error message with directory information."""
-        self._errors.append(IDLCompatibilityError(error_id, msg, old_idl_dir, new_idl_dir, file))
+        self._errors.append(
+            IDLCompatibilityError(error_id, command_name, msg, old_idl_dir, new_idl_dir, file))
 
     def has_errors(self) -> bool:
         """Have any errors been added to the collection?."""
@@ -113,6 +118,11 @@ class IDLCompatibilityErrorCollection(object):
         if error_id_list:
             return error_id_list[0]
         return None
+
+    def get_error_by_command_name(self, command_name: str) -> IDLCompatibilityError:
+        """Get the first error in the error collection with the command command_name."""
+        command_name_list = [a for a in self._errors if a.command_name == command_name]
+        return next(iter(command_name_list), None)
 
     def to_list(self) -> List[str]:
         """Return a list of formatted error messages."""
@@ -150,20 +160,25 @@ class IDLCompatibilityContext(object):
         self.new_idl_dir = new_idl_dir
         self.errors = errors
 
-    def _add_error(self, error_id: str, msg: str, file: str) -> None:
+    def _add_error(self, error_id: str, command_name: str, msg: str, file: str) -> None:
         """Add an error with an error id and error message."""
-        self.errors.add(error_id, msg, self.old_idl_dir, self.new_idl_dir, file)
+        self.errors.add(error_id, command_name, msg, self.old_idl_dir, self.new_idl_dir, file)
 
     def add_command_invalid_api_version_error(self, command_name: str, api_version: str,
                                               file: str) -> None:
         """Add an error about a command with an invalid api version."""
-        self._add_error(ERROR_ID_COMMAND_INVALID_API_VERSION,
+        self._add_error(ERROR_ID_COMMAND_INVALID_API_VERSION, command_name,
                         "'%s' has an invalid API version '%s'" % (command_name, api_version), file)
+
+    def add_command_removed_error(self, command_name: str, file: str) -> None:
+        """Add an error about a command that was removed."""
+        self._add_error(ERROR_ID_REMOVED_COMMAND, command_name,
+                        "Old command '%s' was removed from new commands." % (command_name), file)
 
     def add_duplicate_command_name_error(self, command_name: str, dir_name: str, file: str) -> None:
         """Add an error about a duplicate command name within a directory."""
-        self._add_error(ERROR_ID_DUPLICATE_COMMAND_NAME,
-                        "'%s' has duplicate command name '%s'" % (dir_name, command_name), file)
+        self._add_error(ERROR_ID_DUPLICATE_COMMAND_NAME, command_name,
+                        "'%s' has duplicate command: '%s'" % (dir_name, command_name), file)
 
 
 def _assert_unique_error_messages() -> None:

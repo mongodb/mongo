@@ -33,12 +33,31 @@ imports:
     - "mongo/idl/basic_types.idl"
 
 commands:
-    invalidAPIVersion:
-        description: "old test command, the new version of this command will fail the IDL
-                      compatibility checker"
-        command_name: invalidAPIVersion
+    invalidAPIVersionOld:
+        description: "old command fails because of invalid API version"
+        command_name: invalidAPIVersionOld
         namespace: ignored
-        cpp_name: invalidAPIVersion
+        cpp_name: invalidAPIVersionOld
+        strict: true
+        api_version: "whatever"
+        reply_type: OkReply
+
+    duplicateCommandOld:
+        description: "duplicate command in old commands fails because a command with the same name
+                      is in duplicate_command_fail_old.idl"
+        command_name: duplicateCommandOld
+        namespace: ignored
+        cpp_name: duplicateCommandOld
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    removedCommand:
+        description: "command will be removed from compatibility_test_fail/new which results 
+                      in an error"
+        command_name: removedCommand
+        namespace: ignored
+        cpp_name: removedCommand
         strict: true
         api_version: "1"
         reply_type: OkReply

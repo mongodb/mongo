@@ -33,12 +33,12 @@ imports:
     - "mongo/idl/basic_types.idl"
 
 commands:    
-    duplicateCommand:
+    duplicateCommandNew:
         description: "duplicate command in new commands fails because a command with the same name
                       is in compatibility_test_fail_new.idl"
-        command_name: duplicateCommand
+        command_name: duplicateCommandNew
         namespace: ignored
-        cpp_name: duplicateCommand
+        cpp_name: duplicateCommandNew
         strict: true
         api_version: "1"
         reply_type: OkReply

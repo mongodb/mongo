@@ -41,3 +41,12 @@ commands:
         strict: true
         api_version: "1"
         reply_type: OkReply
+
+    removedCommandNotInAPIV1:
+        description: "removing a command not in API v1 passes"
+        command_name: removedCommandNotInAPIV1
+        namespace: ignored
+        cpp_name: removedCommandNotInAPIV1
+        strict: true
+        api_version: ""
+        reply_type: OkReply

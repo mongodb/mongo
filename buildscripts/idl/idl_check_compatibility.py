@@ -49,6 +49,7 @@ import idl_compatibility_errors
 
 def check_compatibility(old_idl_dir: str, new_idl_dir: str, import_directories: List[str]
                         ) -> idl_compatibility_errors.IDLCompatibilityErrorCollection:
+    # pylint: disable=too-many-locals,too-many-branches
     """Check IDL compatibility between old and new IDL commands."""
     ctxt = idl_compatibility_errors.IDLCompatibilityContext(
         old_idl_dir, new_idl_dir, idl_compatibility_errors.IDLCompatibilityErrorCollection())
@@ -79,8 +80,46 @@ def check_compatibility(old_idl_dir: str, new_idl_dir: str, import_directories: 
                         ctxt.add_duplicate_command_name_error(new_cmd.command_name, new_idl_dir,
                                                               new_idl_file_path)
                         continue
-
                     new_commands[new_cmd.command_name] = new_cmd
+
+    # Check new commands' compatibility with old ones.
+    # Note, a command can be added to V1 at any time, it's ok if a
+    # new command has no corresponding old command.
+    old_commands: Dict[str, syntax.Command] = dict()
+    for dirpath, _, filenames in os.walk(old_idl_dir):
+        for old_filename in filenames:
+            old_idl_file_path = os.path.join(dirpath, old_filename)
+            with open(old_idl_file_path) as old_file:
+                old_idl_file = parser.parse(
+                    old_file, old_idl_file_path,
+                    CompilerImportResolver(import_directories + [old_idl_dir]))
+                if old_idl_file.errors:
+                    old_idl_file.errors.dump_errors()
+                    raise ValueError(f"Cannot parse {old_idl_file_path}")
+
+                for old_cmd in old_idl_file.spec.symbols.commands:
+                    if old_cmd.api_version == "":
+                        continue
+
+                    if old_cmd.api_version != "1":
+                        # We're not ready to handle future API versions yet.
+                        ctxt.add_command_invalid_api_version_error(
+                            old_cmd.command_name, old_cmd.api_version, old_idl_file_path)
+                        continue
+
+                    if old_cmd.command_name in old_commands:
+                        ctxt.add_duplicate_command_name_error(old_cmd.command_name, old_idl_dir,
+                                                              old_idl_file_path)
+                        continue
+
+                    old_commands[old_cmd.command_name] = old_cmd
+
+                    if old_cmd.command_name not in new_commands:
+                        # Can't remove a command from V1
+                        ctxt.add_command_removed_error(old_cmd.command_name, old_idl_file_path)
+                        continue
+
+                    new_cmd = new_commands[old_cmd.command_name]
 
     ctxt.errors.dump_errors()
     return ctxt.errors

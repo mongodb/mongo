@@ -61,17 +61,40 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
             path.join(dir_path, "compatibility_test_fail/new"), ["src"])
 
         self.assertTrue(error_collection.has_errors())
-        self.assertTrue(error_collection.count() == 2)
+        self.assertTrue(error_collection.count() == 5)
 
-        invalid_api_version_error = error_collection.get_error(
-            idl_compatibility_errors.ERROR_ID_COMMAND_INVALID_API_VERSION)
-        self.assertIsNotNone(invalid_api_version_error)
-        self.assertRegex(str(invalid_api_version_error), "invalidAPIVersion")
+        invalid_api_version_new_error = error_collection.get_error_by_command_name(
+            "invalidAPIVersionNew")
+        self.assertIsNotNone(invalid_api_version_new_error)
+        self.assertTrue(invalid_api_version_new_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_COMMAND_INVALID_API_VERSION)
+        self.assertRegex(str(invalid_api_version_new_error), "invalidAPIVersionNew")
 
-        duplicate_command_error = error_collection.get_error(
-            idl_compatibility_errors.ERROR_ID_DUPLICATE_COMMAND_NAME)
-        self.assertIsNotNone(duplicate_command_error)
-        self.assertRegex(str(duplicate_command_error), "duplicateCommand")
+        duplicate_command_new_error = error_collection.get_error_by_command_name(
+            "duplicateCommandNew")
+        self.assertIsNotNone(duplicate_command_new_error)
+        self.assertTrue(duplicate_command_new_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_DUPLICATE_COMMAND_NAME)
+        self.assertRegex(str(duplicate_command_new_error), "duplicateCommandNew")
+
+        invalid_api_version_old_error = error_collection.get_error_by_command_name(
+            "invalidAPIVersionOld")
+        self.assertIsNotNone(invalid_api_version_old_error)
+        self.assertTrue(invalid_api_version_old_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_COMMAND_INVALID_API_VERSION)
+        self.assertRegex(str(invalid_api_version_old_error), "invalidAPIVersionOld")
+
+        duplicate_command_old_error = error_collection.get_error_by_command_name(
+            "duplicateCommandOld")
+        self.assertIsNotNone(duplicate_command_old_error)
+        self.assertTrue(duplicate_command_old_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_DUPLICATE_COMMAND_NAME)
+        self.assertRegex(str(duplicate_command_old_error), "duplicateCommandOld")
+
+        removed_command_error = error_collection.get_error(
+            idl_compatibility_errors.ERROR_ID_REMOVED_COMMAND)
+        self.assertIsNotNone(removed_command_error)
+        self.assertRegex(str(removed_command_error), "removedCommand")
 
 
 if __name__ == '__main__':
