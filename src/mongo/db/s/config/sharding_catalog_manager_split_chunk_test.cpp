@@ -42,7 +42,17 @@ using unittest::assertGet;
 const NamespaceString kNamespace("TestDB", "TestColl");
 const KeyPattern kKeyPattern(BSON("a" << 1));
 
-using SplitChunkTest = ConfigServerTestFixture;
+class SplitChunkTest : public ConfigServerTestFixture {
+protected:
+    std::string _shardName = "shard0000";
+    void setUp() override {
+        ConfigServerTestFixture::setUp();
+        ShardType shard;
+        shard.setName(_shardName);
+        shard.setHost(_shardName + ":12");
+        setupShards({shard});
+    }
+};
 
 TEST_F(SplitChunkTest, SplitExistingChunkCorrectlyShouldSucceed) {
     ChunkType chunk;
@@ -51,13 +61,13 @@ TEST_F(SplitChunkTest, SplitExistingChunkCorrectlyShouldSucceed) {
 
     auto origVersion = ChunkVersion(1, 0, OID::gen(), boost::none /* timestamp */);
     chunk.setVersion(origVersion);
-    chunk.setShard(ShardId("shard0000"));
+    chunk.setShard(ShardId(_shardName));
 
     auto chunkMin = BSON("a" << 1);
     auto chunkMax = BSON("a" << 10);
     chunk.setMin(chunkMin);
     chunk.setMax(chunkMax);
-    chunk.setHistory({ChunkHistory(Timestamp(100, 0), ShardId("shard0000")),
+    chunk.setHistory({ChunkHistory(Timestamp(100, 0), ShardId(_shardName)),
                       ChunkHistory(Timestamp(90, 0), ShardId("shardY"))});
 
     auto chunkSplitPoint = BSON("a" << 5);
@@ -125,13 +135,13 @@ TEST_F(SplitChunkTest, MultipleSplitsOnExistingChunkShouldSucceed) {
 
     auto origVersion = ChunkVersion(1, 0, OID::gen(), boost::none /* timestamp */);
     chunk.setVersion(origVersion);
-    chunk.setShard(ShardId("shard0000"));
+    chunk.setShard(ShardId(_shardName));
 
     auto chunkMin = BSON("a" << 1);
     auto chunkMax = BSON("a" << 10);
     chunk.setMin(chunkMin);
     chunk.setMax(chunkMax);
-    chunk.setHistory({ChunkHistory(Timestamp(100, 0), ShardId("shard0000")),
+    chunk.setHistory({ChunkHistory(Timestamp(100, 0), ShardId(_shardName)),
                       ChunkHistory(Timestamp(90, 0), ShardId("shardY"))});
 
     auto chunkSplitPoint = BSON("a" << 5);
@@ -206,7 +216,7 @@ TEST_F(SplitChunkTest, NewSplitShouldClaimHighestVersion) {
     // set up first chunk
     auto origVersion = ChunkVersion(1, 2, collEpoch, boost::none /* timestamp */);
     chunk.setVersion(origVersion);
-    chunk.setShard(ShardId("shard0000"));
+    chunk.setShard(ShardId(_shardName));
 
     auto chunkMin = BSON("a" << 1);
     auto chunkMax = BSON("a" << 10);
@@ -220,7 +230,7 @@ TEST_F(SplitChunkTest, NewSplitShouldClaimHighestVersion) {
     // set up second chunk (chunk2)
     auto competingVersion = ChunkVersion(2, 1, collEpoch, boost::none /* timestamp */);
     chunk2.setVersion(competingVersion);
-    chunk2.setShard(ShardId("shard0000"));
+    chunk2.setShard(ShardId(_shardName));
     chunk2.setMin(BSON("a" << 10));
     chunk2.setMax(BSON("a" << 20));
 
@@ -264,7 +274,7 @@ TEST_F(SplitChunkTest, PreConditionFailErrors) {
 
     auto origVersion = ChunkVersion(1, 0, OID::gen(), boost::none /* timestamp */);
     chunk.setVersion(origVersion);
-    chunk.setShard(ShardId("shard0000"));
+    chunk.setShard(ShardId(_shardName));
 
     auto chunkMin = BSON("a" << 1);
     auto chunkMax = BSON("a" << 10);
@@ -293,7 +303,7 @@ TEST_F(SplitChunkTest, NonExisingNamespaceErrors) {
 
     auto origVersion = ChunkVersion(1, 0, OID::gen(), boost::none /* timestamp */);
     chunk.setVersion(origVersion);
-    chunk.setShard(ShardId("shard0000"));
+    chunk.setShard(ShardId(_shardName));
 
     auto chunkMin = BSON("a" << 1);
     auto chunkMax = BSON("a" << 10);
@@ -320,7 +330,7 @@ TEST_F(SplitChunkTest, NonMatchingEpochsOfChunkAndRequestErrors) {
 
     auto origVersion = ChunkVersion(1, 0, OID::gen(), boost::none /* timestamp */);
     chunk.setVersion(origVersion);
-    chunk.setShard(ShardId("shard0000"));
+    chunk.setShard(ShardId(_shardName));
 
     auto chunkMin = BSON("a" << 1);
     auto chunkMax = BSON("a" << 10);
@@ -348,7 +358,7 @@ TEST_F(SplitChunkTest, SplitPointsOutOfOrderShouldFail) {
 
     auto origVersion = ChunkVersion(1, 0, OID::gen(), boost::none /* timestamp */);
     chunk.setVersion(origVersion);
-    chunk.setShard(ShardId("shard0000"));
+    chunk.setShard(ShardId(_shardName));
 
     auto chunkMin = BSON("a" << 1);
     auto chunkMax = BSON("a" << 10);
@@ -375,7 +385,7 @@ TEST_F(SplitChunkTest, SplitPointsOutOfRangeAtMinShouldFail) {
 
     auto origVersion = ChunkVersion(1, 0, OID::gen(), boost::none /* timestamp */);
     chunk.setVersion(origVersion);
-    chunk.setShard(ShardId("shard0000"));
+    chunk.setShard(ShardId(_shardName));
 
     auto chunkMin = BSON("a" << 1);
     auto chunkMax = BSON("a" << 10);
@@ -403,7 +413,7 @@ TEST_F(SplitChunkTest, SplitPointsOutOfRangeAtMaxShouldFail) {
 
     auto origVersion = ChunkVersion(1, 0, OID::gen(), boost::none /* timestamp */);
     chunk.setVersion(origVersion);
-    chunk.setShard(ShardId("shard0000"));
+    chunk.setShard(ShardId(_shardName));
 
     auto chunkMin = BSON("a" << 1);
     auto chunkMax = BSON("a" << 10);
@@ -430,7 +440,7 @@ TEST_F(SplitChunkTest, SplitPointsWithDollarPrefixShouldFail) {
 
     auto origVersion = ChunkVersion(1, 0, OID::gen(), boost::none /* timestamp */);
     chunk.setVersion(origVersion);
-    chunk.setShard(ShardId("shard0000"));
+    chunk.setShard(ShardId(_shardName));
 
     auto chunkMin = BSON("a" << kMinBSONKey);
     auto chunkMax = BSON("a" << kMaxBSONKey);

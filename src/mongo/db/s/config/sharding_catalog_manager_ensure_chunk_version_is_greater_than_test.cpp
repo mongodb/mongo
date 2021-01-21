@@ -38,7 +38,17 @@ namespace {
 const NamespaceString kNss("TestDB", "TestColl");
 const KeyPattern kKeyPattern(BSON("x" << 1));
 
-using EnsureChunkVersionIsGreaterThanTest = ConfigServerTestFixture;
+class EnsureChunkVersionIsGreaterThanTest : public ConfigServerTestFixture {
+protected:
+    std::string _shardName = "shard0000";
+    void setUp() override {
+        ConfigServerTestFixture::setUp();
+        ShardType shard;
+        shard.setName(_shardName);
+        shard.setHost(_shardName + ":12");
+        setupShards({shard});
+    }
+};
 
 ChunkType generateChunkType(const NamespaceString& nss,
                             const ChunkVersion& chunkVersion,
@@ -84,7 +94,7 @@ TEST_F(EnsureChunkVersionIsGreaterThanTest, IfNoChunksFoundFoundReturnsSuccess) 
     const auto requestedChunkType =
         generateChunkType(kNss,
                           ChunkVersion(10, 2, OID::gen(), boost::none /* timestamp */),
-                          ShardId("shard0000"),
+                          ShardId(_shardName),
                           BSON("a" << 1),
                           BSON("a" << 10));
 
@@ -99,7 +109,7 @@ TEST_F(EnsureChunkVersionIsGreaterThanTest, IfNoChunkWithMatchingEpochFoundRetur
     const auto requestedChunkType =
         generateChunkType(kNss,
                           ChunkVersion(10, 2, OID::gen(), boost::none /* timestamp */),
-                          ShardId("shard0000"),
+                          ShardId(_shardName),
                           BSON("a" << 1),
                           BSON("a" << 10));
 
@@ -122,7 +132,7 @@ TEST_F(EnsureChunkVersionIsGreaterThanTest, IfNoChunkWithMatchingMinKeyFoundRetu
     const auto requestedChunkType =
         generateChunkType(kNss,
                           ChunkVersion(10, 2, OID::gen(), boost::none /* timestamp */),
-                          ShardId("shard0000"),
+                          ShardId(_shardName),
                           BSON("a" << 1),
                           BSON("a" << 10));
 
@@ -145,7 +155,7 @@ TEST_F(EnsureChunkVersionIsGreaterThanTest, IfNoChunkWithMatchingMaxKeyFoundRetu
     const auto requestedChunkType =
         generateChunkType(kNss,
                           ChunkVersion(10, 2, OID::gen(), boost::none /* timestamp */),
-                          ShardId("shard0000"),
+                          ShardId(_shardName),
                           BSON("a" << 1),
                           BSON("a" << 10));
 
@@ -170,7 +180,7 @@ TEST_F(EnsureChunkVersionIsGreaterThanTest,
     const auto requestedChunkType =
         generateChunkType(kNss,
                           ChunkVersion(10, 2, epoch, boost::none /* timestamp */),
-                          ShardId("shard0000"),
+                          ShardId(_shardName),
                           BSON("a" << 1),
                           BSON("a" << 10));
 
@@ -204,7 +214,7 @@ TEST_F(
     const auto requestedChunkType =
         generateChunkType(kNss,
                           ChunkVersion(10, 2, epoch, boost::none /* timestamp */),
-                          ShardId("shard0000"),
+                          ShardId(_shardName),
                           BSON("a" << 1),
                           BSON("a" << 10));
 

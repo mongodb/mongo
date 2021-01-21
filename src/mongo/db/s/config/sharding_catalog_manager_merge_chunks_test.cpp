@@ -41,7 +41,17 @@ namespace {
 
 using unittest::assertGet;
 
-using MergeChunkTest = ConfigServerTestFixture;
+class MergeChunkTest : public ConfigServerTestFixture {
+protected:
+    std::string _shardName = "shard0000";
+    void setUp() override {
+        ConfigServerTestFixture::setUp();
+        ShardType shard;
+        shard.setName(_shardName);
+        shard.setHost(_shardName + ":12");
+        setupShards({shard});
+    }
+};
 
 const NamespaceString kNamespace("TestDB.TestColl");
 const KeyPattern kKeyPattern(BSON("x" << 1));

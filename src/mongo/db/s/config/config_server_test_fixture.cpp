@@ -309,6 +309,19 @@ StatusWith<ShardType> ConfigServerTestFixture::getShardDoc(OperationContext* opC
 void ConfigServerTestFixture::setupCollection(const NamespaceString& nss,
                                               const KeyPattern& shardKey,
                                               const std::vector<ChunkType>& chunks) {
+    auto dbDoc = findOneOnConfigCollection(
+        operationContext(), DatabaseType::ConfigNS, BSON(DatabaseType::name(nss.db().toString())));
+    if (!dbDoc.isOK()) {
+        // If the database is not setup, choose the first available shard as primary to implicitly
+        // create the db
+        auto swShardDoc =
+            findOneOnConfigCollection(operationContext(), ShardType::ConfigNS, BSONObj());
+        invariant(swShardDoc.isOK(),
+                  "At least one shard should be setup when initializing a collection");
+        auto shard = uassertStatusOK(ShardType::fromBSON(swShardDoc.getValue()));
+        setupDatabase(nss.db().toString(), ShardId(shard.getName()), true /* sharded */);
+    }
+
     CollectionType coll(nss, chunks[0].getVersion().epoch(), Date_t::now(), UUID::gen());
     coll.setKeyPattern(shardKey);
     ASSERT_OK(

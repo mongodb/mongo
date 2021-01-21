@@ -51,6 +51,8 @@ namespace {
 
 class ShardingDDLUtilTest : public ConfigServerTestFixture {
 protected:
+    ShardType shard0;
+
     void setUp() override {
         ConfigServerTestFixture::setUp();
 
@@ -64,6 +66,11 @@ protected:
         LogicalSessionCache::set(getServiceContext(), std::make_unique<LogicalSessionCacheNoop>());
         TransactionCoordinatorService::get(operationContext())
             ->onShardingInitialization(operationContext(), true);
+
+        // Initialize a shard
+        shard0.setName("shard0");
+        shard0.setHost("shard0:12");
+        setupShards({shard0});
     }
 
     void tearDown() override {
@@ -79,11 +86,6 @@ const NamespaceString kToNss("test.to");
 TEST_F(ShardingDDLUtilTest, ShardedRenameMetadata) {
     auto opCtx = operationContext();
     DBDirectClient client(opCtx);
-
-    ShardType shard0;
-    shard0.setName("shard0");
-    shard0.setHost("shard0:12");
-    setupShards({shard0});
 
     const NamespaceString fromNss("test.from");
     const auto fromCollQuery = Query(BSON(CollectionType::kNssFieldName << fromNss.ns()));
@@ -160,14 +162,6 @@ TEST_F(ShardingDDLUtilTest, ShardedRenameMetadata) {
 TEST_F(ShardingDDLUtilTest, ShardedRenamePreconditionsAreMet) {
     auto opCtx = operationContext();
 
-    // Initialize the shard
-    ShardType shard0;
-    shard0.setName("shard0");
-    shard0.setHost("shard0:12");
-    setupShards({shard0});
-
-    setupDatabase("test", shard0.getName(), true /* sharded */);
-
     // No exception is thrown if the TO collection does not exist and has no associated tags
     sharding_ddl_util::checkShardedRenamePreconditions(opCtx, kToNss, false /* dropTarget */);
 
@@ -191,12 +185,6 @@ TEST_F(ShardingDDLUtilTest, ShardedRenamePreconditionsAreMet) {
 TEST_F(ShardingDDLUtilTest, ShardedRenamePreconditionsTargetCollectionExists) {
     auto opCtx = operationContext();
 
-    // Initialize the shard
-    ShardType shard0;
-    shard0.setName("shard0");
-    shard0.setHost("shard0:12");
-    setupShards({shard0});
-
     // Initialize a chunk
     ChunkVersion chunkVersion(1, 1, OID::gen(), boost::none);
     ChunkType chunk;
@@ -209,7 +197,6 @@ TEST_F(ShardingDDLUtilTest, ShardedRenamePreconditionsTargetCollectionExists) {
     chunk.setMax(kMaxBSONKey);
 
     // Initialize the sharded collection
-    setupDatabase("test", shard0.getName(), true /* sharded */);
     setupCollection(kToNss, KeyPattern(BSON("x" << 1)), {chunk});
 
     // Check that an exception is thrown if the target collection exists and dropTarget is not set
