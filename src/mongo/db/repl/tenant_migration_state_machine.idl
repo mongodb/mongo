@@ -72,7 +72,7 @@ structs:
                     The URI string that the donor will utilize to create a connection with
                     the recipient.
                 validator:
-                    callback: "validateConnectionString"
+                    callback: "tenant_migration_util::validateConnectionString"
             readPreference:
                 type: readPreference
                 description: >-
@@ -132,12 +132,12 @@ structs:
                     The URI string that the recipient will utilize to create a connection
                     with the donor.
                 validator:
-                    callback: "validateConnectionString"
+                    callback: "tenant_migration_util::validateConnectionString"
             tenantId:
                 type: string
                 description: "The tenantId for the migration."
                 validator:
-                    callback: "validateDatabasePrefix"
+                    callback: "tenant_migration_util::validateDatabasePrefix"
             readPreference:
                 type: readPreference
                 description: >-

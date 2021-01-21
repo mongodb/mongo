@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2020-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -26,6 +26,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+
 #pragma once
 
 #include <set>
@@ -34,7 +35,9 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/client/mongo_uri.h"
 #include "mongo/config.h"
+#include "mongo/db/keys_collection_document_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/executor/scoped_task_executor.h"
 #include "mongo/util/net/ssl_util.h"
 #include "mongo/util/str.h"
 
@@ -45,6 +48,8 @@ namespace {
 const std::set<std::string> kUnsupportedTenantIds{"", "admin", "local", "config"};
 
 }  // namespace
+
+namespace tenant_migration_util {
 
 inline Status validateDatabasePrefix(const std::string& tenantId) {
     const bool isPrefixSupported =
@@ -121,5 +126,26 @@ inline Status validatePrivateKeyPEMPayload(const StringData& payload) {
     return swBlob.getStatus().withContext("Invalid private key field");
 #endif
 }
+
+/*
+ * Creates an ExternalKeysCollectionDocument representing an admin.system.external_validation_keys
+ * document from the given the admin.system.keys document BSONObj.
+ */
+ExternalKeysCollectionDocument makeExternalClusterTimeKeyDoc(ServiceContext* serviceContext,
+                                                             std::string rsName,
+                                                             BSONObj keyDoc);
+
+/*
+ * For each given ExternalKeysCollectionDocument, inserts it if there is not an existing document in
+ * admin.system.external_validation_keys for it with the same keyId and replicaSetName. Otherwise,
+ * updates the ttlExpiresAt of the existing document if it is less than the new ttlExpiresAt. Waits
+ * for the writes to be majority-committed, and refreshes the logical validator's cache.
+ */
+ExecutorFuture<void> storeExternalClusterTimeKeyDocsAndRefreshCache(
+    std::shared_ptr<executor::ScopedTaskExecutor> executor,
+    std::vector<ExternalKeysCollectionDocument> keyDocs,
+    const CancelationToken& token);
+
+}  // namespace tenant_migration_util
 
 }  // namespace mongo

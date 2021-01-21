@@ -42,9 +42,9 @@ structs:
                 type: string
                 description: "Certificate PEM blob."
                 validator:
-                    callback: "validateCertificatePEMPayload"
+                    callback: "tenant_migration_util::validateCertificatePEMPayload"
             privateKey:
                 type: string
                 description: "Private key PEM blob."
                 validator:
-                    callback: "validatePrivateKeyPEMPayload"
+                    callback: "tenant_migration_util::validatePrivateKeyPEMPayload"

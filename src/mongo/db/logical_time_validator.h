@@ -109,6 +109,11 @@ public:
     void stopKeyManager();
 
     /**
+     * Forces the key manager cache to refresh.
+     */
+    void refreshKeyManagerCache(OperationContext* opCtx);
+
+    /**
      * Reset the key manager cache of keys.
      */
     void resetKeyManagerCache();

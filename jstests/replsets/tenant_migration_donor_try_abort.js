@@ -22,7 +22,8 @@ const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
 
 (() => {
     jsTestLog(
-        "Test sending donorAbortMigration during a tenant migration while recipientSyncData command repeatedly fails.");
+        "Test sending donorAbortMigration during a tenant migration while recipientSyncData " +
+        "command repeatedly fails with retryable errors.");
 
     const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
     if (!tenantMigrationTest.isFeatureFlagEnabled()) {
@@ -61,8 +62,49 @@ const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
 })();
 
 (() => {
-    jsTestLog(
-        "Test sending donorAbortMigration during a tenant migration while waiting for the response of recipientSyncData.");
+    jsTestLog("Test sending donorAbortMigration during a tenant migration while find command " +
+              "against admin.system.keys repeatedly fails with retryable errors.");
+
+    const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
+    if (!tenantMigrationTest.isFeatureFlagEnabled()) {
+        jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
+        return;
+    }
+
+    const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
+    let fp = configureFailPoint(recipientPrimary, "failCommand", {
+        failInternalCommands: true,
+        errorCode: ErrorCodes.ShutdownInProgress,
+        failCommands: ["find"],
+        namespace: "admin.system.keys"
+    });
+
+    const tenantId = kTenantId;
+    const migrationId = UUID();
+    const migrationOpts = {
+        migrationIdString: extractUUIDFromObject(migrationId),
+        tenantId: tenantId,
+        recipientConnString: tenantMigrationTest.getRecipientConnString(),
+    };
+
+    assert.commandWorked(tenantMigrationTest.startMigration(migrationOpts));
+
+    fp.wait();
+
+    assert.commandWorked(tenantMigrationTest.tryAbortMigration(
+        {migrationIdString: migrationOpts.migrationIdString}));
+
+    const stateRes =
+        assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
+    assert.eq(stateRes.state, TenantMigrationTest.State.kAborted);
+
+    fp.off();
+    tenantMigrationTest.stop();
+})();
+
+(() => {
+    jsTestLog("Test sending donorAbortMigration during a tenant migration while waiting for the " +
+              "response  of recipientSyncData.");
 
     const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
     if (!tenantMigrationTest.isFeatureFlagEnabled()) {
@@ -117,6 +159,44 @@ const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
         assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
     assert.eq(stateRes.state, TenantMigrationTest.State.kAborted);
 
+    tenantMigrationTest.stop();
+})();
+
+(() => {
+    jsTestLog("Test sending donorAbortMigration during a tenant migration while waiting for the " +
+              "response of find against admin.system.keys.");
+    const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
+    if (!tenantMigrationTest.isFeatureFlagEnabled()) {
+        jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
+        return;
+    }
+    const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
+    configureFailPoint(recipientPrimary, "failCommand", {
+        failInternalCommands: true,
+        blockConnection: true,
+        blockTimeMS: kDelayMS,
+        failCommands: ["find"],
+        namespace: "admin.system.keys"
+    });
+    const tenantId = kTenantId;
+    const migrationId = UUID();
+    const migrationOpts = {
+        migrationIdString: extractUUIDFromObject(migrationId),
+        tenantId: tenantId,
+        recipientConnString: tenantMigrationTest.getRecipientConnString(),
+    };
+    assert.commandWorked(tenantMigrationTest.startMigration(migrationOpts));
+    // Wait for donorAbortMigration command to start.
+    assert.soon(() => {
+        const res = assert.commandWorked(recipientPrimary.adminCommand(
+            {currentOp: true, $and: [{"command.find": "system.keys"}, {"command.$db": "admin"}]}));
+        return res.inprog.length == 1;
+    });
+    assert.commandWorked(tenantMigrationTest.tryAbortMigration(
+        {migrationIdString: migrationOpts.migrationIdString}));
+    const stateRes =
+        assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
+    assert.eq(stateRes.state, TenantMigrationTest.State.kAborted);
     tenantMigrationTest.stop();
 })();
 

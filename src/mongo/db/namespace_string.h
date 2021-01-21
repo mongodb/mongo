@@ -100,8 +100,12 @@ public:
     // of a specific database
     static const NamespaceString kShardConfigDatabasesNamespace;
 
-    // Name for causal consistency's key collection.
-    static const NamespaceString kSystemKeysNamespace;
+    // Namespace for storing keys for signing and validating cluster times created by the cluster
+    // that this node is in.
+    static const NamespaceString kKeysCollectionNamespace;
+
+    // Namespace for storing keys for validating cluster times created by other clusters.
+    static const NamespaceString kExternalKeysCollectionNamespace;
 
     // Namespace of the the oplog collection.
     static const NamespaceString kRsOplogNamespace;
@@ -147,13 +151,6 @@ public:
 
     // Namespace for storing config.transactions cloner progress for resharding.
     static const NamespaceString kReshardingTxnClonerProgressNamespace;
-
-    // Namespace for storing keys for signing and validating cluster times created by the cluster
-    // that this node is in.
-    static const NamespaceString kKeysCollectionNamespace;
-
-    // Namespace for storing keys for validating cluster times created by other clusters.
-    static const NamespaceString kExternalKeysCollectionNamespace;
 
     /**
      * Constructs an empty NamespaceString.

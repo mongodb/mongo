@@ -220,6 +220,11 @@ bool LogicalTimeValidator::shouldGossipLogicalTime() {
     return _getKeyManagerCopy()->hasSeenKeys();
 }
 
+void LogicalTimeValidator::refreshKeyManagerCache(OperationContext* opCtx) {
+    invariant(_keyManager);
+    _keyManager->refreshNow(opCtx);
+}
+
 void LogicalTimeValidator::resetKeyManagerCache() {
     LOGV2(20716, "Resetting key manager cache");
     invariant(_keyManager);

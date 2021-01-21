@@ -157,7 +157,8 @@ Fetcher::Fetcher(executor::TaskExecutor* executor,
                  const BSONObj& metadata,
                  Milliseconds findNetworkTimeout,
                  Milliseconds getMoreNetworkTimeout,
-                 std::unique_ptr<RemoteCommandRetryScheduler::RetryPolicy> firstCommandRetryPolicy)
+                 std::unique_ptr<RemoteCommandRetryScheduler::RetryPolicy> firstCommandRetryPolicy,
+                 transport::ConnectSSLMode sslMode)
     : _executor(executor),
       _source(source),
       _dbname(dbname),
@@ -168,9 +169,15 @@ Fetcher::Fetcher(executor::TaskExecutor* executor,
       _getMoreNetworkTimeout(getMoreNetworkTimeout),
       _firstRemoteCommandScheduler(
           _executor,
-          RemoteCommandRequest(_source, _dbname, _cmdObj, _metadata, nullptr, _findNetworkTimeout),
+          [&] {
+              RemoteCommandRequest request(
+                  _source, _dbname, _cmdObj, _metadata, nullptr, _findNetworkTimeout);
+              request.sslMode = sslMode;
+              return request;
+          }(),
           [this](const auto& x) { return this->_callback(x, kFirstBatchFieldName); },
-          std::move(firstCommandRetryPolicy)) {
+          std::move(firstCommandRetryPolicy)),
+      _sslMode(sslMode) {
     uassert(ErrorCodes::BadValue, "callback function cannot be null", _work);
 }
 
@@ -297,11 +304,14 @@ Status Fetcher::_scheduleGetMore(const BSONObj& cmdObj) {
         return Status(ErrorCodes::CallbackCanceled,
                       "fetcher was shut down after previous batch was processed");
     }
+
+    RemoteCommandRequest request(
+        _source, _dbname, cmdObj, _metadata, nullptr, _getMoreNetworkTimeout);
+    request.sslMode = _sslMode;
+
     StatusWith<executor::TaskExecutor::CallbackHandle> scheduleResult =
         _executor->scheduleRemoteCommand(
-            RemoteCommandRequest(
-                _source, _dbname, cmdObj, _metadata, nullptr, _getMoreNetworkTimeout),
-            [this](const auto& x) { return this->_callback(x, kNextBatchFieldName); });
+            request, [this](const auto& x) { return this->_callback(x, kNextBatchFieldName); });
 
     if (!scheduleResult.isOK()) {
         return scheduleResult.getStatus();
@@ -405,9 +415,12 @@ void Fetcher::_sendKillCursors(const CursorId id, const NamespaceString& nss) {
                               "error"_attr = redact(status));
             }
         };
+
         auto cmdObj = BSON("killCursors" << nss.coll() << "cursors" << BSON_ARRAY(id));
-        auto scheduleResult = _executor->scheduleRemoteCommand(
-            RemoteCommandRequest(_source, _dbname, cmdObj, nullptr), logKillCursorsResult);
+        RemoteCommandRequest request(_source, _dbname, cmdObj, nullptr);
+        request.sslMode = _sslMode;
+
+        auto scheduleResult = _executor->scheduleRemoteCommand(request, logKillCursorsResult);
         if (!scheduleResult.isOK()) {
             LOGV2_WARNING(23920,
                           "Failed to schedule killCursors command: {error}",

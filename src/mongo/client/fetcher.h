@@ -131,7 +131,8 @@ public:
             Milliseconds findNetworkTimeout = RemoteCommandRequest::kNoTimeout,
             Milliseconds getMoreNetworkTimeout = RemoteCommandRequest::kNoTimeout,
             std::unique_ptr<RemoteCommandRetryScheduler::RetryPolicy> firstCommandRetryPolicy =
-                RemoteCommandRetryScheduler::makeNoRetryPolicy());
+                RemoteCommandRetryScheduler::makeNoRetryPolicy(),
+            transport::ConnectSSLMode sslMode = transport::kGlobalSSLMode);
 
     virtual ~Fetcher();
 
@@ -259,6 +260,8 @@ private:
 
     // First remote command scheduler.
     RemoteCommandRetryScheduler _firstRemoteCommandScheduler;
+
+    const transport::ConnectSSLMode _sslMode;
 };
 
 /**

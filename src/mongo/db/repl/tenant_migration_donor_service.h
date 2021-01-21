@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
+#include "mongo/client/fetcher.h"
 #include "mongo/client/remote_command_targeter_rs.h"
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
@@ -149,10 +150,19 @@ public:
         const NamespaceString _stateDocumentsNS = NamespaceString::kTenantMigrationDonorsNamespace;
 
         /**
+         * Fetches all key documents from the recipient's admin.system.keys collection, stores
+         * them in admin.system.external_validation_keys, and refreshes the keys cache.
+         */
+        ExecutorFuture<void> _fetchAndStoreRecipientClusterTimeKeyDocs(
+            std::shared_ptr<executor::ScopedTaskExecutor> executor,
+            std::shared_ptr<RemoteCommandTargeter> recipientTargeterRS,
+            const CancelationToken& token);
+
+        /**
          * Inserts the state document to _stateDocumentsNS and returns the opTime for the insert
          * oplog entry.
          */
-        ExecutorFuture<repl::OpTime> _insertStateDocument(
+        ExecutorFuture<repl::OpTime> _insertStateDoc(
             std::shared_ptr<executor::ScopedTaskExecutor> executor);
 
         /**
@@ -161,7 +171,7 @@ public:
          * commitOrAbortTimestamp depending on the state. Returns the opTime for the update oplog
          * entry.
          */
-        ExecutorFuture<repl::OpTime> _updateStateDocument(
+        ExecutorFuture<repl::OpTime> _updateStateDoc(
             std::shared_ptr<executor::ScopedTaskExecutor> executor,
             const TenantMigrationDonorStateEnum nextState);
 
@@ -169,7 +179,7 @@ public:
          * Sets the "expireAt" time for the state document to be garbage collected, and returns the
          * the opTime for the write.
          */
-        ExecutorFuture<repl::OpTime> _markStateDocumentAsGarbageCollectable(
+        ExecutorFuture<repl::OpTime> _markStateDocAsGarbageCollectable(
             std::shared_ptr<executor::ScopedTaskExecutor> executor);
 
         /**
@@ -215,6 +225,10 @@ public:
             recipientCmdThreadPoolLimits.maxThreads = 1;
             return recipientCmdThreadPoolLimits;
         }
+
+        // Weak pointer to the Fetcher used for fetching admin.system.keys documents from the
+        // recipient. It is only not null when the instance is actively fetching the documents.
+        std::weak_ptr<Fetcher> _recipientKeysFetcher;
 
         boost::optional<Status> _abortReason;
 

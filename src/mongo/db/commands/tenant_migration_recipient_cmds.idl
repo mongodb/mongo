@@ -62,14 +62,14 @@ structs:
             donor.
           type: string
           validator:
-            callback: "validateConnectionString"
+            callback: "tenant_migration_util::validateConnectionString"
         tenantId:
           description: >-
             The prefix from which the migrating database will be matched. The prefixes 'admin',
             'local', 'config', the empty string, are not allowed.
           type: string
           validator:
-            callback: "validateDatabasePrefix"
+            callback: "tenant_migration_util::validateDatabasePrefix"
         readPreference:
           description: >-
             The read preference settings that the donor will pass on to the recipient.
@@ -98,7 +98,7 @@ commands:
         type: timestamp
         optional: true
         validator:
-          callback: "validateTimestampNotNull"
+          callback: "tenant_migration_util::validateTimestampNotNull"
 
   recipientForgetMigration:
     description: "Parser for the 'recipientForgetMigration' command."

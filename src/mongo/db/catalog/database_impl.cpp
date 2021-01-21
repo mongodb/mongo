@@ -348,7 +348,8 @@ Status DatabaseImpl::dropCollection(OperationContext* opCtx,
                               "turn off profiling before dropping system.profile collection");
         } else if (!(nss.isSystemDotViews() || nss.isHealthlog() ||
                      nss == NamespaceString::kLogicalSessionsNamespace ||
-                     nss == NamespaceString::kSystemKeysNamespace ||
+                     nss == NamespaceString::kKeysCollectionNamespace ||
+                     nss == NamespaceString::kExternalKeysCollectionNamespace ||
                      nss.isTemporaryReshardingCollection())) {
             return Status(ErrorCodes::IllegalOperation,
                           str::stream() << "can't drop system collection " << nss);

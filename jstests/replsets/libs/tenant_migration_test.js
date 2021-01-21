@@ -35,7 +35,7 @@ function TenantMigrationTest(
     recipientRst.getPrimary();
     recipientRst.awaitReplication();
 
-    createAdvanceClusterTimeRoleIfNotExist(donorRst);
+    createFindInternalClusterTimeKeysRoleIfNotExist(recipientRst);
 
     /**
      * Creates a ReplSetTest instance. The repl set will have 2 nodes.
@@ -63,20 +63,81 @@ function TenantMigrationTest(
         return rst;
     }
 
-    function createAdvanceClusterTimeRoleIfNotExist(rst) {
-        const adminDB = rst.getPrimary().getDB("admin");
-        const roles =
-            adminDB.getRoles({rolesInfo: 1, showPrivileges: false, showBuiltinRoles: false});
+    /**
+     * Returns true if the given database role already exists.
+     */
+    function roleExists(db, roleName) {
+        const roles = db.getRoles({rolesInfo: 1, showPrivileges: false, showBuiltinRoles: false});
+        const fullRoleName = `${db.getName()}.${roleName}`;
+        for (let role of roles) {
+            if (role._id == fullRoleName) {
+                return true;
+            }
+        }
+        return false;
+    }
 
-        if (roles.filter(role => role._id == "admin.advanceClusterTimeRole").length > 0) {
+    /**
+     * Creates a role for running find command against admin.system.keys if it doesn't exist.
+     */
+    function createFindInternalClusterTimeKeysRoleIfNotExist(rst) {
+        const adminDB = rst.getPrimary().getDB("admin");
+
+        if (roleExists(adminDB, "findInternalClusterTimeKeysRole")) {
             return;
         }
 
         assert.commandWorked(adminDB.runCommand({
-            createRole: "advanceClusterTimeRole",
-            privileges: [{resource: {cluster: true}, actions: ["advanceClusterTime"]}],
+            createRole: "findInternalClusterTimeKeysRole",
+            privileges: [{resource: {db: "admin", collection: "system.keys"}, actions: ["find"]}],
             roles: []
         }));
+    }
+
+    /**
+     * Creates a role for running find command against admin.system.external_validation_keys if it
+     * doesn't exist.
+     */
+    function createFindExternalClusterTimeKeysRoleIfNotExist(rst) {
+        const adminDB = rst.getPrimary().getDB("admin");
+
+        if (roleExists(adminDB, "findExternalClusterTimeKeysRole")) {
+            return;
+        }
+
+        assert.commandWorked(adminDB.runCommand({
+            createRole: "findExternalClusterTimeKeysRole",
+            privileges: [{
+                resource: {db: "admin", collection: "system.external_validation_keys"},
+                actions: ["find"]
+            }],
+            roles: []
+        }));
+    }
+
+    /**
+     * Gives the current admin database user the privilege to run find commands against
+     * admin.system.external_validation_keys if it does not have that privilege. Used by
+     * 'assertNoDuplicatedExternalKeyDocs' below.
+     */
+    function grantFindExternalClusterTimeKeysPrivilegeIfNeeded(rst) {
+        const adminDB = rst.getPrimary().getDB("admin");
+        const users = assert.commandWorked(adminDB.runCommand({connectionStatus: 1}))
+                          .authInfo.authenticatedUsers;
+
+        if (users.length === 0 || users[0].user === "__system" || users[0].db != "admin") {
+            return;
+        }
+
+        const userRoles = adminDB.getUser(users[0].user).roles;
+
+        if (userRoles.includes("findExternalClusterTimeKeysRole")) {
+            return;
+        }
+
+        createFindExternalClusterTimeKeysRoleIfNotExist(rst);
+        userRoles.push("findExternalClusterTimeKeysRole");
+        assert.commandWorked(adminDB.runCommand({updateUser: users[0].user, roles: userRoles}));
     }
 
     /**
@@ -228,6 +289,8 @@ function TenantMigrationTest(
         if (stateRes.state === TenantMigrationTest.State.kCommitted) {
             this.checkTenantDBHashes(tenantId);
         }
+
+        this.assertNoDuplicatedExternalKeyDocs(this.getDonorRst());
 
         return stateRes;
     };
@@ -540,6 +603,21 @@ function TenantMigrationTest(
             }
             assert(success, 'dbhash mismatch between donor and recipient primaries');
         }
+    };
+
+    /**
+     * Asserts that there are no admin.system.external_validation_keys docs with the same keyId
+     * and replicaSetName.
+     */
+    this.assertNoDuplicatedExternalKeyDocs = function(rst) {
+        grantFindExternalClusterTimeKeysPrivilegeIfNeeded(rst);
+
+        let aggRes = rst.getPrimary().getDB("admin").system.external_validation_keys.aggregate([
+            {$group: {_id: {keyId: "$keyId", replicaSetName: "$replicaSetName"}, count: {$sum: 1}}}
+        ]);
+        aggRes.forEach(doc => {
+            assert.eq(1, doc.count);
+        });
     };
 
     /**

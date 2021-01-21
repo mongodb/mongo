@@ -322,7 +322,7 @@ certs:
     extendedKeyUsage: [clientAuth]
     mongoRoles:
     - {role: backup, db: admin}
-    - {role: advanceClusterTimeRole, db: admin}
+    - {role: findInternalClusterTimeKeysRole, db: admin}
 
 - name: 'rs0_tenant_migration_expired.pem'
   description:
@@ -339,7 +339,21 @@ certs:
     extendedKeyUsage: [clientAuth]
     mongoRoles:
     - {role: backup, db: admin}
-    - {role: advanceClusterTimeRole, db: admin}
+    - {role: findInternalClusterTimeKeysRole, db: admin}
+
+- name: 'rs0_tenant_migration_no_find_cluster_time_keys_role.pem'
+  description:
+    Client certificate file for tenant migration donor or recipient without role to run find command
+    against admin.system.keys.
+  Subject:
+    OU: 'rs0_tenant_migration'
+  extensions:
+    basicConstraints: {CA: false}
+    subjectKeyIdentifier: hash
+    keyUsage: [digitalSignature, keyEncipherment]
+    extendedKeyUsage: [clientAuth]
+    mongoRoles:
+    - {role: backup, db: admin}
 
 - name: 'rs1.pem'
   description: General purpose server certificate file.
@@ -363,7 +377,7 @@ certs:
     extendedKeyUsage: [clientAuth]
     mongoRoles:
     - {role: backup, db: admin}
-    - {role: advanceClusterTimeRole, db: admin}
+    - {role: findInternalClusterTimeKeysRole, db: admin}
 
 - name: 'rs1_tenant_migration_expired.pem'
   description:
@@ -380,7 +394,7 @@ certs:
     extendedKeyUsage: [clientAuth]
     mongoRoles:
     - {role: backup, db: admin}
-    - {role: advanceClusterTimeRole, db: admin}
+    - {role: findInternalClusterTimeKeysRole, db: admin}
 
 - name: 'rs1_tenant_migration_no_backup_role.pem'
   description:
@@ -393,12 +407,12 @@ certs:
     keyUsage: [digitalSignature, keyEncipherment]
     extendedKeyUsage: [clientAuth]
     mongoRoles:
-    - {role: advanceClusterTimeRole, db: admin}
+    - {role: findInternalClusterTimeKeysRole, db: admin}
 
-- name: 'rs1_tenant_migration_no_advance_cluster_time_role.pem'
+- name: 'rs1_tenant_migration_no_find_cluster_time_keys_role.pem'
   description:
-    Client certificate file for tenant migration donor or recipient without role to advance
-    cluster time.
+    Client certificate file for tenant migration donor or recipient without role to run find command
+    against admin.system.keys.
   Subject:
     OU: 'rs1_tenant_migration'
   extensions:
@@ -431,7 +445,7 @@ certs:
     extendedKeyUsage: [clientAuth]
     mongoRoles:
     - {role: backup, db: admin}
-    - {role: advanceClusterTimeRole, db: admin}
+    - {role: findInternalClusterTimeKeysRole, db: admin}
 
 ###
 # Certificates not based on the primary root ca.pem

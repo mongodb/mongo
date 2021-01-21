@@ -1284,9 +1284,15 @@ env.Library(
 )
 
 env.Library(
-    target='tenant_migration_recipient_utils',
+    target='tenant_migration_utils',
     source=[
+        "tenant_migration_util.cpp",
         "tenant_migration_recipient_entry_helpers.cpp",
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/util/future_util',
+        "repl_server_parameters",
+        'wait_for_majority_service',
     ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/base",
@@ -1306,10 +1312,8 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/read_preference',
-        '$BUILD_DIR/mongo/util/future_util',
         'primary_only_service',
-        'tenant_migration_recipient_utils',
-        'wait_for_majority_service',
+        'tenant_migration_utils',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/client/clientdriver_network',
@@ -1363,10 +1367,10 @@ env.Library(
         'tenant_migration_donor_service.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/client/fetcher',
         'primary_only_service',
-        'repl_server_parameters',
         'tenant_migration_donor',
-        'wait_for_majority_service',
+        'tenant_migration_utils',
     ],
 )
 
@@ -1573,7 +1577,7 @@ env.CppUnitTest(
         'task_executor_mock',
         'task_runner',
         'tenant_migration_recipient_service',
-        'tenant_migration_recipient_utils',
+        'tenant_migration_utils',
         'tenant_oplog_processing',
         'wait_for_majority_service',
     ],

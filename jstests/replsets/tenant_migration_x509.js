@@ -315,6 +315,27 @@ if (!TestData.auth) {
 }
 
 (() => {
+    jsTest.log("Test donor certificate without findInternalClusterTimeKeysRole role");
+    const migrationId = UUID();
+    const tenantId = "donorCertificateNoFindInternalClusterTimeKeysRole";
+    const migrationOpts = {
+        migrationIdString: extractUUIDFromObject(migrationId),
+        tenantId: tenantId,
+        donorCertificateForRecipient: TenantMigrationUtil.getCertificateAndPrivateKey(
+            "jstests/libs/rs0_tenant_migration_no_find_cluster_time_keys_role.pem"),
+        recipientCertificateForDonor: kRecipientCertificateAndPrivateKey,
+    };
+    const {dbName, collName} = makeTestNs(tenantId);
+
+    tenantMigrationTest.insertDonorDB(dbName, collName);
+    const stateRes = assert.commandWorked(tenantMigrationTest.runMigration(migrationOpts));
+    assert.eq(stateRes.state, TenantMigrationTest.State.kAborted);
+    assert.eq(stateRes.abortReason.code, ErrorCodes.Unauthorized);
+    tenantMigrationTest.verifyRecipientDB(
+        tenantId, dbName, collName, false /* migrationCommitted */);
+})();
+
+(() => {
     jsTest.log("Test recipient certificate without backup role");
     const migrationId = UUID();
     const tenantId = "recipientCertificateNoBackupRole";
@@ -336,24 +357,26 @@ if (!TestData.auth) {
 })();
 
 (() => {
-    jsTest.log("Test recipient certificate without advanceClusterTime role");
+    jsTest.log("Test recipient certificate without findInternalClusterTimeKeysRole role");
     const migrationId = UUID();
-    const tenantId = "recipientCertificateNoAdvanceClusterTimeRole";
+    const tenantId = "recipientCertificateNoFindInternalClusterTimeKeysRole";
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(migrationId),
         tenantId: tenantId,
         donorCertificateForRecipient: kDonorCertificateAndPrivateKey,
         recipientCertificateForDonor: TenantMigrationUtil.getCertificateAndPrivateKey(
-            "jstests/libs/rs1_tenant_migration_no_advance_cluster_time_role.pem"),
+            "jstests/libs/rs1_tenant_migration_no_find_cluster_time_keys_role.pem"),
     };
     const {dbName, collName} = makeTestNs(tenantId);
 
     tenantMigrationTest.insertDonorDB(dbName, collName);
     const stateRes = assert.commandWorked(tenantMigrationTest.runMigration(migrationOpts));
-    assert.eq(stateRes.state, TenantMigrationTest.State.kAborted);
-    assert.eq(stateRes.abortReason.code, ErrorCodes.KeyNotFound);
+    // TODO (SERVER-53405): Make tenant migration recipient copy the donor's cluster time signing
+    // keys before starting to clone. Right now the recipient doesn't copy the keys so it doesn't
+    // need the findInternalClusterTimeKeysRole role.
+    assert.eq(stateRes.state, TenantMigrationTest.State.kCommitted);
     tenantMigrationTest.verifyRecipientDB(
-        tenantId, dbName, collName, false /* migrationCommitted */);
+        tenantId, dbName, collName, true /* migrationCommitted */);
 })();
 
 tenantMigrationTest.stop();
