@@ -4,6 +4,7 @@
 (function() {
 'use strict';
 load('jstests/sharding/autosplit_include.js');
+load("jstests/sharding/libs/find_chunks_util.js");
 
 var st = new ShardingTest({shards: 1, other: {chunkSize: 1, enableAutoSplit: true}});
 
@@ -16,7 +17,7 @@ var testDB = st.s.getDB('test');
 
 jsTest.log('Test single batch insert should auto-split');
 
-assert.eq(1, configDB.chunks.find({"ns": "test.insert"}).itcount());
+assert.eq(1, findChunksUtil.findChunksByNs(configDB, "test.insert").itcount());
 
 // This should result in a little over 3MB inserted into the chunk, so with
 // a max chunk size of 1MB we'd expect the autosplitter to split this into
@@ -30,7 +31,7 @@ waitForOngoingChunkSplits(st);
 
 // Inserted batch is a multiple of the chunkSize, expect the chunks to split into
 // more than 2.
-assert.gt(configDB.chunks.find({"ns": "test.insert"}).itcount(), 2);
+assert.gt(findChunksUtil.findChunksByNs(configDB, "test.insert").itcount(), 2);
 testDB.dropDatabase();
 
 jsTest.log('Test single batch update should auto-split');
@@ -38,7 +39,7 @@ jsTest.log('Test single batch update should auto-split');
 assert.commandWorked(configDB.adminCommand({enableSharding: 'test'}));
 assert.commandWorked(configDB.adminCommand({shardCollection: 'test.update', key: {x: 1}}));
 
-assert.eq(1, configDB.chunks.find({"ns": "test.update"}).itcount());
+assert.eq(1, findChunksUtil.findChunksByNs(configDB, "test.update").itcount());
 
 for (var x = 0; x < 2100; x++) {
     assert.commandWorked(testDB.runCommand({
@@ -51,7 +52,7 @@ for (var x = 0; x < 2100; x++) {
 
 waitForOngoingChunkSplits(st);
 
-assert.gt(configDB.chunks.find({"ns": "test.update"}).itcount(), 1);
+assert.gt(findChunksUtil.findChunksByNs(configDB, "test.update").itcount(), 1);
 testDB.dropDatabase();
 
 jsTest.log('Test single delete should not auto-split');
@@ -59,7 +60,7 @@ jsTest.log('Test single delete should not auto-split');
 assert.commandWorked(configDB.adminCommand({enableSharding: 'test'}));
 assert.commandWorked(configDB.adminCommand({shardCollection: 'test.delete', key: {x: 1}}));
 
-assert.eq(1, configDB.chunks.find({"ns": "test.delete"}).itcount());
+assert.eq(1, findChunksUtil.findChunksByNs(configDB, "test.delete").itcount());
 
 for (var x = 0; x < 1100; x++) {
     assert.commandWorked(testDB.runCommand({
@@ -75,7 +76,7 @@ for (var x = 0; x < 1100; x++) {
 // done when really it was just in progress.
 waitForOngoingChunkSplits(st);
 
-assert.eq(1, configDB.chunks.find({"ns": "test.delete"}).itcount());
+assert.eq(1, findChunksUtil.findChunksByNs(configDB, "test.delete").itcount());
 testDB.dropDatabase();
 
 jsTest.log('Test batched insert should auto-split');
@@ -83,7 +84,7 @@ jsTest.log('Test batched insert should auto-split');
 assert.commandWorked(configDB.adminCommand({enableSharding: 'test'}));
 assert.commandWorked(configDB.adminCommand({shardCollection: 'test.insert', key: {x: 1}}));
 
-assert.eq(1, configDB.chunks.find({"ns": "test.insert"}).itcount());
+assert.eq(1, findChunksUtil.findChunksByNs(configDB, "test.insert").itcount());
 
 // Note: Estimated 'chunk size' tracked by mongos is initialized with a random value so
 // we are going to be conservative.
@@ -100,7 +101,7 @@ for (var x = 0; x < 2100; x += 400) {
 
 waitForOngoingChunkSplits(st);
 
-assert.gt(configDB.chunks.find({"ns": "test.insert"}).itcount(), 1);
+assert.gt(findChunksUtil.findChunksByNs(configDB, "test.insert").itcount(), 1);
 testDB.dropDatabase();
 
 jsTest.log('Test batched update should auto-split');
@@ -108,7 +109,7 @@ jsTest.log('Test batched update should auto-split');
 assert.commandWorked(configDB.adminCommand({enableSharding: 'test'}));
 assert.commandWorked(configDB.adminCommand({shardCollection: 'test.update', key: {x: 1}}));
 
-assert.eq(1, configDB.chunks.find({"ns": "test.update"}).itcount());
+assert.eq(1, findChunksUtil.findChunksByNs(configDB, "test.update").itcount());
 
 for (var x = 0; x < 2100; x += 400) {
     var docs = [];
@@ -124,7 +125,7 @@ for (var x = 0; x < 2100; x += 400) {
 
 waitForOngoingChunkSplits(st);
 
-assert.gt(configDB.chunks.find({"ns": "test.update"}).itcount(), 1);
+assert.gt(findChunksUtil.findChunksByNs(configDB, "test.update").itcount(), 1);
 testDB.dropDatabase();
 
 jsTest.log('Test batched delete should not auto-split');
@@ -132,7 +133,7 @@ jsTest.log('Test batched delete should not auto-split');
 assert.commandWorked(configDB.adminCommand({enableSharding: 'test'}));
 assert.commandWorked(configDB.adminCommand({shardCollection: 'test.delete', key: {x: 1}}));
 
-assert.eq(1, configDB.chunks.find({"ns": "test.delete"}).itcount());
+assert.eq(1, findChunksUtil.findChunksByNs(configDB, "test.delete").itcount());
 
 for (var x = 0; x < 2100; x += 400) {
     var docs = [];
@@ -155,7 +156,7 @@ for (var x = 0; x < 2100; x += 400) {
 // done when really it was just in progress.
 waitForOngoingChunkSplits(st);
 
-assert.eq(1, configDB.chunks.find({"ns": "test.delete"}).itcount());
+assert.eq(1, findChunksUtil.findChunksByNs(configDB, "test.delete").itcount());
 
 st.stop();
 })();

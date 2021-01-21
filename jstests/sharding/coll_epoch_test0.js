@@ -1,4 +1,6 @@
-// Tests whether a split and a migrate in a sharded cluster preserve the epoch
+// Tests whether a split and a migrate in a sharded cluster preserve the epoch\
+
+load("jstests/sharding/libs/find_chunks_util.js");
 
 var st = new ShardingTest({shards: 2, mongos: 1});
 // Balancer is by default stopped, thus it will not interfere
@@ -21,7 +23,7 @@ config.shards.find().forEach(function(doc) {
 
 var createdEpoch = null;
 var checkEpochs = function() {
-    config.chunks.find({ns: coll + ""}).forEach(function(chunk) {
+    findChunksUtil.findChunksByNs(config, coll + "").forEach(function(chunk) {
         // Make sure the epochs exist, are non-zero, and are consistent
         assert(chunk.lastmodEpoch);
         print(chunk.lastmodEpoch + "");

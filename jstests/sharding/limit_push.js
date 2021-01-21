@@ -2,6 +2,8 @@
 // See: http://jira.mongodb.org/browse/SERVER-1896
 (function() {
 
+load("jstests/sharding/libs/find_chunks_util.js");
+
 var s = new ShardingTest({name: "limit_push", shards: 2, mongos: 1});
 var db = s.getDB("test");
 
@@ -27,7 +29,8 @@ s.adminCommand({
 });
 
 // Check that the chunck have split correctly
-assert.eq(2, s.config.chunks.count({"ns": "test.limit_push"}), "wrong number of chunks");
+assert.eq(
+    2, findChunksUtil.countChunksForNs(s.config, "test.limit_push"), "wrong number of chunks");
 
 // The query is asking for the maximum value below a given value
 // db.limit_push.find( { x : { $lt : 60} } ).sort( { x:-1} ).limit(1)

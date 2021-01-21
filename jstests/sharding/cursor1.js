@@ -2,6 +2,8 @@
 // checks that cursors survive a chunk's move
 (function() {
 
+load("jstests/sharding/libs/find_chunks_util.js");
+
 var s = new ShardingTest({name: "sharding_cursor1", shards: 2});
 
 s.config.settings.find().forEach(printjson);
@@ -22,7 +24,7 @@ for (i = 0; i < numObjs; i++) {
 }
 assert.commandWorked(bulk.execute());
 assert.eq(1,
-          s.config.chunks.count({"ns": "test.foo"}),
+          findChunksUtil.countChunksForNs(s.config, "test.foo"),
           "test requires collection to have one chunk initially");
 
 // Cursor timeout only occurs outside of sessions. Otherwise we rely on the session timeout
@@ -42,7 +44,7 @@ assert.eq(7, cursor3.objsLeftInBatch());
 
 s.adminCommand({split: "test.foo", middle: {_id: 5}});
 s.adminCommand({movechunk: "test.foo", find: {_id: 5}, to: secondary.getMongo().name});
-assert.eq(2, s.config.chunks.count({"ns": "test.foo"}));
+assert.eq(2, findChunksUtil.countChunksForNs(s.config, "test.foo"));
 
 // the cursors should not have been affected
 assert.eq(numObjs, cursor1.itcount(), "c1");

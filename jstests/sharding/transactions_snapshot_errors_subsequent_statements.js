@@ -10,6 +10,7 @@
 "use strict";
 
 load("jstests/sharding/libs/sharded_transactions_helpers.js");
+load("jstests/sharding/libs/find_chunks_util.js");
 
 const dbName = "test";
 const collName = "foo";
@@ -97,8 +98,10 @@ assert.commandWorked(
 
 jsTestLog("One shard transaction");
 
-assert.eq(2, st.s.getDB('config').chunks.count({ns: ns, shard: st.shard0.shardName}));
-assert.eq(0, st.s.getDB('config').chunks.count({ns: ns, shard: st.shard1.shardName}));
+assert.eq(2,
+          findChunksUtil.countChunksForNs(st.s.getDB('config'), ns, {shard: st.shard0.shardName}));
+assert.eq(0,
+          findChunksUtil.countChunksForNs(st.s.getDB('config'), ns, {shard: st.shard1.shardName}));
 
 for (let errorCode of kSnapshotErrors) {
     runTest(st, collName, errorCode, true /* isSharded */);
@@ -107,8 +110,10 @@ for (let errorCode of kSnapshotErrors) {
 jsTestLog("Two shard transaction");
 
 assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 15}, to: st.shard1.shardName}));
-assert.eq(1, st.s.getDB('config').chunks.count({ns: ns, shard: st.shard0.shardName}));
-assert.eq(1, st.s.getDB('config').chunks.count({ns: ns, shard: st.shard1.shardName}));
+assert.eq(1,
+          findChunksUtil.countChunksForNs(st.s.getDB('config'), ns, {shard: st.shard0.shardName}));
+assert.eq(1,
+          findChunksUtil.countChunksForNs(st.s.getDB('config'), ns, {shard: st.shard1.shardName}));
 
 // Multi shard case simulates adding a new participant that can no longer support the already
 // chosen read timestamp.

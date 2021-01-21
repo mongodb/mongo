@@ -2,6 +2,8 @@
 (function() {
 'use strict';
 
+load("jstests/sharding/libs/find_chunks_util.js");
+
 var getListCollectionsCursor = function(database, options, subsequentBatchSize) {
     return new DBCommandCursor(
         database, database.runCommand("listCollections", options), subsequentBatchSize);
@@ -207,7 +209,9 @@ var queryConfigChunks = function(st) {
         st.s.adminCommand({movechunk: testColl.getFullName(), find: {e: 12}, to: shard2}));
 
     // Find query.
-    cursor = configDB.chunks.find({ns: testColl.getFullName()}, {_id: 0, min: 1, max: 1, shard: 1})
+    cursor = findChunksUtil
+                 .findChunksByNs(
+                     configDB, testColl.getFullName(), null, {_id: 0, min: 1, max: 1, shard: 1})
                  .sort({"min.e": 1});
     assert.eq(cursor.next(), {min: {e: {"$minKey": 1}}, "max": {"e": 2}, shard: shard2});
     assert.eq(cursor.next(), {min: {e: 2}, max: {e: 6}, shard: shard1});
@@ -217,21 +221,31 @@ var queryConfigChunks = function(st) {
     assert(!cursor.hasNext());
 
     // Count query with filter.
-    assert.eq(configDB.chunks.count({ns: testColl.getFullName()}), 5);
+    assert.eq(findChunksUtil.countChunksForNs(configDB, testColl.getFullName()), 5);
 
     // Distinct query.
     assert.eq(configDB.chunks.distinct("shard").sort(), [shard1, shard2]);
 
     // Map reduce query.
+    const coll = configDB.collections.findOne({_id: testColl.getFullName()});
     var mapFunction = function() {
-        if (this.ns == "test2.testColl") {
-            emit(this.shard, 1);
+        if (xx.timestamp) {
+            if (this.uuid.toString() == xx.uuid.toString()) {
+                emit(this.shard, 1);
+            }
+        } else {
+            if (this.ns == "test2.testColl") {
+                emit(this.shard, 1);
+            }
         }
     };
     var reduceFunction = function(key, values) {
         return {chunks: values.length};
     };
-    result = configDB.chunks.mapReduce(mapFunction, reduceFunction, {out: {inline: 1}});
+    result = configDB.chunks.mapReduce(
+        mapFunction,
+        reduceFunction,
+        {out: {inline: 1}, scope: {xx: {timestamp: coll.timestamp, uuid: coll.uuid}}});
     assert.eq(result.ok, 1);
     assert.eq(sortArrayById(result.results),
               [{_id: shard1, value: {chunks: 2}}, {_id: shard2, value: {chunks: 3}}]);

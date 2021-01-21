@@ -13,6 +13,8 @@
 (function() {
 'use strict';
 
+load("jstests/sharding/libs/find_chunks_util.js");
+
 /**
  * Simple representation for wall clock time. Hour and minutes should be integers.
  */
@@ -52,7 +54,8 @@ for (var x = 0; x < 150; x += 10) {
     configDB.adminCommand({split: 'test.user', middle: {_id: x}});
 }
 
-var shard0Chunks = configDB.chunks.find({ns: 'test.user', shard: st.shard0.shardName}).count();
+var shard0Chunks =
+    findChunksUtil.findChunksByNs(configDB, 'test.user', {shard: st.shard0.shardName}).count();
 
 var startDate = new Date();
 var hourMinStart = new HourAndMinute(startDate.getHours(), startDate.getMinutes());
@@ -71,7 +74,8 @@ st.startBalancer();
 
 st.waitForBalancer(true, 60000);
 
-var shard0ChunksAfter = configDB.chunks.find({ns: 'test.user', shard: st.shard0.shardName}).count();
+var shard0ChunksAfter =
+    findChunksUtil.findChunksByNs(configDB, 'test.user', {shard: st.shard0.shardName}).count();
 assert.eq(shard0Chunks, shard0ChunksAfter);
 
 assert.commandWorked(configDB.settings.update(
@@ -85,7 +89,8 @@ assert.commandWorked(configDB.settings.update(
 
 st.waitForBalancer(true, 60000);
 
-shard0ChunksAfter = configDB.chunks.find({ns: 'test.user', shard: st.shard0.shardName}).count();
+shard0ChunksAfter =
+    findChunksUtil.findChunksByNs(configDB, 'test.user', {shard: st.shard0.shardName}).count();
 assert.neq(shard0Chunks, shard0ChunksAfter);
 
 st.stop();

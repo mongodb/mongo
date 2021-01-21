@@ -560,7 +560,16 @@ var ShardingTest = function(params) {
             x[z._id] = 0;
         });
 
-        this.config.chunks.find({ns: dbName + "." + collName}).forEach(function(z) {
+        var coll = this.config.collections.findOne({_id: dbName + "." + collName});
+        var chunksQuery = (function() {
+            if (coll.timestamp != null) {
+                return {uuid: coll.uuid};
+            } else {
+                return {ns: dbName + "." + collName};
+            }
+        }());
+
+        this.config.chunks.find(chunksQuery).forEach(function(z) {
             if (x[z.shard])
                 x[z.shard]++;
             else

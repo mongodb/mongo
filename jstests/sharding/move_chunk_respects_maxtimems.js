@@ -9,6 +9,7 @@
 
 load("jstests/libs/fail_point_util.js");
 load('jstests/libs/parallel_shell_helpers.js');
+load("jstests/sharding/libs/find_chunks_util.js");
 
 var st = new ShardingTest({shards: 2});
 
@@ -45,9 +46,9 @@ jsTestLog("Waiting for moveChunk to succeed in the background");
 // interrupted.
 assert.soon(() => {
     var numChunksOnShard0 =
-        st.config.chunks.find({"ns": ns, "shard": st.shard0.shardName}).itcount();
+        findChunksUtil.findChunksByNs(st.config, ns, {shard: st.shard0.shardName}).itcount();
     var numChunksOnShard1 =
-        st.config.chunks.find({"ns": ns, "shard": st.shard1.shardName}).itcount();
+        findChunksUtil.findChunksByNs(st.config, ns, {shard: st.shard1.shardName}).itcount();
     return numChunksOnShard0 == 0 && numChunksOnShard1 == 1;
 });
 

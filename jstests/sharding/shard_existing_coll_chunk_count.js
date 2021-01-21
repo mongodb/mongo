@@ -7,6 +7,7 @@
 (function() {
 'use strict';
 load('jstests/sharding/autosplit_include.js');
+load("jstests/sharding/libs/find_chunks_util.js");
 
 var s = new ShardingTest({
     name: "shard_existing_coll_chunk_count",
@@ -21,7 +22,7 @@ var collNum = 0;
 var overhead = Object.bsonsize({_id: ObjectId(), i: 1, pad: ""});
 
 var getNumberChunks = function(ns) {
-    return s.getDB("config").getCollection("chunks").count({ns});
+    return findChunksUtil.countChunksForNs(s.getDB("config"), ns);
 };
 
 var runCase = function(opts) {

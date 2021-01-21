@@ -17,6 +17,7 @@ TestData.skipCheckOrphans = true;
 "use strict";
 
 load("jstests/sharding/libs/chunk_bounds_util.js");
+load("jstests/sharding/libs/find_chunks_util.js");
 
 /*
  * Asserts that find and count command filter out unowned documents.
@@ -35,7 +36,7 @@ function assertOrphanedDocsFiltered(coll, ownedDocs, unownedDocs, countFilters) 
 
 function runTest(st, coll, ownedDocs, unownedDocs, isHashed) {
     let ns = coll.getFullName();
-    let chunkDocs = st.s.getDB('config').chunks.find({ns: ns}).toArray();
+    let chunkDocs = findChunksUtil.findChunksByNs(st.s.getDB('config'), ns).toArray();
     let shardChunkBounds = chunkBoundsUtil.findShardChunkBounds(chunkDocs);
 
     // Do regular inserts.

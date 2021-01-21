@@ -1,6 +1,8 @@
 (function() {
 'use strict';
 
+load("jstests/sharding/libs/find_chunks_util.js");
+
 var s = new ShardingTest({shards: 2});
 
 // Make sure that findAndModify with upsert against a non-existent database and collection will
@@ -46,11 +48,15 @@ for (var i = 2; i < numObjs; i += 2) {
 }
 
 s.printChunks();
-assert.eq(numObjs / 2, s.config.chunks.count({"ns": "test.sharded_coll"}), 'Split was incorrect');
-assert.eq(numObjs / 4,
-          s.config.chunks.count({shard: s.shard0.shardName, "ns": "test.sharded_coll"}));
-assert.eq(numObjs / 4,
-          s.config.chunks.count({shard: s.shard1.shardName, "ns": "test.sharded_coll"}));
+assert.eq(numObjs / 2,
+          findChunksUtil.countChunksForNs(s.config, "test.sharded_coll"),
+          'Split was incorrect');
+assert.eq(
+    numObjs / 4,
+    findChunksUtil.countChunksForNs(s.config, "test.sharded_coll", {shard: s.shard0.shardName}));
+assert.eq(
+    numObjs / 4,
+    findChunksUtil.countChunksForNs(s.config, "test.sharded_coll", {shard: s.shard1.shardName}));
 
 // update
 for (var i = 0; i < numObjs; i++) {

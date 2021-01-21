@@ -6,6 +6,8 @@
 (function() {
 "use strict";
 
+load("jstests/sharding/libs/find_chunks_util.js");
+
 var st = new ShardingTest({name: 'migrateBig_balancer', shards: 2, other: {enableBalancer: true}});
 var mongos = st.s;
 var admin = mongos.getDB("admin");
@@ -37,13 +39,21 @@ assert.eq(40, coll.count(), "prep1");
 assert.commandWorked(admin.runCommand({shardcollection: "" + coll, key: {_id: 1}}));
 st.printShardingStatus();
 
-assert.lt(5, mongos.getDB("config").chunks.find({ns: "test.stuff"}).count(), "not enough chunks");
+assert.lt(5,
+          findChunksUtil.findChunksByNs(mongos.getDB("config"), "test.stuff").count(),
+          "not enough chunks");
 
 assert.soon(() => {
+    const aggMatch = (function() {
+        const collMetadata = mongos.getDB("config").collections.findOne({_id: "test.stuff"});
+        if (collMetadata.timestamp) {
+            return {$match: {uuid: collMetadata.uuid}};
+        } else {
+            return {$match: {ns: "test.stuff"}};
+        }
+    }());
     let res = mongos.getDB("config")
-                  .chunks
-                  .aggregate(
-                      [{$match: {ns: "test.stuff"}}, {$group: {_id: "$shard", nChunks: {$sum: 1}}}])
+                  .chunks.aggregate([aggMatch, {$group: {_id: "$shard", nChunks: {$sum: 1}}}])
                   .toArray();
     printjson(res);
     return res.length > 1 && Math.abs(res[0].nChunks - res[1].nChunks) <= 3;

@@ -7,6 +7,7 @@
 //
 
 load("jstests/libs/uuid_util.js");
+load("jstests/sharding/libs/find_chunks_util.js");
 
 (function() {
 'use strict';
@@ -119,7 +120,7 @@ let assertSuccessfulReshardCollection = (commandObj, presetReshardedChunks) => {
         commandObj._presetReshardedChunks = presetReshardedChunks;
     } else {
         assert.eq(commandObj._presetReshardedChunks, null);
-        const configChunksArray = mongosConfig.chunks.find({'ns': ns});
+        const configChunksArray = findChunksUtil.findChunksByNs(mongosConfig, ns);
         presetReshardedChunks = [];
         configChunksArray.forEach(chunk => {
             presetReshardedChunks.push(

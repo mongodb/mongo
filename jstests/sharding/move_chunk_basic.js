@@ -5,6 +5,8 @@
 (function() {
 'use strict';
 
+load("jstests/sharding/libs/find_chunks_util.js");
+
 var st = new ShardingTest({mongos: 1, shards: 2});
 var kDbName = 'db';
 
@@ -29,7 +31,7 @@ function testHashed() {
     var ns = kDbName + '.fooHashed';
     assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {_id: 'hashed'}}));
 
-    var aChunk = mongos.getDB('config').chunks.findOne({ns: ns, shard: shard0});
+    var aChunk = findChunksUtil.findOneChunkByNs(mongos.getDB('config'), ns, {shard: shard0});
     assert(aChunk);
 
     // Error if either of the bounds is not a valid shard key (BSON object - 1 yields a NaN)
@@ -57,7 +59,7 @@ function testNotHashed(keyDoc) {
     // Fail if find is not a valid shard key.
     assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: keyDoc}));
 
-    var chunkId = mongos.getDB('config').chunks.findOne({ns: ns, shard: shard0})._id;
+    var chunkId = findChunksUtil.findOneChunkByNs(mongos.getDB('config'), ns, {shard: shard0})._id;
 
     assert.commandFailed(mongos.adminCommand({moveChunk: ns, find: {xxx: 1}, to: shard1}));
     assert.eq(shard0, mongos.getDB('config').chunks.findOne({_id: chunkId}).shard);

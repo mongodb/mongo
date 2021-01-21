@@ -10,10 +10,13 @@
 (function() {
 "use strict";
 
+load("jstests/sharding/libs/find_chunks_util.js");
+
 function expectChunks(st, ns, chunks) {
     for (let i = 0; i < chunks.length; i++) {
         assert.eq(chunks[i],
-                  st.s.getDB("config").chunks.count({ns: ns, shard: st["shard" + i].shardName}),
+                  findChunksUtil.countChunksForNs(
+                      st.s.getDB("config"), ns, {shard: st["shard" + i].shardName}),
                   "unexpected number of chunks on shard " + i);
     }
 }

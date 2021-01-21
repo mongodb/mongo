@@ -1,5 +1,7 @@
 (function() {
 
+load("jstests/sharding/libs/find_chunks_util.js");
+
 var s = new ShardingTest({name: "keystring", shards: 2});
 
 s.adminCommand({enablesharding: "test"});
@@ -9,7 +11,7 @@ s.adminCommand({shardcollection: "test.foo", key: {name: 1}});
 primary = s.getPrimaryShard("test").getDB("test");
 seconday = s.getOther(primary).getDB("test");
 
-assert.eq(1, s.config.chunks.count({"ns": "test.foo"}), "sanity check A");
+assert.eq(1, findChunksUtil.countChunksForNs(s.config, "test.foo"), "sanity check A");
 
 var db = s.getDB("test");
 

@@ -1,4 +1,5 @@
 load("jstests/sharding/libs/chunk_bounds_util.js");
+load("jstests/sharding/libs/find_chunks_util.js");
 
 /**
  * Asserts that the given shards have the given chunks.
@@ -12,7 +13,8 @@ function assertChunksOnShards(configDB, ns, shardChunkBounds) {
         for (let bounds of chunkBounds) {
             assert.eq(
                 shardName,
-                configDB.chunks.findOne({ns: ns, min: bounds[0], max: bounds[1]}).shard,
+                findChunksUtil.findOneChunkByNs(configDB, ns, {min: bounds[0], max: bounds[1]})
+                    .shard,
                 "expected to find chunk " + tojson(bounds) + " on shard \"" + shardName + "\"");
         }
     }

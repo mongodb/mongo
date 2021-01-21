@@ -2,6 +2,8 @@
 (function() {
 'use strict';
 
+load("jstests/sharding/libs/find_chunks_util.js");
+
 var coll = 'points';
 
 function test(st, db, sharded, indexType) {
@@ -24,7 +26,7 @@ function test(st, db, sharded, indexType) {
         }
 
         var config = db.getSiblingDB("config");
-        assert.eq(config.chunks.count({'ns': db[coll].getFullName()}), 10);
+        assert.eq(findChunksUtil.countChunksForNs(config, db[coll].getFullName()), 10);
     }
 
     Random.setRandomSeed();

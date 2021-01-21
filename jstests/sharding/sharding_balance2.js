@@ -4,6 +4,8 @@
 (function() {
 'use strict';
 
+load("jstests/sharding/libs/find_chunks_util.js");
+
 var MaxSizeMB = 1;
 
 var s = new ShardingTest({
@@ -38,7 +40,7 @@ while (inserted < (40 * 1024 * 1024)) {
 assert.commandWorked(bulk.execute());
 
 assert.commandWorked(s.s0.adminCommand({shardcollection: "test.foo", key: {_id: 1}}));
-assert.gt(s.config.chunks.count({"ns": "test.foo"}), 10);
+assert.gt(findChunksUtil.countChunksForNs(s.config, "test.foo"), 10);
 
 var getShardSize = function(conn) {
     var listDatabases = conn.getDB('admin').runCommand({listDatabases: 1});

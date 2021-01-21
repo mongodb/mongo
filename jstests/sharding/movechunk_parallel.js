@@ -2,6 +2,7 @@
 // long as they do not touch the same shards
 
 load('./jstests/libs/chunk_manipulation_util.js');
+load("jstests/sharding/libs/find_chunks_util.js");
 
 (function() {
 'use strict';
@@ -31,14 +32,16 @@ assert.commandWorked(st.splitAt('TestDB.TestColl', {Key: 30}));
 assert.commandWorked(st.moveChunk('TestDB.TestColl', {Key: 20}, st.shard1.shardName));
 assert.commandWorked(st.moveChunk('TestDB.TestColl', {Key: 30}, st.shard1.shardName));
 
-assert.eq(2,
-          st.s0.getDB('config')
-              .chunks.find({ns: 'TestDB.TestColl', shard: st.shard0.shardName})
-              .itcount());
-assert.eq(2,
-          st.s0.getDB('config')
-              .chunks.find({ns: 'TestDB.TestColl', shard: st.shard1.shardName})
-              .itcount());
+assert.eq(
+    2,
+    findChunksUtil
+        .findChunksByNs(st.s0.getDB('config'), 'TestDB.TestColl', {shard: st.shard0.shardName})
+        .itcount());
+assert.eq(
+    2,
+    findChunksUtil
+        .findChunksByNs(st.s0.getDB('config'), 'TestDB.TestColl', {shard: st.shard1.shardName})
+        .itcount());
 
 // Pause migrations at shards 2 and 3
 pauseMigrateAtStep(st.shard2, migrateStepNames.deletedPriorDataInRange);
@@ -59,22 +62,26 @@ unpauseMigrateAtStep(st.shard3, migrateStepNames.deletedPriorDataInRange);
 joinMoveChunk1();
 joinMoveChunk2();
 
-assert.eq(1,
-          st.s0.getDB('config')
-              .chunks.find({ns: 'TestDB.TestColl', shard: st.shard0.shardName})
-              .itcount());
-assert.eq(1,
-          st.s0.getDB('config')
-              .chunks.find({ns: 'TestDB.TestColl', shard: st.shard1.shardName})
-              .itcount());
-assert.eq(1,
-          st.s0.getDB('config')
-              .chunks.find({ns: 'TestDB.TestColl', shard: st.shard2.shardName})
-              .itcount());
-assert.eq(1,
-          st.s0.getDB('config')
-              .chunks.find({ns: 'TestDB.TestColl', shard: st.shard3.shardName})
-              .itcount());
+assert.eq(
+    1,
+    findChunksUtil
+        .findChunksByNs(st.s0.getDB('config'), 'TestDB.TestColl', {shard: st.shard0.shardName})
+        .itcount());
+assert.eq(
+    1,
+    findChunksUtil
+        .findChunksByNs(st.s0.getDB('config'), 'TestDB.TestColl', {shard: st.shard1.shardName})
+        .itcount());
+assert.eq(
+    1,
+    findChunksUtil
+        .findChunksByNs(st.s0.getDB('config'), 'TestDB.TestColl', {shard: st.shard2.shardName})
+        .itcount());
+assert.eq(
+    1,
+    findChunksUtil
+        .findChunksByNs(st.s0.getDB('config'), 'TestDB.TestColl', {shard: st.shard3.shardName})
+        .itcount());
 
 st.stop();
 MongoRunner.stopMongod(staticMongod);

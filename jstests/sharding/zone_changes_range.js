@@ -5,6 +5,7 @@
 'use strict';
 
 load("jstests/sharding/libs/zone_changes_util.js");
+load("jstests/sharding/libs/find_chunks_util.js");
 
 let st = new ShardingTest({shards: 3});
 let primaryShard = st.shard0;
@@ -27,7 +28,7 @@ assert.commandWorked(st.s.adminCommand({split: ns, middle: {x: 20}}));
 
 jsTest.log("Insert docs (one for each chunk) and check that they end up on the primary shard.");
 let docs = [{x: -15}, {x: -5}, {x: 5}, {x: 15}, {x: 25}];
-assert.eq(docs.length, configDB.chunks.count({ns: ns}));
+assert.eq(docs.length, findChunksUtil.countChunksForNs(configDB, ns));
 assert.commandWorked(coll.insert(docs));
 assert.eq(docs.length, primaryShard.getCollection(ns).count());
 

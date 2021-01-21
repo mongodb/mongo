@@ -9,6 +9,8 @@
 (function() {
 'use strict';
 
+load("jstests/sharding/libs/find_chunks_util.js");
+
 // Shard key index does not exactly match shard key, so it is not compatible with $min/$max.
 TestData.skipCheckOrphans = true;
 
@@ -111,7 +113,7 @@ assert.commandWorked(admin.runCommand({
 }));
 
 var expectedShardCount = {};
-config.chunks.find({ns: 'test.user'}).forEach(function(chunkDoc) {
+findChunksUtil.findChunksByNs(config, 'test.user').forEach(function(chunkDoc) {
     var min = chunkDoc.min.num;
     var max = chunkDoc.max.num;
 
@@ -175,7 +177,7 @@ for (i = 0; i < 3; i++) {
     // split on that key, and check it makes 2 chunks
     var splitRes = admin.runCommand({split: coll2 + "", middle: {skey: 0}});
     assert.eq(splitRes.ok, 1, "split didn't work");
-    assert.eq(config.chunks.find({ns: coll2.getFullName()}).count(), 2);
+    assert.eq(findChunksUtil.findChunksByNs(config, coll2.getFullName()).count(), 2);
 
     // movechunk should move ALL docs since they have same value for skey
     moveRes = admin.runCommand(

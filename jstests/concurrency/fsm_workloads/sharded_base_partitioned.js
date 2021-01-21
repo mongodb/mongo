@@ -22,6 +22,7 @@
  */
 
 load('jstests/concurrency/fsm_workload_helpers/chunks.js');  // for chunk helpers
+load("jstests/sharding/libs/find_chunks_util.js");
 
 var $config = (function() {
     var data = {
@@ -80,10 +81,12 @@ var $config = (function() {
             minField += shardKeyField;
         }
 
+        const chunksJoinClause =
+            findChunksUtil.getChunksJoinClause(conn.getDB('config'), this.partition.ns);
         if (this.partition.isLowChunk && this.partition.isHighChunk) {
             return coll
                 .aggregate([
-                    {$match: {ns: this.partition.ns}},
+                    {$match: chunksJoinClause},
                     {$sample: {size: 1}},
                 ])
                 .toArray()[0];
@@ -91,8 +94,8 @@ var $config = (function() {
             return coll
                 .aggregate([
                     {
-                        $match:
-                            {ns: this.partition.ns, [maxField]: {$lte: this.partition.chunkUpper}}
+                        $match: Object.assign({[maxField]: {$lte: this.partition.chunkUpper}},
+                                              chunksJoinClause)
                     },
                     {$sample: {size: 1}}
                 ])
@@ -101,8 +104,8 @@ var $config = (function() {
             return coll
                 .aggregate([
                     {
-                        $match:
-                            {ns: this.partition.ns, [minField]: {$gte: this.partition.chunkLower}}
+                        $match: Object.assign({[minField]: {$gte: this.partition.chunkLower}},
+                                              chunksJoinClause)
                     },
                     {$sample: {size: 1}}
                 ])
@@ -111,11 +114,11 @@ var $config = (function() {
             return coll
                 .aggregate([
                     {
-                        $match: {
-                            ns: this.partition.ns,
+                        $match: Object.assign({
                             [minField]: {$gte: this.partition.chunkLower},
                             [maxField]: {$lte: this.partition.chunkUpper}
-                        }
+                        },
+                                              chunksJoinClause)
                     },
                     {$sample: {size: 1}}
                 ])
@@ -168,7 +171,7 @@ var $config = (function() {
 
         // Sharding must be enabled on db[collName].
         msg = 'collection ' + collName + ' must be sharded.';
-        assertAlways.gte(configDB.chunks.find({ns: ns}).itcount(), 1, msg);
+        assertAlways.gte(findChunksUtil.findChunksByNs(configDB, ns).itcount(), 1, msg);
 
         for (var tid = 0; tid < this.threadCount; ++tid) {
             // Define this thread's partition.

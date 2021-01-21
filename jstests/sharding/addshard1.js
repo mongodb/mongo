@@ -1,6 +1,8 @@
 (function() {
 'use strict';
 
+load("jstests/sharding/libs/find_chunks_util.js");
+
 var s = new ShardingTest({name: "add_shard1", shards: 1, useHostname: false});
 
 // Create a shard and add a database; if the database is not duplicated the mongod should accept
@@ -67,7 +69,7 @@ s.adminCommand({enablesharding: "testDB"});
 s.adminCommand({shardcollection: "testDB.foo", key: {a: 1}});
 s.adminCommand({split: "testDB.foo", middle: {a: Math.floor(numObjs / 2)}});
 assert.eq(2,
-          s.config.chunks.count({"ns": "testDB.foo"}),
+          findChunksUtil.countChunksForNs(s.config, "testDB.foo"),
           "wrong chunk number after splitting collection that existed before");
 assert.eq(numObjs, sdb1.foo.count(), "wrong count after splitting collection that existed before");
 

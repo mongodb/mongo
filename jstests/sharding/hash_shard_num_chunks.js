@@ -2,6 +2,8 @@
 (function() {
 'use strict';
 
+load("jstests/sharding/libs/find_chunks_util.js");
+
 var s = new ShardingTest({shards: 3});
 
 var dbname = "test";
@@ -16,7 +18,7 @@ assert.commandWorked(db.adminCommand(
 
 s.printShardingStatus();
 
-var numChunks = s.config.chunks.count({"ns": "test.foo"});
+var numChunks = findChunksUtil.countChunksForNs(s.config, "test.foo");
 assert.eq(numChunks, 500, "should be exactly 500 chunks");
 
 s.config.shards.find().forEach(

@@ -9,6 +9,8 @@
 (function() {
 'use strict';
 
+load("jstests/sharding/libs/find_chunks_util.js");
+
 let st = new ShardingTest({
     shards: 2,
     mongos: 1,
@@ -51,8 +53,9 @@ function migrateJumboChunk(failpointOn) {
         forceJumbo: true,
         waitForDelete: true
     }));
-    assert.eq(st.s.getDB("config").chunks.find({ns: kDbName + ".foo"}).toArray()[0].shard,
-              st.shard1.shardName);
+    assert.eq(
+        findChunksUtil.findChunksByNs(st.s.getDB("config"), kDbName + ".foo").toArray()[0].shard,
+        st.shard1.shardName);
     assert.eq(st.shard1.getDB(kDbName).foo.find().itcount(), 2000);
     assert.eq(st.shard0.getDB(kDbName).foo.find().itcount(), 0);
     assert.eq(
@@ -91,8 +94,8 @@ function migrateJumboChunk(failpointOn) {
     }, 'Balancer failed to run for 3 rounds', 1000 * 60 * 10);
     st.stopBalancer();
 
-    let jumboChunk = st.getDB('config').chunks.findOne(
-        {ns: 'test.foo', min: {$lte: {x: 0}}, max: {$gt: {x: 0}}});
+    let jumboChunk = findChunksUtil.findOneChunkByNs(
+        st.getDB('config'), 'test.foo', {min: {$lte: {x: 0}}, max: {$gt: {x: 0}}});
 
     if (!failpointOn) {
         assert.lte(diff(), 5);
@@ -154,8 +157,8 @@ assert.soon(function() {
     return ("completed" == res.state);
 }, "failed to remove shard");
 
-let jumboChunk =
-    st.getDB('config').chunks.findOne({ns: 'test.foo', min: {$lte: {x: 0}}, max: {$gt: {x: 0}}});
+let jumboChunk = findChunksUtil.findOneChunkByNs(
+    st.getDB('config'), 'test.foo', {min: {$lte: {x: 0}}, max: {$gt: {x: 0}}});
 assert.eq(
     st.shard0.shardName, jumboChunk.shard, 'jumbo chunk ' + tojson(jumboChunk) + ' was not moved');
 

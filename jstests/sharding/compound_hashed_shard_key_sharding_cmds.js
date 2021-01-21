@@ -8,6 +8,8 @@
 (function() {
 'use strict';
 
+load("jstests/sharding/libs/find_chunks_util.js");
+
 const st = new ShardingTest({shards: 2, other: {chunkSize: 1}});
 const configDB = st.s0.getDB('config');
 assert.commandWorked(configDB.adminCommand({enableSharding: 'test'}));
@@ -17,9 +19,10 @@ st.ensurePrimaryShard('test', shard0);
 const testDBOnPrimary = st.rs0.getPrimary().getDB('test');
 
 function verifyChunkSplitIntoTwo(namespace, chunk) {
-    assert.eq(0, configDB.chunks.count({ns: namespace, min: chunk.min, max: chunk.max}));
-    assert.eq(1, configDB.chunks.count({ns: namespace, min: chunk.min}));
-    assert.eq(1, configDB.chunks.count({ns: namespace, max: chunk.max}));
+    assert.eq(
+        0, findChunksUtil.countChunksForNs(configDB, namespace, {min: chunk.min, max: chunk.max}));
+    assert.eq(1, findChunksUtil.countChunksForNs(configDB, namespace, {min: chunk.min}));
+    assert.eq(1, findChunksUtil.countChunksForNs(configDB, namespace, {max: chunk.max}));
 }
 
 const nonHashedFieldValue = 111;
@@ -61,13 +64,14 @@ function testSplit(shardKey, collName) {
     assert.commandFailed(configDB.adminCommand(
         {split: namespace, bounds: [{someField: MinKey}, {someField: MaxKey}]}));
 
-    let totalChunksBefore = configDB.chunks.count({ns: namespace});
-    const lowestChunk = configDB.chunks.find({ns: namespace}).sort({min: 1}).limit(1).next();
+    let totalChunksBefore = findChunksUtil.countChunksForNs(configDB, namespace);
+    const lowestChunk =
+        findChunksUtil.findChunksByNs(configDB, namespace).sort({min: 1}).limit(1).next();
     assert(lowestChunk);
     // Split the chunk based on 'bounds' and verify total chunks increased by one.
     assert.commandWorked(
         configDB.adminCommand({split: namespace, bounds: [lowestChunk.min, lowestChunk.max]}));
-    assert.eq(++totalChunksBefore, configDB.chunks.count({ns: namespace}));
+    assert.eq(++totalChunksBefore, findChunksUtil.countChunksForNs(configDB, namespace));
 
     // Verify that a single chunk with the previous bounds no longer exists but split into two.
     verifyChunkSplitIntoTwo(namespace, lowestChunk);
@@ -79,28 +83,33 @@ function testSplit(shardKey, collName) {
     const splitObjWithHashedValue = buildObjWithAllShardKeyFields(shardKey, hashedFieldValue);
 
     // Find the chunk to which 'splitObjWithHashedValue' belongs to.
-    let chunkToBeSplit = configDB.chunks.findOne(
-        {ns: namespace, min: {$lte: splitObjWithHashedValue}, max: {$gt: splitObjWithHashedValue}});
+    let chunkToBeSplit = findChunksUtil.findChunksByNs(
+        configDB,
+        namespace,
+        {min: {$lte: splitObjWithHashedValue}, max: {$gt: splitObjWithHashedValue}})[0];
     assert(chunkToBeSplit);
 
     // Split the 'chunkToBeSplit' using 'find'. Note that the object specified for 'find' is not a
     // split point.
     const splitObj = buildObjWithAllShardKeyFields(shardKey, nonHashedFieldValue);
     assert.commandWorked(configDB.adminCommand({split: namespace, find: splitObj}));
-    assert.eq(++totalChunksBefore, configDB.chunks.count({ns: namespace}));
+    assert.eq(++totalChunksBefore, findChunksUtil.countChunksForNs(configDB, namespace));
 
     // Verify that a single chunk with the previous bounds no longer exists but split into two.
     verifyChunkSplitIntoTwo(namespace, chunkToBeSplit);
-    assert.eq(0, configDB.chunks.count({ns: namespace, min: splitObjWithHashedValue}));
+    assert.eq(0,
+              findChunksUtil.countChunksForNs(configDB, namespace, {min: splitObjWithHashedValue}));
 
     // Get the new chunk in which 'splitObj' belongs.
-    chunkToBeSplit = configDB.chunks.findOne(
-        {ns: namespace, min: {$lte: splitObjWithHashedValue}, max: {$gt: splitObjWithHashedValue}});
+    chunkToBeSplit = findChunksUtil.findChunksByNs(
+        configDB,
+        namespace,
+        {min: {$lte: splitObjWithHashedValue}, max: {$gt: splitObjWithHashedValue}})[0];
 
     // Use 'splitObj' as the middle point.
     assert.commandWorked(
         configDB.adminCommand({split: namespace, middle: splitObjWithHashedValue}));
-    assert.eq(++totalChunksBefore, configDB.chunks.count({ns: namespace}));
+    assert.eq(++totalChunksBefore, findChunksUtil.countChunksForNs(configDB, namespace));
     verifyChunkSplitIntoTwo(namespace, chunkToBeSplit);
 
     // Cannot split on existing chunk boundary with 'middle'.
@@ -119,7 +128,7 @@ function testMoveChunk(shardKey) {
     assert.commandWorked(st.s0.adminCommand({shardCollection: ns, key: shardKey}));
 
     // Fetch a chunk from 'shard0'.
-    const aChunk = configDB.chunks.findOne({ns: ns, shard: shard0});
+    const aChunk = findChunksUtil.findOneChunkByNs(configDB, ns, {shard: shard0});
     assert(aChunk);
 
     // Error if either of the bounds is not a valid shard key.
@@ -139,15 +148,18 @@ function testMoveChunk(shardKey) {
 
     // Find the chunk to which 'moveObjWithHashedValue' belongs to.
     const moveObjWithHashedValue = buildObjWithAllShardKeyFields(shardKey, hashedFieldValue);
-    const chunk = st.config.chunks.findOne(
-        {ns: ns, min: {$lte: moveObjWithHashedValue}, max: {$gt: moveObjWithHashedValue}});
+    const chunk = findChunksUtil.findChunksByNs(
+        st.config,
+        ns,
+        {min: {$lte: moveObjWithHashedValue}, max: {$gt: moveObjWithHashedValue}})[0];
     assert(chunk);
 
     // Verify that 'moveChunk' with 'find' works with pre-hashed value.
     const otherShard = (chunk.shard === shard1) ? shard0 : shard1;
     const moveObj = buildObjWithAllShardKeyFields(shardKey, nonHashedFieldValue);
     assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: moveObj, to: otherShard}));
-    assert.eq(st.config.chunks.count({ns: ns, min: chunk.min, shard: otherShard}), 1);
+    assert.eq(findChunksUtil.countChunksForNs(st.config, ns, {min: chunk.min, shard: otherShard}),
+              1);
 
     // Fail if 'find' and 'bounds' are both set.
     assert.commandFailed(st.s0.adminCommand({

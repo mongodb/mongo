@@ -1,6 +1,8 @@
 // Tests whether the noBalance flag disables balancing for collections
 // @tags: [requires_sharding]
 
+load("jstests/sharding/libs/find_chunks_util.js");
+
 var st = new ShardingTest({shards: 2, mongos: 1});
 
 // First, test that shell helpers require an argument
@@ -36,9 +38,13 @@ st.startBalancer();
 // Make sure collA gets balanced
 assert.soon(function() {
     var shardAChunks =
-        st.s.getDB("config").chunks.find({ns: collA.getFullName(), shard: shardAName}).itcount();
+        findChunksUtil
+            .findChunksByNs(st.s.getDB("config"), collA.getFullName(), {shard: shardAName})
+            .itcount();
     var shardBChunks =
-        st.s.getDB("config").chunks.find({ns: collA.getFullName(), shard: shardBName}).itcount();
+        findChunksUtil
+            .findChunksByNs(st.s.getDB("config"), collA.getFullName(), {shard: shardBName})
+            .itcount();
     printjson({shardA: shardAChunks, shardB: shardBChunks});
     return (shardAChunks == numChunksPerShard) && (shardAChunks == shardBChunks);
 }, "" + collA + " chunks not balanced!", 5 * 60 * 1000);
@@ -47,9 +53,11 @@ jsTest.log("Chunks for " + collA + " are balanced.");
 
 // Check that the collB chunks were not moved
 var shardAChunks =
-    st.s.getDB("config").chunks.find({ns: collB.getFullName(), shard: shardAName}).itcount();
+    findChunksUtil.findChunksByNs(st.s.getDB("config"), collB.getFullName(), {shard: shardAName})
+        .itcount();
 var shardBChunks =
-    st.s.getDB("config").chunks.find({ns: collB.getFullName(), shard: shardBName}).itcount();
+    findChunksUtil.findChunksByNs(st.s.getDB("config"), collB.getFullName(), {shard: shardBName})
+        .itcount();
 printjson({shardA: shardAChunks, shardB: shardBChunks});
 assert(shardAChunks == 0 || shardBChunks == 0);
 
@@ -59,9 +67,13 @@ sh.enableBalancing(collB);
 // Make sure that collB is now balanced
 assert.soon(function() {
     var shardAChunks =
-        st.s.getDB("config").chunks.find({ns: collB.getFullName(), shard: shardAName}).itcount();
+        findChunksUtil
+            .findChunksByNs(st.s.getDB("config"), collB.getFullName(), {shard: shardAName})
+            .itcount();
     var shardBChunks =
-        st.s.getDB("config").chunks.find({ns: collB.getFullName(), shard: shardBName}).itcount();
+        findChunksUtil
+            .findChunksByNs(st.s.getDB("config"), collB.getFullName(), {shard: shardBName})
+            .itcount();
     printjson({shardA: shardAChunks, shardB: shardBChunks});
     return (shardAChunks == numChunksPerShard) && (shardAChunks == shardBChunks);
 }, "" + collB + " chunks not balanced!", 5 * 60 * 1000);

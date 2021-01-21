@@ -8,6 +8,7 @@
 TestData.disableImplicitSessions = true;
 
 load("jstests/replsets/rslib.js");
+load("jstests/sharding/libs/find_chunks_util.js");
 
 // Replica set nodes started with --shardsvr do not enable key generation until they are added
 // to a sharded cluster and reject commands with gossiped clusterTime from users without the
@@ -85,7 +86,7 @@ assert.commandWorked(
 st.startBalancer();
 
 // Make sure we've done at least some splitting, so the balancer will work
-assert.gt(configDB.chunks.find({ns: 'test.foo'}).count(), 2);
+assert.gt(findChunksUtil.findChunksByNs(configDB, 'test.foo').count(), 2);
 
 // Make sure we eventually balance all the chunks we've created
 assert.soon(function() {
@@ -219,7 +220,7 @@ var checkAdminOps = function(hasAuth) {
         checkCommandSucceeded(adminDB, {ismaster: 1});
         checkCommandSucceeded(adminDB, {hello: 1});
         checkCommandSucceeded(adminDB, {split: 'test.foo', find: {i: 1, j: 1}});
-        var chunk = configDB.chunks.findOne({ns: 'test.foo', shard: st.rs0.name});
+        var chunk = findChunksUtil.findOneChunkByNs(configDB, 'test.foo', {shard: st.rs0.name});
         checkCommandSucceeded(
             adminDB,
             {moveChunk: 'test.foo', find: chunk.min, to: st.rs1.name, _waitForDelete: true});

@@ -1,6 +1,8 @@
 (function() {
 "use strict";
 
+load("jstests/sharding/libs/find_chunks_util.js");
+
 let st = new ShardingTest({shards: 2});
 
 assert.commandWorked(st.s.adminCommand({enableSharding: 'test'}));
@@ -14,21 +16,28 @@ assert.commandWorked(st.s.adminCommand({shardCollection: 'test.range', key: {x: 
 assert.commandWorked(st.s.adminCommand({split: 'test.range', middle: {x: 0}}));
 
 let chunkColl = st.s.getDB('config').chunks;
-assert.commandWorked(chunkColl.update({ns: 'test.range', min: {x: 0}}, {$set: {jumbo: true}}));
 
-let jumboChunk = chunkColl.findOne({ns: 'test.range', min: {x: 0}});
+let testRangeColl = st.s.getDB("config").collections.findOne({_id: 'test.range'});
+if (testRangeColl.timestamp) {
+    assert.commandWorked(
+        chunkColl.update({uuid: testRangeColl.uuid, min: {x: 0}}, {$set: {jumbo: true}}));
+} else {
+    assert.commandWorked(chunkColl.update({ns: 'test.range', min: {x: 0}}, {$set: {jumbo: true}}));
+}
+
+let jumboChunk = findChunksUtil.findOneChunkByNs(st.s.getDB('config'), 'test.range', {min: {x: 0}});
 assert(jumboChunk.jumbo, tojson(jumboChunk));
 let jumboMajorVersionBefore = jumboChunk.lastmod.getTime();
 
 // Target non-jumbo chunk should not affect real jumbo chunk.
 assert.commandWorked(st.s.adminCommand({clearJumboFlag: 'test.range', find: {x: -1}}));
-jumboChunk = chunkColl.findOne({ns: 'test.range', min: {x: 0}});
+jumboChunk = findChunksUtil.findOneChunkByNs(st.s.getDB('config'), 'test.range', {min: {x: 0}});
 assert(jumboChunk.jumbo, tojson(jumboChunk));
 assert.eq(jumboMajorVersionBefore, jumboChunk.lastmod.getTime());
 
 // Target real jumbo chunk should bump version.
 assert.commandWorked(st.s.adminCommand({clearJumboFlag: 'test.range', find: {x: 1}}));
-jumboChunk = chunkColl.findOne({ns: 'test.range', min: {x: 0}});
+jumboChunk = findChunksUtil.findOneChunkByNs(st.s.getDB('config'), 'test.range', {min: {x: 0}});
 assert(!jumboChunk.jumbo, tojson(jumboChunk));
 assert.lt(jumboMajorVersionBefore, jumboChunk.lastmod.getTime());
 
@@ -36,23 +45,31 @@ assert.lt(jumboMajorVersionBefore, jumboChunk.lastmod.getTime());
 // Hashed shard key
 assert.commandWorked(
     st.s.adminCommand({shardCollection: 'test.hashed', key: {x: 'hashed'}, numInitialChunks: 2}));
-assert.commandWorked(chunkColl.update({ns: 'test.hashed', min: {x: 0}}, {$set: {jumbo: true}}));
-jumboChunk = chunkColl.findOne({ns: 'test.hashed', min: {x: 0}});
+
+let testHashedColl = st.s.getDB("config").collections.findOne({_id: 'test.hashed'});
+if (testHashedColl.timestamp) {
+    assert.commandWorked(
+        chunkColl.update({uuid: testHashedColl.uuid, min: {x: 0}}, {$set: {jumbo: true}}));
+} else {
+    assert.commandWorked(chunkColl.update({ns: 'test.hashed', min: {x: 0}}, {$set: {jumbo: true}}));
+}
+jumboChunk = findChunksUtil.findOneChunkByNs(st.s.getDB("config"), 'test.hashed', {min: {x: 0}});
 assert(jumboChunk.jumbo, tojson(jumboChunk));
 jumboMajorVersionBefore = jumboChunk.lastmod.getTime();
 
 // Target non-jumbo chunk should not affect real jumbo chunk.
-let unrelatedChunk = chunkColl.findOne({ns: 'test.hashed', min: {x: MinKey}});
+let unrelatedChunk =
+    findChunksUtil.findOneChunkByNs(st.s.getDB("config"), 'test.hashed', {min: {x: MinKey}});
 assert.commandWorked(st.s.adminCommand(
     {clearJumboFlag: 'test.hashed', bounds: [unrelatedChunk.min, unrelatedChunk.max]}));
-jumboChunk = chunkColl.findOne({ns: 'test.hashed', min: {x: 0}});
+jumboChunk = findChunksUtil.findOneChunkByNs(st.s.getDB("config"), 'test.hashed', {min: {x: 0}});
 assert(jumboChunk.jumbo, tojson(jumboChunk));
 assert.eq(jumboMajorVersionBefore, jumboChunk.lastmod.getTime());
 
 // Target real jumbo chunk should bump version.
 assert.commandWorked(
     st.s.adminCommand({clearJumboFlag: 'test.hashed', bounds: [jumboChunk.min, jumboChunk.max]}));
-jumboChunk = chunkColl.findOne({ns: 'test.hashed', min: {x: 0}});
+jumboChunk = findChunksUtil.findOneChunkByNs(st.s.getDB("config"), 'test.hashed', {min: {x: 0}});
 assert(!jumboChunk.jumbo, tojson(jumboChunk));
 assert.lt(jumboMajorVersionBefore, jumboChunk.lastmod.getTime());
 
@@ -62,11 +79,17 @@ assert.lt(jumboMajorVersionBefore, jumboChunk.lastmod.getTime());
 // jumbo flag is cleared.
 
 st.stopBalancer();
-assert.commandWorked(chunkColl.update({ns: 'test.range', min: {x: 0}}, {$set: {jumbo: true}}));
+
+if (testRangeColl.timestamp) {
+    assert.commandWorked(
+        chunkColl.update({uuid: testRangeColl.uuid, min: {x: 0}}, {$set: {jumbo: true}}));
+} else {
+    assert.commandWorked(chunkColl.update({ns: 'test.range', min: {x: 0}}, {$set: {jumbo: true}}));
+}
 assert.commandWorked(st.s.adminCommand(
     {updateZoneKeyRange: 'test.range', min: {x: 0}, max: {x: MaxKey}, zone: 'finalDestination'}));
 
-let chunk = chunkColl.findOne({ns: 'test.range', min: {x: 0}});
+let chunk = findChunksUtil.findOneChunkByNs(st.s.getDB("config"), 'test.range', {min: {x: 0}});
 assert(chunk.jumbo, tojson(chunk));
 assert.eq(st.shard0.shardName, chunk.shard);
 
@@ -93,14 +116,14 @@ let waitForBalancerToRun = function() {
 
 waitForBalancerToRun();
 
-chunk = chunkColl.findOne({ns: 'test.range', min: {x: 0}});
+chunk = findChunksUtil.findOneChunkByNs(st.s.getDB("config"), 'test.range', {min: {x: 0}});
 assert.eq(st.shard0.shardName, chunk.shard);
 
 assert.commandWorked(st.s.adminCommand({clearJumboFlag: 'test.range', find: {x: 0}}));
 
 waitForBalancerToRun();
 
-chunk = chunkColl.findOne({ns: 'test.range', min: {x: 0}});
+chunk = findChunksUtil.findOneChunkByNs(st.s.getDB("config"), 'test.range', {min: {x: 0}});
 assert.eq(st.shard1.shardName, chunk.shard);
 
 st.stop();

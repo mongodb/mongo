@@ -5,6 +5,8 @@
 (function() {
 'use strict';
 
+load("jstests/sharding/libs/find_chunks_util.js");
+
 var st = new ShardingTest({mongos: 1, shards: 2});
 var kDbName = 'db';
 
@@ -26,7 +28,7 @@ function assertCountsInChangelog() {
 var ns = kDbName + '.fooHashed';
 assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {_id: 'hashed'}}));
 
-var aChunk = mongos.getDB('config').chunks.findOne({ns: ns, shard: shard0});
+var aChunk = findChunksUtil.findOneChunkByNs(mongos.getDB('config'), ns, {shard: shard0});
 assert(aChunk);
 
 // Assert counts field exists in the changelog entry for moveChunk.commit

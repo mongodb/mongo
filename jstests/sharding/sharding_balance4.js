@@ -7,6 +7,7 @@
  */
 (function() {
 load('jstests/sharding/autosplit_include.js');
+load("jstests/sharding/libs/find_chunks_util.js");
 
 var s = new ShardingTest({shards: 2, mongos: 1, other: {chunkSize: 1, enableAutoSplit: true}});
 
@@ -87,7 +88,7 @@ for (var i = 0; i < 50; i++) {
 }
 check("initial at end");
 
-assert.lt(20, s.config.chunks.count({"ns": "test.foo"}), "setup2");
+assert.lt(20, findChunksUtil.countChunksForNs(s.config, "test.foo"), "setup2");
 
 function check(msg, dontAssert) {
     for (var x in counts) {

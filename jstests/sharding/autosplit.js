@@ -4,6 +4,7 @@
 (function() {
 'use strict';
 load('jstests/sharding/autosplit_include.js');
+load("jstests/sharding/libs/find_chunks_util.js");
 
 var s = new ShardingTest({
     name: "auto1",
@@ -48,20 +49,20 @@ function insertDocsAndWaitForSplit(numDocs) {
 
 insertDocsAndWaitForSplit(100);
 
-counts.push(s.config.chunks.count({"ns": "test.foo"}));
+counts.push(findChunksUtil.countChunksForNs(s.config, "test.foo"));
 assert.eq(100, db.foo.find().itcount());
 
 print("datasize: " +
       tojson(s.getPrimaryShard("test").getDB("admin").runCommand({datasize: "test.foo"})));
 
 insertDocsAndWaitForSplit(100);
-counts.push(s.config.chunks.count({"ns": "test.foo"}));
+counts.push(findChunksUtil.countChunksForNs(s.config, "test.foo"));
 
 insertDocsAndWaitForSplit(200);
-counts.push(s.config.chunks.count({"ns": "test.foo"}));
+counts.push(findChunksUtil.countChunksForNs(s.config, "test.foo"));
 
 insertDocsAndWaitForSplit(300);
-counts.push(s.config.chunks.count({"ns": "test.foo"}));
+counts.push(findChunksUtil.countChunksForNs(s.config, "test.foo"));
 
 assert(counts[counts.length - 1] > counts[0], "counts 1 : " + tojson(counts));
 var sorted = counts.slice(0);

@@ -1,6 +1,8 @@
 (function() {
 'use strict';
 
+load("jstests/sharding/libs/find_chunks_util.js");
+
 // Values have to be sorted - you must have exactly 6 values in each array
 var types = [
     {name: "string", values: ["allan", "bob", "eliot", "joe", "mark", "sara"], keyfield: "k"},
@@ -134,7 +136,9 @@ for (var i = 0; i < types.length; i++) {
     var c = db[shortName];
     s.adminCommand({shardcollection: longName, key: makeObjectDotted(1)});
 
-    assert.eq(1, s.config.chunks.find({ns: longName}).count(), curT.name + " sanity check A");
+    assert.eq(1,
+              findChunksUtil.findChunksByNs(s.config, longName).count(),
+              curT.name + " sanity check A");
 
     var unsorted = Array.shuffle(Object.extend([], curT.values));
     c.insert(makeObject(unsorted[0]));

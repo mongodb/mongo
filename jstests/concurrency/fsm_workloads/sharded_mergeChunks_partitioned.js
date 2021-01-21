@@ -11,6 +11,7 @@
 
 load('jstests/concurrency/fsm_libs/extend_workload.js');                // for extendWorkload
 load('jstests/concurrency/fsm_workloads/sharded_base_partitioned.js');  // for $config
+load("jstests/sharding/libs/find_chunks_util.js");
 
 var $config = extendWorkload($config, function($config, $super) {
     $config.iterations = 8;
@@ -90,9 +91,8 @@ var $config = extendWorkload($config, function($config, $super) {
         var configDB = config.getDB('config');
 
         // Skip this iteration if our data partition contains less than 2 chunks.
-        if (configDB.chunks
-                .find({
-                    ns: ns,
+        if (findChunksUtil
+                .findChunksByNs(configDB, ns, {
                     'min._id': {$gte: this.partition.lower},
                     'max._id': {$lte: this.partition.upper}
                 })
@@ -104,9 +104,9 @@ var $config = extendWorkload($config, function($config, $super) {
         chunk1 = this.getRandomChunkInPartition(collName, config);
         // If we randomly chose the last chunk, choose the one before it.
         if (chunk1.max._id === this.partition.chunkUpper) {
-            chunk1 = configDB.chunks.findOne({ns: ns, 'max._id': chunk1.min._id});
+            chunk1 = findChunksUtil.findOneChunkByNs(configDB, ns, {'max._id': chunk1.min._id});
         }
-        chunk2 = configDB.chunks.findOne({ns: ns, 'min._id': chunk1.max._id});
+        chunk2 = findChunksUtil.findOneChunkByNs(configDB, ns, {'min._id': chunk1.max._id});
 
         // Save the number of documents found in these two chunks' ranges before the mergeChunks
         // operation. This will be used to verify that the same number of documents in that

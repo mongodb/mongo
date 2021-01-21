@@ -4,13 +4,13 @@
 (function() {
 'use strict';
 load('jstests/sharding/autosplit_include.js');
+load("jstests/sharding/libs/find_chunks_util.js");
 
 var st = new ShardingTest({shards: 1, mongos: 1, other: {chunkSize: 1, enableAutoSplit: true}});
 
 /* Return total number of chunks for a specific collection */
 function getNumChunksForColl(coll) {
-    const chunks = st.getDB('config').getCollection('chunks');
-    return chunks.countDocuments({ns: coll.getFullName()});
+    return findChunksUtil.countChunksForNs(st.getDB('config'), coll.getFullName());
 }
 
 /* Return a collection named @collName sharded on `_id` */

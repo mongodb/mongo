@@ -4,6 +4,8 @@
 (function() {
 'use strict';
 
+load("jstests/sharding/libs/find_chunks_util.js");
+
 var st = new ShardingTest({shards: 2, mongos: 2});
 
 var mongos = st.s0;
@@ -118,16 +120,18 @@ assert.commandWorked(
 
 st.printShardingStatus(true);
 
-assert.eq(2, st.s0.getDB('config').chunks.find({'ns': 'foo.bar'}).itcount());
+assert.eq(2, findChunksUtil.findChunksByNs(st.s0.getDB('config'), 'foo.bar').itcount());
 assert.eq(1,
-          st.s0.getDB('config')
-              .chunks
-              .find({'ns': 'foo.bar', 'min._id': MinKey, 'max._id': 90, shard: st.shard0.shardName})
+          findChunksUtil
+              .findChunksByNs(st.s0.getDB('config'),
+                              'foo.bar',
+                              {'min._id': MinKey, 'max._id': 90, shard: st.shard0.shardName})
               .itcount());
 assert.eq(1,
-          st.s0.getDB('config')
-              .chunks
-              .find({'ns': 'foo.bar', 'min._id': 90, 'max._id': MaxKey, shard: st.shard1.shardName})
+          findChunksUtil
+              .findChunksByNs(st.s0.getDB('config'),
+                              'foo.bar',
+                              {'min._id': 90, 'max._id': MaxKey, shard: st.shard1.shardName})
               .itcount());
 
 st.stop();

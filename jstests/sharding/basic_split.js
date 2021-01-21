@@ -4,6 +4,8 @@
 (function() {
 'use strict';
 
+load("jstests/sharding/libs/find_chunks_util.js");
+
 var st = new ShardingTest({mongos: 2, shards: 2, other: {chunkSize: 1}});
 var configDB = st.s0.getDB('config');
 
@@ -24,10 +26,10 @@ assert.commandFailed(configDB.adminCommand({split: 'test.user', key: {_id: 1}}))
 
 assert.commandWorked(configDB.adminCommand({shardCollection: 'test.user', key: {_id: 1}}));
 
-assert.eq(null, configDB.chunks.findOne({ns: 'test.user', min: {_id: 0}}));
+assert.eq(null, findChunksUtil.findOneChunkByNs(configDB, 'test.user', {min: {_id: 0}}));
 
 assert.commandWorked(configDB.adminCommand({split: 'test.user', middle: {_id: 0}}));
-assert.neq(null, configDB.chunks.findOne({ns: 'test.user', min: {_id: 0}}));
+assert.neq(null, findChunksUtil.findOneChunkByNs(configDB, 'test.user', {min: {_id: 0}}));
 
 // Cannot split on existing chunk boundary.
 assert.commandFailed(configDB.adminCommand({split: 'test.user', middle: {_id: 0}}));
@@ -48,19 +50,24 @@ for (var x = -1200; x < 1200; x++) {
 }
 assert.commandWorked(bulk.execute());
 
-assert.eq(1, configDB.chunks.find({ns: 'test.user', min: {$gte: {_id: 0}}}).itcount());
+assert.eq(1,
+          findChunksUtil.findChunksByNs(configDB, 'test.user', {min: {$gte: {_id: 0}}}).itcount());
 
 // Errors if bounds do not correspond to existing chunk boundaries.
 assert.commandFailed(configDB.adminCommand({split: 'test.user', bounds: [{_id: 0}, {_id: 1000}]}));
-assert.eq(1, configDB.chunks.find({ns: 'test.user', min: {$gte: {_id: 0}}}).itcount());
+assert.eq(1,
+          findChunksUtil.findChunksByNs(configDB, 'test.user', {min: {$gte: {_id: 0}}}).itcount());
 
 assert.commandWorked(
     configDB.adminCommand({split: 'test.user', bounds: [{_id: 0}, {_id: MaxKey}]}));
-assert.gt(configDB.chunks.find({ns: 'test.user', min: {$gte: {_id: 0}}}).itcount(), 1);
+assert.gt(findChunksUtil.findChunksByNs(configDB, 'test.user', {min: {$gte: {_id: 0}}}).itcount(),
+          1);
 
-assert.eq(1, configDB.chunks.find({ns: 'test.user', min: {$lt: {_id: 0}}}).itcount());
+assert.eq(1,
+          findChunksUtil.findChunksByNs(configDB, 'test.user', {min: {$lt: {_id: 0}}}).itcount());
 assert.commandWorked(configDB.adminCommand({split: 'test.user', middle: {_id: -600}}));
-assert.gt(configDB.chunks.find({ns: 'test.user', min: {$lt: {_id: 0}}}).itcount(), 1);
+assert.gt(findChunksUtil.findChunksByNs(configDB, 'test.user', {min: {$lt: {_id: 0}}}).itcount(),
+          1);
 
 // Mongos must refresh metadata if the chunk version does not match
 assert.commandWorked(st.s0.adminCommand(
@@ -70,7 +77,7 @@ assert.commandWorked(st.s1.adminCommand(
     {moveChunk: 'test.user', find: {_id: -900}, to: shard0, _waitForDelete: true}));
 assert.commandWorked(st.s1.adminCommand(
     {moveChunk: 'test.user', find: {_id: -901}, to: shard0, _waitForDelete: true}));
-assert.eq(0, configDB.chunks.find({ns: 'test.user', shard: shard1}).itcount());
+assert.eq(0, findChunksUtil.findChunksByNs(configDB, 'test.user', {shard: shard1}).itcount());
 
 //
 // Compound Key
@@ -78,9 +85,9 @@ assert.eq(0, configDB.chunks.find({ns: 'test.user', shard: shard1}).itcount());
 
 assert.commandWorked(configDB.adminCommand({shardCollection: 'test.compound', key: {x: 1, y: 1}}));
 
-assert.eq(null, configDB.chunks.findOne({ns: 'test.compound', min: {x: 0, y: 0}}));
+assert.eq(null, findChunksUtil.findOneChunkByNs(configDB, 'test.compound', {min: {x: 0, y: 0}}));
 assert.commandWorked(configDB.adminCommand({split: 'test.compound', middle: {x: 0, y: 0}}));
-assert.neq(null, configDB.chunks.findOne({ns: 'test.compound', min: {x: 0, y: 0}}));
+assert.neq(null, findChunksUtil.findOneChunkByNs(configDB, 'test.compound', {min: {x: 0, y: 0}}));
 
 // cannot split on existing chunk boundary.
 assert.commandFailed(configDB.adminCommand({split: 'test.compound', middle: {x: 0, y: 0}}));
@@ -91,14 +98,22 @@ for (x = -1200; x < 1200; x++) {
 }
 assert.commandWorked(bulk.execute());
 
-assert.eq(1, configDB.chunks.find({ns: 'test.compound', min: {$gte: {x: 0, y: 0}}}).itcount());
+assert.eq(1,
+          findChunksUtil.findChunksByNs(configDB, 'test.compound', {min: {$gte: {x: 0, y: 0}}})
+              .itcount());
 assert.commandWorked(configDB.adminCommand(
     {split: 'test.compound', bounds: [{x: 0, y: 0}, {x: MaxKey, y: MaxKey}]}));
-assert.gt(configDB.chunks.find({ns: 'test.compound', min: {$gte: {x: 0, y: 0}}}).itcount(), 1);
+assert.gt(
+    findChunksUtil.findChunksByNs(configDB, 'test.compound', {min: {$gte: {x: 0, y: 0}}}).itcount(),
+    1);
 
-assert.eq(1, configDB.chunks.find({ns: 'test.compound', min: {$lt: {x: 0, y: 0}}}).itcount());
+assert.eq(
+    1,
+    findChunksUtil.findChunksByNs(configDB, 'test.compound', {min: {$lt: {x: 0, y: 0}}}).itcount());
 assert.commandWorked(configDB.adminCommand({split: 'test.compound', find: {x: -1, y: -1}}));
-assert.gt(configDB.chunks.find({ns: 'test.compound', min: {$lt: {x: 0, y: 0}}}).itcount(), 1);
+assert.gt(
+    findChunksUtil.findChunksByNs(configDB, 'test.compound', {min: {$lt: {x: 0, y: 0}}}).itcount(),
+    1);
 
 st.stop();
 })();

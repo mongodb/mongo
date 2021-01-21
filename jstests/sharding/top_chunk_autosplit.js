@@ -4,6 +4,7 @@
  * @tags: [resource_intensive]
  */
 load('jstests/sharding/autosplit_include.js');
+load("jstests/sharding/libs/find_chunks_util.js");
 
 function shardSetup(shardConfig, dbName, collName) {
     var st = new ShardingTest(shardConfig);
@@ -20,11 +21,11 @@ function shardSetup(shardConfig, dbName, collName) {
 function getShardWithTopChunk(configDB, lowOrHigh, ns) {
     // lowOrHigh: 1 low "top chunk", -1 high "top chunk"
     print(ns);
-    print(configDB.chunks.count({"ns": ns}));
+    print(findChunksUtil.countChunksForNs(configDB, ns));
     print(configDB.chunks.count());
     print(JSON.stringify(configDB.chunks.findOne()));
     print(JSON.stringify(configDB.chunks.findOne({"ns": {$ne: "config.system.sessions"}})));
-    return configDB.chunks.find({"ns": ns}).sort({min: lowOrHigh}).limit(1).next().shard;
+    return findChunksUtil.findChunksByNs(configDB, ns).sort({min: lowOrHigh}).limit(1).next().shard;
 }
 
 function getNumberOfChunks(configDB) {

@@ -1,5 +1,7 @@
 'use strict';
 
+load("jstests/sharding/libs/find_chunks_util.js");
+
 var CheckOrphansAreDeletedHelpers = (function() {
     function runCheck(mongosConn, shardConn, shardId) {
         const configDB = shardConn.getDB('config');
@@ -66,8 +68,7 @@ var CheckOrphansAreDeletedHelpers = (function() {
                 });
 
             const coll = shardConn.getDB(dbName)[collName];
-            mongosConn.getDB('config')
-                .chunks.find({ns: ns, shard: {$ne: shardId}})
+            findChunksUtil.findChunksByNs(mongosConn.getDB('config'), ns, {shard: {$ne: shardId}})
                 .forEach(chunkDoc => {
                     // Use $min/$max so this will also work with hashed and compound shard keys.
                     const orphans = coll.find({})

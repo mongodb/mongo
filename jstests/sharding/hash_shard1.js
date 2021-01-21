@@ -1,6 +1,8 @@
 // Basic test of sharding with a hashed shard key
 //  - Test basic migrations with moveChunk, using different chunk specification methods
 
+load("jstests/sharding/libs/find_chunks_util.js");
+
 var s = new ShardingTest({name: jsTestName(), shards: 3, mongos: 1, verbose: 1});
 var dbname = "test";
 var coll = "foo";
@@ -16,7 +18,7 @@ s.stopBalancer();
 // shard a fresh collection using a hashed shard key
 t.drop();
 var res = db.adminCommand({shardcollection: ns, key: {a: "hashed"}});
-assert.gt(s.config.chunks.count({ns: ns}), 3);
+assert.gt(findChunksUtil.countChunksForNs(s.config, ns), 3);
 assert.eq(res.ok, 1, "shardcollection didn't work");
 s.printShardingStatus();
 

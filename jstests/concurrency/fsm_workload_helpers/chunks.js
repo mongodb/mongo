@@ -11,6 +11,7 @@
  */
 
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMongos & isMongod
+load("jstests/sharding/libs/find_chunks_util.js");
 
 var ChunkHelper = (function() {
     // exponential backoff
@@ -190,8 +191,10 @@ var ChunkHelper = (function() {
                tojson(conn) + ' is not to a mongos or a mongod config server');
         assert(isString(ns) && ns.indexOf('.') !== -1 && !ns.startsWith('.') && !ns.endsWith('.'),
                ns + ' is not a valid namespace');
-        var query = {'ns': ns, 'min._id': {$gte: lower}, 'max._id': {$lte: upper}};
-        return itcount(conn.getDB('config').chunks, query);
+        return findChunksUtil
+            .findChunksByNs(
+                conn.getDB('config'), ns, {'min._id': {$gte: lower}, 'max._id': {$lte: upper}})
+            .itcount();
     }
 
     // Intended for use on config or mongos connections only.
@@ -202,8 +205,11 @@ var ChunkHelper = (function() {
                tojson(conn) + ' is not to a mongos or a mongod config server');
         assert(isString(ns) && ns.indexOf('.') !== -1 && !ns.startsWith('.') && !ns.endsWith('.'),
                ns + ' is not a valid namespace');
-        var query = {'ns': ns, 'min._id': {$gte: lower}, 'max._id': {$lte: upper}};
-        return conn.getDB('config').chunks.find(query).sort({'min._id': 1}).toArray();
+        return findChunksUtil
+            .findChunksByNs(
+                conn.getDB('config'), ns, {'min._id': {$gte: lower}, 'max._id': {$lte: upper}})
+            .sort({'min._id': 1})
+            .toArray();
     }
 
     // Intended for use on config or mongos connections only.

@@ -1,6 +1,8 @@
 (function() {
 'use strict';
 
+load("jstests/sharding/libs/find_chunks_util.js");
+
 function placeCheck(num) {
     print("shard2 step: " + num);
 }
@@ -21,11 +23,11 @@ var db = s.getDB("test");
 assert.commandWorked(s.s0.adminCommand({enablesharding: "test"}));
 s.ensurePrimaryShard('test', s.shard1.shardName);
 assert.commandWorked(s.s0.adminCommand({shardcollection: "test.foo", key: {num: 1}}));
-assert.eq(1, s.config.chunks.count({"ns": "test.foo"}), "sanity check 1");
+assert.eq(1, findChunksUtil.countChunksForNs(s.config, "test.foo"), "sanity check 1");
 
 assert.commandWorked(s.s0.adminCommand({split: "test.foo", middle: {num: 0}}));
-assert.eq(2, s.config.chunks.count({"ns": "test.foo"}), "should be 2 shards");
-var chunks = s.config.chunks.find({"ns": "test.foo"}).toArray();
+assert.eq(2, findChunksUtil.countChunksForNs(s.config, "test.foo"), "should be 2 shards");
+var chunks = findChunksUtil.findChunksByNs(s.config, "test.foo").toArray();
 assert.eq(chunks[0].shard, chunks[1].shard, "server should be the same after a split");
 
 assert.commandWorked(db.foo.save({num: 1, name: "eliot"}));
@@ -56,9 +58,9 @@ assert.eq(2, secondary.foo.find().length(), "secondary should have 2 after move 
 assert.eq(1, primary.foo.find().length(), "primary should only have 1 after move shard");
 
 assert.eq(2,
-          s.config.chunks.count({"ns": "test.foo"}),
+          findChunksUtil.countChunksForNs(s.config, "test.foo"),
           "still should have 2 shards after move not:" + s.getChunksString());
-var chunks = s.config.chunks.find({"ns": "test.foo"}).toArray();
+var chunks = findChunksUtil.findChunksByNs(s.config, "test.foo").toArray();
 assert.neq(chunks[0].shard, chunks[1].shard, "servers should NOT be the same after the move");
 
 placeCheck(3);
@@ -217,7 +219,7 @@ assert.eq(1, s.onNumShards("test", "foo"), "on 1 shards");
 assert.commandWorked(s.s0.adminCommand(
     {movechunk: "test.foo", find: {num: -2}, to: primary.getMongo().name, _waitForDelete: true}));
 assert.eq(2, s.onNumShards("test", "foo"), "on 2 shards again");
-assert.eq(3, s.config.chunks.count({"ns": "test.foo"}), "only 3 chunks");
+assert.eq(3, findChunksUtil.countChunksForNs(s.config, "test.foo"), "only 3 chunks");
 
 print("YO : " + tojson(db.runCommand("serverStatus")));
 

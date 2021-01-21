@@ -1,5 +1,8 @@
 (function() {
 'use strict';
+
+load("jstests/sharding/libs/find_chunks_util.js");
+
 /**
  * One-shard cluster test do not need to be tested in the multiversion suites.
  * @tags: [multiversion_incompatible]
@@ -16,7 +19,7 @@ var a = s.shard0.getDB("admin");
 assert.eq(a.runCommand({"getShardVersion": "alleyinsider.foo", configdb: s._configDB}).mine.i, 0);
 assert.eq(a.runCommand({"getShardVersion": "alleyinsider.foo", configdb: s._configDB}).global.i, 0);
 
-var fooEpoch = s.getDB('config').chunks.findOne({ns: 'alleyinsider.foo'}).lastmodEpoch;
+var fooEpoch = findChunksUtil.findOneChunkByNs(s.getDB('config'), 'alleyinsider.foo').lastmodEpoch;
 assert.commandWorked(a.runCommand({
     setShardVersion: "alleyinsider.foo",
     configdb: s._configDB,

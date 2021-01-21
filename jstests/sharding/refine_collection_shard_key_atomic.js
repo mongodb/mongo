@@ -6,6 +6,7 @@
 (function() {
 'use strict';
 load('jstests/libs/fail_point_util.js');
+load("jstests/sharding/libs/find_chunks_util.js");
 
 const st = new ShardingTest({shards: 1});
 const mongos = st.s0;
@@ -58,7 +59,7 @@ assert.eq(oldKeyDoc, oldCollArr[0].key);
 
 // Verify that 'config.chunks' is as expected before refineCollectionShardKey.
 const oldChunkArr =
-    mongos.getCollection(kConfigChunks).find({ns: kNsName}).sort({min: 1}).toArray();
+    findChunksUtil.findChunksByNs(mongos.getDB('config'), kNsName).sort({min: 1}).toArray();
 assert.eq(3, oldChunkArr.length);
 assert.eq({a: MinKey, b: MinKey}, oldChunkArr[0].min);
 assert.eq({a: 0, b: 0}, oldChunkArr[0].max);
@@ -91,7 +92,8 @@ let newCollArr = mongos.getCollection(kConfigCollections).find({_id: kNsName}).t
 assert.sameMembers(oldCollArr, newCollArr);
 
 // Verify that 'config.chunks' has not been updated since we haven't committed the transaction.
-let newChunkArr = mongos.getCollection(kConfigChunks).find({ns: kNsName}).sort({min: 1}).toArray();
+let newChunkArr =
+    findChunksUtil.findChunksByNs(mongos.getDB('config'), kNsName).sort({min: 1}).toArray();
 assert.sameMembers(oldChunkArr, newChunkArr);
 
 // Verify that 'config.tags' has not been updated since we haven't committed the transaction.
@@ -108,7 +110,8 @@ assert.eq(1, newCollArr.length);
 assert.eq(newKeyDoc, newCollArr[0].key);
 
 // Verify that 'config.chunks' is as expected after refineCollectionShardKey.
-newChunkArr = mongos.getCollection(kConfigChunks).find({ns: kNsName}).sort({min: 1}).toArray();
+newChunkArr =
+    findChunksUtil.findChunksByNs(mongos.getDB('config'), kNsName).sort({min: 1}).toArray();
 assert.eq(3, newChunkArr.length);
 assert.eq({a: MinKey, b: MinKey, c: MinKey, d: MinKey}, newChunkArr[0].min);
 assert.eq({a: 0, b: 0, c: MinKey, d: MinKey}, newChunkArr[0].max);
@@ -150,7 +153,14 @@ hangBeforeUpdatingChunksFailPoint.wait();
 
 // Manually write to 'config.chunks' to force refineCollectionShardKey to throw a WriteConflict
 // exception.
-assert.writeOK(mongos.getCollection(kConfigChunks).update({ns: kNsName}, {$set: {jumbo: true}}));
+const coll = mongos.getCollection(kNsName);
+if (coll.timestamp) {
+    assert.writeOK(
+        mongos.getCollection(kConfigChunks).update({uuid: coll.uuid}, {$set: {jumbo: true}}));
+} else {
+    assert.writeOK(
+        mongos.getCollection(kConfigChunks).update({ns: kNsName}, {$set: {jumbo: true}}));
+}
 
 // Disable failpoint 'hangRefineCollectionShardKeyBeforeUpdatingChunks' and await parallel shell.
 hangBeforeUpdatingChunksFailPoint.off();
@@ -162,7 +172,8 @@ assert.eq(1, newCollArr.length);
 assert.eq(newKeyDoc, newCollArr[0].key);
 
 // Verify that 'config.chunks' is as expected after refineCollectionShardKey.
-newChunkArr = mongos.getCollection(kConfigChunks).find({ns: kNsName}).sort({min: 1}).toArray();
+newChunkArr =
+    findChunksUtil.findChunksByNs(mongos.getDB('config'), kNsName).sort({min: 1}).toArray();
 assert.eq(1, newChunkArr.length);
 assert.eq({a: MinKey, b: MinKey, c: MinKey, d: MinKey}, newChunkArr[0].min);
 assert.eq({a: MaxKey, b: MaxKey, c: MaxKey, d: MaxKey}, newChunkArr[0].max);

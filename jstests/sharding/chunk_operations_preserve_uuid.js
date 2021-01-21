@@ -8,6 +8,8 @@
 (function() {
 'use strict';
 
+load("jstests/sharding/libs/find_chunks_util.js");
+
 let st = new ShardingTest({mongos: 1, shards: 3});
 
 const dbName = "test";
@@ -30,10 +32,10 @@ var collUUID;  // Initialized after shardCollection
 }
 
 function allChunksWithUUID() {
-    var cursor = st.config.chunks.find({"ns": ns});
+    var cursor = findChunksUtil.findChunksByNs(st.config, ns);
     do {
         var next = cursor.next().uuid;
-        assert.eq(collUUID, UUID(next));
+        assert.eq(collUUID, next);
     } while (cursor.hasNext());
 }
 

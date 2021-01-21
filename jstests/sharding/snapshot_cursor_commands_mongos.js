@@ -9,6 +9,7 @@ TestData.disableImplicitSessions = true;
 
 load("jstests/libs/global_snapshot_reads_util.js");
 load("jstests/sharding/libs/sharded_transactions_helpers.js");
+load("jstests/sharding/libs/find_chunks_util.js");
 
 const dbName = "test";
 const shardedCollName = "shardedColl";
@@ -94,9 +95,15 @@ let shardingScenarios = {
             assert.commandWorked(
                 mongos.adminCommand({moveChunk: ns, find: {_id: 7}, to: st.shard2.shardName}));
 
-            assert.eq(1, mongos.getDB('config').chunks.count({ns: ns, shard: st.shard0.shardName}));
-            assert.eq(1, mongos.getDB('config').chunks.count({ns: ns, shard: st.shard1.shardName}));
-            assert.eq(1, mongos.getDB('config').chunks.count({ns: ns, shard: st.shard2.shardName}));
+            assert.eq(1,
+                      findChunksUtil.countChunksForNs(
+                          mongos.getDB('config'), ns, {shard: st.shard0.shardName}));
+            assert.eq(1,
+                      findChunksUtil.countChunksForNs(
+                          mongos.getDB('config'), ns, {shard: st.shard1.shardName}));
+            assert.eq(1,
+                      findChunksUtil.countChunksForNs(
+                          mongos.getDB('config'), ns, {shard: st.shard2.shardName}));
 
             flushRoutersAndRefreshShardMetadata(st, {ns});
 
@@ -128,9 +135,15 @@ let shardingScenarios = {
             assert.commandWorked(
                 mongos.adminCommand({moveChunk: ns, find: {_id: 7}, to: st.shard2.shardName}));
 
-            assert.eq(0, mongos.getDB('config').chunks.count({ns: ns, shard: st.shard0.shardName}));
-            assert.eq(1, mongos.getDB('config').chunks.count({ns: ns, shard: st.shard1.shardName}));
-            assert.eq(1, mongos.getDB('config').chunks.count({ns: ns, shard: st.shard2.shardName}));
+            assert.eq(0,
+                      findChunksUtil.countChunksForNs(
+                          mongos.getDB('config'), ns, {shard: st.shard0.shardName}));
+            assert.eq(1,
+                      findChunksUtil.countChunksForNs(
+                          mongos.getDB('config'), ns, {shard: st.shard1.shardName}));
+            assert.eq(1,
+                      findChunksUtil.countChunksForNs(
+                          mongos.getDB('config'), ns, {shard: st.shard2.shardName}));
 
             flushRoutersAndRefreshShardMetadata(st, {ns});
 

@@ -202,7 +202,7 @@ public:
     static const BSONField<OID> name;
     static const BSONField<BSONObj> minShardID;
     static const BSONField<std::string> ns;
-    static const BSONField<std::string> collectionUUID;
+    static const BSONField<UUID> collectionUUID;
     static const BSONField<BSONObj> min;
     static const BSONField<BSONObj> max;
     static const BSONField<std::string> shard;

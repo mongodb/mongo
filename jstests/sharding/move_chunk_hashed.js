@@ -7,6 +7,7 @@
 
 load('jstests/libs/chunk_manipulation_util.js');
 load("jstests/sharding/libs/chunk_bounds_util.js");
+load("jstests/sharding/libs/find_chunks_util.js");
 
 /*
  * Returns the shard with the given shard name.
@@ -47,7 +48,7 @@ let docs = [{x: -10}, {x: -1}, {x: 0}, {x: 1}, {x: 10}];
 assert.commandWorked(testDB.user.insert(docs));
 
 // Find the chunks with docs.
-let chunkDocs = configDB.chunks.find({ns: ns}).toArray();
+let chunkDocs = findChunksUtil.findChunksByNs(configDB, ns).toArray();
 let chunksWithDocs = [];
 let numChunksWithMultipleDocs = 0;
 
@@ -78,8 +79,12 @@ for (let chunk of chunksWithDocs) {
         {moveChunk: ns, bounds: chunk.bounds, to: toShard.shardName, _waitForDelete: true}));
 
     // Check that the config database is updated correctly.
-    assert.eq(0, configDB.chunks.count({ns: ns, _id: chunk.id, shard: chunk.shard.shardName}));
-    assert.eq(1, configDB.chunks.count({ns: ns, _id: chunk.id, shard: toShard.shardName}));
+    assert.eq(0,
+              findChunksUtil.countChunksForNs(
+                  configDB, ns, {_id: chunk.id, shard: chunk.shard.shardName}));
+    assert.eq(
+        1,
+        findChunksUtil.countChunksForNs(configDB, ns, {_id: chunk.id, shard: toShard.shardName}));
 
     // Check that the docs in the donated chunk are transferred to the recipient, and the
     // other docs remain on the donor.

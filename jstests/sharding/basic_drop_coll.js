@@ -7,6 +7,8 @@
 (function() {
 "use strict";
 
+load("jstests/sharding/libs/find_chunks_util.js");
+
 var st = new ShardingTest({shards: 2});
 
 var testDB = st.s.getDB('test');
@@ -45,7 +47,7 @@ assert.neq(null, st.shard1.getDB('test').user.findOne({_id: 10}));
 var configDB = st.s.getDB('config');
 var collDoc = configDB.collections.findOne({_id: 'test.user'});
 
-assert.eq(2, configDB.chunks.count({ns: 'test.user'}));
+assert.eq(2, findChunksUtil.countChunksForNs(configDB, 'test.user'));
 assert.eq(1, configDB.tags.count({ns: 'test.user'}));
 
 assert.commandWorked(testDB.runCommand({drop: 'user'}));
@@ -73,6 +75,7 @@ if (collEntry.length > 0) {
 }
 
 assert.eq(0, configDB.chunks.count({ns: 'test.user'}));
+assert.eq(0, configDB.chunks.count({uuid: collDoc.uuid}));
 assert.eq(0, configDB.tags.count({ns: 'test.user'}));
 
 st.stop();

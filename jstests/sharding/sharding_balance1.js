@@ -1,6 +1,8 @@
 (function() {
 'use strict';
 
+load("jstests/sharding/libs/find_chunks_util.js");
+
 var st = new ShardingTest({shards: 2, mongos: 1, other: {chunkSize: 1, enableBalancer: true}});
 
 const dbName = 'ShardingBalanceTest';
@@ -27,7 +29,7 @@ assert.commandWorked(bulk.execute());
 assert.commandWorked(st.s.adminCommand({shardcollection: coll.getFullName(), key: {_id: 1}}));
 jsTest.log("Checking initial chunk distribution: " + st.chunkCounts(collName, dbName));
 assert.lt(minChunkNum,
-          st.config.chunks.count({ns: coll.getFullName()}),
+          findChunksUtil.countChunksForNs(st.config, coll.getFullName()),
           "Number of initial chunks is less then expected");
 assert.lt(minChunkNum,
           st.chunkDiff(collName, dbName),

@@ -77,7 +77,17 @@ var FixtureHelpers = (function() {
             // shard.
             return 1;
         }
-        return db.getSiblingDB("config").chunks.distinct("shard", {ns: coll.getFullName()}).length;
+        const collMetadata =
+            db.getSiblingDB("config").collections.findOne({_id: coll.getFullName()});
+        if (collMetadata.timestamp) {
+            return db.getSiblingDB("config")
+                .chunks.distinct("shard", {uuid: collMetadata.uuid})
+                .length;
+        } else {
+            return db.getSiblingDB("config")
+                .chunks.distinct("shard", {ns: coll.getFullName()})
+                .length;
+        }
     }
 
     /**

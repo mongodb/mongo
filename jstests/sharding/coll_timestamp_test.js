@@ -12,6 +12,8 @@
 (function() {
 'use strict';
 
+load("jstests/sharding/libs/find_chunks_util.js");
+
 function checkTimestampConsistencyInPersistentMetadata(nss, timestampInConfig) {
     // Checking consistency on local shard collection: config.cache.collections
     let timestampInShard =
@@ -20,7 +22,7 @@ function checkTimestampConsistencyInPersistentMetadata(nss, timestampInConfig) {
     assert.eq(timestampCmp(timestampInConfig, timestampInShard), 0);
 
     // Checking consistency on config server collection: config.chunks
-    var cursor = st.config.chunks.find({ns: nss});
+    var cursor = findChunksUtil.findChunksByNs(st.config, nss);
     assert(cursor.hasNext());
     assert.eq(timestampInConfig, cursor.next().lastmodTimestamp);
 }

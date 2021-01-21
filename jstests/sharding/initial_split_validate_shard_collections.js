@@ -4,6 +4,7 @@
  */
 
 load("jstests/libs/uuid_util.js");
+load("jstests/sharding/libs/find_chunks_util.js");
 
 (function() {
 'use strict';
@@ -57,7 +58,7 @@ assert.commandWorked(
 assert.commandWorked(
     st.shard1.adminCommand({_flushRoutingTableCacheUpdates: 'test.user', syncFromConfig: false}));
 
-const chunksOnConfigCount = st.config.chunks.count({ns: 'test.user'});
+const chunksOnConfigCount = findChunksUtil.countChunksForNs(st.config, 'test.user');
 assert.eq(2, chunksOnConfigCount);
 
 const cacheChunksOnShard0 =

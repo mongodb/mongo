@@ -7,6 +7,7 @@
 
 load('jstests/libs/chunk_manipulation_util.js');
 load("jstests/sharding/libs/chunk_bounds_util.js");
+load("jstests/sharding/libs/find_chunks_util.js");  // for findChunksForNs
 
 function runCommandInTxn(cmdFunc) {
     let session = st.s.startSession();
@@ -30,7 +31,7 @@ assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
 st.ensurePrimaryShard(dbName, st.shard1.shardName);
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 'hashed'}}));
 
-let chunkDocs = configDB.chunks.find({ns: ns}).toArray();
+let chunkDocs = findChunksUtil.findChunksByNs(configDB, ns).toArray();
 let shardChunkBounds = chunkBoundsUtil.findShardChunkBounds(chunkDocs);
 
 jsTest.log("Test 'insert'");
@@ -55,7 +56,7 @@ assert.eq(1, toShard.getCollection(ns).find(doc).count());
 
 // Clean up.
 assert.commandWorked(testDB.user.remove({}));
-chunkDocs = configDB.chunks.find({ns: ns}).toArray();
+chunkDocs = findChunksUtil.findChunksByNs(configDB, ns).toArray();
 shardChunkBounds = chunkBoundsUtil.findShardChunkBounds(chunkDocs);
 
 // Insert docs that are expected to go to three different shards, check that the docs

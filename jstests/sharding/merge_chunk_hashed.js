@@ -6,6 +6,7 @@
 'use strict';
 
 load("jstests/sharding/libs/chunk_bounds_util.js");
+load("jstests/sharding/libs/find_chunks_util.js");
 
 let st = new ShardingTest({shards: 2, mongos: 2});
 // , configOptions: {verbose: 3}
@@ -30,8 +31,8 @@ assert.commandWorked(admin.runCommand({shardCollection: ns, key: {x: 'hashed'}})
 //         4611686018427387902  -> MAX
 
 // Get the chunk -4611686018427387902 -> 0 on shard0.
-let chunkToSplit =
-    configDB.chunks.findOne({ns: ns, min: {$ne: {x: MinKey}}, shard: st.shard0.shardName});
+let chunkToSplit = findChunksUtil.findOneChunkByNs(
+    configDB, ns, {min: {$ne: {x: MinKey}}, shard: st.shard0.shardName});
 
 // Create chunks from that chunk and move some chunks to create holes.
 // shard0: MIN                  -> chunkToSplit.min,
@@ -74,7 +75,7 @@ assert.commandWorked(admin.runCommand({
     _waitForDelete: true
 }));
 
-let chunkDocs = configDB.chunks.find({ns: ns}).toArray();
+let chunkDocs = findChunksUtil.findChunksByNs(configDB, ns).toArray();
 let shardChunkBounds = chunkBoundsUtil.findShardChunkBounds(chunkDocs);
 
 jsTest.log("Inserting docs...");
@@ -213,20 +214,18 @@ assert.commandWorked(admin.runCommand(
 // shard0: MIN                  -> -2500000000000000000,
 // shard1: -2500000000000000000 -> MAX
 
-assert.eq(2, configDB.chunks.find({ns: ns}).itcount());
+assert.eq(2, findChunksUtil.findChunksByNs(configDB, ns).itcount());
 assert.eq(1,
-          configDB.chunks
-              .find({
-                  ns: ns,
+          findChunksUtil
+              .findChunksByNs(configDB, ns, {
                   min: {x: MinKey},
                   max: {x: NumberLong(-2500000000000000000)},
                   shard: st.shard0.shardName
               })
               .count());
 assert.eq(1,
-          configDB.chunks
-              .find({
-                  ns: ns,
+          findChunksUtil
+              .findChunksByNs(configDB, ns, {
                   min: {x: NumberLong(-2500000000000000000)},
                   max: {x: MaxKey},
                   shard: st.shard1.shardName

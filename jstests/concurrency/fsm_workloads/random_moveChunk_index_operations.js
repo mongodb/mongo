@@ -63,8 +63,11 @@ var $config = (function() {
             // Pick a chunk from that thread's collection
             const chunkColl = db.getSiblingDB("config").chunks;
             const targetNs = db.getName() + "." + targetThreadColl;
+            const chunksJoinClause =
+                findChunksUtil.getChunksJoinClause(db.getSiblingDB("config"), targetNs);
             const randomChunk =
-                chunkColl.aggregate([{$match: {ns: targetNs}}, {$sample: {size: 1}}]).toArray()[0];
+                chunkColl.aggregate([{$match: chunksJoinClause}, {$sample: {size: 1}}])
+                    .toArray()[0];
             const fromShard = randomChunk.shard;
             const bounds = [randomChunk.min, randomChunk.max];
 

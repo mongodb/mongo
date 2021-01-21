@@ -1,5 +1,7 @@
 (function() {
 
+load("jstests/sharding/libs/find_chunks_util.js");
+
 var s = new ShardingTest({name: "presplit", shards: 2, mongos: 1, other: {chunkSize: 1}});
 
 s.adminCommand({enablesharding: "test"});
@@ -31,7 +33,7 @@ s.adminCommand({shardcollection: "test.foo", key: {_id: 1}});
 
 // Make sure the collection's original chunk got split
 s.printChunks();
-assert.lt(20, s.config.chunks.count({"ns": "test.foo"}), "many chunks assertion");
+assert.lt(20, findChunksUtil.countChunksForNs(s.config, "test.foo"), "many chunks assertion");
 assert.eq(num, primary.foo.count());
 
 s.printChangeLog();

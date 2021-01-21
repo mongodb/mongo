@@ -2,6 +2,8 @@
 (function() {
 'use strict';
 
+load("jstests/sharding/libs/find_chunks_util.js");  // for findChunksByNs
+
 var chunkSizeMB = 1;
 
 // Autosplit is disabled by default, but specify it anyway in case the default changes,
@@ -27,7 +29,7 @@ for (var i = 0; i < 20; i++) {
 }
 
 // Make sure we haven't split
-assert.eq(1, config.chunks.find({ns: coll + ""}).count());
+assert.eq(1, findChunksUtil.findChunksByNs(config, coll + "").count());
 
 st.stop();
 })();

@@ -19,6 +19,7 @@
 "use strict";
 
 load("jstests/sharding/libs/sharded_transactions_helpers.js");
+load("jstests/sharding/libs/find_chunks_util.js");
 
 const dbName = "test";
 const collName = "foo";
@@ -113,8 +114,10 @@ assert.commandWorked(
 
 jsTestLog("One shard snapshot read");
 
-assert.eq(2, st.s.getDB('config').chunks.count({ns: ns, shard: st.shard0.shardName}));
-assert.eq(0, st.s.getDB('config').chunks.count({ns: ns, shard: st.shard1.shardName}));
+assert.eq(2,
+          findChunksUtil.countChunksForNs(st.s.getDB('config'), ns, {shard: st.shard0.shardName}));
+assert.eq(0,
+          findChunksUtil.countChunksForNs(st.s.getDB('config'), ns, {shard: st.shard1.shardName}));
 
 for (let errorCode of kSnapshotErrors) {
     runTest(st, 1, errorCode, true /* isSharded */);
@@ -123,8 +126,10 @@ for (let errorCode of kSnapshotErrors) {
 jsTestLog("Two shard snapshot read");
 
 assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 15}, to: st.shard1.shardName}));
-assert.eq(1, st.s.getDB('config').chunks.count({ns: ns, shard: st.shard0.shardName}));
-assert.eq(1, st.s.getDB('config').chunks.count({ns: ns, shard: st.shard1.shardName}));
+assert.eq(1,
+          findChunksUtil.countChunksForNs(st.s.getDB('config'), ns, {shard: st.shard0.shardName}));
+assert.eq(1,
+          findChunksUtil.countChunksForNs(st.s.getDB('config'), ns, {shard: st.shard1.shardName}));
 
 for (let errorCode of kSnapshotErrors) {
     runTest(st, 2, errorCode, true /* isSharded */);

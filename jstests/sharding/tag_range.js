@@ -2,6 +2,8 @@
 (function() {
 'use strict';
 
+load("jstests/sharding/libs/find_chunks_util.js");
+
 const st = new ShardingTest({shards: 2, mongos: 1});
 
 assert.commandWorked(st.s0.adminCommand({enableSharding: 'test'}));
@@ -12,7 +14,7 @@ function countTags(num, message) {
     assert.eq(st.config.tags.count(), num, message);
 }
 
-assert.eq(1, st.config.chunks.count({"ns": "test.tag_range"}));
+assert.eq(1, findChunksUtil.countChunksForNs(st.config, "test.tag_range"));
 
 st.addShardTag(st.shard0.shardName, 'a');
 st.addShardTag(st.shard0.shardName, 'b');

@@ -5,6 +5,7 @@
 "use strict";
 
 load("jstests/sharding/libs/create_sharded_collection_util.js");
+load("jstests/sharding/libs/find_chunks_util.js");
 
 const st = new ShardingTest({mongos: 1, config: 1, shards: 3, rs: {nodes: 1}});
 const collection = st.s.getCollection("test.create_sharded_collection_util");
@@ -15,7 +16,7 @@ function assertCreatedWithChunks(shardKey, chunks) {
 
     const configDB = st.s.getDB("config");
     const actualChunks =
-        configDB.chunks.find({ns: collection.getFullName()}).sort({min: 1}).toArray();
+        findChunksUtil.findChunksByNs(configDB, collection.getFullName()).sort({min: 1}).toArray();
     assert.eq(chunks.slice().sort((a, b) => bsonWoCompare(a.min, b.min)),
               actualChunks.map(chunk => ({min: chunk.min, max: chunk.max, shard: chunk.shard})));
 

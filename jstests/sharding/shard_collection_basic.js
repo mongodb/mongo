@@ -2,6 +2,8 @@
 // Basic tests for shardCollection.
 //
 
+load("jstests/sharding/libs/find_chunks_util.js");
+
 (function() {
 'use strict';
 
@@ -346,7 +348,7 @@ assert.commandWorked(mongos.getDB(kDbName).createCollection('foo'));
 assert.commandWorked(
     sh.shardCollection(kDbName + '.foo', {a: "hashed"}, false, {numInitialChunks: 5}));
 st.printShardingStatus();
-var numChunks = st.config.chunks.find({ns: kDbName + '.foo'}).count();
+var numChunks = findChunksUtil.findChunksByNs(st.config, kDbName + '.foo').count();
 assert.eq(numChunks, 5, "unexpected number of chunks");
 
 st.stop();

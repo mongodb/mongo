@@ -3,6 +3,8 @@
 (function() {
 'use strict';
 
+load("jstests/sharding/libs/find_chunks_util.js");
+
 var st = new ShardingTest({mongos: 1, shards: 3});
 var kDbName = 'test';
 var kCollName = 'foo';
@@ -104,7 +106,7 @@ function testChunkSplits(collectionExists) {
         {range: [{x: 30}, {x: 40}], shardId: st.shard2.shardName},  // pre-defined
         {range: [{x: 40}, {x: {"$maxKey": 1}}], shardId: st.shard2.shardName}
     ];
-    var chunkDocs = configDB.chunks.find({ns: ns}).toArray();
+    var chunkDocs = findChunksUtil.findChunksByNs(configDB, ns).sort({min: 1}).toArray();
     assert.eq(chunkDocs.length,
               expectedChunks.length,
               "shardCollection failed to create chunk documents correctly");
@@ -145,13 +147,13 @@ function testNonemptyZonedCollection() {
     assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: shardKey}));
 
     // Check that there is initially 1 chunk.
-    assert.eq(1, configDB.chunks.count({ns: ns}));
+    assert.eq(1, findChunksUtil.countChunksForNs(configDB, ns));
 
     st.startBalancer();
 
     // Check that the chunks were moved properly.
     assert.soon(() => {
-        let res = configDB.chunks.count({ns: ns});
+        let res = findChunksUtil.countChunksForNs(configDB, ns);
         return res === 5;
     }, 'balancer never ran', 10 * 60 * 1000, 1000);
 

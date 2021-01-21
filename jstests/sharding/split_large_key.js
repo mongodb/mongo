@@ -2,6 +2,8 @@
 (function() {
 'use strict';
 
+load("jstests/sharding/libs/find_chunks_util.js");
+
 // Tests
 //  - name: Name of test, used in collection name
 //  - key: key to test
@@ -38,7 +40,9 @@ tests.forEach(function(test) {
     var res = configDB.adminCommand({split: "test." + collName, middle: midKey});
     assert(res.ok, "Split: " + collName + " " + res.errmsg);
 
-    assert.eq(2, configDB.chunks.find({"ns": "test." + collName}).count(), "Chunks count split");
+    assert.eq(2,
+              findChunksUtil.findChunksByNs(configDB, "test." + collName).count(),
+              "Chunks count split");
 
     st.s0.getCollection("test." + collName).drop();
 });

@@ -6,18 +6,20 @@
 (function() {
 "use strict";
 
+load("jstests/sharding/libs/find_chunks_util.js");
+
 /*
  * Returns the number of chunks for the sessions collection.
  */
 function getNumTotalChunks() {
-    return configDB.chunks.count({ns: kSessionsNs});
+    return findChunksUtil.countChunksForNs(configDB, kSessionsNs);
 }
 
 /*
  * Returns the number of chunks for the sessions collection that are the given shard.
  */
 function getNumChunksOnShard(shardName) {
-    return configDB.chunks.count({ns: kSessionsNs, shard: shardName});
+    return findChunksUtil.countChunksForNs(configDB, kSessionsNs, {shard: shardName});
 }
 
 /*

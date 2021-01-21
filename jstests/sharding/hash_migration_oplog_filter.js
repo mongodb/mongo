@@ -7,6 +7,7 @@
 
 load('jstests/libs/chunk_manipulation_util.js');
 load("jstests/sharding/libs/chunk_bounds_util.js");
+load("jstests/sharding/libs/find_chunks_util.js");
 
 /*
  * Returns the oplog entry on the shard that matches the query. Asserts
@@ -29,7 +30,7 @@ assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
 st.ensurePrimaryShard(dbName, st.shard1.shardName);
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 'hashed'}}));
 
-let chunkDocs = configDB.chunks.find({ns: ns}).toArray();
+let chunkDocs = findChunksUtil.findChunksByNs(configDB, ns).toArray();
 let shardChunkBounds = chunkBoundsUtil.findShardChunkBounds(chunkDocs);
 
 // Use docs that are expected to go to the same shards but different chunks.

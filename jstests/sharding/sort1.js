@@ -1,6 +1,8 @@
 (function() {
 'use strict';
 
+load("jstests/sharding/libs/find_chunks_util.js");
+
 var s = new ShardingTest({name: "sort1", shards: 2, mongos: 2});
 
 s.adminCommand({enablesharding: "test"});
@@ -29,9 +31,9 @@ s.adminCommand({
     _waitForDelete: true
 });
 
-assert.lte(3, s.config.chunks.find({ns: 'test.data'}).itcount(), "A1");
+assert.lte(3, findChunksUtil.findChunksByNs(s.config, 'test.data').itcount(), "A1");
 
-var temp = s.config.chunks.find({ns: 'test.data'}).sort({min: 1}).toArray();
+var temp = findChunksUtil.findChunksByNs(s.config, 'test.data').sort({min: 1}).toArray();
 temp.forEach(printjsononeline);
 
 var z = 0;

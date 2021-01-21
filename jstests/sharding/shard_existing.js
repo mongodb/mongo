@@ -1,6 +1,8 @@
 (function() {
 'use strict';
 
+load("jstests/sharding/libs/find_chunks_util.js");
+
 var s = new ShardingTest({name: "shard_existing", shards: 2, mongos: 1, other: {chunkSize: 1}});
 var db = s.getDB("test");
 
@@ -29,7 +31,7 @@ var res = s.adminCommand({shardcollection: "test.data", key: {_id: 1}});
 printjson(res);
 
 // number of chunks should be approx equal to the total data size / half the chunk size
-var numChunks = s.config.chunks.find({ns: 'test.data'}).itcount();
+var numChunks = findChunksUtil.findChunksByNs(s.config, 'test.data').itcount();
 var guess = Math.ceil(dataSize / (512 * 1024 + avgObjSize));
 assert(Math.abs(numChunks - guess) < 2, "not right number of chunks");
 

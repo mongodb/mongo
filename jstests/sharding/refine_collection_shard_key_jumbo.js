@@ -5,6 +5,8 @@
 (function() {
 'use strict';
 
+load("jstests/sharding/libs/find_chunks_util.js");
+
 const st = new ShardingTest({mongos: 1, shards: 2, other: {chunkSize: 1, enableAutoSplit: true}});
 const primaryShard = st.shard0.shardName;
 const secondaryShard = st.shard1.shardName;
@@ -53,7 +55,7 @@ function validateBalancerBeforeRefine(ns) {
     runBalancer();
 
     // Confirm that the jumbo chunk has not been split or moved from the primary shard.
-    const jumboChunk = st.s.getCollection(kConfigChunks).find({ns: ns}).toArray();
+    const jumboChunk = findChunksUtil.findChunksByNs(st.s.getDB('config'), ns).toArray();
     assert.eq(1, jumboChunk.length);
     assert.eq(true, jumboChunk[0].jumbo);
     assert.eq(primaryShard, jumboChunk[0].shard);
@@ -63,13 +65,13 @@ function validateBalancerAfterRefine(ns, newField) {
     runBalancer();
 
     // Confirm that the jumbo chunk has been split and some chunks moved to the secondary shard.
-    const chunks = st.s.getCollection(kConfigChunks)
-                       .find({
-                           ns: ns,
-                           min: {$lte: {x: 0, [newField]: MaxKey}},
-                           max: {$gt: {x: 0, [newField]: MinKey}}
-                       })
-                       .toArray();
+    const chunks =
+        findChunksUtil
+            .findChunksByNs(
+                st.s.getDB('config'),
+                ns,
+                {min: {$lte: {x: 0, [newField]: MaxKey}}, max: {$gt: {x: 0, [newField]: MinKey}}})
+            .toArray();
     assert.lt(1, chunks.length);
     assert.eq(true, chunks.some((chunk) => {
         return (chunk.shard === secondaryShard);
@@ -82,7 +84,7 @@ function validateMoveChunkBeforeRefine(ns) {
         ErrorCodes.ChunkTooBig);
 
     // Confirm that the jumbo chunk has not been split or moved from the primary shard.
-    const jumboChunk = st.s.getCollection(kConfigChunks).find({ns: ns}).toArray();
+    const jumboChunk = findChunksUtil.findChunksByNs(st.s.getDB('config'), ns).toArray();
     assert.eq(1, jumboChunk.length);
     assert.eq(primaryShard, jumboChunk[0].shard);
 }
@@ -95,26 +97,26 @@ function validateMoveChunkAfterRefine(ns, newField) {
         assert.commandWorked(st.s.adminCommand({split: ns, middle: {x: 0, [newField]: i * 125}}));
     }
 
-    const chunksToMove = st.s.getCollection(kConfigChunks)
-                             .find({
-                                 ns: ns,
-                                 min: {$lte: {x: 0, [newField]: MaxKey}},
-                                 max: {$gt: {x: 0, [newField]: MinKey}}
-                             })
-                             .toArray();
+    const chunksToMove =
+        findChunksUtil
+            .findChunksByNs(
+                st.s.getDB('config'),
+                ns,
+                {min: {$lte: {x: 0, [newField]: MaxKey}}, max: {$gt: {x: 0, [newField]: MinKey}}})
+            .toArray();
     chunksToMove.forEach((chunk) => {
         assert.commandWorked(st.s.adminCommand(
             {moveChunk: ns, find: {x: 0, [newField]: chunk.min[newField]}, to: secondaryShard}));
     });
 
     // Confirm that the jumbo chunk has been split and all chunks moved to the secondary shard.
-    const chunks = st.s.getCollection(kConfigChunks)
-                       .find({
-                           ns: ns,
-                           min: {$lte: {x: 0, [newField]: MaxKey}},
-                           max: {$gt: {x: 0, [newField]: MinKey}}
-                       })
-                       .toArray();
+    const chunks =
+        findChunksUtil
+            .findChunksByNs(
+                st.s.getDB('config'),
+                ns,
+                {min: {$lte: {x: 0, [newField]: MaxKey}}, max: {$gt: {x: 0, [newField]: MinKey}}})
+            .toArray();
     assert.lt(1, chunks.length);
     chunks.forEach((chunk) => {
         assert.eq(secondaryShard, chunk.shard);

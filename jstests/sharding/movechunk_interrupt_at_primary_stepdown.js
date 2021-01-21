@@ -7,6 +7,7 @@
 // distributed lock.
 
 load('./jstests/libs/chunk_manipulation_util.js');
+load("jstests/sharding/libs/find_chunks_util.js");
 
 (function() {
 'use strict';
@@ -46,14 +47,16 @@ function interruptMoveChunkAndRecover(fromShard, toShard, isJumbo) {
     // Ensure a new primary is found promptly
     st.configRS.getPrimary(30000);
 
-    assert.eq(1,
-              mongos.getDB('config')
-                  .chunks.find({ns: 'TestDB.TestColl', shard: fromShard.shardName})
-                  .itcount());
-    assert.eq(0,
-              mongos.getDB('config')
-                  .chunks.find({ns: 'TestDB.TestColl', shard: toShard.shardName})
-                  .itcount());
+    assert.eq(
+        1,
+        findChunksUtil
+            .findChunksByNs(mongos.getDB('config'), 'TestDB.TestColl', {shard: fromShard.shardName})
+            .itcount());
+    assert.eq(
+        0,
+        findChunksUtil
+            .findChunksByNs(mongos.getDB('config'), 'TestDB.TestColl', {shard: toShard.shardName})
+            .itcount());
 
     // At this point, the balancer is in recovery mode. Ensure that stepdown can be done again and
     // the recovery mode interrupted.
@@ -67,14 +70,16 @@ function interruptMoveChunkAndRecover(fromShard, toShard, isJumbo) {
     // Ensure that migration succeeded
     joinMoveChunk();
 
-    assert.eq(0,
-              mongos.getDB('config')
-                  .chunks.find({ns: 'TestDB.TestColl', shard: fromShard.shardName})
-                  .itcount());
-    assert.eq(1,
-              mongos.getDB('config')
-                  .chunks.find({ns: 'TestDB.TestColl', shard: toShard.shardName})
-                  .itcount());
+    assert.eq(
+        0,
+        findChunksUtil
+            .findChunksByNs(mongos.getDB('config'), 'TestDB.TestColl', {shard: fromShard.shardName})
+            .itcount());
+    assert.eq(
+        1,
+        findChunksUtil
+            .findChunksByNs(mongos.getDB('config'), 'TestDB.TestColl', {shard: toShard.shardName})
+            .itcount());
 }
 
 // We have one non-jumbo chunk initially

@@ -8,6 +8,8 @@
 (function() {
 'use strict';
 
+load("jstests/sharding/libs/find_chunks_util.js");
+
 // Starts a new sharding environment limiting the chunk size to 1GB (highest value allowed).
 // Note that early splitting will start with a 1/4 of max size currently.
 var s = new ShardingTest({name: 'large_chunk', shards: 2, other: {chunkSize: 1024}});
@@ -37,7 +39,8 @@ assert.commandWorked(bulk.execute());
 
 assert.commandWorked(s.s0.adminCommand({shardcollection: "test.foo", key: {_id: 1}}));
 
-assert.eq(1, s.config.chunks.count({"ns": "test.foo"}), "step 1 - need one large chunk");
+assert.eq(
+    1, findChunksUtil.countChunksForNs(s.config, "test.foo"), "step 1 - need one large chunk");
 
 var primary = s.getPrimaryShard("test").getDB("test");
 var secondary = s.getOther(primary).getDB("test");
@@ -57,11 +60,11 @@ assert.throws(function() {
 
 // Move the chunk
 print("checkpoint 1b");
-var before = s.config.chunks.find({ns: 'test.foo'}).toArray();
+var before = findChunksUtil.findChunksByNs(s.config, 'test.foo').toArray();
 assert.commandWorked(
     s.s0.adminCommand({movechunk: "test.foo", find: {_id: 1}, to: secondary.getMongo().name}));
 
-var after = s.config.chunks.find({ns: 'test.foo'}).toArray();
+var after = findChunksUtil.findChunksByNs(s.config, 'test.foo').toArray();
 assert.neq(before[0].shard, after[0].shard, "move chunk did not work");
 
 s.config.changelog.find().forEach(printjson);

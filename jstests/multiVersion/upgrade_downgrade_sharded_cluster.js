@@ -13,6 +13,7 @@
 "use strict";
 
 load('./jstests/multiVersion/libs/multi_cluster.js');  // for upgradeCluster()
+load("jstests/sharding/libs/find_chunks_util.js");
 
 // testDroppedAndDistributionModeFields: it checks two things after upgrading from versions
 // prior 4.9:
@@ -133,7 +134,7 @@ function testTimestampFieldChecksAfterUpgrade() {
     // exists and matches collTimestampInConfigSvr
 
     // Check that 'timestamp' has been created in config.chunks
-    var cursor = st.config.chunks.find({ns: 'sharded.test3_created_before_upgrade'});
+    var cursor = findChunksUtil.findChunksByNs(st.config, 'sharded.test3_created_before_upgrade');
     assert(cursor.hasNext());
     do {
         assert.eq(collTimestampInConfigSvr, cursor.next().lastmodTimestamp);
@@ -170,7 +171,7 @@ function testTimestampFieldChecksAfterFCVDowngrade() {
     assert.eq(null, timestampInShard);
 
     // Check that the 'timestamp' has been removed from config.chunks
-    var cursor = st.config.chunks.find({ns: 'sharded.test3_created_before_upgrade'});
+    var cursor = findChunksUtil.findChunksByNs(st.config, 'sharded.test3_created_before_upgrade');
     assert(cursor.hasNext());
     do {
         assert.eq(null, cursor.next().lastmodTimestamp);
@@ -203,7 +204,7 @@ function testChunkCollectionUuidFieldChecksAfterUpgrade() {
     var cursor = st.config.chunks.find({ns});
     assert(cursor.hasNext());
     do {
-        assert.eq(collUUID, UUID(cursor.next().uuid));
+        assert.eq(collUUID, cursor.next().uuid);
     } while (cursor.hasNext());
 }
 

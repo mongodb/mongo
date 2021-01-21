@@ -3,6 +3,8 @@
 (function() {
 'use strict';
 
+load("jstests/sharding/libs/find_chunks_util.js");
+
 var st = new ShardingTest({shards: 3, mongos: 1});
 
 assert.commandWorked(st.s0.adminCommand({enablesharding: 'test'}));
@@ -65,7 +67,9 @@ st.addTagRange('test.foo', {_id: 100}, {_id: MaxKey}, 'b');
 
 assertBalanceCompleteAndStable(function() {
     var chunksOnShard2 =
-        configDB.chunks.find({ns: 'test.foo', shard: st.shard2.shardName}).sort({min: 1}).toArray();
+        findChunksUtil.findChunksByNs(configDB, 'test.foo', {shard: st.shard2.shardName})
+            .sort({min: 1})
+            .toArray();
 
     jsTestLog('Chunks on shard2: ' + tojson(chunksOnShard2));
 

@@ -6,6 +6,7 @@
 
 load("jstests/aggregation/extras/merge_helpers.js");
 load("jstests/sharding/libs/chunk_bounds_util.js");
+load("jstests/sharding/libs/find_chunks_util.js");
 
 let st = new ShardingTest({shards: 3});
 let dbName = "test";
@@ -19,7 +20,7 @@ let targetNs = targetColl.getFullName();
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
 assert.commandWorked(st.s.adminCommand({shardCollection: targetNs, key: {x: 'hashed'}}));
 
-let chunkDocsForTargetColl = configDB.chunks.find({ns: targetNs}).toArray();
+let chunkDocsForTargetColl = findChunksUtil.findChunksByNs(configDB, targetNs).toArray();
 let shardChunkBoundsForTargetColl = chunkBoundsUtil.findShardChunkBounds(chunkDocsForTargetColl);
 
 // Use docs that are expected to go to three different shards.

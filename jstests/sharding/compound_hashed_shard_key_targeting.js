@@ -13,6 +13,7 @@
 load("jstests/aggregation/extras/utils.js");  // For arrayEq().
 load("jstests/libs/analyze_plan.js");         // For assertStagesForExplainOfCommand().
 load("jstests/libs/profiler.js");             // For profilerHas*OrThrow helper functions.
+load("jstests/sharding/libs/find_chunks_util.js");
 
 const st = new ShardingTest({shards: 2});
 const kDbName = jsTestName();
@@ -186,16 +187,18 @@ function verifyProfilerEntryOnCorrectShard(fieldValue, filter) {
     // Find the chunk to which 'hashedValue' belongs to. We use $expr here so that the $lte and $gt
     // comparisons occurs across data types.
     const hashedValue = convertShardKeyToHashed(fieldValue);
-    const chunk = st.s.getDB('config').chunks.findOne({
-        $expr: {
-            $and: [
-                {$lte: ['$min.a', hashedValue]},
-                {$gt: ['$max.a', hashedValue]},
-                {$eq: ['$ns', ns]}
-            ]
+    const nsOrUUID = (function() {
+        const coll = st.s.getDB('config').collections.findOne({_id: ns});
+        if (coll.timestamp) {
+            return {$eq: ['$uuid', coll.uuid]};
+        } else {
+            return {$eq: ['$ns', ns]};
         }
+    }());
+    const chunk = st.s.getDB('config').chunks.findOne({
+        $expr: {$and: [{$lte: ['$min.a', hashedValue]}, {$gt: ['$max.a', hashedValue]}, nsOrUUID]}
     });
-    assert(chunk, st.s.getDB('config').chunks.find({ns: ns}).toArray());
+    assert(chunk, findChunksUtil.findChunksByNs(st.s.getDB('config'), ns).toArray());
     const [targetShard, otherShard] =
         (chunk.shard == st.shard0.shardName) ? [st.shard0, st.shard1] : [st.shard1, st.shard0];
     profilerHasSingleMatchingEntryOrThrow({profileDB: targetShard.getDB(kDbName), filter: filter});

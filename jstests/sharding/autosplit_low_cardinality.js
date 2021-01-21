@@ -5,6 +5,7 @@
 (function() {
 'use strict';
 load('jstests/sharding/autosplit_include.js');
+load("jstests/sharding/libs/find_chunks_util.js");
 
 var st = new ShardingTest({
     name: "low_cardinality",
@@ -32,7 +33,7 @@ function insertBigDocsWithKey(key, numDocs) {
 }
 
 function numChunks() {
-    return st.config.chunks.count({"ns": "test.foo"});
+    return findChunksUtil.countChunksForNs(st.config, "test.foo");
 }
 
 // Accumulate ~1MB of documents under -10 and +10

@@ -13,6 +13,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 (function() {
 'use strict';
 load("jstests/replsets/rslib.js");
+load("jstests/sharding/libs/find_chunks_util.js");
 
 function seedString(replTest) {
     var members = replTest.getReplSetConfig().members.map(function(elem) {
@@ -45,12 +46,12 @@ function setupInitialData(st, coll) {
     assert.commandWorked(st.s0.adminCommand({shardCollection: coll.getFullName(), key: {i: 1}}));
     assert.commandWorked(st.splitAt(coll.getFullName(), {i: 5}));
     assert.commandWorked(st.moveChunk(coll.getFullName(), {i: 6}, st.shard1.shardName));
-    assert.eq(
-        1,
-        st.s0.getDB('config').chunks.count({ns: coll.getFullName(), shard: st.shard0.shardName}));
-    assert.eq(
-        1,
-        st.s0.getDB('config').chunks.count({ns: coll.getFullName(), shard: st.shard1.shardName}));
+    assert.eq(1,
+              findChunksUtil.countChunksForNs(
+                  st.s0.getDB('config'), coll.getFullName(), {shard: st.shard0.shardName}));
+    assert.eq(1,
+              findChunksUtil.countChunksForNs(
+                  st.s0.getDB('config'), coll.getFullName(), {shard: st.shard1.shardName}));
 
     let str = 'a';
     while (str.length < 1024 * 16) {
@@ -71,12 +72,12 @@ function removeShard(st, coll, replTest) {
     jsTest.log("Moving chunk from shard1 to shard0");
     assert.commandWorked(st.moveChunk(coll.getFullName(), {i: 6}, st.shard0.shardName));
 
-    assert.eq(
-        2,
-        st.s0.getDB('config').chunks.count({ns: coll.getFullName(), shard: st.shard0.shardName}));
-    assert.eq(
-        0,
-        st.s0.getDB('config').chunks.count({ns: coll.getFullName(), shard: st.shard1.shardName}));
+    assert.eq(2,
+              findChunksUtil.countChunksForNs(
+                  st.s0.getDB('config'), coll.getFullName(), {shard: st.shard0.shardName}));
+    assert.eq(0,
+              findChunksUtil.countChunksForNs(
+                  st.s0.getDB('config'), coll.getFullName(), {shard: st.shard1.shardName}));
 
     jsTest.log("Removing shard with name: " + replTest.name);
     var res = st.s.adminCommand({removeShard: replTest.name});
@@ -101,12 +102,12 @@ function addShard(st, coll, replTest) {
 
     jsTest.log("Moving chunk from shard0 to shard1");
     assert.commandWorked(st.moveChunk(coll.getFullName(), {i: 6}, st.shard1.shardName));
-    assert.eq(
-        1,
-        st.s0.getDB('config').chunks.count({ns: coll.getFullName(), shard: st.shard0.shardName}));
-    assert.eq(
-        1,
-        st.s0.getDB('config').chunks.count({ns: coll.getFullName(), shard: st.shard1.shardName}));
+    assert.eq(1,
+              findChunksUtil.countChunksForNs(
+                  st.s0.getDB('config'), coll.getFullName(), {shard: st.shard0.shardName}));
+    assert.eq(1,
+              findChunksUtil.countChunksForNs(
+                  st.s0.getDB('config'), coll.getFullName(), {shard: st.shard1.shardName}));
 
     assert.eq(300, coll.find().itcount());
     jsTest.log("Shard added successfully");

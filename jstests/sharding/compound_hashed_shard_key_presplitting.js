@@ -8,6 +8,9 @@
  */
 (function() {
 'use strict';
+
+load("jstests/sharding/libs/find_chunks_util.js");
+
 const st = new ShardingTest({name: jsTestName(), shards: 3});
 const dbname = "test";
 const mongos = st.s0;
@@ -35,7 +38,7 @@ st.ensurePrimaryShard('test', st.shard1.shardName);
 
         assert.commandWorked(
             db.adminCommand({shardcollection: db.collWithData.getFullName(), key: shardKey}));
-        assert.eq(st.config.chunks.count({ns: db.collWithData.getFullName()}),
+        assert.eq(findChunksUtil.countChunksForNs(st.config, db.collWithData.getFullName()),
                   1,
                   "sharding non-empty collection should not pre-split");
     });
@@ -45,7 +48,7 @@ st.ensurePrimaryShard('test', st.shard1.shardName);
  * has expected number of chunks.
  */
 function checkValidChunks(coll, shardKey, expectedChunks) {
-    const chunks = st.config.chunks.find({"ns": coll.getFullName()}).toArray();
+    const chunks = findChunksUtil.findChunksByNs(st.config, coll.getFullName()).toArray();
     let shardCountsMap =
         {[st.shard0.shardName]: 0, [st.shard1.shardName]: 0, [st.shard2.shardName]: 0};
     for (let chunk of chunks) {

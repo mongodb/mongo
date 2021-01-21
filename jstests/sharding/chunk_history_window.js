@@ -75,7 +75,14 @@ const getChunkHistory = (query) => {
     return configChunks.findOne(query);
 };
 
-const origChunk = getChunkHistory({ns: ns});
+const origChunk = (function() {
+    const coll = st.configRS.getPrimary().getDB("config").collections.findOne({_id: ns});
+    if (coll.timestamp) {
+        return getChunkHistory({uuid: coll.uuid});
+    } else {
+        return getChunkHistory({ns: ns});
+    }
+}());
 jsTestLog(`Original chunk: ${tojson(origChunk)}`);
 assert.eq(1, origChunk.history.length, tojson(origChunk));
 let result = mongosDB.runCommand({insert: "test", documents: [{_id: 0}]});

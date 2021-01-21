@@ -11,6 +11,7 @@
 
 load('jstests/libs/fail_point_util.js');
 load('jstests/libs/parallel_shell_helpers.js');
+load("jstests/sharding/libs/find_chunks_util.js");
 
 const st = new ShardingTest({config: 1, shards: 2});
 const configDB = st.s.getDB("config");
@@ -90,8 +91,10 @@ const testBalancer = function testAllowMigrationsFalseDisablesBalancer(collBSetP
             st.s0.adminCommand({balancerCollectionStatus: coll.getFullName()}));
         assert.eq(balancerStatus.balancerCompliant, false);
         assert.eq(balancerStatus.firstComplianceViolation, 'chunksImbalance');
-        assert.eq(
-            4, configDB.chunks.find({ns: coll.getFullName(), shard: st.shard0.shardName}).count());
+        assert.eq(4,
+                  findChunksUtil
+                      .findChunksByNs(configDB, coll.getFullName(), {shard: st.shard0.shardName})
+                      .count());
     }
 
     jsTestLog(
@@ -103,9 +106,13 @@ const testBalancer = function testAllowMigrationsFalseDisablesBalancer(collBSetP
     assert.soon(() => {
         st.awaitBalancerRound();
         const shard0Chunks =
-            configDB.chunks.find({ns: collA.getFullName(), shard: st.shard0.shardName}).itcount();
+            findChunksUtil
+                .findChunksByNs(configDB, collA.getFullName(), {shard: st.shard0.shardName})
+                .itcount();
         const shard1Chunks =
-            configDB.chunks.find({ns: collA.getFullName(), shard: st.shard1.shardName}).itcount();
+            findChunksUtil
+                .findChunksByNs(configDB, collA.getFullName(), {shard: st.shard1.shardName})
+                .itcount();
         jsTestLog(`shard0 chunks ${shard0Chunks}, shard1 chunks ${shard1Chunks}`);
         return shard0Chunks == 2 && shard1Chunks == 2;
     }, `Balancer failed to balance ${collA.getFullName()}`, 1000 * 60 * 10);
@@ -120,8 +127,10 @@ const testBalancer = function testAllowMigrationsFalseDisablesBalancer(collBSetP
         assert.commandWorked(st.s.adminCommand({balancerCollectionStatus: collB.getFullName()}));
     assert.eq(collBBalanceStatus.balancerCompliant, false);
     assert.eq(collBBalanceStatus.firstComplianceViolation, 'chunksImbalance');
-    assert.eq(4,
-              configDB.chunks.find({ns: collB.getFullName(), shard: st.shard0.shardName}).count());
+    assert.eq(
+        4,
+        findChunksUtil.findChunksByNs(configDB, collB.getFullName(), {shard: st.shard0.shardName})
+            .count());
 };
 
 // Test cases that should disable the balancer.

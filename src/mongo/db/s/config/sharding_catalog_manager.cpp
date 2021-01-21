@@ -746,14 +746,13 @@ void ShardingCatalogManager::_addTimestampAndUUIDToConfigChunksFor49InTxn(
         writeToConfigDocumentInTxn(
             opCtx,
             ChunkType::ConfigNS,
-            buildUpdateOp(
-                ChunkType::ConfigNS,
-                BSON(ChunkType::ns(nss.ns())),
-                BSON("$set" << BSON(ChunkType::timestamp(newTimestamp)
-                                    << ChunkType::collectionUUID(collectionUuid.toString()))),
-                false, /* upsert */
-                true   /* multi */
-                ),
+            buildUpdateOp(ChunkType::ConfigNS,
+                          BSON(ChunkType::ns(nss.ns())),
+                          BSON("$set" << BSON(ChunkType::timestamp(newTimestamp)
+                                              << ChunkType::collectionUUID() << collectionUuid)),
+                          false, /* upsert */
+                          true   /* multi */
+                          ),
             txnNumber);
     } catch (DBException& e) {
         e.addContext(str::stream() << "Failed to update config.chunks to set collectionUUID for "
@@ -771,7 +770,7 @@ void ShardingCatalogManager::_deleteTimestampAndUUIDFromConfigChunksInTxn(
             buildUpdateOp(ChunkType::ConfigNS,
                           BSON(ChunkType::ns(nss.ns())),
                           BSON("$unset" << BSON(ChunkType::timestamp.name()
-                                                << "" << ChunkType::collectionUUID(""))),
+                                                << "" << ChunkType::collectionUUID() << "")),
                           false, /* upsert */
                           true   /* multi */
                           ),

@@ -2,6 +2,8 @@
 
 (function() {
 
+load("jstests/sharding/libs/find_chunks_util.js");
+
 var s = new ShardingTest({
     name: "slow_sharding_balance3",
     shards: 2,
@@ -35,7 +37,7 @@ while (inserted < (40 * 1024 * 1024)) {
 assert.commandWorked(bulk.execute());
 
 s.adminCommand({shardcollection: "test.foo", key: {_id: 1}});
-assert.lt(20, s.config.chunks.count({"ns": "test.foo"}), "setup2");
+assert.lt(20, findChunksUtil.countChunksForNs(s.config, "test.foo"), "setup2");
 
 function diff1() {
     var x = s.chunkCounts("foo");

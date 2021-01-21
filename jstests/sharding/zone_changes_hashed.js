@@ -5,6 +5,7 @@
 'use strict';
 
 load("jstests/sharding/libs/zone_changes_util.js");
+load("jstests/sharding/libs/find_chunks_util.js");
 
 /**
  * Adds each shard to the corresponding zone in zoneTags, and makes the zone range equal
@@ -61,7 +62,7 @@ st.ensurePrimaryShard(dbName, primaryShard.shardName);
 jsTest.log(
     "Shard the collection. The command creates two chunks on each of the shards by default.");
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: shardKey}));
-let chunkDocs = configDB.chunks.find({ns: ns}).toArray();
+let chunkDocs = findChunksUtil.findChunksByNs(configDB, ns).sort({min: 1}).toArray();
 let shardChunkBounds = chunkBoundsUtil.findShardChunkBounds(chunkDocs);
 
 jsTest.log("Insert docs (one for each chunk) and check that they end up on the right shards.");
@@ -81,7 +82,7 @@ docs.forEach(function(doc) {
     }
 });
 assert.eq(docs.length, (new Set(docChunkBounds)).size);
-assert.eq(docs.length, configDB.chunks.count({ns: ns}));
+assert.eq(docs.length, findChunksUtil.countChunksForNs(configDB, ns));
 
 jsTest.log(
     "Assign each shard a zone, make each zone range equal to the chunk range for the shard, " +

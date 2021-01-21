@@ -51,7 +51,7 @@ const std::string ChunkType::ShardNSPrefix = "config.cache.chunks.";
 const BSONField<OID> ChunkType::name("_id");
 const BSONField<BSONObj> ChunkType::minShardID("_id");
 const BSONField<std::string> ChunkType::ns("ns");
-const BSONField<std::string> ChunkType::collectionUUID("uuid");
+const BSONField<UUID> ChunkType::collectionUUID("uuid");
 const BSONField<BSONObj> ChunkType::min("min");
 const BSONField<BSONObj> ChunkType::max("max");
 const BSONField<std::string> ChunkType::shard("shard");
@@ -252,15 +252,14 @@ StatusWith<ChunkType> ChunkType::parseFromConfigBSONCommand(const BSONObj& sourc
     }
 
     {
-        std::string collectionUUIDString;
-        Status status =
-            bsonExtractStringField(source, collectionUUID.name(), &collectionUUIDString);
-        if (status.isOK() && !collectionUUIDString.empty()) {
-            auto swUUID = CollectionUUID::parse(collectionUUIDString);
+        BSONElement collectionUUIDElem;
+        Status status = bsonExtractField(source, collectionUUID.name(), &collectionUUIDElem);
+        if (status.isOK()) {
+            auto swUUID = UUID::parse(collectionUUIDElem);
             if (!swUUID.isOK()) {
                 return swUUID.getStatus();
             }
-            chunk._collectionUUID = std::move(swUUID.getValue());
+            chunk._collectionUUID = swUUID.getValue();
         }
     }
 
@@ -351,7 +350,7 @@ BSONObj ChunkType::toConfigBSON() const {
     if (_nss)
         builder.append(ns.name(), getNS().ns());
     if (_collectionUUID)
-        builder.append(collectionUUID.name(), getCollectionUUID().toString());
+        _collectionUUID->appendToBuilder(&builder, collectionUUID.name());
     if (_min)
         builder.append(min.name(), getMin());
     if (_max)

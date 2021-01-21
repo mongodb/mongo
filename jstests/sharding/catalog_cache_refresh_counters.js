@@ -8,6 +8,7 @@
 
 load('jstests/sharding/libs/sharded_transactions_helpers.js');
 load("jstests/sharding/libs/chunk_bounds_util.js");
+load("jstests/sharding/libs/find_chunks_util.js");
 
 let st = new ShardingTest({mongos: 2, shards: 2});
 const configDB = st.s.getDB('config');
@@ -47,7 +48,7 @@ let verifyBlockedOperationsChange = (oldOperationsCount, increasedOps) => {
 };
 
 let getShardToTargetForMoveChunk = () => {
-    const chunkDocs = configDB.chunks.find({ns: ns}).toArray();
+    const chunkDocs = findChunksUtil.findChunksByNs(configDB, ns).toArray();
     const shardChunkBounds = chunkBoundsUtil.findShardChunkBounds(chunkDocs);
     const shardThatOwnsChunk = chunkBoundsUtil.findShardForShardKey(st, shardChunkBounds, {x: 100});
     return st.getOther(shardThatOwnsChunk).shardName;

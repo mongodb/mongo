@@ -1,6 +1,8 @@
 (function() {
 'use strict';
 
+load("jstests/sharding/libs/find_chunks_util.js");
+
 var s = new ShardingTest({shards: 2, other: {chunkSize: 1}});
 
 assert.commandWorked(s.s.adminCommand({enablesharding: "test"}));
@@ -31,7 +33,7 @@ s.startBalancer();
 
 // Wait for the balancer to try to move the chunk and mark it as jumbo.
 assert.soon(() => {
-    let chunk = s.getDB('config').chunks.findOne({ns: 'test.foo', min: {x: 0}});
+    let chunk = findChunksUtil.findOneChunkByNs(s.getDB('config'), 'test.foo', {min: {x: 0}});
     if (chunk == null) {
         // Balancer hasn't run and enforce the zone boundaries yet.
         return false;

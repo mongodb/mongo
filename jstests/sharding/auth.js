@@ -9,6 +9,7 @@
 (function() {
 'use strict';
 load("jstests/replsets/rslib.js");
+load("jstests/sharding/libs/find_chunks_util.js");
 
 // Replica set nodes started with --shardsvr do not enable key generation until they are added
 // to a sharded cluster and reject commands with gossiped clusterTime from users without the
@@ -184,9 +185,9 @@ assert.commandWorked(bulk.execute());
 s.startBalancer(60000);
 
 assert.soon(function() {
-    var d1Chunks = s.getDB("config").chunks.count({ns: 'test.foo', shard: "d1"});
-    var d2Chunks = s.getDB("config").chunks.count({ns: 'test.foo', shard: "d2"});
-    var totalChunks = s.getDB("config").chunks.count({ns: 'test.foo'});
+    var d1Chunks = findChunksUtil.countChunksForNs(s.getDB("config"), 'test.foo', {shard: "d1"});
+    var d2Chunks = findChunksUtil.countChunksForNs(s.getDB("config"), 'test.foo', {shard: "d2"});
+    var totalChunks = findChunksUtil.countChunksForNs(s.getDB("config"), 'test.foo');
 
     print("chunks: " + d1Chunks + " " + d2Chunks + " " + totalChunks);
 
