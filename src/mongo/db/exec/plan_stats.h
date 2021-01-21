@@ -893,4 +893,22 @@ struct DocumentSourceLookupStats : public SpecificStats {
     PlanSummaryStats planSummaryStats;
 };
 
+struct UnionWithStats final : public SpecificStats {
+    SpecificStats* clone() const final {
+        return new UnionWithStats(*this);
+    }
+
+    uint64_t estimateObjectSizeInBytes() const {
+        return sizeof(*this) +
+            (planSummaryStats.estimateObjectSizeInBytes() - sizeof(planSummaryStats));
+    }
+
+    void accumulate(PlanSummaryStats& summary) const final {
+        summary.accumulate(planSummaryStats);
+    }
+
+    // Tracks the summary stats of the subpipeline.
+    PlanSummaryStats planSummaryStats;
+};
+
 }  // namespace mongo

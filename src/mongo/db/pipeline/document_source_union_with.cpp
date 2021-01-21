@@ -210,6 +210,9 @@ DocumentSource::GetNextResult DocumentSourceUnionWith::doGetNext() {
     if (res)
         return std::move(*res);
 
+    // Record the plan summary stats after $unionWith operation is done.
+    recordPlanSummaryStats(*_pipeline);
+
     _executionState = ExecutionProgress::kFinished;
     return GetNextResult::makeEOF();
 }
@@ -234,14 +237,18 @@ Pipeline::SourceContainer::iterator DocumentSourceUnionWith::doOptimizeAt(
 
 bool DocumentSourceUnionWith::usedDisk() {
     if (_pipeline) {
-        _usedDisk = _usedDisk || _pipeline->usedDisk();
+        _stats.planSummaryStats.usedDisk =
+            _stats.planSummaryStats.usedDisk || _pipeline->usedDisk();
     }
-    return _usedDisk;
+    return _stats.planSummaryStats.usedDisk;
 }
 
 void DocumentSourceUnionWith::doDispose() {
     if (_pipeline) {
-        _usedDisk = _usedDisk || _pipeline->usedDisk();
+        _stats.planSummaryStats.usedDisk =
+            _stats.planSummaryStats.usedDisk || _pipeline->usedDisk();
+        recordPlanSummaryStats(*_pipeline);
+
         if (!_pipeline->getContext()->explain) {
             _pipeline->dispose(pExpCtx->opCtx);
             _pipeline.reset();
@@ -326,6 +333,14 @@ void DocumentSourceUnionWith::addInvolvedCollections(
     stdx::unordered_set<NamespaceString>* collectionNames) const {
     collectionNames->insert(_pipeline->getContext()->ns);
     collectionNames->merge(_pipeline->getInvolvedCollections());
+}
+
+void DocumentSourceUnionWith::recordPlanSummaryStats(const Pipeline& pipeline) {
+    for (auto&& source : pipeline.getSources()) {
+        if (auto specificStats = source->getSpecificStats()) {
+            specificStats->accumulate(_stats.planSummaryStats);
+        }
+    }
 }
 
 }  // namespace mongo

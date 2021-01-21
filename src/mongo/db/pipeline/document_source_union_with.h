@@ -126,6 +126,10 @@ public:
 
     bool usedDisk() final;
 
+    const SpecificStats* getSpecificStats() const final {
+        return &_stats;
+    }
+
 protected:
     GetNextResult doGetNext() final;
 
@@ -160,10 +164,12 @@ private:
 
     void addViewDefinition(NamespaceString nss, std::vector<BSONObj> viewPipeline);
 
+    void recordPlanSummaryStats(const Pipeline& pipeline);
+
     std::unique_ptr<Pipeline, PipelineDeleter> _pipeline;
     Pipeline::SourceContainer _cachedPipeline;
-    bool _usedDisk = false;
     ExecutionProgress _executionState = ExecutionProgress::kIteratingSource;
+    UnionWithStats _stats;
 };
 
 }  // namespace mongo
