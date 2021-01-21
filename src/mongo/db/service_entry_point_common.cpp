@@ -791,8 +791,11 @@ private:
 Future<void> InvokeCommand::run() {
     return makeReadyFutureWith([&] {
                auto execContext = _ecd->getExecutionContext();
+               // TODO SERVER-53761: find out if we can do this more asynchronously. The client
+               // Strand is locked to current thread in ServiceStateMachine::Impl::startNewLoop().
                tenant_migration_access_blocker::checkIfCanReadOrBlock(
-                   execContext->getOpCtx(), execContext->getRequest().getDatabase());
+                   execContext->getOpCtx(), execContext->getRequest().getDatabase())
+                   .get();
                return CommandHelpers::runCommandInvocationAsync(_ecd->getExecutionContext(),
                                                                 _ecd->getInvocation());
            })
@@ -808,8 +811,10 @@ Future<void> CheckoutSessionAndInvokeCommand::run() {
                _checkOutSession();
 
                auto execContext = _ecd->getExecutionContext();
+               // TODO SERVER-53761: find out if we can do this more asynchronously.
                tenant_migration_access_blocker::checkIfCanReadOrBlock(
-                   execContext->getOpCtx(), execContext->getRequest().getDatabase());
+                   execContext->getOpCtx(), execContext->getRequest().getDatabase())
+                   .get();
                return CommandHelpers::runCommandInvocationAsync(_ecd->getExecutionContext(),
                                                                 _ecd->getInvocation());
            })
