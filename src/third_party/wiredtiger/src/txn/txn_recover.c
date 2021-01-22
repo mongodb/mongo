@@ -965,7 +965,7 @@ done:
         if (conn->txn_global.recovery_timestamp != WT_TS_NONE)
             conn->txn_global.has_stable_timestamp = true;
 
-        __wt_verbose(session, WT_VERB_RTS,
+        __wt_verbose(session, WT_VERB_RECOVERY | WT_VERB_RTS,
           "Performing recovery rollback_to_stable with stable timestamp: %s and oldest timestamp: "
           "%s",
           __wt_timestamp_to_string(conn->txn_global.stable_timestamp, ts_string[0]),

@@ -1008,8 +1008,8 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
          * The newly allocated child's page index references the same structures as the parent. (We
          * cannot move WT_REF structures, threads may be underneath us right now changing the
          * structure state.) However, if the WT_REF structures reference on-page information, we
-         * have to fix that, because the disk image for the page that has an page index entry for
-         * the WT_REF is about to be discarded.
+         * have to fix that, because the disk image for the page that has a page index entry for the
+         * WT_REF is about to be discarded.
          */
         child_pindex = WT_INTL_INDEX_GET_SAFE(child);
         child_incr = 0;

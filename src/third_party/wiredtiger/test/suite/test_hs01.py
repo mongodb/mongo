@@ -29,6 +29,7 @@
 from helper import copy_wiredtiger_home
 import wiredtiger, wttest
 from wtdataset import SimpleDataSet
+from wtscenario import make_scenarios
 
 def timestamp_str(t):
     return '%x' % t
@@ -39,6 +40,12 @@ class test_hs01(wttest.WiredTigerTestCase):
     # Force a small cache.
     conn_config = 'cache_size=50MB'
     session_config = 'isolation=snapshot'
+    key_format_values = [
+        ('column', dict(key_format='r')),
+        ('integer', dict(key_format='i')),
+        ('string', dict(key_format='S'))
+    ]
+    scenarios = make_scenarios(key_format_values)
 
     def large_updates(self, session, uri, value, ds, nrows, timestamp=False):
         # Update a large number of records, we'll hang if the history store table
@@ -96,7 +103,7 @@ class test_hs01(wttest.WiredTigerTestCase):
         # Create a small table.
         uri = "table:test_hs01"
         nrows = 100
-        ds = SimpleDataSet(self, uri, nrows, key_format="S", value_format='u')
+        ds = SimpleDataSet(self, uri, nrows, key_format=self.key_format, value_format='u')
         ds.populate()
         bigvalue = b"aaaaa" * 100
 
@@ -136,17 +143,20 @@ class test_hs01(wttest.WiredTigerTestCase):
         session2.rollback_transaction()
         session2.close()
 
-        # Scenario: 3
-        # Check to see if the history store is working with the old timestamp.
-        bigvalue4 = b"ddddd" * 100
-        self.conn.set_timestamp('stable_timestamp=' + timestamp_str(1))
-        self.large_updates(self.session, uri, bigvalue4, ds, nrows, timestamp=True)
-        # Check to see data can be see only till the stable_timestamp
-        self.durable_check(bigvalue3, uri, ds, nrows)
+        # Rollback to stable support for column store is not implemented, and it fails only when it is used with timestamps.
+        # Remove the above comment once WT-5545 is implemented.
+        if self.key_format != 'r':
+            # Scenario: 3
+            # Check to see if the history store is working with the old timestamp.
+            bigvalue4 = b"ddddd" * 100
+            self.conn.set_timestamp('stable_timestamp=' + timestamp_str(1))
+            self.large_updates(self.session, uri, bigvalue4, ds, nrows, timestamp=True)
+            # Check to see data can be see only till the stable_timestamp
+            self.durable_check(bigvalue3, uri, ds, nrows)
 
-        self.conn.set_timestamp('stable_timestamp=' + timestamp_str(i + 1))
-        # Check that the latest data can be seen.
-        self.durable_check(bigvalue4, uri, ds, nrows)
+            self.conn.set_timestamp('stable_timestamp=' + timestamp_str(i + 1))
+            # Check that the latest data can be seen.
+            self.durable_check(bigvalue4, uri, ds, nrows)
 
 if __name__ == '__main__':
     wttest.run()

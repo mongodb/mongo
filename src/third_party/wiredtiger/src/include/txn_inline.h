@@ -1308,14 +1308,17 @@ __wt_txn_update_check(
         ret = __wt_txn_rollback_required(session, "conflict between concurrent operations");
     }
 
-    if (prev_tsp != NULL && upd != NULL) {
+    /*
+     * Don't access the update from an uncommitted transaction as it can produce wrong timestamp
+     * results.
+     */
+    if (!rollback && prev_tsp != NULL && upd != NULL) {
         /*
          * The durable timestamp must be greater than or equal to the commit timestamp unless it is
          * an in-progress prepared update.
-         *
-         * FIXME-WT-7020: We should be able to assert this but we're seeing some fallout in format.
-         * We should investigate why and assert the above statement.
          */
+        WT_ASSERT(
+          session, upd->durable_ts >= upd->start_ts || upd->prepare_state == WT_PREPARE_INPROGRESS);
         *prev_tsp = upd->durable_ts;
     }
     if (ignore_prepare_set)

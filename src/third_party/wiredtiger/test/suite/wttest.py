@@ -198,7 +198,7 @@ class WiredTigerTestCase(unittest.TestCase):
     @staticmethod
     def globalSetup(preserveFiles = False, useTimestamp = False,
                     gdbSub = False, lldbSub = False, verbose = 1, builddir = None, dirarg = None,
-                    longtest = False, ignoreStdout = False):
+                    longtest = False, ignoreStdout = False, seedw = 0, seedz = 0):
         WiredTigerTestCase._preserveFiles = preserveFiles
         d = 'WT_TEST' if dirarg == None else dirarg
         if useTimestamp:
@@ -221,6 +221,11 @@ class WiredTigerTestCase(unittest.TestCase):
         WiredTigerTestCase._concurrent = False
         WiredTigerTestCase._globalSetup = True
         WiredTigerTestCase._ttyDescriptor = None
+        WiredTigerTestCase._seeds = [521288629, 362436069]
+        WiredTigerTestCase._randomseed = False
+        if seedw != 0 and seedz != 0:
+            WiredTigerTestCase._randomseed = True
+            WiredTigerTestCase._seeds = [seedw, seedz]
 
     def fdSetUp(self):
         self.captureout = CapturedFd('stdout.txt', 'standard output')
@@ -470,7 +475,6 @@ class WiredTigerTestCase(unittest.TestCase):
             except:
                 pass
         self._connections = []
-
         try:
             self.fdTearDown()
             self.captureout.check(self)
@@ -757,6 +761,9 @@ def longtest(description):
 def islongtest():
     return WiredTigerTestCase._longtest
 
+def getseed():
+    return WiredTigerTestCase._seeds
+
 def runsuite(suite, parallel):
     suite_to_run = suite
     if parallel > 1:
@@ -766,6 +773,9 @@ def runsuite(suite, parallel):
         WiredTigerTestCase._concurrent = True
         suite_to_run = ConcurrentTestSuite(suite, fork_for_tests(parallel))
     try:
+        if WiredTigerTestCase._randomseed:
+            WiredTigerTestCase.prout("Starting test suite with seedw={0} and seedz={1}. Rerun this test with -seed {0}.{1} to get the same randomness"
+                .format(str(WiredTigerTestCase._seeds[0]), str(WiredTigerTestCase._seeds[1])))
         return unittest.TextTestRunner(
             verbosity=WiredTigerTestCase._verbose).run(suite_to_run)
     except BaseException as e:

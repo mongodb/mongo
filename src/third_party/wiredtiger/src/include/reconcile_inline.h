@@ -359,8 +359,8 @@ __wt_rec_cell_build_val(WT_SESSION_IMPL *session, WT_RECONCILE *r, const void *d
     if (size != 0) {
         /* Optionally compress the data using the Huffman engine. */
         if (btree->huffman_value != NULL)
-            WT_RET(__wt_huffman_encode(
-              session, btree->huffman_value, val->buf.data, (uint32_t)val->buf.size, &val->buf));
+            WT_RET(__wt_huffman_encode(session, btree->huffman_value,
+              (const uint8_t *)val->buf.data, (uint32_t)val->buf.size, &val->buf));
 
         /* Create an overflow object if the data won't fit. */
         if (val->buf.size > btree->maxleafvalue) {

@@ -7,6 +7,60 @@
  */
 
 /*
+ * WT_REC_KV--
+ *	An on-page key/value item we're building.
+ */
+struct __wt_rec_kv {
+    WT_ITEM buf;  /* Data */
+    WT_CELL cell; /* Cell and cell's length */
+    size_t cell_len;
+    size_t len; /* Total length of cell + data */
+};
+
+/*
+ * WT_REC_DICTIONARY --
+ *  We optionally build a dictionary of values for leaf pages. Where
+ * two value cells are identical, only write the value once, the second
+ * and subsequent copies point to the original cell. The dictionary is
+ * fixed size, but organized in a skip-list to make searches faster.
+ */
+struct __wt_rec_dictionary {
+    uint64_t hash;   /* Hash value */
+    uint32_t offset; /* Matching cell */
+
+    u_int depth; /* Skiplist */
+    WT_REC_DICTIONARY *next[0];
+};
+
+/*
+ * WT_REC_CHUNK --
+ *	Reconciliation split chunk.
+ */
+struct __wt_rec_chunk {
+    /*
+     * The recno and entries fields are the starting record number of the split chunk (for
+     * column-store splits), and the number of entries in the split chunk.
+     *
+     * The key for a row-store page; no column-store key is needed because the page's recno, stored
+     * in the recno field, is the column-store key.
+     */
+    uint32_t entries;
+    uint64_t recno;
+    WT_ITEM key;
+    WT_TIME_AGGREGATE ta;
+
+    /* Saved minimum split-size boundary information. */
+    uint32_t min_entries;
+    uint64_t min_recno;
+    WT_ITEM min_key;
+    WT_TIME_AGGREGATE ta_min;
+
+    size_t min_offset; /* byte offset */
+
+    WT_ITEM image; /* disk-image */
+};
+
+/*
  * Reconciliation is the process of taking an in-memory page, walking each entry
  * in the page, building a backing disk image in a temporary buffer representing
  * that information, and writing that buffer to disk.  What could be simpler?
@@ -113,29 +167,7 @@ struct __wt_reconcile {
      * generates more split chunks, the previous chunk is written to the disk and current and
      * previous swap.
      */
-    struct __wt_rec_chunk {
-        /*
-         * The recno and entries fields are the starting record number of the split chunk (for
-         * column-store splits), and the number of entries in the split chunk.
-         *
-         * The key for a row-store page; no column-store key is needed because the page's recno,
-         * stored in the recno field, is the column-store key.
-         */
-        uint32_t entries;
-        uint64_t recno;
-        WT_ITEM key;
-        WT_TIME_AGGREGATE ta;
-
-        /* Saved minimum split-size boundary information. */
-        uint32_t min_entries;
-        uint64_t min_recno;
-        WT_ITEM min_key;
-        WT_TIME_AGGREGATE ta_min;
-
-        size_t min_offset; /* byte offset */
-
-        WT_ITEM image; /* disk-image */
-    } chunk_A, chunk_B, *cur_ptr, *prev_ptr;
+    WT_REC_CHUNK chunk_A, chunk_B, *cur_ptr, *prev_ptr;
 
     size_t disk_img_buf_size; /* Base size needed for a chunk memory image */
 
@@ -210,34 +242,12 @@ struct __wt_reconcile {
      */
     bool evict_matching_checksum_failed;
 
-    /*
-     * WT_REC_DICTIONARY --
-     *	We optionally build a dictionary of values for leaf pages. Where
-     * two value cells are identical, only write the value once, the second
-     * and subsequent copies point to the original cell. The dictionary is
-     * fixed size, but organized in a skip-list to make searches faster.
-     */
-    struct __wt_rec_dictionary {
-        uint64_t hash;   /* Hash value */
-        uint32_t offset; /* Matching cell */
-
-        u_int depth; /* Skiplist */
-        WT_REC_DICTIONARY *next[0];
-    } * *dictionary;                         /* Dictionary */
+    WT_REC_DICTIONARY **dictionary;          /* Dictionary */
     u_int dictionary_next, dictionary_slots; /* Next, max entries */
                                              /* Skiplist head. */
     WT_REC_DICTIONARY *dictionary_head[WT_SKIP_MAXDEPTH];
 
-    /*
-     * WT_REC_KV--
-     *	An on-page key/value item we're building.
-     */
-    struct __wt_rec_kv {
-        WT_ITEM buf;  /* Data */
-        WT_CELL cell; /* Cell and cell's length */
-        size_t cell_len;
-        size_t len; /* Total length of cell + data */
-    } k, v;         /* Key/Value being built */
+    WT_REC_KV k, v; /* Key/Value being built */
 
     WT_ITEM *cur, _cur;   /* Key/Value being built */
     WT_ITEM *last, _last; /* Last key/value built */

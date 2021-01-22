@@ -1,4 +1,4 @@
-AM_CPPFLAGS = -I$(top_builddir) -I$(top_srcdir)/src/include \
+AM_CPPFLAGS = -std='c++11' -I$(top_builddir) -I$(top_srcdir)/src/include \
     -I$(top_srcdir)/test/utility -I$(top_srcdir)/test/cppsuite
 LDADD = $(top_builddir)/test/utility/libtest_util.la \
     $(top_builddir)/libwiredtiger.la
