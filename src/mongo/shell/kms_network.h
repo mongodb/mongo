@@ -73,12 +73,12 @@ void getSSLParamsForNetworkKMS(SSLParams*);
 /**
  * Converts a base64 encoded KMS response to a vector of bytes.
  */
-std::vector<uint8_t> kmsResponseToVector(const std::string& str);
+std::vector<uint8_t> kmsResponseToVector(StringData str);
 
 /**
  * Converts a base64 encoded KMS response to a securely allocated vector of bytes.
  */
-SecureVector<uint8_t> kmsResponseToSecureVector(const std::string& str);
+SecureVector<uint8_t> kmsResponseToSecureVector(StringData str);
 
 /**
  * Base class for KMS services that use OAuth for authorization.

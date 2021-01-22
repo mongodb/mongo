@@ -117,7 +117,7 @@ void getSSLParamsForNetworkKMS(SSLParams* params) {
         std::vector({SSLParams::Protocols::TLS1_0, SSLParams::Protocols::TLS1_1});
 }
 
-std::vector<uint8_t> kmsResponseToVector(const std::string& str) {
+std::vector<uint8_t> kmsResponseToVector(StringData str) {
     std::vector<uint8_t> blob;
 
     std::transform(std::begin(str), std::end(str), std::back_inserter(blob), [](auto c) {
@@ -127,8 +127,8 @@ std::vector<uint8_t> kmsResponseToVector(const std::string& str) {
     return blob;
 }
 
-SecureVector<uint8_t> kmsResponseToSecureVector(const std::string& str) {
-    SecureVector<uint8_t> blob(str.length());
+SecureVector<uint8_t> kmsResponseToSecureVector(StringData str) {
+    SecureVector<uint8_t> blob(str.size());
 
     std::transform(std::begin(str), std::end(str), blob->data(), [](auto c) {
         return static_cast<uint8_t>(c);

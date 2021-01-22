@@ -146,12 +146,21 @@ class MockKMSServerAWS {
     }
 
     /**
-     * Get the URL.
+     * Get the URL. Prefixed with https://
      *
      * @return {string} url of http server
      */
     getURL() {
         return "https://localhost:" + this.port;
+    }
+
+    /**
+     * Get the endpoint. A "<host>:<port>".
+     *
+     * @return {string} url of http server
+     */
+    getEndpoint() {
+        return "localhost:" + this.port;
     }
 
     /**
@@ -166,5 +175,12 @@ class MockKMSServerGCP extends MockKMSServerAWS {
     constructor(fault_type, disableFaultsOnStartup) {
         super(fault_type, disableFaultsOnStartup);
         this.web_server_py = "jstests/client_encrypt/lib/kms_http_server_gcp.py";
+    }
+}
+
+class MockKMSServerAzure extends MockKMSServerAWS {
+    constructor(fault_type, disableFaultsOnStartup) {
+        super(fault_type, disableFaultsOnStartup);
+        this.web_server_py = "jstests/client_encrypt/lib/kms_http_server_azure.py";
     }
 }
