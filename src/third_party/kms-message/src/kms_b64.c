@@ -519,10 +519,6 @@ kms_message_b64_to_b64url (const char *src,
    size_t i;
 
    for (i = 0; i < srclength; i++) {
-      if (src[i] == '=') {
-         break;
-      }
-
       if (i >= targsize) {
          return -1;
       }
@@ -553,10 +549,6 @@ kms_message_b64url_to_b64 (const char *src,
    size_t boundary;
 
    for (i = 0; i < srclength; i++) {
-      if (src[i] == '=') {
-         break;
-      }
-
       if (i >= targsize) {
          return -1;
       }
