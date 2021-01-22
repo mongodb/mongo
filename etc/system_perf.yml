@@ -480,22 +480,10 @@ tasks:
         directory: *src_dir
         revisions:
           dsi: ${dsi_rev}
-    # Use AWS user that has route53 permissions required by certbot plugin
-    - command: shell.exec
-      params:
-        script: |
-          sudo -i
-          mkdir /root/.aws
-          cat > /root/.aws/credentials << EOF
-          [default]
-          aws_access_key_id = ${terraform_key}
-          aws_secret_access_key = ${terraform_secret}
-          EOF
-          exit
     # Run the script to generate ssl cert files
     - command: shell.exec
       params:
-        script: ./src/dsi/run-dsi ./src/dsi/configurations/mongodb_setup/ssl/generate-ssl-cert.sh
+        script: AWS_ACCESS_KEY_ID=${terraform_key} AWS_SECRET_ACCESS_KEY=${terraform_secret} ./src/dsi/run-dsi generate_ssl_cert
     # Upload files for further DSI usage
     - command: s3.put
       params:
