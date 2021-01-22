@@ -31,6 +31,28 @@ global:
 
 imports:
     - "mongo/idl/basic_types.idl"
+    - "../buildscripts/idl/tests/compatibility_test_fail/new/imports.idl"
+
+structs:
+    UnstableNewFieldReply:
+        description: "This reply contains a field that is stable in the old command but is
+                      unstable in the new command."
+        fields:
+            unstableNewField:
+                type: string
+                unstable: true
+    
+    OptionalNewFieldReply:
+        description: "This reply contains a field that is required in the old command but is
+                      optional in the new command."
+        fields:
+            optionalNewField:
+                type: string
+                optional: true
+    
+    MissingNewFieldReply:
+        description: "This reply contains a field that exists in the old command but is
+                      missing in the new command."
 
 commands:
     invalidAPIVersionNew:
@@ -71,3 +93,42 @@ commands:
         strict: true
         api_version: "1"
         reply_type: OkReply
+    
+    newReplyFieldUnstable:
+        description: "new command fails because it contains an unstable reply field that is stable
+                      in the corresponding old command"
+        command_name: newReplyFieldUnstable
+        namespace: ignored
+        cpp_name: newReplyFieldUnstable
+        strict: true
+        api_version: "1"
+        reply_type: UnstableNewFieldReply
+    
+    newReplyFieldOptional:
+        description: "new command fails because it contains an optional reply field that is
+                      required in the corresponding old command"
+        command_name: newReplyFieldOptional
+        namespace: ignored
+        cpp_name: newReplyFieldOptional
+        strict: true
+        api_version: "1"
+        reply_type: OptionalNewFieldReply
+
+    newReplyFieldMissing:
+        description: "new command fails because it is missing a reply field that exists in
+                      the corresponding old command"
+        command_name: newReplyFieldMissing
+        namespace: ignored
+        cpp_name: newReplyFieldMissing
+        strict: true
+        api_version: "1"
+        reply_type: MissingNewFieldReply
+
+    importedReplyCommand:
+        description: "reply is imported and should fail"
+        command_name: importedReplyCommand
+        namespace: ignored
+        cpp_name: importedReplyCommand
+        strict: true
+        api_version: "1"
+        reply_type: ImportedUnstableNewFieldReply

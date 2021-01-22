@@ -199,6 +199,14 @@ class SymbolTable(object):
         for idltype in imported_symbols.types:
             self.add_type(ctxt, idltype)
 
+    def get_struct(self, name):
+        # type: (str) -> Struct
+        """Get the struct from the SymbolTable's struct list based on the struct name."""
+        for struct in self.structs:
+            if struct.name == name:
+                return struct
+        return None
+
     def resolve_type_from_name(self, ctxt, location, field_name, field_type_name):
         # type: (errors.ParserContext, common.SourceLocation, str, str) -> Optional[Union[Enum, Struct, Type]]
         """Find the type or struct a field refers to or log an error."""

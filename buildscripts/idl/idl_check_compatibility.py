@@ -49,14 +49,18 @@ import idl_compatibility_errors
 
 def check_compatibility(old_idl_dir: str, new_idl_dir: str, import_directories: List[str]
                         ) -> idl_compatibility_errors.IDLCompatibilityErrorCollection:
-    # pylint: disable=too-many-locals,too-many-branches
+    # pylint: disable=too-many-locals,too-many-branches,too-many-statements,too-many-nested-blocks
     """Check IDL compatibility between old and new IDL commands."""
     ctxt = idl_compatibility_errors.IDLCompatibilityContext(
         old_idl_dir, new_idl_dir, idl_compatibility_errors.IDLCompatibilityErrorCollection())
     new_commands: Dict[str, syntax.Command] = dict()
+    new_command_replies: Dict[str, syntax.Struct] = dict()  # command_name -> reply
 
     for dirpath, _, filenames in os.walk(new_idl_dir):
         for new_filename in filenames:
+            if not new_filename.endswith('.idl'):
+                continue
+
             new_idl_file_path = os.path.join(dirpath, new_filename)
             with open(new_idl_file_path) as new_file:
                 new_idl_file = parser.parse(
@@ -82,12 +86,18 @@ def check_compatibility(old_idl_dir: str, new_idl_dir: str, import_directories: 
                         continue
                     new_commands[new_cmd.command_name] = new_cmd
 
+                    new_reply = new_idl_file.spec.symbols.get_struct(new_cmd.reply_type)
+                    new_command_replies[new_cmd.command_name] = new_reply
+
     # Check new commands' compatibility with old ones.
     # Note, a command can be added to V1 at any time, it's ok if a
     # new command has no corresponding old command.
     old_commands: Dict[str, syntax.Command] = dict()
     for dirpath, _, filenames in os.walk(old_idl_dir):
         for old_filename in filenames:
+            if not old_filename.endswith('.idl'):
+                continue
+
             old_idl_file_path = os.path.join(dirpath, old_filename)
             with open(old_idl_file_path) as old_file:
                 old_idl_file = parser.parse(
@@ -120,6 +130,29 @@ def check_compatibility(old_idl_dir: str, new_idl_dir: str, import_directories: 
                         continue
 
                     new_cmd = new_commands[old_cmd.command_name]
+
+                    old_reply = old_idl_file.spec.symbols.get_struct(old_cmd.reply_type)
+                    new_reply = new_command_replies[new_cmd.command_name]
+
+                    for old_field in old_reply.fields or []:
+                        if old_field.unstable:
+                            continue
+
+                        new_field_exists = False
+                        for new_field in new_reply.fields or []:
+                            if new_field.name == old_field.name:
+                                if new_field.unstable:
+                                    ctxt.add_new_reply_field_unstable_error(
+                                        new_cmd.command_name, new_field.name, old_idl_file_path)
+                                if new_field.optional and not old_field.optional:
+                                    ctxt.add_new_reply_field_optional_error(
+                                        new_cmd.command_name, new_field.name, old_idl_file_path)
+                                new_field_exists = True
+                                break
+
+                        if not new_field_exists:
+                            ctxt.add_new_reply_field_missing_error(
+                                new_cmd.command_name, old_field.name, old_idl_file_path)
 
     ctxt.errors.dump_errors()
     return ctxt.errors

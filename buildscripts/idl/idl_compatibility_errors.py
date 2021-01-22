@@ -44,6 +44,9 @@ from typing import List
 ERROR_ID_COMMAND_INVALID_API_VERSION = "ID0001"
 ERROR_ID_DUPLICATE_COMMAND_NAME = "ID0002"
 ERROR_ID_REMOVED_COMMAND = "ID0003"
+ERROR_ID_NEW_REPLY_FIELD_UNSTABLE = "ID0004"
+ERROR_ID_NEW_REPLY_FIELD_OPTIONAL = "ID0005"
+ERROR_ID_NEW_REPLY_FIELD_MISSING = "ID0006"
 
 
 class IDLCompatibilityCheckerError(Exception):
@@ -112,12 +115,10 @@ class IDLCompatibilityErrorCollection(object):
         """Check if the error collection has at least one message of a given error_id."""
         return len([a for a in self._errors if a.error_id == error_id]) > 0
 
-    def get_error(self, error_id: str) -> IDLCompatibilityError:
+    def get_error_by_error_id(self, error_id: str) -> IDLCompatibilityError:
         """Get the first error in the error collection with the id error_id."""
         error_id_list = [a for a in self._errors if a.error_id == error_id]
-        if error_id_list:
-            return error_id_list[0]
-        return None
+        return next(iter(error_id_list), None)
 
     def get_error_by_command_name(self, command_name: str) -> IDLCompatibilityError:
         """Get the first error in the error collection with the command command_name."""
@@ -179,6 +180,30 @@ class IDLCompatibilityContext(object):
         """Add an error about a duplicate command name within a directory."""
         self._add_error(ERROR_ID_DUPLICATE_COMMAND_NAME, command_name,
                         "'%s' has duplicate command: '%s'" % (dir_name, command_name), file)
+
+    def add_new_reply_field_missing_error(self, command_name: str, field_name: str,
+                                          file: str) -> None:
+        """Add an error about the new command missing a reply field that exists in the old command."""
+        self._add_error(
+            ERROR_ID_NEW_REPLY_FIELD_MISSING, command_name,
+            "'%s' is missing a reply field '%s' that exists in the old command." %
+            (command_name, field_name), file)
+
+    def add_new_reply_field_optional_error(self, command_name: str, field_name: str,
+                                           file: str) -> None:
+        """Add an error about the new command reply field being optional when the corresponding old reply field is not optional."""
+        self._add_error(
+            ERROR_ID_NEW_REPLY_FIELD_OPTIONAL, command_name,
+            "'%s' has an optional reply field '%s' that was non-optional in the old command." %
+            (command_name, field_name), file)
+
+    def add_new_reply_field_unstable_error(self, command_name: str, field_name: str,
+                                           file: str) -> None:
+        """Add an error about the new command reply field being unstable when the corresponding old reply field is stable."""
+        self._add_error(
+            ERROR_ID_NEW_REPLY_FIELD_UNSTABLE, command_name,
+            "'%s' has an unstable reply field '%s' that was stable in the old command." %
+            (command_name, field_name), file)
 
 
 def _assert_unique_error_messages() -> None:

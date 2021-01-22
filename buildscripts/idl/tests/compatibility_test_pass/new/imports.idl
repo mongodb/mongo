@@ -29,16 +29,10 @@
 global:
     cpp_namespace: "mongo"
 
-imports:
-    - "mongo/idl/basic_types.idl"
-
-commands:    
-    duplicateCommandOld:
-        description: "duplicate command in old commands fails because a command with the same name
-                      is in compatibility_test_fail_old.idl"
-        command_name: duplicateCommandOld
-        namespace: ignored
-        cpp_name: duplicateCommandOld
-        strict: true
-        api_version: "1"
-        reply_type: OkReply
+structs:
+    ImportedStableNewFieldReply:
+        description: "This reply contains a field that is unstable in the old command but is
+                      stable in the new command."
+        fields:
+            stableNewField:
+                type: string

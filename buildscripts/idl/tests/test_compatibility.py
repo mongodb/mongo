@@ -61,7 +61,7 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
             path.join(dir_path, "compatibility_test_fail/new"), ["src"])
 
         self.assertTrue(error_collection.has_errors())
-        self.assertTrue(error_collection.count() == 5)
+        self.assertTrue(error_collection.count() == 9)
 
         invalid_api_version_new_error = error_collection.get_error_by_command_name(
             "invalidAPIVersionNew")
@@ -91,10 +91,34 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
                         idl_compatibility_errors.ERROR_ID_DUPLICATE_COMMAND_NAME)
         self.assertRegex(str(duplicate_command_old_error), "duplicateCommandOld")
 
-        removed_command_error = error_collection.get_error(
+        removed_command_error = error_collection.get_error_by_error_id(
             idl_compatibility_errors.ERROR_ID_REMOVED_COMMAND)
         self.assertIsNotNone(removed_command_error)
         self.assertRegex(str(removed_command_error), "removedCommand")
+
+        new_reply_field_unstable_error = error_collection.get_error_by_command_name(
+            "newReplyFieldUnstable")
+        self.assertIsNotNone(new_reply_field_unstable_error)
+        self.assertTrue(new_reply_field_unstable_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_NEW_REPLY_FIELD_UNSTABLE)
+        self.assertRegex(str(new_reply_field_unstable_error), "newReplyFieldUnstable")
+
+        new_reply_field_optional_error = error_collection.get_error_by_error_id(
+            idl_compatibility_errors.ERROR_ID_NEW_REPLY_FIELD_OPTIONAL)
+        self.assertIsNotNone(new_reply_field_optional_error)
+        self.assertRegex(str(new_reply_field_optional_error), "newReplyFieldOptional")
+
+        new_reply_field_missing_error = error_collection.get_error_by_error_id(
+            idl_compatibility_errors.ERROR_ID_NEW_REPLY_FIELD_MISSING)
+        self.assertIsNotNone(new_reply_field_missing_error)
+        self.assertRegex(str(new_reply_field_missing_error), "newReplyFieldMissing")
+
+        imported_reply_field_unstable_error = error_collection.get_error_by_command_name(
+            "importedReplyCommand")
+        self.assertIsNotNone(imported_reply_field_unstable_error)
+        self.assertTrue(imported_reply_field_unstable_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_NEW_REPLY_FIELD_UNSTABLE)
+        self.assertRegex(str(imported_reply_field_unstable_error), "importedReplyCommand")
 
 
 if __name__ == '__main__':

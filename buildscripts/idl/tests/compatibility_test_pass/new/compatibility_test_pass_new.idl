@@ -31,6 +31,37 @@ global:
 
 imports:
     - "mongo/idl/basic_types.idl"
+    - "../buildscripts/idl/tests/compatibility_test_pass/new/imports.idl"
+
+structs:
+    StableNewFieldReply:
+        description: "This reply contains a field that is unstable in the old command but is
+                      stable in the new command."
+        fields:
+            stableNewField:
+                type: string
+
+    RequiredNewFieldReply:
+        description: "This reply contains a field that is optional in the old command but is
+                      unstable in the new command."
+        fields:
+            requiredNewField:
+                type: string
+    
+    AddedNewFieldReply:
+        description: "This reply contains a field that is added in the new command."
+        fields:
+            addedNewField:
+                type: string
+    
+    UnstableOldFieldReply:
+        description: "This reply contains a field that is unstable in the old command and is
+                      unstable and optional in the new command."
+        fields:
+            unstableOldField:
+                type: string
+                unstable: true
+                optional: true
 
 commands:
     testCommand:
@@ -41,3 +72,51 @@ commands:
         strict: true
         api_version: "1"
         reply_type: OkReply
+
+    newReplyFieldStable:
+        description: "new command contains a stable reply field that is unstable
+                      in the corresponding old command and still passes"
+        command_name: newReplyFieldStable
+        namespace: ignored
+        cpp_name: newReplyFieldStable
+        strict: true
+        api_version: "1"
+        reply_type: StableNewFieldReply
+    
+    newReplyFieldRequired:
+        description: "new command contains a required reply field that is optional
+                      in the corresponding old command and still passes"
+        command_name: newReplyFieldRequired
+        namespace: ignored
+        cpp_name: newReplyFieldRequired
+        strict: true
+        api_version: "1"
+        reply_type: RequiredNewFieldReply
+
+    newReplyFieldAdded:
+        description: "new command adds a new reply field and still passes"
+        command_name: newReplyFieldAdded
+        namespace: ignored
+        cpp_name: newReplyFieldAdded
+        strict: true
+        api_version: "1"
+        reply_type: AddedNewFieldReply
+
+    oldReplyFieldUnstable:
+        description: "old reply field is unstable so new commmand passes even if its new reply
+                      field is unstable"
+        command_name: oldReplyFieldUnstable
+        namespace: ignored
+        cpp_name: oldReplyFieldUnstable
+        strict: true
+        api_version: "1"
+        reply_type: UnstableOldFieldReply
+    
+    importedReplyCommand:
+        description: "reply is imported and should pass"
+        command_name: importedReplyCommand
+        namespace: ignored
+        cpp_name: importedReplyCommand
+        strict: true
+        api_version: "1"
+        reply_type: ImportedStableNewFieldReply
