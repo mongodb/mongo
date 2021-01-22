@@ -679,7 +679,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
     invariant(hasNoRequirements);
 
     // Any data returned from the inner executor must be owned.
-    size_t plannerOpts = QueryPlannerParams::DEFAULT | QueryPlannerParams::RETURN_OWNED_DATA;
+    size_t plannerOpts = QueryPlannerParams::DEFAULT;
 
     if (pipeline->peekFront() && pipeline->peekFront()->constraints().isChangeStreamStage()) {
         invariant(expCtx->tailableMode == TailableModeEnum::kTailableAndAwaitData);
@@ -736,6 +736,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
         // projection at the front of the pipeline, it will be removed and handled by the PlanStage
         // layer. If a projection cannot be pushed down, an empty BSONObj will be returned.
         projObj = buildProjectionForPushdown(deps, pipeline);
+        plannerOpts |= QueryPlannerParams::RETURN_OWNED_DATA;
     }
 
     if (rewrittenGroupStage) {
