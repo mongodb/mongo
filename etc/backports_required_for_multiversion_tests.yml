@@ -109,6 +109,8 @@ all:
     test_file: jstests/replsets/election_handoff_not_immediately_electable.js
   - ticket: SERVER-53394
     test_file: jstests/sharding/sharding_task_executor_pool_matching_policy.js
+  - ticket: SERVER-53985
+    test_file: jstests/replsets/unconditional_step_down.js
 
 suites:
 

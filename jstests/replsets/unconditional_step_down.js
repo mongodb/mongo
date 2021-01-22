@@ -7,6 +7,7 @@
 "use strict";
 
 load("jstests/libs/curop_helpers.js");  // for waitForCurOpByFailPoint().
+load("jstests/libs/fail_point_util.js");
 
 const testName = "txnsDuringStepDown";
 const dbName = testName;
@@ -88,6 +89,9 @@ function runStepDownTest({testMsg, stepDownFn, toRemovedState}) {
             ErrorCodes.InterruptedDueToReplStateChange);
     }, primary.port);
 
+    // A failpoint to hang in the middle of a 'checkLog' command. This is used to synchronize
+    // the 'joinUnblockStepDown' thread with 'stepDown'.
+    const hangFp = configureFailPoint(primary, "hangInGetLog");
     const joinUnblockStepDown = startSafeParallelShell(() => {
         jsTestLog("Wait for step down to start killing operations");
         checkLog.contains(db, "Starting to kill user operations");
@@ -103,6 +107,10 @@ function runStepDownTest({testMsg, stepDownFn, toRemovedState}) {
 
     jsTestLog("Wait for write cmd to reach the fail point");
     waitForCurOpByFailPoint(primaryDB, collNss, writeFailPoint);
+
+    // Make sure the 'joinUnblockStepDown' thread has connected before initiating stepdown.
+    hangFp.wait();
+    hangFp.off();
 
     let res = assert.commandWorked(primary.adminCommand({replSetGetStatus: 1}));
     assert(res.electionCandidateMetrics,
