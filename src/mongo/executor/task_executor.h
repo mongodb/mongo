@@ -340,7 +340,7 @@ public:
 
 
     /**
-     * Schedules "cb" to be run by the executor on each reply recevied from executing the exhaust
+     * Schedules "cb" to be run by the executor on each reply received from executing the exhaust
      * remote command described by "request".
      *
      * Returns a handle for waiting on or canceling the callback, or
@@ -360,6 +360,33 @@ public:
         const RemoteCommandRequestOnAny& request,
         const RemoteCommandOnAnyCallbackFn& cb,
         const BatonHandle& baton = nullptr) = 0;
+
+    /**
+     * Schedules "cb" to be run by the executor on each reply received from executing the exhaust
+     * remote command described by "request", as above, but returns a future containing the
+     * last response.
+     *
+     * May be called by client threads or callbacks running in the executor.
+     *
+     * The input CancelationToken may be used to cancel sending the request. There is no guarantee
+     * that this will succeed in canceling the request and the resulting ExecutorFuture may contain
+     * either success or error. If cancelation is successful, the resulting ExecutorFuture will be
+     * set with a CallbackCanceled error.
+     *
+     * Cancelling the future will also result in cancelling any outstanding invocations of the
+     * callback.
+     */
+    ExecutorFuture<TaskExecutor::ResponseStatus> scheduleExhaustRemoteCommand(
+        const RemoteCommandRequest& request,
+        const RemoteCommandCallbackFn& cb,
+        const CancelationToken& token,
+        const BatonHandle& baton = nullptr);
+
+    ExecutorFuture<TaskExecutor::ResponseOnAnyStatus> scheduleExhaustRemoteCommandOnAny(
+        const RemoteCommandRequestOnAny& request,
+        const RemoteCommandOnAnyCallbackFn& cb,
+        const CancelationToken& token,
+        const BatonHandle& baton = nullptr);
 
     /**
      * Returns true if there are any tasks scheduled on the executor.

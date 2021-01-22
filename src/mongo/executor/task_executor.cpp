@@ -59,13 +59,14 @@ Status wrapCallbackHandleWithCancelToken(
  * Takes a schedule(Exhaust)RemoteCommand(OnAny)-style function and wraps it to return a future and
  * be cancelable with CancelationTokens.
  */
-template <typename Request, typename Response, typename ScheduleFn>
+template <typename Request, typename Response, typename ScheduleFn, typename CallbackFn>
 ExecutorFuture<Response> wrapScheduleCallWithCancelTokenAndFuture(
     const std::shared_ptr<TaskExecutor>& executor,
     ScheduleFn&& schedule,
     const Request& request,
     const CancelationToken& token,
-    const BatonHandle& baton) {
+    const BatonHandle& baton,
+    const CallbackFn& cb) {
     if (token.isCanceled()) {
         return ExecutorFuture<Response>(executor, TaskExecutor::kCallbackCanceledErrorStatus);
     }
@@ -74,14 +75,21 @@ ExecutorFuture<Response> wrapScheduleCallWithCancelTokenAndFuture(
     // This has to be made shared because otherwise we'd have to move the promise into this
     // callback, and would be unable to use it in the case where scheduling the request fails below.
     auto sharedPromise = std::make_shared<Promise<Response>>(std::move(promise));
-    auto signalPromiseOnCompletion = [sharedPromise](const auto& args) mutable {
+    auto signalPromiseOnCompletion = [sharedPromise, cb = std::move(cb)](const auto& args) mutable {
+        // Upon completion, unconditionally run our callback.
+        cb(args);
         auto status = args.response.status;
-        if (status.isOK()) {
-            sharedPromise->emplaceValue(std::move(args.response));
-        } else {
-            // Only set an error on failures to send the request (including if the request was
-            // canceled). Errors from the remote host will be contained in the response.
-            sharedPromise->setError(status);
+
+        // Only mark the future as complete when the moreToCome flag is false, even if an error has
+        // occured.
+        if (!args.response.moreToCome) {
+            if (status.isOK()) {
+                sharedPromise->emplaceValue(std::move(args.response));
+            } else {
+                // Only set an error on failures to send the request (including if the request was
+                // canceled). Errors from the remote host will be contained in the response.
+                sharedPromise->setError(status);
+            }
         }
     };
 
@@ -102,9 +110,24 @@ ExecutorFuture<Response> wrapScheduleCallWithCancelTokenAndFuture(
         sharedPromise->setError(scheduleStatus);
     }
 
-    return std::move(future).thenRunOn(executor);
+    return std::move(future)
+        .template onError<ErrorCodes::BrokenPromise>(
+            [token](Status&& status) -> StatusWith<Response> {
+                // When an exhaust command is canceled, its callback is not run, so the
+                // SharedPromise captured in the callback will be destroyed and set a BrokenPromise
+                // error status. We check here if the token was canceled, and if so convert that to
+                // a CallbackCanceled error. N.B. this means that we will pave over truly broken
+                // promises with a callback canceled error if our cancellation token is canceled
+                // after the promise is broken; we are willing to accept this behavior, as fixing it
+                // requires extra synchronization that we'd like to avoid.
+                if (token.isCanceled()) {
+                    return TaskExecutor::kCallbackCanceledErrorStatus;
+                } else {
+                    return std::move(status);
+                }
+            })
+        .thenRunOn(executor);
 }
-
 }  // namespace
 
 TaskExecutor::TaskExecutor() = default;
@@ -254,7 +277,8 @@ ExecutorFuture<TaskExecutor::ResponseStatus> TaskExecutor::scheduleRemoteCommand
         [this](const auto&... args) { return scheduleRemoteCommand(args...); },
         request,
         token,
-        baton);
+        baton,
+        [](const auto& args) {});
 }
 
 ExecutorFuture<TaskExecutor::ResponseOnAnyStatus> TaskExecutor::scheduleRemoteCommandOnAny(
@@ -267,7 +291,8 @@ ExecutorFuture<TaskExecutor::ResponseOnAnyStatus> TaskExecutor::scheduleRemoteCo
         [this](const auto&... args) { return scheduleRemoteCommandOnAny(args...); },
         request,
         token,
-        baton);
+        baton,
+        [](const auto& args) {});
 }
 
 StatusWith<TaskExecutor::CallbackHandle> TaskExecutor::scheduleExhaustRemoteCommand(
@@ -279,6 +304,36 @@ StatusWith<TaskExecutor::CallbackHandle> TaskExecutor::scheduleExhaustRemoteComm
                                                  cb({args, 0});
                                              },
                                              baton);
+}
+
+ExecutorFuture<TaskExecutor::ResponseStatus> TaskExecutor::scheduleExhaustRemoteCommand(
+    const RemoteCommandRequest& request,
+    const RemoteCommandCallbackFn& cb,
+    const CancelationToken& token,
+    const BatonHandle& baton) {
+    return wrapScheduleCallWithCancelTokenAndFuture<decltype(request),
+                                                    TaskExecutor::ResponseStatus>(
+        shared_from_this(),
+        [this](const auto&... args) { return scheduleExhaustRemoteCommand(args...); },
+        request,
+        token,
+        baton,
+        cb);
+}
+
+ExecutorFuture<TaskExecutor::ResponseOnAnyStatus> TaskExecutor::scheduleExhaustRemoteCommandOnAny(
+    const RemoteCommandRequestOnAny& request,
+    const RemoteCommandOnAnyCallbackFn& cb,
+    const CancelationToken& token,
+    const BatonHandle& baton) {
+    return wrapScheduleCallWithCancelTokenAndFuture<decltype(request),
+                                                    TaskExecutor::ResponseOnAnyStatus>(
+        shared_from_this(),
+        [this](const auto&... args) { return scheduleExhaustRemoteCommandOnAny(args...); },
+        request,
+        token,
+        baton,
+        cb);
 }
 }  // namespace executor
 }  // namespace mongo
