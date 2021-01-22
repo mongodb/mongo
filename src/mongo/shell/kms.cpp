@@ -42,7 +42,9 @@ HostAndPort parseUrl(StringData url) {
     // URL: https://(host):(port)
     //
     constexpr StringData urlPrefix = "https://"_sd;
-    uassert(51140, "KMS URL must start with https://", url.startsWith(urlPrefix));
+    uassert(51140,
+            str::stream() << "KMS URL must start with https://, URL: " << url,
+            url.startsWith(urlPrefix));
 
     StringData hostAndPort = url.substr(urlPrefix.size());
 

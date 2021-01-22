@@ -141,6 +141,7 @@ kmsEnv.Library(
     source=[
         "kms.cpp",
         "kms_aws.cpp",
+        "kms_azure.cpp",
         "kms_gcp.cpp",
         "kms_local.cpp",
         "kms_network.cpp",
