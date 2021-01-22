@@ -135,6 +135,8 @@ public:
                             ClusterClientCursorParams&& params,
                             boost::optional<LogicalSessionId> lsid);
 
+    ~ClusterClientCursorImpl() final;
+
 private:
     /**
      * Constructs the pipeline of MergerPlanStages which will be used to answer the query.

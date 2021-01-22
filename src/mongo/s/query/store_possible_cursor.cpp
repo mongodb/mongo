@@ -121,7 +121,7 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
     }
 
     auto ccc = ClusterClientCursorImpl::make(opCtx, std::move(executor), std::move(params));
-
+    ccc->incNBatches();
     // We don't expect to use this cursor until a subsequent getMore, so detach from the current
     // OperationContext until then.
     ccc->detachFromOperationContext();
