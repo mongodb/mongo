@@ -69,7 +69,9 @@ public:
 
     static const char kSessionMigrateOplogTag[];
 
-    SessionCatalogMigrationDestination(ShardId fromShard, MigrationSessionId migrationSessionId);
+    SessionCatalogMigrationDestination(NamespaceString nss,
+                                       ShardId fromShard,
+                                       MigrationSessionId migrationSessionId);
     ~SessionCatalogMigrationDestination();
 
     /**
@@ -110,6 +112,7 @@ private:
 
     void _errorOccurred(StringData errMsg);
 
+    const NamespaceString _nss;
     const ShardId _fromShard;
     const MigrationSessionId _migrationSessionId;
 

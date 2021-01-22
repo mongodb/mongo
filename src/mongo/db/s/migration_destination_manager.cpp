@@ -434,7 +434,7 @@ Status MigrationDestinationManager::start(OperationContext* opCtx,
     }
 
     _sessionMigration =
-        std::make_unique<SessionCatalogMigrationDestination>(_fromShard, *_sessionId);
+        std::make_unique<SessionCatalogMigrationDestination>(_nss, _fromShard, *_sessionId);
     ShardingStatistics::get(opCtx).countRecipientMoveChunkStarted.addAndFetch(1);
 
     _migrateThreadHandle = stdx::thread([this]() { _migrateThread(); });
