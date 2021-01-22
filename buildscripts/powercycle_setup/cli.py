@@ -1,6 +1,6 @@
 """Command-line entry-point for powercycle_operations."""
 
-from buildscripts.powercycle import parser
+from buildscripts.powercycle_setup import parser
 
 
 def main(argv):

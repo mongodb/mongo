@@ -31,8 +31,8 @@ import pymongo
 import requests
 import yaml
 
-from buildscripts.powercycle import remote_operations
-from buildscripts.resmokelib.powertest import powercycle_constants
+from buildscripts.powercycle_setup import remote_operations
+from buildscripts.resmokelib.powercycle import powercycle_config, powercycle_constants
 
 # See https://docs.python.org/2/library/sys.html#sys.platform
 _IS_WINDOWS = sys.platform == "win32" or sys.platform == "cygwin"
@@ -77,7 +77,7 @@ REPORT_JSON_FILE = ""
 REPORT_JSON_SUCCESS = False
 
 EXIT_YML = {"exit_code": 0}  # type: ignore
-EXIT_YML_FILE = None
+EXIT_YML_FILE = ""
 
 
 def local_exit(code):
@@ -119,6 +119,7 @@ def exit_handler():
         try:
             with open(EXIT_YML_FILE, "w") as yaml_stream:
                 yaml.safe_dump(EXIT_YML, yaml_stream)
+            LOGGER.debug("Exit handler: report file contents %s", EXIT_YML)
         except:  # pylint: disable=bare-except
             pass
 
@@ -602,7 +603,7 @@ def print_uptime():
 
 def call_remote_operation(local_ops, remote_python, script_name, client_args, operation):
     """Call the remote operation and return tuple (ret, ouput)."""
-    client_call = "{} {} {} {}".format(remote_python, script_name, client_args, operation)
+    client_call = f"{remote_python} {script_name} {client_args} {operation}"
     ret, output = local_ops.shell(client_call)
     return ret, output
 
@@ -877,7 +878,7 @@ class WindowsService(object):
 
             if ret == winerror.ERROR_BROKEN_PIPE:
                 # win32serviceutil.StopService() returns a "The pipe has been ended" error message
-                # (winerror=109) when stopping the "mongod-powertest" service on
+                # (winerror=109) when stopping the "mongod-powercycle-test" service on
                 # Windows Server 2016 and the underlying mongod process has already exited.
                 ret = 0
                 output = f"Assuming service '{self.name}' stopped despite error: {output}"
@@ -1010,8 +1011,8 @@ class MongodControl(object):  # pylint: disable=too-many-instance-attributes
             self._service = PosixService
         # After mongod has been installed, self.bin_path is defined.
         if self.bin_path:
-            self.service = self._service("mongod-powertest", self.bin_path, self.mongod_options(),
-                                         db_path)
+            self.service = self._service("mongod-powercycle-test", self.bin_path,
+                                         self.mongod_options(), db_path)
 
     def set_mongod_option(self, option, option_value=None, option_form="--"):
         """Set mongod command line option."""
@@ -1050,7 +1051,7 @@ class MongodControl(object):  # pylint: disable=too-many-instance-attributes
         self.bin_path = os.path.join(self.bin_dir, self.process_name)
         # We need to instantiate the Service when installing, since the bin_path
         # is only known after install_mongod runs.
-        self.service = self._service("mongod-powertest", self.bin_path, self.mongod_options(),
+        self.service = self._service("mongod-powercycle-test", self.bin_path, self.mongod_options(),
                                      db_path=None)
         ret, output = self.service.create()
         return ret, output
@@ -1141,7 +1142,7 @@ class LocalToRemoteOperations(object):
         return self.remote_op.access_info()
 
 
-def remote_handler(options, operations, root_dir):  # pylint: disable=too-many-branches,too-many-locals,too-many-statements
+def remote_handler(options, task_config, root_dir):  # pylint: disable=too-many-branches,too-many-locals,too-many-statements
     """Remote operations handler executes all remote operations on the remote host.
 
     These operations are invoked on the remote host's copy of this script.
@@ -1150,18 +1151,17 @@ def remote_handler(options, operations, root_dir):  # pylint: disable=too-many-b
 
     # Set 'root_dir' to absolute path.
     root_dir = abs_path(root_dir)
-    if not operations:
+    if not options.remote_operations:
         raise ValueError("No remote operation specified.")
 
     print_uptime()
-    LOGGER.info("Operations to perform %s", operations)
+    LOGGER.info("Operations to perform %s", options.remote_operations)
     host = "localhost"
     host_port = "{}:{}".format(host, options.port)
 
-    options_dict = vars(options)
-    if options.repl_set:
-        options_dict["mongod_options"] = "{} --replSet {}".format(options.mongod_options,
-                                                                  options.repl_set)
+    mongod_options = task_config.mongod_options
+    if task_config.repl_set:
+        mongod_options = f"{mongod_options} --replSet {task_config.repl_set}"
 
     # For MongodControl, the file references should be fully specified.
     bin_dir = abs_path(powercycle_constants.REMOTE_DIR)
@@ -1169,19 +1169,19 @@ def remote_handler(options, operations, root_dir):  # pylint: disable=too-many-b
     log_path = abs_path(powercycle_constants.LOG_PATH)
 
     mongod = MongodControl(bin_dir=bin_dir, db_path=db_path, log_path=log_path, port=options.port,
-                           options=options.mongod_options)
+                           options=mongod_options)
 
-    mongo_client_opts = get_mongo_client_args(host=host, port=options.port, options=options)
+    mongo_client_opts = get_mongo_client_args(host=host, port=options.port, task_config=task_config)
 
     # Perform the sequence of operations specified. If any operation fails then return immediately.
-    for operation in operations:
+    for operation in options.remote_operations:
         ret = 0
         if operation == "noop":
             pass
 
         # This is the internal "crash" mechanism, which is executed on the remote host.
         elif operation == "crash_server":
-            ret, output = internal_crash(options.remote_sudo)
+            ret, output = internal_crash()
             # An internal crash on Windows is not immediate
             try:
                 LOGGER.info("Waiting after issuing internal crash!")
@@ -1240,8 +1240,8 @@ def remote_handler(options, operations, root_dir):  # pylint: disable=too-many-b
             mongo = pymongo.MongoClient(**mongo_client_opts)
             LOGGER.info("Server buildinfo: %s", mongo.admin.command("buildinfo"))
             LOGGER.info("Server serverStatus: %s", mongo.admin.command("serverStatus"))
-            if options.repl_set:
-                ret = mongo_reconfig_replication(mongo, host_port, options.repl_set)
+            if task_config.repl_set:
+                ret = mongo_reconfig_replication(mongo, host_port, task_config.repl_set)
 
         elif operation == "stop_mongod":
             ret, output = mongod.stop()
@@ -1270,12 +1270,12 @@ def remote_handler(options, operations, root_dir):  # pylint: disable=too-many-b
         elif operation == "seed_docs":
             mongo = pymongo.MongoClient(**mongo_client_opts)
             ret = mongo_seed_docs(mongo, powercycle_constants.DB_NAME,
-                                  powercycle_constants.COLLECTION_NAME, options.seed_doc_num)
+                                  powercycle_constants.COLLECTION_NAME, task_config.seed_doc_num)
 
         elif operation == "set_fcv":
             mongo = pymongo.MongoClient(**mongo_client_opts)
             try:
-                ret = mongo.admin.command("setFeatureCompatibilityVersion", options.fcv_version)
+                ret = mongo.admin.command("setFeatureCompatibilityVersion", task_config.fcv)
                 ret = 0 if ret["ok"] == 1 else 1
             except pymongo.errors.OperationFailure as err:
                 LOGGER.error("%s", err)
@@ -1368,7 +1368,7 @@ def kill_mongod():
     return ret, output
 
 
-def internal_crash(use_sudo=False):
+def internal_crash():
     """Internally crash the host this excutes on."""
 
     # Windows can use NotMyFault to immediately crash itself, if it's been installed.
@@ -1391,35 +1391,34 @@ def internal_crash(use_sudo=False):
         #       f.write("1\n")
         #   with open("/proc/sysrq-trigger", "w") as f:
         #       f.write("b\n")
-        sudo = "/usr/bin/sudo" if use_sudo else ""
-        cmds = """
+        sudo = "/usr/bin/sudo"
+        cmds = f"""
             echo "Server crashing now" | {sudo} wall ;
             echo 1 | {sudo} tee /proc/sys/kernel/sysrq ;
-            echo b | {sudo} tee /proc/sysrq-trigger""".format(sudo=sudo)
+            echo b | {sudo} tee /proc/sysrq-trigger"""
         ret, output = execute_cmd(cmds, use_file=True)
     LOGGER.debug(output)
     return 1, "Crash did not occur"
 
 
 def crash_server_or_kill_mongod(  # pylint: disable=too-many-arguments,too-many-locals
-        options, crash_canary, local_ops, script_name, client_args):
+        task_config, crash_canary, local_ops, script_name, client_args):
     """Crash server or kill mongod and optionally write canary doc. Return tuple (ret, output)."""
 
     crash_wait_time = powercycle_constants.CRASH_WAIT_TIME + random.randint(
         0, powercycle_constants.CRASH_WAIT_TIME_JITTER)
-    message_prefix = "Killing mongod" if options.crash_method == "kill" else "Crashing server"
+    message_prefix = "Killing mongod" if task_config.crash_method == "kill" else "Crashing server"
     LOGGER.info("%s in %d seconds", message_prefix, crash_wait_time)
     time.sleep(crash_wait_time)
 
-    if options.crash_method == "internal" or options.crash_method == "kill":
-        crash_cmd = "crash_server" if options.crash_method == "internal" else "kill_mongod"
+    if task_config.crash_method == "internal" or task_config.crash_method == "kill":
+        crash_cmd = "crash_server" if task_config.crash_method == "internal" else "kill_mongod"
         crash_func = local_ops.shell
-        crash_args = [
-            f"{options.remote_python} {script_name} {client_args} --remoteOperation {crash_cmd}"
-        ]
+        remote_python = get_remote_python()
+        crash_args = [f"{remote_python} {script_name} {client_args} --remoteOperation {crash_cmd}"]
 
     else:
-        message = "Unsupported crash method '{}' provided".format(options.crash_method)
+        message = "Unsupported crash method '{}' provided".format(task_config.crash_method)
         LOGGER.error(message)
         return 1, message
 
@@ -1451,7 +1450,7 @@ def wait_for_mongod_shutdown(mongod_control, timeout=2 * ONE_HOUR_SECS):
     return 0
 
 
-def get_mongo_client_args(host=None, port=None, options=None,
+def get_mongo_client_args(host=None, port=None, task_config=None,
                           server_selection_timeout_ms=2 * ONE_HOUR_SECS * 1000,
                           socket_timeout_ms=2 * ONE_HOUR_SECS * 1000):
     """Return keyword arg dict used in PyMongo client."""
@@ -1464,13 +1463,13 @@ def get_mongo_client_args(host=None, port=None, options=None,
         mongo_args["host"] = host
     if port:
         mongo_args["port"] = port
-    if options:
+    if task_config:
         # Set the writeConcern
-        if options.write_concern:
-            mongo_args.update(yaml.safe_load(options.write_concern))
+        if task_config.write_concern:
+            mongo_args.update(yaml.safe_load(task_config.write_concern))
         # Set the readConcernLevel
-        if options.read_concern_level:
-            mongo_args["readConcernLevel"] = options.read_concern_level
+        if task_config.read_concern_level:
+            mongo_args["readConcernLevel"] = task_config.read_concern_level
     return mongo_args
 
 
@@ -1650,7 +1649,16 @@ def setup_ssh_tunnel(  # pylint: disable=too-many-arguments
     Processes.create(ssh_tunnel_cmd)
 
 
-def main(parser, parser_actions, options):  # pylint: disable=too-many-branches,too-many-locals,too-many-statements
+def get_remote_python():
+    """Return remote python."""
+
+    python_bin_dir = "Scripts" if _IS_WINDOWS else "bin"
+    remote_python = f". {powercycle_constants.VIRTUALENV_DIR}/{python_bin_dir}/activate; python -u"
+
+    return remote_python
+
+
+def main(parser_actions, options):  # pylint: disable=too-many-branches,too-many-locals,too-many-statements
     """Execute Main program."""
 
     # pylint: disable=global-statement
@@ -1669,76 +1677,57 @@ def main(parser, parser_actions, options):  # pylint: disable=too-many-branches,
     logging.getLogger(__name__).setLevel(options.log_level.upper())
     logging.Formatter.converter = time.gmtime
 
-    LOGGER.info("powertest invocation: %s", " ".join(sys.argv))
+    LOGGER.info("powercycle invocation: %s", " ".join(sys.argv))
 
-    options_dict = vars(options)
-    # Command line options override the config file options.
-    if options.config_file:
-        with open(options.config_file) as ystream:
-            config_options = yaml.safe_load(ystream)
-        LOGGER.info("Loading config file %s with options %s", options.config_file, config_options)
-        # Load the options specified in the config_file
-        for key, value in config_options.items():
-            options_dict[key] = value
-        # Disable this option such that the remote side does not load a config_file.
-        options_dict["config_file"] = None
+    task_name = options.task_name
+    task_config = powercycle_config.get_task_config(task_name, options.remote_operation)
 
-    if options.save_config_options:
-        # Disable this option such that the remote side does not save the config options.
-        save_config_options = options.save_config_options
-        options_dict["save_config_options"] = None
-        save_options = {}
-        for action in parser_actions:
-            option_value = options_dict.get(action.dest, None)
-            if option_value != action.default:
-                save_options[action.dest] = option_value
-        LOGGER.info("Config options being saved %s", save_options)
-        with open(save_config_options, "w") as ystream:
-            yaml.safe_dump(save_options, ystream, default_flow_style=False)
-        sys.exit(0)
-
-    if not options.remote_operation:
-        EXIT_YML_FILE = powercycle_constants.POWERCYCLE_EXIT_FILE
-
-    if not options.remote_operation:
-        REPORT_JSON_FILE = powercycle_constants.REPORT_JSON_FILE
-        if REPORT_JSON_FILE and os.path.exists(REPORT_JSON_FILE):
-            with open(REPORT_JSON_FILE) as jstream:
-                REPORT_JSON = json.load(jstream)
-        else:
-            REPORT_JSON = {
-                "failures":
-                    0, "results": [{
-                        "status": "fail", "test_file": __name__, "exit_code": 0, "elapsed": 0,
-                        "start": int(time.time()), "end": int(time.time())
-                    }]
-            }
-        LOGGER.debug("Updating/creating report JSON %s", REPORT_JSON)
+    LOGGER.info("powercycle task config: %s", task_config)
 
     # Initialize the mongod options
     # Note - We use posixpath for Windows client to Linux server scenarios.
-    root_dir = f"{powercycle_constants.REMOTE_DIR}/mongodb-powertest-{int(time.time())}"
-    mongod_options_map = parse_options(options.mongod_options)
-    set_fcv_cmd = "set_fcv" if options.fcv_version is not None else ""
+    root_dir = f"{powercycle_constants.REMOTE_DIR}/mongodb-powercycle-test-{int(time.time())}"
+    mongod_options_map = parse_options(task_config.mongod_options)
+    set_fcv_cmd = "set_fcv" if task_config.fcv is not None else ""
 
     # Error out earlier if these options are not properly specified
-    write_concern = yaml.safe_load(options.write_concern)
+    write_concern = yaml.safe_load(task_config.write_concern)
 
     # Invoke remote_handler if remote_operation is specified.
     # The remote commands are program args.
     if options.remote_operation:
-        ret = remote_handler(options, options.remote_operations, root_dir)
+        ret = remote_handler(options, task_config, root_dir)
         # Exit here since the local operations are performed after this.
         local_exit(ret)
 
-    # Required option for non-remote commands.
-    if options.ssh_user_host is None and not options.remote_operation:
-        parser.error("Missing required argument --sshUserHost")
+    EXIT_YML_FILE = powercycle_constants.POWERCYCLE_EXIT_FILE
+    REPORT_JSON_FILE = powercycle_constants.REPORT_JSON_FILE
+    REPORT_JSON = {
+        "failures":
+            0, "results": [{
+                "status": "fail", "test_file": task_name, "exit_code": 1, "elapsed": 0,
+                "start": int(time.time()), "end": int(time.time())
+            }]
+    }
+    LOGGER.debug("Creating report JSON %s", REPORT_JSON)
+
+    test_loops = task_config.test_loops
+    num_crud_clients = powercycle_constants.NUM_CRUD_CLIENTS
+    num_fsm_clients = powercycle_constants.NUM_FSM_CLIENTS
+
+    # Windows task overrides:
+    #   - Execute no more than 10 test loops
+    #   - Cap the maximum number of clients to 10 each
+    if _IS_WINDOWS:
+        if test_loops > 10:
+            test_loops = 10
+        num_crud_clients = 10
+        num_fsm_clients = 10
 
     secret_port = powercycle_constants.SECRET_PORT
     standard_port = powercycle_constants.STANDARD_PORT
 
-    seed_docs = "seed_docs" if options.seed_doc_num else ""
+    seed_docs = "seed_docs"
 
     rsync_cmd = "rsync_data"
     backup_path_before = powercycle_constants.BACKUP_PATH_BEFORE
@@ -1748,11 +1737,10 @@ def main(parser, parser_actions, options):  # pylint: disable=too-many-branches,
     backup_path_after = f"{backup_path_after}-1"
 
     # Setup the mongo client, mongo_path is required if there are local clients.
-    if options.num_crud_clients > 0 or options.num_fsm_clients > 0:
-        mongo_executable = distutils.spawn.find_executable(
-            "dist-test/bin/mongo",
-            os.getcwd() + os.pathsep + os.environ["PATH"])
-        mongo_path = os.path.abspath(os.path.normpath(mongo_executable))
+    mongo_executable = distutils.spawn.find_executable(
+        "dist-test/bin/mongo",
+        os.getcwd() + os.pathsep + os.environ["PATH"])
+    mongo_path = os.path.abspath(os.path.normpath(mongo_executable))
 
     # Setup the CRUD & FSM clients.
     if not os.path.isfile(powercycle_constants.CONFIG_CRUD_CLIENT):
@@ -1761,7 +1749,7 @@ def main(parser, parser_actions, options):  # pylint: disable=too-many-branches,
         local_exit(1)
     with_external_server = powercycle_constants.CONFIG_CRUD_CLIENT
     fsm_client = powercycle_constants.FSM_CLIENT
-    read_concern_level = options.read_concern_level
+    read_concern_level = task_config.read_concern_level
     if write_concern and not read_concern_level:
         read_concern_level = "local"
     crud_test_data = {}
@@ -1806,7 +1794,7 @@ def main(parser, parser_actions, options):  # pylint: disable=too-many-branches,
     # For remote operations requiring sudo, force pseudo-tty allocation,
     # see https://stackoverflow.com/questions/10310299/proper-way-to-sudo-over-ssh.
     # Note - the ssh option RequestTTY was added in OpenSSH 5.9, so we use '-tt'.
-    ssh_options = "-tt" if options.remote_sudo else None
+    ssh_options = None if _IS_WINDOWS else "-tt"
 
     # Instantiate the local handler object.
     local_ops = LocalToRemoteOperations(user_host=ssh_user_host,
@@ -1815,7 +1803,8 @@ def main(parser, parser_actions, options):  # pylint: disable=too-many-branches,
     verify_remote_access(local_ops)
 
     # Pass client_args to the remote script invocation.
-    client_args = "powertest"
+    client_args = "powercycle"
+    options_dict = vars(options)
     for action in parser_actions:
         option_value = options_dict.get(action.dest, None)
         if option_value != action.default:
@@ -1835,18 +1824,15 @@ def main(parser, parser_actions, options):  # pylint: disable=too-many-branches,
     script_name = f"{powercycle_constants.REMOTE_DIR}/{powercycle_constants.RESMOKE_PATH}"
     LOGGER.info("%s %s", script_name, client_args)
 
+    remote_python = get_remote_python()
+
     # Remote install of MongoDB.
-    ret, output = call_remote_operation(local_ops, options.remote_python, script_name, client_args,
+    ret, output = call_remote_operation(local_ops, remote_python, script_name, client_args,
                                         "--remoteOperation install_mongod")
     LOGGER.info("****install_mongod: %d %s****", ret, output)
     if ret:
         local_exit(ret)
 
-    # test_time option overrides num_loops.
-    if options.test_time:
-        options_dict["num_loops"] = 999999
-    else:
-        options_dict["test_time"] = 999999
     loop_num = 0
     start_time = int(time.time())
     test_time = 0
@@ -1893,8 +1879,8 @@ def main(parser, parser_actions, options):  # pylint: disable=too-many-branches,
                             f" start_mongod"
                             f" {set_fcv_cmd if loop_num == 1 else ''}"
                             f" {seed_docs if loop_num == 1 else ''}")
-        ret, output = call_remote_operation(local_ops, options.remote_python, script_name,
-                                            client_args, remote_operation)
+        ret, output = call_remote_operation(local_ops, remote_python, script_name, client_args,
+                                            remote_operation)
         rsync_text = "rsync_data beforerecovery & "
         LOGGER.info("****%sstart mongod: %d %s****", rsync_text, ret, output)
         if ret:
@@ -1928,8 +1914,8 @@ def main(parser, parser_actions, options):  # pylint: disable=too-many-branches,
 
         # Shutdown mongod on secret port.
         remote_op = f"--remoteOperation --mongodPort {secret_port} shutdown_mongod"
-        ret, output = call_remote_operation(local_ops, options.remote_python, script_name,
-                                            client_args, remote_op)
+        ret, output = call_remote_operation(local_ops, remote_python, script_name, client_args,
+                                            remote_op)
         LOGGER.info("****shutdown_mongod: %d %s****", ret, output)
         if ret:
             local_exit(ret)
@@ -1948,8 +1934,8 @@ def main(parser, parser_actions, options):  # pylint: disable=too-many-branches,
                      f" --mongodPort {standard_port}"
                      f" {rsync_cmd}"
                      f" start_mongod")
-        ret, output = call_remote_operation(local_ops, options.remote_python, script_name,
-                                            client_args, remote_op)
+        ret, output = call_remote_operation(local_ops, remote_python, script_name, client_args,
+                                            remote_op)
         rsync_text = "rsync_data afterrecovery & "
         LOGGER.info("****%s start mongod: %d %s****", rsync_text, ret, output)
         if ret:
@@ -1959,7 +1945,7 @@ def main(parser, parser_actions, options):  # pylint: disable=too-many-branches,
 
         # Start CRUD clients
         host_port = f"localhost:{standard_port}"
-        for i in range(options.num_crud_clients):
+        for i in range(num_crud_clients):
             crud_config_file = NamedTempFile.create(suffix=".yml", directory="tmp")
             crud_test_data["collectionName"] = f"{powercycle_constants.COLLECTION_NAME}-{i}"
             new_resmoke_config(with_external_server, crud_config_file, crud_test_data, eval_str)
@@ -1968,11 +1954,10 @@ def main(parser, parser_actions, options):  # pylint: disable=too-many-branches,
                                   resmoke_suite=crud_config_file, repeat_num=100, no_wait=True,
                                   log_file=f"crud_{i}.log")
 
-        if options.num_crud_clients:
-            LOGGER.info("****Started %d CRUD client(s)****", options.num_crud_clients)
+        LOGGER.info("****Started %d CRUD client(s)****", num_crud_clients)
 
         # Start FSM clients
-        for i in range(options.num_fsm_clients):
+        for i in range(num_fsm_clients):
             fsm_config_file = NamedTempFile.create(suffix=".yml", directory="tmp")
             fsm_test_data["dbNamePrefix"] = f"fsm-{i}"
             # Do collection validation only for the first FSM client.
@@ -1983,8 +1968,7 @@ def main(parser, parser_actions, options):  # pylint: disable=too-many-branches,
                                   resmoke_suite=fsm_config_file, repeat_num=100, no_wait=True,
                                   log_file=f"fsm_{i}.log")
 
-        if options.num_fsm_clients:
-            LOGGER.info("****Started %d FSM client(s)****", options.num_fsm_clients)
+        LOGGER.info("****Started %d FSM client(s)****", num_fsm_clients)
 
         # Crash the server. A pre-crash canary document is written to the DB.
         crash_canary = {}
@@ -1997,18 +1981,18 @@ def main(parser, parser_actions, options):  # pylint: disable=too-many-branches,
         crash_canary["args"] = [
             mongo, powercycle_constants.DB_NAME, powercycle_constants.COLLECTION_NAME, canary_doc
         ]
-        ret, output = crash_server_or_kill_mongod(options, crash_canary, local_ops, script_name,
+        ret, output = crash_server_or_kill_mongod(task_config, crash_canary, local_ops, script_name,
                                                   client_args)
 
         LOGGER.info("Crash server or Kill mongod: %d %s****", ret, output)
 
         # For internal crashes 'ret' is non-zero, because the ssh session unexpectedly terminates.
-        if options.crash_method != "internal" and ret:
+        if task_config.crash_method != "internal" and ret:
             raise Exception(f"Crash of server failed: {output}")
 
-        if options.crash_method != "kill":
+        if task_config.crash_method != "kill":
             # Check if the crash failed due to an ssh error.
-            if options.crash_method == "internal" and local_ops.ssh_error(output):
+            if task_config.crash_method == "internal" and local_ops.ssh_error(output):
                 ssh_failure_exit(ret, output)
             # Wait a bit after sending command to crash the server to avoid connecting to the
             # server before the actual crash occurs.
@@ -2024,14 +2008,14 @@ def main(parser, parser_actions, options):  # pylint: disable=too-many-branches,
                                             ssh_connection_options=ssh_connection_options,
                                             ssh_options=ssh_options, use_shell=True)
         verify_remote_access(local_ops)
-        ret, output = call_remote_operation(local_ops, options.remote_python, script_name,
-                                            client_args, "--remoteOperation noop")
+        ret, output = call_remote_operation(local_ops, remote_python, script_name, client_args,
+                                            "--remoteOperation noop")
         boot_time_after_crash = get_boot_datetime(output)
         if boot_time_after_crash == -1 or boot_time_after_recovery == -1:
             LOGGER.warning(
                 "Cannot compare boot time after recovery: %s with boot time after crash: %s",
                 boot_time_after_recovery, boot_time_after_crash)
-        elif options.crash_method != "kill" and boot_time_after_crash <= boot_time_after_recovery:
+        elif task_config.crash_method != "kill" and boot_time_after_crash <= boot_time_after_recovery:
             raise Exception(f"System boot time after crash ({boot_time_after_crash}) is not newer"
                             f" than boot time before crash ({boot_time_after_recovery})")
 
@@ -2039,11 +2023,11 @@ def main(parser, parser_actions, options):  # pylint: disable=too-many-branches,
 
         test_time = int(time.time()) - start_time
         LOGGER.info("****Completed test loop %d test time %d seconds****", loop_num, test_time)
-        if loop_num == options.num_loops or test_time >= options.test_time:
+        if loop_num == test_loops:
             break
 
-        ret, output = call_remote_operation(local_ops, options.remote_python, script_name,
-                                            client_args, "--remoteOperation check_disk")
+        ret, output = call_remote_operation(local_ops, remote_python, script_name, client_args,
+                                            "--remoteOperation check_disk")
         if ret != 0:
             LOGGER.error("****check_disk: %d %s****", ret, output)
 

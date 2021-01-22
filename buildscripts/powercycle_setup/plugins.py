@@ -8,9 +8,9 @@ import sys
 import shlex
 import yaml
 
-from buildscripts.powercycle.remote_operations import RemoteOperations, SSHOperation
+from buildscripts.powercycle_setup.remote_operations import RemoteOperations, SSHOperation
 from buildscripts.resmokelib.plugin import PluginInterface, Subcommand
-from buildscripts.resmokelib.powertest import powercycle_constants
+from buildscripts.resmokelib.powercycle import powercycle_constants
 
 
 class PowercycleCommand(Subcommand):  # pylint: disable=abstract-method, too-many-instance-attributes
@@ -201,9 +201,14 @@ class TarEC2Artifacts(PowercycleCommand):
         if "ec2_ssh_failure" in self.expansions:
             return
         tar_cmd = "tar" if "tar" not in self.expansions else self.expansions["tar"]
-        ec2_artifacts = powercycle_constants.EC2_ARTIFACTS
-        if self.expansions.get("ec2_artifacts", "") == "mongod_log_only":
-            ec2_artifacts = powercycle_constants.LOG_PATH
+        ec2_artifacts = powercycle_constants.LOG_PATH
+        # On test success, we only archive mongod.log.
+        if self.expansions.get("exit_code", "1") != "0":
+            ec2_artifacts = f"{ec2_artifacts} {powercycle_constants.DB_PATH}"
+            ec2_artifacts = f"{ec2_artifacts} {powercycle_constants.BACKUP_ARTIFACTS}"
+            if self.is_windows():
+                ec2_artifacts = f"{ec2_artifacts} {powercycle_constants.EVENT_LOGPATH}"
+
         cmd = f"{tar_cmd} czf ec2_artifacts.tgz {ec2_artifacts}"
 
         self.remote_op.operation(SSHOperation.SHELL, cmd, None)
@@ -261,7 +266,7 @@ class GatherRemoteMongoCoredumps(PowercycleCommand):
 
         remote_dir = powercycle_constants.REMOTE_DIR
         # Find all core files and move to $remote_dir
-        cmds = "core_files=$(/usr/bin/find -H . ( -name '*.core' -o -name '*.mdmp' ) 2> /dev/null)"
+        cmds = "core_files=$(/usr/bin/find -H . \\( -name '*.core' -o -name '*.mdmp' \\) 2> /dev/null)"
         cmds = f"{cmds}; if [ -z \"$core_files\" ]; then exit 0; fi"
         cmds = f"{cmds}; echo Found remote core files $core_files, moving to $(pwd)"
         cmds = f"{cmds}; for core_file in $core_files"

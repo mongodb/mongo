@@ -9,6 +9,6 @@ if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # pylint: disable=wrong-import-position
-import buildscripts.powercycle.cli as cli
+import buildscripts.powercycle_setup.cli as cli
 
 cli.main(sys.argv)

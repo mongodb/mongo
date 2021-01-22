@@ -5,7 +5,7 @@ import shlex
 
 from buildscripts.resmokelib import configure_resmoke
 from buildscripts.resmokelib.hang_analyzer import HangAnalyzerPlugin
-from buildscripts.resmokelib.powertest import PowertestPlugin
+from buildscripts.resmokelib.powercycle import PowercyclePlugin
 from buildscripts.resmokelib.run import RunPlugin
 from buildscripts.resmokelib.setup_multiversion import SetupMultiversionPlugin
 from buildscripts.resmokelib.undodb import UndoDbPlugin
@@ -15,7 +15,7 @@ _PLUGINS = [
     HangAnalyzerPlugin(),
     UndoDbPlugin(),
     SetupMultiversionPlugin(),
-    PowertestPlugin(),
+    PowercyclePlugin(),
 ]
 
 

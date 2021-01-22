@@ -2,7 +2,7 @@
 
 import argparse
 
-import buildscripts.powercycle.plugins as plugins
+import buildscripts.powercycle_setup.plugins as plugins
 
 _PLUGINS = [plugins.PowercyclePlugin()]
 

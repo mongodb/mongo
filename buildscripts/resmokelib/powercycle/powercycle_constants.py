@@ -35,10 +35,20 @@ RSYNC_EXCLUDE_FILES = ["diagnostic.data/metrics.interim*"]
 CRASH_WAIT_TIME = 45
 CRASH_WAIT_TIME_JITTER = 5
 
+NUM_CRUD_CLIENTS = 20
 CRUD_CLIENT = "jstests/hooks/crud_client.js"
 CONFIG_CRUD_CLIENT = "buildscripts/resmokeconfig/suites/with_external_server.yml"
+NUM_FSM_CLIENTS = 20
 FSM_CLIENT = "jstests/libs/fsm_serial_client.js"
 SET_READ_AND_WRITE_CONCERN = "jstests/libs/override_methods/set_read_and_write_concerns.js"
 
 REPORT_JSON_FILE = "report.json"
 POWERCYCLE_EXIT_FILE = "powercycle_exit.yml"
+
+DEFAULT_CRASH_METHOD = "internal"
+DEFAULT_TEST_LOOPS = 15
+DEFAULT_SEED_DOC_NUM = 10_000
+DEFAULT_MONGOD_OPTIONS = ("--setParameter enableTestCommands=1"
+                          " --setParameter logComponentVerbosity='{storage:{recovery:2}}'"
+                          " --storageEngine wiredTiger"
+                          " --wiredTigerEngineConfigString 'debug_mode=[table_logging=true]'")
