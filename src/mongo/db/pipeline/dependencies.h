@@ -101,11 +101,16 @@ struct DepsTracker {
     DepsTracker(const QueryMetadataBitSet& unavailableMetadata = kNoMetadata)
         : _unavailableMetadata{unavailableMetadata} {}
 
+    enum class TruncateToRootLevel : bool { no, yes };
+
     /**
      * Returns a projection object covering the non-metadata dependencies tracked by this class, or
-     * empty BSONObj if the entire document is required.
+     * empty BSONObj if the entire document is required. By default, the resulting project will
+     * include the full, dotted field names of the dependencies. If 'truncationBehavior' is set to
+     * TruncateToRootLevel::yes, the project will contain only the root-level field names.
      */
-    BSONObj toProjectionWithoutMetadata() const;
+    BSONObj toProjectionWithoutMetadata(
+        TruncateToRootLevel truncationBehavior = TruncateToRootLevel::no) const;
 
     /**
      * Returns 'true' if there is no dependency on the input documents or metadata.

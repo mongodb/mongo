@@ -31,7 +31,10 @@
 
 #include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/pipeline/document_source_project.h"
+#include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 
@@ -232,5 +235,86 @@ DocumentSource::GetNextResult DocumentSourceInternalUnpackBucket::doGetNext() {
     }
 
     return nextResult;
+}
+
+namespace {
+/**
+ * A projection can be internalized if it does not include any dotted field names and if every field
+ * name corresponds to a boolean value.
+ */
+bool canInternalizeProjectObj(const BSONObj& projObj) {
+    const auto names = projObj.getFieldNames<std::set<std::string>>();
+    return std::all_of(names.begin(), names.end(), [&projObj](auto&& name) {
+        return name.find('.') == std::string::npos && projObj.getField(name).isBoolean();
+    });
+}
+
+/**
+ * If 'src' represents an inclusion or exclusion $project, return a BSONObj representing it, else
+ * return an empty BSONObj. If 'inclusionOnly' is true, 'src' must be an inclusion $project.
+ */
+auto getProjectObj(DocumentSource* src, bool inclusionOnly) {
+    if (const auto projStage = dynamic_cast<DocumentSourceSingleDocumentTransformation*>(src);
+        projStage &&
+        (projStage->getType() == TransformerInterface::TransformerType::kInclusionProjection ||
+         (!inclusionOnly &&
+          projStage->getType() == TransformerInterface::TransformerType::kExclusionProjection))) {
+        return projStage->getTransformer().serializeTransformation(boost::none).toBson();
+    }
+
+    return BSONObj{};
+}
+
+/**
+ * Given a source container and an iterator pointing to the $unpackBucket stage, builds a projection
+ * BSONObj that can be entirely moved into the $unpackBucket stage, following these rules:
+ *    1. If there is an inclusion projection immediately after the $unpackBucket which can be
+ *       internalized, an empty BSONObj will be returned.
+ *    2. Otherwise, if there is a finite dependency set for the rest of the pipeline, an inclusion
+ *       $project representing it and containing only root-level fields will be returned. An
+ *       inclusion $project will be returned here even if there is a viable exclusion $project
+ *       next in the pipeline.
+ *    3. Otherwise, an empty BSONObj will be returned.
+ */
+auto buildProjectToInternalize(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                               Pipeline::SourceContainer::iterator itr,
+                               Pipeline::SourceContainer* container) {
+    // Check for a viable inclusion $project after the $unpackBucket. This handles case 1.
+    if (auto projObj = getProjectObj(std::next(itr)->get(), true);
+        !projObj.isEmpty() && canInternalizeProjectObj(projObj)) {
+        return BSONObj{};
+    }
+
+    // If there is a finite dependency set for the pipeline after the $unpackBucket, obtain an
+    // inclusion $project representing its root-level fields. Otherwise, we get an empty BSONObj.
+    Pipeline::SourceContainer restOfPipeline(std::next(itr), container->end());
+    auto deps = Pipeline::getDependenciesForContainer(expCtx, restOfPipeline, boost::none);
+    auto dependencyProj = deps.toProjectionWithoutMetadata(DepsTracker::TruncateToRootLevel::yes);
+
+    // If 'dependencyProj' is not empty, we're in case 2. If it is empty, we're in case 3. There may
+    // be a viable exclusion $project in the pipeline, but we don't need to check for it here.
+    return dependencyProj;
+}
+}  // namespace
+
+Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimizeAt(
+    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+    invariant(*itr == this);
+
+    if (std::next(itr) == container->end()) {
+        return container->end();
+    }
+
+    // Attempt to build an internalizable $project based on dependency analysis.
+    if (auto projObj = buildProjectToInternalize(getContext(), itr, container);
+        !projObj.isEmpty()) {
+        // Give the new $project a chance to be optimized before internalizing.
+        container->insert(std::next(itr),
+                          DocumentSourceProject::createFromBson(
+                              BSON("$project" << projObj).firstElement(), pExpCtx));
+        return std::next(itr);
+    }
+
+    return std::next(itr);
 }
 }  // namespace mongo

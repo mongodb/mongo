@@ -268,9 +268,22 @@ public:
 
     /**
      * Returns the dependencies needed by this pipeline. 'unavailableMetadata' should reflect what
-     * metadata is not present on documents that are input to the front of the pipeline.
+     * metadata is not present on documents that are input to the front of the pipeline. If
+     * 'unavailableMetadata' is specified, this method will throw if any of the dependencies
+     * reference unavailable metadata.
      */
-    DepsTracker getDependencies(QueryMetadataBitSet unavailableMetadata) const;
+    DepsTracker getDependencies(boost::optional<QueryMetadataBitSet> unavailableMetadata) const;
+
+    /**
+     * Returns the dependencies needed by the SourceContainer. 'unavailableMetadata' should reflect
+     * what metadata is not present on documents that are input to the front of the pipeline. If
+     * 'unavailableMetadata' is specified, this method will throw if any of the dependencies
+     * reference unavailable metadata.
+     */
+    static DepsTracker getDependenciesForContainer(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const SourceContainer& container,
+        boost::optional<QueryMetadataBitSet> unavailableMetadata);
 
     const SourceContainer& getSources() const {
         return _sources;

@@ -158,6 +158,9 @@ public:
         return boost::none;
     };
 
+    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
+                                                     Pipeline::SourceContainer* container) final;
+
 private:
     GetNextResult doGetNext() final;
 

@@ -37,7 +37,8 @@
 
 namespace mongo {
 
-BSONObj DepsTracker::toProjectionWithoutMetadata() const {
+BSONObj DepsTracker::toProjectionWithoutMetadata(
+    TruncateToRootLevel truncationBehavior /*= TruncateToRootLevel::no*/) const {
     BSONObjBuilder bb;
 
     if (needWholeDocument) {
@@ -65,14 +66,17 @@ BSONObj DepsTracker::toProjectionWithoutMetadata() const {
             continue;
         }
 
-        last = field + '.';
+        // Check that the field requested is a valid field name in the agg language. This
+        // constructor will throw if it isn't.
+        FieldPath fp(field);
 
-        {
-            // Check that the field requested is a valid field name in the agg language. This
-            // constructor will throw if it isn't.
-            FieldPath fp(field);
+        if (truncationBehavior == TruncateToRootLevel::yes) {
+            last = fp.front().toString() + '.';
+            bb.append(fp.front(), 1);
+        } else {
+            last = field + '.';
+            bb.append(field, 1);
         }
-        bb.append(field, 1);
     }
 
     if (!idSpecified) {

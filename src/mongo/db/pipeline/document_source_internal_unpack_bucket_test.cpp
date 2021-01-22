@@ -29,10 +29,17 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/bson/unordered_fields_bsonobj_comparator.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
+#include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
+#include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_mock.h"
+#include "mongo/db/pipeline/document_source_project.h"
+#include "mongo/db/pipeline/document_source_sort.h"
+#include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/query/util/make_data_structure.h"
 
 namespace mongo {
 namespace {
@@ -722,6 +729,229 @@ TEST_F(InternalUnpackBucketStageTest, ParserRejectsMissingTimeField) {
             fromjson("{$_internalUnpackBucket: {include: [], metaField: 'bar'}}").firstElement(),
             getExpCtx()),
         AssertionException);
+}
+
+TEST_F(InternalUnpackBucketStageTest, OptimizeAddsIncludeProjectForGroupDependencies) {
+    auto unpackSpecObj = fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo'}}");
+    auto groupSpecObj = fromjson("{$group: {_id: '$x', f: {$first: '$y'}}}");
+
+    auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, groupSpecObj), getExpCtx());
+    ASSERT_EQ(2u, pipeline->getSources().size());
+
+    pipeline->optimizePipeline();
+    ASSERT_EQ(3u, pipeline->getSources().size());
+
+    auto serialized = pipeline->serializeToBson();
+    ASSERT_EQ(3u, serialized.size());
+
+    const UnorderedFieldsBSONObjComparator kComparator;
+    ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[0]);
+    ASSERT_EQ(
+        kComparator.compare(fromjson("{$project: {_id: false, x: true, y: true}}"), serialized[1]),
+        0);
+    ASSERT_BSONOBJ_EQ(groupSpecObj, serialized[2]);
+}
+
+TEST_F(InternalUnpackBucketStageTest, OptimizeAddsIncludeProjectForProjectDependencies) {
+    auto unpackSpecObj = fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo'}}");
+    auto projectSpecObj = fromjson("{$project: {_id: true, x: {f: '$y'}}}");
+
+    auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, projectSpecObj), getExpCtx());
+    ASSERT_EQ(2u, pipeline->getSources().size());
+
+    pipeline->optimizePipeline();
+    ASSERT_EQ(3u, pipeline->getSources().size());
+
+    auto serialized = pipeline->serializeToBson();
+    ASSERT_EQ(3u, serialized.size());
+
+    const UnorderedFieldsBSONObjComparator kComparator;
+    ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[0]);
+    ASSERT_EQ(
+        kComparator.compare(fromjson("{$project: {_id: true, x: true, y: true}}"), serialized[1]),
+        0);
+    ASSERT_BSONOBJ_EQ(projectSpecObj, serialized[2]);
+}
+
+TEST_F(InternalUnpackBucketStageTest, OptimizeAddsIncludeProjectWhenInMiddleOfPipeline) {
+    auto matchSpecObj = fromjson("{$match: {'meta.source': 'primary'}}");
+    auto unpackSpecObj =
+        fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'meta'}}");
+    auto groupSpecObj = fromjson("{$group: {_id: '$x', f: {$first: '$y'}}}");
+
+    auto pipeline =
+        Pipeline::parse(makeVector(matchSpecObj, unpackSpecObj, groupSpecObj), getExpCtx());
+    ASSERT_EQ(3u, pipeline->getSources().size());
+
+    pipeline->optimizePipeline();
+    ASSERT_EQ(4u, pipeline->getSources().size());
+
+    auto serialized = pipeline->serializeToBson();
+    ASSERT_EQ(4u, serialized.size());
+
+    const UnorderedFieldsBSONObjComparator kComparator;
+    ASSERT_BSONOBJ_EQ(matchSpecObj, serialized[0]);
+    ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[1]);
+    ASSERT_EQ(
+        kComparator.compare(fromjson("{$project: {_id: false, x: true, y: true}}"), serialized[2]),
+        0);
+    ASSERT_BSONOBJ_EQ(groupSpecObj, serialized[3]);
+}
+
+TEST_F(InternalUnpackBucketStageTest, OptimizeAddsIncludeProjectWhenDependenciesAreDotted) {
+    auto unpackSpecObj = fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo'}}");
+    auto groupSpecObj = fromjson("{$group: {_id: '$x.y', f: {$first: '$a.b'}}}");
+
+    auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, groupSpecObj), getExpCtx());
+    ASSERT_EQ(2u, pipeline->getSources().size());
+
+    pipeline->optimizePipeline();
+    ASSERT_EQ(3u, pipeline->getSources().size());
+
+    auto serialized = pipeline->serializeToBson();
+    ASSERT_EQ(3u, serialized.size());
+
+    const UnorderedFieldsBSONObjComparator kComparator;
+    ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[0]);
+    ASSERT_EQ(
+        kComparator.compare(fromjson("{$project: {_id: false, x: true, a: true}}"), serialized[1]),
+        0);
+    ASSERT_BSONOBJ_EQ(groupSpecObj, serialized[2]);
+}
+
+TEST_F(InternalUnpackBucketStageTest, OptimizeDoesNotAddProjectWhenThereAreNoDependencies) {
+    auto unpackSpecObj = fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo'}}");
+    auto groupSpecObj = fromjson("{$group: {_id: {$const: null}, count: { $sum: {$const: 1 }}}}");
+
+    auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, groupSpecObj), getExpCtx());
+    ASSERT_EQ(2u, pipeline->getSources().size());
+
+    pipeline->optimizePipeline();
+    ASSERT_EQ(2u, pipeline->getSources().size());
+
+    auto serialized = pipeline->serializeToBson();
+    ASSERT_EQ(2u, serialized.size());
+
+    ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[0]);
+    ASSERT_BSONOBJ_EQ(groupSpecObj, serialized[1]);
+}
+
+TEST_F(InternalUnpackBucketStageTest, OptimizeDoesNotAddProjectWhenSortDependenciesAreNotFinite) {
+    auto unpackSpecObj = fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo'}}");
+    auto sortSpecObj = fromjson("{$sort: {x: 1}}");
+
+    auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, sortSpecObj), getExpCtx());
+    ASSERT_EQ(2u, pipeline->getSources().size());
+
+    pipeline->optimizePipeline();
+    ASSERT_EQ(2u, pipeline->getSources().size());
+
+    auto serialized = pipeline->serializeToBson();
+    ASSERT_EQ(2u, serialized.size());
+
+    ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[0]);
+    ASSERT_BSONOBJ_EQ(sortSpecObj, serialized[1]);
+}
+
+TEST_F(InternalUnpackBucketStageTest,
+       OptimizeDoesNotAddProjectWhenProjectDependenciesAreNotFinite) {
+    auto unpackSpecObj = fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo'}}");
+    auto sortSpecObj = fromjson("{$sort: {x: 1}}");
+    auto projectSpecObj = fromjson("{$project: {_id: false, x: false}}");
+
+    auto pipeline =
+        Pipeline::parse(makeVector(unpackSpecObj, sortSpecObj, projectSpecObj), getExpCtx());
+    ASSERT_EQ(3u, pipeline->getSources().size());
+
+    pipeline->optimizePipeline();
+    ASSERT_EQ(3u, pipeline->getSources().size());
+
+    auto serialized = pipeline->serializeToBson();
+    ASSERT_EQ(3u, serialized.size());
+
+    ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[0]);
+    ASSERT_BSONOBJ_EQ(sortSpecObj, serialized[1]);
+    ASSERT_BSONOBJ_EQ(projectSpecObj, serialized[2]);
+}
+
+TEST_F(InternalUnpackBucketStageTest, OptimizeDoesNotAddProjectWhenViableInclusionProjectExists) {
+    auto unpackSpecObj = fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo'}}");
+    auto projectSpecObj = fromjson("{$project: {_id: true, x: true}}");
+
+    auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, projectSpecObj), getExpCtx());
+    ASSERT_EQ(2u, pipeline->getSources().size());
+
+    pipeline->optimizePipeline();
+    ASSERT_EQ(2u, pipeline->getSources().size());
+
+    auto serialized = pipeline->serializeToBson();
+    ASSERT_EQ(2u, serialized.size());
+
+    ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[0]);
+    ASSERT_BSONOBJ_EQ(projectSpecObj, serialized[1]);
+}
+
+TEST_F(InternalUnpackBucketStageTest,
+       OptimizeDoesNotAddProjectWhenViableNonBoolInclusionProjectExists) {
+    auto unpackSpecObj = fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo'}}");
+    auto pipeline = Pipeline::parse(
+        makeVector(unpackSpecObj, fromjson("{$project: {_id: 1, x: 1.0, y: 1.5}}")), getExpCtx());
+    ASSERT_EQ(2u, pipeline->getSources().size());
+
+    pipeline->optimizePipeline();
+    ASSERT_EQ(2u, pipeline->getSources().size());
+
+    auto serialized = pipeline->serializeToBson();
+    ASSERT_EQ(2u, serialized.size());
+
+    const UnorderedFieldsBSONObjComparator kComparator;
+    ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[0]);
+    ASSERT_EQ(
+        kComparator.compare(fromjson("{$project: {_id: true, x: true, y: true}}"), serialized[1]),
+        0);
+}
+
+TEST_F(InternalUnpackBucketStageTest, OptimizeDoesNotAddProjectWhenViableExclusionProjectExists) {
+    auto unpackSpecObj = fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo'}}");
+    auto projectSpecObj = fromjson("{$project: {_id: false, x: false}}");
+
+    auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, projectSpecObj), getExpCtx());
+    ASSERT_EQ(2u, pipeline->getSources().size());
+
+    pipeline->optimizePipeline();
+    ASSERT_EQ(2u, pipeline->getSources().size());
+
+    auto serialized = pipeline->serializeToBson();
+    ASSERT_EQ(2u, serialized.size());
+
+    ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[0]);
+    ASSERT_BSONOBJ_EQ(projectSpecObj, serialized[1]);
+}
+
+TEST_F(InternalUnpackBucketStageTest, OptimizeAddsInclusionProjectInsteadOfViableExclusionProject) {
+    auto unpackSpecObj = fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo'}}");
+    auto projectSpecObj = fromjson("{$project: {_id: false, x: false}}");
+    auto sortSpecObj = fromjson("{$sort: {y: 1}}");
+    auto groupSpecObj = fromjson("{$group: {_id: '$y', f: {$first: '$z'}}}");
+
+    auto pipeline = Pipeline::parse(
+        makeVector(unpackSpecObj, projectSpecObj, sortSpecObj, groupSpecObj), getExpCtx());
+    ASSERT_EQ(4u, pipeline->getSources().size());
+
+    pipeline->optimizePipeline();
+    ASSERT_EQ(5u, pipeline->getSources().size());
+
+    auto serialized = pipeline->serializeToBson();
+    ASSERT_EQ(5u, serialized.size());
+
+    const UnorderedFieldsBSONObjComparator kComparator;
+    ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[0]);
+    ASSERT_EQ(
+        kComparator.compare(fromjson("{$project: {_id: false, y: true, z: true}}"), serialized[1]),
+        0);
+    ASSERT_BSONOBJ_EQ(projectSpecObj, serialized[2]);
+    ASSERT_BSONOBJ_EQ(sortSpecObj, serialized[3]);
+    ASSERT_BSONOBJ_EQ(groupSpecObj, serialized[4]);
 }
 }  // namespace
 }  // namespace mongo

@@ -61,6 +61,52 @@ TEST(DependenciesTest, CheckClassConstants) {
     ASSERT_TRUE(DepsTracker::kOnlyTextScore[DocumentMetadataFields::kTextScore]);
 }
 
+TEST(DependenciesNeedsMetadataTest, ShouldSucceedIfMetadataAvailableAndNeeded) {
+    DepsTracker deps(~DepsTracker::kOnlyTextScore);
+    deps.setNeedsMetadata(DocumentMetadataFields::kTextScore, true);
+    ASSERT_TRUE(deps.getNeedsMetadata(DocumentMetadataFields::kTextScore));
+    ASSERT_TRUE(deps.getNeedsAnyMetadata());
+}
+
+TEST(DependenciesNeedsMetadataTest, ShouldSucceedIfAllMetadataAvailableAndNeeded) {
+    DepsTracker deps(DepsTracker::kNoMetadata);
+    deps.setNeedsMetadata(DocumentMetadataFields::kTextScore, true);
+    ASSERT_TRUE(deps.getNeedsMetadata(DocumentMetadataFields::kTextScore));
+    ASSERT_TRUE(deps.getNeedsAnyMetadata());
+
+    deps.setNeedsMetadata(DocumentMetadataFields::kGeoNearPoint, true);
+    ASSERT_TRUE(deps.getNeedsMetadata(DocumentMetadataFields::kGeoNearPoint));
+    ASSERT_TRUE(deps.getNeedsAnyMetadata());
+}
+
+TEST(DependenciesNeedsMetadataTest, ShouldSucceedIfMetadataUnavailableAndNotNeeded) {
+    DepsTracker deps(DepsTracker::kOnlyTextScore);
+    deps.setNeedsMetadata(DocumentMetadataFields::kTextScore, false);
+    ASSERT_FALSE(deps.getNeedsMetadata(DocumentMetadataFields::kTextScore));
+    ASSERT_FALSE(deps.getNeedsAnyMetadata());
+}
+
+TEST(DependenciesNeedsMetadataTest, ShouldSucceedIfMetadataAvailableAndNotNeeded) {
+    DepsTracker deps(~DepsTracker::kOnlyTextScore);
+    deps.setNeedsMetadata(DocumentMetadataFields::kTextScore, false);
+    ASSERT_FALSE(deps.getNeedsMetadata(DocumentMetadataFields::kTextScore));
+    ASSERT_FALSE(deps.getNeedsAnyMetadata());
+}
+
+TEST(DependenciesNeedsMetadataTest, ShouldThrowIfMetadataUnavailableButNeeded) {
+    DepsTracker deps(DepsTracker::kOnlyTextScore);
+    ASSERT_THROWS(deps.setNeedsMetadata(DocumentMetadataFields::kTextScore, true),
+                  AssertionException);
+}
+
+TEST(DependenciesNeedsMetadataTest, ShouldThrowIfNoMetadataAvailableButNeeded) {
+    DepsTracker deps(DepsTracker::kAllMetadata);
+    ASSERT_THROWS(deps.setNeedsMetadata(DocumentMetadataFields::kTextScore, true),
+                  AssertionException);
+    ASSERT_THROWS(deps.setNeedsMetadata(DocumentMetadataFields::kGeoNearPoint, true),
+                  AssertionException);
+}
+
 TEST(DependenciesToProjectionTest, ShouldIncludeAllFieldsAndExcludeIdIfNotSpecified) {
     const char* array[] = {"a", "b"};
     DepsTracker deps;
@@ -81,6 +127,39 @@ TEST(DependenciesToProjectionTest, ShouldNotIncludeSubFieldIfTopLevelAlreadyIncl
     DepsTracker deps;
     deps.fields = arrayToSet(array);
     ASSERT_BSONOBJ_EQ(deps.toProjectionWithoutMetadata(), BSON("a" << 1 << "b" << 1 << "_id" << 0));
+}
+
+TEST(DependenciesToProjectionTest, ShouldOnlyIncludeRootLevelPrefixesWithTruncate) {
+    const char* array[] = {"a.b", "a.c", "a.c.d", "_id.a"};
+    DepsTracker deps;
+    deps.fields = arrayToSet(array);
+    ASSERT_BSONOBJ_EQ(deps.toProjectionWithoutMetadata(DepsTracker::TruncateToRootLevel::yes),
+                      BSON("_id" << 1 << "a" << 1));
+}
+
+TEST(DependenciesToProjectionTest, ShouldIncludeDottedPrefixesWithoutTruncate) {
+    const char* array[] = {"a.b", "a.c", "a.c.d", "_id.a"};
+    DepsTracker deps;
+    deps.fields = arrayToSet(array);
+    ASSERT_BSONOBJ_EQ(deps.toProjectionWithoutMetadata(DepsTracker::TruncateToRootLevel::no),
+                      BSON("_id.a" << 1 << "a.b" << 1 << "a.c" << 1));
+}
+
+TEST(DependenciesToProjectionTest,
+     ShouldIncludeAllRootFieldsAndExcludeIdIfNotSpecifiedWithTruncate) {
+    const char* array[] = {"a", "b"};
+    DepsTracker deps;
+    deps.fields = arrayToSet(array);
+    ASSERT_BSONOBJ_EQ(deps.toProjectionWithoutMetadata(DepsTracker::TruncateToRootLevel::yes),
+                      BSON("a" << 1 << "b" << 1 << "_id" << 0));
+}
+
+TEST(DependenciesToProjectionTest, ShouldIncludeFieldEvenIfSuffixOfAnotherFieldWithTruncate) {
+    const char* array[] = {"a", "ab"};
+    DepsTracker deps;
+    deps.fields = arrayToSet(array);
+    ASSERT_BSONOBJ_EQ(deps.toProjectionWithoutMetadata(DepsTracker::TruncateToRootLevel::yes),
+                      BSON("a" << 1 << "ab" << 1 << "_id" << 0));
 }
 
 TEST(DependenciesToProjectionTest, ShouldIncludeIdIfNeeded) {

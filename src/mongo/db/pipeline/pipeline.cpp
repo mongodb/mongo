@@ -484,12 +484,23 @@ void Pipeline::addFinalSource(intrusive_ptr<DocumentSource> source) {
     _sources.push_back(source);
 }
 
-DepsTracker Pipeline::getDependencies(QueryMetadataBitSet unavailableMetadata) const {
-    DepsTracker deps(unavailableMetadata);
+DepsTracker Pipeline::getDependencies(
+    boost::optional<QueryMetadataBitSet> unavailableMetadata) const {
+    return getDependenciesForContainer(getContext(), _sources, unavailableMetadata);
+}
+
+DepsTracker Pipeline::getDependenciesForContainer(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const SourceContainer& container,
+    boost::optional<QueryMetadataBitSet> unavailableMetadata) {
+    // If 'unavailableMetadata' was not specified, we assume all metadata is available. This allows
+    // us to call 'deps.setNeedsMetadata()' without throwing.
+    DepsTracker deps(unavailableMetadata.get_value_or(DepsTracker::kNoMetadata));
+
     bool hasUnsupportedStage = false;
     bool knowAllFields = false;
     bool knowAllMeta = false;
-    for (auto&& source : _sources) {
+    for (auto&& source : container) {
         DepsTracker localDeps(deps.getUnavailableMetadata());
         DepsTracker::State status = source->getDependencies(&localDeps);
 
@@ -521,11 +532,11 @@ DepsTracker Pipeline::getDependencies(QueryMetadataBitSet unavailableMetadata) c
     if (!knowAllFields)
         deps.needWholeDocument = true;  // don't know all fields we need
 
-    if (!unavailableMetadata[DocumentMetadataFields::kTextScore]) {
+    if (!deps.getUnavailableMetadata()[DocumentMetadataFields::kTextScore]) {
         // There is a text score available. If we are the first half of a split pipeline, then we
         // have to assume future stages might depend on the textScore (unless we've encountered a
         // stage that doesn't preserve metadata).
-        if (getContext()->needsMerge && !knowAllMeta) {
+        if (expCtx->needsMerge && !knowAllMeta) {
             deps.setNeedsMetadata(DocumentMetadataFields::kTextScore, true);
         }
     } else {
