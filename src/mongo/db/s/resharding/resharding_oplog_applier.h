@@ -31,7 +31,6 @@
 
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry.h"
-#include "mongo/db/repl/oplog_entry_or_grouped_inserts.h"
 #include "mongo/db/s/resharding/donor_oplog_id_gen.h"
 #include "mongo/db/s/resharding/resharding_donor_oplog_iterator.h"
 #include "mongo/db/s/resharding/resharding_oplog_application.h"
@@ -114,8 +113,7 @@ private:
     /**
      * Apply the oplog entries.
      */
-    Status _applyOplogEntryOrGroupedInserts(
-        OperationContext* opCtx, const repl::OplogEntryOrGroupedInserts& entryOrGroupedInserts);
+    Status _applyOplogEntry(OperationContext* opCtx, const repl::OplogEntry& op);
 
     /**
      * Record results from a writer vector for the current batch being applied.

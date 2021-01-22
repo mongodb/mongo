@@ -111,14 +111,12 @@ ReshardingOplogApplicationRules::ReshardingOplogApplicationRules(
       _donorShardId(std::move(donorShardId)),
       _sourceChunkMgr(std::move(sourceChunkMgr)) {}
 
-Status ReshardingOplogApplicationRules::applyOperation(
-    OperationContext* opCtx, const repl::OplogEntryOrGroupedInserts& opOrGroupedInserts) {
-    LOGV2_DEBUG(
-        49901, 3, "Applying op for resharding", "op"_attr = redact(opOrGroupedInserts.toBSON()));
+Status ReshardingOplogApplicationRules::applyOperation(OperationContext* opCtx,
+                                                       const repl::OplogEntry& op) {
+    LOGV2_DEBUG(49901, 3, "Applying op for resharding", "op"_attr = redact(op.toBSONForLogging()));
 
     invariant(!opCtx->lockState()->inAWriteUnitOfWork());
     invariant(opCtx->writesAreReplicated());
-    auto op = opOrGroupedInserts.getOp();
 
     return writeConflictRetry(opCtx, "applyOplogEntryCRUDOpResharding", op.getNss().ns(), [&] {
         try {
@@ -149,25 +147,16 @@ Status ReshardingOplogApplicationRules::applyOperation(
             auto opType = op.getOpType();
             switch (opType) {
                 case repl::OpTypeEnum::kInsert:
-                    _applyInsert_inlock(opCtx,
-                                        autoCollOutput.getDb(),
-                                        *autoCollOutput,
-                                        *autoCollStash,
-                                        opOrGroupedInserts);
+                    _applyInsert_inlock(
+                        opCtx, autoCollOutput.getDb(), *autoCollOutput, *autoCollStash, op);
                     break;
                 case repl::OpTypeEnum::kUpdate:
-                    _applyUpdate_inlock(opCtx,
-                                        autoCollOutput.getDb(),
-                                        *autoCollOutput,
-                                        *autoCollStash,
-                                        opOrGroupedInserts);
+                    _applyUpdate_inlock(
+                        opCtx, autoCollOutput.getDb(), *autoCollOutput, *autoCollStash, op);
                     break;
                 case repl::OpTypeEnum::kDelete:
-                    _applyDelete_inlock(opCtx,
-                                        autoCollOutput.getDb(),
-                                        *autoCollOutput,
-                                        *autoCollStash,
-                                        opOrGroupedInserts);
+                    _applyDelete_inlock(
+                        opCtx, autoCollOutput.getDb(), *autoCollOutput, *autoCollStash, op);
                     break;
                 default:
                     MONGO_UNREACHABLE;
@@ -186,12 +175,11 @@ Status ReshardingOplogApplicationRules::applyOperation(
     });
 }
 
-void ReshardingOplogApplicationRules::_applyInsert_inlock(
-    OperationContext* opCtx,
-    Database* db,
-    const CollectionPtr& outputColl,
-    const CollectionPtr& stashColl,
-    const repl::OplogEntryOrGroupedInserts& opOrGroupedInserts) {
+void ReshardingOplogApplicationRules::_applyInsert_inlock(OperationContext* opCtx,
+                                                          Database* db,
+                                                          const CollectionPtr& outputColl,
+                                                          const CollectionPtr& stashColl,
+                                                          const repl::OplogEntry& op) {
     /**
      * The rules to apply ordinary insert operations are as follows:
      *
@@ -208,12 +196,6 @@ void ReshardingOplogApplicationRules::_applyInsert_inlock(
      * 4. If there exists a document with _id == [op _id] in the output collection and it is NOT
      * owned by this donor shard, insert the contents of 'op' into the conflict stash collection.
      */
-    auto op = opOrGroupedInserts.getOp();
-
-    uassert(ErrorCodes::OperationFailed,
-            "Cannot apply an array insert as a part of resharding oplog application",
-            !opOrGroupedInserts.isGroupedInserts());
-
     // Writes are replicated, so use global op counters.
     OpCounters* opCounters = &globalOpCounters;
     opCounters->gotInsert();
@@ -286,12 +268,11 @@ void ReshardingOplogApplicationRules::_applyInsert_inlock(
         opCtx, InsertStatement(oField), nullptr /* nullOpDebug */, false /* fromMigrate */));
 }
 
-void ReshardingOplogApplicationRules::_applyUpdate_inlock(
-    OperationContext* opCtx,
-    Database* db,
-    const CollectionPtr& outputColl,
-    const CollectionPtr& stashColl,
-    const repl::OplogEntryOrGroupedInserts& opOrGroupedInserts) {
+void ReshardingOplogApplicationRules::_applyUpdate_inlock(OperationContext* opCtx,
+                                                          Database* db,
+                                                          const CollectionPtr& outputColl,
+                                                          const CollectionPtr& stashColl,
+                                                          const repl::OplogEntry& op) {
     /**
      * The rules to apply ordinary update operations are as follows:
      *
@@ -306,8 +287,6 @@ void ReshardingOplogApplicationRules::_applyUpdate_inlock(
      * 4. If there exists a document with _id == [op _id] in the output collection and it is owned
      * by this donor shard, update the document from this collection.
      */
-    auto op = opOrGroupedInserts.getOp();
-
     // Writes are replicated, so use global op counters.
     OpCounters* opCounters = &globalOpCounters;
     opCounters->gotUpdate();
@@ -373,12 +352,11 @@ void ReshardingOplogApplicationRules::_applyUpdate_inlock(
     invariant(ur.numMatched != 0);
 }
 
-void ReshardingOplogApplicationRules::_applyDelete_inlock(
-    OperationContext* opCtx,
-    Database* db,
-    const CollectionPtr& outputColl,
-    const CollectionPtr& stashColl,
-    const repl::OplogEntryOrGroupedInserts& opOrGroupedInserts) {
+void ReshardingOplogApplicationRules::_applyDelete_inlock(OperationContext* opCtx,
+                                                          Database* db,
+                                                          const CollectionPtr& outputColl,
+                                                          const CollectionPtr& stashColl,
+                                                          const repl::OplogEntry& op) {
     /**
      * The rules to apply ordinary delete operations are as follows:
      *
@@ -395,8 +373,6 @@ void ReshardingOplogApplicationRules::_applyDelete_inlock(
      * _id == [op _id] arbitrarily from among all resharding conflict stash collections to delete
      * from that resharding conflict stash collection and insert into the output collection.
      */
-    auto op = opOrGroupedInserts.getOp();
-
     // Writes are replicated, so use global op counters.
     OpCounters* opCounters = &globalOpCounters;
     opCounters->gotDelete();

@@ -391,34 +391,32 @@ Status ReshardingOplogApplier::_applyOplogBatchPerWorker(
     std::vector<const repl::OplogEntry*>* ops) {
     auto opCtx = makeInterruptibleOperationContext();
 
-    return repl::OplogApplierUtils::applyOplogBatchCommon(
-        opCtx.get(),
-        ops,
-        repl::OplogApplication::Mode::kInitialSync,
-        false /* allowNamespaceNotFoundErrorsOnCrudOps */,
-        [this](OperationContext* opCtx,
-               const repl::OplogEntryOrGroupedInserts& opOrInserts,
-               repl::OplogApplication::Mode mode) {
-            invariant(mode == repl::OplogApplication::Mode::kInitialSync);
-            return _applyOplogEntryOrGroupedInserts(opCtx, opOrInserts);
-        });
+    for (const auto& op : *ops) {
+        try {
+            auto status = _applyOplogEntry(opCtx.get(), *op);
+
+            if (!status.isOK()) {
+                return status;
+            }
+        } catch (const DBException& ex) {
+            return ex.toStatus();
+        }
+    }
+
+    return Status::OK();
 }
 
-Status ReshardingOplogApplier::_applyOplogEntryOrGroupedInserts(
-    OperationContext* opCtx, const repl::OplogEntryOrGroupedInserts& entryOrGroupedInserts) {
+Status ReshardingOplogApplier::_applyOplogEntry(OperationContext* opCtx,
+                                                const repl::OplogEntry& op) {
     // Unlike normal secondary replication, we want the write to generate it's own oplog entry.
     invariant(opCtx->writesAreReplicated());
 
-    auto op = entryOrGroupedInserts.getOp();
-
     if (op.isForReshardingSessionApplication()) {
-        return insertOplogAndUpdateConfigForRetryable(opCtx, entryOrGroupedInserts.getOp());
+        return insertOplogAndUpdateConfigForRetryable(opCtx, op);
     }
 
-    invariant(DocumentValidationSettings::get(opCtx).isSchemaValidationDisabled());
-
     invariant(op.isCrudOpType());
-    return _applicationRules.applyOperation(opCtx, entryOrGroupedInserts);
+    return _applicationRules.applyOperation(opCtx, op);
 }
 
 Status ReshardingOplogApplier::_onError(Status status) {

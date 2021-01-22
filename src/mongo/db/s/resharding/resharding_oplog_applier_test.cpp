@@ -45,6 +45,7 @@
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/resharding/resharding_donor_oplog_iterator.h"
 #include "mongo/db/s/resharding/resharding_oplog_applier.h"
+#include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding_util.h"
 #include "mongo/db/s/sharding_mongod_test_fixture.h"
 #include "mongo/db/s/sharding_state.h"
@@ -102,6 +103,26 @@ private:
     std::deque<repl::OplogEntry> _oplogToReturn;
     const size_t _batchSize;
     bool _doThrow{false};
+};
+
+/**
+ * RAII type for temporarily changing the value for gReshardingWriterThreadCount.
+ */
+class ReshardingWriterVectorSizeBlock {
+public:
+    using ValType = decltype(resharding::gReshardingWriterThreadCount);
+
+    ReshardingWriterVectorSizeBlock(ValType newValue)
+        : _origValue(resharding::gReshardingWriterThreadCount) {
+        resharding::gReshardingWriterThreadCount = newValue;
+    }
+
+    ~ReshardingWriterVectorSizeBlock() {
+        resharding::gReshardingWriterThreadCount = _origValue;
+    }
+
+private:
+    ValType _origValue;
 };
 
 class ReshardingOplogApplierTest : public ShardingMongodTestFixture {
@@ -2160,6 +2181,81 @@ public:
         return str.str();
     }
 };
+
+TEST_F(ReshardingOplogApplierRetryableTest, GroupInserts) {
+    std::deque<repl::OplogEntry> crudOps;
+
+    OperationSessionInfo session;
+    session.setSessionId(makeLogicalSessionIdForTest());
+    session.setTxnNumber(1);
+
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 1),
+                                boost::none,
+                                session,
+                                1));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(6, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 2),
+                                boost::none,
+                                session,
+                                2));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(7, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 3),
+                                boost::none,
+                                session,
+                                3));
+
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 5 /* batchSize */);
+    boost::optional<ReshardingOplogApplier> applier;
+    auto executor = makeTaskExecutorForApplier();
+
+    // Make the writer pool size 1 so all the inserts will be assigned to a single writer.
+    auto writerPool = repl::makeReplWriterPool(1);
+    ReshardingWriterVectorSizeBlock reshardingWriteVectorSizeForThisTest(1);
+
+    applier.emplace(getServiceContext(),
+                    sourceId(),
+                    oplogNs(),
+                    crudNs(),
+                    crudUUID(),
+                    stashCollections(),
+                    0U, /* myStashIdx */
+                    Timestamp(1, 3),
+                    std::move(iterator),
+                    chunkManager(),
+                    executor,
+                    writerPool.get());
+
+    auto future = applier->applyUntilCloneFinishedTs();
+    future.get();
+
+    future = applier->applyUntilDone();
+    future.get();
+
+    DBDirectClient client(operationContext());
+    auto doc = client.findOne(appliedToNs().ns(), BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 1), doc);
+
+    doc = client.findOne(appliedToNs().ns(), BSON("_id" << 2));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 2), doc);
+
+    doc = client.findOne(appliedToNs().ns(), BSON("_id" << 3));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 3), doc);
+
+    auto progressDoc = ReshardingOplogApplier::checkStoredProgress(operationContext(), sourceId());
+    ASSERT_TRUE(progressDoc);
+    ASSERT_EQ(Timestamp(7, 3), progressDoc->getProgress().getClusterTime());
+    ASSERT_EQ(Timestamp(7, 3), progressDoc->getProgress().getTs());
+
+    ASSERT_TRUE(isWriteAlreadyExecuted(session, 1));
+    ASSERT_TRUE(isWriteAlreadyExecuted(session, 2));
+    ASSERT_TRUE(isWriteAlreadyExecuted(session, 3));
+
+    checkSecondaryCanReplicateCorrectly();
+}
 
 TEST_F(ReshardingOplogApplierRetryableTest, CrudWithEmptyConfigTransactions) {
     std::deque<repl::OplogEntry> crudOps;
