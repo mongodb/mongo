@@ -323,12 +323,6 @@ functions:
           evergreen_api_user=${evergreen_api_user}
           source ../src/buildscripts/signal_processing_setup.sh
           detect-changes --config .signal-processing.yml
-    - command: shell.exec
-      params:
-        working_dir: work
-        script: |
-          source ../src/buildscripts/signal_processing_setup.sh
-          detect-outliers --config .signal-processing.yml
 
 #######################################
 #               Tasks                 #
