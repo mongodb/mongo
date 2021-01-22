@@ -48,7 +48,7 @@ SessionKiller::SessionKiller(ServiceContext* sc, KillFunc killer)
     _thread = stdx::thread([this, sc] {
         // This is the background killing thread
 
-        Client::setCurrent(sc->makeClient("SessionKiller"));
+        ThreadClient tc("SessionKiller", sc);
 
         stdx::unique_lock<Latch> lk(_mutex);
 
