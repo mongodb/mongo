@@ -74,7 +74,7 @@ public:
     }
 
     ServiceContext::UniqueServiceContext _serviceCtx = ServiceContext::make();
-    std::unique_ptr<ThreadPoolTaskExecutor> _executor;
+    std::shared_ptr<ThreadPoolTaskExecutor> _executor;
 };
 
 class RequestHandlerUtil {
@@ -166,6 +166,37 @@ TEST_F(TaskExecutorFixture, RunExhaustShouldReceiveMultipleResponses) {
 
     // The tasks should be removed after 'isMaster' fails
     ASSERT_TRUE(waitUntilNoTasksOrDeadline(Date_t::now() + Seconds(5)));
+}
+
+TEST_F(TaskExecutorFixture, RunExhaustFutureShouldReceiveMultipleResponses) {
+    auto client = _serviceCtx->makeClient("TaskExecutorExhaustTest");
+    auto opCtx = client->makeOperationContext();
+
+    RemoteCommandRequest rcr(unittest::getFixtureConnectionString().getServers().front(),
+                             "admin",
+                             BSON("isMaster" << 1 << "maxAwaitTimeMS" << 1000 << "topologyVersion"
+                                             << TopologyVersion(OID::max(), 0).toBSON()),
+                             opCtx.get());
+
+    RequestHandlerUtil exhaustRequestHandler;
+    auto swFuture = executor()->scheduleExhaustRemoteCommand(
+        std::move(rcr), exhaustRequestHandler.getRequestCallbackFn(), opCtx->getCancelationToken());
+
+    for (size_t i = 0; i < 5; ++i) {
+        auto counters = exhaustRequestHandler.getCountersWhenReady();
+
+        // Each response should be successful
+        ASSERT_EQ(counters._success, i + 1);
+        ASSERT_EQ(counters._failed, 0);
+        ASSERT_FALSE(swFuture.isReady());
+    }
+
+    // Cancel the callback
+    opCtx->markKilled();
+
+    // The tasks should be removed after 'isMaster' fails
+    ASSERT_TRUE(waitUntilNoTasksOrDeadline(Date_t::now() + Seconds(5)));
+    ASSERT_FALSE(swFuture.getNoThrow().isOK());
 }
 
 TEST_F(TaskExecutorFixture, RunExhaustShouldStopOnFailure) {

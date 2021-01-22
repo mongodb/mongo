@@ -199,11 +199,22 @@ public:
     NetworkOperationIterator getNthUnscheduledRequest(size_t n);
 
     /**
+     * Schedules the given list of responses to "noi" at their respective times.
+     */
+    void scheduleResponses(
+        NetworkOperationIterator noi,
+        const std::list<std::pair<Date_t, TaskExecutor::ResponseStatus>>& responses);
+
+    /**
      * Schedules "response" in response to "noi" at virtual time "when".
      */
     void scheduleResponse(NetworkOperationIterator noi,
                           Date_t when,
-                          const TaskExecutor::ResponseStatus& response);
+                          const TaskExecutor::ResponseStatus& response) {
+        std::list<std::pair<Date_t, TaskExecutor::ResponseStatus>> responseList = {
+            std::make_pair(when, response)};
+        return scheduleResponses(noi, responseList);
+    }
 
     /**
      * Schedules a successful "response" to "noi" at virtual time "when".
@@ -366,6 +377,12 @@ private:
      */
     void _runReadyNetworkOperations_inlock(stdx::unique_lock<stdx::mutex>* lk);
 
+    template <typename CallbackFn>
+    Status _startCommand(const TaskExecutor::CallbackHandle& cbHandle,
+                         RemoteCommandRequestOnAny& request,
+                         CallbackFn&& onReply,
+                         const BatonHandle& baton = nullptr);
+
     // Mutex that synchronizes access to mutable data in this class and its subclasses.
     // Fields guarded by the mutex are labled (M), below, and those that are read-only
     // in multi-threaded execution, and so unsynchronized, are labeled (R).
@@ -402,12 +419,12 @@ private:
     NetworkOperationList _unscheduled;  // (M)
 
     // List of network operations that have been returned by getNextReadyRequest() but not
-    // yet scheudled, black-holed or requeued.
+    // yet scheduled, black-holed or requeued.
     NetworkOperationList _processing;  // (M)
 
     // List of network operations whose responses have been scheduled but not delivered, sorted
-    // by NetworkOperation::_responseDate.  These operations will have their responses delivered
-    // when now() == getResponseDate().
+    // by the time of the first response dates.  These operations will have their responses
+    // delivered when now() == getFirstResponseDate().
     NetworkOperationList _scheduled;  // (M)
 
     // List of network operations that will not be responded to until shutdown() is called.
@@ -444,7 +461,7 @@ public:
     NetworkOperation(const TaskExecutor::CallbackHandle& cbHandle,
                      const RemoteCommandRequestOnAny& theRequest,
                      Date_t theRequestDate,
-                     RemoteCommandCompletionFn onFinish);
+                     RemoteCommandCompletionFn onResponse);
 
     /**
      * Adjusts the stored virtual time at which this entry will be subject to consideration
@@ -455,7 +472,14 @@ public:
     /**
      * Sets the response and thet virtual time at which it will be delivered.
      */
-    void setResponse(Date_t responseDate, const TaskExecutor::ResponseStatus& response);
+    void setResponse(Date_t responseDate, const TaskExecutor::ResponseStatus& response) {
+        return setResponses({std::make_pair(responseDate, response)});
+    }
+
+    /**
+     * Sets the responses and thet virtual time at which they will be delivered.
+     */
+    void setResponses(const std::list<std::pair<Date_t, TaskExecutor::ResponseStatus>>& responses);
 
     /**
      * Predicate that returns true if cbHandle equals the executor's handle for this network
@@ -484,6 +508,13 @@ public:
     }
 
     /**
+     * Returns true if there are pending responses for this operation.
+     */
+    bool hasResponses() const {
+        return !_responses.empty();
+    }
+
+    /**
      * Gets the virtual time at which the operation was started.
      */
     Date_t getRequestDate() const {
@@ -499,17 +530,17 @@ public:
     }
 
     /**
-     * After setResponse() has been called, returns the virtual time at which
-     * the response should be delivered.
+     * After setResponses() has been called, returns the virtual time at which
+     * the first response should be delivered.
      */
-    Date_t getResponseDate() const {
-        return _responseDate;
+    Date_t getFirstResponseDate() const {
+        return hasResponses() ? _responses.front().first : Date_t();
     }
 
     /**
-     * Delivers the response, by invoking the onFinish callback passed into the constructor.
+     * Delivers the response, by invoking the onResponse callback passed into the constructor.
      */
-    void finishResponse();
+    void issueResponse();
 
     /**
      * Returns a printable diagnostic string.
@@ -519,12 +550,19 @@ public:
 private:
     Date_t _requestDate;
     Date_t _nextConsiderationDate;
-    Date_t _responseDate;
     TaskExecutor::CallbackHandle _cbHandle;
     RemoteCommandRequestOnAny _requestOnAny;
     RemoteCommandRequest _request;
-    TaskExecutor::ResponseStatus _response;
-    RemoteCommandCompletionFn _onFinish;
+    std::list<std::pair<Date_t, TaskExecutor::ResponseStatus>> _responses;
+
+    // We want to be able to handle arbitrary OnReply or Completion functions, but these are
+    // currently the same type, which makes constructing the resultant std::variant difficult. We
+    // therefore create a std::variant with a single template argument if the OnReply and Completion
+    // function signatures are the same.
+    std::conditional<std::is_same_v<RemoteCommandOnReplyFn, RemoteCommandCompletionFn>,
+                     std::variant<RemoteCommandOnReplyFn>,
+                     std::variant<RemoteCommandOnReplyFn, RemoteCommandCompletionFn>>::type
+        _onResponse;
 };
 
 /**
