@@ -1666,6 +1666,58 @@ The CPU time metric is only supported on certain flavors of Linux. It is impleme
 `clock_gettime` and `CLOCK_THREAD_CPUTIME_ID`, which has limitations on certain systems. See the
 [man page for clock_gettime()](https://linux.die.net/man/3/clock_gettime).
 
+## Example output
+
+The $operationMetrics stage behaves like any other pipeline cursor, and will have the following
+schema, per returned document:
+
+```
+{
+  db: "<dbname>",
+  // Metrics recorded while the node was PRIMARY. Summed with secondaryMetrics metrics gives total
+  // metrics in all replication states.
+  primaryMetrics: {
+    // The number of document bytes read from the storage engine
+    docBytesRead: 0,
+    // The number of document units read from the storage engine
+    docUnitsRead: 0,
+    // The number of index entry bytes read from the storage engine
+    idxEntryBytesRead: 0,
+    // The number of index entry units read from the storage engine
+    idxEntryUnitsRead: 0,
+    // The number of random seeks to a position on an index or collection
+    cursorSeeks: 0,
+    // The number of keys sorted for query operations
+    keysSorted: 0,
+    // The number of times an in-memory sort operation had to spill to disk
+    sorterSpills: 0,
+    // The number of document units returned by query operations
+    docUnitsReturned: 0
+  },
+  // Metrics recorded while the node was SECONDARY
+  secondaryMetrics: {
+    docBytesRead: 0,
+    docUnitsRead: 0,
+    idxEntryBytesRead: 0,
+    idxEntryUnitsRead: 0,
+    cursorSeeks: 0,
+    keysSorted: 0,
+    sorterSpills: 0,
+    docUnitsReturned: 0
+  },
+  // The amount of active CPU time used by all operations
+  cpuNanos: 0,
+  // The number of document bytes attempted to be written to or deleted from the storage engine
+  docBytesWritten: 0,
+  // The number of document units attempted to be written to or deleted from the storage engine
+  docUnitsWritten: 0,
+  // The number of index entry bytes attempted to be written to or deleted from the storage engine
+  idxEntryBytesWritten: 0,
+  // The number of index entry units attempted to be written to or deleted from the storage engine
+  idxEntryUnitsWritten: 0,
+}
+```
+
 # Glossary
 **binary comparable**: Two values are binary comparable if the lexicographical order over their byte
 representation, from lower memory addresses to higher addresses, is the same as the defined ordering
