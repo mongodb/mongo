@@ -36,13 +36,21 @@ const expectedMetrics = {
     numIdleBuckets: 0,
 };
 
-const checkServerStatus = function() {
+const checkServerStatus = function(empty = false) {
     const metrics = assert.commandWorked(testDB.serverStatus({bucketCatalog: 1})).bucketCatalog;
 
+    const invalidMetricMsg = function(metric) {
+        return "Invalid '" + metric + "' value in serverStatus: " + tojson(metrics);
+    };
+
     for (let [metric, value] of Object.entries(expectedMetrics)) {
-        assert.eq(metrics[metric],
-                  value,
-                  "Invalid '" + metric + "' value in serverStatus: " + tojson(metrics));
+        assert.eq(metrics[metric], value, invalidMetricMsg(metric));
+    }
+
+    if (empty) {
+        assert.eq(metrics.memoryUsage, 0, invalidMetricMsg('memoryUsage'));
+    } else {
+        assert.gt(metrics.memoryUsage, 0, invalidMetricMsg('memoryUsage'));
     }
 };
 
@@ -61,7 +69,7 @@ const testWithInsertPaused = function(docs) {
     awaitInsert();
 };
 
-checkServerStatus();
+checkServerStatus(true);
 
 // Inserting the first measurement will open a new bucket.
 expectedMetrics.numBuckets++;

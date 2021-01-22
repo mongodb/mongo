@@ -39,6 +39,8 @@
 namespace mongo {
 namespace {
 const auto getBucketCatalog = ServiceContext::declareDecoration<BucketCatalog>();
+
+constexpr uint64_t kIdleBucketExpiryMemoryUsageThreshold = 1024 * 1024 * 100;  // 100 MB
 }  // namespace
 
 BSONObj BucketCatalog::CommitData::toBSON() const {
@@ -88,14 +90,15 @@ BucketCatalog::InsertResult BucketCatalog::insert(OperationContext* opCtx,
     }
     auto key = std::make_pair(ns, BucketMetadata{metadata.obj()});
 
+    auto& stats = _executionStats[ns];
+
     auto time = doc[options.getTimeField()].Date();
-    auto createNewBucketId = [time = durationCount<Seconds>(time.toDurationSinceEpoch())] {
+    auto createNewBucketId = [&] {
+        _expireIdleBuckets(&stats);
         auto bucketId = OID::gen();
-        bucketId.setTimestamp(time);
+        bucketId.setTimestamp(durationCount<Seconds>(time.toDurationSinceEpoch()));
         return bucketId;
     };
-
-    auto& stats = _executionStats[ns];
 
     auto it = _bucketIds.find(key);
     if (it == _bucketIds.end()) {
@@ -109,9 +112,13 @@ BucketCatalog::InsertResult BucketCatalog::insert(OperationContext* opCtx,
     auto bucket = &_buckets[it->second];
 
     StringSet newFieldNamesToBeInserted;
+    uint32_t newFieldNamesSize = 0;
     uint32_t sizeToBeAdded = 0;
-    bucket->calculateBucketFieldsAndSizeChange(
-        doc, options.getMetaField(), &newFieldNamesToBeInserted, &sizeToBeAdded);
+    bucket->calculateBucketFieldsAndSizeChange(doc,
+                                               options.getMetaField(),
+                                               &newFieldNamesToBeInserted,
+                                               &newFieldNamesSize,
+                                               &sizeToBeAdded);
 
     auto isBucketFull = [&]() {
         if (bucket->numMeasurements == kTimeseriesBucketMaxCount) {
@@ -140,15 +147,20 @@ BucketCatalog::InsertResult BucketCatalog::insert(OperationContext* opCtx,
             bucket->numCommittedMeasurements == bucket->numMeasurements) {
             // The bucket does not contain any measurements that are yet to be committed, so we can
             // remove it now. Otherwise, we must keep the bucket around until it is committed.
+            _memoryUsage -= bucket->memoryUsage;
             _buckets.erase(it->second);
+            _orderedBuckets.erase({it->first.first, it->first.second, it->second});
         } else {
             bucket->full = true;
         }
         it->second = createNewBucketId();
         _orderedBuckets.insert({ns, it->first.second, it->second});
         bucket = &_buckets[it->second];
-        bucket->calculateBucketFieldsAndSizeChange(
-            doc, options.getMetaField(), &newFieldNamesToBeInserted, &sizeToBeAdded);
+        bucket->calculateBucketFieldsAndSizeChange(doc,
+                                                   options.getMetaField(),
+                                                   &newFieldNamesToBeInserted,
+                                                   &newFieldNamesSize,
+                                                   &sizeToBeAdded);
     }
 
     // If this is the first uncommitted measurement, the caller is the committer. Otherwise, it is a
@@ -169,9 +181,22 @@ BucketCatalog::InsertResult BucketCatalog::insert(OperationContext* opCtx,
         // The namespace and metadata only need to be set if this bucket was newly created.
         bucket->ns = ns;
         bucket->metadata = it->first.second;
+
+        // The namespace is stored three times: the bucket itself, _bucketIds, and _orderedBuckets.
+        // The metadata is stored three times: the bucket itself, _bucketIds, and _orderedBuckets.
+        // The bucketId is stored four times: _buckets, _bucketIds, _orderedBuckets, and
+        // _idleBuckets.
+        bucket->memoryUsage +=
+            (ns.size() * 3) + (bucket->metadata.metadata.objsize() * 3) + (sizeof(OID) * 4);
+    } else {
+        _memoryUsage -= bucket->memoryUsage;
     }
+    bucket->memoryUsage -= bucket->min.getMemoryUsage() + bucket->max.getMemoryUsage();
     bucket->min.update(doc, options.getMetaField(), std::less<>());
     bucket->max.update(doc, options.getMetaField(), std::greater<>());
+    bucket->memoryUsage +=
+        newFieldNamesSize + bucket->min.getMemoryUsage() + bucket->max.getMemoryUsage();
+    _memoryUsage += bucket->memoryUsage;
 
     return {it->second, std::move(commitInfoFuture)};
 }
@@ -230,6 +255,7 @@ BucketCatalog::CommitData BucketCatalog::commit(const OID& bucketId,
         if (bucket.full) {
             // Everything in the bucket has been committed, and nothing more will be added since the
             // bucket is full. Thus, we can remove it.
+            _memoryUsage -= bucket.memoryUsage;
             _orderedBuckets.erase(
                 {std::move(it->second.ns), std::move(it->second.metadata), bucketId});
             _buckets.erase(it);
@@ -256,14 +282,16 @@ void BucketCatalog::clear(const NamespaceString& ns) {
     };
 
     for (auto it = _orderedBuckets.lower_bound({ns, {}, {}});
-         it != _orderedBuckets.end() && shouldClear(std::get<NamespaceString>(*it));) {
+         it != _orderedBuckets.end() && shouldClear(std::get<NamespaceString>(*it));
+         it = _orderedBuckets.erase(it)) {
         const auto& bucketId = std::get<OID>(*it);
         const auto& bucketNs = std::get<NamespaceString>(*it);
-        _buckets.erase(bucketId);
+        auto bucketIt = _buckets.find(bucketId);
+        _memoryUsage -= bucketIt->second.memoryUsage;
+        _buckets.erase(bucketIt);
         _idleBuckets.erase(bucketId);
         _bucketIds.erase({bucketNs, std::get<BucketMetadata>(*it)});
         _executionStats.erase(bucketNs);
-        it = _orderedBuckets.erase(it);
     }
 }
 
@@ -286,12 +314,26 @@ void BucketCatalog::appendExecutionStats(const NamespaceString& ns, BSONObjBuild
                           stats.numBucketsClosedDueToTimeForward);
     builder->appendNumber("numBucketsClosedDueToTimeBackward",
                           stats.numBucketsClosedDueToTimeBackward);
+    builder->appendNumber("numBucketsClosedDueToMemoryThreshold",
+                          stats.numBucketsClosedDueToMemoryThreshold);
     builder->appendNumber("numCommits", stats.numCommits);
     builder->appendNumber("numWaits", stats.numWaits);
     builder->appendNumber("numMeasurementsCommitted", stats.numMeasurementsCommitted);
     if (stats.numCommits) {
         builder->appendNumber("avgNumMeasurementsPerCommit",
                               stats.numMeasurementsCommitted / stats.numCommits);
+    }
+}
+
+void BucketCatalog::_expireIdleBuckets(ExecutionStats* stats) {
+    while (!_idleBuckets.empty() && _memoryUsage > kIdleBucketExpiryMemoryUsageThreshold) {
+        auto it = _buckets.find(*_idleBuckets.begin());
+        _memoryUsage -= it->second.memoryUsage;
+        _idleBuckets.erase(_idleBuckets.begin());
+        _bucketIds.erase({it->second.ns, it->second.metadata});
+        _orderedBuckets.erase({it->second.ns, it->second.metadata, it->first});
+        _buckets.erase(it);
+        stats->numBucketsClosedDueToMemoryThreshold++;
     }
 }
 
@@ -310,8 +352,10 @@ void BucketCatalog::Bucket::calculateBucketFieldsAndSizeChange(
     const BSONObj& doc,
     boost::optional<StringData> metaField,
     StringSet* newFieldNamesToBeInserted,
+    uint32_t* newFieldNamesSize,
     uint32_t* sizeToBeAdded) const {
     newFieldNamesToBeInserted->clear();
+    *newFieldNamesSize = 0;
     *sizeToBeAdded = 0;
     auto numMeasurementsFieldLength = std::to_string(numMeasurements).size();
     for (const auto& elem : doc) {
@@ -323,6 +367,7 @@ void BucketCatalog::Bucket::calculateBucketFieldsAndSizeChange(
         // If the field name is new, add the size of an empty object with that field name.
         if (!fieldNames.contains(elem.fieldName())) {
             newFieldNamesToBeInserted->insert(elem.fieldName());
+            *newFieldNamesSize += elem.fieldNameSize();
             *sizeToBeAdded += BSON(elem.fieldName() << BSONObj()).objsize();
         }
 
@@ -343,7 +388,7 @@ void BucketCatalog::MinMax::update(const BSONObj& doc,
         if (metaField && elem.fieldNameStringData() == metaField) {
             continue;
         }
-        _object[elem.fieldName()]._update(elem, comp);
+        _updateWithMemoryUsage(&_object[elem.fieldName()], elem, comp);
     }
 }
 
@@ -359,9 +404,10 @@ void BucketCatalog::MinMax::_update(BSONElement elem, const std::function<bool(i
             // Compare objects element-wise.
             if (std::exchange(_type, Type::kObject) != Type::kObject) {
                 _updated = true;
+                _memoryUsage = 0;
             }
             for (auto&& subElem : elem.Obj()) {
-                _object[subElem.fieldName()]._update(subElem, comp);
+                _updateWithMemoryUsage(&_object[subElem.fieldName()], subElem, comp);
             }
         }
         return;
@@ -374,13 +420,14 @@ void BucketCatalog::MinMax::_update(BSONElement elem, const std::function<bool(i
             // Compare arrays element-wise.
             if (std::exchange(_type, Type::kArray) != Type::kArray) {
                 _updated = true;
+                _memoryUsage = 0;
             }
             auto elemArray = elem.Array();
             if (_array.size() < elemArray.size()) {
                 _array.resize(elemArray.size());
             }
             for (size_t i = 0; i < elemArray.size(); i++) {
-                _array[i]._update(elemArray[i], comp);
+                _updateWithMemoryUsage(&_array[i], elemArray[i], comp);
             }
         }
         return;
@@ -392,7 +439,16 @@ void BucketCatalog::MinMax::_update(BSONElement elem, const std::function<bool(i
         _type = Type::kValue;
         _value = elem.wrap();
         _updated = true;
+        _memoryUsage = _value.objsize();
     }
+}
+
+void BucketCatalog::MinMax::_updateWithMemoryUsage(MinMax* minMax,
+                                                   BSONElement elem,
+                                                   const std::function<bool(int, int)>& comp) {
+    _memoryUsage -= minMax->getMemoryUsage();
+    minMax->_update(elem, comp);
+    _memoryUsage += minMax->getMemoryUsage();
 }
 
 BSONObj BucketCatalog::MinMax::toBSON() const {
@@ -533,6 +589,10 @@ void BucketCatalog::MinMax::_clearUpdated() {
     }
 }
 
+uint64_t BucketCatalog::MinMax::getMemoryUsage() const {
+    return _memoryUsage + (sizeof(MinMax) * (_object.size() + _array.size()));
+}
+
 class BucketCatalog::ServerStatus : public ServerStatusSection {
 public:
     ServerStatus() : ServerStatusSection("bucketCatalog") {}
@@ -549,6 +609,7 @@ public:
         builder.appendNumber("numBuckets", bucketCatalog._buckets.size());
         builder.appendNumber("numOpenBuckets", bucketCatalog._bucketIds.size());
         builder.appendNumber("numIdleBuckets", bucketCatalog._idleBuckets.size());
+        builder.appendNumber("memoryUsage", static_cast<long long>(bucketCatalog._memoryUsage));
         return builder.obj();
     }
 } bucketCatalogServerStatus;

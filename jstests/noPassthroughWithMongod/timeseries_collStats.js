@@ -31,25 +31,31 @@ const bucketsColl = testDB.getCollection('system.buckets.' + coll.getName());
 const timeFieldName = 'time';
 const metaFieldName = 'meta';
 
-assert.commandWorked(testDB.createCollection(
-    coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
-assert.contains(bucketsColl.getName(), testDB.getCollectionNames());
-
 const expectedStats = {
     ns: coll.getFullName(),
     bucketsNs: bucketsColl.getFullName(),
-    bucketCount: 0,
-    numBucketInserts: 0,
-    numBucketUpdates: 0,
-    numBucketsOpenedDueToMetadata: 0,
-    numBucketsClosedDueToCount: 0,
-    numBucketsClosedDueToSize: 0,
-    numBucketsClosedDueToTimeForward: 0,
-    numBucketsClosedDueToTimeBackward: 0,
-    numCommits: 0,
-    numWaits: 0,
-    numMeasurementsCommitted: 0,
 };
+
+const clearCollection = function() {
+    coll.drop();
+    assert.commandWorked(testDB.createCollection(
+        coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
+    assert.contains(bucketsColl.getName(), testDB.getCollectionNames());
+
+    expectedStats.bucketCount = 0;
+    expectedStats.numBucketInserts = 0;
+    expectedStats.numBucketUpdates = 0;
+    expectedStats.numBucketsOpenedDueToMetadata = 0;
+    expectedStats.numBucketsClosedDueToCount = 0;
+    expectedStats.numBucketsClosedDueToSize = 0;
+    expectedStats.numBucketsClosedDueToTimeForward = 0;
+    expectedStats.numBucketsClosedDueToTimeBackward = 0;
+    expectedStats.numBucketsClosedDueToMemoryThreshold = 0;
+    expectedStats.numCommits = 0;
+    expectedStats.numWaits = 0;
+    expectedStats.numMeasurementsCommitted = 0;
+};
+clearCollection();
 
 const checkCollStats = function(empty = false) {
     const stats = assert.commandWorked(coll.stats());
@@ -137,7 +143,7 @@ const bucketMaxSizeKB = 125;
 numDocs = 2;
 // The measurement data should not take up all of the 'bucketMaxSizeKB' limit because we need
 // to leave a little room for the _id and the time fields.
-const largeValue = 'x'.repeat((bucketMaxSizeKB - 1) * 1024);
+let largeValue = 'x'.repeat((bucketMaxSizeKB - 1) * 1024);
 docs = Array(numDocs).fill(
     {[timeFieldName]: ISODate(), x: largeValue, [metaFieldName]: {a: 'limit_size'}});
 assert.commandWorked(coll.insert(docs));
@@ -168,4 +174,42 @@ expectedStats.numMeasurementsCommitted += numDocs;
 expectedStats.avgNumMeasurementsPerCommit =
     Math.floor(expectedStats.numMeasurementsCommitted / expectedStats.numCommits);
 checkCollStats();
+
+const kIdleBucketExpiryMemoryUsageThreshold = 1024 * 1024 * 100;
+numDocs = 60;
+largeValue = 'a'.repeat(1024 * 1024);
+
+const testIdleBucketExpiry = function(docFn) {
+    clearCollection();
+
+    let shouldExpire = false;
+    for (let i = 0; i < numDocs; i++) {
+        assert.commandWorked(coll.insert(docFn(i)));
+        const memoryUsage =
+            assert.commandWorked(testDB.serverStatus({bucketCatalog: 1})).bucketCatalog.memoryUsage;
+
+        expectedStats.bucketCount++;
+        expectedStats.numBucketInserts++;
+        expectedStats.numBucketsOpenedDueToMetadata++;
+        if (shouldExpire) {
+            expectedStats.numBucketsClosedDueToMemoryThreshold++;
+        }
+        expectedStats.numCommits++;
+        expectedStats.numMeasurementsCommitted++;
+        expectedStats.avgNumMeasurementsPerCommit =
+            Math.floor(expectedStats.numMeasurementsCommitted / expectedStats.numCommits);
+        checkCollStats();
+
+        shouldExpire = memoryUsage > kIdleBucketExpiryMemoryUsageThreshold;
+    }
+
+    assert(shouldExpire, 'Memory usage did not reach idle bucket expiry threshold');
+};
+
+testIdleBucketExpiry(i => {
+    return {[timeFieldName]: ISODate(), [metaFieldName]: {[i.toString()]: largeValue}};
+});
+testIdleBucketExpiry(i => {
+    return {[timeFieldName]: ISODate(), [metaFieldName]: i, a: largeValue};
+});
 })();

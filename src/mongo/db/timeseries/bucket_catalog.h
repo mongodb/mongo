@@ -148,6 +148,11 @@ private:
          */
         BSONObj getUpdates();
 
+        /*
+         * Returns the approximate memory usage of this MinMax.
+         */
+        uint64_t getMemoryUsage() const;
+
     private:
         enum class Type {
             kObject,
@@ -157,6 +162,9 @@ private:
         };
 
         void _update(BSONElement elem, const std::function<bool(int, int)>& comp);
+        void _updateWithMemoryUsage(MinMax* minMax,
+                                    BSONElement elem,
+                                    const std::function<bool(int, int)>& comp);
 
         void _append(BSONObjBuilder* builder) const;
         void _append(BSONArrayBuilder* builder) const;
@@ -179,6 +187,8 @@ private:
         Type _type = Type::kUnset;
 
         bool _updated = false;
+
+        uint64_t _memoryUsage = 0;
     };
 
     struct Bucket {
@@ -228,6 +238,9 @@ private:
         // range.
         bool full = false;
 
+        // Approximate memory usage of this bucket.
+        uint64_t memoryUsage = sizeof(*this);
+
         /**
          * Determines the effect of adding 'doc' to this bucket If adding 'doc' causes this bucket
          * to overflow, we will create a new bucket and recalculate the change to the bucket size
@@ -236,6 +249,7 @@ private:
         void calculateBucketFieldsAndSizeChange(const BSONObj& doc,
                                                 boost::optional<StringData> metaField,
                                                 StringSet* newFieldNamesToBeInserted,
+                                                uint32_t* newFieldNamesSize,
                                                 uint32_t* sizeToBeAdded) const;
     };
 
@@ -247,12 +261,18 @@ private:
         long long numBucketsClosedDueToSize = 0;
         long long numBucketsClosedDueToTimeForward = 0;
         long long numBucketsClosedDueToTimeBackward = 0;
+        long long numBucketsClosedDueToMemoryThreshold = 0;
         long long numCommits = 0;
         long long numWaits = 0;
         long long numMeasurementsCommitted = 0;
     };
 
     class ServerStatus;
+
+    /**
+     * Expires idle buckets until the bucket catalog's memory usage is below the expiry threshold.
+     */
+    void _expireIdleBuckets(ExecutionStats* stats);
 
     mutable Mutex _mutex = MONGO_MAKE_LATCH("BucketCatalog");
 
@@ -270,5 +290,8 @@ private:
 
     // Per-collection execution stats.
     stdx::unordered_map<NamespaceString, ExecutionStats> _executionStats;
+
+    // Approximate memory usage of the bucket catalog.
+    uint64_t _memoryUsage = 0;
 };
 }  // namespace mongo

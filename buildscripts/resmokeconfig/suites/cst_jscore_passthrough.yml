@@ -391,6 +391,7 @@ selector:
   - jstests/core/sparse_index_supports_ne_null.js
   - jstests/core/stages_and_hash.js
   - jstests/core/stages_collection_scan.js
+  - jstests/core/timeseries/timeseries_idle_buckets.js
   - jstests/core/top.js
   - jstests/core/txns/abort_prepared_transaction.js
   - jstests/core/txns/aggregation_in_transaction.js
