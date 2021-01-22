@@ -743,27 +743,12 @@ S2Region* buildS2Region(const R2Annulus& sphereBounds) {
         regions.push_back(new S2Cap(innerCap));
     }
 
-    // 'kEpsilon' is about 9 times the double-precision roundoff relative error.
-    constexpr double kEpsilon = 1e-15;
-
     // We only need to max bound if this is not a full search of the Earth
     // Using the constant here is important since we use the min of kMaxEarthDistance
     // and the actual bounds passed in to set up the search area.
-    if ((outer * (1 + kEpsilon)) < kMaxEarthDistanceInMeters) {
-        // SERVER-52953: The cell covering returned by S2 may have a matching point along its
-        // boundary. In certain cases, this boundary point is not contained within the covering,
-        // which means that this search will not match said point. As such, we avoid this issue by
-        // finding a covering for the region expanded over a very small radius because this covering
-        // is guaranteed to contain the boundary point.
-        auto angle = S1Angle::Radians((outer * (1 + kEpsilon)) / kRadiusOfEarthInMeters);
-        S2Cap outerCap = S2Cap::FromAxisAngle(latLng.ToPoint(), angle);
-
-        // If 'outer' is sufficiently small, the computation of the S2Cap's height from 'angle' may
-        // underflow, resulting in a height less than 'kEpsilon' and an empty cap. As such, we
-        // guarantee that 'outerCap' has a height of at least 'kEpsilon'.
-        if (outerCap.height() < kEpsilon) {
-            outerCap = S2Cap::FromAxisHeight(latLng.ToPoint(), kEpsilon);
-        }
+    if (outer < kMaxEarthDistanceInMeters) {
+        S2Cap outerCap = S2Cap::FromAxisAngle(latLng.ToPoint(),
+                                              S1Angle::Radians(outer / kRadiusOfEarthInMeters));
         regions.push_back(new S2Cap(outerCap));
     }
 
