@@ -5807,8 +5807,6 @@ tasks:
 - <<: *task_template
   name: jsCore_ese
   tags: ["jscore", "encrypt"]
-  depends_on:
-  - name: jsCore
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -5818,8 +5816,6 @@ tasks:
 - <<: *task_template
   name: jsCore_ese_gcm
   tags: ["jscore", "encrypt", "gcm"]
-  depends_on:
-  - name: jsCore
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -5829,8 +5825,6 @@ tasks:
 - <<: *task_template
   name: jsCore_compatibility
   tags: ["jscore", "common", "compat"]
-  depends_on:
-  - name: jsCore
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -5840,8 +5834,6 @@ tasks:
 - <<: *task_template
   name: jsCore_auth
   tags: ["jscore", "auth", "common"]
-  depends_on:
-  - name: jsCore
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -5851,8 +5843,6 @@ tasks:
 - <<: *task_template
   name: jsCore_minimum_batch_size
   tags: ["jscore"]
-  depends_on:
-  - name: jsCore
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -5862,8 +5852,6 @@ tasks:
 - <<: *task_template
   name: jsCore_op_query
   tags: ["jscore"]
-  depends_on:
-  - name: jsCore
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -5873,8 +5861,6 @@ tasks:
 - <<: *task_template
   name: jsCore_txns
   tags: ["jscore", "common", "txns"]
-  depends_on:
-    - name: jsCore
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -5884,8 +5870,6 @@ tasks:
 - <<: *task_template
   name: jsCore_txns_large_txns_format
   tags: ["jscore", "txns", "multi_oplog"]
-  depends_on:
-    - name: jsCore
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -5895,8 +5879,6 @@ tasks:
 - <<: *task_template
   name: jsCore_slot_based_execution
   tags: ["jscore", "common", "sbe"]
-  depends_on:
-    - name: jsCore
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -5906,8 +5888,6 @@ tasks:
 - <<: *task_template
   name: sharded_jscore_txns
   tags: ["sharding", "jscore", "txns"]
-  depends_on:
-    - name: jsCore
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -5917,8 +5897,6 @@ tasks:
 - <<: *task_template
   name: sharded_jscore_op_query_txns
   tags: ["sharding", "jscore", "txns"]
-  depends_on:
-    - name: jsCore
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -5928,8 +5906,6 @@ tasks:
 - <<: *task_template
   name: sharded_jscore_txns_without_snapshot
   tags: ["sharding", "wo_snapshot", "jscore"]
-  depends_on:
-    - name: jsCore
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -5939,8 +5915,6 @@ tasks:
 - <<: *task_template
   name: sharded_jscore_txns_sharded_collections
   tags: ["sharding", "jscore", "txns"]
-  depends_on:
-    - name: jsCore
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -5950,8 +5924,6 @@ tasks:
 - <<: *task_template
   name: cst_jscore_passthrough
   tags: ["jscore"]
-  depends_on:
-    - name: jsCore
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -5970,8 +5942,6 @@ tasks:
 - <<: *task_template
   name: causally_consistent_jscore_txns_passthrough
   tags: ["causally_consistent"]
-  depends_on:
-    - name: jsCore
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -5980,8 +5950,6 @@ tasks:
 
 - name: sharded_causally_consistent_jscore_txns_passthrough_gen
   tags: ["sharding", "jscore", "causally_consistent", "txns"]
-  depends_on:
-    - name: jsCore
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -5991,8 +5959,6 @@ tasks:
 
 - name: sharded_causally_consistent_jscore_txns_passthrough_without_snapshot_gen
   tags: ["sharding", "wo_snapshot", "causally_consistent", "jscore"]
-  depends_on:
-    - name: jsCore
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -6003,8 +5969,6 @@ tasks:
 
 - name: causally_consistent_hedged_reads_jscore_passthrough_gen
   tags: ["causally_consistent", "sharding", "jscore"]
-  depends_on:
-    - name: jsCore
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -6015,8 +5979,6 @@ tasks:
 - <<: *task_template
   name: sharded_collections_causally_consistent_jscore_txns_passthrough
   tags: ["sharding", "jscore", "causally_consistent", "txns"]
-  depends_on:
-    - name: jsCore
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -6026,8 +5988,6 @@ tasks:
 - <<: *task_template
   name: replica_sets_jscore_passthrough
   tags: ["replica_sets", "common", "san", "large"]
-  depends_on:
-  - name: jsCore
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -6035,8 +5995,6 @@ tasks:
       resmoke_args: --suites=replica_sets_jscore_passthrough --storageEngine=wiredTiger
 
 - name: replica_sets_reconfig_jscore_passthrough_gen
-  depends_on:
-  - name: jsCore
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -6047,8 +6005,6 @@ tasks:
 
 - <<: *task_template
   name: replica_sets_reconfig_jscore_stepdown_passthrough
-  depends_on:
-  - name: jsCore
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -6057,8 +6013,6 @@ tasks:
 
 - <<: *task_template
   name: replica_sets_reconfig_kill_primary_jscore_passthrough
-  depends_on:
-  - name: jsCore
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -6066,8 +6020,6 @@ tasks:
       resmoke_args: --suites=replica_sets_reconfig_kill_primary_jscore_passthrough --storageEngine=wiredTiger
 
 - name: replica_sets_jscore_passthrough_gen
-  depends_on:
-  - name: jsCore
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -6079,8 +6031,6 @@ tasks:
 - <<: *task_template
   name: replica_sets_large_txns_format_jscore_passthrough
   tags: ["replica_sets", "multi_oplog", "large", "non_maj_read", "san"]
-  depends_on:
-  - name: jsCore
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -6090,8 +6040,6 @@ tasks:
 - <<: *task_template
   name: replica_sets_multi_stmt_txn_jscore_passthrough
   tags: ["replica_sets", "large"]
-  depends_on:
-  - name: jsCore
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -6100,8 +6048,6 @@ tasks:
 
 - name: replica_sets_multi_stmt_txn_stepdown_jscore_passthrough_gen
   tags: ["replica_sets", "non_maj_read"]
-  depends_on:
-  - name: jsCore
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -6113,8 +6059,6 @@ tasks:
 - <<: *task_template
   name: replica_sets_multi_stmt_txn_kill_primary_jscore_passthrough
   tags: ["replica_sets", "non_maj_read", "non_live_record"]
-  depends_on:
-  - name: jsCore
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -6124,8 +6068,6 @@ tasks:
 - <<: *task_template
   name: replica_sets_multi_stmt_txn_terminate_primary_jscore_passthrough
   tags: ["replica_sets", "non_maj_read"]
-  depends_on:
-  - name: jsCore
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -6135,8 +6077,6 @@ tasks:
 - <<: *task_template
   name: replica_sets_update_v1_oplog_jscore_passthrough
   tags: ["replica_sets", "non_maj_read"]
-  depends_on:
-  - name: jsCore
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -6146,8 +6086,6 @@ tasks:
 - <<: *task_template
   name: replica_sets_initsync_jscore_passthrough
   tags: ["replica_sets", "san", "large"]
-  depends_on:
-  - name: jsCore
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -6157,8 +6095,6 @@ tasks:
 - <<: *task_template
   name: replica_sets_initsync_static_jscore_passthrough
   tags: ["replica_sets", "san", "large"]
-  depends_on:
-  - name: jsCore
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -6168,8 +6104,6 @@ tasks:
 - <<: *task_template
   name: replica_sets_kill_primary_jscore_passthrough
   tags: ["replica_sets", "large", "non_maj_read", "non_live_record"]
-  depends_on:
-  - name: jsCore
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -6179,8 +6113,6 @@ tasks:
 - <<: *task_template
   name: replica_sets_terminate_primary_jscore_passthrough
   tags: ["replica_sets", "large", "non_maj_read"]
-  depends_on:
-  - name: jsCore
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -6190,8 +6122,6 @@ tasks:
 - <<: *task_template
   name: replica_sets_kill_secondaries_jscore_passthrough
   tags: ["replica_sets", "san", "large", "non_live_record"]
-  depends_on:
-  - name: jsCore
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -6304,8 +6234,6 @@ tasks:
 - <<: *task_template
   name: sharded_collections_jscore_passthrough
   tags: ["sharding", "jscore"]
-  depends_on:
-  - name: jsCore
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -6326,8 +6254,6 @@ tasks:
 - <<: *task_template
   name: sharding_jscore_passthrough
   tags: ["sharding", "jscore", "common"]
-  depends_on:
-  - name: jsCore
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -6348,8 +6274,6 @@ tasks:
 - <<: *task_template
   name: sharding_jscore_op_query_passthrough
   tags: ["sharding", "jscore"]
-  depends_on:
-  - name: jsCore
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -6359,8 +6283,6 @@ tasks:
 - <<: *task_template
   name: sharding_update_v1_oplog_jscore_passthrough
   tags: ["sharding", "jscore"]
-  depends_on:
-  - name: jsCore
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -6369,8 +6291,6 @@ tasks:
 
 - name: sharding_jscore_passthrough_wire_ops_gen
   tags: ["sharding", "jscore"]
-  depends_on:
-  - name: jsCore
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -6382,8 +6302,6 @@ tasks:
 - <<: *task_template
   name: sharded_multi_stmt_txn_jscore_passthrough
   tags: ["sharding", "jscore", "multi_stmt"]
-  depends_on:
-  - name: jsCore
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -6392,8 +6310,6 @@ tasks:
 
 - name: multi_shard_multi_stmt_txn_jscore_passthrough_gen
   tags: ["multi_shard", "multi_stmt", "common"]
-  depends_on:
-  - name: jsCore
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -6405,8 +6321,6 @@ tasks:
 
 - name: multi_shard_local_read_write_multi_stmt_txn_jscore_passthrough_gen
   tags: ["multi_shard", "common"]
-  depends_on:
-  - name: jsCore
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -6416,8 +6330,6 @@ tasks:
 
 - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
   tags: ["multi_stmt"]
-  depends_on:
-  - name: jsCore
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -6428,8 +6340,6 @@ tasks:
 
 - name: multi_shard_multi_stmt_txn_kill_primary_jscore_passthrough_gen
   tags: ["multi_shard"]
-  depends_on:
-  - name: jsCore
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -6440,8 +6350,6 @@ tasks:
 
 - name: multi_shard_multi_stmt_txn_stepdown_primary_jscore_passthrough_gen
   tags: ["multi_shard"]
-  depends_on:
-  - name: jsCore
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -6451,8 +6359,6 @@ tasks:
       fallback_num_sub_suites: 37
 
 - name: tenant_migration_jscore_passthrough_gen
-  depends_on:
-  - name: jsCore
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -6463,8 +6369,6 @@ tasks:
 
 - name: parallel_gen
   tags: ["misc_js"]
-  depends_on:
-  - name: jsCore
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -6476,8 +6380,6 @@ tasks:
 - <<: *task_template
   name: parallel_compatibility
   tags: ["misc_js"]
-  depends_on:
-  - name: jsCore_compatibility
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -6841,8 +6743,6 @@ tasks:
 - <<: *task_template
   name: read_concern_linearizable_passthrough
   tags: ["read_write_concern", "linearize", "large"]
-  depends_on:
-  - name: jsCore
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -6851,8 +6751,6 @@ tasks:
 
 - name: read_concern_majority_passthrough_gen
   tags: ["read_write_concern"]
-  depends_on:
-  - name: jsCore
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -6864,8 +6762,6 @@ tasks:
 - <<: *task_template
   name: write_concern_majority_passthrough
   tags: ["read_write_concern", "large", "write"]
-  depends_on:
-  - name: jsCore
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -6875,8 +6771,6 @@ tasks:
 - <<: *task_template
   name: cwrwc_passthrough
   tags: ["read_write_concern", "large", "write"]
-  depends_on:
-  - name: jsCore
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -6885,8 +6779,6 @@ tasks:
 
 - name: cwrwc_rc_majority_passthrough_gen
   tags: ["read_write_concern"]
-  depends_on:
-  - name: jsCore
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -6898,8 +6790,6 @@ tasks:
 - <<: *task_template
   name: cwrwc_wc_majority_passthrough
   tags: ["read_write_concern", "large", "write"]
-  depends_on:
-  - name: jsCore
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -6907,8 +6797,6 @@ tasks:
       resmoke_args: --suites=cwrwc_wc_majority_passthrough --storageEngine=wiredTiger
 
 - name: secondary_reads_passthrough_gen
-  depends_on:
-  - name: jsCore
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -7177,8 +7065,6 @@ tasks:
 
 - <<: *task_template
   name: session_jscore_passthrough
-  depends_on:
-  - name: jsCore
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -7187,8 +7073,6 @@ tasks:
 
 - name: causally_consistent_jscore_passthrough_gen
   tags: ["causally_consistent"]
-  depends_on:
-  - name: jsCore
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -7198,8 +7082,6 @@ tasks:
 
 - name: causally_consistent_jscore_passthrough_auth_gen
   tags: ["causally_consistent"]
-  depends_on:
-  - name: jsCore
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -7209,8 +7091,6 @@ tasks:
 
 - name: causally_consistent_read_concern_snapshot_passthrough_gen
   tags: ["causally_consistent", "read_write_concern", "durable_history"]
-  depends_on:
-  - name: jsCore
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -7220,8 +7100,6 @@ tasks:
 
 - name: sharded_causally_consistent_read_concern_snapshot_passthrough_gen
   tags: ["causally_consistent", "read_write_concern", "durable_history"]
-  depends_on:
-  - name: jsCore
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -7231,8 +7109,6 @@ tasks:
 
 - name: sharded_causally_consistent_jscore_passthrough_gen
   tags: ["causally_consistent"]
-  depends_on:
-  - name: jsCore
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -7242,8 +7118,6 @@ tasks:
 
 - name: retryable_writes_jscore_passthrough_gen
   tags: ["retry"]
-  depends_on:
-  - name: jsCore
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -7254,8 +7128,6 @@ tasks:
 
 - name: logical_session_cache_replication_default_refresh_jscore_passthrough_gen
   tags: ["logical_session_cache", "repl"]
-  depends_on:
-  - name: jsCore
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -7265,8 +7137,6 @@ tasks:
 
 - name: logical_session_cache_replication_100ms_refresh_jscore_passthrough_gen
   tags: ["logical_session_cache", "repl"]
-  depends_on:
-  - name: jsCore
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -7276,8 +7146,6 @@ tasks:
 
 - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_gen
   tags: ["logical_session_cache", "one_sec", "repl"]
-  depends_on:
-  - name: jsCore
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -7287,8 +7155,6 @@ tasks:
 
 - name: logical_session_cache_replication_10sec_refresh_jscore_passthrough_gen
   tags: ["logical_session_cache", "repl"]
-  depends_on:
-  - name: jsCore
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -7298,8 +7164,6 @@ tasks:
 
 - name: logical_session_cache_sharding_default_refresh_jscore_passthrough_gen
   tags: ["logical_session_cache"]
-  depends_on:
-  - name: jsCore
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -7309,8 +7173,6 @@ tasks:
 
 - name: logical_session_cache_sharding_100ms_refresh_jscore_passthrough_gen
   tags: ["logical_session_cache"]
-  depends_on:
-  - name: jsCore
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -7320,8 +7182,6 @@ tasks:
 
 - name: logical_session_cache_sharding_100ms_refresh_jscore_txns_passthrough_gen
   tags: ["logical_session_cache"]
-  depends_on:
-  - name: jsCore
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -7331,8 +7191,6 @@ tasks:
 
 - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
   tags: ["logical_session_cache", "one_sec"]
-  depends_on:
-  - name: jsCore
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -7342,8 +7200,6 @@ tasks:
 
 - name: logical_session_cache_sharding_10sec_refresh_jscore_passthrough_gen
   tags: ["logical_session_cache"]
-  depends_on:
-  - name: jsCore
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -7353,8 +7209,6 @@ tasks:
 
 - name: logical_session_cache_standalone_default_refresh_jscore_passthrough_gen
   tags: ["logical_session_cache"]
-  depends_on:
-  - name: jsCore
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -7364,8 +7218,6 @@ tasks:
 
 - name: logical_session_cache_standalone_100ms_refresh_jscore_passthrough_gen
   tags: ["logical_session_cache"]
-  depends_on:
-  - name: jsCore
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -7375,8 +7227,6 @@ tasks:
 
 - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
   tags: ["logical_session_cache", "one_sec"]
-  depends_on:
-  - name: jsCore
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -7386,8 +7236,6 @@ tasks:
 
 - name: logical_session_cache_standalone_10sec_refresh_jscore_passthrough_gen
   tags: ["logical_session_cache"]
-  depends_on:
-  - name: jsCore
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -7398,8 +7246,6 @@ tasks:
 - <<: *task_template
   name: retryable_writes_jscore_stepdown_passthrough
   tags: ["retry"]
-  depends_on:
-  - name: jsCore
   commands:
   - func: "do setup"
   - func: "run tests"
