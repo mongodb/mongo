@@ -49,7 +49,7 @@ client threads await events without busy polling.
 
 ## Example
 
-For an exmaple of scheduling a task on the `OperationContext` baton, see 
+For an example of scheduling a task on the `OperationContext` baton, see 
 [here][example].
 
 ## Considerations
