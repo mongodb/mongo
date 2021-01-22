@@ -243,6 +243,11 @@ void TenantMigrationAccessBlocker::setCommitOpTime(OperationContext* opCtx, repl
     }
 
     stdx::unique_lock<Latch> lk(_mutex);
+    if (_completionPromise.getFuture().isReady()) {
+        // onMajorityCommitPointUpdate() was called during the time that this thread is not holding
+        // the lock.
+        return;
+    }
     _onMajorityCommitCommitOpTime(lk);
 }
 
@@ -266,6 +271,11 @@ void TenantMigrationAccessBlocker::setAbortOpTime(OperationContext* opCtx, repl:
     }
 
     stdx::unique_lock<Latch> lk(_mutex);
+    if (_completionPromise.getFuture().isReady()) {
+        // onMajorityCommitPointUpdate() was called during the time that this thread is not holding
+        // the lock.
+        return;
+    }
     _onMajorityCommitAbortOpTime(lk);
 }
 
@@ -305,7 +315,9 @@ void TenantMigrationAccessBlocker::_onMajorityCommitCommitOpTime(stdx::unique_lo
 }
 
 void TenantMigrationAccessBlocker::_onMajorityCommitAbortOpTime(stdx::unique_lock<Latch>& lk) {
+    invariant(_state != State::kReject);
     invariant(!_commitOpTime);
+    invariant(_state != State::kAborted);
     invariant(_abortOpTime);
 
     _state = State::kAborted;
