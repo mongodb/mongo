@@ -12,6 +12,7 @@ const conn = MongoRunner.runMongod();
 
 if (!TimeseriesTest.timeseriesCollectionsEnabled(conn)) {
     jsTestLog("Skipping test because the time-series collection feature flag is disabled");
+    MongoRunner.stopMongod(conn);
     return;
 }
 
