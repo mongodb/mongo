@@ -77,6 +77,7 @@ MONGO_FAIL_POINT_DEFINE(pauseAfterCreatingOplogBuffer);
 MONGO_FAIL_POINT_DEFINE(failWhilePersistingTenantMigrationRecipientInstanceStateDoc);
 MONGO_FAIL_POINT_DEFINE(fpAfterPersistingTenantMigrationRecipientInstanceStateDoc);
 MONGO_FAIL_POINT_DEFINE(fpAfterConnectingTenantMigrationRecipientInstance);
+MONGO_FAIL_POINT_DEFINE(fpAfterRecordingRecipientPrimaryStartingFCV);
 MONGO_FAIL_POINT_DEFINE(fpAfterRetrievingStartOpTimesMigrationRecipientInstance);
 MONGO_FAIL_POINT_DEFINE(fpAfterStartingOplogFetcherMigrationRecipientInstance);
 MONGO_FAIL_POINT_DEFINE(setTenantMigrationRecipientInstanceHostTimeout);
@@ -1084,6 +1085,14 @@ BSONObj TenantMigrationRecipientService::Instance::_getOplogFetcherFilter() cons
                                             << "o.applyOps.0.ns" << namespaceRegex)));
 }
 
+SharedSemiFuture<void> TenantMigrationRecipientService::Instance::_updateStateDocForMajority()
+    const {
+    auto opCtx = cc().makeOperationContext();
+    uassertStatusOK(tenantMigrationRecipientEntryHelpers::updateStateDoc(opCtx.get(), _stateDoc));
+    return WaitForMajorityService::get(opCtx->getServiceContext())
+        .waitUntilMajority(repl::ReplClientInfo::forClient(cc()).getLastOp());
+}
+
 ExecutorFuture<void>
 TenantMigrationRecipientService::Instance::_fetchAndStoreDonorClusterTimeKeyDocs(
     const CancelationToken& token) {
@@ -1163,12 +1172,35 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
         .then([this, self = shared_from_this()] {
             _stopOrHangOnFailPoint(&fpAfterConnectingTenantMigrationRecipientInstance);
             stdx::lock_guard lk(_mutex);
+
+            // Record the FCV at the start of a migration and check for changes in every subsequent
+            // attempt. Fail if there is any mismatch in FCV or upgrade/downgrade state.
+            // (Generic FCV reference): This FCV check should exist across LTS binary versions.
+            auto currentFCV = serverGlobalParams.featureCompatibility.getVersion();
+            auto startingFCV = _stateDoc.getRecipientPrimaryStartingFCV();
+
+            if (!startingFCV) {
+                _stateDoc.setRecipientPrimaryStartingFCV(currentFCV);
+                return _updateStateDocForMajority();
+            }
+
+            if (startingFCV != currentFCV) {
+                LOGV2_ERROR(5356200,
+                            "FCV may not change during migration",
+                            "tenantId"_attr = getTenantId(),
+                            "migrationId"_attr = getMigrationUUID(),
+                            "startingFCV"_attr = startingFCV,
+                            "currentFCV"_attr = currentFCV);
+                uasserted(5356201, "Detected FCV change from last migration attempt.");
+            }
+
+            return Future<void>::makeReady().share();
+        })
+        .then([this, self = shared_from_this()] {
+            _stopOrHangOnFailPoint(&fpAfterRecordingRecipientPrimaryStartingFCV);
+            stdx::lock_guard lk(_mutex);
             _getStartOpTimesFromDonor(lk);
-            auto opCtx = cc().makeOperationContext();
-            uassertStatusOK(
-                tenantMigrationRecipientEntryHelpers::updateStateDoc(opCtx.get(), _stateDoc));
-            return WaitForMajorityService::get(opCtx->getServiceContext())
-                .waitUntilMajority(repl::ReplClientInfo::forClient(cc()).getLastOp());
+            return _updateStateDocForMajority();
         })
         .then([this, self = shared_from_this()] {
             _stopOrHangOnFailPoint(&fpAfterRetrievingStartOpTimesMigrationRecipientInstance);

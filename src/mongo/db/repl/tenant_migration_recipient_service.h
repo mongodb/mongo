@@ -395,6 +395,11 @@ public:
          */
         void _stopOrHangOnFailPoint(FailPoint* fp);
 
+        /**
+         * Updates the state doc in the database and waits for that to be propagated to a majority.
+         */
+        SharedSemiFuture<void> _updateStateDocForMajority() const;
+
         mutable Mutex _mutex = MONGO_MAKE_LATCH("TenantMigrationRecipientService::_mutex");
 
         // All member variables are labeled with one of the following codes indicating the

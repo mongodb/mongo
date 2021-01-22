@@ -29,6 +29,7 @@ global:
     cpp_namespace: "mongo"
     cpp_includes:
         - "mongo/client/read_preference.h"
+        - "mongo/db/commands/feature_compatibility_version_parser.h"
         - "mongo/db/repl/tenant_migration_util.h"
 
 imports:
@@ -182,3 +183,10 @@ structs:
                     The SSL certificate and private key that the recipient should use to
                     authenticate to the donor.
                 type: TenantMigrationPEMPayload
+            recipientPrimaryStartingFCV:
+                description: >-
+                    The featureCompatibilityVersion of the recipient as recorded at the beginning
+                    of a migration attempt. Implicitly includes information on current upgrade or
+                    downgrade state.
+                type: fcv_string
+                optional: true

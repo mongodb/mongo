@@ -2562,6 +2562,107 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientForgetMigration_FailToMarkG
         checkStateDocPersisted(opCtx.get(), instance.get());
     }
 }
+
+TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientServiceRecordsFCVAtStart) {
+    stopFailPointEnableBlock fp("fpAfterRecordingRecipientPrimaryStartingFCV");
+
+    const UUID migrationUUID = UUID::gen();
+    MockReplicaSet replSet("donorSet", 3, true /* hasPrimary */, true /* dollarPrefixHosts */);
+
+    TenantMigrationRecipientDocument initialStateDocument(
+        migrationUUID,
+        replSet.getConnectionString(),
+        "tenantA",
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+        kRecipientPEMPayload);
+
+    // Create and start the instance.
+    auto opCtx = makeOperationContext();
+    auto instance = TenantMigrationRecipientService::Instance::getOrCreate(
+        opCtx.get(), _service, initialStateDocument.toBSON());
+    ASSERT(instance.get());
+
+    // Wait for task completion.
+    ASSERT_EQ(stopFailPointErrorCode, instance->getDataSyncCompletionFuture().getNoThrow().code());
+    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+
+    auto doc = getStateDoc(instance.get());
+    auto docFCV = doc.getRecipientPrimaryStartingFCV();
+    auto currentFCV = serverGlobalParams.featureCompatibility.getVersion();
+    LOGV2(5356202, "FCV in doc vs current", "docFCV"_attr = docFCV, "currentFCV"_attr = currentFCV);
+    ASSERT(currentFCV == docFCV);
+    checkStateDocPersisted(opCtx.get(), instance.get());
+}
+
+TEST_F(TenantMigrationRecipientServiceTest,
+       TenantMigrationRecipientServiceAlreadyRecordedFCV_Match) {
+    stopFailPointEnableBlock fp("fpAfterRecordingRecipientPrimaryStartingFCV");
+
+    const UUID migrationUUID = UUID::gen();
+    MockReplicaSet replSet("donorSet", 3, true /* hasPrimary */, true /* dollarPrefixHosts */);
+
+    TenantMigrationRecipientDocument initialStateDocument(
+        migrationUUID,
+        replSet.getConnectionString(),
+        "tenantA",
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+        kRecipientPEMPayload);
+
+    // Add an FCV value as if it was from a previous attempt.
+    auto currentFCV = serverGlobalParams.featureCompatibility.getVersion();
+    initialStateDocument.setRecipientPrimaryStartingFCV(currentFCV);
+
+    // Create and start the instance.
+    auto opCtx = makeOperationContext();
+    auto instance = TenantMigrationRecipientService::Instance::getOrCreate(
+        opCtx.get(), _service, initialStateDocument.toBSON());
+    ASSERT(instance.get());
+
+    // Wait for task completion.
+    // The FCV should match so we should exit with the failpoint code rather than an error.
+    ASSERT_EQ(stopFailPointErrorCode, instance->getDataSyncCompletionFuture().getNoThrow().code());
+    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+
+    auto doc = getStateDoc(instance.get());
+    auto docFCV = doc.getRecipientPrimaryStartingFCV();
+    LOGV2(5356203, "FCV in doc vs current", "docFCV"_attr = docFCV, "currentFCV"_attr = currentFCV);
+    ASSERT(currentFCV == docFCV);
+    checkStateDocPersisted(opCtx.get(), instance.get());
+}
+
+TEST_F(TenantMigrationRecipientServiceTest,
+       TenantMigrationRecipientServiceAlreadyRecordedFCV_Mismatch) {
+    stopFailPointEnableBlock fp("fpAfterRecordingRecipientPrimaryStartingFCV");
+
+    const UUID migrationUUID = UUID::gen();
+    MockReplicaSet replSet("donorSet", 3, true /* hasPrimary */, true /* dollarPrefixHosts */);
+
+    TenantMigrationRecipientDocument initialStateDocument(
+        migrationUUID,
+        replSet.getConnectionString(),
+        "tenantA",
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+        kRecipientPEMPayload);
+
+    // Add an FCV value as if it was from a previous attempt, making sure we set a different
+    // version from the one we currently have.
+    // (Generic FCV reference): This FCV reference should exist across LTS binary versions.
+    initialStateDocument.setRecipientPrimaryStartingFCV(
+        ServerGlobalParams::FeatureCompatibility::kLastLTS);
+
+    // Create and start the instance.
+    auto opCtx = makeOperationContext();
+    auto instance = TenantMigrationRecipientService::Instance::getOrCreate(
+        opCtx.get(), _service, initialStateDocument.toBSON());
+    ASSERT(instance.get());
+
+    // Wait for task completion failure.
+    // The FCV should differ so we expect to exit with an error.
+    std::int32_t expectedCode = 5356201;
+    ASSERT_EQ(expectedCode, instance->getDataSyncCompletionFuture().getNoThrow().code());
+    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+}
+
 #endif
 }  // namespace repl
 }  // namespace mongo
