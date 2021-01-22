@@ -120,6 +120,7 @@ function finishTest({failPoint, expectedLog, expectedLogId, waitForDrop, createN
 
     jsTestLog("Waiting for initial sync to complete.");
     replTest.waitForState(secondary, ReplSetTest.State.SECONDARY);
+    replTest.awaitReplication();
 
     let res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1}));
     assert.eq(0, res.initialSyncStatus.failedInitialSyncAttempts);
