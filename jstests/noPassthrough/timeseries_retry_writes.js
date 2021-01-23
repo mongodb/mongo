@@ -106,8 +106,27 @@ const runTest = function(docInsert, docUpdateA, docUpdateB) {
     }),
                          'failed to append doc B to bucket (retry write): ' + tojson(docUpdateB));
 
-    // Check view.
+    // Retryable writes on time-series collections with more than one measurement are not allowed.
     let docs = [docInsert, docUpdateA, docUpdateB];
+    assert.commandFailedWithCode(testDB.runCommand({
+        insert: coll.getName(),
+        documents: docs,
+        lsid: session.getSessionId(),
+        txnNumber: NumberLong(3),
+    }),
+                                 ErrorCodes.OperationFailed);
+
+    // This test case ensures that the batch size error handling is consistent with non-time-series
+    // collections.
+    assert.commandFailedWithCode(testDB.runCommand({
+        insert: coll.getName(),
+        documents: [],  // No documents
+        lsid: session.getSessionId(),
+        txnNumber: NumberLong(4),
+    }),
+                                 ErrorCodes.InvalidLength);
+
+    // Check view.
     const viewDocs = coll.find({}).sort({_id: 1}).toArray();
     assert.eq(docs.length, viewDocs.length, viewDocs);
     for (let i = 0; i < docs.length; i++) {
@@ -129,12 +148,20 @@ const runTest = function(docInsert, docUpdateA, docUpdateB) {
 
     // Keys in data field should match element indexes in 'docs' array.
     for (let i = 0; i < docs.length; i++) {
-        assert(bucketDoc.data[timeFieldName].hasOwnProperty((i * 2).toString()),
+        assert(bucketDoc.data[timeFieldName].hasOwnProperty(i.toString()),
                'missing element for index ' + i + ' in data field: ' + tojson(bucketDoc));
         assert.eq(docs[i][timeFieldName],
-                  bucketDoc.data[timeFieldName][(i * 2).toString()],
+                  bucketDoc.data[timeFieldName][i.toString()],
                   'invalid time for measurement ' + i + ' in data field: ' + tojson(bucketDoc));
     }
+
+    const transactionsServerStatus = testDB.serverStatus().transactions;
+    assert.eq(docs.length,
+              transactionsServerStatus.retriedCommandsCount,
+              'Incorrect statistic in db.serverStatus(): ' + tojson(transactionsServerStatus));
+    assert.eq(docs.length,
+              transactionsServerStatus.retriedStatementsCount,
+              'Incorrect statistic in db.serverStatus(): ' + tojson(transactionsServerStatus));
 
     session.endSession();
 };

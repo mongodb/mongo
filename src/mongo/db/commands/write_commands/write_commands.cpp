@@ -59,9 +59,11 @@
 #include "mongo/db/repl/tenant_migration_access_blocker_registry.h"
 #include "mongo/db/repl/tenant_migration_committed_info.h"
 #include "mongo/db/repl/tenant_migration_conflict_info.h"
+#include "mongo/db/retryable_writes_stats.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/db/timeseries/bucket_catalog.h"
+#include "mongo/db/transaction_participant.h"
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/s/stale_exception.h"
@@ -258,6 +260,53 @@ void appendOpTime(const repl::OpTime& opTime, BSONObjBuilder* out) {
     } else {
         opTime.append(out, "opTime");
     }
+}
+
+/**
+ * Returns true if the retryable time-series write has been executed.
+ */
+bool isRetryableTimeseriesWriteExecuted(OperationContext* opCtx,
+                                        const write_ops::Insert& insert,
+                                        BSONObjBuilder* result) {
+    if (!opCtx->getTxnNumber()) {
+        return false;
+    }
+
+    if (opCtx->inMultiDocumentTransaction()) {
+        return false;
+    }
+
+    if (insert.getDocuments().empty()) {
+        return false;
+    }
+
+    auto txnParticipant = TransactionParticipant::get(opCtx);
+    const auto& writeCommandBase = insert.getWriteCommandBase();
+
+    uassert(ErrorCodes::OperationFailed,
+            str::stream() << "Retryable time-series insert operations are limited to one document "
+                             "per command request",
+            insert.getDocuments().size() == 1U);
+
+    auto stmtId = write_ops::getStmtIdForWriteAt(writeCommandBase, 0);
+    if (!txnParticipant.checkStatementExecutedNoOplogEntryFetch(stmtId)) {
+        return false;
+    }
+
+    // This retryable write has been executed previously. Fill in command result before returning.
+    result->appendNumber("n", 1);
+
+    auto* replCoord = repl::ReplicationCoordinator::get(opCtx->getServiceContext());
+    if (replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet) {
+        appendOpTime(repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp(), result);
+        result->append("electionId", replCoord->getElectionId());
+    }
+
+    auto retryStats = RetryableWritesStats::get(opCtx);
+    retryStats->incrementRetriedStatementsCount();
+    retryStats->incrementRetriedCommandsCount();
+
+    return true;
 }
 
 boost::optional<BSONObj> generateError(OperationContext* opCtx,
@@ -526,6 +575,10 @@ private:
          * Writes to the underlying system.buckets collection.
          */
         void _performTimeseriesWrites(OperationContext* opCtx, BSONObjBuilder* result) const {
+            if (isRetryableTimeseriesWriteExecuted(opCtx, _batch, result)) {
+                return;
+            }
+
             auto ns = _batch.getNamespace();
             auto bucketsNs = ns.makeTimeseriesBucketsNamespace();
 
