@@ -45,6 +45,7 @@
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding_util.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/executor/task_executor.h"
@@ -76,13 +77,15 @@ boost::intrusive_ptr<ExpressionContext> _makeExpressionContext(OperationContext*
 }
 }  // namespace
 
-ReshardingOplogFetcher::ReshardingOplogFetcher(UUID reshardingUUID,
+ReshardingOplogFetcher::ReshardingOplogFetcher(std::unique_ptr<Env> env,
+                                               UUID reshardingUUID,
                                                UUID collUUID,
                                                ReshardingDonorOplogId startAt,
                                                ShardId donorShard,
                                                ShardId recipientShard,
                                                NamespaceString toWriteInto)
-    : _reshardingUUID(reshardingUUID),
+    : _env(std::move(env)),
+      _reshardingUUID(reshardingUUID),
       _collUUID(collUUID),
       _startAt(startAt),
       _donorShard(donorShard),
@@ -164,8 +167,7 @@ ExecutorFuture<void> ReshardingOplogFetcher::_reschedule(
             ThreadClient client(fmt::format("OplogFetcher-{}-{}",
                                             _reshardingUUID.toString(),
                                             _donorShard.toString()),
-                                getGlobalServiceContext());
-
+                                _service());
             return iterate(client.get());
         })
         .then([executor, cancelToken](bool moreToCome) {
@@ -279,17 +281,16 @@ bool ReshardingOplogFetcher::consume(Client* client, Shard* shard) {
     auto opCtxRaii = client->makeOperationContext();
     int batchesProcessed = 0;
     bool moreToCome = true;
-    auto svcCtx = client->getServiceContext();
     // Note that the oplog entries are *not* being copied with a tailable cursor.
     // Shard::runAggregation() will instead return upon hitting the end of the donor's oplog.
     uassertStatusOK(shard->runAggregation(
         opCtxRaii.get(),
         aggRequest,
-        [this, svcCtx, &batchesProcessed, &moreToCome](const std::vector<BSONObj>& batch) {
+        [this, &batchesProcessed, &moreToCome](const std::vector<BSONObj>& batch) {
             ThreadClient client(fmt::format("ReshardingFetcher-{}-{}",
                                             _reshardingUUID.toString(),
                                             _donorShard.toString()),
-                                svcCtx,
+                                _service(),
                                 nullptr);
             auto opCtxRaii = cc().makeOperationContext();
             auto opCtx = opCtxRaii.get();
@@ -310,6 +311,8 @@ bool ReshardingOplogFetcher::consume(Client* client, Shard* shard) {
                 uassertStatusOK(toWriteTo->insertDocument(opCtx, InsertStatement{doc}, nullptr));
                 wuow.commit();
                 ++_numOplogEntriesCopied;
+
+                _env->metrics()->onOplogEntriesFetched(1);
 
                 auto [p, f] = makePromiseFuture<void>();
                 {

@@ -45,6 +45,7 @@
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
+#include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_oplog_fetcher.h"
 #include "mongo/db/s/resharding_util.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
@@ -57,8 +58,6 @@
 
 namespace mongo {
 namespace {
-
-using namespace unittest;
 
 /**
  * RAII type for operating at a timestamp. Will remove any timestamping when the object destructs.
@@ -85,17 +84,15 @@ private:
 
 class ReshardingOplogFetcherTest : public ShardServerTestFixture {
 public:
-    OperationContext* _opCtx;
-    ServiceContext* _svcCtx;
-    UUID _reshardingUUID = UUID::gen();
-    Timestamp _fetchTimestamp;
-    ShardId _donorShard;
-    ShardId _destinationShard;
-
-    void setUp() {
+    void setUp() override {
         ShardServerTestFixture::setUp();
         _opCtx = operationContext();
         _svcCtx = _opCtx->getServiceContext();
+
+        // Initialize ReshardingMetrics to a recipient state compatible with fetching.
+        _metrics = std::make_unique<ReshardingMetrics>(_svcCtx);
+        _metrics->onStart();
+        _metrics->setRecipientState(RecipientStateEnum::kCloning);
 
         for (const auto& shardId : kTwoShardIdList) {
             auto shardTargeter = RemoteCommandTargeterMock::get(
@@ -117,9 +114,13 @@ public:
         _destinationShard = kTwoShardIdList[1];
     }
 
-    void tearDown() {
+    void tearDown() override {
         WaitForMajorityService::get(getServiceContext()).shutDown();
         ShardServerTestFixture::tearDown();
+    }
+
+    auto makeFetcherEnv() {
+        return std::make_unique<ReshardingOplogFetcher::Env>(_svcCtx, &*_metrics);
     }
 
     /**
@@ -301,8 +302,22 @@ public:
                                 << "off"));
     }
 
+    long long metricsFetchedCount() const {
+        BSONObjBuilder bob;
+        _metrics->serialize(&bob, ReshardingMetrics::ReporterOptions::Role::kRecipient);
+        return bob.obj()["oplogEntriesFetched"_sd].Long();
+    }
+
 protected:
     const std::vector<ShardId> kTwoShardIdList{{"s1"}, {"s2"}};
+
+    OperationContext* _opCtx;
+    ServiceContext* _svcCtx;
+    UUID _reshardingUUID = UUID::gen();
+    Timestamp _fetchTimestamp;
+    ShardId _donorShard;
+    ShardId _destinationShard;
+    std::unique_ptr<ReshardingMetrics> _metrics;
 
 private:
     static HostAndPort makeHostAndPort(const ShardId& shardId) {
@@ -319,7 +334,8 @@ TEST_F(ReshardingOplogFetcherTest, TestBasic) {
     AutoGetCollection dataColl(_opCtx, dataCollectionNss, LockMode::MODE_IX);
     auto fetcherJob = launchAsync([&, this] {
         ThreadClient tc("RefetchRunner", _svcCtx, nullptr);
-        ReshardingOplogFetcher fetcher(_reshardingUUID,
+        ReshardingOplogFetcher fetcher(makeFetcherEnv(),
+                                       _reshardingUUID,
                                        dataColl->uuid(),
                                        {_fetchTimestamp, _fetchTimestamp},
                                        _donorShard,
@@ -335,6 +351,7 @@ TEST_F(ReshardingOplogFetcherTest, TestBasic) {
 
     // Five oplog entries for resharding + the sentinel final oplog entry.
     ASSERT_EQ(6, itcount(outputCollectionNss));
+    ASSERT_EQ(6, metricsFetchedCount()) << " Verify reported metrics";
 }
 
 TEST_F(ReshardingOplogFetcherTest, TestTrackLastSeen) {
@@ -349,7 +366,8 @@ TEST_F(ReshardingOplogFetcherTest, TestTrackLastSeen) {
     auto fetcherJob = launchAsync([&, this] {
         ThreadClient tc("RefetcherRunner", _svcCtx, nullptr);
 
-        ReshardingOplogFetcher fetcher(_reshardingUUID,
+        ReshardingOplogFetcher fetcher(makeFetcherEnv(),
+                                       _reshardingUUID,
                                        dataColl->uuid(),
                                        {_fetchTimestamp, _fetchTimestamp},
                                        _donorShard,
@@ -367,6 +385,7 @@ TEST_F(ReshardingOplogFetcherTest, TestTrackLastSeen) {
 
     // Two oplog entries due to the batch size.
     ASSERT_EQ(2, itcount(outputCollectionNss));
+    ASSERT_EQ(2, metricsFetchedCount()) << " Verify reported metrics";
     // Assert the lastSeen value has been bumped from the original `_fetchTimestamp`.
     ASSERT_GT(lastSeen.getTs(), _fetchTimestamp);
 }
@@ -383,7 +402,8 @@ TEST_F(ReshardingOplogFetcherTest, TestFallingOffOplog) {
         ThreadClient tc("RefetcherRunner", _svcCtx, nullptr);
 
         const Timestamp doesNotExist(1, 1);
-        ReshardingOplogFetcher fetcher(_reshardingUUID,
+        ReshardingOplogFetcher fetcher(makeFetcherEnv(),
+                                       _reshardingUUID,
                                        dataColl->uuid(),
                                        {doesNotExist, doesNotExist},
                                        _donorShard,
@@ -423,7 +443,8 @@ TEST_F(ReshardingOplogFetcherTest, TestAwaitInsert) {
     }();
 
     ReshardingDonorOplogId startAt{_fetchTimestamp, _fetchTimestamp};
-    ReshardingOplogFetcher fetcher(_reshardingUUID,
+    ReshardingOplogFetcher fetcher(makeFetcherEnv(),
+                                   _reshardingUUID,
                                    collectionUUID,
                                    startAt,
                                    _donorShard,

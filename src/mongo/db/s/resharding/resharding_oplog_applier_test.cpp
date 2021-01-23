@@ -44,6 +44,7 @@
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/resharding/resharding_donor_oplog_iterator.h"
+#include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_oplog_applier.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding_util.h"
@@ -162,6 +163,10 @@ public:
                                          BSON("create" << kOtherDonorStashNs.coll())));
 
         _cm = createChunkManagerForOriginalColl();
+
+        _metrics = std::make_unique<ReshardingMetrics>(getServiceContext());
+        _metrics->onStart();
+        _metrics->setRecipientState(RecipientStateEnum::kApplying);
     }
 
     ChunkManager createChunkManagerForOriginalColl() {
@@ -270,7 +275,17 @@ public:
         return kStashCollections;
     }
 
+    long long metricsAppliedCount() const {
+        BSONObjBuilder bob;
+        _metrics->serialize(&bob, ReshardingMetrics::ReporterOptions::Role::kRecipient);
+        return bob.obj()["oplogEntriesApplied"_sd].Long();
+    }
+
 protected:
+    auto makeApplierEnv() {
+        return std::make_unique<ReshardingOplogApplier::Env>(getServiceContext(), &*_metrics);
+    }
+
     std::shared_ptr<executor::ThreadPoolTaskExecutor> makeTaskExecutorForApplier() {
         auto executor = executor::makeThreadPoolTestExecutor(
             std::make_unique<executor::NetworkInterfaceMock>());
@@ -293,6 +308,7 @@ protected:
     boost::optional<ChunkManager> _cm;
 
     const ReshardingSourceId _sourceId{UUID::gen(), kMyShardId};
+    std::unique_ptr<ReshardingMetrics> _metrics;
 };
 
 TEST_F(ReshardingOplogApplierTest, NothingToIterate) {
@@ -302,7 +318,8 @@ TEST_F(ReshardingOplogApplierTest, NothingToIterate) {
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
-    applier.emplace(getServiceContext(),
+
+    applier.emplace(makeApplierEnv(),
                     sourceId(),
                     oplogNs(),
                     crudNs(),
@@ -345,7 +362,7 @@ TEST_F(ReshardingOplogApplierTest, ApplyBasicCrud) {
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
-    applier.emplace(getServiceContext(),
+    applier.emplace(makeApplierEnv(),
                     sourceId(),
                     oplogNs(),
                     crudNs(),
@@ -397,7 +414,7 @@ TEST_F(ReshardingOplogApplierTest, InsertTypeOplogAppliedInMultipleBatches) {
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
-    applier.emplace(getServiceContext(),
+    applier.emplace(makeApplierEnv(),
                     sourceId(),
                     oplogNs(),
                     crudNs(),
@@ -457,7 +474,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorDuringBatchApplyCloningPhase) {
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
-    applier.emplace(getServiceContext(),
+    applier.emplace(makeApplierEnv(),
                     sourceId(),
                     oplogNs(),
                     crudNs(),
@@ -505,7 +522,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorDuringBatchApplyCatchUpPhase) {
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
-    applier.emplace(getServiceContext(),
+    applier.emplace(makeApplierEnv(),
                     sourceId(),
                     oplogNs(),
                     crudNs(),
@@ -554,7 +571,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstOplogCloningPhase) {
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
-    applier.emplace(getServiceContext(),
+    applier.emplace(makeApplierEnv(),
                     sourceId(),
                     oplogNs(),
                     crudNs(),
@@ -600,7 +617,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstOplogCatchUpPhase) {
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
-    applier.emplace(getServiceContext(),
+    applier.emplace(makeApplierEnv(),
                     sourceId(),
                     oplogNs(),
                     crudNs(),
@@ -646,7 +663,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstBatchCloningPhase) {
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
-    applier.emplace(getServiceContext(),
+    applier.emplace(makeApplierEnv(),
                     sourceId(),
                     oplogNs(),
                     crudNs(),
@@ -696,7 +713,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstBatchCatchUpPhase) {
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
-    applier.emplace(getServiceContext(),
+    applier.emplace(makeApplierEnv(),
                     sourceId(),
                     oplogNs(),
                     crudNs(),
@@ -747,7 +764,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingSecondBatchCloningPhase) {
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
-    applier.emplace(getServiceContext(),
+    applier.emplace(makeApplierEnv(),
                     sourceId(),
                     oplogNs(),
                     crudNs(),
@@ -809,7 +826,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingSecondBatchCatchUpPhase) {
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
-    applier.emplace(getServiceContext(),
+    applier.emplace(makeApplierEnv(),
                     sourceId(),
                     oplogNs(),
                     crudNs(),
@@ -862,7 +879,7 @@ TEST_F(ReshardingOplogApplierTest, ExecutorIsShutDownCloningPhase) {
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
-    applier.emplace(getServiceContext(),
+    applier.emplace(makeApplierEnv(),
                     sourceId(),
                     oplogNs(),
                     crudNs(),
@@ -907,7 +924,7 @@ TEST_F(ReshardingOplogApplierTest, ExecutorIsShutDownCatchUpPhase) {
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
-    applier.emplace(getServiceContext(),
+    applier.emplace(makeApplierEnv(),
                     sourceId(),
                     oplogNs(),
                     crudNs(),
@@ -949,7 +966,7 @@ TEST_F(ReshardingOplogApplierTest, WriterPoolIsShutDownCloningPhase) {
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
-    applier.emplace(getServiceContext(),
+    applier.emplace(makeApplierEnv(),
                     sourceId(),
                     oplogNs(),
                     crudNs(),
@@ -994,7 +1011,7 @@ TEST_F(ReshardingOplogApplierTest, WriterPoolIsShutDownCatchUpPhase) {
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
-    applier.emplace(getServiceContext(),
+    applier.emplace(makeApplierEnv(),
                     sourceId(),
                     oplogNs(),
                     crudNs(),
@@ -1050,7 +1067,7 @@ TEST_F(ReshardingOplogApplierTest, InsertOpIntoOuputCollectionUseReshardingAppli
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
-    applier.emplace(getServiceContext(),
+    applier.emplace(makeApplierEnv(),
                     sourceId(),
                     oplogNs(),
                     crudNs(),
@@ -1102,7 +1119,7 @@ TEST_F(ReshardingOplogApplierTest,
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
-    applier.emplace(getServiceContext(),
+    applier.emplace(makeApplierEnv(),
                     sourceId(),
                     oplogNs(),
                     crudNs(),
@@ -1155,7 +1172,7 @@ TEST_F(ReshardingOplogApplierTest,
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
-    applier.emplace(getServiceContext(),
+    applier.emplace(makeApplierEnv(),
                     sourceId(),
                     oplogNs(),
                     crudNs(),
@@ -1221,7 +1238,7 @@ TEST_F(ReshardingOplogApplierTest,
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
-    applier.emplace(getServiceContext(),
+    applier.emplace(makeApplierEnv(),
                     sourceId(),
                     oplogNs(),
                     crudNs(),
@@ -1287,7 +1304,7 @@ TEST_F(ReshardingOplogApplierTest,
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
-    applier.emplace(getServiceContext(),
+    applier.emplace(makeApplierEnv(),
                     sourceId(),
                     oplogNs(),
                     crudNs(),
@@ -1358,7 +1375,7 @@ TEST_F(ReshardingOplogApplierTest,
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
-    applier.emplace(getServiceContext(),
+    applier.emplace(makeApplierEnv(),
                     sourceId(),
                     oplogNs(),
                     crudNs(),
@@ -1425,7 +1442,7 @@ TEST_F(ReshardingOplogApplierTest,
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
-    applier.emplace(getServiceContext(),
+    applier.emplace(makeApplierEnv(),
                     sourceId(),
                     oplogNs(),
                     crudNs(),
@@ -1512,7 +1529,7 @@ TEST_F(ReshardingOplogApplierTest, UpdateShouldModifyStashCollectionUseReshardin
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
-    applier.emplace(getServiceContext(),
+    applier.emplace(makeApplierEnv(),
                     sourceId(),
                     oplogNs(),
                     crudNs(),
@@ -1577,7 +1594,7 @@ TEST_F(ReshardingOplogApplierTest, UpdateShouldDoNothingUseReshardingApplication
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
-    applier.emplace(getServiceContext(),
+    applier.emplace(makeApplierEnv(),
                     sourceId(),
                     oplogNs(),
                     crudNs(),
@@ -1647,7 +1664,7 @@ TEST_F(ReshardingOplogApplierTest, UpdateOutputCollUseReshardingApplicationRules
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
-    applier.emplace(getServiceContext(),
+    applier.emplace(makeApplierEnv(),
                     sourceId(),
                     oplogNs(),
                     crudNs(),
@@ -1707,7 +1724,7 @@ TEST_F(ReshardingOplogApplierTest, UnsupportedCommandOpsShouldErrorUseResharding
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
-    applier.emplace(getServiceContext(),
+    applier.emplace(makeApplierEnv(),
                     sourceId(),
                     oplogNs(),
                     crudNs(),
@@ -1752,7 +1769,7 @@ TEST_F(ReshardingOplogApplierTest,
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
-    applier.emplace(getServiceContext(),
+    applier.emplace(makeApplierEnv(),
                     sourceId(),
                     oplogNs(),
                     crudNs(),
@@ -2216,7 +2233,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, GroupInserts) {
     auto writerPool = repl::makeReplWriterPool(1);
     ReshardingWriterVectorSizeBlock reshardingWriteVectorSizeForThisTest(1);
 
-    applier.emplace(getServiceContext(),
+    applier.emplace(makeApplierEnv(),
                     sourceId(),
                     oplogNs(),
                     crudNs(),
@@ -2303,7 +2320,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, CrudWithEmptyConfigTransactions) {
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
-    applier.emplace(getServiceContext(),
+    applier.emplace(makeApplierEnv(),
                     sourceId(),
                     oplogNs(),
                     crudNs(),
@@ -2389,7 +2406,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, MultipleTxnSameLsidInOneBatch) {
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
-    applier.emplace(getServiceContext(),
+    applier.emplace(makeApplierEnv(),
                     sourceId(),
                     oplogNs(),
                     crudNs(),
@@ -2449,7 +2466,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithLowerExistingTxn) {
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
-    applier.emplace(getServiceContext(),
+    applier.emplace(makeApplierEnv(),
                     sourceId(),
                     oplogNs(),
                     crudNs(),
@@ -2502,7 +2519,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithHigherExistingTxnNum) {
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
-    applier.emplace(getServiceContext(),
+    applier.emplace(makeApplierEnv(),
                     sourceId(),
                     oplogNs(),
                     crudNs(),
@@ -2566,7 +2583,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithEqualExistingTxnNum) {
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
-    applier.emplace(getServiceContext(),
+    applier.emplace(makeApplierEnv(),
                     sourceId(),
                     oplogNs(),
                     crudNs(),
@@ -2620,7 +2637,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithStmtIdAlreadyExecuted) 
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
-    applier.emplace(getServiceContext(),
+    applier.emplace(makeApplierEnv(),
                     sourceId(),
                     oplogNs(),
                     crudNs(),
@@ -2676,7 +2693,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithActiveUnpreparedTxnSame
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
-    applier.emplace(getServiceContext(),
+    applier.emplace(makeApplierEnv(),
                     sourceId(),
                     oplogNs(),
                     crudNs(),
@@ -2733,7 +2750,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithActiveUnpreparedTxnWith
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
-    applier.emplace(getServiceContext(),
+    applier.emplace(makeApplierEnv(),
                     sourceId(),
                     oplogNs(),
                     crudNs(),
@@ -2789,7 +2806,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithPreparedTxnThatWillComm
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
-    applier.emplace(getServiceContext(),
+    applier.emplace(makeApplierEnv(),
                     sourceId(),
                     oplogNs(),
                     crudNs(),
@@ -2853,7 +2870,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithPreparedTxnThatWillAbor
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
-    applier.emplace(getServiceContext(),
+    applier.emplace(makeApplierEnv(),
                     sourceId(),
                     oplogNs(),
                     crudNs(),
@@ -2924,7 +2941,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWriteWithPreImage) {
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
-    applier.emplace(getServiceContext(),
+    applier.emplace(makeApplierEnv(),
                     sourceId(),
                     oplogNs(),
                     crudNs(),
@@ -2990,7 +3007,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWriteWithPostImage) {
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
-    applier.emplace(getServiceContext(),
+    applier.emplace(makeApplierEnv(),
                     sourceId(),
                     oplogNs(),
                     crudNs(),
@@ -3039,7 +3056,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, ApplyTxnWithLowerExistingTxn) {
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
-    applier.emplace(getServiceContext(),
+    applier.emplace(makeApplierEnv(),
                     sourceId(),
                     oplogNs(),
                     crudNs(),
@@ -3089,7 +3106,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, ApplyTxnWithHigherExistingTxnNum) {
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
-    applier.emplace(getServiceContext(),
+    applier.emplace(makeApplierEnv(),
                     sourceId(),
                     oplogNs(),
                     crudNs(),
@@ -3148,7 +3165,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, ApplyTxnWithEqualExistingTxnNum) {
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
-    applier.emplace(getServiceContext(),
+    applier.emplace(makeApplierEnv(),
                     sourceId(),
                     oplogNs(),
                     crudNs(),
@@ -3201,7 +3218,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, ApplyTxnWithActiveUnpreparedTxnSameT
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
-    applier.emplace(getServiceContext(),
+    applier.emplace(makeApplierEnv(),
                     sourceId(),
                     oplogNs(),
                     crudNs(),
@@ -3258,7 +3275,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, ApplyTxnActiveUnpreparedTxnWithLower
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
-    applier.emplace(getServiceContext(),
+    applier.emplace(makeApplierEnv(),
                     sourceId(),
                     oplogNs(),
                     crudNs(),
@@ -3314,7 +3331,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, ApplyTxnWithPreparedTxnThatWillCommi
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
-    applier.emplace(getServiceContext(),
+    applier.emplace(makeApplierEnv(),
                     sourceId(),
                     oplogNs(),
                     crudNs(),
@@ -3374,7 +3391,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, ApplyTxnWithPreparedTxnThatWillAbort
     boost::optional<ReshardingOplogApplier> applier;
     auto executor = makeTaskExecutorForApplier();
     auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
-    applier.emplace(getServiceContext(),
+    applier.emplace(makeApplierEnv(),
                     sourceId(),
                     oplogNs(),
                     crudNs(),
@@ -3410,6 +3427,43 @@ TEST_F(ReshardingOplogApplierRetryableTest, ApplyTxnWithPreparedTxnThatWillAbort
         isWriteAlreadyExecuted(session, 1), DBException, ErrorCodes::IncompleteTransactionHistory);
 
     checkSecondaryCanReplicateCorrectly();
+}
+
+TEST_F(ReshardingOplogApplierTest, MetricsAreReported) {
+    auto executor = makeTaskExecutorForApplier();
+    auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
+    // Compress the makeOplog syntax a little further for this special case.
+    using OpT = repl::OpTypeEnum;
+    auto easyOp = [this](auto ts, OpT opType, BSONObj obj1, boost::optional<BSONObj> obj2 = {}) {
+        return makeOplog(repl::OpTime(Timestamp(ts, 3), 1), opType, obj1, obj2);
+    };
+    auto iterator = std::make_unique<OplogIteratorMock>(
+        std::deque<repl::OplogEntry>{
+            easyOp(5, OpT::kDelete, BSON("_id" << 1)),
+            easyOp(6, OpT::kInsert, BSON("_id" << 2)),
+            easyOp(7, OpT::kUpdate, BSON("$set" << BSON("x" << 1)), BSON("_id" << 2)),
+            easyOp(8, OpT::kDelete, BSON("_id" << 1)),
+            easyOp(9, OpT::kInsert, BSON("_id" << 3))},
+        2);
+    ReshardingOplogApplier applier(makeApplierEnv(),
+                                   sourceId(),
+                                   oplogNs(),
+                                   crudNs(),
+                                   crudUUID(),
+                                   stashCollections(),
+                                   0U,
+                                   Timestamp(7, 3),
+                                   std::move(iterator),
+                                   chunkManager(),
+                                   executor,
+                                   writerPool.get());
+
+    ASSERT_EQ(metricsAppliedCount(), 0);
+    applier.applyUntilCloneFinishedTs().get();  // Stop at clone timestamp 7
+    ASSERT_EQ(metricsAppliedCount(),
+              4);  // Applied timestamps {5,6,7}, and {8} drafts in on the batch.
+    applier.applyUntilDone().get();
+    ASSERT_EQ(metricsAppliedCount(), 5);  // Now includes timestamp {9}
 }
 
 }  // unnamed namespace
