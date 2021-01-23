@@ -17,12 +17,16 @@
 
 load("jstests/core/timeseries/libs/timeseries.js");
 
-if (!TimeseriesTest.timeseriesCollectionsEnabled(db.getMongo())) {
+const conn = MongoRunner.runMongod();
+
+if (!TimeseriesTest.timeseriesCollectionsEnabled(conn)) {
     jsTestLog("Skipping test because the time-series collection feature flag is disabled");
+    MongoRunner.stopMongod(conn);
     return;
 }
 
-const testDB = db.getSiblingDB(jsTestName());
+const dbName = jsTestName();
+const testDB = conn.getDB(dbName);
 assert.commandWorked(testDB.dropDatabase());
 
 const coll = testDB.getCollection('t');
@@ -212,4 +216,6 @@ testIdleBucketExpiry(i => {
 testIdleBucketExpiry(i => {
     return {[timeFieldName]: ISODate(), [metaFieldName]: i, a: largeValue};
 });
+
+MongoRunner.stopMongod(conn);
 })();
