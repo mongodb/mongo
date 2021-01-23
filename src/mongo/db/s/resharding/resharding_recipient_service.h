@@ -171,6 +171,8 @@ private:
     // Initializes the txn cloners for this resharding operation.
     void _initTxnCloner(OperationContext* opCtx, const Timestamp& fetchTimestamp);
 
+    ReshardingMetrics* _metrics() const;
+
     // The in-memory representation of the underlying document in
     // config.localReshardingOperations.recipient.
     ReshardingRecipientDocument _recipientDoc;

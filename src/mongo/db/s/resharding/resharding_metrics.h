@@ -39,6 +39,8 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/uuid.h"
 
+#pragma once
+
 namespace mongo {
 
 /*

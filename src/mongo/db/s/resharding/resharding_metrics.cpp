@@ -257,12 +257,12 @@ void ReshardingMetrics::OperationMetrics::append(BSONObjBuilder* bob, Role role)
     };
 
     auto remainingMsec = [&]() -> boost::optional<Milliseconds> {
-        if (oplogEntriesApplied > 0) {
+        if (oplogEntriesApplied > 0 && oplogEntriesFetched > 0) {
             // All fetched oplogEntries must be applied. Some of them already have been.
             return remainingTime(
                 applyingOplogEntries.duration(), oplogEntriesApplied, oplogEntriesFetched);
         }
-        if (bytesCopied > 0) {
+        if (bytesCopied > 0 && bytesToCopy > 0) {
             // Until the time to apply batches of oplog entries is measured, we assume that applying
             // all of them will take as long as copying did.
             return remainingTime(copyingDocuments.duration(), bytesCopied, 2 * bytesToCopy);

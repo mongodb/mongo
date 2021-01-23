@@ -48,9 +48,29 @@
 #include "mongo/util/uuid.h"
 
 namespace mongo {
+
+class ReshardingMetrics;
+
 class ReshardingOplogFetcher : public resharding::OnInsertAwaitable {
 public:
-    ReshardingOplogFetcher(UUID reshardingUUID,
+    class Env {
+    public:
+        Env(ServiceContext* service, ReshardingMetrics* metrics)
+            : _service(service), _metrics(metrics) {}
+        ServiceContext* service() const {
+            return _service;
+        }
+        ReshardingMetrics* metrics() const {
+            return _metrics;
+        }
+
+    private:
+        ServiceContext* _service;
+        ReshardingMetrics* _metrics;
+    };
+
+    ReshardingOplogFetcher(std::unique_ptr<Env> env,
+                           UUID reshardingUUID,
                            UUID collUUID,
                            ReshardingDonorOplogId startAt,
                            ShardId donorShard,
@@ -121,6 +141,12 @@ private:
     AggregateCommand _makeAggregateCommand(Client* client);
     ExecutorFuture<void> _reschedule(std::shared_ptr<executor::TaskExecutor> executor,
                                      const CancelationToken& cancelToken);
+
+    ServiceContext* _service() const {
+        return _env->service();
+    }
+
+    std::unique_ptr<Env> _env;
 
     const UUID _reshardingUUID;
     const UUID _collUUID;
