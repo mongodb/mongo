@@ -33,6 +33,7 @@
 
 #include "mongo/db/catalog/drop_collection.h"
 
+#include "mongo/db/audit.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/uncommitted_collections.h"
 #include "mongo/db/client.h"
@@ -74,12 +75,16 @@ Status _dropView(OperationContext* opCtx,
                  DropReply* reply,
                  bool clearBucketCatalog = false) {
     if (!db) {
-        return Status(ErrorCodes::NamespaceNotFound, "ns not found");
+        Status status = Status(ErrorCodes::NamespaceNotFound, "ns not found");
+        audit::logDropView(&cc(), collectionName.ns(), "", {}, status.code());
+        return status;
     }
     auto view =
         ViewCatalog::get(db)->lookupWithoutValidatingDurableViews(opCtx, collectionName.ns());
     if (!view) {
-        return Status(ErrorCodes::NamespaceNotFound, "ns not found");
+        Status status = Status(ErrorCodes::NamespaceNotFound, "ns not found");
+        audit::logDropView(&cc(), collectionName.ns(), "", {}, status.code());
+        return status;
     }
 
     // Validates the view or throws an "invalid view" error.
@@ -110,6 +115,10 @@ Status _dropView(OperationContext* opCtx,
     }
 
     WriteUnitOfWork wunit(opCtx);
+
+    audit::logDropView(
+        &cc(), collectionName.ns(), view->viewOn().ns(), view->pipeline(), ErrorCodes::OK);
+
     Status status = db->dropView(opCtx, collectionName);
     if (!status.isOK()) {
         return status;
@@ -325,7 +334,9 @@ Status dropCollection(OperationContext* opCtx,
             auto view = ViewCatalog::get(db)->lookupWithoutValidatingDurableViews(
                 opCtx, collectionName.ns());
             if (!view) {
-                return Status(ErrorCodes::NamespaceNotFound, "ns not found");
+                Status status = Status(ErrorCodes::NamespaceNotFound, "ns not found");
+                audit::logDropView(&cc(), collectionName.ns(), "", {}, status.code());
+                return status;
             }
 
             if (!view->timeseries()) {

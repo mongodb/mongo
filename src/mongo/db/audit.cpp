@@ -169,6 +169,12 @@ void mongo::audit::logDropIndex(Client* client, StringData indexname, StringData
 
 void mongo::audit::logDropCollection(Client* client, StringData nsname) {}
 
+void mongo::audit::logDropView(Client* client,
+                               StringData nsname,
+                               StringData viewOn,
+                               const std::vector<BSONObj>& pipeline,
+                               ErrorCodes::Error code) {}
+
 void mongo::audit::logDropDatabase(Client* client, StringData dbname) {}
 
 void mongo::audit::logRenameCollection(Client* client, StringData source, StringData target) {}

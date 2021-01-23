@@ -308,9 +308,18 @@ void logCreateDatabase(Client* client, StringData dbname);
 void logDropIndex(Client* client, StringData indexname, StringData nsname);
 
 /**
- * Logs the result of a dropCollection command.
+ * Logs the result of a dropCollection command on a collection.
  */
 void logDropCollection(Client* client, StringData nsname);
+
+/**
+ * Logs the result of a dropCollection command on a view.
+ */
+void logDropView(Client* client,
+                 StringData nsname,
+                 StringData viewOn,
+                 const std::vector<BSONObj>& pipeline,
+                 ErrorCodes::Error code);
 
 /**
  * Logs the result of a dropDatabase command.
