@@ -10516,7 +10516,7 @@ buildvariants:
 
 - name: enterprise-rhel-62-64-bit-dynamic-all-feature-flags
   display_name: "! Shared Library Enterprise RHEL 6.2 (all feature flags)"
-  batchtime: 120 # 2 hour
+  batchtime: 60 # 1 hour
   stepback: false
   modules:
   - enterprise
