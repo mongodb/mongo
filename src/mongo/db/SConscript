@@ -572,6 +572,7 @@ env.CppUnitTest(
 env.Library(
     target="commands",
     source=[
+        'coll_mod.idl',
         'commands.cpp',
         'drop.idl',
         'drop_database.idl',
@@ -585,6 +586,8 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
+        '$BUILD_DIR/mongo/db/catalog/collection_options_idl',
+        '$BUILD_DIR/mongo/db/commands/create_command',
         '$BUILD_DIR/mongo/idl/idl_parser',
         '$BUILD_DIR/mongo/rpc/command_status',
         '$BUILD_DIR/mongo/rpc/rpc',

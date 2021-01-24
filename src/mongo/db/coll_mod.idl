@@ -1,0 +1,125 @@
+# Copyright (C) 2018-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+global:
+    cpp_namespace: "mongo"
+    cpp_includes:
+    - "mongo/db/commands/create_command_validation.h"
+
+imports:
+    - "mongo/idl/basic_types.idl"
+    - "mongo/db/catalog/collection_options.idl"
+
+structs:
+    CollModIndex:
+        description: "A type representing a spec for an index to be modified by collMod command."
+        strict: true
+        fields:
+            name:
+                optional: true
+                type: string
+            keyPattern:
+                optional: true
+                type: object
+            expireAfterSeconds:
+                optional: true
+                type: safeInt
+            hidden:
+                optional: true
+                type: safeBool
+
+    CollModReply:
+        description: "The collMod command's reply."
+        strict: true
+        fields:
+            ok: 
+                # Used in mongos reply.
+                optional: true
+                type: safeDouble
+            expireAfterSeconds_old:
+                optional: true
+                type: safeInt
+            expireAfterSeconds_new:
+                optional: true
+                type: safeInt
+            hidden_old:
+                optional: true
+                type: safeBool
+            hidden_new:
+                optional: true
+                type: safeBool
+            writeConcernError:
+                optional: true
+                type: object
+commands:
+    collMod:
+        description: "Specify collMod Command."
+        command_name: collMod
+        namespace: concatenate_with_db
+        cpp_name: collMod
+        strict: true
+        api_version: "1"
+        fields:
+            index:
+                description: "Index to be modified."
+                optional: true
+                type: CollModIndex            
+            validator:
+                description: "Specify validation rules or expressions for the collection."
+                type: object
+                optional: true
+            validationLevel:
+                description: "Determines how strictly to apply the validation rules to existing
+                              documents during an update.
+                              Can be one of following values: 'off', 'strict' or 'moderate'."
+                type: ValidationLevel
+                optional: true
+            validationAction:
+                description: "Determines whether to error on invalid documents or just warn about
+                              the violations but allow invalid documents to be inserted.
+                              Can be either 'warn' or 'error'."
+                type: ValidationAction
+                optional: true
+            viewOn:
+                description: "The name of the source collection or view that 
+                              'namespace' is based off of."
+                type: string
+                optional: true
+                validator:
+                    callback: create_command_validation::validateViewOnNotEmpty
+            pipeline:
+                description: "An array that consists of the aggregation pipeline. Defines the view
+                              by applying the specified pipeline to the 'viewOn' collection or 
+                              view."
+                type: array<object>
+                optional: true
+            recordPreImages:
+                description: "Sets whether updates/deletes should store the pre-image of the
+                              document in the oplog"
+                optional: true
+                type: safeBool
+        reply_type: CollModReply

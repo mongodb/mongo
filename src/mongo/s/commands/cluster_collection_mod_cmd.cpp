@@ -32,6 +32,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/coll_mod_gen.h"
 #include "mongo/db/commands.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/cluster_commands_helpers.h"
@@ -72,7 +73,12 @@ public:
                    const BSONObj& cmdObj,
                    std::string& errmsg,
                    BSONObjBuilder& output) override {
-        const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
+        auto cmd = CollMod::parse(
+            IDLParserErrorContext(CollMod::kCommandName,
+                                  APIParameters::get(opCtx).getAPIStrict().value_or(false)),
+            cmdObj);
+
+        auto nss = cmd.getNamespace();
         LOGV2_DEBUG(22748,
                     1,
                     "collMod: {namespace} cmd: {command}",
@@ -84,11 +90,13 @@ public:
             uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
         auto shardResponses = scatterGatherVersionedTargetByRoutingTable(
             opCtx,
-            nss.db(),
+            cmd.getDbName(),
             nss,
             routingInfo,
             applyReadWriteConcern(
-                opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
+                opCtx,
+                this,
+                CommandHelpers::filterCommandRequestForPassthrough(cmd.toBSON(BSONObj()))),
             ReadPreferenceSetting::get(opCtx),
             Shard::RetryPolicy::kNoRetry,
             BSONObj() /* query */,

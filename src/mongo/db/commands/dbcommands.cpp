@@ -53,6 +53,7 @@
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/clientcursor.h"
+#include "mongo/db/coll_mod_gen.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/create_gen.h"
 #include "mongo/db/commands/profile_common.h"
@@ -732,8 +733,14 @@ public:
              const string& dbname,
              const BSONObj& jsobj,
              BSONObjBuilder& result) {
-        const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbname, jsobj));
-        uassertStatusOK(collMod(opCtx, nss, jsobj, &result));
+        auto cmd = CollMod::parse(
+            IDLParserErrorContext(CollMod::kCommandName,
+                                  APIParameters::get(opCtx).getAPIStrict().value_or(false)),
+            jsobj);
+        uassertStatusOK(collMod(opCtx, cmd.getNamespace(), cmd.toBSON(BSONObj()), &result));
+
+        CollModReply::parse(IDLParserErrorContext("CollModReply"), result.asTempObj());
+
         return true;
     }
 

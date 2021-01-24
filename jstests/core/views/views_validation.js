@@ -1,5 +1,6 @@
 // @tags: [
 //   requires_non_retryable_commands,
+//   requires_fcv_49
 // ]
 
 (function() {
@@ -154,13 +155,14 @@ assert.commandFailedWithCode(viewsDb.runCommand({collMod: "b", viewOn: "a", pipe
                              "collmod changed view to create a cycle");
 
 // Check that collMod disallows the specification of invalid pipelines.
-assert.commandFailedWithCode(viewsDb.runCommand({collMod: "b", viewOn: "c", pipeline: {}}),
-                             ErrorCodes.InvalidOptions,
-                             "collMod modified view to have invalid pipeline");
+assert.commandFailedWithCode(
+    viewsDb.runCommand({collMod: "b", viewOn: "c", pipeline: {}}),
+    ErrorCodes.TypeMismatch,
+    "BSON field 'collMod.pipeline' is the wrong type 'object', expected type 'array'");
 assert.commandFailedWithCode(
     viewsDb.runCommand({collMod: "b", viewOn: "c", pipeline: {0: {$limit: 7}}}),
-    ErrorCodes.InvalidOptions,
-    "collMod modified view to have invalid pipeline");
+    ErrorCodes.TypeMismatch,
+    "BSON field 'collMod.pipeline' is the wrong type 'object', expected type 'array'");
 clear();
 
 // Check that invalid pipelines are disallowed. The following $lookup is missing the 'as' field.
