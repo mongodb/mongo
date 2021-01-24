@@ -33,6 +33,10 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/matcher/expression.h"
+#include "mongo/db/matcher/expression_algo.h"
+#include "mongo/db/matcher/expression_internal_expr_comparison.h"
+#include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_project.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -303,7 +307,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalUnpackBucket::createF
 
     // Check that none of the required arguments are missing.
     uassert(5346507,
-            "The $_internalUnpackBucket stage requries an include/exclude parameter",
+            "The $_internalUnpackBucket stage requires an include/exclude parameter",
             hasIncludeExclude);
 
     uassert(5346508,
@@ -419,12 +423,116 @@ BSONObj DocumentSourceInternalUnpackBucket::buildProjectToInternalize(
     return deps.toProjectionWithoutMetadata(DepsTracker::TruncateToRootLevel::yes);
 }
 
+std::unique_ptr<MatchExpression> createComparisonPredicate(
+    const ComparisonMatchExpression* matchExpr, const boost::optional<std::string>& metaField) {
+    auto path = matchExpr->path();
+    auto rhs = matchExpr->getData();
+
+    // The control field's min and max are chosen using a field-order insensitive comparator, while
+    // MatchExpressions use a comparator that treats field-order as significant. Because of this we
+    // will not perform this optimization on queries with operands of compound types.
+    if (rhs.type() == BSONType::Object || rhs.type() == BSONType::Array) {
+        return nullptr;
+    }
+
+    // MatchExpressions have special comparison semantics regarding null, in that {$eq: null} will
+    // match all documents where the field is either null or missing. Because this is different
+    // from both the comparison semantics that InternalExprComparison expressions and the control's
+    // min and max fields use, we will not perform this optimization on queries with null operands.
+    if (rhs.type() == BSONType::jstNULL) {
+        return nullptr;
+    }
+
+    // We must avoid mapping predicates on the meta field onto the control field.
+    if (metaField &&
+        (path == metaField.get() || expression::isPathPrefixOf(metaField.get(), path))) {
+        return nullptr;
+    }
+
+    switch (matchExpr->matchType()) {
+        case MatchExpression::EQ: {
+            auto andMatchExpr = std::make_unique<AndMatchExpression>();
+
+            andMatchExpr->add(std::make_unique<InternalExprLTEMatchExpression>(
+                str::stream() << DocumentSourceInternalUnpackBucket::kControlMinFieldName << path,
+                rhs));
+            andMatchExpr->add(std::make_unique<InternalExprGTEMatchExpression>(
+                str::stream() << DocumentSourceInternalUnpackBucket::kControlMaxFieldName << path,
+                rhs));
+            return andMatchExpr;
+        }
+        case MatchExpression::GT: {
+            return std::make_unique<InternalExprGTMatchExpression>(
+                str::stream() << DocumentSourceInternalUnpackBucket::kControlMaxFieldName << path,
+                rhs);
+        }
+        case MatchExpression::GTE: {
+            return std::make_unique<InternalExprGTEMatchExpression>(
+                str::stream() << DocumentSourceInternalUnpackBucket::kControlMaxFieldName << path,
+                rhs);
+        }
+        case MatchExpression::LT: {
+            return std::make_unique<InternalExprLTMatchExpression>(
+                str::stream() << DocumentSourceInternalUnpackBucket::kControlMinFieldName << path,
+                rhs);
+        }
+        case MatchExpression::LTE: {
+            return std::make_unique<InternalExprLTEMatchExpression>(
+                str::stream() << DocumentSourceInternalUnpackBucket::kControlMinFieldName << path,
+                rhs);
+        }
+        default:
+            MONGO_UNREACHABLE_TASSERT(5348302);
+    }
+
+    MONGO_UNREACHABLE_TASSERT(5348303);
+}
+
+std::unique_ptr<MatchExpression> DocumentSourceInternalUnpackBucket::createPredicatesOnControlField(
+    const MatchExpression* matchExpr) const {
+    if (matchExpr->matchType() == MatchExpression::AND) {
+        auto nextAnd = static_cast<const AndMatchExpression*>(matchExpr);
+        auto andMatchExpr = std::make_unique<AndMatchExpression>();
+
+        for (size_t i = 0; i < nextAnd->numChildren(); i++) {
+            if (auto child = createPredicatesOnControlField(nextAnd->getChild(i))) {
+                andMatchExpr->add(std::move(child));
+            }
+        }
+        if (andMatchExpr->numChildren() > 0) {
+            return andMatchExpr;
+        }
+    } else if (ComparisonMatchExpression::isComparisonMatchExpression(matchExpr)) {
+        return createComparisonPredicate(static_cast<const ComparisonMatchExpression*>(matchExpr),
+                                         _bucketUnpacker.bucketSpec().metaField);
+    }
+
+    return nullptr;
+}
+
 Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimizeAt(
     Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
     invariant(*itr == this);
 
     if (std::next(itr) == container->end()) {
         return container->end();
+    }
+
+    // Attempt to map predicates on bucketed fields to predicates on the control field.
+    if (auto nextMatch = dynamic_cast<DocumentSourceMatch*>((*std::next(itr)).get())) {
+        if (auto match = createPredicatesOnControlField(nextMatch->getMatchExpression())) {
+            // Optimize the newly created MatchExpression.
+            auto optimized = MatchExpression::optimize(std::move(match));
+            BSONObjBuilder bob;
+            optimized->serialize(&bob);
+
+            // Because we insert any possible $match first before performing other
+            // $_internalUnpackBucket optimizations, it is not necessary to call
+            // optimizeContainer() here to allow for the newly inserted stage to engage in further
+            // optimizations with its neighbors, as this $match is already in the optimal place for
+            // predicate pushdown.
+            container->insert(itr, DocumentSourceMatch::create(bob.obj(), pExpCtx));
+        }
     }
 
     // Attempt to build an internalizable $project based on dependency analysis.

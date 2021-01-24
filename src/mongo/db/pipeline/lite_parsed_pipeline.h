@@ -175,26 +175,11 @@ public:
     void validatePipelineStagesforAPIVersion(const OperationContext* opCtx) const;
 
     /**
-     * Validates if 'AggregateCommand' specs complies with API versioning. Throws uassert in case of
-     * any failure.
+     * Verifies that the pipeline contains valid stages. Calls
+     * 'validatePipelineStagesforAPIVersion' with 'opCtx', and throws UserException if there is
+     * more than one $_internalUnpackBucket stage in the pipeline.
      */
-    void validateRequestForAPIVersion(const OperationContext* opCtx,
-                                      const AggregateCommand& request) const;
-
-    /**
-     * Performs validations related to API versioning before running the aggregation command.
-     * Throws uassert if any of the validations fails
-     *     - validation on each stage on the pipeline
-     *     - validation on 'AggregateCommand' request
-     */
-    void performAPIVersionChecks(const OperationContext* opCtx,
-                                 const AggregateCommand& request) const {
-
-        invariant(opCtx);
-
-        validatePipelineStagesforAPIVersion(opCtx);
-        validateRequestForAPIVersion(opCtx, request);
-    }
+    void validate(const OperationContext* opCtx) const;
 
 private:
     std::vector<std::unique_ptr<LiteParsedDocumentSource>> _stageSpecs;

@@ -140,6 +140,8 @@ public:
     static constexpr StringData kExclude = "exclude"_sd;
     static constexpr StringData kTimeFieldName = "timeField"_sd;
     static constexpr StringData kMetaFieldName = "metaField"_sd;
+    static constexpr StringData kControlMaxFieldName = "control.max."_sd;
+    static constexpr StringData kControlMinFieldName = "control.min."_sd;
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
@@ -189,6 +191,17 @@ public:
 
     BSONObj buildProjectToInternalize(Pipeline::SourceContainer::iterator itr,
                                       Pipeline::SourceContainer* container) const;
+
+    /**
+     * Takes a predicate after $_internalUnpackBucket on a bucketed field as an argument, and
+     * attempts to map it to a new predicate on the control field. For example, the predicate {a:
+     * {$gt: 5}} will generate the predicate {control.max.a: {$_internalExprGt: 5}}, which will be
+     * added before the $_internalUnpackBucket stage.
+     *
+     * If the provided predicate is ineligible for this mapping, the function will return a nullptr.
+     */
+    std::unique_ptr<MatchExpression> createPredicatesOnControlField(
+        const MatchExpression* matchExpr) const;
 
 private:
     GetNextResult doGetNext() final;
