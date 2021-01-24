@@ -25,13 +25,17 @@ if (!TimeseriesTest.timeseriesCollectionsEnabled(db.getMongo())) {
 const testDB = db.getSiblingDB(jsTestName());
 assert.commandWorked(testDB.dropDatabase());
 
-const coll = testDB.getCollection('t');
-const bucketsColl = testDB.getCollection('system.buckets.' + coll.getName());
-
 const timeFieldName = 'time';
 const metaFieldName = 'meta';
 
+let collCount = 0;
+let coll;
+let bucketsColl;
+
 const clearColl = function() {
+    coll = testDB.getCollection('t_' + collCount++);
+    bucketsColl = testDB.getCollection('system.buckets.' + coll.getName());
+
     coll.drop();
 
     const timeFieldName = 'time';
