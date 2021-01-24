@@ -175,4 +175,17 @@ void LiteParsedPipeline::validatePipelineStagesforAPIVersion(const OperationCont
     }
 }
 
+void LiteParsedPipeline::validate(const OperationContext* opCtx) const {
+    validatePipelineStagesforAPIVersion(opCtx);
+
+    // Validates that the pipeline contains at most one $_internalUnpackBucket stage.
+    auto count =
+        std::accumulate(_stageSpecs.begin(), _stageSpecs.end(), 0, [](auto&& acc, auto&& spec) {
+            return acc + (spec->getParseTimeName() == "$_internalUnpackBucket" ? 1 : 0);
+        });
+    uassert(5348302,
+            "Encountered pipeline with more than one $_internalUnpackBucket stage",
+            count <= 1);
+}
+
 }  // namespace mongo
