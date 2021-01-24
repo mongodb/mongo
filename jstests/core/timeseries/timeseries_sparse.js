@@ -3,7 +3,7 @@
  * This test provides coverage for when this is not the case.
  * @tags: [
  *     assumes_no_implicit_collection_creation_after_drop,
- *     does_not_support_causal_consistency,  # TODO(SERVER-53819): remove
+ *     does_not_support_retryable_writes,  # Batches containing more than one measurement
  *     does_not_support_stepdowns,
  *     requires_fcv_49,
  *     requires_find_command,

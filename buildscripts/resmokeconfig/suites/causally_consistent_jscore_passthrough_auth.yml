@@ -123,6 +123,11 @@ selector:
   - jstests/core/rename_stayTemp.js
   - jstests/core/txns/prepare_transaction_fails_on_temp_collections.js
 
+  # These tests expect listCollections to return system.bucket.* collections, which are filtered
+  # out by mongos when authentication is enabled.
+  # Refer to filter in cluster_list_collections_cmd.cpp
+  - jstests/core/timeseries/timeseries_*.js
+
   exclude_with_any_tags:
   - assumes_against_mongod_not_mongos
   ##

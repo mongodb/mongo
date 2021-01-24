@@ -3,7 +3,7 @@
  * time-series collections.
  *
  * @tags: [
- *     does_not_support_causal_consistency,  # TODO(SERVER-53819): remove
+ *     does_not_support_retryable_writes,  # Batches containing more than one measurement
  *     does_not_support_stepdowns,
  *     requires_fcv_49,
  *     requires_find_command,

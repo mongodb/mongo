@@ -3,7 +3,6 @@
  * This test is for the simple case of only one measurement per bucket.
  * @tags: [
  *     assumes_no_implicit_collection_creation_after_drop,
- *     does_not_support_causal_consistency,  # TODO(SERVER-53819): remove
  *     does_not_support_stepdowns,
  *     requires_fcv_49,
  *     requires_find_command,
