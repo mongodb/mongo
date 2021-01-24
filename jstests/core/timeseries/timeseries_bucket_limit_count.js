@@ -1,7 +1,7 @@
 /**
  * Tests maximum number of measurements held in each bucket in a time-series buckets collection.
  * @tags: [
- *     assumes_unsharded_collection,         # TODO(SERVER-53816): remove
+ *     assumes_no_implicit_collection_creation_after_drop,
  *     does_not_support_causal_consistency,  # TODO(SERVER-53819): remove
  *     does_not_support_stepdowns,
  *     requires_fcv_49,

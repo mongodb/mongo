@@ -3,7 +3,6 @@
  * time-series collections.
  *
  * @tags: [
- *     assumes_unsharded_collection,         # TODO(SERVER-53816): remove
  *     does_not_support_causal_consistency,  # TODO(SERVER-53819): remove
  *     does_not_support_stepdowns,
  *     requires_fcv_49,
