@@ -579,7 +579,7 @@ void TenantMigrationRecipientService::Instance::_startOplogFetcher() {
         // The config is only used for setting the awaitData timeout; the defaults are fine.
         ReplSetConfig::parse(BSON("_id"
                                   << "dummy"
-                                  << "version" << 1 << "members" << BSONObj())),
+                                  << "version" << 1 << "members" << BSONArray(BSONObj()))),
         // We do not need to check the rollback ID.
         ReplicationProcess::kUninitializedRollbackId,
         tenantMigrationOplogFetcherBatchSize,

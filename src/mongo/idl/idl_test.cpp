@@ -1057,8 +1057,25 @@ TEST(IDLArrayTests, TestBadArrays) {
     }
 }
 
-// Positive: Test arrays with good field names but made with BSONObjBuilder
-TEST(IDLArrayTests, TestGoodArrays) {
+// Negative: Test arrays with good field names but made with BSONObjBuilder::subobjStart
+TEST(IDLArrayTests, TestGoodArraysWithObjectType) {
+    IDLParserErrorContext ctxt("root");
+
+    {
+        BSONObjBuilder builder;
+        {
+            BSONObjBuilder subBuilder(builder.subobjStart("field1"));
+            subBuilder.append("0", 1);
+            subBuilder.append("1", 2);
+        }
+
+        auto testDoc = builder.obj();
+        ASSERT_THROWS(Simple_int_array::parse(ctxt, testDoc), AssertionException);
+    }
+}
+
+// Positive: Test arrays with good field names but made with BSONObjBuilder::subarrayStart
+TEST(IDLArrayTests, TestGoodArraysWithArrayType) {
     IDLParserErrorContext ctxt("root");
 
     {

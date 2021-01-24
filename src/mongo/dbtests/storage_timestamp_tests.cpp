@@ -738,7 +738,7 @@ public:
                                       << "ns"
                                       << "test.$cmd"
                                       << "wall" << Date_t() << "o"
-                                      << BSON("applyOps" << BSONArrayBuilder().obj())))),
+                                      << BSON("applyOps" << BSONArrayBuilder().arr())))),
                 repl::OplogApplication::Mode::kApplyOpsCmd,
                 &result));
         }

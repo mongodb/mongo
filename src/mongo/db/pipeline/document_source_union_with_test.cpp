@@ -282,7 +282,7 @@ TEST_F(DocumentSourceUnionWithTest, ParseErrors) {
                                .firstElement(),
                            getExpCtx()),
                        AssertionException,
-                       10065);
+                       ErrorCodes::TypeMismatch);
     ASSERT_THROWS_CODE(DocumentSourceUnionWith::createFromBson(
                            BSON("$unionWith" << BSON("coll" << nsToUnionWith.coll() << "pipeline"
                                                             << BSON("not"
@@ -290,7 +290,7 @@ TEST_F(DocumentSourceUnionWithTest, ParseErrors) {
                                .firstElement(),
                            getExpCtx()),
                        AssertionException,
-                       40422);
+                       ErrorCodes::TypeMismatch);
 }
 
 TEST_F(DocumentSourceUnionWithTest, PropagatePauses) {

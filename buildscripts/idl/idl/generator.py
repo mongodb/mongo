@@ -1290,7 +1290,9 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         """Generate the C++ deserializer piece for a field."""
         # pylint: disable=too-many-arguments
         if field.type.is_array:
-            self._gen_usage_check(field, bson_element, field_usage_check)
+            predicate = "MONGO_likely(ctxt.checkAndAssertType(%s, Array))" % (bson_element)
+            with self._predicate(predicate):
+                self._gen_usage_check(field, bson_element, field_usage_check)
 
             self._gen_array_deserializer(field, bson_element, field.type)
             return

@@ -32,7 +32,7 @@ assert.commandFailedWithCode(cmdRes, ErrorCodes.BadValue);
 // killCursors command should fail if the cursors parameter is not an array.
 cmdRes =
     db.runCommand({killCursors: coll.getName(), cursors: {a: NumberLong(123), b: NumberLong(456)}});
-assert.commandFailedWithCode(cmdRes, [40422]);
+assert.commandFailedWithCode(cmdRes, ErrorCodes.TypeMismatch);
 
 // killCursors command should report that zero cursors were killed if the cursors parameter is an
 // empty array.

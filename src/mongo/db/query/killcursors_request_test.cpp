@@ -89,7 +89,8 @@ TEST(KillCursorsRequestTest, parseCursorFieldNotArray) {
                         << "coll"
                         << "cursors" << CursorId(123) << "$db"
                         << "db");
-    ASSERT_THROWS_CODE(KillCursorsRequest::parse(ctxt, bsonObj), AssertionException, 10065);
+    ASSERT_THROWS_CODE(
+        KillCursorsRequest::parse(ctxt, bsonObj), AssertionException, ErrorCodes::TypeMismatch);
 }
 
 TEST(KillCursorsRequestTest, parseCursorFieldArrayWithNonCursorIdValue) {
