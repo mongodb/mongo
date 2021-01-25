@@ -1129,21 +1129,19 @@ var _bulk_api_module = (function() {
                  (!ordered &&
                   // not all errored.
                   batchResult.writeErrors.length < batch.operations.length))) {
-                // if last write errored
-                if (batchResult.writeErrors.length > 0 &&
-                    batchResult.writeErrors[batchResult.writeErrors.length - 1].index ==
-                        (batch.operations.length - 1)) {
-                    // Reset previous errors so we can apply the write concern no matter what
-                    // as long as it is valid.
-                    collection.getDB().runCommand({resetError: 1});
-                }
+                var hadError = batchResult.writeErrors.length > 0;
+                var lastErrorIndex = batchResult.writeErrors.length - 1;
+                var didAllOperationsFail = hadError &&
+                    batchResult.writeErrors[lastErrorIndex].index == (batch.operations.length - 1);
 
-                result = executeGetLastError(collection.getDB(), writeConcern);
-                extractedErr = extractGLEErrors(result);
+                if (!didAllOperationsFail) {
+                    result = executeGetLastError(collection.getDB(), writeConcern);
+                    extractedErr = extractGLEErrors(result);
 
-                if (extractedErr.unknownError) {
-                    // Report as a wc failure
-                    extractedErr.wcError = extractedErr.unknownError;
+                    if (extractedErr.unknownError) {
+                        // Report as a wc failure
+                        extractedErr.wcError = extractedErr.unknownError;
+                    }
                 }
             }
 

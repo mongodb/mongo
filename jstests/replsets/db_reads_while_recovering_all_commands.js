@@ -268,7 +268,6 @@ const allCommands = {
     replSetTestEgress: {skip: isNotAUserDataRead},
     replSetUpdatePosition: {skip: isNotAUserDataRead},
     replSetResizeOplog: {skip: isNotAUserDataRead},
-    resetError: {skip: isNotAUserDataRead},
     revokePrivilegesFromRole: {skip: isPrimaryOnly},
     revokeRolesFromRole: {skip: isPrimaryOnly},
     revokeRolesFromUser: {skip: isPrimaryOnly},

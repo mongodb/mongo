@@ -482,7 +482,6 @@ DB.prototype.help = function() {
     print("\tdb.printReplicationInfo()");
     print("\tdb.printShardingStatus()");
     print("\tdb.printSecondaryReplicationInfo()");
-    print("\tdb.resetError()");
     print(
         "\tdb.rotateCertificates(message) - rotates certificates, CRLs, and CA files and logs an optional message");
     print(
@@ -667,10 +666,6 @@ DB.prototype._groupFixParms = function(parmsObj) {
     }
 
     return parms;
-};
-
-DB.prototype.resetError = function() {
-    return this.runCommand({reseterror: 1});
 };
 
 DB.prototype.forceError = function() {

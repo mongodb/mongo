@@ -857,7 +857,6 @@ const testCases = {
     replSetTest: {skip: isNotRunOnUserDatabase},
     replSetTestEgress: {skip: isNotRunOnUserDatabase},
     replSetUpdatePosition: {skip: isNotRunOnUserDatabase},
-    resetError: {skip: isNotRunOnUserDatabase},
     revokePrivilegesFromRole: {skip: isAuthCommand},
     revokeRolesFromRole: {skip: isAuthCommand},
     revokeRolesFromUser: {skip: isAuthCommand},

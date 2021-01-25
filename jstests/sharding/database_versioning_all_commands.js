@@ -592,7 +592,6 @@ let testCases = {
         }
     },
     replSetGetStatus: {skip: "not supported in mongos"},
-    resetError: {skip: "not on a user database"},
     reshardCollection: {skip: "does not forward command to primary shard"},
     revokePrivilegesFromRole: {skip: "always targets the config server"},
     revokeRolesFromRole: {skip: "always targets the config server"},

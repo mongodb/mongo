@@ -596,7 +596,6 @@ TEST_F(MongodbCAPITest, RunListCommands) {
                                           "refreshSessions",
                                           "renameCollection",
                                           "repairDatabase",
-                                          "resetError",
                                           "serverStatus",
                                           "setParameter",
                                           "sleep",

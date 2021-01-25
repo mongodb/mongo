@@ -49,41 +49,6 @@ namespace {
 using std::string;
 using std::stringstream;
 
-/* reset any errors so that getlasterror comes back clean.
-
-   useful before performing a long series of operations where we want to
-   see if any of the operations triggered an error, but don't want to check
-   after each op as that woudl be a client/server turnaround.
-*/
-class CmdResetError : public BasicCommand {
-public:
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return false;
-    }
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return AllowedOnSecondary::kAlways;
-    }
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) const {}  // No auth required
-
-    bool requiresAuth() const override {
-        return false;
-    }
-
-    std::string help() const override {
-        return "reset error state";
-    }
-    CmdResetError() : BasicCommand("resetError", "reseterror") {}
-    bool run(OperationContext* opCtx,
-             const string& db,
-             const BSONObj& cmdObj,
-             BSONObjBuilder& result) {
-        LastError::get(opCtx->getClient()).reset();
-        return true;
-    }
-} cmdResetError;
-
 class CmdGetLastError : public ErrmsgCommandDeprecated {
 public:
     CmdGetLastError() : ErrmsgCommandDeprecated("getLastError", "getlasterror") {}

@@ -474,7 +474,6 @@ let viewsCommandTests = {
         expectFailure: true,
         isAdminCommand: true,
     },
-    resetError: {skip: isUnrelated},
     revokePrivilegesFromRole: {
         command: {
             revokePrivilegesFromRole: "testrole",

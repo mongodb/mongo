@@ -82,7 +82,6 @@ env.Library(
         'cluster_remove_shard_from_zone_cmd.cpp',
         'cluster_rename_collection_cmd.cpp',
         'cluster_repl_set_get_status_cmd.cpp',
-        'cluster_reset_error_cmd.cpp',
         'cluster_reshard_collection_cmd.cpp',
         'cluster_rwc_defaults_commands.cpp',
         'cluster_set_feature_compatibility_version_cmd.cpp',

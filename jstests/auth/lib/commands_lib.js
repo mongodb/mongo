@@ -5248,15 +5248,6 @@ var authCommandsLib = {
           ]
         },
         {
-          testname: "resetError",
-          command: {resetError: 1},
-          testcases: [
-              {runOnDb: adminDbName, roles: roles_all, privileges: []},
-              {runOnDb: firstDbName, roles: roles_all, privileges: []},
-              {runOnDb: secondDbName, roles: roles_all, privileges: []}
-          ]
-        },
-        {
           testname: "reshardCollection",
           command: {reshardCollection: "test.x", key: {_id: 1}},
           skipUnlessSharded: true,

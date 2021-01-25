@@ -943,10 +943,6 @@ let MongosAPIParametersUtil = (function() {
         },
         {commandName: "replSetGetStatus", skip: "not supported in mongos"},
         {
-            commandName: "resetError",
-            skip: "executes locally on mongos (not sent to any remote node)"
-        },
-        {
             commandName: "reshardCollection",
             run: {
                 inAPIVersion1: false,
