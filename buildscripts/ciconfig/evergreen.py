@@ -14,6 +14,8 @@ import yaml
 
 import buildscripts.util.runcommand as runcommand
 
+ENTERPRISE_MODULE_NAME = "enterprise"
+
 
 def parse_evergreen_file(path, evergreen_binary="evergreen"):
     """Read an Evergreen file and return EvergreenProjectConfig instance."""
@@ -297,6 +299,10 @@ class Variant(object):
         """Get build variant modules parameter as a list of module names."""
         modules = self.raw.get("modules")
         return modules if modules is not None else []
+
+    def is_enterprise_build(self) -> bool:
+        """Determine if this build variant include the enterprise module."""
+        return ENTERPRISE_MODULE_NAME in set(self.modules)
 
     @property
     def run_on(self):
