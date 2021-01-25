@@ -694,9 +694,6 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
                             // TODO (SERVER-53389): TenantMigration{Donor, Recipient}Service should
                             // use its base PrimaryOnlyService's cancelation source to pass tokens
                             // in calls to WaitForMajorityService::waitUntilMajority.
-                            checkIfReceivedDonorAbortMigration(token,
-                                                               _instanceCancelationSource.token());
-
                             return _waitForMajorityWriteConcern(executor, std::move(opTime))
                                 .then([this, self = shared_from_this()] {
                                     // If interrupt is called at some point during execution, it is
