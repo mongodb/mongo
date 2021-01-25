@@ -52,7 +52,7 @@ namespace mongo {
 StatusWith<std::list<BSONObj>> listIndexes(OperationContext* opCtx,
                                            const NamespaceStringOrUUID& ns,
                                            bool includeBuildUUIDs) {
-    AutoGetCollectionForReadCommand collection(opCtx, ns);
+    AutoGetCollectionForReadCommandMaybeLockFree collection(opCtx, ns);
     auto nss = collection.getNss();
     if (!collection) {
         return StatusWith<std::list<BSONObj>>(ErrorCodes::NamespaceNotFound,

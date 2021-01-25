@@ -38,6 +38,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/storage/snapshot_helper.h"
 #include "mongo/logv2/log.h"
 
@@ -587,6 +588,69 @@ const NamespaceString& AutoGetCollectionForReadCommandMaybeLockFree::getNss() co
         return _autoGet->getNss();
     } else {
         return _autoGetLockFree->getNss();
+    }
+}
+
+AutoGetDbForReadLockFree::AutoGetDbForReadLockFree(OperationContext* opCtx,
+                                                   StringData dbName,
+                                                   Date_t deadline)
+    : _lockFreeReadsBlock(opCtx),
+      _globalLock(
+          opCtx, MODE_IS, deadline, Lock::InterruptBehavior::kThrow, true /* skipRSTLLock */),
+      _catalogStash(opCtx) {
+
+    // Type that pretends to be a Collection. It implements the minimal interface used by
+    // acquireCollectionAndConsistentSnapshot(). We are tricking
+    // acquireCollectionAndConsistentSnapshot to establish a consistent snapshot with just the
+    // catalog and not for a specific Collection.
+    class FakeCollection {
+    public:
+        // We just need to return something that would not considered to be the oplog. A default
+        // constructed NamespaceString is fine.
+        const NamespaceString& ns() const {
+            return _ns;
+        };
+        // We just need to return something that compares equal with itself here.
+        boost::optional<Timestamp> getMinimumVisibleSnapshot() const {
+            return boost::none;
+        }
+
+    private:
+        NamespaceString _ns;
+    };
+
+    // The catalog will be stashed inside the CollectionCatalogStasher
+    FakeCollection fakeColl;
+    acquireCollectionAndConsistentSnapshot(
+        opCtx,
+        /* isLockFreeReadSubOperation */
+        false,
+        /* CollectionCatalogStasher */
+        _catalogStash,
+        /* GetCollectionAndEstablishReadSourceFunc */
+        [&](OperationContext* opCtx, const CollectionCatalog&) {
+            // Check that the sharding database version matches our read.
+            // Note: this must always be checked, regardless of whether the collection exists, so
+            // that the dbVersion of this node or the caller gets updated quickly in case either is
+            // stale.
+            auto dss = DatabaseShardingState::getSharedForLockFreeReads(opCtx, dbName);
+            auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, dss.get());
+            dss->checkDbVersion(opCtx, dssLock);
+            return &fakeColl;
+        },
+        /* GetCollectionAfterSnapshotFunc */
+        [&](OperationContext* opCtx, const CollectionCatalog& catalog) { return &fakeColl; },
+        /* ResetFunc */
+        []() {});
+}
+
+AutoGetDbForReadMaybeLockFree::AutoGetDbForReadMaybeLockFree(OperationContext* opCtx,
+                                                             StringData dbName,
+                                                             Date_t deadline) {
+    if (supportsLockFreeRead(opCtx)) {
+        _autoGetLockFree.emplace(opCtx, dbName, deadline);
+    } else {
+        _autoGet.emplace(opCtx, dbName, MODE_IS, deadline);
     }
 }
 

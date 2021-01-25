@@ -169,7 +169,8 @@ public:
         std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec;
         std::vector<mongo::ListIndexesReplyItem> firstBatch;
         {
-            AutoGetCollectionForReadCommand collection(opCtx, parsed.getNamespaceOrUUID());
+            AutoGetCollectionForReadCommandMaybeLockFree collection(opCtx,
+                                                                    parsed.getNamespaceOrUUID());
             uassert(ErrorCodes::NamespaceNotFound,
                     str::stream() << "ns does not exist: " << collection.getNss().ns(),
                     collection);
