@@ -485,6 +485,11 @@ public:
     virtual void setStableTimestamp(Timestamp stableTimestamp, bool force = false) {}
 
     /**
+     * Returns the stable timestamp.
+     */
+    virtual Timestamp getStableTimestamp() const = 0;
+
+    /**
      * Tells the storage engine the timestamp of the data at startup. This is necessary because
      * timestamps are not persisted in the storage layer.
      */
@@ -512,6 +517,12 @@ public:
      * through. Additionally, all future writes must be newer or equal to this value.
      */
     virtual void setOldestTimestamp(Timestamp timestamp) {}
+
+    /**
+     * Gets the oldest timestamp for which the storage engine must maintain snapshot history
+     * through.
+     */
+    virtual Timestamp getOldestTimestamp() const = 0;
 
     /**
      * Sets a callback which returns the timestamp of the oldest oplog entry involved in an

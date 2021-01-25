@@ -121,6 +121,8 @@ public:
 
     virtual void setStableTimestamp(Timestamp stableTimestamp, bool force = false) override;
 
+    virtual Timestamp getStableTimestamp() const override;
+
     virtual void setInitialDataTimestamp(Timestamp initialDataTimestamp) override;
 
     virtual Timestamp getInitialDataTimestamp() override;
@@ -128,6 +130,8 @@ public:
     virtual void setOldestTimestampFromStable() override;
 
     virtual void setOldestTimestamp(Timestamp newOldestTimestamp) override;
+
+    virtual Timestamp getOldestTimestamp() const override;
 
     virtual void setOldestActiveTransactionTimestampCallback(
         StorageEngine::OldestActiveTransactionTimestampCallback) override;

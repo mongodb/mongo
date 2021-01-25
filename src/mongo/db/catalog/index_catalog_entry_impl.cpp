@@ -323,9 +323,18 @@ void IndexCatalogEntryImpl::setMultikey(OperationContext* opCtx,
         // correctness requirement for multikey writes i.e. they must occur at or before the
         // first write that set the multikey flag.
         auto recoveryPrepareOpTime = txnParticipant.getPrepareOpTimeForRecovery();
+        // We might replay a prepared transaction behind the oldest timestamp during initial
+        // sync or behind the stable timestamp during rollback. During initial sync, we
+        // may not have a stable timestamp. Therefore, we need to round up
+        // the multi-key write timestamp to the max of the three so that we don't write
+        // behind the oldest/stable timestamp. This code path is only hit during initial
+        // sync/recovery when reconstructing prepared transactions and so we don't expect
+        // the oldest/stable timestamp to advance concurrently.
         Timestamp writeTs = recoveryPrepareOpTime.isNull()
             ? LogicalClock::get(opCtx)->getClusterTime().asTimestamp()
-            : recoveryPrepareOpTime.getTimestamp();
+            : std::max({recoveryPrepareOpTime.getTimestamp(),
+                        opCtx->getServiceContext()->getStorageEngine()->getOldestTimestamp(),
+                        opCtx->getServiceContext()->getStorageEngine()->getStableTimestamp()});
 
         auto status = opCtx->recoveryUnit()->setTimestamp(writeTs);
         if (status.code() == ErrorCodes::BadValue) {
