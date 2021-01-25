@@ -83,6 +83,10 @@ BatchedCommandRequest BatchedCommandRequest::parseDelete(const OpMsgRequest& req
     return constructBatchedCommandRequest<DeleteOp>(request);
 }
 
+bool BatchedCommandRequest::getBypassDocumentValidation() const {
+    return _visit([](auto&& op) -> decltype(auto) { return op.getBypassDocumentValidation(); });
+}
+
 const NamespaceString& BatchedCommandRequest::getNS() const {
     return _visit([](auto&& op) -> decltype(auto) { return op.getNamespace(); });
 }

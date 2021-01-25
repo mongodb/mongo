@@ -72,6 +72,8 @@ public:
 
     const NamespaceString& getNS() const;
 
+    bool getBypassDocumentValidation() const;
+
     const auto& getInsertRequest() const {
         invariant(_insertReq);
         return *_insertReq;

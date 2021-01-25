@@ -423,7 +423,6 @@ public:
                    BatchedCommandRequest batchedRequest,
                    UpdateMetrics* updateMetrics = nullptr)
         : CommandInvocation(command),
-          _bypass{shouldBypassDocumentValidationForCommand(request.body)},
           _request{&request},
           _batchedRequest{std::move(batchedRequest)},
           _updateMetrics{updateMetrics} {}
@@ -433,7 +432,7 @@ public:
     }
 
     bool getBypass() const {
-        return _bypass;
+        return _batchedRequest.getBypassDocumentValidation();
     }
 
 private:

@@ -29,6 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/base/checked_cast.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/mutable/element.h"
@@ -466,6 +467,7 @@ void serializeReply(OperationContext* opCtx,
     }
 }
 
+template <typename DerivedT>
 class WriteCommand : public Command {
 public:
     explicit WriteCommand(StringData name) : Command(name) {}
@@ -491,13 +493,17 @@ private:
     }
 };
 
-class WriteCommand::InvocationBase : public CommandInvocation {
+template <typename DerivedT>
+class WriteCommand<DerivedT>::InvocationBase : public CommandInvocation {
 public:
+    using DerivedInvocation = typename DerivedT::Invocation;
     InvocationBase(const WriteCommand* writeCommand, const OpMsgRequest& request)
         : CommandInvocation(writeCommand), _request(&request) {}
 
     bool getBypass() const {
-        return shouldBypassDocumentValidationForCommand(_request->body);
+        return checked_cast<const DerivedInvocation*>(this)
+            ->request()
+            .getBypassDocumentValidation();
     }
 
 private:
@@ -549,7 +555,7 @@ private:
     const OpMsgRequest* _request;
 };
 
-class CmdInsert final : public WriteCommand {
+class CmdInsert final : public WriteCommand<CmdInsert> {
 public:
     CmdInsert() : WriteCommand("insert") {}
 
@@ -557,11 +563,14 @@ public:
         return kApiVersions1;
     }
 
-private:
     class Invocation final : public InvocationBase {
     public:
         Invocation(const WriteCommand* cmd, const OpMsgRequest& request)
             : InvocationBase(cmd, request), _batch(InsertOp::parse(request)) {}
+
+        const auto& request() const {
+            return _batch;
+        }
 
     private:
         NamespaceString ns() const override {
@@ -734,7 +743,7 @@ private:
     }
 } cmdInsert;
 
-class CmdUpdate final : public WriteCommand {
+class CmdUpdate final : public WriteCommand<CmdUpdate> {
 public:
     CmdUpdate() : WriteCommand("update"), _updateMetrics{"update"} {}
 
@@ -742,7 +751,6 @@ public:
         return kApiVersions1;
     }
 
-private:
     class Invocation final : public InvocationBase {
     public:
         Invocation(const WriteCommand* cmd,
@@ -765,6 +773,10 @@ private:
                 invariant(seq->objs.front().isOwned());
                 _updateOpObj = seq->objs.front();
             }
+        }
+
+        const auto& request() const {
+            return _batch;
         }
 
         bool supportsReadMirroring() const override {
@@ -897,7 +909,7 @@ private:
     UpdateMetrics _updateMetrics;
 } cmdUpdate;
 
-class CmdDelete final : public WriteCommand {
+class CmdDelete final : public WriteCommand<CmdDelete> {
 public:
     CmdDelete() : WriteCommand("delete") {}
 
@@ -905,13 +917,16 @@ public:
         return kApiVersions1;
     }
 
-private:
     class Invocation final : public InvocationBase {
     public:
         Invocation(const WriteCommand* cmd, const OpMsgRequest& request)
             : InvocationBase(cmd, request),
               _batch(DeleteOp::parse(request)),
               _commandObj(request.body) {}
+
+        const auto& request() const {
+            return _batch;
+        }
 
     private:
         NamespaceString ns() const override {
