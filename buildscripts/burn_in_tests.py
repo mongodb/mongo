@@ -54,7 +54,8 @@ AVG_TEST_SETUP_SEC = 4 * 60
 AVG_TEST_TIME_MULTIPLIER = 3
 CONFIG_FILE = ".evergreen.yml"
 DEFAULT_PROJECT = "mongodb-mongo-master"
-DEFAULT_REPO_LOCATIONS = [".", "./src/mongo/db/modules/enterprise"]
+ENTERPRISE_MODULE_PATH = "src/mongo/db/modules/enterprise"
+DEFAULT_REPO_LOCATIONS = [".", f"./{ENTERPRISE_MODULE_PATH}"]
 REPEAT_SUITES = 2
 EVERGREEN_FILE = "etc/evergreen.yml"
 MIN_AVG_TEST_OVERFLOW_SEC = float(60)
@@ -263,7 +264,7 @@ def find_excludes(selector_file: str) -> Tuple[List, List, List]:
             default_if_none(js_test.get("exclude_tests"), []))
 
 
-def filter_tests(tests: Set[str], exclude_tests: [str]) -> Set[str]:
+def filter_tests(tests: Set[str], exclude_tests: List[str]) -> Set[str]:
     """
     Exclude tests which have been blacklisted.
 
@@ -667,6 +668,8 @@ def create_tests_by_task(build_variant: str, evg_conf: EvergreenProjectConfig,
     :return: Tests by task.
     """
     exclude_suites, exclude_tasks, exclude_tests = find_excludes(SELECTOR_FILE)
+    if not evg_conf.get_variant(build_variant).is_enterprise_build():
+        exclude_tests.append(f"{ENTERPRISE_MODULE_PATH}/**/*")
     changed_tests = filter_tests(changed_tests, exclude_tests)
 
     buildscripts.resmokelib.parser.set_run_options()
