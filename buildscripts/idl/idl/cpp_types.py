@@ -105,10 +105,11 @@ def _optionally_make_call(method_name, param):
 class CppTypeBase(metaclass=ABCMeta):
     """Base type for C++ Type information."""
 
-    def __init__(self, field):
-        # type: (ast.Field) -> None
+    def __init__(self, field, cpp_type_name):
+        # type: (ast.Field, str) -> None
         """Construct a CppTypeBase."""
         self._field = field
+        self._cpp_type_name = cpp_type_name
 
     @abstractmethod
     def get_type_name(self):
@@ -182,12 +183,7 @@ class _CppTypeBasic(CppTypeBase):
 
     def get_type_name(self):
         # type: () -> str
-        if self._field.struct_type:
-            cpp_type = common.title_case(self._field.struct_type)
-        else:
-            cpp_type = self._field.type.cpp_type
-
-        return cpp_type
+        return self._cpp_type_name
 
     def get_storage_type(self):
         # type: () -> str
@@ -250,11 +246,11 @@ class _CppTypeBasic(CppTypeBase):
 class _CppTypeView(CppTypeBase):
     """Base type for C++ View Types information."""
 
-    def __init__(self, field, storage_type, view_type):
-        # type: (ast.Field, str, str) -> None
+    def __init__(self, field, cpp_type_name, storage_type, view_type):
+        # type: (ast.Field, str, str, str) -> None
         self._storage_type = storage_type
         self._view_type = view_type
-        super(_CppTypeView, self).__init__(field)
+        super(_CppTypeView, self).__init__(field, cpp_type_name)
 
     def get_type_name(self):
         # type: () -> str
@@ -311,9 +307,13 @@ class _CppTypeView(CppTypeBase):
 class _CppTypeVector(CppTypeBase):
     """Base type for C++ Std::Vector Types information."""
 
+    def __init__(self, field):
+        # type: (ast.Field) -> None
+        super(_CppTypeVector, self).__init__(field, 'std::vector<std::uint8_t>')
+
     def get_type_name(self):
         # type: () -> str
-        return 'std::vector<std::uint8_t>'
+        return self._cpp_type_name
 
     def get_storage_type(self):
         # type: () -> str
@@ -367,10 +367,10 @@ class _CppTypeVector(CppTypeBase):
 class _CppTypeDelegating(CppTypeBase):
     """Delegates all method calls a nested instance of CppTypeBase. Used to build other classes."""
 
-    def __init__(self, base, field):
-        # type: (CppTypeBase, ast.Field) -> None
+    def __init__(self, base, field, cpp_type_name):
+        # type: (CppTypeBase, ast.Field, str) -> None
         self._base = base
-        super(_CppTypeDelegating, self).__init__(field)
+        super(_CppTypeDelegating, self).__init__(field, cpp_type_name)
 
     def get_type_name(self):
         # type: () -> str
@@ -539,23 +539,27 @@ class _CppTypeOptional(_CppTypeDelegating):
         return self._base.get_setter_body(member_name, validator_method_name)
 
 
+def get_cpp_type_from_cpp_type_name(field, cpp_type_name, array):
+    # type: (ast.Field, str, bool) -> CppTypeBase
+    """Get the C++ Type information for the given C++ type name, e.g. std::string."""
+    cpp_type_info: CppTypeBase
+    if cpp_type_name == 'std::string':
+        cpp_type_info = _CppTypeView(field, 'std::string', 'std::string', 'StringData')
+    elif cpp_type_name == 'std::vector<std::uint8_t>':
+        cpp_type_info = _CppTypeVector(field)
+    else:
+        cpp_type_info = _CppTypeBasic(field, cpp_type_name)
+
+    if array:
+        cpp_type_info = _CppTypeArray(cpp_type_info, field, cpp_type_name)
+
+    return cpp_type_info
+
+
 def get_cpp_type_without_optional(field):
     # type: (ast.Field) -> CppTypeBase
     """Get the C++ Type information for the given field but ignore optional."""
-
-    cpp_type_info = None  # type: Any
-
-    if field.type.cpp_type == 'std::string':
-        cpp_type_info = _CppTypeView(field, 'std::string', 'StringData')
-    elif field.type.cpp_type == 'std::vector<std::uint8_t>':
-        cpp_type_info = _CppTypeVector(field)
-    else:
-        cpp_type_info = _CppTypeBasic(field)
-
-    if field.type.is_array:
-        cpp_type_info = _CppTypeArray(cpp_type_info, field)
-
-    return cpp_type_info
+    return get_cpp_type_from_cpp_type_name(field, field.type.cpp_type, field.type.is_array)
 
 
 def get_cpp_type(field):
@@ -565,7 +569,7 @@ def get_cpp_type(field):
     cpp_type_info = get_cpp_type_without_optional(field)
 
     if field.optional:
-        cpp_type_info = _CppTypeOptional(cpp_type_info, field)
+        return _CppTypeOptional(cpp_type_info, field, field.type.cpp_type)
 
     return cpp_type_info
 

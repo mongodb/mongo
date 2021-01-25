@@ -124,34 +124,6 @@ structs:
         fields:
             value: uuid
 
-    one_variant:
-        description: UnitTest for a single variant which accepts int or string
-        # TODO (SERVER-51369): Set generate_comparison_operators: true, test comparison ops.
-        fields:
-            value:
-                type:
-                    variant: [int, string]
-
-    one_variant_aggregate:
-        description: UnitTest for a single variant which accepts string, doc, or array of string
-        # TODO (SERVER-51369): Set generate_comparison_operators: true, test comparison ops.
-        fields:
-            value:
-                type:
-                    variant:
-                    - string
-                    - object
-                    - array<string>
-
-    one_variant_optional:
-        description: UnitTest for a single optional variant
-        # TODO (SERVER-51369): Set generate_comparison_operators: true, test comparison ops.
-        fields:
-            value:
-                type:
-                    variant: [int, string]
-                optional: true
-
 enums:
 
     IntEnum:

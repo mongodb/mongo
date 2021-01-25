@@ -117,6 +117,11 @@ ERROR_ID_MISSING_REPLY_TYPE = "ID0074"
 ERROR_ID_API_VERSION_NO_STRICT = "ID0075"
 ERROR_ID_USELESS_VARIANT = "ID0076"
 ERROR_ID_ILLEGAL_FIELD_ALWAYS_SERIALIZE_NOT_OPTIONAL = "ID0077"
+ERROR_ID_VARIANT_COMPARISON = "ID0078"
+ERROR_ID_VARIANT_NO_DEFAULT = "ID0079"
+ERROR_ID_VARIANT_DUPLICATE_TYPES = "ID0080"
+ERROR_ID_VARIANT_STRUCTS = "ID0081"
+ERROR_ID_NO_VARIANT_ENUM = "ID0082"
 
 
 class IDLError(Exception):
@@ -680,6 +685,43 @@ class ParserContext(object):
         """Add an error about a variant with 0 or 1 variant types."""
         self._add_error(location, ERROR_ID_USELESS_VARIANT,
                         ("Cannot declare a variant with only 0 or 1 variant types"))
+
+    def add_variant_comparison_error(self, location):
+        # type: (common.SourceLocation,) -> None
+        """Add an error about a struct with generate_comparison_operators and a variant field."""
+        self._add_error(location, ERROR_ID_VARIANT_COMPARISON,
+                        ("generate_comparison_operators is not supported with variant types"))
+
+    def add_variant_no_default_error(self, location, field_name):
+        # type: (common.SourceLocation, str) -> None
+        """Add an error about a variant having a default value."""
+        self._add_error(
+            location, ERROR_ID_VARIANT_NO_DEFAULT,
+            "Field '%s' is a variant, and default values for variants aren't implemented yet" %
+            (field_name))
+
+    def add_variant_duplicate_types_error(self, location, field_name, type_name):
+        # type: (common.SourceLocation, str, str) -> None
+        """Add an error about a variant having more than one alternative of the same BSON type."""
+        self._add_error(
+            location, ERROR_ID_VARIANT_DUPLICATE_TYPES,
+            ("Variant field '%s' has multiple alternatives with BSON type '%s', this is prohibited"
+             " to avoid ambiguity while parsing BSON.") % (field_name, type_name))
+
+    def add_variant_structs_error(self, location, field_name):
+        # type: (common.SourceLocation, str) -> None
+        """Add an error about a variant having more than one struct alternative."""
+        self._add_error(location, ERROR_ID_VARIANT_STRUCTS,
+                        ("Variant field '%s' has multiple struct alternatives, this is prohibited"
+                         " to avoid ambiguity while parsing BSON subdocuments.") % (field_name, ))
+
+    def add_variant_enum_error(self, location, field_name, type_name):
+        # type: (common.SourceLocation, str, str) -> None
+        """Add an error for a variant that can be an enum."""
+        self._add_error(
+            location, ERROR_ID_NO_VARIANT_ENUM,
+            "Field '%s' cannot be a variant with an enum alternative type '%s'" % (field_name,
+                                                                                   type_name))
 
     def is_scalar_non_negative_int_node(self, node, node_name):
         # type: (Union[yaml.nodes.MappingNode, yaml.nodes.ScalarNode, yaml.nodes.SequenceNode], str) -> bool

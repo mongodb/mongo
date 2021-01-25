@@ -34,7 +34,7 @@ it follows the rules of the IDL, etc.
 """
 
 import itertools
-from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
+from typing import Any, Dict, Iterator, List, Optional, Tuple, Union, cast
 
 from . import common
 from . import errors
@@ -199,7 +199,7 @@ class SymbolTable(object):
         for idltype in imported_symbols.types:
             self.add_type(ctxt, idltype)
 
-    def resolve_field_from_type_name(self, ctxt, location, field_name, field_type_name):
+    def resolve_type_from_name(self, ctxt, location, field_name, field_type_name):
         # type: (errors.ParserContext, common.SourceLocation, str, str) -> Optional[Union[Enum, Struct, Type]]
         """Find the type or struct a field refers to or log an error."""
         field_type = FieldTypeSingle(location.file_name, location.line, location.column)
@@ -220,13 +220,30 @@ class SymbolTable(object):
                     # There was an error.
                     return None
 
-                # TODO (SERVER-51369): proper error, and test it
-                assert isinstance(alternative_type, Type)
-                variant.variant_types.append(alternative_type)
-                if alternative_type.bson_serialization_type:
-                    variant.bson_serialization_type = list(
-                        set(variant.bson_serialization_type).union(
-                            set(alternative_type.bson_serialization_type)))
+                if isinstance(alternative_type, Enum):
+                    ctxt.add_variant_enum_error(location, field_name, alternative_type.name)
+                    return None
+
+                if isinstance(alternative_type, Struct):
+                    if variant.variant_struct_type:
+                        ctxt.add_variant_structs_error(location, field_name)
+                        continue
+
+                    variant.variant_struct_type = alternative_type
+                    bson_serialization_type = ["object"]
+                else:
+                    variant.variant_types.append(alternative_type)
+                    if isinstance(alternative_type, ArrayType):
+                        base_type = cast(Type, alternative_type.element_type)
+                    else:
+                        base_type = cast(Type, alternative_type)
+
+                    bson_serialization_type = []
+                    # If alternative_type is an array, element type could be Struct or Type.
+                    if isinstance(base_type, Type):
+                        bson_serialization_type = cast(Type, base_type).bson_serialization_type
+
+                variant.bson_serialization_type.extend(bson_serialization_type)
 
             return variant
 
@@ -245,6 +262,12 @@ class SymbolTable(object):
 
         assert isinstance(field_type, FieldTypeSingle)
         type_name = field_type.type_name
+        if type_name.startswith('array<'):
+            # The caller should've already stripped "array<...>" from type_name, this may be an
+            # illegal nested array like "array<array<...>>".
+            ctxt.add_bad_array_type_name_error(location, field_name, type_name)
+            return None
+
         for command in self.commands:
             if command.name == type_name:
                 return command
@@ -260,14 +283,6 @@ class SymbolTable(object):
         for idltype in self.types:
             if idltype.name == type_name:
                 return idltype
-
-        if type_name.startswith('array<'):
-            array_type_name = parse_array_type(type_name)
-            if not array_type_name:
-                ctxt.add_bad_array_type_name_error(location, field_name, type_name)
-                return None
-
-            return self.resolve_field_type(ctxt, location, field_name, field_type)
 
         ctxt.add_unknown_type_error(location, field_name, type_name)
 
@@ -359,6 +374,9 @@ class VariantType(Type):
         super(VariantType, self).__init__(file_name, line, column)
         self.name = 'variant'
         self.variant_types = []  # type: List[Type]
+        # A variant can have at most one alternative type which is a struct. Otherwise, if we see
+        # a sub-object while parsing BSON, we don't know which struct to interpret it as.
+        self.variant_struct_type = None  # type: Struct
 
 
 class Validator(common.SourceLocation):
@@ -648,7 +666,7 @@ class FieldTypeVariant(FieldType):
 
     def debug_string(self):
         """Display this field type in error messages."""
-        return 'VariantType(%s)' % (', '.join(v.debug_string() for v in self.variant))
+        return 'variant<%s>' % (', '.join(v.debug_string() for v in self.variant))
 
 
 class Expression(common.SourceLocation):

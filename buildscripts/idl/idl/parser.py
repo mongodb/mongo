@@ -56,8 +56,8 @@ class _RuleDesc(object):
     - sequence - a sequence node, populates a list
     - mapping - a mapping node, calls another parser
     - scalar_or_mapping - means a scalar of mapping node, populates a struct
-    mapping_parser_func and sequence_parser_func are only called when parsing a mapping or
-    scalar_or_mapping yaml node.
+    mapping_parser_func is only called when parsing a mapping or scalar_or_mapping yaml node.
+    Similar for sequence_parser_func.
     """
 
     # TODO: after porting to Python 3, use an enum
@@ -523,6 +523,13 @@ def _parse_struct(ctxt, spec, name, node):
             "generate_comparison_operators": _RuleDesc("bool_scalar"),
             "non_const_getter": _RuleDesc('bool_scalar'),
         })
+
+    # PyLint has difficulty with some iterables: https://github.com/PyCQA/pylint/issues/3105
+    # pylint: disable=not-an-iterable
+    if struct.generate_comparison_operators and struct.fields and any(
+            isinstance(f.type, syntax.FieldTypeVariant) for f in struct.fields):
+        ctxt.add_variant_comparison_error(struct)
+        return
 
     spec.symbols.add_struct(ctxt, struct)
 

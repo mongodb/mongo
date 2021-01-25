@@ -536,7 +536,6 @@ structs:
         fields:
             field3: string
 
-
 ##################################################################################################
 #
 # Test struct with enum
@@ -566,6 +565,125 @@ structs:
             fieldDefault:
                 type: StringEnum
                 default: s1
+
+##################################################################################################
+#
+# Test struct with variant
+#
+##################################################################################################
+    one_variant:
+        description: UnitTest for a single variant which accepts int or string
+        strict: false
+        fields:
+            value:
+                type:
+                    variant: [int, string]
+
+    one_variant_safeInt:
+        description: UnitTest for a single variant with an alternative type which has multiple
+                     BSON serialization types
+        strict: false
+        fields:
+            value:
+                type:
+                    variant: [safeInt, string]
+
+    one_variant_compound:
+        description: UnitTest for a single variant which accepts string, doc, or array of string
+        strict: false
+        fields:
+            value:
+                type:
+                    variant:
+                    - string
+                    - object
+                    - array<string>
+
+    one_variant_struct:
+        description: UnitTest for a single variant which accepts an int or a struct
+        strict: false
+        fields:
+            value:
+                type:
+                    variant:
+                    - int
+                    - one_string
+
+    one_variant_struct_array:
+        description: UnitTest for a single variant which accepts an int or array of structs
+        strict: false
+        fields:
+            value:
+                type:
+                    variant:
+                    - int
+                    - array<one_string>
+
+    one_variant_two_arrays:
+        description: UnitTest for a single variant which accepts array of int or array of string
+        strict: false
+        fields:
+            value:
+                type:
+                    variant:
+                    - array<int>
+                    - array<string>
+
+    one_variant_optional:
+        description: UnitTest for a single optional variant
+        strict: false
+        fields:
+            value:
+                type:
+                    variant: [int, string]
+                optional: true
+
+    two_variants:
+        description: UnitTest for a struct with two variant fields
+        strict: false
+        fields:
+            value0:
+                type:
+                    variant: [int, string]
+            value1:
+                type:
+                    variant: [object, array<string>]
+
+    chained_struct_variant:
+        description: Struct with chained variant
+        strict: false
+        inline_chained_structs: false
+        chained_structs:
+            one_variant_compound: one_variant_compound
+        fields:
+            field1: string
+
+    chained_struct_variant_inline:
+        description: Struct with inline chained variant
+        strict: false
+        inline_chained_structs: true
+        chained_structs:
+            one_variant_compound: one_variant_compound
+        fields:
+            field1: string
+
+    chained_struct_variant_struct:
+        description: Struct with chained variant that has a struct alternative type
+        strict: false
+        inline_chained_structs: false
+        chained_structs:
+            one_variant_struct: one_variant_struct
+        fields:
+            field1: string
+
+    chained_struct_variant_struct_inline:
+        description: Struct with inline chained variant that has a struct alternative type
+        strict: false
+        inline_chained_structs: true
+        chained_structs:
+            one_variant_struct: one_variant_struct
+        fields:
+            field1: string
 
 ##################################################################################################
 #
@@ -805,8 +923,21 @@ commands:
         api_version: ""
         type: array<one_string>
 
-    # TODO (SERVER-51369): Test a command with type: variant: [int, string] and
-    #   with type: variant: [int, one_string]
+    CommandTypeVariantCommand:
+        description: Command with a variant parameter
+        command_name: CommandTypeVariantCommand
+        namespace: type
+        api_version: ""
+        type:
+            variant: [int, string, array<string>]
+
+    CommandTypeVariantStructCommand:
+        description: Command with a variant parameter that can be a struct
+        command_name: CommandTypeVariantStructCommand
+        namespace: type
+        api_version: ""
+        type:
+            variant: [bool, one_string]
 
     _underscore_command:
         description: Command with custom type string

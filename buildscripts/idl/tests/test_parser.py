@@ -394,7 +394,6 @@ class TestParser(testcase.IDLTestcase):
         # type: () -> None
         """Positive variant test cases."""
 
-        # TODO (SERVER-51369): support IDL-defined struct as one of the alternative types
         self.assert_parse(
             textwrap.dedent("""
         structs:
@@ -462,6 +461,18 @@ class TestParser(testcase.IDLTestcase):
                             - string
                             - {variant: [string, int]}
             """), idl.errors.ERROR_ID_IS_NODE_TYPE)
+
+        self.assert_parse_fail(
+            textwrap.dedent("""
+        structs:
+            foo:
+                description: foo
+                generate_comparison_operators: true
+                fields:
+                    my_variant_field:
+                        type:
+                            variant: [string, int]
+            """), idl.errors.ERROR_ID_VARIANT_COMPARISON)
 
     def test_field_positive(self):
         # type: () -> None
