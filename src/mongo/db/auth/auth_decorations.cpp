@@ -35,9 +35,12 @@
 #include "mongo/db/auth/authentication_session.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/sasl_options.h"
 #include "mongo/db/client.h"
+#include "mongo/db/commands/authentication_commands.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/sequence_util.h"
 
 namespace mongo {
 namespace {
@@ -50,6 +53,12 @@ const auto getAuthorizationManager =
 
 const auto getAuthorizationSession =
     Client::declareDecoration<std::unique_ptr<AuthorizationSession>>();
+
+struct DisabledAuthMechanisms {
+    bool x509 = false;
+};
+
+const auto getDisabledAuthMechanisms = ServiceContext::declareDecoration<DisabledAuthMechanisms>();
 
 class AuthzClientObserver final : public ServiceContext::ClientObserver {
 public:
@@ -64,6 +73,13 @@ public:
     void onCreateOperationContext(OperationContext* opCtx) override {}
     void onDestroyOperationContext(OperationContext* opCtx) override {}
 };
+
+auto disableAuthMechanismsRegisterer = ServiceContext::ConstructorActionRegisterer{
+    "DisableAuthMechanisms", [](ServiceContext* service) {
+        if (!sequenceContains(saslGlobalParams.authenticationMechanisms, kX509AuthMechanism)) {
+            disableX509Auth(service);
+        }
+    }};
 
 ServiceContext::ConstructorActionRegisterer authzClientObserverRegisterer{
     "AuthzClientObserver", [](ServiceContext* service) {
@@ -122,6 +138,14 @@ void AuthorizationSession::set(Client* client,
     invariant(authorizationSession);
     invariant(!authzSession);
     authzSession = std::move(authorizationSession);
+}
+
+void disableX509Auth(ServiceContext* svcCtx) {
+    getDisabledAuthMechanisms(svcCtx).x509 = true;
+}
+
+bool isX509AuthDisabled(ServiceContext* svcCtx) {
+    return getDisabledAuthMechanisms(svcCtx).x509;
 }
 
 }  // namespace mongo

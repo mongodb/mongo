@@ -32,6 +32,9 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/service_context',
     ],
+    LIBDEPS_PRIVATE=[
+        'sasl_options',
+    ],
 )
 
 env.Library(
@@ -153,8 +156,9 @@ env.Library(
         'user_document_parser',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/audit',
+        '$BUILD_DIR/mongo/db/audit', # audit:logLogout in AuthZSession.
         '$BUILD_DIR/mongo/db/commands/create_command',
+        '$BUILD_DIR/mongo/db/stats/counters',
         '$BUILD_DIR/mongo/idl/server_parameter',
         '$BUILD_DIR/mongo/util/caching',
     ],
@@ -221,27 +225,39 @@ env.Library(
 )
 
 env.Library(
-    target='authservercommon',
+    target='sasl_commands',
     source=[
-        'authz_session_external_state_server_common.cpp',
         'sasl_commands.cpp',
         'sasl_commands.idl',
         'sasl_payload.cpp',
-        'enable_localhost_auth_bypass_parameter.idl',
-    ],
-    LIBDEPS=[
-        'auth',
-        'auth_impl_internal',
-        'authorization_manager_global',
-        'saslauth',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/client/sasl_client',
         '$BUILD_DIR/mongo/db/audit',
         '$BUILD_DIR/mongo/db/commands',
-        '$BUILD_DIR/mongo/db/commands/authentication_commands',
         '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
-        '$BUILD_DIR/mongo/db/stats/counters',
+        'auth',
+        'auth_impl_internal',
+        'authorization_manager_global',
+        'saslauth',
+    ],
+)
+
+env.Library(
+    target='authservercommon',
+    source=[
+        'authz_session_external_state_server_common.cpp',
+        'enable_localhost_auth_bypass_parameter.idl',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/commands/authentication_commands',
+        'auth',
+        'auth_impl_internal',
+        'authorization_manager_global',
+        'sasl_commands',
+        'saslauth',
+    ],
+    LIBDEPS_PRIVATE=[
         'sasl_options_init',
     ],
 )

@@ -331,13 +331,6 @@ SaslReply CmdSaslContinue::Invocation::typedRun(OperationContext* opCtx) {
     return uassertStatusOK(swReply);
 }
 
-// The CyrusSaslCommands Enterprise initializer is dependent on PreSaslCommands
-MONGO_INITIALIZER(PreSaslCommands)
-(InitializerContext*) {
-    if (!sequenceContains(saslGlobalParams.authenticationMechanisms, kX509AuthMechanism))
-        disableAuthMechanism(kX509AuthMechanism);
-}
-
 constexpr auto kDBFieldName = "db"_sd;
 }  // namespace
 }  // namespace auth

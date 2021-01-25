@@ -47,7 +47,6 @@
 #include "mongo/db/auth/authentication_session.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
-#include "mongo/db/auth/sasl_options.h"
 #include "mongo/db/auth/security_key.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/client.h"
@@ -173,8 +172,6 @@ public:
     }
 } cmdLogout;
 
-bool _isX509AuthDisabled;
-
 #ifdef MONGO_CONFIG_SSL
 constexpr auto kX509AuthenticationDisabledMessage = "x.509 authentication is disabled."_sd;
 
@@ -255,7 +252,9 @@ void _authenticateX509(OperationContext* opCtx, UserName& user, StringData dbnam
         authorizationSession->grantInternalAuthorization(client);
     } else {
         // Handle normal client authentication, only applies to client-server connections
-        uassert(ErrorCodes::BadValue, kX509AuthenticationDisabledMessage, !_isX509AuthDisabled);
+        uassert(ErrorCodes::BadValue,
+                kX509AuthenticationDisabledMessage,
+                !isX509AuthDisabled(opCtx->getServiceContext()));
         uassertStatusOK(authorizationSession->addAndAuthorizeUser(opCtx, user));
     }
 }
@@ -368,12 +367,6 @@ public:
 } cmdAuthenticate;
 
 }  // namespace
-
-void disableAuthMechanism(StringData authMechanism) {
-    if (authMechanism == kX509AuthMechanism) {
-        _isX509AuthDisabled = true;
-    }
-}
 
 void doSpeculativeAuthenticate(OperationContext* opCtx,
                                BSONObj cmdObj,
