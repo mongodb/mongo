@@ -56,6 +56,9 @@ namespace transport {
  * We implement our networking reactor on top of poll + eventfd for wakeups
  */
 class TransportLayerASIO::BatonASIO : public Baton {
+    static auto makeDetachedError() {
+        return Status(ErrorCodes::ShutdownInProgress, "Baton detached");
+    }
 
     /**
      * RAII type that wraps up an eventfd and reading/writing to it.  We don't actually need the
@@ -110,23 +113,64 @@ public:
     }
 
     void detach() override {
+        OperationContext* opCtx;
+
         {
             stdx::lock_guard<stdx::mutex> lk(_mutex);
-            invariant(_sessions.empty());
-            invariant(_scheduled.empty());
-            invariant(_timers.empty());
+            if (!_opCtx) {
+                return;
+            }
+
+            opCtx = std::exchange(_opCtx, nullptr);
         }
 
         {
-            stdx::lock_guard<Client> lk(*_opCtx->getClient());
-            invariant(_opCtx->getBaton().get() == this);
-            _opCtx->setBaton(nullptr);
+            stdx::lock_guard<Client> lk(*opCtx->getClient());
+            invariant(opCtx->getBaton().get() == this);
+            opCtx->setBaton(nullptr);
         }
 
-        _opCtx = nullptr;
+        decltype(_scheduled) scheduled;
+        decltype(_sessions) sessions;
+        decltype(_timers) timers;
+
+        {
+            stdx::lock_guard<stdx::mutex> lk(_mutex);
+
+            using std::swap;
+            swap(_scheduled, scheduled);
+            swap(_sessions, sessions);
+            swap(_timers, timers);
+            _timersById.clear();
+        }
+
+        for (auto& job : scheduled) {
+            try {
+                job();
+                job = {};
+            } catch (const DBException& ex) {
+                LOG(3) << "Job threw during detach: " << ex;
+            }
+        }
+
+        for (auto& session : sessions) {
+            session.second.promise.setError(makeDetachedError());
+        }
+
+        for (auto& timer : timers) {
+            auto promise = std::move(timer.promise);
+            promise.setError(makeDetachedError());
+        }
     }
 
     Future<void> addSession(Session& session, Type type) override {
+        {
+            stdx::unique_lock<stdx::mutex> lk(_mutex);
+            if (!_opCtx) {
+                return makeDetachedError();
+            }
+        }
+
         auto fd = checked_cast<ASIOSession&>(session).getSocket().native_handle();
         auto pf = makePromiseFuture<void>();
 
@@ -142,6 +186,13 @@ public:
     }
 
     Future<void> waitUntil(const ReactorTimer& timer, Date_t expiration) override {
+        {
+            stdx::unique_lock<stdx::mutex> lk(_mutex);
+            if (!_opCtx) {
+                return makeDetachedError();
+            }
+        }
+
         auto pf = makePromiseFuture<void>();
         _safeExecute([ timerPtr = &timer, expiration, sp = pf.promise.share(), this ] {
             auto pair = _timers.insert({
@@ -191,14 +242,21 @@ public:
         return true;
     }
 
-    void schedule(stdx::function<void()> func) override {
+    bool schedule(stdx::function<void()> func) override {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
+
+        if (!_opCtx) {
+            // If we're already detached, people have to find somewhere else to run.
+            return false;
+        }
 
         _scheduled.push_back(std::move(func));
 
         if (_inPoll) {
             _efd.notify();
         }
+
+        return true;
     }
 
     void notify() noexcept override {
@@ -383,7 +441,7 @@ private:
      */
     template <typename Callback>
     void _safeExecute(stdx::unique_lock<stdx::mutex> lk, Callback&& cb) {
-        if (_inPoll) {
+        if (_inPoll && _opCtx) {
             _scheduled.push_back([cb, this] {
                 stdx::lock_guard<stdx::mutex> lk(_mutex);
                 cb();

@@ -101,6 +101,7 @@ env.Library(
         "async_requests_sender.cpp",
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
         "$BUILD_DIR/mongo/db/query/command_request_response",
         "$BUILD_DIR/mongo/executor/task_executor_interface",
         "$BUILD_DIR/mongo/s/client/sharding_client",

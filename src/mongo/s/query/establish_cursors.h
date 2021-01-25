@@ -38,6 +38,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/cursor_id.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/s/client/shard.h"
 #include "mongo/s/query/async_results_merger_params_gen.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/net/hostandport.h"
@@ -68,6 +69,7 @@ std::vector<RemoteCursor> establishCursors(OperationContext* opCtx,
                                            const NamespaceString& nss,
                                            const ReadPreferenceSetting readPref,
                                            const std::vector<std::pair<ShardId, BSONObj>>& remotes,
-                                           bool allowPartialResults);
+                                           bool allowPartialResults,
+                                           Shard::RetryPolicy = Shard::RetryPolicy::kIdempotent);
 
 }  // namespace mongo

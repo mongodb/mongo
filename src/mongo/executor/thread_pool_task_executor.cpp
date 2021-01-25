@@ -589,15 +589,15 @@ void ThreadPoolTaskExecutor::scheduleIntoPool_inlock(WorkQueue* fromQueue,
     }
 
     for (const auto& cbState : todo) {
-        if (cbState->baton) {
-            cbState->baton->schedule([this, cbState] { runCallback(std::move(cbState)); });
-        } else {
-            const auto status =
-                _pool->schedule([this, cbState] { runCallback(std::move(cbState)); });
-            if (status == ErrorCodes::ShutdownInProgress)
-                break;
-            fassert(28735, status);
+        if (cbState->baton &&
+            cbState->baton->schedule([this, cbState] { runCallback(std::move(cbState)); })) {
+            continue;
         }
+
+        const auto status = _pool->schedule([this, cbState] { runCallback(std::move(cbState)); });
+        if (status == ErrorCodes::ShutdownInProgress)
+            break;
+        fassert(28735, status);
     }
     _net->signalWorkAvailable();
 }

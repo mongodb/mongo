@@ -314,14 +314,14 @@ Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHa
             if (baton) {
                 // If we have a baton, we want to get back to the baton thread immediately after we
                 // get a connection
-                baton->schedule(
-                    [ resolver = std::move(resolver), swConn = std::move(swConn) ]() mutable {
-                        std::move(resolver)(std::move(swConn));
-                    });
-            } else {
-                // otherwise we're happy to run inline
-                std::move(resolver)(std::move(swConn));
+                if (baton->schedule(
+                        [resolver, swConn]() mutable { std::move(resolver)(std::move(swConn)); })) {
+                    return;
+                }
             }
+            // otherwise we're happy to run inline
+            std::move(resolver)(std::move(swConn));
+
         });
 
     return Status::OK();
@@ -472,11 +472,11 @@ Status NetworkInterfaceTL::setAlarm(Date_t when,
     }
 
     if (when <= now()) {
-        if (baton) {
-            baton->schedule(std::move(action));
-        } else {
-            _reactor->schedule(transport::Reactor::kPost, std::move(action));
+        if (baton && baton->schedule(action)) {
+            return Status::OK();
         }
+
+        _reactor->schedule(transport::Reactor::kPost, std::move(action));
         return Status::OK();
     }
 
@@ -511,11 +511,10 @@ Status NetworkInterfaceTL::setAlarm(Date_t when,
             }
 
             if (status.isOK()) {
-                if (baton) {
-                    baton->schedule(std::move(action));
-                } else {
-                    _reactor->schedule(transport::Reactor::kPost, std::move(action));
+                if (baton && baton->schedule(action)) {
+                    return;
                 }
+                _reactor->schedule(transport::Reactor::kPost, std::move(action));
             } else if (status != ErrorCodes::CallbackCanceled) {
                 warning() << "setAlarm() received an error: " << status;
             }

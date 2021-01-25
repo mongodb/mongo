@@ -35,6 +35,7 @@
 #include "mongo/s/async_requests_sender.h"
 
 #include "mongo/client/remote_command_targeter.h"
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -56,6 +57,22 @@ namespace {
 // Maximum number of retries for network and replication notMaster errors (per host).
 const int kMaxNumFailedHostRetryAttempts = 3;
 
+// Maximum time to wait for a network operation.
+const Seconds kMaxWait = Seconds(20);
+
+transport::BatonHandle makeBaton(OperationContext* opCtx) {
+    if (!AsyncRequestsSenderUseBaton.load()) {
+        return nullptr;
+    }
+
+    auto tl = opCtx->getServiceContext()->getTransportLayer();
+    if (!tl) {
+        return nullptr;
+    }
+
+    return tl->makeBaton(opCtx);
+}
+
 }  // namespace
 
 AsyncRequestsSender::AsyncRequestsSender(OperationContext* opCtx,
@@ -66,7 +83,7 @@ AsyncRequestsSender::AsyncRequestsSender(OperationContext* opCtx,
                                          Shard::RetryPolicy retryPolicy)
     : _opCtx(opCtx),
       _executor(executor),
-      _baton(opCtx),
+      _baton(makeBaton(_opCtx)),
       _db(dbName.toString()),
       _readPreference(readPreference),
       _retryPolicy(retryPolicy) {
@@ -82,6 +99,11 @@ AsyncRequestsSender::AsyncRequestsSender(OperationContext* opCtx,
 }
 
 AsyncRequestsSender::~AsyncRequestsSender() {
+    ON_BLOCK_EXIT([&] {
+        if (_baton) {
+            _baton->detach();
+        }
+    });
     _cancelPendingRequests();
 
     // Wait on remaining callbacks to run.
@@ -276,8 +298,21 @@ void AsyncRequestsSender::_makeProgress(OperationContext* opCtx) {
         // If we're using a baton, we peek the queue, and block on the baton if it's empty
         if (boost::optional<boost::optional<Job>> tryJob = _responseQueue.tryPop()) {
             job = std::move(*tryJob);
+        } else if (opCtx) {
+            auto didWork = _baton->run(opCtx, opCtx->getDeadline());
+            if (!didWork) {
+                // If we resumed without doing work, then we hit the deadline which is also
+                // maxTimeMS. Thus we expect checkForInterrupt() to throw in normal operation. If it
+                // does not throw, then we are likely subject to the maxTimeNeverTimeOut fail point
+                // and we should wait without a deadline.
+                opCtx->checkForInterrupt();
+                uassert(ErrorCodes::ExceededTimeLimit,
+                        "Experienced an unexpected timeout outside of testing",
+                        getTestCommandsEnabled());
+                _baton->run(opCtx, boost::none);
+            }
         } else {
-            _baton->run(opCtx, boost::none);
+            _baton->run(nullptr, boost::none);
         }
     } else {
         // Otherwise we block on the queue
@@ -331,14 +366,15 @@ Status AsyncRequestsSender::RemoteData::resolveShardIdToHostAndPort(
 
     auto clock = ars->_opCtx->getServiceContext()->getFastClockSource();
 
-    auto deadline = clock->now() + Seconds(20);
+    const auto maxDeadline = clock->now() + kMaxWait;
+    const auto deadline = std::min(ars->_opCtx->getDeadline(), maxDeadline);
 
     auto targeter = shard->getTargeter();
 
     auto findHostStatus = [&] {
         // If we don't have a baton, just go ahead and block in targeting
         if (!ars->_baton) {
-            return targeter->findHostWithMaxWait(readPref, Seconds{20});
+            return targeter->findHostWithMaxWait(readPref, kMaxWait);
         }
 
         // If we do have a baton, and we can target quickly, just do that
@@ -384,19 +420,6 @@ Status AsyncRequestsSender::RemoteData::resolveShardIdToHostAndPort(
 std::shared_ptr<Shard> AsyncRequestsSender::RemoteData::getShard() {
     // TODO: Pass down an OperationContext* to use here.
     return Grid::get(getGlobalServiceContext())->shardRegistry()->getShardNoReload(shardId);
-}
-
-AsyncRequestsSender::BatonDetacher::BatonDetacher(OperationContext* opCtx)
-    : _baton(AsyncRequestsSenderUseBaton.load()
-                 ? (opCtx->getServiceContext()->getTransportLayer()
-                        ? opCtx->getServiceContext()->getTransportLayer()->makeBaton(opCtx)
-                        : nullptr)
-                 : nullptr) {}
-
-AsyncRequestsSender::BatonDetacher::~BatonDetacher() {
-    if (_baton) {
-        _baton->detach();
-    }
 }
 
 }  // namespace mongo

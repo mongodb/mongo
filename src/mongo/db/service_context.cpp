@@ -43,6 +43,7 @@
 #include "mongo/db/storage/recovery_unit_noop.h"
 #include "mongo/stdx/list.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/transport/baton.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer.h"
@@ -270,6 +271,11 @@ void ServiceContext::OperationContextDeleter::operator()(OperationContext* opCtx
         stdx::lock_guard<Client> lk(*client);
         client->resetOperationContext();
     }
+
+    if (auto baton = opCtx->getBaton()) {
+        baton->detach();
+    }
+
     onDestroy(opCtx, service->_clientObservers);
     delete opCtx;
 }

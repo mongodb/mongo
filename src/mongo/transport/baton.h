@@ -84,7 +84,7 @@ public:
     /**
      * Executes a callback on the baton.
      */
-    virtual void schedule(stdx::function<void()> func) = 0;
+    virtual bool schedule(stdx::function<void()> func) = 0;
 
     /**
      * Wakes the Baton up if it is currently blocked, or ensures that the next time it tries to

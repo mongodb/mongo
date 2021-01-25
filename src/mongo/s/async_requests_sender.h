@@ -81,7 +81,8 @@ namespace mongo {
  * Does not throw exceptions.
  */
 class AsyncRequestsSender {
-    MONGO_DISALLOW_COPYING(AsyncRequestsSender);
+    AsyncRequestsSender(const AsyncRequestsSender&) = delete;
+    AsyncRequestsSender& operator=(const AsyncRequestsSender&) = delete;
 
 public:
     /**
@@ -215,38 +216,6 @@ private:
     };
 
     /**
-     * We have to make sure to detach the baton if we throw in construction.  We also need a baton
-     * that lives longer than this type (because it can end up in callbacks that won't actually
-     * modify it).
-     *
-     * TODO: work out actual lifetime semantics for a baton.  For now, leaving this as a wort in ARS
-     */
-    class BatonDetacher {
-    public:
-        explicit BatonDetacher(OperationContext* opCtx);
-        ~BatonDetacher();
-
-        transport::Baton& operator*() const {
-            return *_baton;
-        }
-
-        transport::Baton* operator->() const noexcept {
-            return _baton.get();
-        }
-
-        operator transport::BatonHandle() const {
-            return _baton;
-        }
-
-        explicit operator bool() const noexcept {
-            return static_cast<bool>(_baton);
-        }
-
-    private:
-        transport::BatonHandle _baton;
-    };
-
-    /**
      * Cancels all outstanding requests on the TaskExecutor and sets the _stopRetrying flag.
      */
     void _cancelPendingRequests();
@@ -292,7 +261,7 @@ private:
     OperationContext* _opCtx;
 
     executor::TaskExecutor* _executor;
-    BatonDetacher _baton;
+    transport::BatonHandle _baton;
     size_t _batonRequests = 0;
 
     // The metadata obj to pass along with the command remote. Used to indicate that the command is
