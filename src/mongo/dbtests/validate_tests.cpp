@@ -987,7 +987,8 @@ public:
 
         // Insert additional multikey path metadata index keys.
         lockDb(MODE_X);
-        const RecordId recordId(RecordId::ReservedId::kWildcardMultikeyMetadataId);
+        const RecordId recordId(
+            RecordId::reservedIdFor<int64_t>(RecordId::Reservation::kWildcardMultikeyMetadataId));
         const IndexCatalog* indexCatalog = coll->getIndexCatalog();
         auto descriptor = indexCatalog->findIndexByName(&_opCtx, indexName);
         auto accessMethod =
@@ -1118,7 +1119,8 @@ public:
         lockDb(MODE_X);
         {
             WriteUnitOfWork wunit(&_opCtx);
-            RecordId recordId(RecordId::ReservedId::kWildcardMultikeyMetadataId);
+            RecordId recordId(RecordId::reservedIdFor<int64_t>(
+                RecordId::Reservation::kWildcardMultikeyMetadataId));
             const KeyString::Value indexKey =
                 KeyString::HeapBuilder(sortedDataInterface->getKeyStringVersion(),
                                        BSON("" << 1 << ""
@@ -1169,7 +1171,7 @@ public:
 
         // Insert documents.
         OpDebug* const nullOpDebug = nullptr;
-        RecordId rid = RecordId::min();
+        RecordId rid = RecordId::min<int64_t>();
         lockDb(MODE_X);
         {
             WriteUnitOfWork wunit(&_opCtx);
@@ -1265,7 +1267,7 @@ public:
 
         // Insert documents.
         OpDebug* const nullOpDebug = nullptr;
-        RecordId rid = RecordId::min();
+        RecordId rid = RecordId::min<int64_t>();
         lockDb(MODE_X);
         {
             WriteUnitOfWork wunit(&_opCtx);
@@ -1382,7 +1384,7 @@ public:
 
         // Insert documents.
         OpDebug* const nullOpDebug = nullptr;
-        RecordId rid = RecordId::min();
+        RecordId rid = RecordId::min<int64_t>();
         lockDb(MODE_X);
         {
             WriteUnitOfWork wunit(&_opCtx);
@@ -1650,7 +1652,7 @@ public:
 
         // Insert documents.
         OpDebug* const nullOpDebug = nullptr;
-        RecordId rid = RecordId::min();
+        RecordId rid = RecordId::min<int64_t>();
         lockDb(MODE_X);
         {
             WriteUnitOfWork wunit(&_opCtx);
@@ -1828,7 +1830,7 @@ public:
 
         // Insert documents.
         OpDebug* const nullOpDebug = nullptr;
-        RecordId rid = RecordId::min();
+        RecordId rid = RecordId::min<int64_t>();
         lockDb(MODE_X);
         {
             WriteUnitOfWork wunit(&_opCtx);
@@ -2392,7 +2394,7 @@ public:
 
         // Insert a document.
         OpDebug* const nullOpDebug = nullptr;
-        RecordId rid = RecordId::min();
+        RecordId rid = RecordId::min<int64_t>();
         lockDb(MODE_X);
         {
             WriteUnitOfWork wunit(&_opCtx);

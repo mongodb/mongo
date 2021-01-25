@@ -163,12 +163,12 @@ TEST_F(WildcardKeyGeneratorFullDocumentTest, ShouldIndexNonNestedEmptyArrayAsUnd
                                     fromjson("{'': 'b.c', '': undefined}"),
                                     fromjson("{'': 'd', '': []}"),
                                     fromjson("{'': 'd.e', '': undefined}")});
-    auto expectedMultikeyPaths =
-        makeKeySet({fromjson("{'': 1, '': 'a'}"),
-                    fromjson("{'': 1, '': 'b.c'}"),
-                    fromjson("{'': 1, '': 'd'}"),
-                    fromjson("{'': 1, '': 'd.e'}")},
-                   RecordId{RecordId::ReservedId::kWildcardMultikeyMetadataId});
+    auto expectedMultikeyPaths = makeKeySet(
+        {fromjson("{'': 1, '': 'a'}"),
+         fromjson("{'': 1, '': 'b.c'}"),
+         fromjson("{'': 1, '': 'd'}"),
+         fromjson("{'': 1, '': 'd.e'}")},
+        RecordId::reservedIdFor<int64_t>(RecordId::Reservation::kWildcardMultikeyMetadataId));
 
     auto outputKeys = makeKeySet();
     auto multikeyMetadataKeys = makeKeySet();
@@ -192,9 +192,9 @@ TEST_F(WildcardKeyGeneratorFullDocumentTest, ExtractMultikeyPath) {
                                     fromjson("{'': 'a.c', '': 2}"),
                                     fromjson("{'': 'a.d', '': 3}")});
 
-    auto expectedMultikeyPaths =
-        makeKeySet({fromjson("{'': 1, '': 'a'}")},
-                   RecordId{RecordId::ReservedId::kWildcardMultikeyMetadataId});
+    auto expectedMultikeyPaths = makeKeySet(
+        {fromjson("{'': 1, '': 'a'}")},
+        RecordId::reservedIdFor<int64_t>(RecordId::Reservation::kWildcardMultikeyMetadataId));
 
     auto outputKeys = makeKeySet();
     auto multikeyMetadataKeys = makeKeySet();
@@ -218,9 +218,9 @@ TEST_F(WildcardKeyGeneratorFullDocumentTest, ExtractMultikeyPathAndDedupKeys) {
                                     fromjson("{'': 'a.c', '': 2}"),
                                     fromjson("{'': 'a.d', '': 3}")});
 
-    auto expectedMultikeyPaths =
-        makeKeySet({fromjson("{'': 1, '': 'a'}")},
-                   RecordId{RecordId::ReservedId::kWildcardMultikeyMetadataId});
+    auto expectedMultikeyPaths = makeKeySet(
+        {fromjson("{'': 1, '': 'a'}")},
+        RecordId::reservedIdFor<int64_t>(RecordId::Reservation::kWildcardMultikeyMetadataId));
 
     auto outputKeys = makeKeySet();
     auto multikeyMetadataKeys = makeKeySet();
@@ -245,9 +245,9 @@ TEST_F(WildcardKeyGeneratorFullDocumentTest, ExtractZeroElementMultikeyPath) {
                                     fromjson("{'': 'a.d', '': 3}"),
                                     fromjson("{'': 'e', '': undefined}")});
 
-    auto expectedMultikeyPaths =
-        makeKeySet({fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'e'}")},
-                   RecordId{RecordId::ReservedId::kWildcardMultikeyMetadataId});
+    auto expectedMultikeyPaths = makeKeySet(
+        {fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'e'}")},
+        RecordId::reservedIdFor<int64_t>(RecordId::Reservation::kWildcardMultikeyMetadataId));
 
     auto outputKeys = makeKeySet();
     auto multikeyMetadataKeys = makeKeySet();
@@ -281,9 +281,9 @@ TEST_F(WildcardKeyGeneratorFullDocumentTest, ExtractNestedMultikeyPaths) {
                                     fromjson("{'': 'a.e', '': 4}"),
                                     fromjson("{'': 'a.e', '': 5}")});
 
-    auto expectedMultikeyPaths =
-        makeKeySet({fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'a.e'}")},
-                   RecordId{RecordId::ReservedId::kWildcardMultikeyMetadataId});
+    auto expectedMultikeyPaths = makeKeySet(
+        {fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'a.e'}")},
+        RecordId::reservedIdFor<int64_t>(RecordId::Reservation::kWildcardMultikeyMetadataId));
 
     auto outputKeys = makeKeySet();
     auto multikeyMetadataKeys = makeKeySet();
@@ -321,12 +321,12 @@ TEST_F(WildcardKeyGeneratorFullDocumentTest, ExtractMixedPathTypesAndAllSubpaths
                                     fromjson("{'': 'g.h.k', '': 12.0}"),
                                     fromjson("{'': 'l', '': 'string'}")});
 
-    auto expectedMultikeyPaths =
-        makeKeySet({fromjson("{'': 1, '': 'a'}"),
-                    fromjson("{'': 1, '': 'a.e'}"),
-                    fromjson("{'': 1, '': 'g.h.j'}"),
-                    fromjson("{'': 1, '': 'g.h.j.k'}")},
-                   RecordId{RecordId::ReservedId::kWildcardMultikeyMetadataId});
+    auto expectedMultikeyPaths = makeKeySet(
+        {fromjson("{'': 1, '': 'a'}"),
+         fromjson("{'': 1, '': 'a.e'}"),
+         fromjson("{'': 1, '': 'g.h.j'}"),
+         fromjson("{'': 1, '': 'g.h.j.k'}")},
+        RecordId::reservedIdFor<int64_t>(RecordId::Reservation::kWildcardMultikeyMetadataId));
 
     auto outputKeys = makeKeySet();
     auto multikeyMetadataKeys = makeKeySet();
@@ -356,9 +356,9 @@ TEST_F(WildcardKeyGeneratorSingleSubtreeTest, ExtractSubtreeWithSinglePathCompon
                                     fromjson("{'': 'g.h.j.k', '': 11.5}"),
                                     fromjson("{'': 'g.h.k', '': 12.0}")});
 
-    auto expectedMultikeyPaths =
-        makeKeySet({fromjson("{'': 1, '': 'g.h.j'}"), fromjson("{'': 1, '': 'g.h.j.k'}")},
-                   RecordId{RecordId::ReservedId::kWildcardMultikeyMetadataId});
+    auto expectedMultikeyPaths = makeKeySet(
+        {fromjson("{'': 1, '': 'g.h.j'}"), fromjson("{'': 1, '': 'g.h.j.k'}")},
+        RecordId::reservedIdFor<int64_t>(RecordId::Reservation::kWildcardMultikeyMetadataId));
 
     auto outputKeys = makeKeySet();
     auto multikeyMetadataKeys = makeKeySet();
@@ -385,9 +385,9 @@ TEST_F(WildcardKeyGeneratorSingleSubtreeTest, ExtractSubtreeWithMultiplePathComp
                                     fromjson("{'': 'g.h.j.k', '': 11.5}"),
                                     fromjson("{'': 'g.h.k', '': 12.0}")});
 
-    auto expectedMultikeyPaths =
-        makeKeySet({fromjson("{'': 1, '': 'g.h.j'}"), fromjson("{'': 1, '': 'g.h.j.k'}")},
-                   RecordId{RecordId::ReservedId::kWildcardMultikeyMetadataId});
+    auto expectedMultikeyPaths = makeKeySet(
+        {fromjson("{'': 1, '': 'g.h.j'}"), fromjson("{'': 1, '': 'g.h.j.k'}")},
+        RecordId::reservedIdFor<int64_t>(RecordId::Reservation::kWildcardMultikeyMetadataId));
 
     auto outputKeys = makeKeySet();
     auto multikeyMetadataKeys = makeKeySet();
@@ -412,9 +412,9 @@ TEST_F(WildcardKeyGeneratorSingleSubtreeTest, ExtractMultikeySubtree) {
                                     fromjson("{'': 'g.h.j.k', '': 11}"),
                                     fromjson("{'': 'g.h.j.k', '': 11.5}")});
 
-    auto expectedMultikeyPaths =
-        makeKeySet({fromjson("{'': 1, '': 'g.h.j'}"), fromjson("{'': 1, '': 'g.h.j.k'}")},
-                   RecordId{RecordId::ReservedId::kWildcardMultikeyMetadataId});
+    auto expectedMultikeyPaths = makeKeySet(
+        {fromjson("{'': 1, '': 'g.h.j'}"), fromjson("{'': 1, '': 'g.h.j.k'}")},
+        RecordId::reservedIdFor<int64_t>(RecordId::Reservation::kWildcardMultikeyMetadataId));
 
     auto outputKeys = makeKeySet();
     auto multikeyMetadataKeys = makeKeySet();
@@ -441,9 +441,9 @@ TEST_F(WildcardKeyGeneratorSingleSubtreeTest, ExtractNestedMultikeySubtree) {
                                     fromjson("{'': 'a.e', '': 4}"),
                                     fromjson("{'': 'a.e', '': 5}")});
 
-    auto expectedMultikeyPaths =
-        makeKeySet({fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'a.e'}")},
-                   RecordId{RecordId::ReservedId::kWildcardMultikeyMetadataId});
+    auto expectedMultikeyPaths = makeKeySet(
+        {fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'a.e'}")},
+        RecordId::reservedIdFor<int64_t>(RecordId::Reservation::kWildcardMultikeyMetadataId));
 
     auto outputKeys = makeKeySet();
     auto multikeyMetadataKeys = makeKeySet();
@@ -473,9 +473,9 @@ TEST_F(WildcardKeyGeneratorInclusionTest, InclusionProjectionSingleSubtree) {
                                     fromjson("{'': 'g.h.j.k', '': 11.5}"),
                                     fromjson("{'': 'g.h.k', '': 12.0}")});
 
-    auto expectedMultikeyPaths =
-        makeKeySet({fromjson("{'': 1, '': 'g.h.j'}"), fromjson("{'': 1, '': 'g.h.j.k'}")},
-                   RecordId{RecordId::ReservedId::kWildcardMultikeyMetadataId});
+    auto expectedMultikeyPaths = makeKeySet(
+        {fromjson("{'': 1, '': 'g.h.j'}"), fromjson("{'': 1, '': 'g.h.j.k'}")},
+        RecordId::reservedIdFor<int64_t>(RecordId::Reservation::kWildcardMultikeyMetadataId));
 
     auto outputKeys = makeKeySet();
     auto multikeyMetadataKeys = makeKeySet();
@@ -502,9 +502,9 @@ TEST_F(WildcardKeyGeneratorInclusionTest, InclusionProjectionNestedSubtree) {
                                     fromjson("{'': 'g.h.j.k', '': 11.5}"),
                                     fromjson("{'': 'g.h.k', '': 12.0}")});
 
-    auto expectedMultikeyPaths =
-        makeKeySet({fromjson("{'': 1, '': 'g.h.j'}"), fromjson("{'': 1, '': 'g.h.j.k'}")},
-                   RecordId{RecordId::ReservedId::kWildcardMultikeyMetadataId});
+    auto expectedMultikeyPaths = makeKeySet(
+        {fromjson("{'': 1, '': 'g.h.j'}"), fromjson("{'': 1, '': 'g.h.j.k'}")},
+        RecordId::reservedIdFor<int64_t>(RecordId::Reservation::kWildcardMultikeyMetadataId));
 
     auto outputKeys = makeKeySet();
     auto multikeyMetadataKeys = makeKeySet();
@@ -529,9 +529,9 @@ TEST_F(WildcardKeyGeneratorInclusionTest, InclusionProjectionMultikeySubtree) {
                                     fromjson("{'': 'g.h.j.k', '': 11}"),
                                     fromjson("{'': 'g.h.j.k', '': 11.5}")});
 
-    auto expectedMultikeyPaths =
-        makeKeySet({fromjson("{'': 1, '': 'g.h.j'}"), fromjson("{'': 1, '': 'g.h.j.k'}")},
-                   RecordId{RecordId::ReservedId::kWildcardMultikeyMetadataId});
+    auto expectedMultikeyPaths = makeKeySet(
+        {fromjson("{'': 1, '': 'g.h.j'}"), fromjson("{'': 1, '': 'g.h.j.k'}")},
+        RecordId::reservedIdFor<int64_t>(RecordId::Reservation::kWildcardMultikeyMetadataId));
 
     auto outputKeys = makeKeySet();
     auto multikeyMetadataKeys = makeKeySet();
@@ -556,9 +556,9 @@ TEST_F(WildcardKeyGeneratorInclusionTest, InclusionProjectionNestedMultikeySubtr
                                     fromjson("{'': 'a.e', '': 4}"),
                                     fromjson("{'': 'a.e', '': 5}")});
 
-    auto expectedMultikeyPaths =
-        makeKeySet({fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'a.e'}")},
-                   RecordId{RecordId::ReservedId::kWildcardMultikeyMetadataId});
+    auto expectedMultikeyPaths = makeKeySet(
+        {fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'a.e'}")},
+        RecordId::reservedIdFor<int64_t>(RecordId::Reservation::kWildcardMultikeyMetadataId));
 
     auto outputKeys = makeKeySet();
     auto multikeyMetadataKeys = makeKeySet();
@@ -586,9 +586,9 @@ TEST_F(WildcardKeyGeneratorInclusionTest, InclusionProjectionMultipleSubtrees) {
                                     fromjson("{'': 'a.e', '': 5}"),
                                     fromjson("{'': 'g.h.i', '': 9}")});
 
-    auto expectedMultikeyPaths =
-        makeKeySet({fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'a.e'}")},
-                   RecordId{RecordId::ReservedId::kWildcardMultikeyMetadataId});
+    auto expectedMultikeyPaths = makeKeySet(
+        {fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'a.e'}")},
+        RecordId::reservedIdFor<int64_t>(RecordId::Reservation::kWildcardMultikeyMetadataId));
 
     auto outputKeys = makeKeySet();
     auto multikeyMetadataKeys = makeKeySet();
@@ -623,9 +623,9 @@ TEST_F(WildcardKeyGeneratorExclusionTest, ExclusionProjectionSingleSubtree) {
                                     fromjson("{'': 'a.e', '': 5}"),
                                     fromjson("{'': 'l', '': 'string'}")});
 
-    auto expectedMultikeyPaths =
-        makeKeySet({fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'a.e'}")},
-                   RecordId{RecordId::ReservedId::kWildcardMultikeyMetadataId});
+    auto expectedMultikeyPaths = makeKeySet(
+        {fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'a.e'}")},
+        RecordId::reservedIdFor<int64_t>(RecordId::Reservation::kWildcardMultikeyMetadataId));
 
     auto outputKeys = makeKeySet();
     auto multikeyMetadataKeys = makeKeySet();
@@ -658,9 +658,9 @@ TEST_F(WildcardKeyGeneratorExclusionTest, ExclusionProjectionNestedSubtree) {
                                     fromjson("{'': 'g', '': {}}"),
                                     fromjson("{'': 'l', '': 'string'}")});
 
-    auto expectedMultikeyPaths =
-        makeKeySet({fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'a.e'}")},
-                   RecordId{RecordId::ReservedId::kWildcardMultikeyMetadataId});
+    auto expectedMultikeyPaths = makeKeySet(
+        {fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'a.e'}")},
+        RecordId::reservedIdFor<int64_t>(RecordId::Reservation::kWildcardMultikeyMetadataId));
 
     auto outputKeys = makeKeySet();
     auto multikeyMetadataKeys = makeKeySet();
@@ -694,9 +694,9 @@ TEST_F(WildcardKeyGeneratorExclusionTest, ExclusionProjectionMultikeySubtree) {
                                     fromjson("{'': 'g.h.k', '': 12.0}"),
                                     fromjson("{'': 'l', '': 'string'}")});
 
-    auto expectedMultikeyPaths =
-        makeKeySet({fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'a.e'}")},
-                   RecordId{RecordId::ReservedId::kWildcardMultikeyMetadataId});
+    auto expectedMultikeyPaths = makeKeySet(
+        {fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'a.e'}")},
+        RecordId::reservedIdFor<int64_t>(RecordId::Reservation::kWildcardMultikeyMetadataId));
 
     auto outputKeys = makeKeySet();
     auto multikeyMetadataKeys = makeKeySet();
@@ -731,11 +731,11 @@ TEST_F(WildcardKeyGeneratorExclusionTest, ExclusionProjectionNestedMultikeySubtr
                                     fromjson("{'': 'g.h.k', '': 12}"),
                                     fromjson("{'': 'l', '': 'string'}")});
 
-    auto expectedMultikeyPaths =
-        makeKeySet({fromjson("{'': 1, '': 'a'}"),
-                    fromjson("{'': 1, '': 'g.h.j'}"),
-                    fromjson("{'': 1, '': 'g.h.j.k'}")},
-                   RecordId{RecordId::ReservedId::kWildcardMultikeyMetadataId});
+    auto expectedMultikeyPaths = makeKeySet(
+        {fromjson("{'': 1, '': 'a'}"),
+         fromjson("{'': 1, '': 'g.h.j'}"),
+         fromjson("{'': 1, '': 'g.h.j.k'}")},
+        RecordId::reservedIdFor<int64_t>(RecordId::Reservation::kWildcardMultikeyMetadataId));
 
     auto outputKeys = makeKeySet();
     auto multikeyMetadataKeys = makeKeySet();
@@ -767,11 +767,11 @@ TEST_F(WildcardKeyGeneratorExclusionTest, ExclusionProjectionMultipleSubtrees) {
                                     fromjson("{'': 'g.h.k', '': 12.0}"),
                                     fromjson("{'': 'l', '': 'string'}")});
 
-    auto expectedMultikeyPaths =
-        makeKeySet({fromjson("{'': 1, '': 'a'}"),
-                    fromjson("{'': 1, '': 'g.h.j'}"),
-                    fromjson("{'': 1, '': 'g.h.j.k'}")},
-                   RecordId{RecordId::ReservedId::kWildcardMultikeyMetadataId});
+    auto expectedMultikeyPaths = makeKeySet(
+        {fromjson("{'': 1, '': 'a'}"),
+         fromjson("{'': 1, '': 'g.h.j'}"),
+         fromjson("{'': 1, '': 'g.h.j.k'}")},
+        RecordId::reservedIdFor<int64_t>(RecordId::Reservation::kWildcardMultikeyMetadataId));
 
     auto outputKeys = makeKeySet();
     auto multikeyMetadataKeys = makeKeySet();
@@ -801,9 +801,9 @@ TEST_F(WildcardKeyGeneratorIdTest, ExcludeIdFieldIfProjectionIsEmpty) {
                                     fromjson("{'': 'g.h.i', '': 9}"),
                                     fromjson("{'': 'g.h.k', '': 12.0}")});
 
-    auto expectedMultikeyPaths =
-        makeKeySet({fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'a.e'}")},
-                   RecordId{RecordId::ReservedId::kWildcardMultikeyMetadataId});
+    auto expectedMultikeyPaths = makeKeySet(
+        {fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'a.e'}")},
+        RecordId::reservedIdFor<int64_t>(RecordId::Reservation::kWildcardMultikeyMetadataId));
 
     auto outputKeys = makeKeySet();
     auto multikeyMetadataKeys = makeKeySet();
@@ -828,9 +828,9 @@ TEST_F(WildcardKeyGeneratorIdTest, ExcludeIdFieldForSingleSubtreeKeyPattern) {
                                     fromjson("{'': 'a.b', '': 1}"),
                                     fromjson("{'': 'a.e', '': 4}")});
 
-    auto expectedMultikeyPaths =
-        makeKeySet({fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'a.e'}")},
-                   RecordId{RecordId::ReservedId::kWildcardMultikeyMetadataId});
+    auto expectedMultikeyPaths = makeKeySet(
+        {fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'a.e'}")},
+        RecordId::reservedIdFor<int64_t>(RecordId::Reservation::kWildcardMultikeyMetadataId));
 
     auto outputKeys = makeKeySet();
     auto multikeyMetadataKeys = makeKeySet();
@@ -900,9 +900,9 @@ TEST_F(WildcardKeyGeneratorIdTest, ExcludeIdFieldByDefaultForInclusionProjection
                                     fromjson("{'': 'a.b', '': 1}"),
                                     fromjson("{'': 'a.e', '': 4}")});
 
-    auto expectedMultikeyPaths =
-        makeKeySet({fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'a.e'}")},
-                   RecordId{RecordId::ReservedId::kWildcardMultikeyMetadataId});
+    auto expectedMultikeyPaths = makeKeySet(
+        {fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'a.e'}")},
+        RecordId::reservedIdFor<int64_t>(RecordId::Reservation::kWildcardMultikeyMetadataId));
 
     auto outputKeys = makeKeySet();
     auto multikeyMetadataKeys = makeKeySet();
@@ -975,9 +975,9 @@ TEST_F(WildcardKeyGeneratorIdTest, PermitIdSubfieldExclusionInExplicitProjection
                                     fromjson("{'': 'g.h.i', '': 9}"),
                                     fromjson("{'': 'g.h.k', '': 12.0}")});
 
-    auto expectedMultikeyPaths =
-        makeKeySet({fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'a.e'}")},
-                   RecordId{RecordId::ReservedId::kWildcardMultikeyMetadataId});
+    auto expectedMultikeyPaths = makeKeySet(
+        {fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'a.e'}")},
+        RecordId::reservedIdFor<int64_t>(RecordId::Reservation::kWildcardMultikeyMetadataId));
 
     auto outputKeys = makeKeySet();
     auto multikeyMetadataKeys = makeKeySet();
@@ -1004,9 +1004,9 @@ TEST_F(WildcardKeyGeneratorIdTest, IncludeIdFieldIfExplicitlySpecifiedInProjecti
                                     fromjson("{'': 'a.b', '': 1}"),
                                     fromjson("{'': 'a.e', '': 4}")});
 
-    auto expectedMultikeyPaths =
-        makeKeySet({fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'a.e'}")},
-                   RecordId{RecordId::ReservedId::kWildcardMultikeyMetadataId});
+    auto expectedMultikeyPaths = makeKeySet(
+        {fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'a.e'}")},
+        RecordId::reservedIdFor<int64_t>(RecordId::Reservation::kWildcardMultikeyMetadataId));
 
     auto outputKeys = makeKeySet();
     auto multikeyMetadataKeys = makeKeySet();
@@ -1031,9 +1031,9 @@ TEST_F(WildcardKeyGeneratorIdTest, ExcludeIdFieldIfExplicitlySpecifiedInProjecti
                                     fromjson("{'': 'a.b', '': 1}"),
                                     fromjson("{'': 'a.e', '': 4}")});
 
-    auto expectedMultikeyPaths =
-        makeKeySet({fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'a.e'}")},
-                   RecordId{RecordId::ReservedId::kWildcardMultikeyMetadataId});
+    auto expectedMultikeyPaths = makeKeySet(
+        {fromjson("{'': 1, '': 'a'}"), fromjson("{'': 1, '': 'a.e'}")},
+        RecordId::reservedIdFor<int64_t>(RecordId::Reservation::kWildcardMultikeyMetadataId));
 
     auto outputKeys = makeKeySet();
     auto multikeyMetadataKeys = makeKeySet();
@@ -1107,12 +1107,12 @@ TEST_F(WildcardKeyGeneratorCollationTest, CollationMixedPathAndKeyTypes) {
                                     fromjson("{'': 'g.h.k', '': 12.0}"),
                                     fromjson("{'': 'l', '': 'gnirts'}")});
 
-    auto expectedMultikeyPaths =
-        makeKeySet({fromjson("{'': 1, '': 'a'}"),
-                    fromjson("{'': 1, '': 'a.e'}"),
-                    fromjson("{'': 1, '': 'g.h.j'}"),
-                    fromjson("{'': 1, '': 'g.h.j.k'}")},
-                   RecordId{RecordId::ReservedId::kWildcardMultikeyMetadataId});
+    auto expectedMultikeyPaths = makeKeySet(
+        {fromjson("{'': 1, '': 'a'}"),
+         fromjson("{'': 1, '': 'a.e'}"),
+         fromjson("{'': 1, '': 'g.h.j'}"),
+         fromjson("{'': 1, '': 'g.h.j.k'}")},
+        RecordId::reservedIdFor<int64_t>(RecordId::Reservation::kWildcardMultikeyMetadataId));
 
     auto outputKeys = makeKeySet();
     auto multikeyMetadataKeys = makeKeySet();
@@ -1140,9 +1140,9 @@ TEST_F(WildcardKeyGeneratorDottedFieldsTest, DoNotIndexDottedFields) {
                                     fromjson("{'': 'b', '': [{'a.b': 9}]}"),
                                     fromjson("{'': 'c', '': 10}")});
 
-    auto expectedMultikeyPaths =
-        makeKeySet({fromjson("{'': 1, '': 'b'}")},
-                   RecordId{RecordId::ReservedId::kWildcardMultikeyMetadataId});
+    auto expectedMultikeyPaths = makeKeySet(
+        {fromjson("{'': 1, '': 'b'}")},
+        RecordId::reservedIdFor<int64_t>(RecordId::Reservation::kWildcardMultikeyMetadataId));
 
     auto outputKeys = makeKeySet();
     auto multikeyMetadataKeys = makeKeySet();

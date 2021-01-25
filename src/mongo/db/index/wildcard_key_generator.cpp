@@ -246,7 +246,8 @@ void WildcardKeyGenerator::_addMultiKey(SharedBufferFragmentBuilder& pooledBuffe
             _keyStringVersion,
             key,
             _ordering,
-            RecordId{RecordId::ReservedId::kWildcardMultikeyMetadataId});
+            RecordId{RecordId::reservedIdFor<int64_t>(
+                RecordId::Reservation::kWildcardMultikeyMetadataId)});
         multikeyPaths->push_back(keyString.release());
     }
 }

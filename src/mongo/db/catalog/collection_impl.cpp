@@ -704,8 +704,8 @@ Status CollectionImpl::_insertDocuments(OperationContext* opCtx,
     int recordIndex = 0;
     for (auto it = begin; it != end; it++) {
         RecordId loc = records[recordIndex++].id;
-        invariant(RecordId::min() < loc);
-        invariant(loc < RecordId::max());
+        invariant(RecordId::min<int64_t>() < loc);
+        invariant(loc < RecordId::max<int64_t>());
 
         BsonRecord bsonRecord = {loc, Timestamp(it->oplogSlot.getTimestamp()), &(it->doc)};
         bsonRecords.push_back(bsonRecord);

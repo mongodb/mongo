@@ -261,7 +261,7 @@ void WiredTigerRecordStore::OplogStones::awaitHasExcessStonesOrDead() {
                             "wallTime"_attr = stone.wallTime,
                             "pinnedOplog"_attr = _rs->getPinnedOplog());
 
-                if (static_cast<std::uint64_t>(stone.lastRecord.repr()) <
+                if (static_cast<std::uint64_t>(stone.lastRecord.as<int64_t>()) <
                     _rs->getPinnedOplog().asULL()) {
                     break;
                 }
@@ -518,7 +518,7 @@ void WiredTigerRecordStore::OplogStones::_calculateStonesBySampling(OperationCon
             _calculateStonesByScanning(opCtx);
             return;
         }
-        earliestOpTime = Timestamp(record->id.repr());
+        earliestOpTime = Timestamp(record->id.as<int64_t>());
     }
 
     {
@@ -533,7 +533,7 @@ void WiredTigerRecordStore::OplogStones::_calculateStonesBySampling(OperationCon
             _calculateStonesByScanning(opCtx);
             return;
         }
-        latestOpTime = Timestamp(record->id.repr());
+        latestOpTime = Timestamp(record->id.as<int64_t>());
     }
 
     LOGV2(22389,
@@ -1410,7 +1410,8 @@ void WiredTigerRecordStore::reclaimOplog(OperationContext* opCtx, Timestamp mayT
     while (auto stone = _oplogStones->peekOldestStoneIfNeeded()) {
         invariant(stone->lastRecord.isValid());
 
-        if (static_cast<std::uint64_t>(stone->lastRecord.repr()) >= mayTruncateUpTo.asULL()) {
+        if (static_cast<std::uint64_t>(stone->lastRecord.as<int64_t>()) >=
+            mayTruncateUpTo.asULL()) {
             // Do not truncate oplogs needed for replication recovery.
             return;
         }
@@ -1460,12 +1461,12 @@ void WiredTigerRecordStore::reclaimOplog(OperationContext* opCtx, Timestamp mayT
             }
             invariantWTOK(ret);
             RecordId nextRecord = getKey(cursor);
-            if (static_cast<std::uint64_t>(nextRecord.repr()) > mayTruncateUpTo.asULL()) {
+            if (static_cast<std::uint64_t>(nextRecord.as<int64_t>()) > mayTruncateUpTo.asULL()) {
                 LOGV2_DEBUG(5140901,
                             0,
                             "Cannot truncate as there are no oplog entries after the stone but "
                             "before the truncate-up-to point",
-                            "nextRecord"_attr = Timestamp(nextRecord.repr()),
+                            "nextRecord"_attr = Timestamp(nextRecord.as<int64_t>()),
                             "mayTruncateUpTo"_attr = mayTruncateUpTo);
                 return;
             }
@@ -1560,7 +1561,7 @@ Status WiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
             // flush. Because these are direct writes into the oplog, the machinery to trigger a
             // journal flush is bypassed. A followup oplog read will require a fresh visibility
             // value to make progress.
-            ts = Timestamp(record.id.repr());
+            ts = Timestamp(record.id.as<int64_t>());
             opCtx->recoveryUnit()->setOrderedCommit(false);
         } else {
             ts = timestamps[i];
@@ -1598,10 +1599,10 @@ Status WiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
 }
 
 bool WiredTigerRecordStore::isOpHidden_forTest(const RecordId& id) const {
-    invariant(id.repr() > 0);
+    invariant(id.as<int64_t>() > 0);
     invariant(_kvEngine->getOplogManager()->isRunning());
     return _kvEngine->getOplogManager()->getOplogReadTimestamp() <
-        static_cast<std::uint64_t>(id.repr());
+        static_cast<std::uint64_t>(id.as<int64_t>());
 }
 
 bool WiredTigerRecordStore::haveCappedWaiters() {
@@ -1637,7 +1638,7 @@ StatusWith<Timestamp> WiredTigerRecordStore::getLatestOplogTimestamp(
 
     RecordId recordId = getKey(cursor);
 
-    return {Timestamp(static_cast<unsigned long long>(recordId.repr()))};
+    return {Timestamp(static_cast<unsigned long long>(recordId.as<int64_t>()))};
 }
 
 StatusWith<Timestamp> WiredTigerRecordStore::getEarliestOplogTimestamp(OperationContext* opCtx) {
@@ -1664,7 +1665,7 @@ StatusWith<Timestamp> WiredTigerRecordStore::getEarliestOplogTimestamp(Operation
         _cappedFirstRecord = getKey(cursor);
     }
 
-    return {Timestamp(static_cast<unsigned long long>(_cappedFirstRecord.repr()))};
+    return {Timestamp(static_cast<unsigned long long>(_cappedFirstRecord.as<int64_t>()))};
 }
 
 Status WiredTigerRecordStore::updateRecord(OperationContext* opCtx,
@@ -1966,7 +1967,7 @@ boost::optional<RecordId> WiredTigerRecordStore::oplogStartHack(
 
     RecordId searchFor = startingPosition;
     auto visibilityTs = wtRu->getOplogVisibilityTs();
-    if (visibilityTs && searchFor.repr() > *visibilityTs) {
+    if (visibilityTs && searchFor.as<int64_t>() > *visibilityTs) {
         searchFor = RecordId(*visibilityTs);
     }
 
@@ -2016,13 +2017,13 @@ void WiredTigerRecordStore::_initNextIdIfNeeded(OperationContext* opCtx) {
         return;
     }
 
-    // Need to start at 1 so we are always higher than RecordId::min()
+    // Need to start at 1 so we are always higher than RecordId::min<int64_t>()
     int64_t nextId = 1;
 
     // Find the largest RecordId currently in use.
     std::unique_ptr<SeekableRecordCursor> cursor = getCursor(opCtx, /*forward=*/false);
     if (auto record = cursor->next()) {
-        nextId = record->id.repr() + 1;
+        nextId = record->id.as<int64_t>() + 1;
     }
 
     _nextIdNum.store(nextId);
@@ -2191,7 +2192,7 @@ void WiredTigerRecordStore::cappedTruncateAfter(OperationContext* opCtx,
     if (_isOplog) {
         // Immediately rewind visibility to our truncation point, to prevent new
         // transactions from appearing.
-        Timestamp truncTs(lastKeptId.repr());
+        Timestamp truncTs(lastKeptId.as<int64_t>());
 
         if (!serverGlobalParams.enableMajorityReadConcern &&
             _kvEngine->getOldestTimestamp() > truncTs) {
@@ -2284,7 +2285,7 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::next() {
         id = getKey(c);
     }
 
-    if (_forward && _oplogVisibleTs && id.repr() > *_oplogVisibleTs) {
+    if (_forward && _oplogVisibleTs && id.as<int64_t>() > *_oplogVisibleTs) {
         _eof = true;
         return {};
     }
@@ -2317,7 +2318,7 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::next() {
 
 boost::optional<Record> WiredTigerRecordStoreCursorBase::seekExact(const RecordId& id) {
     invariant(_hasRestored);
-    if (_forward && _oplogVisibleTs && id.repr() > *_oplogVisibleTs) {
+    if (_forward && _oplogVisibleTs && id.as<int64_t>() > *_oplogVisibleTs) {
         _eof = true;
         return {};
     }
@@ -2453,7 +2454,7 @@ RecordId StandardWiredTigerRecordStore::getKey(WT_CURSOR* cursor) const {
 }
 
 void StandardWiredTigerRecordStore::setKey(WT_CURSOR* cursor, RecordId id) const {
-    cursor->set_key(cursor, id.repr());
+    cursor->set_key(cursor, id.as<int64_t>());
 }
 
 std::unique_ptr<SeekableRecordCursor> StandardWiredTigerRecordStore::getCursor(
@@ -2481,7 +2482,7 @@ WiredTigerRecordStoreStandardCursor::WiredTigerRecordStoreStandardCursor(
     : WiredTigerRecordStoreCursorBase(opCtx, rs, forward) {}
 
 void WiredTigerRecordStoreStandardCursor::setKey(WT_CURSOR* cursor, RecordId id) const {
-    cursor->set_key(cursor, id.repr());
+    cursor->set_key(cursor, id.as<int64_t>());
 }
 
 RecordId WiredTigerRecordStoreStandardCursor::getKey(WT_CURSOR* cursor) const {

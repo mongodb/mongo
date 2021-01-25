@@ -2807,7 +2807,7 @@ Value ExpressionMeta::evaluate(const Document& root, Variables* variables) const
             static_assert(RecordId::kMinRepr >= std::numeric_limits<long long>::min());
             static_assert(RecordId::kMaxRepr <= std::numeric_limits<long long>::max());
             return metadata.hasRecordId()
-                ? Value{static_cast<long long>(metadata.getRecordId().repr())}
+                ? Value{static_cast<long long>(metadata.getRecordId().as<int64_t>())}
                 : Value();
         case MetaType::kIndexKey:
             return metadata.hasIndexKey() ? Value(metadata.getIndexKey()) : Value();

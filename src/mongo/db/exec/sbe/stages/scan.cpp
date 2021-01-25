@@ -230,7 +230,7 @@ PlanState ScanStage::getNext() {
 
     if (_recordIdAccessor) {
         _recordIdAccessor->reset(value::TypeTags::RecordId,
-                                 value::bitcastFrom<int64_t>(nextRecord->id.repr()));
+                                 value::bitcastFrom<int64_t>(nextRecord->id.as<int64_t>()));
     }
 
     if (!_fieldAccessors.empty()) {
@@ -553,7 +553,7 @@ PlanState ParallelScanStage::getNext() {
 
     if (_recordIdAccessor) {
         _recordIdAccessor->reset(value::TypeTags::RecordId,
-                                 value::bitcastFrom<int64_t>(nextRecord->id.repr()));
+                                 value::bitcastFrom<int64_t>(nextRecord->id.as<int64_t>()));
     }
 
 

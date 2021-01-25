@@ -913,7 +913,7 @@ BSONObj MultiIndexBlock::_constructStateObject(OperationContext* opCtx,
     // We can be interrupted by shutdown before inserting the first document from the collection
     // scan, in which case there is no _lastRecordIdInserted.
     if (_phase == IndexBuildPhaseEnum::kCollectionScan && _lastRecordIdInserted)
-        builder.append("collectionScanPosition", _lastRecordIdInserted->repr());
+        builder.append("collectionScanPosition", _lastRecordIdInserted->as<int64_t>());
 
     BSONArrayBuilder indexesArray(builder.subarrayStart("indexes"));
     for (const auto& index : _indexes) {

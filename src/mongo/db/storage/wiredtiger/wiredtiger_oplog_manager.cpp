@@ -63,7 +63,7 @@ void WiredTigerOplogManager::startVisibilityThread(OperationContext* opCtx,
         // event of a secondary crashing, replication recovery will truncate the oplog, resetting
         // visibility to the truncate point. In the event of a primary crashing, it will perform
         // rollback before servicing oplog reads.
-        auto topOfOplogTimestamp = Timestamp(lastRecord->id.repr());
+        auto topOfOplogTimestamp = Timestamp(lastRecord->id.as<int64_t>());
         setOplogReadTimestamp(topOfOplogTimestamp);
         LOGV2_DEBUG(22368,
                     1,
@@ -174,7 +174,7 @@ void WiredTigerOplogManager::waitForAllEarlierOplogWritesToBeVisible(
             LOGV2_DEBUG(22371,
                         2,
                         "Operation is waiting for an entry to become visible in the oplog.",
-                        "awaitedOplogEntryTimestamp"_attr = Timestamp(waitingFor.repr()),
+                        "awaitedOplogEntryTimestamp"_attr = Timestamp(waitingFor.as<int64_t>()),
                         "currentLatestVisibleOplogEntryTimestamp"_attr =
                             Timestamp(currentLatestVisibleTimestamp));
         }

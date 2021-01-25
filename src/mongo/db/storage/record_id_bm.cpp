@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2020-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,32 +27,43 @@
  *    it in the license file.
  */
 
-#include "mongo/db/catalog/validate_results.h"
+#include "mongo/platform/basic.h"
+
+#include "mongo/db/record_id.h"
+
+#include <benchmark/benchmark.h>
 
 namespace mongo {
+namespace {
 
-void ValidateResults::appendToResultObj(BSONObjBuilder* resultObj, bool debugging) const {
-    resultObj->appendBool("valid", valid);
-    resultObj->appendBool("repaired", repaired);
-    if (readTimestamp) {
-        resultObj->append("readTimestamp", readTimestamp.get());
-    }
-    resultObj->append("warnings", warnings);
-    resultObj->append("errors", errors);
-    resultObj->append("extraIndexEntries", extraIndexEntries);
-    resultObj->append("missingIndexEntries", missingIndexEntries);
+RecordId incInt(RecordId r) {
+    return RecordId(r.as<int64_t>() + 1);
+}
 
-    // Need to convert RecordId to int64_t to append to BSONObjBuilder
-    BSONArrayBuilder builder;
-    for (RecordId corruptRecord : corruptRecords) {
-        builder.append(corruptRecord.as<int64_t>());
-    }
-    resultObj->append("corruptRecords", builder.arr());
+RecordId incOID(RecordId r) {
+    OID o = r.as<OID>();
+    o.setTimestamp(o.getTimestamp() + 1);
+    return RecordId(o);
+}
 
-    if (repaired || debugging) {
-        resultObj->appendNumber("numRemovedCorruptRecords", numRemovedCorruptRecords);
-        resultObj->appendNumber("numRemovedExtraIndexEntries", numRemovedExtraIndexEntries);
-        resultObj->appendNumber("numInsertedMissingIndexEntries", numInsertedMissingIndexEntries);
+void BM_RecordIdCopyLong(benchmark::State& state) {
+    RecordId rid(1 << 31);
+    for (auto _ : state) {
+        benchmark::ClobberMemory();
+        benchmark::DoNotOptimize(rid = incInt(rid));
     }
 }
+
+void BM_RecordIdCopyOID(benchmark::State& state) {
+    RecordId rid(OID::gen());
+    for (auto _ : state) {
+        benchmark::ClobberMemory();
+        benchmark::DoNotOptimize(rid = incOID(rid));
+    }
+}
+
+BENCHMARK(BM_RecordIdCopyLong);
+BENCHMARK(BM_RecordIdCopyOID);
+
+}  // namespace
 }  // namespace mongo

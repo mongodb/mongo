@@ -144,7 +144,7 @@ public:
 
     virtual Timestamp getAllDurableTimestamp() const override {
         RecordId id = _visibilityManager->getAllCommittedRecord();
-        return Timestamp(id.repr());
+        return Timestamp(id.as<int64_t>());
     }
 
     boost::optional<Timestamp> getOplogNeededForCrashRecovery() const final {

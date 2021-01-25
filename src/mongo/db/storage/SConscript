@@ -413,6 +413,16 @@ env.Benchmark(
     ],
 )
 
+env.Benchmark(
+    target='storage_record_id_bm',
+    source=[
+        'record_id_bm.cpp'
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
+)
+
 env.Library(
     target='remove_saver',
     source=[

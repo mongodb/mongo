@@ -42,8 +42,9 @@ namespace mongo {
  */
 static FieldRef extractMultikeyPathFromIndexKey(const IndexKeyEntry& entry) {
     invariant(entry.loc.isReserved());
-    invariant(entry.loc.repr() ==
-              static_cast<int64_t>(RecordId::ReservedId::kWildcardMultikeyMetadataId));
+    invariant(entry.loc.as<int64_t>() ==
+              RecordId::reservedIdFor<int64_t>(RecordId::Reservation::kWildcardMultikeyMetadataId)
+                  .as<int64_t>());
 
     // Validate that the first piece of the key is the integer 1.
     BSONObjIterator iter(entry.key);

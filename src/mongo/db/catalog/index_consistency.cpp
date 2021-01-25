@@ -493,10 +493,10 @@ BSONObj IndexConsistency::_generateInfo(const std::string& indexName,
 
     if (!idKey.isEmpty()) {
         invariant(idKey.nFields() == 1);
-        return BSON("indexName" << indexName << "recordId" << recordId.repr() << "idKey" << idKey
-                                << "indexKey" << rehydratedKey);
+        return BSON("indexName" << indexName << "recordId" << recordId.as<int64_t>() << "idKey"
+                                << idKey << "indexKey" << rehydratedKey);
     } else {
-        return BSON("indexName" << indexName << "recordId" << recordId.repr() << "indexKey"
+        return BSON("indexName" << indexName << "recordId" << recordId.as<int64_t>() << "indexKey"
                                 << rehydratedKey);
     }
 }

@@ -300,7 +300,7 @@ void ValidateAdaptor::traverseIndex(OperationContext* opCtx,
         }
 
         const RecordId kWildcardMultikeyMetadataRecordId{
-            RecordId::ReservedId::kWildcardMultikeyMetadataId};
+            RecordId::reservedIdFor<int64_t>(RecordId::Reservation::kWildcardMultikeyMetadataId)};
         if (descriptor->getIndexType() == IndexType::INDEX_WILDCARD &&
             indexEntry->loc == kWildcardMultikeyMetadataRecordId) {
             _indexConsistency->removeMultikeyMetadataPath(indexEntry->keyString, &indexInfo);

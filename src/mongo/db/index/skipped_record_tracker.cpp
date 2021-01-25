@@ -67,7 +67,7 @@ void SkippedRecordTracker::finalizeTemporaryTable(OperationContext* opCtx,
 }
 
 void SkippedRecordTracker::record(OperationContext* opCtx, const RecordId& recordId) {
-    auto toInsert = BSON(kRecordIdField << recordId.repr());
+    auto toInsert = BSON(kRecordIdField << recordId.as<int64_t>());
 
     // Lazily initialize table when we record the first document.
     if (!_skippedRecordsTable) {

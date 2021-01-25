@@ -54,7 +54,7 @@ boost::optional<Record> SeekableRecordThrottleCursor::seekExact(OperationContext
                                                                 const RecordId& id) {
     boost::optional<Record> record = _cursor->seekExact(id);
     if (record) {
-        const int64_t dataSize = record->data.size() + sizeof(record->id.repr());
+        const int64_t dataSize = record->data.size() + sizeof(record->id);
         _dataThrottle->awaitIfNeeded(opCtx, dataSize);
     }
 
@@ -64,7 +64,7 @@ boost::optional<Record> SeekableRecordThrottleCursor::seekExact(OperationContext
 boost::optional<Record> SeekableRecordThrottleCursor::next(OperationContext* opCtx) {
     boost::optional<Record> record = _cursor->next();
     if (record) {
-        const int64_t dataSize = record->data.size() + sizeof(record->id.repr());
+        const int64_t dataSize = record->data.size() + sizeof(record->id);
         _dataThrottle->awaitIfNeeded(opCtx, dataSize);
     }
 
@@ -82,7 +82,7 @@ boost::optional<IndexKeyEntry> SortedDataInterfaceThrottleCursor::seek(
     OperationContext* opCtx, const KeyString::Value& key) {
     boost::optional<IndexKeyEntry> entry = _cursor->seek(key);
     if (entry) {
-        const int64_t dataSize = entry->key.objsize() + sizeof(entry->loc.repr());
+        const int64_t dataSize = entry->key.objsize() + sizeof(entry->loc);
         _dataThrottle->awaitIfNeeded(opCtx, dataSize);
     }
 
@@ -93,7 +93,7 @@ boost::optional<KeyStringEntry> SortedDataInterfaceThrottleCursor::seekForKeyStr
     OperationContext* opCtx, const KeyString::Value& key) {
     boost::optional<KeyStringEntry> entry = _cursor->seekForKeyString(key);
     if (entry) {
-        const int64_t dataSize = entry->keyString.getSize() + sizeof(entry->loc.repr());
+        const int64_t dataSize = entry->keyString.getSize() + sizeof(entry->loc);
         _dataThrottle->awaitIfNeeded(opCtx, dataSize);
     }
 
@@ -103,7 +103,7 @@ boost::optional<KeyStringEntry> SortedDataInterfaceThrottleCursor::seekForKeyStr
 boost::optional<IndexKeyEntry> SortedDataInterfaceThrottleCursor::next(OperationContext* opCtx) {
     boost::optional<IndexKeyEntry> entry = _cursor->next();
     if (entry) {
-        const int64_t dataSize = entry->key.objsize() + sizeof(entry->loc.repr());
+        const int64_t dataSize = entry->key.objsize() + sizeof(entry->loc);
         _dataThrottle->awaitIfNeeded(opCtx, dataSize);
     }
 
@@ -114,7 +114,7 @@ boost::optional<KeyStringEntry> SortedDataInterfaceThrottleCursor::nextKeyString
     OperationContext* opCtx) {
     boost::optional<KeyStringEntry> entry = _cursor->nextKeyString();
     if (entry) {
-        const int64_t dataSize = entry->keyString.getSize() + sizeof(entry->loc.repr());
+        const int64_t dataSize = entry->keyString.getSize() + sizeof(entry->loc);
         _dataThrottle->awaitIfNeeded(opCtx, dataSize);
     }
 

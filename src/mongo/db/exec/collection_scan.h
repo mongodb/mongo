@@ -77,7 +77,7 @@ public:
     BSONObj getPostBatchResumeToken() const {
         // Return a resume token compatible with resumable initial sync.
         if (_params.requestResumeToken) {
-            return BSON("$recordId" << _lastSeenId.repr());
+            return BSON("$recordId" << _lastSeenId.as<int64_t>());
         }
         // Return a resume token compatible with resharding oplog sync.
         if (_params.shouldTrackLatestOplogTimestamp) {

@@ -189,8 +189,9 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateOptimizedOplo
                     sbe::makeS<sbe::CoScanStage>(csn->nodeId()), 1, boost::none, csn->nodeId()),
                 csn->nodeId(),
                 *seekRecordIdSlot,
-                sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::RecordId,
-                                           sbe::value::bitcastFrom<int64_t>(seekRecordId->repr()))),
+                sbe::makeE<sbe::EConstant>(
+                    sbe::value::TypeTags::RecordId,
+                    sbe::value::bitcastFrom<int64_t>(seekRecordId->as<int64_t>()))),
             std::move(stage),
             sbe::makeSV(),
             sbe::makeSV(*seekRecordIdSlot),
@@ -366,7 +367,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateGenericCollSc
             seekSlot,
             sbe::makeE<sbe::EConstant>(
                 sbe::value::TypeTags::RecordId,
-                sbe::value::bitcastFrom<int64_t>(csn->resumeAfterRecordId->repr())));
+                sbe::value::bitcastFrom<int64_t>(csn->resumeAfterRecordId->as<int64_t>())));
 
         // Construct a 'seek' branch of the 'union'. If we're succeeded to reposition the cursor,
         // the branch will output  the 'seekSlot' to start the real scan from, otherwise it will

@@ -567,7 +567,7 @@ TEST(KVEngineTestHarness, BasicTimestampSingle) {
 
     opCtx1.recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
                                                   kReadTimestamp);
-    ASSERT(!rs->findRecord(&opCtx1, RecordId::min(), nullptr));
+    ASSERT(!rs->findRecord(&opCtx1, RecordId::min<int64_t>(), nullptr));
 
     // Insert a record at a later time.
     RecordId rid;
