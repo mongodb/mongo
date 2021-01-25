@@ -116,6 +116,8 @@ all:
     test_file: jstests/replsets/election_handoff_not_immediately_electable.js
   - ticket: SERVER-50486
     test_file: jstests/replsets/dont_refresh_session_prepare_secondary.js
+  - ticket: SERVER-53932
+    test_file: jstests/replsets/rollback_reconstructs_transactions_prepared_before_stable.js
 
 # Tests that should only be excluded from particular suites should be listed under that suite.
 suites:
