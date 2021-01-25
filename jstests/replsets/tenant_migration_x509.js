@@ -371,12 +371,10 @@ if (!TestData.auth) {
 
     tenantMigrationTest.insertDonorDB(dbName, collName);
     const stateRes = assert.commandWorked(tenantMigrationTest.runMigration(migrationOpts));
-    // TODO (SERVER-53405): Make tenant migration recipient copy the donor's cluster time signing
-    // keys before starting to clone. Right now the recipient doesn't copy the keys so it doesn't
-    // need the findInternalClusterTimeKeysRole role.
-    assert.eq(stateRes.state, TenantMigrationTest.State.kCommitted);
+    assert.eq(stateRes.state, TenantMigrationTest.State.kAborted);
+    assert.eq(stateRes.abortReason.code, ErrorCodes.Unauthorized);
     tenantMigrationTest.verifyRecipientDB(
-        tenantId, dbName, collName, true /* migrationCommitted */);
+        tenantId, dbName, collName, false /* migrationCommitted */);
 })();
 
 tenantMigrationTest.stop();

@@ -1,5 +1,6 @@
 /**
- * Verify that after a tenant migration the donor can validate the recipient's cluster times.
+ * Verify that after a tenant migration the donor and recipient can validate each other's
+ * cluster times.
  *
  * @tags: [requires_fcv_47, requires_majority_read_concern, incompatible_with_eft]
  */
@@ -131,16 +132,14 @@ assert.commandWorked(tenantMigrationTest.runMigration(migrationOpts));
 donorAdminDB.logout();
 recipientAdminDB.logout();
 
-jsTest.log("Verify that after the migration, the donor can validate the recipient's clusterTime");
+jsTest.log("Verify that after the migration, the donor and recipient can validate each other's" +
+           "clusterTime");
 
 assert.eq(1, donorTestDB.auth(kTestUser.name, kTestUser.pwd));
 assert.eq(1, recipientTestDB.auth(kTestUser.name, kTestUser.pwd));
 
 assert.commandWorked(donorTestDB.runCommand({find: kCollName, $clusterTime: recipientClusterTime}));
-// TODO (SERVER-53405): Test that the recipient can validate the donor's clusterTime.
-assert.commandFailedWithCode(
-    recipientTestDB.runCommand({find: kCollName, $clusterTime: donorClusterTime}),
-    [ErrorCodes.TimeProofMismatch, ErrorCodes.KeyNotFound]);
+assert.commandWorked(recipientTestDB.runCommand({find: kCollName, $clusterTime: donorClusterTime}));
 
 tenantMigrationTest.stop();
 donorRst.stopSet();

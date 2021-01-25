@@ -72,7 +72,7 @@ const Seconds kRecipientSyncDataTimeout(30);
 const int kMaxRecipientKeyDocsFindAttempts = 10;
 
 std::shared_ptr<TenantMigrationAccessBlocker> getTenantMigrationAccessBlocker(
-    ServiceContext* serviceContext, StringData tenantId) {
+    ServiceContext* const serviceContext, StringData tenantId) {
     return TenantMigrationAccessBlockerRegistry::get(serviceContext)
         .getTenantMigrationAccessBlockerForTenantId(tenantId);
 }
@@ -129,7 +129,7 @@ ExecutorFuture<void> TenantMigrationDonorService::_rebuildService(
         .on(**executor, CancelationToken::uncancelable());
 }
 
-TenantMigrationDonorService::Instance::Instance(ServiceContext* serviceContext,
+TenantMigrationDonorService::Instance::Instance(ServiceContext* const serviceContext,
                                                 const BSONObj& initialState)
     : repl::PrimaryOnlyService::TypedInstance<Instance>(),
       _serviceContext(serviceContext),

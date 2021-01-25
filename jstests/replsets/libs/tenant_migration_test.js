@@ -35,6 +35,7 @@ function TenantMigrationTest(
     recipientRst.getPrimary();
     recipientRst.awaitReplication();
 
+    createFindInternalClusterTimeKeysRoleIfNotExist(donorRst);
     createFindInternalClusterTimeKeysRoleIfNotExist(recipientRst);
 
     /**
@@ -291,6 +292,7 @@ function TenantMigrationTest(
         }
 
         this.assertNoDuplicatedExternalKeyDocs(this.getDonorRst());
+        this.assertNoDuplicatedExternalKeyDocs(this.getRecipientRst());
 
         return stateRes;
     };

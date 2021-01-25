@@ -63,7 +63,7 @@ public:
         "TenantMigrationRecipientService"_sd;
     static constexpr StringData kNoopMsg = "Resume token noop"_sd;
 
-    explicit TenantMigrationRecipientService(ServiceContext* serviceContext);
+    explicit TenantMigrationRecipientService(ServiceContext* const serviceContext);
     ~TenantMigrationRecipientService() = default;
 
     StringData getServiceName() const final;
@@ -77,7 +77,8 @@ public:
 
     class Instance final : public PrimaryOnlyService::TypedInstance<Instance> {
     public:
-        explicit Instance(const TenantMigrationRecipientService* recipientService,
+        explicit Instance(ServiceContext* const serviceContext,
+                          const TenantMigrationRecipientService* recipientService,
                           BSONObj stateDoc);
 
         SemiFuture<void> run(std::shared_ptr<executor::ScopedTaskExecutor> executor,
@@ -285,7 +286,7 @@ public:
          * Persists the instance state doc and waits for it to be majority replicated.
          * Throws on shutdown / notPrimary errors.
          */
-        SemiFuture<void> _markStateDocumentAsGarbageCollectable();
+        SemiFuture<void> _markStateDocAsGarbageCollectable();
 
         /**
          * Creates a client, connects it to the donor, and authenticates it if authParams is
@@ -302,6 +303,12 @@ public:
          * operations.
          */
         SemiFuture<ConnectionPair> _createAndConnectClients();
+
+        /**
+         * Fetches all key documents from the donor's admin.system.keys collection, stores them in
+         * admin.system.external_validation_keys, and refreshes the keys cache.
+         */
+        ExecutorFuture<void> _fetchAndStoreDonorClusterTimeKeyDocs(const CancelationToken& token);
 
         /**
          * Retrieves the start optimes from the donor and updates the in-memory state accordingly.
@@ -398,6 +405,7 @@ public:
         // (M)  Reads and writes guarded by _mutex.
         // (W)  Synchronization required only for writes.
 
+        ServiceContext* const _serviceContext;
         const TenantMigrationRecipientService* const _recipientService;  // (R) (not owned)
         std::shared_ptr<executor::ScopedTaskExecutor> _scopedExecutor;   // (M)
         TenantMigrationRecipientDocument _stateDoc;                      // (M)
@@ -407,6 +415,7 @@ public:
         const std::string _tenantId;                  // (R)
         const UUID _migrationUuid;                    // (R)
         const std::string _donorConnectionString;     // (R)
+        const MongoURI _donorUri;                     // (R)
         const ReadPreferenceSetting _readPreference;  // (R)
 
         std::shared_ptr<ReplicaSetMonitor> _donorReplicaSetMonitor;  // (M)
@@ -455,6 +464,8 @@ public:
     };
 
 private:
+    ServiceContext* const _serviceContext;
+
     /*
      * Ensures that only one Instance is able to insert the initial state doc provided by the user,
      * into NamespaceString::kTenantMigrationRecipientsNamespace collection at a time.

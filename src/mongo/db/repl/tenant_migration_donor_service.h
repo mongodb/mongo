@@ -44,10 +44,8 @@ class TenantMigrationDonorService final : public repl::PrimaryOnlyService {
 public:
     static constexpr StringData kServiceName = "TenantMigrationDonorService"_sd;
 
-    explicit TenantMigrationDonorService(ServiceContext* serviceContext)
-        : PrimaryOnlyService(serviceContext) {
-        _serviceContext = serviceContext;
-    }
+    explicit TenantMigrationDonorService(ServiceContext* const serviceContext)
+        : PrimaryOnlyService(serviceContext), _serviceContext(serviceContext) {}
     ~TenantMigrationDonorService() = default;
 
     StringData getServiceName() const override {
@@ -77,7 +75,7 @@ public:
             boost::optional<Status> abortReason;
         };
 
-        explicit Instance(ServiceContext* serviceContext, const BSONObj& initialState);
+        explicit Instance(ServiceContext* const serviceContext, const BSONObj& initialState);
 
         ~Instance();
 
@@ -210,7 +208,7 @@ public:
             std::shared_ptr<executor::ScopedTaskExecutor> executor,
             std::shared_ptr<RemoteCommandTargeter> recipientTargeterRS);
 
-        ServiceContext* _serviceContext;
+        ServiceContext* const _serviceContext;
 
         TenantMigrationDonorDocument _stateDoc;
         const std::string _instanceName;
@@ -261,6 +259,6 @@ private:
     ExecutorFuture<void> _rebuildService(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                          const CancelationToken& token) override;
 
-    ServiceContext* _serviceContext;
+    ServiceContext* const _serviceContext;
 };
 }  // namespace mongo

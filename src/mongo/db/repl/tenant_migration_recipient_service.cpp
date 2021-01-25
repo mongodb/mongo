@@ -154,8 +154,9 @@ public:
 
 
 }  // namespace
-TenantMigrationRecipientService::TenantMigrationRecipientService(ServiceContext* serviceContext)
-    : PrimaryOnlyService(serviceContext) {}
+TenantMigrationRecipientService::TenantMigrationRecipientService(
+    ServiceContext* const serviceContext)
+    : PrimaryOnlyService(serviceContext), _serviceContext(serviceContext) {}
 
 StringData TenantMigrationRecipientService::getServiceName() const {
     return kTenantMigrationRecipientServiceName;
@@ -173,18 +174,23 @@ ThreadPool::Limits TenantMigrationRecipientService::getThreadPoolLimits() const 
 
 std::shared_ptr<PrimaryOnlyService::Instance> TenantMigrationRecipientService::constructInstance(
     BSONObj initialStateDoc) const {
-    return std::make_shared<TenantMigrationRecipientService::Instance>(this, initialStateDoc);
+    return std::make_shared<TenantMigrationRecipientService::Instance>(
+        _serviceContext, this, initialStateDoc);
 }
 
 TenantMigrationRecipientService::Instance::Instance(
-    const TenantMigrationRecipientService* recipientService, BSONObj stateDoc)
+    ServiceContext* const serviceContext,
+    const TenantMigrationRecipientService* recipientService,
+    BSONObj stateDoc)
     : PrimaryOnlyService::TypedInstance<Instance>(),
+      _serviceContext(serviceContext),
       _recipientService(recipientService),
       _stateDoc(TenantMigrationRecipientDocument::parse(IDLParserErrorContext("recipientStateDoc"),
                                                         stateDoc)),
       _tenantId(_stateDoc.getTenantId().toString()),
       _migrationUuid(_stateDoc.getId()),
       _donorConnectionString(_stateDoc.getDonorConnectionString().toString()),
+      _donorUri(uassertStatusOK(MongoURI::parse(_stateDoc.getDonorConnectionString().toString()))),
       _readPreference(_stateDoc.getReadPreference()) {}
 
 boost::optional<BSONObj> TenantMigrationRecipientService::Instance::reportForCurrentOp(
@@ -328,22 +334,10 @@ TenantMigrationRecipientService::Instance::_createAndConnectClients() {
                 "migrationId"_attr = getMigrationUUID(),
                 "connectionString"_attr = _donorConnectionString,
                 "readPreference"_attr = _readPreference);
-    auto connectionStringWithStatus = ConnectionString::parse(_donorConnectionString);
-    if (!connectionStringWithStatus.isOK()) {
-        LOGV2_ERROR(4880403,
-                    "Failed to parse connection string",
-                    "tenantId"_attr = getTenantId(),
-                    "migrationId"_attr = getMigrationUUID(),
-                    "connectionString"_attr = _donorConnectionString,
-                    "error"_attr = connectionStringWithStatus.getStatus());
-
-        return SemiFuture<ConnectionPair>::makeReady(connectionStringWithStatus.getStatus());
-    }
-    auto donorConnectionString = std::move(connectionStringWithStatus.getValue());
-    const auto& servers = donorConnectionString.getServers();
+    const auto& servers = _donorUri.getServers();
     stdx::lock_guard lk(_mutex);
     _donorReplicaSetMonitor = ReplicaSetMonitor::createIfNeeded(
-        donorConnectionString.getSetName(), std::set<HostAndPort>(servers.begin(), servers.end()));
+        _donorUri.getSetName(), std::set<HostAndPort>(servers.begin(), servers.end()));
 
     // Only ever used to cancel when the setTenantMigrationRecipientInstanceHostTimeout failpoint is
     // set.
@@ -363,8 +357,7 @@ TenantMigrationRecipientService::Instance::_createAndConnectClients() {
     return _donorReplicaSetMonitor
         ->getHostOrRefresh(_readPreference, excludedHosts, getHostCancelSource.token())
         .thenRunOn(**_scopedExecutor)
-        .then([this, self = shared_from_this(), donorConnectionString](
-                  const HostAndPort& serverAddress) {
+        .then([this, self = shared_from_this()](const HostAndPort& serverAddress) {
             // Application name is constructed such that it doesn't exceeds
             // kMaxApplicationNameByteLength (128 bytes).
             // "TenantMigration_" (16 bytes) + <tenantId> (61 bytes) + "_" (1 byte) +
@@ -378,7 +371,7 @@ TenantMigrationRecipientService::Instance::_createAndConnectClients() {
             auto recipientCertificate = _stateDoc.getRecipientCertificateForDonor();
             auto recipientSSLClusterPEMPayload = recipientCertificate.getCertificate().toString() +
                 "\n" + recipientCertificate.getPrivateKey().toString();
-            const TransientSSLParams transientSSLParams{donorConnectionString,
+            const TransientSSLParams transientSSLParams{_donorUri.connectionString(),
                                                         std::move(recipientSSLClusterPEMPayload)};
 
             auto client = _connectAndAuth(serverAddress, applicationName, &transientSSLParams);
@@ -904,8 +897,7 @@ void setPromiseOkifNotReady(WithLock lk, Promise& promise) {
 
 }  // namespace
 
-SemiFuture<void>
-TenantMigrationRecipientService::Instance::_markStateDocumentAsGarbageCollectable() {
+SemiFuture<void> TenantMigrationRecipientService::Instance::_markStateDocAsGarbageCollectable() {
     _stopOrHangOnFailPoint(&fpAfterReceivingRecipientForgetMigration);
 
     // Throws if we have failed to persist the state doc at the first place. This can only happen in
@@ -1092,6 +1084,22 @@ BSONObj TenantMigrationRecipientService::Instance::_getOplogFetcherFilter() cons
                                             << "o.applyOps.0.ns" << namespaceRegex)));
 }
 
+ExecutorFuture<void>
+TenantMigrationRecipientService::Instance::_fetchAndStoreDonorClusterTimeKeyDocs(
+    const CancelationToken& token) {
+    std::vector<ExternalKeysCollectionDocument> keyDocs;
+
+    auto cursor = _client->query(NamespaceString::kKeysCollectionNamespace, Query());
+    while (cursor->more()) {
+        const auto doc = cursor->nextSafe().getOwned();
+        keyDocs.push_back(tenant_migration_util::makeExternalClusterTimeKeyDoc(
+            _serviceContext, _donorUri.getSetName(), doc));
+    }
+
+    return tenant_migration_util::storeExternalClusterTimeKeyDocsAndRefreshCache(
+        _scopedExecutor, std::move(keyDocs), token);
+}
+
 SemiFuture<void> TenantMigrationRecipientService::Instance::run(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancelationToken& token) noexcept {
@@ -1148,6 +1156,9 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                 getGlobalServiceContext()->getFastClockSource(),
                 getMigrationUUID(),
                 _stateDoc.getStartFetchingDonorOpTime().has_value());
+        })
+        .then([this, self = shared_from_this(), token] {
+            return _fetchAndStoreDonorClusterTimeKeyDocs(token);
         })
         .then([this, self = shared_from_this()] {
             _stopOrHangOnFailPoint(&fpAfterConnectingTenantMigrationRecipientInstance);
@@ -1313,8 +1324,7 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
             // for the recipientForgetMigration command.
             return _receivedRecipientForgetMigrationPromise.getFuture();
         })
-        .then(
-            [this, self = shared_from_this()] { return _markStateDocumentAsGarbageCollectable(); })
+        .then([this, self = shared_from_this()] { return _markStateDocAsGarbageCollectable(); })
         .thenRunOn(_recipientService->getInstanceCleanupExecutor())
         .onCompletion([this, self = shared_from_this()](Status status) {
             // Schedule on the parent executor to mark the completion of the whole chain so this is
