@@ -1002,6 +1002,8 @@ struct __wt_session {
 	 * object blocks from the system buffer cache after that many bytes from this object are
 	 * read or written into the buffer cache., an integer greater than or equal to 0; default \c
 	 * 0.}
+	 * @config{readonly, the file is read-only.  All methods that may modify a file are
+	 * disabled.  See @ref readonly for more information., a boolean flag; default \c false.}
 	 * @config{verbose, enable messages for various events.  Options are given as a list\, such
 	 * as <code>"verbose=[write_timestamp]"</code>., a list\, with values chosen from the
 	 * following options: \c "write_timestamp"; default \c [].}
@@ -1050,10 +1052,12 @@ struct __wt_session {
 	 * an integer between 512B and 128MB; default \c 4KB.}
 	 * @config{app_metadata, application-owned metadata for this object., a string; default
 	 * empty.}
-	 * @config{block_allocation, configure block allocation.  Permitted values are \c "first" or
-	 * \c "best"; the \c "first" configuration uses a first-available algorithm during block
-	 * allocation\, the \c "best" configuration uses a best-fit algorithm., a string\, chosen
-	 * from the following options: \c "first"\, \c "best"; default \c best.}
+	 * @config{block_allocation, configure block allocation.  Permitted values are \c "best" or
+	 * \c "first"; the \c "best" configuration uses a best-fit algorithm\, the \c "first"
+	 * configuration uses a first-available algorithm during block allocation\, the \c
+	 * "log-structure" configuration allocates a new file for each checkpoint., a string\,
+	 * chosen from the following options: \c "best"\, \c "first"\, \c "log-structured"; default
+	 * \c best.}
 	 * @config{block_compressor, configure a compressor for file blocks.  Permitted values are
 	 * \c "none" or custom compression engine name created with WT_CONNECTION::add_compressor.
 	 * If WiredTiger has builtin support for \c "lz4"\, \c "snappy"\, \c "zlib" or \c "zstd"
@@ -1104,6 +1108,8 @@ struct __wt_session {
 	 * \c none.}
 	 * @config{format, the file format., a string\, chosen from the following options: \c
 	 * "btree"; default \c btree.}
+	 * @config{huffman_key, This option is no longer supported.  Retained for backward
+	 * compatibility.  See @ref huffman for more information., a string; default \c none.}
 	 * @config{huffman_value, configure Huffman encoding for values.  Permitted values are \c
 	 * "none"\, \c "english"\, \c "utf8<file>" or \c "utf16<file>". See @ref huffman for more
 	 * information., a string; default \c none.}
@@ -1230,10 +1236,21 @@ struct __wt_session {
 	 * boolean flag; default \c false.}
 	 * @config{prefix_compression_min, minimum gain before prefix compression will be used on
 	 * row-store leaf pages., an integer greater than or equal to 0; default \c 4.}
+	 * @config{readonly, the file is read-only.  All methods that may modify a file are
+	 * disabled.  See @ref readonly for more information., a boolean flag; default \c false.}
 	 * @config{split_pct, the Btree page split size as a percentage of the maximum Btree page
 	 * size\, that is\, when a Btree page is split\, it will be split into smaller pages\, where
 	 * each page is the specified percentage of the maximum Btree page size., an integer between
 	 * 50 and 100; default \c 90.}
+	 * @config{tiered = (, options only relevant for tiered data sources., a set of related
+	 * configuration options defined below.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;chunk_size, the
+	 * maximum size of the hot chunk of tiered tree.  This limit is soft - it is possible for
+	 * chunks to be temporarily larger than this value., an integer greater than or equal to 1M;
+	 * default \c 1GB.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;tiers, list of data sources to combine
+	 * into a tiered storage structure., a list of strings; default empty.}
+	 * @config{ ),,}
 	 * @config{type, set the type of data source used to store a column group\, index or simple
 	 * table.  By default\, a \c "file:" URI is derived from the object name.  The \c type
 	 * configuration can be used to switch to a different data source\, such as LSM or an

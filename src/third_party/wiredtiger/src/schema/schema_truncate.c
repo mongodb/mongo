@@ -83,6 +83,8 @@ __wt_schema_truncate(WT_SESSION_IMPL *session, const char *uri, const char *cfg[
         ret = __wt_lsm_tree_truncate(session, uri, cfg);
     else if (WT_PREFIX_SKIP(tablename, "table:"))
         ret = __truncate_table(session, tablename, cfg);
+    else if (WT_PREFIX_MATCH(uri, "tiered:"))
+        ret = __wt_tiered_truncate(session, uri, cfg);
     else if ((dsrc = __wt_schema_get_source(session, uri)) != NULL)
         ret = dsrc->truncate == NULL ?
           __truncate_dsrc(session, uri) :

@@ -377,6 +377,7 @@ int
 __wt_debug_offset(
   WT_SESSION_IMPL *session, wt_off_t offset, uint32_t size, uint32_t checksum, const char *ofile)
 {
+    WT_BLOCK *block;
     WT_DECL_ITEM(buf);
     WT_DECL_RET;
     uint8_t addr[WT_BTREE_MAX_ADDR_COOKIE], *endp;
@@ -390,8 +391,9 @@ __wt_debug_offset(
      *
      * Convert the triplet into an address structure.
      */
+    block = S2BT(session)->bm->block;
     endp = addr;
-    WT_RET(__wt_block_addr_to_buffer(S2BT(session)->bm->block, &endp, offset, size, checksum));
+    WT_RET(__wt_block_addr_to_buffer(block, &endp, block->logid, offset, size, checksum));
 
     /*
      * Read the address through the btree I/O functions (so the block is decompressed as necessary).

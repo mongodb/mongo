@@ -26,17 +26,16 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import wiredtiger, wttest
+import wiredtiger
 import os, shutil
-from helper import compare_files
-from suite_subprocess import suite_subprocess
+from wtbackup import backup_base
 from wtdataset import simple_key
 from wtscenario import make_scenarios
 import glob
 
 # test_backup19.py
 # Test cursor backup with a block-based incremental cursor source id only.
-class test_backup19(wttest.WiredTigerTestCase, suite_subprocess):
+class test_backup19(backup_base):
     bkp_home = "WT_BLOCK"
     counter=0
     conn_config='cache_size=1G,log=(enabled,file_max=100K)'
@@ -51,8 +50,6 @@ class test_backup19(wttest.WiredTigerTestCase, suite_subprocess):
     home_full = "WT_BLOCK_LOG_FULL"
     home_incr = "WT_BLOCK_LOG_INCR"
 
-    full_out = "./backup_block_full"
-    incr_out = "./backup_block_incr"
     logpath = "logpath"
     new_table=False
     initial_backup=False
@@ -61,22 +58,6 @@ class test_backup19(wttest.WiredTigerTestCase, suite_subprocess):
     # Set the key and value big enough that we modify a few blocks.
     bigkey = 'Key' * 100
     bigval = 'Value' * 100
-
-    #
-    # Set up all the directories needed for the test. We have a full backup directory for each
-    # iteration and an incremental backup for each iteration. That way we can compare the full and
-    # incremental each time through.
-    #
-    def setup_directories(self):
-        # We're only coming through once so just set up the 0 and 1 directories.
-        for i in range(0, 2):
-            # The log directory is a subdirectory of the home directory,
-            # creating that will make the home directory also.
-            log_dir = self.home_incr + '.' + str(i) + '/' + self.logpath
-            os.makedirs(log_dir)
-            if i != 0:
-                log_dir = self.home_full + '.' + str(i) + '/' + self.logpath
-                os.makedirs(log_dir)
 
     def range_copy(self, filename, offset, size):
         read_from = filename
@@ -219,26 +200,10 @@ class test_backup19(wttest.WiredTigerTestCase, suite_subprocess):
         self.assertEqual(ret, wiredtiger.WT_NOTFOUND)
         bkup_c.close()
 
-    def compare_backups(self, t_uri):
-        # Run wt dump on full backup directory.
-        full_backup_out = self.full_out + '.' + str(self.counter)
-        home_dir = self.home_full + '.' + str(self.counter)
-        if self.counter == 0:
-            home_dir = self.home
-        self.runWt(['-R', '-h', home_dir, 'dump', t_uri], outfilename=full_backup_out)
-
-        # Run wt dump on incremental backup directory.
-        incr_backup_out = self.incr_out + '.' + str(self.counter)
-        home_dir = self.home_incr + '.' + str(self.counter)
-        self.runWt(['-R', '-h', home_dir, 'dump', t_uri], outfilename=incr_backup_out)
-
-        self.assertEqual(True,
-            compare_files(self, full_backup_out, incr_backup_out))
-
     #
     # Add data to the given uri.
     #
-    def add_data(self, uri):
+    def add_complex_data(self, uri):
         c = self.session.open_cursor(uri, None, None)
         # The first time we want to add in a lot of data. Then after that we want to
         # rapidly change a single key to create a hotspot in one block.
@@ -270,21 +235,20 @@ class test_backup19(wttest.WiredTigerTestCase, suite_subprocess):
         self.home = self.bkp_home
         self.session.create(self.uri, "key_format=S,value_format=S")
 
-        self.setup_directories()
+        self.setup_directories(2, self.home_incr, self.home_full, self.logpath)
 
         self.pr('*** Add data, checkpoint, take backups and validate ***')
         self.pr('Adding initial data')
         self.initial_backup = True
-        self.add_data(self.uri)
+        self.add_complex_data(self.uri)
         self.take_full_backup()
         self.initial_backup = False
         self.session.checkpoint()
 
-        self.add_data(self.uri)
+        self.add_complex_data(self.uri)
         self.session.checkpoint()
         self.take_full_backup()
         self.take_incr_backup()
-        self.compare_backups(self.uri)
-
+        self.compare_backups(self.uri, self.home_full, self.home_incr, str(self.counter))
 if __name__ == '__main__':
     wttest.run()

@@ -99,10 +99,11 @@ struct __wt_config_parser_impl {
 #define WT_CONFIG_ENTRY_index_meta 45
 #define WT_CONFIG_ENTRY_lsm_meta 46
 #define WT_CONFIG_ENTRY_table_meta 47
-#define WT_CONFIG_ENTRY_wiredtiger_open 48
-#define WT_CONFIG_ENTRY_wiredtiger_open_all 49
-#define WT_CONFIG_ENTRY_wiredtiger_open_basecfg 50
-#define WT_CONFIG_ENTRY_wiredtiger_open_usercfg 51
+#define WT_CONFIG_ENTRY_tiered_meta 48
+#define WT_CONFIG_ENTRY_wiredtiger_open 49
+#define WT_CONFIG_ENTRY_wiredtiger_open_all 50
+#define WT_CONFIG_ENTRY_wiredtiger_open_basecfg 51
+#define WT_CONFIG_ENTRY_wiredtiger_open_usercfg 52
 /*
  * configuration section: END
  * DO NOT EDIT: automatically built by dist/flags.py.

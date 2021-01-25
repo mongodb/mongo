@@ -142,6 +142,8 @@ __compact_uri_analyze(WT_SESSION_IMPL *session, const char *uri, bool *skipp)
         *skipp = true;
     } else if (WT_PREFIX_MATCH(uri, "file:"))
         session->compact->file_count++;
+    if (WT_PREFIX_MATCH(uri, "tiered:"))
+        WT_RET(ENOTSUP);
 
     return (0);
 }
@@ -362,7 +364,7 @@ __wt_session_compact(WT_SESSION *wt_session, const char *uri, const char *config
 
     if (!WT_PREFIX_MATCH(uri, "colgroup:") && !WT_PREFIX_MATCH(uri, "file:") &&
       !WT_PREFIX_MATCH(uri, "index:") && !WT_PREFIX_MATCH(uri, "lsm:") &&
-      !WT_PREFIX_MATCH(uri, "table:")) {
+      !WT_PREFIX_MATCH(uri, "table:") && !WT_PREFIX_MATCH(uri, "tiered:")) {
         if ((dsrc = __wt_schema_get_source(session, uri)) != NULL)
             ret = dsrc->compact == NULL ?
               __wt_object_unsupported(session, uri) :

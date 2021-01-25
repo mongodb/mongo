@@ -484,6 +484,11 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
     /* Configure encryption. */
     WT_RET(__wt_btree_config_encryptor(session, cfg, &btree->kencryptor));
 
+    /* Configure read-only. */
+    WT_RET(__wt_config_gets(session, cfg, "readonly", &cval));
+    if (cval.val)
+        F_SET(btree, WT_BTREE_READONLY);
+
     /* Initialize locks. */
     WT_RET(__wt_rwlock_init(session, &btree->ovfl_lock));
     WT_RET(__wt_spin_init(session, &btree->flush_lock, "btree flush"));

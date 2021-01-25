@@ -29,21 +29,21 @@
 import wiredtiger, wttest
 import os, shutil
 from helper import compare_files
-from suite_subprocess import suite_subprocess
+from wtbackup import backup_base
 from wtdataset import simple_key
 from wtscenario import make_scenarios
 
 # test_backup07.py
 # Test cursor backup with target URIs, logging and create during backup
 
-class test_backup07(wttest.WiredTigerTestCase, suite_subprocess):
+class test_backup07(backup_base):
     dir='backup.dir'                    # Backup directory name
     logmax="100K"
     newuri="table:newtable"
 
     pfx = 'test_backup'
     scenarios = make_scenarios([
-        ('table', dict(uri='table:test',dsize=100,nops=100,nthreads=1)),
+        ('table', dict(uri='table:test',dsize=100,nthreads=1))
     ])
 
     # Create a large cache, otherwise this test runs quite slowly.
@@ -59,15 +59,8 @@ class test_backup07(wttest.WiredTigerTestCase, suite_subprocess):
 
         # Insert small amounts of data at a time stopping just after we
         # cross into log file 2.
-        loop = 0
-        c = self.session.open_cursor(self.uri)
         while not os.path.exists(log2):
-            for i in range(0, self.nops):
-                num = i + (loop * self.nops)
-                key = 'key' + str(num)
-                val = 'value' + str(num)
-                c[key] = val
-            loop += 1
+            self.add_data(self.uri, 'key', 'value')
 
         # Test a potential bug in full backups and creates.
         # We allow creates during backup because the file doesn't exist
@@ -82,12 +75,7 @@ class test_backup07(wttest.WiredTigerTestCase, suite_subprocess):
         # Now create and populate the new table. Make sure the log records
         # are on disk and will be copied to the backup.
         self.session.create(self.newuri, "key_format=S,value_format=S")
-        c = self.session.open_cursor(self.newuri)
-        for i in range(0, self.nops):
-            key = 'key' + str(i)
-            val = 'value' + str(i)
-            c[key] = val
-        c.close()
+        self.add_data(self.newuri, 'key', 'value')
         self.session.log_flush('sync=on')
 
         # Now copy the files returned by the backup cursor. This should not

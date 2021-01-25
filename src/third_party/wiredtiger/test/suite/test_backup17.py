@@ -29,21 +29,19 @@
 import wiredtiger, wttest
 import os, shutil
 from helper import compare_files
-from suite_subprocess import suite_subprocess
+from wtbackup import backup_base
 from wtdataset import simple_key
 from wtscenario import make_scenarios
 
 # test_backup17.py
 # Test cursor backup with a block-based incremental cursor and consolidate.
-class test_backup17(wttest.WiredTigerTestCase, suite_subprocess):
+class test_backup17(backup_base):
     dir='backup.dir'                    # Backup directory name
     gran="100K"
     granval=100*1024
     logmax="100K"
     uri="table:test"
     uri2="table:test2"
-    nops=1000
-    mult=0
 
     conn_config='cache_size=1G,log=(enabled,file_max=%s)' % logmax
 
@@ -52,15 +50,7 @@ class test_backup17(wttest.WiredTigerTestCase, suite_subprocess):
     bigkey = 'Key' * 100
     bigval = 'Value' * 100
 
-    def add_data(self, uri):
-        c = self.session.open_cursor(uri)
-        for i in range(0, self.nops):
-            num = i + (self.mult * self.nops)
-            key = self.bigkey + str(num)
-            val = self.bigval + str(num)
-            c[key] = val
-        self.session.checkpoint()
-        c.close()
+    nops = 1000
 
     def take_incr_backup(self, id, consolidate):
         # Open the backup data source for incremental backup.
@@ -121,9 +111,9 @@ class test_backup17(wttest.WiredTigerTestCase, suite_subprocess):
 
         self.session.create(self.uri, "key_format=S,value_format=S")
         self.session.create(self.uri2, "key_format=S,value_format=S")
-        self.add_data(self.uri)
-        self.add_data(self.uri2)
-        self.mult += 1
+        self.add_data(self.uri, self.bigkey, self.bigval, True)
+        self.mult = 0
+        self.add_data(self.uri2, self.bigkey, self.bigval, True)
 
         # Open up the backup cursor. This causes a new log file to be created.
         # That log file is not part of the list returned. This is a full backup
@@ -150,10 +140,14 @@ class test_backup17(wttest.WiredTigerTestCase, suite_subprocess):
         # Then perform the incremental backup with consolidate off (the default). Then add the
         # same data to the second table. Perform an incremental backup with consolidate on and
         # verify we get fewer, consolidated values.
-        self.add_data(self.uri)
+        self.mult = 1
+        self.add_data(self.uri, self.bigkey, self.bigval, True)
+
         uri1_lens = self.take_incr_backup(2, False)
 
-        self.add_data(self.uri2)
+        self.mult = 1
+        self.add_data(self.uri2, self.bigkey, self.bigval, True)
+
         uri2_lens = self.take_incr_backup(3, True)
 
         # Assert that we recorded fewer lengths on the consolidated backup.
