@@ -298,17 +298,16 @@ Status IndexCatalogEntryImpl::_setMultikeyInMultiDocumentTransaction(
             auto recoveryPrepareOpTime = txnParticipant.getPrepareOpTimeForRecovery();
             if (!recoveryPrepareOpTime.isNull()) {
                 // We might replay a prepared transaction behind the oldest timestamp during initial
-                // sync. So round up to the oldest timestamp for the multikey write if the prepare
-                // timestamp is behind the oldest timestamp.
-                auto status = opCtx->recoveryUnit()->setTimestamp(
-                    std::max(opCtx->getServiceContext()->getStorageEngine()->getOldestTimestamp(),
-                             recoveryPrepareOpTime.getTimestamp()));
-                if (status.code() == ErrorCodes::BadValue) {
-                    LOGV2(20352,
-                          "Temporarily could not timestamp the multikey catalog write, retrying",
-                          "reason"_attr = status.reason());
-                    throw WriteConflictException();
-                }
+                // sync or behind the stable timestamp during rollback. During initial sync, we
+                // may not have a stable timestamp. Therefore, we need to round up
+                // the multi-key write timestamp to the max of the three so that we don't write
+                // behind the oldest/stable timestamp. This code path is only hit during initial
+                // sync/recovery when reconstructing prepared transactions and so we don't expect
+                // the oldest/stable timestamp to advance concurrently.
+                auto status = opCtx->recoveryUnit()->setTimestamp(std::max(
+                    {recoveryPrepareOpTime.getTimestamp(),
+                     opCtx->getServiceContext()->getStorageEngine()->getOldestTimestamp(),
+                     opCtx->getServiceContext()->getStorageEngine()->getStableTimestamp()}));
                 fassert(31164, status);
             } else {
                 // If there is no recovery prepare OpTime, then this node must be a primary. We

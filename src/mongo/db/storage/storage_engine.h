@@ -488,6 +488,11 @@ public:
     virtual void setStableTimestamp(Timestamp stableTimestamp, bool force = false) = 0;
 
     /**
+     * Returns the stable timestamp.
+     */
+    virtual Timestamp getStableTimestamp() const = 0;
+
+    /**
      * Tells the storage engine the timestamp of the data at startup. This is necessary because
      * timestamps are not persisted in the storage layer.
      */

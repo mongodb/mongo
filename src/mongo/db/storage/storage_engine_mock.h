@@ -136,6 +136,9 @@ public:
         MONGO_UNREACHABLE;
     }
     void setStableTimestamp(Timestamp stableTimestamp, bool force = false) final {}
+    Timestamp getStableTimestamp() const final {
+        return Timestamp();
+    }
     void setInitialDataTimestamp(Timestamp timestamp) final {}
     Timestamp getInitialDataTimestamp() {
         return Timestamp();

@@ -21,11 +21,17 @@ let testDB = primary.getDB(dbName);
 let testColl = testDB.getCollection(collName);
 assert.commandWorked(testDB.runCommand({create: collName}));
 
+// Set up another collection for multi-key write in transaction.
+const anotherCollName = "anotherColl";
+const anotherColl = testDB.getCollection(anotherCollName);
+assert.commandWorked(anotherColl.createIndex({"$**": 1}));
+
 // Start a session on the primary.
 let session = primary.startSession();
 const sessionID = session.getSessionId();
 let sessionDB = session.getDatabase(dbName);
 let sessionColl = sessionDB.getCollection(collName);
+const sessionAnotherColl = sessionDB.getCollection(anotherCollName);
 
 assert.commandWorked(sessionColl.insert({_id: 0}));
 
@@ -33,6 +39,9 @@ assert.commandWorked(sessionColl.insert({_id: 0}));
 session.startTransaction();
 assert.commandWorked(sessionColl.insert({_id: 1}));
 assert.commandWorked(sessionColl.update({_id: 0}, {$set: {a: 1}}));
+// Trigger multi-key writes in the same transaction so that we can also test multi-key writes during
+// recovery of the prepared transaction.
+assert.commandWorked(sessionAnotherColl.insert({a: [1, 2, 3]}));
 const prepareTimestamp = PrepareHelpers.prepareTransaction(session);
 
 // Fastcount reflects the insert of a prepared transaction.

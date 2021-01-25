@@ -126,6 +126,8 @@ public:
 
     virtual void setStableTimestamp(Timestamp stableTimestamp, bool force = false) override;
 
+    virtual Timestamp getStableTimestamp() const override;
+
     virtual void setInitialDataTimestamp(Timestamp initialDataTimestamp) override;
 
     virtual Timestamp getInitialDataTimestamp() override;

@@ -111,6 +111,8 @@ all:
     test_file: jstests/sharding/sharding_task_executor_pool_matching_policy.js
   - ticket: SERVER-53985
     test_file: jstests/replsets/unconditional_step_down.js
+  - ticket: SERVER-53932
+    test_file: jstests/replsets/rollback_reconstructs_transactions_prepared_before_stable.js
 
 suites:
 

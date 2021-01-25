@@ -784,6 +784,10 @@ void StorageEngineImpl::setStableTimestamp(Timestamp stableTimestamp, bool force
     _engine->setStableTimestamp(stableTimestamp, force);
 }
 
+Timestamp StorageEngineImpl::getStableTimestamp() const {
+    return _engine->getStableTimestamp();
+}
+
 void StorageEngineImpl::setInitialDataTimestamp(Timestamp initialDataTimestamp) {
     _engine->setInitialDataTimestamp(initialDataTimestamp);
 }
