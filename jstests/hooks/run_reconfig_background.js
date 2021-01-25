@@ -24,6 +24,9 @@ function isIgnorableError(codeName) {
     return false;
 }
 
+/**
+ * Returns true if the error code indicates the node is currently shutting down.
+ */
 function isShutdownError(code) {
     return code === ErrorCodes.ShutdownInProgress || code === ErrorCodes.InterruptedAtShutdown;
 }
@@ -71,18 +74,7 @@ function reconfigBackground(primary, numNodes) {
     // could lead to generating an overwhelming amount of log messages.
     let conn;
     quietly(() => {
-        // It's possible that the primary we passed in gets killed by the kill primary hook.
-        // During shutdown, mongod will respond to incoming hello requests with ShutdownInProgress
-        // or InterruptedAtShutdown. This hook should ignore both cases and wait until we have a
-        // new primary in a subsequent run.
-        try {
-            conn = new Mongo(primary);
-        } catch (e) {
-            if (!isShutdownError(e.code)) {
-                throw e;
-            }
-            return {ok: 1};
-        }
+        conn = new Mongo(primary);
     });
     assert.neq(
         null, conn, "Failed to connect to primary '" + primary + "' for background reconfigs");
@@ -157,10 +149,11 @@ try {
                    return regex.test(e.message);
                })) {
         jsTestLog("Ignoring replica set monitor error" + tojson(e));
-    } else if (e.code === ErrorCodes.ShutdownInProgress) {
-        // When a node is being shutdown, it is possible to fail isMaster requests with
-        // ShutdownInProgress. If we encounter this error, ignore it and find a new
-        // primary.
+    } else if (isShutdownError(e.code)) {
+        // It's possible that the primary we passed in gets killed by the kill primary hook.
+        // During shutdown, mongod will respond to incoming hello requests with ShutdownInProgress
+        // or InterruptedAtShutdown. This hook should ignore both cases and wait until we have a
+        // new primary in a subsequent run.
         jsTestLog("Ignoring ShutdownInProgress error" + tojson(e));
     } else {
         jsTestLog(`run_reconfig_background unexpected error: ${tojson(e)}`);
