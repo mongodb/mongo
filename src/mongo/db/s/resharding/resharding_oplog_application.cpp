@@ -176,9 +176,11 @@ Status ReshardingOplogApplicationRules::applyOperation(
             wuow.commit();
 
             return Status::OK();
-        } catch (const ExceptionFor<ErrorCodes::LockTimeout>&) {
-            throw WriteConflictException();
         } catch (const DBException& ex) {
+            if (ex.code() == ErrorCodes::WriteConflict || ex.code() == ErrorCodes::LockTimeout) {
+                throw WriteConflictException();
+            }
+
             return ex.toStatus();
         }
     });
