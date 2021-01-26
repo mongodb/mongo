@@ -788,6 +788,12 @@ selector:
   # which is disabled in this test configuration.
   - jstests/core/timeseries/timeseries_expire.js
 
+  # TODO SERVER-54042 Time-series collection queries
+  - jstests/core/timeseries/timeseries_bucket_limit_count.js
+  - jstests/core/timeseries/timeseries_min_max.js
+  - jstests/core/timeseries/timeseries_simple.js
+  - jstests/core/timeseries/timeseries_sparse.js
+
 executor:
   archive:
     hooks:
