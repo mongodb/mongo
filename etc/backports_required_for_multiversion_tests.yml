@@ -118,6 +118,8 @@ all:
     test_file: jstests/replsets/dont_refresh_session_prepare_secondary.js
   - ticket: SERVER-53932
     test_file: jstests/replsets/rollback_reconstructs_transactions_prepared_before_stable.js
+  - ticket: SERVER-53431
+    test_file: jstests/replsets/stepdown_kill_other_ops.js
 
 # Tests that should only be excluded from particular suites should be listed under that suite.
 suites:
