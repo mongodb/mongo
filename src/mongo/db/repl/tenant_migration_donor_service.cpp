@@ -57,9 +57,9 @@ namespace mongo {
 
 namespace {
 
-MONGO_FAIL_POINT_DEFINE(abortTenantMigrationAfterBlockingStarts);
-MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationAfterBlockingStarts);
-MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationAfterDataSync);
+MONGO_FAIL_POINT_DEFINE(abortTenantMigrationBeforeLeavingBlockingState);
+MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationBeforeLeavingBlockingState);
+MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationBeforeLeavingDataSyncState);
 
 const std::string kTTLIndexName = "TenantMigrationDonorTTLIndex";
 const Seconds kRecipientSyncDataTimeout(30);
@@ -595,7 +595,7 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
                 .then([this, self = shared_from_this()] {
                     auto opCtxHolder = cc().makeOperationContext();
                     auto opCtx = opCtxHolder.get();
-                    pauseTenantMigrationAfterDataSync.pauseWhileSet(opCtx);
+                    pauseTenantMigrationBeforeLeavingDataSyncState.pauseWhileSet(opCtx);
                 })
                 .then([this, self = shared_from_this(), executor, token] {
                     checkIfReceivedDonorAbortMigration(token, _instanceCancelationSource.token());
@@ -663,26 +663,29 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
                     auto opCtxHolder = cc().makeOperationContext();
                     auto opCtx = opCtxHolder.get();
 
-                    pauseTenantMigrationAfterBlockingStarts.executeIf(
+                    pauseTenantMigrationBeforeLeavingBlockingState.executeIf(
                         [&](const BSONObj&) {
-                            pauseTenantMigrationAfterBlockingStarts.pauseWhileSet(opCtx);
+                            pauseTenantMigrationBeforeLeavingBlockingState.pauseWhileSet(opCtx);
                         },
                         [&](const BSONObj& data) {
                             return !data.hasField("tenantId") ||
                                 _stateDoc.getTenantId() == data["tenantId"].str();
                         });
 
-                    abortTenantMigrationAfterBlockingStarts.execute([&](const BSONObj& data) {
-                        if (data.hasField("blockTimeMS")) {
-                            const auto blockTime = Milliseconds{data.getIntField("blockTimeMS")};
-                            LOGV2(5010400,
-                                  "Keep migration in blocking state before aborting",
-                                  "blockTime"_attr = blockTime);
-                            opCtx->sleepFor(blockTime);
-                        }
+                    abortTenantMigrationBeforeLeavingBlockingState.execute(
+                        [&](const BSONObj& data) {
+                            if (data.hasField("blockTimeMS")) {
+                                const auto blockTime =
+                                    Milliseconds{data.getIntField("blockTimeMS")};
+                                LOGV2(5010400,
+                                      "Keep migration in blocking state before aborting",
+                                      "blockTime"_attr = blockTime);
+                                opCtx->sleepFor(blockTime);
+                            }
 
-                        uasserted(ErrorCodes::InternalError, "simulate a tenant migration error");
-                    });
+                            uasserted(ErrorCodes::InternalError,
+                                      "simulate a tenant migration error");
+                        });
                 })
                 .then([this, self = shared_from_this(), executor, token] {
                     checkIfReceivedDonorAbortMigration(token, _instanceCancelationSource.token());

@@ -26,11 +26,11 @@ const tenantId = "testTenantId";
 const migrationId1 = extractUUIDFromObject(UUID());
 const migrationId2 = extractUUIDFromObject(UUID());
 
-// Start a migration with the "abortTenantMigrationAfterBlockingStarts" failPoint enabled. The
-// migration will abort as a result, and a status of "kAborted" should be returned.
+// Start a migration with the "abortTenantMigrationBeforeLeavingBlockingState" failPoint enabled.
+// The migration will abort as a result, and a status of "kAborted" should be returned.
 jsTestLog("Starting a migration that is expected to abort. migrationId: " + migrationId1 +
           ", tenantId: " + tenantId);
-const abortFp = configureFailPoint(donorPrimary, "abortTenantMigrationAfterBlockingStarts");
+const abortFp = configureFailPoint(donorPrimary, "abortTenantMigrationBeforeLeavingBlockingState");
 const abortRes = assert.commandWorked(
     tenantMigrationTest.runMigration({migrationIdString: migrationId1, tenantId},
                                      false /* retryOnRetryableErrors */,

@@ -43,7 +43,8 @@ function testTimeoutBlockingState() {
     const donorRstArgs = TenantMigrationUtil.createRstArgs(donorRst);
 
     // Fail point to pause right before entering the blocking mode.
-    let afterDataSyncFp = configureFailPoint(donorPrimary, "pauseTenantMigrationAfterDataSync");
+    let afterDataSyncFp =
+        configureFailPoint(donorPrimary, "pauseTenantMigrationBeforeLeavingDataSyncState");
 
     // Run the migration in its own thread, since the initial 'donorStartMigration' command will
     // hang due to the fail point.

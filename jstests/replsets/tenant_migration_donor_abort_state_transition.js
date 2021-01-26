@@ -126,16 +126,16 @@ testAbortInitialState(donorRst);
 
 jsTest.log("Test aborting donor's state doc update");
 [{
-    pauseFailPoint: "pauseTenantMigrationAfterDataSync",
+    pauseFailPoint: "pauseTenantMigrationBeforeLeavingDataSyncState",
     nextState: TenantMigrationTest.State.kBlocking
 },
  {
-     pauseFailPoint: "pauseTenantMigrationAfterBlockingStarts",
+     pauseFailPoint: "pauseTenantMigrationBeforeLeavingBlockingState",
      nextState: TenantMigrationTest.State.kCommitted
  },
  {
-     pauseFailPoint: "pauseTenantMigrationAfterBlockingStarts",
-     setUpFailPoints: ["abortTenantMigrationAfterBlockingStarts"],
+     pauseFailPoint: "pauseTenantMigrationBeforeLeavingBlockingState",
+     setUpFailPoints: ["abortTenantMigrationBeforeLeavingBlockingState"],
      nextState: TenantMigrationTest.State.kAborted
  }].forEach(({pauseFailPoint, setUpFailPoints = [], nextState}) => {
     testAbortStateTransition(donorRst, pauseFailPoint, setUpFailPoints, nextState);

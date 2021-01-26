@@ -219,7 +219,7 @@ function retryFailedWrites(primaryDB, collName, writeErrors, ops) {
     const bulkWriteThread =
         new Thread(bulkWriteDocsUnordered, primary.host, dbName, kCollName, kNumWriteOps);
 
-    const blockFp = configureFailPoint(primaryDB, "pauseTenantMigrationAfterBlockingStarts");
+    const blockFp = configureFailPoint(primaryDB, "pauseTenantMigrationBeforeLeavingBlockingState");
     const migrationThread =
         new Thread(TenantMigrationUtil.runMigrationAsync, migrationOpts, donorRstArgs);
 
@@ -302,12 +302,12 @@ function retryFailedWrites(primaryDB, collName, writeErrors, ops) {
     const bulkWriteThread =
         new Thread(bulkWriteDocsUnordered, primary.host, dbName, kCollName, kNumWriteOps);
 
-    const abortFp = configureFailPoint(primaryDB, "abortTenantMigrationAfterBlockingStarts");
+    const abortFp = configureFailPoint(primaryDB, "abortTenantMigrationBeforeLeavingBlockingState");
 
     // The failpoint below is used to ensure that a write to throw TenantMigrationConflict in the op
     // observer. Without this failpoint, the migration could have already aborted by the time the
     // write gets to the op observer.
-    const blockFp = configureFailPoint(primaryDB, "pauseTenantMigrationAfterBlockingStarts");
+    const blockFp = configureFailPoint(primaryDB, "pauseTenantMigrationBeforeLeavingBlockingState");
     const migrationThread =
         new Thread(TenantMigrationUtil.runMigrationAsync, migrationOpts, donorRstArgs);
 
@@ -452,7 +452,7 @@ function retryFailedWrites(primaryDB, collName, writeErrors, ops) {
     const bulkWriteThread =
         new Thread(bulkWriteDocsOrdered, primary.host, dbName, kCollName, kNumWriteOps);
 
-    const blockFp = configureFailPoint(primaryDB, "pauseTenantMigrationAfterBlockingStarts");
+    const blockFp = configureFailPoint(primaryDB, "pauseTenantMigrationBeforeLeavingBlockingState");
     const migrationThread =
         new Thread(TenantMigrationUtil.runMigrationAsync, migrationOpts, donorRstArgs);
 
@@ -529,12 +529,12 @@ function retryFailedWrites(primaryDB, collName, writeErrors, ops) {
     const bulkWriteThread =
         new Thread(bulkWriteDocsOrdered, primary.host, dbName, kCollName, kNumWriteOps);
 
-    const abortFp = configureFailPoint(primaryDB, "abortTenantMigrationAfterBlockingStarts");
+    const abortFp = configureFailPoint(primaryDB, "abortTenantMigrationBeforeLeavingBlockingState");
 
     // The failpoint below is used to ensure that a write to throw TenantMigrationConflict in the op
     // observer. Without this failpoint, the migration could have already aborted by the time the
     // write gets to the op observer.
-    const blockFp = configureFailPoint(primaryDB, "pauseTenantMigrationAfterBlockingStarts");
+    const blockFp = configureFailPoint(primaryDB, "pauseTenantMigrationBeforeLeavingBlockingState");
     const migrationThread =
         new Thread(TenantMigrationUtil.runMigrationAsync, migrationOpts, donorRstArgs);
 

@@ -349,7 +349,7 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
         try:
             while True:
                 # Keep polling the migration state until the migration completes, otherwise we
-                # might end up disabling 'pauseTenantMigrationAfterBlockingStartsWithTimeout'
+                # might end up disabling 'pauseTenantMigrationBeforeLeavingBlockingStateWithTimeout'
                 # before the tenant migration enters the blocking state and aborts.
                 res = donor_primary_client.admin.command(
                     cmd_obj,

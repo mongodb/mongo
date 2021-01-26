@@ -57,7 +57,8 @@ const migrationOpts = {
 const donorRstArgs = TenantMigrationUtil.createRstArgs(tenantMigrationTest.getDonorRst());
 
 // Start a migration, and pause it after the donor has majority-committed the initial state doc.
-const dataSyncFp = configureFailPoint(donorPrimary, "pauseTenantMigrationAfterDataSync");
+const dataSyncFp =
+    configureFailPoint(donorPrimary, "pauseTenantMigrationBeforeLeavingDataSyncState");
 const migrationThread =
     new Thread(TenantMigrationUtil.runMigrationAsync, migrationOpts, donorRstArgs);
 migrationThread.start();

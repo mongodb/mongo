@@ -303,11 +303,11 @@ jsTest.log("Test roll back donor's state doc insert");
 testRollbackInitialState();
 
 jsTest.log("Test roll back donor's state doc update");
-[{pauseFailPoint: "pauseTenantMigrationAfterDataSync", nextState: "blocking"},
- {pauseFailPoint: "pauseTenantMigrationAfterBlockingStarts", nextState: "committed"},
+[{pauseFailPoint: "pauseTenantMigrationBeforeLeavingDataSyncState", nextState: "blocking"},
+ {pauseFailPoint: "pauseTenantMigrationBeforeLeavingBlockingState", nextState: "committed"},
  {
-     pauseFailPoint: "pauseTenantMigrationAfterBlockingStarts",
-     setUpFailPoints: ["abortTenantMigrationAfterBlockingStarts"],
+     pauseFailPoint: "pauseTenantMigrationBeforeLeavingBlockingState",
+     setUpFailPoints: ["abortTenantMigrationBeforeLeavingBlockingState"],
      nextState: "aborted"
  }].forEach(({pauseFailPoint, setUpFailPoints = [], nextState}) => {
     testRollBackStateTransition(pauseFailPoint, setUpFailPoints, nextState);

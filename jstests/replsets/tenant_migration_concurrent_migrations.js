@@ -189,7 +189,7 @@ const kTenantIdPrefix = "testTenantId";
     const connPoolStatsBefore = assert.commandWorked(donorPrimary.adminCommand({connPoolStats: 1}));
 
     let blockFp = configureFailPoint(
-        donorPrimary, "pauseTenantMigrationAfterBlockingStarts", {tenantId: tenantId1});
+        donorPrimary, "pauseTenantMigrationBeforeLeavingBlockingState", {tenantId: tenantId1});
     assert.commandWorked(tenantMigrationTest0.startMigration(migrationOpts0));
     assert.commandWorked(tenantMigrationTest1.startMigration(migrationOpts1));
 

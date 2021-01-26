@@ -62,7 +62,7 @@ function resumeMigrationAfterBlockingWrite(host, targetBlockedWrites) {
     }));
 
     assert.commandWorked(primary.adminCommand(
-        {configureFailPoint: "pauseTenantMigrationAfterBlockingStarts", mode: "off"}));
+        {configureFailPoint: "pauseTenantMigrationBeforeLeavingBlockingState", mode: "off"}));
 }
 
 function createCollectionAndInsertDocs(primaryDB, collName, isCapped, numDocs = kNumInitialDocs) {
@@ -268,7 +268,8 @@ function testWriteIsAcceptedIfSentAfterMigrationHasAborted(testCase, testOpts) {
         tenantId,
     };
 
-    let abortFp = configureFailPoint(testOpts.primaryDB, "abortTenantMigrationAfterBlockingStarts");
+    let abortFp =
+        configureFailPoint(testOpts.primaryDB, "abortTenantMigrationBeforeLeavingBlockingState");
     const stateRes = assert.commandWorked(tenantMigrationTest.runMigration(
         migrationOpts, false /* retryOnRetryableErrors */, false /* automaticForgetMigration */));
     assert.eq(stateRes.state, TenantMigrationTest.State.kAborted);
@@ -299,7 +300,7 @@ function testWriteBlocksIfMigrationIsInBlocking(testCase, testOpts) {
     };
 
     let blockingFp =
-        configureFailPoint(testOpts.primaryDB, "pauseTenantMigrationAfterBlockingStarts");
+        configureFailPoint(testOpts.primaryDB, "pauseTenantMigrationBeforeLeavingBlockingState");
 
     assert.commandWorked(tenantMigrationTest.startMigration(migrationOpts));
 
@@ -330,7 +331,7 @@ function testBlockedWriteGetsUnblockedAndRejectedIfMigrationCommits(testCase, te
     };
 
     let blockingFp =
-        configureFailPoint(testOpts.primaryDB, "pauseTenantMigrationAfterBlockingStarts");
+        configureFailPoint(testOpts.primaryDB, "pauseTenantMigrationBeforeLeavingBlockingState");
     const targetBlockedWrites =
         assert
             .commandWorked(testOpts.primaryDB.adminCommand(
@@ -372,8 +373,9 @@ function testBlockedWriteGetsUnblockedAndRejectedIfMigrationAborts(testCase, tes
     };
 
     let blockingFp =
-        configureFailPoint(testOpts.primaryDB, "pauseTenantMigrationAfterBlockingStarts");
-    let abortFp = configureFailPoint(testOpts.primaryDB, "abortTenantMigrationAfterBlockingStarts");
+        configureFailPoint(testOpts.primaryDB, "pauseTenantMigrationBeforeLeavingBlockingState");
+    let abortFp =
+        configureFailPoint(testOpts.primaryDB, "abortTenantMigrationBeforeLeavingBlockingState");
     const targetBlockedWrites =
         assert
             .commandWorked(testOpts.primaryDB.adminCommand(

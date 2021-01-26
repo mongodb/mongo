@@ -97,7 +97,8 @@ let configDonorsColl = donorPrimary.getCollection(TenantMigrationTest.kConfigDon
         tenantId: kTenantId,
     };
 
-    let blockingFp = configureFailPoint(donorPrimary, "pauseTenantMigrationAfterBlockingStarts");
+    let blockingFp =
+        configureFailPoint(donorPrimary, "pauseTenantMigrationBeforeLeavingBlockingState");
     assert.commandWorked(tenantMigrationTest.startMigration(migrationOpts));
 
     // Wait for the migration to enter the blocking state.
@@ -153,7 +154,8 @@ let configDonorsColl = donorPrimary.getCollection(TenantMigrationTest.kConfigDon
         tenantId: kTenantId,
     };
 
-    let abortFp = configureFailPoint(donorPrimary, "abortTenantMigrationAfterBlockingStarts");
+    let abortFp =
+        configureFailPoint(donorPrimary, "abortTenantMigrationBeforeLeavingBlockingState");
     const stateRes = assert.commandWorked(tenantMigrationTest.runMigration(
         migrationOpts, false /* retryOnRetryableErrors */, false /* automaticForgetMigration */));
     assert.eq(stateRes.state, TenantMigrationTest.State.kAborted);

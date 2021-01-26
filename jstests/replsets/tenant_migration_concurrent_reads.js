@@ -42,7 +42,7 @@ function resumeMigrationAfterBlockingRead(host, targetBlockedReads) {
     }));
 
     assert.commandWorked(primary.adminCommand(
-        {configureFailPoint: "pauseTenantMigrationAfterBlockingStarts", mode: "off"}));
+        {configureFailPoint: "pauseTenantMigrationBeforeLeavingBlockingState", mode: "off"}));
 }
 
 function runCommand(db, cmd, expectedError, isTransaction) {
@@ -131,7 +131,8 @@ function testReadIsAcceptedIfSentAfterMigrationHasAborted(testCase, dbName, coll
     const donorRst = tenantMigrationTest.getDonorRst();
     const donorPrimary = donorRst.getPrimary();
 
-    let abortFp = configureFailPoint(donorPrimary, "abortTenantMigrationAfterBlockingStarts");
+    let abortFp =
+        configureFailPoint(donorPrimary, "abortTenantMigrationBeforeLeavingBlockingState");
     const stateRes = assert.commandWorked(tenantMigrationTest.runMigration(
         migrationOpts, false /* retryOnRetryableErrors */, false /* automaticForgetMigration */));
     assert.eq(stateRes.state, TenantMigrationTest.State.kAborted);
@@ -179,7 +180,8 @@ function testReadBlocksIfMigrationIsInBlocking(testCase, dbName, collName) {
     const donorRst = tenantMigrationTest.getDonorRst();
     const donorPrimary = donorRst.getPrimary();
 
-    let blockingFp = configureFailPoint(donorPrimary, "pauseTenantMigrationAfterBlockingStarts");
+    let blockingFp =
+        configureFailPoint(donorPrimary, "pauseTenantMigrationBeforeLeavingBlockingState");
     assert.commandWorked(tenantMigrationTest.startMigration(migrationOpts));
 
     // Wait for the migration to enter the blocking state.
@@ -233,7 +235,8 @@ function testBlockedReadGetsUnblockedAndRejectedIfMigrationCommits(testCase, dbN
     const donorRst = tenantMigrationTest.getDonorRst();
     const donorPrimary = donorRst.getPrimary();
 
-    let blockingFp = configureFailPoint(donorPrimary, "pauseTenantMigrationAfterBlockingStarts");
+    let blockingFp =
+        configureFailPoint(donorPrimary, "pauseTenantMigrationBeforeLeavingBlockingState");
     const targetBlockedReads =
         assert
             .commandWorked(donorPrimary.adminCommand(
@@ -296,8 +299,10 @@ function testBlockedReadGetsUnblockedAndSucceedsIfMigrationAborts(testCase, dbNa
     const donorRst = tenantMigrationTest.getDonorRst();
     const donorPrimary = donorRst.getPrimary();
 
-    let blockingFp = configureFailPoint(donorPrimary, "pauseTenantMigrationAfterBlockingStarts");
-    let abortFp = configureFailPoint(donorPrimary, "abortTenantMigrationAfterBlockingStarts");
+    let blockingFp =
+        configureFailPoint(donorPrimary, "pauseTenantMigrationBeforeLeavingBlockingState");
+    let abortFp =
+        configureFailPoint(donorPrimary, "abortTenantMigrationBeforeLeavingBlockingState");
     const targetBlockedReads =
         assert
             .commandWorked(donorPrimary.adminCommand(

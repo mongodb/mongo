@@ -118,7 +118,7 @@ executor:
     mongod_options:
       set_parameters:
         enableTestCommands: 1
-        failpoint.abortTenantMigrationAfterBlockingStarts:
+        failpoint.abortTenantMigrationBeforeLeavingBlockingState:
             mode: alwaysOn
             data:
               blockTimeMS: 250

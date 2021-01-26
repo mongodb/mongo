@@ -31,9 +31,9 @@ let donorPrimary = tenantMigrationTest.getDonorPrimary();
 // Force the migration to pause after entering a randomly selected state to simulate a failure.
 Random.setRandomSeed();
 const kMigrationFpNames = [
-    "pauseTenantMigrationAfterDataSync",
-    "pauseTenantMigrationAfterBlockingStarts",
-    "abortTenantMigrationAfterBlockingStarts"
+    "pauseTenantMigrationBeforeLeavingDataSyncState",
+    "pauseTenantMigrationBeforeLeavingBlockingState",
+    "abortTenantMigrationBeforeLeavingBlockingState"
 ];
 let fp;
 const index = Random.randInt(kMigrationFpNames.length + 1);

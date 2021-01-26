@@ -17,9 +17,9 @@ load("jstests/replsets/libs/tenant_migration_util.js");
 const kMaxSleepTimeMS = 100;
 const kTenantId = "testTenantId";
 const kMigrationFpNames = [
-    "pauseTenantMigrationAfterDataSync",
-    "pauseTenantMigrationAfterBlockingStarts",
-    "abortTenantMigrationAfterBlockingStarts",
+    "pauseTenantMigrationBeforeLeavingDataSyncState",
+    "pauseTenantMigrationBeforeLeavingBlockingState",
+    "abortTenantMigrationBeforeLeavingBlockingState",
     ""
 ];
 

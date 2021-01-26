@@ -130,7 +130,7 @@ const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
     }
 
     const donorPrimary = tenantMigrationTest.getDonorPrimary();
-    let fp = configureFailPoint(donorPrimary, "pauseTenantMigrationAfterDataSync");
+    let fp = configureFailPoint(donorPrimary, "pauseTenantMigrationBeforeLeavingDataSyncState");
 
     const tenantId = kTenantId;
     const migrationId = extractUUIDFromObject(UUID());
@@ -180,7 +180,7 @@ const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
     }
 
     const donorPrimary = tenantMigrationTest.getDonorPrimary();
-    let fp = configureFailPoint(donorPrimary, "pauseTenantMigrationAfterBlockingStarts");
+    let fp = configureFailPoint(donorPrimary, "pauseTenantMigrationBeforeLeavingBlockingState");
 
     const tenantId = kTenantId;
     const migrationId = extractUUIDFromObject(UUID());
@@ -230,7 +230,7 @@ const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
     }
 
     const donorPrimary = tenantMigrationTest.getDonorPrimary();
-    let fp = configureFailPoint(donorPrimary, "abortTenantMigrationAfterBlockingStarts");
+    let fp = configureFailPoint(donorPrimary, "abortTenantMigrationBeforeLeavingBlockingState");
 
     const tenantId = kTenantId;
     const migrationId = extractUUIDFromObject(UUID());

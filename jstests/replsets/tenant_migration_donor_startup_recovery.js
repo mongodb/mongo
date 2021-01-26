@@ -43,9 +43,9 @@ let configDonorsColl = donorPrimary.getCollection(TenantMigrationTest.kConfigDon
 // Force the migration to pause after entering a randomly selected state to simulate a failure.
 Random.setRandomSeed();
 const kMigrationFpNames = [
-    "pauseTenantMigrationAfterDataSync",
-    "pauseTenantMigrationAfterBlockingStarts",
-    "abortTenantMigrationAfterBlockingStarts"
+    "pauseTenantMigrationBeforeLeavingDataSyncState",
+    "pauseTenantMigrationBeforeLeavingBlockingState",
+    "abortTenantMigrationBeforeLeavingBlockingState"
 ];
 const index = Random.randInt(kMigrationFpNames.length + 1);
 if (index < kMigrationFpNames.length) {

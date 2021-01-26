@@ -44,7 +44,7 @@ const kReadPreference = {
         tenantId: kTenantId,
         readPreference: kReadPreference
     };
-    let fp = configureFailPoint(donorPrimary, "pauseTenantMigrationAfterDataSync");
+    let fp = configureFailPoint(donorPrimary, "pauseTenantMigrationBeforeLeavingDataSyncState");
     assert.commandWorked(tenantMigrationTest.startMigration(migrationOpts));
     fp.wait();
 
@@ -79,7 +79,7 @@ const kReadPreference = {
         tenantId: kTenantId,
         readPreference: kReadPreference
     };
-    let fp = configureFailPoint(donorPrimary, "pauseTenantMigrationAfterBlockingStarts");
+    let fp = configureFailPoint(donorPrimary, "pauseTenantMigrationBeforeLeavingBlockingState");
     assert.commandWorked(tenantMigrationTest.startMigration(migrationOpts));
     fp.wait();
 
@@ -115,7 +115,7 @@ const kReadPreference = {
         tenantId: kTenantId,
         readPreference: kReadPreference
     };
-    configureFailPoint(donorPrimary, "abortTenantMigrationAfterBlockingStarts");
+    configureFailPoint(donorPrimary, "abortTenantMigrationBeforeLeavingBlockingState");
     assert.commandWorked(tenantMigrationTest.runMigration(
         migrationOpts, false /* retryOnRetryableErrors */, false /* automaticForgetMigration */));
 
