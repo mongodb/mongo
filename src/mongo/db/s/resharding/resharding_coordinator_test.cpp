@@ -790,7 +790,7 @@ TEST_F(ReshardingCoordinatorPersistenceTest, StateTransitionWhenCoordinatorDocDo
     ASSERT_THROWS_CODE(resharding::writeStateTransitionAndCatalogUpdatesThenBumpShardVersions(
                            operationContext(), coordinatorDoc),
                        AssertionException,
-                       50577);
+                       5057701);
 }
 
 TEST_F(ReshardingCoordinatorPersistenceTest,

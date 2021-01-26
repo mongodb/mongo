@@ -60,6 +60,7 @@
 #include "mongo/s/sharded_collections_ddl_parameters_gen.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/util/log_and_backoff.h"
 
@@ -174,6 +175,109 @@ void abortTransaction(OperationContext* opCtx, TxnNumber txnNumber) {
         uassertStatusOK(status);
         uassertStatusOK(getWriteConcernStatusFromCommandResult(response));
     }
+}
+
+// Updates documents in the config db using DBDirectClient
+void updateConfigDocumentDBDirect(OperationContext* opCtx,
+                                  const mongo::NamespaceString& nss,
+                                  const BSONObj& query,
+                                  const BSONObj& update,
+                                  bool upsert,
+                                  bool multi) {
+    invariant(nss.db() == "config");
+
+    DBDirectClient client(opCtx);
+
+    write_ops::Update updateOp(nss, [&] {
+        write_ops::UpdateOpEntry u;
+        u.setQ(query);
+        u.setU(write_ops::UpdateModification::parseFromClassicUpdate(update));
+        u.setMulti(multi);
+        u.setUpsert(upsert);
+        return std::vector{u};
+    }());
+    updateOp.setWriteCommandBase([] {
+        write_ops::WriteCommandBase base;
+        base.setOrdered(false);
+        return base;
+    }());
+
+    auto commandResult = client.runCommand(OpMsgRequest::fromDBAndBody(
+        nss.db(), updateOp.toBSON(ShardingCatalogClient::kMajorityWriteConcern.toBSON())));
+    uassertStatusOK([&] {
+        BatchedCommandResponse response;
+        std::string unusedErrmsg;
+        response.parseBSON(
+            commandResult->getCommandReply(),
+            &unusedErrmsg);  // Return value intentionally ignored, because response.toStatus() will
+                             // contain any errors in more detail
+        return response.toStatus();
+    }());
+    uassertStatusOK(getWriteConcernStatusFromCommandResult(commandResult->getCommandReply()));
+}
+
+Status createNsIndexesForConfigChunks(OperationContext* opCtx) {
+    const bool unique = true;
+    auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+
+    Status result = configShard->createIndexOnConfig(
+        opCtx, ChunkType::ConfigNS, BSON(ChunkType::ns() << 1 << ChunkType::min() << 1), unique);
+    if (!result.isOK()) {
+        return result.withContext("couldn't create ns_1_min_1 index on config db");
+    }
+
+    result = configShard->createIndexOnConfig(
+        opCtx,
+        ChunkType::ConfigNS,
+        BSON(ChunkType::ns() << 1 << ChunkType::shard() << 1 << ChunkType::min() << 1),
+        unique);
+    if (!result.isOK()) {
+        return result.withContext("couldn't create ns_1_shard_1_min_1 index on config db");
+    }
+
+    result =
+        configShard->createIndexOnConfig(opCtx,
+                                         ChunkType::ConfigNS,
+                                         BSON(ChunkType::ns() << 1 << ChunkType::lastmod() << 1),
+                                         unique);
+    if (!result.isOK()) {
+        return result.withContext("couldn't create ns_1_lastmod_1 index on config db");
+    }
+
+    return Status::OK();
+}
+
+Status createUuidIndexesForConfigChunks(OperationContext* opCtx) {
+    const bool unique = true;
+    auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+    Status result = configShard->createIndexOnConfig(
+        opCtx,
+        ChunkType::ConfigNS,
+        BSON(ChunkType::collectionUUID() << 1 << ChunkType::min() << 1),
+        unique);
+    if (!result.isOK()) {
+        return result.withContext("couldn't create uuid_1_min_1 index on config db");
+    }
+
+    result = configShard->createIndexOnConfig(
+        opCtx,
+        ChunkType::ConfigNS,
+        BSON(ChunkType::collectionUUID() << 1 << ChunkType::shard() << 1 << ChunkType::min() << 1),
+        unique);
+    if (!result.isOK()) {
+        return result.withContext("couldn't create uuid_1_shard_1_min_1 index on config db");
+    }
+
+    result = configShard->createIndexOnConfig(
+        opCtx,
+        ChunkType::ConfigNS,
+        BSON(ChunkType::collectionUUID() << 1 << ChunkType::lastmod() << 1),
+        unique);
+    if (!result.isOK()) {
+        return result.withContext("couldn't create uuid_1_lastmod_1 index on config db");
+    }
+
+    return Status::OK();
 }
 
 }  // namespace
@@ -328,31 +432,21 @@ Status ShardingCatalogManager::_initConfigIndexes(OperationContext* opCtx) {
     const bool unique = true;
     auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
 
+    if (feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        const auto result = createUuidIndexesForConfigChunks(opCtx);
+        if (result != Status::OK()) {
+            return result;
+        }
+
+    } else {
+        const auto result = createNsIndexesForConfigChunks(opCtx);
+        if (result != Status::OK()) {
+            return result;
+        }
+    }
+
     Status result = configShard->createIndexOnConfig(
-        opCtx, ChunkType::ConfigNS, BSON(ChunkType::ns() << 1 << ChunkType::min() << 1), unique);
-    if (!result.isOK()) {
-        return result.withContext("couldn't create ns_1_min_1 index on config db");
-    }
-
-    result = configShard->createIndexOnConfig(
-        opCtx,
-        ChunkType::ConfigNS,
-        BSON(ChunkType::ns() << 1 << ChunkType::shard() << 1 << ChunkType::min() << 1),
-        unique);
-    if (!result.isOK()) {
-        return result.withContext("couldn't create ns_1_shard_1_min_1 index on config db");
-    }
-
-    result =
-        configShard->createIndexOnConfig(opCtx,
-                                         ChunkType::ConfigNS,
-                                         BSON(ChunkType::ns() << 1 << ChunkType::lastmod() << 1),
-                                         unique);
-    if (!result.isOK()) {
-        return result.withContext("couldn't create ns_1_lastmod_1 index on config db");
-    }
-
-    result = configShard->createIndexOnConfig(
         opCtx,
         MigrationType::ConfigNS,
         BSON(MigrationType::ns() << 1 << MigrationType::min() << 1),
@@ -610,24 +704,91 @@ void ShardingCatalogManager::_upgradeCollectionsAndChunksMetadataFor49(Operation
                 boost::none))
             .docs;
 
+    stdx::unordered_map<NamespaceString, Timestamp> timestampMap;
+
+    // Set timestamp and uuid for all chunks in all collections
+    for (const auto& doc : collectionDocs) {
+        const CollectionType coll(doc);
+        const auto uuid = coll.getUuid();
+        const auto nss = coll.getNss();
+
+        const auto now = VectorClock::get(opCtx)->getTime();
+        const auto newTimestamp = now.clusterTime().asTimestamp();
+        timestampMap.emplace(nss, newTimestamp);
+
+        // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk splits, merges, and
+        // migrations.
+        Lock::ExclusiveLock lk(opCtx->lockState(), _kChunkOpLock);
+
+        updateConfigDocumentDBDirect(
+            opCtx,
+            ChunkType::ConfigNS,
+            BSON(ChunkType::ns(nss.ns())) /* query */,
+            BSON("$set" << BSON(ChunkType::timestamp(newTimestamp)
+                                << ChunkType::collectionUUID() << uuid)) /* update */,
+            false /* upsert */,
+            true /* multi */);
+    }
+
+    // Create uuid_* indexes for config.chunks
+    uassertStatusOK(createUuidIndexesForConfigChunks(opCtx));
+
+    // Set timestamp for all collections in config.collections
     for (const auto& doc : collectionDocs) {
         // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk splits, merges, and
         // migrations.
         Lock::ExclusiveLock lk(opCtx->lockState(), _kChunkOpLock);
 
         const CollectionType coll(doc);
-        const auto uuid = coll.getUuid();
         const auto nss = coll.getNss();
 
-        auto updateCollectionAndChunksFn = [&](OperationContext* opCtx, TxnNumber txnNumber) {
-            const auto now = VectorClock::get(opCtx)->getTime();
-            const auto newTimestamp = now.clusterTime().asTimestamp();
-            _addTimestampAndUUIDToConfigChunksFor49InTxn(opCtx, nss, uuid, txnNumber, newTimestamp);
-            _addTimestampToConfigCollectionsFor49InTxn(opCtx, nss, txnNumber, newTimestamp);
-        };
+        updateConfigDocumentDBDirect(opCtx,
+                                     CollectionType::ConfigNS,
+                                     BSON(CollectionType::kNssFieldName << nss.ns()) /* query */,
+                                     BSON("$set" << BSON(CollectionType::kTimestampFieldName
+                                                         << timestampMap.at(nss))) /* update */,
+                                     false /* upsert */,
+                                     false /* multi */);
 
-        withTransaction(opCtx, nss, updateCollectionAndChunksFn);
         catalogCache->invalidateCollectionEntry_LINEARIZABLE(nss);
+    }
+
+    // Drop ns_* indexes of config.chunks
+    {
+        DBDirectClient client(opCtx);
+
+        const bool includeBuildUUIDs = false;
+        const int options = 0;
+        auto indexes = client.getIndexSpecs(ChunkType::ConfigNS, includeBuildUUIDs, options);
+        BSONArrayBuilder indexNamesToDrop;
+        for (const auto& index : indexes) {
+            const auto indexName = index.getStringField("name");
+            if (indexName == "ns_1_min_1"_sd || indexName == "ns_1_shard_1_min_1"_sd ||
+                indexName == "ns_1_lastmod_1"_sd) {
+                indexNamesToDrop.append(indexName);
+            }
+        }
+
+        BSONObj info;
+        if (!client.runCommand(ChunkType::ConfigNS.db().toString(),
+                               BSON("dropIndexes" << ChunkType::ConfigNS.coll() << "index"
+                                                  << indexNamesToDrop.arr()),
+                               info))
+            uassertStatusOK(getStatusFromCommandResult(info));
+    }
+
+    // Unset ns for all chunks on config.chunks
+    {
+        // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk splits, merges, and
+        // migrations.
+        Lock::ExclusiveLock lk(opCtx->lockState(), _kChunkOpLock);
+
+        updateConfigDocumentDBDirect(opCtx,
+                                     ChunkType::ConfigNS,
+                                     {} /* query */,
+                                     BSON("$unset" << BSON(ChunkType::ns(""))) /* update */,
+                                     false /* upsert */,
+                                     true /* multi */);
     }
 
     LOGV2(5276701, "Successfully upgraded config.collections and config.chunks");
@@ -637,6 +798,7 @@ void ShardingCatalogManager::_downgradeCollectionsAndChunksMetadataToPre49(
     OperationContext* opCtx) {
     LOGV2(5276702, "Starting downgrade of config.collections and config.chunks");
 
+    auto const catalogCache = Grid::get(opCtx)->catalogCache();
     auto const configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
     auto collectionDocs =
         uassertStatusOK(
@@ -650,7 +812,28 @@ void ShardingCatalogManager::_downgradeCollectionsAndChunksMetadataToPre49(
                 boost::none))
             .docs;
 
-    auto const catalogCache = Grid::get(opCtx)->catalogCache();
+    // Set ns on all chunks
+    for (const auto& doc : collectionDocs) {
+        // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk splits, merges, and
+        // migrations.
+        Lock::ExclusiveLock lk(opCtx->lockState(), _kChunkOpLock);
+
+        const CollectionType coll(doc);
+        const auto uuid = coll.getUuid();
+        const auto nss = coll.getNss();
+
+        updateConfigDocumentDBDirect(opCtx,
+                                     ChunkType::ConfigNS,
+                                     BSON(ChunkType::collectionUUID << uuid) /* query */,
+                                     BSON("$set" << BSON(ChunkType::ns(nss.ns()))) /* update */,
+                                     false /* upsert */,
+                                     true /* multi */);
+    }
+
+    // Create ns_* indexes for config.chunks
+    uassertStatusOK(createNsIndexesForConfigChunks(opCtx));
+
+    // Unset timestamp for all collections
     for (const auto& doc : collectionDocs) {
         // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk splits, merges, and
         // migrations.
@@ -659,110 +842,59 @@ void ShardingCatalogManager::_downgradeCollectionsAndChunksMetadataToPre49(
         const CollectionType coll(doc);
         const auto nss = coll.getNss();
 
-        auto updateCollectionAndChunksFn = [&](OperationContext* opCtx, TxnNumber txnNumber) {
-            _deleteTimestampFromConfigCollectionsInTxn(opCtx, nss, txnNumber);
-            _deleteTimestampAndUUIDFromConfigChunksInTxn(opCtx, nss, txnNumber);
-        };
+        updateConfigDocumentDBDirect(
+            opCtx,
+            CollectionType::ConfigNS,
+            BSON(CollectionType::kNssFieldName << nss.ns()) /* query */,
+            BSON("$unset" << BSON(CollectionType::kTimestampFieldName << "")) /* update */,
+            false /* upsert */,
+            false /* multi */);
 
-        withTransaction(opCtx, nss, updateCollectionAndChunksFn);
         catalogCache->invalidateCollectionEntry_LINEARIZABLE(nss);
     }
 
+    // Drop uuid_* indexes for config.chunks
+    {
+        DBDirectClient client(opCtx);
+
+        const bool includeBuildUUIDs = false;
+        const int options = 0;
+        auto indexes = client.getIndexSpecs(ChunkType::ConfigNS, includeBuildUUIDs, options);
+        BSONArrayBuilder indexNamesToDrop;
+        for (const auto& index : indexes) {
+            const auto indexName = index.getStringField("name");
+            if (indexName == "uuid_1_min_1"_sd || indexName == "uuid_1_shard_1_min_1"_sd ||
+                indexName == "uuid_1_lastmod_1"_sd) {
+                indexNamesToDrop.append(indexName);
+            }
+        }
+
+        BSONObj info;
+        if (!client.runCommand(ChunkType::ConfigNS.db().toString(),
+                               BSON("dropIndexes" << ChunkType::ConfigNS.coll() << "index"
+                                                  << indexNamesToDrop.arr()),
+                               info))
+            uassertStatusOK(getStatusFromCommandResult(info));
+    }
+
+    // Unset uuid for all chunks on config.chunks
+    {
+        // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk splits, merges, and
+        // migrations.
+        Lock::ExclusiveLock lk(opCtx->lockState(), _kChunkOpLock);
+
+        updateConfigDocumentDBDirect(
+            opCtx,
+            ChunkType::ConfigNS,
+            {} /* query */,
+            BSON("$unset" << BSON(ChunkType::timestamp.name()
+                                  << "" << ChunkType::collectionUUID() << "")) /* update */,
+            false /* upsert */,
+            true /* multi */);
+    }
+
+
     LOGV2(5276703, "Successfully downgraded config.collections and config.chunks");
-}
-
-void ShardingCatalogManager::_addTimestampToConfigCollectionsFor49InTxn(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    TxnNumber txnNumber,
-    const Timestamp& newTimestamp) {
-    try {
-        writeToConfigDocumentInTxn(
-            opCtx,
-            CollectionType::ConfigNS,
-            BatchedCommandRequest::buildUpdateOp(
-                CollectionType::ConfigNS,
-                BSON(CollectionType::kNssFieldName << nss.ns()),
-                BSON("$set" << BSON(CollectionType::kTimestampFieldName << newTimestamp)),
-                false, /* upsert */
-                false  /* multi */
-                ),
-            txnNumber);
-    } catch (DBException& e) {
-        e.addContext(str::stream() << "Failed to update config.collections to set timestamp for "
-                                   << nss.toString());
-        throw;
-    }
-}
-
-void ShardingCatalogManager::_deleteTimestampFromConfigCollectionsInTxn(OperationContext* opCtx,
-                                                                        const NamespaceString& nss,
-                                                                        TxnNumber txnNumber) {
-    try {
-        writeToConfigDocumentInTxn(
-            opCtx,
-            CollectionType::ConfigNS,
-            BatchedCommandRequest::buildUpdateOp(
-                CollectionType::ConfigNS,
-                BSON(CollectionType::kNssFieldName << nss.ns()),
-                BSON("$unset" << BSON(CollectionType::kTimestampFieldName << "")),
-                false, /* upsert */
-                false  /* multi */
-                ),
-            txnNumber);
-    } catch (DBException& e) {
-        e.addContext(str::stream() << "Failed to update config.collections to unset timestamp for "
-                                   << nss.toString());
-        throw;
-    }
-}
-
-void ShardingCatalogManager::_addTimestampAndUUIDToConfigChunksFor49InTxn(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    const mongo::UUID& collectionUuid,
-    TxnNumber txnNumber,
-    const Timestamp& newTimestamp) {
-    try {
-        writeToConfigDocumentInTxn(
-            opCtx,
-            ChunkType::ConfigNS,
-            BatchedCommandRequest::buildUpdateOp(
-                ChunkType::ConfigNS,
-                BSON(ChunkType::ns(nss.ns())),
-                BSON("$set" << BSON(ChunkType::timestamp(newTimestamp)
-                                    << ChunkType::collectionUUID() << collectionUuid)),
-                false, /* upsert */
-                true   /* multi */
-                ),
-            txnNumber);
-    } catch (DBException& e) {
-        e.addContext(str::stream() << "Failed to update config.chunks to set collectionUUID for "
-                                   << nss.toString());
-        throw;
-    }
-}
-
-void ShardingCatalogManager::_deleteTimestampAndUUIDFromConfigChunksInTxn(
-    OperationContext* opCtx, const NamespaceString& nss, TxnNumber txnNumber) {
-    try {
-        writeToConfigDocumentInTxn(
-            opCtx,
-            ChunkType::ConfigNS,
-            BatchedCommandRequest::buildUpdateOp(
-                ChunkType::ConfigNS,
-                BSON(ChunkType::ns(nss.ns())),
-                BSON("$unset" << BSON(ChunkType::timestamp.name()
-                                      << "" << ChunkType::collectionUUID() << "")),
-                false, /* upsert */
-                true   /* multi */
-                ),
-            txnNumber);
-    } catch (DBException& e) {
-        e.addContext(str::stream() << "Failed to update config.chunks to unset collectionUUID for "
-                                   << nss.toString());
-        throw;
-    }
 }
 
 Lock::ExclusiveLock ShardingCatalogManager::lockZoneMutex(OperationContext* opCtx) {

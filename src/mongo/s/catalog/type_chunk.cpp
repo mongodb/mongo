@@ -215,13 +215,11 @@ ChunkType::ChunkType(NamespaceString nss, ChunkRange range, ChunkVersion version
       _version(std::move(version)),
       _shard(std::move(shardId)) {}
 
-ChunkType::ChunkType(NamespaceString nss,
-                     CollectionUUID collectionUUID,
+ChunkType::ChunkType(CollectionUUID collectionUUID,
                      ChunkRange range,
                      ChunkVersion version,
                      ShardId shardId)
-    : _nss(std::move(nss)),
-      _collectionUUID(collectionUUID),
+    : _collectionUUID(collectionUUID),
       _min(range.getMin()),
       _max(range.getMax()),
       _version(std::move(version)),
@@ -246,9 +244,13 @@ StatusWith<ChunkType> ChunkType::parseFromConfigBSONCommand(const BSONObj& sourc
     {
         std::string chunkNS;
         Status status = bsonExtractStringField(source, ns.name(), &chunkNS);
-        if (!status.isOK())
+        if (status.isOK()) {
+            chunk._nss = NamespaceString(chunkNS);
+        } else if (status == ErrorCodes::NoSuchKey) {
+            // Ignore NoSuchKey because in 5.0 and beyond chunks don't include a ns.
+        } else {
             return status;
-        chunk._nss = NamespaceString(chunkNS);
+        }
     }
 
     {
@@ -260,7 +262,17 @@ StatusWith<ChunkType> ChunkType::parseFromConfigBSONCommand(const BSONObj& sourc
                 return swUUID.getStatus();
             }
             chunk._collectionUUID = swUUID.getValue();
+        } else if (status == ErrorCodes::NoSuchKey) {
+            // Ignore NoSuchKey because before 5.0 chunks don't include a collectionUUID
+        } else {
+            return status;
         }
+    }
+
+    // There must be at least one of nss or uuid (or both)
+    if (!chunk._nss && !chunk._collectionUUID) {
+        return {ErrorCodes::FailedToParse,
+                str::stream() << "There must be at least one of nss or uuid"};
     }
 
     {

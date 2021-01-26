@@ -115,8 +115,14 @@ var testListConfigCollections = function(st) {
 var testListConfigChunksIndexes = function(st) {
     // This test depends on all the indexes in the configChunksIndexes being the exact indexes
     // in the config chunks collection.
-    var configChunksIndexes = ["_id_", "ns_1_lastmod_1", "ns_1_min_1", "ns_1_shard_1_min_1"];
     var configDB = st.s.getDB("config");
+    var configChunksIndexes = (function() {
+        if (configDB.collections.findOne({_id: "config.system.sessions"}).timestamp) {
+            return ["_id_", "uuid_1_lastmod_1", "uuid_1_min_1", "uuid_1_shard_1_min_1"];
+        } else {
+            return ["_id_", "ns_1_lastmod_1", "ns_1_min_1", "ns_1_shard_1_min_1"];
+        }
+    }());
     var cursor;
     var cursorArray = [];
 

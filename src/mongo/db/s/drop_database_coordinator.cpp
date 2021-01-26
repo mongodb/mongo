@@ -124,15 +124,24 @@ SemiFuture<void> DropDatabaseCoordinator::runImpl(
 
             // Drop all collections under this DB
             auto const catalogClient = Grid::get(opCtx)->catalogClient();
-            const auto allCollectionsForDb = catalogClient->getAllShardedCollectionsForDb(
+            const auto allCollectionsForDb = catalogClient->getCollections(
                 opCtx, dbName, repl::ReadConcernLevel::kMajorityReadConcern);
 
-            for (const auto& nss : allCollectionsForDb) {
+            for (const auto& coll : allCollectionsForDb) {
+                if (coll.getDropped()) {
+                    continue;
+                }
+
+                const auto nss = coll.getNss();
+                const auto collectionUUID = coll.getTimestamp().has_value()
+                    ? boost::optional<UUID>(coll.getUuid())
+                    : boost::none;
+
                 // TODO SERVER-53905 to support failovers here we need to store the
                 // current namespace of this loop before to delete it from config server
                 // so that on step-up we will remmeber to resume the drop collection for that
                 // namespace.
-                sharding_ddl_util::removeCollMetadataFromConfig(opCtx, nss);
+                sharding_ddl_util::removeCollMetadataFromConfig(opCtx, nss, collectionUUID);
                 const auto dropCollParticipantCmd = ShardsvrDropCollectionParticipant(nss);
                 sendCommandToAllShards(opCtx,
                                        dbName,

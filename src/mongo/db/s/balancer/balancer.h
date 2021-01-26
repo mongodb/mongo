@@ -220,14 +220,6 @@ private:
     int _moveChunks(OperationContext* opCtx,
                     const BalancerChunkSelectionPolicy::MigrateInfoVector& candidateChunks);
 
-    /**
-     * Performs a split on the chunk with min value "minKey". If the split fails, it is marked as
-     * jumbo.
-     */
-    void _splitOrMarkJumbo(OperationContext* opCtx,
-                           const NamespaceString& nss,
-                           const BSONObj& minKey);
-
     // Protects the state below
     Mutex _mutex = MONGO_MAKE_LATCH("Balancer::_mutex");
 

@@ -47,7 +47,9 @@ namespace mongo {
 
 namespace sharding_ddl_util {
 
-void removeCollMetadataFromConfig(OperationContext* opCtx, NamespaceString nss) {
+void removeCollMetadataFromConfig(OperationContext* opCtx,
+                                  NamespaceString nss,
+                                  const boost::optional<UUID>& collectionUUID) {
 
     IgnoreAPIParametersBlock ignoreApiParametersBlock(opCtx);
     const auto catalogClient = Grid::get(opCtx)->catalogClient();
@@ -56,11 +58,15 @@ void removeCollMetadataFromConfig(OperationContext* opCtx, NamespaceString nss) 
         [&] { Grid::get(opCtx)->catalogCache()->invalidateCollectionEntry_LINEARIZABLE(nss); });
 
     // Remove chunk data
-    uassertStatusOK(
-        catalogClient->removeConfigDocuments(opCtx,
-                                             ChunkType::ConfigNS,
-                                             BSON(ChunkType::ns(nss.ns())),
-                                             ShardingCatalogClient::kMajorityWriteConcern));
+    const auto chunksQuery = [&]() {
+        if (collectionUUID) {
+            return BSON(ChunkType::collectionUUID << *collectionUUID);
+        } else {
+            return BSON(ChunkType::ns(nss.ns()));
+        }
+    }();
+    uassertStatusOK(catalogClient->removeConfigDocuments(
+        opCtx, ChunkType::ConfigNS, chunksQuery, ShardingCatalogClient::kMajorityWriteConcern));
     // Remove tag data
     uassertStatusOK(
         catalogClient->removeConfigDocuments(opCtx,

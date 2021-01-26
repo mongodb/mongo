@@ -66,9 +66,15 @@ struct QueryAndSort {
  * ensures that changes to chunk version (which will always be higher) will always come *after* our
  * current position in the chunk cursor.
  */
-QueryAndSort createConfigDiffQuery(const NamespaceString& nss, ChunkVersion collectionVersion) {
+QueryAndSort createConfigDiffQueryNs(const NamespaceString& nss, ChunkVersion collectionVersion) {
     return {BSON(ChunkType::ns() << nss.ns() << ChunkType::lastmod() << GTE
                                  << Timestamp(collectionVersion.toLong())),
+            BSON(ChunkType::lastmod() << 1)};
+}
+
+QueryAndSort createConfigDiffQueryUuid(const UUID& uuid, ChunkVersion collectionVersion) {
+    return {BSON(ChunkType::collectionUUID()
+                 << uuid << ChunkType::lastmod() << GTE << Timestamp(collectionVersion.toLong())),
             BSON(ChunkType::lastmod() << 1)};
 }
 
@@ -92,7 +98,13 @@ CollectionAndChangedChunks getChangedChunks(OperationContext* opCtx,
         : ChunkVersion(0, 0, coll.getEpoch(), coll.getTimestamp());
 
     // Diff tracker should *always* find at least one chunk if collection exists
-    const auto diffQuery = createConfigDiffQuery(nss, startingCollectionVersion);
+    const auto diffQuery = [&]() {
+        if (coll.getTimestamp()) {
+            return createConfigDiffQueryUuid(coll.getUuid(), startingCollectionVersion);
+        } else {
+            return createConfigDiffQueryNs(nss, startingCollectionVersion);
+        }
+    }();
 
     // Query the chunks which have changed
     repl::OpTime opTime;

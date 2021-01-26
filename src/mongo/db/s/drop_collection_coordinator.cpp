@@ -116,7 +116,16 @@ SemiFuture<void> DropCollectionCoordinator::runImpl(
             const auto routingInfo = uassertStatusOK(
                 Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(opCtx, _nss));
 
-            sharding_ddl_util::removeCollMetadataFromConfig(opCtx, _nss);
+            const boost::optional<UUID> collectionUUID = [&]() {
+                if (routingInfo.isSharded() && routingInfo.getVersion().getTimestamp()) {
+                    invariant(routingInfo.getUUID());
+                    return routingInfo.getUUID();
+                } else {
+                    return boost::optional<UUID>(boost::none);
+                }
+            }();
+
+            sharding_ddl_util::removeCollMetadataFromConfig(opCtx, _nss, collectionUUID);
 
             if (routingInfo.isSharded()) {
                 _participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);

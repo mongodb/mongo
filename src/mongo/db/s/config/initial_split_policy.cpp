@@ -58,7 +58,7 @@ void appendChunk(const NamespaceString& nss,
                  const ShardId& shardId,
                  std::vector<ChunkType>* chunks) {
     if (collectionUUID) {
-        chunks->emplace_back(nss, *collectionUUID, ChunkRange(min, max), *version, shardId);
+        chunks->emplace_back(*collectionUUID, ChunkRange(min, max), *version, shardId);
     } else {
         chunks->emplace_back(nss, ChunkRange(min, max), *version, shardId);
     }

@@ -194,6 +194,32 @@ TEST(ChunkType, BadType) {
     ASSERT_FALSE(chunkRes.isOK());
 }
 
+TEST(ChunkType, BothNsAndUUID) {
+    ChunkVersion chunkVersion(1, 2, OID::gen(), boost::none /* timestamp */);
+
+    BSONObj objModNS =
+        BSON(ChunkType::name(OID::gen())
+             << ChunkType::ns("ns") << ChunkType::collectionUUID() << mongo::UUID::gen()
+             << ChunkType::min(BSON("a" << 10 << "b" << 10)) << ChunkType::max(BSON("a" << 20))
+             << "lastmod" << Timestamp(chunkVersion.toLong()) << "lastmodEpoch"
+             << chunkVersion.epoch() << ChunkType::shard("shard0001"));
+    StatusWith<ChunkType> chunkRes = ChunkType::fromConfigBSON(objModNS);
+    ASSERT_TRUE(chunkRes.isOK());
+}
+
+TEST(ChunkType, UUIDPresentAndNsMissing) {
+    ChunkVersion chunkVersion(1, 2, OID::gen(), boost::none /* timestamp */);
+
+    BSONObj objModNS =
+        BSON(ChunkType::name(OID::gen())
+             << ChunkType::collectionUUID() << mongo::UUID::gen()
+             << ChunkType::min(BSON("a" << 10 << "b" << 10)) << ChunkType::max(BSON("a" << 20))
+             << "lastmod" << Timestamp(chunkVersion.toLong()) << "lastmodEpoch"
+             << chunkVersion.epoch() << ChunkType::shard("shard0001"));
+    StatusWith<ChunkType> chunkRes = ChunkType::fromConfigBSON(objModNS);
+    ASSERT_TRUE(chunkRes.isOK());
+}
+
 TEST(ChunkRange, BasicBSONParsing) {
     auto parseStatus =
         ChunkRange::fromBSON(BSON("min" << BSON("x" << 0) << "max" << BSON("x" << 10)));

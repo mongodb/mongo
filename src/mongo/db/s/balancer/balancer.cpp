@@ -682,7 +682,8 @@ int Balancer::_moveChunks(OperationContext* opCtx,
                   "migrateInfo"_attr = redact(requestIt->toString()),
                   "error"_attr = redact(status));
 
-            _splitOrMarkJumbo(opCtx, requestIt->nss, requestIt->minKey);
+            ShardingCatalogManager::get(opCtx)->splitOrMarkJumbo(
+                opCtx, requestIt->nss, requestIt->minKey);
             continue;
         }
 
@@ -694,62 +695,6 @@ int Balancer::_moveChunks(OperationContext* opCtx,
     }
 
     return numChunksProcessed;
-}
-
-void Balancer::_splitOrMarkJumbo(OperationContext* opCtx,
-                                 const NamespaceString& nss,
-                                 const BSONObj& minKey) {
-    const auto cm = uassertStatusOK(
-        Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(opCtx, nss));
-    auto chunk = cm.findIntersectingChunkWithSimpleCollation(minKey);
-
-    try {
-        const auto splitPoints = uassertStatusOK(shardutil::selectChunkSplitPoints(
-            opCtx,
-            chunk.getShardId(),
-            nss,
-            cm.getShardKeyPattern(),
-            ChunkRange(chunk.getMin(), chunk.getMax()),
-            Grid::get(opCtx)->getBalancerConfiguration()->getMaxChunkSizeBytes(),
-            boost::none));
-
-        if (splitPoints.empty()) {
-            LOGV2(21873,
-                  "Marking chunk {chunk} as jumbo",
-                  "Marking chunk as jumbo",
-                  "chunk"_attr = redact(chunk.toString()));
-            chunk.markAsJumbo();
-
-            auto status = Grid::get(opCtx)->catalogClient()->updateConfigDocument(
-                opCtx,
-                ChunkType::ConfigNS,
-                BSON(ChunkType::ns(nss.ns()) << ChunkType::min(chunk.getMin())),
-                BSON("$set" << BSON(ChunkType::jumbo(true))),
-                false,
-                ShardingCatalogClient::kMajorityWriteConcern);
-            if (!status.isOK()) {
-                LOGV2(21874,
-                      "Couldn't mark chunk with namespace {namespace} and min key {minKey} as "
-                      "jumbo due to {error}",
-                      "Couldn't mark chunk as jumbo",
-                      "namespace"_attr = redact(nss.ns()),
-                      "minKey"_attr = redact(chunk.getMin()),
-                      "error"_attr = redact(status.getStatus()));
-            }
-
-            return;
-        }
-
-        uassertStatusOK(
-            shardutil::splitChunkAtMultiplePoints(opCtx,
-                                                  chunk.getShardId(),
-                                                  nss,
-                                                  cm.getShardKeyPattern(),
-                                                  cm.getVersion(),
-                                                  ChunkRange(chunk.getMin(), chunk.getMax()),
-                                                  splitPoints));
-    } catch (const DBException&) {
-    }
 }
 
 void Balancer::notifyPersistedBalancerSettingsChanged() {

@@ -383,17 +383,24 @@ void insertChunkAndTagDocsForTempNss(OperationContext* opCtx,
 
 void removeChunkAndTagsDocsForOriginalNss(OperationContext* opCtx,
                                           const ReshardingCoordinatorDocument& coordinatorDoc,
+                                          boost::optional<Timestamp> newCollectionTimestamp,
                                           TxnNumber txnNumber) {
     // Remove all chunk documents for the original nss. We do not know how many chunk docs currently
     // exist, so cannot pass a value for expectedNumModified
+    const auto chunksQuery = [&]() {
+        if (newCollectionTimestamp) {
+            return BSON(ChunkType::collectionUUID() << coordinatorDoc.getExistingUUID());
+        } else {
+            return BSON(ChunkType::ns(coordinatorDoc.getNss().ns()));
+        }
+    }();
     ShardingCatalogManager::get(opCtx)->writeToConfigDocumentInTxn(
         opCtx,
         ChunkType::ConfigNS,
-        BatchedCommandRequest::buildDeleteOp(
-            ChunkType::ConfigNS,
-            BSON(ChunkType::ns(coordinatorDoc.getNss().ns())),  // query
-            true                                                // multi
-            ),
+        BatchedCommandRequest::buildDeleteOp(ChunkType::ConfigNS,
+                                             chunksQuery,
+                                             true  // multi
+                                             ),
         txnNumber);
 
     // Remove all tag documents for the original nss. We do not know how many tag docs currently
@@ -412,17 +419,31 @@ void removeChunkAndTagsDocsForOriginalNss(OperationContext* opCtx,
 void updateChunkAndTagsDocsForTempNss(OperationContext* opCtx,
                                       const ReshardingCoordinatorDocument& coordinatorDoc,
                                       OID newCollectionEpoch,
+                                      boost::optional<Timestamp> newCollectionTimestamp,
                                       TxnNumber txnNumber) {
     // Update all chunk documents that currently have 'ns' as the temporary collection namespace
     // such that 'ns' is now the original collection namespace and 'lastmodEpoch' is
     // newCollectionEpoch.
-    auto chunksRequest = BatchedCommandRequest::buildUpdateOp(
-        ChunkType::ConfigNS,
-        BSON(ChunkType::ns(coordinatorDoc.getTempReshardingNss().ns())),  // query
-        BSON("$set" << BSON("ns" << coordinatorDoc.getNss().ns() << "lastmodEpoch"
-                                 << newCollectionEpoch)),  // update
-        false,                                             // upsert
-        true                                               // multi
+    const auto chunksQuery = [&]() {
+        if (newCollectionTimestamp) {
+            return BSON(ChunkType::collectionUUID() << coordinatorDoc.get_id());
+        } else {
+            return BSON(ChunkType::ns(coordinatorDoc.getTempReshardingNss().ns()));
+        }
+    }();
+    const auto chunksUpdate = [&]() {
+        if (newCollectionTimestamp) {
+            return BSON("$set" << BSON("lastmodEpoch" << newCollectionEpoch));
+        } else {
+            return BSON("$set" << BSON("ns" << coordinatorDoc.getNss().ns() << "lastmodEpoch"
+                                            << newCollectionEpoch));
+        }
+    }();
+    auto chunksRequest = BatchedCommandRequest::buildUpdateOp(ChunkType::ConfigNS,
+                                                              chunksQuery,   // query
+                                                              chunksUpdate,  // update
+                                                              false,         // upsert
+                                                              true           // multi
     );
 
     auto chunksRes = ShardingCatalogManager::get(opCtx)->writeToConfigDocumentInTxn(
@@ -574,6 +595,7 @@ CollectionType createTempReshardingCollectionType(
     collType.setKeyPattern(coordinatorDoc.getReshardingKey());
     collType.setDefaultCollation(collation);
     collType.setUnique(false);
+    collType.setTimestamp(chunkVersion.getTimestamp());
 
     TypeCollectionReshardingFields tempEntryReshardingFields(coordinatorDoc.get_id());
     tempEntryReshardingFields.setState(coordinatorDoc.getState());
@@ -663,10 +685,19 @@ ParticipantShardsAndChunks calculateParticipantShardsAndChunks(
 
             auto reshardedChunk =
                 ReshardedChunk::parse(IDLParserErrorContext("ReshardedChunk"), obj);
-            initialChunks.emplace_back(coordinatorDoc.getTempReshardingNss(),
-                                       ChunkRange{reshardedChunk.getMin(), reshardedChunk.getMax()},
-                                       version,
-                                       reshardedChunk.getRecipientShardId());
+            if (version.getTimestamp()) {
+                initialChunks.emplace_back(
+                    coordinatorDoc.get_id(),
+                    ChunkRange{reshardedChunk.getMin(), reshardedChunk.getMax()},
+                    version,
+                    reshardedChunk.getRecipientShardId());
+            } else {
+                initialChunks.emplace_back(
+                    coordinatorDoc.getTempReshardingNss(),
+                    ChunkRange{reshardedChunk.getMin(), reshardedChunk.getMax()},
+                    version,
+                    reshardedChunk.getRecipientShardId());
+            }
             version.incMinor();
         }
     } else {
@@ -676,10 +707,17 @@ ParticipantShardsAndChunks calculateParticipantShardsAndChunks(
 
         cm.forEachChunk([&](const auto& chunk) {
             // TODO SERVER-49526 Change the range to refer to the new shard key pattern.
-            initialChunks.emplace_back(coordinatorDoc.getTempReshardingNss(),
-                                       ChunkRange{chunk.getMin(), chunk.getMax()},
-                                       version,
-                                       chunk.getShardId());
+            if (version.getTimestamp()) {
+                initialChunks.emplace_back(coordinatorDoc.get_id(),
+                                           ChunkRange{chunk.getMin(), chunk.getMax()},
+                                           version,
+                                           chunk.getShardId());
+            } else {
+                initialChunks.emplace_back(coordinatorDoc.getTempReshardingNss(),
+                                           ChunkRange{chunk.getMin(), chunk.getMax()},
+                                           version,
+                                           chunk.getShardId());
+            }
             version.incMinor();
             return true;
         });
@@ -733,8 +771,10 @@ void writeDecisionPersistedState(OperationContext* opCtx,
             // Remove all chunk and tag documents associated with the original collection, then
             // update the chunk and tag docs currently associated with the temp nss to be associated
             // with the original nss
-            removeChunkAndTagsDocsForOriginalNss(opCtx, coordinatorDoc, txnNumber);
-            updateChunkAndTagsDocsForTempNss(opCtx, coordinatorDoc, newCollectionEpoch, txnNumber);
+            removeChunkAndTagsDocsForOriginalNss(
+                opCtx, coordinatorDoc, newCollectionTimestamp, txnNumber);
+            updateChunkAndTagsDocsForTempNss(
+                opCtx, coordinatorDoc, newCollectionEpoch, newCollectionTimestamp, txnNumber);
         });
 }
 

@@ -201,17 +201,20 @@ function testChunkCollectionUuidFieldChecksAfterUpgrade() {
     const ns = "sharded.test_chunk_uuid";
 
     var collUUID = st.config.collections.findOne({_id: ns}).uuid;
-    var cursor = st.config.chunks.find({ns});
+    var cursor = findChunksUtil.findChunksByNs(st.config, ns);
     assert(cursor.hasNext());
     do {
         assert.eq(collUUID, cursor.next().uuid);
     } while (cursor.hasNext());
+
+    // Check no chunk with ns is left after upgrade
+    assert.eq(0, st.config.chunks.count({ns: {$exists: true}}));
 }
 
 function testChunkCollectionUuidFieldChecksAfterFCVDowngrade() {
     const ns = "sharded.test_chunk_uuid";
 
-    var cursor = st.config.chunks.find({ns});
+    var cursor = findChunksUtil.findChunksByNs(st.config, ns);
     assert(cursor.hasNext());
     do {
         assert.eq(undefined, cursor.next().uuid);
