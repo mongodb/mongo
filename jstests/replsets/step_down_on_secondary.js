@@ -53,7 +53,8 @@ const joinStepDownThread = startParallelShell(() => {
 waitForCurOpByFailPointNoNS(primaryDB, "stepdownHangBeforeRSTLEnqueue");
 
 jsTestLog("Force reconfig to swap the electable node");
-const newConfig = rst.getReplSetConfigFromNode();
+// We must specify the node in getReplSetConfigFromNode, because we do not have a writable primary.
+const newConfig = rst.getReplSetConfigFromNode(0);
 const oldPrimaryId = rst.getNodeId(primary);
 const newPrimaryId = rst.getNodeId(secondary);
 newConfig.members[newPrimaryId].priority = 1;
