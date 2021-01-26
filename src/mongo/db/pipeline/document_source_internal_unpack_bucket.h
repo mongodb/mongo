@@ -83,7 +83,7 @@ public:
     /**
      * This resets the unpacker to prepare to unpack a new bucket described by the given document.
      */
-    void reset(Document&& bucket);
+    void reset(BSONObj&& bucket);
 
     Behavior behavior() const {
         return _unpackerBehavior;
@@ -93,7 +93,7 @@ public:
         return _spec;
     }
 
-    const Document& bucket() const {
+    const BSONObj& bucket() const {
         return _bucket;
     }
 
@@ -102,24 +102,25 @@ private:
     const Behavior _unpackerBehavior;
 
     // Iterates the timestamp section of the bucket to drive the unpacking iteration.
-    boost::optional<FieldIterator> _timeFieldIter;
+    boost::optional<BSONObjIterator> _timeFieldIter;
 
     // A flag used to mark that the timestamp value should be materialized in measurements.
     const bool _includeTimeField;
 
-    // Since the metadata value is the same across all materialized measurements we can cache the
-    // metadata value in the reset phase and use it to materialize the metadata in each measurement.
-    Value _metaValue;
-
-    // A flag used to mark that a bucket's metadata value should be materialized in measurements.
+    // A flag used to mark that a bucket's metadata element should be materialized in measurements.
     const bool _includeMetaField;
 
     // The bucket being unpacked.
-    Document _bucket;
+    BSONObj _bucket;
+
+    // Since the metadata value is the same across all materialized measurements we can cache the
+    // metadata BSONElement in the reset phase and use it to materialize the metadata in each
+    // measurement.
+    BSONElement _metaValue;
 
     // Iterators used to unpack the columns of the above bucket that are populated during the reset
     // phase according to the provided 'Behavior' and 'BucketSpec'.
-    std::vector<std::pair<std::string, FieldIterator>> _fieldIters;
+    std::vector<std::pair<std::string, BSONObjIterator>> _fieldIters;
 };
 
 class DocumentSourceInternalUnpackBucket : public DocumentSource {

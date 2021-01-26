@@ -44,18 +44,29 @@ REGISTER_DOCUMENT_SOURCE(_internalUnpackBucket,
                          LiteParsedDocumentSourceDefault::parse,
                          DocumentSourceInternalUnpackBucket::createFromBson);
 
-void BucketUnpacker::reset(Document&& bucket) {
+void BucketUnpacker::reset(BSONObj&& bucket) {
     _fieldIters.clear();
     _timeFieldIter = boost::none;
 
     _bucket = std::move(bucket);
-    uassert(5346510, "An empty bucket cannot be unpacked", !_bucket.empty());
+    uassert(5346510, "An empty bucket cannot be unpacked", !_bucket.isEmpty());
+    tassert(5346701,
+            "The $_internalUnpackBucket stage requires the bucket to be owned",
+            _bucket.isOwned());
 
-    if (_bucket[kBucketDataFieldName].getDocument().empty()) {
+    auto&& dataRegion = _bucket.getField(kBucketDataFieldName).Obj();
+    if (dataRegion.isEmpty()) {
         // If the data field of a bucket is present but it holds an empty object, there's nothing to
         // unpack.
         return;
     }
+
+    auto&& timeFieldElem = dataRegion.getField(_spec.timeField);
+    uassert(5346700,
+            "The $_internalUnpackBucket stage requires the data region to have a timeField object",
+            timeFieldElem);
+
+    _timeFieldIter = BSONObjIterator{timeFieldElem.Obj()};
 
     _metaValue = _bucket[kBucketMetaFieldName];
     if (_spec.metaField) {
@@ -65,23 +76,20 @@ void BucketUnpacker::reset(Document&& bucket) {
         uassert(5369600,
                 "The $_internalUnpackBucket stage requires metadata to be present in a bucket if "
                 "metaField parameter is provided",
-                (_metaValue.getType() != BSONType::Undefined) && !_metaValue.missing());
+                (_metaValue.type() != BSONType::Undefined) && _metaValue);
     } else {
         // If the spec indicates that the time series collection has no metadata field, then we
         // should not find a metadata region in the underlying bucket documents.
         uassert(5369601,
                 "The $_internalUnpackBucket stage expects buckets to have missing metadata regions "
                 "if the metaField parameter is not provided",
-                _metaValue.missing());
+                !_metaValue);
     }
-
-    _timeFieldIter = _bucket[kBucketDataFieldName][_spec.timeField].getDocument().fieldIterator();
 
     // Walk the data region of the bucket, and decide if an iterator should be set up based on the
     // include or exclude case.
-    auto colIter = _bucket[kBucketDataFieldName].getDocument().fieldIterator();
-    while (colIter.more()) {
-        auto&& [colName, colVal] = colIter.next();
+    for (auto&& elem : dataRegion) {
+        auto& colName = elem.fieldNameStringData();
         if (colName == _spec.timeField) {
             // Skip adding a FieldIterator for the timeField since the timestamp value from
             // _timeFieldIter can be placed accordingly in the materialized measurement.
@@ -89,7 +97,7 @@ void BucketUnpacker::reset(Document&& bucket) {
         }
         auto found = _spec.fieldSet.find(colName.toString()) != _spec.fieldSet.end();
         if ((_unpackerBehavior == Behavior::kInclude) == found) {
-            _fieldIters.push_back({colName.toString(), colVal.getDocument().fieldIterator()});
+            _fieldIters.push_back({colName.toString(), BSONObjIterator{elem.Obj()}});
         }
     }
 }
@@ -98,20 +106,20 @@ Document BucketUnpacker::getNext() {
     invariant(hasNext());
 
     auto measurement = MutableDocument{};
-
-    auto&& [currentIdx, timeVal] = _timeFieldIter->next();
+    auto&& timeElem = _timeFieldIter->next();
     if (_includeTimeField) {
-        measurement.addField(_spec.timeField, timeVal);
+        measurement.addField(_spec.timeField, Value{timeElem});
     }
 
-    if (_includeMetaField && !_metaValue.nullish()) {
-        measurement.addField(*_spec.metaField, _metaValue);
+    if (_includeMetaField && !_metaValue.isNull()) {
+        measurement.addField(*_spec.metaField, Value{_metaValue});
     }
 
+    auto& currentIdx = timeElem.fieldNameStringData();
     for (auto&& [colName, colIter] : _fieldIters) {
-        if (colIter.more() && colIter.fieldName() == currentIdx) {
-            auto&& [_, val] = colIter.next();
-            measurement.addField(colName, val);
+        if (auto&& elem = *colIter; colIter.more() && elem.fieldNameStringData() == currentIdx) {
+            measurement.addField(colName, Value{elem});
+            colIter.advance(elem);
         }
     }
 
@@ -228,7 +236,7 @@ DocumentSource::GetNextResult DocumentSourceInternalUnpackBucket::doGetNext() {
 
     auto nextResult = pSource->getNext();
     if (nextResult.isAdvanced()) {
-        auto bucket = nextResult.getDocument();
+        auto bucket = nextResult.getDocument().toBson();
         _bucketUnpacker.reset(std::move(bucket));
         uassert(
             5346509,
