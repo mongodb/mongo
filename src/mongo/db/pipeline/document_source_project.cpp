@@ -33,7 +33,6 @@
 
 #include <boost/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <memory>
 
 #include "mongo/db/exec/projection_executor.h"
 #include "mongo/db/exec/projection_executor_builder.h"
@@ -99,26 +98,6 @@ intrusive_ptr<DocumentSource> DocumentSourceProject::create(
         kStageName,
         isIndependentOfAnyCollection));
     return project;
-}
-
-boost::intrusive_ptr<DocumentSource> DocumentSourceProject::createUnset(
-    const FieldPath& fieldPath, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-
-    // This helper is only meant for removing top-level fields. Dotted field paths require
-    // thinking about implicit array traversal.
-    tassert(5339701,
-            str::stream() << "Expected a top-level field name, but got " << fieldPath.fullPath(),
-            fieldPath.getPathLength() == 1);
-
-    projection_ast::ProjectionPathASTNode pathNode;
-    pathNode.addChild(fieldPath.fullPath(),
-                      std::make_unique<projection_ast::BooleanConstantASTNode>(false));
-    auto projection = projection_ast::Projection{
-        std::move(pathNode),
-        projection_ast::ProjectType::kExclusion,
-    };
-
-    return create(std::move(projection), expCtx, kAliasNameUnset);
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceProject::createFromBson(

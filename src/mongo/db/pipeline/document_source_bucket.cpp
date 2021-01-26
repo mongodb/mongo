@@ -40,9 +40,9 @@ using boost::intrusive_ptr;
 using std::list;
 using std::vector;
 
-REGISTER_DOCUMENT_SOURCE(bucket,
-                         LiteParsedDocumentSourceDefault::parse,
-                         DocumentSourceBucket::createFromBson);
+REGISTER_MULTI_STAGE_ALIAS(bucket,
+                           LiteParsedDocumentSourceDefault::parse,
+                           DocumentSourceBucket::createFromBson);
 
 namespace {
 intrusive_ptr<ExpressionConstant> getExpressionConstant(ExpressionContext* const expCtx,

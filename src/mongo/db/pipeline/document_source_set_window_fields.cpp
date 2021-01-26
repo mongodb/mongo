@@ -29,153 +29,21 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/pipeline/document_source_add_fields.h"
-#include "mongo/db/pipeline/document_source_project.h"
 #include "mongo/db/pipeline/document_source_set_window_fields.h"
 #include "mongo/db/pipeline/document_source_set_window_fields_gen.h"
-#include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
-
-using boost::intrusive_ptr;
-using boost::optional;
-using std::list;
 
 namespace mongo {
 
 REGISTER_DOCUMENT_SOURCE_CONDITIONALLY(
     setWindowFields,
     LiteParsedDocumentSourceDefault::parse,
-    document_source_set_window_fields::createFromBson,
+    DocumentSourceSetWindowFields::createFromBson,
     boost::none,
     ::mongo::feature_flags::gFeatureFlagWindowFunctions.isEnabledAndIgnoreFCV());
 
-REGISTER_DOCUMENT_SOURCE_CONDITIONALLY(
-    _internalSetWindowFields,
-    LiteParsedDocumentSourceDefault::parse,
-    DocumentSourceInternalSetWindowFields::createFromBson,
-    boost::none,
-    ::mongo::feature_flags::gFeatureFlagWindowFunctions.isEnabledAndIgnoreFCV());
-
-list<intrusive_ptr<DocumentSource>> document_source_set_window_fields::createFromBson(
-    BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
-    uassert(ErrorCodes::FailedToParse,
-            str::stream() << "the " << kStageName
-                          << " stage specification must be an object, found "
-                          << typeName(elem.type()),
-            elem.type() == BSONType::Object);
-
-    auto spec =
-        SetWindowFieldsSpec::parse(IDLParserErrorContext(kStageName), elem.embeddedObject());
-    auto partitionBy = [&]() -> boost::optional<boost::intrusive_ptr<Expression>> {
-        if (auto partitionBy = spec.getPartitionBy())
-            return Expression::parseOperand(
-                expCtx.get(), partitionBy->getElement(), expCtx->variablesParseState);
-        else
-            return boost::none;
-    }();
-    return create(std::move(expCtx),
-                  std::move(partitionBy),
-                  std::move(spec.getSortBy()),
-                  std::move(spec.getOutput()));
-}
-
-list<intrusive_ptr<DocumentSource>> document_source_set_window_fields::create(
-    const intrusive_ptr<ExpressionContext>& expCtx,
-    optional<intrusive_ptr<Expression>> partitionBy,
-    optional<BSONObj> sortBy,
-    BSONObj fields) {
-
-    // Starting with an input like this:
-    //     {$setWindowFields: {partitionBy: {$foo: "$x"}, sortBy: {y: 1}, fields: {...}}}
-
-    // We move the partitionBy expression out into its own $set stage:
-    //     {$set: {__tmp: {$foo: "$x"}}}
-    //     {$setWindowFields: {partitionBy: "$__tmp", sortBy: {y: 1}, fields: {...}}}
-    //     {$unset: '__tmp'}
-
-    // This lets us insert a $sort in between:
-    //     {$set: {__tmp: {$foo: "$x"}}}
-    //     {$sort: {__tmp: 1, y: 1}}
-    //     {$setWindowFields: {partitionBy: "$__tmp", sortBy: {y: 1}, fields: {...}}}
-    //     {$unset: '__tmp'}
-
-    // Which lets us replace $setWindowFields with $_internalSetWindowFields:
-    //     {$set: {__tmp: {$foo: "$x"}}}
-    //     {$sort: {__tmp: 1, y: 1}}
-    //     {$_internalSetWindowFields: {partitionBy: "$__tmp", sortBy: {y: 1}, fields: {...}}}
-    //     {$unset: '__tmp'}
-
-    // If partitionBy is a field path, we can $sort by that field directly and avoid creating a
-    // $set stage. This is important for pushing down the $sort. This is only valid because we
-    // assert (in getNextInput()) that partitionBy is never an array.
-
-    // If there is no partitionBy at all then we just $sort by the sortBy spec.
-
-    // If there is no sortBy and no partitionBy then we can omit the $sort stage completely.
-
-    list<intrusive_ptr<DocumentSource>> result;
-
-    // complexPartitionBy is an expression to evaluate.
-    // simplePartitionBy is a field path, which can be evaluated or sorted.
-    optional<intrusive_ptr<Expression>> complexPartitionBy;
-    optional<FieldPath> simplePartitionBy;
-    optional<intrusive_ptr<Expression>> simplePartitionByExpr;
-    // If there is no partitionBy, both are empty.
-    // If partitionBy is already a field path, we only fill in simplePartitionBy.
-    // If partitionBy is a more complex expression, we will need to generate a $set stage,
-    // which will bind the value of the expression to the name in simplePartitionBy.
-    if (partitionBy) {
-        auto exprFieldPath = dynamic_cast<ExpressionFieldPath*>(partitionBy->get());
-        if (exprFieldPath && exprFieldPath->isRootFieldPath()) {
-            // ExpressionFieldPath has "CURRENT" as an explicit first component,
-            // but for $sort we don't want that.
-            simplePartitionBy = exprFieldPath->getFieldPath().tail();
-            simplePartitionByExpr = partitionBy;
-        } else {
-            // In DocumentSource we don't have a mechanism for generating non-colliding field names,
-            // so we have to choose the tmp name carefully to make a collision unlikely in practice.
-            auto tmp = "__internal_setWindowFields_partition_key";
-            simplePartitionBy = FieldPath{tmp};
-            simplePartitionByExpr = ExpressionFieldPath::createPathFromString(
-                expCtx.get(), tmp, expCtx->variablesParseState);
-            complexPartitionBy = partitionBy;
-        }
-    }
-
-    // $set
-    if (complexPartitionBy) {
-        result.push_back(
-            DocumentSourceAddFields::create(*simplePartitionBy, *complexPartitionBy, expCtx));
-    }
-
-    // $sort
-    if (simplePartitionBy || sortBy) {
-        BSONObjBuilder sortSpec;
-        if (simplePartitionBy) {
-            sortSpec << simplePartitionBy->fullPath() << 1;
-        }
-        if (sortBy) {
-            for (auto elem : *sortBy) {
-                sortSpec << elem;
-            }
-        }
-        result.push_back(DocumentSourceSort::create(expCtx, sortSpec.obj()));
-    }
-
-    // $_internalSetWindowFields
-    result.push_back(make_intrusive<DocumentSourceInternalSetWindowFields>(
-        expCtx, simplePartitionByExpr, sortBy, fields));
-
-    // $unset
-    if (complexPartitionBy) {
-        result.push_back(DocumentSourceProject::createUnset(*simplePartitionBy, expCtx));
-    }
-
-    return result;
-}
-
-Value DocumentSourceInternalSetWindowFields::serialize(
+Value DocumentSourceSetWindowFields::serialize(
     boost::optional<ExplainOptions::Verbosity> explain) const {
     MutableDocument spec;
     spec[SetWindowFieldsSpec::kPartitionByFieldName] =
@@ -185,7 +53,7 @@ Value DocumentSourceInternalSetWindowFields::serialize(
     return Value(DOC(kStageName << spec.freeze()));
 }
 
-boost::intrusive_ptr<DocumentSource> DocumentSourceInternalSetWindowFields::createFromBson(
+boost::intrusive_ptr<DocumentSource> DocumentSourceSetWindowFields::createFromBson(
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     uassert(ErrorCodes::FailedToParse,
             str::stream() << "the " << kStageName
@@ -202,13 +70,12 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalSetWindowFields::crea
         else
             return boost::none;
     }();
-    return make_intrusive<DocumentSourceInternalSetWindowFields>(
+    return make_intrusive<DocumentSourceSetWindowFields>(
         expCtx, partitionBy, spec.getSortBy(), spec.getOutput());
 }
 
-DocumentSource::GetNextResult DocumentSourceInternalSetWindowFields::doGetNext() {
-    // This is a placeholder: it returns every input doc unchanged.
-    return pSource->getNext();
+DocumentSource::GetNextResult DocumentSourceSetWindowFields::doGetNext() {
+    return GetNextResult::makeEOF();
 }
 
 }  // namespace mongo

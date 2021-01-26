@@ -70,19 +70,6 @@ intrusive_ptr<DocumentSource> DocumentSourceAddFields::create(
     return addFields;
 }
 
-intrusive_ptr<DocumentSource> DocumentSourceAddFields::create(
-    const FieldPath& fieldPath,
-    const intrusive_ptr<Expression>& expr,
-    const intrusive_ptr<ExpressionContext>& expCtx) {
-
-    const bool isIndependentOfAnyCollection = false;
-    return make_intrusive<DocumentSourceSingleDocumentTransformation>(
-        expCtx,
-        projection_executor::AddFieldsProjectionExecutor::create(expCtx, fieldPath, expr),
-        kStageName,
-        isIndependentOfAnyCollection);
-}
-
 intrusive_ptr<DocumentSource> DocumentSourceAddFields::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
     const auto specifiedName = elem.fieldNameStringData();
