@@ -11,6 +11,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/idl/idl_parser',
+        '$BUILD_DIR/mongo/idl/server_parameter',
     ],
 )
 

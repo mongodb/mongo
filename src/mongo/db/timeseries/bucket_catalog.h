@@ -41,9 +41,8 @@
 namespace mongo {
 class BucketCatalog {
 public:
-    // This set of constants define limits on the measurements held in a bucket.
-    static constexpr int kTimeseriesBucketMaxCount = 1000;
-    static constexpr int kTimeseriesBucketMaxSizeBytes = 125 * 1024;  // 125 KB
+    // This constant, together with parameters defined in timeseries.idl, defines limits on the
+    // measurements held in a bucket.
     static constexpr auto kTimeseriesBucketMaxTimeRange = Hours(1);
 
     struct CommitInfo {

@@ -223,7 +223,7 @@ TEST_F(BucketCatalogWithoutMetadataTest, CommitReturnsNewFields) {
     ASSERT(data.newFieldNamesToBeInserted.count("b")) << data.toBSON();
 
     // Fill up the bucket.
-    for (auto i = 3; i < BucketCatalog::kTimeseriesBucketMaxCount; ++i) {
+    for (auto i = 3; i < gTimeseriesBucketMaxCount; ++i) {
         _bucketCatalog->insert(_opCtx, _ns1, BSON(_timeField << Date_t::now() << "a" << i));
         data = _bucketCatalog->commit(bucketId, _commitInfo);
         ASSERT_EQ(0U, data.newFieldNamesToBeInserted.size()) << i << ":" << data.toBSON();
@@ -232,9 +232,7 @@ TEST_F(BucketCatalogWithoutMetadataTest, CommitReturnsNewFields) {
     // When a bucket overflows, committing to the new overflow bucket should return the fields of
     // the first measurement as new fields.
     auto [overflowBucketId, unusedCommitInfo] = _bucketCatalog->insert(
-        _opCtx,
-        _ns1,
-        BSON(_timeField << Date_t::now() << "a" << BucketCatalog::kTimeseriesBucketMaxCount));
+        _opCtx, _ns1, BSON(_timeField << Date_t::now() << "a" << gTimeseriesBucketMaxCount));
     ASSERT_NE(bucketId, overflowBucketId);
     data = _bucketCatalog->commit(overflowBucketId);
     ASSERT_EQ(2U, data.newFieldNamesToBeInserted.size()) << data.toBSON();

@@ -31,6 +31,30 @@ global:
 imports:
     - "mongo/idl/basic_types.idl"
 
+server_parameters:
+    "timeseriesBucketMaxCount":
+        description: "Maximum number of measurements to store in a single bucket"
+        set_at: [ startup ]
+        cpp_vartype: "std::int32_t"
+        cpp_varname: "gTimeseriesBucketMaxCount"
+        default: 1000
+        validator: { gte: 1 }
+    "timeseriesBucketMaxSize":
+        description: "Maximum size in bytes of measurements to store together in a single bucket"
+        set_at: [ startup ]
+        cpp_vartype: "std::int32_t"
+        cpp_varname: "gTimeseriesBucketMaxSize"
+        default: 128000 # 125KB
+        validator: { gte: 1 }
+    "timeseriesIdleBucketExpiryMemoryUsageThreshold":
+        description: "The threshold for bucket catalog memory usage above which idle buckets will be
+                      expired"
+        set_at: [ startup ]
+        cpp_vartype: "std::int32_t"
+        cpp_varname: "gTimeseriesIdleBucketExpiryMemoryUsageThreshold"
+        default:  104857600 # 100MB
+        validator: { gte: 1 }
+
 structs:
     TimeseriesOptions:
         description: "The options that define a time-series collection."

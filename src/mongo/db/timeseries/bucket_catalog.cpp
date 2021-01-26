@@ -39,8 +39,6 @@
 namespace mongo {
 namespace {
 const auto getBucketCatalog = ServiceContext::declareDecoration<BucketCatalog>();
-
-constexpr uint64_t kIdleBucketExpiryMemoryUsageThreshold = 1024 * 1024 * 100;  // 100 MB
 }  // namespace
 
 BSONObj BucketCatalog::CommitData::toBSON() const {
@@ -121,11 +119,11 @@ BucketCatalog::InsertResult BucketCatalog::insert(OperationContext* opCtx,
                                                &sizeToBeAdded);
 
     auto isBucketFull = [&]() {
-        if (bucket->numMeasurements == kTimeseriesBucketMaxCount) {
+        if (bucket->numMeasurements == static_cast<std::uint64_t>(gTimeseriesBucketMaxCount)) {
             stats.numBucketsClosedDueToCount++;
             return true;
         }
-        if (bucket->size + sizeToBeAdded > kTimeseriesBucketMaxSizeBytes) {
+        if (bucket->size + sizeToBeAdded > static_cast<std::uint64_t>(gTimeseriesBucketMaxSize)) {
             stats.numBucketsClosedDueToSize++;
             return true;
         }
@@ -362,7 +360,9 @@ void BucketCatalog::_removeBucket(const OID& bucketId,
 }
 
 void BucketCatalog::_expireIdleBuckets(ExecutionStats* stats) {
-    while (!_idleBuckets.empty() && _memoryUsage > kIdleBucketExpiryMemoryUsageThreshold) {
+    while (!_idleBuckets.empty() &&
+           _memoryUsage >
+               static_cast<std::uint64_t>(gTimeseriesIdleBucketExpiryMemoryUsageThreshold)) {
         _removeBucket(*_idleBuckets.begin(), boost::none, _idleBuckets.begin());
         stats->numBucketsClosedDueToMemoryThreshold++;
     }
