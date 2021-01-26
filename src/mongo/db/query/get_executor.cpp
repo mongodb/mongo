@@ -272,11 +272,20 @@ void fillOutPlannerParams(OperationContext* opCtx,
                           CanonicalQuery* canonicalQuery,
                           QueryPlannerParams* plannerParams) {
     invariant(canonicalQuery);
+    bool apiStrict = APIParameters::get(opCtx).getAPIStrict().value_or(false);
     // If it's not NULL, we may have indices.  Access the catalog and fill out IndexEntry(s)
     std::unique_ptr<IndexCatalog::IndexIterator> ii =
         collection->getIndexCatalog()->getIndexIterator(opCtx, false);
     while (ii->more()) {
         const IndexCatalogEntry* ice = ii->next();
+
+        // Indexes excluded from API version 1 should _not_ be used for planning if apiStrict is set
+        // to true.
+        auto indexType = ice->descriptor()->getIndexType();
+        if (apiStrict &&
+            (indexType == IndexType::INDEX_HAYSTACK || indexType == IndexType::INDEX_TEXT ||
+             ice->descriptor()->isSparse()))
+            continue;
 
         // Skip the addition of hidden indexes to prevent use in query planning.
         if (ice->descriptor()->hidden())
