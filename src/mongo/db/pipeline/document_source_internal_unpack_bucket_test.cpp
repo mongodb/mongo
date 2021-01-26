@@ -741,227 +741,558 @@ TEST_F(InternalUnpackBucketStageTest, ParserRejectsBothIncludeAndExcludeParamete
                        5408000);
 }
 
-TEST_F(InternalUnpackBucketStageTest, OptimizeAddsIncludeProjectForGroupDependencies) {
-    auto unpackSpecObj = fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo'}}");
-    auto groupSpecObj = fromjson("{$group: {_id: '$x', f: {$first: '$y'}}}");
+/**************************** buildProjectToInternalize() tests ****************************/
+using InternalUnpackBucketBuildProjectToInternalizeTest = AggregationContextFixture;
 
-    auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, groupSpecObj), getExpCtx());
-    ASSERT_EQ(2u, pipeline->getSources().size());
+TEST_F(InternalUnpackBucketBuildProjectToInternalizeTest,
+       BuildsIncludeProjectForGroupDependencies) {
+    auto pipeline = Pipeline::parse(
+        makeVector(fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo'}}"),
+                   fromjson("{$group: {_id: '$x', f: {$first: '$y'}}}")),
+        getExpCtx());
+    auto& container = pipeline->getSources();
+    ASSERT_EQ(2u, container.size());
 
-    pipeline->optimizePipeline();
-    ASSERT_EQ(3u, pipeline->getSources().size());
-
-    auto serialized = pipeline->serializeToBson();
-    ASSERT_EQ(3u, serialized.size());
-
-    const UnorderedFieldsBSONObjComparator kComparator;
-    ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[0]);
-    ASSERT_EQ(
-        kComparator.compare(fromjson("{$project: {_id: false, x: true, y: true}}"), serialized[1]),
-        0);
-    ASSERT_BSONOBJ_EQ(groupSpecObj, serialized[2]);
-}
-
-TEST_F(InternalUnpackBucketStageTest, OptimizeAddsIncludeProjectForProjectDependencies) {
-    auto unpackSpecObj = fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo'}}");
-    auto projectSpecObj = fromjson("{$project: {_id: true, x: {f: '$y'}}}");
-
-    auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, projectSpecObj), getExpCtx());
-    ASSERT_EQ(2u, pipeline->getSources().size());
-
-    pipeline->optimizePipeline();
-    ASSERT_EQ(3u, pipeline->getSources().size());
-
-    auto serialized = pipeline->serializeToBson();
-    ASSERT_EQ(3u, serialized.size());
+    auto project = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.begin()->get())
+                       ->buildProjectToInternalize(container.begin(), &container);
 
     const UnorderedFieldsBSONObjComparator kComparator;
-    ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[0]);
-    ASSERT_EQ(
-        kComparator.compare(fromjson("{$project: {_id: true, x: true, y: true}}"), serialized[1]),
-        0);
-    ASSERT_BSONOBJ_EQ(projectSpecObj, serialized[2]);
+    ASSERT_EQ(kComparator.compare(fromjson("{_id: 0, x: 1, y: 1}"), project), 0);
 }
 
-TEST_F(InternalUnpackBucketStageTest, OptimizeAddsIncludeProjectWhenInMiddleOfPipeline) {
-    auto matchSpecObj = fromjson("{$match: {'meta.source': 'primary'}}");
-    auto unpackSpecObj =
-        fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'meta'}}");
-    auto groupSpecObj = fromjson("{$group: {_id: '$x', f: {$first: '$y'}}}");
+TEST_F(InternalUnpackBucketBuildProjectToInternalizeTest,
+       BuildsIncludeProjectForProjectDependencies) {
+    auto pipeline = Pipeline::parse(
+        makeVector(fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo'}}"),
+                   fromjson("{$project: {x: {f: '$y'}}}")),
+        getExpCtx());
+    auto& container = pipeline->getSources();
+    ASSERT_EQ(2u, container.size());
 
-    auto pipeline =
-        Pipeline::parse(makeVector(matchSpecObj, unpackSpecObj, groupSpecObj), getExpCtx());
-    ASSERT_EQ(3u, pipeline->getSources().size());
-
-    pipeline->optimizePipeline();
-    ASSERT_EQ(4u, pipeline->getSources().size());
-
-    auto serialized = pipeline->serializeToBson();
-    ASSERT_EQ(4u, serialized.size());
+    auto project = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.begin()->get())
+                       ->buildProjectToInternalize(container.begin(), &container);
 
     const UnorderedFieldsBSONObjComparator kComparator;
-    ASSERT_BSONOBJ_EQ(matchSpecObj, serialized[0]);
-    ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[1]);
-    ASSERT_EQ(
-        kComparator.compare(fromjson("{$project: {_id: false, x: true, y: true}}"), serialized[2]),
-        0);
-    ASSERT_BSONOBJ_EQ(groupSpecObj, serialized[3]);
+    ASSERT_EQ(kComparator.compare(fromjson("{_id: 1, x: 1, y: 1}"), project), 0);
 }
 
-TEST_F(InternalUnpackBucketStageTest, OptimizeAddsIncludeProjectWhenDependenciesAreDotted) {
-    auto unpackSpecObj = fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo'}}");
-    auto groupSpecObj = fromjson("{$group: {_id: '$x.y', f: {$first: '$a.b'}}}");
+TEST_F(InternalUnpackBucketBuildProjectToInternalizeTest,
+       BuildsIncludeProjectWhenInMiddleOfPipeline) {
+    auto pipeline = Pipeline::parse(
+        makeVector(
+            fromjson("{$match: {'meta.source': 'primary'}}"),
+            fromjson(
+                "{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'meta'}}"),
+            fromjson("{$group: {_id: '$x', f: {$first: '$y'}}}")),
+        getExpCtx());
+    auto& container = pipeline->getSources();
+    ASSERT_EQ(3u, container.size());
 
-    auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, groupSpecObj), getExpCtx());
-    ASSERT_EQ(2u, pipeline->getSources().size());
-
-    pipeline->optimizePipeline();
-    ASSERT_EQ(3u, pipeline->getSources().size());
-
-    auto serialized = pipeline->serializeToBson();
-    ASSERT_EQ(3u, serialized.size());
+    auto project =
+        dynamic_cast<DocumentSourceInternalUnpackBucket*>(std::next(container.begin())->get())
+            ->buildProjectToInternalize(std::next(container.begin()), &container);
 
     const UnorderedFieldsBSONObjComparator kComparator;
-    ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[0]);
-    ASSERT_EQ(
-        kComparator.compare(fromjson("{$project: {_id: false, x: true, a: true}}"), serialized[1]),
-        0);
-    ASSERT_BSONOBJ_EQ(groupSpecObj, serialized[2]);
+    ASSERT_EQ(kComparator.compare(fromjson("{_id: 0, x: 1, y: 1}"), project), 0);
 }
 
-TEST_F(InternalUnpackBucketStageTest, OptimizeDoesNotAddProjectWhenThereAreNoDependencies) {
-    auto unpackSpecObj = fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo'}}");
-    auto groupSpecObj = fromjson("{$group: {_id: {$const: null}, count: { $sum: {$const: 1 }}}}");
+TEST_F(InternalUnpackBucketBuildProjectToInternalizeTest,
+       BuildsIncludeProjectWhenGroupDependenciesAreDotted) {
+    auto pipeline = Pipeline::parse(
+        makeVector(fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo'}}"),
+                   fromjson("{$group: {_id: '$x.y', f: {$first: '$a.b'}}}")),
+        getExpCtx());
+    auto& container = pipeline->getSources();
+    ASSERT_EQ(2u, container.size());
 
-    auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, groupSpecObj), getExpCtx());
-    ASSERT_EQ(2u, pipeline->getSources().size());
+    auto project = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.begin()->get())
+                       ->buildProjectToInternalize(container.begin(), &container);
 
-    pipeline->optimizePipeline();
+    const UnorderedFieldsBSONObjComparator kComparator;
+    ASSERT_EQ(kComparator.compare(fromjson("{_id: 0, x: 1, a: 1}"), project), 0);
+}
+
+TEST_F(InternalUnpackBucketBuildProjectToInternalizeTest,
+       BuildsIncludeProjectWhenProjectDependenciesAreDotted) {
+    auto pipeline = Pipeline::parse(
+        makeVector(fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo'}}"),
+                   fromjson("{$project: {'_id.a': true}}")),
+        getExpCtx());
+    auto& container = pipeline->getSources();
+    ASSERT_EQ(2u, container.size());
+
+    auto project = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.begin()->get())
+                       ->buildProjectToInternalize(container.begin(), &container);
+
+    const UnorderedFieldsBSONObjComparator kComparator;
+    ASSERT_EQ(kComparator.compare(fromjson("{_id: 1}"), project), 0);
+}
+
+TEST_F(InternalUnpackBucketBuildProjectToInternalizeTest,
+       DoesNotBuildProjectWhenThereAreNoDependencies) {
+    auto pipeline = Pipeline::parse(
+        makeVector(fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo'}}"),
+                   fromjson("{$group: {_id: {$const: null}, count: { $sum: {$const: 1 }}}}")),
+        getExpCtx());
+    auto& container = pipeline->getSources();
+    ASSERT_EQ(2u, container.size());
+
+    auto project = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.begin()->get())
+                       ->buildProjectToInternalize(container.begin(), &container);
+    ASSERT(project.isEmpty());
+}
+
+TEST_F(InternalUnpackBucketBuildProjectToInternalizeTest,
+       DoesNotBuildProjectWhenSortDependenciesAreNotFinite) {
+    auto pipeline = Pipeline::parse(
+        makeVector(fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo'}}"),
+                   fromjson("{$sort: {x: 1}}")),
+        getExpCtx());
+    auto& container = pipeline->getSources();
+    ASSERT_EQ(2u, container.size());
+
+    auto project = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.begin()->get())
+                       ->buildProjectToInternalize(container.begin(), &container);
+    ASSERT(project.isEmpty());
+}
+
+TEST_F(InternalUnpackBucketBuildProjectToInternalizeTest,
+       DoesNotBuildProjectWhenProjectDependenciesAreNotFinite) {
+    auto pipeline = Pipeline::parse(
+        makeVector(fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo'}}"),
+                   fromjson("{$sort: {x: 1}}"),
+                   fromjson("{$project: {_id: false, x: false}}")),
+        getExpCtx());
+    auto& container = pipeline->getSources();
+    ASSERT_EQ(3u, container.size());
+
+    auto project = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.begin()->get())
+                       ->buildProjectToInternalize(container.begin(), &container);
+    ASSERT(project.isEmpty());
+}
+
+TEST_F(InternalUnpackBucketBuildProjectToInternalizeTest,
+       DoesNotBuildProjectWhenViableInclusionProjectExists) {
+    auto pipeline = Pipeline::parse(
+        makeVector(fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo'}}"),
+                   fromjson("{$project: {_id: true, x: true}}")),
+        getExpCtx());
+    auto& container = pipeline->getSources();
+    ASSERT_EQ(2u, container.size());
+
+    auto project = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.begin()->get())
+                       ->buildProjectToInternalize(container.begin(), &container);
+    ASSERT(project.isEmpty());
+}
+
+TEST_F(InternalUnpackBucketBuildProjectToInternalizeTest,
+       DoesNotBuildProjectWhenViableNonBoolInclusionProjectExists) {
+    auto pipeline = Pipeline::parse(
+        makeVector(fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo'}}"),
+                   fromjson("{$project: {_id: 1, x: 1.0, y: 1.5}}")),
+        getExpCtx());
+    auto& container = pipeline->getSources();
+    ASSERT_EQ(2u, container.size());
+
+    auto project = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.begin()->get())
+                       ->buildProjectToInternalize(container.begin(), &container);
+    ASSERT(project.isEmpty());
+}
+
+TEST_F(InternalUnpackBucketBuildProjectToInternalizeTest,
+       DoesNotBuildProjectWhenViableExclusionProjectExists) {
+    auto pipeline = Pipeline::parse(
+        makeVector(fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo'}}"),
+                   fromjson("{$project: {_id: false, x: false}}")),
+        getExpCtx());
+    auto& container = pipeline->getSources();
+    ASSERT_EQ(2u, container.size());
+
+    auto project = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.begin()->get())
+                       ->buildProjectToInternalize(container.begin(), &container);
+    ASSERT(project.isEmpty());
+}
+
+TEST_F(InternalUnpackBucketBuildProjectToInternalizeTest,
+       BuildsInclusionProjectInsteadOfViableExclusionProject) {
+    auto pipeline = Pipeline::parse(
+        makeVector(fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo'}}"),
+                   fromjson("{$project: {_id: false, x: false}}"),
+                   fromjson("{$sort: {y: 1}}"),
+                   fromjson("{$group: {_id: '$y', f: {$first: '$z'}}}")),
+        getExpCtx());
+    auto& container = pipeline->getSources();
+    ASSERT_EQ(4u, container.size());
+
+    auto project = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.begin()->get())
+                       ->buildProjectToInternalize(container.begin(), &container);
+
+    const UnorderedFieldsBSONObjComparator kComparator;
+    ASSERT_EQ(kComparator.compare(fromjson("{_id: 0, y: 1, z: 1}"), project), 0);
+}
+
+/******************************* internalizeProject() tests *******************************/
+using InternalUnpackBucketInternalizeProjectTest = AggregationContextFixture;
+
+TEST_F(InternalUnpackBucketInternalizeProjectTest, InternalizesInclusionProject) {
+    auto pipeline = Pipeline::parse(
+        makeVector(fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo'}}"),
+                   fromjson("{$project: {x: true, y: true, _id: true}}")),
+        getExpCtx());
     ASSERT_EQ(2u, pipeline->getSources().size());
+    auto& container = pipeline->getSources();
+
+    dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.begin()->get())
+        ->internalizeProject(container.begin(), &container);
+
+    auto serialized = pipeline->serializeToBson();
+    ASSERT_EQ(1u, serialized.size());
+    ASSERT_BSONOBJ_EQ(
+        fromjson("{$_internalUnpackBucket: { include: ['_id', 'x', 'y'], timeField: 'foo'}}"),
+        serialized[0]);
+}
+
+TEST_F(InternalUnpackBucketInternalizeProjectTest, InternalizesInclusionButExcludesId) {
+    auto pipeline = Pipeline::parse(
+        makeVector(fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo'}}"),
+                   fromjson("{$project: {x: true, y: true, _id: false}}")),
+        getExpCtx());
+    ASSERT_EQ(2u, pipeline->getSources().size());
+    auto& container = pipeline->getSources();
+
+    dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.begin()->get())
+        ->internalizeProject(container.begin(), &container);
+
+    auto serialized = pipeline->serializeToBson();
+    ASSERT_EQ(1u, serialized.size());
+    ASSERT_BSONOBJ_EQ(
+        fromjson("{$_internalUnpackBucket: { include: ['x', 'y'], timeField: 'foo'}}"),
+        serialized[0]);
+}
+
+TEST_F(InternalUnpackBucketInternalizeProjectTest, InternalizesInclusionThatImplicitlyIncludesId) {
+    auto pipeline = Pipeline::parse(
+        makeVector(fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo'}}"),
+                   fromjson("{$project: {x: true, y: true}}")),
+        getExpCtx());
+    ASSERT_EQ(2u, pipeline->getSources().size());
+    auto& container = pipeline->getSources();
+
+    dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.begin()->get())
+        ->internalizeProject(container.begin(), &container);
+
+    auto serialized = pipeline->serializeToBson();
+    ASSERT_EQ(1u, serialized.size());
+    ASSERT_BSONOBJ_EQ(
+        fromjson("{$_internalUnpackBucket: { include: ['_id', 'x', 'y'], timeField: 'foo'}}"),
+        serialized[0]);
+}
+
+TEST_F(InternalUnpackBucketInternalizeProjectTest, InternalizesPartOfInclusionProject) {
+    auto projectSpecObj = fromjson("{$project: {_id: true, x: {y: true}, a: {b: '$c'}}}");
+    auto pipeline = Pipeline::parse(
+        makeVector(fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo'}}"),
+                   projectSpecObj),
+        getExpCtx());
+    ASSERT_EQ(2u, pipeline->getSources().size());
+    auto& container = pipeline->getSources();
+
+    dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.begin()->get())
+        ->internalizeProject(container.begin(), &container);
 
     auto serialized = pipeline->serializeToBson();
     ASSERT_EQ(2u, serialized.size());
+    ASSERT_BSONOBJ_EQ(
+        fromjson("{$_internalUnpackBucket: { include: ['_id', 'a', 'c', 'x'], timeField: 'foo'}}"),
+        serialized[0]);
+    ASSERT_BSONOBJ_EQ(projectSpecObj, serialized[1]);
+}
 
-    ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[0]);
+TEST_F(InternalUnpackBucketInternalizeProjectTest,
+       InternalizesPartOfInclusionProjectButExcludesId) {
+    auto projectSpecObj = fromjson("{$project: {x: {y: true}, a: {b: '$c'}, _id: false}}");
+    auto pipeline = Pipeline::parse(
+        makeVector(fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo'}}"),
+                   projectSpecObj),
+        getExpCtx());
+    ASSERT_EQ(2u, pipeline->getSources().size());
+    auto& container = pipeline->getSources();
+
+    dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.begin()->get())
+        ->internalizeProject(container.begin(), &container);
+
+    auto serialized = pipeline->serializeToBson();
+    ASSERT_EQ(2u, serialized.size());
+    ASSERT_BSONOBJ_EQ(
+        fromjson("{$_internalUnpackBucket: { include: ['a', 'c', 'x'], timeField: 'foo'}}"),
+        serialized[0]);
+    ASSERT_BSONOBJ_EQ(projectSpecObj, serialized[1]);
+}
+
+TEST_F(InternalUnpackBucketInternalizeProjectTest, InternalizesExclusionProject) {
+    auto pipeline = Pipeline::parse(
+        makeVector(fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo'}}"),
+                   fromjson("{$project: {_id: false, x: false}}")),
+        getExpCtx());
+    ASSERT_EQ(2u, pipeline->getSources().size());
+    auto& container = pipeline->getSources();
+
+    dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.begin()->get())
+        ->internalizeProject(container.begin(), &container);
+
+    auto serialized = pipeline->serializeToBson();
+    ASSERT_EQ(1u, serialized.size());
+    ASSERT_BSONOBJ_EQ(
+        fromjson("{$_internalUnpackBucket: { exclude: ['_id', 'x'], timeField: 'foo'}}"),
+        serialized[0]);
+}
+
+TEST_F(InternalUnpackBucketInternalizeProjectTest, InternalizesExclusionProjectButIncludesId) {
+    auto pipeline = Pipeline::parse(
+        makeVector(fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo'}}"),
+                   fromjson("{$project: {_id: true, x: false}}")),
+        getExpCtx());
+    ASSERT_EQ(2u, pipeline->getSources().size());
+    auto& container = pipeline->getSources();
+
+    dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.begin()->get())
+        ->internalizeProject(container.begin(), &container);
+
+    auto serialized = pipeline->serializeToBson();
+    ASSERT_EQ(1u, serialized.size());
+    ASSERT_BSONOBJ_EQ(fromjson("{$_internalUnpackBucket: { exclude: ['x'], timeField: 'foo'}}"),
+                      serialized[0]);
+}
+
+TEST_F(InternalUnpackBucketInternalizeProjectTest,
+       InternalizesExclusionProjectThatImplicitlyIncludesId) {
+    auto pipeline = Pipeline::parse(
+        makeVector(fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo'}}"),
+                   fromjson("{$project: {x: false}}")),
+        getExpCtx());
+    ASSERT_EQ(2u, pipeline->getSources().size());
+    auto& container = pipeline->getSources();
+
+    dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.begin()->get())
+        ->internalizeProject(container.begin(), &container);
+
+    auto serialized = pipeline->serializeToBson();
+    ASSERT_EQ(1u, serialized.size());
+    ASSERT_BSONOBJ_EQ(fromjson("{$_internalUnpackBucket: { exclude: ['x'], timeField: 'foo'}}"),
+                      serialized[0]);
+}
+
+TEST_F(InternalUnpackBucketInternalizeProjectTest, InternalizesPartOfExclusionProjectExcludesId) {
+    auto pipeline = Pipeline::parse(
+        makeVector(fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo'}}"),
+                   fromjson("{$project: {x: {y: false}, _id: false}}")),
+        getExpCtx());
+    ASSERT_EQ(2u, pipeline->getSources().size());
+    auto& container = pipeline->getSources();
+
+    dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.begin()->get())
+        ->internalizeProject(container.begin(), &container);
+
+    auto serialized = pipeline->serializeToBson();
+    ASSERT_EQ(2u, serialized.size());
+    ASSERT_BSONOBJ_EQ(fromjson("{$_internalUnpackBucket: { exclude: ['_id'], timeField: 'foo'}}"),
+                      serialized[0]);
+    ASSERT_BSONOBJ_EQ(fromjson("{$project: {x: {y: false}, _id: true}}"), serialized[1]);
+}
+
+TEST_F(InternalUnpackBucketInternalizeProjectTest,
+       InternalizesPartOfExclusionProjectImplicitlyIncludesId) {
+    auto pipeline = Pipeline::parse(
+        makeVector(fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo'}}"),
+                   fromjson("{$project: {x: {y: false}, z: false}}")),
+        getExpCtx());
+    ASSERT_EQ(2u, pipeline->getSources().size());
+    auto& container = pipeline->getSources();
+
+    dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.begin()->get())
+        ->internalizeProject(container.begin(), &container);
+
+    auto serialized = pipeline->serializeToBson();
+    ASSERT_EQ(2u, serialized.size());
+    ASSERT_BSONOBJ_EQ(fromjson("{$_internalUnpackBucket: { exclude: ['z'], timeField: 'foo'}}"),
+                      serialized[0]);
+    ASSERT_BSONOBJ_EQ(fromjson("{$project: {x: {y: false}, _id: true}}"), serialized[1]);
+}
+
+TEST_F(InternalUnpackBucketInternalizeProjectTest,
+       InternalizesPartOfExclusionProjectIncludesNestedId) {
+    auto pipeline = Pipeline::parse(
+        makeVector(fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo'}}"),
+                   fromjson("{$project: {x: false, _id: {y: false}}}")),
+        getExpCtx());
+    ASSERT_EQ(2u, pipeline->getSources().size());
+    auto& container = pipeline->getSources();
+
+    dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.begin()->get())
+        ->internalizeProject(container.begin(), &container);
+
+    auto serialized = pipeline->serializeToBson();
+    ASSERT_EQ(2u, serialized.size());
+    ASSERT_BSONOBJ_EQ(fromjson("{$_internalUnpackBucket: { exclude: ['x'], timeField: 'foo'}}"),
+                      serialized[0]);
+    ASSERT_BSONOBJ_EQ(fromjson("{$project: {_id: {y: false}}}"), serialized[1]);
+}
+
+TEST_F(InternalUnpackBucketInternalizeProjectTest, InternalizesNonBoolInclusionProject) {
+    auto pipeline = Pipeline::parse(
+        makeVector(fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo'}}"),
+                   fromjson("{$project: {_id: 1, x: 1.0, y: 1.5}}")),
+        getExpCtx());
+    ASSERT_EQ(2u, pipeline->getSources().size());
+    auto& container = pipeline->getSources();
+
+    dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.begin()->get())
+        ->internalizeProject(container.begin(), &container);
+
+    auto serialized = pipeline->serializeToBson();
+    ASSERT_EQ(1u, serialized.size());
+    ASSERT_BSONOBJ_EQ(
+        fromjson("{$_internalUnpackBucket: { include: ['_id', 'x', 'y'], timeField: 'foo'}}"),
+        serialized[0]);
+}
+
+TEST_F(InternalUnpackBucketInternalizeProjectTest, InternalizesWhenInMiddleOfPipeline) {
+    auto matchSpecObj = fromjson("{$match: {'meta.source': 'primary'}}");
+    auto pipeline = Pipeline::parse(
+        makeVector(matchSpecObj,
+                   fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo'}}"),
+                   fromjson("{$project: {_id: false, x: true, y: true}}")),
+        getExpCtx());
+    ASSERT_EQ(3u, pipeline->getSources().size());
+    auto& container = pipeline->getSources();
+
+    dynamic_cast<DocumentSourceInternalUnpackBucket*>(std::next(container.begin())->get())
+        ->internalizeProject(std::next(container.begin()), &container);
+
+    auto serialized = pipeline->serializeToBson();
+    ASSERT_EQ(2u, serialized.size());
+    ASSERT_BSONOBJ_EQ(matchSpecObj, serialized[0]);
+    ASSERT_BSONOBJ_EQ(
+        fromjson("{$_internalUnpackBucket: { include: ['x', 'y'], timeField: 'foo'}}"),
+        serialized[1]);
+}
+
+TEST_F(InternalUnpackBucketInternalizeProjectTest, DoesNotInternalizeWhenNoProjectFollows) {
+    auto unpackBucketSpecObj =
+        fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo'}}");
+    auto groupSpecObj = fromjson("{$group: {_id: {$const: null}, count: { $sum: {$const: 1 }}}}");
+    auto pipeline = Pipeline::parse(makeVector(unpackBucketSpecObj, groupSpecObj), getExpCtx());
+    ASSERT_EQ(2u, pipeline->getSources().size());
+    auto& container = pipeline->getSources();
+
+    dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.begin()->get())
+        ->internalizeProject(container.begin(), &container);
+
+    auto serialized = pipeline->serializeToBson();
+    ASSERT_EQ(2u, serialized.size());
+    ASSERT_BSONOBJ_EQ(unpackBucketSpecObj, serialized[0]);
     ASSERT_BSONOBJ_EQ(groupSpecObj, serialized[1]);
 }
 
-TEST_F(InternalUnpackBucketStageTest, OptimizeDoesNotAddProjectWhenSortDependenciesAreNotFinite) {
-    auto unpackSpecObj = fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo'}}");
-    auto sortSpecObj = fromjson("{$sort: {x: 1}}");
-
-    auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, sortSpecObj), getExpCtx());
+TEST_F(InternalUnpackBucketInternalizeProjectTest,
+       DoesNotInternalizeWhenUnpackBucketAlreadyExcludes) {
+    auto unpackBucketSpecObj =
+        fromjson("{$_internalUnpackBucket: { exclude: ['a'], timeField: 'foo'}}");
+    auto projectSpecObj = fromjson("{$project: {_id: true}}");
+    auto pipeline = Pipeline::parse(makeVector(unpackBucketSpecObj, projectSpecObj), getExpCtx());
     ASSERT_EQ(2u, pipeline->getSources().size());
+    auto& container = pipeline->getSources();
 
-    pipeline->optimizePipeline();
-    ASSERT_EQ(2u, pipeline->getSources().size());
+    dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.begin()->get())
+        ->internalizeProject(container.begin(), &container);
 
     auto serialized = pipeline->serializeToBson();
     ASSERT_EQ(2u, serialized.size());
-
-    ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[0]);
-    ASSERT_BSONOBJ_EQ(sortSpecObj, serialized[1]);
-}
-
-TEST_F(InternalUnpackBucketStageTest,
-       OptimizeDoesNotAddProjectWhenProjectDependenciesAreNotFinite) {
-    auto unpackSpecObj = fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo'}}");
-    auto sortSpecObj = fromjson("{$sort: {x: 1}}");
-    auto projectSpecObj = fromjson("{$project: {_id: false, x: false}}");
-
-    auto pipeline =
-        Pipeline::parse(makeVector(unpackSpecObj, sortSpecObj, projectSpecObj), getExpCtx());
-    ASSERT_EQ(3u, pipeline->getSources().size());
-
-    pipeline->optimizePipeline();
-    ASSERT_EQ(3u, pipeline->getSources().size());
-
-    auto serialized = pipeline->serializeToBson();
-    ASSERT_EQ(3u, serialized.size());
-
-    ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[0]);
-    ASSERT_BSONOBJ_EQ(sortSpecObj, serialized[1]);
-    ASSERT_BSONOBJ_EQ(projectSpecObj, serialized[2]);
-}
-
-TEST_F(InternalUnpackBucketStageTest, OptimizeDoesNotAddProjectWhenViableInclusionProjectExists) {
-    auto unpackSpecObj = fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo'}}");
-    auto projectSpecObj = fromjson("{$project: {_id: true, x: true}}");
-
-    auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, projectSpecObj), getExpCtx());
-    ASSERT_EQ(2u, pipeline->getSources().size());
-
-    pipeline->optimizePipeline();
-    ASSERT_EQ(2u, pipeline->getSources().size());
-
-    auto serialized = pipeline->serializeToBson();
-    ASSERT_EQ(2u, serialized.size());
-
-    ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[0]);
+    ASSERT_BSONOBJ_EQ(unpackBucketSpecObj, serialized[0]);
     ASSERT_BSONOBJ_EQ(projectSpecObj, serialized[1]);
 }
 
-TEST_F(InternalUnpackBucketStageTest,
-       OptimizeDoesNotAddProjectWhenViableNonBoolInclusionProjectExists) {
-    auto unpackSpecObj = fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo'}}");
-    auto pipeline = Pipeline::parse(
-        makeVector(unpackSpecObj, fromjson("{$project: {_id: 1, x: 1.0, y: 1.5}}")), getExpCtx());
+TEST_F(InternalUnpackBucketInternalizeProjectTest,
+       DoesNotInternalizeWhenUnpackBucketAlreadyIncludes) {
+    auto unpackBucketSpecObj =
+        fromjson("{$_internalUnpackBucket: { include: ['a'], timeField: 'foo'}}");
+    auto projectSpecObj = fromjson("{$project: {_id: true}}");
+    auto pipeline = Pipeline::parse(makeVector(unpackBucketSpecObj, projectSpecObj), getExpCtx());
     ASSERT_EQ(2u, pipeline->getSources().size());
+    auto& container = pipeline->getSources();
 
-    pipeline->optimizePipeline();
-    ASSERT_EQ(2u, pipeline->getSources().size());
+    dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.begin()->get())
+        ->internalizeProject(container.begin(), &container);
 
     auto serialized = pipeline->serializeToBson();
     ASSERT_EQ(2u, serialized.size());
-
-    const UnorderedFieldsBSONObjComparator kComparator;
-    ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[0]);
-    ASSERT_EQ(
-        kComparator.compare(fromjson("{$project: {_id: true, x: true, y: true}}"), serialized[1]),
-        0);
-}
-
-TEST_F(InternalUnpackBucketStageTest, OptimizeDoesNotAddProjectWhenViableExclusionProjectExists) {
-    auto unpackSpecObj = fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo'}}");
-    auto projectSpecObj = fromjson("{$project: {_id: false, x: false}}");
-
-    auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, projectSpecObj), getExpCtx());
-    ASSERT_EQ(2u, pipeline->getSources().size());
-
-    pipeline->optimizePipeline();
-    ASSERT_EQ(2u, pipeline->getSources().size());
-
-    auto serialized = pipeline->serializeToBson();
-    ASSERT_EQ(2u, serialized.size());
-
-    ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[0]);
+    ASSERT_BSONOBJ_EQ(unpackBucketSpecObj, serialized[0]);
     ASSERT_BSONOBJ_EQ(projectSpecObj, serialized[1]);
 }
 
-TEST_F(InternalUnpackBucketStageTest, OptimizeAddsInclusionProjectInsteadOfViableExclusionProject) {
-    auto unpackSpecObj = fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo'}}");
-    auto projectSpecObj = fromjson("{$project: {_id: false, x: false}}");
-    auto sortSpecObj = fromjson("{$sort: {y: 1}}");
-    auto groupSpecObj = fromjson("{$group: {_id: '$y', f: {$first: '$z'}}}");
-
+TEST_F(InternalUnpackBucketInternalizeProjectTest,
+       InternalizeProjectUpdatesMetaAndTimeFieldStateInclusionProj) {
     auto pipeline = Pipeline::parse(
-        makeVector(unpackSpecObj, projectSpecObj, sortSpecObj, groupSpecObj), getExpCtx());
+        makeVector(
+            fromjson(
+                "{$_internalUnpackBucket: { exclude: [], timeField: 'time', metaField: 'meta'}}"),
+            fromjson("{$project: {meta: true, _id: true}}")),
+        getExpCtx());
+    ASSERT_EQ(2u, pipeline->getSources().size());
+    auto& container = pipeline->getSources();
+
+    auto unpack = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.begin()->get());
+    unpack->internalizeProject(container.begin(), &container);
+
+    auto serialized = pipeline->serializeToBson();
+    ASSERT_EQ(1u, serialized.size());
+    ASSERT_BSONOBJ_EQ(
+        fromjson(
+            "{$_internalUnpackBucket: { include: ['_id'], timeField: 'time', metaField: 'meta'}}"),
+        serialized[0]);
+    ASSERT_TRUE(unpack->includeMetaField());
+    ASSERT_FALSE(unpack->includeTimeField());
+}
+
+TEST_F(InternalUnpackBucketInternalizeProjectTest,
+       InternalizeProjectUpdatesMetaAndTimeFieldStateExclusionProj) {
+    auto unpackBucketSpecObj = fromjson(
+        "{$_internalUnpackBucket: { exclude: [], timeField: 'time', metaField: 'myMeta'}}");
+    auto pipeline = Pipeline::parse(
+        makeVector(unpackBucketSpecObj, fromjson("{$project: {myMeta: false}}")), getExpCtx());
+    ASSERT_EQ(2u, pipeline->getSources().size());
+    auto& container = pipeline->getSources();
+
+    auto unpack = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.begin()->get());
+    unpack->internalizeProject(container.begin(), &container);
+
+    auto serialized = pipeline->serializeToBson();
+    ASSERT_EQ(1u, serialized.size());
+    ASSERT_BSONOBJ_EQ(unpackBucketSpecObj, serialized[0]);
+    ASSERT_FALSE(unpack->includeMetaField());
+    ASSERT_TRUE(unpack->includeTimeField());
+}
+
+TEST_F(InternalUnpackBucketStageTest, OptimizeInternalizesAndOptimizesEndOfPipeline) {
+    auto sortSpecObj = fromjson("{$sort: {'a': 1}}");
+    auto matchSpecObj = fromjson("{$match: {x: {$gt: 1}}}");
+    auto pipeline = Pipeline::parse(
+        makeVector(fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo'}}"),
+                   fromjson("{$project: {_id: false, a: true, x: true}}"),
+                   sortSpecObj,
+                   matchSpecObj),
+        getExpCtx());
     ASSERT_EQ(4u, pipeline->getSources().size());
 
     pipeline->optimizePipeline();
-    ASSERT_EQ(5u, pipeline->getSources().size());
 
     auto serialized = pipeline->serializeToBson();
-    ASSERT_EQ(5u, serialized.size());
-
-    const UnorderedFieldsBSONObjComparator kComparator;
-    ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[0]);
-    ASSERT_EQ(
-        kComparator.compare(fromjson("{$project: {_id: false, y: true, z: true}}"), serialized[1]),
-        0);
-    ASSERT_BSONOBJ_EQ(projectSpecObj, serialized[2]);
-    ASSERT_BSONOBJ_EQ(sortSpecObj, serialized[3]);
-    ASSERT_BSONOBJ_EQ(groupSpecObj, serialized[4]);
+    ASSERT_EQ(3u, serialized.size());
+    ASSERT_BSONOBJ_EQ(
+        fromjson("{$_internalUnpackBucket: { include: ['a', 'x'], timeField: 'foo'}}"),
+        serialized[0]);
+    ASSERT_BSONOBJ_EQ(matchSpecObj, serialized[1]);
+    ASSERT_BSONOBJ_EQ(sortSpecObj, serialized[2]);
 }
 }  // namespace
 }  // namespace mongo

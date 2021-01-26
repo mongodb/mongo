@@ -241,31 +241,32 @@ void Pipeline::optimizePipeline() {
         return;
     }
 
+    optimizeContainer(&_sources);
+}
+
+void Pipeline::optimizeContainer(SourceContainer* container) {
     SourceContainer optimizedSources;
 
-    SourceContainer::iterator itr = _sources.begin();
-
-    // We could be swapping around stages during this process, so disconnect the pipeline to prevent
-    // us from entering a state with dangling pointers.
-    unstitch();
+    SourceContainer::iterator itr = container->begin();
     try {
-        while (itr != _sources.end()) {
+        while (itr != container->end()) {
             invariant((*itr).get());
-            itr = (*itr).get()->optimizeAt(itr, &_sources);
+            itr = (*itr).get()->optimizeAt(itr, container);
         }
 
         // Once we have reached our final number of stages, optimize each individually.
-        for (auto&& source : _sources) {
+        for (auto&& source : *container) {
             if (auto out = source->optimize()) {
                 optimizedSources.push_back(out);
             }
         }
-        _sources.swap(optimizedSources);
+        container->swap(optimizedSources);
     } catch (DBException& ex) {
         ex.addContext("Failed to optimize pipeline");
         throw;
     }
-    stitch();
+
+    stitch(container);
 }
 
 bool Pipeline::aggHasWriteStage(const BSONObj& cmd) {
@@ -421,20 +422,19 @@ vector<BSONObj> Pipeline::serializeToBson() const {
     return asBson;
 }
 
-void Pipeline::unstitch() {
-    for (auto&& stage : _sources) {
-        stage->setSource(nullptr);
-    }
+void Pipeline::stitch() {
+    stitch(&_sources);
 }
 
-void Pipeline::stitch() {
-    if (_sources.empty()) {
+void Pipeline::stitch(SourceContainer* container) {
+    if (container->empty()) {
         return;
     }
+
     // Chain together all the stages.
-    DocumentSource* prevSource = _sources.front().get();
+    DocumentSource* prevSource = container->front().get();
     prevSource->setSource(nullptr);
-    for (SourceContainer::iterator iter(++_sources.begin()), listEnd(_sources.end());
+    for (Pipeline::SourceContainer::iterator iter(++container->begin()), listEnd(container->end());
          iter != listEnd;
          ++iter) {
         intrusive_ptr<DocumentSource> pTemp(*iter);

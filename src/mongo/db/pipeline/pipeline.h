@@ -238,6 +238,11 @@ public:
     void optimizePipeline();
 
     /**
+     * Modifies the container, optimizing it by combining and swapping stages.
+     */
+    static void optimizeContainer(SourceContainer* container);
+
+    /**
      * Returns any other collections involved in the pipeline in addition to the collection the
      * aggregation is run on. All namespaces returned are the names of collections, after views have
      * been resolved.
@@ -353,10 +358,11 @@ private:
     void stitch();
 
     /**
-     * Reset all stages' child pointers to nullptr. Used to prevent dangling pointers during the
-     * optimization process, where we might swap or destroy stages.
+     * Stitch together the source pointers by calling setSource() for each source in 'container'.
+     * This function must be called any time the order of stages within the container changes, e.g.
+     * in optimizeContainer().
      */
-    void unstitch();
+    static void stitch(SourceContainer* container);
 
     /**
      * Performs common validation for top-level or facet pipelines. Throws if the pipeline is

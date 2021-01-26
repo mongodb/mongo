@@ -44,6 +44,119 @@ REGISTER_DOCUMENT_SOURCE(_internalUnpackBucket,
                          LiteParsedDocumentSourceDefault::parse,
                          DocumentSourceInternalUnpackBucket::createFromBson);
 
+namespace {
+/**
+ * Removes metaField from the field set and returns a boolean indicating whether metaField should be
+ * included in the materialized measurements. Always returns false if metaField does not exist.
+ */
+auto eraseMetaFromFieldSetAndDetermineIncludeMeta(BucketUnpacker::Behavior unpackerBehavior,
+                                                  BucketSpec* bucketSpec) {
+    if (!bucketSpec->metaField) {
+        return false;
+    } else if (auto itr = bucketSpec->fieldSet.find(*bucketSpec->metaField);
+               itr != bucketSpec->fieldSet.end()) {
+        bucketSpec->fieldSet.erase(itr);
+        return unpackerBehavior == BucketUnpacker::Behavior::kInclude;
+    } else {
+        return unpackerBehavior == BucketUnpacker::Behavior::kExclude;
+    }
+}
+
+/**
+ * Determine if timestamp values should be included in the materialized measurements.
+ */
+auto determineIncludeTimeField(BucketUnpacker::Behavior unpackerBehavior, BucketSpec* bucketSpec) {
+    return (unpackerBehavior == BucketUnpacker::Behavior::kInclude) ==
+        (bucketSpec->fieldSet.find(bucketSpec->timeField) != bucketSpec->fieldSet.end());
+}
+
+/**
+ * A projection can be internalized if every field corresponds to a boolean value. Note that this
+ * correctly rejects dotted fieldnames, which are mapped to objects internally.
+ */
+bool canInternalizeProjectObj(const BSONObj& projObj) {
+    return std::all_of(projObj.begin(), projObj.end(), [](auto&& e) { return e.isBoolean(); });
+}
+
+/**
+ * If 'src' represents an inclusion or exclusion $project, return a BSONObj representing it and a
+ * bool indicating its type (true for inclusion, false for exclusion). Else return an empty BSONObj.
+ */
+auto getIncludeExcludeProjectAndType(DocumentSource* src) {
+    if (const auto proj = dynamic_cast<DocumentSourceSingleDocumentTransformation*>(src); proj &&
+        (proj->getType() == TransformerInterface::TransformerType::kInclusionProjection ||
+         proj->getType() == TransformerInterface::TransformerType::kExclusionProjection)) {
+        return std::pair{proj->getTransformer().serializeTransformation(boost::none).toBson(),
+                         proj->getType() ==
+                             TransformerInterface::TransformerType::kInclusionProjection};
+    }
+    return std::pair{BSONObj{}, false};
+}
+
+/**
+ * Determine which fields can be moved out of 'src', if it is a $project, and into
+ * $_internalUnpackBucket. Return the set of those field names, the remaining $project, and a bool
+ * indicating its type.
+ *
+ * For example, given {$project: {a: 1, b.c: 1, _id: 0}}, return the set ['a', 'b'], the project
+ * {a: 1, b.c: 1}, and 'true'. In this case, '_id' does not need to be included in either the set or
+ * the project, since the unpack will exclude any field not explicitly included in its field set.
+ */
+auto extractInternalizableFieldsRemainingProjectAndType(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx, DocumentSource* src) {
+    auto eraseIdIf = [](std::set<std::string>&& set, auto&& cond) {
+        if (cond)
+            set.erase("_id");
+        return std::move(set);
+    };
+
+    if (auto [remainingProj, isInclusion] = getIncludeExcludeProjectAndType(src);
+        remainingProj.isEmpty()) {
+        // There is nothing to internalize.
+        return std::tuple{std::set<std::string>{}, remainingProj, isInclusion};
+    } else if (canInternalizeProjectObj(remainingProj)) {
+        // We can internalize the whole object, so 'remainingProject' should be empty.
+        return std::tuple{eraseIdIf(remainingProj.getFieldNames<std::set<std::string>>(),
+                                    remainingProj.getBoolField("_id") != isInclusion),
+                          BSONObj{},
+                          isInclusion};
+    } else if (isInclusion) {
+        // We can't internalize the whole inclusion, so we must leave it unmodified in the pipeline
+        // for correctness. We do dependency analysis to get an internalizable $project to ensure
+        // we're handling dotted fields or fields referenced inside 'src'.
+        Pipeline::SourceContainer projectStage{src};
+        auto dependencyProj =
+            Pipeline::getDependenciesForContainer(expCtx, projectStage, boost::none)
+                .toProjectionWithoutMetadata(DepsTracker::TruncateToRootLevel::yes);
+        return std::tuple{eraseIdIf(dependencyProj.getFieldNames<std::set<std::string>>(),
+                                    dependencyProj.getIntField("_id") != 1),
+                          remainingProj,
+                          isInclusion};
+    } else {
+        // We can internalize any fields that are not dotted, and leave the rest in 'remainingProj'.
+        std::set<std::string> topLevelFields;
+        std::for_each(remainingProj.begin(), remainingProj.end(), [&topLevelFields](auto&& elem) {
+            // '_id' may be included in this exclusion. If so, don't add it to 'topLevelFields'.
+            if (elem.isBoolean() && !elem.Bool()) {
+                topLevelFields.emplace(elem.fieldName());
+            }
+        });
+        return std::tuple{topLevelFields, remainingProj.removeFields(topLevelFields), isInclusion};
+    }
+}
+
+// Optimize the given pipeline after the $_internalUnpackBucket stage.
+void optimizeEndOfPipeline(Pipeline::SourceContainer::iterator itr,
+                           Pipeline::SourceContainer* container) {
+    // We must create a new SourceContainer representing the subsection of the pipeline we wish to
+    // optimize, since otherwise calls to optimizeAt() will overrun these limits.
+    auto endOfPipeline = Pipeline::SourceContainer(std::next(itr), container->end());
+    Pipeline::optimizeContainer(&endOfPipeline);
+    container->erase(std::next(itr), container->end());
+    container->splice(std::next(itr), endOfPipeline);
+}
+}  // namespace
+
 void BucketUnpacker::reset(BSONObj&& bucket) {
     _fieldIters.clear();
     _timeFieldIter = boost::none;
@@ -100,6 +213,13 @@ void BucketUnpacker::reset(BSONObj&& bucket) {
             _fieldIters.push_back({colName.toString(), BSONObjIterator{elem.Obj()}});
         }
     }
+}
+
+void BucketUnpacker::setBucketSpecAndBehavior(BucketSpec&& bucketSpec, Behavior behavior) {
+    _includeMetaField = eraseMetaFromFieldSetAndDetermineIncludeMeta(behavior, &bucketSpec);
+    _includeTimeField = determineIncludeTimeField(behavior, &bucketSpec);
+    _unpackerBehavior = behavior;
+    _spec = std::move(bucketSpec);
 }
 
 Document BucketUnpacker::getNext() {
@@ -189,21 +309,10 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalUnpackBucket::createF
             "The $_internalUnpackBucket stage requires a timeField parameter",
             specElem[kTimeFieldName].ok());
 
-    // Determine if timestamp values should be included in the materialized measurements.
-    auto includeTimeField = (unpackerBehavior == BucketUnpacker::Behavior::kInclude) ==
-        (bucketSpec.fieldSet.find(bucketSpec.timeField) != bucketSpec.fieldSet.end());
+    auto includeTimeField = determineIncludeTimeField(unpackerBehavior, &bucketSpec);
 
-    // Check the include/exclude set to determine if measurements should be materialized with
-    // metadata.
-    auto includeMetaField = false;
-    if (bucketSpec.metaField) {
-        const auto metaFieldIt = bucketSpec.fieldSet.find(*bucketSpec.metaField);
-        auto found = metaFieldIt != bucketSpec.fieldSet.end();
-        if (found) {
-            bucketSpec.fieldSet.erase(metaFieldIt);
-        }
-        includeMetaField = (unpackerBehavior == BucketUnpacker::Behavior::kInclude) == found;
-    }
+    auto includeMetaField =
+        eraseMetaFromFieldSetAndDetermineIncludeMeta(unpackerBehavior, &bucketSpec);
 
     return make_intrusive<DocumentSourceInternalUnpackBucket>(
         expCtx,
@@ -250,65 +359,64 @@ DocumentSource::GetNextResult DocumentSourceInternalUnpackBucket::doGetNext() {
     return nextResult;
 }
 
-namespace {
-/**
- * A projection can be internalized if it does not include any dotted field names and if every field
- * name corresponds to a boolean value.
- */
-bool canInternalizeProjectObj(const BSONObj& projObj) {
-    const auto names = projObj.getFieldNames<std::set<std::string>>();
-    return std::all_of(names.begin(), names.end(), [&projObj](auto&& name) {
-        return name.find('.') == std::string::npos && projObj.getField(name).isBoolean();
-    });
-}
-
-/**
- * If 'src' represents an inclusion or exclusion $project, return a BSONObj representing it, else
- * return an empty BSONObj. If 'inclusionOnly' is true, 'src' must be an inclusion $project.
- */
-auto getProjectObj(DocumentSource* src, bool inclusionOnly) {
-    if (const auto projStage = dynamic_cast<DocumentSourceSingleDocumentTransformation*>(src);
-        projStage &&
-        (projStage->getType() == TransformerInterface::TransformerType::kInclusionProjection ||
-         (!inclusionOnly &&
-          projStage->getType() == TransformerInterface::TransformerType::kExclusionProjection))) {
-        return projStage->getTransformer().serializeTransformation(boost::none).toBson();
+void DocumentSourceInternalUnpackBucket::internalizeProject(Pipeline::SourceContainer::iterator itr,
+                                                            Pipeline::SourceContainer* container) {
+    if (std::next(itr) == container->end() || !_bucketUnpacker.bucketSpec().fieldSet.empty()) {
+        // There is no project to internalize or there are already fields being included/excluded.
+        return;
+    }
+    auto [fields, remainingProject, isInclusion] =
+        extractInternalizableFieldsRemainingProjectAndType(getContext(), std::next(itr)->get());
+    if (fields.empty()) {
+        return;
     }
 
-    return BSONObj{};
+    // Update 'bucketUnpacker' state with the new fields and behavior. Update 'container' state by
+    // removing the old $project and potentially replacing it with 'remainingProject'.
+    auto spec = _bucketUnpacker.bucketSpec();
+    spec.fieldSet = std::move(fields);
+    _bucketUnpacker.setBucketSpecAndBehavior(std::move(spec),
+                                             isInclusion ? BucketUnpacker::Behavior::kInclude
+                                                         : BucketUnpacker::Behavior::kExclude);
+    container->erase(std::next(itr));
+    if (!remainingProject.isEmpty()) {
+        container->insert(std::next(itr),
+                          DocumentSourceProject::createFromBson(
+                              BSON("$project" << remainingProject).firstElement(), getContext()));
+    }
 }
 
 /**
- * Given a source container and an iterator pointing to the $unpackBucket stage, builds a projection
- * BSONObj that can be entirely moved into the $unpackBucket stage, following these rules:
- *    1. If there is an inclusion projection immediately after the $unpackBucket which can be
- *       internalized, an empty BSONObj will be returned.
+ * Given a source container and an iterator pointing to the $_internalUnpackBucket, builds a
+ * projection that can be entirely moved into the $_internalUnpackBucket, following these rules:
+ *    1. If there is an inclusion projection immediately after which can be internalized, an empty
+         BSONObj will be returned.
  *    2. Otherwise, if there is a finite dependency set for the rest of the pipeline, an inclusion
  *       $project representing it and containing only root-level fields will be returned. An
  *       inclusion $project will be returned here even if there is a viable exclusion $project
  *       next in the pipeline.
  *    3. Otherwise, an empty BSONObj will be returned.
  */
-auto buildProjectToInternalize(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                               Pipeline::SourceContainer::iterator itr,
-                               Pipeline::SourceContainer* container) {
-    // Check for a viable inclusion $project after the $unpackBucket. This handles case 1.
-    if (auto projObj = getProjectObj(std::next(itr)->get(), true);
-        !projObj.isEmpty() && canInternalizeProjectObj(projObj)) {
+BSONObj DocumentSourceInternalUnpackBucket::buildProjectToInternalize(
+    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) const {
+    if (std::next(itr) == container->end()) {
         return BSONObj{};
     }
 
-    // If there is a finite dependency set for the pipeline after the $unpackBucket, obtain an
-    // inclusion $project representing its root-level fields. Otherwise, we get an empty BSONObj.
-    Pipeline::SourceContainer restOfPipeline(std::next(itr), container->end());
-    auto deps = Pipeline::getDependenciesForContainer(expCtx, restOfPipeline, boost::none);
-    auto dependencyProj = deps.toProjectionWithoutMetadata(DepsTracker::TruncateToRootLevel::yes);
+    // Check for a viable inclusion $project after the $_internalUnpackBucket. This handles case 1.
+    if (auto [project, isInclusion] = getIncludeExcludeProjectAndType(std::next(itr)->get());
+        isInclusion && !project.isEmpty() && canInternalizeProjectObj(project)) {
+        return BSONObj{};
+    }
 
-    // If 'dependencyProj' is not empty, we're in case 2. If it is empty, we're in case 3. There may
-    // be a viable exclusion $project in the pipeline, but we don't need to check for it here.
-    return dependencyProj;
+    // Attempt to get an inclusion $project representing the root-level dependencies of the pipeline
+    // after the $_internalUnpackBucket. If this $project is not empty, then the dependency set was
+    // finite, and we are in case 2. If it is empty, we're in case 3. There may be a viable
+    // exclusion $project in the pipeline, but we don't need to check for it here.
+    Pipeline::SourceContainer restOfPipeline(std::next(itr), container->end());
+    auto deps = Pipeline::getDependenciesForContainer(getContext(), restOfPipeline, boost::none);
+    return deps.toProjectionWithoutMetadata(DepsTracker::TruncateToRootLevel::yes);
 }
-}  // namespace
 
 Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimizeAt(
     Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
@@ -319,15 +427,20 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
     }
 
     // Attempt to build an internalizable $project based on dependency analysis.
-    if (auto projObj = buildProjectToInternalize(getContext(), itr, container);
-        !projObj.isEmpty()) {
+    if (auto projObj = buildProjectToInternalize(itr, container); !projObj.isEmpty()) {
         // Give the new $project a chance to be optimized before internalizing.
         container->insert(std::next(itr),
                           DocumentSourceProject::createFromBson(
                               BSON("$project" << projObj).firstElement(), pExpCtx));
-        return std::next(itr);
     }
 
-    return std::next(itr);
+    // Optimize the pipeline after the $unpackBucket.
+    optimizeEndOfPipeline(std::next(itr), container);
+
+    // If there is a $project following the $_internalUnpackBucket, internalize as much of it as
+    // possible, and update the state of 'container' and '_bucketUnpacker' to reflect this.
+    internalizeProject(itr, container);
+
+    return container->end();
 }
 }  // namespace mongo

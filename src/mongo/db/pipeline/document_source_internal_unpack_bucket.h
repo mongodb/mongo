@@ -97,18 +97,28 @@ public:
         return _bucket;
     }
 
+    bool includeMetaField() const {
+        return _includeMetaField;
+    }
+
+    bool includeTimeField() const {
+        return _includeTimeField;
+    }
+
+    void setBucketSpecAndBehavior(BucketSpec&& bucketSpec, Behavior behavior);
+
 private:
-    const BucketSpec _spec;
-    const Behavior _unpackerBehavior;
+    BucketSpec _spec;
+    Behavior _unpackerBehavior;
 
     // Iterates the timestamp section of the bucket to drive the unpacking iteration.
     boost::optional<BSONObjIterator> _timeFieldIter;
 
     // A flag used to mark that the timestamp value should be materialized in measurements.
-    const bool _includeTimeField;
+    bool _includeTimeField;
 
-    // A flag used to mark that a bucket's metadata element should be materialized in measurements.
-    const bool _includeMetaField;
+    // A flag used to mark that a bucket's metadata value should be materialized in measurements.
+    bool _includeMetaField;
 
     // The bucket being unpacked.
     BSONObj _bucket;
@@ -141,6 +151,14 @@ public:
         return kStageName.rawData();
     }
 
+    bool includeMetaField() const {
+        return _bucketUnpacker.includeMetaField();
+    }
+
+    bool includeTimeField() const {
+        return _bucketUnpacker.includeTimeField();
+    }
+
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
         return {StreamType::kStreaming,
                 PositionRequirement::kNone,
@@ -161,6 +179,16 @@ public:
 
     Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
                                                      Pipeline::SourceContainer* container) final;
+
+    /*
+     * Given a source container and an iterator pointing to the unpack stage, attempt to internalize
+     * a following $project, and update the state for 'container' and '_bucketUnpacker'.
+     */
+    void internalizeProject(Pipeline::SourceContainer::iterator itr,
+                            Pipeline::SourceContainer* container);
+
+    BSONObj buildProjectToInternalize(Pipeline::SourceContainer::iterator itr,
+                                      Pipeline::SourceContainer* container) const;
 
 private:
     GetNextResult doGetNext() final;
