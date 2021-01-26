@@ -210,6 +210,11 @@ public:
     }
 
     /**
+     * Returns true if this shard has any chunks for the collection.
+     */
+    bool currentShardHasAnyChunks() const;
+
+    /**
      * Given a key in the shard key range, get the next range which overlaps or is greater than
      * this key.
      *

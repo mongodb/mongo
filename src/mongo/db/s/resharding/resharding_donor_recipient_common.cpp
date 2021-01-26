@@ -92,6 +92,12 @@ void processReshardingFieldsForDonorCollection(OperationContext* opCtx,
         return;
     }
 
+    // This could be a shard not indicated as a donor that's trying to refresh the source
+    // collection. In this case, we don't want to create a donor machine.
+    if (!metadata.currentShardHasAnyChunks()) {
+        return;
+    }
+
     auto donorDoc = constructDonorDocumentFromReshardingFields(nss, metadata, reshardingFields);
     createReshardingStateMachine<ReshardingDonorService,
                                  DonorStateMachine,
@@ -124,6 +130,12 @@ void processReshardingFieldsForRecipientCollection(OperationContext* opCtx,
     // RecipientStateMachine until all donor shards are known to be prepared for the recipient to
     // start cloning.
     if (reshardingFields.getState() != CoordinatorStateEnum::kCloning) {
+        return;
+    }
+
+    // This could be a shard not indicated as a recipient that's trying to refresh the temporary
+    // collection. In this case, we don't want to create a recipient machine.
+    if (!metadata.currentShardHasAnyChunks()) {
         return;
     }
 
@@ -183,10 +195,9 @@ void processReshardingFieldsForCollection(OperationContext* opCtx,
     auto coordinatorState = reshardingFields.getState();
     if (coordinatorState != CoordinatorStateEnum::kError) {
         if (coordinatorState < CoordinatorStateEnum::kDecisionPersisted) {
-            // The reshardingFields are either (1) on the originalNss because this shard is a donor
-            // or (2) temporaryNss because this shard is a recipient. Until the cordinator is in
-            // state CoordinatorStateEnum::kDecisionPersisted, reshardingFields should contain
-            // either recipientFields or donorFields, not both.
+            // Prior to the state CoordinatorStateEnum::kDecisionPersisted, only the source
+            // collection's config.collections entry should have donorFields, and only the
+            // temporary resharding collection's entry should have recipientFields.
             uassert(
                 5274201,
                 fmt::format("reshardingFields must contain either donorFields or recipientFields "
@@ -197,8 +208,9 @@ void processReshardingFieldsForCollection(OperationContext* opCtx,
                 reshardingFields.getDonorFields().is_initialized() ^
                     reshardingFields.getRecipientFields().is_initialized());
         } else {
-            // Once the entry in config.collections for the temporaryNss is removed, recipientFields
-            // and donorFields should both exist in the reshardingFields.
+            // At and after state CoordinatorStateEnum::kDecisionPersisted, the temporary
+            // resharding collection's config.collections entry has been removed, and so the
+            // source collection's entry should have both donorFields and recipientFields.
             uassert(
                 5274202,
                 fmt::format("reshardingFields must contain both donorFields and recipientFields "
