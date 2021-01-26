@@ -584,6 +584,8 @@ bool CurOp::completeAndLogOperation(OperationContext* opCtx,
             opCtx, (lockerInfo ? &lockerInfo->stats : nullptr), operationMetricsPtr, &attr);
 
         LOGV2_OPTIONS(51803, {component}, "Slow query", attr);
+
+        _checkForFailpointsAfterCommandLogged();
     }
 
     // Return 'true' if this operation should also be added to the profiler.
@@ -592,6 +594,23 @@ bool CurOp::completeAndLogOperation(OperationContext* opCtx,
     if (_dbprofile <= 0)
         return false;
     return shouldProfileAtLevel1;
+}
+
+// Failpoints after commands are logged.
+constexpr auto kPrepareTransactionCmdName = "prepareTransaction"_sd;
+MONGO_FAIL_POINT_DEFINE(waitForPrepareTransactionCommandLogged);
+
+void CurOp::_checkForFailpointsAfterCommandLogged() {
+    if (!isCommand() || !getCommand()) {
+        return;
+    }
+
+    auto cmdName = getCommand()->getName();
+    if (cmdName == kPrepareTransactionCmdName) {
+        if (MONGO_unlikely(waitForPrepareTransactionCommandLogged.shouldFail())) {
+            LOGV2(31481, "waitForPrepareTransactionCommandLogged failpoint enabled");
+        }
+    }
 }
 
 Command::ReadWriteType CurOp::getReadWriteType() const {

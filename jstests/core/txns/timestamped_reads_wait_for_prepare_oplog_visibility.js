@@ -37,14 +37,14 @@ TestData.otherDocFilter = {
  * field. This function is run in a separate thread and tests that oplog visibility blocks
  * certain reads and that prepare conflicts block other types of reads.
  */
-const readThreadFunc = function(readFunc, _collName, timesEntered) {
+const readThreadFunc = function(readFunc, _collName, hangTimesEntered, logTimesEntered) {
     load("jstests/libs/logv2_helpers.js");
     load("jstests/libs/fail_point_util.js");
 
     // Do not start reads until we are blocked in 'prepareTransaction'.
     assert.commandWorked(db.adminCommand({
         waitForFailPoint: "hangAfterReservingPrepareTimestamp",
-        timesEntered: timesEntered,
+        timesEntered: hangTimesEntered,
         maxTimeMS: kDefaultWaitForFailPointTimeout
     }));
 
@@ -52,19 +52,16 @@ const readThreadFunc = function(readFunc, _collName, timesEntered) {
     const readFuncObj = readFunc(_collName);
     readFuncObj.oplogVisibility();
 
-    // Let the transaction finish preparing and wait for 'prepareTransaction' to complete.
+    // Let the transaction finish preparing.
     assert.commandWorked(
         db.adminCommand({configureFailPoint: 'hangAfterReservingPrepareTimestamp', mode: 'off'}));
 
-    if (isJsonLog(db.getMongo())) {
-        checkLog.containsJson(db.getMongo(), 51803, {
-            'command': function(obj) {
-                return obj.hasOwnProperty('prepareTransaction');
-            }
-        });
-    } else {
-        checkLog.contains(db.getMongo(), "command: prepareTransaction");
-    }
+    // Wait for 'prepareTransaction' to complete and be logged.
+    assert.commandWorked(db.adminCommand({
+        waitForFailPoint: "waitForPrepareTransactionCommandLogged",
+        timesEntered: logTimesEntered,
+        maxTimeMS: kDefaultWaitForFailPointTimeout
+    }));
 
     readFuncObj.prepareConflict();
 };
@@ -80,7 +77,8 @@ function runTest(prefix, readFunc) {
     testColl.drop({writeConcern: {w: "majority"}});
     assert.commandWorked(testDB.runCommand({create: collName, writeConcern: {w: 'majority'}}));
 
-    let failPoint = configureFailPoint(testDB, "hangAfterReservingPrepareTimestamp");
+    let hangFailPoint = configureFailPoint(testDB, "hangAfterReservingPrepareTimestamp");
+    let logFailPoint = configureFailPoint(testDB, "waitForPrepareTransactionCommandLogged");
 
     // Insert a document for the transaction.
     assert.commandWorked(testColl.insert(TestData.txnDoc));
@@ -103,8 +101,11 @@ function runTest(prefix, readFunc) {
     // Clear the log history to ensure we only see the most recent 'prepareTransaction'
     // failpoint log message.
     assert.commandWorked(db.adminCommand({clearLog: 'global'}));
-    const joinReadThread = startParallelShell(
-        funWithArgs(readThreadFunc, readFunc, collName, failPoint.timesEntered + 1));
+    const joinReadThread = startParallelShell(funWithArgs(readThreadFunc,
+                                                          readFunc,
+                                                          collName,
+                                                          hangFailPoint.timesEntered + 1,
+                                                          logFailPoint.timesEntered + 1));
 
     jsTestLog("Preparing the transaction for " + prefix);
     const prepareTimestamp = PrepareHelpers.prepareTransaction(session);

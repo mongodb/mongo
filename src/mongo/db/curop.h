@@ -760,6 +760,12 @@ private:
      */
     void _finishInit(OperationContext* opCtx, CurOpStack* stack);
 
+    /**
+     * Handles failpoints that check whether a command has completed or not.
+     * Used for testing purposes instead of the getLog command.
+     */
+    void _checkForFailpointsAfterCommandLogged();
+
     static const OperationContext::Decoration<CurOpStack> _curopStack;
 
     CurOp(OperationContext*, CurOpStack*);
