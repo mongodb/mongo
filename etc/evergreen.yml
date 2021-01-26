@@ -10377,14 +10377,14 @@ buildvariants:
   - name: .read_write_concern !.large
   - name: .replica_sets !.encrypt !.auth
     distros:
-    - rhel62-medium
+    - rhel62-large
   - name: replica_sets_reconfig_jscore_passthrough_gen
   - name: replica_sets_reconfig_jscore_stepdown_passthrough
     distros:
-    - rhel62-medium
+    - rhel62-large
   - name: replica_sets_reconfig_kill_primary_jscore_passthrough
     distros:
-    - rhel62-medium
+    - rhel62-large
   - name: retryable_writes_jscore_passthrough_gen
   - name: retryable_writes_jscore_stepdown_passthrough
     distros:
