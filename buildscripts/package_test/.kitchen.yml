@@ -57,7 +57,7 @@ platforms:
       username: admin
   - name: debian10-x86-64
     driver:
-      image_id: ami-02ad06066b040a84b
+      image_id: ami-0dedf6a6502877301
     transport:
       username: admin
   - name: rhel62-x86-64
