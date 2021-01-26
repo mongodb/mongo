@@ -208,6 +208,46 @@ TEST_F(CollectionTest, AsynchronouslyNotifyCappedWaitersIfNeeded) {
     ASSERT_EQ(notifier->getVersion(), thisVersion);
 }
 
+TEST_F(CollectionTest, CreateTimeseriesBucketCollection) {
+    NamespaceString nss("test.system.buckets.a");
+    invariant(nss.isTimeseriesBucketsCollection());
+
+    AutoGetOrCreateDb databaseWriteGuard(operationContext(), nss.db(), MODE_IX);
+    auto db = databaseWriteGuard.getDb();
+    invariant(db);
+
+    Lock::CollectionLock lk(operationContext(), nss, MODE_IX);
+
+    {
+        WriteUnitOfWork wuow(operationContext());
+
+        ASSERT_THROWS_WITH_CHECK(
+            db->createCollection(operationContext(),
+                                 nss,
+                                 CollectionOptions(),
+                                 /*createIdIndex=*/true,
+                                 /*idIndex=*/
+                                 BSON("v" << IndexDescriptor::getDefaultIndexVersion() << "name"
+                                          << "_id_"
+                                          << "key" << BSON("_id" << 1))),
+            AssertionException,
+            [](const AssertionException& exception) {
+                ASSERT_EQ(exception.code(), ErrorCodes::CannotCreateIndex);
+                ASSERT_STRING_CONTAINS(
+                    exception.reason(),
+                    "cannot have an _id index on a time-series bucket collection");
+            });
+    }
+
+    {
+        WriteUnitOfWork wuow(operationContext());
+        auto coll = db->createCollection(
+            operationContext(), nss, CollectionOptions(), /*createIdIndex=*/false);
+        ASSERT(coll);
+        wuow.commit();
+    }
+}
+
 TEST_F(CatalogTestFixture, CollectionPtrNoYieldTag) {
     CollectionMock mock(NamespaceString("test.t"));
 
