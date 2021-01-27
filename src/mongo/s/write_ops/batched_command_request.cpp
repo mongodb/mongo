@@ -227,6 +227,69 @@ BatchedCommandRequest BatchedCommandRequest::cloneInsertWithIds(
     return newCmdRequest;
 }
 
+BatchedCommandRequest BatchedCommandRequest::buildDeleteOp(const NamespaceString& nss,
+                                                           const BSONObj& query,
+                                                           bool multiDelete) {
+    return BatchedCommandRequest([&] {
+        write_ops::Delete deleteOp(nss);
+        deleteOp.setDeletes({[&] {
+            write_ops::DeleteOpEntry entry;
+            entry.setQ(query);
+            entry.setMulti(multiDelete);
+            return entry;
+        }()});
+        return deleteOp;
+    }());
+}
+
+BatchedCommandRequest BatchedCommandRequest::buildInsertOp(const NamespaceString& nss,
+                                                           const std::vector<BSONObj> docs) {
+    return BatchedCommandRequest([&] {
+        write_ops::Insert insertOp(nss);
+        insertOp.setDocuments(docs);
+        return insertOp;
+    }());
+}
+
+BatchedCommandRequest BatchedCommandRequest::buildUpdateOp(const NamespaceString& nss,
+                                                           const BSONObj& query,
+                                                           const BSONObj& update,
+                                                           bool upsert,
+                                                           bool multi) {
+    return BatchedCommandRequest([&] {
+        write_ops::Update updateOp(nss);
+        updateOp.setUpdates({[&] {
+            write_ops::UpdateOpEntry entry;
+            entry.setQ(query);
+            entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(update));
+            entry.setUpsert(upsert);
+            entry.setMulti(multi);
+            return entry;
+        }()});
+        return updateOp;
+    }());
+}
+
+BatchedCommandRequest BatchedCommandRequest::buildPipelineUpdateOp(
+    const NamespaceString& nss,
+    const BSONObj& query,
+    const std::vector<BSONObj>& updates,
+    bool upsert,
+    bool useMultiUpdate) {
+    return BatchedCommandRequest([&] {
+        write_ops::Update updateOp(nss);
+        updateOp.setUpdates({[&] {
+            write_ops::UpdateOpEntry entry;
+            entry.setQ(query);
+            entry.setU(write_ops::UpdateModification(updates));
+            entry.setUpsert(upsert);
+            entry.setMulti(useMultiUpdate);
+            return entry;
+        }()});
+        return updateOp;
+    }());
+}
+
 BatchItemRef::BatchItemRef(const BatchedCommandRequest* request, int index)
     : _request(*request), _index(index) {
     invariant(index < int(request->sizeWriteOps()));

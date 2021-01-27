@@ -176,27 +176,6 @@ void abortTransaction(OperationContext* opCtx, TxnNumber txnNumber) {
     }
 }
 
-BatchedCommandRequest buildUpdateOp(const NamespaceString& nss,
-                                    const BSONObj& query,
-                                    const BSONObj& update,
-                                    bool upsert,
-                                    bool multi) {
-    BatchedCommandRequest request([&] {
-        write_ops::Update updateOp(nss);
-        updateOp.setUpdates({[&] {
-            write_ops::UpdateOpEntry entry;
-            entry.setQ(query);
-            entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(update));
-            entry.setUpsert(upsert);
-            entry.setMulti(multi);
-            return entry;
-        }()});
-        return updateOp;
-    }());
-
-    return request;
-}
-
 }  // namespace
 
 void ShardingCatalogManager::create(ServiceContext* serviceContext,
@@ -701,12 +680,13 @@ void ShardingCatalogManager::_addTimestampToConfigCollectionsFor49InTxn(
         writeToConfigDocumentInTxn(
             opCtx,
             CollectionType::ConfigNS,
-            buildUpdateOp(CollectionType::ConfigNS,
-                          BSON(CollectionType::kNssFieldName << nss.ns()),
-                          BSON("$set" << BSON(CollectionType::kTimestampFieldName << newTimestamp)),
-                          false, /* upsert */
-                          false  /* multi */
-                          ),
+            BatchedCommandRequest::buildUpdateOp(
+                CollectionType::ConfigNS,
+                BSON(CollectionType::kNssFieldName << nss.ns()),
+                BSON("$set" << BSON(CollectionType::kTimestampFieldName << newTimestamp)),
+                false, /* upsert */
+                false  /* multi */
+                ),
             txnNumber);
     } catch (DBException& e) {
         e.addContext(str::stream() << "Failed to update config.collections to set timestamp for "
@@ -722,12 +702,13 @@ void ShardingCatalogManager::_deleteTimestampFromConfigCollectionsInTxn(Operatio
         writeToConfigDocumentInTxn(
             opCtx,
             CollectionType::ConfigNS,
-            buildUpdateOp(CollectionType::ConfigNS,
-                          BSON(CollectionType::kNssFieldName << nss.ns()),
-                          BSON("$unset" << BSON(CollectionType::kTimestampFieldName << "")),
-                          false, /* upsert */
-                          false  /* multi */
-                          ),
+            BatchedCommandRequest::buildUpdateOp(
+                CollectionType::ConfigNS,
+                BSON(CollectionType::kNssFieldName << nss.ns()),
+                BSON("$unset" << BSON(CollectionType::kTimestampFieldName << "")),
+                false, /* upsert */
+                false  /* multi */
+                ),
             txnNumber);
     } catch (DBException& e) {
         e.addContext(str::stream() << "Failed to update config.collections to unset timestamp for "
@@ -746,13 +727,14 @@ void ShardingCatalogManager::_addTimestampAndUUIDToConfigChunksFor49InTxn(
         writeToConfigDocumentInTxn(
             opCtx,
             ChunkType::ConfigNS,
-            buildUpdateOp(ChunkType::ConfigNS,
-                          BSON(ChunkType::ns(nss.ns())),
-                          BSON("$set" << BSON(ChunkType::timestamp(newTimestamp)
-                                              << ChunkType::collectionUUID() << collectionUuid)),
-                          false, /* upsert */
-                          true   /* multi */
-                          ),
+            BatchedCommandRequest::buildUpdateOp(
+                ChunkType::ConfigNS,
+                BSON(ChunkType::ns(nss.ns())),
+                BSON("$set" << BSON(ChunkType::timestamp(newTimestamp)
+                                    << ChunkType::collectionUUID() << collectionUuid)),
+                false, /* upsert */
+                true   /* multi */
+                ),
             txnNumber);
     } catch (DBException& e) {
         e.addContext(str::stream() << "Failed to update config.chunks to set collectionUUID for "
@@ -767,13 +749,14 @@ void ShardingCatalogManager::_deleteTimestampAndUUIDFromConfigChunksInTxn(
         writeToConfigDocumentInTxn(
             opCtx,
             ChunkType::ConfigNS,
-            buildUpdateOp(ChunkType::ConfigNS,
-                          BSON(ChunkType::ns(nss.ns())),
-                          BSON("$unset" << BSON(ChunkType::timestamp.name()
-                                                << "" << ChunkType::collectionUUID() << "")),
-                          false, /* upsert */
-                          true   /* multi */
-                          ),
+            BatchedCommandRequest::buildUpdateOp(
+                ChunkType::ConfigNS,
+                BSON(ChunkType::ns(nss.ns())),
+                BSON("$unset" << BSON(ChunkType::timestamp.name()
+                                      << "" << ChunkType::collectionUUID() << "")),
+                false, /* upsert */
+                true   /* multi */
+                ),
             txnNumber);
     } catch (DBException& e) {
         e.addContext(str::stream() << "Failed to update config.chunks to unset collectionUUID for "

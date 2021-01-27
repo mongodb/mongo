@@ -44,60 +44,6 @@
 #include "mongo/s/write_ops/batched_command_response.h"
 
 namespace mongo {
-namespace {
-
-/** Returns batch of delete operations to be attached to a transaction */
-BatchedCommandRequest buildDeleteOp(const NamespaceString& nss,
-                                    const BSONObj& query,
-                                    bool multiDelete) {
-    BatchedCommandRequest request([&] {
-        write_ops::Delete deleteOp(nss);
-        deleteOp.setDeletes({[&] {
-            write_ops::DeleteOpEntry entry;
-            entry.setQ(query);
-            entry.setMulti(multiDelete);
-            return entry;
-        }()});
-        return deleteOp;
-    }());
-
-    return request;
-}
-
-/** Returns batch of insert operations to be attached to a transaction */
-BatchedCommandRequest buildInsertOp(const NamespaceString& nss, const std::vector<BSONObj> docs) {
-    BatchedCommandRequest request([&] {
-        write_ops::Insert insertOp(nss);
-        insertOp.setDocuments(docs);
-        return insertOp;
-    }());
-
-    return request;
-}
-
-/** Returns batch of update operations to be attached to a transaction */
-BatchedCommandRequest buildUpdateOp(const NamespaceString& nss,
-                                    const BSONObj& query,
-                                    const BSONObj& update,
-                                    bool upsert,
-                                    bool multi) {
-    BatchedCommandRequest request([&] {
-        write_ops::Update updateOp(nss);
-        updateOp.setUpdates({[&] {
-            write_ops::UpdateOpEntry entry;
-            entry.setQ(query);
-            entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(update));
-            entry.setUpsert(upsert);
-            entry.setMulti(multi);
-            return entry;
-        }()});
-        return updateOp;
-    }());
-
-    return request;
-}
-
-}  // namespace
 
 namespace sharding_ddl_util {
 

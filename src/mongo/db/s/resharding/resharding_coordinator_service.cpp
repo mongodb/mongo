@@ -59,54 +59,6 @@ using namespace fmt::literals;
 MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorInSteadyState);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforeDecisionPersisted);
 
-BatchedCommandRequest buildInsertOp(const NamespaceString& nss, std::vector<BSONObj> docs) {
-    BatchedCommandRequest request([&] {
-        write_ops::Insert insertOp(nss);
-        insertOp.setDocuments(docs);
-        return insertOp;
-    }());
-
-    return request;
-}
-
-BatchedCommandRequest buildDeleteOp(const NamespaceString& nss,
-                                    const BSONObj& query,
-                                    bool multiDelete) {
-    BatchedCommandRequest request([&] {
-        write_ops::Delete deleteOp(nss);
-        deleteOp.setDeletes({[&] {
-            write_ops::DeleteOpEntry entry;
-            entry.setQ(query);
-            entry.setMulti(multiDelete);
-            return entry;
-        }()});
-        return deleteOp;
-    }());
-
-    return request;
-}
-
-BatchedCommandRequest buildUpdateOp(const NamespaceString& nss,
-                                    const BSONObj& query,
-                                    const BSONObj& update,
-                                    bool upsert,
-                                    bool multi) {
-    BatchedCommandRequest request([&] {
-        write_ops::Update updateOp(nss);
-        updateOp.setUpdates({[&] {
-            write_ops::UpdateOpEntry entry;
-            entry.setQ(query);
-            entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(update));
-            entry.setUpsert(upsert);
-            entry.setMulti(multi);
-            return entry;
-        }()});
-        return updateOp;
-    }());
-
-    return request;
-}
-
 void assertNumDocsModifiedMatchesExpected(const BatchedCommandRequest& request,
                                           const BSONObj& response,
                                           int expected) {
@@ -149,13 +101,15 @@ void writeToCoordinatorStateNss(OperationContext* opCtx,
         switch (nextState) {
             case CoordinatorStateEnum::kInitializing:
                 // Insert the new coordinator document.
-                return buildInsertOp(NamespaceString::kConfigReshardingOperationsNamespace,
-                                     std::vector<BSONObj>{coordinatorDoc.toBSON()});
+                return BatchedCommandRequest::buildInsertOp(
+                    NamespaceString::kConfigReshardingOperationsNamespace,
+                    std::vector<BSONObj>{coordinatorDoc.toBSON()});
             case CoordinatorStateEnum::kDone:
                 // Remove the coordinator document.
-                return buildDeleteOp(NamespaceString::kConfigReshardingOperationsNamespace,
-                                     BSON("_id" << coordinatorDoc.get_id()),  // query
-                                     false                                    // multi
+                return BatchedCommandRequest::buildDeleteOp(
+                    NamespaceString::kConfigReshardingOperationsNamespace,
+                    BSON("_id" << coordinatorDoc.get_id()),  // query
+                    false                                    // multi
                 );
             default: {
                 // Partially update the coordinator document.
@@ -180,11 +134,12 @@ void writeToCoordinatorStateNss(OperationContext* opCtx,
                     }
                 }
 
-                return buildUpdateOp(NamespaceString::kConfigReshardingOperationsNamespace,
-                                     BSON("_id" << coordinatorDoc.get_id()),
-                                     updateBuilder.obj(),
-                                     false,  // upsert
-                                     false   // multi
+                return BatchedCommandRequest::buildUpdateOp(
+                    NamespaceString::kConfigReshardingOperationsNamespace,
+                    BSON("_id" << coordinatorDoc.get_id()),
+                    updateBuilder.obj(),
+                    false,  // upsert
+                    false   // multi
                 );
             }
         }
@@ -294,13 +249,13 @@ void updateConfigCollectionsForOriginalNss(OperationContext* opCtx,
     auto writeOp = createReshardingFieldsUpdateForOriginalNss(
         opCtx, coordinatorDoc, newCollectionEpoch, newCollectionTimestamp);
 
-    auto request =
-        buildUpdateOp(CollectionType::ConfigNS,
-                      BSON(CollectionType::kNssFieldName << coordinatorDoc.getNss().ns()),  // query
-                      writeOp,
-                      false,  // upsert
-                      false   // multi
-        );
+    auto request = BatchedCommandRequest::buildUpdateOp(
+        CollectionType::ConfigNS,
+        BSON(CollectionType::kNssFieldName << coordinatorDoc.getNss().ns()),  // query
+        writeOp,
+        false,  // upsert
+        false   // multi
+    );
 
     auto res = ShardingCatalogManager::get(opCtx)->writeToConfigDocumentInTxn(
         opCtx, CollectionType::ConfigNS, request, txnNumber);
@@ -320,13 +275,13 @@ void writeToConfigCollectionsForTempNss(OperationContext* opCtx,
                 // Insert new entry for the temporary nss into config.collections
                 auto collType = resharding::createTempReshardingCollectionType(
                     opCtx, coordinatorDoc, chunkVersion.get(), collation.get());
-                return buildInsertOp(CollectionType::ConfigNS,
-                                     std::vector<BSONObj>{collType.toBSON()});
+                return BatchedCommandRequest::buildInsertOp(
+                    CollectionType::ConfigNS, std::vector<BSONObj>{collType.toBSON()});
             }
             case CoordinatorStateEnum::kCloning:
                 // Update the 'state' and 'fetchTimestamp' fields in the
                 // 'reshardingFields.recipient' section
-                return buildUpdateOp(
+                return BatchedCommandRequest::buildUpdateOp(
                     CollectionType::ConfigNS,
                     BSON(CollectionType::kNssFieldName
                          << coordinatorDoc.getTempReshardingNss().ns()),
@@ -341,14 +296,15 @@ void writeToConfigCollectionsForTempNss(OperationContext* opCtx,
                 );
             case CoordinatorStateEnum::kDecisionPersisted:
                 // Remove the entry for the temporary nss
-                return buildDeleteOp(CollectionType::ConfigNS,
-                                     BSON(CollectionType::kNssFieldName
-                                          << coordinatorDoc.getTempReshardingNss().ns()),
-                                     false  // multi
+                return BatchedCommandRequest::buildDeleteOp(
+                    CollectionType::ConfigNS,
+                    BSON(CollectionType::kNssFieldName
+                         << coordinatorDoc.getTempReshardingNss().ns()),
+                    false  // multi
                 );
             default:
                 // Update the 'state' field in the 'reshardingFields' section
-                return buildUpdateOp(
+                return BatchedCommandRequest::buildUpdateOp(
                     CollectionType::ConfigNS,
                     BSON(CollectionType::kNssFieldName
                          << coordinatorDoc.getTempReshardingNss().ns()),
@@ -400,10 +356,11 @@ void removeChunkAndTagsDocsForOriginalNss(OperationContext* opCtx,
     ShardingCatalogManager::get(opCtx)->writeToConfigDocumentInTxn(
         opCtx,
         ChunkType::ConfigNS,
-        buildDeleteOp(ChunkType::ConfigNS,
-                      BSON(ChunkType::ns(coordinatorDoc.getNss().ns())),  // query
-                      true                                                // multi
-                      ),
+        BatchedCommandRequest::buildDeleteOp(
+            ChunkType::ConfigNS,
+            BSON(ChunkType::ns(coordinatorDoc.getNss().ns())),  // query
+            true                                                // multi
+            ),
         txnNumber);
 
     // Remove all tag documents for the original nss. We do not know how many tag docs currently
@@ -411,10 +368,11 @@ void removeChunkAndTagsDocsForOriginalNss(OperationContext* opCtx,
     ShardingCatalogManager::get(opCtx)->writeToConfigDocumentInTxn(
         opCtx,
         TagsType::ConfigNS,
-        buildDeleteOp(TagsType::ConfigNS,
-                      BSON(ChunkType::ns(coordinatorDoc.getNss().ns())),  // query
-                      true                                                // multi
-                      ),
+        BatchedCommandRequest::buildDeleteOp(
+            TagsType::ConfigNS,
+            BSON(ChunkType::ns(coordinatorDoc.getNss().ns())),  // query
+            true                                                // multi
+            ),
         txnNumber);
 }
 
@@ -425,25 +383,25 @@ void updateChunkAndTagsDocsForTempNss(OperationContext* opCtx,
     // Update all chunk documents that currently have 'ns' as the temporary collection namespace
     // such that 'ns' is now the original collection namespace and 'lastmodEpoch' is
     // newCollectionEpoch.
-    auto chunksRequest =
-        buildUpdateOp(ChunkType::ConfigNS,
-                      BSON(ChunkType::ns(coordinatorDoc.getTempReshardingNss().ns())),  // query
-                      BSON("$set" << BSON("ns" << coordinatorDoc.getNss().ns() << "lastmodEpoch"
-                                               << newCollectionEpoch)),  // update
-                      false,                                             // upsert
-                      true                                               // multi
-        );
+    auto chunksRequest = BatchedCommandRequest::buildUpdateOp(
+        ChunkType::ConfigNS,
+        BSON(ChunkType::ns(coordinatorDoc.getTempReshardingNss().ns())),  // query
+        BSON("$set" << BSON("ns" << coordinatorDoc.getNss().ns() << "lastmodEpoch"
+                                 << newCollectionEpoch)),  // update
+        false,                                             // upsert
+        true                                               // multi
+    );
 
     auto chunksRes = ShardingCatalogManager::get(opCtx)->writeToConfigDocumentInTxn(
         opCtx, ChunkType::ConfigNS, chunksRequest, txnNumber);
 
-    auto tagsRequest =
-        buildUpdateOp(TagsType::ConfigNS,
-                      BSON(TagsType::ns(coordinatorDoc.getTempReshardingNss().ns())),  // query
-                      BSON("$set" << BSON("ns" << coordinatorDoc.getNss().ns())),      // update
-                      false,                                                           // upsert
-                      true                                                             // multi
-        );
+    auto tagsRequest = BatchedCommandRequest::buildUpdateOp(
+        TagsType::ConfigNS,
+        BSON(TagsType::ns(coordinatorDoc.getTempReshardingNss().ns())),  // query
+        BSON("$set" << BSON("ns" << coordinatorDoc.getNss().ns())),      // update
+        false,                                                           // upsert
+        true                                                             // multi
+    );
 
     // Update the 'ns' field to be the original collection namespace for all tags documents that
     // currently have 'ns' as the temporary collection namespace

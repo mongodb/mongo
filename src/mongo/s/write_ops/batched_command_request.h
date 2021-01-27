@@ -161,6 +161,37 @@ public:
      */
     static BatchedCommandRequest cloneInsertWithIds(BatchedCommandRequest origCmdRequest);
 
+    /**
+     * Returns batch of delete operations to be attached to a transaction
+     */
+    static BatchedCommandRequest buildDeleteOp(const NamespaceString& nss,
+                                               const BSONObj& query,
+                                               bool multiDelete);
+
+    /**
+     * Returns batch of insert operations to be attached to a transaction
+     */
+    static BatchedCommandRequest buildInsertOp(const NamespaceString& nss,
+                                               const std::vector<BSONObj> docs);
+
+    /*
+     * Returns batch of update operations to be attached to a transaction
+     */
+    static BatchedCommandRequest buildUpdateOp(const NamespaceString& nss,
+                                               const BSONObj& query,
+                                               const BSONObj& update,
+                                               bool upsert,
+                                               bool multi);
+
+    /**
+     *  Returns batch of pipeline update operations to be attached to a transaction
+     */
+    static BatchedCommandRequest buildPipelineUpdateOp(const NamespaceString& nss,
+                                                       const BSONObj& query,
+                                                       const std::vector<BSONObj>& updates,
+                                                       bool upsert,
+                                                       bool useMultiUpdate);
+
     /** These are used to return empty refs from Insert ops that don't carry runtimeConstants
      * or let parameters in getLet and getLegacyRuntimeConstants.
      */

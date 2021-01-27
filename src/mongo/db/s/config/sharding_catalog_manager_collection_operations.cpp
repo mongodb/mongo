@@ -139,48 +139,6 @@ boost::optional<UUID> checkCollectionOptions(OperationContext* opCtx,
     return uassertStatusOK(UUID::parse(collectionInfo["uuid"]));
 }
 
-BatchedCommandRequest buildUpdateOp(const NamespaceString& nss,
-                                    const BSONObj& query,
-                                    const BSONObj& update,
-                                    bool upsert,
-                                    bool multi) {
-    BatchedCommandRequest request([&] {
-        write_ops::Update updateOp(nss);
-        updateOp.setUpdates({[&] {
-            write_ops::UpdateOpEntry entry;
-            entry.setQ(query);
-            entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(update));
-            entry.setUpsert(upsert);
-            entry.setMulti(multi);
-            return entry;
-        }()});
-        return updateOp;
-    }());
-
-    return request;
-}
-
-BatchedCommandRequest buildPipelineUpdateOp(const NamespaceString& nss,
-                                            const BSONObj& query,
-                                            const std::vector<BSONObj>& updates,
-                                            bool upsert,
-                                            bool useMultiUpdate) {
-    BatchedCommandRequest request([&] {
-        write_ops::Update updateOp(nss);
-        updateOp.setUpdates({[&] {
-            write_ops::UpdateOpEntry entry;
-            entry.setQ(query);
-            entry.setU(write_ops::UpdateModification(updates));
-            entry.setUpsert(upsert);
-            entry.setMulti(useMultiUpdate);
-            return entry;
-        }()});
-        return updateOp;
-    }());
-
-    return request;
-}
-
 void triggerFireAndForgetShardRefreshes(OperationContext* opCtx, const NamespaceString& nss) {
     const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
     const auto allShards = uassertStatusOK(Grid::get(opCtx)->catalogClient()->getAllShards(
@@ -591,15 +549,16 @@ void ShardingCatalogManager::refineCollectionShardKey(OperationContext* opCtx,
         // to the newly-generated objectid, (ii) their bounds for each new field in the refined
         // key to MinKey (except for the global max chunk where the max bounds are set to
         // MaxKey), and unsetting (iii) their jumbo field.
-        writeToConfigDocumentInTxn(opCtx,
-                                   ChunkType::ConfigNS,
-                                   buildPipelineUpdateOp(ChunkType::ConfigNS,
+        writeToConfigDocumentInTxn(
+            opCtx,
+            ChunkType::ConfigNS,
+            BatchedCommandRequest::buildPipelineUpdateOp(ChunkType::ConfigNS,
                                                          BSON("ns" << nss.ns()),
                                                          chunkUpdates,
                                                          false,  // upsert
                                                          true    // useMultiUpdate
                                                          ),
-                                   txnNumber);
+            txnNumber);
 
         LOGV2(21935,
               "refineCollectionShardKey: updated chunk entries for {namespace}: took "
@@ -613,15 +572,16 @@ void ShardingCatalogManager::refineCollectionShardKey(OperationContext* opCtx,
         // Update all config.tags entries for the given namespace by setting their bounds for
         // each new field in the refined key to MinKey (except for the global max tag where the
         // max bounds are set to MaxKey).
-        writeToConfigDocumentInTxn(opCtx,
-                                   TagsType::ConfigNS,
-                                   buildPipelineUpdateOp(TagsType::ConfigNS,
+        writeToConfigDocumentInTxn(
+            opCtx,
+            TagsType::ConfigNS,
+            BatchedCommandRequest::buildPipelineUpdateOp(TagsType::ConfigNS,
                                                          BSON("ns" << nss.ns()),
                                                          tagUpdates,
                                                          false,  // upsert
                                                          true    // useMultiUpdate
                                                          ),
-                                   txnNumber);
+            txnNumber);
 
 
         LOGV2(21936,
@@ -668,15 +628,16 @@ void ShardingCatalogManager::updateShardingCatalogEntryForCollectionInTxn(
     const bool upsert,
     TxnNumber txnNumber) {
     try {
-        writeToConfigDocumentInTxn(opCtx,
-                                   CollectionType::ConfigNS,
-                                   buildUpdateOp(CollectionType::ConfigNS,
+        writeToConfigDocumentInTxn(
+            opCtx,
+            CollectionType::ConfigNS,
+            BatchedCommandRequest::buildUpdateOp(CollectionType::ConfigNS,
                                                  BSON(CollectionType::kNssFieldName << nss.ns()),
                                                  coll.toBSON(),
                                                  upsert,
                                                  false /* multi */
                                                  ),
-                                   txnNumber);
+            txnNumber);
     } catch (DBException& e) {
         e.addContext("Collection metadata write failed");
         throw;

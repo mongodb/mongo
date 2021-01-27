@@ -72,27 +72,6 @@ MONGO_FAIL_POINT_DEFINE(skipExpiringOldChunkHistory);
 
 const WriteConcernOptions kNoWaitWriteConcern(1, WriteConcernOptions::SyncMode::UNSET, Seconds(0));
 
-BatchedCommandRequest buildUpdateOp(const NamespaceString& nss,
-                                    const BSONObj& query,
-                                    const BSONObj& update,
-                                    bool upsert,
-                                    bool multi) {
-    BatchedCommandRequest request([&] {
-        write_ops::Update updateOp(nss);
-        updateOp.setUpdates({[&] {
-            write_ops::UpdateOpEntry entry;
-            entry.setQ(query);
-            entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(update));
-            entry.setUpsert(upsert);
-            entry.setMulti(multi);
-            return entry;
-        }()});
-        return updateOp;
-    }());
-
-    return request;
-}
-
 /**
  * Append min, max and version information from chunk to the buffer for logChange purposes.
  */
@@ -390,7 +369,7 @@ void bumpMajorVersionOneChunkPerShard(OperationContext* opCtx,
         updateVersionClause.doneFast();
         auto chunkUpdate = updateBuilder.obj();
 
-        auto request = buildUpdateOp(
+        auto request = BatchedCommandRequest::buildUpdateOp(
             ChunkType::ConfigNS,
             BSON(ChunkType::ns(nss.ns()) << ChunkType::shard(shardId.toString())),  // query
             chunkUpdate,                                                            // update
