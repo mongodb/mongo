@@ -171,9 +171,6 @@ database directory has not been opened and recovery run.  Once recovery
 has run in a backup directory, you can no longer back up to that
 database directory.
 
-Block-based incremental backup does not work with LSM trees. An error
-will be returned in that case.
-
 An example of opening the backup data source for block-based incremental backup:
 
 @snippet ex_all.c incremental block backup

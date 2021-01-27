@@ -34,8 +34,7 @@ __curtiered_open_cursors(WT_CURSOR_TIERED *curtiered)
     dhandle = NULL;
     tiered = curtiered->tiered;
 
-    if (tiered->ntiers == 0)
-        return (0);
+    WT_ASSERT(session, tiered->ntiers > 0);
 
     /*
      * If the key is pointing to memory that is pinned by a chunk cursor, take a copy before closing
@@ -1017,21 +1016,14 @@ err:
  *     documents avoids biasing towards small chunks. Then return the cursor on the chunk we have
  *     picked.
  */
-static int
+static void
 __curtiered_random_chunk(WT_SESSION_IMPL *session, WT_CURSOR_TIERED *curtiered, WT_CURSOR **cursor)
 {
-    u_int i, ntiers;
-
-    /*
-     * If the tree is empty we cannot do a random lookup, so return a WT_NOTFOUND.
-     */
-    if ((ntiers = curtiered->tiered->ntiers) == 0)
-        return (WT_NOTFOUND);
+    u_int i;
 
     /* TODO: make randomness respect tree size. */
-    i = __wt_random(&session->rnd) % ntiers;
+    i = __wt_random(&session->rnd) % curtiered->tiered->ntiers;
     *cursor = curtiered->cursors[i];
-    return (0);
 }
 
 /*
@@ -1055,7 +1047,7 @@ __curtiered_next_random(WT_CURSOR *cursor)
     WT_ERR(__curtiered_enter(curtiered, false));
 
     for (;;) {
-        WT_ERR(__curtiered_random_chunk(session, curtiered, &c));
+        __curtiered_random_chunk(session, curtiered, &c);
         /*
          * This call to next_random on the chunk can potentially end in WT_NOTFOUND if the chunk we
          * picked is empty. We want to retry in that case.

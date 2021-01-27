@@ -1044,19 +1044,19 @@ __wt_meta_sysinfo_set(WT_SESSION_IMPL *session)
     }
 
     /* Record snapshot information in metadata for checkpoint. */
-    if (txn->snapshot_count > 0) {
-        WT_ERR(__wt_buf_fmt(session, buf,
-          WT_SYSTEM_CKPT_SNAPSHOT_MIN "=%" PRIu64 "," WT_SYSTEM_CKPT_SNAPSHOT_MAX "=%" PRIu64
-                                      "," WT_SYSTEM_CKPT_SNAPSHOT_COUNT "=%" PRIu32
-                                      "," WT_SYSTEM_CKPT_SNAPSHOT "=[",
-          txn->snap_min, txn->snap_max, txn->snapshot_count));
+    WT_ERR(__wt_buf_fmt(session, buf,
+      WT_SYSTEM_CKPT_SNAPSHOT_MIN "=%" PRIu64 "," WT_SYSTEM_CKPT_SNAPSHOT_MAX "=%" PRIu64
+                                  "," WT_SYSTEM_CKPT_SNAPSHOT_COUNT "=%" PRIu32,
+      txn->snap_min, txn->snap_max, txn->snapshot_count));
 
+    if (txn->snapshot_count > 0) {
+        WT_ERR(__wt_buf_catfmt(session, buf, "," WT_SYSTEM_CKPT_SNAPSHOT "=["));
         for (snap_count = 0; snap_count < txn->snapshot_count - 1; ++snap_count)
             WT_ERR(__wt_buf_catfmt(session, buf, "%" PRIu64 "%s", txn->snapshot[snap_count], ","));
 
         WT_ERR(__wt_buf_catfmt(session, buf, "%" PRIu64 "%s", txn->snapshot[snap_count], "]"));
-        WT_ERR(__wt_metadata_update(session, WT_SYSTEM_CKPT_SNAPSHOT_URI, buf->data));
     }
+    WT_ERR(__wt_metadata_update(session, WT_SYSTEM_CKPT_SNAPSHOT_URI, buf->data));
 
     /* Record the base write gen in metadata as part of checkpoint */
     WT_ERR(__wt_buf_fmt(

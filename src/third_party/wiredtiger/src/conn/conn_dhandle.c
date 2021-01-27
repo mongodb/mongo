@@ -917,6 +917,37 @@ restart:
 }
 
 /*
+ * __wt_dhandle_update_write_gens --
+ *     Update the open dhandles write generation, run write generation and base write generation
+ *     number.
+ */
+void
+__wt_dhandle_update_write_gens(WT_SESSION_IMPL *session)
+{
+    WT_BTREE *btree;
+    WT_CONNECTION_IMPL *conn;
+    WT_DATA_HANDLE *dhandle;
+
+    conn = S2C(session);
+
+    for (dhandle = NULL;;) {
+        WT_WITH_HANDLE_LIST_WRITE_LOCK(session, WT_DHANDLE_NEXT(session, dhandle, &conn->dhqh, q));
+        if (dhandle == NULL)
+            break;
+        btree = (WT_BTREE *)dhandle->handle;
+
+        WT_ASSERT(session, btree != NULL);
+
+        /*
+         * Initialize the btree write generation numbers after rollback to stable so that the
+         * transaction ids of the pages will be reset when loaded from disk to memory.
+         */
+        btree->write_gen = btree->base_write_gen = btree->run_write_gen =
+          WT_MAX(btree->write_gen, conn->base_write_gen);
+    }
+}
+
+/*
  * __wt_verbose_dump_handles --
  *     Dump information about all data handles.
  */

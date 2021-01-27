@@ -784,25 +784,11 @@ config_lsm_reset(void)
         config_single("transaction.timestamps=off", false);
     }
 
-    /*
-     * LSM does not work with block-based incremental backup, change the incremental backup
-     * mechanism if block based in configured.
-     */
+    /* LSM may not work with backups, turn off backups if lsm is configured. */
     if (g.c_backups) {
-        if (config_is_perm("backup.incremental") && g.c_backup_incr_flag == INCREMENTAL_BLOCK)
-            testutil_die(EINVAL, "LSM does not work with backup.incremental=block configuration.");
-
-        if (g.c_backup_incr_flag == INCREMENTAL_BLOCK)
-            switch (mmrand(NULL, 1, 2)) {
-            case 1:
-                /* 50% */
-                config_single("backup.incremental=off", false);
-                break;
-            case 2:
-                /* 50% */
-                config_single("backup.incremental=log", false);
-                break;
-            }
+        if (config_is_perm("backup"))
+            testutil_die(EINVAL, "LSM is incompatible with backup configurations");
+        config_single("backup=off", false);
     }
 }
 

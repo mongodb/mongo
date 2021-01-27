@@ -611,11 +611,6 @@ __backup_config(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb, const char *cfg[
               session, EINVAL, "Incremental primary cursor must have a known source identifier");
         F_SET(cb, WT_CURBACKUP_INCR);
     }
-
-    /* Return an error if block-based incremental backup is performed with open LSM trees. */
-    if (incremental_config && !TAILQ_EMPTY(&conn->lsmqh))
-        WT_ERR_MSG(session, ENOTSUP, "LSM does not work with block-based incremental backup");
-
 err:
     if (ret != 0 && cb->incr_src != NULL) {
         F_CLR(cb->incr_src, WT_BLKINCR_INUSE);

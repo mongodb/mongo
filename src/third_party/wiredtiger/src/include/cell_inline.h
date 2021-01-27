@@ -970,6 +970,16 @@ __cell_unpack_window_cleanup(WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk
      * No delete              txnid=MAX, ts=MAX,            txnid=MAX, ts=MAX,
      *                        durable_ts=NONE               durable_ts=NONE
      */
+
+    /*
+     * Don't reset the transaction ids in rollback to stable when called from recovery because
+     * rollback to stable in addition to stable timestamp also depends on transaction ids from the
+     * page that are read into cache to decide if an update needs to be rolled back.
+     */
+    if (F_ISSET(S2C(session), WT_CONN_RECOVERING) &&
+      F_ISSET(session, WT_SESSION_ROLLBACK_TO_STABLE))
+        return;
+
     if (dsk->write_gen == 0 || dsk->write_gen > S2BT(session)->base_write_gen)
         return;
 

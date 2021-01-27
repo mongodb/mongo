@@ -71,5 +71,12 @@ class test_tiered01(wttest.WiredTigerTestCase):
 
        #  self.session.drop(self.uri)
 
+    # It is an error to configure a tiered table with no tiers
+    def test_no_tiers(self):
+        msg = '/tiered table must specify at least one tier/'
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.session.create(self.uri, 'type=tiered,key_format=S,tiered=(tiers=())'),
+            msg)
+
 if __name__ == '__main__':
     wttest.run()
