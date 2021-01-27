@@ -483,12 +483,14 @@ TEST_F(DestinedRecipientTest, TestUpdateChangesOwningShardThrows) {
 
     OperationShardingState::get(opCtx).initializeClientRoutingVersions(
         kNss, env.version, env.dbVersion);
-    ASSERT_THROWS(runInTransaction(
-                      opCtx,
-                      [&]() {
-                          updateDoc(
-                              opCtx, kNss, BSON("_id" << 0), BSON("$set" << BSON("y" << 50)), env);
-                      }),
+    ASSERT_THROWS(runInTransaction(opCtx,
+                                   [&]() {
+                                       updateDoc(opCtx,
+                                                 kNss,
+                                                 BSON("_id" << 0 << "x" << 2),
+                                                 BSON("$set" << BSON("y" << 50)),
+                                                 env);
+                                   }),
                   ExceptionFor<ErrorCodes::WouldChangeOwningShard>);
 }
 
@@ -503,7 +505,7 @@ TEST_F(DestinedRecipientTest, TestUpdateSameOwningShard) {
     OperationShardingState::get(opCtx).initializeClientRoutingVersions(
         kNss, env.version, env.dbVersion);
     runInTransaction(opCtx, [&]() {
-        updateDoc(opCtx, kNss, BSON("_id" << 0), BSON("$set" << BSON("y" << 3)), env);
+        updateDoc(opCtx, kNss, BSON("_id" << 0 << "x" << 2), BSON("$set" << BSON("y" << 3)), env);
     });
 }
 

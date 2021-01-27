@@ -114,6 +114,9 @@ protected:
 
     void _assertPathsNotArray(const mutablebson::Document& document, const FieldRefSet& paths);
 
+    void _checkRestrictionsOnUpdatingShardKeyAreNotViolated(
+        const ScopedCollectionDescription& collDesc, const FieldRefSet& shardKeyPaths);
+
     UpdateStageParams _params;
 
     // Not owned by us.

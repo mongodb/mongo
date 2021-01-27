@@ -570,6 +570,41 @@ PlanStage::StageState UpdateStage::prepareToRetryWSM(WorkingSetID idToRetry, Wor
     return NEED_YIELD;
 }
 
+
+void UpdateStage::_checkRestrictionsOnUpdatingShardKeyAreNotViolated(
+    const ScopedCollectionDescription& collDesc, const FieldRefSet& shardKeyPaths) {
+    // We do not allow modifying either the current shard key value or new shard key value (if
+    // resharding) without specifying the full current shard key in the query.
+    // If the query is a simple equality match on _id, then '_params.canonicalQuery' will be null.
+    // But if we are here, we already know that the shard key is not _id, since we have an assertion
+    // earlier for requests that try to modify the immutable _id field. So it is safe to uassert if
+    // '_params.canonicalQuery' is null OR if the query does not include equality matches on all
+    // shard key fields.
+    const auto& shardKeyPathsVector = collDesc.getKeyPatternFields();
+    pathsupport::EqualityMatches equalities;
+    uassert(31025,
+            "Shard key update is not allowed without specifying the full shard key in the query",
+            _params.canonicalQuery &&
+                pathsupport::extractFullEqualityMatches(
+                    *(_params.canonicalQuery->root()), shardKeyPaths, &equalities)
+                    .isOK() &&
+                equalities.size() == shardKeyPathsVector.size());
+
+    // We do not allow updates to the shard key when 'multi' is true.
+    uassert(ErrorCodes::InvalidOptions,
+            "Multi-update operations are not allowed when updating the shard key field.",
+            !_params.request->isMulti());
+
+    // If this node is a replica set primary node, an attempted update to the shard key value must
+    // either be a retryable write or inside a transaction.
+    // If this node is a replica set secondary node, we can skip validation.
+    uassert(ErrorCodes::IllegalOperation,
+            "Must run update to shard key field in a multi-statement transaction or with "
+            "retryWrites: true.",
+            opCtx()->getTxnNumber() || !opCtx()->writesAreReplicated());
+}
+
+
 bool UpdateStage::wasReshardingKeyUpdated(const ScopedCollectionDescription& collDesc,
                                           const BSONObj& newObj,
                                           const Snapshotted<BSONObj>& oldObj) {
@@ -583,13 +618,8 @@ bool UpdateStage::wasReshardingKeyUpdated(const ScopedCollectionDescription& col
     if (newShardKey.binaryEqual(oldShardKey))
         return false;
 
-    // If this node is a replica set primary node, an attempted update to the shard key value must
-    // either be a retryable write or inside a transaction.
-    // If this node is a replica set secondary node, we can skip validation.
-    uassert(ErrorCodes::IllegalOperation,
-            "Must run update to resharding key field in a multi-statement transaction or with "
-            "retryWrites: true.",
-            opCtx()->getTxnNumber() || !opCtx()->writesAreReplicated());
+    FieldRefSet shardKeyPaths(collDesc.getKeyPatternFields());
+    _checkRestrictionsOnUpdatingShardKeyAreNotViolated(collDesc, shardKeyPaths);
 
     auto oldRecipShard = getDestinedRecipient(opCtx(), collection()->ns(), oldObj.value());
     auto newRecipShard = getDestinedRecipient(opCtx(), collection()->ns(), newObj);
@@ -643,34 +673,7 @@ bool UpdateStage::wasExistingShardKeyUpdated(CollectionShardingState* css,
     // Assert that the updated doc has no arrays or array descendants for the shard key fields.
     _assertPathsNotArray(_doc, shardKeyPaths);
 
-    // We do not allow modifying shard key value without specifying the full shard key in the query.
-    // If the query is a simple equality match on _id, then '_params.canonicalQuery' will be null.
-    // But if we are here, we already know that the shard key is not _id, since we have an assertion
-    // earlier for requests that try to modify the immutable _id field. So it is safe to uassert if
-    // '_params.canonicalQuery' is null OR if the query does not include equality matches on all
-    // shard key fields.
-    const auto& shardKeyPathsVector = collDesc.getKeyPatternFields();
-    pathsupport::EqualityMatches equalities;
-    uassert(31025,
-            "Shard key update is not allowed without specifying the full shard key in the query",
-            _params.canonicalQuery &&
-                pathsupport::extractFullEqualityMatches(
-                    *(_params.canonicalQuery->root()), shardKeyPaths, &equalities)
-                    .isOK() &&
-                equalities.size() == shardKeyPathsVector.size());
-
-    // We do not allow updates to the shard key when 'multi' is true.
-    uassert(ErrorCodes::InvalidOptions,
-            "Multi-update operations are not allowed when updating the shard key field.",
-            !_params.request->isMulti());
-
-    // If this node is a replica set primary node, an attempted update to the shard key value must
-    // either be a retryable write or inside a transaction.
-    // If this node is a replica set secondary node, we can skip validation.
-    uassert(ErrorCodes::IllegalOperation,
-            "Must run update to shard key field in a multi-statement transaction or with "
-            "retryWrites: true.",
-            opCtx()->getTxnNumber() || !opCtx()->writesAreReplicated());
+    _checkRestrictionsOnUpdatingShardKeyAreNotViolated(collDesc, shardKeyPaths);
 
     // At this point we already asserted that the complete shardKey have been specified in the
     // query, this implies that mongos is not doing a broadcast update and that it attached a

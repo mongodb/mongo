@@ -61,9 +61,6 @@ reshardingTest.withReshardingInBackground(  //
             return coordinatorDoc !== null && coordinatorDoc.state === "applying";
         });
 
-        // TODO SERVER-52683: Change assertion to say the update succeeds. Also capture the
-        // operationTime associated with the write and assert the generated oplog entry is a
-        // delete+insert in an applyOps.
         assert.commandFailedWithCode(
             testColl.update({_id: 0, x: 2, s: 2}, {$set: {y: 10}}),
             ErrorCodes.IllegalOperation,
@@ -73,8 +70,17 @@ reshardingTest.withReshardingInBackground(  //
         const sessionColl =
             session.getDatabase(testColl.getDB().getName()).getCollection(testColl.getName());
 
-        // TODO SERVER-52683: Remove the manual retries for the update once mongos is no longer
-        // responsible for converting retryable writes into transactions.
+        assert.commandFailedWithCode(
+            sessionColl.update({_id: 0, x: 2, s: 2}, {$set: {y: 10}}, {multi: true}),
+            ErrorCodes.InvalidOptions,
+            'was able to update value under new shard key when {multi: true} specified');
+
+        assert.commandFailedWithCode(
+            sessionColl.update({_id: 0}, {$set: {y: 10}}),
+            31025,
+            'was able to update value under new shard key without specifying the full shard key ' +
+                'in the query');
+
         let res;
         assert.soon(
             () => {
@@ -109,9 +115,6 @@ reshardingTest.withReshardingInBackground(  //
             // version to be bumped. The StaleConfig error won't be automatically retried by mongos
             // for the second statement in the transaction (the insert) and would lead to a
             // NoSuchTransaction error.
-            //
-            // TODO SERVER-52683: Remove the manual retries for the update once mongos is no longer
-            // responsible for converting the update into a delete + insert.
             assert.commandFailedWithCode(res, ErrorCodes.NoSuchTransaction);
             session.abortTransaction();
             return false;
