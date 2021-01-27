@@ -37,6 +37,12 @@ namespace mongo::sbe {
 enum class MakeObjFieldBehavior { drop, keep };
 
 enum class MakeObjOutputType { object, bsonObject };
+
+/**
+ * Base stage for creating a bsonObject or object.
+ *
+ * Template argument 'O' indicates which output type to use.
+ */
 template <MakeObjOutputType O>
 class MakeObjStageBase final : public PlanStage {
 public:
@@ -89,9 +95,17 @@ private:
     void projectField(value::Object* obj, size_t idx);
     void projectField(UniqueBSONObjBuilder* bob, size_t idx);
 
-    bool isFieldRestricted(const std::string_view& sv) const {
-        invariant(_fieldBehavior);
-        return _fieldSet.count(sv) == (*_fieldBehavior == FieldBehavior::keep ? 0 : 1);
+    bool isFieldRestricted(const StringMapHashedKey& key) const {
+        return _fieldSet.count(key) == (*_fieldBehavior == FieldBehavior::keep ? 0 : 1);
+    }
+
+    void resetAlreadyProjected() {
+        if (!_alreadyProjected.empty()) {
+            std::memset(_alreadyProjected.data(),
+                        0,
+                        _alreadyProjected.size() *
+                            sizeof(typename decltype(_alreadyProjected)::value_type));
+        }
     }
 
     void produceObject();
@@ -105,12 +119,15 @@ private:
     const bool _forceNewObject;
     const bool _returnOldObject;
 
-    absl::flat_hash_set<std::string> _fieldSet;
-    absl::flat_hash_map<std::string, size_t> _projectFieldsMap;
+    StringSet _fieldSet;
+    StringMap<size_t> _projectFieldsMap;
 
     std::vector<std::pair<std::string, value::SlotAccessor*>> _projects;
 
     value::OwnedValueAccessor _obj;
+
+    // Reset to all 0's on each call to getNext(). Kept here to avoid repeated allocations.
+    std::vector<char> _alreadyProjected;
 
     value::SlotAccessor* _root{nullptr};
 
@@ -119,5 +136,4 @@ private:
 
 using MakeObjStage = MakeObjStageBase<MakeObjOutputType::object>;
 using MakeBsonObjStage = MakeObjStageBase<MakeObjOutputType::bsonObject>;
-
 }  // namespace mongo::sbe
