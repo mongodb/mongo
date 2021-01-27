@@ -756,6 +756,20 @@ class TestBinder(testcase.IDLTestcase):
                             - array<struct1>
             """), idl.errors.ERROR_ID_VARIANT_DUPLICATE_TYPES)
 
+        # At most one array can have BSON serialization type NumberInt.
+        self.assert_bind_fail(
+            test_preamble + textwrap.dedent("""
+        structs:
+            foo:
+                description: foo
+                fields:
+                    my_variant_field:
+                        type:
+                            variant:
+                            - array<int>
+                            - array<safeInt>
+            """), idl.errors.ERROR_ID_VARIANT_DUPLICATE_TYPES)
+
         self.assert_bind_fail(
             test_preamble + textwrap.dedent("""
         structs:

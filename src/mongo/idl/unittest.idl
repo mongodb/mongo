@@ -609,6 +609,16 @@ structs:
                     - int
                     - one_string
 
+    one_variant_safeInt_array:
+        description: UnitTest for a single variant which accepts a string or array of safeInt
+        strict: false
+        fields:
+            value:
+                type:
+                    variant:
+                    - string
+                    - array<safeInt>
+
     one_variant_struct_array:
         description: UnitTest for a single variant which accepts an int or array of structs
         strict: false

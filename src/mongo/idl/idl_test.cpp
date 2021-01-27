@@ -136,6 +136,12 @@ BSONObj appendDB(const BSONObj& obj, StringData dbName) {
     return builder.obj();
 }
 
+template <typename T>
+BSONObj serializeCmd(const T& cmd) {
+    auto reply = cmd.serialize({});
+    return reply.body;
+}
+
 // Use a separate function to get better error messages when types do not match.
 template <typename T1, typename T2>
 void assert_same_types() {
@@ -461,6 +467,468 @@ TEST(IDLOneTypeTests, TestObjectTypeNegative) {
     {
         auto testDoc = BSON("value" << 12);
         One_any_basic_type::parse(ctxt, testDoc);
+    }
+}
+
+// Trait check used in TestLoopbackVariant.
+template <typename T>
+struct IsVector : std::false_type {};
+template <typename T>
+struct IsVector<std::vector<T>> : std::true_type {};
+template <typename T>
+constexpr bool isVector = IsVector<T>::value;
+
+// We don't generate comparison operators like "==" for variants, so test only for BSON equality.
+template <typename ParserT, typename TestT, BSONType Test_bson_type>
+void TestLoopbackVariant(TestT test_value) {
+    IDLParserErrorContext ctxt("root");
+
+    BSONObjBuilder bob;
+    if constexpr (idl::hasBSONSerialize<TestT>) {
+        // TestT might be an IDL struct type like One_string.
+        BSONObjBuilder subObj(bob.subobjStart("value"));
+        test_value.serialize(&subObj);
+    } else if constexpr (isVector<TestT>) {
+        BSONArrayBuilder arrayBuilder(bob.subarrayStart("value"));
+        for (const auto& item : test_value) {
+            if constexpr (idl::hasBSONSerialize<decltype(item)>) {
+                BSONObjBuilder subObjBuilder(arrayBuilder.subobjStart());
+                item.serialize(&subObjBuilder);
+            } else {
+                arrayBuilder.append(item);
+            }
+        }
+    } else {
+        bob.append("value", test_value);
+    }
+
+    auto obj = bob.obj();
+    auto element = obj.firstElement();
+    ASSERT_EQUALS(element.type(), Test_bson_type);
+
+    auto parsed = ParserT::parse(ctxt, obj);
+    if constexpr (std::is_same_v<TestT, BSONObj>) {
+        ASSERT_BSONOBJ_EQ(stdx::get<TestT>(parsed.getValue()), test_value);
+    } else {
+        // Use ASSERT instead of ASSERT_EQ to avoid operator<<
+        ASSERT(stdx::get<TestT>(parsed.getValue()) == test_value);
+    }
+    ASSERT_BSONOBJ_EQ(obj, parsed.toBSON());
+
+    // Test setValue.
+    ParserT assembled;
+    assembled.setValue(test_value);
+    ASSERT_BSONOBJ_EQ(obj, assembled.toBSON());
+
+    // Test the constructor.
+    ParserT constructed(test_value);
+    if constexpr (std::is_same_v<TestT, BSONObj>) {
+        ASSERT_BSONOBJ_EQ(stdx::get<TestT>(parsed.getValue()), test_value);
+    } else {
+        ASSERT(stdx::get<TestT>(parsed.getValue()) == test_value);
+    }
+    ASSERT_BSONOBJ_EQ(obj, constructed.toBSON());
+}
+
+TEST(IDLVariantTests, TestVariantRoundtrip) {
+    TestLoopbackVariant<One_variant, int, NumberInt>(1);
+    TestLoopbackVariant<One_variant, std::string, String>("test_value");
+
+    TestLoopbackVariant<One_variant_compound, std::string, String>("test_value");
+    TestLoopbackVariant<One_variant_compound, BSONObj, Object>(BSON("x" << 1));
+    TestLoopbackVariant<One_variant_compound, std::vector<std::string>, Array>({});
+    TestLoopbackVariant<One_variant_compound, std::vector<std::string>, Array>({"a"});
+    TestLoopbackVariant<One_variant_compound, std::vector<std::string>, Array>({"a", "b"});
+
+    TestLoopbackVariant<One_variant_struct, int, NumberInt>(1);
+    TestLoopbackVariant<One_variant_struct, One_string, Object>(One_string("test_value"));
+
+    TestLoopbackVariant<One_variant_struct_array, int, NumberInt>(1);
+    TestLoopbackVariant<One_variant_struct_array, std::vector<One_string>, Array>(
+        std::vector<One_string>());
+    TestLoopbackVariant<One_variant_struct_array, std::vector<One_string>, Array>(
+        {One_string("a")});
+    TestLoopbackVariant<One_variant_struct_array, std::vector<One_string>, Array>(
+        {One_string("a"), One_string("b")});
+}
+
+TEST(IDLVariantTests, TestVariantSafeInt) {
+    TestLoopbackVariant<One_variant_safeInt, std::string, String>("test_value");
+    TestLoopbackVariant<One_variant_safeInt, int, NumberInt>(1);
+
+    // safeInt accepts all numbers, but always deserializes and serializes as int32.
+    IDLParserErrorContext ctxt("root");
+    ASSERT_EQ(stdx::get<std::int32_t>(
+                  One_variant_safeInt::parse(ctxt, BSON("value" << Decimal128(1))).getValue()),
+              1);
+    ASSERT_EQ(
+        stdx::get<std::int32_t>(One_variant_safeInt::parse(ctxt, BSON("value" << 1LL)).getValue()),
+        1);
+    ASSERT_EQ(
+        stdx::get<std::int32_t>(One_variant_safeInt::parse(ctxt, BSON("value" << 1.0)).getValue()),
+        1);
+}
+
+TEST(IDLVariantTests, TestVariantSafeIntArray) {
+    using int32vec = std::vector<std::int32_t>;
+
+    TestLoopbackVariant<One_variant_safeInt_array, std::string, String>("test_value");
+    TestLoopbackVariant<One_variant_safeInt_array, int32vec, Array>({});
+    TestLoopbackVariant<One_variant_safeInt_array, int32vec, Array>({1});
+    TestLoopbackVariant<One_variant_safeInt_array, int32vec, Array>({1, 2});
+
+    // Use ASSERT instead of ASSERT_EQ to avoid operator<<
+    IDLParserErrorContext ctxt("root");
+    ASSERT(stdx::get<int32vec>(
+               One_variant_safeInt_array::parse(ctxt, BSON("value" << BSON_ARRAY(Decimal128(1))))
+                   .getValue()) == int32vec{1});
+    ASSERT(
+        stdx::get<int32vec>(
+            One_variant_safeInt_array::parse(ctxt, BSON("value" << BSON_ARRAY(1LL))).getValue()) ==
+        int32vec{1});
+    ASSERT(
+        stdx::get<int32vec>(
+            One_variant_safeInt_array::parse(ctxt, BSON("value" << BSON_ARRAY(1.0))).getValue()) ==
+        int32vec{1});
+    ASSERT(
+        stdx::get<int32vec>(One_variant_safeInt_array::parse(
+                                ctxt, BSON("value" << BSON_ARRAY(1.0 << 2LL << 3 << Decimal128(4))))
+                                .getValue()) == (int32vec{1, 2, 3, 4}));
+}
+
+TEST(IDLVariantTests, TestVariantTwoArrays) {
+    TestLoopbackVariant<One_variant_two_arrays, std::vector<int>, Array>({});
+    TestLoopbackVariant<One_variant_two_arrays, std::vector<int>, Array>({1});
+    TestLoopbackVariant<One_variant_two_arrays, std::vector<int>, Array>({1, 2});
+    TestLoopbackVariant<One_variant_two_arrays, std::vector<std::string>, Array>({"a"});
+    TestLoopbackVariant<One_variant_two_arrays, std::vector<std::string>, Array>({"a", "b"});
+
+    // This variant can be array<int> or array<string>. It assumes an empty array is array<int>
+    // because that type is declared first in the IDL.
+    auto obj = BSON("value" << BSONArray());
+    auto parsed = One_variant_two_arrays::parse({"root"}, obj);
+    ASSERT(stdx::get<std::vector<int>>(parsed.getValue()) == std::vector<int>());
+    ASSERT_THROWS(stdx::get<std::vector<std::string>>(parsed.getValue()), stdx::bad_variant_access);
+
+    // Corrupt array: its first key isn't "0".
+    BSONObjBuilder bob;
+    {
+        BSONObjBuilder arrayBob(bob.subarrayStart("value"));
+        arrayBob.append("1", "test_value");
+    }
+
+    ASSERT_THROWS_CODE(
+        One_variant_two_arrays::parse({"root"}, bob.obj()), AssertionException, 40423);
+}
+
+TEST(IDLVariantTests, TestVariantOptional) {
+    {
+        auto obj = BSON("value" << 1);
+        auto parsed = One_variant_optional::parse({"root"}, obj);
+        ASSERT_BSONOBJ_EQ(obj, parsed.toBSON());
+        ASSERT_EQ(stdx::get<int>(*parsed.getValue()), 1);
+    }
+
+    {
+        auto obj = BSON("value"
+                        << "test_value");
+        auto parsed = One_variant_optional::parse({"root"}, obj);
+        ASSERT_BSONOBJ_EQ(obj, parsed.toBSON());
+        ASSERT_EQ(stdx::get<std::string>(*parsed.getValue()), "test_value");
+    }
+
+    // The optional key is absent.
+    auto parsed = One_variant_optional::parse({"root"}, BSONObj());
+    ASSERT_FALSE(parsed.getValue().is_initialized());
+    ASSERT_BSONOBJ_EQ(BSONObj(), parsed.toBSON());
+}
+
+TEST(IDLVariantTests, TestTwoVariants) {
+    // Combinations of value0 (int or string) and value1 (object or array<string>). For each, test
+    // parse(), toBSON(), getValue0(), getValue1(), and the constructor.
+    {
+        auto obj = BSON("value0" << 1 << "value1" << BSONObj());
+        auto parsed = Two_variants::parse({"root"}, obj);
+        ASSERT_BSONOBJ_EQ(obj, parsed.toBSON());
+        ASSERT_EQ(stdx::get<int>(parsed.getValue0()), 1);
+        ASSERT_BSONOBJ_EQ(stdx::get<BSONObj>(parsed.getValue1()), BSONObj());
+        ASSERT_BSONOBJ_EQ(Two_variants(1, BSONObj()).toBSON(), obj);
+    }
+
+    {
+        auto obj = BSON("value0"
+                        << "test_value"
+                        << "value1" << BSONObj());
+        auto parsed = Two_variants::parse({"root"}, obj);
+        ASSERT_BSONOBJ_EQ(obj, parsed.toBSON());
+        ASSERT_EQ(stdx::get<std::string>(parsed.getValue0()), "test_value");
+        ASSERT_BSONOBJ_EQ(stdx::get<BSONObj>(parsed.getValue1()), BSONObj());
+        ASSERT_BSONOBJ_EQ(Two_variants("test_value", BSONObj()).toBSON(), obj);
+    }
+
+    {
+        auto obj = BSON("value0" << 1 << "value1"
+                                 << BSON_ARRAY("x"
+                                               << "y"));
+        auto parsed = Two_variants::parse({"root"}, obj);
+        ASSERT_BSONOBJ_EQ(obj, parsed.toBSON());
+        ASSERT_EQ(stdx::get<int>(parsed.getValue0()), 1);
+        ASSERT(stdx::get<std::vector<std::string>>(parsed.getValue1()) ==
+               (std::vector<std::string>{"x", "y"}));
+        ASSERT_BSONOBJ_EQ(Two_variants(1, std::vector<std::string>{"x", "y"}).toBSON(), obj);
+    }
+
+    {
+        auto obj = BSON("value0"
+                        << "test_value"
+                        << "value1"
+                        << BSON_ARRAY("x"
+                                      << "y"));
+        auto parsed = Two_variants::parse({"root"}, obj);
+        ASSERT_BSONOBJ_EQ(obj, parsed.toBSON());
+        ASSERT_EQ(stdx::get<std::string>(parsed.getValue0()), "test_value");
+        ASSERT(stdx::get<std::vector<std::string>>(parsed.getValue1()) ==
+               (std::vector<std::string>{"x", "y"}));
+        ASSERT_BSONOBJ_EQ(Two_variants("test_value", std::vector<std::string>{"x", "y"}).toBSON(),
+                          obj);
+    }
+}
+
+TEST(IDLVariantTests, TestChainedStructVariant) {
+    IDLParserErrorContext ctxt("root");
+    {
+        auto obj = BSON("value"
+                        << "x"
+                        << "field1"
+                        << "y");
+        auto parsed = Chained_struct_variant::parse(ctxt, obj);
+        ASSERT_EQ(stdx::get<std::string>(parsed.getOne_variant_compound().getValue()), "x");
+        ASSERT_EQ(parsed.getField1(), "y");
+        ASSERT_BSONOBJ_EQ(obj, parsed.toBSON());
+
+        Chained_struct_variant assembled;
+        assembled.setOne_variant_compound(One_variant_compound("x"));
+        assembled.setField1("y");
+        ASSERT_BSONOBJ_EQ(obj, assembled.toBSON());
+
+        // Test the constructor.
+        Chained_struct_variant constructed("y");
+        constructed.setOne_variant_compound(One_variant_compound("x"));
+        ASSERT_EQ(stdx::get<std::string>(constructed.getOne_variant_compound().getValue()), "x");
+        ASSERT_EQ(constructed.getField1(), "y");
+        ASSERT_BSONOBJ_EQ(obj, constructed.toBSON());
+    }
+    {
+        auto obj = BSON("value" << BSON_ARRAY("x"
+                                              << "y")
+                                << "field1"
+                                << "y");
+        auto parsed = Chained_struct_variant::parse(ctxt, obj);
+        ASSERT(stdx::get<std::vector<std::string>>(parsed.getOne_variant_compound().getValue()) ==
+               (std::vector<std::string>{"x", "y"}));
+        ASSERT_EQ(parsed.getField1(), "y");
+        ASSERT_BSONOBJ_EQ(obj, parsed.toBSON());
+
+        Chained_struct_variant assembled;
+        assembled.setOne_variant_compound(One_variant_compound(std::vector<std::string>{"x", "y"}));
+        assembled.setField1("y");
+        ASSERT_BSONOBJ_EQ(obj, assembled.toBSON());
+
+        // Test the constructor.
+        Chained_struct_variant constructed("y");
+        constructed.setOne_variant_compound(
+            One_variant_compound(std::vector<std::string>{"x", "y"}));
+        ASSERT(
+            stdx::get<std::vector<std::string>>(constructed.getOne_variant_compound().getValue()) ==
+            (std::vector<std::string>{"x", "y"}));
+        ASSERT_EQ(constructed.getField1(), "y");
+        ASSERT_BSONOBJ_EQ(obj, constructed.toBSON());
+    }
+    {
+        auto obj = BSON("value" << BSONObj() << "field1"
+                                << "y");
+        auto parsed = Chained_struct_variant::parse(ctxt, obj);
+        ASSERT_BSONOBJ_EQ(stdx::get<BSONObj>(parsed.getOne_variant_compound().getValue()),
+                          BSONObj());
+        ASSERT_EQ(parsed.getField1(), "y");
+        ASSERT_BSONOBJ_EQ(obj, parsed.toBSON());
+
+        Chained_struct_variant assembled;
+        assembled.setOne_variant_compound(One_variant_compound(BSONObj()));
+        assembled.setField1("y");
+        ASSERT_BSONOBJ_EQ(obj, assembled.toBSON());
+
+        // Test the constructor.
+        Chained_struct_variant constructed("y");
+        constructed.setOne_variant_compound({BSONObj()});
+        ASSERT_BSONOBJ_EQ(stdx::get<BSONObj>(constructed.getOne_variant_compound().getValue()),
+                          BSONObj());
+        ASSERT_EQ(constructed.getField1(), "y");
+        ASSERT_BSONOBJ_EQ(obj, constructed.toBSON());
+    }
+}
+
+TEST(IDLVariantTests, TestChainedStructVariantInline) {
+    IDLParserErrorContext ctxt("root");
+    {
+        auto obj = BSON("value"
+                        << "x"
+                        << "field1"
+                        << "y");
+        auto parsed = Chained_struct_variant_inline::parse(ctxt, obj);
+        ASSERT_EQ(stdx::get<std::string>(parsed.getValue()), "x");
+        ASSERT_EQ(parsed.getField1(), "y");
+        ASSERT_BSONOBJ_EQ(obj, parsed.toBSON());
+
+        Chained_struct_variant_inline assembled;
+        assembled.setOne_variant_compound(One_variant_compound("x"));
+        assembled.setField1("y");
+        ASSERT_BSONOBJ_EQ(obj, assembled.toBSON());
+
+        // Test the constructor.
+        Chained_struct_variant_inline constructed("y");
+        constructed.setOne_variant_compound(One_variant_compound("x"));
+        ASSERT_EQ(stdx::get<std::string>(constructed.getValue()), "x");
+        ASSERT_EQ(constructed.getField1(), "y");
+        ASSERT_BSONOBJ_EQ(obj, constructed.toBSON());
+    }
+    {
+        auto obj = BSON("value" << BSON_ARRAY("x"
+                                              << "y")
+                                << "field1"
+                                << "y");
+        auto parsed = Chained_struct_variant_inline::parse(ctxt, obj);
+        ASSERT(stdx::get<std::vector<std::string>>(parsed.getValue()) ==
+               (std::vector<std::string>{"x", "y"}));
+        ASSERT_EQ(parsed.getField1(), "y");
+        ASSERT_BSONOBJ_EQ(obj, parsed.toBSON());
+
+        Chained_struct_variant_inline assembled;
+        assembled.setOne_variant_compound(One_variant_compound(std::vector<std::string>{"x", "y"}));
+        assembled.setField1("y");
+        ASSERT_BSONOBJ_EQ(obj, assembled.toBSON());
+
+        // Test the constructor.
+        Chained_struct_variant_inline constructed("y");
+        constructed.setOne_variant_compound(
+            One_variant_compound(std::vector<std::string>{"x", "y"}));
+        ASSERT(stdx::get<std::vector<std::string>>(constructed.getValue()) ==
+               (std::vector<std::string>{"x", "y"}));
+        ASSERT_EQ(constructed.getField1(), "y");
+        ASSERT_BSONOBJ_EQ(obj, constructed.toBSON());
+    }
+    {
+        auto obj = BSON("value" << BSONObj() << "field1"
+                                << "y");
+        auto parsed = Chained_struct_variant_inline::parse(ctxt, obj);
+        ASSERT_BSONOBJ_EQ(stdx::get<BSONObj>(parsed.getValue()), BSONObj());
+        ASSERT_EQ(parsed.getField1(), "y");
+        ASSERT_BSONOBJ_EQ(obj, parsed.toBSON());
+
+        Chained_struct_variant_inline assembled;
+        assembled.setOne_variant_compound(One_variant_compound(BSONObj()));
+        assembled.setField1("y");
+        ASSERT_BSONOBJ_EQ(obj, assembled.toBSON());
+
+        // Test the constructor.
+        Chained_struct_variant_inline constructed("y");
+        constructed.setOne_variant_compound({BSONObj()});
+        ASSERT_BSONOBJ_EQ(stdx::get<BSONObj>(constructed.getValue()), BSONObj());
+        ASSERT_EQ(constructed.getField1(), "y");
+        ASSERT_BSONOBJ_EQ(obj, constructed.toBSON());
+    }
+}
+
+TEST(IDLVariantTests, TestChainedStructVariantStruct) {
+    IDLParserErrorContext ctxt("root");
+    {
+        auto obj = BSON("value" << 1 << "field1"
+                                << "y");
+        auto parsed = Chained_struct_variant_struct::parse(ctxt, obj);
+        ASSERT_EQ(stdx::get<int>(parsed.getOne_variant_struct().getValue()), 1);
+        ASSERT_EQ(parsed.getField1(), "y");
+        ASSERT_BSONOBJ_EQ(obj, parsed.toBSON());
+
+        Chained_struct_variant_struct assembled;
+        assembled.setOne_variant_struct(One_variant_struct(1));
+        assembled.setField1("y");
+        ASSERT_BSONOBJ_EQ(obj, assembled.toBSON());
+
+        // Test the constructor.
+        Chained_struct_variant_struct constructed("y");
+        constructed.setOne_variant_struct(One_variant_struct(1));
+        ASSERT_EQ(stdx::get<int>(constructed.getOne_variant_struct().getValue()), 1);
+        ASSERT_EQ(constructed.getField1(), "y");
+        ASSERT_BSONOBJ_EQ(obj, constructed.toBSON());
+    }
+    {
+        auto obj = BSON("value" << BSON("value"
+                                        << "x")
+                                << "field1"
+                                << "y");
+        auto parsed = Chained_struct_variant_struct::parse(ctxt, obj);
+        ASSERT_EQ(stdx::get<One_string>(parsed.getOne_variant_struct().getValue()).getValue(), "x");
+        ASSERT_EQ(parsed.getField1(), "y");
+        ASSERT_BSONOBJ_EQ(obj, parsed.toBSON());
+
+        Chained_struct_variant_struct assembled;
+        assembled.setOne_variant_struct(One_variant_struct(One_string("x")));
+        assembled.setField1("y");
+        ASSERT_BSONOBJ_EQ(obj, assembled.toBSON());
+
+        // Test the constructor.
+        Chained_struct_variant_struct constructed("y");
+        constructed.setOne_variant_struct(One_variant_struct(One_string("x")));
+        ASSERT_EQ(stdx::get<One_string>(constructed.getOne_variant_struct().getValue()).getValue(),
+                  "x");
+        ASSERT_EQ(constructed.getField1(), "y");
+        ASSERT_BSONOBJ_EQ(obj, constructed.toBSON());
+    }
+}
+
+TEST(IDLVariantTests, TestChainedStructVariantStructInline) {
+    IDLParserErrorContext ctxt("root");
+    {
+        auto obj = BSON("value" << 1 << "field1"
+                                << "y");
+        auto parsed = Chained_struct_variant_struct_inline::parse(ctxt, obj);
+        ASSERT_EQ(stdx::get<int>(parsed.getValue()), 1);
+        ASSERT_EQ(parsed.getField1(), "y");
+        ASSERT_BSONOBJ_EQ(obj, parsed.toBSON());
+
+        Chained_struct_variant_struct_inline assembled;
+        assembled.setOne_variant_struct(One_variant_struct(1));
+        assembled.setField1("y");
+        ASSERT_BSONOBJ_EQ(obj, assembled.toBSON());
+
+        // Test the constructor.
+        Chained_struct_variant_struct_inline constructed("y");
+        constructed.setOne_variant_struct(One_variant_struct(1));
+        ASSERT_EQ(stdx::get<int>(constructed.getValue()), 1);
+        ASSERT_EQ(constructed.getField1(), "y");
+        ASSERT_BSONOBJ_EQ(obj, constructed.toBSON());
+    }
+    {
+        auto obj = BSON("value" << BSON("value"
+                                        << "x")
+                                << "field1"
+                                << "y");
+        auto parsed = Chained_struct_variant_struct_inline::parse(ctxt, obj);
+        ASSERT_EQ(stdx::get<One_string>(parsed.getValue()).getValue(), "x");
+        ASSERT_EQ(parsed.getField1(), "y");
+        ASSERT_BSONOBJ_EQ(obj, parsed.toBSON());
+
+        Chained_struct_variant_struct_inline assembled;
+        assembled.setOne_variant_struct(One_variant_struct(One_string("x")));
+        assembled.setField1("y");
+        ASSERT_BSONOBJ_EQ(obj, assembled.toBSON());
+
+        // Test the constructor.
+        Chained_struct_variant_struct_inline constructed("y");
+        constructed.setOne_variant_struct(One_variant_struct(One_string("x")));
+        ASSERT_EQ(stdx::get<One_string>(constructed.getValue()).getValue(), "x");
+        ASSERT_EQ(constructed.getField1(), "y");
+        ASSERT_BSONOBJ_EQ(obj, constructed.toBSON());
     }
 }
 
@@ -1783,12 +2251,7 @@ TEST(IDLCommand, TestConcatentateWithDb) {
     assert_same_types<decltype(testStruct.getNamespace()), const NamespaceString&>();
 
     // Positive: Test we can roundtrip from the just parsed document
-    {
-        BSONObjBuilder builder;
-        OpMsgRequest reply = testStruct.serialize(BSONObj());
-
-        ASSERT_BSONOBJ_EQ(testDoc, reply.body);
-    }
+    ASSERT_BSONOBJ_EQ(testDoc, serializeCmd(testStruct));
 
     // Positive: Test we can serialize from nothing the same document except for $db
     {
@@ -1809,13 +2272,10 @@ TEST(IDLCommand, TestConcatentateWithDb) {
 
     // Positive: Test we can serialize from nothing the same document
     {
-        BSONObjBuilder builder;
         BasicConcatenateWithDbCommand one_new(NamespaceString("db.coll1"));
         one_new.setField1(3);
         one_new.setField2("five");
-        OpMsgRequest reply = one_new.serialize(BSONObj());
-
-        ASSERT_BSONOBJ_EQ(testDoc, reply.body);
+        ASSERT_BSONOBJ_EQ(testDoc, serializeCmd(testStruct));
     }
 }
 
@@ -1901,12 +2361,7 @@ TEST(IDLCommand, TestConcatentateWithDbOrUUID_TestNSS) {
     assert_same_types<decltype(testStruct.getNamespaceOrUUID()), const NamespaceStringOrUUID&>();
 
     // Positive: Test we can roundtrip from the just parsed document
-    {
-        BSONObjBuilder builder;
-        OpMsgRequest reply = testStruct.serialize(BSONObj());
-
-        ASSERT_BSONOBJ_EQ(testDoc, reply.body);
-    }
+    ASSERT_BSONOBJ_EQ(testDoc, serializeCmd(testStruct));
 
     // Positive: Test we can serialize from nothing the same document except for $db
     {
@@ -1927,13 +2382,10 @@ TEST(IDLCommand, TestConcatentateWithDbOrUUID_TestNSS) {
 
     // Positive: Test we can serialize from nothing the same document
     {
-        BSONObjBuilder builder;
         BasicConcatenateWithDbOrUUIDCommand one_new(NamespaceString("db.coll1"));
         one_new.setField1(3);
         one_new.setField2("five");
-        OpMsgRequest reply = one_new.serialize(BSONObj());
-
-        ASSERT_BSONOBJ_EQ(testDoc, reply.body);
+        ASSERT_BSONOBJ_EQ(testDoc, serializeCmd(one_new));
     }
 }
 
@@ -1958,12 +2410,7 @@ TEST(IDLCommand, TestConcatentateWithDbOrUUID_TestUUID) {
     assert_same_types<decltype(testStruct.getNamespaceOrUUID()), const NamespaceStringOrUUID&>();
 
     // Positive: Test we can roundtrip from the just parsed document
-    {
-        BSONObjBuilder builder;
-        OpMsgRequest reply = testStruct.serialize(BSONObj());
-
-        ASSERT_BSONOBJ_EQ(testDoc, reply.body);
-    }
+    ASSERT_BSONOBJ_EQ(testDoc, serializeCmd(testStruct));
 
     // Positive: Test we can serialize from nothing the same document except for $db
     {
@@ -1983,13 +2430,10 @@ TEST(IDLCommand, TestConcatentateWithDbOrUUID_TestUUID) {
 
     // Positive: Test we can serialize from nothing the same document
     {
-        BSONObjBuilder builder;
         BasicConcatenateWithDbOrUUIDCommand one_new(NamespaceStringOrUUID("db", uuid));
         one_new.setField1(3);
         one_new.setField2("five");
-        OpMsgRequest reply = one_new.serialize(BSONObj());
-
-        ASSERT_BSONOBJ_EQ(testDoc, reply.body);
+        ASSERT_BSONOBJ_EQ(testDoc, serializeCmd(one_new));
     }
 }
 
@@ -2067,14 +2511,11 @@ TEST(IDLCommand, TestIgnore) {
 
     // Positive: Test we can serialize from nothing the same document
     {
-        BSONObjBuilder builder;
         BasicIgnoredCommand one_new;
         one_new.setField1(3);
         one_new.setField2("five");
         one_new.setDbName("admin");
-        OpMsgRequest reply = one_new.serialize(BSONObj());
-
-        ASSERT_BSONOBJ_EQ(testDocWithDB, reply.body);
+        ASSERT_BSONOBJ_EQ(testDocWithDB, serializeCmd(one_new));
     }
 }
 
@@ -2105,7 +2546,56 @@ TEST(IDLCommand, TestIgnoredNegative) {
     }
 }
 
-// Positive: Test a command read and written to OpMsgRequest works
+// We don't generate comparison operators like "==" for variants, so test only for BSON equality.
+template <typename CommandT, typename TestT, BSONType Test_bson_type>
+void TestLoopbackCommandTypeVariant(TestT test_value) {
+    IDLParserErrorContext ctxt("root");
+
+    BSONObjBuilder bob;
+    if constexpr (idl::hasBSONSerialize<TestT>) {
+        // TestT might be an IDL struct type like One_string.
+        BSONObjBuilder subObj(bob.subobjStart(CommandT::kCommandParameterFieldName));
+        test_value.serialize(&subObj);
+    } else {
+        bob.append(CommandT::kCommandParameterFieldName, test_value);
+    }
+
+    bob.append("$db", "db");
+    auto obj = bob.obj();
+    auto element = obj.firstElement();
+    ASSERT_EQUALS(element.type(), Test_bson_type);
+
+    auto parsed = CommandT::parse(ctxt, obj);
+    if constexpr (std::is_same_v<TestT, BSONObj>) {
+        ASSERT_BSONOBJ_EQ(stdx::get<TestT>(parsed.getValue()), test_value);
+    } else {
+        // Use ASSERT instead of ASSERT_EQ to avoid operator<<
+        ASSERT(stdx::get<TestT>(parsed.getCommandParameter()) == test_value);
+    }
+    ASSERT_BSONOBJ_EQ(obj, serializeCmd(parsed));
+
+    // Test the constructor.
+    CommandT constructed(test_value);
+    constructed.setDbName("db");
+    if constexpr (std::is_same_v<TestT, BSONObj>) {
+        ASSERT_BSONOBJ_EQ(stdx::get<TestT>(parsed.getValue()), test_value);
+    } else {
+        ASSERT(stdx::get<TestT>(parsed.getCommandParameter()) == test_value);
+    }
+    ASSERT_BSONOBJ_EQ(obj, serializeCmd(constructed));
+}
+
+TEST(IDLCommand, TestCommandTypeVariant) {
+    TestLoopbackCommandTypeVariant<CommandTypeVariantCommand, int, NumberInt>(1);
+    TestLoopbackCommandTypeVariant<CommandTypeVariantCommand, std::string, String>("test_value");
+    TestLoopbackCommandTypeVariant<CommandTypeVariantCommand, std::vector<std::string>, Array>(
+        {"x", "y"});
+
+    TestLoopbackCommandTypeVariant<CommandTypeVariantStructCommand, bool, Bool>(true);
+    TestLoopbackCommandTypeVariant<CommandTypeVariantStructCommand, One_string, Object>(
+        One_string("test_value"));
+}
+
 TEST(IDLDocSequence, TestBasic) {
     IDLParserErrorContext ctxt("root");
 
@@ -2828,12 +3318,7 @@ TEST(IDLTypeCommand, TestString) {
     assert_same_types<decltype(testStruct.getCommandParameter()), const StringData>();
 
     // Positive: Test we can roundtrip from the just parsed document
-    {
-        BSONObjBuilder builder;
-        OpMsgRequest reply = testStruct.serialize(BSONObj());
-
-        ASSERT_BSONOBJ_EQ(testDoc, reply.body);
-    }
+    ASSERT_BSONOBJ_EQ(testDoc, serializeCmd(testStruct));
 
     // Positive: Test we can serialize from nothing the same document except for $db
     {
@@ -2852,13 +3337,11 @@ TEST(IDLTypeCommand, TestString) {
 
     // Positive: Test we can serialize from nothing the same document
     {
-        BSONObjBuilder builder;
         CommandTypeStringCommand one_new("foo");
         one_new.setField1(3);
         one_new.setDbName("db");
         OpMsgRequest reply = one_new.serialize(BSONObj());
-
-        ASSERT_BSONOBJ_EQ(testDoc, reply.body);
+        ASSERT_BSONOBJ_EQ(testDoc, serializeCmd(one_new));
     }
 }
 
@@ -2878,24 +3361,16 @@ TEST(IDLTypeCommand, TestArrayObject) {
                       const std::vector<mongo::BSONObj>&>();
 
     // Positive: Test we can roundtrip from the just parsed document
-    {
-        BSONObjBuilder builder;
-        OpMsgRequest reply = testStruct.serialize(BSONObj());
-
-        ASSERT_BSONOBJ_EQ(testDoc, reply.body);
-    }
+    ASSERT_BSONOBJ_EQ(testDoc, serializeCmd(testStruct));
 
     // Positive: Test we can serialize from nothing the same document
     {
-        BSONObjBuilder builder;
         std::vector<BSONObj> vec;
         vec.emplace_back(BSON("sample"
                               << "doc"));
         CommandTypeArrayObjectCommand one_new(vec);
         one_new.setDbName("db");
-        OpMsgRequest reply = one_new.serialize(BSONObj());
-
-        ASSERT_BSONOBJ_EQ(testDoc, reply.body);
+        ASSERT_BSONOBJ_EQ(testDoc, serializeCmd(one_new));
     }
 }
 
@@ -2923,23 +3398,15 @@ TEST(IDLTypeCommand, TestStruct) {
     }
 
     // Positive: Test we can roundtrip from the just parsed document
-    {
-        BSONObjBuilder builder;
-        OpMsgRequest reply = testStruct.serialize(BSONObj());
-
-        ASSERT_BSONOBJ_EQ(testDoc, reply.body);
-    }
+    ASSERT_BSONOBJ_EQ(testDoc, serializeCmd(testStruct));
 
     // Positive: Test we can serialize from nothing the same document
     {
-        BSONObjBuilder builder;
         One_string os;
         os.setValue("sample");
         CommandTypeStructCommand one_new(os);
         one_new.setDbName("db");
-        OpMsgRequest reply = one_new.serialize(BSONObj());
-
-        ASSERT_BSONOBJ_EQ(testDoc, reply.body);
+        ASSERT_BSONOBJ_EQ(testDoc, serializeCmd(one_new));
     }
 }
 
@@ -2959,25 +3426,17 @@ TEST(IDLTypeCommand, TestStructArray) {
                       const std::vector<mongo::idl::import::One_string>&>();
 
     // Positive: Test we can roundtrip from the just parsed document
-    {
-        BSONObjBuilder builder;
-        OpMsgRequest reply = testStruct.serialize(BSONObj());
-
-        ASSERT_BSONOBJ_EQ(testDoc, reply.body);
-    }
+    ASSERT_BSONOBJ_EQ(testDoc, serializeCmd(testStruct));
 
     // Positive: Test we can serialize from nothing the same document
     {
-        BSONObjBuilder builder;
         std::vector<One_string> vec;
         One_string os;
         os.setValue("sample");
         vec.push_back(os);
         CommandTypeArrayStructCommand one_new(vec);
         one_new.setDbName("db");
-        OpMsgRequest reply = one_new.serialize(BSONObj());
-
-        ASSERT_BSONOBJ_EQ(testDoc, reply.body);
+        ASSERT_BSONOBJ_EQ(testDoc, serializeCmd(one_new));
     }
 }
 
@@ -2996,12 +3455,7 @@ TEST(IDLTypeCommand, TestUnderscoreCommand) {
     assert_same_types<decltype(testStruct.getCommandParameter()), const StringData>();
 
     // Positive: Test we can roundtrip from the just parsed document
-    {
-        BSONObjBuilder builder;
-        OpMsgRequest reply = testStruct.serialize(BSONObj());
-
-        ASSERT_BSONOBJ_EQ(testDoc, reply.body);
-    }
+    ASSERT_BSONOBJ_EQ(testDoc, serializeCmd(testStruct));
 
     // Positive: Test we can serialize from nothing the same document except for $db
     {
@@ -3020,13 +3474,10 @@ TEST(IDLTypeCommand, TestUnderscoreCommand) {
 
     // Positive: Test we can serialize from nothing the same document
     {
-        BSONObjBuilder builder;
         WellNamedCommand one_new("foo");
         one_new.setField1(3);
         one_new.setDbName("db");
-        OpMsgRequest reply = one_new.serialize(BSONObj());
-
-        ASSERT_BSONOBJ_EQ(testDoc, reply.body);
+        ASSERT_BSONOBJ_EQ(testDoc, serializeCmd(one_new));
     }
 }
 
@@ -3138,12 +3589,7 @@ TEST(IDLCommand, BasicNamespaceConstGetterCommand_TestNonConstGetterGeneration) 
         const NamespaceStringOrUUID&>();
 
     // Test we can roundtrip from the just parsed document.
-    {
-        BSONObjBuilder builder;
-        OpMsgRequest reply = testStruct.serialize(BSONObj());
-
-        ASSERT_BSONOBJ_EQ(testDoc, reply.body);
-    }
+    ASSERT_BSONOBJ_EQ(testDoc, serializeCmd(testStruct));
 
     // Test mutable getter modifies the command object.
     {

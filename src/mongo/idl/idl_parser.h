@@ -34,10 +34,44 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/namespace_string.h"
 
 namespace mongo {
+
+namespace idl {
+template <typename T>
+using HasBSONSerializeOp = decltype(std::declval<T>().serialize(std::declval<BSONObjBuilder*>()));
+
+template <typename T>
+constexpr bool hasBSONSerialize = stdx::is_detected_v<HasBSONSerializeOp, T>;
+
+template <typename T>
+void idlSerialize(BSONObjBuilder* builder, StringData fieldName, T arg) {
+    if constexpr (hasBSONSerialize<decltype(arg)>) {
+        BSONObjBuilder subObj(builder->subobjStart(fieldName));
+        arg.serialize(&subObj);
+    } else {
+        builder->append(fieldName, arg);
+    }
+}
+
+template <typename T>
+void idlSerialize(BSONObjBuilder* builder, StringData fieldName, std::vector<T> arg) {
+    BSONArrayBuilder arrayBuilder(builder->subarrayStart(fieldName));
+    for (const auto& item : arg) {
+        if constexpr (hasBSONSerialize<decltype(item)>) {
+            BSONObjBuilder subObj(arrayBuilder.subobjStart());
+            item.serialize(&subObj);
+        } else {
+            arrayBuilder.append(item);
+        }
+    }
+}
+
+
+}  // namespace idl
 
 /**
  * IDLParserErrorContext manages the current parser context for parsing BSON documents.
@@ -152,6 +186,12 @@ public:
      */
     MONGO_COMPILER_NORETURN void throwBadEnumValue(StringData enumValue) const;
     MONGO_COMPILER_NORETURN void throwBadEnumValue(int enumValue) const;
+
+    /**
+     * Throw an error about a field having the wrong type.
+     */
+    MONGO_COMPILER_NORETURN void throwBadType(const BSONElement& element,
+                                              const std::vector<BSONType>& types) const;
 
     /**
      * Throw an 'APIStrictError' if the user command has 'apiStrict' field as true.

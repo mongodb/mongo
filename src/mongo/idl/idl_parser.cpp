@@ -110,12 +110,7 @@ bool IDLParserErrorContext::checkAndAssertTypes(const BSONElement& element,
             return false;
         }
 
-        std::string path = getElementPath(element);
-        std::string type_str = toCommaDelimitedList(types);
-        uasserted(ErrorCodes::TypeMismatch,
-                  str::stream() << "BSON field '" << path << "' is the wrong type '"
-                                << typeName(element.type()) << "', expected types '[" << type_str
-                                << "']");
+        throwBadType(element, types);
     }
 
     return true;
@@ -223,6 +218,16 @@ void IDLParserErrorContext::throwBadEnumValue(StringData enumValue) const {
     uasserted(ErrorCodes::BadValue,
               str::stream() << "Enumeration value '" << enumValue << "' for field '" << path
                             << "' is not a valid value.");
+}
+
+void IDLParserErrorContext::throwBadType(const BSONElement& element,
+                                         const std::vector<BSONType>& types) const {
+    std::string path = getElementPath(element);
+    std::string type_str = toCommaDelimitedList(types);
+    uasserted(ErrorCodes::TypeMismatch,
+              str::stream() << "BSON field '" << path << "' is the wrong type '"
+                            << typeName(element.type()) << "', expected types '[" << type_str
+                            << "']");
 }
 
 void IDLParserErrorContext::throwAPIStrictErrorIfApplicable(BSONElement field) const {
