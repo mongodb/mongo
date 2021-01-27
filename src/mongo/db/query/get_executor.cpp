@@ -2114,7 +2114,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorForS
         LOGV2_DEBUG(20931,
                     2,
                     "Using fast distinct",
-                    "query"_attr = redact(parsedDistinct->getQuery()->toStringShort()),
+                    "query"_attr = redact(exec.getValue()->getCanonicalQuery()->toStringShort()),
                     "planSummary"_attr = exec.getValue()->getPlanExplainer().getPlanSummary());
     }
 
