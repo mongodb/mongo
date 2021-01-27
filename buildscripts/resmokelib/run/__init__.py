@@ -12,6 +12,7 @@ import sys
 import tarfile
 import time
 
+import curatorbin
 import pkg_resources
 import requests
 
@@ -310,85 +311,6 @@ class TestRunner(Subcommand):  # pylint: disable=too-many-instance-attributes
         if self._archive and not self._interrupted:
             self._archive.exit()
 
-    # pylint: disable=too-many-instance-attributes,too-many-statements,too-many-locals
-    def _get_jasper_reqs(self):
-        """Ensure that we have all requirements for running jasper."""
-        root_dir = os.getcwd()
-        proto_file = os.path.join(root_dir, "buildscripts", "resmokelib", "core", "jasper.proto")
-        if not os.path.exists(proto_file):
-            raise RuntimeError("Resmoke must be run from the root of the mongo repo.")
-
-        try:
-            well_known_protos_include = pkg_resources.resource_filename("grpc_tools", "_proto")
-        except ImportError:
-            raise ImportError("You must run: sys.executable + '-m pip install grpcio grpcio-tools "
-                              "googleapis-common-protos' to use --spawnUsing=jasper.")
-
-        # We use the build/ directory as the output directory because the generated files aren't
-        # meant to because tracked by git or linted.
-        proto_out = os.path.join(root_dir, "build", "jasper")
-
-        utils.rmtree(proto_out, ignore_errors=True)
-        os.makedirs(proto_out)
-
-        # We make 'proto_out' into a Python package so we can add it to 'sys.path' and import the
-        # *pb2*.py modules from it.
-        with open(os.path.join(proto_out, "__init__.py"), "w"):
-            pass
-
-        ret = grpc_tools.protoc.main([
-            grpc_tools.protoc.__file__,
-            "--grpc_python_out",
-            proto_out,
-            "--python_out",
-            proto_out,
-            "--proto_path",
-            os.path.dirname(proto_file),
-            "--proto_path",
-            well_known_protos_include,
-            os.path.basename(proto_file),
-        ])
-
-        if ret != 0:
-            raise RuntimeError("Failed to generated gRPC files from the jasper.proto file")
-
-        sys.path.extend([os.path.dirname(proto_out), proto_out])
-
-        curator_path = "build/curator"
-        if sys.platform == "win32":
-            curator_path += ".exe"
-        git_hash = "b0c3c0fc68bce26d9572796d6bed3af4a298e30e"
-        curator_exists = os.path.isfile(curator_path)
-        curator_same_version = False
-        if curator_exists:
-            curator_version = subprocess.check_output([curator_path,
-                                                       "--version"]).decode('utf-8').split()
-            curator_same_version = git_hash in curator_version
-
-        if curator_exists and not curator_same_version:
-            os.remove(curator_path)
-            self._resmoke_logger.info(
-                "Found a different version of curator. Downloading version %s of curator to enable"
-                "process management using jasper.", git_hash)
-
-        if not curator_exists or not curator_same_version:
-            if sys.platform == "darwin":
-                os_platform = "macos"
-            elif sys.platform == "win32":
-                os_platform = "windows-64"
-            elif sys.platform.startswith("linux"):
-                os_platform = "ubuntu1604"
-            else:
-                raise OSError("Unrecognized platform. "
-                              "This program is meant to be run on MacOS, Windows, or Linux.")
-            url = ("https://s3.amazonaws.com/boxes.10gen.com/build/curator/"
-                   "curator-dist-%s-%s.tar.gz") % (os_platform, git_hash)
-            response = requests.get(url, stream=True)
-            with tarfile.open(mode="r|gz", fileobj=response.raw) as tf:
-                tf.extractall(path="./build/")
-
-        return curator_path
-
     def _setup_jasper(self):
         """Start up the jasper process manager."""
         curator_path = self._get_jasper_reqs()
@@ -423,6 +345,55 @@ class TestRunner(Subcommand):  # pylint: disable=too-many-instance-attributes
         self._exit_code = exit_code
         self._resmoke_logger.info("Exiting with code: %d", exit_code)
         sys.exit(exit_code)
+
+
+# pylint: disable=too-many-instance-attributes,too-many-statements,too-many-locals
+def _get_jasper_reqs():
+    """Ensure that we have all requirements for running jasper."""
+    root_dir = os.getcwd()
+    proto_file = os.path.join(root_dir, "buildscripts", "resmokelib", "core", "jasper.proto")
+    if not os.path.exists(proto_file):
+        raise RuntimeError("Resmoke must be run from the root of the mongo repo.")
+
+    try:
+        well_known_protos_include = pkg_resources.resource_filename("grpc_tools", "_proto")
+    except ImportError:
+        raise ImportError("You must run: sys.executable + '-m pip install grpcio grpcio-tools "
+                          "googleapis-common-protos' to use --spawnUsing=jasper.")
+
+    # We use the build/ directory as the output directory because the generated files aren't
+    # meant to because tracked by git or linted.
+    proto_out = os.path.join(root_dir, "build", "jasper")
+
+    utils.rmtree(proto_out, ignore_errors=True)
+    os.makedirs(proto_out)
+
+    # We make 'proto_out' into a Python package so we can add it to 'sys.path' and import the
+    # *pb2*.py modules from it.
+    with open(os.path.join(proto_out, "__init__.py"), "w"):
+        pass
+
+    ret = grpc_tools.protoc.main([
+        grpc_tools.protoc.__file__,
+        "--grpc_python_out",
+        proto_out,
+        "--python_out",
+        proto_out,
+        "--proto_path",
+        os.path.dirname(proto_file),
+        "--proto_path",
+        well_known_protos_include,
+        os.path.basename(proto_file),
+    ])
+
+    if ret != 0:
+        raise RuntimeError("Failed to generated gRPC files from the jasper.proto file")
+
+    sys.path.extend([os.path.dirname(proto_out), proto_out])
+
+    curator_path = curatorbin.get_curator_path()
+
+    return curator_path
 
 
 _TagInfo = collections.namedtuple("_TagInfo", ["tag_name", "evergreen_aware", "suite_options"])
