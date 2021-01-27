@@ -2261,8 +2261,13 @@ var ReplSetTest = function(opts) {
             const firstReader = readers[firstReaderIndex];
             let prevOplogEntry;
             assert(firstReader.hasNext(), "oplog is empty while checkOplogs is called");
+            // Track the number of bytes we are reading as we check the oplog. We use this to avoid
+            // out-of-memory issues by calling to garbage collect whenever the memory footprint is
+            // large.
+            let bytesSinceGC = 0;
             while (firstReader.hasNext()) {
                 const oplogEntry = firstReader.next();
+                bytesSinceGC += Object.bsonsize(oplogEntry);
                 if (oplogEntry === kCappedPositionLostSentinel) {
                     // When using legacy OP_QUERY/OP_GET_MORE reads against mongos, it is
                     // possible for hasNext() to return true but for next() to throw an exception.
@@ -2277,6 +2282,7 @@ var ReplSetTest = function(opts) {
                     }
 
                     const otherOplogEntry = readers[i].next();
+                    bytesSinceGC += Object.bsonsize(otherOplogEntry);
                     if (otherOplogEntry && otherOplogEntry !== kCappedPositionLostSentinel) {
                         assertOplogEntriesEq.call(this,
                                                   oplogEntry,
@@ -2285,6 +2291,11 @@ var ReplSetTest = function(opts) {
                                                   readers[i],
                                                   prevOplogEntry);
                     }
+                }
+                // Garbage collect every 10MB.
+                if (bytesSinceGC > (10 * 1024 * 1024)) {
+                    gc();
+                    bytesSinceGC = 0;
                 }
                 prevOplogEntry = oplogEntry;
             }
