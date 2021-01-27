@@ -27,37 +27,25 @@
  *    it in the license file.
  */
 
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context.h"
+#pragma once
+
+#include "mongo/db/auth/user_name.h"
+#include "mongo/db/s/sharding_ddl_coordinator.h"
+#include "mongo/s/shard_id.h"
 
 namespace mongo {
-namespace sharding_ddl_util {
 
-/**
- * Erase collection metadata from config server and invalidate the locally cached once.
- * In particular remove chunks, tags, and the description associated with the given namespace.
- */
-void removeCollMetadataFromConfig(OperationContext* opCtx, NamespaceString nss);
+class DropDatabaseCoordinator final : public ShardingDDLCoordinator,
+                                      public std::enable_shared_from_this<DropDatabaseCoordinator> {
+public:
+    DropDatabaseCoordinator(OperationContext* opCtx, StringData dbName);
 
-/**
- * Rename sharded collection metadata as part of a renameCollection operation.
- *
- * Transaction:
- * - Update config.collections entry: update nss and epoch.
- * - Update config.chunks entries: change epoch/timestamp.
- */
-void shardedRenameMetadata(OperationContext* opCtx,
-                           const NamespaceString& fromNss,
-                           const NamespaceString& toNss);
+private:
+    SemiFuture<void> runImpl(std::shared_ptr<executor::TaskExecutor> executor) override;
 
-/**
- * Ensures rename preconditions for sharded collections are met:
- * - Check that `dropTarget` is true if the destination collection exists
- * - Check that no tags exist for the destination collection
- */
-void checkShardedRenamePreconditions(OperationContext* opCtx,
-                                     const NamespaceString& toNss,
-                                     const bool dropTarget);
+    ServiceContext* _serviceContext;
+    std::vector<UserName> _users;
+    std::vector<RoleName> _roles;
+};
 
-}  // namespace sharding_ddl_util
 }  // namespace mongo

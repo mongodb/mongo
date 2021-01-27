@@ -103,6 +103,14 @@ commands:
         # The reply can completely removed once 5.0 became last lts
         reply_type: DropDatabaseReply
 
+    _shardsvrDropDatabaseParticipant:
+        description: "Internal command sent to participants shards to drop a database."
+        command_name: _shardsvrDropDatabaseParticipant
+        namespace: ignored
+        api_version: ""
+        cpp_name: ShardsvrDropDatabaseParticipant
+        strict: false
+
     _shardsvrDropCollection:
         description: "Parser for the _shardsvrDropCollection command"
         command_name: _shardsvrDropCollection

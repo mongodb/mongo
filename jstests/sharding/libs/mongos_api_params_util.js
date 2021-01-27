@@ -385,8 +385,7 @@ let MongosAPIParametersUtil = (function() {
             commandName: "dropDatabase",
             run: {
                 inAPIVersion1: true,
-                configServerCommandName: "_configsvrDropDatabase",
-                shardCommandName: "dropDatabase",
+                shardCommandName: "_shardsvrDropDatabase",
                 permittedInTxn: false,
                 command: () => ({dropDatabase: 1})
             }

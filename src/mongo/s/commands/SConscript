@@ -42,7 +42,7 @@ env.Library(
         'cluster_data_size_cmd.cpp',
         'cluster_db_stats_cmd.cpp',
         'cluster_distinct_cmd.cpp',
-        'cluster_drop_cmd.cpp',
+        'cluster_drop_collection_cmd.cpp',
         'cluster_drop_database_cmd.cpp',
         'cluster_drop_indexes_cmd.cpp',
         'cluster_enable_sharding_cmd.cpp',

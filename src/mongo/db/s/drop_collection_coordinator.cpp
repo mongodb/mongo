@@ -37,6 +37,8 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/dist_lock_manager.h"
+#include "mongo/db/s/drop_collection_coordinator.h"
+#include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_chunk.h"
@@ -48,8 +50,6 @@
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
-
-static constexpr int kMaxNumStaleShardVersionRetries = 10;
 
 DropCollectionCoordinator::DropCollectionCoordinator(OperationContext* opCtx,
                                                      const NamespaceString& nss)
@@ -81,34 +81,6 @@ void DropCollectionCoordinator::_sendDropCollToParticipants(OperationContext* op
             str::stream() << "Error dropping collection " << _nss.toString()
                           << " on participant shard " << shardId);
     }
-}
-
-void DropCollectionCoordinator::_removeCollMetadataFromConfig(OperationContext* opCtx) {
-    IgnoreAPIParametersBlock ignoreApiParametersBlock(opCtx);
-    const auto catalogClient = Grid::get(opCtx)->catalogClient();
-
-    ON_BLOCK_EXIT([this, opCtx] {
-        Grid::get(opCtx)->catalogCache()->invalidateCollectionEntry_LINEARIZABLE(_nss);
-    });
-
-    // Remove chunk data
-    uassertStatusOK(
-        catalogClient->removeConfigDocuments(opCtx,
-                                             ChunkType::ConfigNS,
-                                             BSON(ChunkType::ns(_nss.ns())),
-                                             ShardingCatalogClient::kMajorityWriteConcern));
-    // Remove tag data
-    uassertStatusOK(
-        catalogClient->removeConfigDocuments(opCtx,
-                                             TagsType::ConfigNS,
-                                             BSON(TagsType::ns(_nss.ns())),
-                                             ShardingCatalogClient::kMajorityWriteConcern));
-    // Remove coll metadata
-    uassertStatusOK(
-        catalogClient->removeConfigDocuments(opCtx,
-                                             CollectionType::ConfigNS,
-                                             BSON(CollectionType::kNssFieldName << _nss.ns()),
-                                             ShardingCatalogClient::kMajorityWriteConcern));
 }
 
 void DropCollectionCoordinator::_stopMigrations(OperationContext* opCtx) {
@@ -144,7 +116,7 @@ SemiFuture<void> DropCollectionCoordinator::runImpl(
             const auto routingInfo = uassertStatusOK(
                 Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(opCtx, _nss));
 
-            _removeCollMetadataFromConfig(opCtx);
+            sharding_ddl_util::removeCollMetadataFromConfig(opCtx, _nss);
 
             if (routingInfo.isSharded()) {
                 _participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);

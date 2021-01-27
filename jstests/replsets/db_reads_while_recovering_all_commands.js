@@ -70,6 +70,7 @@ const allCommands = {
     _shardsvrMovePrimary: {skip: isPrimaryOnly},
     _shardsvrRenameCollection: {skip: isPrimaryOnly},
     _shardsvrDropDatabase: {skip: isPrimaryOnly},
+    _shardsvrDropDatabaseParticipant: {skip: isPrimaryOnly},
     _shardsvrShardCollection: {skip: isPrimaryOnly},
     _shardsvrRefineCollectionShardKey: {skip: isPrimaryOnly},
     _transferMods: {skip: isPrimaryOnly},

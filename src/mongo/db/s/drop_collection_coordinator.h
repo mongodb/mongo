@@ -45,7 +45,6 @@ private:
     SemiFuture<void> runImpl(std::shared_ptr<executor::TaskExecutor> executor) override;
 
     void _stopMigrations(OperationContext* opCtx);
-    void _removeCollMetadataFromConfig(OperationContext* opCtx);
     void _sendDropCollToParticipants(OperationContext* opCtx);
 
     ServiceContext* _serviceContext;

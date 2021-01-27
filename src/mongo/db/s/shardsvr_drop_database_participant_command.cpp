@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2020-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -32,36 +32,19 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/catalog/drop_database.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/curop.h"
-#include "mongo/db/s/drop_database_coordinator.h"
+#include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/grid.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
-#include "mongo/s/sharded_collections_ddl_parameters_gen.h"
 
 namespace mongo {
 namespace {
 
-DropDatabaseReply dropDatabaseLegacy(OperationContext* opCtx, StringData dbName) {
-    const auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-    auto cmdResponse = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
-        opCtx,
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        "admin",
-        CommandHelpers::appendMajorityWriteConcern(BSON("_configsvrDropDatabase" << dbName),
-                                                   opCtx->getWriteConcern()),
-        Shard::RetryPolicy::kIdempotent));
-
-    uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(cmdResponse));
-
-    return DropDatabaseReply::parse(IDLParserErrorContext("dropDatabase-reply"),
-                                    cmdResponse.response);
-}
-
-class ShardsvrDropDatabaseCommand final : public TypedCommand<ShardsvrDropDatabaseCommand> {
+class ShardsvrDropDatabaseParticipantCommand final
+    : public TypedCommand<ShardsvrDropDatabaseParticipantCommand> {
 public:
     bool acceptsAnyApiVersionParameters() const override {
         return true;
@@ -72,51 +55,43 @@ public:
     }
 
     std::string help() const override {
-        return "Internal command, which is exported by the primary sharding server. Do not call "
-               "directly. Drops a database.";
+        return "Internal command, which is exported by secondary sharding servers. Do not call "
+               "directly. Participates in droping a database.";
     }
 
-    using Request = ShardsvrDropDatabase;
-    using Response = DropDatabaseReply;
+    using Request = ShardsvrDropDatabaseParticipant;
 
     class Invocation final : public InvocationBase {
     public:
         using InvocationBase::InvocationBase;
 
-        Response typedRun(OperationContext* opCtx) {
+        void typedRun(OperationContext* opCtx) {
             uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
-
             uassert(ErrorCodes::InvalidOptions,
                     str::stream() << Request::kCommandName
                                   << " must be called with majority writeConcern, got "
                                   << opCtx->getWriteConcern().wMode,
                     opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
 
-            const auto dbName = request().getDbName();
+            const auto& dbName = request().getDbName();
 
-            if (!feature_flags::gShardingFullDDLSupport.isEnabled(
-                    serverGlobalParams.featureCompatibility) ||
-                feature_flags::gDisableIncompleteShardingDDLSupport.isEnabled(
-                    serverGlobalParams.featureCompatibility)) {
-
-                LOGV2_DEBUG(
-                    5281110, 1, "Running legacy drop database procedure", "database"_attr = dbName);
-                return dropDatabaseLegacy(opCtx, dbName);
+            try {
+                uassertStatusOK(dropDatabase(opCtx, dbName.toString()));
+            } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+                LOGV2_DEBUG(5281101,
+                            1,
+                            "Received a ShardsvrDropDatabaseParticipant but did not find the "
+                            "database locally",
+                            "database"_attr = dbName);
             }
 
-            LOGV2_DEBUG(
-                5281111, 1, "Running new drop database procedure", "database"_attr = dbName);
-
-            // Since this operation is not directly writing locally we need to force its db
-            // profile level increase in order to be logged in "<db>.system.profile"
-            CurOp::get(opCtx)->raiseDbProfileLevel(
-                CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(dbName));
-
-            auto dropDatabaseCoordinator = std::make_shared<DropDatabaseCoordinator>(opCtx, dbName);
-            dropDatabaseCoordinator->run(opCtx).get();
-
-            // The following response can be omitted once 5.0 became last LTS
-            return Response();
+            {
+                // Clear CollectionShardingRuntime entry
+                UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+                Lock::DBLock dbLock(opCtx, dbName, MODE_X);
+                auto dss = DatabaseShardingState::get(opCtx, dbName);
+                dss->clearDatabaseInfo(opCtx);
+            }
         }
 
     private:
@@ -136,7 +111,7 @@ public:
                                                            ActionType::internal));
         }
     };
-} shardsvrDropDatabaseCommand;
+} sharsvrdDropCollectionParticipantCommand;
 
 }  // namespace
 }  // namespace mongo

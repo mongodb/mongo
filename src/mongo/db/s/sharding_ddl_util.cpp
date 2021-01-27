@@ -47,6 +47,34 @@ namespace mongo {
 
 namespace sharding_ddl_util {
 
+void removeCollMetadataFromConfig(OperationContext* opCtx, NamespaceString nss) {
+
+    IgnoreAPIParametersBlock ignoreApiParametersBlock(opCtx);
+    const auto catalogClient = Grid::get(opCtx)->catalogClient();
+
+    ON_BLOCK_EXIT(
+        [&] { Grid::get(opCtx)->catalogCache()->invalidateCollectionEntry_LINEARIZABLE(nss); });
+
+    // Remove chunk data
+    uassertStatusOK(
+        catalogClient->removeConfigDocuments(opCtx,
+                                             ChunkType::ConfigNS,
+                                             BSON(ChunkType::ns(nss.ns())),
+                                             ShardingCatalogClient::kMajorityWriteConcern));
+    // Remove tag data
+    uassertStatusOK(
+        catalogClient->removeConfigDocuments(opCtx,
+                                             TagsType::ConfigNS,
+                                             BSON(TagsType::ns(nss.ns())),
+                                             ShardingCatalogClient::kMajorityWriteConcern));
+    // Remove coll metadata
+    uassertStatusOK(
+        catalogClient->removeConfigDocuments(opCtx,
+                                             CollectionType::ConfigNS,
+                                             BSON(CollectionType::kNssFieldName << nss.ns()),
+                                             ShardingCatalogClient::kMajorityWriteConcern));
+}
+
 void shardedRenameMetadata(OperationContext* opCtx,
                            const NamespaceString& fromNss,
                            const NamespaceString& toNss) {
