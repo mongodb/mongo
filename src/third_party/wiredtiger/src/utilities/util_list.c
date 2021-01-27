@@ -8,7 +8,7 @@
 
 #include "util.h"
 
-static int list_get_allocsize(WT_SESSION *, const char *, size_t *);
+static int list_init_block(WT_SESSION *, const char *, WT_BLOCK *);
 static int list_print(WT_SESSION *, const char *, bool, bool);
 static int list_print_checkpoint(WT_SESSION *, const char *);
 
@@ -67,20 +67,20 @@ util_list(WT_SESSION *session, int argc, char *argv[])
 }
 
 /*
- * list_get_allocsize --
- *     Get the allocation size for this file from the metadata.
+ * list_init_block --
+ *     Initialize a dummy block structure for a file.
  */
 static int
-list_get_allocsize(WT_SESSION *session, const char *key, size_t *allocsize)
+list_init_block(WT_SESSION *session, const char *key, WT_BLOCK *block)
 {
-    WT_CONFIG_ITEM szvalue;
+    WT_CONFIG_ITEM cval;
     WT_CONFIG_PARSER *parser;
     WT_DECL_RET;
     WT_EXTENSION_API *wt_api;
     int tret;
     char *config;
 
-    *allocsize = 0;
+    WT_CLEAR(*block);
 
     parser = NULL;
     config = NULL;
@@ -90,10 +90,14 @@ list_get_allocsize(WT_SESSION *session, const char *key, size_t *allocsize)
         WT_ERR(util_err(session, ret, "%s: WT_EXTENSION_API.metadata_search", key));
     if ((ret = wt_api->config_parser_open(wt_api, session, config, strlen(config), &parser)) != 0)
         WT_ERR(util_err(session, ret, "WT_EXTENSION_API.config_parser_open"));
-    if ((ret = parser->get(parser, "allocation_size", &szvalue)) == 0)
-        *allocsize = (size_t)szvalue.val;
-    else
-        ret = ret == WT_NOTFOUND ? 0 : util_err(session, ret, "WT_CONFIG_PARSER.get");
+    if ((ret = parser->get(parser, "allocation_size", &cval)) == 0)
+        block->allocsize = (uint32_t)cval.val;
+    else if (ret != WT_NOTFOUND)
+        WT_ERR(util_err(session, ret, "WT_CONFIG_PARSER.get"));
+
+    if ((ret = parser->get(parser, "block_allocation", &cval)) == 0)
+        block->log_structured = WT_STRING_MATCH("log_structured", cval.str, cval.len);
+
 err:
     if (parser != NULL && (tret = parser->close(parser)) != 0) {
         tret = util_err(session, tret, "WT_CONFIG_PARSER.close");
@@ -202,10 +206,11 @@ list_print_size(uint64_t v)
 static int
 list_print_checkpoint(WT_SESSION *session, const char *key)
 {
+    WT_BLOCK _block, *block;
     WT_BLOCK_CKPT ci;
     WT_CKPT *ckpt, *ckptbase;
     WT_DECL_RET;
-    size_t allocsize, len;
+    size_t len;
     time_t t;
 
     /*
@@ -217,7 +222,9 @@ list_print_checkpoint(WT_SESSION *session, const char *key)
         return (ret == WT_NOTFOUND ? 0 : ret);
 
     /* We need the allocation size for decoding the checkpoint addr */
-    if ((ret = list_get_allocsize(session, key, &allocsize)) != 0)
+    /* TODO this is a kludge: fix */
+    block = &_block;
+    if ((ret = list_init_block(session, key, block)) != 0)
         return (ret);
 
     /* Find the longest name, so we can pretty-print. */
@@ -245,7 +252,7 @@ list_print_checkpoint(WT_SESSION *session, const char *key)
         /* Decode the checkpoint block. */
         if (ckpt->raw.data == NULL)
             continue;
-        if ((ret = __wt_block_ckpt_decode(session, allocsize, ckpt->raw.data, &ci)) == 0) {
+        if ((ret = __wt_block_ckpt_decode(session, block, ckpt->raw.data, &ci)) == 0) {
             printf(
               "\t\t"
               "file-size: ");

@@ -27,16 +27,15 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import glob, os, shutil, string
-import wiredtiger, wttest
-from helper import compare_files
-from suite_subprocess import suite_subprocess
+import wiredtiger
+from wtbackup import backup_base
 from wtdataset import SimpleDataSet, ComplexDataSet, ComplexLSMDataSet
 from wtscenario import make_scenarios
 
 # test_backup03.py
 #    Utilities: wt backup
 # Test cursor backup with target URIs
-class test_backup_target(wttest.WiredTigerTestCase, suite_subprocess):
+class test_backup_target(backup_base):
     dir='backup.dir'                    # Backup directory name
 
     # This test is written to test LSM hot backups: we test a simple LSM object
@@ -81,36 +80,6 @@ class test_backup_target(wttest.WiredTigerTestCase, suite_subprocess):
     # Create a large cache, otherwise this test runs quite slowly.
     conn_config = 'cache_size=1G'
 
-    # Populate a set of objects.
-    def populate(self):
-        for i in self.objs:
-            if self.big == i[2]:
-                rows = 50000           # Big object
-            else:
-                rows = 1000             # Small object
-            i[1](self, i[0], rows, cgconfig = i[3]).populate()
-        # Backup needs a checkpoint
-        self.session.checkpoint(None)
-
-    # Compare the original and backed-up files using the wt dump command.
-    def compare(self, uri):
-        self.runWt(['dump', uri], outfilename='orig')
-        self.runWt(['-h', self.dir, 'dump', uri], outfilename='backup')
-        self.assertEqual(True, compare_files(self, 'orig', 'backup'))
-
-    # Check that a URI doesn't exist, both the meta-data and the file names.
-    def confirmPathDoesNotExist(self, uri):
-        conn = self.wiredtiger_open(self.dir)
-        session = conn.open_session()
-        self.assertRaises(wiredtiger.WiredTigerError,
-            lambda: session.open_cursor(uri, None, None))
-        conn.close()
-
-        self.assertEqual(
-            glob.glob(self.dir + '*' + uri.split(":")[1] + '*'), [],
-            'confirmPathDoesNotExist: URI exists, file name matching \"' +
-            uri.split(":")[1] + '\" found')
-
     # Backup a set of target tables using a backup cursor.
     def backup_table_cursor(self, l):
         # Create the backup directory.
@@ -139,17 +108,18 @@ class test_backup_target(wttest.WiredTigerTestCase, suite_subprocess):
         # Confirm the objects we backed up exist, with correct contents.
         for i in range(0, len(self.objs)):
             if not l or i in l:
-                self.compare(self.objs[i][0])
+                self.compare_backups(self.objs[i][0], self.dir, './')
 
         # Confirm the other objects don't exist.
         if l:
             for i in range(0, len(self.objs)):
                 if i not in l:
-                    self.confirmPathDoesNotExist(self.objs[i][0])
+                    self.confirmPathDoesNotExist(self.objs[i][0], self.dir)
 
     # Test backup with targets.
     def test_backup_target(self):
-        self.populate()
+        self.populate_big = self.big
+        self.populate(self.objs, True)
         self.backup_table_cursor(self.list)
 
 if __name__ == '__main__':

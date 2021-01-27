@@ -85,7 +85,7 @@ struct __wt_data_handle {
     WT_DATA_SOURCE *dsrc; /* Data source for this handle */
     void *handle;         /* Generic handle */
 
-    enum { WT_DHANDLE_TYPE_BTREE, WT_DHANDLE_TYPE_TABLE } type;
+    enum { WT_DHANDLE_TYPE_BTREE, WT_DHANDLE_TYPE_TABLE, WT_DHANDLE_TYPE_TIERED } type;
 
     bool compact_skip; /* If the handle failed to compact */
 

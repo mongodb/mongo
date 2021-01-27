@@ -29,17 +29,16 @@
 import wiredtiger, wttest
 import os, shutil
 from helper import compare_files
-from suite_subprocess import suite_subprocess
+from wtbackup import backup_base
 from wtdataset import simple_key
 from wtscenario import make_scenarios
 
 # test_backup10.py
 # Test cursor backup with a duplicate backup cursor.
-class test_backup10(wttest.WiredTigerTestCase, suite_subprocess):
+class test_backup10(backup_base):
     dir='backup.dir'                    # Backup directory name
     logmax="100K"
     uri="table:test"
-    nops=100
 
     pfx = 'test_backup'
 
@@ -62,15 +61,8 @@ class test_backup10(wttest.WiredTigerTestCase, suite_subprocess):
 
         # Insert small amounts of data at a time stopping after we
         # cross into log file 2.
-        loop = 0
-        c = self.session.open_cursor(self.uri)
         while not os.path.exists(log2):
-            for i in range(0, self.nops):
-                num = i + (loop * self.nops)
-                key = 'key' + str(num)
-                val = 'value' + str(num)
-                c[key] = val
-            loop += 1
+            self.add_data(self.uri, 'key', 'value')
 
         # Open up the backup cursor. This causes a new log file to be created.
         # That log file is not part of the list returned.
@@ -78,13 +70,7 @@ class test_backup10(wttest.WiredTigerTestCase, suite_subprocess):
         bkup_c = self.session.open_cursor('backup:', None, None)
 
         # Add some data that will appear in log file 3.
-        for i in range(0, self.nops):
-            num = i + (loop * self.nops)
-            key = 'key' + str(num)
-            val = 'value' + str(num)
-            c[key] = val
-        loop += 1
-        c.close()
+        self.add_data(self.uri, 'key', 'value')
         self.session.log_flush('sync=on')
 
         # Now copy the files returned by the backup cursor.

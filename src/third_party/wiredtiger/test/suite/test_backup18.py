@@ -29,16 +29,14 @@
 import wiredtiger, wttest
 import os, shutil
 from helper import compare_files
-from suite_subprocess import suite_subprocess
+from wtbackup import backup_base
 from wtdataset import simple_key
 from wtscenario import make_scenarios
 
 # test_backup18.py
 # Test backup:query_id API.
-class test_backup18(wttest.WiredTigerTestCase, suite_subprocess):
+class test_backup18(backup_base):
     conn_config= 'cache_size=1G,log=(enabled,file_max=100K)'
-    mult=0
-    nops=100
     pfx = 'test_backup'
     uri="table:test"
 
@@ -58,22 +56,11 @@ class test_backup18(wttest.WiredTigerTestCase, suite_subprocess):
         expect.sort()
         self.assertEqual(got, expect)
 
-    def add_data(self):
-        c = self.session.open_cursor(self.uri)
-        for i in range(0, self.nops):
-            num = i + (self.mult * self.nops)
-            key = 'key' + str(num)
-            val = 'value' + str(num)
-            c[key] = val
-        self.mult += 1
-        self.session.checkpoint()
-        c.close()
-
     def test_backup18(self):
         # We're not taking actual backups in this test, but we do want a table to
         # exist for the backup cursor to generate something.
         self.session.create(self.uri, "key_format=S,value_format=S")
-        self.add_data()
+        self.add_data(self.uri, 'key', 'value', True)
 
         msg = "/is not configured/"
         self.pr("Query IDs before any backup")

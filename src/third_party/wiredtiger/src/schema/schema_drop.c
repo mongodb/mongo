@@ -199,6 +199,8 @@ __schema_drop(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
         ret = __wt_lsm_tree_drop(session, uri, cfg);
     else if (WT_PREFIX_MATCH(uri, "table:"))
         ret = __drop_table(session, uri, cfg);
+    else if (WT_PREFIX_MATCH(uri, "tiered:"))
+        ret = __wt_tiered_drop(session, uri, cfg);
     else if ((dsrc = __wt_schema_get_source(session, uri)) != NULL)
         ret = dsrc->drop == NULL ? __wt_object_unsupported(session, uri) :
                                    dsrc->drop(dsrc, &session->iface, uri, (WT_CONFIG_ARG *)cfg);

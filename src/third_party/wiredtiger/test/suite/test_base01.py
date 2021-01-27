@@ -66,7 +66,7 @@ class test_base01(wttest.WiredTigerTestCase):
                 gotException = True
                 self.pr('got expected exception: ' + str(e))
                 self.assertTrue(str(e).find('nvalid argument') >= 0)
-        self.assertTrue(gotException, 'expected exception')
+        self.assertTrue(gotException, msg = 'expected exception')
 
     def test_empty(self):
         """
@@ -96,7 +96,7 @@ class test_base01(wttest.WiredTigerTestCase):
         getcursor = self.cursor_s(self.table_name2, 'key1')
         ret = getcursor.search()
         self.assertTrue(ret == 0)
-        self.assertTrue(getcursor.get_value(), 'value1')
+        self.assertEqual(getcursor.get_value(), 'value1')
         self.pr('closing cursor')
         getcursor.close()
 

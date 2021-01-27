@@ -71,7 +71,6 @@ struct __wt_cache {
     uint64_t bytes_dirty_leaf;
     uint64_t bytes_dirty_total;
     uint64_t bytes_evict;      /* Bytes/pages discarded by eviction */
-    uint64_t bytes_hs;         /* History store bytes inmem */
     uint64_t bytes_image_intl; /* Bytes of disk images (internal) */
     uint64_t bytes_image_leaf; /* Bytes of disk images (leaf) */
     uint64_t bytes_inmem;      /* Bytes/pages in memory */
@@ -79,6 +78,13 @@ struct __wt_cache {
     uint64_t bytes_read;       /* Bytes read into memory */
     uint64_t bytes_updates;    /* Bytes of updates to pages */
     uint64_t bytes_written;
+
+    /*
+     * History store cache usage. TODO: The values for these variables are cached and potentially
+     * outdated.
+     */
+    uint64_t bytes_hs;       /* History store bytes inmem */
+    uint64_t bytes_hs_dirty; /* History store bytes inmem dirty */
 
     uint64_t pages_dirty_intl;
     uint64_t pages_dirty_leaf;

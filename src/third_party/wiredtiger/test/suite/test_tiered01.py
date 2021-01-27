@@ -29,59 +29,47 @@
 import wiredtiger, wtscenario, wttest
 from wtdataset import SimpleDataSet
 
-# test_lsm01.py
-#    Test LSM tree configuration options.
-class test_lsm01(wttest.WiredTigerTestCase):
+# test_tiered01.py
+#    Basic tiered tree test
+class test_tiered01(wttest.WiredTigerTestCase):
     K = 1024
     M = 1024 * K
     G = 1024 * M
-    uri = "lsm:test_lsm01"
+    uri = "table:test_tiered01"
 
     chunk_size_scenarios = wtscenario.quick_scenarios('s_chunk_size',
         [1*M,20*M,None], [0.6,0.6,0.6])
-    merge_max_scenarios = wtscenario.quick_scenarios('s_merge_max',
-        [2,10,20,None], None)
-    bloom_scenarios = wtscenario.quick_scenarios('s_bloom',
-        [True,False,None], None)
-    bloom_bit_scenarios = wtscenario.quick_scenarios('s_bloom_bit_count',
-        [2,8,20,None], None)
-    bloom_hash_scenarios = wtscenario.quick_scenarios('s_bloom_hash_count',
-        [2,10,20,None], None)
     # Occasionally add a lot of records, so that merges (and bloom) happen.
     record_count_scenarios = wtscenario.quick_scenarios(
         'nrecs', [10, 10000], [0.9, 0.1])
 
-    config_vars = [ 'chunk_size', 'merge_max', 'bloom',
-                    'bloom_bit_count', 'bloom_hash_count' ]
+    config_vars = [ 'chunk_size', ]
 
     scenarios = wtscenario.make_scenarios(
-        chunk_size_scenarios, merge_max_scenarios, bloom_scenarios,
-        bloom_bit_scenarios, bloom_hash_scenarios, record_count_scenarios,
+        chunk_size_scenarios, record_count_scenarios,
         prune=100, prunelong=500)
 
-    # Test drop of an object.
-    def test_lsm(self):
-        args = 'key_format=S'
-        args += ',lsm=(' # Start the LSM configuration options.
+    # Test create of an object.
+    def test_tiered(self):
+        self.session.create('file:first.wt', 'key_format=S')
+        self.session.create('file:second.wt', 'key_format=S')
+        args = 'type=tiered,key_format=S'
+        args += ',tiered=(' # Start the tiered configuration options.
+        args += 'tiers=("file:first.wt", "file:second.wt"),'
         # add names to args, e.g. args += ',session_max=30'
         for var in self.config_vars:
             value = getattr(self, 's_' + var)
             if value != None:
                 if var == 'verbose':
                     value = '[' + str(value) + ']'
-                if value == True:
-                    value = 'true'
-                if value == False:
-                    value = 'false'
+                value = {True : 'true', False : 'false'}.get(value, value)
                 args += ',' + var + '=' + str(value)
-        args += ')' # Close the LSM configuration option group
+        args += ')' # Close the tiered configuration option group
         self.verbose(3,
-            'Test LSM with config: ' + args + ' count: ' + str(self.nrecs))
+            'Test tiered with config: ' + args + ' count: ' + str(self.nrecs))
         SimpleDataSet(self, self.uri, self.nrecs, config=args).populate()
 
-        # TODO: Adding an explicit drop here can cause deadlocks, if a merge
-        # is still happening. See issue #349.
-        # self.session.drop(self.uri)
+       #  self.session.drop(self.uri)
 
 if __name__ == '__main__':
     wttest.run()

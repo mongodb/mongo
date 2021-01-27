@@ -29,19 +29,17 @@
 import wiredtiger, wttest
 import os, shutil
 from helper import compare_files
-from suite_subprocess import suite_subprocess
+from wtbackup import backup_base
 from wtdataset import simple_key
 from wtscenario import make_scenarios
 
 # test_backup16.py
 # Ensure incremental backup doesn't copy unnecessary files.
-class test_backup16(wttest.WiredTigerTestCase, suite_subprocess):
+class test_backup16(backup_base):
 
     conn_config='cache_size=1G,log=(enabled,file_max=100K)'
     counter=1
     logmax='100K'
-    mult=1
-    nops=10
 
     # Define the table name and its on-disk file name together.
     file1='test1.wt'
@@ -62,21 +60,12 @@ class test_backup16(wttest.WiredTigerTestCase, suite_subprocess):
     bigkey = 'Key' * 10
     bigval = 'Value' * 10
 
-    def add_data(self, uri):
-        c = self.session.open_cursor(uri)
-        for i in range(0, self.nops):
-            num = i + (self.mult * self.nops)
-            key = self.bigkey + str(num)
-            val = self.bigval + str(num)
-            c[key] = val
-        self.session.checkpoint()
-        c.close()
-        # Increase the multiplier so that later calls insert unique items.
-        self.mult += 1
+    mult = 1
+    counter = 1
+    nops = 10
 
     def verify_incr_backup(self, expected_file_list):
-
-        bkup_config = ('incremental=(src_id="ID' +  str(self.counter-1) +
+        bkup_config = ('incremental=(src_id="ID' +  str(self.counter - 1) +
                        '",this_id="ID' + str(self.counter) + '")')
         bkup_cur = self.session.open_cursor('backup:', None, bkup_config)
         self.counter += 1
@@ -129,8 +118,8 @@ class test_backup16(wttest.WiredTigerTestCase, suite_subprocess):
         self.session.create(self.uri2, 'key_format=S,value_format=S')
         self.session.create(self.uri3, 'key_format=S,value_format=S')
         self.session.create(self.uri6, 'key_format=S,value_format=S')
-        self.add_data(self.uri1)
-        self.add_data(self.uri2)
+        self.add_data(self.uri1, self.bigkey, self.bigval, True)
+        self.add_data(self.uri2, self.bigkey, self.bigval, True)
 
         # Checkpoint and simulate full backup.
         self.session.checkpoint()
@@ -154,8 +143,8 @@ class test_backup16(wttest.WiredTigerTestCase, suite_subprocess):
         #
         self.session.create(self.uri4, "key_format=S,value_format=S")
         self.session.create(self.uri5, "key_format=S,value_format=S")
-        self.add_data(self.uri1)
-        self.add_data(self.uri5)
+        self.add_data(self.uri1, self.bigkey, self.bigval, True)
+        self.add_data(self.uri5, self.bigkey, self.bigval, True)
         self.session.checkpoint()
 
         # Validate these three files are included in the incremental.
@@ -167,10 +156,10 @@ class test_backup16(wttest.WiredTigerTestCase, suite_subprocess):
         # Add more data and checkpoint. Earlier old tables without new data should not
         # appear in the list. The table with no data at all continues to appear in the
         # list.
-        self.add_data(self.uri3)
-        self.add_data(self.uri5)
-        self.session.checkpoint()
+        self.add_data(self.uri3, self.bigkey, self.bigval, True)
+        self.add_data(self.uri5, self.bigkey, self.bigval, True)
 
+        self.session.checkpoint()
         # Validate these three files are included in the incremental.
         files_to_backup = [self.file3, self.file4, self.file5]
         self.verify_incr_backup(files_to_backup)

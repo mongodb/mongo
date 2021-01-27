@@ -48,6 +48,14 @@ common_runtime_config = [
     Config('assert', '', r'''
         enable enhanced checking. ''',
         type='category', subconfig= [
+        Config('commit_timestamp', 'none', r'''
+            This option is no longer supported. Retained for backward
+            compatibility. Use \c write_timestamp option instead.''',
+            choices=['always', 'key_consistent', 'never', 'none']),
+        Config('durable_timestamp', 'none', r'''
+            This option is no longer supported. Retained for backward
+            compatibility. Use \c write_timestamp option instead.''',
+            choices=['always', 'key_consistent', 'never', 'none']),
         Config('write_timestamp', 'off', r'''
             verify that commit timestamps are used per the configured
             \c write_timestamp_usage option for this table''',
@@ -197,6 +205,20 @@ lsm_config = [
     ]),
 ]
 
+tiered_config = common_runtime_config + [
+    Config('tiered', '', r'''
+        options only relevant for tiered data sources''',
+        type='category', subconfig=[
+        Config('chunk_size', '1GB', r'''
+            the maximum size of the hot chunk of tiered tree.  This
+            limit is soft - it is possible for chunks to be temporarily
+            larger than this value''',
+            min='1M'),
+        Config('tiers', '', r'''
+            list of data sources to combine into a tiered storage structure''', type='list')
+    ]),
+]
+
 file_runtime_config = common_runtime_config + [
     Config('access_pattern_hint', 'none', r'''
         It is recommended that workloads that consist primarily of
@@ -229,16 +251,20 @@ file_runtime_config = common_runtime_config + [
         system buffer cache after that many bytes from this object are
         written into the buffer cache''',
         min=0),
+    Config('readonly', 'false', r'''
+        the file is read-only. All methods that may modify a file are
+        disabled. See @ref readonly for more information''',
+        type='boolean'),
 ]
 
 # Per-file configuration
 file_config = format_meta + file_runtime_config + [
     Config('block_allocation', 'best', r'''
-        configure block allocation. Permitted values are \c "first" or
-        \c "best"; the \c "first" configuration uses a first-available
-        algorithm during block allocation, the \c "best" configuration
-        uses a best-fit algorithm''',
-        choices=['first', 'best',]),
+        configure block allocation. Permitted values are \c "best" or \c "first";
+        the \c "best" configuration uses a best-fit algorithm,
+        the \c "first" configuration uses a first-available algorithm during block allocation,
+        the \c "log-structure" configuration allocates a new file for each checkpoint''',
+        choices=['best', 'first', 'log-structured',]),
     Config('allocation_size', '4KB', r'''
         the file unit allocation size, in bytes, must a power-of-two;
         smaller values decrease the file space required by overflow
@@ -284,6 +310,9 @@ file_config = format_meta + file_runtime_config + [
     Config('format', 'btree', r'''
         the file format''',
         choices=['btree']),
+    Config('huffman_key', 'none', r'''
+        This option is no longer supported. Retained for backward
+        compatibility. See @ref huffman for more information'''),
     Config('huffman_value', 'none', r'''
         configure Huffman encoding for values.  Permitted values are
         \c "none", \c "english", \c "utf8<file>" or \c "utf16<file>".
@@ -408,6 +437,8 @@ lsm_meta = file_config + lsm_config + [
     Config('old_chunks', '', r'''
         obsolete chunks in the LSM tree'''),
 ]
+
+tiered_meta = tiered_config
 
 table_only_config = [
     Config('colgroups', '', r'''
@@ -1141,11 +1172,15 @@ methods = {
 
 'table.meta' : Method(table_meta),
 
+'tiered.meta' : Method(tiered_meta),
+
 'WT_CURSOR.close' : Method([]),
 
 'WT_CURSOR.reconfigure' : Method(cursor_runtime_config),
 
 'WT_SESSION.alter' : Method(file_runtime_config + [
+    Config('checkpoint', '', r'''
+        the file checkpoint entries''', undoc=True),
     Config('exclusive_refreshed', 'true', r'''
         refresh the in memory state and flush the metadata change to disk,
         disabling this flag is dangerous - it will only re-write the
@@ -1165,8 +1200,8 @@ methods = {
         type='int'),
 ]),
 
-'WT_SESSION.create' : Method(file_config + lsm_config + source_meta +
-        index_only_config + table_only_config + [
+'WT_SESSION.create' : Method(file_config + lsm_config + tiered_config +
+        source_meta + index_only_config + table_only_config + [
     Config('exclusive', 'false', r'''
         fail if the object exists.  When false (the default), if the
         object exists, check that its settings match the specified
