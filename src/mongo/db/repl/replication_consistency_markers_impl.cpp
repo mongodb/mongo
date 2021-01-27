@@ -393,8 +393,14 @@ Status ReplicationConsistencyMarkersImpl::_setOplogTruncateAfterPoint(OperationC
 
 void ReplicationConsistencyMarkersImpl::setOplogTruncateAfterPoint(OperationContext* opCtx,
                                                                    const Timestamp& timestamp) {
-
     fassert(40512, _setOplogTruncateAfterPoint(opCtx, timestamp));
+
+    // If the oplogTruncateAfterPoint is manually reset via this function, then we need to clear the
+    // cached last no-holes oplog entry. This is important so that
+    // refreshOplogTruncateAfterPointIfPrimary always returns the latest oplog entry without
+    // skipping it.
+    _lastNoHolesOplogTimestamp = boost::none;
+    _lastNoHolesOplogOpTimeAndWallTime = boost::none;
 }
 
 boost::optional<OplogTruncateAfterPointDocument>
@@ -494,7 +500,11 @@ ReplicationConsistencyMarkersImpl::refreshOplogTruncateAfterPointIfPrimary(
     // holes behind it in-memory (only, not on disk, despite the name).
     auto truncateTimestamp = _storageInterface->getAllDurableTimestamp(opCtx->getServiceContext());
 
-    if (truncateTimestamp != Timestamp(StorageEngine::kMinimumTimestamp)) {
+    if (_lastNoHolesOplogTimestamp && truncateTimestamp == _lastNoHolesOplogTimestamp) {
+        invariant(_lastNoHolesOplogOpTimeAndWallTime);
+        // Return the last durable no-holes oplog entry. Nothing has changed in the system yet.
+        return _lastNoHolesOplogOpTimeAndWallTime;
+    } else if (truncateTimestamp != Timestamp(StorageEngine::kMinimumTimestamp)) {
         // Throw write interruption errors up to the caller so that durability attempts can be
         // retried.
         uassertStatusOK(_setOplogTruncateAfterPoint(opCtx, truncateTimestamp));
@@ -523,9 +533,20 @@ ReplicationConsistencyMarkersImpl::refreshOplogTruncateAfterPointIfPrimary(
     // oplog.
     invariant(truncateOplogEntryBSON, "Found no oplog entry lte " + truncateTimestamp.toString());
 
-    return fassert(
+    // Note: the oplogTruncateAfterPoint is written to disk and updated periodically with WT's
+    // all_durable timestamp, which tracks the oplog no holes point. The oplog entry associated with
+    // the no holes point is sent along to replication (the return value here) to update their
+    // durable timestamp. Since the WT all_durable timestamp doesn't always match a particular oplog
+    // entry (it can be momentarily between oplog entry timestamps), _lastNoHolesOplogTimestamp
+    // tracks the oplog entry so as to ensure we send out all updates before desisting until new
+    // operations occur.
+    OpTime opTime = fassert(4455502, OpTime::parseFromOplogEntry(truncateOplogEntryBSON.get()));
+    _lastNoHolesOplogTimestamp = opTime.getTimestamp();
+    _lastNoHolesOplogOpTimeAndWallTime = fassert(
         4455501,
         OpTimeAndWallTime::parseOpTimeAndWallTimeFromOplogEntry(truncateOplogEntryBSON.get()));
+
+    return _lastNoHolesOplogOpTimeAndWallTime;
 }
 
 Status ReplicationConsistencyMarkersImpl::createInternalCollections(OperationContext* opCtx) {
