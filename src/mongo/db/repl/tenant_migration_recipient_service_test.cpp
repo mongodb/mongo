@@ -397,7 +397,7 @@ TEST_F(TenantMigrationRecipientServiceTest, BasicTenantMigrationRecipientService
 
     const UUID migrationUUID = UUID::gen();
 
-    TenantMigrationRecipientDocument TenantMigrationRecipientInstance(
+    TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         "donor-rs/localhost:12345",
         "tenantA",
@@ -407,7 +407,7 @@ TEST_F(TenantMigrationRecipientServiceTest, BasicTenantMigrationRecipientService
     // Create and start the instance.
     auto opCtx = makeOperationContext();
     auto instance = TenantMigrationRecipientService::Instance::getOrCreate(
-        opCtx.get(), _service, TenantMigrationRecipientInstance.toBSON());
+        opCtx.get(), _service, initialStateDocument.toBSON());
     ASSERT(instance.get());
     ASSERT_EQ(migrationUUID, instance->getMigrationUUID());
 
@@ -422,7 +422,7 @@ TEST_F(TenantMigrationRecipientServiceTest, InstanceReportsErrorOnFailureWhilePe
 
     const UUID migrationUUID = UUID::gen();
 
-    TenantMigrationRecipientDocument TenantMigrationRecipientInstance(
+    TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         "donor-rs/localhost:12345",
         "tenantA",
@@ -432,7 +432,7 @@ TEST_F(TenantMigrationRecipientServiceTest, InstanceReportsErrorOnFailureWhilePe
     // Create and start the instance.
     auto opCtx = makeOperationContext();
     auto instance = TenantMigrationRecipientService::Instance::getOrCreate(
-        opCtx.get(), _service, TenantMigrationRecipientInstance.toBSON());
+        opCtx.get(), _service, initialStateDocument.toBSON());
     ASSERT(instance.get());
     ASSERT_EQ(migrationUUID, instance->getMigrationUUID());
 
@@ -454,7 +454,7 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientConnection_P
 
     MockReplicaSet replSet("donorSet", 3, true /* hasPrimary */, true /* dollarPrefixHosts */);
 
-    TenantMigrationRecipientDocument TenantMigrationRecipientInstance(
+    TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
@@ -464,7 +464,7 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientConnection_P
     // Create and start the instance.
     auto opCtx = makeOperationContext();
     auto instance = TenantMigrationRecipientService::Instance::getOrCreate(
-        opCtx.get(), _service, TenantMigrationRecipientInstance.toBSON());
+        opCtx.get(), _service, initialStateDocument.toBSON());
     ASSERT(instance.get());
 
     taskFp->waitForTimesEntered(initialTimesEntered + 1);
@@ -502,7 +502,7 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientConnection_S
 
     MockReplicaSet replSet("donorSet", 2, true /* hasPrimary */, true /* dollarPrefixHosts */);
 
-    TenantMigrationRecipientDocument TenantMigrationRecipientInstance(
+    TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
@@ -512,7 +512,7 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientConnection_S
     // Create and start the instance.
     auto opCtx = makeOperationContext();
     auto instance = TenantMigrationRecipientService::Instance::getOrCreate(
-        opCtx.get(), _service, TenantMigrationRecipientInstance.toBSON());
+        opCtx.get(), _service, initialStateDocument.toBSON());
     ASSERT(instance.get());
 
     taskFp->waitForTimesEntered(initialTimesEntered + 1);
