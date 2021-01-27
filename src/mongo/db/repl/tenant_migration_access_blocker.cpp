@@ -85,11 +85,15 @@ void TenantMigrationAccessBlocker::checkIfCanWriteOrThrow() {
     }
 }
 
-Status TenantMigrationAccessBlocker::waitUntilCommittedOrAborted(OperationContext* opCtx) {
+Status TenantMigrationAccessBlocker::waitUntilCommittedOrAborted(OperationContext* opCtx,
+                                                                 OperationType operationType) {
     {
         stdx::unique_lock<Latch> ul(_mutex);
 
-        auto canWrite = [&]() { return _state == State::kAllow || _state == State::kAborted; };
+        auto canWrite = [&]() {
+            return (operationType == kWrite && _state == State::kAllow) ||
+                _state == State::kAborted;
+        };
 
         if (!canWrite()) {
             tenantMigrationBlockWrite.shouldFail();  // Return value intentionally ignored.
@@ -178,6 +182,23 @@ void TenantMigrationAccessBlocker::checkIfLinearizableReadWasAllowedOrThrow(
     uassert(TenantMigrationCommittedInfo(_tenantId, _recipientConnString),
             "Read must be re-routed to the new owner of this tenant",
             _state != State::kReject);
+}
+
+Status TenantMigrationAccessBlocker::checkIfCanBuildIndex() {
+    stdx::lock_guard<Latch> lg(_mutex);
+    switch (_state) {
+        case State::kAllow:
+        case State::kBlockWrites:
+        case State::kBlockWritesAndReads:
+            return {TenantMigrationConflictInfo(_tenantId, shared_from_this(), kIndexBuild),
+                    "Index build must block until tenant migration is committed or aborted."};
+        case State::kReject:
+            return {TenantMigrationCommittedInfo(_tenantId, _recipientConnString),
+                    "Index build must be re-routed to the new owner of this tenant"};
+        case State::kAborted:
+            return Status::OK();
+    }
+    MONGO_UNREACHABLE;
 }
 
 void TenantMigrationAccessBlocker::startBlockingWrites() {

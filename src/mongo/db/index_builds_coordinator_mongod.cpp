@@ -43,6 +43,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index_build_entry_helpers.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/tenant_migration_donor_util.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
@@ -58,6 +59,7 @@ namespace mongo {
 
 namespace {
 
+MONGO_FAIL_POINT_DEFINE(hangAfterAcquiringIndexBuildSlot);
 MONGO_FAIL_POINT_DEFINE(hangBeforeInitializingIndexBuild);
 MONGO_FAIL_POINT_DEFINE(hangIndexBuildAfterSignalPrimaryForCommitReadiness);
 
@@ -180,6 +182,11 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
                         replCoord->canAcceptWritesFor(opCtx, nssOrUuid));
             }
 
+            // The check here catches empty index builds and also allows us to stop index
+            // builds before waiting for throttling. It may race with the abort at the start
+            // of migration so we do check again later.
+            uassertStatusOK(tenant_migration_donor::checkIfCanBuildIndex(opCtx, dbName));
+
             stdx::unique_lock<Latch> lk(_throttlingMutex);
             opCtx->waitForConditionOrInterrupt(_indexBuildFinished, lk, [&] {
                 const int maxActiveBuilds = maxNumActiveUserIndexBuilds.load();
@@ -211,6 +218,11 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
         _indexBuildFinished.notify_one();
     });
 
+    if (MONGO_unlikely(hangAfterAcquiringIndexBuildSlot.shouldFail())) {
+        LOGV2(4886201, "Hanging index build due to failpoint 'hangAfterAcquiringIndexBuildSlot'");
+        hangAfterAcquiringIndexBuildSlot.pauseWhileSet();
+    }
+
     if (indexBuildOptions.applicationMode == ApplicationMode::kStartupRepair) {
         // Two phase index build recovery goes though a different set-up procedure because we will
         // either resume the index build or the original index will be dropped first.
@@ -238,6 +250,20 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
             // The requested index (specs) are already built or are being built. Return success
             // early (this is v4.0 behavior compatible).
             return statusWithOptionalResult.getValue().get();
+        }
+
+        if (opCtx->getClient()->isFromUserConnection()) {
+            auto migrationStatus = tenant_migration_donor::checkIfCanBuildIndex(opCtx, dbName);
+            if (!migrationStatus.isOK()) {
+                LOGV2(4886200,
+                      "Aborted index build before start due to tenant migration",
+                      "error"_attr = migrationStatus,
+                      "buildUUID"_attr = buildUUID,
+                      "collectionUUID"_attr = collectionUUID);
+                activeIndexBuilds.unregisterIndexBuild(&_indexBuildsManager,
+                                                       invariant(_getIndexBuild(buildUUID)));
+                return migrationStatus;
+            }
         }
     }
 

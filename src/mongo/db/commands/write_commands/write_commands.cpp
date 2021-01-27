@@ -352,7 +352,8 @@ boost::optional<BSONObj> generateError(OperationContext* opCtx,
 
             auto mtab = migrationConflictInfo->getTenantMigrationAccessBlocker();
 
-            auto migrationStatus = mtab->waitUntilCommittedOrAborted(opCtx);
+            auto migrationStatus =
+                mtab->waitUntilCommittedOrAborted(opCtx, migrationConflictInfo->getOperationType());
             error.append("code", static_cast<int>(migrationStatus.code()));
 
             // We want to append an empty errmsg for the errors after the first one, so let the

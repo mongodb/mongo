@@ -91,9 +91,9 @@ inline RepeatableSharedPromise<void>::~RepeatableSharedPromise() {
 
 
 /**
- * The TenantMigrationAccessBlocker is used to block and eventually reject reads and writes to a
- * database while the Atlas Serverless tenant that owns the database is being migrated from this
- * replica set to another replica set.
+ * The TenantMigrationAccessBlocker is used to block and eventually reject reads, writes, and index
+ * builds to a database while the Atlas Serverless tenant that owns the database is being migrated
+ * from this replica set to another replica set.
  *
  * In order to preserve causal consistency across the migration, this replica set, the "donor",
  * blocks writes and reads as of a particular "blockTimestamp". The donor then advances the
@@ -122,6 +122,15 @@ inline RepeatableSharedPromise<void>::~RepeatableSharedPromise() {
  * Reads with afterClusterTime or atClusterTime call getCanReadFuture at some point after
  * waiting for readConcern, that is, after waiting to reach their clusterTime, which includes
  * waiting for all earlier oplog holes to be filled.
+ *
+ * Index build user threads call checkIfCanBuildIndex.  Index builds are blocked throughout
+ * a migration, including the kAllow state.  If the state is kReject (indicating the migration has
+ * committed), checkIfCanBuildIndex throws TenantMigrationCommitted which cancels the index
+ * build.  If the state is kAborted, the index build is allowed.
+ *
+ * Because there may be a race between the start of a migration and the start of an index build,
+ * the index builder will call checkIfCanBuildIndex after registering the build.
+ *
  *
  * Given this, the donor uses this class's API in the following way:
  *
@@ -171,6 +180,11 @@ public:
      */
     enum class State { kAllow, kBlockWrites, kBlockWritesAndReads, kReject, kAborted };
 
+    /**
+     * The operation type determines the states during which we need to block.
+     */
+    enum OperationType { kWrite, kIndexBuild };
+
     TenantMigrationAccessBlocker(ServiceContext* serviceContext,
                                  std::string tenantId,
                                  std::string recipientConnString);
@@ -180,10 +194,16 @@ public:
     //
 
     void checkIfCanWriteOrThrow();
-    Status waitUntilCommittedOrAborted(OperationContext* opCtx);
+    Status waitUntilCommittedOrAborted(OperationContext* opCtx, OperationType operationType);
 
     void checkIfLinearizableReadWasAllowedOrThrow(OperationContext* opCtx);
     SharedSemiFuture<void> getCanReadFuture(OperationContext* opCtx);
+
+    //
+    // Called by index build user threads before acquiring an index build slot, and again right
+    // after registering the build.
+    //
+    Status checkIfCanBuildIndex();
 
     //
     // Called while donating this database.

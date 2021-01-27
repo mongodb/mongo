@@ -174,6 +174,23 @@ void onWriteToDatabase(OperationContext* opCtx, StringData dbName) {
     }
 }
 
+Status checkIfCanBuildIndex(OperationContext* opCtx, StringData dbName) {
+    auto mtab = TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
+                    .getTenantMigrationAccessBlockerForDbName(dbName);
+
+    if (mtab) {
+        // This log is included for synchronization of the tenant migration buildindex jstests.
+        auto status = mtab->checkIfCanBuildIndex();
+        LOGV2_DEBUG(4886202,
+                    1,
+                    "Checked if tenant migration on database prevents index builds",
+                    "db"_attr = dbName,
+                    "error"_attr = status);
+        return status;
+    }
+    return Status::OK();
+}
+
 void recoverTenantMigrationAccessBlockers(OperationContext* opCtx) {
     TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext()).shutDown();
 
@@ -232,7 +249,8 @@ void handleTenantMigrationConflict(OperationContext* opCtx, Status status) {
     invariant(migrationConflictInfo);
     auto mtab = migrationConflictInfo->getTenantMigrationAccessBlocker();
     invariant(mtab);
-    uassertStatusOK(mtab->waitUntilCommittedOrAborted(opCtx));
+    uassertStatusOK(
+        mtab->waitUntilCommittedOrAborted(opCtx, migrationConflictInfo->getOperationType()));
 }
 
 void performNoopWrite(OperationContext* opCtx, StringData msg) {

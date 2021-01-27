@@ -41,8 +41,10 @@ public:
     static constexpr auto code = ErrorCodes::TenantMigrationConflict;
 
     TenantMigrationConflictInfo(const std::string tenantId,
-                                std::shared_ptr<TenantMigrationAccessBlocker> mtab = nullptr)
-        : _tenantId(std::move(tenantId)), _mtab(std::move(mtab)){};
+                                std::shared_ptr<TenantMigrationAccessBlocker> mtab = nullptr,
+                                TenantMigrationAccessBlocker::OperationType operationType =
+                                    TenantMigrationAccessBlocker::kWrite)
+        : _tenantId(std::move(tenantId)), _mtab(std::move(mtab)), _operationType(operationType){};
 
     const auto& getTenantId() const {
         return _tenantId;
@@ -52,12 +54,17 @@ public:
         return _mtab;
     }
 
+    TenantMigrationAccessBlocker::OperationType getOperationType() const {
+        return _operationType;
+    }
+
     void serialize(BSONObjBuilder* bob) const override;
     static std::shared_ptr<const ErrorExtraInfo> parse(const BSONObj&);
 
 private:
     std::string _tenantId;
     std::shared_ptr<TenantMigrationAccessBlocker> _mtab;
+    TenantMigrationAccessBlocker::OperationType _operationType;
 };
 using TenantMigrationConflictException = ExceptionFor<ErrorCodes::TenantMigrationConflict>;
 

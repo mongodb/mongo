@@ -916,6 +916,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog/collection_catalog',
         '$BUILD_DIR/mongo/db/catalog/index_build_entry_idl',
+        '$BUILD_DIR/mongo/db/repl/tenant_migration_donor',
         '$BUILD_DIR/mongo/db/storage/two_phase_index_build_knobs_idl',
         '$BUILD_DIR/mongo/executor/task_executor_interface',
         'curop',
