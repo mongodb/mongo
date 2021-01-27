@@ -63,11 +63,13 @@ public:
 
             const auto& cmd = request();
 
-            TenantMigrationRecipientDocument stateDoc(cmd.getMigrationId(),
-                                                      cmd.getDonorConnectionString().toString(),
-                                                      cmd.getTenantId().toString(),
-                                                      cmd.getReadPreference(),
-                                                      cmd.getRecipientCertificateForDonor());
+            const TenantMigrationRecipientDocument stateDoc(
+                cmd.getMigrationId(),
+                cmd.getDonorConnectionString().toString(),
+                cmd.getTenantId().toString(),
+                cmd.getReadPreference(),
+                cmd.getRecipientCertificateForDonor());
+            const auto stateDocBson = stateDoc.toBSON();
 
 
             if (MONGO_unlikely(returnResponseOkForRecipientSyncDataCmd.shouldFail())) {
@@ -82,7 +84,7 @@ public:
                     ->lookupServiceByName(repl::TenantMigrationRecipientService::
                                               kTenantMigrationRecipientServiceName);
             auto recipientInstance = repl::TenantMigrationRecipientService::Instance::getOrCreate(
-                opCtx, recipientService, stateDoc.toBSON());
+                opCtx, recipientService, stateDocBson);
 
             // Ensure that the options (e.g. tenantId, recipientConnectionString, or readPreference)
             // received by this migration match the options it was created with. If there is a
@@ -106,7 +108,7 @@ public:
                 // Since the conflict occurred at the insert stage, that means this instance's
                 // tenantId conflicts with an existing instance's tenantId. Therefore, remove the
                 // instance that was just created.
-                recipientService->releaseInstance(stateDoc.toBSON()["_id"].wrap());
+                recipientService->releaseInstance(stateDocBson["_id"].wrap());
                 throw;
             }
         }
@@ -166,11 +168,12 @@ public:
             // recipientSyncData. But even if that's the case, we still need to create an instance
             // and persist a state document that's marked garbage collectable (which is done by the
             // main chain).
-            TenantMigrationRecipientDocument stateDoc(cmd.getMigrationId(),
-                                                      cmd.getDonorConnectionString().toString(),
-                                                      cmd.getTenantId().toString(),
-                                                      cmd.getReadPreference(),
-                                                      cmd.getRecipientCertificateForDonor());
+            const TenantMigrationRecipientDocument stateDoc(
+                cmd.getMigrationId(),
+                cmd.getDonorConnectionString().toString(),
+                cmd.getTenantId().toString(),
+                cmd.getReadPreference(),
+                cmd.getRecipientCertificateForDonor());
             auto recipientInstance = repl::TenantMigrationRecipientService::Instance::getOrCreate(
                 opCtx, recipientService, stateDoc.toBSON());
 

@@ -94,9 +94,9 @@ public:
         /**
          * To be called on the instance returned by PrimaryOnlyService::getOrCreate. Returns an
          * error if the options this Instance was created with are incompatible with a request for
-         * an instance with the options given in 'options'.
+         * an instance with the options given in 'stateDoc'.
          */
-        Status checkIfOptionsConflict(BSONObj options);
+        Status checkIfOptionsConflict(const TenantMigrationDonorDocument& stateDoc);
 
         /**
          * Returns the latest durable migration state.

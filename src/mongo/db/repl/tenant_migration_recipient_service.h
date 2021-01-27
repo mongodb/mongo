@@ -131,9 +131,9 @@ public:
         /**
          * To be called on the instance returned by PrimaryOnlyService::getOrCreate(). Returns an
          * error if the options this Instance was created with are incompatible with a request for
-         * an instance with the options given in 'options'.
+         * an instance with the options given in 'stateDoc'.
          */
-        Status checkIfOptionsConflict(const TenantMigrationRecipientDocument& StateDoc) const;
+        Status checkIfOptionsConflict(const TenantMigrationRecipientDocument& stateDoc) const;
 
         /*
          * Blocks the thread until the tenant migration reaches consistent state in an interruptible

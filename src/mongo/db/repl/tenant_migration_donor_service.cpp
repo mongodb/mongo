@@ -238,9 +238,8 @@ boost::optional<BSONObj> TenantMigrationDonorService::Instance::reportForCurrent
     return bob.obj();
 }
 
-Status TenantMigrationDonorService::Instance::checkIfOptionsConflict(BSONObj options) {
-    auto stateDoc = tenant_migration_donor::parseDonorStateDocument(options);
-
+Status TenantMigrationDonorService::Instance::checkIfOptionsConflict(
+    const TenantMigrationDonorDocument& stateDoc) {
     if (stateDoc.getId() != _stateDoc.getId() ||
         stateDoc.getTenantId() != _stateDoc.getTenantId() ||
         stateDoc.getRecipientConnectionString() != _stateDoc.getRecipientConnectionString() ||
