@@ -208,7 +208,13 @@ public:
             std::shared_ptr<executor::ScopedTaskExecutor> executor,
             std::shared_ptr<RemoteCommandTargeter> recipientTargeterRS);
 
-        ServiceContext* const _serviceContext;
+        ThreadPool::Limits _getRecipientCmdThreadPoolLimits() const {
+            ThreadPool::Limits recipientCmdThreadPoolLimits;
+            recipientCmdThreadPoolLimits.maxThreads = 1;
+            return recipientCmdThreadPoolLimits;
+        }
+
+        ServiceContext* _serviceContext;
 
         TenantMigrationDonorDocument _stateDoc;
         const std::string _instanceName;
@@ -217,12 +223,6 @@ public:
         // Task executor used for executing commands against the recipient using SSL connection
         // created using the migration-specific certificate.
         std::shared_ptr<executor::TaskExecutor> _recipientCmdExecutor;
-
-        ThreadPool::Limits getRecipientCmdThreadPoolLimits() const {
-            ThreadPool::Limits recipientCmdThreadPoolLimits;
-            recipientCmdThreadPoolLimits.maxThreads = 1;
-            return recipientCmdThreadPoolLimits;
-        }
 
         // Weak pointer to the Fetcher used for fetching admin.system.keys documents from the
         // recipient. It is only not null when the instance is actively fetching the documents.
