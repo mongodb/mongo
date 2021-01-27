@@ -56,10 +56,6 @@ structs:
         description: "The collMod command's reply."
         strict: true
         fields:
-            ok: 
-                # Used in mongos reply.
-                optional: true
-                type: safeDouble
             expireAfterSeconds_old:
                 optional: true
                 type: safeInt
@@ -72,9 +68,6 @@ structs:
             hidden_new:
                 optional: true
                 type: safeBool
-            writeConcernError:
-                optional: true
-                type: object
 commands:
     collMod:
         description: "Specify collMod Command."

@@ -52,21 +52,8 @@ public:
 
     void validateResult(const BSONObj& resultObj) final {
         auto ctx = IDLParserErrorContext("CommitReply");
-        auto status = getStatusFromCommandResult(resultObj);
-        auto wcStatus = getWriteConcernStatusFromCommandResult(resultObj);
-
-        if (!wcStatus.isOK()) {
-            if (wcStatus.code() == ErrorCodes::TypeMismatch) {
-                // Result has "writeConcerError" field but it is not valid wce object.
-                uassertStatusOK(wcStatus);
-            }
-        }
-
-        if (!status.isOK()) {
-            // Will throw if the result doesn't match the ErrorReply.
-            ErrorReply::parse(ctx, resultObj);
-        } else {
-            // Will throw if the result doesn't match the committReply.
+        if (!checkIsErrorStatus(resultObj, ctx)) {
+            // Will throw if the result doesn't match the commitReply.
             Reply::parse(ctx, resultObj);
         }
     }

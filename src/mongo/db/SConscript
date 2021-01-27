@@ -573,6 +573,7 @@ env.Library(
     target="commands",
     source=[
         'coll_mod.idl',
+        'coll_mod_reply_validation.cpp',
         'commands.cpp',
         'drop.idl',
         'drop_database.idl',

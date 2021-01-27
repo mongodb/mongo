@@ -51,6 +51,7 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/request_execution_context.h"
 #include "mongo/db/write_concern.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/util/fail_point.h"
@@ -991,6 +992,27 @@ protected:
 
     // Custom logic to validate results to enforce API versioning.
     virtual void validateResult(const BSONObj& resultObj) = 0;
+
+    static bool checkIsErrorStatus(const BSONObj& resultObj, const IDLParserErrorContext& ctx) {
+        auto wcStatus = getWriteConcernStatusFromCommandResult(resultObj);
+        if (!wcStatus.isOK()) {
+            if (wcStatus.code() == ErrorCodes::TypeMismatch) {
+                // Result has "writeConcerError" field but it is not valid wce object.
+                uassertStatusOK(wcStatus);
+            }
+        }
+
+        if (resultObj.hasField("ok")) {
+            auto status = getStatusFromCommandResult(resultObj);
+            if (!status.isOK()) {
+                // Will throw if the result doesn't match the ErrorReply.
+                ErrorReply::parse(IDLParserErrorContext("ErrorType", &ctx), resultObj);
+                return true;
+            }
+        }
+
+        return false;
+    }
 };
 
 template <typename Derived>

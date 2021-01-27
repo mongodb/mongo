@@ -148,12 +148,12 @@ BSONObj applyReadWriteConcern(OperationContext* opCtx,
 
 /**
  * Convenience versions of applyReadWriteConcern() for calling from within
- * CommandInvocation or BasicCommand.
+ * CommandInvocation, BasicCommand or BasicCommandWithRequestParser.
  */
 BSONObj applyReadWriteConcern(OperationContext* opCtx,
                               CommandInvocation* invocation,
                               const BSONObj& cmdObj);
-BSONObj applyReadWriteConcern(OperationContext* opCtx, BasicCommand* cmd, const BSONObj& cmdObj);
+
 BSONObj applyReadWriteConcern(OperationContext* opCtx,
                               BasicCommandWithReplyBuilderInterface* cmd,
                               const BSONObj& cmdObj);
