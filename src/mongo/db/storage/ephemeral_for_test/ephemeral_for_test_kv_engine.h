@@ -80,7 +80,7 @@ public:
                                              StringData ident,
                                              const BSONObj& storageMetadata);
 
-    virtual Status dropGroupedSortedDataInterface(OperationContext* opCtx, StringData ident) {
+    virtual Status dropSortedDataInterface(OperationContext* opCtx, StringData ident) {
         return Status::OK();
     }
 

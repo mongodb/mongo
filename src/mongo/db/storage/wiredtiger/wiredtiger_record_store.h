@@ -36,7 +36,6 @@
 
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/storage/capped_callback.h"
-#include "mongo/db/storage/kv/kv_prefix.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_cursor.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
@@ -74,7 +73,6 @@ class WiredTigerRecordStore : public RecordStore {
     friend class WiredTigerRecordStoreCursorBase;
 
     friend class StandardWiredTigerRecordStore;
-    friend class PrefixedWiredTigerRecordStore;
 
 public:
     /**
@@ -99,8 +97,7 @@ public:
     static StatusWith<std::string> generateCreateString(const std::string& engineName,
                                                         StringData ns,
                                                         const CollectionOptions& options,
-                                                        StringData extraStrings,
-                                                        bool prefixed);
+                                                        StringData extraStrings);
 
     struct Params {
         StringData ns;
@@ -414,32 +411,6 @@ protected:
     virtual void setKey(WT_CURSOR* cursor, RecordId id) const;
 };
 
-class PrefixedWiredTigerRecordStore final : public WiredTigerRecordStore {
-public:
-    PrefixedWiredTigerRecordStore(WiredTigerKVEngine* kvEngine,
-                                  OperationContext* opCtx,
-                                  Params params,
-                                  KVPrefix prefix);
-
-    virtual std::unique_ptr<SeekableRecordCursor> getCursor(OperationContext* opCtx,
-                                                            bool forward) const override;
-
-    virtual std::unique_ptr<RecordCursor> getRandomCursorWithOptions(
-        OperationContext* opCtx, StringData extraConfig) const override;
-
-    virtual KVPrefix getPrefix() const {
-        return _prefix;
-    }
-
-protected:
-    virtual RecordId getKey(WT_CURSOR* cursor) const;
-
-    virtual void setKey(WT_CURSOR* cursor, RecordId id) const;
-
-private:
-    KVPrefix _prefix;
-};
-
 class WiredTigerRecordStoreCursorBase : public SeekableRecordCursor {
 public:
     WiredTigerRecordStoreCursorBase(OperationContext* opCtx,
@@ -464,15 +435,6 @@ protected:
     virtual RecordId getKey(WT_CURSOR* cursor) const = 0;
 
     virtual void setKey(WT_CURSOR* cursor, RecordId id) const = 0;
-
-    /**
-     * Callers must have already checked the return value of a positioning method against
-     * 'WT_NOTFOUND'. This method allows for additional predicates to be considered on a validly
-     * positioned cursor. 'id' is an out parameter. Implementations are not required to fill it
-     * in. It's simply a possible optimization to avoid a future 'getKey' call if 'hasWrongPrefix'
-     * already did one.
-     */
-    virtual bool hasWrongPrefix(WT_CURSOR* cursor, RecordId* id) const = 0;
 
     /**
      * Called when restoring a cursor that has not been advanced.
@@ -510,43 +472,7 @@ protected:
 
     virtual void setKey(WT_CURSOR* cursor, RecordId id) const override;
 
-    /**
-     * Callers must have already checked the return value of a positioning method against
-     * 'WT_NOTFOUND'. This method allows for additional predicates to be considered on a validly
-     * positioned cursor. 'id' is an out parameter. Implementations are not required to fill it
-     * in. It's simply a possible optimization to avoid a future 'getKey' call if 'hasWrongPrefix'
-     * already did one.
-     */
-    virtual bool hasWrongPrefix(WT_CURSOR* cursor, RecordId* id) const override;
-
     virtual void initCursorToBeginning(){};
-};
-
-class WiredTigerRecordStorePrefixedCursor final : public WiredTigerRecordStoreCursorBase {
-public:
-    WiredTigerRecordStorePrefixedCursor(OperationContext* opCtx,
-                                        const WiredTigerRecordStore& rs,
-                                        KVPrefix prefix,
-                                        bool forward = true);
-
-protected:
-    virtual RecordId getKey(WT_CURSOR* cursor) const override;
-
-    virtual void setKey(WT_CURSOR* cursor, RecordId id) const override;
-
-    /**
-     * Callers must have already checked the return value of a positioning method against
-     * 'WT_NOTFOUND'. This method allows for additional predicates to be considered on a validly
-     * positioned cursor. 'id' is an out parameter. Implementations are not required to fill it
-     * in. It's simply a possible optimization to avoid a future 'getKey' call if 'hasWrongPrefix'
-     * already did one.
-     */
-    virtual bool hasWrongPrefix(WT_CURSOR* cursor, RecordId* id) const override;
-
-    virtual void initCursorToBeginning() override;
-
-private:
-    KVPrefix _prefix;
 };
 
 // WT failpoint to throw write conflict exceptions randomly

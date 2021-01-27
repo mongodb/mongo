@@ -11,7 +11,6 @@ env.Library(
         'ephemeral_catalog_record_store.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/storage/kv/kv_prefix',
         '$BUILD_DIR/mongo/db/storage/oplog_hack',
         '$BUILD_DIR/mongo/db/storage/recovery_unit_base',
     ],

@@ -34,7 +34,6 @@
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/storage/durable_catalog_impl.h"
 #include "mongo/db/storage/kv/kv_engine.h"
-#include "mongo/db/storage/kv/kv_prefix.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/unittest/death_test.h"
@@ -81,10 +80,9 @@ protected:
     RecordId newCollection(OperationContext* opCtx,
                            const NamespaceString& ns,
                            const CollectionOptions& options,
-                           KVPrefix prefix,
                            DurableCatalogImpl* catalog) {
         Lock::DBLock dbLk(opCtx, ns.db(), MODE_IX);
-        auto swEntry = catalog->_addEntry(opCtx, ns, options, prefix);
+        auto swEntry = catalog->_addEntry(opCtx, ns, options);
         ASSERT_OK(swEntry.getStatus());
         return swEntry.getValue().catalogId;
     }
@@ -1153,11 +1151,8 @@ TEST_F(DurableCatalogImplTest, Coll1) {
         auto clientAndCtx = makeClientAndCtx("opCtx");
         auto opCtx = clientAndCtx.opCtx();
         WriteUnitOfWork uow(opCtx);
-        catalogId = newCollection(opCtx,
-                                  NamespaceString("a.b"),
-                                  CollectionOptions(),
-                                  KVPrefix::kNotPrefixed,
-                                  catalog.get());
+        catalogId =
+            newCollection(opCtx, NamespaceString("a.b"), CollectionOptions(), catalog.get());
         ASSERT_NOT_EQUALS("a.b", catalog->getEntry(catalogId).ident);
         uow.commit();
     }
@@ -1181,11 +1176,8 @@ TEST_F(DurableCatalogImplTest, Coll1) {
         auto opCtx = clientAndCtx.opCtx();
         WriteUnitOfWork uow(opCtx);
         dropCollection(opCtx, catalogId, catalog.get()).transitional_ignore();
-        newCatalogId = newCollection(opCtx,
-                                     NamespaceString("a.b"),
-                                     CollectionOptions(),
-                                     KVPrefix::kNotPrefixed,
-                                     catalog.get());
+        newCatalogId =
+            newCollection(opCtx, NamespaceString("a.b"), CollectionOptions(), catalog.get());
         uow.commit();
     }
     ASSERT_NOT_EQUALS(ident, catalog->getEntry(newCatalogId).ident);
@@ -1211,11 +1203,8 @@ TEST_F(DurableCatalogImplTest, Idx1) {
         auto clientAndCtx = makeClientAndCtx("opCtx");
         auto opCtx = clientAndCtx.opCtx();
         WriteUnitOfWork uow(opCtx);
-        catalogId = newCollection(opCtx,
-                                  NamespaceString("a.b"),
-                                  CollectionOptions(),
-                                  KVPrefix::kNotPrefixed,
-                                  catalog.get());
+        catalogId =
+            newCollection(opCtx, NamespaceString("a.b"), CollectionOptions(), catalog.get());
         ASSERT_NOT_EQUALS("a.b", catalog->getEntry(catalogId).ident);
         ASSERT_TRUE(catalog->isUserDataIdent(catalog->getEntry(catalogId).ident));
         uow.commit();
@@ -1234,7 +1223,6 @@ TEST_F(DurableCatalogImplTest, Idx1) {
                         << "foo");
         imd.ready = false;
         imd.multikey = false;
-        imd.prefix = KVPrefix::kNotPrefixed;
         imd.isBackgroundSecondaryBuild = false;
         md.indexes.push_back(imd);
         putMetaData(opCtx, catalog.get(), catalogId, md);
@@ -1270,7 +1258,6 @@ TEST_F(DurableCatalogImplTest, Idx1) {
                         << "foo");
         imd.ready = false;
         imd.multikey = false;
-        imd.prefix = KVPrefix::kNotPrefixed;
         imd.isBackgroundSecondaryBuild = false;
         md.indexes.push_back(imd);
         putMetaData(opCtx, catalog.get(), catalogId, md);
@@ -1304,11 +1291,8 @@ TEST_F(DurableCatalogImplTest, DirectoryPerDb1) {
         auto clientAndCtx = makeClientAndCtx("opCtx");
         auto opCtx = clientAndCtx.opCtx();
         WriteUnitOfWork uow(opCtx);
-        catalogId = newCollection(opCtx,
-                                  NamespaceString("a.b"),
-                                  CollectionOptions(),
-                                  KVPrefix::kNotPrefixed,
-                                  catalog.get());
+        catalogId =
+            newCollection(opCtx, NamespaceString("a.b"), CollectionOptions(), catalog.get());
         ASSERT_STRING_CONTAINS(catalog->getEntry(catalogId).ident, "a/");
         ASSERT_TRUE(catalog->isUserDataIdent(catalog->getEntry(catalogId).ident));
         uow.commit();
@@ -1327,7 +1311,6 @@ TEST_F(DurableCatalogImplTest, DirectoryPerDb1) {
                         << "foo");
         imd.ready = false;
         imd.multikey = false;
-        imd.prefix = KVPrefix::kNotPrefixed;
         imd.isBackgroundSecondaryBuild = false;
         md.indexes.push_back(imd);
         putMetaData(opCtx, catalog.get(), catalogId, md);
@@ -1358,11 +1341,8 @@ TEST_F(DurableCatalogImplTest, Split1) {
         auto clientAndCtx = makeClientAndCtx("opCtx");
         auto opCtx = clientAndCtx.opCtx();
         WriteUnitOfWork uow(opCtx);
-        catalogId = newCollection(opCtx,
-                                  NamespaceString("a.b"),
-                                  CollectionOptions(),
-                                  KVPrefix::kNotPrefixed,
-                                  catalog.get());
+        catalogId =
+            newCollection(opCtx, NamespaceString("a.b"), CollectionOptions(), catalog.get());
         ASSERT_STRING_CONTAINS(catalog->getEntry(catalogId).ident, "collection/");
         ASSERT_TRUE(catalog->isUserDataIdent(catalog->getEntry(catalogId).ident));
         uow.commit();
@@ -1381,7 +1361,6 @@ TEST_F(DurableCatalogImplTest, Split1) {
                         << "foo");
         imd.ready = false;
         imd.multikey = false;
-        imd.prefix = KVPrefix::kNotPrefixed;
         imd.isBackgroundSecondaryBuild = false;
         md.indexes.push_back(imd);
         putMetaData(opCtx, catalog.get(), catalogId, md);
@@ -1412,11 +1391,8 @@ TEST_F(DurableCatalogImplTest, DirectoryPerAndSplit1) {
         auto clientAndCtx = makeClientAndCtx("opCtx");
         auto opCtx = clientAndCtx.opCtx();
         WriteUnitOfWork uow(opCtx);
-        catalogId = newCollection(opCtx,
-                                  NamespaceString("a.b"),
-                                  CollectionOptions(),
-                                  KVPrefix::kNotPrefixed,
-                                  catalog.get());
+        catalogId =
+            newCollection(opCtx, NamespaceString("a.b"), CollectionOptions(), catalog.get());
         ASSERT_STRING_CONTAINS(catalog->getEntry(catalogId).ident, "a/collection/");
         ASSERT_TRUE(catalog->isUserDataIdent(catalog->getEntry(catalogId).ident));
         uow.commit();
@@ -1435,7 +1411,6 @@ TEST_F(DurableCatalogImplTest, DirectoryPerAndSplit1) {
                         << "foo");
         imd.ready = false;
         imd.multikey = false;
-        imd.prefix = KVPrefix::kNotPrefixed;
         imd.isBackgroundSecondaryBuild = false;
         md.indexes.push_back(imd);
         putMetaData(opCtx, catalog.get(), catalogId, md);

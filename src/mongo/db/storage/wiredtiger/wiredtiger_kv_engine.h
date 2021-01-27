@@ -135,16 +135,12 @@ public:
     Status createRecordStore(OperationContext* opCtx,
                              StringData ns,
                              StringData ident,
-                             const CollectionOptions& options) override {
-        return createGroupedRecordStore(opCtx, ns, ident, options, KVPrefix::kNotPrefixed);
-    }
+                             const CollectionOptions& options) override;
 
     std::unique_ptr<RecordStore> getRecordStore(OperationContext* opCtx,
                                                 StringData ns,
                                                 StringData ident,
-                                                const CollectionOptions& options) override {
-        return getGroupedRecordStore(opCtx, ns, ident, options, KVPrefix::kNotPrefixed);
-    }
+                                                const CollectionOptions& options) override;
 
     std::unique_ptr<RecordStore> makeTemporaryRecordStore(OperationContext* opCtx,
                                                           StringData ident) override;
@@ -152,37 +148,14 @@ public:
     Status createSortedDataInterface(OperationContext* opCtx,
                                      const CollectionOptions& collOptions,
                                      StringData ident,
-                                     const IndexDescriptor* desc) override {
-        return createGroupedSortedDataInterface(
-            opCtx, collOptions, ident, desc, KVPrefix::kNotPrefixed);
-    }
+                                     const IndexDescriptor* desc) override;
 
     std::unique_ptr<SortedDataInterface> getSortedDataInterface(
-        OperationContext* opCtx, StringData ident, const IndexDescriptor* desc) override {
-        return getGroupedSortedDataInterface(opCtx, ident, desc, KVPrefix::kNotPrefixed);
-    }
-
-    Status createGroupedRecordStore(OperationContext* opCtx,
-                                    StringData ns,
-                                    StringData ident,
-                                    const CollectionOptions& options,
-                                    KVPrefix prefix) override;
+        OperationContext* opCtx, StringData ident, const IndexDescriptor* desc) override;
 
     Status importRecordStore(OperationContext* opCtx,
                              StringData ident,
                              const BSONObj& storageMetadata) override;
-
-    std::unique_ptr<RecordStore> getGroupedRecordStore(OperationContext* opCtx,
-                                                       StringData ns,
-                                                       StringData ident,
-                                                       const CollectionOptions& options,
-                                                       KVPrefix prefix) override;
-
-    Status createGroupedSortedDataInterface(OperationContext* opCtx,
-                                            const CollectionOptions& collOptions,
-                                            StringData ident,
-                                            const IndexDescriptor* desc,
-                                            KVPrefix prefix) override;
 
     Status importSortedDataInterface(OperationContext* opCtx,
                                      StringData ident,
@@ -191,12 +164,7 @@ public:
     /**
      * Drops the specified ident for resumable index builds.
      */
-    Status dropGroupedSortedDataInterface(OperationContext* opCtx, StringData ident) override;
-
-    std::unique_ptr<SortedDataInterface> getGroupedSortedDataInterface(OperationContext* opCtx,
-                                                                       StringData ident,
-                                                                       const IndexDescriptor* desc,
-                                                                       KVPrefix prefix) override;
+    Status dropSortedDataInterface(OperationContext* opCtx, StringData ident) override;
 
     Status dropIdent(RecoveryUnit* ru,
                      StringData ident,

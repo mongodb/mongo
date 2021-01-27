@@ -528,8 +528,7 @@ DurableCatalog::Entry DurableCatalogImpl::getEntry(RecordId catalogId) const {
 
 StatusWith<DurableCatalog::Entry> DurableCatalogImpl::_addEntry(OperationContext* opCtx,
                                                                 NamespaceString nss,
-                                                                const CollectionOptions& options,
-                                                                KVPrefix prefix) {
+                                                                const CollectionOptions& options) {
     invariant(opCtx->lockState()->isDbLockedForMode(nss.db(), MODE_IX));
 
     const string ident = _newUniqueIdent(nss, "collection");
@@ -542,7 +541,6 @@ StatusWith<DurableCatalog::Entry> DurableCatalogImpl::_addEntry(OperationContext
         BSONCollectionCatalogEntry::MetaData md;
         md.ns = nss.ns();
         md.options = options;
-        md.prefix = prefix;
         b.append("md", md.toBSON());
         obj = b.obj();
     }
@@ -826,8 +824,6 @@ StatusWith<std::string> DurableCatalogImpl::newOrphanedIdent(OperationContext* o
         md.ns = ns.ns();
         // Default options with newly generated UUID.
         md.options = optionsWithUUID;
-        // Not Prefixed.
-        md.prefix = KVPrefix::kNotPrefixed;
         b.append("md", md.toBSON());
         obj = b.obj();
     }
@@ -860,15 +856,12 @@ StatusWith<std::pair<RecordId, std::unique_ptr<RecordStore>>> DurableCatalogImpl
         throw WriteConflictException();
     }
 
-    KVPrefix prefix = KVPrefix::getNextPrefix(nss);
-
-    StatusWith<Entry> swEntry = _addEntry(opCtx, nss, options, prefix);
+    StatusWith<Entry> swEntry = _addEntry(opCtx, nss, options);
     if (!swEntry.isOK())
         return swEntry.getStatus();
     Entry& entry = swEntry.getValue();
 
-    Status status = _engine->getEngine()->createGroupedRecordStore(
-        opCtx, nss.ns(), entry.ident, options, prefix);
+    Status status = _engine->getEngine()->createRecordStore(opCtx, nss.ns(), entry.ident, options);
     if (!status.isOK())
         return status;
 
@@ -887,8 +880,7 @@ StatusWith<std::pair<RecordId, std::unique_ptr<RecordStore>>> DurableCatalogImpl
         catalog->_engine->getEngine()->dropIdent(ru, ident).ignore();
     });
 
-    auto rs =
-        _engine->getEngine()->getGroupedRecordStore(opCtx, nss.ns(), entry.ident, options, prefix);
+    auto rs = _engine->getEngine()->getRecordStore(opCtx, nss.ns(), entry.ident, options);
     invariant(rs);
 
     return std::pair<RecordId, std::unique_ptr<RecordStore>>(entry.catalogId, std::move(rs));
@@ -995,8 +987,7 @@ StatusWith<DurableCatalog::ImportResult> DurableCatalogImpl::importCollection(
             }
         });
 
-    auto rs = _engine->getEngine()->getGroupedRecordStore(
-        opCtx, nss.ns(), entry.ident, md.options, md.prefix);
+    auto rs = _engine->getEngine()->getRecordStore(opCtx, nss.ns(), entry.ident, md.options);
     invariant(rs);
 
     return DurableCatalog::ImportResult(entry.catalogId, std::move(rs), md.options.uuid.get());
@@ -1112,12 +1103,10 @@ Status DurableCatalogImpl::prepareForIndexBuild(OperationContext* opCtx,
                                                 bool isBackgroundSecondaryBuild) {
     BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, catalogId);
 
-    KVPrefix prefix = KVPrefix::getNextPrefix(NamespaceString(md.ns));
     BSONCollectionCatalogEntry::IndexMetaData imd;
     imd.spec = spec->infoObj();
     imd.ready = false;
     imd.multikey = false;
-    imd.prefix = prefix;
     imd.isBackgroundSecondaryBuild = isBackgroundSecondaryBuild;
     imd.buildUUID = buildUUID;
 
@@ -1146,8 +1135,8 @@ Status DurableCatalogImpl::prepareForIndexBuild(OperationContext* opCtx,
     string ident = getIndexIdent(opCtx, catalogId, spec->indexName());
 
     auto kvEngine = _engine->getEngine();
-    const Status status = kvEngine->createGroupedSortedDataInterface(
-        opCtx, getCollectionOptions(opCtx, catalogId), ident, spec, prefix);
+    const Status status = kvEngine->createSortedDataInterface(
+        opCtx, getCollectionOptions(opCtx, catalogId), ident, spec);
     if (status.isOK()) {
         opCtx->recoveryUnit()->registerChange(
             std::make_unique<AddIndexChange>(opCtx->recoveryUnit(), _engine, ident));
@@ -1159,14 +1148,13 @@ Status DurableCatalogImpl::prepareForIndexBuild(OperationContext* opCtx,
 Status DurableCatalogImpl::dropAndRecreateIndexIdentForResume(OperationContext* opCtx,
                                                               RecordId catalogId,
                                                               const IndexDescriptor* spec,
-                                                              StringData ident,
-                                                              KVPrefix prefix) {
-    auto status = _engine->getEngine()->dropGroupedSortedDataInterface(opCtx, ident);
+                                                              StringData ident) {
+    auto status = _engine->getEngine()->dropSortedDataInterface(opCtx, ident);
     if (!status.isOK())
         return status;
 
-    status = _engine->getEngine()->createGroupedSortedDataInterface(
-        opCtx, getCollectionOptions(opCtx, catalogId), ident, spec, prefix);
+    status = _engine->getEngine()->createSortedDataInterface(
+        opCtx, getCollectionOptions(opCtx, catalogId), ident, spec);
 
     return status;
 }
@@ -1346,17 +1334,6 @@ bool DurableCatalogImpl::isIndexReady(OperationContext* opCtx,
               str::stream() << "cannot get ready status for index " << indexName << " @ "
                             << catalogId << " : " << md.toBSON());
     return md.indexes[offset].ready;
-}
-
-KVPrefix DurableCatalogImpl::getIndexPrefix(OperationContext* opCtx,
-                                            RecordId catalogId,
-                                            StringData indexName) const {
-    BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, catalogId);
-    int offset = md.findIndexOffset(indexName);
-    invariant(offset >= 0,
-              str::stream() << "cannot get prefix for index " << indexName << " @ " << catalogId
-                            << " : " << md.toBSON());
-    return md.indexes[offset].prefix;
 }
 
 void DurableCatalogImpl::setRand_forTest(const std::string& rand) {

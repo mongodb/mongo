@@ -71,7 +71,7 @@ public:
         return Status::OK();
     }
 
-    virtual Status dropGroupedSortedDataInterface(OperationContext* opCtx, StringData ident) {
+    virtual Status dropSortedDataInterface(OperationContext* opCtx, StringData ident) {
         return Status::OK();
     }
 

@@ -4,14 +4,6 @@ Import("env")
 
 env = env.Clone()
 
-env.Library(
-    target='kv_prefix',
-    source=['kv_prefix.cpp'],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/storage/storage_options',
-    ],
-)
-
 # Should not be referenced outside this SConscript file.
 env.Library(
     target='kv_drop_pending_ident_reaper',
@@ -19,7 +11,6 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/storage/write_unit_of_work',
-        'kv_prefix',
     ],
 )
 
@@ -38,7 +29,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/unittest/unittest',
         '$BUILD_DIR/mongo/util/clock_source_mock',
-        'kv_prefix',
     ],
 )
 

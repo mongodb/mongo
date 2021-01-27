@@ -121,8 +121,8 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx, bool loadingFromUnc
     if (!catalogExists) {
         WriteUnitOfWork uow(opCtx);
 
-        auto status = _engine->createGroupedRecordStore(
-            opCtx, catalogInfo, catalogInfo, CollectionOptions(), KVPrefix::kNotPrefixed);
+        auto status =
+            _engine->createRecordStore(opCtx, catalogInfo, catalogInfo, CollectionOptions());
 
         // BadValue is usually caused by invalid configuration string.
         // We still fassert() but without a stack trace.
@@ -133,8 +133,8 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx, bool loadingFromUnc
         uow.commit();
     }
 
-    _catalogRecordStore = _engine->getGroupedRecordStore(
-        opCtx, catalogInfo, catalogInfo, CollectionOptions(), KVPrefix::kNotPrefixed);
+    _catalogRecordStore =
+        _engine->getRecordStore(opCtx, catalogInfo, catalogInfo, CollectionOptions());
     if (shouldLog(::mongo::logv2::LogComponent::kStorageRecovery, kCatalogLogLevel)) {
         LOGV2_FOR_RECOVERY(4615631, kCatalogLogLevel.toInt(), "loadCatalog:");
         _dumpCatalog(opCtx);
@@ -230,7 +230,6 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx, bool loadingFromUnc
         }
     }
 
-    KVPrefix maxSeenPrefix = KVPrefix::kNotPrefixed;
     for (DurableCatalog::Entry entry : catalogEntries) {
         if (loadingFromUncleanShutdownOrRepair) {
             // If we are loading the catalog after an unclean shutdown or during repair, it's
@@ -286,8 +285,6 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx, bool loadingFromUnc
         }
 
         _initCollection(opCtx, entry.catalogId, entry.nss, _options.forRepair, minVisibleTs);
-        auto maxPrefixForCollection = _catalog->getMetaData(opCtx, entry.catalogId).getMaxPrefix();
-        maxSeenPrefix = std::max(maxSeenPrefix, maxPrefixForCollection);
 
         if (entry.nss.isOrphanCollection()) {
             LOGV2(22248,
@@ -297,7 +294,6 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx, bool loadingFromUnc
         }
     }
 
-    KVPrefix::setLargestPrefix(maxSeenPrefix);
     opCtx->recoveryUnit()->abandonSnapshot();
 }
 
@@ -319,7 +315,7 @@ void StorageEngineImpl::_initCollection(OperationContext* opCtx,
         // repaired. This also ensures that if we try to use it, it will blow up.
         rs = nullptr;
     } else {
-        rs = _engine->getGroupedRecordStore(opCtx, nss.ns(), ident, md.options, md.prefix);
+        rs = _engine->getRecordStore(opCtx, nss.ns(), ident, md.options);
         invariant(rs);
     }
 

@@ -160,15 +160,6 @@ bool BSONCollectionCatalogEntry::MetaData::eraseIndex(StringData name) {
     return true;
 }
 
-KVPrefix BSONCollectionCatalogEntry::MetaData::getMaxPrefix() const {
-    // Use the collection prefix as the initial max value seen. Then compare it with each index
-    // prefix. Note the oplog has no indexes so the vector of 'IndexMetaData' may be empty.
-    return std::accumulate(
-        indexes.begin(), indexes.end(), prefix, [](KVPrefix max, IndexMetaData index) {
-            return max < index.prefix ? index.prefix : max;
-        });
-}
-
 BSONObj BSONCollectionCatalogEntry::MetaData::toBSON() const {
     BSONObjBuilder b;
     b.append("ns", ns);
@@ -190,7 +181,6 @@ BSONObj BSONCollectionCatalogEntry::MetaData::toBSON() const {
             }
 
             sub.append("head", 0ll);  // For backward compatibility with 4.0
-            sub.append("prefix", indexes[i].prefix.toBSONValue());
             sub.append("backgroundSecondary", indexes[i].isBackgroundSecondaryBuild);
 
             if (indexes[i].buildUUID) {
@@ -200,7 +190,6 @@ BSONObj BSONCollectionCatalogEntry::MetaData::toBSON() const {
         }
         arr.doneFast();
     }
-    b.append("prefix", prefix.toBSONValue());
     return b.obj();
 }
 
@@ -226,7 +215,6 @@ void BSONCollectionCatalogEntry::MetaData::parse(const BSONObj& obj) {
                 parseMultikeyPathsFromBytes(multikeyPathsElem.Obj(), &imd.multikeyPaths);
             }
 
-            imd.prefix = KVPrefix::fromBSONElement(idx["prefix"]);
             auto bgSecondary = BSONElement(idx["backgroundSecondary"]);
             // Opt-in to rebuilding behavior for old-format index catalog objects.
             imd.isBackgroundSecondaryBuild = bgSecondary.eoo() || bgSecondary.trueValue();
@@ -237,7 +225,5 @@ void BSONCollectionCatalogEntry::MetaData::parse(const BSONObj& obj) {
             indexes.push_back(imd);
         }
     }
-
-    prefix = KVPrefix::fromBSONElement(obj["prefix"]);
 }
 }  // namespace mongo

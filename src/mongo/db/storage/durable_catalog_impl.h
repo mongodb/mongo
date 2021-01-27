@@ -39,7 +39,6 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/bson_collection_catalog_entry.h"
 #include "mongo/db/storage/durable_catalog.h"
-#include "mongo/db/storage/kv/kv_prefix.h"
 #include "mongo/platform/mutex.h"
 
 namespace mongo {
@@ -172,8 +171,7 @@ public:
     Status dropAndRecreateIndexIdentForResume(OperationContext* opCtx,
                                               RecordId catalogId,
                                               const IndexDescriptor* spec,
-                                              StringData ident,
-                                              KVPrefix prefix);
+                                              StringData ident);
 
     boost::optional<UUID> getIndexBuildUUID(OperationContext* opCtx,
                                             RecordId catalogId,
@@ -211,10 +209,6 @@ public:
 
     bool isIndexReady(OperationContext* opCtx, RecordId catalogId, StringData indexName) const;
 
-    KVPrefix getIndexPrefix(OperationContext* opCtx,
-                            RecordId catalogId,
-                            StringData indexName) const;
-
     void setRand_forTest(const std::string& rand);
 
     std::string getRand_forTest() const;
@@ -231,8 +225,7 @@ private:
     BSONObj _findEntry(OperationContext* opCtx, RecordId catalogId) const;
     StatusWith<Entry> _addEntry(OperationContext* opCtx,
                                 NamespaceString nss,
-                                const CollectionOptions& options,
-                                KVPrefix prefix);
+                                const CollectionOptions& options);
     StatusWith<Entry> _importEntry(OperationContext* opCtx,
                                    NamespaceString nss,
                                    const BSONObj& metadata);

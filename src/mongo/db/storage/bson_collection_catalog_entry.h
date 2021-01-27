@@ -34,7 +34,6 @@
 
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/index/multikey_paths.h"
-#include "mongo/db/storage/kv/kv_prefix.h"
 
 namespace mongo {
 
@@ -73,7 +72,6 @@ public:
         BSONObj spec;
         bool ready = false;
         bool multikey = false;
-        KVPrefix prefix = KVPrefix::kNotPrefixed;
         bool isBackgroundSecondaryBuild = false;
 
         // If initialized, a two-phase index build is in progress.
@@ -98,12 +96,9 @@ public:
          */
         bool eraseIndex(StringData name);
 
-        KVPrefix getMaxPrefix() const;
-
         std::string ns;
         CollectionOptions options;
         std::vector<IndexMetaData> indexes;
-        KVPrefix prefix = KVPrefix::kNotPrefixed;
     };
 };
 }  // namespace mongo

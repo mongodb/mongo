@@ -34,7 +34,6 @@
 #include "mongo/base/status_with.h"
 #include "mongo/db/storage/index_entry_comparison.h"
 #include "mongo/db/storage/key_string.h"
-#include "mongo/db/storage/kv/kv_prefix.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_prepare_conflict.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
@@ -77,8 +76,7 @@ public:
                                                         const std::string& sysIndexConfig,
                                                         const std::string& collIndexConfig,
                                                         const NamespaceString& collectionNamespace,
-                                                        const IndexDescriptor& desc,
-                                                        bool isPrefixed);
+                                                        const IndexDescriptor& desc);
 
     /**
      * Creates a WiredTiger table suitable for implementing a MongoDB index.
@@ -95,7 +93,6 @@ public:
                     const std::string& uri,
                     StringData ident,
                     const IndexDescriptor* desc,
-                    KVPrefix prefix,
                     bool readOnly);
 
     virtual Status insert(OperationContext* opCtx,
@@ -193,7 +190,6 @@ protected:
     const std::string _indexName;
     const BSONObj _keyPattern;
     const BSONObj _collation;
-    KVPrefix _prefix;
 };
 
 class WiredTigerIndexUnique : public WiredTigerIndex {
@@ -202,7 +198,6 @@ public:
                           const std::string& uri,
                           StringData ident,
                           const IndexDescriptor* desc,
-                          KVPrefix prefix,
                           bool readOnly = false);
 
     std::unique_ptr<SortedDataInterface::Cursor> newCursor(OperationContext* opCtx,
@@ -245,7 +240,6 @@ public:
                       const std::string& uri,
                       StringData ident,
                       const IndexDescriptor* desc,
-                      KVPrefix prefix,
                       bool readOnly = false);
 
     std::unique_ptr<Cursor> newCursor(OperationContext* opCtx,
@@ -289,7 +283,6 @@ public:
                             const std::string& uri,
                             StringData ident,
                             const IndexDescriptor* desc,
-                            KVPrefix prefix,
                             bool readOnly = false);
 
     std::unique_ptr<SortedDataInterface::Cursor> newCursor(OperationContext* opCtx,

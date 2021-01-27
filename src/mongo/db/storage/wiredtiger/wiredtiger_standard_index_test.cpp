@@ -38,7 +38,6 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/json.h"
 #include "mongo/db/operation_context_noop.h"
-#include "mongo/db/storage/kv/kv_prefix.h"
 #include "mongo/db/storage/sorted_data_interface_test_harness.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_index.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
@@ -83,15 +82,14 @@ public:
         IndexDescriptor desc("", spec);
         invariant(desc.isIdIndex());
 
-        KVPrefix prefix = KVPrefix::kNotPrefixed;
         StatusWith<std::string> result = WiredTigerIndex::generateCreateString(
-            kWiredTigerEngineName, "", "", NamespaceString(ns), desc, prefix.isPrefixed());
+            kWiredTigerEngineName, "", "", NamespaceString(ns), desc);
         ASSERT_OK(result.getStatus());
 
         string uri = "table:" + ns;
         invariantWTOK(WiredTigerIndex::Create(&opCtx, uri, result.getValue()));
 
-        return std::make_unique<WiredTigerIdIndex>(&opCtx, uri, "" /* ident */, &desc, prefix);
+        return std::make_unique<WiredTigerIdIndex>(&opCtx, uri, "" /* ident */, &desc);
     }
 
     std::unique_ptr<SortedDataInterface> newSortedDataInterface(bool unique, bool partial) final {
@@ -114,19 +112,16 @@ public:
 
         IndexDescriptor& desc = _descriptors.emplace_back("", spec);
 
-        KVPrefix prefix = KVPrefix::kNotPrefixed;
         StatusWith<std::string> result = WiredTigerIndex::generateCreateString(
-            kWiredTigerEngineName, "", "", NamespaceString(ns), desc, prefix.isPrefixed());
+            kWiredTigerEngineName, "", "", NamespaceString(ns), desc);
         ASSERT_OK(result.getStatus());
 
         string uri = "table:" + ns;
         invariantWTOK(WiredTigerIndex::Create(&opCtx, uri, result.getValue()));
 
         if (unique)
-            return std::make_unique<WiredTigerIndexUnique>(
-                &opCtx, uri, "" /* ident */, &desc, prefix);
-        return std::make_unique<WiredTigerIndexStandard>(
-            &opCtx, uri, "" /* ident */, &desc, prefix);
+            return std::make_unique<WiredTigerIndexUnique>(&opCtx, uri, "" /* ident */, &desc);
+        return std::make_unique<WiredTigerIndexStandard>(&opCtx, uri, "" /* ident */, &desc);
     }
 
     std::unique_ptr<RecoveryUnit> newRecoveryUnit() final {

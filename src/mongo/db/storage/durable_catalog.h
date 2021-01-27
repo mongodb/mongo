@@ -35,7 +35,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/bson_collection_catalog_entry.h"
-#include "mongo/db/storage/kv/kv_prefix.h"
 #include "mongo/db/storage/storage_engine.h"
 
 namespace mongo {
@@ -262,8 +261,7 @@ public:
     virtual Status dropAndRecreateIndexIdentForResume(OperationContext* opCtx,
                                                       RecordId catalogId,
                                                       const IndexDescriptor* spec,
-                                                      StringData ident,
-                                                      KVPrefix prefix) = 0;
+                                                      StringData ident) = 0;
 
     /**
      * Returns a UUID if the index is being built with the two-phase index build procedure.
@@ -335,10 +333,6 @@ public:
     virtual bool isIndexReady(OperationContext* opCtx,
                               RecordId catalogId,
                               StringData indexName) const = 0;
-
-    virtual KVPrefix getIndexPrefix(OperationContext* opCtx,
-                                    RecordId catalogId,
-                                    StringData indexName) const = 0;
 
     virtual void setRand_forTest(const std::string& rand) = 0;
 

@@ -45,7 +45,6 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/kv/kv_engine_test_harness.h"
-#include "mongo/db/storage/kv/kv_prefix.h"
 #include "mongo/db/storage/record_store_test_harness.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
@@ -101,9 +100,8 @@ public:
         OperationContextNoop opCtx(ru);
         string uri = WiredTigerKVEngine::kTableUriPrefix + ns;
 
-        const bool prefixed = false;
         StatusWith<std::string> result = WiredTigerRecordStore::generateCreateString(
-            kWiredTigerEngineName, ns, CollectionOptions(), "", prefixed);
+            kWiredTigerEngineName, ns, CollectionOptions(), "");
         ASSERT_TRUE(result.isOK());
         std::string config = result.getValue();
 
@@ -149,9 +147,8 @@ public:
         CollectionOptions options;
         options.capped = true;
 
-        const bool prefixed = false;
-        StatusWith<std::string> result = WiredTigerRecordStore::generateCreateString(
-            kWiredTigerEngineName, ns, options, "", prefixed);
+        StatusWith<std::string> result =
+            WiredTigerRecordStore::generateCreateString(kWiredTigerEngineName, ns, options, "");
         ASSERT_TRUE(result.isOK());
         std::string config = result.getValue();
 

@@ -71,9 +71,7 @@ IndexCatalogEntryImpl::IndexCatalogEntryImpl(OperationContext* const opCtx,
       _ordering(Ordering::make(_descriptor->keyPattern())),
       _isReady(false),
       _isFrozen(isFrozen),
-      _isDropped(false),
-      _prefix(
-          DurableCatalog::get(opCtx)->getIndexPrefix(opCtx, _catalogId, _descriptor->indexName())) {
+      _isDropped(false) {
 
     _descriptor->_entry = this;
     _isReady = isReadyInMySnapshot(opCtx);
@@ -382,10 +380,6 @@ void IndexCatalogEntryImpl::_catalogSetMultikey(OperationContext* opCtx,
         // flipping multikey.
         _isMultikeyForWrite.store(true);
     });
-}
-
-KVPrefix IndexCatalogEntryImpl::_catalogGetPrefix(OperationContext* opCtx) const {
-    return DurableCatalog::get(opCtx)->getIndexPrefix(opCtx, _catalogId, _descriptor->indexName());
 }
 
 }  // namespace mongo

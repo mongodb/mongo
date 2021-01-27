@@ -74,7 +74,6 @@ if wiredtiger:
             '$BUILD_DIR/mongo/db/service_context',
             '$BUILD_DIR/mongo/db/storage/index_entry_comparison',
             '$BUILD_DIR/mongo/db/storage/key_string',
-            '$BUILD_DIR/mongo/db/storage/kv/kv_prefix',
             '$BUILD_DIR/mongo/db/storage/oplog_hack',
             '$BUILD_DIR/mongo/db/storage/recovery_unit_base',
             '$BUILD_DIR/mongo/db/storage/storage_file_util',
@@ -197,22 +196,6 @@ if wiredtiger:
             source=[
                 'wiredtiger_standard_index_test.cpp',
                 'wiredtiger_standard_record_store_test.cpp',
-            ],
-            LIBDEPS=[
-                '$BUILD_DIR/mongo/db/auth/authmocks',
-                '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
-                '$BUILD_DIR/mongo/db/repl/replmocks',
-                '$BUILD_DIR/mongo/db/service_context_test_fixture',
-                'additional_wiredtiger_index_tests',
-                'additional_wiredtiger_record_store_tests',
-            ],
-        )
-
-        wtEnv.CppUnitTest(
-            target='storage_wiredtiger_prefixed_record_store_and_index_test',
-            source=[
-                'wiredtiger_prefixed_index_test.cpp',
-                'wiredtiger_prefixed_record_store_test.cpp',
             ],
             LIBDEPS=[
                 '$BUILD_DIR/mongo/db/auth/authmocks',
