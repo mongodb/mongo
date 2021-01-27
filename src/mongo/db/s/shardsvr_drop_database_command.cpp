@@ -31,17 +31,29 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/drop_database_gen.h"
-#include "mongo/db/s/config/sharding_catalog_manager.h"
-#include "mongo/db/s/sharding_logging.h"
-#include "mongo/s/catalog/type_database.h"
-#include "mongo/s/catalog_cache.h"
+#include "mongo/db/s/sharding_state.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
-#include "mongo/s/sharded_collections_ddl_parameters_gen.h"
 
 namespace mongo {
 namespace {
+
+DropDatabaseReply dropDatabaseLegacy(OperationContext* opCtx, StringData dbName) {
+    const auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+    auto cmdResponse = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
+        opCtx,
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+        "admin",
+        CommandHelpers::appendMajorityWriteConcern(BSON("_configsvrDropDatabase" << dbName),
+                                                   opCtx->getWriteConcern()),
+        Shard::RetryPolicy::kIdempotent));
+
+    uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(cmdResponse));
+
+    return DropDatabaseReply::parse(IDLParserErrorContext("dropDatabase-reply"),
+                                    cmdResponse.response);
+}
 
 class ShardsvrDropDatabaseCommand final : public TypedCommand<ShardsvrDropDatabaseCommand> {
 public:
@@ -66,35 +78,32 @@ public:
         using InvocationBase::InvocationBase;
 
         Response typedRun(OperationContext* opCtx) {
-            uassert(ErrorCodes::IllegalOperation,
-                    "_shardsvrDropDatabase can only be run on primary shard servers",
-                    serverGlobalParams.clusterRole == ClusterRole::ShardServer);
+            uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
 
-            const StringData dbName = request().getDbName();
+            uassert(ErrorCodes::InvalidOptions,
+                    str::stream() << Request::kCommandName
+                                  << " must be called with majority writeConcern, got "
+                                  << opCtx->getWriteConcern().wMode,
+                    opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
 
-            const auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-            auto cmdResponse = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
-                opCtx,
-                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                "admin",
-                CommandHelpers::appendMajorityWriteConcern(BSON("_configsvrDropDatabase" << dbName),
-                                                           opCtx->getWriteConcern()),
-                Shard::RetryPolicy::kIdempotent));
+            return dropDatabaseLegacy(opCtx, request().getDbName());
+        }
 
-            uassertStatusOK(cmdResponse.commandStatus);
-
-            return Response::parse(IDLParserErrorContext("dropDatabase-reply"),
-                                   cmdResponse.response);
+    private:
+        NamespaceString ns() const override {
+            return {request().getDbName(), ""};
         }
 
         bool supportsWriteConcern() const override {
             return true;
         }
 
-        void doCheckAuthorization(OperationContext*) const override {}
-
-        NamespaceString ns() const override {
-            return {"", ""};
+        void doCheckAuthorization(OperationContext* opCtx) const override {
+            uassert(ErrorCodes::Unauthorized,
+                    "Unauthorized",
+                    AuthorizationSession::get(opCtx->getClient())
+                        ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
+                                                           ActionType::internal));
         }
     };
 } shardsvrDropDatabaseCommand;

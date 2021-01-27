@@ -95,12 +95,12 @@ commands:
                 optional: true
 
     _shardsvrDropDatabase:
-        description: "Parser for the shardDropDatabase command"
+        description: "Internal command sent to the primary shard of a database to drop it."
         command_name: _shardsvrDropDatabase
-        namespace: type
+        namespace: ignored
         api_version: ""
-        type: safeInt64
         cpp_name: ShardsvrDropDatabase
+        # The reply can completely removed once 5.0 became last lts
         reply_type: DropDatabaseReply
 
     _shardsvrDropCollection:
