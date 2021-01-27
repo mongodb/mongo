@@ -2080,7 +2080,6 @@ env.Library(
         'repl/topology_coordinator',
         'rw_concern_d',
         's/sessions_collection_config_server',
-        's/sharding_catalog_manager',
         's/sharding_commands_d',
         's/sharding_runtime_d',
         'service_context_d',

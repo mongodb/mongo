@@ -36,6 +36,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/s/drop_database_coordinator.h"
+#include "mongo/db/s/drop_database_legacy.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
@@ -44,22 +45,6 @@
 
 namespace mongo {
 namespace {
-
-DropDatabaseReply dropDatabaseLegacy(OperationContext* opCtx, StringData dbName) {
-    const auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-    auto cmdResponse = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
-        opCtx,
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        "admin",
-        CommandHelpers::appendMajorityWriteConcern(BSON("_configsvrDropDatabase" << dbName),
-                                                   opCtx->getWriteConcern()),
-        Shard::RetryPolicy::kIdempotent));
-
-    uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(cmdResponse));
-
-    return DropDatabaseReply::parse(IDLParserErrorContext("dropDatabase-reply"),
-                                    cmdResponse.response);
-}
 
 class ShardsvrDropDatabaseCommand final : public TypedCommand<ShardsvrDropDatabaseCommand> {
 public:

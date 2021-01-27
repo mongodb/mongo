@@ -32,10 +32,10 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/s/drop_collection_coordinator.h"
+#include "mongo/db/s/drop_collection_legacy.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
@@ -44,19 +44,6 @@
 
 namespace mongo {
 namespace {
-
-void dropCollectionLegacy(OperationContext* opCtx, const NamespaceString& nss) {
-    auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-    const auto cmdResponse = configShard->runCommandWithFixedRetryAttempts(
-        opCtx,
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        "admin",
-        CommandHelpers::appendMajorityWriteConcern(
-            BSON("_configsvrDropCollection" << nss.toString()), opCtx->getWriteConcern()),
-        Shard::RetryPolicy::kIdempotent);
-
-    uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(cmdResponse));
-}
 
 class ShardsvrDropCollectionCommand final : public TypedCommand<ShardsvrDropCollectionCommand> {
 public:

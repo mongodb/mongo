@@ -261,6 +261,8 @@ env.Library(
         'dist_lock_catalog.cpp',
         'dist_lock_manager_replset.cpp',
         'dist_lock_manager.cpp',
+        'drop_collection_legacy.cpp',
+        'drop_database_legacy.cpp',
         'type_lockpings.cpp',
         'type_locks.cpp',
     ],

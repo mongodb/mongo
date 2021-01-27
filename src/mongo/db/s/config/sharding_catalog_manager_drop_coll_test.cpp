@@ -34,13 +34,13 @@
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
-#include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "mongo/db/s/drop_collection_legacy.h"
 #include "mongo/rpc/metadata/tracking_metadata.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
+#include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog/type_tags.h"
-#include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/util/scopeguard.h"
 
@@ -79,7 +79,13 @@ public:
                 ->getTargeter());
         shard2Targeter->setFindHostReturnValue(HostAndPort(_shard2.getHost()));
 
-        // insert documents into the config database
+        // Create the database, collection, chunks and zones in the config collection, so the test
+        // starts with a properly created collection
+        DatabaseType dbt(
+            dropNS().db().toString(), _shard1.getName(), true, DatabaseVersion(UUID::gen()));
+        ASSERT_OK(
+            insertToConfigCollection(operationContext(), DatabaseType::ConfigNS, dbt.toBSON()));
+
         CollectionType shardedCollection(dropNS(), OID::gen(), Date_t::now(), UUID::gen());
         shardedCollection.setKeyPattern(BSON(_shardKey << 1));
         ASSERT_OK(insertToConfigCollection(
@@ -168,9 +174,9 @@ public:
     }
 
     void doDrop() {
-        ThreadClient tc("Test", getGlobalServiceContext());
-        auto opCtx = cc().makeOperationContext();
-        ShardingCatalogManager::get(opCtx.get())->dropCollection(opCtx.get(), dropNS());
+        ThreadClient tc("Test", getServiceContext());
+        auto opCtx = tc->makeOperationContext();
+        dropCollectionLegacy(opCtx.get(), dropNS());
     }
 
     const NamespaceString& dropNS() const {
