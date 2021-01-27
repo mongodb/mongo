@@ -731,6 +731,16 @@ TEST_F(InternalUnpackBucketStageTest, ParserRejectsMissingTimeField) {
         AssertionException);
 }
 
+TEST_F(InternalUnpackBucketStageTest, ParserRejectsBothIncludeAndExcludeParameters) {
+    ASSERT_THROWS_CODE(DocumentSourceInternalUnpackBucket::createFromBson(
+                           fromjson("{$_internalUnpackBucket: {include: ['_id', 'a'], exclude: "
+                                    "['a'], timeField: 'time', metaField: 'bar'}}")
+                               .firstElement(),
+                           getExpCtx()),
+                       AssertionException,
+                       5408000);
+}
+
 TEST_F(InternalUnpackBucketStageTest, OptimizeAddsIncludeProjectForGroupDependencies) {
     auto unpackSpecObj = fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo'}}");
     auto groupSpecObj = fromjson("{$group: {_id: '$x', f: {$first: '$y'}}}");

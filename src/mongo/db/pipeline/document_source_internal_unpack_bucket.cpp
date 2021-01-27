@@ -135,6 +135,11 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalUnpackBucket::createF
     for (auto&& elem : specElem.embeddedObject()) {
         auto fieldName = elem.fieldNameStringData();
         if (fieldName == "include" || fieldName == "exclude") {
+            uassert(5408000,
+                    "The $_internalUnpackBucket stage expects at most one of include/exclude "
+                    "parameters to be specified",
+                    !hasIncludeExclude);
+
             uassert(5346501,
                     "include or exclude field must be an array",
                     elem.type() == BSONType::Array);
