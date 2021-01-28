@@ -281,7 +281,8 @@ function TenantMigrationTest(
             cmdObj, this.getDonorRst(), retryOnRetryableErrors);
 
         // If the command succeeded, we expect that the migration is marked garbage collectable on
-        // the donor and the recipient. Check the state docs for expireAt.
+        // the donor and the recipient. Check the state docs for expireAt, and check that the oplog
+        // buffer collection has been dropped.
         if (res.ok) {
             const donorPrimary = this.getDonorPrimary();
             const recipientPrimary = this.getRecipientPrimary();
@@ -301,6 +302,10 @@ function TenantMigrationTest(
             if (recipientStateDoc) {
                 assert(recipientStateDoc.expireAt);
             }
+
+            const configDBCollections = recipientPrimary.getDB('config').getCollectionNames();
+            assert(!configDBCollections.includes('repl.migration.oplog_' + migrationIdString),
+                   configDBCollections);
         }
 
         return res;

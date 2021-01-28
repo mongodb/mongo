@@ -64,6 +64,11 @@ namespace mongo {
 namespace repl {
 namespace {
 constexpr StringData kOplogBufferPrefix = "repl.migration.oplog_"_sd;
+
+NamespaceString getOplogBufferNs(const UUID& migrationUUID) {
+    return NamespaceString(NamespaceString::kConfigDb,
+                           kOplogBufferPrefix + migrationUUID.toString());
+}
 }  // namespace
 
 // A convenient place to set test-specific parameters.
@@ -567,12 +572,10 @@ void TenantMigrationRecipientService::Instance::_startOplogFetcher() {
     options.dropCollectionAtStartup = false;
     options.dropCollectionAtShutdown = false;
     options.useTemporaryCollection = false;
-    NamespaceString oplogBufferNs(NamespaceString::kConfigDb,
-                                  kOplogBufferPrefix + getMigrationUUID().toString());
     stdx::lock_guard lk(_mutex);
     invariant(_stateDoc.getStartFetchingDonorOpTime());
     _donorOplogBuffer = std::make_unique<OplogBufferCollection>(
-        StorageInterface::get(opCtx.get()), oplogBufferNs, options);
+        StorageInterface::get(opCtx.get()), getOplogBufferNs(getMigrationUUID()), options);
     _donorOplogBuffer->startup(opCtx.get());
 
     pauseAfterCreatingOplogBuffer.pauseWhileSet();
@@ -946,7 +949,7 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::_markStateDocAsGarba
 void TenantMigrationRecipientService::Instance::_cancelRemainingWork(WithLock lk) {
     if (_sharedData) {
         stdx::lock_guard<TenantMigrationSharedData> sharedDatalk(*_sharedData);
-        // Prevents the tenant cloner from getting retried on retriable errors.
+        // Prevents the tenant cloner from getting retried on retryable errors.
         _sharedData->setStatusIfOK(
             sharedDatalk, Status{ErrorCodes::CallbackCanceled, "Tenant migration cloner canceled"});
     }
@@ -1359,6 +1362,17 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
             return _receivedRecipientForgetMigrationPromise.getFuture();
         })
         .then([this, self = shared_from_this()] { return _markStateDocAsGarbageCollectable(); })
+        .then([this, self = shared_from_this()] {
+            auto opCtx = cc().makeOperationContext();
+            auto storageInterface = StorageInterface::get(opCtx.get());
+
+            // The oplog buffer collection can be safely dropped at this point. In case it doesn't
+            // exist, dropping will be a no-op.
+            // It isn't necessary that the drop is majority-committed. A new primary will attempt
+            // to drop the collection anyway.
+            return storageInterface->dropCollection(opCtx.get(),
+                                                    getOplogBufferNs(getMigrationUUID()));
+        })
         .thenRunOn(_recipientService->getInstanceCleanupExecutor())
         .onCompletion([this, self = shared_from_this()](Status status) {
             // Schedule on the parent executor to mark the completion of the whole chain so this is

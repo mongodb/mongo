@@ -41,6 +41,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/op_observer_impl.h"
 #include "mongo/db/op_observer_registry.h"
+#include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_buffer_collection.h"
 #include "mongo/db/repl/oplog_fetcher_mock.h"
@@ -186,6 +187,12 @@ public:
 
             // Need real (non-mock) storage for the oplog buffer.
             StorageInterface::set(serviceContext, std::make_unique<StorageInterfaceImpl>());
+
+            // The DropPendingCollectionReaper is required to drop the oplog buffer collection.
+            repl::DropPendingCollectionReaper::set(
+                serviceContext,
+                std::make_unique<repl::DropPendingCollectionReaper>(
+                    StorageInterface::get(serviceContext)));
 
             // Set up OpObserver so that repl::logOp() will store the oplog entry's optime in
             // ReplClientInfo.
