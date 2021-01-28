@@ -348,7 +348,7 @@ variables:
   - enterprise-macos
   - enterprise-rhel-62-64-bit
   - enterprise-rhel-62-64-bit-dynamic-required
-  - enterprise-rhel-80-64-bit-dynamic
+  - enterprise-rhel-80-64-bit-dynamic-required
   - enterprise-rhel-70-64-bit
   - enterprise-rhel-82-arm64
   - enterprise-amazon2-arm64
@@ -10536,8 +10536,8 @@ buildvariants:
       - rhel62-large
 
 - <<: *enterprise-rhel-62-64-bit-dynamic-required-template
-  name: enterprise-rhel-80-64-bit-dynamic
-  display_name: ~ Shared Library Enterprise RHEL 8.0
+  name: enterprise-rhel-80-64-bit-dynamic-required
+  display_name: "! Shared Library Enterprise RHEL 8.0"
   run_on:
   - rhel80-small
   expansions:
