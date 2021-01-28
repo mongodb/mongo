@@ -113,7 +113,7 @@ def build_fuzzer_sub_task(task_name: str, task_index: int, options: ConfigOption
     ]
     commands = [command for command in commands if command is not None]
 
-    return Task(sub_task_name, commands, {TaskDependency("compile")})
+    return Task(sub_task_name, commands, {TaskDependency("archive_dist_test")})
 
 
 def generate_fuzzer_sub_tasks(task_name: str, options: ConfigOptions) -> Set[Task]:

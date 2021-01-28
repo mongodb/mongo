@@ -47,7 +47,7 @@ variables:
 - &task_template
   name: template
   depends_on:
-  - name: compile
+  - name: archive_dist_test
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -89,7 +89,7 @@ variables:
 - &run_jepsen_template
   name: run_jepsen_template
   depends_on:
-  - name: compile
+  - name: archive_dist_test
   commands:
   - func: "do setup"
   - func: "do jepsen setup"
@@ -141,8 +141,8 @@ variables:
 - &libfuzzertests
   name: libfuzzertests!
   execution_tasks:
-  - compile_libfuzzertests
-  - libfuzzertests
+  - compile_and_archive_libfuzzertests
+  - run_libfuzzertests
 
 - &compile_task_group_template
   name: compile_task_group_template
@@ -242,7 +242,7 @@ variables:
     jstestfuzz_num_generated_files: 35
     large_distro_name: windows-64-vs2019-large
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
     distros:
     - windows-64-vs2019-large
   - name: burn_in_tests_gen
@@ -3031,7 +3031,7 @@ functions:
         set -eou pipefail
 
         # Only run on unit test tasks so we don't target mongod binaries from cores.
-        if [ "${task_name}" != "unittests" ] && [ "${task_name}" != "dbtest" ]; then
+        if [ "${task_name}" != "run_unittests" ] && [ "${task_name}" != "run_dbtest" ]; then
             exit 0
         fi
 
@@ -3410,7 +3410,7 @@ timeout:
 tasks:
 
 ## compile - build all scons targets except unittests ##
-- name: compile_no_archive
+- name: compile_dist_test
   depends_on: []
   commands:
     - func: "scons compile"
@@ -3423,9 +3423,9 @@ tasks:
           --separate-debug
           PREFIX=dist-test
 
-- name: compile
+- name: archive_dist_test
   depends_on:
-    - name: compile_no_archive
+    - name: compile_dist_test
   commands:
     - func: "scons compile"
       vars:
@@ -3563,7 +3563,7 @@ tasks:
 ## compile_all - build all scons targets ##
 - name: compile_all
   depends_on:
-    - name: compile_no_archive
+    - name: compile_dist_test
   commands:
     - func: "scons compile"
       vars:
@@ -3610,10 +3610,10 @@ tasks:
             --checks="-*,bugprone-unused-raii,bugprone-use-after-move,readability-const-return-type,readability-avoid-const-params-in-decls" \
             -warnings-as-errors="*"
 
-## unittests - run unittests ##
-- name: unittests
+## compile_unittests ##
+- name: compile_unittests
   depends_on:
-    - name: compile_no_archive
+    - name: compile_dist_test
   commands:
     - func: "scons compile"
       vars:
@@ -3621,6 +3621,12 @@ tasks:
         task_compile_flags: >-
           --separate-debug
         compiling_for_test: true
+
+## run_unittests ##
+- name: run_unittests
+  depends_on:
+    - name: compile_unittests
+  commands:
     - func: "run diskstats"
     - func: "monitor process threads"
     - func: "collect system resource info"
@@ -3628,8 +3634,8 @@ tasks:
       vars:
         resmoke_args: --suites=unittests
 
-##compile_libfuzzertests - build libfuzzertests ##
-- name: compile_libfuzzertests
+##compile_and_archive_libfuzzertests - build libfuzzertests ##
+- name: compile_and_archive_libfuzzertests
   commands:
     - func: "scons compile"
       vars:
@@ -3647,8 +3653,8 @@ tasks:
         content_type: application/tar
         display_name: "LibFuzzer Tests"
 
-## libfuzzertests - run libfuzzertests ##
-- name: libfuzzertests
+## run_libfuzzertests - run libfuzzertests ##
+- name: run_libfuzzertests
   commands:
     - func: "fetch corpus"
     - func: "extract corpus"
@@ -3676,10 +3682,10 @@ tasks:
       vars:
         resmoke_args: --suites=server_selection_json_test
 
-## dbtest ##
-- name: dbtest_no_archive
+## compile_dbtest ##
+- name: compile_dbtest
   depends_on:
-    - name: compile_no_archive
+    - name: compile_dist_test
   commands:
     - func: "scons compile"
       vars:
@@ -3687,6 +3693,12 @@ tasks:
         task_compile_flags: >-
           --separate-debug
         compiling_for_test: true
+
+## run_dbtest ##
+- name: run_dbtest
+  depends_on:
+    - name: compile_dbtest
+  commands:
     - func: "run diskstats"
     - func: "monitor process threads"
     - func: "collect system resource info"
@@ -3695,9 +3707,9 @@ tasks:
         resmoke_args: --suites=dbtest --storageEngine=wiredTiger
         install_dir: build/install/bin
 
-- name: dbtest
+- name: archive_dbtest
   depends_on:
-    - name: dbtest_no_archive
+    - name: compile_dbtest
   commands:
     - func: "scons compile"
       vars:
@@ -4117,7 +4129,7 @@ tasks:
 
 - name: test_api_version_compatibility
   depends_on:
-    - name: compile
+    - name: archive_dist_test
   commands:
     - command: manifest.load
     - func: "git get project"
@@ -5244,7 +5256,7 @@ tasks:
 
 - name: burn_in_tags_gen
   depends_on:
-    - name: compile
+    - name: archive_dist_test
   commands:
   - command: manifest.load
   - func: "git get project"
@@ -7368,7 +7380,7 @@ tasks:
   tags: ["powercycle"]
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on:
-  - name: compile
+  - name: archive_dist_test
   commands:
   - func: "do setup"
   - func: "set up remote credentials"
@@ -7385,7 +7397,7 @@ tasks:
   tags: ["powercycle"]
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on:
-  - name: compile
+  - name: archive_dist_test
   commands:
   - func: "do setup"
   - func: "set up remote credentials"
@@ -7403,7 +7415,7 @@ tasks:
   tags: ["powercycle"]
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on:
-  - name: compile
+  - name: archive_dist_test
   commands:
   - func: "do setup"
   - func: "set up remote credentials"
@@ -7421,7 +7433,7 @@ tasks:
   tags: ["powercycle"]
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on:
-  - name: compile
+  - name: archive_dist_test
   commands:
   - func: "do setup"
   - func: "set up remote credentials"
@@ -7437,7 +7449,7 @@ tasks:
 - name: powercycle_replication_smalloplog
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on:
-  - name: compile
+  - name: archive_dist_test
   commands:
   - func: "do setup"
   - func: "set up remote credentials"
@@ -7454,7 +7466,7 @@ tasks:
   tags: ["powercycle"]
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on:
-  - name: compile
+  - name: archive_dist_test
   commands:
   - func: "do setup"
   - func: "set up remote credentials"
@@ -7470,7 +7482,7 @@ tasks:
 - name: powercycle_write_concern_majority
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on:
-  - name: compile
+  - name: archive_dist_test
   commands:
   - func: "do setup"
   - func: "set up remote credentials"
@@ -7485,7 +7497,7 @@ tasks:
 
 - name: idl_tests
   depends_on:
-  - name: compile
+  - name: archive_dist_test
   commands:
   - command: manifest.load
   - func: "git get project"
@@ -7579,7 +7591,7 @@ tasks:
 
 - name: package
   depends_on:
-    - name: compile_no_archive
+    - name: compile_dist_test
   commands:
     - func: "scons compile"
       vars:
@@ -7736,7 +7748,7 @@ tasks:
   depends_on:
   - name: package
   - name: jsCore
-  - name: dbtest
+  - name: run_dbtest
   - name: replica_sets_jscore_passthrough
   commands:
     - func: "fetch artifacts"
@@ -7767,7 +7779,7 @@ tasks:
   depends_on:
   - name: package
   - name: jsCore
-  - name: dbtest
+  - name: run_dbtest
   - name: replica_sets_jscore_passthrough
   stepback: false
   commands:
@@ -8415,16 +8427,16 @@ tasks:
 #######################################
 task_groups:
 - <<: *compile_task_group_template
-  name: compile_without_package_TG
+  name: compile_and_archive_dist_test_TG
   tasks:
-  - compile_no_archive
-  - compile
+  - compile_dist_test
+  - archive_dist_test
 
 - <<: *compile_task_group_template
-  name: compile_TG
+  name: compile_and_archive_dist_test_then_package_TG
   tasks:
-  - compile_no_archive
-  - compile
+  - compile_dist_test
+  - archive_dist_test
   - package
 
 - <<: *compile_task_group_template
@@ -8466,26 +8478,28 @@ task_groups:
   - server_selection_json_test
 
 - <<: *compile_task_group_template
-  name: dbtest_TG
+  name: compile_run_and_archive_dbtest_TG
   tasks:
-  - dbtest_no_archive
-  - dbtest
+  - compile_dbtest
+  - run_dbtest
+  - archive_dbtest
 
 - <<: *compile_task_group_template
-  name: libfuzzertests_TG
+  name: compile_archive_and_run_libfuzzertests_TG
   tasks:
-  - compile_libfuzzertests
-  - libfuzzertests
+  - compile_and_archive_libfuzzertests
+  - run_libfuzzertests
 
 - <<: *compile_task_group_template
-  name: compile_all_run_unittests_TG
-  max_hosts: 1
+  name: compile_test_and_package_serial_TG
   tasks:
-  - compile_no_archive
-  - compile
-  - unittests
-  - dbtest_no_archive
-  - dbtest
+  - compile_dist_test
+  - archive_dist_test
+  - compile_unittests
+  - run_unittests
+  - compile_dbtest
+  - run_dbtest
+  - archive_dbtest
   - compile_all
   - package
 
@@ -8499,26 +8513,25 @@ task_groups:
 # groups so that if they do run on the same machine, they can avoid the
 # cost of re-running the setup tasks.
 - <<: *compile_task_group_template
-  name: compile_parallel_TG
-  max_hosts: 1
+  name: compile_test_and_package_parallel_core_stream_TG
   tasks:
-  - compile_no_archive
-  - compile
+  - compile_dist_test
+  - archive_dist_test
   - compile_all
   - package
 
 - <<: *compile_task_group_template
-  name: unittests_parallel_TG
-  max_hosts: 1
+  name: compile_test_and_package_parallel_unittest_stream_TG
   tasks:
-  - unittests
+  - compile_unittests
+  - run_unittests
 
 - <<: *compile_task_group_template
-  name: dbtest_parallel_TG
-  max_hosts: 1
+  name: compile_test_and_package_parallel_dbtest_stream_TG
   tasks:
-  - dbtest_no_archive
-  - dbtest
+  - compile_dbtest
+  - run_dbtest
+  - archive_dbtest
 
 - name: clang_tidy_TG
   setup_group_can_fail_task: true
@@ -8654,7 +8667,7 @@ buildvariants:
     scons_cache_scope: shared
     large_distro_name: rhel62-medium
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
     distros:
     - rhel62-large
   - name: .integration !.audit
@@ -8686,13 +8699,13 @@ buildvariants:
     num_scons_link_jobs_available: 0.99
     large_distro_name: rhel62-medium
   tasks:
-  - name: compile_parallel_TG
+  - name: compile_test_and_package_parallel_core_stream_TG
     distros:
       - rhel62-large
-  - name: unittests_parallel_TG
+  - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
       - rhel62-large
-  - name: dbtest_parallel_TG
+  - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
     - rhel62-large
   - name: .aggregation !.encrypt
@@ -8757,7 +8770,7 @@ buildvariants:
     scons_cache_scope: shared
     large_distro_name: rhel62-medium
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
     distros:
     - rhel62-large
   - name: .aggfuzzer .common
@@ -8795,7 +8808,7 @@ buildvariants:
     scons_cache_scope: shared
     large_distro_name: ubuntu1804-build
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
     distros:
     - ubuntu1804-build
   - name: .aggfuzzer .common
@@ -8851,7 +8864,7 @@ buildvariants:
     scons_cache_scope: shared
     large_distro_name: ubuntu1804-build
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
     distros:
     - ubuntu1804-build
   - name: compile_ninja_next_TG
@@ -8918,7 +8931,7 @@ buildvariants:
     scons_cache_scope: shared
     large_distro_name: ubuntu1604-build
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
     distros:
     - ubuntu1604-build
   - name: .aggfuzzer .common
@@ -8986,7 +8999,7 @@ buildvariants:
     multiversion_edition: enterprise
     scons_cache_scope: shared
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
   - name: aggregation
   - name: .auth !.audit !.multiversion !.jscore
   - name: .misc_js
@@ -9029,7 +9042,7 @@ buildvariants:
     multiversion_edition: enterprise
     scons_cache_scope: shared
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
   - name: aggregation
   - name: aggregation_wildcard_fuzzer_gen
   - name: .auth !.audit !.multiversion !.jscore
@@ -9075,7 +9088,7 @@ buildvariants:
     multiversion_edition: targeted
     scons_cache_scope: shared
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
   - name: free_monitoring
   - name: jsCore
   - name: replica_sets_jscore_passthrough
@@ -9109,7 +9122,7 @@ buildvariants:
     multiversion_edition: enterprise
     use_default_timeouts: true
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
     distros:
     - ubuntu1804-power8-build
   - name: aggregation
@@ -9149,7 +9162,7 @@ buildvariants:
     packager_distro: ubuntu1804
     repo_edition: org
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
     distros:
     - ubuntu1804-zseries-build
   - name: jsCore
@@ -9184,7 +9197,7 @@ buildvariants:
     multiversion_architecture: s390x
     multiversion_edition: enterprise
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
     distros:
     - ubuntu1804-zseries-build
 
@@ -9214,7 +9227,7 @@ buildvariants:
     multiversion_architecture: s390x
     multiversion_edition: enterprise
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
     distros:
     - ubuntu1804-zseries-build
   - name: aggregation
@@ -9259,7 +9272,7 @@ buildvariants:
     scons_cache_scope: shared
     large_distro_name: ubuntu2004-large
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
     distros:
     - ubuntu2004-large
   - name: .aggfuzzer .common !.multiversion
@@ -9313,7 +9326,7 @@ buildvariants:
     scons_cache_scope: shared
     large_distro_name: ubuntu2004-large
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
     distros:
     - ubuntu2004-large
   - name: compile_ninja_next_TG
@@ -9369,7 +9382,7 @@ buildvariants:
     multiversion_edition: enterprise
     scons_cache_scope: shared
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
   - name: aggregation
   - name: aggregation_wildcard_fuzzer_gen
   - name: .auth !.audit !.multiversion !.jscore
@@ -9414,7 +9427,7 @@ buildvariants:
     multiversion_edition: targeted
     scons_cache_scope: shared
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
   - name: free_monitoring
   - name: jsCore
   - name: replica_sets_jscore_passthrough
@@ -9445,7 +9458,7 @@ buildvariants:
     scons_cache_scope: shared
     virtualenv: /opt/mongodbtoolchain/v3/bin/virtualenv
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
     distros:
     - amazon1-2018-build
   - name: .aggfuzzer .common
@@ -9498,7 +9511,7 @@ buildvariants:
     virtualenv: /opt/mongodbtoolchain/v3/bin/virtualenv
     large_distro_name: amazon1-2018-build
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
     distros:
     - amazon1-2018-build
   - name: .aggfuzzer .common
@@ -9553,7 +9566,7 @@ buildvariants:
     repo_edition: enterprise
     scons_cache_scope: shared
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
     distros:
     - amazon2-build
   - name: .aggfuzzer .common
@@ -9606,7 +9619,7 @@ buildvariants:
     scons_cache_scope: shared
     large_distro_name: amazon-build
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
     distros:
     - amazon2-build
   - name: .aggfuzzer .common
@@ -9657,7 +9670,7 @@ buildvariants:
     repo_edition: enterprise
     scons_cache_scope: shared
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
     distros:
     - amazon2-arm64-large
   - name: .aggfuzzer !.multiversion
@@ -9708,7 +9721,7 @@ buildvariants:
     scons_cache_scope: shared
     large_distro_name: amazon2-arm64-large
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
     distros:
     - amazon2-arm64-large
   - name: aggregation
@@ -9783,7 +9796,7 @@ buildvariants:
     multiversion_edition: enterprise
     large_distro_name: windows-64-vs2019-large
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
     distros:
     - windows-64-vs2019-large
   - name: compile_build_tools_next_TG
@@ -9861,7 +9874,7 @@ buildvariants:
     push_name: windows
     push_arch: x86_64-enterprise
   tasks:
-  - name: compile_TG
+  - name: compile_and_archive_dist_test_then_package_TG
     distros:
     - windows-64-vs2019-large
   - name: compile_build_tools_next_TG
@@ -9872,7 +9885,7 @@ buildvariants:
   - name: noPassthrough_gen
   - name: server_discovery_and_monitoring_json_test_TG
   - name: server_selection_json_test_TG
-  - name: dbtest_TG
+  - name: compile_run_and_archive_dbtest_TG
     distros:
       - windows-64-vs2019-large
   - name: unittest_shell_hang_analyzer_gen
@@ -9940,7 +9953,7 @@ buildvariants:
     push_name: windows
     push_arch: x86_64-enterprise
   tasks:
-    - name: compile_all_run_unittests_TG
+    - name: compile_test_and_package_serial_TG
       distros:
         - windows-64-vs2019-large
     - name: audit
@@ -10053,7 +10066,7 @@ buildvariants:
     multiversion_edition: enterprise
     large_distro_name: windows-64-vs2019-large
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
     distros:
     - windows-64-vs2019-large
   - name: .aggfuzzer .common
@@ -10102,7 +10115,7 @@ buildvariants:
     scons_cache_scope: shared
     large_distro_name: windows-64-vs2019-large
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
     distros:
     - windows-64-vs2019-large
   - name: .aggfuzzer
@@ -10158,7 +10171,7 @@ buildvariants:
   # This variant tests that unoptimized, DEBUG mongos and mongod binaries can run on Windows.
   # It has a minimal amount of tasks because unoptimized builds are slow, which causes
   # timing-sensitive tests to fail.
-  - name: compile_TG
+  - name: compile_and_archive_dist_test_then_package_TG
     distros:
     - windows-64-vs2019-large
   - name: compile_ninja_next_TG
@@ -10184,7 +10197,7 @@ buildvariants:
     compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --libc++ --variables-files=etc/scons/xcode_macosx.vars
     resmoke_jobs_max: 6
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
   - name: compile_build_tools_next_TG
   - name: .aggregation !.auth !.encrypt !.unwind
   - name: .auth .gle
@@ -10237,7 +10250,7 @@ buildvariants:
     compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --libc++ --variables-files=etc/scons/xcode_macosx.vars
     resmoke_jobs_max: 6
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
   - name: compile_ninja_next_TG
   - name: audit
   - name: auth_audit_gen
@@ -10338,7 +10351,7 @@ buildvariants:
     max_sub_suites: 3
     large_distro_name: rhel62-medium
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
     distros:
     - rhel62-large
   - name: .aggfuzzer
@@ -10441,13 +10454,13 @@ buildvariants:
     burn_in_tag_buildvariants: enterprise-rhel-62-64-bit-inmem linux-64-duroff enterprise-rhel-62-64-bit-multiversion
     num_scons_link_jobs_available: 0.99
   tasks:
-  - name: compile_parallel_TG
+  - name: compile_test_and_package_parallel_core_stream_TG
     distros:
       - rhel62-large
-  - name: unittests_parallel_TG
+  - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
       - rhel62-large
-  - name: dbtest_parallel_TG
+  - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
     - rhel62-large
   - name: lint_pylinters
@@ -10545,13 +10558,13 @@ buildvariants:
     multiversion_platform: rhel80
     large_distro_name: rhel80-large
   tasks:
-  - name: compile_parallel_TG
+  - name: compile_test_and_package_parallel_core_stream_TG
     distros:
       - rhel80-xlarge
-  - name: unittests_parallel_TG
+  - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
       - rhel80-xlarge
-  - name: dbtest_parallel_TG
+  - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
     - rhel80-xlarge
   - name: lint_pylinters
@@ -10678,13 +10691,13 @@ buildvariants:
             featureFlagWindowFunctions: true,
         }"
   tasks:
-  - name: compile_parallel_TG
+  - name: compile_test_and_package_parallel_core_stream_TG
     distros:
       - rhel62-large
-  - name: unittests_parallel_TG
+  - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
       - rhel62-large
-  - name: dbtest_parallel_TG
+  - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
     - rhel62-medium
   - name: burn_in_tests_gen
@@ -10788,13 +10801,13 @@ buildvariants:
         --mongodSetParameters="{featureFlagSBE: true}"
         --excludeWithAnyTags=sbe_incompatible
   tasks:
-  - name: compile_parallel_TG
+  - name: compile_test_and_package_parallel_core_stream_TG
     distros:
       - rhel62-large
-  - name: unittests_parallel_TG
+  - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
       - rhel62-large
-  - name: dbtest_parallel_TG
+  - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
     - rhel62-medium
   - name: .aggregation !.no_async !.secondary_reads !.read_write_concern !.sharded !.unwind !aggregation_disabled_optimization
@@ -10826,7 +10839,7 @@ buildvariants:
         --mongodSetParameters="{maxNumberOfTransactionOperationsInSingleOplogEntry: 2}"
         --excludeWithAnyTags=exclude_from_large_txns
   tasks:
-  - name: compile_TG
+  - name: compile_and_archive_dist_test_then_package_TG
     distros:
     - rhel62-large
   - name: auth_gen
@@ -10894,7 +10907,7 @@ buildvariants:
     large_distro_name: rhel62-medium
   tasks:
   - name: burn_in_tests_gen
-  - name: compile_TG
+  - name: compile_and_archive_dist_test_then_package_TG
     distros:
     - rhel62-large
   - name: noPassthrough_gen
@@ -10929,7 +10942,7 @@ buildvariants:
     large_distro_name: rhel62-medium
     resmoke_jobs_factor: 0.25
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
     distros:
     - rhel62-large
   - name: .multiversion_fuzzer
@@ -10959,10 +10972,10 @@ buildvariants:
     scons_cache_scope: shared
     large_distro_name: rhel62-medium
   tasks:
-  - name: compile_TG
+  - name: compile_and_archive_dist_test_then_package_TG
     distros:
     - rhel62-large
-  - name: dbtest_TG
+  - name: compile_run_and_archive_dbtest_TG
     distros:
     - rhel62-large
   - name: .aggfuzzer
@@ -11038,7 +11051,7 @@ buildvariants:
     build_mongoreplay: false
     large_distro_name: rhel62-medium
   tasks:
-  - name: compile_parallel_TG
+  - name: compile_test_and_package_parallel_core_stream_TG
     distros:
       - rhel62-large
   - name: .aggfuzzer
@@ -11126,7 +11139,7 @@ buildvariants:
     build_mongoreplay: false
     large_distro_name: rhel62-medium
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
     distros:
     - rhel62-large
   - name: jsCore
@@ -11155,7 +11168,7 @@ buildvariants:
     timeout_secs: 10800 # 3 hour timeout
     use_scons_cache: false
   tasks:
-    - name: compile_all_run_unittests_TG
+    - name: compile_test_and_package_serial_TG
     - name: .aggregation !.unwind
     - name: audit
     - name: .auth
@@ -11208,7 +11221,7 @@ buildvariants:
     <<: *enterprise-rhel-62-64-bit-expansions
     max_sub_suites: 1  # Only generate 1 sub-suite per task.
   tasks:
-    - name: compile_all_run_unittests_TG
+    - name: compile_test_and_package_serial_TG
       distros:
         - rhel62-medium
     - name: .aggregation
@@ -11261,7 +11274,7 @@ buildvariants:
     repo_edition: enterprise
     scons_cache_scope: shared
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
     distros:
     - rhel70
   - name: compile_build_tools_next_TG
@@ -11321,7 +11334,7 @@ buildvariants:
     test_flags: >-
       --excludeWithAnyTags=requires_os_access
   tasks:
-  - name: compile_TG
+  - name: compile_and_archive_dist_test_then_package_TG
     distros:
     - rhel70-large
   - name: jsCore
@@ -11351,7 +11364,7 @@ buildvariants:
     repo_edition: enterprise
     scons_cache_scope: shared
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
     distros:
     - rhel80-build
   - name: .aggfuzzer
@@ -11405,7 +11418,7 @@ buildvariants:
     repo_edition: enterprise
     scons_cache_scope: shared
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
     distros:
     - rhel82-arm64-large
   - name: .aggfuzzer !.multiversion
@@ -11445,7 +11458,7 @@ buildvariants:
     compile_flags: --ssl MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     additional_compile_targets: dagger # If this moves to another variant, update the compile_all task
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
     distros:
     - rhel70
   - name: jsCore
@@ -11462,7 +11475,7 @@ buildvariants:
     compile_flags: --ssl MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --enterprise-features=hot_backups
     has_packages: false
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
   - name: jsCore
   - name: noPassthroughHotBackups_gen
 
@@ -11479,7 +11492,7 @@ buildvariants:
     additional_package_targets: ""
   # Override list of tasks to exclude package testing and publishing
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
     distros:
     - rhel70
   - name: .aggfuzzer
@@ -11518,7 +11531,7 @@ buildvariants:
     scons_cache_mode: all
     num_scons_link_jobs_available: 0.99
   tasks:
-  - name: compile_TG
+  - name: compile_and_archive_dist_test_then_package_TG
     distros:
     - ubuntu1604-build
   - name: compile_build_tools_next_TG
@@ -11547,7 +11560,7 @@ buildvariants:
     test_flags: >-
       --excludeWithAnyTags=requires_os_access
   tasks:
-  - name: compile_TG
+  - name: compile_and_archive_dist_test_then_package_TG
     distros:
     - ubuntu1604-build
   - name: jsCore
@@ -11574,7 +11587,7 @@ buildvariants:
     scons_cache_scope: shared
     large_distro_name: rhel62-medium
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
     distros:
     - rhel62-large
   - name: .aggfuzzer .common
@@ -11625,7 +11638,7 @@ buildvariants:
     scons_cache_scope: shared
     large_distro_name: rhel70
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
     distros:
     - rhel70
   - name: aggregation
@@ -11675,7 +11688,7 @@ buildvariants:
     scons_cache_scope: shared
     large_distro_name: rhel80-build
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
     distros:
     - rhel80-build
   - name: aggregation
@@ -11723,7 +11736,7 @@ buildvariants:
     scons_cache_scope: shared
     large_distro_name: rhel82-arm64-large
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
     distros:
     - rhel82-arm64-large
   - name: aggregation
@@ -11757,7 +11770,7 @@ buildvariants:
   expansions:
     compile_flags: --ssl MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
   tasks:
-  - name: compile_TG
+  - name: compile_and_archive_dist_test_then_package_TG
     distros:
     - rhel70
   - name: .ssl
@@ -11790,7 +11803,7 @@ buildvariants:
     multiversion_architecture: ppc64le
     multiversion_edition: enterprise
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
     distros:
     - rhel71-power8-build
   - name: .aggregation .common
@@ -11841,7 +11854,7 @@ buildvariants:
     multiversion_architecture: ppc64le
     multiversion_edition: enterprise
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
     distros:
     - rhel81-power8-large
   - name: .aggregation .common
@@ -11892,7 +11905,7 @@ buildvariants:
     multiversion_architecture: s390x
     multiversion_edition: enterprise
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
     distros:
     - rhel72-zseries-build
 
@@ -11922,7 +11935,7 @@ buildvariants:
     multiversion_architecture: s390x
     multiversion_edition: enterprise
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
     distros:
     - rhel72-zseries-build
   - name: .aggregation .common
@@ -11984,7 +11997,7 @@ buildvariants:
             featureFlagWindowFunctions: true,
         }"
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
     distros:
     - rhel72-zseries-build
   - name: jsCore
@@ -12011,7 +12024,7 @@ buildvariants:
     push_arch: s390x-enterprise-rhel67
     repo_edition: enterprise
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
     distros:
     - rhel67-zseries-build
 
@@ -12036,7 +12049,7 @@ buildvariants:
     push_arch: s390x-enterprise-rhel67
     repo_edition: enterprise
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
     distros:
     - rhel67-zseries-build
   - name: .aggregation .common
@@ -12077,7 +12090,7 @@ buildvariants:
     push_arch: s390x-rhel72
     repo_edition: org
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
     distros:
     - rhel72-zseries-build
   - name: jsCore
@@ -12104,7 +12117,7 @@ buildvariants:
     push_arch: s390x-rhel67
     repo_edition: org
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
     distros:
     - rhel67-zseries-build
   - name: jsCore
@@ -12141,7 +12154,7 @@ buildvariants:
     repo_edition: enterprise
     scons_cache_scope: shared
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
     distros:
     - ubuntu1604-build
   - name: .aggfuzzer .common
@@ -12215,7 +12228,7 @@ buildvariants:
     repo_edition: enterprise
     scons_cache_scope: shared
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
     distros:
     - suse12-build
   - name: .aggfuzzer .common
@@ -12262,7 +12275,7 @@ buildvariants:
     multiversion_architecture: s390x
     multiversion_edition: enterprise
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
     distros:
     - suse12-zseries-build
 
@@ -12290,7 +12303,7 @@ buildvariants:
     multiversion_architecture: s390x
     multiversion_edition: enterprise
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
     distros:
     - suse12-zseries-build
   - name: .aggregation .common
@@ -12337,7 +12350,7 @@ buildvariants:
     multiversion_architecture: s390x
     multiversion_edition: targeted
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
     distros:
     - suse12-zseries-build
   - name: jsCore
@@ -12368,7 +12381,7 @@ buildvariants:
     scons_cache_scope: shared
     large_distro_name: suse12-build
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
     distros:
     - suse12-build
   - name: .aggfuzzer .common
@@ -12417,7 +12430,7 @@ buildvariants:
     repo_edition: enterprise
     scons_cache_scope: shared
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
     distros:
     - suse15-build
   - name: .aggfuzzer .common !.multiversion
@@ -12457,7 +12470,7 @@ buildvariants:
     scons_cache_scope: shared
     large_distro_name: suse15-build
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
     distros:
     - suse15-build
   - name: .aggfuzzer .common !.multiversion
@@ -12510,7 +12523,7 @@ buildvariants:
     scons_cache_scope: shared
     large_distro_name: debian92-build
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
     distros:
     - debian92-build
   - name: .aggfuzzer .common
@@ -12553,7 +12566,7 @@ buildvariants:
     scons_cache_scope: shared
     large_distro_name: debian92-build
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
     distros:
     - debian92-build
   - name: .aggfuzzer .common
@@ -12606,7 +12619,7 @@ buildvariants:
     scons_cache_scope: shared
     large_distro_name: debian10-build
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
     distros:
     - debian10-build
   - name: .aggfuzzer .common
@@ -12649,7 +12662,7 @@ buildvariants:
     scons_cache_scope: shared
     large_distro_name: debian10-build
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
     distros:
     - debian10-build
   - name: .aggfuzzer .common
@@ -12714,7 +12727,7 @@ buildvariants:
     scons_cache_scope: shared
     large_distro_name: rhel62-medium
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
     distros:
     - rhel62-large
   - name: .aggfuzzer .common
@@ -12780,7 +12793,7 @@ buildvariants:
     multiversion_edition: targeted
     scons_cache_scope: shared
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
   - name: .aggfuzzer .common
   - name: aggregation
   - name: .auth !.multiversion !.audit !.sharding
@@ -12819,7 +12832,7 @@ buildvariants:
     resmoke_jobs_factor: 0.25
     test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_journaling
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
     distros:
     - rhel71-power8-build
   - name: .aggregation .common
@@ -12854,7 +12867,7 @@ buildvariants:
     resmoke_jobs_max: 2
     test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_journaling
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
     distros:
     - rhel72-zseries-build
   - name: .aggregation .common
@@ -12903,7 +12916,7 @@ buildvariants:
     hang_analyzer_dump_core: false
     scons_cache_scope: shared
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
   - name: compile_benchmarks
   - name: .aggregation
   - name: .auth
@@ -12991,7 +13004,7 @@ buildvariants:
             featureFlagWindowFunctions: true,
         }"
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
   - name: compile_benchmarks
   - name: .aggregation
 #  - name: .auth
@@ -13053,7 +13066,7 @@ buildvariants:
     scons_cache_scope: shared
     test_flags: --excludeWithAnyTags=requires_fast_memory,requires_ocsp_stapling
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
   - name: .aggfuzzer .common
   - name: free_monitoring
   - name: .jstestfuzz !.initsync
@@ -13079,7 +13092,7 @@ buildvariants:
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under UBSAN build.
     scons_cache_scope: shared
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
   - name: compile_benchmarks
   - name: .aggregation
   - name: .auth
@@ -13162,7 +13175,7 @@ buildvariants:
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under UBSAN build.
     scons_cache_scope: shared
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
   - name: compile_benchmarks
   - name: .aggregation
   - name: .auth
@@ -13228,9 +13241,9 @@ buildvariants:
     max_sub_suites: 3
     num_scons_link_jobs_available: 0.99
   tasks:
-  - name: compile_parallel_TG
-  - name: unittests_parallel_TG
-  - name: dbtest_parallel_TG
+  - name: compile_test_and_package_parallel_core_stream_TG
+  - name: compile_test_and_package_parallel_unittest_stream_TG
+  - name: compile_test_and_package_parallel_dbtest_stream_TG
   - name: jsCore
   - name: jsCore_txns
   - name: unittest_shell_hang_analyzer_gen
@@ -13269,9 +13282,9 @@ buildvariants:
     max_sub_suites: 3
     num_scons_link_jobs_available: 0.99
   tasks:
-  - name: compile_parallel_TG
-  - name: unittests_parallel_TG
-  - name: dbtest_parallel_TG
+  - name: compile_test_and_package_parallel_core_stream_TG
+  - name: compile_test_and_package_parallel_unittest_stream_TG
+  - name: compile_test_and_package_parallel_dbtest_stream_TG
   - name: jsCore
   - name: jsCore_txns
   - name: unittest_shell_hang_analyzer_gen
@@ -13297,7 +13310,7 @@ buildvariants:
   display_tasks:
   - *libfuzzertests
   tasks:
-   - name: libfuzzertests_TG
+   - name: compile_archive_and_run_libfuzzertests_TG
 
 - name: enterprise-ubuntu2004-debug-tsan
   display_name: ~ TSAN Enterprise Ubuntu 20.04 DEBUG (ephemeralForTest)
@@ -13329,7 +13342,7 @@ buildvariants:
     resmoke_jobs_factor: 0.3
     scons_cache_scope: shared
   tasks:
-    - name: compile_all_run_unittests_TG
+    - name: compile_test_and_package_serial_TG
     - name: jsCore
 
 - name: enterprise-ubuntu-no-latch-1604-64-bit
@@ -13340,7 +13353,7 @@ buildvariants:
   expansions:
     compile_flags: MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --use-diagnostic-latches=off
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
     distros:
     - ubuntu1604-build
 
@@ -13353,7 +13366,7 @@ buildvariants:
     compile_flags: MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --dbg=on --opt=off --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --detect-odr-violations
     scons_cache_scope: shared
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
     distros:
     - ubuntu1804-build
 
@@ -13375,7 +13388,7 @@ buildvariants:
     large_distro_name: ubuntu1604-build
 
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
     distros:
     - ubuntu1604-build
   - name: .aggregation !.no_async
@@ -13408,7 +13421,7 @@ buildvariants:
       --excludeWithAnyTags=requires_streamable_rsm
     large_distro_name: ubuntu1604-build
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
     distros:
     - ubuntu1604-build
   - name: .aggregation !.no_async
@@ -13437,7 +13450,7 @@ buildvariants:
         --mongosSetParameters="taskExecutorPoolSize: 4"
     large_distro_name: ubuntu1604-build
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_test_and_package_serial_TG
     distros:
     - ubuntu1604-build
   - name: .aggregation !.no_async
@@ -13514,7 +13527,7 @@ buildvariants:
     exec_timeout_secs: 28800 # 8 hours
     test_flags: --excludeWithAnyTags=requires_fast_memory,live_record_incompatible
   tasks:
-  - name: compile_without_package_TG
+  - name: compile_and_archive_dist_test_TG
   - name: .aggfuzzer
   - name: .aggregation
 #  - name: audit

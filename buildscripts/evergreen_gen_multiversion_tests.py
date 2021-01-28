@@ -183,7 +183,7 @@ class EvergreenMultiversionConfigGenerator(object):
             FunctionCall("run generated tests", run_tests_vars),
         ]
 
-        return Task(sub_task_name, commands, {TaskDependency("compile")})
+        return Task(sub_task_name, commands, {TaskDependency("archive_dist_test")})
 
     def _generate_burn_in_execution_tasks(self, version_configs: List[str], suites: List[Suite],
                                           burn_in_test: str, burn_in_idx: int,

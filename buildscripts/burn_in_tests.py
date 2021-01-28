@@ -575,7 +575,7 @@ def _create_task(index: int, test_count: int, test: str, task_data: Dict,
         run_tests_vars["task_path_suffix"] = multiversion_path
     timeout = _generate_timeouts(repeat_config, test, task_runtime_stats)
     commands = resmoke_commands("run tests", run_tests_vars, timeout, multiversion_path)
-    dependencies = {TaskDependency("compile")}
+    dependencies = {TaskDependency("archive_dist_test")}
 
     return Task(sub_task_name, commands, dependencies)
 
