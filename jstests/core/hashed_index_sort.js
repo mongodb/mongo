@@ -7,7 +7,6 @@
  *   # Sort optimizations added in 4.7 can generate a different plan in the presence of equality
  *   # predicates.
  *   requires_fcv_47,
- *   sbe_incompatible,
  * ]
  */
 (function() {
@@ -15,6 +14,12 @@
 
 load("jstests/libs/analyze_plan.js");  // For assertStagesForExplainOfCommand().
 
+// The explain output depends on which execution engine is enabled.
+// TODO Remove when SERVER-51823 lands.
+const isSBEEnabled = (() => {
+    const getParam = db.adminCommand({getParameter: 1, featureFlagSBE: 1});
+    return getParam.hasOwnProperty("featureFlagSBE") && getParam.featureFlagSBE.value;
+})();
 const coll = db.hashed_index_sort;
 coll.drop();
 
@@ -102,7 +107,7 @@ validateFindCmdOutputAndPlan({
         {a: 1, b: 3, c: 4, d: -2},
         {a: 1, b: 4, c: 5, d: -3},
     ],
-    expectedStages: ["IXSCAN", "SORT"]
+    expectedStages: ["IXSCAN", isSBEEnabled ? "SORT_SIMPLE" : "SORT"]
 });
 
 /**
@@ -164,7 +169,7 @@ validateFindCmdOutputAndPlan({
     filter: {},
     project: {_id: 0, a: 1, b: 1},
     sort: {a: 1, b: -1, c: 1},
-    expectedStages: ["SORT", "COLLSCAN"],
+    expectedStages: [isSBEEnabled ? "SORT_SIMPLE" : "SORT", "COLLSCAN"],
 });
 
 // Verify that a list of exact match predicates on range field (prefix) and sort with an immediate
@@ -186,7 +191,7 @@ validateFindCmdOutputAndPlan({
     project: {_id: 0, d: 1, b: 1},
     sort: {d: 1},
     expectedOutput: [{b: 4, d: -3}, {b: 3, d: -2}, {b: 2, d: -1}, {b: 1, d: 0}, {b: 0, d: 1}],
-    expectedStages: ["IXSCAN", "SORT"],
+    expectedStages: ["IXSCAN", isSBEEnabled ? "SORT_DEFAULT" : "SORT"],
     stagesNotExpected: ["COLLSCAN", "FETCH"]
 });
 
@@ -196,6 +201,6 @@ validateFindCmdOutputAndPlan({
     project: {_id: 0, c: 1},
     sort: {c: 1},
     expectedOutput: [{c: 2}],
-    expectedStages: ["IXSCAN", "FETCH", "SORT"]
+    expectedStages: ["IXSCAN", "FETCH", isSBEEnabled ? "SORT_SIMPLE" : "SORT"]
 });
 })();

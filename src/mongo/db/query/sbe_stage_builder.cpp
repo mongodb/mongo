@@ -318,7 +318,6 @@ SlotBasedStageBuilder::makeLoopJoinForFetch(std::unique_ptr<sbe::PlanStage> inpu
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildFetch(
     const QuerySolutionNode* root, const PlanStageReqs& reqs) {
     auto fn = static_cast<const FetchNode*>(root);
-    invariant(!reqs.getIndexKeyBitset());
 
     // At present, makeLoopJoinForFetch() doesn't have the necessary logic for producing an
     // oplogTsSlot, so assert that the caller doesn't need oplogTsSlot.
@@ -341,6 +340,11 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     auto relevantSlots = sbe::makeSV();
     outputs.forEachSlot(forwardingReqs, [&](auto&& slot) { relevantSlots.push_back(slot); });
 
+    // Forward slots for components of the index key if our parent requested them.
+    if (auto indexKeySlots = outputs.getIndexKeySlots()) {
+        relevantSlots.insert(relevantSlots.end(), indexKeySlots->begin(), indexKeySlots->end());
+    }
+
     sbe::value::SlotId fetchResultSlot, fetchRecordIdSlot;
     std::tie(fetchResultSlot, fetchRecordIdSlot, stage) = makeLoopJoinForFetch(
         std::move(stage), outputs.get(kRecordId), root->nodeId(), std::move(relevantSlots));
@@ -354,6 +358,10 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         relevantSlots = sbe::makeSV();
         outputs.forEachSlot(forwardingReqs, [&](auto&& slot) { relevantSlots.push_back(slot); });
 
+        // Forward slots for components of the index key if our parent requested them.
+        if (auto indexKeySlots = outputs.getIndexKeySlots()) {
+            relevantSlots.insert(relevantSlots.end(), indexKeySlots->begin(), indexKeySlots->end());
+        }
 
         std::tie(std::ignore, stage) = generateFilter(_opCtx,
                                                       fn->filter.get(),
@@ -534,19 +542,11 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
     auto mergeSortNode = static_cast<const MergeSortNode*>(root);
 
-    uassert(5073803,
-            "SORT_MERGE stage with unfetched children not supported",
-            mergeSortNode->fetched());
-
     const auto sortPattern = SortPattern{mergeSortNode->sort, _cq.getExpCtx()};
     std::vector<sbe::value::SortDirection> direction;
 
     for (const auto& part : sortPattern) {
         uassert(4822881, "Sorting by expression not supported", !part.expression);
-        uassert(4822882,
-                "Sorting by dotted paths not supported",
-                part.fieldPath && part.fieldPath->getPathLength() == 1);
-
         direction.push_back(part.isAscending ? sbe::value::SortDirection::Ascending
                                              : sbe::value::SortDirection::Descending);
     }
@@ -556,46 +556,76 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     std::vector<sbe::value::SlotVector> inputVals;
 
     // Children must produce all of the slots required by the parent of this SortMergeNode. In
-    // addition to that, children must always produce a 'recordIdSlot' if the 'dedup' flag is true,
-    // and children must always produce a 'resultSlot' because it's needed by the sort logic below.
-    auto childReqs = reqs.copy().set(kResult).setIf(kRecordId, mergeSortNode->dedup);
+    // addition, children must always produce a 'recordIdSlot' if the 'dedup' flag is true.
+    auto childReqs = reqs.copy().setIf(kRecordId, mergeSortNode->dedup);
 
     for (auto&& child : mergeSortNode->children) {
-        auto [stage, outputs] = build(child, childReqs);
-
-        sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> projectMap;
         sbe::value::SlotVector inputKeysForChild;
 
-        for (const auto& part : sortPattern) {
-            // Slot holding the sort key.
-            auto sortFieldSlot{_slotIdGenerator.generate()};
-            inputKeysForChild.push_back(sortFieldSlot);
+        // Map of field name to position within the index key. This is used to account for
+        // mismatches between the sort pattern and the index key pattern. For instance, suppose the
+        // requested sort is {a: 1, b: 1} and the index key pattern is {c: 1, b: 1, a: 1}. When the
+        // slots for the relevant components of the index key are generated (i.e. extract keys for
+        // 'b' and 'a'),  we wish to insert them into 'inputKeys' in the order that they appear in
+        // the sort pattern.
+        StringMap<size_t> indexKeyPositionMap;
+        auto ixnNode = getNodeByType(child, STAGE_IXSCAN);
+        tassert(5184300,
+                str::stream() << "Can't build exec tree for node: " << child->toString(),
+                ixnNode);
 
-            auto fieldName = part.fieldPath->getFieldName(0);
-            auto fieldNameSV = std::string_view{fieldName.rawData(), fieldName.size()};
-
-            auto getSortFieldExpr = makeFunction("getField"sv,
-                                                 sbe::makeE<sbe::EVariable>(outputs.get(kResult)),
-                                                 sbe::makeE<sbe::EConstant>(fieldNameSV));
-
-            if (auto collatorSlot = _data.env->getSlotIfExists("collator"_sd); collatorSlot) {
-                getSortFieldExpr = makeFunction("collComparisonKey"sv,
-                                                std::move(getSortFieldExpr),
-                                                sbe::makeE<sbe::EVariable>(*collatorSlot));
+        auto ixn = static_cast<const IndexScanNode*>(ixnNode);
+        sbe::IndexKeysInclusionSet indexKeyBitset;
+        size_t i = 0;
+        for (auto&& elt : ixn->index.keyPattern) {
+            for (auto&& sortPart : sortPattern) {
+                auto path = sortPart.fieldPath->fullPath();
+                if (elt.fieldNameStringData() == path) {
+                    indexKeyBitset.set(i);
+                    indexKeyPositionMap.emplace(path, indexKeyPositionMap.size());
+                    break;
+                }
             }
+            ++i;
+        }
+        childReqs.getIndexKeyBitset() = indexKeyBitset;
 
-            projectMap.emplace(sortFieldSlot, std::move(getSortFieldExpr));
+        // Children must produce a 'resultSlot' if they produce fetched results.
+        auto [stage, outputs] = build(child, childReqs);
+
+        tassert(5184301,
+                "SORT_MERGE node must receive a RecordID slot as input from child stage"
+                " if the 'dedup' flag is set",
+                !mergeSortNode->dedup || outputs.has(kRecordId));
+
+        // Clear the index key bitset after building the child stage.
+        childReqs.getIndexKeyBitset() = boost::none;
+
+        // Insert the index key slots in the order of the sort pattern.
+        auto indexKeys = outputs.extractIndexKeySlots();
+        tassert(5184302,
+                "SORT_MERGE must receive index key slots as input from its child stages",
+                indexKeys.has_value());
+
+        for (const auto& part : sortPattern) {
+            auto partPath = part.fieldPath->fullPath();
+            auto index = indexKeyPositionMap.find(partPath);
+            tassert(5184303,
+                    str::stream() << "Could not find index key position for sort key part "
+                                  << partPath,
+                    index != indexKeyPositionMap.end());
+            auto indexPos = index->second;
+            tassert(5184304,
+                    str::stream() << "Index position " << indexPos
+                                  << " is not less than number of index components "
+                                  << indexKeys->size(),
+                    indexPos < indexKeys->size());
+            auto indexKeyPart = indexKeys->at(indexPos);
+            inputKeysForChild.push_back(indexKeyPart);
         }
 
-        stage =
-            sbe::makeS<sbe::ProjectStage>(std::move(stage), std::move(projectMap), root->nodeId());
-
-        inputStages.push_back(std::move(stage));
-
-        invariant(outputs.has(kResult));
-        invariant(!mergeSortNode->dedup || outputs.has(kRecordId));
-
         inputKeys.push_back(std::move(inputKeysForChild));
+        inputStages.push_back(std::move(stage));
 
         auto sv = sbe::makeSV();
         outputs.forEachSlot(childReqs, [&](auto&& slot) { sv.push_back(slot); });
