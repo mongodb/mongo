@@ -250,40 +250,12 @@ function TenantMigrationTest(
             recipientCertificateForDonor
         };
 
-        let donorPrimary = this.getDonorPrimary();
-        let stateRes;
-
-        assert.soon(() => {
-            try {
-                stateRes = donorPrimary.adminCommand(cmdObj);
-
-                if (!stateRes.ok) {
-                    // If retry is enabled and the command failed with a NotPrimary error, continue
-                    // looping.
-                    if (retryOnRetryableErrors && ErrorCodes.isNotPrimaryError(stateRes.code)) {
-                        donorPrimary = donorRst.getPrimary();
-                        return false;
-                    }
-                    return true;
-                }
-
-                // The command has been successfully executed. If we don't need to wait for the
-                // migration to complete, exit the loop.
-                if (!waitForMigrationToComplete) {
-                    return true;
-                }
-
-                return (stateRes.state === TenantMigrationTest.State.kCommitted ||
-                        stateRes.state === TenantMigrationTest.State.kAborted);
-            } catch (e) {
-                // If the thrown error is network related and we are allowing retryable errors,
-                // continue issuing commands.
-                if (retryOnRetryableErrors && isNetworkError(e)) {
-                    return false;
-                }
-                throw e;
-            }
-        });
+        const stateRes = TenantMigrationUtil.runTenantMigrationCommand(
+            cmdObj,
+            this.getDonorRst(),
+            retryOnRetryableErrors,
+            stateRes => (!waitForMigrationToComplete ||
+                         TenantMigrationUtil.isMigrationCompleted(stateRes)));
 
         // If the migration has been successfully committed, check the db hashes for the tenantId
         // between the donor and recipient.
@@ -304,36 +276,14 @@ function TenantMigrationTest(
      * NotPrimary or network error.
      */
     this.forgetMigration = function(migrationIdString, retryOnRetryableErrors = false) {
-        let donorPrimary = this.getDonorPrimary();
-
-        let res;
-
-        assert.soon(() => {
-            try {
-                res = donorPrimary.adminCommand(
-                    {donorForgetMigration: 1, migrationId: UUID(migrationIdString)});
-
-                if (!res.ok) {
-                    // If retry is enabled and the command failed with a NotPrimary error, continue
-                    // looping.
-                    if (retryOnRetryableErrors && ErrorCodes.isNotPrimaryError(res.code)) {
-                        donorPrimary = donorRst.getPrimary();
-                        return false;
-                    }
-                }
-
-                return true;
-            } catch (e) {
-                if (retryOnRetryableErrors && isNetworkError(e)) {
-                    return false;
-                }
-                throw e;
-            }
-        });
+        const cmdObj = {donorForgetMigration: 1, migrationId: UUID(migrationIdString)};
+        const res = TenantMigrationUtil.runTenantMigrationCommand(
+            cmdObj, this.getDonorRst(), retryOnRetryableErrors);
 
         // If the command succeeded, we expect that the migration is marked garbage collectable on
         // the donor and the recipient. Check the state docs for expireAt.
         if (res.ok) {
+            const donorPrimary = this.getDonorPrimary();
             const recipientPrimary = this.getRecipientPrimary();
 
             const donorStateDoc =
@@ -361,15 +311,12 @@ function TenantMigrationTest(
      * response.
      */
     this.tryAbortMigration = function(migrationOpts, retryOnRetryableErrors = false) {
-        let donorPrimary = this.getDonorPrimary();
-
         const cmdObj = {
             donorAbortMigration: 1,
             migrationId: UUID(migrationOpts.migrationIdString),
         };
-
         return TenantMigrationUtil.runTenantMigrationCommand(
-            cmdObj, donorPrimary, this.getDonorRst, retryOnRetryableErrors);
+            cmdObj, this.getDonorRst(), retryOnRetryableErrors);
     };
 
     /**

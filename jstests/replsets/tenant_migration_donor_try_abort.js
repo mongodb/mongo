@@ -226,10 +226,8 @@ const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
     fp.wait();
 
     const donorRstArgs = TenantMigrationUtil.createRstArgs(tenantMigrationTest.getDonorRst());
-    const tryAbortThread = new Thread(TenantMigrationUtil.tryAbortMigrationAsync,
-                                      migrationOpts,
-                                      donorRstArgs,
-                                      TenantMigrationUtil.runTenantMigrationCommand);
+    const tryAbortThread =
+        new Thread(TenantMigrationUtil.tryAbortMigrationAsync, migrationOpts, donorRstArgs);
     tryAbortThread.start();
 
     // Wait for donorAbortMigration command to start.
@@ -276,10 +274,8 @@ const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
     fp.wait();
 
     const donorRstArgs = TenantMigrationUtil.createRstArgs(tenantMigrationTest.getDonorRst());
-    const tryAbortThread = new Thread(TenantMigrationUtil.tryAbortMigrationAsync,
-                                      migrationOpts,
-                                      donorRstArgs,
-                                      TenantMigrationUtil.runTenantMigrationCommand);
+    const tryAbortThread =
+        new Thread(TenantMigrationUtil.tryAbortMigrationAsync, migrationOpts, donorRstArgs);
     tryAbortThread.start();
 
     // Wait for donorAbortMigration command to start.

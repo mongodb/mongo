@@ -139,8 +139,7 @@ function testDonorAbortMigrationInterrupt(interruptFunc, verifyCmdResponseFunc, 
 
     const tryAbortThread = new Thread(TenantMigrationUtil.tryAbortMigrationAsync,
                                       {migrationIdString: migrationOpts.migrationIdString},
-                                      donorRstArgs,
-                                      TenantMigrationUtil.runTenantMigrationCommand);
+                                      donorRstArgs);
     tryAbortThread.start();
 
     // Wait for donorAbortMigration command to start.

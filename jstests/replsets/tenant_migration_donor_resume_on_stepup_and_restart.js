@@ -258,7 +258,6 @@ function testDonorAbortMigrationInterrupt(interruptFunc, fpName, isShutdown = fa
     const tryAbortThread = new Thread(TenantMigrationUtil.tryAbortMigrationAsync,
                                       {migrationIdString: migrationOpts.migrationIdString},
                                       donorRstArgs,
-                                      TenantMigrationUtil.runTenantMigrationCommand,
                                       true /* retryOnRetryableErrors */);
     tryAbortThread.start();
 
