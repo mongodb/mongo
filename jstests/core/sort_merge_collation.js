@@ -8,6 +8,8 @@
 (function() {
 "use strict";
 
+load("jstests/libs/analyze_plan.js");
+
 const numericOrdering = {
     collation: {locale: "en_US", numericOrdering: true}
 };
@@ -21,6 +23,7 @@ assert.commandWorked(
     coll.createIndex({filterFieldA: 1, sortFieldA: 1, sortFieldB: 1}, numericOrdering));
 assert.commandWorked(
     coll.createIndex({filterFieldA: 1, sortFieldA: -1, sortFieldB: -1}, numericOrdering));
+assert.commandWorked(coll.createIndex({sortFieldA: 1, sortFieldB: 1}, numericOrdering));
 
 assert.commandWorked(coll.insert([
     {filterFieldA: "1", filterFieldB: "1", sortFieldA: "18", sortFieldB: "11"},
@@ -54,6 +57,53 @@ function isSorted(array, lessThanFunction) {
     return true;
 }
 
+function runTest(sorts, filters) {
+    for (let sortInfo of sorts) {
+        for (let filter of filters) {
+            // Verify that the sort/filter combination produces a SORT_MERGE plan.
+            const explain = coll.find(filter).sort(sortInfo.sortPattern).explain("queryPlanner");
+            const sortMergeStages = getPlanStages(explain, "SORT_MERGE");
+            assert.gt(sortMergeStages.length, 0, explain);
+
+            // Check that the results are in order.
+            let res = coll.find(filter).sort(sortInfo.sortPattern).toArray();
+            assert(isSorted(res, sortInfo.cmpFunction),
+                   () => "Assertion failed for filter: " + filter + "\n" +
+                       "sort pattern " + sortInfo.sortPattern);
+
+            // Check that there are no duplicates.
+            let ids = new Set();
+            for (let doc of res) {
+                assert(!ids.has(doc._id), () => "Duplicate _id: " + tojson(_id));
+                ids.add(doc._id);
+            }
+        }
+    }
+}
+
+const kSorts = [
+    {
+        sortPattern: {sortFieldA: 1},
+        cmpFunction: (docA, docB) => parseInt(docA.sortFieldA) < parseInt(docB.sortFieldA)
+    },
+    {
+        sortPattern: {sortFieldA: -1},
+        cmpFunction: (docA, docB) => parseInt(docA.sortFieldA) > parseInt(docB.sortFieldA)
+    },
+    {
+        sortPattern: {sortFieldA: 1, sortFieldB: 1},
+        cmpFunction: (docA, docB) => parseInt(docA.sortFieldA) < parseInt(docB.sortFieldA) ||
+            (parseInt(docA.sortFieldA) == parseInt(docB.sortFieldA) &&
+             parseInt(docA.sortFieldB) < parseInt(docB.sortFieldB))
+    },
+    {
+        sortPattern: {sortFieldA: -1, sortFieldB: -1},
+        cmpFunction: (docA, docB) => parseInt(docA.sortFieldA) > parseInt(docB.sortFieldA) ||
+            (parseInt(docA.sortFieldA) == parseInt(docB.sortFieldA) &&
+             parseInt(docA.sortFieldB) > parseInt(docB.sortFieldB))
+    },
+];
+
 // Cases where the children of the $or all require a FETCH.
 (function testFetchedChildren() {
     const kFilterPredicates = [
@@ -80,46 +130,35 @@ function isSorted(array, lessThanFunction) {
         },
     ];
 
-    const kSorts = [
+    runTest(kSorts, kFilterPredicates);
+})();
+
+// Cases where the children of the $or are IXSCANs.
+(function testUnfetchedChildren() {
+    const kFilterPredicates = [
+        // $or with two children.
+        {$or: [{sortFieldA: "4", sortFieldB: "4"}, {sortFieldA: "3", sortFieldB: "3"}]},
+
+        // $or with three children.
         {
-            sortPattern: {sortFieldA: 1},
-            cmpFunction: (docA, docB) => parseInt(docA.sortFieldA) < parseInt(docB.sortFieldA)
+            $or: [
+                {sortFieldA: "4", sortFieldB: "4"},
+                {sortFieldA: "3", sortFieldB: "3"},
+                {sortFieldA: "7", sortFieldB: "4"}
+            ]
         },
+
+        // $or with four children.
         {
-            sortPattern: {sortFieldA: -1},
-            cmpFunction: (docA, docB) => parseInt(docA.sortFieldA) > parseInt(docB.sortFieldA)
-        },
-        {
-            sortPattern: {sortFieldA: 1, sortFieldB: 1},
-            cmpFunction: (docA, docB) => parseInt(docA.sortFieldA) < parseInt(docB.sortFieldA) ||
-                (parseInt(docA.sortFieldA) == parseInt(docB.sortFieldA) &&
-                 parseInt(docA.sortFieldB) < parseInt(docB.sortFieldB))
-        },
-        {
-            sortPattern: {sortFieldA: -1, sortFieldB: -1},
-            cmpFunction: (docA, docB) => parseInt(docA.sortFieldA) > parseInt(docB.sortFieldA) ||
-                (parseInt(docA.sortFieldA) == parseInt(docB.sortFieldA) &&
-                 parseInt(docA.sortFieldB) > parseInt(docB.sortFieldB))
+            $or: [
+                {sortFieldA: "4", sortFieldB: "4"},
+                {sortFieldA: "3", sortFieldB: "3"},
+                {sortFieldA: "7", sortFieldB: "4"},
+                {sortFieldA: "10", sortFieldB: "9"}
+            ]
         },
     ];
 
-    for (let sortInfo of kSorts) {
-        for (let filter of kFilterPredicates) {
-            // Check that the results are in order.
-            let res = coll.find(filter).sort(sortInfo.sortPattern).toArray();
-            assert(isSorted(res, sortInfo.cmpFunction),
-                   () => "Assertion failed for filter: " + filter + "\n" +
-                       "sort pattern " + sortInfo.sortPattern);
-
-            // Check that there are no duplicates.
-            let ids = new Set();
-            for (let doc of res) {
-                assert(!ids.has(doc._id), () => "Duplicate _id: " + tojson(_id));
-                ids.add(doc._id);
-            }
-        }
-    }
+    runTest(kSorts, kFilterPredicates);
 })();
-
-// TODO SERVER-51843: Test with children that are not fetched.
 })();

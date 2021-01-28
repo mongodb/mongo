@@ -118,8 +118,8 @@ public:
 private:
     StringMap<sbe::value::SlotId> _slots;
 
-    // When an index scan produces parts of an index key for a covered projection, this is where
-    // the slots for the produced values are stored.
+    // When an index scan produces parts of an index key for a covered plan, this is where the
+    // slots for the produced values are stored.
     boost::optional<sbe::value::SlotVector> _indexKeySlots;
 };
 

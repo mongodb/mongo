@@ -13,6 +13,8 @@ selector:
   - jstests/core/profile2.js # Extra operation for a getmore.
   - jstests/core/sortk.js # Negative limit value changes result to batchSize.
   - jstests/core/tailable_skip_limit.js # Negative limit value changes result to batchSize.
+  # This test fails when SBE is enabled depending on the data generated.
+  - jstests/core/sort_merge.js
 
 executor:
   archive:

@@ -4,7 +4,6 @@
  *  2) MERGE_SORT stage execution.
  * @tags: [
  *   requires_find_command,
- *   sbe_incompatible,
  * ]
  */
 (function() {

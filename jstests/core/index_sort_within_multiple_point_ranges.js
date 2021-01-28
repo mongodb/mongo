@@ -9,7 +9,6 @@
  * - the query asks for a sort within each point range
  * @tags: [
  *   assumes_no_implicit_collection_creation_after_drop,
- *   sbe_incompatible,
  * ]
  */
 (function() {
