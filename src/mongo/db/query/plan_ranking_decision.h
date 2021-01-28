@@ -137,6 +137,18 @@ struct PlanRankingDecision {
         return stdx::get<typename StatsToDetailMap<PlanStageStatsType>::Value>(stats);
     }
 
+    /*
+     * Returns true if there are at least two possible plans, and at least the top two plans
+     * have the same scores.
+     */
+    bool tieForBest() const {
+        if (scores.size() > 1) {
+            const double epsilon = 1e-10;
+            return (std::abs(scores[0] - scores[1]) < epsilon);
+        }
+        return false;
+    }
+
     // Execution stats details for each candidate plan.
     stdx::variant<StatsDetails, SBEStatsDetails> stats;
 
@@ -158,11 +170,5 @@ struct PlanRankingDecision {
     //
     // Like 'candidateOrder', the contents of this array are indicies into the 'candidates' array.
     std::vector<size_t> failedCandidates;
-
-    // Whether two plans tied for the win.
-    //
-    // Reading this flag is the only reliable way for callers to determine if there was a tie,
-    // because the scores kept inside the PlanRankingDecision do not incorporate the EOF bonus.
-    bool tieForBest = false;
 };
 }  // namespace mongo::plan_ranker

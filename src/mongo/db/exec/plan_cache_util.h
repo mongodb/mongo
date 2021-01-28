@@ -99,7 +99,7 @@ void updatePlanCache(
         // In "sometimes cache" mode, we cache unless we hit one of the special cases below.
         canCache = true;
 
-        if (ranking->tieForBest) {
+        if (ranking->tieForBest()) {
             // The winning plan tied with the runner-up and we're using "sometimes cache" mode. We
             // will not write a plan cache entry.
             canCache = false;
