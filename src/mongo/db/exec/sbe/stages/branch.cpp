@@ -106,6 +106,8 @@ value::SlotAccessor* BranchStage::getAccessor(CompileCtx& ctx, value::SlotId slo
 }
 
 void BranchStage::open(bool reOpen) {
+    auto optTimer(getOptTimer(_opCtx));
+
     _commonStats.opens++;
     _specificStats.numTested++;
 
@@ -132,6 +134,8 @@ void BranchStage::open(bool reOpen) {
 }
 
 PlanState BranchStage::getNext() {
+    auto optTimer(getOptTimer(_opCtx));
+
     if (!_activeBranch) {
         return trackPlanState(PlanState::IS_EOF);
     }
@@ -158,6 +162,8 @@ PlanState BranchStage::getNext() {
 }
 
 void BranchStage::close() {
+    auto optTimer(getOptTimer(_opCtx));
+
     _commonStats.closes++;
 
     if (_thenOpened) {

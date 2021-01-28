@@ -126,6 +126,8 @@ void MakeObjStageBase<O>::projectField(UniqueBSONObjBuilder* bob, size_t idx) {
 
 template <MakeObjOutputType O>
 void MakeObjStageBase<O>::open(bool reOpen) {
+    auto optTimer(getOptTimer(_opCtx));
+
     _commonStats.opens++;
     _children[0]->open(reOpen);
 }
@@ -279,6 +281,8 @@ void MakeObjStageBase<MakeObjOutputType::bsonObject>::produceObject() {
 
 template <MakeObjOutputType O>
 PlanState MakeObjStageBase<O>::getNext() {
+    auto optTimer(getOptTimer(_opCtx));
+
     auto state = _children[0]->getNext();
 
     if (state == PlanState::ADVANCED) {
@@ -289,6 +293,8 @@ PlanState MakeObjStageBase<O>::getNext() {
 
 template <MakeObjOutputType O>
 void MakeObjStageBase<O>::close() {
+    auto optTimer(getOptTimer(_opCtx));
+
     _commonStats.closes++;
     _children[0]->close();
 }

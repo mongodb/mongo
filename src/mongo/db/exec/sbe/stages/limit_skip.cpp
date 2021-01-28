@@ -61,6 +61,8 @@ value::SlotAccessor* LimitSkipStage::getAccessor(CompileCtx& ctx, value::SlotId 
 }
 
 void LimitSkipStage::open(bool reOpen) {
+    auto optTimer(getOptTimer(_opCtx));
+
     _commonStats.opens++;
     _isEOF = false;
     _children[0]->open(reOpen);
@@ -73,6 +75,8 @@ void LimitSkipStage::open(bool reOpen) {
     _current = 0;
 }
 PlanState LimitSkipStage::getNext() {
+    auto optTimer(getOptTimer(_opCtx));
+
     if (_isEOF || (_limit && _current++ == *_limit)) {
         return trackPlanState(PlanState::IS_EOF);
     }
@@ -80,6 +84,8 @@ PlanState LimitSkipStage::getNext() {
     return trackPlanState(_children[0]->getNext());
 }
 void LimitSkipStage::close() {
+    auto optTimer(getOptTimer(_opCtx));
+
     _commonStats.closes++;
     _children[0]->close();
 }

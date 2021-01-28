@@ -87,6 +87,8 @@ value::SlotAccessor* UnwindStage::getAccessor(CompileCtx& ctx, value::SlotId slo
 }
 
 void UnwindStage::open(bool reOpen) {
+    auto optTimer(getOptTimer(_opCtx));
+
     _commonStats.opens++;
     _children[0]->open(reOpen);
 
@@ -95,6 +97,8 @@ void UnwindStage::open(bool reOpen) {
 }
 
 PlanState UnwindStage::getNext() {
+    auto optTimer(getOptTimer(_opCtx));
+
     if (!_inArray) {
         do {
             auto state = _children[0]->getNext();
@@ -151,6 +155,8 @@ PlanState UnwindStage::getNext() {
 }
 
 void UnwindStage::close() {
+    auto optTimer(getOptTimer(_opCtx));
+
     _commonStats.closes++;
     _children[0]->close();
 }

@@ -170,6 +170,8 @@ void IndexScanStage::doAttachToTrialRunTracker(TrialRunTracker* tracker) {
 }
 
 void IndexScanStage::open(bool reOpen) {
+    auto optTimer(getOptTimer(_opCtx));
+
     _commonStats.opens++;
 
     invariant(_opCtx);
@@ -238,6 +240,8 @@ void IndexScanStage::open(bool reOpen) {
             // TODO SERVER-49385: When the 'prepare()' phase takes the collection lock, it will be
             // possible to intialize '_ordering' there instead of here.
             _ordering = entry->ordering();
+
+            ++_specificStats.seeks;
         } else {
             _cursor.reset();
         }
@@ -247,6 +251,8 @@ void IndexScanStage::open(bool reOpen) {
 }
 
 PlanState IndexScanStage::getNext() {
+    auto optTimer(getOptTimer(_opCtx));
+
     if (!_cursor) {
         return trackPlanState(PlanState::IS_EOF);
     }
@@ -306,6 +312,8 @@ PlanState IndexScanStage::getNext() {
 }
 
 void IndexScanStage::close() {
+    auto optTimer(getOptTimer(_opCtx));
+
     _commonStats.closes++;
 
     _cursor.reset();

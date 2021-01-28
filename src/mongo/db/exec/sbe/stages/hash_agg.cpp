@@ -102,6 +102,8 @@ value::SlotAccessor* HashAggStage::getAccessor(CompileCtx& ctx, value::SlotId sl
 }
 
 void HashAggStage::open(bool reOpen) {
+    auto optTimer(getOptTimer(_opCtx));
+
     _commonStats.opens++;
     _children[0]->open(reOpen);
 
@@ -140,6 +142,8 @@ void HashAggStage::open(bool reOpen) {
 }
 
 PlanState HashAggStage::getNext() {
+    auto optTimer(getOptTimer(_opCtx));
+
     if (_htIt == _ht.end()) {
         _htIt = _ht.begin();
     } else {
@@ -178,6 +182,8 @@ const SpecificStats* HashAggStage::getSpecificStats() const {
 }
 
 void HashAggStage::close() {
+    auto optTimer(getOptTimer(_opCtx));
+
     _commonStats.closes++;
     _ht.clear();
 }

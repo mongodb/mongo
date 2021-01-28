@@ -68,12 +68,16 @@ value::SlotAccessor* CheckBoundsStage::getAccessor(CompileCtx& ctx, value::SlotI
 }
 
 void CheckBoundsStage::open(bool reOpen) {
+    auto optTimer(getOptTimer(_opCtx));
+
     _commonStats.opens++;
     _children[0]->open(reOpen);
     _isEOF = false;
 }
 
 PlanState CheckBoundsStage::getNext() {
+    auto optTimer(getOptTimer(_opCtx));
+
     if (_isEOF) {
         return trackPlanState(PlanState::IS_EOF);
     }
@@ -114,6 +118,8 @@ PlanState CheckBoundsStage::getNext() {
                 // passed behind the current interval and need to signal the parent stage that we're
                 // done and can only continue further once the stage is reopened.
                 _isEOF = true;
+
+                ++_specificStats.seeks;
                 break;
             }
         }
@@ -122,6 +128,8 @@ PlanState CheckBoundsStage::getNext() {
 }
 
 void CheckBoundsStage::close() {
+    auto optTimer(getOptTimer(_opCtx));
+
     _commonStats.closes++;
     _children[0]->close();
 }

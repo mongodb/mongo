@@ -157,6 +157,8 @@ void SortStage::doAttachToTrialRunTracker(TrialRunTracker* tracker) {
 }
 
 void SortStage::open(bool reOpen) {
+    auto optTimer(getOptTimer(_opCtx));
+
     invariant(_opCtx);
     _commonStats.opens++;
     _children[0]->open(reOpen);
@@ -208,6 +210,8 @@ void SortStage::open(bool reOpen) {
 }
 
 PlanState SortStage::getNext() {
+    auto optTimer(getOptTimer(_opCtx));
+
     // When the sort spilled data to disk then read back the sorted runs.
     if (_mergeIt && _mergeIt->more()) {
         _mergeData = _mergeIt->next();
@@ -219,6 +223,8 @@ PlanState SortStage::getNext() {
 }
 
 void SortStage::close() {
+    auto optTimer(getOptTimer(_opCtx));
+
     _commonStats.closes++;
     _mergeIt.reset();
     _sorter.reset();

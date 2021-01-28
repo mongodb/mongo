@@ -70,6 +70,8 @@ public:
     }
 
     void open(bool reOpen) final {
+        auto optTimer(getOptTimer(_opCtx));
+
         _commonStats.opens++;
 
         if constexpr (IsConst) {
@@ -86,6 +88,8 @@ public:
     }
 
     PlanState getNext() final {
+        auto optTimer(getOptTimer(_opCtx));
+
         // The constant filter evaluates the predicate in the open method.
         if constexpr (IsConst) {
             if (!_childOpened) {
@@ -118,6 +122,8 @@ public:
     }
 
     void close() final {
+        auto optTimer(getOptTimer(_opCtx));
+
         _commonStats.closes++;
 
         if (_childOpened) {

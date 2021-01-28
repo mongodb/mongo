@@ -78,6 +78,12 @@ buildSlotBasedExecutableTree(OperationContext* opCtx,
 
     root->attachToOperationContext(opCtx);
 
+    auto expCtx = cq.getExpCtxRaw();
+    tassert(5327100, "No expression context", expCtx);
+    if (expCtx->explain || expCtx->mayDbProfile) {
+        root->markShouldCollectTimingInfo();
+    }
+
     // Register this plan to yield according to the configured policy.
     sbeYieldPolicy->registerPlan(root.get());
 

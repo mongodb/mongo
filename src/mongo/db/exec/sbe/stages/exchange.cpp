@@ -197,6 +197,8 @@ value::SlotAccessor* ExchangeConsumer::getAccessor(CompileCtx& ctx, value::SlotI
     return ctx.getAccessor(slot);
 }
 void ExchangeConsumer::open(bool reOpen) {
+    auto optTimer(getOptTimer(_opCtx));
+
     _commonStats.opens++;
 
     if (reOpen) {
@@ -289,6 +291,8 @@ void ExchangeConsumer::open(bool reOpen) {
 }
 
 PlanState ExchangeConsumer::getNext() {
+    auto optTimer(getOptTimer(_opCtx));
+
     if (_orderPreserving) {
         // Build a heap and return min element.
         uasserted(4822834, "ordere exchange not yet implemented");
@@ -321,6 +325,8 @@ PlanState ExchangeConsumer::getNext() {
     return trackPlanState(PlanState::IS_EOF);
 }
 void ExchangeConsumer::close() {
+    auto optTimer(getOptTimer(_opCtx));
+
     _commonStats.closes++;
 
     {
@@ -490,6 +496,8 @@ value::SlotAccessor* ExchangeProducer::getAccessor(CompileCtx& ctx, value::SlotI
     return _children[0]->getAccessor(ctx, slot);
 }
 void ExchangeProducer::open(bool reOpen) {
+    auto optTimer(getOptTimer(_opCtx));
+
     _commonStats.opens++;
     if (reOpen) {
         uasserted(4822839, "exchange producer cannot be reopened");
@@ -513,6 +521,8 @@ bool ExchangeProducer::appendData(size_t consumerId) {
 }
 
 PlanState ExchangeProducer::getNext() {
+    auto optTimer(getOptTimer(_opCtx));
+
     while (_children[0]->getNext() == PlanState::ADVANCED) {
         // Push to the correct pipe.
         switch (_state->policy()) {
@@ -554,6 +564,8 @@ PlanState ExchangeProducer::getNext() {
     return trackPlanState(PlanState::IS_EOF);
 }
 void ExchangeProducer::close() {
+    auto optTimer(getOptTimer(_opCtx));
+
     _commonStats.closes++;
     _children[0]->close();
 }

@@ -233,6 +233,20 @@ public:
         stage->doAttachToTrialRunTracker(tracker);
     }
 
+    /**
+     * Force this stage to collect timing info during its execution. Must not be called after
+     * execution has started.
+     */
+    void markShouldCollectTimingInfo() {
+        invariant(!_commonStats.executionTimeMillis || *_commonStats.executionTimeMillis == 0);
+        _commonStats.executionTimeMillis.emplace(0);
+
+        auto stage = static_cast<T*>(this);
+        for (auto&& child : stage->_children) {
+            child->markShouldCollectTimingInfo();
+        }
+    }
+
 protected:
     PlanState trackPlanState(PlanState state) {
         if (state == PlanState::IS_EOF) {
@@ -242,6 +256,19 @@ protected:
             _commonStats.advances++;
         }
         return state;
+    }
+
+    /**
+     * Returns an optional timer which is used to collect time spent executing the current stage.
+     * May return boost::none if it is not necessary to collect timing info.
+     */
+    boost::optional<ScopedTimer> getOptTimer(OperationContext* opCtx) {
+        if (_commonStats.executionTimeMillis && opCtx) {
+            return {{opCtx->getServiceContext()->getFastClockSource(),
+                     _commonStats.executionTimeMillis.get_ptr()}};
+        }
+
+        return boost::none;
     }
 
     CommonStats _commonStats;

@@ -59,11 +59,15 @@ value::SlotAccessor* TextMatchStage::getAccessor(CompileCtx& ctx, value::SlotId 
 }
 
 void TextMatchStage::open(bool reOpen) {
+    auto optTimer(getOptTimer(_opCtx));
+
     _commonStats.opens++;
     _children[0]->open(reOpen);
 }
 
 PlanState TextMatchStage::getNext() {
+    auto optTimer(getOptTimer(_opCtx));
+
     auto state = _children[0]->getNext();
 
     if (state == PlanState::ADVANCED) {
@@ -87,6 +91,8 @@ PlanState TextMatchStage::getNext() {
 }
 
 void TextMatchStage::close() {
+    auto optTimer(getOptTimer(_opCtx));
+
     _commonStats.closes++;
     _children[0]->close();
 }

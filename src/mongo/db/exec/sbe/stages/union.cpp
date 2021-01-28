@@ -94,6 +94,8 @@ value::SlotAccessor* UnionStage::getAccessor(CompileCtx& ctx, value::SlotId slot
 }
 
 void UnionStage::open(bool reOpen) {
+    auto optTimer(getOptTimer(_opCtx));
+
     _commonStats.opens++;
     if (reOpen) {
         std::queue<UnionBranch> emptyQueue;
@@ -109,6 +111,8 @@ void UnionStage::open(bool reOpen) {
 }
 
 PlanState UnionStage::getNext() {
+    auto optTimer(getOptTimer(_opCtx));
+
     auto state = PlanState::IS_EOF;
 
     while (!_remainingBranchesToDrain.empty() && state != PlanState::ADVANCED) {
@@ -137,6 +141,8 @@ PlanState UnionStage::getNext() {
 }
 
 void UnionStage::close() {
+    auto optTimer(getOptTimer(_opCtx));
+
     _commonStats.closes++;
     _currentStage = nullptr;
     while (!_remainingBranchesToDrain.empty()) {

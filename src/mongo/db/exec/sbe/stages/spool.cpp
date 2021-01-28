@@ -74,6 +74,8 @@ value::SlotAccessor* SpoolEagerProducerStage::getAccessor(CompileCtx& ctx, value
 }
 
 void SpoolEagerProducerStage::open(bool reOpen) {
+    auto optTimer(getOptTimer(_opCtx));
+
     _commonStats.opens++;
     _children[0]->open(reOpen);
 
@@ -98,6 +100,8 @@ void SpoolEagerProducerStage::open(bool reOpen) {
 }
 
 PlanState SpoolEagerProducerStage::getNext() {
+    auto optTimer(getOptTimer(_opCtx));
+
     if (_bufferIt == _buffer->size()) {
         _bufferIt = 0;
     } else {
@@ -112,6 +116,8 @@ PlanState SpoolEagerProducerStage::getNext() {
 }
 
 void SpoolEagerProducerStage::close() {
+    auto optTimer(getOptTimer(_opCtx));
+
     _commonStats.closes++;
 }
 
@@ -208,6 +214,8 @@ value::SlotAccessor* SpoolLazyProducerStage::getAccessor(CompileCtx& ctx, value:
 }
 
 void SpoolLazyProducerStage::open(bool reOpen) {
+    auto optTimer(getOptTimer(_opCtx));
+
     _commonStats.opens++;
     _children[0]->open(reOpen);
 
@@ -217,6 +225,8 @@ void SpoolLazyProducerStage::open(bool reOpen) {
 }
 
 PlanState SpoolLazyProducerStage::getNext() {
+    auto optTimer(getOptTimer(_opCtx));
+
     auto state = _children[0]->getNext();
 
     if (state == PlanState::ADVANCED) {
@@ -253,6 +263,8 @@ PlanState SpoolLazyProducerStage::getNext() {
 }
 
 void SpoolLazyProducerStage::close() {
+    auto optTimer(getOptTimer(_opCtx));
+
     _commonStats.closes++;
 }
 

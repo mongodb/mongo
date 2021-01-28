@@ -69,11 +69,15 @@ value::SlotAccessor* ProjectStage::getAccessor(CompileCtx& ctx, value::SlotId sl
     }
 }
 void ProjectStage::open(bool reOpen) {
+    auto optTimer(getOptTimer(_opCtx));
+
     _commonStats.opens++;
     _children[0]->open(reOpen);
 }
 
 PlanState ProjectStage::getNext() {
+    auto optTimer(getOptTimer(_opCtx));
+
     auto state = _children[0]->getNext();
 
     if (state == PlanState::ADVANCED) {
@@ -90,6 +94,8 @@ PlanState ProjectStage::getNext() {
 }
 
 void ProjectStage::close() {
+    auto optTimer(getOptTimer(_opCtx));
+
     _commonStats.closes++;
     _children[0]->close();
 }

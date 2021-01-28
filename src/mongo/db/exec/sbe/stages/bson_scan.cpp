@@ -82,11 +82,15 @@ value::SlotAccessor* BSONScanStage::getAccessor(CompileCtx& ctx, value::SlotId s
 }
 
 void BSONScanStage::open(bool reOpen) {
+    auto optTimer(getOptTimer(_opCtx));
+
     _commonStats.opens++;
     _bsonCurrent = _bsonBegin;
 }
 
 PlanState BSONScanStage::getNext() {
+    auto optTimer(getOptTimer(_opCtx));
+
     if (_bsonCurrent < _bsonEnd) {
         if (_recordAccessor) {
             _recordAccessor->reset(value::TypeTags::bsonObject,
@@ -129,6 +133,8 @@ PlanState BSONScanStage::getNext() {
 }
 
 void BSONScanStage::close() {
+    auto optTimer(getOptTimer(_opCtx));
+
     _commonStats.closes++;
 }
 
