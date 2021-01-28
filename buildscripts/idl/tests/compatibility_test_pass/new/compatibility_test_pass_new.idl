@@ -33,6 +33,31 @@ imports:
     - "mongo/idl/basic_types.idl"
     - "../buildscripts/idl/tests/compatibility_test_pass/new/imports.idl"
 
+types:
+    intStringToInt:
+        bson_serialization_type: int
+        description: "The bson_serialization_type changes from [int, string] in the old command's
+                      reply field type to int in the new command's reply field type"
+        cpp_type: "std::int32_t"
+
+    intStringBoolToIntString:
+        bson_serialization_type:
+                                - int
+                                - string
+        description: "The bson_serialization_type changes from [int, string, bool] in the old
+                      command's reply field type to [int, string] in the new command's reply
+                      field type"
+        cpp_type: "std::int32_t"
+
+enums:
+    NewReplyFieldEnumSubset:
+        description: "The new reply type is an enum that is a subset of the old reply type's 
+                      enum values"
+        type: string
+        values:
+            valueOne: "one"
+            valueTwo: "two"
+
 structs:
     StableNewFieldReply:
         description: "This reply contains a field that is unstable in the old command but is
@@ -62,6 +87,27 @@ structs:
                 type: string
                 unstable: true
                 optional: true
+
+    EnumSubsetReply:
+        description: "This reply contains an enum field where the new enum values is a subset
+                      of the old reply type's enum values"
+        fields:
+            replyField:
+                type: NewReplyFieldEnumSubset
+
+    BsonSubsetReply:
+        description: "This reply contains a field type where the new bson_serialization_type
+                      is a subset of the old bson_serialization_type"
+        fields:
+            bsonSubsetReplyField:
+                type: intStringToInt
+
+    BsonSubsetReplyTwo:
+        description: "This reply contains a field type where the new bson_serialization_type
+                      is a subset of the old bson_serialization_type"
+        fields:
+            bsonSubsetReplyFieldTwo:
+                type: intStringBoolToIntString
 
 commands:
     testCommand:
@@ -120,3 +166,35 @@ commands:
         strict: true
         api_version: "1"
         reply_type: ImportedStableNewFieldReply
+
+    newReplyFieldTypeEnumSubset:
+        description: "new command passes because its reply field type is an enum that is
+                      a subset of the corresponding old reply field type's enum values"
+        command_name: newReplyFieldTypeEnumSubset
+        namespace: ignored
+        cpp_name: newReplyFieldTypeEnumSubset
+        strict: true
+        api_version: "1"
+        reply_type: EnumSubsetReply
+
+    newReplyFieldTypeBsonSubset:
+        description: "new command passes because its reply field type has a bson_serialization_type
+                      that is a subset of the corresponding old reply field type's
+                      bson_serialization_type"
+        command_name: newReplyFieldTypeBsonSubset
+        namespace: ignored
+        cpp_name: newReplyFieldTypeBsonSubset
+        strict: true
+        api_version: "1"
+        reply_type: BsonSubsetReply
+
+    newReplyFieldTypeBsonSubsetTwo:
+        description: "new command passes because its reply field type has a bson_serialization_type
+                      that is a subset of the corresponding old reply field type's
+                      bson_serialization_type"
+        command_name: newReplyFieldTypeBsonSubsetTwo
+        namespace: ignored
+        cpp_name: newReplyFieldTypeBsonSubsetTwo
+        strict: true
+        api_version: "1"
+        reply_type: BsonSubsetReplyTwo

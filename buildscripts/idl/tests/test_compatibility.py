@@ -42,7 +42,6 @@ import idl_compatibility_errors
 
 
 class TestIDLCompatibilityChecker(unittest.TestCase):
-    # pylint: disable=too-many-public-methods
     """Test the IDL Compatibility Checker."""
 
     def test_should_pass(self):
@@ -53,6 +52,15 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
                 path.join(dir_path, "compatibility_test_pass/old"),
                 path.join(dir_path, "compatibility_test_pass/new"), ["src"]).has_errors())
 
+    def test_should_abort(self):
+        """Tests that invalid old and new IDL commands should cause script to abort."""
+        dir_path = path.dirname(path.realpath(__file__))
+        with self.assertRaises(SystemExit):
+            idl_check_compatibility.check_compatibility(
+                path.join(dir_path, "compatibility_test_fail/old_abort"),
+                path.join(dir_path, "compatibility_test_fail/new_abort"), ["src"])
+
+    # pylint: disable=too-many-locals,too-many-statements
     def test_should_fail(self):
         """Tests that incompatible old and new IDL commands should fail."""
         dir_path = path.dirname(path.realpath(__file__))
@@ -61,64 +69,98 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
             path.join(dir_path, "compatibility_test_fail/new"), ["src"])
 
         self.assertTrue(error_collection.has_errors())
-        self.assertTrue(error_collection.count() == 9)
+        self.assertTrue(error_collection.count() == 17)
 
         invalid_api_version_new_error = error_collection.get_error_by_command_name(
             "invalidAPIVersionNew")
-        self.assertIsNotNone(invalid_api_version_new_error)
         self.assertTrue(invalid_api_version_new_error.error_id ==
                         idl_compatibility_errors.ERROR_ID_COMMAND_INVALID_API_VERSION)
         self.assertRegex(str(invalid_api_version_new_error), "invalidAPIVersionNew")
 
         duplicate_command_new_error = error_collection.get_error_by_command_name(
             "duplicateCommandNew")
-        self.assertIsNotNone(duplicate_command_new_error)
         self.assertTrue(duplicate_command_new_error.error_id ==
                         idl_compatibility_errors.ERROR_ID_DUPLICATE_COMMAND_NAME)
         self.assertRegex(str(duplicate_command_new_error), "duplicateCommandNew")
 
         invalid_api_version_old_error = error_collection.get_error_by_command_name(
             "invalidAPIVersionOld")
-        self.assertIsNotNone(invalid_api_version_old_error)
         self.assertTrue(invalid_api_version_old_error.error_id ==
                         idl_compatibility_errors.ERROR_ID_COMMAND_INVALID_API_VERSION)
         self.assertRegex(str(invalid_api_version_old_error), "invalidAPIVersionOld")
 
         duplicate_command_old_error = error_collection.get_error_by_command_name(
             "duplicateCommandOld")
-        self.assertIsNotNone(duplicate_command_old_error)
         self.assertTrue(duplicate_command_old_error.error_id ==
                         idl_compatibility_errors.ERROR_ID_DUPLICATE_COMMAND_NAME)
         self.assertRegex(str(duplicate_command_old_error), "duplicateCommandOld")
 
         removed_command_error = error_collection.get_error_by_error_id(
             idl_compatibility_errors.ERROR_ID_REMOVED_COMMAND)
-        self.assertIsNotNone(removed_command_error)
         self.assertRegex(str(removed_command_error), "removedCommand")
 
         new_reply_field_unstable_error = error_collection.get_error_by_command_name(
             "newReplyFieldUnstable")
-        self.assertIsNotNone(new_reply_field_unstable_error)
         self.assertTrue(new_reply_field_unstable_error.error_id ==
                         idl_compatibility_errors.ERROR_ID_NEW_REPLY_FIELD_UNSTABLE)
         self.assertRegex(str(new_reply_field_unstable_error), "newReplyFieldUnstable")
 
         new_reply_field_optional_error = error_collection.get_error_by_error_id(
             idl_compatibility_errors.ERROR_ID_NEW_REPLY_FIELD_OPTIONAL)
-        self.assertIsNotNone(new_reply_field_optional_error)
         self.assertRegex(str(new_reply_field_optional_error), "newReplyFieldOptional")
 
         new_reply_field_missing_error = error_collection.get_error_by_error_id(
             idl_compatibility_errors.ERROR_ID_NEW_REPLY_FIELD_MISSING)
-        self.assertIsNotNone(new_reply_field_missing_error)
         self.assertRegex(str(new_reply_field_missing_error), "newReplyFieldMissing")
 
         imported_reply_field_unstable_error = error_collection.get_error_by_command_name(
             "importedReplyCommand")
-        self.assertIsNotNone(imported_reply_field_unstable_error)
         self.assertTrue(imported_reply_field_unstable_error.error_id ==
                         idl_compatibility_errors.ERROR_ID_NEW_REPLY_FIELD_UNSTABLE)
         self.assertRegex(str(imported_reply_field_unstable_error), "importedReplyCommand")
+
+        new_reply_field_type_enum_not_subset_error = error_collection.get_error_by_command_name(
+            "newReplyFieldTypeEnumNotSubset")
+        self.assertTrue(new_reply_field_type_enum_not_subset_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_COMMAND_NOT_SUBSET)
+        self.assertRegex(
+            str(new_reply_field_type_enum_not_subset_error), "newReplyFieldTypeEnumNotSubset")
+
+        new_reply_field_type_not_enum_error = error_collection.get_error_by_error_id(
+            idl_compatibility_errors.ERROR_ID_NEW_REPLY_FIELD_TYPE_NOT_ENUM)
+        self.assertRegex(str(new_reply_field_type_not_enum_error), "newReplyFieldTypeNotEnum")
+
+        new_reply_field_type_not_struct_error = error_collection.get_error_by_error_id(
+            idl_compatibility_errors.ERROR_ID_NEW_REPLY_FIELD_TYPE_NOT_STRUCT)
+        self.assertRegex(str(new_reply_field_type_not_struct_error), "newReplyFieldTypeNotStruct")
+
+        new_reply_field_type_enum_or_struct_error = error_collection.get_error_by_error_id(
+            idl_compatibility_errors.ERROR_ID_NEW_REPLY_FIELD_TYPE_ENUM_OR_STRUCT)
+        self.assertRegex(
+            str(new_reply_field_type_enum_or_struct_error), "newReplyFieldTypeEnumOrStruct")
+
+        new_reply_field_type_bson_not_subset_error = error_collection.get_error_by_command_name(
+            "newReplyFieldTypeBsonNotSubset")
+        self.assertTrue(new_reply_field_type_bson_not_subset_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_COMMAND_NOT_SUBSET)
+        self.assertRegex(
+            str(new_reply_field_type_bson_not_subset_error), "newReplyFieldTypeBsonNotSubset")
+
+        new_reply_field_type_bson_not_subset_two_error = error_collection.get_error_by_command_name(
+            "newReplyFieldTypeBsonNotSubsetTwo")
+        self.assertTrue(new_reply_field_type_bson_not_subset_two_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_COMMAND_NOT_SUBSET)
+        self.assertRegex(
+            str(new_reply_field_type_bson_not_subset_two_error),
+            "newReplyFieldTypeBsonNotSubsetTwo")
+
+        old_reply_field_type_bson_any_error = error_collection.get_error_by_error_id(
+            idl_compatibility_errors.ERROR_ID_OLD_REPLY_FIELD_BSON_SERIALIZATION_TYPE_ANY)
+        self.assertRegex(str(old_reply_field_type_bson_any_error), "oldReplyFieldTypeBsonAny")
+
+        new_reply_field_type_bson_any_error = error_collection.get_error_by_error_id(
+            idl_compatibility_errors.ERROR_ID_NEW_REPLY_FIELD_BSON_SERIALIZATION_TYPE_ANY)
+        self.assertRegex(str(new_reply_field_type_bson_any_error), "newReplyFieldTypeBsonAny")
 
 
 if __name__ == '__main__':

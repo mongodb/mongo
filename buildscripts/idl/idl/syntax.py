@@ -584,6 +584,15 @@ class EnumValue(common.SourceLocation):
 
         super(EnumValue, self).__init__(file_name, line, column)
 
+    def __eq__(self, other):
+        return self.name == other.name and self.value == other.value
+
+    def __ne__(self, other):
+        return not self == other
+
+    def __hash__(self):
+        return hash((self.name, self.value))
+
 
 class Enum(common.SourceLocation):
     """

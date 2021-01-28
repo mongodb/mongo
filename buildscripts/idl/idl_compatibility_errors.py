@@ -47,6 +47,13 @@ ERROR_ID_REMOVED_COMMAND = "ID0003"
 ERROR_ID_NEW_REPLY_FIELD_UNSTABLE = "ID0004"
 ERROR_ID_NEW_REPLY_FIELD_OPTIONAL = "ID0005"
 ERROR_ID_NEW_REPLY_FIELD_MISSING = "ID0006"
+ERROR_ID_NEW_REPLY_FIELD_TYPE_NOT_STRUCT = "ID0007"
+ERROR_ID_NEW_REPLY_FIELD_TYPE_NOT_ENUM = "ID0008"
+ERROR_ID_OLD_REPLY_FIELD_BSON_SERIALIZATION_TYPE_ANY = "ID0009"
+ERROR_ID_NEW_REPLY_FIELD_BSON_SERIALIZATION_TYPE_ANY = "ID0010"
+ERROR_ID_NEW_REPLY_FIELD_TYPE_ENUM_OR_STRUCT = "ID0011"
+ERROR_ID_REPLY_FIELD_TYPE_INVALID = "ID0012"
+ERROR_ID_COMMAND_NOT_SUBSET = "ID0013"
 
 
 class IDLCompatibilityCheckerError(Exception):
@@ -118,12 +125,16 @@ class IDLCompatibilityErrorCollection(object):
     def get_error_by_error_id(self, error_id: str) -> IDLCompatibilityError:
         """Get the first error in the error collection with the id error_id."""
         error_id_list = [a for a in self._errors if a.error_id == error_id]
-        return next(iter(error_id_list), None)
+        error = next(iter(error_id_list), None)
+        assert error is not None
+        return error
 
     def get_error_by_command_name(self, command_name: str) -> IDLCompatibilityError:
         """Get the first error in the error collection with the command command_name."""
         command_name_list = [a for a in self._errors if a.command_name == command_name]
-        return next(iter(command_name_list), None)
+        error = next(iter(command_name_list), None)
+        assert error is not None
+        return error
 
     def to_list(self) -> List[str]:
         """Return a list of formatted error messages."""
@@ -181,6 +192,14 @@ class IDLCompatibilityContext(object):
         self._add_error(ERROR_ID_DUPLICATE_COMMAND_NAME, command_name,
                         "'%s' has duplicate command: '%s'" % (dir_name, command_name), file)
 
+    def add_command_not_subset_error(self, command_name: str, field_name: str, type_name: str,
+                                     file: str) -> None:
+        """Add an error about the command not being a subset."""
+        self._add_error(
+            ERROR_ID_COMMAND_NOT_SUBSET, command_name,
+            "'%s' has field '%s' with type '%s' that is not a subset of the other version of this command."
+            % (command_name, field_name, type_name), file)
+
     def add_new_reply_field_missing_error(self, command_name: str, field_name: str,
                                           file: str) -> None:
         """Add an error about the new command missing a reply field that exists in the old command."""
@@ -191,19 +210,74 @@ class IDLCompatibilityContext(object):
 
     def add_new_reply_field_optional_error(self, command_name: str, field_name: str,
                                            file: str) -> None:
-        """Add an error about the new command reply field being optional when the corresponding old reply field is not optional."""
+        """Add an error about the new command reply field being optional when the old reply field is not."""
         self._add_error(
             ERROR_ID_NEW_REPLY_FIELD_OPTIONAL, command_name,
             "'%s' has an optional reply field '%s' that was non-optional in the old command." %
             (command_name, field_name), file)
 
+    def add_new_reply_field_bson_any_error(self, command_name: str, field_name: str,
+                                           new_field_type: str, file: str) -> None:
+        """Add an error about the new reply field type's bson serialization type being of type "any"."""
+        self._add_error(
+            ERROR_ID_NEW_REPLY_FIELD_BSON_SERIALIZATION_TYPE_ANY, command_name,
+            ("'%s' has a reply field '%s' of type '%s' that has a bson serialization type 'any'") %
+            (command_name, field_name, new_field_type), file)
+
+    def add_new_reply_field_type_not_enum_error(self, command_name: str, field_name: str,
+                                                new_field_type: str, old_field_type: str,
+                                                file: str) -> None:
+        # pylint: disable=too-many-arguments
+        """Add an error about the new reply field type not being an enum when the old one is."""
+        self._add_error(
+            ERROR_ID_NEW_REPLY_FIELD_TYPE_NOT_ENUM, command_name,
+            ("'%s' has a reply field '%s' of type '%s' that is not an enum while the corresponding "
+             "old reply field was an enum of type '%s'.") % (command_name, field_name,
+                                                             new_field_type, old_field_type), file)
+
+    def add_new_reply_field_type_not_struct_error(self, command_name: str, field_name: str,
+                                                  new_field_type: str, old_field_type: str,
+                                                  file: str) -> None:
+        # pylint: disable=too-many-arguments
+        """Add an error about the new reply field type not being a struct when the old one is."""
+        self._add_error(ERROR_ID_NEW_REPLY_FIELD_TYPE_NOT_STRUCT, command_name, (
+            "'%s' has a reply field '%s' of type '%s' that is not a struct while the corresponding "
+            "old reply field was a struct of type '%s'.") % (command_name, field_name,
+                                                             new_field_type, old_field_type), file)
+
+    def add_new_reply_field_type_enum_or_struct_error(self, command_name: str, field_name: str,
+                                                      new_field_type: str, old_field_type: str,
+                                                      file: str) -> None:
+        # pylint: disable=too-many-arguments
+        """Add an error when the new reply field type is an enum or struct and the old reply field is a non-enum or struct type."""
+        self._add_error(ERROR_ID_NEW_REPLY_FIELD_TYPE_ENUM_OR_STRUCT, command_name, (
+            "'%s' has a reply field '%s' of type '%s' that is an enum or struct while the corresponding "
+            "old reply field was a non-enum or struct of type '%s'.") %
+                        (command_name, field_name, new_field_type, old_field_type), file)
+
     def add_new_reply_field_unstable_error(self, command_name: str, field_name: str,
                                            file: str) -> None:
-        """Add an error about the new command reply field being unstable when the corresponding old reply field is stable."""
+        """Add an error about the new command reply field being unstable when the old one is stable."""
         self._add_error(
             ERROR_ID_NEW_REPLY_FIELD_UNSTABLE, command_name,
             "'%s' has an unstable reply field '%s' that was stable in the old command." %
             (command_name, field_name), file)
+
+    def add_old_reply_field_bson_any_error(self, command_name: str, field_name: str,
+                                           old_field_type: str, file: str) -> None:
+        """Add an error about the old reply field type's bson serialization type being of type "any"."""
+        self._add_error(
+            ERROR_ID_OLD_REPLY_FIELD_BSON_SERIALIZATION_TYPE_ANY, command_name,
+            ("'%s' has a reply field '%s' of type '%s' that has a bson serialization type 'any'") %
+            (command_name, field_name, old_field_type), file)
+
+    def add_reply_field_type_invalid_error(self, command_name: str, field_name: str,
+                                           file: str) -> None:
+        """Add an error about the reply field type being invalid."""
+        self._add_error(
+            ERROR_ID_REPLY_FIELD_TYPE_INVALID, command_name,
+            ("'%s' has a reply field '%s' that has an invalid type") % (command_name, field_name),
+            file)
 
 
 def _assert_unique_error_messages() -> None:

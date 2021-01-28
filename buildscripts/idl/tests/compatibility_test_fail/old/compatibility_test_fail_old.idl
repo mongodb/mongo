@@ -33,6 +33,44 @@ imports:
     - "mongo/idl/basic_types.idl"
     - "../buildscripts/idl/tests/compatibility_test_fail/old/imports.idl"
 
+types:
+    intToIntString:
+        bson_serialization_type: int
+        description: "The bson_serialization_type changes from int in the old command's reply
+                      field type to [int, string] in the new command's reply field type"
+        cpp_type: "std::int32_t"
+
+    intStringToIntStringBool:
+        bson_serialization_type:
+                                - int
+                                - string
+        description: "The bson_serialization_type changes from [int, string] in the old command's
+                      reply field type to [int, string, bool] in the new command's reply field
+                      type"
+        cpp_type: "std::int32_t"
+
+    oldBsonSerializationTypeAny:
+        bson_serialization_type:
+                                - int
+                                - any
+        description: "The old bson_serialization_type contains 'any'"
+        cpp_type: "std::int32_t"
+
+    newBsonSerializationTypeAny:
+        bson_serialization_type:
+                                - int
+        description: "The new bson_serialization_type contains 'any'"
+        cpp_type: "std::int32_t"
+
+enums:
+    NewReplyFieldEnumNotSubset:
+        description: "The new reply type is an enum that is not a subset of the old reply type's 
+                      enum values"
+        type: string
+        values:
+            valueOne: "one"
+            valueTwo: "two"
+
 structs:
     UnstableNewFieldReply:
         description: "This reply contains a field that is stable in the old command but is
@@ -54,6 +92,65 @@ structs:
         fields:
             missingNewField:
                 type: string
+
+    EnumNotSubsetReply:
+        description: "This reply contains an enum field where the new enum values is not a subset
+                      of the old reply type's enum values"
+        fields:
+            enumNotSubsetReplyField:
+                type: NewReplyFieldEnumNotSubset
+
+    NotEnumFieldReply:
+        description: "This reply contains a field that is an enum type in the old command but
+                      is not an enum type in the new command"
+        fields:
+            notEnumReplyField:
+                type: NewReplyFieldEnumNotSubset
+
+    NotStructFieldReply:
+        description: "This reply contains a field that is a struct type in the old command but
+                      is not a struct type in the new command"
+        fields:
+            notStructReplyField:
+                type: StructReplyFieldType
+
+    StructReplyFieldType:
+        description: "This is a struct reply field type"
+
+    EnumOrStructFieldReply:
+        description: "This reply contains a field that is a non-enum or struct type in the old
+                      command but is an enum or struct in the new command"
+        fields:
+            EnumOrStructReplyField:
+                type: intToIntString
+
+    BsonNotSubsetReply:
+        description: "This reply contains a field type where the new bson_serialization_type
+                      is not a subset of the old bson_serialization_type"
+        fields:
+            bsonNotSubsetReplyField:
+                type: intToIntString
+
+    BsonNotSubsetReplyTwo:
+        description: "This reply contains a field type where the new bson_serialization_type
+                      is not a subset of the old bson_serialization_type"
+        fields:
+            bsonNotSubsetReplyFieldTwo:
+                type: intStringToIntStringBool
+
+    OldBsonSerializationTypeAnyReply:
+        description: "This reply contains a field whose old type has a bson_serialization_type
+                      that contains 'any'"
+        fields:
+            oldBsonSerializationTypeAnyReplyField:
+                type: oldBsonSerializationTypeAny
+
+    NewBsonSerializationTypeAnyReply:
+        description: "This reply contains a field whose new type has a bson_serialization_type
+                      that contains 'any'"
+        fields:
+            newBsonSerializationTypeAnyReplyField:
+                type: newBsonSerializationTypeAny
 
 commands:
     invalidAPIVersionOld:
@@ -123,3 +220,85 @@ commands:
         strict: true
         api_version: "1"
         reply_type: ImportedUnstableNewFieldReply
+
+    newReplyFieldTypeEnumNotSubset:
+        description: "new command fails because its reply field type is an enum that is not
+                      a subset of the corresponding old reply field type's enum values"
+        command_name: newReplyFieldTypeEnumNotSubset
+        namespace: ignored
+        cpp_name: newReplyFieldTypeEnumNotSubset
+        strict: true
+        api_version: "1"
+        reply_type: EnumNotSubsetReply
+
+    newReplyFieldTypeNotEnum:
+        description: "new command fails because its reply field type is not an enum when the
+                      old reply field type is an enum"
+        command_name: newReplyFieldTypeNotEnum
+        namespace: ignored
+        cpp_name: newReplyFieldTypeNotEnum
+        strict: true
+        api_version: "1"
+        reply_type: NotEnumFieldReply
+
+    newReplyFieldTypeNotStruct:
+        description: "new command fails because its reply field type is not a struct when the
+                      old reply field type is a struct"
+        command_name: newReplyFieldTypeNotStruct
+        namespace: ignored
+        cpp_name: newReplyFieldTypeNotStruct
+        strict: true
+        api_version: "1"
+        reply_type: NotStructFieldReply
+
+    newReplyFieldTypeEnumOrStruct:
+        description: "new command fails because it contains a field that is a non-enum or struct
+                      type in the old command, and an enum or struct in the new command"
+        command_name: newReplyFieldTypeEnumOrStruct
+        namespace: ignored
+        cpp_name: newReplyFieldTypeEnumOrStruct
+        strict: true
+        api_version: "1"
+        reply_type: EnumOrStructFieldReply
+
+    newReplyFieldTypeBsonNotSubset:
+        description: "new command fails because its reply field type has a bson_serialization_type
+                      that is not a subset of the corresponding old reply field type's
+                      bson_serialization_type"
+        command_name: newReplyFieldTypeBsonNotSubset
+        namespace: ignored
+        cpp_name: newReplyFieldTypeBsonNotSubset
+        strict: true
+        api_version: "1"
+        reply_type: BsonNotSubsetReply
+
+    newReplyFieldTypeBsonNotSubsetTwo:
+        description: "new command fails because its reply field type has a bson_serialization_type
+                      that is not a subset of the corresponding old reply field type's
+                      bson_serialization_type"
+        command_name: newReplyFieldTypeBsonNotSubsetTwo
+        namespace: ignored
+        cpp_name: newReplyFieldTypeBsonNotSubsetTwo
+        strict: true
+        api_version: "1"
+        reply_type: BsonNotSubsetReplyTwo
+
+    oldReplyFieldTypeBsonAny:
+        description: "old command fails because its reply field type has a bson_serialization_type
+                      that contains 'any'"
+        command_name: oldReplyFieldTypeBsonAny
+        namespace: ignored
+        cpp_name: oldReplyFieldTypeBsonAny
+        strict: true
+        api_version: "1"
+        reply_type: OldBsonSerializationTypeAnyReply
+
+    newReplyFieldTypeBsonAny:
+        description: "new command fails because its reply field type has a bson_serialization_type
+                      that contains 'any'"
+        command_name: newReplyFieldTypeBsonAny
+        namespace: ignored
+        cpp_name: newReplyFieldTypeBsonAny
+        strict: true
+        api_version: "1"
+        reply_type: NewBsonSerializationTypeAnyReply
