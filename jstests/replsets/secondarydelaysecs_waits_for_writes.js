@@ -1,3 +1,13 @@
+// In this test, we verify that nodes with the delay field specified successfully wait before
+// receiving writes.
+// 1. We first initiate a three-node replica set with a delayed secondary and issue a
+// write to the primary. We then ensure there is indeed a delay before the delayed node receives
+// this write.
+// 2. Next, we issue a reconfig to add a delayed fourth node, and perform the same delay
+// test as above.
+// 3. Finally, we perform a reconfig to reduce the fourth node's delay from 30 seconds
+// to 15 seconds, and test that the delay behavior is the same as before.
+//
 // @tags: [requires_fcv_49]
 load("jstests/replsets/rslib.js");
 

@@ -1,3 +1,8 @@
+// Test that a delayed secondary in a replica set still succeeds as a sync source.
+// First, we disconnect the primary from the non-delayed secondary. Next, we issue
+// a write to the primary and ensure this write propagates
+// to the disconnected node via the delayed secondary.
+//
 // @tags: [requires_fcv_49]
 load("jstests/replsets/rslib.js");
 
