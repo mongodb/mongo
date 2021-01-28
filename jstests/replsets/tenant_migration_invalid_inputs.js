@@ -66,7 +66,9 @@ assert.commandFailedWithCode(donorPrimary.adminCommand({
     recipientConnectionString:
         tenantMigrationTest.getRecipientRst().getURL() + "," + donorPrimary.host,
     tenantId: tenantId,
-    readPreference: readPreference
+    readPreference: readPreference,
+    donorCertificateForRecipient: migrationCertificates.donorCertificateForRecipient,
+    recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor,
 }),
                              ErrorCodes.BadValue);
 
@@ -103,7 +105,8 @@ assert.commandFailedWithCode(recipientPrimary.adminCommand({
     migrationId: UUID(),
     donorConnectionString: tenantMigrationTest.getRecipientRst().getURL(),
     tenantId: tenantId,
-    readPreference: readPreference
+    readPreference: readPreference,
+    recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor,
 }),
                              ErrorCodes.BadValue);
 
@@ -124,11 +127,12 @@ assert.commandFailedWithCode(recipientPrimary.adminCommand({
     migrationId: UUID(),
     donorConnectionString: recipientPrimary.host,
     tenantId: tenantId,
-    readPreference: readPreference
+    readPreference: readPreference,
+    recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor,
 }),
                              ErrorCodes.BadValue);
 
-// Test 'returnAfterReachingDonorTimestamp' can' be null.
+// Test 'returnAfterReachingDonorTimestamp' can't be null.
 const nullTimestamps = [Timestamp(0, 0), Timestamp(0, 1)];
 nullTimestamps.forEach((nullTs) => {
     assert.commandFailedWithCode(donorPrimary.adminCommand({
@@ -137,7 +141,8 @@ nullTimestamps.forEach((nullTs) => {
         donorConnectionString: tenantMigrationTest.getDonorRst().getURL(),
         tenantId: tenantId,
         readPreference: readPreference,
-        returnAfterReachingDonorTimestamp: nullTs
+        returnAfterReachingDonorTimestamp: nullTs,
+        recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor,
     }),
                                  ErrorCodes.BadValue);
 });
