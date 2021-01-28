@@ -309,7 +309,7 @@ variables:
   - enterprise-rhel-71-ppc64le-inmem
   - enterprise-rhel-72-s390x
   - enterprise-rhel-72-s390x-inmem
-  - enterprise-rhel-80-64-bit
+  - enterprise-rhel-80-64-bit-suggested
   - enterprise-rhel-82-arm64
   - enterprise-suse12-64
   - enterprise-suse15-64
@@ -322,7 +322,7 @@ variables:
   - enterprise-ubuntu1804-ppc64le
   - enterprise-ubuntu1804-s390x
   - enterprise-ubuntu2004-64
-  - enterprise-windows
+  - enterprise-windows-suggested
   - enterprise-windows-compile-all
   - enterprise-windows-debug-unoptimized
   - enterprise-windows-inmem
@@ -331,7 +331,7 @@ variables:
   - enterprise-windows-wtdevelop
   - ubuntu1804-debug-asan
   - ubuntu1804-debug-ubsan
-  - ubuntu1804-debug-aubsan-lite
+  - ubuntu1804-debug-aubsan-lite-required
   - ubuntu1804-debug-aubsan-lite_fuzzer
 
 
@@ -341,14 +341,13 @@ variables:
   - enterprise-debian92-64
   - enterprise-macos
   - enterprise-rhel-62-64-bit
-  - enterprise-rhel-62-64-bit-dynamic-required
   - enterprise-rhel-80-64-bit-dynamic-required
   - enterprise-rhel-70-64-bit
   - enterprise-rhel-82-arm64
   - enterprise-amazon2-arm64
   - enterprise-ubuntu1604-64
   - enterprise-ubuntu1804-64
-  - enterprise-windows
+  - enterprise-windows-suggested
   - enterprise-windows-required
 
 # List of all variants that use the packages.tgz
@@ -377,7 +376,7 @@ variables:
   - enterprise-rhel-72-s390x
   - rhel80
   - rhel-82-arm64
-  - enterprise-rhel-80-64-bit
+  - enterprise-rhel-80-64-bit-suggested
   - enterprise-rhel-82-arm64
   - suse12
   - suse12-s390x
@@ -386,10 +385,10 @@ variables:
   - suse15
   - enterprise-suse15-64
   - ubuntu1604
-  - ubuntu1604-debug
+  - ubuntu1804-debug-suggested
   - enterprise-ubuntu1604-64
   - enterprise-ubuntu1604-arm64
-  - enterprise-ubuntu-dynamic-1604-clang-tidy
+  - enterprise-ubuntu-dynamic-1804-clang-tidy-suggested
   - ubuntu1804
   - ubuntu1804-arm64
   - ubuntu2004-arm64
@@ -401,7 +400,7 @@ variables:
   - enterprise-ubuntu1804-ppc64le
   - enterprise-ubuntu1804-s390x
   - enterprise-ubuntu2004-64
-  - enterprise-windows
+  - enterprise-windows-suggested
   - windows
 
 
@@ -8581,12 +8580,12 @@ buildvariants:
       - rhel62-medium
   - name: concurrency_replication_causal_consistency_gen
 
-- &linux-64-debug-template
-  name: linux-64-debug
+- &linux-64-debug-required-template
+  name: linux-64-debug-required
   display_name: "! Shared Library Linux DEBUG"
   batchtime: 240 # 4 hours
   run_on:
-  - rhel62-medium
+  - rhel80-medium
   expansions:
     resmoke_jobs_factor: 0.5  # Avoid starting too many mongod's
     compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --enable-free-mon=on --enable-http-client=on --link-model=dynamic
@@ -8596,17 +8595,17 @@ buildvariants:
     target_resmoke_time: 15
     max_sub_suites: 5
     num_scons_link_jobs_available: 0.99
-    large_distro_name: rhel62-medium
+    large_distro_name: rhel80-medium
   tasks:
   - name: compile_test_and_package_parallel_core_stream_TG
     distros:
-      - rhel62-large
+      - rhel80-xlarge
   - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
-      - rhel62-large
+      - rhel80-xlarge
   - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
-    - rhel62-large
+    - rhel80-xlarge
   - name: .aggregation !.encrypt
   - name: .auth !.audit !.gle !.multiversion
   - name: bulk_gle_passthrough
@@ -8636,12 +8635,12 @@ buildvariants:
   - name: .stitch
   - name: server_discovery_and_monitoring_json_test_TG
     distros:
-    - rhel62-large
+    - rhel80-large
   - name: server_selection_json_test_TG
     distros:
-    - rhel62-large
+    - rhel80-large
 
-- <<: *linux-64-debug-template
+- <<: *linux-64-debug-required-template
   name: linux-64-debug-wtdevelop
   display_name: "~ Linux DEBUG WiredTiger develop"
   batchtime: 240 # 4 hours
@@ -9679,7 +9678,7 @@ buildvariants:
 #         Windows buildvariants           #
 ###########################################
 
-- name: windows-debug
+- name: windows-debug-suggested
   display_name: "* Windows DEBUG"
   batchtime: 240 # 4 hours
   run_on:
@@ -9697,10 +9696,10 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - windows-64-vs2019-large
+    - windows-64-vs2019-xlarge
   - name: compile_build_tools_next_TG
     distros:
-    - windows-64-vs2019-large
+    - windows-64-vs2019-xlarge
   - name: .aggregation !.auth !.encrypt
   - name: aggregation_expression_multiversion_fuzzer_gen
   - name: aggregation_expression_optimization_fuzzer_gen
@@ -9753,7 +9752,7 @@ buildvariants:
   run_on:
   - windows-64-vs2019-small
   expansions:
-    burn_in_tests_build_variant: enterprise-windows
+    burn_in_tests_build_variant: enterprise-windows-suggested
     exe: ".exe"
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug msi archive-mh archive-mh-debug
     content_type: application/zip
@@ -9775,10 +9774,10 @@ buildvariants:
   tasks:
   - name: compile_and_archive_dist_test_then_package_TG
     distros:
-    - windows-64-vs2019-large
+    - windows-64-vs2019-xlarge
   - name: compile_build_tools_next_TG
     distros:
-    - windows-64-vs2019-large
+    - windows-64-vs2019-xlarge
   - name: burn_in_tests_gen
   - name: buildscripts_test
   - name: noPassthrough_gen
@@ -9786,15 +9785,15 @@ buildvariants:
   - name: server_selection_json_test_TG
   - name: compile_run_and_archive_dbtest_TG
     distros:
-      - windows-64-vs2019-large
+      - windows-64-vs2019-xlarge
   - name: unittest_shell_hang_analyzer_gen
 
 - <<: *enterprise-windows-required-template
-  name: enterprise-windows-required-all-feature-flags
+  name: enterprise-windows-all-feature-flags-required
   display_name: "! Enterprise Windows (all feature flags)"
   batchtime: 240 # 4 hours
   expansions:
-    burn_in_tests_build_variant: enterprise-windows
+    burn_in_tests_build_variant: enterprise-windows-suggested
     exe: ".exe"
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug msi archive-mh archive-mh-debug
     content_type: application/zip
@@ -9824,8 +9823,8 @@ buildvariants:
             featureFlagWindowFunctions: true,
         }"
 
-- &enterprise-windows-template
-  name: enterprise-windows
+- &enterprise-windows-suggested-template
+  name: enterprise-windows-suggested
   display_name: "* Enterprise Windows"
   batchtime: 240 # 4 hours
   modules:
@@ -9854,7 +9853,7 @@ buildvariants:
   tasks:
     - name: compile_test_and_package_serial_TG
       distros:
-        - windows-64-vs2019-large
+        - windows-64-vs2019-xlarge
     - name: audit
     - name: auth_audit_gen
     - name: buildscripts_test
@@ -9891,10 +9890,10 @@ buildvariants:
       distros:
         - rhel70-small
 
-- <<: *enterprise-windows-template
-  name: enterprise-windows-all-feature-flags
+- <<: *enterprise-windows-suggested-template
+  name: enterprise-windows-all-feature-flags-suggested
   display_name: "* Enterprise Windows (all feature flags)"
-  batchtime: 360 # 6 hours
+  batchtime: 240 # 4 hours
   expansions:
     exe: ".exe"
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug msi archive-mh archive-mh-debug
@@ -10329,18 +10328,18 @@ buildvariants:
     - ubuntu1604-packer
   - name: .publish
 
-- &enterprise-rhel-62-64-bit-dynamic-required-template
-  name: enterprise-rhel-62-64-bit-dynamic-required
-  display_name: "! Shared Library Enterprise RHEL 6.2"
+- &enterprise-rhel-80-64-bit-dynamic-required-template
+  name: enterprise-rhel-80-64-bit-dynamic-required
+  display_name: "! Shared Library Enterprise RHEL 8.0"
   batchtime: 60 # 1 hour
   modules:
   - enterprise
   run_on:
-  - rhel62-small
-  expansions: &enterprise-rhel-62-64-bit-dynamic-required-expansions
+  - rhel80-small
+  expansions: &enterprise-rhel-80-64-bit-dynamic-required-expansions
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
-    compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
-    multiversion_platform: rhel62
+    compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
+    multiversion_platform: rhel80
     multiversion_edition: enterprise
     has_packages: false
     scons_cache_scope: shared
@@ -10349,113 +10348,9 @@ buildvariants:
     jstestfuzz_concurrent_num_files: 10
     target_resmoke_time: 10
     max_sub_suites: 5
-    large_distro_name: rhel62-medium
+    large_distro_name: rhel80-medium
     burn_in_tag_buildvariants: enterprise-rhel-62-64-bit-inmem linux-64-duroff enterprise-rhel-62-64-bit-multiversion
     num_scons_link_jobs_available: 0.99
-  tasks:
-  - name: compile_test_and_package_parallel_core_stream_TG
-    distros:
-      - rhel62-large
-  - name: compile_test_and_package_parallel_unittest_stream_TG
-    distros:
-      - rhel62-large
-  - name: compile_test_and_package_parallel_dbtest_stream_TG
-    distros:
-    - rhel62-large
-  - name: lint_pylinters
-  - name: lint_clang_format
-  - name: lint_eslint
-  - name: lint_cpplint
-  - name: lint_fuzzer_sanity_patch
-  - name: lint_yaml
-  - name: lint_errorcodes
-  - name: test_api_version_compatibility
-  - name: burn_in_tests_gen
-  - name: burn_in_tests_multiversion_gen
-  - name: .aggfuzzer
-  - name: .aggregation
-  - name: audit
-  - name: .auth
-  - name: burn_in_tags_gen
-  - name: buildscripts_test
-  - name: resmoke_end2end_tests
-  - name: unittest_shell_hang_analyzer_gen
-  - name: .causally_consistent !.sharding
-  - name: .change_streams
-  - name: .misc_js
-  - name: .concurrency !.large !.ubsan !.no_txns !.debug_only
-  - name: .concurrency .large !.ubsan !.no_txns !.debug_only
-    distros:
-    - rhel62-medium
-  - name: disk_wiredtiger
-  - name: .encrypt
-  - name: idl_tests
-  - name: initial_sync_fuzzer_gen
-  - name: .integration
-    distros:
-    - rhel62-medium
-  - name: .jscore .common
-  - name: jsCore_minimum_batch_size
-  - name: jsCore_op_query
-  - name: jsCore_txns_large_txns_format
-  - name: jsonSchema
-  - name: .jstestfuzz !.flow_control  # Flow control jstestfuzz take longer.
-  - name: libunwind_tests
-  - name: multiversion_sanity_check_gen
-  - name: mqlrun
-  - name: .multi_shard
-  - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
-  - name: multiversion_gen
-  - name: .query_fuzzer
-  - name: .random_multiversion_ds
-  - name: .read_write_concern .large
-    distros:
-    - rhel62-medium
-  - name: .read_write_concern !.large
-  - name: .replica_sets !.encrypt !.auth
-    distros:
-    - rhel62-large
-  - name: replica_sets_reconfig_jscore_passthrough_gen
-  - name: replica_sets_reconfig_jscore_stepdown_passthrough
-    distros:
-    - rhel62-large
-  - name: replica_sets_reconfig_kill_primary_jscore_passthrough
-    distros:
-    - rhel62-large
-  - name: retryable_writes_jscore_passthrough_gen
-  - name: retryable_writes_jscore_stepdown_passthrough
-    distros:
-    - rhel62-medium
-  - name: .read_only
-  - name: .rollbackfuzzer
-  - name: sasl
-  - name: search
-  - name: search_auth
-  - name: search_ssl
-  - name: session_jscore_passthrough
-  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
-  - name: .sharding .txns
-  - name: .sharding .common
-  - name: snmp
-  - name: .stitch
-  - name: .updatefuzzer
-  - name: secondary_reads_passthrough_gen
-  - name: server_discovery_and_monitoring_json_test_TG
-    distros:
-      - rhel62-large
-  - name: server_selection_json_test_TG
-    distros:
-      - rhel62-large
-
-- <<: *enterprise-rhel-62-64-bit-dynamic-required-template
-  name: enterprise-rhel-80-64-bit-dynamic-required
-  display_name: "! Shared Library Enterprise RHEL 8.0"
-  run_on:
-  - rhel80-small
-  expansions:
-    <<: *enterprise-rhel-62-64-bit-dynamic-required-expansions
-    multiversion_platform: rhel80
-    large_distro_name: rhel80-large
   tasks:
   - name: compile_test_and_package_parallel_core_stream_TG
     distros:
@@ -10490,14 +10385,14 @@ buildvariants:
   - name: .concurrency !.large !.ubsan !.no_txns !.debug_only
   - name: .concurrency .large !.ubsan !.no_txns !.debug_only
     distros:
-    - rhel80-large
+    - rhel80-medium
   - name: disk_wiredtiger
   - name: .encrypt
   - name: idl_tests
   - name: initial_sync_fuzzer_gen
   - name: .integration
     distros:
-    - rhel80-large
+    - rhel80-medium
   - name: .jscore .common
   - name: jsCore_minimum_batch_size
   - name: jsCore_op_query
@@ -10514,7 +10409,7 @@ buildvariants:
   - name: .random_multiversion_ds
   - name: .read_write_concern .large
     distros:
-    - rhel80-large
+    - rhel80-medium
   - name: .read_write_concern !.large
   - name: .replica_sets !.encrypt !.auth
     distros:
@@ -10529,7 +10424,7 @@ buildvariants:
   - name: retryable_writes_jscore_passthrough_gen
   - name: retryable_writes_jscore_stepdown_passthrough
     distros:
-    - rhel80-large
+    - rhel80-medium
   - name: .read_only
   - name: .rollbackfuzzer
   - name: sasl
@@ -10551,18 +10446,18 @@ buildvariants:
     distros:
       - rhel80-large
 
-- name: enterprise-rhel-62-64-bit-dynamic-all-feature-flags
-  display_name: "! Shared Library Enterprise RHEL 6.2 (all feature flags)"
+- name: enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required
+  display_name: "! Shared Library Enterprise RHEL 8.0 (all feature flags)"
   batchtime: 60 # 1 hour
   stepback: false
   modules:
   - enterprise
   run_on:
-  - rhel62-small
-  expansions: &enterprise-rhel-62-64-bit-dynamic-all-feature-flags-expansions
+  - rhel80-small
+  expansions: &enterprise-rhel-80-64-bit-dynamic-all-feature-flags-expansions
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
-    compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
-    multiversion_platform: rhel62
+    compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
+    multiversion_platform: rhel80
     multiversion_edition: enterprise
     has_packages: false
     scons_cache_scope: shared
@@ -10571,7 +10466,7 @@ buildvariants:
     jstestfuzz_concurrent_num_files: 10
     target_resmoke_time: 10
     max_sub_suites: 5
-    large_distro_name: rhel62-medium
+    large_distro_name: rhel80-medium
     burn_in_tag_buildvariants: enterprise-rhel-62-64-bit-inmem linux-64-duroff enterprise-rhel-62-64-bit-multiversion
     num_scons_link_jobs_available: 0.99
     test_flags: >-
@@ -10592,13 +10487,13 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_parallel_core_stream_TG
     distros:
-      - rhel62-large
+      - rhel80-large
   - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
-      - rhel62-large
+      - rhel80-large
   - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
-    - rhel62-medium
+    - rhel80-medium
   - name: burn_in_tests_gen
   - name: .aggfuzzer
   - name: .aggregation
@@ -10611,7 +10506,7 @@ buildvariants:
   - name: .concurrency !.large !.ubsan !.no_txns !.debug_only
   - name: .concurrency .large !.ubsan !.no_txns !.debug_only
     distros:
-    - rhel62-medium
+    - rhel80-medium
   - name: disk_wiredtiger
   - name: .encrypt
   - name: feature_flag_multiversion_gen
@@ -10619,7 +10514,7 @@ buildvariants:
   - name: initial_sync_fuzzer_gen
   - name: .integration
     distros:
-    - rhel62-medium
+    - rhel80-medium
   - name: .jscore .common
   - name: jsCore_minimum_batch_size
   - name: jsCore_op_query
@@ -10636,22 +10531,22 @@ buildvariants:
   - name: .random_multiversion_ds
   - name: .read_write_concern .large
     distros:
-    - rhel62-medium
+    - rhel80-medium
   - name: .read_write_concern !.large
   - name: .replica_sets !.encrypt !.auth
     distros:
-    - rhel62-medium
+    - rhel80-medium
   - name: replica_sets_reconfig_jscore_passthrough_gen
   - name: replica_sets_reconfig_jscore_stepdown_passthrough
     distros:
-    - rhel62-medium
+    - rhel80-medium
   - name: replica_sets_reconfig_kill_primary_jscore_passthrough
     distros:
-    - rhel62-medium
+    - rhel80-medium
   - name: retryable_writes_jscore_passthrough_gen
   - name: retryable_writes_jscore_stepdown_passthrough
     distros:
-    - rhel62-medium
+    - rhel80-medium
   - name: .read_only
   - name: .rollbackfuzzer
   - name: sasl
@@ -10668,10 +10563,10 @@ buildvariants:
   - name: secondary_reads_passthrough_gen
   - name: server_discovery_and_monitoring_json_test_TG
     distros:
-      - rhel62-large
+      - rhel80-large
   - name: server_selection_json_test_TG
     distros:
-      - rhel62-large
+      - rhel80-large
 
 - name: enterprise-rhel-62-64-bit-dynamic-sbe
   display_name: "Shared Library Enterprise RHEL 6.2 (SBE)"
@@ -11151,8 +11046,7 @@ buildvariants:
 
 - &enterprise-rhel-70-64-bit-template
   name: enterprise-rhel-70-64-bit
-  display_name: "* Enterprise RHEL 7.0"
-  batchtime: 240 # 4 hours
+  display_name: "Enterprise RHEL 7.0"
   modules:
   - enterprise
   run_on:
@@ -11240,9 +11134,10 @@ buildvariants:
   - name: sharding_gen
   - name: replica_sets
 
-- &enterprise-rhel-80-64-bit-template
-  name: enterprise-rhel-80-64-bit
-  display_name: "Enterprise RHEL 8.0"
+- &enterprise-rhel-80-64-bit-suggested-template
+  name: enterprise-rhel-80-64-bit-suggested
+  display_name: "* Enterprise RHEL 8.0"
+  batchtime: 240 # 4 hours
   modules:
   - enterprise
   run_on:
@@ -11262,10 +11157,11 @@ buildvariants:
     packager_distro: rhel80
     repo_edition: enterprise
     scons_cache_scope: shared
+    large_distro_name: rhel80-large
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - rhel80-build
+    - rhel80-xlarge
   - name: .aggfuzzer
   - name: audit
   - name: auth_audit_gen
@@ -11418,24 +11314,31 @@ buildvariants:
   - name: snmp
   - name: .stitch
 
-- name: ubuntu1604-debug
-  display_name: "* Shared Library Ubuntu 16.04 DEBUG"
+- name: ubuntu1804-debug-suggested
+  display_name: "* Shared Library Ubuntu 18.04 DEBUG"
   batchtime: 240 # 4 hours
   run_on:
-  - ubuntu1604-test
+  - ubuntu1804-test
   expansions:
     resmoke_jobs_factor: 0.5  # Avoid starting too many mongod's
-    compile_flags: MONGO_DISTMOD=ubuntu1604 --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
+    compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
     scons_cache_scope: shared
     scons_cache_mode: all
     num_scons_link_jobs_available: 0.99
+    large_distro_name: ubuntu1804-large
   tasks:
-  - name: compile_and_archive_dist_test_then_package_TG
+  - name: compile_test_and_package_parallel_core_stream_TG
     distros:
-    - ubuntu1604-build
+      - ubuntu1804-xlarge
+  - name: compile_test_and_package_parallel_unittest_stream_TG
+    distros:
+      - ubuntu1804-xlarge
+  - name: compile_test_and_package_parallel_dbtest_stream_TG
+    distros:
+      - ubuntu1804-xlarge
   - name: compile_build_tools_next_TG
     distros:
-    - ubuntu1604-build
+    - ubuntu1804-xlarge
   - name: jsCore
   - name: .read_write_concern !.write !.aggregation
   - name: replica_sets_jscore_passthrough
@@ -12080,13 +11983,13 @@ buildvariants:
     distros:
     - ubuntu1604-small
 
-- name: enterprise-ubuntu-dynamic-1604-clang-tidy
+- name: enterprise-ubuntu-dynamic-1804-clang-tidy-suggested
   display_name: "* Enterprise Clang Tidy"
   batchtime: 240 # 4 hours
   modules:
   - enterprise
   run_on:
-   - ubuntu1604-build
+   - ubuntu1804-xlarge
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     lang_environment: LANG=C
@@ -13116,8 +13019,8 @@ buildvariants:
   - name: server_discovery_and_monitoring_json_test_TG
   - name: server_selection_json_test_TG
 
-- &ubuntu1804-debug-aubsan-lite-template
-  name: ubuntu1804-debug-aubsan-lite
+- &ubuntu1804-debug-aubsan-lite-required-template
+  name: ubuntu1804-debug-aubsan-lite-required
   display_name: "! Shared Library {A,UB}SAN Enterprise Ubuntu 18.04 DEBUG"
   batchtime: 240 # 4 hours
   modules:
@@ -13141,14 +13044,20 @@ buildvariants:
     num_scons_link_jobs_available: 0.99
   tasks:
   - name: compile_test_and_package_parallel_core_stream_TG
+    distros:
+      - ubuntu1804-xlarge
   - name: compile_test_and_package_parallel_unittest_stream_TG
+    distros:
+      - ubuntu1804-xlarge
   - name: compile_test_and_package_parallel_dbtest_stream_TG
+    distros:
+      - ubuntu1804-xlarge
   - name: jsCore
   - name: jsCore_txns
   - name: unittest_shell_hang_analyzer_gen
 
-- <<: *ubuntu1804-debug-aubsan-lite-template
-  name: ubuntu1804-debug-aubsan-lite-all-feature-flags
+- <<: *ubuntu1804-debug-aubsan-lite-required-template
+  name: ubuntu1804-debug-aubsan-lite-all-feature-flags-required
   display_name: "! Shared Library {A,UB}SAN Enterprise Ubuntu 18.04 DEBUG (all feature flags)"
   batchtime: 240 # 4 hours
   expansions:
@@ -13182,8 +13091,14 @@ buildvariants:
     num_scons_link_jobs_available: 0.99
   tasks:
   - name: compile_test_and_package_parallel_core_stream_TG
+    distros:
+      - ubuntu1804-xlarge
   - name: compile_test_and_package_parallel_unittest_stream_TG
+    distros:
+      - ubuntu1804-xlarge
   - name: compile_test_and_package_parallel_dbtest_stream_TG
+    distros:
+      - ubuntu1804-xlarge
   - name: jsCore
   - name: jsCore_txns
   - name: unittest_shell_hang_analyzer_gen
@@ -13387,7 +13302,7 @@ buildvariants:
   batchtime: 10080 # 7 days
   stepback: false
   expansions:
-    selected_tests_buildvariants: enterprise-rhel-62-64-bit enterprise-windows-required linux-64-debug enterprise-ubuntu-dynamic-1604-clang ubuntu1804-debug-aubsan-lite
+    selected_tests_buildvariants: enterprise-rhel-62-64-bit enterprise-windows-required linux-64-debug-required enterprise-ubuntu-dynamic-1604-clang ubuntu1804-debug-aubsan-lite-required
   tasks:
   - name: selected_tests_gen
 
@@ -13466,12 +13381,12 @@ buildvariants:
   - name: snmp
 #  - name: .updatefuzzer
 
-- <<: *enterprise-rhel-62-64-bit-dynamic-required-template
-  name: rhel-62-64-bit-dynamic-visibility-test
-  display_name: "~ Shared Library RHEL 6.2 (visibility test)"
+- <<: *enterprise-rhel-80-64-bit-dynamic-required-template
+  name: rhel-80-64-bit-dynamic-visibility-test
+  display_name: "~ Shared Library RHEL 8.0 (visibility test)"
   expansions:
-    <<: *enterprise-rhel-62-64-bit-dynamic-required-expansions
-    compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic --experimental-visibility-support=on
+    <<: *enterprise-rhel-80-64-bit-dynamic-required-expansions
+    compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic --experimental-visibility-support=on
 
 - name: windows-dynamic-visibility-test
   display_name: "~ Shared Library Windows (visibility test)"
