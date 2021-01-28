@@ -212,8 +212,25 @@ public:
             return CollectionValidation::ValidateMode::kForeground;
         }();
 
-        auto repairMode = repair ? CollectionValidation::RepairMode::kRepair
-                                 : CollectionValidation::RepairMode::kNone;
+        auto repairMode = [&] {
+            switch (mode) {
+                case CollectionValidation::ValidateMode::kForeground:
+                case CollectionValidation::ValidateMode::kForegroundFull:
+                case CollectionValidation::ValidateMode::kForegroundFullIndexOnly:
+                    // Foreground validation may not repair data while running as a replica set node
+                    // because we do not have timestamps that are required to perform writes.
+                    if (replCoord->isReplEnabled()) {
+                        return CollectionValidation::RepairMode::kNone;
+                    }
+                    if (repair) {
+                        return CollectionValidation::RepairMode::kFixErrors;
+                    }
+                    // Foreground validation will adjust multikey metadata by default.
+                    return CollectionValidation::RepairMode::kAdjustMultikey;
+                default:
+                    return CollectionValidation::RepairMode::kNone;
+            }
+        }();
 
         if (repair) {
             opCtx->recoveryUnit()->setPrepareConflictBehavior(

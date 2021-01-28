@@ -57,6 +57,11 @@ struct IndexInfo {
     int64_t numRecords = 0;
     // A hashed set of indexed multikey paths (applies to $** indexes only).
     std::set<uint32_t> hashedMultikeyMetadataPaths;
+    // Indicates whether or not there are documents that make this index multikey.
+    bool multikeyDocs = false;
+    // The set of multikey paths generated from all documents. Only valid when multikeyDocs is also
+    // set and an index tracks path-level information.
+    MultikeyPaths docMultikeyPaths;
     // Indicates whether key entries must be unique.
     const bool unique;
     // Index access method pointer.
@@ -116,6 +121,11 @@ public:
                      IndexInfo* indexInfo,
                      RecordId recordId,
                      ValidateResults* results);
+
+    /**
+     * During the first phase of validation, tracks the multikey paths for every observed document.
+     */
+    void addDocumentMultikeyPaths(IndexInfo* indexInfo, const MultikeyPaths& multikeyPaths);
 
     /**
      * To validate $** multikey metadata paths, we first scan the collection and add a hash of all

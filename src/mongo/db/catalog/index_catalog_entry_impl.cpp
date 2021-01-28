@@ -253,6 +253,36 @@ void IndexCatalogEntryImpl::setMultikey(OperationContext* opCtx,
     }
 }
 
+void IndexCatalogEntryImpl::forceSetMultikey(OperationContext* const opCtx,
+                                             const CollectionPtr& coll,
+                                             bool isMultikey,
+                                             const MultikeyPaths& multikeyPaths) {
+    invariant(opCtx->lockState()->isCollectionLockedForMode(coll->ns(), MODE_X));
+
+    // Don't check _indexTracksMultikeyPathsInCatalog because the caller may be intentionally trying
+    // to bypass this check. That is, pre-3.4 indexes may be 'stuck' in a state where they are not
+    // tracking multikey paths in the catalog (i.e. the multikeyPaths field is absent), but the
+    // caller wants to upgrade this index because it knows exactly which paths are multikey. We rely
+    // on the following function to make sure this upgrade only takes place on index types that
+    // currently support path-level multikey path tracking.
+    DurableCatalog::get(opCtx)->forceSetIndexIsMultikey(
+        opCtx, _catalogId, _descriptor.get(), isMultikey, multikeyPaths);
+
+    // The prior call to set the multikey metadata in the catalog does some validation and clean up
+    // based on the inputs, so reset the multikey variables based on what is actually in the durable
+    // catalog entry.
+    {
+        stdx::lock_guard<Latch> lk(_indexMultikeyPathsMutex);
+        const bool isMultikey = _catalogIsMultikey(opCtx, &_indexMultikeyPaths);
+        _isMultikeyForRead.store(isMultikey);
+        _isMultikeyForWrite.store(isMultikey);
+        _indexTracksMultikeyPathsInCatalog = !_indexMultikeyPaths.empty();
+    }
+
+    // Since multikey metadata has changed, invalidate the query cache.
+    CollectionQueryInfo::get(coll).clearQueryCacheForSetMultikey(coll);
+}
+
 Status IndexCatalogEntryImpl::_setMultikeyInMultiDocumentTransaction(
     OperationContext* opCtx, const CollectionPtr& collection, const MultikeyPaths& multikeyPaths) {
     // If we are inside a multi-document transaction, we write the on-disk multikey update in a

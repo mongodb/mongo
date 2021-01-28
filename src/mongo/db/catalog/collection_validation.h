@@ -64,14 +64,21 @@ enum class ValidateMode {
 };
 
 /**
- * RepairMode indicates whether validate should repair the data inconsistencies it detects. When set
- * to kRepair, if any repairs are made, the 'repaired' flag in ValidateResults will be set to true.
- * If all errors are fixed, then 'valid' will also be set to true. kRepair is incompatible with the
- * ValidateModes kBackground and kForegroundFullEnforceFastCount.
+ * RepairMode indicates whether validate should repair the data inconsistencies it detects.
+ *
+ * When set to kFixErrors, if any validation errors are detected, repairs are attempted and the
+ * 'repaired' flag in ValidateResults will be set to true. If all errors are fixed, then 'valid'
+ * will also be set to true. kFixErrors is incompatible with the ValidateModes kBackground and
+ * kForegroundFullEnforceFastCount. This implies kAdjustMultikey.
+ *
+ * When set to kAdjustMultikey, if any permissible, yet undesirable multikey inconsistencies are
+ * detected, then the multikey metadata will be adjusted. The 'repaired' flag will be set if any
+ * adjustments have been made. This is incompatible with background validation.
  */
 enum class RepairMode {
     kNone,
-    kRepair,
+    kFixErrors,
+    kAdjustMultikey,
 };
 
 /**

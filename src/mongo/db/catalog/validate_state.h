@@ -84,8 +84,12 @@ public:
         return isFullValidation() || _mode == ValidateMode::kForegroundFullIndexOnly;
     }
 
-    bool shouldRunRepair() const {
-        return _repairMode == RepairMode::kRepair;
+    bool fixErrors() const {
+        return _repairMode == RepairMode::kFixErrors;
+    }
+
+    bool adjustMultikey() const {
+        return _repairMode == RepairMode::kFixErrors || _repairMode == RepairMode::kAdjustMultikey;
     }
 
     const UUID uuid() const {

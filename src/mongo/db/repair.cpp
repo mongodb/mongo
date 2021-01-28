@@ -236,7 +236,7 @@ Status repairCollection(OperationContext* opCtx,
         CollectionValidation::validate(opCtx,
                                        nss,
                                        CollectionValidation::ValidateMode::kForegroundFullIndexOnly,
-                                       CollectionValidation::RepairMode::kRepair,
+                                       CollectionValidation::RepairMode::kFixErrors,
                                        &validateResults,
                                        &output);
     if (!status.isOK()) {

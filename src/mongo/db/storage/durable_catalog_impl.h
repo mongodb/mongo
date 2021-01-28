@@ -189,6 +189,12 @@ public:
                             StringData indexName,
                             const MultikeyPaths& multikeyPaths);
 
+    void forceSetIndexIsMultikey(OperationContext* opCtx,
+                                 RecordId catalogId,
+                                 const IndexDescriptor* desc,
+                                 bool isMultikey,
+                                 const MultikeyPaths& multikeyPaths);
+
     CollectionOptions getCollectionOptions(OperationContext* opCtx, RecordId catalogId) const;
 
     int getTotalIndexCount(OperationContext* opCtx, RecordId catalogId) const;

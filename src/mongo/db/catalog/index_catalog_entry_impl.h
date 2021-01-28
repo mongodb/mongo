@@ -160,6 +160,11 @@ public:
                      const KeyStringSet& multikeyMetadataKeys,
                      const MultikeyPaths& multikeyPaths) final;
 
+    void forceSetMultikey(OperationContext* const opCtx,
+                          const CollectionPtr& coll,
+                          bool isMultikey,
+                          const MultikeyPaths& multikeyPaths) final;
+
     bool isReady(OperationContext* opCtx) const final;
 
     bool isFrozen() const final;

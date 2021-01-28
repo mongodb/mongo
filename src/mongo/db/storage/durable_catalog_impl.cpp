@@ -1258,6 +1258,31 @@ bool DurableCatalogImpl::setIndexIsMultikey(OperationContext* opCtx,
     return true;
 }
 
+void DurableCatalogImpl::forceSetIndexIsMultikey(OperationContext* opCtx,
+                                                 RecordId catalogId,
+                                                 const IndexDescriptor* desc,
+                                                 bool isMultikey,
+                                                 const MultikeyPaths& multikeyPaths) {
+    BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, catalogId);
+
+    int offset = md.findIndexOffset(desc->indexName());
+    invariant(offset >= 0,
+              str::stream() << "cannot set index " << desc->indexName() << " multikey state @ "
+                            << catalogId << " : " << md.toBSON());
+
+    md.indexes[offset].multikey = isMultikey;
+    if (indexTypeSupportsPathLevelMultikeyTracking(desc->getAccessMethodName())) {
+        if (isMultikey) {
+            md.indexes[offset].multikeyPaths = multikeyPaths;
+        } else {
+            md.indexes[offset].multikeyPaths =
+                MultikeyPaths{static_cast<size_t>(desc->keyPattern().nFields())};
+        }
+    }
+    putMetaData(opCtx, catalogId, md);
+}
+
+
 CollectionOptions DurableCatalogImpl::getCollectionOptions(OperationContext* opCtx,
                                                            RecordId catalogId) const {
     BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, catalogId);

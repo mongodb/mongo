@@ -140,6 +140,19 @@ public:
                              const MultikeyPaths& multikeyPaths) = 0;
 
     /**
+     * Sets the index to be multikey with the provided paths. This performs minimal validation of
+     * the inputs and is intended to be used internally to "correct" multikey metadata that drifts
+     * from the underlying data.
+     *
+     * This may also be used to allow indexes built before 3.4 to start tracking multikey path
+     * metadata in the catalog.
+     */
+    virtual void forceSetMultikey(OperationContext* const opCtx,
+                                  const CollectionPtr& coll,
+                                  bool isMultikey,
+                                  const MultikeyPaths& multikeyPaths) = 0;
+
+    /**
      * Returns whether this index is ready for queries. This is potentially unsafe in that it does
      * not consider whether the index is visible or ready in the current storage snapshot. For
      * that, use isReadyInMySnapshot() or isPresentInMySnapshot().

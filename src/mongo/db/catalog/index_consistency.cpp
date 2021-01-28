@@ -41,6 +41,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/storage/storage_debug_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/string_map.h"
@@ -282,6 +283,17 @@ void IndexConsistency::addIndexEntryErrors(ValidateResults* results) {
     }
 }
 
+void IndexConsistency::addDocumentMultikeyPaths(IndexInfo* indexInfo,
+                                                const MultikeyPaths& newPaths) {
+    invariant(newPaths.size());
+    if (indexInfo->docMultikeyPaths.size()) {
+        MultikeyPathTracker::mergeMultikeyPaths(&indexInfo->docMultikeyPaths, newPaths);
+    } else {
+        // Instantiate the multikey paths. Also indicates that this index uses multikeyPaths.
+        indexInfo->docMultikeyPaths = newPaths;
+    }
+}
+
 void IndexConsistency::addDocKey(OperationContext* opCtx,
                                  const KeyString::Value& ks,
                                  IndexInfo* indexInfo,
@@ -359,7 +371,7 @@ void IndexConsistency::addIndexKey(OperationContext* opCtx,
 
         IndexKey key = _generateKeyForMap(*indexInfo, ks);
         if (_missingIndexEntries.count(key) == 0) {
-            if (_validateState->shouldRunRepair()) {
+            if (_validateState->fixErrors()) {
                 // Removing extra index entries.
                 InsertDeleteOptions options;
                 options.dupsAllowed = !indexInfo->unique;

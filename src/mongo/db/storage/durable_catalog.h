@@ -281,8 +281,8 @@ public:
      * Returns true if the index identified by 'indexName' is multikey, and returns false otherwise.
      *
      * If the 'multikeyPaths' pointer is non-null, then it must point to an empty vector. If this
-     * index supports tracking path-level multikey information, then this function sets
-     * 'multikeyPaths' as the path components that cause this index to be multikey.
+     * index type supports tracking path-level multikey information in the catalog, then this
+     * function sets 'multikeyPaths' as the path components that cause this index to be multikey.
      *
      * In particular, if this function returns false and the index supports tracking path-level
      * multikey information, then 'multikeyPaths' is initialized as a vector with size equal to the
@@ -306,6 +306,22 @@ public:
                                     RecordId catalogId,
                                     StringData indexName,
                                     const MultikeyPaths& multikeyPaths) = 0;
+
+    /**
+     * Sets the index to be multikey with the provided paths. This performs minimal validation of
+     * the inputs and is intended to be used internally to "correct" multikey metadata that drifts
+     * from the underlying collection data.
+     *
+     * When isMultikey is false, ignores multikeyPaths and resets the metadata appropriately based
+     * on the index descriptor. Otherwise, overwrites the existing multikeyPaths with the ones
+     * provided. This only writes multikey paths if the index type supports path-level tracking, and
+     * only sets the multikey boolean flag otherwise.
+     */
+    virtual void forceSetIndexIsMultikey(OperationContext* opCtx,
+                                         RecordId catalogId,
+                                         const IndexDescriptor* desc,
+                                         bool isMultikey,
+                                         const MultikeyPaths& multikeyPaths) = 0;
 
     virtual CollectionOptions getCollectionOptions(OperationContext* opCtx,
                                                    RecordId catalogId) const = 0;

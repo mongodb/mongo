@@ -41,6 +41,7 @@
 #include "mongo/db/index/index_build_interceptor.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/execution_context.h"
 #include "mongo/db/storage/storage_debug_util.h"
 #include "mongo/dbtests/dbtests.h"
@@ -1558,7 +1559,7 @@ public:
                 CollectionValidation::validate(&_opCtx,
                                                _nss,
                                                CollectionValidation::ValidateMode::kForegroundFull,
-                                               CollectionValidation::RepairMode::kRepair,
+                                               CollectionValidation::RepairMode::kFixErrors,
                                                &results,
                                                &output,
                                                kTurnOnExtraLoggingForTest));
@@ -1594,7 +1595,7 @@ public:
                 CollectionValidation::validate(&_opCtx,
                                                _nss,
                                                CollectionValidation::ValidateMode::kForegroundFull,
-                                               CollectionValidation::RepairMode::kRepair,
+                                               CollectionValidation::RepairMode::kFixErrors,
                                                &results,
                                                &output,
                                                kTurnOnExtraLoggingForTest));
@@ -1742,7 +1743,7 @@ public:
                 CollectionValidation::validate(&_opCtx,
                                                _nss,
                                                CollectionValidation::ValidateMode::kForegroundFull,
-                                               CollectionValidation::RepairMode::kRepair,
+                                               CollectionValidation::RepairMode::kFixErrors,
                                                &results,
                                                &output,
                                                kTurnOnExtraLoggingForTest));
@@ -1895,7 +1896,7 @@ public:
                 CollectionValidation::validate(&_opCtx,
                                                _nss,
                                                CollectionValidation::ValidateMode::kForegroundFull,
-                                               CollectionValidation::RepairMode::kRepair,
+                                               CollectionValidation::RepairMode::kFixErrors,
                                                &results,
                                                &output,
                                                kTurnOnExtraLoggingForTest));
@@ -2143,7 +2144,7 @@ public:
                 CollectionValidation::validate(&_opCtx,
                                                _nss,
                                                CollectionValidation::ValidateMode::kForegroundFull,
-                                               CollectionValidation::RepairMode::kRepair,
+                                               CollectionValidation::RepairMode::kFixErrors,
                                                &results,
                                                &output,
                                                kTurnOnExtraLoggingForTest));
@@ -2293,7 +2294,7 @@ public:
                 CollectionValidation::validate(&_opCtx,
                                                _nss,
                                                CollectionValidation::ValidateMode::kForeground,
-                                               CollectionValidation::RepairMode::kRepair,
+                                               CollectionValidation::RepairMode::kFixErrors,
                                                &results,
                                                &output,
                                                kTurnOnExtraLoggingForTest));
@@ -2325,7 +2326,7 @@ public:
                 CollectionValidation::validate(&_opCtx,
                                                _nss,
                                                CollectionValidation::ValidateMode::kForeground,
-                                               CollectionValidation::RepairMode::kRepair,
+                                               CollectionValidation::RepairMode::kFixErrors,
                                                &results,
                                                &output,
                                                kTurnOnExtraLoggingForTest));
@@ -2840,7 +2841,7 @@ public:
                 CollectionValidation::validate(&_opCtx,
                                                _nss,
                                                CollectionValidation::ValidateMode::kForeground,
-                                               CollectionValidation::RepairMode::kRepair,
+                                               CollectionValidation::RepairMode::kFixErrors,
                                                &results,
                                                &output,
                                                kTurnOnExtraLoggingForTest));
@@ -2875,7 +2876,7 @@ public:
                 CollectionValidation::validate(&_opCtx,
                                                _nss,
                                                CollectionValidation::ValidateMode::kForeground,
-                                               CollectionValidation::RepairMode::kRepair,
+                                               CollectionValidation::RepairMode::kFixErrors,
                                                &results,
                                                &output,
                                                kTurnOnExtraLoggingForTest));
@@ -3100,7 +3101,7 @@ public:
                 CollectionValidation::validate(&_opCtx,
                                                _nss,
                                                CollectionValidation::ValidateMode::kForeground,
-                                               CollectionValidation::RepairMode::kRepair,
+                                               CollectionValidation::RepairMode::kFixErrors,
                                                &results,
                                                &output,
                                                kTurnOnExtraLoggingForTest));
@@ -3130,7 +3131,7 @@ public:
                 CollectionValidation::validate(&_opCtx,
                                                _nss,
                                                CollectionValidation::ValidateMode::kForeground,
-                                               CollectionValidation::RepairMode::kRepair,
+                                               CollectionValidation::RepairMode::kFixErrors,
                                                &results,
                                                &output,
                                                kTurnOnExtraLoggingForTest));
@@ -3303,7 +3304,7 @@ public:
                 CollectionValidation::validate(&_opCtx,
                                                _nss,
                                                CollectionValidation::ValidateMode::kForeground,
-                                               CollectionValidation::RepairMode::kRepair,
+                                               CollectionValidation::RepairMode::kFixErrors,
                                                &results,
                                                &output,
                                                kTurnOnExtraLoggingForTest));
@@ -3318,7 +3319,7 @@ public:
             ASSERT_EQ(static_cast<size_t>(0), results.errors.size());
             ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
             ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
-            ASSERT_EQ(static_cast<size_t>(1), results.warnings.size());
+            ASSERT_EQ(static_cast<size_t>(2), results.warnings.size());
 
             dumpOnErrorGuard.dismiss();
         }
@@ -3351,6 +3352,145 @@ public:
 
             dumpOnErrorGuard.dismiss();
         }
+    }
+};
+
+// Tests that multikey paths can be added to an index for the first time.
+class ValidateAddNewMultikeyPaths : public ValidateBase {
+public:
+    // No need to test with background validation as repair mode is not supported in background
+    // validation.
+    ValidateAddNewMultikeyPaths() : ValidateBase(/*full=*/false, /*background=*/false) {}
+
+    void run() {
+
+        // Create a new collection and create an index.
+        lockDb(MODE_X);
+        CollectionPtr coll;
+        {
+            WriteUnitOfWork wunit(&_opCtx);
+            ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
+            coll = _db->createCollection(&_opCtx, _nss);
+            wunit.commit();
+        }
+
+        const auto indexName = "mk_index";
+        auto status = dbtests::createIndexFromSpec(&_opCtx,
+                                                   coll->ns().ns(),
+                                                   BSON("name" << indexName << "key"
+                                                               << BSON("a" << 1 << "b" << 1) << "v"
+                                                               << static_cast<int>(kIndexVersion)));
+        ASSERT_OK(status);
+
+        // Remove the multikeyPaths from the index catalog entry. This simulates the catalog state
+        // of a pre-3.4 index.
+        {
+            WriteUnitOfWork wunit(&_opCtx);
+            auto collMetadata =
+                DurableCatalog::get(&_opCtx)->getMetaData(&_opCtx, coll->getCatalogId());
+            int offset = collMetadata.findIndexOffset(indexName);
+            ASSERT_GTE(offset, 0);
+
+            auto& indexMetadata = collMetadata.indexes[offset];
+            indexMetadata.multikeyPaths = {};
+            DurableCatalog::get(&_opCtx)->putMetaData(&_opCtx, coll->getCatalogId(), collMetadata);
+            wunit.commit();
+        }
+
+        // Reload the index from the modified catalog.
+        auto indexCatalog = coll->getIndexCatalog();
+        auto descriptor = indexCatalog->findIndexByName(&_opCtx, indexName);
+        {
+            WriteUnitOfWork wunit(&_opCtx);
+            auto writableCatalog = const_cast<IndexCatalog*>(indexCatalog);
+            descriptor = writableCatalog->refreshEntry(&_opCtx, descriptor);
+            wunit.commit();
+        }
+
+        // Insert a multikey document. The multikeyPaths should not get updated in this old
+        // state.
+        RecordId id1;
+        BSONObj doc1 = BSON("_id" << 0 << "a" << BSON_ARRAY(1 << 2) << "b" << 1);
+        OpDebug* const nullOpDebug = nullptr;
+        {
+            WriteUnitOfWork wunit(&_opCtx);
+            ASSERT_OK(coll->insertDocument(&_opCtx, InsertStatement(doc1), nullOpDebug, true));
+            id1 = coll->getCursor(&_opCtx)->next()->id;
+            wunit.commit();
+        }
+
+        auto catalogEntry = indexCatalog->getEntry(descriptor);
+        auto expectedPathsBefore = MultikeyPaths{};
+        ASSERT(catalogEntry->isMultikey());
+        ASSERT(catalogEntry->getMultikeyPaths(&_opCtx) == expectedPathsBefore);
+
+        releaseDb();
+        ensureValidateWorked();
+
+        // Confirm multikeyPaths are added by validate.
+        {
+            ValidateResults results;
+            BSONObjBuilder output;
+
+            ASSERT_OK(
+                CollectionValidation::validate(&_opCtx,
+                                               _nss,
+                                               CollectionValidation::ValidateMode::kForeground,
+                                               CollectionValidation::RepairMode::kAdjustMultikey,
+                                               &results,
+                                               &output,
+                                               kTurnOnExtraLoggingForTest));
+
+            auto dumpOnErrorGuard = makeGuard([&] {
+                StorageDebugUtil::printValidateResults(results);
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+            });
+
+            ASSERT_EQ(true, results.valid);
+            ASSERT_EQ(true, results.repaired);
+            ASSERT_EQ(static_cast<size_t>(0), results.errors.size());
+            ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
+            ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
+            ASSERT_EQ(static_cast<size_t>(1), results.warnings.size());
+
+            dumpOnErrorGuard.dismiss();
+        }
+
+        auto expectedPathsAfter = MultikeyPaths{{0}, {}};
+        ASSERT(catalogEntry->isMultikey());
+        ASSERT(catalogEntry->getMultikeyPaths(&_opCtx) == expectedPathsAfter);
+
+        // Confirm validate does not make changes when run a second time.
+        {
+            ValidateResults results;
+            BSONObjBuilder output;
+
+            ASSERT_OK(
+                CollectionValidation::validate(&_opCtx,
+                                               _nss,
+                                               CollectionValidation::ValidateMode::kForeground,
+                                               CollectionValidation::RepairMode::kAdjustMultikey,
+                                               &results,
+                                               &output,
+                                               kTurnOnExtraLoggingForTest));
+
+            auto dumpOnErrorGuard = makeGuard([&] {
+                StorageDebugUtil::printValidateResults(results);
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+            });
+
+            ASSERT_EQ(true, results.valid);
+            ASSERT_EQ(false, results.repaired);
+            ASSERT_EQ(static_cast<size_t>(0), results.errors.size());
+            ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
+            ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
+            ASSERT_EQ(static_cast<size_t>(0), results.warnings.size());
+
+            dumpOnErrorGuard.dismiss();
+        }
+
+        ASSERT(catalogEntry->isMultikey());
+        ASSERT(catalogEntry->getMultikeyPaths(&_opCtx) == expectedPathsAfter);
     }
 };
 
@@ -3414,6 +3554,8 @@ public:
 
         add<ValidateIndexWithMultikeyDocRepair>();
         add<ValidateMultikeyPathCoverageRepair>();
+
+        add<ValidateAddNewMultikeyPaths>();
     }
 };
 
