@@ -10534,7 +10534,6 @@ buildvariants:
   - name: server_selection_json_test_TG
     distros:
       - rhel62-large
-  - name: cst_jscore_passthrough
 
 - <<: *enterprise-rhel-62-64-bit-dynamic-required-template
   name: enterprise-rhel-80-64-bit-dynamic
@@ -10639,7 +10638,6 @@ buildvariants:
   - name: server_selection_json_test_TG
     distros:
       - rhel80-large
-  - name: cst_jscore_passthrough
 
 - name: enterprise-rhel-62-64-bit-dynamic-all-feature-flags
   display_name: "! Shared Library Enterprise RHEL 6.2 (all feature flags)"
@@ -10762,7 +10760,6 @@ buildvariants:
   - name: server_selection_json_test_TG
     distros:
       - rhel62-large
-  - name: cst_jscore_passthrough
 
 - name: enterprise-rhel-62-64-bit-dynamic-sbe
   display_name: "Shared Library Enterprise RHEL 6.2 (SBE)"
@@ -11110,7 +11107,6 @@ buildvariants:
   - name: server_selection_json_test_TG
     distros:
       - rhel62-large
-  - name: cst_jscore_passthrough
 
 - name: rhel-62-64-bit-nossl
   display_name: "RHEL 6.2 Shared Library (No SSL)"
