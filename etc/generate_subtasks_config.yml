@@ -4,6 +4,7 @@ build_variant_large_distro_exceptions:
   - debian10
   - debian92
   - enterprise-amazon2
+  - enterprise-amazon2-arm64
   - enterprise-debian10-64
   - enterprise-debian92-64
   - enterprise-linux-64-amazon-ami
