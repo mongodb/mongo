@@ -249,7 +249,7 @@ __sweep_remove_handles(WT_SESSION_IMPL *session)
 static bool
 __sweep_server_run_chk(WT_SESSION_IMPL *session)
 {
-    return (F_ISSET(S2C(session), WT_CONN_SERVER_SWEEP));
+    return (FLD_ISSET(S2C(session)->server_flags, WT_CONN_SERVER_SWEEP));
 }
 
 /*
@@ -375,7 +375,7 @@ __wt_sweep_create(WT_SESSION_IMPL *session)
     conn = S2C(session);
 
     /* Set first, the thread might run before we finish up. */
-    F_SET(conn, WT_CONN_SERVER_SWEEP);
+    FLD_SET(conn->server_flags, WT_CONN_SERVER_SWEEP);
 
     /*
      * Handle sweep does enough I/O it may be called upon to perform slow operations for the block
@@ -406,7 +406,7 @@ __wt_sweep_destroy(WT_SESSION_IMPL *session)
 
     conn = S2C(session);
 
-    F_CLR(conn, WT_CONN_SERVER_SWEEP);
+    FLD_CLR(conn->server_flags, WT_CONN_SERVER_SWEEP);
     if (conn->sweep_tid_set) {
         __wt_cond_signal(session, conn->sweep_cond);
         WT_TRET(__wt_thread_join(session, &conn->sweep_tid));
