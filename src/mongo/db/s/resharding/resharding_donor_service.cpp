@@ -78,30 +78,32 @@ Timestamp generateMinFetchTimestamp(const ReshardingDonorDocument& donorDoc) {
     auto opCtx = cc().makeOperationContext();
 
     // Do a no-op write and use the OpTime as the minFetchTimestamp
-    {
-        AutoGetOplog oplogWrite(opCtx.get(), OplogAccessMode::kWrite);
-        writeConflictRetry(
-            opCtx.get(),
-            "resharding donor minFetchTimestamp",
-            NamespaceString::kRsOplogNamespace.ns(),
-            [&] {
-                const std::string msg = str::stream()
-                    << "All future oplog entries on the namespace " << donorDoc.getNss().ns()
-                    << " must include a 'destinedRecipient' field";
-                WriteUnitOfWork wuow(opCtx.get());
-                opCtx->getClient()->getServiceContext()->getOpObserver()->onInternalOpMessage(
-                    opCtx.get(),
-                    donorDoc.getNss(),
-                    donorDoc.getExistingUUID(),
-                    {},
-                    BSON("msg" << msg),
-                    boost::none,
-                    boost::none,
-                    boost::none,
-                    boost::none);
-                wuow.commit();
-            });
-    }
+    writeConflictRetry(
+        opCtx.get(),
+        "resharding donor minFetchTimestamp",
+        NamespaceString::kRsOplogNamespace.ns(),
+        [&] {
+            AutoGetDb db(opCtx.get(), donorDoc.getNss().db(), MODE_IX);
+            Lock::CollectionLock collLock(opCtx.get(), donorDoc.getNss(), MODE_S);
+
+            AutoGetOplog oplogWrite(opCtx.get(), OplogAccessMode::kWrite);
+
+            const std::string msg = str::stream()
+                << "All future oplog entries on the namespace " << donorDoc.getNss().ns()
+                << " must include a 'destinedRecipient' field";
+            WriteUnitOfWork wuow(opCtx.get());
+            opCtx->getClient()->getServiceContext()->getOpObserver()->onInternalOpMessage(
+                opCtx.get(),
+                donorDoc.getNss(),
+                donorDoc.getExistingUUID(),
+                {},
+                BSON("msg" << msg),
+                boost::none,
+                boost::none,
+                boost::none,
+                boost::none);
+            wuow.commit();
+        });
 
     auto generatedOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
     WriteConcernResult result;
