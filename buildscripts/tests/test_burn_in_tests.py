@@ -94,8 +94,8 @@ class TestAcceptance(unittest.TestCase):
             "project",
         )  # yapf: disable
 
-        under_test.burn_in(repeat_config, gen_config, "", "testfile.json", False, None, repos, None,
-                           None)
+        under_test.burn_in(repeat_config, gen_config, "", "testfile.json", False, MagicMock(),
+                           repos, None, None)
 
         write_json_mock.assert_called_once()
         written_config = json.loads(write_json_mock.call_args[0][1])
