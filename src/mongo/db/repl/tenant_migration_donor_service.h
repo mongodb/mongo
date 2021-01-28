@@ -162,14 +162,15 @@ public:
         ExecutorFuture<void> _fetchAndStoreRecipientClusterTimeKeyDocs(
             std::shared_ptr<executor::ScopedTaskExecutor> executor,
             std::shared_ptr<RemoteCommandTargeter> recipientTargeterRS,
-            const CancelationToken& token);
+            const CancelationToken& serviceToken,
+            const CancelationToken& instanceToken);
 
         /**
          * Inserts the state document to _stateDocumentsNS and returns the opTime for the insert
          * oplog entry.
          */
         ExecutorFuture<repl::OpTime> _insertStateDoc(
-            std::shared_ptr<executor::ScopedTaskExecutor> executor);
+            std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancelationToken& token);
 
         /**
          * Updates the state document to have the given state. Then, persists the updated document
@@ -179,14 +180,15 @@ public:
          */
         ExecutorFuture<repl::OpTime> _updateStateDoc(
             std::shared_ptr<executor::ScopedTaskExecutor> executor,
-            const TenantMigrationDonorStateEnum nextState);
+            const TenantMigrationDonorStateEnum nextState,
+            const CancelationToken& token);
 
         /**
          * Sets the "expireAt" time for the state document to be garbage collected, and returns the
          * the opTime for the write.
          */
         ExecutorFuture<repl::OpTime> _markStateDocAsGarbageCollectable(
-            std::shared_ptr<executor::ScopedTaskExecutor> executor);
+            std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancelationToken& token);
 
         /**
          * Waits for given opTime to be majority committed.
@@ -200,21 +202,24 @@ public:
         ExecutorFuture<void> _sendCommandToRecipient(
             std::shared_ptr<executor::ScopedTaskExecutor> executor,
             std::shared_ptr<RemoteCommandTargeter> recipientTargeterRS,
-            const BSONObj& cmdObj);
+            const BSONObj& cmdObj,
+            const CancelationToken& token);
 
         /**
          * Sends the recipientSyncData command to the recipient replica set.
          */
         ExecutorFuture<void> _sendRecipientSyncDataCommand(
             std::shared_ptr<executor::ScopedTaskExecutor> executor,
-            std::shared_ptr<RemoteCommandTargeter> recipientTargeterRS);
+            std::shared_ptr<RemoteCommandTargeter> recipientTargeterRS,
+            const CancelationToken& token);
 
         /**
          * Sends the recipientForgetMigration command to the recipient replica set.
          */
         ExecutorFuture<void> _sendRecipientForgetMigrationCommand(
             std::shared_ptr<executor::ScopedTaskExecutor> executor,
-            std::shared_ptr<RemoteCommandTargeter> recipientTargeterRS);
+            std::shared_ptr<RemoteCommandTargeter> recipientTargeterRS,
+            const CancelationToken& token);
 
         ThreadPool::Limits _getRecipientCmdThreadPoolLimits() const {
             ThreadPool::Limits recipientCmdThreadPoolLimits;
@@ -261,7 +266,7 @@ public:
 
         // This CancelationSource is instantiated from CancelationToken that is passed into run().
         // It allows for manual cancelation of work from the instance.
-        CancelationSource _instanceCancelationSource;
+        CancelationSource _abortMigrationSource;
     };
 
 private:
