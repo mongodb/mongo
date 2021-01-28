@@ -251,13 +251,18 @@ bool AuthzManagerExternalStateLocal::hasAnyPrivilegeDocuments(OperationContext* 
 }
 
 AuthzManagerExternalStateLocal::RolesLocks::RolesLocks(OperationContext* opCtx) {
-    _adminLock =
-        std::make_unique<Lock::DBLock>(opCtx, NamespaceString::kAdminDb, LockMode::MODE_IS);
-    _rolesLock = std::make_unique<Lock::CollectionLock>(
-        opCtx, AuthorizationManager::rolesCollectionNamespace, LockMode::MODE_S);
+    if (!storageGlobalParams.disableLockFreeReads) {
+        _readLockFree = std::make_unique<AutoReadLockFree>(opCtx);
+    } else {
+        _adminLock =
+            std::make_unique<Lock::DBLock>(opCtx, NamespaceString::kAdminDb, LockMode::MODE_IS);
+        _rolesLock = std::make_unique<Lock::CollectionLock>(
+            opCtx, AuthorizationManager::rolesCollectionNamespace, LockMode::MODE_S);
+    }
 }
 
 AuthzManagerExternalStateLocal::RolesLocks::~RolesLocks() {
+    _readLockFree.reset(nullptr);
     _rolesLock.reset(nullptr);
     _adminLock.reset(nullptr);
 }

@@ -94,7 +94,9 @@ env.Library(
         'auth_impl_internal',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/catalog/collection_catalog',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        '$BUILD_DIR/mongo/db/db_raii',
     ]
 )
 

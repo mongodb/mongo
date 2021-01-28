@@ -76,7 +76,7 @@ Status AuthzManagerExternalStateMongod::findOne(OperationContext* opCtx,
                                                 const NamespaceString& collectionName,
                                                 const BSONObj& query,
                                                 BSONObj* result) {
-    AutoGetCollectionForReadCommand ctx(opCtx, collectionName);
+    AutoGetCollectionForReadCommandMaybeLockFree ctx(opCtx, collectionName);
 
     BSONObj found;
     if (Helpers::findOne(opCtx, ctx.getCollection(), query, found)) {
@@ -91,7 +91,7 @@ Status AuthzManagerExternalStateMongod::findOne(OperationContext* opCtx,
 bool AuthzManagerExternalStateMongod::hasOne(OperationContext* opCtx,
                                              const NamespaceString& collectionName,
                                              const BSONObj& query) {
-    AutoGetCollectionForReadCommand ctx(opCtx, collectionName);
+    AutoGetCollectionForReadCommandMaybeLockFree ctx(opCtx, collectionName);
     return !Helpers::findOne(opCtx, ctx.getCollection(), query, false).isNull();
 }
 
