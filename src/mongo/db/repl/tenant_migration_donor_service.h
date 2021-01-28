@@ -35,6 +35,7 @@
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_util.h"
+#include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/util/cancelation.h"
 #include "mongo/util/string_map.h"
 
@@ -148,6 +149,12 @@ public:
         const NamespaceString _stateDocumentsNS = NamespaceString::kTenantMigrationDonorsNamespace;
 
         /**
+         * Makes a task executor for executing commands against the recipient on an SSL connection
+         * that uses the migration certificate.
+         */
+        std::shared_ptr<executor::ThreadPoolTaskExecutor> _makeRecipientCmdExecutor();
+
+        /**
          * Fetches all key documents from the recipient's admin.system.keys collection, stores
          * them in admin.system.external_validation_keys, and refreshes the keys cache.
          */
@@ -220,8 +227,7 @@ public:
         const std::string _instanceName;
         const MongoURI _recipientUri;
 
-        // Task executor used for executing commands against the recipient using SSL connection
-        // created using the migration-specific certificate.
+        // Task executor used for executing commands against the recipient.
         std::shared_ptr<executor::TaskExecutor> _recipientCmdExecutor;
 
         // Weak pointer to the Fetcher used for fetching admin.system.keys documents from the

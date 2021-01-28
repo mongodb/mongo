@@ -47,7 +47,6 @@
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/executor/connection_pool.h"
 #include "mongo/executor/network_interface_factory.h"
-#include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
@@ -131,41 +130,7 @@ TenantMigrationDonorService::Instance::Instance(ServiceContext* const serviceCon
       _instanceName(kServiceName + "-" + _stateDoc.getTenantId()),
       _recipientUri(
           uassertStatusOK(MongoURI::parse(_stateDoc.getRecipientConnectionString().toString()))) {
-    ThreadPool::Options threadPoolOptions(_getRecipientCmdThreadPoolLimits());
-    threadPoolOptions.threadNamePrefix = _instanceName + "-";
-    threadPoolOptions.poolName = _instanceName + "ThreadPool";
-    threadPoolOptions.onCreateThread = [this](const std::string& threadName) {
-        Client::initThread(threadName.c_str());
-        auto client = Client::getCurrent();
-        AuthorizationSession::get(*client)->grantInternalAuthorization(&cc());
-
-        // Ideally, we should also associate the client created by _recipientCmdExecutor with the
-        // TenantMigrationDonorService to make the opCtxs created by the task executor get
-        // registered in the TenantMigrationDonorService, and killed on stepdown. But that would
-        // require passing the pointer to the TenantMigrationService into the Instance and making
-        // constructInstance not const so we can set the client's decoration here. Right now there
-        // is no need for that since the task executor is only used with scheduleRemoteCommand and
-        // no opCtx will be created (the cancelation token is responsible for canceling the
-        // outstanding work on the task executor).
-        stdx::lock_guard<Client> lk(*client);
-        client->setSystemOperationKillableByStepdown(lk);
-    };
-
-    auto hookList = std::make_unique<rpc::EgressMetadataHookList>();
-
-    auto connPoolOptions = executor::ConnectionPool::Options();
-#ifdef MONGO_CONFIG_SSL
-    auto donorCertificate = _stateDoc.getDonorCertificateForRecipient();
-    auto donorSSLClusterPEMPayload = donorCertificate.getCertificate().toString() + "\n" +
-        donorCertificate.getPrivateKey().toString();
-    connPoolOptions.transientSSLParams =
-        TransientSSLParams{_recipientUri.connectionString(), std::move(donorSSLClusterPEMPayload)};
-#endif
-
-    _recipientCmdExecutor = std::make_shared<executor::ThreadPoolTaskExecutor>(
-        std::make_unique<ThreadPool>(threadPoolOptions),
-        executor::makeNetworkInterface(
-            _instanceName + "-Network", nullptr, std::move(hookList), connPoolOptions));
+    _recipientCmdExecutor = _makeRecipientCmdExecutor();
     _recipientCmdExecutor->startup();
 
     if (_stateDoc.getState() > TenantMigrationDonorStateEnum::kUninitialized) {
@@ -200,6 +165,51 @@ TenantMigrationDonorService::Instance::~Instance() {
     // stepup.
     _recipientCmdExecutor->shutdown();
     _recipientCmdExecutor->join();
+}
+
+std::shared_ptr<executor::ThreadPoolTaskExecutor>
+TenantMigrationDonorService::Instance::_makeRecipientCmdExecutor() {
+    ThreadPool::Options threadPoolOptions(_getRecipientCmdThreadPoolLimits());
+    threadPoolOptions.threadNamePrefix = _instanceName + "-";
+    threadPoolOptions.poolName = _instanceName + "ThreadPool";
+    threadPoolOptions.onCreateThread = [this](const std::string& threadName) {
+        Client::initThread(threadName.c_str());
+        auto client = Client::getCurrent();
+        AuthorizationSession::get(*client)->grantInternalAuthorization(&cc());
+
+        // Ideally, we should also associate the client created by _recipientCmdExecutor with the
+        // TenantMigrationDonorService to make the opCtxs created by the task executor get
+        // registered in the TenantMigrationDonorService, and killed on stepdown. But that would
+        // require passing the pointer to the TenantMigrationService into the Instance and making
+        // constructInstance not const so we can set the client's decoration here. Right now there
+        // is no need for that since the task executor is only used with scheduleRemoteCommand and
+        // no opCtx will be created (the cancelation token is responsible for canceling the
+        // outstanding work on the task executor).
+        stdx::lock_guard<Client> lk(*client);
+        client->setSystemOperationKillableByStepdown(lk);
+    };
+
+    auto hookList = std::make_unique<rpc::EgressMetadataHookList>();
+
+    auto connPoolOptions = executor::ConnectionPool::Options();
+#ifdef MONGO_CONFIG_SSL
+    uassert(ErrorCodes::IllegalOperation,
+            "Cannot run tenant migration as SSL is not enabled",
+            getSSLGlobalParams().sslMode.load() != SSLParams::SSLMode_disabled);
+    auto donorCertificate = _stateDoc.getDonorCertificateForRecipient();
+    auto donorSSLClusterPEMPayload = donorCertificate.getCertificate().toString() + "\n" +
+        donorCertificate.getPrivateKey().toString();
+    connPoolOptions.transientSSLParams =
+        TransientSSLParams{_recipientUri.connectionString(), std::move(donorSSLClusterPEMPayload)};
+#else
+    // If SSL is not supported, the donorStartMigration command should have failed certificate field
+    // validation.
+    MONGO_UNREACHABLE;
+#endif
+    return std::make_shared<executor::ThreadPoolTaskExecutor>(
+        std::make_unique<ThreadPool>(threadPoolOptions),
+        executor::makeNetworkInterface(
+            _instanceName + "-Network", nullptr, std::move(hookList), connPoolOptions));
 }
 
 boost::optional<BSONObj> TenantMigrationDonorService::Instance::reportForCurrentOp(

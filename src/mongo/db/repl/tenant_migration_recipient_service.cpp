@@ -35,6 +35,7 @@
 #include "mongo/client/dbclient_connection.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/client/replica_set_monitor_manager.h"
+#include "mongo/config.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/dbdirectclient.h"
@@ -197,7 +198,24 @@ TenantMigrationRecipientService::Instance::Instance(
       _migrationUuid(_stateDoc.getId()),
       _donorConnectionString(_stateDoc.getDonorConnectionString().toString()),
       _donorUri(uassertStatusOK(MongoURI::parse(_stateDoc.getDonorConnectionString().toString()))),
-      _readPreference(_stateDoc.getReadPreference()) {}
+      _readPreference(_stateDoc.getReadPreference()),
+      _transientSSLParams([&]() -> TransientSSLParams {
+#ifdef MONGO_CONFIG_SSL
+          uassert(ErrorCodes::IllegalOperation,
+                  "Cannot run tenant migration as SSL is not enabled",
+                  getSSLGlobalParams().sslMode.load() != SSLParams::SSLMode_disabled);
+          auto recipientCertificate = _stateDoc.getRecipientCertificateForDonor();
+          auto recipientSSLClusterPEMPayload = recipientCertificate.getCertificate().toString() +
+              "\n" + recipientCertificate.getPrivateKey().toString();
+          return TransientSSLParams{_donorUri.connectionString(),
+                                    std::move(recipientSSLClusterPEMPayload)};
+#else
+          // If SSL is not supported, the recipientSyncData command should have failed certificate
+          // field validation.
+          MONGO_UNREACHABLE;
+#endif
+      }()) {
+}
 
 boost::optional<BSONObj> TenantMigrationRecipientService::Instance::reportForCurrentOp(
     MongoProcessInterface::CurrentOpConnectionsMode connMode,
@@ -299,15 +317,13 @@ OpTime TenantMigrationRecipientService::Instance::waitUntilTimestampIsMajorityCo
 }
 
 std::unique_ptr<DBClientConnection> TenantMigrationRecipientService::Instance::_connectAndAuth(
-    const HostAndPort& serverAddress,
-    StringData applicationName,
-    const TransientSSLParams* transientSSLParams) {
+    const HostAndPort& serverAddress, StringData applicationName) {
     auto swClientBase = ConnectionString(serverAddress)
                             .connect(applicationName,
                                      0 /* socketTimeout */,
                                      nullptr /* uri */,
                                      nullptr /* apiParameters */,
-                                     transientSSLParams);
+                                     &_transientSSLParams);
     if (!swClientBase.isOK()) {
         LOGV2_ERROR(4880400,
                     "Failed to connect to migration donor",
@@ -374,21 +390,14 @@ TenantMigrationRecipientService::Instance::_createAndConnectClients() {
             auto applicationName =
                 "TenantMigration_" + getTenantId() + "_" + getMigrationUUID().toString();
 
-            auto recipientCertificate = _stateDoc.getRecipientCertificateForDonor();
-            auto recipientSSLClusterPEMPayload = recipientCertificate.getCertificate().toString() +
-                "\n" + recipientCertificate.getPrivateKey().toString();
-            const TransientSSLParams transientSSLParams{_donorUri.connectionString(),
-                                                        std::move(recipientSSLClusterPEMPayload)};
-
-            auto client = _connectAndAuth(serverAddress, applicationName, &transientSSLParams);
+            auto client = _connectAndAuth(serverAddress, applicationName);
 
             // Application name is constructed such that it doesn't exceeds
             // kMaxApplicationNameByteLength (128 bytes).
             // "TenantMigration_" (16 bytes) + <tenantId> (61 bytes) + "_" (1 byte) +
             // <migrationUuid> (36 bytes) + _oplogFetcher" (13 bytes) =  127 bytes length.
             applicationName += "_oplogFetcher";
-            auto oplogFetcherClient =
-                _connectAndAuth(serverAddress, applicationName, &transientSSLParams);
+            auto oplogFetcherClient = _connectAndAuth(serverAddress, applicationName);
             return ConnectionPair(std::move(client), std::move(oplogFetcherClient));
         })
         .onError(

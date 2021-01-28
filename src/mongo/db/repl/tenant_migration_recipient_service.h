@@ -289,14 +289,11 @@ public:
         SemiFuture<void> _markStateDocAsGarbageCollectable();
 
         /**
-         * Creates a client, connects it to the donor, and authenticates it if authParams is
-         * non-empty.  Throws a user assertion on failure.
-         *
+         * Creates a client, connects it to the donor, and authenticates it using the migration
+         * certificate. Throws a user assertion on failure.
          */
-        std::unique_ptr<DBClientConnection> _connectAndAuth(
-            const HostAndPort& serverAddress,
-            StringData applicationName,
-            const TransientSSLParams* transientSSLParams);
+        std::unique_ptr<DBClientConnection> _connectAndAuth(const HostAndPort& serverAddress,
+                                                            StringData applicationName);
 
         /**
          * Creates and connects both the oplog fetcher client and the client used for other
@@ -417,11 +414,12 @@ public:
 
         // This data is provided in the initial state doc and never changes.  We keep copies to
         // avoid having to obtain the mutex to access them.
-        const std::string _tenantId;                  // (R)
-        const UUID _migrationUuid;                    // (R)
-        const std::string _donorConnectionString;     // (R)
-        const MongoURI _donorUri;                     // (R)
-        const ReadPreferenceSetting _readPreference;  // (R)
+        const std::string _tenantId;                   // (R)
+        const UUID _migrationUuid;                     // (R)
+        const std::string _donorConnectionString;      // (R)
+        const MongoURI _donorUri;                      // (R)
+        const ReadPreferenceSetting _readPreference;   // (R)
+        const TransientSSLParams _transientSSLParams;  // (R)
 
         std::shared_ptr<ReplicaSetMonitor> _donorReplicaSetMonitor;  // (M)
 

@@ -218,6 +218,9 @@ public:
         auto authFp = globalFailPointRegistry().find("skipTenantMigrationRecipientAuth");
         authFp->setMode(FailPoint::alwaysOn);
 
+        // Set the sslMode to allowSSL to avoid validation error.
+        sslGlobalParams.sslMode.store(SSLParams::SSLMode_allowSSL);
+
         // Set up clocks.
         serviceContext->setFastClockSource(std::make_unique<SharedClockSourceAdapter>(_clkSource));
         serviceContext->setPreciseClockSource(
@@ -231,6 +234,9 @@ public:
     void tearDown() override {
         auto authFp = globalFailPointRegistry().find("skipTenantMigrationRecipientAuth");
         authFp->setMode(FailPoint::off);
+
+        // Unset the sslMode.
+        sslGlobalParams.sslMode.store(SSLParams::SSLMode_disabled);
 
         WaitForMajorityService::get(getServiceContext()).shutDown();
 
