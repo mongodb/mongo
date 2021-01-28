@@ -69,6 +69,35 @@ const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
 
 (() => {
     jsTest.log("Test that the donor and recipient correctly copy each other's cluster time keys " +
+               "when there is no failover but the recipient syncs data from a secondary.");
+    const recipientRst = new ReplSetTest(
+        {nodes: 3, name: "recipientRst", nodeOptions: migrationX509Options.recipient});
+    recipientRst.startSet();
+    recipientRst.initiate();
+
+    const tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), recipientRst});
+    if (!tenantMigrationTest.isFeatureFlagEnabled()) {
+        jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
+        recipientRst.stopSet();
+        tenantMigrationTest.stop();
+        return;
+    }
+
+    const migrationId = UUID();
+    const migrationOpts = {
+        migrationIdString: extractUUIDFromObject(migrationId),
+        tenantId: kTenantId,
+        readPreference: {mode: "secondary"}
+    };
+    assert.commandWorked(tenantMigrationTest.runMigration(migrationOpts));
+    assertCopiedExternalKeys(tenantMigrationTest);
+
+    recipientRst.stopSet();
+    tenantMigrationTest.stop();
+})();
+
+(() => {
+    jsTest.log("Test that the donor and recipient correctly copy each other's cluster time keys " +
                "when there is donor failover.");
     const donorRst =
         new ReplSetTest({nodes: 3, name: "donorRst", nodeOptions: migrationX509Options.donor});
@@ -112,8 +141,8 @@ const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
 (() => {
     jsTest.log("Test that the donor and recipient correctly copy each other's cluster time keys " +
                "when there is recipient failover.");
-    const recipientRst =
-        new ReplSetTest({nodes: 3, name: "recipientRst", nodeOptions: migrationX509Options.donor});
+    const recipientRst = new ReplSetTest(
+        {nodes: 3, name: "recipientRst", nodeOptions: migrationX509Options.recipient});
     recipientRst.startSet();
     recipientRst.initiate();
 

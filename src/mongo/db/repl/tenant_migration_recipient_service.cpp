@@ -1098,7 +1098,9 @@ TenantMigrationRecipientService::Instance::_fetchAndStoreDonorClusterTimeKeyDocs
     const CancelationToken& token) {
     std::vector<ExternalKeysCollectionDocument> keyDocs;
 
-    auto cursor = _client->query(NamespaceString::kKeysCollectionNamespace, Query());
+    auto cursor =
+        _client->query(NamespaceString::kKeysCollectionNamespace,
+                       Query().readPref(_readPreference.pref, _readPreference.tags.getTagBSON()));
     while (cursor->more()) {
         const auto doc = cursor->nextSafe().getOwned();
         keyDocs.push_back(tenant_migration_util::makeExternalClusterTimeKeyDoc(
