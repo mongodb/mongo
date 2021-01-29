@@ -635,11 +635,18 @@ public:
                         // direct operations by end users and is not applicable here.
                         builder.append(write_ops::Insert::kBypassDocumentValidationFieldName, true);
                         builder.append(write_ops::Insert::kOrderedFieldName, _batch.getOrdered());
-                        if (auto stmtId = _batch.getStmtId()) {
-                            builder.append(write_ops::Insert::kStmtIdFieldName, *stmtId);
-                        } else if (auto stmtIds = _batch.getStmtIds()) {
-                            builder.append(write_ops::Insert::kStmtIdsFieldName, *stmtIds);
+
+                        // Statement IDs are not meaningful because of the way we combine and
+                        // convert inserts for the bucket collection. A retryable write is the only
+                        // situation where it is appropriate to forward statement IDs.
+                        if (isTimeseriesWriteRetryable(opCtx)) {
+                            if (auto stmtId = _batch.getStmtId()) {
+                                builder.append(write_ops::Insert::kStmtIdFieldName, *stmtId);
+                            } else if (auto stmtIds = _batch.getStmtIds()) {
+                                builder.append(write_ops::Insert::kStmtIdsFieldName, *stmtIds);
+                            }
                         }
+
                         builder.append(write_ops::Insert::kDocumentsFieldName,
                                        makeTimeseriesInsertDocument(bucketId, data, metadata));
 
@@ -655,11 +662,18 @@ public:
                             // for direct operations by end users and is not applicable here.
                             writeCommandBase.setBypassDocumentValidation(true);
                             writeCommandBase.setOrdered(_batch.getOrdered());
-                            if (auto stmtId = _batch.getStmtId()) {
-                                writeCommandBase.setStmtId(*stmtId);
-                            } else if (auto stmtIds = _batch.getStmtIds()) {
-                                writeCommandBase.setStmtIds(*stmtIds);
+
+                            // Statement IDs are not meaningful because of the way we combine and
+                            // convert inserts for the bucket collection. A retryable write is the
+                            // only situation where it is appropriate to forward statement IDs.
+                            if (isTimeseriesWriteRetryable(opCtx)) {
+                                if (auto stmtId = _batch.getStmtId()) {
+                                    writeCommandBase.setStmtId(*stmtId);
+                                } else if (auto stmtIds = _batch.getStmtIds()) {
+                                    writeCommandBase.setStmtIds(*stmtIds);
+                                }
                             }
+
                             timeseriesUpdateBatch.setWriteCommandBase(std::move(writeCommandBase));
                         }
 
