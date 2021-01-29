@@ -1576,6 +1576,20 @@ TEST(QueryRequestTest, ParseFromLegacyQueryUnwrapped) {
     ASSERT_BSONOBJ_EQ(findCommand->getFilter(), fromjson("{foo: 1}"));
 }
 
+TEST(QueryRequestHelperTest, ValidateResponseMissingFields) {
+    BSONObjBuilder builder;
+    ASSERT_THROWS_CODE(
+        query_request_helper::validateCursorResponse(builder.asTempObj()), DBException, 40414);
+}
+
+TEST(QueryRequestHelperTest, ValidateResponseWrongDataType) {
+    BSONObjBuilder builder;
+    builder.append("cursor", 1);
+    ASSERT_THROWS_CODE(query_request_helper::validateCursorResponse(builder.asTempObj()),
+                       DBException,
+                       ErrorCodes::TypeMismatch);
+}
+
 TEST(QueryRequestTest, ParseFromLegacyQueryTooNegativeNToReturn) {
     BSONObj queryObj = fromjson(R"({
             foo: 1

@@ -881,7 +881,6 @@ Status runAggregate(OperationContext* opCtx,
         curOp->setNS_inlock(origNss.ns());
     }
 
-    // Any code that needs the cursor pinned must be inside the try block, above.
     return Status::OK();
 }
 

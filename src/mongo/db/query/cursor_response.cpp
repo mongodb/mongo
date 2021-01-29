@@ -57,26 +57,16 @@ const char kPartialResultsReturnedField[] = "partialResultsReturned";
 CursorResponseBuilder::CursorResponseBuilder(rpc::ReplyBuilderInterface* replyBuilder,
                                              Options options = Options())
     : _options(options), _replyBuilder(replyBuilder) {
-    if (_options.useDocumentSequences) {
-        _docSeqBuilder.emplace(_replyBuilder->getDocSequenceBuilder(
-            _options.isInitialResponse ? kBatchDocSequenceFieldInitial : kBatchDocSequenceField));
-    } else {
-        _bodyBuilder.emplace(_replyBuilder->getBodyBuilder());
-        _cursorObject.emplace(_bodyBuilder->subobjStart(kCursorField));
-        _batch.emplace(_cursorObject->subarrayStart(_options.isInitialResponse ? kBatchFieldInitial
-                                                                               : kBatchField));
-    }
+    _bodyBuilder.emplace(_replyBuilder->getBodyBuilder());
+    _cursorObject.emplace(_bodyBuilder->subobjStart(kCursorField));
+    _batch.emplace(_cursorObject->subarrayStart(_options.isInitialResponse ? kBatchFieldInitial
+                                                                           : kBatchField));
 }
 
 void CursorResponseBuilder::done(CursorId cursorId, StringData cursorNamespace) {
     invariant(_active);
-    if (_options.useDocumentSequences) {
-        _docSeqBuilder.reset();
-        _bodyBuilder.emplace(_replyBuilder->getBodyBuilder());
-        _cursorObject.emplace(_bodyBuilder->subobjStart(kCursorField));
-    } else {
-        _batch.reset();
-    }
+
+    _batch.reset();
     if (!_postBatchResumeToken.isEmpty()) {
         _cursorObject->append(kPostBatchResumeTokenField, _postBatchResumeToken);
     }

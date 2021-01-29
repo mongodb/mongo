@@ -56,7 +56,6 @@ public:
      */
     struct Options {
         bool isInitialResponse = false;
-        bool useDocumentSequences = false;
         boost::optional<LogicalTime> atClusterTime = boost::none;
     };
 
@@ -78,16 +77,13 @@ public:
 
     size_t bytesUsed() const {
         invariant(_active);
-        return _options.useDocumentSequences ? _docSeqBuilder->len() : _batch->len();
+        return _batch->len();
     }
 
     void append(const BSONObj& obj) {
         invariant(_active);
-        if (_options.useDocumentSequences) {
-            _docSeqBuilder->append(obj);
-        } else {
-            _batch->append(obj);
-        }
+
+        _batch->append(obj);
         _numDocs++;
     }
 
@@ -123,7 +119,6 @@ private:
     boost::optional<BSONObjBuilder> _bodyBuilder;
     boost::optional<BSONObjBuilder> _cursorObject;
     boost::optional<BSONArrayBuilder> _batch;
-    boost::optional<OpMsgBuilder::DocSequenceBuilder> _docSeqBuilder;
 
     bool _active = true;
     long long _numDocs = 0;

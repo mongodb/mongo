@@ -4,6 +4,8 @@
  * @tags: [
  *   requires_fcv_47,
  *   uses_api_parameters,
+ *   # 'explain' does not support stepdowns.
+ *   does_not_support_stepdowns,
  * ]
  */
 
@@ -16,7 +18,7 @@ assert.commandWorked(db[collName].insert({a: 1}));
 const unstableFieldsForAggregate = {
     isMapReduceCommand: false,
     $_requestReshardingResumeToken: false,
-    exchange: {policy: "roundrobin", consumers: NumberInt(10), bufferSize: NumberInt(1024)},
+    explain: true,
     runtimeConstants: {a: 1},
     collectionUUID: UUID(),
     use44SortKeys: false,
