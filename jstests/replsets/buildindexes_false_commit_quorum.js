@@ -29,7 +29,8 @@ replTest.initiate();
 
 const dbName = "buildIndexes";
 const collName = "test";
-const primaryDb = replTest.getPrimary().getDB(dbName);
+const primary = replTest.getPrimary();
+const primaryDb = primary.getDB(dbName);
 
 // Ensure the collection is populated. Index builds on empty collection circumvent the two-phase
 // index build machinery, and we want to exercise that in this test.
@@ -37,31 +38,40 @@ for (let i = 0; i < 100; i++) {
     primaryDb[collName].insert({x: 1, y: "abc", c: 1});
 }
 
-// The default commit quorum is 'votingMembers', and this index build should fail early because the
-// voting buildIndexes:false node will never build the index.
-assert.commandFailedWithCode(primaryDb.runCommand({
-    createIndexes: collName,
-    indexes: [{key: {y: 1}, name: 'y_1_default_commitQuorum'}],
-}),
-                             ErrorCodes.UnsatisfiableCommitQuorum);
+let indexName;
+if (IndexBuildTest.twoPhaseIndexBuildEnabled(primary) &&
+    IndexBuildTest.indexBuildCommitQuorumEnabled(primary)) {
+    // The default commit quorum is 'votingMembers', and this index build should fail early because
+    // the voting buildIndexes:false node will never build the index.
+    assert.commandFailedWithCode(primaryDb.runCommand({
+        createIndexes: collName,
+        indexes: [{key: {y: 1}, name: 'y_1_default_commitQuorum'}],
+    }),
+                                 ErrorCodes.UnsatisfiableCommitQuorum);
 
-// With a commit quorum that includes all nodes, the quorum is unsatisfiable for the same reason as
-// 'votingMembers'.
-assert.commandFailedWithCode(primaryDb.runCommand({
-    createIndexes: collName,
-    indexes: [{key: {y: 1}, name: 'y_1_commitQuorum_3'}],
-    commitQuorum: 3,
-}),
-                             ErrorCodes.UnsatisfiableCommitQuorum);
-
-// This commit quorum does not need to include the buildIndexes:false node so it should be
-// satisfiable.
-const indexName = 'y_1_commitQuorum_majority';
-assert.commandWorked(primaryDb.runCommand({
-    createIndexes: collName,
-    indexes: [{key: {y: 1}, name: indexName}],
-    commitQuorum: 'majority',
-}));
+    // With a commit quorum that includes all nodes, the quorum is unsatisfiable for the same reason
+    // as 'votingMembers'.
+    assert.commandFailedWithCode(primaryDb.runCommand({
+        createIndexes: collName,
+        indexes: [{key: {y: 1}, name: 'y_1_commitQuorum_3'}],
+        commitQuorum: 3,
+    }),
+                                 ErrorCodes.UnsatisfiableCommitQuorum);
+    // This commit quorum does not need to include the buildIndexes:false node so it should be
+    // satisfiable.
+    indexName = 'y_1_commitQuorum_majority';
+    assert.commandWorked(primaryDb.runCommand({
+        createIndexes: collName,
+        indexes: [{key: {y: 1}, name: indexName}],
+        commitQuorum: 'majority',
+    }));
+} else {
+    indexName = 'y_1';
+    assert.commandWorked(primaryDb.runCommand({
+        createIndexes: collName,
+        indexes: [{key: {y: 1}, name: indexName}],
+    }));
+}
 
 replTest.awaitReplication();
 

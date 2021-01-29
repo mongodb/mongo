@@ -217,4 +217,10 @@ var IndexBuildTest = class {
             .commandWorked(conn.adminCommand({getParameter: 1, enableIndexBuildCommitQuorum: 1}))
             .enableIndexBuildCommitQuorum;
     }
+
+    static twoPhaseIndexBuildEnabled(conn) {
+        return assert
+            .commandWorked(conn.adminCommand({getParameter: 1, enableTwoPhaseIndexBuild: 1}))
+            .enableTwoPhaseIndexBuild;
+    }
 };

@@ -4,6 +4,9 @@
 // ]
 
 (function() {
+
+load('jstests/noPassthrough/libs/index_build.js');
+
 // Skip db hash check because secondary will have different number of indexes due to
 // buildIndexes=false on the secondary.
 TestData.skipCheckDBHashes = true;
@@ -29,13 +32,21 @@ for (var i in slaveConns) {
 }
 replTest.awaitReplication();
 
-// Need to use a commitQuorum of 2 rather than the default of 'votingMembers', which includes the
-// buildIndexes:false node. The index build will otherwise fail early.
-assert.commandWorked(master.runCommand({
-    createIndexes: 'x',
-    indexes: [{key: {y: 1}, name: 'y_1'}],
-    commitQuorum: 2,
-}));
+if (IndexBuildTest.twoPhaseIndexBuildEnabled(master) &&
+    IndexBuildTest.indexBuildCommitQuorumEnabled(master)) {
+    // Need to use a commitQuorum of 2 rather than the default of 'votingMembers', which includes
+    // the buildIndexes:false node. The index build will otherwise fail early.
+    assert.commandWorked(master.runCommand({
+        createIndexes: 'x',
+        indexes: [{key: {y: 1}, name: 'y_1'}],
+        commitQuorum: 2,
+    }));
+} else {
+    assert.commandWorked(master.runCommand({
+        createIndexes: 'x',
+        indexes: [{key: {y: 1}, name: 'y_1'}],
+    }));
+}
 
 for (i = 0; i < 100; i++) {
     master.x.insert({x: 1, y: "abc", c: 1});
