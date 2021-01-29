@@ -604,7 +604,7 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientConnection_P
 TEST_F(TenantMigrationRecipientServiceTest,
        TenantMigrationRecipientConnect_ExcludedPrimaryHostPrimaryOnly) {
     auto taskFp = globalFailPointRegistry().find("hangBeforeTaskCompletion");
-    auto initialTimesEntered = taskFp->setMode(FailPoint::alwaysOn);
+    auto taskFpInitialTimesEntered = taskFp->setMode(FailPoint::alwaysOn);
 
     const UUID migrationUUID = UUID::gen();
 
@@ -617,11 +617,20 @@ TEST_F(TenantMigrationRecipientServiceTest,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly),
         kRecipientPEMPayload);
 
+    // Hang the migration before attempting to connect to clients.
+    auto hangFp =
+        globalFailPointRegistry().find("fpAfterPersistingTenantMigrationRecipientInstanceStateDoc");
+    auto hangFpInitialTimesEntered = hangFp->setMode(FailPoint::alwaysOn,
+                                                     0,
+                                                     BSON("action"
+                                                          << "hang"));
     // Create and start the instance.
     auto opCtx = makeOperationContext();
     auto instance = TenantMigrationRecipientService::Instance::getOrCreate(
         opCtx.get(), _service, initialStateDocument.toBSON());
     ASSERT(instance.get());
+
+    hangFp->waitForTimesEntered(hangFpInitialTimesEntered + 1);
 
     // Mark the primary as excluded.
     auto hosts = replSet.getHosts();
@@ -643,7 +652,8 @@ TEST_F(TenantMigrationRecipientServiceTest,
         }
     });
 
-    taskFp->waitForTimesEntered(initialTimesEntered + 1);
+    hangFp->setMode(FailPoint::off);
+    taskFp->waitForTimesEntered(taskFpInitialTimesEntered + 1);
     runReplMonitor.store(false);
     replMonitorThread.join();
 
@@ -666,7 +676,7 @@ TEST_F(TenantMigrationRecipientServiceTest,
     stopFailPointEnableBlock fp("fpAfterConnectingTenantMigrationRecipientInstance");
 
     auto taskFp = globalFailPointRegistry().find("hangBeforeTaskCompletion");
-    auto initialTimesEntered = taskFp->setMode(FailPoint::alwaysOn);
+    auto taskFpInitialTimesEntered = taskFp->setMode(FailPoint::alwaysOn);
 
     const UUID migrationUUID = UUID::gen();
 
@@ -679,11 +689,21 @@ TEST_F(TenantMigrationRecipientServiceTest,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly),
         kRecipientPEMPayload);
 
+    // Hang the migration before attempting to connect to clients.
+    auto hangFp =
+        globalFailPointRegistry().find("fpAfterPersistingTenantMigrationRecipientInstanceStateDoc");
+    auto hangFpInitialTimesEntered = hangFp->setMode(FailPoint::alwaysOn,
+                                                     0,
+                                                     BSON("action"
+                                                          << "hang"));
+
     // Create and start the instance.
     auto opCtx = makeOperationContext();
     auto instance = TenantMigrationRecipientService::Instance::getOrCreate(
         opCtx.get(), _service, initialStateDocument.toBSON());
     ASSERT(instance.get());
+
+    hangFp->waitForTimesEntered(hangFpInitialTimesEntered + 1);
 
     // Mark the primary as excluded.
     auto hosts = replSet.getHosts();
@@ -694,7 +714,8 @@ TEST_F(TenantMigrationRecipientServiceTest,
     // Advance the clock past excludeTime.
     advanceTime(excludeTime + Milliseconds(500));
 
-    taskFp->waitForTimesEntered(initialTimesEntered + 1);
+    hangFp->setMode(FailPoint::off);
+    taskFp->waitForTimesEntered(taskFpInitialTimesEntered + 1);
 
     auto* client = getClient(instance.get());
     auto* oplogFetcherClient = getOplogFetcherClient(instance.get());
@@ -722,7 +743,7 @@ TEST_F(TenantMigrationRecipientServiceTest,
 TEST_F(TenantMigrationRecipientServiceTest,
        TenantMigrationRecipientConnect_ExcludedAllHostsNearest) {
     auto taskFp = globalFailPointRegistry().find("hangBeforeTaskCompletion");
-    auto initialTimesEntered = taskFp->setMode(FailPoint::alwaysOn);
+    auto taskFpInitialTimesEntered = taskFp->setMode(FailPoint::alwaysOn);
 
     const UUID migrationUUID = UUID::gen();
 
@@ -735,11 +756,21 @@ TEST_F(TenantMigrationRecipientServiceTest,
         ReadPreferenceSetting(ReadPreference::Nearest),
         kRecipientPEMPayload);
 
+    // Hang the migration before attempting to connect to clients.
+    auto hangFp =
+        globalFailPointRegistry().find("fpAfterPersistingTenantMigrationRecipientInstanceStateDoc");
+    auto hangFpInitialTimesEntered = hangFp->setMode(FailPoint::alwaysOn,
+                                                     0,
+                                                     BSON("action"
+                                                          << "hang"));
+
     // Create and start the instance.
     auto opCtx = makeOperationContext();
     auto instance = TenantMigrationRecipientService::Instance::getOrCreate(
         opCtx.get(), _service, initialStateDocument.toBSON());
     ASSERT(instance.get());
+
+    hangFp->waitForTimesEntered(hangFpInitialTimesEntered + 1);
 
     // Mark all hosts as excluded.
     auto hosts = replSet.getHosts();
@@ -763,7 +794,8 @@ TEST_F(TenantMigrationRecipientServiceTest,
         }
     });
 
-    taskFp->waitForTimesEntered(initialTimesEntered + 1);
+    hangFp->setMode(FailPoint::off);
+    taskFp->waitForTimesEntered(taskFpInitialTimesEntered + 1);
     runReplMonitor.store(false);
     replMonitorThread.join();
 
@@ -786,7 +818,7 @@ TEST_F(TenantMigrationRecipientServiceTest,
     stopFailPointEnableBlock fp("fpAfterConnectingTenantMigrationRecipientInstance");
 
     auto taskFp = globalFailPointRegistry().find("hangBeforeTaskCompletion");
-    auto initialTimesEntered = taskFp->setMode(FailPoint::alwaysOn);
+    auto taskFpInitialTimesEntered = taskFp->setMode(FailPoint::alwaysOn);
 
     const UUID migrationUUID = UUID::gen();
 
@@ -799,11 +831,21 @@ TEST_F(TenantMigrationRecipientServiceTest,
         ReadPreferenceSetting(ReadPreference::PrimaryPreferred),
         kRecipientPEMPayload);
 
+    // Hang the migration before attempting to connect to clients.
+    auto hangFp =
+        globalFailPointRegistry().find("fpAfterPersistingTenantMigrationRecipientInstanceStateDoc");
+    auto hangFpInitialTimesEntered = hangFp->setMode(FailPoint::alwaysOn,
+                                                     0,
+                                                     BSON("action"
+                                                          << "hang"));
+
     // Create and start the instance.
     auto opCtx = makeOperationContext();
     auto instance = TenantMigrationRecipientService::Instance::getOrCreate(
         opCtx.get(), _service, initialStateDocument.toBSON());
     ASSERT(instance.get());
+
+    hangFp->waitForTimesEntered(hangFpInitialTimesEntered + 1);
 
     // Mark the primary as excluded.
     auto hosts = replSet.getHosts();
@@ -811,7 +853,8 @@ TEST_F(TenantMigrationRecipientServiceTest,
     auto excludeTime = Milliseconds(500);
     instance->excludeDonorHost(hosts.at(0), now + excludeTime);
 
-    taskFp->waitForTimesEntered(initialTimesEntered + 1);
+    hangFp->setMode(FailPoint::off);
+    taskFp->waitForTimesEntered(taskFpInitialTimesEntered + 1);
 
     auto* client = getClient(instance.get());
     auto* oplogFetcherClient = getOplogFetcherClient(instance.get());
@@ -841,7 +884,7 @@ TEST_F(TenantMigrationRecipientServiceTest,
     stopFailPointEnableBlock fp("fpAfterConnectingTenantMigrationRecipientInstance");
 
     auto taskFp = globalFailPointRegistry().find("hangBeforeTaskCompletion");
-    auto initialTimesEntered = taskFp->setMode(FailPoint::alwaysOn);
+    auto taskFpInitialTimesEntered = taskFp->setMode(FailPoint::alwaysOn);
 
     const UUID migrationUUID = UUID::gen();
 
@@ -854,11 +897,21 @@ TEST_F(TenantMigrationRecipientServiceTest,
         ReadPreferenceSetting(ReadPreference::PrimaryPreferred),
         kRecipientPEMPayload);
 
+    // Hang the migration before attempting to connect to clients.
+    auto hangFp =
+        globalFailPointRegistry().find("fpAfterPersistingTenantMigrationRecipientInstanceStateDoc");
+    auto hangFpInitialTimesEntered = hangFp->setMode(FailPoint::alwaysOn,
+                                                     0,
+                                                     BSON("action"
+                                                          << "hang"));
+
     // Create and start the instance.
     auto opCtx = makeOperationContext();
     auto instance = TenantMigrationRecipientService::Instance::getOrCreate(
         opCtx.get(), _service, initialStateDocument.toBSON());
     ASSERT(instance.get());
+
+    hangFp->waitForTimesEntered(hangFpInitialTimesEntered + 1);
 
     // Mark the primary as excluded.
     auto hosts = replSet.getHosts();
@@ -869,7 +922,8 @@ TEST_F(TenantMigrationRecipientServiceTest,
     // Advance the clock past excludeTime.
     advanceTime(excludeTime + Milliseconds(500));
 
-    taskFp->waitForTimesEntered(initialTimesEntered + 1);
+    hangFp->setMode(FailPoint::off);
+    taskFp->waitForTimesEntered(taskFpInitialTimesEntered + 1);
 
     auto* client = getClient(instance.get());
     auto* oplogFetcherClient = getOplogFetcherClient(instance.get());
