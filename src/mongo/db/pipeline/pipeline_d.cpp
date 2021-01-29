@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/db/query/projection_parser.h"
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 #include "mongo/platform/basic.h"
@@ -650,11 +651,18 @@ SkipThenLimit extractSkipAndLimitForPushdown(Pipeline* pipeline) {
  *    2. If there is no inclusion projection at the front of the pipeline, but there is a finite
  *       dependency set, a projection representing this dependency set will be pushed down.
  *    3. Otherwise, an empty projection is returned and no projection push down will happen.
+ *
+ * If 'allowExpressions' is true, the returned projection may include expressions (which can only
+ * happen in case 1). If 'allowExpressions' is false and the projection we find has expressions,
+ * then we fall through to case 2 and attempt to push down a pure-inclusion projection based on its
+ * dependencies.
  */
-auto buildProjectionForPushdown(const DepsTracker& deps, Pipeline* pipeline) {
+auto buildProjectionForPushdown(const DepsTracker& deps,
+                                Pipeline* pipeline,
+                                bool allowExpressions) {
     auto&& sources = pipeline->getSources();
 
-    // Short-circuit if the pipeline is emtpy, there is no projection and nothing to push down.
+    // Short-circuit if the pipeline is empty: there is no projection and nothing to push down.
     if (sources.empty()) {
         return BSONObj();
     }
@@ -663,17 +671,24 @@ auto buildProjectionForPushdown(const DepsTracker& deps, Pipeline* pipeline) {
             exact_pointer_cast<DocumentSourceSingleDocumentTransformation*>(sources.front().get());
         projStage) {
         if (projStage->getType() == TransformerInterface::TransformerType::kInclusionProjection) {
-            // If there is an inclusion projection at the front of the pipeline, we have case 1.
             auto projObj =
                 projStage->getTransformer().serializeTransformation(boost::none).toBson();
-            sources.pop_front();
-            return projObj;
+            auto projAst = projection_ast::parse(projStage->getContext(),
+                                                 projObj,
+                                                 ProjectionPolicies::aggregateProjectionPolicies());
+            if (!projAst.hasExpressions() || allowExpressions) {
+                // If there is an inclusion projection at the front of the pipeline, we have case 1.
+                sources.pop_front();
+                return projObj;
+            }
         }
     }
 
     // Depending of whether there is a finite dependency set, either return a projection
     // representing this dependency set, or an empty BSON, meaning no projection push down will
     // happen. This covers cases 2 and 3.
+    if (deps.getNeedsAnyMetadata())
+        return BSONObj();
     return deps.toProjectionWithoutMetadata();
 }
 }  // namespace
@@ -902,7 +917,19 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
         // Build a BSONObj representing a projection eligible for pushdown. If there is an inclusion
         // projection at the front of the pipeline, it will be removed and handled by the PlanStage
         // layer. If a projection cannot be pushed down, an empty BSONObj will be returned.
-        projObj = buildProjectionForPushdown(deps, pipeline);
+
+        // In most cases .find() behaves as if it evaluates in a predictable order:
+        //     predicate, sort, skip, limit, projection.
+        // But there is at least one case where it runs the projection before the sort/skip/limit:
+        // when the predicate has a rooted $or.  (In that case we plan each branch of the $or
+        // separately, using Subplan, and include the projection on each branch.)
+
+        // To work around this behavior, don't allow pushing down expressions if we are also going
+        // to push down a sort, skip or limit. We don't want the expressions to be evaluated on any
+        // documents that the sort/skip/limit would have filtered out. (The sort stage can be a
+        // top-k sort, which both sorts and limits.)
+        bool allowExpressions = !sortStage && !skipThenLimit.getSkip() && !skipThenLimit.getLimit();
+        projObj = buildProjectionForPushdown(deps, pipeline, allowExpressions);
         plannerOpts |= QueryPlannerParams::RETURN_OWNED_DATA;
     }
 
