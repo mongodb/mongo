@@ -180,9 +180,25 @@ var ReplSetTest = function(opts) {
         });
     }
 
+    /**
+     * For all unauthenticated connections passed in, authenticates them with the '__system' user.
+     * If a connection is already authenticated, we will skip authentication for that connection and
+     * assume that it already has the correct privileges. It is up to the caller of this function to
+     * ensure that the connection is appropriately authenticated.
+     */
     function asCluster(conn, fn, keyFileParam = self.keyFile) {
-        if (keyFileParam) {
-            return authutil.asCluster(conn, keyFileParam, fn);
+        let connArray = conn;
+        if (conn.length == null)
+            connArray = [conn];
+
+        const unauthenticatedConns = connArray.filter(connection => {
+            const connStatus = connection.adminCommand({connectionStatus: 1, showPrivileges: true});
+            const connIsAuthenticated = connStatus.authInfo.authenticatedUsers.length > 0;
+            return !connIsAuthenticated;
+        });
+
+        if (keyFileParam && unauthenticatedConns.length > 0) {
+            return authutil.asCluster(unauthenticatedConns, keyFileParam, fn);
         } else {
             return fn();
         }
@@ -420,8 +436,9 @@ var ReplSetTest = function(opts) {
      * Returns the OpTime for the specified host by issuing replSetGetStatus.
      */
     function _getLastOpTime(conn) {
-        var replSetStatus =
-            assert.commandWorked(conn.getDB("admin").runCommand({replSetGetStatus: 1}));
+        var replSetStatus = asCluster(
+            conn,
+            () => assert.commandWorked(conn.getDB("admin").runCommand({replSetGetStatus: 1})));
         var connStatus = replSetStatus.members.filter(m => m.self)[0];
         var opTime = connStatus.optime;
         if (_isEmptyOpTime(opTime)) {
@@ -459,8 +476,9 @@ var ReplSetTest = function(opts) {
      * Returns the last applied OpTime otherwise.
      */
     function _getDurableOpTime(conn) {
-        var replSetStatus =
-            assert.commandWorked(conn.getDB("admin").runCommand({replSetGetStatus: 1}));
+        var replSetStatus = asCluster(
+            conn,
+            () => assert.commandWorked(conn.getDB("admin").runCommand({replSetGetStatus: 1})));
 
         var opTimeType = "durableOpTime";
         if (_isRunningWithoutJournaling(conn)) {
@@ -1948,7 +1966,8 @@ var ReplSetTest = function(opts) {
 
         assert.retryNoExcept(() => {
             primary = this.getPrimary();
-            primaryConfigVersion = this.getReplSetConfigFromNode().version;
+            primaryConfigVersion =
+                asCluster(primary, () => this.getReplSetConfigFromNode()).version;
             primaryName = primary.host;
             return true;
         }, "ReplSetTest awaitReplication: couldnt get repl set config.", num_attempts, 1000);
@@ -1973,13 +1992,15 @@ var ReplSetTest = function(opts) {
             var secondaryName = secondary.host;
 
             var secondaryConfigVersion =
-                secondary._runWithForcedReadMode("commands",
-                                                 () => secondary.getDB("local")['system.replset']
-                                                           .find()
-                                                           .readConcern("local")
-                                                           .limit(1)
-                                                           .next()
-                                                           .version);
+                asCluster(secondary,
+                          () => secondary._runWithForcedReadMode(
+                              "commands",
+                              () => secondary.getDB("local")['system.replset']
+                                        .find()
+                                        .readConcern("local")
+                                        .limit(1)
+                                        .next()
+                                        .version));
 
             if (primaryConfigVersion != secondaryConfigVersion) {
                 print("ReplSetTest awaitReplication: secondary #" + secondaryCount + ", " +
@@ -2006,7 +2027,9 @@ var ReplSetTest = function(opts) {
             }
 
             // Skip this node if we're connected to an arbiter
-            var res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1}));
+            var res = asCluster(
+                secondary,
+                () => assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1})));
             if (res.myState == ReplSetTest.State.ARBITER) {
                 return Progress.Skip;
             }
