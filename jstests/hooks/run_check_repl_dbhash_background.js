@@ -505,7 +505,8 @@ if (topology.type === Topology.kReplicaSet) {
         }
 
         returnData.forEach(res => {
-            assert.commandWorked(res, () => 'data consistency checks failed: ' + tojson(res));
+            assert.commandWorked(
+                res, () => 'data consistency checks (point-in-time) failed: ' + tojson(res));
         });
     }
 } else {
