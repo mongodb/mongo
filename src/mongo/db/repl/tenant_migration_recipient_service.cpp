@@ -1085,8 +1085,8 @@ BSONObj TenantMigrationRecipientService::Instance::_getOplogFetcherFilter() cons
                                             << "o.applyOps.0.ns" << namespaceRegex)));
 }
 
-SharedSemiFuture<void> TenantMigrationRecipientService::Instance::_updateStateDocForMajority()
-    const {
+SharedSemiFuture<void> TenantMigrationRecipientService::Instance::_updateStateDocForMajority(
+    WithLock lk) const {
     auto opCtx = cc().makeOperationContext();
     uassertStatusOK(tenantMigrationRecipientEntryHelpers::updateStateDoc(opCtx.get(), _stateDoc));
     return WaitForMajorityService::get(opCtx->getServiceContext())
@@ -1183,7 +1183,7 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
 
             if (!startingFCV) {
                 _stateDoc.setRecipientPrimaryStartingFCV(currentFCV);
-                return _updateStateDocForMajority();
+                return _updateStateDocForMajority(lk);
             }
 
             if (startingFCV != currentFCV) {
@@ -1196,13 +1196,13 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                 uasserted(5356201, "Detected FCV change from last migration attempt.");
             }
 
-            return Future<void>::makeReady().share();
+            return SemiFuture<void>::makeReady().share();
         })
         .then([this, self = shared_from_this()] {
             _stopOrHangOnFailPoint(&fpAfterRecordingRecipientPrimaryStartingFCV);
             stdx::lock_guard lk(_mutex);
             _getStartOpTimesFromDonor(lk);
-            return _updateStateDocForMajority();
+            return _updateStateDocForMajority(lk);
         })
         .then([this, self = shared_from_this()] {
             _stopOrHangOnFailPoint(&fpAfterRetrievingStartOpTimesMigrationRecipientInstance);

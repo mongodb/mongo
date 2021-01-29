@@ -398,7 +398,7 @@ public:
         /**
          * Updates the state doc in the database and waits for that to be propagated to a majority.
          */
-        SharedSemiFuture<void> _updateStateDocForMajority() const;
+        SharedSemiFuture<void> _updateStateDocForMajority(WithLock lk) const;
 
         mutable Mutex _mutex = MONGO_MAKE_LATCH("TenantMigrationRecipientService::_mutex");
 
