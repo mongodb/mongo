@@ -264,16 +264,28 @@ void appendOpTime(const repl::OpTime& opTime, BSONObjBuilder* out) {
 }
 
 /**
- * Returns true if the retryable time-series write has been executed.
+ * Returns true if the time-series write is retryable.
  */
-bool isRetryableTimeseriesWriteExecuted(OperationContext* opCtx,
-                                        const write_ops::Insert& insert,
-                                        BSONObjBuilder* result) {
+bool isTimeseriesWriteRetryable(OperationContext* opCtx) {
     if (!opCtx->getTxnNumber()) {
         return false;
     }
 
     if (opCtx->inMultiDocumentTransaction()) {
+        return false;
+    }
+
+    return true;
+}
+
+/**
+ * Returns true if the retryable time-series write has been executed.
+ */
+bool isRetryableTimeseriesWriteExecuted(OperationContext* opCtx,
+                                        const write_ops::Insert& insert,
+                                        BSONObjBuilder* result) {
+
+    if (!isTimeseriesWriteRetryable(opCtx)) {
         return false;
     }
 
