@@ -82,7 +82,7 @@ variables:
       # We get the raw version string (r1.2.3-45-gabcdef) from git
       ### SPLUNK
       ### MONGO_VERSION=$(git describe)
-      MONGO_VERSION=3.6.17-SERVER-42525-splunk1
+      MONGO_VERSION=splunk-3.6.17-windows-v2
       # If this is a patch build, we add the patch version id to the version string so we know
       # this build was a patch, and which evergreen task it came from
       ### SPLUNK
@@ -814,7 +814,7 @@ functions:
         # We get the raw version string (r1.2.3-45-gabcdef) from git
         ### SPLUNK
         ### MONGO_VERSION=$(git describe)
-        MONGO_VERSION=3.6.17-SERVER-42525-splunk1
+        MONGO_VERSION=splunk-3.6.17-windows-v2
         # If this is a patch build, we add the patch version id to the version string so we know
         # this build was a patch, and which evergreen task it came from
         ### SPLUNK
