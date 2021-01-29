@@ -1164,7 +1164,7 @@ def remote_handler(options, task_config, root_dir):  # pylint: disable=too-many-
         mongod_options = f"{mongod_options} --replSet {task_config.repl_set}"
 
     # For MongodControl, the file references should be fully specified.
-    bin_dir = abs_path(powercycle_constants.REMOTE_DIR)
+    bin_dir = abs_path(os.path.join(powercycle_constants.REMOTE_DIR, "bin"))
     db_path = abs_path(powercycle_constants.DB_PATH)
     log_path = abs_path(powercycle_constants.LOG_PATH)
 

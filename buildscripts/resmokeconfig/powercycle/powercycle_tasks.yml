@@ -20,6 +20,10 @@ tasks:
   test_loops: 3
   seed_doc_num: 1000
 
+- name: powercycle_smoke_skip_compile
+  test_loops: 3
+  seed_doc_num: 1000
+
 - name: powercycle_kill_mongod
   crash_method: kill
 

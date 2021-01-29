@@ -21,7 +21,6 @@ class PowercycleCommand(Subcommand):  # pylint: disable=abstract-method, too-man
 
         self.expansions = yaml.safe_load(open(powercycle_constants.EXPANSIONS_FILE))
 
-        self.exe = ".exe" if self.is_windows() else ""
         self.retries = 0 if "ssh_retries" not in self.expansions else int(
             self.expansions["ssh_retries"])
         self.ssh_identity = self._get_ssh_identity()
@@ -92,10 +91,11 @@ class SetUpEC2Instance(PowercycleCommand):
 
         # Second operation -
         # Copy buildscripts and mongoDB executables to the remote host.
-        files = ['etc', 'buildscripts']
-        mongo_executables = ["mongo", "mongod", "mongos"]
-        for executable in mongo_executables:
-            files.append(f"dist-test/bin/{executable}{self.exe}")
+        files = ["etc", "buildscripts", "dist-test/bin"]
+
+        shared_libs = "dist-test/lib"
+        if os.path.isdir(shared_libs):
+            files.append(shared_libs)
 
         self.remote_op.operation(SSHOperation.COPY_TO, files, remote_dir)
 

@@ -118,7 +118,7 @@ def get_compile_artifact_urls(evg_api, evg_version, buildvariant_name):
         push_task = None
 
         for evg_task in evg_tasks:
-            if evg_task.display_name == "compile":
+            if evg_task.display_name in ("compile", "archive_dist_test"):
                 compile_task = evg_task
             if evg_task.display_name == "push":
                 push_task = evg_task

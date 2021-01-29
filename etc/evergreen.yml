@@ -7255,7 +7255,7 @@ tasks:
       resmoke_args: --suites=json_schema --storageEngine=wiredTiger
       resmoke_jobs_max: 1
 
-- name: powercycle_smoke
+- name: powercycle_smoke_skip_compile
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   commands:
     - command: manifest.load
@@ -7275,6 +7275,18 @@ tasks:
     - func: "run powercycle test"
       timeout_secs: 1800 # 30 minute timeout for no output
 
+- name: powercycle_smoke
+  exec_timeout_secs: 7200 # 2 hour timeout for the task overall
+  depends_on:
+  - name: archive_dist_test
+  commands:
+  - func: "do setup"
+  - func: "set up remote credentials"
+    vars:
+      <<: *powercycle_remote_credentials
+  - func: "set up EC2 instance"
+  - func: "run powercycle test"
+    timeout_secs: 1800 # 30 minute timeout for no output
 
 - name: powercycle
   tags: ["powercycle"]
@@ -9638,7 +9650,7 @@ buildvariants:
   stepback: false
   tasks:
   - name: lint_fuzzer_sanity_all
-  - name: powercycle_smoke
+  - name: powercycle_smoke_skip_compile
     distros:
     - amazon2-test
 
@@ -10392,6 +10404,7 @@ buildvariants:
   - name: .multi_shard
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
   - name: multiversion_gen
+  - name: powercycle_smoke
   - name: .query_fuzzer
   - name: .random_multiversion_ds
   - name: .read_write_concern .large
