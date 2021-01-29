@@ -199,21 +199,27 @@ TenantMigrationRecipientService::Instance::Instance(
       _donorConnectionString(_stateDoc.getDonorConnectionString().toString()),
       _donorUri(uassertStatusOK(MongoURI::parse(_stateDoc.getDonorConnectionString().toString()))),
       _readPreference(_stateDoc.getReadPreference()),
-      _transientSSLParams([&]() -> TransientSSLParams {
+      _transientSSLParams([&]() -> boost::optional<TransientSSLParams> {
+          if (auto recipientCertificate = _stateDoc.getRecipientCertificateForDonor()) {
+              invariant(!repl::tenantMigrationDisableX509Auth);
 #ifdef MONGO_CONFIG_SSL
-          uassert(ErrorCodes::IllegalOperation,
-                  "Cannot run tenant migration as SSL is not enabled",
-                  getSSLGlobalParams().sslMode.load() != SSLParams::SSLMode_disabled);
-          auto recipientCertificate = _stateDoc.getRecipientCertificateForDonor();
-          auto recipientSSLClusterPEMPayload = recipientCertificate.getCertificate().toString() +
-              "\n" + recipientCertificate.getPrivateKey().toString();
-          return TransientSSLParams{_donorUri.connectionString(),
-                                    std::move(recipientSSLClusterPEMPayload)};
+              uassert(ErrorCodes::IllegalOperation,
+                      "Cannot run tenant migration with x509 authentication as SSL is not enabled",
+                      getSSLGlobalParams().sslMode.load() != SSLParams::SSLMode_disabled);
+              auto recipientSSLClusterPEMPayload =
+                  recipientCertificate->getCertificate().toString() + "\n" +
+                  recipientCertificate->getPrivateKey().toString();
+              return TransientSSLParams{_donorUri.connectionString(),
+                                        std::move(recipientSSLClusterPEMPayload)};
 #else
-          // If SSL is not supported, the recipientSyncData command should have failed certificate
-          // field validation.
-          MONGO_UNREACHABLE;
+              // If SSL is not supported, the recipientSyncData command should have failed
+              // certificate field validation.
+              MONGO_UNREACHABLE;
 #endif
+          } else {
+              invariant(repl::tenantMigrationDisableX509Auth);
+              return boost::none;
+          }
       }()) {
 }
 
@@ -323,7 +329,7 @@ std::unique_ptr<DBClientConnection> TenantMigrationRecipientService::Instance::_
                                      0 /* socketTimeout */,
                                      nullptr /* uri */,
                                      nullptr /* apiParameters */,
-                                     &_transientSSLParams);
+                                     _transientSSLParams ? &_transientSSLParams.get() : nullptr);
     if (!swClientBase.isOK()) {
         LOGV2_ERROR(4880400,
                     "Failed to connect to migration donor",
@@ -335,12 +341,20 @@ std::unique_ptr<DBClientConnection> TenantMigrationRecipientService::Instance::_
         uassertStatusOK(swClientBase.getStatus());
     }
 
+    auto clientBase = swClientBase.getValue().release();
+
     // ConnectionString::connect() always returns a DBClientConnection in a unique_ptr of
     // DBClientBase type.
-    std::unique_ptr<DBClientConnection> client(
-        checked_cast<DBClientConnection*>(swClientBase.getValue().release()));
+    std::unique_ptr<DBClientConnection> client(checked_cast<DBClientConnection*>(clientBase));
 
-    if (MONGO_likely(!skipTenantMigrationRecipientAuth.shouldFail())) {
+    // Authenticate connection to the donor.
+    if (!_transientSSLParams) {
+        uassertStatusOK(
+            replAuthenticate(clientBase)
+                .withContext(str::stream()
+                             << "TenantMigrationRecipientService failed to authenticate to "
+                             << serverAddress));
+    } else if (MONGO_likely(!skipTenantMigrationRecipientAuth.shouldFail())) {
         client->auth(auth::createInternalX509AuthDocument());
     }
 

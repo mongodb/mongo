@@ -79,6 +79,8 @@ structs:
             The SSL certificate and private key that the recipient should use to authenticate to the
             donor.
           type: TenantMigrationPEMPayload
+          # TODO (SERVER-54085): Remove server parameter tenantMigrationDisableX509Auth.
+          optional: true
 
 commands:
   recipientSyncData:

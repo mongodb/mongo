@@ -64,14 +64,20 @@ public:
 
             const auto& cmd = request();
 
-            const TenantMigrationRecipientDocument stateDoc(
-                cmd.getMigrationId(),
-                cmd.getDonorConnectionString().toString(),
-                cmd.getTenantId().toString(),
-                cmd.getReadPreference(),
-                cmd.getRecipientCertificateForDonor());
-            const auto stateDocBson = stateDoc.toBSON();
+            TenantMigrationRecipientDocument stateDoc(cmd.getMigrationId(),
+                                                      cmd.getDonorConnectionString().toString(),
+                                                      cmd.getTenantId().toString(),
+                                                      cmd.getReadPreference());
 
+            if (!repl::tenantMigrationDisableX509Auth) {
+                uassert(ErrorCodes::InvalidOptions,
+                        str::stream() << "'" << Request::kRecipientCertificateForDonorFieldName
+                                      << "' is a required field",
+                        cmd.getRecipientCertificateForDonor());
+                stateDoc.setRecipientCertificateForDonor(cmd.getRecipientCertificateForDonor());
+            }
+
+            const auto stateDocBson = stateDoc.toBSON();
 
             if (MONGO_unlikely(returnResponseOkForRecipientSyncDataCmd.shouldFail())) {
                 LOGV2(4879608,
@@ -169,12 +175,17 @@ public:
             // recipientSyncData. But even if that's the case, we still need to create an instance
             // and persist a state document that's marked garbage collectable (which is done by the
             // main chain).
-            const TenantMigrationRecipientDocument stateDoc(
-                cmd.getMigrationId(),
-                cmd.getDonorConnectionString().toString(),
-                cmd.getTenantId().toString(),
-                cmd.getReadPreference(),
-                cmd.getRecipientCertificateForDonor());
+            TenantMigrationRecipientDocument stateDoc(cmd.getMigrationId(),
+                                                      cmd.getDonorConnectionString().toString(),
+                                                      cmd.getTenantId().toString(),
+                                                      cmd.getReadPreference());
+            if (!repl::tenantMigrationDisableX509Auth) {
+                uassert(ErrorCodes::InvalidOptions,
+                        str::stream() << "'" << Request::kRecipientCertificateForDonorFieldName
+                                      << "' is a required field",
+                        cmd.getRecipientCertificateForDonor());
+                stateDoc.setRecipientCertificateForDonor(cmd.getRecipientCertificateForDonor());
+            }
             auto recipientInstance = repl::TenantMigrationRecipientService::Instance::getOrCreate(
                 opCtx, recipientService, stateDoc.toBSON());
 

@@ -129,7 +129,9 @@ TenantMigrationDonorService::Instance::Instance(ServiceContext* const serviceCon
       _stateDoc(tenant_migration_access_blocker::parseDonorStateDocument(initialState)),
       _instanceName(kServiceName + "-" + _stateDoc.getTenantId()),
       _recipientUri(
-          uassertStatusOK(MongoURI::parse(_stateDoc.getRecipientConnectionString().toString()))) {
+          uassertStatusOK(MongoURI::parse(_stateDoc.getRecipientConnectionString().toString()))),
+      _sslMode(repl::tenantMigrationDisableX509Auth ? transport::kGlobalSSLMode
+                                                    : transport::kEnableSSL) {
     _recipientCmdExecutor = _makeRecipientCmdExecutor();
     _recipientCmdExecutor->startup();
 
@@ -192,20 +194,31 @@ TenantMigrationDonorService::Instance::_makeRecipientCmdExecutor() {
     auto hookList = std::make_unique<rpc::EgressMetadataHookList>();
 
     auto connPoolOptions = executor::ConnectionPool::Options();
-#ifdef MONGO_CONFIG_SSL
-    uassert(ErrorCodes::IllegalOperation,
-            "Cannot run tenant migration as SSL is not enabled",
-            getSSLGlobalParams().sslMode.load() != SSLParams::SSLMode_disabled);
     auto donorCertificate = _stateDoc.getDonorCertificateForRecipient();
-    auto donorSSLClusterPEMPayload = donorCertificate.getCertificate().toString() + "\n" +
-        donorCertificate.getPrivateKey().toString();
-    connPoolOptions.transientSSLParams =
-        TransientSSLParams{_recipientUri.connectionString(), std::move(donorSSLClusterPEMPayload)};
+    auto recipientCertificate = _stateDoc.getRecipientCertificateForDonor();
+    if (donorCertificate) {
+        invariant(!repl::tenantMigrationDisableX509Auth);
+        invariant(recipientCertificate);
+        invariant(_sslMode == transport::kEnableSSL);
+#ifdef MONGO_CONFIG_SSL
+        uassert(ErrorCodes::IllegalOperation,
+                "Cannot run tenant migration with x509 authentication as SSL is not enabled",
+                getSSLGlobalParams().sslMode.load() != SSLParams::SSLMode_disabled);
+        auto donorSSLClusterPEMPayload = donorCertificate->getCertificate().toString() + "\n" +
+            donorCertificate->getPrivateKey().toString();
+        connPoolOptions.transientSSLParams = TransientSSLParams{
+            _recipientUri.connectionString(), std::move(donorSSLClusterPEMPayload)};
 #else
-    // If SSL is not supported, the donorStartMigration command should have failed certificate field
-    // validation.
-    MONGO_UNREACHABLE;
+        // If SSL is not supported, the donorStartMigration command should have failed certificate
+        // field validation.
+        MONGO_UNREACHABLE;
 #endif
+    } else {
+        invariant(repl::tenantMigrationDisableX509Auth);
+        invariant(!recipientCertificate);
+        invariant(_sslMode == transport::kGlobalSSLMode);
+    }
+
     return std::make_shared<executor::ThreadPoolTaskExecutor>(
         std::make_unique<ThreadPool>(threadPoolOptions),
         executor::makeNetworkInterface(
@@ -359,7 +372,7 @@ TenantMigrationDonorService::Instance::_fetchAndStoreRecipientClusterTimeKeyDocs
                 executor::RemoteCommandRequest::kNoTimeout, /* getMoreNetworkTimeout */
                 RemoteCommandRetryScheduler::makeRetryPolicy<ErrorCategory::RetriableError>(
                     kMaxRecipientKeyDocsFindAttempts, executor::RemoteCommandRequest::kNoTimeout),
-                transport::kEnableSSL);
+                _sslMode);
             uassertStatusOK(fetcher->schedule());
 
             {
@@ -596,7 +609,7 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendCommandToRecipi
                                                               rpc::makeEmptyMetadata(),
                                                               nullptr,
                                                               kRecipientSyncDataTimeout);
-                       request.sslMode = transport::kEnableSSL;
+                       request.sslMode = _sslMode;
 
                        return (_recipientCmdExecutor)
                            ->scheduleRemoteCommand(std::move(request),
@@ -629,13 +642,17 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendRecipientSyncDa
     const auto cmdObj = [&] {
         auto donorConnString =
             repl::ReplicationCoordinator::get(opCtx)->getConfig().getConnectionString();
+
         RecipientSyncData request;
         request.setDbName(NamespaceString::kAdminDb);
-        request.setMigrationRecipientCommonData({_stateDoc.getId(),
-                                                 donorConnString.toString(),
-                                                 _stateDoc.getTenantId().toString(),
-                                                 _stateDoc.getReadPreference(),
-                                                 _stateDoc.getRecipientCertificateForDonor()});
+
+        MigrationRecipientCommonData commonData(_stateDoc.getId(),
+                                                donorConnString.toString(),
+                                                _stateDoc.getTenantId().toString(),
+                                                _stateDoc.getReadPreference());
+        commonData.setRecipientCertificateForDonor(_stateDoc.getRecipientCertificateForDonor());
+        request.setMigrationRecipientCommonData(commonData);
+
         request.setReturnAfterReachingDonorTimestamp(_stateDoc.getBlockTimestamp());
         return request.toBSON(BSONObj());
     }();
@@ -652,13 +669,17 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendRecipientForget
 
     auto donorConnString =
         repl::ReplicationCoordinator::get(opCtx)->getConfig().getConnectionString();
+
     RecipientForgetMigration request;
     request.setDbName(NamespaceString::kAdminDb);
-    request.setMigrationRecipientCommonData({_stateDoc.getId(),
-                                             donorConnString.toString(),
-                                             _stateDoc.getTenantId().toString(),
-                                             _stateDoc.getReadPreference(),
-                                             _stateDoc.getRecipientCertificateForDonor()});
+
+    MigrationRecipientCommonData commonData(_stateDoc.getId(),
+                                            donorConnString.toString(),
+                                            _stateDoc.getTenantId().toString(),
+                                            _stateDoc.getReadPreference());
+    commonData.setRecipientCertificateForDonor(_stateDoc.getRecipientCertificateForDonor());
+    request.setMigrationRecipientCommonData(commonData);
+
     return _sendCommandToRecipient(executor, recipientTargeterRS, request.toBSON(BSONObj()));
 }
 

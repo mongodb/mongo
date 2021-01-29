@@ -64,13 +64,24 @@ public:
 
             const auto& cmd = request();
 
-            const TenantMigrationDonorDocument stateDoc(
-                cmd.getMigrationId(),
-                cmd.getRecipientConnectionString().toString(),
-                cmd.getReadPreference(),
-                cmd.getTenantId().toString(),
-                cmd.getDonorCertificateForRecipient(),
-                cmd.getRecipientCertificateForDonor());
+            TenantMigrationDonorDocument stateDoc(cmd.getMigrationId(),
+                                                  cmd.getRecipientConnectionString().toString(),
+                                                  cmd.getReadPreference(),
+                                                  cmd.getTenantId().toString());
+
+            if (!repl::tenantMigrationDisableX509Auth) {
+                uassert(ErrorCodes::InvalidOptions,
+                        str::stream() << "'" << Request::kDonorCertificateForRecipientFieldName
+                                      << "' is a required field",
+                        cmd.getDonorCertificateForRecipient());
+                uassert(ErrorCodes::InvalidOptions,
+                        str::stream() << "'" << Request::kRecipientCertificateForDonorFieldName
+                                      << "' is a required field",
+                        cmd.getRecipientCertificateForDonor());
+                stateDoc.setDonorCertificateForRecipient(cmd.getDonorCertificateForRecipient());
+                stateDoc.setRecipientCertificateForDonor(cmd.getRecipientCertificateForDonor());
+            }
+
             const auto stateDocBson = stateDoc.toBSON();
 
             auto donorService =

@@ -414,8 +414,8 @@ TEST_F(TenantMigrationRecipientServiceTest, BasicTenantMigrationRecipientService
         migrationUUID,
         "donor-rs/localhost:12345",
         "tenantA",
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet::primaryOnly()),
-        kRecipientPEMPayload);
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet::primaryOnly()));
+    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Create and start the instance.
     auto opCtx = makeOperationContext();
@@ -439,8 +439,8 @@ TEST_F(TenantMigrationRecipientServiceTest, InstanceReportsErrorOnFailureWhilePe
         migrationUUID,
         "donor-rs/localhost:12345",
         "tenantA",
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet::primaryOnly()),
-        kRecipientPEMPayload);
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet::primaryOnly()));
+    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Create and start the instance.
     auto opCtx = makeOperationContext();
@@ -471,8 +471,8 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientConnection_P
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        kRecipientPEMPayload);
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Create and start the instance.
     auto opCtx = makeOperationContext();
@@ -519,8 +519,8 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientConnection_S
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
-        ReadPreferenceSetting(ReadPreference::SecondaryOnly),
-        kRecipientPEMPayload);
+        ReadPreferenceSetting(ReadPreference::SecondaryOnly));
+    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Create and start the instance.
     auto opCtx = makeOperationContext();
@@ -572,8 +572,8 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientConnection_P
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        kRecipientPEMPayload);
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Create and start the instance.
     auto opCtx = makeOperationContext();
@@ -627,8 +627,8 @@ TEST_F(TenantMigrationRecipientServiceTest,
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        kRecipientPEMPayload);
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Hang the migration before attempting to connect to clients.
     auto hangFp =
@@ -699,8 +699,8 @@ TEST_F(TenantMigrationRecipientServiceTest,
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        kRecipientPEMPayload);
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Hang the migration before attempting to connect to clients.
     auto hangFp =
@@ -766,8 +766,8 @@ TEST_F(TenantMigrationRecipientServiceTest,
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
-        ReadPreferenceSetting(ReadPreference::Nearest),
-        kRecipientPEMPayload);
+        ReadPreferenceSetting(ReadPreference::Nearest));
+    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Hang the migration before attempting to connect to clients.
     auto hangFp =
@@ -841,8 +841,8 @@ TEST_F(TenantMigrationRecipientServiceTest,
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
-        ReadPreferenceSetting(ReadPreference::PrimaryPreferred),
-        kRecipientPEMPayload);
+        ReadPreferenceSetting(ReadPreference::PrimaryPreferred));
+    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Hang the migration before attempting to connect to clients.
     auto hangFp =
@@ -907,8 +907,8 @@ TEST_F(TenantMigrationRecipientServiceTest,
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
-        ReadPreferenceSetting(ReadPreference::PrimaryPreferred),
-        kRecipientPEMPayload);
+        ReadPreferenceSetting(ReadPreference::PrimaryPreferred));
+    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Hang the migration before attempting to connect to clients.
     auto hangFp =
@@ -978,8 +978,8 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientConnection_P
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
-        ReadPreferenceSetting(ReadPreference::PrimaryPreferred),
-        kRecipientPEMPayload);
+        ReadPreferenceSetting(ReadPreference::PrimaryPreferred));
+    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Create and start the instance.
     auto opCtx = makeOperationContext();
@@ -1021,8 +1021,8 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientConnection_B
         migrationUUID,
         "broken,connect,string,no,set,name",
         "tenantA",
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        kRecipientPEMPayload);
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Create and start the instance.
     auto opCtx = makeOperationContext();
@@ -1042,8 +1042,8 @@ TEST_F(TenantMigrationRecipientServiceTest,
         migrationUUID,
         "localhost:12345",
         "tenantA",
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        kRecipientPEMPayload);
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Create and start the instance.
     auto opCtx = makeOperationContext();
@@ -1066,8 +1066,8 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientGetStartOpTi
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        kRecipientPEMPayload);
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Create and start the instance.
     auto opCtx = makeOperationContext();
@@ -1103,8 +1103,8 @@ TEST_F(TenantMigrationRecipientServiceTest,
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        kRecipientPEMPayload);
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Create and start the instance.
     auto opCtx = makeOperationContext();
@@ -1145,8 +1145,8 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientGetStartOpTi
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        kRecipientPEMPayload);
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Create and start the instance.
     auto opCtx = makeOperationContext();
@@ -1189,8 +1189,8 @@ TEST_F(TenantMigrationRecipientServiceTest,
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        kRecipientPEMPayload);
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Create and start the instance.
     auto opCtx = makeOperationContext();
@@ -1223,8 +1223,8 @@ TEST_F(TenantMigrationRecipientServiceTest,
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        kRecipientPEMPayload);
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Create and start the instance.  Fail to populate the remote oplog mock.
     auto opCtx = makeOperationContext();
@@ -1256,8 +1256,8 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientStartOplogFe
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        kRecipientPEMPayload);
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     auto opCtx = makeOperationContext();
     std::shared_ptr<TenantMigrationRecipientService::Instance> instance;
@@ -1309,8 +1309,8 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientStartsCloner
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        kRecipientPEMPayload);
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     auto opCtx = makeOperationContext();
     std::shared_ptr<TenantMigrationRecipientService::Instance> instance;
@@ -1362,8 +1362,8 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogFetcherFailsDuringOplogApplicat
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        kRecipientPEMPayload);
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Skip the cloners in this test, so we provide an empty list of databases.
     MockRemoteDBServer* const _donorServer =
@@ -1416,8 +1416,8 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogFetcherResumesFromTopOfOplogBuf
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        kRecipientPEMPayload);
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // We skip cloning here as a way to simulate that the recipient service has detected an existing
     // migration on startup and will resume oplog fetching from the appropriate optime.
@@ -1519,8 +1519,8 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogFetcherNoDocInBufferToResumeFro
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        kRecipientPEMPayload);
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // We skip cloning here as a way to simulate that the recipient service has detected an existing
     // migration on startup and will attempt to resume oplog fetching from the appropriate optime.
@@ -1624,8 +1624,8 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogApplierResumesFromLastNoOpOplog
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        kRecipientPEMPayload);
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // We skip cloning here as a way to simulate that the recipient service has detected an existing
     // migration on startup and will attempt to resume oplog fetching from the appropriate optime.
@@ -1743,8 +1743,8 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogApplierResumesFromStartDonorApp
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        kRecipientPEMPayload);
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // We skip cloning here as a way to simulate that the recipient service has detected an existing
     // migration on startup and will attempt to resume oplog fetching from the appropriate optime.
@@ -1897,8 +1897,8 @@ TEST_F(TenantMigrationRecipientServiceTest,
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        kRecipientPEMPayload);
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // We skip cloning here as a way to simulate that the recipient service has detected an existing
     // migration on startup and will resume oplog fetching from the appropriate optime.
@@ -2001,8 +2001,8 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogApplierFails) {
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        kRecipientPEMPayload);
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Skip the cloners in this test, so we provide an empty list of databases.
     MockRemoteDBServer* const _donorServer =
@@ -2065,8 +2065,8 @@ TEST_F(TenantMigrationRecipientServiceTest, StoppingApplierAllowsCompletion) {
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        kRecipientPEMPayload);
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Skip the cloners in this test, so we provide an empty list of databases.
     MockRemoteDBServer* const _donorServer =
@@ -2118,8 +2118,8 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientAddResumeTok
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        kRecipientPEMPayload);
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Skip the cloners in this test, so we provide an empty list of databases.
     MockRemoteDBServer* const _donorServer =
@@ -2218,8 +2218,8 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientForgetMigration_BeforeRun) 
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        kRecipientPEMPayload);
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     auto fp = globalFailPointRegistry().find("pauseBeforeRunTenantMigrationRecipientInstance");
     fp->setMode(FailPoint::alwaysOn);
@@ -2253,8 +2253,8 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientForgetMigration_FailToIniti
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        kRecipientPEMPayload);
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     auto opCtx = makeOperationContext();
     auto instance = repl::TenantMigrationRecipientService::Instance::getOrCreate(
@@ -2285,8 +2285,8 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientForgetMigration_WaitUntilSt
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        kRecipientPEMPayload);
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     auto fp = globalFailPointRegistry().find("pauseAfterRunTenantMigrationRecipientInstance");
     auto initialTimesEntered = fp->setMode(FailPoint::alwaysOn);
@@ -2365,8 +2365,8 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientForgetMigration_AfterStartO
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        kRecipientPEMPayload);
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Create and start the instance.
     auto opCtx = makeOperationContext();
@@ -2426,8 +2426,8 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientForgetMigration_AfterConsis
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        kRecipientPEMPayload);
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Skip the cloners in this test, so we provide an empty list of databases.
     MockRemoteDBServer* const _donorServer =
@@ -2512,8 +2512,8 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientForgetMigration_AfterFail) 
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        kRecipientPEMPayload);
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Skip the cloners in this test, so we provide an empty list of databases.
     MockRemoteDBServer* const _donorServer =
@@ -2591,8 +2591,8 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientForgetMigration_FailToMarkG
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        kRecipientPEMPayload);
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Create and start the instance.
     auto opCtx = makeOperationContext();
@@ -2640,8 +2640,8 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientServiceRecor
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        kRecipientPEMPayload);
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Create and start the instance.
     auto opCtx = makeOperationContext();
@@ -2672,8 +2672,8 @@ TEST_F(TenantMigrationRecipientServiceTest,
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        kRecipientPEMPayload);
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Add an FCV value as if it was from a previous attempt.
     auto currentFCV = serverGlobalParams.featureCompatibility.getVersion();
@@ -2708,8 +2708,8 @@ TEST_F(TenantMigrationRecipientServiceTest,
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        kRecipientPEMPayload);
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Add an FCV value as if it was from a previous attempt, making sure we set a different
     // version from the one we currently have.

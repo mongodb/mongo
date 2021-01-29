@@ -289,8 +289,10 @@ public:
         SemiFuture<void> _markStateDocAsGarbageCollectable();
 
         /**
-         * Creates a client, connects it to the donor, and authenticates it using the migration
-         * certificate. Throws a user assertion on failure.
+         * Creates a client, connects it to the donor. If '_transientSSLParams' is not none, uses
+         * the migration certificate to do SSL authentication. Otherwise, uses the default
+         * authentication mode. Throws a user assertion on failure.
+         *
          */
         std::unique_ptr<DBClientConnection> _connectAndAuth(const HostAndPort& serverAddress,
                                                             StringData applicationName);
@@ -414,12 +416,15 @@ public:
 
         // This data is provided in the initial state doc and never changes.  We keep copies to
         // avoid having to obtain the mutex to access them.
-        const std::string _tenantId;                   // (R)
-        const UUID _migrationUuid;                     // (R)
-        const std::string _donorConnectionString;      // (R)
-        const MongoURI _donorUri;                      // (R)
-        const ReadPreferenceSetting _readPreference;   // (R)
-        const TransientSSLParams _transientSSLParams;  // (R)
+        const std::string _tenantId;                  // (R)
+        const UUID _migrationUuid;                    // (R)
+        const std::string _donorConnectionString;     // (R)
+        const MongoURI _donorUri;                     // (R)
+        const ReadPreferenceSetting _readPreference;  // (R)
+        // TODO (SERVER-54085): Remove server parameter tenantMigrationDisableX509Auth.
+        // Transient SSL params created based on the state doc if the server parameter
+        // 'tenantMigrationDisableX509Auth' is false.
+        const boost::optional<TransientSSLParams> _transientSSLParams = boost::none;  // (R)
 
         std::shared_ptr<ReplicaSetMonitor> _donorReplicaSetMonitor;  // (M)
 

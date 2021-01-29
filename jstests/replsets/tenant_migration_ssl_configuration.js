@@ -1,5 +1,6 @@
 /**
- * Test that tenant migration commands require certificate fields and SSL to be enabled.
+ * Test that tenant migration commands only require and use certificate fields, and require SSL to
+ * to be enabled when 'tenantMigrationDisableX509Auth' server parameter is false (default).
  *
  * @tags: [requires_fcv_47, requires_majority_read_concern, incompatible_with_eft]
  */
@@ -14,11 +15,17 @@ const kTenantId = "testTenantId";
 const kReadPreference = {
     mode: "primary"
 };
-const kMigrationCertificates = TenantMigrationUtil.makeMigrationCertificatesForTest();
+const kValidMigrationCertificates = TenantMigrationUtil.makeMigrationCertificatesForTest();
+const kExpiredMigrationCertificates = {
+    donorCertificateForRecipient: TenantMigrationUtil.getCertificateAndPrivateKey(
+        "jstests/libs/rs0_tenant_migration_expired.pem"),
+    recipientCertificateForDonor: TenantMigrationUtil.getCertificateAndPrivateKey(
+        "jstests/libs/rs1_tenant_migration_expired.pem")
+};
 
 (() => {
-    jsTest.log("Test that certificate fields are required fields for donorStartMigration and " +
-               "recipientSyncData");
+    jsTest.log(
+        "Test that certificate fields are required when tenantMigrationDisableX509Auth=false");
     const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
     if (!tenantMigrationTest.isFeatureFlagEnabled()) {
         jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
@@ -28,32 +35,32 @@ const kMigrationCertificates = TenantMigrationUtil.makeMigrationCertificatesForT
     const donorPrimary = tenantMigrationTest.getDonorPrimary();
     const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
 
-    jsTest.log(
-        "Test that 'donorCertificateForRecipient' is a required field for donorStartMigration");
+    jsTest.log("Test that donorStartMigration requires 'donorCertificateForRecipient' when  " +
+               "tenantMigrationDisableX509Auth=false");
     assert.commandFailedWithCode(donorPrimary.adminCommand({
         donorStartMigration: 1,
         migrationId: UUID(),
         recipientConnectionString: tenantMigrationTest.getRecipientRst().getURL(),
         tenantId: kTenantId,
         readPreference: kReadPreference,
-        recipientCertificateForDonor: kMigrationCertificates.recipientCertificateForDonor,
+        recipientCertificateForDonor: kValidMigrationCertificates.recipientCertificateForDonor,
     }),
-                                 40414);
+                                 ErrorCodes.InvalidOptions);
 
-    jsTest.log(
-        "Test that 'recipientCertificateForDonor' is a required field for donorStartMigration");
+    jsTest.log("Test that donorStartMigration requires 'recipientCertificateForDonor' when  " +
+               "tenantMigrationDisableX509Auth=false");
     assert.commandFailedWithCode(donorPrimary.adminCommand({
         donorStartMigration: 1,
         migrationId: UUID(),
         recipientConnectionString: tenantMigrationTest.getRecipientRst().getURL(),
         tenantId: kTenantId,
         readPreference: kReadPreference,
-        donorCertificateForRecipient: kMigrationCertificates.donorCertificateForRecipient,
+        donorCertificateForRecipient: kValidMigrationCertificates.donorCertificateForRecipient,
     }),
-                                 40414);
+                                 ErrorCodes.InvalidOptions);
 
-    jsTest.log(
-        "Test that 'recipientCertificateForDonor' is a required field for recipientSyncData");
+    jsTest.log("Test that recipientSyncData requires 'recipientCertificateForDonor' when " +
+               "tenantMigrationDisableX509Auth=false");
     assert.commandFailedWithCode(recipientPrimary.adminCommand({
         recipientSyncData: 1,
         migrationId: UUID(),
@@ -61,10 +68,10 @@ const kMigrationCertificates = TenantMigrationUtil.makeMigrationCertificatesForT
         tenantId: kTenantId,
         readPreference: kReadPreference
     }),
-                                 40414);
+                                 ErrorCodes.InvalidOptions);
 
-    jsTest.log(
-        "Test that 'recipientCertificateForDonor' is a required field for recipientForgetMigration");
+    jsTest.log("Test that recipientForgetMigration requires 'recipientCertificateForDonor' when " +
+               "tenantMigrationDisableX509Auth=false");
     assert.commandFailedWithCode(recipientPrimary.adminCommand({
         recipientForgetMigration: 1,
         migrationId: UUID(),
@@ -72,13 +79,14 @@ const kMigrationCertificates = TenantMigrationUtil.makeMigrationCertificatesForT
         tenantId: kTenantId,
         readPreference: kReadPreference
     }),
-                                 40414);
+                                 ErrorCodes.InvalidOptions);
 
     tenantMigrationTest.stop();
 })();
 
 (() => {
-    jsTest.log("Test that donorStartMigration fails if SSL is not enabled on the donor");
+    jsTest.log("Test that donorStartMigration fails if SSL is not enabled on the donor and " +
+               "tenantMigrationDisableX509Auth=false");
     const donorRst = new ReplSetTest({nodes: 1, name: "donor"});
     donorRst.startSet();
     donorRst.initiate();
@@ -98,8 +106,8 @@ const kMigrationCertificates = TenantMigrationUtil.makeMigrationCertificatesForT
         recipientConnectionString: tenantMigrationTest.getRecipientRst().getURL(),
         tenantId: kTenantId,
         readPreference: kReadPreference,
-        donorCertificateForRecipient: kMigrationCertificates.donorCertificateForRecipient,
-        recipientCertificateForDonor: kMigrationCertificates.recipientCertificateForDonor,
+        donorCertificateForRecipient: kValidMigrationCertificates.donorCertificateForRecipient,
+        recipientCertificateForDonor: kValidMigrationCertificates.recipientCertificateForDonor,
     }),
                                  ErrorCodes.IllegalOperation);
 
@@ -108,7 +116,8 @@ const kMigrationCertificates = TenantMigrationUtil.makeMigrationCertificatesForT
 })();
 
 (() => {
-    jsTest.log("Test that recipientSyncData fails if SSL is not enabled on the recipient");
+    jsTest.log("Test that recipientSyncData fails if SSL is not enabled on the recipient and " +
+               "tenantMigrationDisableX509Auth=false");
     const recipientRst = new ReplSetTest({nodes: 1, name: "recipient"});
     recipientRst.startSet();
     recipientRst.initiate();
@@ -128,7 +137,7 @@ const kMigrationCertificates = TenantMigrationUtil.makeMigrationCertificatesForT
         donorConnectionString: tenantMigrationTest.getDonorRst().getURL(),
         tenantId: kTenantId,
         readPreference: kReadPreference,
-        recipientCertificateForDonor: kMigrationCertificates.recipientCertificateForDonor,
+        recipientCertificateForDonor: kValidMigrationCertificates.recipientCertificateForDonor,
     }),
                                  ErrorCodes.IllegalOperation);
 
@@ -137,7 +146,8 @@ const kMigrationCertificates = TenantMigrationUtil.makeMigrationCertificatesForT
 })();
 
 (() => {
-    jsTest.log("Test that donorStartMigration fails if SSL is not enabled on the recipient");
+    jsTest.log("Test that donorStartMigration fails if SSL is not enabled on the recipient and " +
+               "tenantMigrationDisableX509Auth=false");
     const recipientRst = new ReplSetTest({nodes: 1, name: "recipient"});
     recipientRst.startSet();
     recipientRst.initiate();
@@ -157,8 +167,8 @@ const kMigrationCertificates = TenantMigrationUtil.makeMigrationCertificatesForT
         recipientConnectionString: tenantMigrationTest.getRecipientRst().getURL(),
         tenantId: kTenantId,
         readPreference: kReadPreference,
-        donorCertificateForRecipient: kMigrationCertificates.donorCertificateForRecipient,
-        recipientCertificateForDonor: kMigrationCertificates.recipientCertificateForDonor,
+        donorCertificateForRecipient: kValidMigrationCertificates.donorCertificateForRecipient,
+        recipientCertificateForDonor: kValidMigrationCertificates.recipientCertificateForDonor,
     };
 
     const stateRes = assert.commandWorked(TenantMigrationUtil.runTenantMigrationCommand(
@@ -171,6 +181,230 @@ const kMigrationCertificates = TenantMigrationUtil.makeMigrationCertificatesForT
     // connection with the recipient.
     assert.eq(stateRes.abortReason.code, ErrorCodes.HostUnreachable);
 
+    recipientRst.stopSet();
+    tenantMigrationTest.stop();
+})();
+
+(() => {
+    jsTest.log("Test that recipientSyncData doesn't require 'recipientCertificateForDonor' when " +
+               "tenantMigrationDisableX509Auth=true");
+    const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
+    const recipientRst = new ReplSetTest({
+        nodes: 1,
+        name: "recipient",
+        nodeOptions: Object.assign(migrationX509Options.recipient,
+                                   {setParameter: {tenantMigrationDisableX509Auth: true}})
+    });
+
+    recipientRst.startSet();
+    recipientRst.initiate();
+
+    const tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), recipientRst});
+    if (!tenantMigrationTest.isFeatureFlagEnabled()) {
+        jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
+        recipientRst.stopSet();
+        return;
+    }
+
+    const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
+
+    assert.commandWorked(recipientPrimary.adminCommand({
+        recipientSyncData: 1,
+        migrationId: UUID(),
+        donorConnectionString: tenantMigrationTest.getDonorRst().getURL(),
+        tenantId: kTenantId,
+        readPreference: kReadPreference
+    }));
+
+    recipientRst.stopSet();
+    tenantMigrationTest.stop();
+})();
+
+(() => {
+    jsTest.log(
+        "Test that recipientForgetMigration doesn't require 'recipientCertificateForDonor' when " +
+        "tenantMigrationDisableX509Auth=true");
+    const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
+    const recipientRst = new ReplSetTest({
+        nodes: 1,
+        name: "recipient",
+        nodeOptions: Object.assign(migrationX509Options.recipient,
+                                   {setParameter: {tenantMigrationDisableX509Auth: true}})
+    });
+
+    recipientRst.startSet();
+    recipientRst.initiate();
+
+    const tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), recipientRst});
+    if (!tenantMigrationTest.isFeatureFlagEnabled()) {
+        jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
+        recipientRst.stopSet();
+        return;
+    }
+
+    const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
+
+    assert.commandWorked(recipientPrimary.adminCommand({
+        recipientForgetMigration: 1,
+        migrationId: UUID(),
+        donorConnectionString: tenantMigrationTest.getDonorRst().getURL(),
+        tenantId: kTenantId,
+        readPreference: kReadPreference
+    }));
+
+    recipientRst.stopSet();
+    tenantMigrationTest.stop();
+})();
+
+(() => {
+    jsTest.log("Test that donorStartMigration doesn't require certificate fields when " +
+               "tenantMigrationDisableX509Auth=true");
+    const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
+    const donorRst = new ReplSetTest({
+        nodes: 1,
+        name: "donor",
+        nodeOptions: Object.assign(migrationX509Options.donor,
+                                   {setParameter: {tenantMigrationDisableX509Auth: true}})
+    });
+    const recipientRst = new ReplSetTest({
+        nodes: 1,
+        name: "recipient",
+        nodeOptions: Object.assign(migrationX509Options.recipient,
+                                   {setParameter: {tenantMigrationDisableX509Auth: true}})
+    });
+
+    donorRst.startSet();
+    donorRst.initiate();
+
+    recipientRst.startSet();
+    recipientRst.initiate();
+
+    const tenantMigrationTest =
+        new TenantMigrationTest({name: jsTestName(), donorRst, recipientRst});
+    if (!tenantMigrationTest.isFeatureFlagEnabled()) {
+        jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
+        donorRst.stopSet();
+        recipientRst.stopSet();
+        return;
+    }
+
+    const migrationId = UUID();
+    const donorStartMigrationCmdObj = {
+        donorStartMigration: 1,
+        migrationId: migrationId,
+        recipientConnectionString: tenantMigrationTest.getRecipientRst().getURL(),
+        tenantId: kTenantId,
+        readPreference: kReadPreference
+    };
+    const stateRes = assert.commandWorked(TenantMigrationUtil.runTenantMigrationCommand(
+        donorStartMigrationCmdObj,
+        donorRst,
+        false /* retryOnRetryableErrors */,
+        TenantMigrationUtil.isMigrationCompleted /* shouldStopFunc */));
+    assert.eq(stateRes.state, TenantMigrationTest.State.kCommitted);
+    assert.commandWorked(
+        donorRst.getPrimary().adminCommand({donorForgetMigration: 1, migrationId: migrationId}));
+})();
+
+(() => {
+    jsTest.log("Test that tenant migration doesn't fail if SSL is not enabled on the donor and " +
+               "the recipient and tenantMigrationDisableX509Auth=true");
+
+    const donorRst = new ReplSetTest({
+        nodes: 1,
+        name: "donor",
+        nodeOptions: {setParameter: {tenantMigrationDisableX509Auth: true}}
+    });
+    const recipientRst = new ReplSetTest({
+        nodes: 1,
+        name: "recipient",
+        nodeOptions: {setParameter: {tenantMigrationDisableX509Auth: true}}
+    });
+
+    donorRst.startSet();
+    donorRst.initiate();
+
+    recipientRst.startSet();
+    recipientRst.initiate();
+
+    const tenantMigrationTest =
+        new TenantMigrationTest({name: jsTestName(), donorRst, recipientRst});
+    if (!tenantMigrationTest.isFeatureFlagEnabled()) {
+        jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
+        donorRst.stopSet();
+        recipientRst.stopSet();
+        return;
+    }
+
+    const donorStartMigrationCmdObj = {
+        donorStartMigration: 1,
+        migrationId: UUID(),
+        recipientConnectionString: tenantMigrationTest.getRecipientRst().getURL(),
+        tenantId: kTenantId,
+        readPreference: kReadPreference
+    };
+
+    const stateRes = assert.commandWorked(TenantMigrationUtil.runTenantMigrationCommand(
+        donorStartMigrationCmdObj,
+        donorRst,
+        false /* retryOnRetryableErrors */,
+        TenantMigrationUtil.isMigrationCompleted /* shouldStopFunc */));
+    assert.eq(stateRes.state, TenantMigrationTest.State.kCommitted);
+
+    donorRst.stopSet();
+    recipientRst.stopSet();
+    tenantMigrationTest.stop();
+})();
+
+(() => {
+    jsTest.log(
+        "Test that input certificate fields are not used when tenantMigrationDisableX509Auth=true");
+    const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
+    const donorRst = new ReplSetTest({
+        nodes: 1,
+        name: "donor",
+        nodeOptions: Object.assign(migrationX509Options.donor,
+                                   {setParameter: {tenantMigrationDisableX509Auth: true}})
+    });
+    const recipientRst = new ReplSetTest({
+        nodes: 1,
+        name: "recipient",
+        nodeOptions: Object.assign(migrationX509Options.recipient,
+                                   {setParameter: {tenantMigrationDisableX509Auth: true}})
+    });
+
+    donorRst.startSet();
+    donorRst.initiate();
+
+    recipientRst.startSet();
+    recipientRst.initiate();
+
+    const tenantMigrationTest =
+        new TenantMigrationTest({name: jsTestName(), donorRst, recipientRst});
+    if (!tenantMigrationTest.isFeatureFlagEnabled()) {
+        jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
+        donorRst.stopSet();
+        recipientRst.stopSet();
+        return;
+    }
+
+    const donorStartMigrationCmdObj = {
+        donorStartMigration: 1,
+        migrationId: UUID(),
+        recipientConnectionString: tenantMigrationTest.getRecipientRst().getURL(),
+        tenantId: kTenantId,
+        readPreference: kReadPreference,
+        donorCertificateForRecipient: kExpiredMigrationCertificates.donorCertificateForRecipient,
+        recipientCertificateForDonor: kExpiredMigrationCertificates.recipientCertificateForDonor,
+    };
+    const stateRes = assert.commandWorked(TenantMigrationUtil.runTenantMigrationCommand(
+        donorStartMigrationCmdObj,
+        donorRst,
+        false /* retryOnRetryableErrors */,
+        TenantMigrationUtil.isMigrationCompleted /* shouldStopFunc */));
+    assert.eq(stateRes.state, TenantMigrationTest.State.kCommitted);
+
+    donorRst.stopSet();
     recipientRst.stopSet();
     tenantMigrationTest.stop();
 })();

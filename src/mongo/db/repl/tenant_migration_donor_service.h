@@ -149,8 +149,9 @@ public:
         const NamespaceString _stateDocumentsNS = NamespaceString::kTenantMigrationDonorsNamespace;
 
         /**
-         * Makes a task executor for executing commands against the recipient on an SSL connection
-         * that uses the migration certificate.
+         * Makes a task executor for executing commands against the recipient. If the server
+         * parameter 'tenantMigrationDisableX509Auth' is false, configures the executor to use the
+         * migration certificate to establish an SSL connection to the recipient.
          */
         std::shared_ptr<executor::ThreadPoolTaskExecutor> _makeRecipientCmdExecutor();
 
@@ -226,6 +227,8 @@ public:
         TenantMigrationDonorDocument _stateDoc;
         const std::string _instanceName;
         const MongoURI _recipientUri;
+        // TODO (SERVER-54085): Remove server parameter tenantMigrationDisableX509Auth.
+        const transport::ConnectSSLMode _sslMode;
 
         // Task executor used for executing commands against the recipient.
         std::shared_ptr<executor::TaskExecutor> _recipientCmdExecutor;

@@ -80,11 +80,15 @@ commands:
           The SSL certificate and private key that the donor should use to authenticate to the
           recipient.
         type: TenantMigrationPEMPayload
+        # TODO (SERVER-54085): Remove server parameter tenantMigrationDisableX509Auth.
+        optional: true
       recipientCertificateForDonor:
         description: >-
           The SSL certificate and private key that the recipient should use to authenticate to the
           donor.
         type: TenantMigrationPEMPayload
+        # TODO (SERVER-54085): Remove server parameter tenantMigrationDisableX509Auth.
+        optional: true
 
   donorForgetMigration:
     description: "Parser for the 'donorForgetMigration' command."
