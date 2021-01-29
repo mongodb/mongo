@@ -65,11 +65,14 @@ OplogFetcherMock::~OplogFetcherMock() {
     if (_waitForFinishThread.joinable()) {
         _waitForFinishThread.join();
     }
+    stdx::unique_lock ul(_mutex);
+    _inTestCodeCV.wait(ul, [this] { return _inTestCodeSemaphore == 0; });
 }
 
 void OplogFetcherMock::receiveBatch(CursorId cursorId,
                                     OplogFetcher::Documents documents,
                                     boost::optional<Timestamp> resumeToken) {
+    TestCodeBlock tcb(this);
     {
         stdx::lock_guard<Latch> lock(_mutex);
         if (!_isActive_inlock()) {
@@ -131,6 +134,7 @@ void OplogFetcherMock::receiveBatch(CursorId cursorId,
 }
 
 void OplogFetcherMock::simulateResponseError(Status status) {
+    TestCodeBlock tcb(this);
     invariant(!status.isOK());
     // Shutdown the OplogFetcher with error if it cannot restart.
     if (!_oplogFetcherRestartDecision->shouldContinue(this, status)) {

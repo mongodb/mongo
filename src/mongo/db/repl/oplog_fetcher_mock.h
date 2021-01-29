@@ -83,6 +83,22 @@ private:
     Mutex* _getMutex() noexcept override;
 
     // ============= End AbstractAsyncComponent overrides ==============
+    class TestCodeBlock {
+    public:
+        TestCodeBlock(OplogFetcherMock* mock) : _mock(mock) {
+            stdx::lock_guard lk(_mock->_mutex);
+            _mock->_inTestCodeSemaphore++;
+        }
+
+        ~TestCodeBlock() {
+            stdx::lock_guard lk(_mock->_mutex);
+            _mock->_inTestCodeSemaphore--;
+            _mock->_inTestCodeCV.notify_one();
+        }
+
+    private:
+        OplogFetcherMock* _mock;
+    };
 
     OpTime _getLastOpTimeFetched() const override;
 
@@ -110,6 +126,11 @@ private:
     // Thread to wait for _finishPromise and call _onShutdownCallbackFn with the given status only
     // once before the OplogFetcher finishes.
     stdx::thread _waitForFinishThread;
+
+    // Counts the number of times we are in simulateReceiveBatch or simulateError, so we can
+    // delay destruction until those calls complete.
+    int _inTestCodeSemaphore = 0;
+    stdx::condition_variable _inTestCodeCV;
 
     bool _first = true;
 };
