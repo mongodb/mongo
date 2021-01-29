@@ -167,7 +167,7 @@ class TestFetchArtifactsForPreviousCompileTask(unittest.TestCase):
         artifact_mock.url = "http://s3.amazon.com/mciuploads/mongodb/build_var//binaries/mongo-test.tgz"
         artifacts_mock = [artifact_mock]
 
-        task_response = MagicMock(status="success", display_name="compile")
+        task_response = MagicMock(status="success", display_name="archive_dist_test")
         task_response.artifacts = artifacts_mock
         build.get_tasks.return_value = [task_response]
 
@@ -186,7 +186,7 @@ class TestFetchArtifactsForPreviousCompileTask(unittest.TestCase):
 
         artifacts_mock = []
 
-        task_response = MagicMock(status="success", display_name="compile")
+        task_response = MagicMock(status="success", display_name="archive_dist_test")
         task_response.artifacts = artifacts_mock
         build.get_tasks.return_value = [task_response]
 
@@ -198,7 +198,7 @@ class TestFetchArtifactsForPreviousCompileTask(unittest.TestCase):
         build_id = "project_variant_patch_a22_date"
         build = MagicMock(id=build_id)
 
-        task_response = MagicMock(status="failure", display_name="compile")
+        task_response = MagicMock(status="failure", display_name="archive_dist_test")
         task_response.is_success.return_value = False
         build.get_tasks.return_value = [task_response]
 
@@ -208,7 +208,7 @@ class TestFetchArtifactsForPreviousCompileTask(unittest.TestCase):
 
 class TestFindPreviousCompileTask(unittest.TestCase):
     def test_find_task(self):
-        task_response = MagicMock(status="success", display_name="compile")
+        task_response = MagicMock(status="success", display_name="archive_dist_test")
         build = MagicMock()
         build.get_tasks.return_value = [task_response]
 

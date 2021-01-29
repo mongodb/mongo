@@ -34,7 +34,7 @@ CONFIG_DIRECTORY = "generated_burn_in_tags_config"
 CONFIG_FILE = "burn_in_tags_gen.json"
 EVERGREEN_FILE = "etc/evergreen.yml"
 EVG_CONFIG_FILE = ".evergreen.yml"
-COMPILE_TASK = "compile_without_package_TG"
+COMPILE_TASK = "compile_and_archive_dist_test_TG"
 TASK_ID_EXPANSION = "task_id"
 
 ConfigOptions = namedtuple("ConfigOptions", [
