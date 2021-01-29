@@ -36,6 +36,7 @@
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/db/update/update_oplog_entry_version.h"
+#include "mongo/logv2/redaction.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/visit_helper.h"
@@ -57,13 +58,21 @@ void checkOpCountForCommand(const T& op, size_t numOps) {
                           << write_ops::kMaxWriteBatchSize << ". Got " << numOps << " operations.",
             numOps != 0 && numOps <= write_ops::kMaxWriteBatchSize);
 
-    const auto& stmtIds = op.getWriteCommandBase().getStmtIds();
-    uassert(ErrorCodes::InvalidLength,
-            "Number of statement ids must match the number of batch entries",
-            !stmtIds || stmtIds->size() == numOps);
-    uassert(ErrorCodes::InvalidOptions,
-            "May not specify both stmtId and stmtIds in write command",
-            !stmtIds || !op.getWriteCommandBase().getStmtId());
+    if (const auto& stmtIds = op.getWriteCommandBase().getStmtIds()) {
+        uassert(
+            ErrorCodes::InvalidLength,
+            str::stream() << "Number of statement ids must match the number of batch entries. Got "
+                          << stmtIds->size() << " statement ids but " << numOps
+                          << " operations. Statement ids: " << BSON("stmtIds" << *stmtIds)
+                          << ". Write command: " << redact(op.toBSON({})),
+            stmtIds->size() == numOps);
+        uassert(ErrorCodes::InvalidOptions,
+                str::stream() << "May not specify both stmtId and stmtIds in write command. Got "
+                              << BSON("stmtId" << *op.getWriteCommandBase().getStmtId() << "stmtIds"
+                                               << *stmtIds)
+                              << ". Write command: " << redact(op.toBSON({})),
+                !op.getWriteCommandBase().getStmtId());
+    }
 }
 
 void validateInsertOp(const write_ops::Insert& insertOp) {
