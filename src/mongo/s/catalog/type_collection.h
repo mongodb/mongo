@@ -151,8 +151,6 @@ public:
     bool getAllowBalance() const {
         return !getNoBalance();
     }
-
-    bool hasSameOptions(const CollectionType& other) const;
 };
 
 }  // namespace mongo

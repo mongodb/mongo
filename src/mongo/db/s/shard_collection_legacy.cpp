@@ -107,35 +107,32 @@ void uassertStatusOKWithWarning(const Status& status) {
  * If the collection is already sharded with the same options, returns the existing collection's
  * full spec, else returns boost::none.
  */
-boost::optional<CollectionType> checkIfCollectionAlreadyShardedWithSameOptions(
+boost::optional<CreateCollectionResponse> checkIfCollectionAlreadyShardedWithSameOptions(
     OperationContext* opCtx, const ShardsvrShardCollectionRequest& request) {
-    auto const catalogClient = Grid::get(opCtx)->catalogClient();
+    const auto& nss = *request.get_shardsvrShardCollection();
+    auto cm = uassertStatusOK(
+        Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(opCtx, nss));
 
-    CollectionType existingColl;
-    try {
-        existingColl = catalogClient->getCollection(opCtx,
-                                                    *request.get_shardsvrShardCollection(),
-                                                    repl::ReadConcernLevel::kMajorityReadConcern);
-    } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-        // Not currently sharded.
+    if (!cm.isSharded()) {
         return boost::none;
     }
 
-    CollectionType newColl(
-        *request.get_shardsvrShardCollection(), OID::gen(), Date_t::now(), UUID::gen());
-    newColl.setKeyPattern(KeyPattern(request.getKey()));
-    newColl.setDefaultCollation(*request.getCollation());
-    newColl.setUnique(request.getUnique());
+    auto defaultCollator =
+        cm.getDefaultCollator() ? cm.getDefaultCollator()->getSpec().toBSON() : BSONObj();
 
     // If the collection is already sharded, fail if the deduced options in this request do not
     // match the options the collection was originally sharded with.
     uassert(ErrorCodes::AlreadyInitialized,
-            str::stream() << "sharding already enabled for collection "
-                          << *request.get_shardsvrShardCollection() << " with options "
-                          << existingColl.toString(),
-            newColl.hasSameOptions(existingColl));
+            str::stream() << "sharding already enabled for collection " << nss,
+            SimpleBSONObjComparator::kInstance.evaluate(cm.getShardKeyPattern().toBSON() ==
+                                                        request.getKey()) &&
+                SimpleBSONObjComparator::kInstance.evaluate(defaultCollator ==
+                                                            *request.getCollation()) &&
+                cm.isUnique() == request.getUnique());
 
-    return existingColl;
+    CreateCollectionResponse response(cm.getVersion());
+    response.setCollectionUUID(cm.getUUID());
+    return response;
 }
 
 void checkForExistingChunks(OperationContext* opCtx, const NamespaceString& nss) {
@@ -535,12 +532,9 @@ CreateCollectionResponse shardCollection(OperationContext* opCtx,
                                          bool mustTakeDistLock) {
     CreateCollectionResponse shardCollectionResponse;
     // Fast check for whether the collection is already sharded without taking any locks
-    if (auto collectionOptional = checkIfCollectionAlreadyShardedWithSameOptions(opCtx, request)) {
-        auto cri =
-            uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
-        shardCollectionResponse.setCollectionUUID(collectionOptional->getUuid());
-        shardCollectionResponse.setCollectionVersion(cri.getVersion());
-        return shardCollectionResponse;
+    if (auto createCollectionResponseOpt =
+            checkIfCollectionAlreadyShardedWithSameOptions(opCtx, request)) {
+        return *createCollectionResponseOpt;
     }
 
     auto writeChunkDocumentsAndRefreshShards =
@@ -603,13 +597,9 @@ CreateCollectionResponse shardCollection(OperationContext* opCtx,
 
         pauseShardCollectionReadOnlyCriticalSection.pauseWhileSet();
 
-        if (auto collectionOptional =
+        if (auto createCollectionResponseOpt =
                 checkIfCollectionAlreadyShardedWithSameOptions(opCtx, request)) {
-            auto cri = uassertStatusOK(
-                Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
-            shardCollectionResponse.setCollectionUUID(collectionOptional->getUuid());
-            shardCollectionResponse.setCollectionVersion(cri.getVersion());
-            return shardCollectionResponse;
+            return *createCollectionResponseOpt;
         }
 
         // If DistLock must not be taken, then the request came from the config server, there is no

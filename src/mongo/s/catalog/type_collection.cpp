@@ -93,13 +93,4 @@ void CollectionType::setDefaultCollation(const BSONObj& defaultCollation) {
         setPre50CompatibleDefaultCollation(defaultCollation);
 }
 
-bool CollectionType::hasSameOptions(const CollectionType& other) const {
-    return getNss() == other.getNss() &&
-        SimpleBSONObjComparator::kInstance.evaluate(getKeyPattern().toBSON() ==
-                                                    other.getKeyPattern().toBSON()) &&
-        SimpleBSONObjComparator::kInstance.evaluate(getDefaultCollation() ==
-                                                    other.getDefaultCollation()) &&
-        getUnique() == other.getUnique();
-}
-
 }  // namespace mongo
