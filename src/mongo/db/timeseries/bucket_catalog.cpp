@@ -274,6 +274,25 @@ BucketCatalog::CommitData BucketCatalog::commit(const OID& bucketId,
     return data;
 }
 
+void BucketCatalog::clear(const OID& bucketId) {
+    stdx::lock_guard lk(_mutex);
+
+    auto it = _buckets.find(bucketId);
+    if (it == _buckets.end()) {
+        return;
+    }
+    auto& bucket = it->second;
+
+    while (!bucket.promises.empty()) {
+        bucket.promises.front().setError({ErrorCodes::TimeseriesBucketCleared,
+                                          str::stream() << "Time-series bucket " << bucketId
+                                                        << " for " << bucket.ns << " was cleared"});
+        bucket.promises.pop();
+    }
+
+    _removeBucket(bucketId);
+}
+
 void BucketCatalog::clear(const NamespaceString& ns) {
     stdx::lock_guard lk(_mutex);
 
@@ -282,16 +301,11 @@ void BucketCatalog::clear(const NamespaceString& ns) {
     };
 
     for (auto it = _orderedBuckets.lower_bound({ns, {}, {}});
-         it != _orderedBuckets.end() && shouldClear(std::get<NamespaceString>(*it));
-         it = _orderedBuckets.erase(it)) {
-        const auto& bucketId = std::get<OID>(*it);
-        const auto& bucketNs = std::get<NamespaceString>(*it);
-        auto bucketIt = _buckets.find(bucketId);
-        _memoryUsage -= bucketIt->second.memoryUsage;
-        _buckets.erase(bucketIt);
-        _idleBuckets.erase(bucketId);
-        _bucketIds.erase({bucketNs, std::get<BucketMetadata>(*it)});
-        _executionStats.erase(bucketNs);
+         it != _orderedBuckets.end() && shouldClear(std::get<NamespaceString>(*it));) {
+        auto nextIt = std::next(it);
+        _executionStats.erase(std::get<NamespaceString>(*it));
+        _removeBucket(std::get<OID>(*it), it);
+        it = nextIt;
     }
 }
 
@@ -325,14 +339,31 @@ void BucketCatalog::appendExecutionStats(const NamespaceString& ns, BSONObjBuild
     }
 }
 
+void BucketCatalog::_removeBucket(const OID& bucketId,
+                                  boost::optional<OrderedBuckets::iterator> orderedBucketsIt,
+                                  boost::optional<IdleBuckets::iterator> idleBucketsIt) {
+    auto it = _buckets.find(bucketId);
+    _memoryUsage -= it->second.memoryUsage;
+
+    if (orderedBucketsIt) {
+        _orderedBuckets.erase(*orderedBucketsIt);
+    } else {
+        _orderedBuckets.erase({it->second.ns, it->second.metadata, it->first});
+    }
+
+    if (idleBucketsIt) {
+        _idleBuckets.erase(*idleBucketsIt);
+    } else {
+        _idleBuckets.erase(it->first);
+    }
+
+    _bucketIds.erase({std::move(it->second.ns), std::move(it->second.metadata)});
+    _buckets.erase(it);
+}
+
 void BucketCatalog::_expireIdleBuckets(ExecutionStats* stats) {
     while (!_idleBuckets.empty() && _memoryUsage > kIdleBucketExpiryMemoryUsageThreshold) {
-        auto it = _buckets.find(*_idleBuckets.begin());
-        _memoryUsage -= it->second.memoryUsage;
-        _idleBuckets.erase(_idleBuckets.begin());
-        _bucketIds.erase({it->second.ns, it->second.metadata});
-        _orderedBuckets.erase({it->second.ns, it->second.metadata, it->first});
-        _buckets.erase(it);
+        _removeBucket(*_idleBuckets.begin(), boost::none, _idleBuckets.begin());
         stats->numBucketsClosedDueToMemoryThreshold++;
     }
 }

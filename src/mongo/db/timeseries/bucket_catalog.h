@@ -100,6 +100,11 @@ public:
                       boost::optional<CommitInfo> previousCommitInfo = boost::none);
 
     /**
+     * Clears the given bucket.
+     */
+    void clear(const OID& bucketId);
+
+    /**
      * Clears the buckets for the given namespace.
      */
     void clear(const NamespaceString& ns);
@@ -269,6 +274,16 @@ private:
 
     class ServerStatus;
 
+    using OrderedBuckets = std::set<std::tuple<NamespaceString, BucketMetadata, OID>>;
+    using IdleBuckets = std::set<OID>;
+
+    /**
+     * Removes the given bucket from the bucket catalog's internal data structures.
+     */
+    void _removeBucket(const OID& bucketId,
+                       boost::optional<OrderedBuckets::iterator> orderedBucketsIt = boost::none,
+                       boost::optional<IdleBuckets::iterator> idleBucketsIt = boost::none);
+
     /**
      * Expires idle buckets until the bucket catalog's memory usage is below the expiry threshold.
      */
@@ -283,10 +298,10 @@ private:
     stdx::unordered_map<std::pair<NamespaceString, BucketMetadata>, OID> _bucketIds;
 
     // All namespace, metadata, and _id tuples which currently have a bucket in the catalog.
-    std::set<std::tuple<NamespaceString, BucketMetadata, OID>> _orderedBuckets;
+    OrderedBuckets _orderedBuckets;
 
     // Buckets that do not have any writers.
-    std::set<OID> _idleBuckets;
+    IdleBuckets _idleBuckets;
 
     // Per-collection execution stats.
     stdx::unordered_map<NamespaceString, ExecutionStats> _executionStats;
