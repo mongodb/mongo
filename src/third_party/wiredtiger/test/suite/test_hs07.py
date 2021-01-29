@@ -30,6 +30,7 @@ import time
 from helper import copy_wiredtiger_home
 import wiredtiger, wttest
 from wtdataset import SimpleDataSet
+from wtscenario import make_scenarios
 
 def timestamp_str(t):
     return '%x' % t
@@ -41,6 +42,12 @@ class test_hs07(wttest.WiredTigerTestCase):
     conn_config = ('cache_size=50MB,eviction_updates_trigger=95,'
                    'eviction_updates_target=80,log=(enabled)')
     session_config = 'isolation=snapshot'
+
+    key_format_values = (
+        ('column', dict(key_format='r')),
+        ('int', dict(key_format='i'))
+    )
+    scenarios = make_scenarios(key_format_values)
 
     def large_updates(self, uri, value, ds, nrows, commit_ts):
         # Update a large number of records, we'll hang if the history store table isn't working.
@@ -70,11 +77,11 @@ class test_hs07(wttest.WiredTigerTestCase):
         # behavior.
         uri = "table:las07_main"
         ds = SimpleDataSet(
-            self, uri, 0, key_format="i", value_format="S", config='log=(enabled=false)')
+            self, uri, 0, key_format=self.key_format, value_format="S", config='log=(enabled=false)')
         ds.populate()
 
         uri2 = "table:las07_extra"
-        ds2 = SimpleDataSet(self, uri2, 0, key_format="i", value_format="S")
+        ds2 = SimpleDataSet(self, uri2, 0, key_format=self.key_format, value_format="S")
         ds2.populate()
 
         # Pin oldest and stable to timestamp 1.

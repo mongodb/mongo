@@ -1006,7 +1006,7 @@ retry:
     if (F_ISSET(S2C(session), WT_CONN_HS_OPEN) && !F_ISSET(session->dhandle, WT_DHANDLE_HS)) {
         __wt_timing_stress(session, WT_TIMING_STRESS_HS_SEARCH);
         WT_RET(__wt_hs_find_upd(session, key, cbt->iface.value_format, recno, cbt->upd_value, false,
-          &cbt->upd_value->buf, &tw));
+          &cbt->upd_value->buf));
     }
 
     /*

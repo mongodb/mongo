@@ -30,6 +30,7 @@ from helper import copy_wiredtiger_home
 import wiredtiger, wttest
 from wiredtiger import stat
 from wtdataset import SimpleDataSet
+from wtscenario import make_scenarios
 
 def timestamp_str(t):
     return '%x' % t
@@ -44,6 +45,12 @@ class test_hs05(wttest.WiredTigerTestCase):
     conn_config += 'eviction_updates_target=100,eviction_updates_trigger=100'
     session_config = 'isolation=snapshot'
     stable = 1
+    key_format_values = [
+        ('column', dict(key_format='r')),
+        ('integer', dict(key_format='i')),
+        ('string', dict(key_format='S'))
+    ]
+    scenarios = make_scenarios(key_format_values)
 
     def get_stat(self, stat):
         stat_cursor = self.session.open_cursor('statistics:')
@@ -71,7 +78,7 @@ class test_hs05(wttest.WiredTigerTestCase):
         # Create a small table.
         uri = "table:test_hs05"
         nrows = 100
-        ds = SimpleDataSet(self, uri, nrows, key_format="S", value_format='u')
+        ds = SimpleDataSet(self, uri, nrows, key_format=self.key_format, value_format='u')
         ds.populate()
         bigvalue = b"aaaaa" * 100
 
