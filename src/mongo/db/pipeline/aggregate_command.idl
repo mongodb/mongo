@@ -38,6 +38,7 @@ imports:
     - "mongo/db/pipeline/exchange_spec.idl"
     - "mongo/db/pipeline/legacy_runtime_constants.idl"
     - "mongo/db/query/hint.idl"
+    - "mongo/db/query/cursor_response.idl"
     - "mongo/db/write_concern_options.idl"
 
 types:
@@ -68,6 +69,11 @@ commands:
         namespace: concatenate_with_db
         allow_global_collection_name: true
         api_version: "1"
+        # Note that the 'CursorInitialReply' is not the only response that an aggregate command
+        # could return. With 'explain' or 'exchange', the response would not include the fields in
+        # 'CursorInitialReply'. But using 'explain' or 'exchange' is unstable, but otherwise the
+        # aggregate response is guaranteed to be stable.
+        reply_type: CursorInitialReply
         fields:
             pipeline:
                 description: "An unparsed version of the pipeline."
@@ -76,6 +82,7 @@ commands:
                 description: "Specifies to return the information on the processing of the pipeline."
                 type: explainVerbosity
                 optional: true
+                unstable: true
             allowDiskUse:
                 description: "Enables writing to temporary files."
                 type: optionalBool
@@ -118,7 +125,6 @@ commands:
             fromMongos:
                 description: "True if this request originated from a mongoS."
                 type: optionalBool
-
             $queryOptions:
                 description: "The unwrapped readPreference object, if one was given to us by the mongos command processor. This object will be empty when no readPreference is specified or if the request does not originate from mongos."
                 cpp_name: unwrappedReadPref
@@ -167,6 +173,3 @@ commands:
                 type: bool
                 ignore: true
                 unstable: true
-        # TODO SERVER-51622: This OkReply is just used as default to be able to mark "unstable"
-        # fields, and should be replaced when converting the output of aggregate command to IDL.
-        reply_type: OkReply

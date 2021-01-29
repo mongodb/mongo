@@ -570,6 +570,7 @@ public:
             // documents.
             auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
             metricsCollector.incrementDocUnitsReturned(docUnitsReturned);
+            query_request_helper::validateCursorResponse(result->getBodyBuilder().asTempObj());
         }
 
         void appendMirrorableRequest(BSONObjBuilder* bob) const override {

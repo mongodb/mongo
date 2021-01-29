@@ -133,6 +133,11 @@ void setTailableMode(TailableModeEnum tailableMode, FindCommand* findCommand);
 
 TailableModeEnum getTailableMode(const FindCommand& findCommand);
 
+/**
+ * Asserts whether the cursor response adhere to the format defined in IDL.
+ */
+void validateCursorResponse(const BSONObj& outputAsBson);
+
 //
 // Old parsing code: SOON TO BE DEPRECATED.
 //

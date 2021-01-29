@@ -146,6 +146,12 @@ public:
                                          _request.body,
                                          _privileges,
                                          reply));
+
+            // The aggregate command's response is unstable when 'explain' or 'exchange' fields are
+            // set.
+            if (!_aggregationRequest.getExplain() && !_aggregationRequest.getExchange()) {
+                query_request_helper::validateCursorResponse(reply->getBodyBuilder().asTempObj());
+            }
         }
 
         NamespaceString ns() const override {

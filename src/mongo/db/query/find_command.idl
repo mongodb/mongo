@@ -39,18 +39,19 @@ imports:
     - "mongo/db/logical_session_id.idl"
     - "mongo/db/pipeline/legacy_runtime_constants.idl"
     - "mongo/idl/basic_types.idl"
+    - "mongo/db/query/cursor_response.idl"
     - "mongo/db/query/hint.idl"
 
 types:
     boolNoOpSerializer:
-      bson_serialization_type: any
-      description: "Bool data type field which doesn't produce any data when serialized."
-      cpp_type: "bool"
-      deserializer: "::mongo::parseBoolean"
-      serializer: "::mongo::noOpSerializer"
+        bson_serialization_type: any
+        description: "Bool data type field which doesn't produce any data when serialized."
+        cpp_type: "bool"
+        deserializer: "::mongo::parseBoolean"
+        serializer: "::mongo::noOpSerializer"
     object_owned_nonempty_serialize:
         bson_serialization_type: any
-        description: "An owned BSONObj, which gets serialized only when the BSON is not empty. 
+        description: "An owned BSONObj, which gets serialized only when the BSON is not empty.
         The object is ignored if empty, null or missing."
         cpp_type: "mongo::BSONObj"
         serializer: "::mongo::serializeBSONWhenNotEmpty"
@@ -71,6 +72,7 @@ commands:
     namespace: concatenate_with_db_or_uuid
     non_const_getter: true
     api_version: "1"
+    reply_type: CursorInitialReply
     fields:
       filter:
         description: "The query predicate. If unspecified, then all documents in the collection
@@ -214,6 +216,3 @@ commands:
         cpp_name: legacyRuntimeConstants
         type: LegacyRuntimeConstants
         optional: true
-    # TODO SERVER-51622: This OkReply is just used as default to be able to mark "unstable" fields,
-    # and should be replaced when converting the output of find command to IDL.
-    reply_type: OkReply
