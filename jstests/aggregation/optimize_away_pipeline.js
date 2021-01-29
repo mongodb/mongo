@@ -17,7 +17,6 @@
 (function() {
 "use strict";
 
-load("jstests/aggregation/extras/utils.js");  // For 'orderedArrayEq' and 'arrayEq'.
 load("jstests/concurrency/fsm_workload_helpers/server_types.js");  // For isWiredTiger.
 load("jstests/libs/analyze_plan.js");     // For 'aggPlanHasStage' and other explain helpers.
 load("jstests/libs/fixture_helpers.js");  // For 'isMongos' and 'isSharded'.
@@ -75,8 +74,11 @@ function assertPipelineUsesAggregation({
 
     if (expectedResult) {
         const actualResult = coll.aggregate(pipeline, pipelineOptions).toArray();
-        assert(preserveResultOrder ? orderedArrayEq(actualResult, expectedResult)
-                                   : arrayEq(actualResult, expectedResult));
+        if (preserveResultOrder) {
+            assert.docEq(actualResult, expectedResult);
+        } else {
+            assert.sameMembers(actualResult, expectedResult);
+        }
     }
 
     return explainOutput;
@@ -116,8 +118,11 @@ function assertPipelineDoesNotUseAggregation({
 
     if (expectedResult) {
         const actualResult = coll.aggregate(pipeline, pipelineOptions).toArray();
-        assert(preserveResultOrder ? orderedArrayEq(actualResult, expectedResult)
-                                   : arrayEq(actualResult, expectedResult));
+        if (preserveResultOrder) {
+            assert.docEq(actualResult, expectedResult);
+        } else {
+            assert.sameMembers(actualResult, expectedResult);
+        }
     }
 
     return explainOutput;
@@ -128,7 +133,7 @@ function testGetMore({command = null, expectedResult = null} = {}) {
     const documents =
         new DBCommandCursor(db, assert.commandWorked(db.runCommand(command)), 1 /* batchsize */)
             .toArray();
-    assert(arrayEq(documents, expectedResult));
+    assert.sameMembers(documents, expectedResult);
 }
 
 let explainOutput;
@@ -179,6 +184,19 @@ assertPipelineDoesNotUseAggregation({
     pipeline: [{$match: {x: {$gte: 20}}}, {$sort: {x: 1}}, {$limit: 1}, {$project: {x: 1, _id: 0}}],
     expectedStages: ["IXSCAN"],
     expectedResult: [{x: 20}]
+});
+// However, when the $project is computed, pushing it down into the find() layer would sometimes
+// have the effect of reordering it before the $sort and $limit. This can cause a valid query to
+// throw an error, as in SERVER-54128.
+assertPipelineUsesAggregation({
+    pipeline: [
+        {$match: {x: {$gte: 20}}},
+        {$sort: {x: 1}},
+        {$limit: 1},
+        {$project: {x: {$substr: ["$y", 0, 1]}, _id: 0}}
+    ],
+    expectedStages: ["IXSCAN"],
+    expectedResult: [{x: ""}]
 });
 assert.commandWorked(coll.dropIndexes());
 
@@ -571,10 +589,9 @@ if (!FixtureHelpers.isMongos(db) && isWiredTiger(db)) {
     });
     db.setProfilingLevel(0);
     let profile = db.system.profile.find({}, {op: 1, ns: 1}).sort({ts: 1}).toArray();
-    assert(
-        arrayEq(profile,
-                [{op: "command", ns: coll.getFullName()}, {op: "getmore", ns: coll.getFullName()}]),
-        profile);
+    assert.sameMembers(
+        profile,
+        [{op: "command", ns: coll.getFullName()}, {op: "getmore", ns: coll.getFullName()}]);
     // Test getMore puts a correct namespace into profile data for a view with an optimized away
     // pipeline.
     if (!FixtureHelpers.isSharded(coll)) {
@@ -591,9 +608,9 @@ if (!FixtureHelpers.isMongos(db) && isWiredTiger(db)) {
         });
         db.setProfilingLevel(0);
         profile = db.system.profile.find({}, {op: 1, ns: 1}).sort({ts: 1}).toArray();
-        assert(arrayEq(
+        assert.sameMembers(
             profile,
-            [{op: "query", ns: view.getFullName()}, {op: "getmore", ns: view.getFullName()}]));
+            [{op: "query", ns: view.getFullName()}, {op: "getmore", ns: view.getFullName()}]);
     }
 }
 }());

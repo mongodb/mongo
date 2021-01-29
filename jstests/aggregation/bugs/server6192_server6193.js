@@ -20,41 +20,56 @@ const t = db.jstests_aggregation_server6192;
 t.drop();
 assert.commandWorked(t.insert({x: true}));
 
-function assertOptimized(pipeline, v) {
-    const explained = t.runCommand("aggregate", {pipeline: pipeline, explain: true});
-    const projectStage = getPlanStage(explained, "PROJECTION_DEFAULT");
-    assert.eq(projectStage.transformBy.a["$const"], v, "ensure short-circuiting worked", explained);
+function optimize(expression) {
+    const explained = t.explain().aggregate([
+        // This inhibit optimization prevents the expression being pushed down into the .find()
+        // layer, to make assertions simpler. But it doesn't prevent the $project stage itself
+        // from being optimized.
+        {$_internalInhibitOptimization: {}},
+        {$project: {result: expression}},
+    ]);
+
+    const stage = getAggPlanStage(explained, "$project");
+    assert(stage, explained);
+    assert(stage.$project.result, explained);
+    return stage.$project.result;
 }
 
-function assertNotOptimized(pipeline) {
-    const explained = t.runCommand("aggregate", {pipeline: pipeline, explain: true});
-    const projectStage = getPlanStage(explained, "PROJECTION_DEFAULT");
-    assert(!("$const" in projectStage.transformBy.a), "ensure no short-circuiting");
+function assertOptimized(expression, value) {
+    const optimized = optimize(expression);
+    assert.docEq(optimized, {$const: value}, "ensure short-circuiting worked", optimized);
+}
+
+function assertNotOptimized(expression) {
+    const optimized = optimize(expression);
+    // 'optimized' may be simpler than 'expression', but we assert it did not optimize to a
+    // constant.
+    assert.neq(Object.keys(optimized), ['$const'], "ensure no short-circuiting", optimized);
 }
 
 // short-circuiting for $and
-assertOptimized([{$project: {a: {$and: [0, '$x']}}}], false);
-assertOptimized([{$project: {a: {$and: [0, 1, '$x']}}}], false);
-assertOptimized([{$project: {a: {$and: [0, 1, '', '$x']}}}], false);
+assertOptimized({$and: [0, '$x']}, false);
+assertOptimized({$and: [0, 1, '$x']}, false);
+assertOptimized({$and: [0, 1, '', '$x']}, false);
 
-assertOptimized([{$project: {a: {$and: [1, 0, '$x']}}}], false);
-assertOptimized([{$project: {a: {$and: [1, '', 0, '$x']}}}], false);
-assertOptimized([{$project: {a: {$and: [1, 1, 0, 1]}}}], false);
+assertOptimized({$and: [1, 0, '$x']}, false);
+assertOptimized({$and: [1, '', 0, '$x']}, false);
+assertOptimized({$and: [1, 1, 0, 1]}, false);
 
 // short-circuiting for $or
-assertOptimized([{$project: {a: {$or: [1, '$x']}}}], true);
-assertOptimized([{$project: {a: {$or: [1, 0, '$x']}}}], true);
-assertOptimized([{$project: {a: {$or: [1, '', '$x']}}}], true);
+assertOptimized({$or: [1, '$x']}, true);
+assertOptimized({$or: [1, 0, '$x']}, true);
+assertOptimized({$or: [1, '', '$x']}, true);
 
-assertOptimized([{$project: {a: {$or: [0, 1, '$x']}}}], true);
-assertOptimized([{$project: {a: {$or: ['', 0, 1, '$x']}}}], true);
-assertOptimized([{$project: {a: {$or: [0, 0, 0, 1]}}}], true);
+assertOptimized({$or: [0, 1, '$x']}, true);
+assertOptimized({$or: ['', 0, 1, '$x']}, true);
+assertOptimized({$or: [0, 0, 0, 1]}, true);
 
 // examples that should not short-circuit
-assertNotOptimized([{$project: {a: {$and: [1, '$x']}}}]);
-assertNotOptimized([{$project: {a: {$or: [0, '$x']}}}]);
-assertNotOptimized([{$project: {a: {$and: ['$x', '$x']}}}]);
-assertNotOptimized([{$project: {a: {$or: ['$x', '$x']}}}]);
-assertNotOptimized([{$project: {a: {$and: ['$x']}}}]);
-assertNotOptimized([{$project: {a: {$or: ['$x']}}}]);
+assertNotOptimized({$and: [1, '$x']});
+assertNotOptimized({$or: [0, '$x']});
+assertNotOptimized({$and: ['$x', '$x']});
+assertNotOptimized({$or: ['$x', '$x']});
+assertNotOptimized({$and: ['$x']});
+assertNotOptimized({$or: ['$x']});
 }());
