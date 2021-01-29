@@ -406,6 +406,18 @@ public:
                         timeseriesNotAllowedWith("pipeline"),
                         !cmd.getPipeline());
 
+                auto hasDot = [](StringData field) -> bool {
+                    return field.find('.') != std::string::npos;
+                };
+                auto mustBeTopLevel = [&cmd](StringData field) -> std::string {
+                    return str::stream()
+                        << cmd.getNamespace() << ": '" << field << "' must be a top-level field "
+                        << "and not contain a '.'";
+                };
+                uassert(ErrorCodes::InvalidOptions,
+                        mustBeTopLevel("timeField"),
+                        !hasDot(timeseries->getTimeField()));
+
                 if (auto metaField = timeseries->getMetaField()) {
                     uassert(ErrorCodes::InvalidOptions,
                             "'metaField' cannot be \"_id\"",
@@ -413,6 +425,9 @@ public:
                     uassert(ErrorCodes::InvalidOptions,
                             "'metaField' cannot be the same as 'timeField'",
                             *metaField != timeseries->getTimeField());
+                    uassert(ErrorCodes::InvalidOptions,
+                            mustBeTopLevel("metaField"),
+                            !hasDot(*metaField));
                 }
             }
 

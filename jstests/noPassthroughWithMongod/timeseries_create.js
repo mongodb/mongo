@@ -109,6 +109,9 @@ testInvalidTimeseriesOptions({timeField: "time", expireAfterSeconds: ""}, ErrorC
 testInvalidTimeseriesOptions({timeField: "time", expireAfterSeconds: NumberLong(-10)},
                              ErrorCodes.CannotCreateIndex);
 testInvalidTimeseriesOptions({timeField: "time", invalidOption: {}}, 40415);
+testInvalidTimeseriesOptions({timeField: "sub.time"}, ErrorCodes.InvalidOptions);
+testInvalidTimeseriesOptions({timeField: "time", metaField: "sub.meta"}, ErrorCodes.InvalidOptions);
+testInvalidTimeseriesOptions({timeField: "time", metaField: "time"}, ErrorCodes.InvalidOptions);
 
 testCompatibleCreateOptions({storageEngine: {}});
 testCompatibleCreateOptions({indexOptionDefaults: {}});

@@ -61,14 +61,14 @@ structs:
         strict: true
         fields:
             timeField:
-                description: "The name of the field to be used for time. Inserted documents must
-                              have this field, and the field must be of the BSON UTC datetime type
-                              (0x9)"
+                description: "The name of the top-level field to be used for time. Inserted 
+                              documents must have this field, and the field must be of the BSON UTC
+                              datetime type (0x9)"
                 type: string
             metaField:
-                description: "The name of the field describing the series. This field is used to
-                              group related data and may be of any BSON type. This may not be
-                              \"_id\" or the same as 'timeField'."
+                description: "The name of the top-level field describing the series. This field is
+                              used to group related data and may be of any BSON type. This may not 
+                              be \"_id\" or the same as 'timeField'."
                 type: string
                 optional: true
             expireAfterSeconds:

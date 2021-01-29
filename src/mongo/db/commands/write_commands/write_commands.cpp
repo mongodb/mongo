@@ -736,7 +736,7 @@ public:
             std::vector<std::pair<Future<BucketCatalog::CommitInfo>, size_t>> bucketsToWaitOn;
             auto insert = [&](size_t index) {
                 auto [bucketId, commitInfo] =
-                    bucketCatalog.insert(opCtx, ns(), _batch.getDocuments()[start + index]);
+                    bucketCatalog.insert(opCtx, ns(), _batch.getDocuments()[index]);
                 if (commitInfo) {
                     bucketsToWaitOn.push_back({std::move(*commitInfo), index});
                 } else {
