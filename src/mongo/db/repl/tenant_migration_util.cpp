@@ -75,7 +75,7 @@ ExecutorFuture<void> storeExternalClusterTimeKeyDocsAndRefreshCache(
                                      << ExternalKeysCollectionDocument::kReplicaSetNameFieldName
                                      << keyDoc.getReplicaSetName()
                                      << ExternalKeysCollectionDocument::kTTLExpiresAtFieldName
-                                     << BSON("$lt" << keyDoc.getTTLExpiresAt()));
+                                     << BSON("$lte" << keyDoc.getTTLExpiresAt()));
 
             // Remove _id since updating _id is not allowed.
             const auto updateMod = keyDoc.toBSON().removeField("_id");

@@ -561,11 +561,12 @@ function TenantMigrationTest(
     this.assertNoDuplicatedExternalKeyDocs = function(rst) {
         grantFindExternalClusterTimeKeysPrivilegeIfNeeded(rst);
 
+        const docs = rst.getPrimary().getDB("admin").system.external_validation_keys.find();
         let aggRes = rst.getPrimary().getDB("admin").system.external_validation_keys.aggregate([
             {$group: {_id: {keyId: "$keyId", replicaSetName: "$replicaSetName"}, count: {$sum: 1}}}
         ]);
         aggRes.forEach(doc => {
-            assert.eq(1, doc.count);
+            assert.eq(1, doc.count, "all external key docs: " + tojson(docs.toArray()));
         });
     };
 
