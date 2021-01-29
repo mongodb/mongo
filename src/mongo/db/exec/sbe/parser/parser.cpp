@@ -303,11 +303,13 @@ std::vector<sbe::value::SortDirection> parseSortDirList(const AstQuery& ast) {
     return dirs;
 }
 
-template <class MkObjType>
-typename MkObjType::FieldBehavior parseFieldBehavior(StringData val) {
-    const auto drop = MkObjType::FieldBehavior::drop;
-    const auto keep = MkObjType::FieldBehavior::keep;
-    return val == "drop" ? drop : keep;
+MakeObjFieldBehavior parseFieldBehavior(StringData val) {
+    if (val == "drop") {
+        return MakeObjFieldBehavior::drop;
+    } else if (val == "keep") {
+        return MakeObjFieldBehavior::keep;
+    }
+    MONGO_UNREACHABLE_TASSERT(5389100);
 }
 
 void Parser::walkChildren(AstQuery& ast) {
@@ -926,24 +928,22 @@ void Parser::walkMkObj(AstQuery& ast) {
     std::string newRootName = ast.nodes[0]->identifier;
     std::string oldRootName;
     std::vector<std::string> fields;
-    size_t dropKeepPos;
+    boost::optional<MakeObjFieldBehavior> fieldBehavior;
 
     size_t projectListPos = 1;
     size_t forceNewObjPos = 2;
     size_t retOldObjPos = 3;
     size_t inputPos = 4;
 
-
     if (ast.nodes.size() != 5) {
         oldRootName = ast.nodes[1]->identifier;
         fields = std::move(ast.nodes[2]->identifiers);
-        dropKeepPos = 3;
+        fieldBehavior = parseFieldBehavior(ast.nodes[3]->token);
         projectListPos = 4;
         forceNewObjPos = 5;
         retOldObjPos = 6;
         inputPos = 7;
     }
-
 
     const bool forceNewObj = ast.nodes[forceNewObjPos]->token == "true";
     const bool retOldObj = ast.nodes[retOldObjPos]->token == "true";
@@ -953,7 +953,7 @@ void Parser::walkMkObj(AstQuery& ast) {
             makeS<MakeObjStage>(std::move(ast.nodes[inputPos]->stage),
                                 lookupSlotStrict(newRootName),
                                 lookupSlot(oldRootName),
-                                parseFieldBehavior<MakeObjStage>(ast.nodes[dropKeepPos]->token),
+                                fieldBehavior,
                                 std::move(fields),
                                 std::move(ast.nodes[projectListPos]->renames),
                                 lookupSlots(std::move(ast.nodes[projectListPos]->identifiers)),
@@ -961,17 +961,17 @@ void Parser::walkMkObj(AstQuery& ast) {
                                 retOldObj,
                                 getCurrentPlanNodeId());
     } else {
-        ast.stage = makeS<MakeBsonObjStage>(
-            std::move(ast.nodes[inputPos]->stage),
-            lookupSlotStrict(newRootName),
-            lookupSlot(oldRootName),
-            parseFieldBehavior<MakeBsonObjStage>(ast.nodes[dropKeepPos]->token),
-            std::move(fields),
-            std::move(ast.nodes[projectListPos]->renames),
-            lookupSlots(std::move(ast.nodes[projectListPos]->identifiers)),
-            forceNewObj,
-            retOldObj,
-            getCurrentPlanNodeId());
+        ast.stage =
+            makeS<MakeBsonObjStage>(std::move(ast.nodes[inputPos]->stage),
+                                    lookupSlotStrict(newRootName),
+                                    lookupSlot(oldRootName),
+                                    fieldBehavior,
+                                    std::move(fields),
+                                    std::move(ast.nodes[projectListPos]->renames),
+                                    lookupSlots(std::move(ast.nodes[projectListPos]->identifiers)),
+                                    forceNewObj,
+                                    retOldObj,
+                                    getCurrentPlanNodeId());
     }
 }
 

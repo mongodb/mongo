@@ -33,14 +33,14 @@
 #include "mongo/db/exec/sbe/values/value.h"
 
 namespace mongo::sbe {
+
+enum class MakeObjFieldBehavior { drop, keep };
+
 enum class MakeObjOutputType { object, bsonObject };
 template <MakeObjOutputType O>
 class MakeObjStageBase final : public PlanStage {
 public:
-    /**
-     * Indicates whether the fields provided to the stage should be kept or dropped.
-     */
-    enum class FieldBehavior { drop, keep };
+    using FieldBehavior = MakeObjFieldBehavior;
 
     /**
      * Constructor. Arguments:
