@@ -76,9 +76,9 @@ BSONObj BucketCatalog::getMetadata(const BucketId& bucketId) const {
     return bucket.metadata.metadata;
 }
 
-BucketCatalog::InsertResult BucketCatalog::insert(OperationContext* opCtx,
-                                                  const NamespaceString& ns,
-                                                  const BSONObj& doc) {
+StatusWith<BucketCatalog::InsertResult> BucketCatalog::insert(OperationContext* opCtx,
+                                                              const NamespaceString& ns,
+                                                              const BSONObj& doc) {
     stdx::lock_guard lk(_mutex);
 
     auto viewCatalog = DatabaseHolder::get(opCtx)->getViewCatalog(opCtx, ns.db());
@@ -99,7 +99,14 @@ BucketCatalog::InsertResult BucketCatalog::insert(OperationContext* opCtx,
 
     auto& stats = _executionStats[ns];
 
-    auto time = doc[options.getTimeField()].Date();
+    auto timeElem = doc[options.getTimeField()];
+    if (!timeElem || BSONType::Date != timeElem.type()) {
+        return {ErrorCodes::BadValue,
+                str::stream() << "'" << options.getTimeField() << "' must be present an contain a "
+                              << "valid BSON UTC datetime value"};
+    }
+
+    auto time = timeElem.Date();
     auto createNewBucketId = [&] {
         _expireIdleBuckets(&stats);
         return BucketIdInternal{time, ++_bucketNum};
@@ -211,7 +218,7 @@ BucketCatalog::InsertResult BucketCatalog::insert(OperationContext* opCtx,
         newFieldNamesSize + bucket->min.getMemoryUsage() + bucket->max.getMemoryUsage();
     _memoryUsage += bucket->memoryUsage;
 
-    return {it->second, std::move(commitInfoFuture)};
+    return {InsertResult{it->second, std::move(commitInfoFuture)}};
 }
 
 BucketCatalog::CommitData BucketCatalog::commit(const BucketId& bucketId,

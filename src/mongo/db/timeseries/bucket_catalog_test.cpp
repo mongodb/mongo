@@ -99,8 +99,8 @@ void BucketCatalogTest::_commit(const BucketCatalog::BucketId& bucketId,
 
 void BucketCatalogTest::_insertOneAndCommit(const NamespaceString& ns,
                                             uint16_t numCommittedMeasurements) {
-    auto [bucketId, commitInfo] =
-        _bucketCatalog->insert(_opCtx, ns, BSON(_timeField << Date_t::now()));
+    auto result = _bucketCatalog->insert(_opCtx, ns, BSON(_timeField << Date_t::now()));
+    auto& [bucketId, commitInfo] = result.getValue();
     ASSERT(!commitInfo);
 
     _commit(bucketId, numCommittedMeasurements);
@@ -109,29 +109,29 @@ void BucketCatalogTest::_insertOneAndCommit(const NamespaceString& ns,
 TEST_F(BucketCatalogTest, InsertIntoSameBucket) {
     // The first insert should be the committer.
     auto result1 = _bucketCatalog->insert(_opCtx, _ns1, BSON(_timeField << Date_t::now()));
-    ASSERT(!result1.commitInfo);
+    ASSERT(!result1.getValue().commitInfo);
 
     // A subsequent insert into the same bucket should be a waiter.
     auto result2 = _bucketCatalog->insert(_opCtx, _ns1, BSON(_timeField << Date_t::now()));
-    ASSERT(result2.commitInfo);
-    ASSERT(!result2.commitInfo->isReady());
+    ASSERT(result2.getValue().commitInfo);
+    ASSERT(!result2.getValue().commitInfo->isReady());
 
     // Committing should return both documents since they belong in the same bucket.
-    auto data = _bucketCatalog->commit(result1.bucketId);
+    auto data = _bucketCatalog->commit(result1.getValue().bucketId);
     ASSERT_EQ(data.docs.size(), 2);
     ASSERT_EQ(data.numCommittedMeasurements, 0);
-    ASSERT(!result2.commitInfo->isReady());
+    ASSERT(!result2.getValue().commitInfo->isReady());
 
     // Once the commit has occurred, the waiter should be notified.
-    data = _bucketCatalog->commit(result1.bucketId, _commitInfo);
+    data = _bucketCatalog->commit(result1.getValue().bucketId, _commitInfo);
     ASSERT_EQ(data.docs.size(), 0);
     ASSERT_EQ(data.numCommittedMeasurements, 2);
-    ASSERT(result2.commitInfo->isReady());
+    ASSERT(result2.getValue().commitInfo->isReady());
 }
 
 TEST_F(BucketCatalogTest, GetMetadataReturnsEmptyDocOnMissingBucket) {
     auto bucketId =
-        _bucketCatalog->insert(_opCtx, _ns1, BSON(_timeField << Date_t::now())).bucketId;
+        _bucketCatalog->insert(_opCtx, _ns1, BSON(_timeField << Date_t::now())).getValue().bucketId;
     _bucketCatalog->clear(bucketId);
     ASSERT_BSONOBJ_EQ(BSONObj(), _bucketCatalog->getMetadata(bucketId));
 }
@@ -140,24 +140,28 @@ TEST_F(BucketCatalogTest, InsertIntoDifferentBuckets) {
     // The first insert should be the committer.
     auto result1 = _bucketCatalog->insert(
         _opCtx, _ns1, BSON(_timeField << Date_t::now() << _metaField << "123"));
-    ASSERT(!result1.commitInfo);
+    ASSERT(!result1.getValue().commitInfo);
 
     // Subsequent inserts into different buckets should also be committers.
     auto result2 = _bucketCatalog->insert(
         _opCtx, _ns1, BSON(_timeField << Date_t::now() << _metaField << BSONObj()));
-    ASSERT(!result2.commitInfo);
+    ASSERT(!result2.getValue().commitInfo);
 
     auto result3 = _bucketCatalog->insert(_opCtx, _ns2, BSON(_timeField << Date_t::now()));
-    ASSERT(!result3.commitInfo);
+    ASSERT(!result3.getValue().commitInfo);
 
     // Check metadata in buckets.
-    ASSERT_BSONOBJ_EQ(BSON(_metaField << "123"), _bucketCatalog->getMetadata(result1.bucketId));
-    ASSERT_BSONOBJ_EQ(BSON(_metaField << BSONObj()), _bucketCatalog->getMetadata(result2.bucketId));
-    ASSERT_BSONOBJ_EQ(BSON(_metaField << BSONNULL), _bucketCatalog->getMetadata(result3.bucketId));
+    ASSERT_BSONOBJ_EQ(BSON(_metaField << "123"),
+                      _bucketCatalog->getMetadata(result1.getValue().bucketId));
+    ASSERT_BSONOBJ_EQ(BSON(_metaField << BSONObj()),
+                      _bucketCatalog->getMetadata(result2.getValue().bucketId));
+    ASSERT_BSONOBJ_EQ(BSON(_metaField << BSONNULL),
+                      _bucketCatalog->getMetadata(result3.getValue().bucketId));
 
     // Committing one bucket should only return the one document in that bucket and shoukd not
     // affect the other bucket.
-    for (const auto& bucketId : {result1.bucketId, result2.bucketId, result3.bucketId}) {
+    for (const auto& bucketId :
+         {result1.getValue().bucketId, result2.getValue().bucketId, result3.getValue().bucketId}) {
         _commit(bucketId, 0);
     }
 }
@@ -192,50 +196,59 @@ TEST_F(BucketCatalogTest, ClearDatabaseBuckets) {
 }
 
 DEATH_TEST_F(BucketCatalogTest, CannotProvideCommitInfoOnFirstCommit, "invariant") {
-    auto [bucketId, _] = _bucketCatalog->insert(_opCtx, _ns1, BSON(_timeField << Date_t::now()));
+    auto result = _bucketCatalog->insert(_opCtx, _ns1, BSON(_timeField << Date_t::now()));
+    auto& [bucketId, _] = result.getValue();
     _bucketCatalog->commit(bucketId, _commitInfo);
 }
 
 TEST_F(BucketCatalogWithoutMetadataTest, GetMetadataReturnsEmptyDoc) {
     auto result = _bucketCatalog->insert(_opCtx, _ns1, BSON(_timeField << Date_t::now()));
-    ASSERT(!result.commitInfo);
+    ASSERT(!result.getValue().commitInfo);
 
-    ASSERT_BSONOBJ_EQ(BSONObj(), _bucketCatalog->getMetadata(result.bucketId));
+    ASSERT_BSONOBJ_EQ(BSONObj(), _bucketCatalog->getMetadata(result.getValue().bucketId));
 
-    _commit(result.bucketId, 0);
+    _commit(result.getValue().bucketId, 0);
 }
 
 TEST_F(BucketCatalogWithoutMetadataTest, CommitReturnsNewFields) {
     // Creating a new bucket should return all fields from the initial measurement.
-    auto [bucketId, _] =
+    auto result =
         _bucketCatalog->insert(_opCtx, _ns1, BSON(_timeField << Date_t::now() << "a" << 0));
+    auto& [bucketId, _] = result.getValue();
     auto data = _bucketCatalog->commit(bucketId);
     ASSERT_EQ(2U, data.newFieldNamesToBeInserted.size()) << data.toBSON();
     ASSERT(data.newFieldNamesToBeInserted.count(_timeField)) << data.toBSON();
     ASSERT(data.newFieldNamesToBeInserted.count("a")) << data.toBSON();
 
     // Inserting a new measurement with the same fields should return an empty set of new fields.
-    _bucketCatalog->insert(_opCtx, _ns1, BSON(_timeField << Date_t::now() << "a" << 1));
+
+    ASSERT_OK(_bucketCatalog->insert(_opCtx, _ns1, BSON(_timeField << Date_t::now() << "a" << 1))
+                  .getStatus());
     data = _bucketCatalog->commit(bucketId, _commitInfo);
     ASSERT_EQ(0U, data.newFieldNamesToBeInserted.size()) << data.toBSON();
 
     // Insert a new measurement with the a new field.
-    _bucketCatalog->insert(_opCtx, _ns1, BSON(_timeField << Date_t::now() << "a" << 2 << "b" << 2));
+    ASSERT_OK(_bucketCatalog
+                  ->insert(_opCtx, _ns1, BSON(_timeField << Date_t::now() << "a" << 2 << "b" << 2))
+                  .getStatus());
     data = _bucketCatalog->commit(bucketId, _commitInfo);
     ASSERT_EQ(1U, data.newFieldNamesToBeInserted.size()) << data.toBSON();
     ASSERT(data.newFieldNamesToBeInserted.count("b")) << data.toBSON();
 
     // Fill up the bucket.
     for (auto i = 3; i < gTimeseriesBucketMaxCount; ++i) {
-        _bucketCatalog->insert(_opCtx, _ns1, BSON(_timeField << Date_t::now() << "a" << i));
+        ASSERT_OK(
+            _bucketCatalog->insert(_opCtx, _ns1, BSON(_timeField << Date_t::now() << "a" << i))
+                .getStatus());
         data = _bucketCatalog->commit(bucketId, _commitInfo);
         ASSERT_EQ(0U, data.newFieldNamesToBeInserted.size()) << i << ":" << data.toBSON();
     }
 
     // When a bucket overflows, committing to the new overflow bucket should return the fields of
     // the first measurement as new fields.
-    auto [overflowBucketId, unusedCommitInfo] = _bucketCatalog->insert(
+    auto result2 = _bucketCatalog->insert(
         _opCtx, _ns1, BSON(_timeField << Date_t::now() << "a" << gTimeseriesBucketMaxCount));
+    auto& [overflowBucketId, unusedCommitInfo] = result2.getValue();
     ASSERT_NE(*bucketId, *overflowBucketId);
     data = _bucketCatalog->commit(overflowBucketId);
     ASSERT_EQ(2U, data.newFieldNamesToBeInserted.size()) << data.toBSON();

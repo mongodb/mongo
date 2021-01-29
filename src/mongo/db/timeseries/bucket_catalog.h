@@ -111,7 +111,9 @@ public:
      * caller is a waiter for the bucket. If no Future is provided, the caller is the committer for
      * this bucket.
      */
-    InsertResult insert(OperationContext* opCtx, const NamespaceString& ns, const BSONObj& doc);
+    StatusWith<InsertResult> insert(OperationContext* opCtx,
+                                    const NamespaceString& ns,
+                                    const BSONObj& doc);
 
     /**
      * Returns the uncommitted measurements and the number of measurements that have already been

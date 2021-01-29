@@ -261,8 +261,9 @@ bool checkFailTimeseriesInsertFailPoint(const BSONObj& metadata) {
     return shouldFailInsert;
 }
 
+template <typename T>
 boost::optional<BSONObj> generateError(OperationContext* opCtx,
-                                       const StatusWith<SingleWriteResult>& result,
+                                       const StatusWith<T>& result,
                                        int index,
                                        size_t numErrors) {
     auto status = result.getStatus();
@@ -285,7 +286,7 @@ boost::optional<BSONObj> generateError(OperationContext* opCtx,
     BSONSizeTracker errorsSizeTracker;
     BSONObjBuilder error(errorsSizeTracker);
     error.append("index", index);
-    if (auto staleInfo = status.extraInfo<StaleConfigInfo>()) {
+    if (auto staleInfo = status.template extraInfo<StaleConfigInfo>()) {
         error.append("code", int(ErrorCodes::StaleShardVersion));  // Different from exception!
         {
             BSONObjBuilder errInfo(error.subobjStart("errInfo"));
@@ -293,12 +294,12 @@ boost::optional<BSONObj> generateError(OperationContext* opCtx,
         }
     } else if (ErrorCodes::DocumentValidationFailure == status.code() && status.extraInfo()) {
         auto docValidationError =
-            status.extraInfo<doc_validation_error::DocumentValidationFailureInfo>();
+            status.template extraInfo<doc_validation_error::DocumentValidationFailureInfo>();
         error.append("code", static_cast<int>(ErrorCodes::DocumentValidationFailure));
         error.append("errInfo", docValidationError->getDetails());
     } else if (ErrorCodes::isTenantMigrationError(status.code())) {
         if (ErrorCodes::TenantMigrationConflict == status.code()) {
-            auto migrationConflictInfo = status.extraInfo<TenantMigrationConflictInfo>();
+            auto migrationConflictInfo = status.template extraInfo<TenantMigrationConflictInfo>();
 
             hangWriteBeforeWaitingForMigrationDecision.pauseWhileSet(opCtx);
 
@@ -314,13 +315,15 @@ boost::optional<BSONObj> generateError(OperationContext* opCtx,
                 error.append("errmsg", errorMessage(migrationStatus.reason()));
             }
             if (migrationStatus.extraInfo()) {
-                error.append("errInfo",
-                             migrationStatus.extraInfo<TenantMigrationCommittedInfo>()->toBSON());
+                error.append(
+                    "errInfo",
+                    migrationStatus.template extraInfo<TenantMigrationCommittedInfo>()->toBSON());
             }
         } else {
             error.append("code", int(status.code()));
             if (status.extraInfo()) {
-                error.append("errInfo", status.extraInfo<TenantMigrationCommittedInfo>()->toBSON());
+                error.append("errInfo",
+                             status.template extraInfo<TenantMigrationCommittedInfo>()->toBSON());
             }
         }
     } else {
@@ -735,12 +738,17 @@ public:
             std::vector<std::pair<BucketCatalog::BucketId, size_t>> bucketsToCommit;
             std::vector<std::pair<Future<BucketCatalog::CommitInfo>, size_t>> bucketsToWaitOn;
             auto insert = [&](size_t index) {
-                auto [bucketId, commitInfo] =
-                    bucketCatalog.insert(opCtx, ns(), _batch.getDocuments()[index]);
-                if (commitInfo) {
-                    bucketsToWaitOn.push_back({std::move(*commitInfo), index});
+                auto result =
+                    bucketCatalog.insert(opCtx, ns(), _batch.getDocuments()[start + index]);
+                if (auto error = generateError(opCtx, result, index, errors->size())) {
+                    errors->push_back(*error);
                 } else {
-                    bucketsToCommit.push_back({std::move(bucketId), index});
+                    auto& [bucketId, commitInfo] = result.getValue();
+                    if (commitInfo) {
+                        bucketsToWaitOn.push_back({std::move(*commitInfo), index});
+                    } else {
+                        bucketsToCommit.push_back({std::move(bucketId), index});
+                    }
                 }
             };
 
