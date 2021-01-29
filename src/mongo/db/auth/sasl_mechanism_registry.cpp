@@ -88,61 +88,54 @@ StatusWith<std::unique_ptr<ServerMechanismBase>> SASLServerMechanismRegistry::ge
 }
 
 void SASLServerMechanismRegistry::advertiseMechanismNamesForUser(OperationContext* opCtx,
-                                                                 const BSONObj& isMasterCmd,
+                                                                 UserName userName,
                                                                  BSONObjBuilder* builder) {
-    BSONElement saslSupportedMechs = isMasterCmd["saslSupportedMechs"];
-    if (saslSupportedMechs.type() == BSONType::String) {
-
-        UserName userName = uassertStatusOK(UserName::parse(saslSupportedMechs.String()));
-
-
-        // Authenticating the __system@local user to the admin database on mongos is required
-        // by the auth passthrough test suite.
-        if (getTestCommandsEnabled() &&
-            userName.getUser() == internalSecurity.user->getName().getUser() &&
-            userName.getDB() == "admin") {
-            userName = internalSecurity.user->getName();
-        }
-
-        AuthorizationManager* authManager = AuthorizationManager::get(opCtx->getServiceContext());
-
-        UserHandle user;
-        const auto swUser = authManager->acquireUser(opCtx, userName);
-        if (!swUser.isOK()) {
-            auto& status = swUser.getStatus();
-            if (status.code() == ErrorCodes::UserNotFound) {
-                LOGV2(20251,
-                      "Supported SASL mechanisms requested for unknown user",
-                      "user"_attr = userName);
-                return;
-            }
-            uassertStatusOK(status);
-        }
-
-        user = std::move(swUser.getValue());
-        BSONArrayBuilder mechanismsBuilder;
-        const auto& mechList = _getMapRef(userName.getDB());
-
-        for (const auto& factoryIt : mechList) {
-            SecurityPropertySet properties = factoryIt->properties();
-            if (!properties.hasAllProperties(SecurityPropertySet{SecurityProperty::kNoPlainText,
-                                                                 SecurityProperty::kMutualAuth}) &&
-                userName.getDB() != "$external") {
-                continue;
-            }
-
-            auto mechanismEnabled = _mechanismSupportedByConfig(factoryIt->mechanismName());
-            if (!mechanismEnabled && userName == internalSecurity.user->getName()) {
-                mechanismEnabled = factoryIt->isInternalAuthMech();
-            }
-
-            if (mechanismEnabled && factoryIt->canMakeMechanismForUser(user.get())) {
-                mechanismsBuilder << factoryIt->mechanismName();
-            }
-        }
-
-        builder->appendArray("saslSupportedMechs", mechanismsBuilder.arr());
+    // Authenticating the __system@local user to the admin database on mongos is required
+    // by the auth passthrough test suite.
+    if (getTestCommandsEnabled() &&
+        userName.getUser() == internalSecurity.user->getName().getUser() &&
+        userName.getDB() == "admin") {
+        userName = internalSecurity.user->getName();
     }
+
+    AuthorizationManager* authManager = AuthorizationManager::get(opCtx->getServiceContext());
+
+    UserHandle user;
+    const auto swUser = authManager->acquireUser(opCtx, userName);
+    if (!swUser.isOK()) {
+        auto& status = swUser.getStatus();
+        if (status.code() == ErrorCodes::UserNotFound) {
+            LOGV2(20251,
+                  "Supported SASL mechanisms requested for unknown user",
+                  "user"_attr = userName);
+            return;
+        }
+        uassertStatusOK(status);
+    }
+
+    user = std::move(swUser.getValue());
+    BSONArrayBuilder mechanismsBuilder;
+    const auto& mechList = _getMapRef(userName.getDB());
+
+    for (const auto& factoryIt : mechList) {
+        SecurityPropertySet properties = factoryIt->properties();
+        if (!properties.hasAllProperties(SecurityPropertySet{SecurityProperty::kNoPlainText,
+                                                             SecurityProperty::kMutualAuth}) &&
+            userName.getDB() != "$external") {
+            continue;
+        }
+
+        auto mechanismEnabled = _mechanismSupportedByConfig(factoryIt->mechanismName());
+        if (!mechanismEnabled && userName == internalSecurity.user->getName()) {
+            mechanismEnabled = factoryIt->isInternalAuthMech();
+        }
+
+        if (mechanismEnabled && factoryIt->canMakeMechanismForUser(user.get())) {
+            mechanismsBuilder << factoryIt->mechanismName();
+        }
+    }
+
+    builder->appendArray("saslSupportedMechs", mechanismsBuilder.arr());
 }
 
 bool SASLServerMechanismRegistry::_mechanismSupportedByConfig(StringData mechName) const {

@@ -334,12 +334,11 @@ public:
 
     /**
      * Produces a list of SASL mechanisms which can be used to authenticate as a user.
-     * If isMasterCmd contains a field with a username called 'saslSupportedMechs',
-     * will populate 'builder' with an Array called saslSupportedMechs containing each mechanism the
-     * user supports.
+     * This will populate 'builder' with an Array called saslSupportedMechs containing each
+     * mechanism the user supports.
      */
     void advertiseMechanismNamesForUser(OperationContext* opCtx,
-                                        const BSONObj& isMasterCmd,
+                                        UserName userName,
                                         BSONObjBuilder* builder);
 
     /**

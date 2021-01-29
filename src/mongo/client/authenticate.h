@@ -71,6 +71,7 @@ constexpr auto kMechanismScramSha256 = "SCRAM-SHA-256"_sd;
 constexpr auto kMechanismMongoAWS = "MONGODB-AWS"_sd;
 constexpr auto kInternalAuthFallbackMechanism = kMechanismScramSha1;
 
+constexpr auto kSaslSupportedMechanisms = "saslSupportedMechs"_sd;
 constexpr auto kSpeculativeAuthenticate = "speculativeAuthenticate"_sd;
 constexpr auto kClusterAuthenticate = "clusterAuthenticate"_sd;
 constexpr auto kAuthenticateCommand = "authenticate"_sd;

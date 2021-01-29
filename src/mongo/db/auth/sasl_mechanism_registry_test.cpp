@@ -230,10 +230,7 @@ public:
 
     BSONObj getMechsFor(const UserName user) {
         BSONObjBuilder builder;
-        registry.advertiseMechanismNamesForUser(
-            opCtx.get(),
-            BSON("isMaster" << 1 << "saslSupportedMechs" << user.getUnambiguousName()),
-            &builder);
+        registry.advertiseMechanismNamesForUser(opCtx.get(), user, &builder);
         return builder.obj();
     }
 

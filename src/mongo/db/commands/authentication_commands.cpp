@@ -221,7 +221,7 @@ void _authenticateX509(OperationContext* opCtx, UserName& user, StringData dbnam
 
     // Handle internal cluster member auth, only applies to server-server connections
     if (sslConfiguration->isClusterMember(clientName)) {
-        uassertStatusOK(authCounter.incClusterAuthenticateReceived("MONGODB-X509"));
+        authCounter.getMechanismCounter("MONGODB-X509").incClusterAuthenticateReceived();
 
         int clusterAuthMode = serverGlobalParams.clusterAuthMode.load();
 
@@ -245,8 +245,7 @@ void _authenticateX509(OperationContext* opCtx, UserName& user, StringData dbnam
                               "certificate with cluster membership");
             }
 
-
-            uassertStatusOK(authCounter.incClusterAuthenticateSuccessful("MONGODB-X509"));
+            authCounter.getMechanismCounter("MONGODB-X509").incClusterAuthenticateSuccessful();
         }
 
         authorizationSession->grantInternalAuthorization(client);
@@ -299,7 +298,8 @@ AuthenticateReply authCommand(OperationContext* opCtx, const AuthenticateCommand
     }
 
     try {
-        uassertStatusOK(authCounter.incAuthenticateReceived(mechanism));
+        auto mechCounter = authCounter.getMechanismCounter("MONGODB-X509");
+        mechCounter.incAuthenticateReceived();
 
         _authenticate(opCtx, mechanism, user, dbname);
         audit::logAuthentication(opCtx->getClient(), mechanism, user, ErrorCodes::OK);
@@ -313,7 +313,7 @@ AuthenticateReply authCommand(OperationContext* opCtx, const AuthenticateCommand
                   "remote"_attr = opCtx->getClient()->session()->remote());
         }
 
-        uassertStatusOK(authCounter.incAuthenticateSuccessful(mechanism));
+        mechCounter.incAuthenticateSuccessful();
 
         return AuthenticateReply(user.getUser().toString(), user.getDB().toString());
 
@@ -389,13 +389,15 @@ void doSpeculativeAuthenticate(OperationContext* opCtx,
 
 
     const auto mechanism = authCmdObj.getMechanism().toString();
-
-    // Run will make sure an audit entry happens. Let it reach that point.
-    authCounter.incSpeculativeAuthenticateReceived(mechanism).ignore();
+    try {
+        authCounter.getMechanismCounter(mechanism).incSpeculativeAuthenticateReceived();
+    } catch (...) {
+        // Run will make sure an audit entry happens. Let it reach that point.
+    }
 
     auto authReply = authCommand(opCtx, authCmdObj);
 
-    uassertStatusOK(authCounter.incSpeculativeAuthenticateSuccessful(mechanism));
+    authCounter.getMechanismCounter(mechanism).incSpeculativeAuthenticateSuccessful();
     result->append(auth::kSpeculativeAuthenticate, authReply.toBSON());
 } catch (...) {
     // Treat failure like we never even got a speculative start.

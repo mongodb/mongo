@@ -37,7 +37,6 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclient_connection.h"
-#include "mongo/db/auth/sasl_mechanism_registry.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/curop.h"
@@ -50,12 +49,12 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/query/internal_plans.h"
+#include "mongo/db/repl/hello_auth.h"
 #include "mongo/db/repl/hello_response.h"
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/repl/replication_auth.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_process.h"
-#include "mongo/db/repl/speculative_auth.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/wire_version.h"
@@ -479,9 +478,6 @@ public:
                 .serverNegotiate(cmdObj, &result);
         }
 
-        auto& saslMechanismRegistry = SASLServerMechanismRegistry::get(opCtx->getServiceContext());
-        saslMechanismRegistry.advertiseMechanismNamesForUser(opCtx, cmdObj, &result);
-
         if (opCtx->isExhaust()) {
             LOGV2_DEBUG(23905, 3, "Using exhaust for isMaster or hello protocol");
 
@@ -513,7 +509,7 @@ public:
             }
         }
 
-        handleHelloSpeculativeAuth(opCtx, cmdObj, &result);
+        handleHelloAuth(opCtx, cmdObj, &result);
 
         return true;
     }

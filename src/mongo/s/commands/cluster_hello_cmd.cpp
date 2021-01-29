@@ -32,14 +32,13 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/auth/sasl_mechanism_registry.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops.h"
-#include "mongo/db/repl/speculative_auth.h"
+#include "mongo/db/repl/hello_auth.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/metadata/client_metadata.h"
@@ -207,9 +206,6 @@ public:
         MessageCompressorManager::forSession(opCtx->getClient()->session())
             .serverNegotiate(cmdObj, &result);
 
-        auto& saslMechanismRegistry = SASLServerMechanismRegistry::get(opCtx->getServiceContext());
-        saslMechanismRegistry.advertiseMechanismNamesForUser(opCtx, cmdObj, &result);
-
         if (opCtx->isExhaust()) {
             LOGV2_DEBUG(23872, 3, "Using exhaust for hello protocol");
 
@@ -242,7 +238,7 @@ public:
             }
         }
 
-        handleHelloSpeculativeAuth(opCtx, cmdObj, &result);
+        handleHelloAuth(opCtx, cmdObj, &result);
 
         return true;
     }

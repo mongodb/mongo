@@ -27,41 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/db/repl/speculative_auth.h"
+#pragma once
 
-#include "mongo/client/authenticate.h"
-#include "mongo/db/auth/sasl_command_constants.h"
-#include "mongo/db/auth/sasl_commands.h"
-#include "mongo/db/commands/authentication_commands.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/operation_context.h"
 
 namespace mongo {
 
-void handleHelloSpeculativeAuth(OperationContext* opCtx, BSONObj cmdObj, BSONObjBuilder* result) {
-    auto sae = cmdObj[auth::kSpeculativeAuthenticate];
-    if (sae.eoo()) {
-        return;
-    }
-
-    uassert(ErrorCodes::BadValue,
-            str::stream() << "hello." << auth::kSpeculativeAuthenticate << " must be an Object",
-            sae.type() == Object);
-    auto specAuth = sae.Obj();
-
-    uassert(ErrorCodes::BadValue,
-            str::stream() << "hello." << auth::kSpeculativeAuthenticate
-                          << " must be a non-empty Object",
-            !specAuth.isEmpty());
-    auto specCmd = specAuth.firstElementFieldNameStringData();
-
-    if (specCmd == saslStartCommandName) {
-        doSpeculativeSaslStart(opCtx, specAuth, result);
-    } else if (specCmd == auth::kAuthenticateCommand) {
-        doSpeculativeAuthenticate(opCtx, specAuth, result);
-    } else {
-        uasserted(51769,
-                  str::stream() << "hello." << auth::kSpeculativeAuthenticate
-                                << " unknown command: " << specCmd);
-    }
-}
+/**
+ * Check a hello request for "saslSupportedMechs" or "speculativeAuthenticate".
+ *
+ * This will attach supported mechanisms or invoke the behavior of saslStart/authenticate commands
+ * as appropriate.
+ */
+void handleHelloAuth(OperationContext* opCtx, BSONObj cmdObj, BSONObjBuilder* result);
 
 }  // namespace mongo

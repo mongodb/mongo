@@ -184,10 +184,6 @@ StatusWith<SaslReply> doSaslStep(OperationContext* opCtx,
                   "authenticationDatabase"_attr = mechanism.getAuthenticationDatabase(),
                   "remote"_attr = opCtx->getClient()->session()->remote());
         }
-        if (session->isSpeculative()) {
-            uassertStatusOK(authCounter.incSpeculativeAuthenticateSuccessful(
-                mechanism.mechanismName().toString()));
-        }
     }
 
     SaslReply reply;
@@ -243,27 +239,30 @@ SaslReply runSaslStart(OperationContext* opCtx, const SaslStartCommand& request,
     auto db = request.getDbName();
     auto mechanismName = request.getMechanism().toString();
 
-    auto status = authCounter.incAuthenticateReceived(mechanismName);
-    if (!status.isOK()) {
-        audit::logAuthentication(client, mechanismName, UserName("", db), status.code());
-        uassertStatusOK(status);
-        MONGO_UNREACHABLE;
-    }
-
     SaslReply reply;
     std::string principalName;
     try {
         std::unique_ptr<AuthenticationSession> session;
+
+        auto mechCounter = authCounter.getMechanismCounter(mechanismName);
+        mechCounter.incAuthenticateReceived();
+        if (speculative) {
+            mechCounter.incSpeculativeAuthenticateReceived();
+        }
+
         reply = doSaslStart(opCtx, request, speculative, &principalName, &session);
 
         const bool isClusterMember = session->getMechanism().isClusterMember();
         if (isClusterMember) {
-            uassertStatusOK(authCounter.incClusterAuthenticateReceived(mechanismName));
+            mechCounter.incClusterAuthenticateReceived();
         }
         if (session->getMechanism().isSuccess()) {
-            uassertStatusOK(authCounter.incAuthenticateSuccessful(mechanismName));
+            mechCounter.incAuthenticateSuccessful();
             if (isClusterMember) {
-                uassertStatusOK(authCounter.incClusterAuthenticateSuccessful(mechanismName));
+                mechCounter.incClusterAuthenticateSuccessful();
+            }
+            if (speculative) {
+                mechCounter.incSpeculativeAuthenticateSuccessful();
             }
             audit::logAuthentication(
                 client, mechanismName, UserName(principalName, db), ErrorCodes::OK);
@@ -316,12 +315,15 @@ SaslReply CmdSaslContinue::Invocation::typedRun(OperationContext* opCtx) {
             mechanism.mechanismName(),
             UserName(mechanism.getPrincipalName(), mechanism.getAuthenticationDatabase()),
             swReply.getStatus().code());
+
+        auto mechCounter = authCounter.getMechanismCounter(mechanism.mechanismName());
         if (mechanism.isSuccess()) {
-            uassertStatusOK(
-                authCounter.incAuthenticateSuccessful(mechanism.mechanismName().toString()));
+            mechCounter.incAuthenticateSuccessful();
             if (mechanism.isClusterMember()) {
-                uassertStatusOK(authCounter.incClusterAuthenticateSuccessful(
-                    mechanism.mechanismName().toString()));
+                mechCounter.incClusterAuthenticateSuccessful();
+            }
+            if (session->isSpeculative()) {
+                mechCounter.incSpeculativeAuthenticateSuccessful();
             }
         }
     } else {
@@ -336,14 +338,6 @@ constexpr auto kDBFieldName = "db"_sd;
 }  // namespace auth
 
 void doSpeculativeSaslStart(OperationContext* opCtx, BSONObj cmdObj, BSONObjBuilder* result) try {
-    auto mechElem = cmdObj["mechanism"];
-    if (mechElem.type() != String) {
-        return;
-    }
-
-    // Run will make sure an audit entry happens. Let it reach that point.
-    authCounter.incSpeculativeAuthenticateReceived(mechElem.String()).ignore();
-
     // TypedCommands expect DB overrides in the "$db" field,
     // but saslStart coming from the Hello command has it in the "db" field.
     // Rewrite it for handling here.

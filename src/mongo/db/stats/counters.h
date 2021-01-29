@@ -219,15 +219,29 @@ private:
 extern NetworkCounter networkCounter;
 
 class AuthCounter {
+    struct MechanismData;
+
 public:
-    Status incSpeculativeAuthenticateReceived(const std::string& mechanism);
-    Status incSpeculativeAuthenticateSuccessful(const std::string& mechanism);
+    class MechanismCounterHandle {
+    public:
+        MechanismCounterHandle(MechanismData* data) : _data(data) {}
 
-    Status incAuthenticateReceived(const std::string& mechanism);
-    Status incAuthenticateSuccessful(const std::string& mechanism);
+        void incSpeculativeAuthenticateReceived();
+        void incSpeculativeAuthenticateSuccessful();
 
-    Status incClusterAuthenticateReceived(const std::string& mechanism);
-    Status incClusterAuthenticateSuccessful(const std::string& mechanism);
+        void incAuthenticateReceived();
+        void incAuthenticateSuccessful();
+
+        void incClusterAuthenticateReceived();
+        void incClusterAuthenticateSuccessful();
+
+    private:
+        MechanismData* _data;
+    };
+
+    MechanismCounterHandle getMechanismCounter(StringData mechanism);
+
+    void incSaslSupportedMechanismsReceived();
 
     void append(BSONObjBuilder*);
 
@@ -249,6 +263,8 @@ private:
         } clusterAuthenticate;
     };
     using MechanismMap = std::map<std::string, MechanismData>;
+
+    AtomicWord<long long> _saslSupportedMechanismsReceived;
 
     // Mechanism maps are initialized at startup to contain all
     // mechanisms known to authenticationMechanisms setParam.

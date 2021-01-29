@@ -1247,9 +1247,9 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/commands/server_status',
-        '$BUILD_DIR/mongo/db/repl/speculative_authenticate',
         '$BUILD_DIR/mongo/db/stats/counters',
         '$BUILD_DIR/mongo/transport/message_compressor',
+        'hello_auth',
         'primary_only_service',
         'replication_auth',
         'split_horizon',
@@ -1726,13 +1726,14 @@ env.Library(
 )
 
 env.Library(
-    target='speculative_authenticate',
+    target='hello_auth',
     source=[
-        'speculative_auth.cpp',
+        'hello_auth.cpp',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/auth/authservercommon',
+        '$BUILD_DIR/mongo/db/stats/counters',
     ],
 )
 

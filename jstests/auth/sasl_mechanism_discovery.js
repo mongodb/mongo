@@ -4,16 +4,30 @@
 "use strict";
 
 function runTest(conn) {
+    const db = conn.getDB("admin");
+    const externalDB = conn.getDB("$external");
+
+    function getStatCounter() {
+        const res = assert.commandWorked(db.runCommand({serverStatus: 1}));
+        return res.security.authentication.saslSupportedMechsReceived;
+    }
+
     function checkMechs(userid, mechs) {
+        const lastCounterValue = getStatCounter();
+
         const res = assert.commandWorked(db.runCommand({hello: 1, saslSupportedMechs: userid}));
+
+        const counterValue = getStatCounter();
+        assert.eq(counterValue, lastCounterValue + 1);
+
         assert.eq(mechs.sort(), res.saslSupportedMechs.sort(), tojson(res));
     }
 
-    var db = conn.getDB("admin");
-    var externalDB = conn.getDB("$external");
-
-    assert.commandWorked(db.runCommand(
-        {createUser: "userAdmin", pwd: "userAdmin", roles: ["userAdminAnyDatabase"]}));
+    assert.commandWorked(db.runCommand({
+        createUser: "userAdmin",
+        pwd: "userAdmin",
+        roles: ["userAdminAnyDatabase", "clusterMonitor"]
+    }));
     db.auth("userAdmin", "userAdmin");
 
     // Check that unknown users do not interrupt hello
