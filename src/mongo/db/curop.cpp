@@ -599,6 +599,10 @@ bool CurOp::completeAndLogOperation(OperationContext* opCtx,
 // Failpoints after commands are logged.
 constexpr auto kPrepareTransactionCmdName = "prepareTransaction"_sd;
 MONGO_FAIL_POINT_DEFINE(waitForPrepareTransactionCommandLogged);
+constexpr auto kHelloCmdName = "hello"_sd;
+MONGO_FAIL_POINT_DEFINE(waitForHelloCommandLogged);
+constexpr auto kIsMasterCmdName = "isMaster"_sd;
+MONGO_FAIL_POINT_DEFINE(waitForIsMasterCommandLogged);
 
 void CurOp::_checkForFailpointsAfterCommandLogged() {
     if (!isCommand() || !getCommand()) {
@@ -609,6 +613,14 @@ void CurOp::_checkForFailpointsAfterCommandLogged() {
     if (cmdName == kPrepareTransactionCmdName) {
         if (MONGO_unlikely(waitForPrepareTransactionCommandLogged.shouldFail())) {
             LOGV2(31481, "waitForPrepareTransactionCommandLogged failpoint enabled");
+        }
+    } else if (cmdName == kHelloCmdName) {
+        if (MONGO_unlikely(waitForHelloCommandLogged.shouldFail())) {
+            LOGV2(31482, "waitForHelloCommandLogged failpoint enabled");
+        }
+    } else if (cmdName == kIsMasterCmdName) {
+        if (MONGO_unlikely(waitForIsMasterCommandLogged.shouldFail())) {
+            LOGV2(31483, "waitForIsMasterCommandLogged failpoint enabled");
         }
     }
 }
