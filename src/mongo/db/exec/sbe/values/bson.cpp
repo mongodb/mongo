@@ -68,6 +68,8 @@ const char* advance(const char* be, size_t fieldNameSize) {
         auto advOffset = advanceTable[type];
         if (advOffset < 128) {
             be += advOffset;
+        } else if (static_cast<BSONType>(type) == BSONType::RegEx) {
+            be += value::BsonRegex(be).byteSize();
         } else {
             be += ConstDataView(be).read<LittleEndian<uint32_t>>();
             if (advOffset == 0xff) {
@@ -224,6 +226,15 @@ std::pair<value::TypeTags, value::Value> convertFrom(bool view,
             return {value::TypeTags::MaxKey, 0};
         case BSONType::Undefined:
             return {value::TypeTags::bsonUndefined, 0};
+        case BSONType::RegEx: {
+            if (view) {
+                return {value::TypeTags::bsonRegex, value::bitcastFrom<const char*>(be)};
+            }
+
+            value::BsonRegex bsonRegex{be};
+            auto [_, strVal] = value::makeBigString(bsonRegex.dataView());
+            return {value::TypeTags::bsonRegex, strVal};
+        }
         default:
             return {value::TypeTags::Nothing, 0};
     }
@@ -315,6 +326,11 @@ void convertToBsonObj(ArrayBuilder& builder, value::ArrayEnumerator arr) {
             case value::TypeTags::bsonUndefined:
                 builder.appendUndefined();
                 break;
+            case value::TypeTags::bsonRegex: {
+                auto regex = value::getBsonRegexView(val);
+                builder.appendRegex(regex.pattern, regex.flags);
+                break;
+            }
             default:
                 MONGO_UNREACHABLE;
         }
@@ -438,6 +454,11 @@ void appendValueToBsonObj(ObjBuilder& builder,
         case value::TypeTags::bsonUndefined:
             builder.appendUndefined(name);
             break;
+        case value::TypeTags::bsonRegex: {
+            auto regex = value::getBsonRegexView(val);
+            builder.appendRegex(name, regex.pattern, regex.flags);
+            break;
+        }
         default:
             MONGO_UNREACHABLE;
     }

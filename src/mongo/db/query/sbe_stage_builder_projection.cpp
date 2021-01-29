@@ -51,6 +51,10 @@
 #include "mongo/util/str.h"
 #include "mongo/util/visit_helper.h"
 
+namespace mongo {
+extern FailPoint disablePipelineOptimization;
+}
+
 namespace mongo::stage_builder {
 namespace {
 using ExpressionType = std::unique_ptr<sbe::EExpression>;
@@ -389,9 +393,14 @@ public:
         // Generate an expression to evaluate a projection expression and push it on top of the
         // 'evals' stack. If the expression is translated into a sub-tree, stack it with the
         // existing 'evalStage' sub-tree.
+        auto expression = node->expression();
+        if (MONGO_likely(!disablePipelineOptimization.shouldFail())) {
+            expression = expression->optimize();
+        }
+
         auto [outputSlot, expr, stage] =
             generateExpression(_context->opCtx,
-                               node->expression()->optimize().get(),
+                               expression.get(),
                                std::move(_context->topLevel().evalStage),
                                _context->slotIdGenerator,
                                _context->frameIdGenerator,

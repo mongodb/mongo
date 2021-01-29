@@ -114,6 +114,7 @@ enum class TypeTags : uint8_t {
     // The bson prefix signifies the fact that this type can only come from BSON (either from disk
     // or from user over the wire). It is never created or manipulated by SBE.
     bsonUndefined,
+    bsonRegex,
 
     // KeyString::Value
     ksValue,
@@ -170,6 +171,10 @@ inline constexpr bool isPcreRegex(TypeTags tag) noexcept {
 
 inline constexpr bool isCollatableType(TypeTags tag) noexcept {
     return isString(tag) || isArray(tag) || isObject(tag);
+}
+
+inline constexpr bool isBsonRegex(TypeTags tag) noexcept {
+    return tag == TypeTags::bsonRegex;
 }
 
 BSONType tagToType(TypeTags tag) noexcept;
@@ -587,10 +592,8 @@ private:
  */
 class PcreRegex {
 public:
-    PcreRegex() = default;
-
     PcreRegex(std::string_view pattern, std::string_view options)
-        : _pattern(pattern), _options(options), _pcrePtr(nullptr) {
+        : _pattern(pattern), _options(options) {
         _compile();
     }
 
@@ -600,25 +603,16 @@ public:
 
     PcreRegex& operator=(const PcreRegex& other) {
         if (this != &other) {
-            if (_pcrePtr != nullptr) {
-                (*pcre_free)(_pcrePtr);
-            }
+            (*pcre_free)(_pcrePtr);
             _pattern = other._pattern;
             _options = other._options;
-            _isValid = false;
             _compile();
         }
         return *this;
     }
 
     ~PcreRegex() {
-        if (_pcrePtr != nullptr) {
-            (*pcre_free)(_pcrePtr);
-        }
-    }
-
-    bool isValid() const {
-        return _isValid;
+        (*pcre_free)(_pcrePtr);
     }
 
     const std::string& pattern() const {
@@ -651,7 +645,6 @@ private:
     std::string _options;
 
     pcre* _pcrePtr;
-    bool _isValid = false;
 };
 
 constexpr size_t kSmallStringMaxLength = 7;
@@ -910,6 +903,45 @@ inline ShardFilterer* getShardFiltererView(Value val) noexcept {
 
 inline CollatorInterface* getCollatorView(Value val) noexcept {
     return reinterpret_cast<CollatorInterface*>(val);
+}
+
+/**
+ * Pattern and flags of Regex are stored in BSON as two C strings written one after another.
+ *
+ *   <pattern> <NULL> <flags> <NULL>
+ */
+struct BsonRegex {
+    BsonRegex(const char* rawValue) {
+        pattern = rawValue;
+        // We add 1 to account NULL byte after pattern.
+        flags = pattern.data() + pattern.size() + 1;
+    }
+
+    BsonRegex(std::string_view pattern, std::string_view flags) : pattern(pattern), flags(flags) {
+        // Ensure that flags follow right after pattern in memory. Otherwise 'dataView()' may return
+        // invalid 'std::string_view' object.
+        invariant(pattern.data() + pattern.size() + 1 == flags.data());
+    }
+
+    size_t byteSize() const {
+        // We add 2 to account NULL bytes after each string.
+        return pattern.size() + flags.size() + 2;
+    }
+
+    const char* data() const {
+        return pattern.data();
+    }
+
+    std::string_view dataView() const {
+        return {data(), byteSize()};
+    }
+
+    std::string_view pattern;
+    std::string_view flags;
+};
+
+inline BsonRegex getBsonRegexView(Value val) noexcept {
+    return BsonRegex(getRawPointerView(val));
 }
 
 std::pair<TypeTags, Value> makeCopyKeyString(const KeyString::Value& inKey);

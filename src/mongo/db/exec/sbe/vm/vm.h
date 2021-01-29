@@ -298,6 +298,9 @@ enum class Builtin : uint8_t {
     extractSubArray,
     isArrayEmpty,
     dateAdd,
+    hasNullBytes,
+    getRegexPattern,
+    getRegexFlags,
 };
 
 using SmallArityType = uint8_t;
@@ -707,6 +710,9 @@ private:
     std::tuple<bool, value::TypeTags, value::Value> builtinExtractSubArray(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinIsArrayEmpty(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinDateAdd(ArityType arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinHasNullBytes(ArityType arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinGetRegexPattern(ArityType arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinGetRegexFlags(ArityType arity);
 
     std::tuple<bool, value::TypeTags, value::Value> dispatchBuiltin(Builtin f, ArityType arity);
 

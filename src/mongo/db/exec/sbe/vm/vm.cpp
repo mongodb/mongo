@@ -2509,17 +2509,10 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinRegexCompile(Ar
     auto [patternOwned, patternTypeTag, patternValue] = getFromStack(0);
     auto [optionsOwned, optionsTypeTag, optionsValue] = getFromStack(1);
 
-    if (patternTypeTag == value::TypeTags::Null) {
-        return {false, value::TypeTags::Null, 0};
-    }
     if (!value::isString(patternTypeTag) || !value::isString(optionsTypeTag)) {
         return {false, value::TypeTags::Nothing, 0};
     }
-    // At the moment we support only string patterns.
-    // TODO SERVER-51266 : complete the following items once BSONType::RegEx is supported in SBE
-    // - Handle the case when patternTypeTag == TypeTags::bsonRegex.
-    // - Ensure that regex options are specified either in the options argument or in bsonRegex
-    // value.
+
     auto pattern = value::getStringView(patternTypeTag, patternValue);
     auto options = value::getStringView(optionsTypeTag, optionsValue);
 
@@ -2571,6 +2564,7 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinRegexFindAll(Ar
     value::ValueGuard arrGuard{arrTag, arrVal};
     auto arrayView = value::getArrayView(arrVal);
 
+    int resultSize = 0;
     do {
         auto [owned, matchTag, matchVal] = [&]() {
             if (isFirstMatch) {
@@ -2587,6 +2581,12 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinRegexFindAll(Ar
         if (matchTag != value::TypeTags::Object) {
             return {false, value::TypeTags::Nothing, 0};
         }
+
+        resultSize += getApproximateSize(matchTag, matchVal);
+        uassert(5126606,
+                "$regexFindAll: the size of buffer to store output exceeded the 64MB limit",
+                resultSize <= mongo::BufferMaxSize);
+
         arrayView->push_back(matchTag, matchVal);
 
         // Move indexes after the current matched string to prepare for the next search.
@@ -2763,6 +2763,48 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinIsArrayEmpty(Ar
         // bsonArray, so it should be impossible to reach this point.
         MONGO_UNREACHABLE
     }
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinHasNullBytes(ArityType arity) {
+    invariant(arity == 1);
+    auto [strOwned, strType, strValue] = getFromStack(0);
+
+    if (!value::isString(strType)) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+
+    auto stringView = value::getStringView(strType, strValue);
+    auto hasNullBytes = stringView.find('\0') != std::string_view::npos;
+
+    return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(hasNullBytes)};
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinGetRegexPattern(ArityType arity) {
+    invariant(arity == 1);
+    auto [regexOwned, regexType, regexValue] = getFromStack(0);
+
+    if (regexType != value::TypeTags::bsonRegex) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+
+    auto regex = value::getBsonRegexView(regexValue);
+    auto [strType, strValue] = value::makeNewString(regex.pattern);
+
+    return {true, strType, strValue};
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinGetRegexFlags(ArityType arity) {
+    invariant(arity == 1);
+    auto [regexOwned, regexType, regexValue] = getFromStack(0);
+
+    if (regexType != value::TypeTags::bsonRegex) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+
+    auto regex = value::getBsonRegexView(regexValue);
+    auto [strType, strValue] = value::makeNewString(regex.flags);
+
+    return {true, strType, strValue};
 }
 
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinDateAdd(ArityType arity) {
@@ -2952,6 +2994,12 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builti
             return builtinIsArrayEmpty(arity);
         case Builtin::dateAdd:
             return builtinDateAdd(arity);
+        case Builtin::hasNullBytes:
+            return builtinHasNullBytes(arity);
+        case Builtin::getRegexPattern:
+            return builtinGetRegexPattern(arity);
+        case Builtin::getRegexFlags:
+            return builtinGetRegexFlags(arity);
     }
 
     MONGO_UNREACHABLE;

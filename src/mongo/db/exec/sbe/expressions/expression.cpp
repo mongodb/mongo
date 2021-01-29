@@ -432,11 +432,16 @@ static stdx::unordered_map<std::string, BuiltinFn> kBuiltinFunctions = {
     {"regexCompile", BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::regexCompile, false}},
     {"regexFind", BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::regexFind, false}},
     {"regexFindAll", BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::regexFindAll, false}},
+    {"getRegexPattern",
+     BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::getRegexPattern, false}},
+    {"getRegexFlags",
+     BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::getRegexFlags, false}},
     {"shardFilter", BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::shardFilter, false}},
     {"extractSubArray",
      BuiltinFn{[](size_t n) { return n == 2 || n == 3; }, vm::Builtin::extractSubArray, false}},
     {"isArrayEmpty", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::isArrayEmpty, false}},
     {"dateAdd", BuiltinFn{[](size_t n) { return n == 5; }, vm::Builtin::dateAdd, false}},
+    {"hasNullBytes", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::hasNullBytes, false}},
 };
 
 /**

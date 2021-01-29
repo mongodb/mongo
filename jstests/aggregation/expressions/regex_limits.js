@@ -1,13 +1,11 @@
 /**
  * Tests to validate limits for $regexFind, $regexFindAll and $regexMatch aggregation expressions.
- * @tags: [
- *   sbe_incompatible,
- * ]
  */
 (function() {
 'use strict';
 
-load("jstests/aggregation/extras/utils.js");  // For assertErrorCode().
+load("jstests/aggregation/extras/utils.js");        // For assertErrorCode().
+load('jstests/libs/sbe_assert_error_override.js');  // Override error-code-checking APIs.
 
 const coll = db.regex_expr_limit;
 coll.drop();

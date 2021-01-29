@@ -115,6 +115,11 @@ public:
      * Implicitly convert to a std::string_view.
      */
     operator std::string_view() const {
+        // std::string_view produces undefined behaviour if [pointer, pointer + size) is not a valid
+        // range. To fix this we explicitly use default constructor if StringData contains nullptr.
+        if (MONGO_unlikely(rawData() == nullptr)) {
+            return {};
+        }
         return {rawData(), size()};
     }
 

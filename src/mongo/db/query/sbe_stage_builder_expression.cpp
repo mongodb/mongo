@@ -52,6 +52,9 @@
 #include "mongo/db/query/sbe_stage_builder_helpers.h"
 #include "mongo/util/str.h"
 
+#include <absl/container/flat_hash_map.h>
+#include <absl/container/flat_hash_set.h>
+
 namespace mongo::stage_builder {
 namespace {
 std::pair<sbe::value::TypeTags, sbe::value::Value> convertFrom(Value val) {
@@ -3047,76 +3050,192 @@ private:
      * Shared expression building logic for regex expressions.
      */
     void generateRegexExpression(ExpressionRegex* expr, StringData exprName) {
-        size_t arity = (expr->hasOptions()) ? 3 : 2;
+        size_t arity = expr->hasOptions() ? 3 : 2;
         _context->ensureArity(arity);
 
         std::unique_ptr<sbe::EExpression> options =
-            (arity == 3) ? _context->popExpr() : sbe::makeE<sbe::EConstant>("");
+            expr->hasOptions() ? _context->popExpr() : nullptr;
         auto pattern = _context->popExpr();
         auto input = _context->popExpr();
 
-        auto pcreRegexExpr = [&]() {
-            auto [patternStr, optStr] = expr->getConstantPatternAndOptions();
-            if (patternStr) {
-                // Create the compiled Regex from constant pattern and options.
-                auto [regexTag, regexVal] = sbe::value::makeNewPcreRegex(patternStr.get(), optStr);
-                return sbe::makeE<sbe::EConstant>(regexTag, regexVal);
-            } else {
-                // Build a call to regexCompile function.
-                auto frameId = _context->frameIdGenerator->generate();
-                auto binds = sbe::makeEs(std::move(pattern));
-                sbe::EVariable patternRef(frameId, 0);
+        // Create top level local bind.
+        auto frameId = _context->frameIdGenerator->generate();
+        auto binds = sbe::makeEs(std::move(input));
+        sbe::EVariable inputVar{frameId, 0};
 
-                return sbe::makeE<sbe::ELocalBind>(
-                    frameId,
-                    std::move(binds),
-                    buildMultiBranchConditional(
-                        CaseValuePair{generateNullOrMissing(patternRef),
-                                      sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0)},
-                        CaseValuePair{generateNonStringCheck(patternRef),
-                                      sbe::makeE<sbe::EFail>(ErrorCodes::Error{5073400},
-                                                             str::stream()
-                                                                 << "$" << exprName.toString()
-                                                                 << " expects string pattern")},
-                        sbe::makeE<sbe::EFunction>(
-                            "regexCompile", sbe::makeEs(patternRef.clone(), std::move(options)))));
+        auto makeError = [exprName](int errorCode, StringData message) {
+            return sbe::makeE<sbe::EFail>(ErrorCodes::Error{errorCode},
+                                          str::stream() << "$" << exprName.toString() << ": "
+                                                        << message.toString());
+        };
+
+        auto makeRegexFunctionCall = [&](std::unique_ptr<sbe::EExpression> compiledRegex) {
+            return makeLocalBind(
+                _context->frameIdGenerator,
+                [&](sbe::EVariable regexResult) {
+                    return sbe::makeE<sbe::EIf>(
+                        makeFunction("exists", regexResult.clone()),
+                        regexResult.clone(),
+                        makeError(5073403,
+                                  "error occurred while executing the regular expression"));
+                },
+                makeFunction(exprName.toString(), std::move(compiledRegex), inputVar.clone()));
+        };
+
+        auto regexFunctionResult = [&]() {
+            if (auto patternAndOptions = expr->getConstantPatternAndOptions(); patternAndOptions) {
+                auto [pattern, options] = *patternAndOptions;
+                if (!pattern) {
+                    // Pattern is null, just generate null result.
+                    return generateRegexNullResponse(exprName);
+                }
+
+                // Create the compiled Regex from constant pattern and options.
+                auto [regexTag, regexVal] = sbe::value::makeNewPcreRegex(*pattern, options);
+                auto compiledRegex = sbe::makeE<sbe::EConstant>(regexTag, regexVal);
+                return makeRegexFunctionCall(std::move(compiledRegex));
             }
+
+            // Include pattern and options in the outer local bind.
+            sbe::EVariable patternVar{frameId, 1};
+            binds.push_back(std::move(pattern));
+
+            boost::optional<sbe::EVariable> optionsVar;
+            if (options) {
+                binds.push_back(std::move(options));
+                optionsVar.emplace(frameId, 2);
+            }
+
+            // 'patternArgument' contains the following expression:
+            //
+            // if isString(pattern) {
+            //     if hasNullBytes(pattern) {
+            //         fail('pattern cannot have null bytes in it')
+            //     } else {
+            //         pattern
+            //     }
+            // } else if isBsonRegex(pattern) {
+            //     getRegexPattern(pattern)
+            // } else {
+            //     fail('pattern must be either string or BSON RegEx')
+            // }
+            auto patternNullBytesCheck = sbe::makeE<sbe::EIf>(
+                makeFunction("hasNullBytes", patternVar.clone()),
+                makeError(5126602, "regex pattern must not have embedded null bytes"),
+                patternVar.clone());
+            auto patternArgument = buildMultiBranchConditional(
+                CaseValuePair{makeFunction("isString", patternVar.clone()),
+                              std::move(patternNullBytesCheck)},
+                CaseValuePair{sbe::makeE<sbe::ETypeMatch>(patternVar.clone(),
+                                                          getBSONTypeMask(BSONType::RegEx)),
+                              makeFunction("getRegexPattern", patternVar.clone())},
+                makeError(5126601, "regex pattern must have either string or BSON RegEx type"));
+
+            if (!optionsVar) {
+                // If no options are passed to the expression, try to extract them from the pattern.
+                auto optionsArgument =
+                    sbe::makeE<sbe::EIf>(sbe::makeE<sbe::ETypeMatch>(
+                                             patternVar.clone(), getBSONTypeMask(BSONType::RegEx)),
+                                         makeFunction("getRegexFlags", patternVar.clone()),
+                                         makeConstant(""));
+                auto compiledRegex = makeFunction(
+                    "regexCompile", std::move(patternArgument), std::move(optionsArgument));
+                return sbe::makeE<sbe::EIf>(makeFunction("isNull", patternVar.clone()),
+                                            generateRegexNullResponse(exprName),
+                                            makeRegexFunctionCall(std::move(compiledRegex)));
+            }
+
+            auto optionsArgument = [&]() {
+                // The code below generates the following expression:
+                //
+                // let stringOptions =
+                //     if isString(options) {
+                //         if hasNullBytes(options) {
+                //             fail('options cannot have null bytes in it')
+                //         } else {
+                //             options
+                //         }
+                //     } else if isNull(options) {
+                //         ''
+                //     } else {
+                //         fail('options must be either string or null')
+                //     }
+                // in
+                //     if isBsonRegex(pattern) {
+                //         let bsonOptions = getRegexFlags(pattern)
+                //         in
+                //             if stringOptions == "" {
+                //                 bsonOptions
+                //             } else if bsonOptions == "" {
+                //                 stringOptions
+                //             } else {
+                //                 fail('multiple options specified')
+                //             }
+                //     } else {
+                //         stringOptions
+                //     }
+                auto optionsNullBytesCheck = sbe::makeE<sbe::EIf>(
+                    makeFunction("hasNullBytes", optionsVar->clone()),
+                    makeError(5126604, "regex flags must not have embedded null bytes"),
+                    optionsVar->clone());
+                auto stringOptions = buildMultiBranchConditional(
+                    CaseValuePair{makeFunction("isString", optionsVar->clone()),
+                                  std::move(optionsNullBytesCheck)},
+                    CaseValuePair{makeFunction("isNull", optionsVar->clone()), makeConstant("")},
+                    makeError(5126603, "regex flags must have either string or null type"));
+
+                auto generateIsEmptyString = [](const sbe::EVariable& var) {
+                    return makeBinaryOp(sbe::EPrimBinary::eq, var.clone(), makeConstant(""));
+                };
+
+                return makeLocalBind(
+                    _context->frameIdGenerator,
+                    [&](sbe::EVariable stringOptions) {
+                        auto checkBsonRegexOptions = makeLocalBind(
+                            _context->frameIdGenerator,
+                            [&](sbe::EVariable bsonOptions) {
+                                return buildMultiBranchConditional(
+                                    CaseValuePair{generateIsEmptyString(stringOptions),
+                                                  bsonOptions.clone()},
+                                    CaseValuePair{generateIsEmptyString(bsonOptions),
+                                                  stringOptions.clone()},
+                                    makeError(5126605,
+                                              "regex options cannot be specified in both BSON "
+                                              "RegEx and 'options' field"));
+                            },
+                            makeFunction("getRegexFlags", patternVar.clone()));
+
+                        return sbe::makeE<sbe::EIf>(
+                            sbe::makeE<sbe::ETypeMatch>(patternVar.clone(),
+                                                        getBSONTypeMask(BSONType::RegEx)),
+                            std::move(checkBsonRegexOptions),
+                            stringOptions.clone());
+                    },
+                    std::move(stringOptions));
+            }();
+
+            // If there are options passed to the expression, we construct local bind with options
+            // argument because it needs to be validated even when pattern is null.
+            return makeLocalBind(
+                _context->frameIdGenerator,
+                [&](sbe::EVariable options) {
+                    auto compiledRegex =
+                        makeFunction("regexCompile", std::move(patternArgument), options.clone());
+                    return sbe::makeE<sbe::EIf>(makeFunction("isNull", patternVar.clone()),
+                                                generateRegexNullResponse(exprName),
+                                                makeRegexFunctionCall(std::move(compiledRegex)));
+                },
+                std::move(optionsArgument));
         }();
 
-        auto outerFrameId = _context->frameIdGenerator->generate();
-        auto outerBinds = sbe::makeEs(std::move(pcreRegexExpr), std::move(input));
-        sbe::EVariable regexRef(outerFrameId, 0);
-        sbe::EVariable inputRef(outerFrameId, 1);
-        auto innerFrameId = _context->frameIdGenerator->generate();
-        sbe::EVariable resRef(innerFrameId, 0);
+        auto resultExpr = buildMultiBranchConditional(
+            CaseValuePair{generateNullOrMissing(inputVar), generateRegexNullResponse(exprName)},
+            CaseValuePair{generateNonStringCheck(inputVar),
+                          makeError(5073401, "input must be of type string")},
+            std::move(regexFunctionResult));
 
-        auto regexWithErrorCheck = buildMultiBranchConditional(
-            CaseValuePair{makeBinaryOp(sbe::EPrimBinary::logicOr,
-                                       generateNullOrMissing(inputRef),
-                                       makeFunction("isNull", regexRef.clone())),
-                          generateRegexNullResponse(exprName)},
-            CaseValuePair{generateNonStringCheck(inputRef),
-                          sbe::makeE<sbe::EFail>(ErrorCodes::Error{5073401},
-                                                 str::stream() << "$" << exprName.toString()
-                                                               << " expects input of type string")},
-
-            CaseValuePair{
-                makeNot(makeFunction("exists", regexRef.clone())),
-                sbe::makeE<sbe::EFail>(ErrorCodes::Error{5073402}, "Invalid regular expression")},
-            sbe::makeE<sbe::ELocalBind>(
-                innerFrameId,
-                sbe::makeEs(makeFunction(exprName.toString(), regexRef.clone(), inputRef.clone())),
-                sbe::makeE<sbe::EIf>(
-                    makeFunction("exists", resRef.clone()),
-                    resRef.clone(),
-                    sbe::makeE<sbe::EFail>(ErrorCodes::Error{5073403},
-                                           str::stream()
-                                               << "Unexpected error occurred while executing "
-                                               << exprName.toString()
-                                               << ". For more details see the error logs."))));
-
-        _context->pushExpr(sbe::makeE<sbe::ELocalBind>(
-            outerFrameId, std::move(outerBinds), std::move(regexWithErrorCheck)));
+        _context->pushExpr(
+            sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(resultExpr)));
     }
 
     /**

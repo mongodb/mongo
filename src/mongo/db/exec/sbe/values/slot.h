@@ -578,4 +578,6 @@ void orderedSlotMapTraverse(const SlotMap<T>& map, C callback) {
         callback(slot, map.at(slot));
     }
 }
+
+int getApproximateSize(TypeTags tag, Value val);
 }  // namespace mongo::sbe::value

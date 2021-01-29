@@ -153,6 +153,14 @@ static std::pair<TypeTags, Value> deserializeTagVal(BufReader& buf) {
             val = ksVal;
             break;
         }
+        case TypeTags::bsonRegex: {
+            auto pattern = buf.readCStr();
+            auto flags = buf.readCStr();
+            BsonRegex bsonRegex{pattern, flags};
+            auto [_, strVal] = makeBigString(bsonRegex.dataView());
+            val = strVal;
+            break;
+        }
         default:
             MONGO_UNREACHABLE;
     }
@@ -278,6 +286,12 @@ static void serializeTagValue(BufBuilder& buf, TypeTags tag, Value val) {
             ks->serialize(buf);
             break;
         }
+        case TypeTags::bsonRegex: {
+            auto regex = getBsonRegexView(val);
+            buf.appendStr(regex.pattern);
+            buf.appendStr(regex.flags);
+            break;
+        }
         default:
             MONGO_UNREACHABLE;
     }
@@ -292,7 +306,7 @@ void MaterializedRow::serializeForSorter(BufBuilder& buf) const {
     }
 }
 
-static int getApproximateSize(TypeTags tag, Value val) {
+int getApproximateSize(TypeTags tag, Value val) {
     int result = sizeof(tag) + sizeof(val);
     switch (tag) {
         // These are shallow types.
@@ -364,6 +378,11 @@ static int getApproximateSize(TypeTags tag, Value val) {
         case TypeTags::ksValue: {
             auto ks = getKeyStringView(val);
             result += ks->memUsageForSorter();
+            break;
+        }
+        case TypeTags::bsonRegex: {
+            auto regex = getBsonRegexView(val);
+            result += regex.byteSize();
             break;
         }
         default:

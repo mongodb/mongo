@@ -2981,10 +2981,11 @@ public:
     }
 
     /**
-     * Return regex pattern and options in case they are constants. Return pattern boost::none in
-     * case the pattern or options are not constants, or if the pattern is null.
+     * If pattern or options are not constants, returns boost::none. Otherwise, return value
+     * contains regex pattern and options if they are not null.
      */
-    std::pair<boost::optional<std::string>, std::string> getConstantPatternAndOptions() const;
+    boost::optional<std::pair<boost::optional<std::string>, std::string>>
+    getConstantPatternAndOptions() const;
 
     Value serialize(bool explain) const;
 

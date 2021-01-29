@@ -50,19 +50,12 @@ std::pair<TypeTags, Value> makeCopyKeyString(const KeyString::Value& inKey) {
 
 std::pair<TypeTags, Value> makeNewPcreRegex(std::string_view pattern, std::string_view options) {
     auto regex = std::make_unique<PcreRegex>(pattern, options);
-    if (regex->isValid()) {
-        return {TypeTags::pcreRegex, bitcastFrom<PcreRegex*>(regex.release())};
-    }
-    return {TypeTags::Nothing, 0};
+    return {TypeTags::pcreRegex, bitcastFrom<PcreRegex*>(regex.release())};
 }
 
 std::pair<TypeTags, Value> makeCopyPcreRegex(const PcreRegex& regex) {
-    if (regex.isValid()) {
-        auto regexCopy = std::make_unique<PcreRegex>(regex);
-        invariant(regexCopy->isValid());
-        return {TypeTags::pcreRegex, bitcastFrom<PcreRegex*>(regexCopy.release())};
-    }
-    return {TypeTags::Nothing, 0};
+    auto regexCopy = std::make_unique<PcreRegex>(regex);
+    return {TypeTags::pcreRegex, bitcastFrom<PcreRegex*>(regexCopy.release())};
 }
 
 void PcreRegex::_compile() {
@@ -70,11 +63,10 @@ void PcreRegex::_compile() {
     const char* compile_error;
     int eoffset;
     _pcrePtr = pcre_compile(_pattern.c_str(), pcreOptions, &compile_error, &eoffset, nullptr);
-    _isValid = (_pcrePtr != nullptr);
+    uassert(5073402, str::stream() << "Invalid Regex: " << compile_error, _pcrePtr != nullptr);
 }
 
 int PcreRegex::execute(std::string_view stringView, int startPos, std::vector<int>& buf) {
-    invariant(_isValid);
     return pcre_exec(_pcrePtr,
                      nullptr,
                      stringView.data(),
@@ -87,7 +79,6 @@ int PcreRegex::execute(std::string_view stringView, int startPos, std::vector<in
 
 size_t PcreRegex::getNumberCaptures() const {
     int numCaptures;
-    invariant(_isValid);
     pcre_fullinfo(_pcrePtr, nullptr, PCRE_INFO_CAPTURECOUNT, &numCaptures);
     invariant(numCaptures >= 0);
     return static_cast<size_t>(numCaptures);
@@ -240,6 +231,9 @@ void writeTagToStream(T& stream, const TypeTags tag) {
             break;
         case TypeTags::collator:
             stream << "Collator";
+            break;
+        case TypeTags::bsonRegex:
+            stream << "bsonRegex";
             break;
         default:
             stream << "unknown tag";
@@ -433,7 +427,7 @@ void writeValueToStream(T& stream, TypeTags tag, Value val) {
         }
         case TypeTags::pcreRegex: {
             auto regex = getPcreRegexView(val);
-            stream << "/" << regex->pattern() << "/" << regex->options();
+            stream << "PcreRegex(/" << regex->pattern() << "/" << regex->options() << ")";
             break;
         }
         case TypeTags::timeZoneDB: {
@@ -455,6 +449,11 @@ void writeValueToStream(T& stream, TypeTags tag, Value val) {
         case TypeTags::collator:
             stream << "Collator(" << getCollatorView(val)->getSpec().toBSON().toString() << ")";
             break;
+        case value::TypeTags::bsonRegex: {
+            const auto regex = getBsonRegexView(val);
+            stream << '/' << regex.pattern << '/' << regex.flags;
+            break;
+        }
         default:
             MONGO_UNREACHABLE;
     }
@@ -532,6 +531,8 @@ BSONType tagToType(TypeTags tag) noexcept {
         case TypeTags::ksValue:
             // This is completely arbitrary.
             return BSONType::EOO;
+        case TypeTags::bsonRegex:
+            return BSONType::RegEx;
         default:
             MONGO_UNREACHABLE;
     }
@@ -641,6 +642,10 @@ std::size_t hashValue(TypeTags tag, Value val, const CollatorInterface* collator
                 return absl::Hash<uint64_t>{}(
                     readFromMemory<uint64_t>(getRawPointerView(val) + sizeof(uint32_t)));
             }
+        }
+        case TypeTags::bsonRegex: {
+            auto regex = getBsonRegexView(val);
+            return absl::Hash<std::string_view>{}(regex.dataView());
         }
         default:
             break;
@@ -811,6 +816,11 @@ std::pair<TypeTags, Value> compareValue(TypeTags lhsTag,
         return {TypeTags::NumberInt32, bitcastFrom<int32_t>(0)};
     } else if (lhsTag == TypeTags::RecordId && rhsTag == TypeTags::RecordId) {
         auto result = compareHelper(bitcastTo<int64_t>(lhsValue), bitcastTo<int64_t>(rhsValue));
+        return {TypeTags::NumberInt32, bitcastFrom<int32_t>(result)};
+    } else if (lhsTag == TypeTags::bsonRegex && rhsTag == TypeTags::bsonRegex) {
+        auto lhsRegex = getBsonRegexView(lhsValue);
+        auto rhsRegex = getBsonRegexView(rhsValue);
+        auto result = compareHelper(lhsRegex.dataView(), rhsRegex.dataView());
         return {TypeTags::NumberInt32, bitcastFrom<int32_t>(result)};
     } else {
         // Different types.

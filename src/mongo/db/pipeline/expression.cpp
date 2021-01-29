@@ -6498,11 +6498,11 @@ void ExpressionRegex::_doAddDependencies(DepsTracker* deps) const {
     }
 }
 
-std::pair<boost::optional<std::string>, std::string> ExpressionRegex::getConstantPatternAndOptions()
-    const {
+boost::optional<std::pair<boost::optional<std::string>, std::string>>
+ExpressionRegex::getConstantPatternAndOptions() const {
     if (!ExpressionConstant::isNullOrConstant(_regex) ||
         !ExpressionConstant::isNullOrConstant(_options)) {
-        return {boost::none, ""};
+        return {};
     }
     auto patternValue = static_cast<ExpressionConstant*>(_regex.get())->getValue();
     uassert(5073405,
@@ -6528,6 +6528,9 @@ std::pair<boost::optional<std::string>, std::string> ExpressionRegex::getConstan
     auto optionsStr = [&]() -> std::string {
         if (_options.get() != nullptr) {
             auto optValue = static_cast<ExpressionConstant*>(_options.get())->getValue();
+            uassert(5126607,
+                    str::stream() << _opName << " needs 'options' to be of type string",
+                    optValue.nullish() || optValue.getType() == BSONType::String);
             if (optValue.getType() == BSONType::String) {
                 return optValue.getString();
             }
@@ -6543,14 +6546,14 @@ std::pair<boost::optional<std::string>, std::string> ExpressionRegex::getConstan
 
     uassert(5073407,
             str::stream() << _opName << ": regular expression cannot contain an embedded null byte",
-            patternStr->find('\0', 0) == std::string::npos);
+            !patternStr || patternStr->find('\0') == std::string::npos);
 
     uassert(5073408,
             str::stream() << _opName
                           << ": regular expression options cannot contain an embedded null byte",
-            optionsStr.find('\0', 0) == std::string::npos);
+            optionsStr.find('\0') == std::string::npos);
 
-    return {patternStr, optionsStr};
+    return std::make_pair(patternStr, optionsStr);
 }
 
 /* -------------------------- ExpressionRegexFind ------------------------------ */
