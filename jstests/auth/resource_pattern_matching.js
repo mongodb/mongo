@@ -85,7 +85,8 @@ function run_test(name, granter, verifier, privileges, collections) {
     grant_privileges(granter, privileges);
     invalidateUserCache(verifier);
 
-    verifier.getSiblingDB('admin').auth("test_user", "password");
+    const verifierDB = verifier.getSiblingDB('admin');
+    verifierDB.auth("test_user", "password");
 
     for (var key in collections) {
         var parts = key.split(".");
@@ -98,6 +99,7 @@ function run_test(name, granter, verifier, privileges, collections) {
     }
 
     revoke_privileges(granter, privileges);
+    verifierDB.logout();
 }
 
 function run_test_bad_resource(name, granter, resource) {
