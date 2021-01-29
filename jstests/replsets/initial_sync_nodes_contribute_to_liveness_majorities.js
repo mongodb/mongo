@@ -66,7 +66,7 @@ assert.eq(primary, rst.getPrimary());
 
 // Verify that the term has incremented due to the last election.
 primaryReplSetStatus = assert.commandWorked(primary.adminCommand({replSetGetStatus: 1}));
-assert.eq(2, primaryReplSetStatus.term);
+assert.gt(primaryReplSetStatus.term, 1);
 
 // Verify that initial sync node voted in the election and sets the correct term in its
 // electionParticipantMetrics field.
