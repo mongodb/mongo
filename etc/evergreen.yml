@@ -296,9 +296,9 @@ variables:
   - enterprise-rhel-62-64-bit-inmem
   - enterprise-rhel-62-64-bit-logv2
   - enterprise-rhel-62-64-bit-flow-control-off
-  - enterprise-rhel-62-64-bit-multiversion
+  - enterprise-rhel-80-64-bit-multiversion
   - enterprise-rhel-62-64-bit-multi-txn-oplog-entries
-  - enterprise-rhel-62-64-bit-required-inmem
+  - enterprise-rhel-80-64-bit-required-inmem
   - enterprise-rhel-62-64-bit-required-majority-read-concern-off
   - enterprise-rhel-67-s390x
   - enterprise-rhel-70-64-bit
@@ -8634,21 +8634,21 @@ buildvariants:
 - name: linux-64-duroff
   display_name: Linux (No Journal)
   run_on:
-  - rhel62-small
+  - rhel80-small
   expansions: &linux-64-required-duroff-expansions
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --enable-free-mon=off --enable-http-client=off
-    multiversion_platform: rhel62
+    multiversion_platform: rhel80
     multiversion_edition: targeted
     # Running WiredTiger with --nojournal in a replica set is no longer supported, so this variant
     # does not include replica set tests. Since transactions are only supported on replica sets, we
     # exclude those tests as well.
     test_flags: --nojournal --excludeWithAnyTags=requires_journaling,requires_replication,requires_sharding,uses_transactions,requires_http_client
     scons_cache_scope: shared
-    large_distro_name: rhel62-medium
+    large_distro_name: rhel80-medium
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - rhel62-large
+    - rhel80-xlarge
   - name: .aggfuzzer .common
   - name: aggregation
   - name: aggregation_auth
@@ -10336,7 +10336,7 @@ buildvariants:
     target_resmoke_time: 10
     max_sub_suites: 5
     large_distro_name: rhel80-medium
-    burn_in_tag_buildvariants: enterprise-rhel-62-64-bit-inmem linux-64-duroff enterprise-rhel-62-64-bit-multiversion
+    burn_in_tag_buildvariants: enterprise-rhel-80-64-bit-inmem linux-64-duroff enterprise-rhel-80-64-bit-multiversion
     num_scons_link_jobs_available: 0.99
   tasks:
   - name: compile_test_and_package_parallel_core_stream_TG
@@ -10454,7 +10454,6 @@ buildvariants:
     target_resmoke_time: 10
     max_sub_suites: 5
     large_distro_name: rhel80-medium
-    burn_in_tag_buildvariants: enterprise-rhel-62-64-bit-inmem linux-64-duroff enterprise-rhel-62-64-bit-multiversion
     num_scons_link_jobs_available: 0.99
     test_flags: >-
         --mongodSetParameters="{
@@ -10578,7 +10577,6 @@ buildvariants:
     target_resmoke_time: 10
     max_sub_suites: 5
     large_distro_name: rhel62-medium
-    burn_in_tag_buildvariants: enterprise-rhel-62-64-bit-majority-read-concern-off enterprise-rhel-62-64-bit-inmem linux-64-duroff enterprise-rhel-62-64-bit-multiversion
     num_scons_link_jobs_available: 0.99
     test_flags: >-
         --mongodSetParameters="{featureFlagSBE: true}"
@@ -10702,32 +10700,32 @@ buildvariants:
 
 # This build variant is used to run multiversion tests as part of burn_in_tags as these tests are
 # currently only run on our daily builders.
-- name: enterprise-rhel-62-64-bit-multiversion
-  display_name: "Enterprise RHEL 6.2 (implicit multiversion)"
+- name: enterprise-rhel-80-64-bit-multiversion
+  display_name: "Enterprise RHEL 8.0 (implicit multiversion)"
   modules:
   - enterprise
   run_on:
-  - rhel62-small
-  expansions: &enterprise-rhel-62-64-bit-multiversion
+  - rhel80-small
+  expansions: &enterprise-rhel-80-64-bit-multiversion
     test_flags: >-
       --excludeWithAnyTags=requires_fcv_47,requires_fcv_48,requires_fcv_49,multiversion_incompatible
     compile_flags: >-
       -j$(grep -c ^processor /proc/cpuinfo)
       --ssl
       --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-      MONGO_DISTMOD=rhel62
-    multiversion_platform: rhel62
+      MONGO_DISTMOD=rhel80
+    multiversion_platform: rhel80
     multiversion_edition: enterprise
     repo_edition: enterprise
     scons_cache_scope: shared
     tooltags: "ssl sasl gssapi"
     build_mongoreplay: true
-    large_distro_name: rhel62-medium
+    large_distro_name: rhel80-medium
     resmoke_jobs_factor: 0.25
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - rhel62-large
+    - rhel80-xlarge
   - name: .multiversion_fuzzer
   - name: .multiversion_passthrough
   - name: .random_multiversion_ds
@@ -12504,24 +12502,24 @@ buildvariants:
     distros:
     - centos6-perf
 
-- name: enterprise-rhel-62-64-bit-inmem
-  display_name: Enterprise RHEL 6.2 (inMemory)
+- name: enterprise-rhel-80-64-bit-inmem
+  display_name: Enterprise RHEL 8.0 (inMemory)
   modules:
   - enterprise
   run_on:
-  - rhel62-small
+  - rhel80-small
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_journaling
-    compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    multiversion_platform: rhel62
+    compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    multiversion_platform: rhel80
     multiversion_edition: enterprise
     scons_cache_scope: shared
-    large_distro_name: rhel62-medium
+    large_distro_name: rhel80-medium
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - rhel62-large
+    - rhel80-xlarge
   - name: .aggfuzzer .common
   - name: .aggregation !.unwind !.encrypt
   - name: audit
@@ -12531,11 +12529,11 @@ buildvariants:
   - name: .misc_js
   - name: .concurrency !.ubsan !.no_txns !.debug_only !.kill_terminate
     distros:
-    - rhel62-medium  # Some workloads require a lot of memory, use a bigger machine for this suite.
+    - rhel80-medium  # Some workloads require a lot of memory, use a bigger machine for this suite.
   - name: initial_sync_fuzzer_gen
   - name: .integration !.audit
     distros:
-    - rhel62-medium
+    - rhel80-medium
   - name: .jscore .common !.decimal
   - name: jsCore_op_query
   - name: jsCore_txns_large_txns_format
@@ -12550,7 +12548,7 @@ buildvariants:
   - name: replica_sets_multi_stmt_txn_jscore_passthrough
   - name: replica_sets_multi_stmt_txn_stepdown_jscore_passthrough_gen
     distros:
-    - rhel62-medium
+    - rhel80-medium
   - name: .resharding_fuzzer
   - name: .retry
   - name: rollback_fuzzer_gen
@@ -12559,7 +12557,7 @@ buildvariants:
   - name: session_jscore_passthrough
   - name: sharded_multi_stmt_txn_jscore_passthrough
     distros:
-    - rhel62-medium
+    - rhel80-medium
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .common !.multiversion !.csrs
   - name: snmp
