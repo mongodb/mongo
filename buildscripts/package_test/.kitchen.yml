@@ -21,87 +21,93 @@ verifier:
 
 provisioner:
   name: chef_solo
-  require_chef_omnibus: 12.6.0
+  require_chef_omnibus: 12
 
 platforms:
-  - name: amazon
+  - name: amazon-x86-64
     driver:
       image_id: ami-c481fad3
     transport:
       username: ec2-user
-  - name: amazon2
+  - name: amazon2-x86-64
     driver:
       image_id: ami-428aa838
     transport:
       username: ec2-user
-  - name: debian71
+  - name: amazon2-arm64
+    driver:
+      image_id: ami-0c582118883b46f4f
+      instance_type: c6g.medium
+    transport:
+      username: ec2-user
+  - name: debian71-x86-64
     driver:
       image_id: ami-4b124a22
     transport:
       username: admin
-  - name: debian81
+  - name: debian81-x86-64
     driver:
       image_id: ami-896d85e2
     transport:
       username: admin
-  - name: debian92
+  - name: debian92-x86-64
     driver:
       image_id: ami-71b7750b
     transport:
       username: admin
-  - name: debian10
+  - name: debian10-x86-64
     driver:
       image_id: ami-02ad06066b040a84b
     transport:
       username: admin
-  - name: rhel62
+  - name: rhel62-x86-64
     driver:
       # Use rhel 6.5 chef fails on previous versions.
       image_id: ami-5b697332
     transport:
       username: root
       instance_type: t2.small
-  - name: rhel70
+  - name: rhel70-x86-64
     driver:
       image_id: ami-60a1e808
     transport:
       username: root
-  - name: rhel80
+  - name: rhel80-x86-64
     driver:
       image_id: ami-0c322300a1dd5dc79
     transport:
       username: ec2-user
-  - name: suse11
+  - name: suse11-x86-64
     driver:
       image_id: ami-7f2e6015
     transport:
       username: ec2-user
-  - name: suse12
+  - name: suse12-x86-64
     driver:
       image_id: ami-043eebeabcc4e3d35
     transport:
       username: ec2-user
-  - name: suse15
+  - name: suse15-x86-64
     driver:
       image_id: ami-06ea7729e394412c8
     transport:
       username: ec2-user
-  - name: ubuntu1204
+  - name: ubuntu1204-x86-64
     driver:
       image_id: ami-3fec7956
     transport:
       username: ubuntu
-  - name: ubuntu1404
+  - name: ubuntu1404-x86-64
     driver:
       image_id: ami-1d8c9574
     transport:
       username: ubuntu
-  - name: ubuntu1604
+  - name: ubuntu1604-x86-64
     driver:
       image_id: ami-64140d0e
     transport:
       username: ubuntu
-  - name: ubuntu1804
+  - name: ubuntu1804-x86-64
     driver:
       image_id: ami-7ad76705
     transport:

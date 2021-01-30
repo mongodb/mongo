@@ -312,6 +312,7 @@ variables:
 # If a variant is listed here and has a push task, mongocryptd is pushed
 - mongocryptd_variants: &mongocryptd_variants
   - enterprise-amazon2
+  - enterprise-amazon2-arm64
   - enterprise-debian92-64
   - enterprise-debian10-64
   - enterprise-linux-64-amazon-ami
@@ -2045,17 +2046,21 @@ functions:
         export KITCHEN_SUBNET="${kitchen_subnet}"
         export KITCHEN_VPC="${kitchen_vpc}"
 
+        if [[ "${packager_arch}" == "aarch64" || "${packager_arch}" == "arm64" ]]; then
+          kitchen_packager_distro="${packager_distro}-arm64"
+        else
+          kitchen_packager_distro="${packager_distro}-x86-64"
+        fi
+
         ${activate_virtualenv}
         # set expiration tag 2 hours in the future, since no test should take this long
         export KITCHEN_EXPIRE="$($python -c 'import datetime; print((datetime.datetime.utcnow() + datetime.timedelta(hours=2)).strftime("%Y-%m-%d %H:%M:%S"))')"
 
         for i in {1..3}
         do
-          # kitchen commands use regex so 'kitchen verify amazon' matches both amazon and amazon2
-          # that's why we pass $ at the end of "${packager_distro}"
-          if ! kitchen verify "${packager_distro}"\$; then
+          if ! kitchen verify $kitchen_packager_distro; then
             verified="false"
-            kitchen destroy "${packager_distro}"\$ || true
+            kitchen destroy $kitchen_packager_distro || true
             sleep 30
           else
             verified="true"
@@ -2063,7 +2068,7 @@ functions:
           fi
         done
 
-        kitchen destroy "${packager_distro}"\$ || true
+        kitchen destroy $kitchen_packager_distro || true
         test "$verified" = "true"
 
   "copy ec2 monitor files": &copy_ec2_monitor_files
@@ -8045,6 +8050,65 @@ buildvariants:
     distros:
     - amazon2-small
 
+- name: enterprise-amazon2-arm64
+  display_name: "Enterprise Amazon Linux 2 ARM64"
+  modules:
+  - enterprise
+  run_on:
+  - amazon2-arm64-small
+  batchtime: 1440 # 1 day
+  expansions:
+    test_flags: >-
+      --excludeWithAnyTags=SERVER-34286
+    push_path: linux
+    push_bucket: downloads.10gen.com
+    push_name: linux
+    push_arch: aarch64-enterprise-amazon2
+    compile_flags: --ssl MONGO_DISTMOD=amazon2 -j$(grep -c ^processor /proc/cpuinfo) CCFLAGS="-march=armv8-a+crc -mtune=generic" --release --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    multiversion_platform: amazon2
+    multiversion_edition: enterprise
+    # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
+    # spawning a large number of linker processes.
+    num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
+    has_packages: true
+    packager_script: packager_enterprise.py
+    packager_arch: aarch64
+    packager_distro: amazon2
+    repo_edition: enterprise
+    scons_cache_scope: shared
+    tooltags: "ssl sasl gssapi"
+    build_mongoreplay: true
+  tasks:
+  - name: compile_all_run_unittests_TG
+    distros:
+    - amazon2-arm64-large
+  - name: .aggfuzzer .common !.multiversion
+  - name: aggregation
+  - name: audit
+  - name: .auth !.gle !.multiversion
+  - name: bulk_gle_passthrough
+  - name: causally_consistent_jscore_txns_passthrough
+  - name: .encrypt !.aggregation
+  - name: .jscore .common !.compat
+  - name: .jstestfuzz .common
+  - name: .logical_session_cache .one_sec
+  - name: noPassthrough_gen
+  - name: noPassthroughWithMongod_gen
+  - name: .replica_sets .common
+  - name: sasl
+  - name: serial_run
+  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
+  - name: .sharding .txns !.csrs
+  - name: slow1_gen
+  - name: snmp
+  - name: .stitch
+  - name: package
+    distros:
+    - ubuntu1604-packer
+  - name: .publish
+    distros:
+    - amazon2-small
+
 - name: amazon2
   display_name: SSL Amazon Linux 2
   run_on:
@@ -8094,6 +8158,64 @@ buildvariants:
   - name: .replica_sets .common
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .common !.op_query !.csrs
+  - name: .sharding .txns
+  - name: .ssl
+  - name: .stitch
+  - name: package
+    distros:
+    - ubuntu1604-packer
+  - name: .publish
+    distros:
+    - amazon2-small
+
+- name: amazon2-arm64
+  display_name: SSL Amazon Linux 2 ARM64
+  run_on:
+  - amazon2-arm64-small
+  batchtime: 1440 # 1 day
+  expansions:
+    test_flags: >-
+      --excludeWithAnyTags=SERVER-34286
+    push_path: linux
+    push_bucket: downloads.mongodb.org
+    push_name: linux
+    push_arch: aarch64-amazon2
+    compile_flags: --ssl MONGO_DISTMOD=amazon2 -j$(grep -c ^processor /proc/cpuinfo) CCFLAGS="-march=armv8-a+crc -mtune=generic" --release --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
+    # spawning a large number of linker processes.
+    num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
+    multiversion_platform: amazon
+    multiversion_edition: targeted
+    has_packages: true
+    packager_script: packager.py
+    packager_arch: aarch64
+    packager_distro: amazon2
+    repo_edition: org
+    scons_cache_scope: shared
+    tooltags: "ssl"
+    build_mongoreplay: true
+  tasks:
+  - name: compile_all_run_unittests_TG
+    distros:
+    - amazon2-arm64-large
+  - name: .aggfuzzer .common !.multiversion
+  - name: aggregation
+  - name: .auth !.audit !.multiversion
+  - name: causally_consistent_jscore_txns_passthrough
+  - name: .misc_js
+  - name: .concurrency .common
+  - name: concurrency_replication_causal_consistency
+    distros:
+      - amazon2-arm64-large
+  - name: disk_wiredtiger
+  - name: free_monitoring
+  - name: .jscore .common
+  - name: .jstestfuzz .common
+  - name: .logical_session_cache .one_sec
+  - name: replica_sets
+  - name: .replica_sets .common
+  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
+  - name: .sharding .common !.op_query !.csrs !.mixed_version
   - name: .sharding .txns
   - name: .ssl
   - name: .stitch

@@ -41,7 +41,7 @@ sys.path.append(os.getcwd())
 import packager  # pylint: disable=wrong-import-position
 
 # The MongoDB names for the architectures we support.
-ARCH_CHOICES = ["x86_64", "ppc64le", "s390x", "arm64"]
+ARCH_CHOICES = ["x86_64", "ppc64le", "s390x", "arm64", "aarch64"]
 
 # Made up names for the flavors of distribution we package for.
 DISTROS = ["suse", "debian", "redhat", "ubuntu", "amazon", "amazon2"]
@@ -137,6 +137,9 @@ class EnterpriseDistro(packager.Distro):
         if arch == "arm64":
             if self.dname == 'ubuntu':
                 return ["ubuntu1604", "ubuntu1804"]
+        if arch == "aarch64":
+            if self.dname == 'amazon2':
+                return ["amazon2"]
             return []
 
         if re.search("(redhat|fedora|centos)", self.dname):

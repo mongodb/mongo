@@ -41,7 +41,7 @@ import tempfile
 import time
 
 # The MongoDB names for the architectures we support.
-ARCH_CHOICES = ["x86_64", "arm64", "s390x"]
+ARCH_CHOICES = ["x86_64", "arm64", "s390x", "aarch64"]
 
 # Made up names for the flavors of distribution we package for.
 DISTROS = ["suse", "debian", "redhat", "ubuntu", "amazon", "amazon2"]
@@ -207,6 +207,8 @@ class Distro(object):
                 return "s390x"
             elif arch.endswith("86"):
                 return "i686"
+            elif arch == "aarch64":
+                return "aarch64"
             return "x86_64"
         else:
             raise Exception("BUG: unsupported platform?")
@@ -324,7 +326,7 @@ class Distro(object):
         "suse11" for suse, etc.
         """
         # Community builds only support amd64
-        if arch not in ['x86_64', 'ppc64le', 's390x', 'arm64']:
+        if arch not in ['x86_64', 'ppc64le', 's390x', 'arm64', 'aarch64']:
             raise Exception("BUG: unsupported architecture (%s)" % arch)
 
         if re.search("(suse)", self.dname):
