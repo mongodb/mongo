@@ -159,6 +159,24 @@ structs:
                 type: object
                 optional: true
 
+    WriteCommandResponseBase:
+        description: "Contains basic information included by all write command responses"
+        strict: false
+        fields:
+            n:
+                description: "The number of documents which were eligible for the operation. For
+                              insert and delete, these are always equal to the number of documents
+                              inserted or deleted. For update, it could be that some updates were
+                              no-ops so they were not updated."
+                type: int
+                optional: false
+
+    UpdateResponse:
+        description: "Parser for the response from an `update` command"
+        strict: false
+        chained_structs:
+            WriteCommandResponseBase: WriteCommandResponseBase
+
 commands:
 
     insert:

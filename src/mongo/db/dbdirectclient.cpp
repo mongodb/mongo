@@ -125,10 +125,6 @@ bool DBDirectClient::lazySupported() const {
     return false;
 }
 
-void DBDirectClient::setOpCtx(OperationContext* opCtx) {
-    _opCtx = opCtx;
-}
-
 QueryOptions DBDirectClient::_lookupAvailableOptions() {
     // Exhaust mode is not available in DBDirectClient.
     return QueryOptions(DBClientBase::_lookupAvailableOptions() & ~QueryOption_Exhaust);

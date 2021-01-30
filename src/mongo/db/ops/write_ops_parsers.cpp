@@ -37,6 +37,7 @@
 #include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/db/update/update_oplog_entry_version.h"
 #include "mongo/logv2/redaction.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/visit_helper.h"
@@ -183,6 +184,14 @@ write_ops::Update UpdateOp::parseLegacy(const Message& msgRaw) {
     }());
 
     return op;
+}
+
+write_ops::UpdateResponse UpdateOp::parseResponse(const BSONObj& obj) {
+    uassertStatusOK(getStatusFromCommandResult(obj));
+
+    write_ops::UpdateResponse response;
+    response.parse(IDLParserErrorContext("update"), obj);
+    return response;
 }
 
 write_ops::Delete DeleteOp::parse(const OpMsgRequest& request) {

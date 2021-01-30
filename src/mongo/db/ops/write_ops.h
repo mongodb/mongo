@@ -45,6 +45,8 @@ class UpdateOp {
 public:
     static write_ops::Update parse(const OpMsgRequest& request);
     static write_ops::Update parseLegacy(const Message& msg);
+
+    static write_ops::UpdateResponse parseResponse(const BSONObj& obj);
 };
 
 class DeleteOp {

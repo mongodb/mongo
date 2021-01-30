@@ -31,16 +31,16 @@
 
 #include "mongo/platform/basic.h"
 
-#include <set>
-
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/field_parser.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/ops/write_ops.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/dist_lock_manager.h"
@@ -133,15 +133,42 @@ public:
         // Make sure to force update of any stale metadata
         ON_BLOCK_EXIT([opCtx, dbname] { Grid::get(opCtx)->catalogCache()->purgeDatabase(dbname); });
 
-        auto dbDistLock = uassertStatusOK(DistLockManager::get(opCtx)->lock(
-            opCtx, dbname, "enableSharding", DistLockManager::kDefaultLockTimeout));
+        // For an existing database, the enableSharding operation is just adding the {sharded: true}
+        // field to config.database. First do an optimistic attempt to add it and if the write
+        // succeeds do not go through the createDatabase flow.
+        DBDirectClient client(opCtx);
+        auto response = UpdateOp::parseResponse([&] {
+            write_ops::Update updateOp(DatabaseType::ConfigNS);
+            updateOp.setUpdates({[&] {
+                auto queryFilter = BSON(DatabaseType::name(dbname));
+                auto updateModification = write_ops::UpdateModification(
+                    write_ops::UpdateModification::parseFromClassicUpdate(
+                        BSON("$set" << BSON(DatabaseType::sharded(true)))));
+                write_ops::UpdateOpEntry updateEntry(queryFilter, updateModification);
+                updateEntry.setMulti(false);
+                updateEntry.setUpsert(false);
+                return updateEntry;
+            }()});
 
-        ShardingCatalogManager::get(opCtx)->enableSharding(opCtx, dbname, shardId);
+            auto response = client.runCommand(updateOp.serialize({}));
+            return response->getCommandReply();
+        }());
+
+        // If an entry for the database was found it can be assumed that it was either updated or
+        // already had 'sharded' enabled, so we can assume success
+        if (response.getN() != 1) {
+            auto dbDistLock = uassertStatusOK(DistLockManager::get(opCtx)->lock(
+                opCtx, dbname, "enableSharding", DistLockManager::kDefaultLockTimeout));
+
+            ShardingCatalogManager::get(opCtx)->enableSharding(opCtx, dbname, shardId);
+        }
+
         audit::logEnableSharding(Client::getCurrent(), dbname);
 
         return true;
     }
 
 } configsvrEnableShardingCmd;
+
 }  // namespace
 }  // namespace mongo

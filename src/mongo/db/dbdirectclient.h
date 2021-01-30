@@ -46,18 +46,13 @@ class OperationContext;
  *
  * All operations are performed within the scope of a passed-in OperationContext (except when
  * using the deprecated constructor). You must ensure that the OperationContext is valid when
- * calling into any function. If you ever need to change the OperationContext, that can be done
- * without the overhead of creating a new DBDirectClient by calling setOpCtx(), after which all
- * operations will use the new OperationContext.
+ * calling into any function.
  */
 class DBDirectClient : public DBClientBase {
 public:
     DBDirectClient(OperationContext* opCtx);
 
     using DBClientBase::query;
-
-    // XXX: is this valid or useful?
-    void setOpCtx(OperationContext* opCtx);
 
     virtual std::unique_ptr<DBClientCursor> query(
         const NamespaceStringOrUUID& nsOrUuid,
