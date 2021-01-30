@@ -33,6 +33,7 @@
 #include "mongo/db/ops/single_write_result_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
+#include "mongo/db/views/view.h"
 #include "mongo/util/string_map.h"
 
 #include <queue>
@@ -127,10 +128,12 @@ private:
         template <typename H>
         friend H AbslHashValue(H h, const BucketMetadata& metadata) {
             return H::combine(std::move(h),
-                              UnorderedFieldsBSONObjComparator().hash(metadata.metadata));
+                              UnorderedFieldsBSONObjComparator(metadata.view->defaultCollator())
+                                  .hash(metadata.metadata));
         }
 
         BSONObj metadata;
+        std::shared_ptr<const ViewDefinition> view;
     };
 
     class MinMax {
@@ -140,6 +143,7 @@ private:
          */
         void update(const BSONObj& doc,
                     boost::optional<StringData> metaField,
+                    const StringData::ComparatorInterface* stringComparator,
                     const std::function<bool(int, int)>& comp);
 
         /**
@@ -166,9 +170,12 @@ private:
             kUnset,
         };
 
-        void _update(BSONElement elem, const std::function<bool(int, int)>& comp);
+        void _update(BSONElement elem,
+                     const StringData::ComparatorInterface* stringComparator,
+                     const std::function<bool(int, int)>& comp);
         void _updateWithMemoryUsage(MinMax* minMax,
                                     BSONElement elem,
+                                    const StringData::ComparatorInterface* stringComparator,
                                     const std::function<bool(int, int)>& comp);
 
         void _append(BSONObjBuilder* builder) const;

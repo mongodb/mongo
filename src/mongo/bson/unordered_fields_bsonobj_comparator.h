@@ -35,28 +35,30 @@
 namespace mongo {
 
 /**
- * A BSONObj comparator that supports unordered element comparison. Does not support using a
- * non-simple string comparator.
+ * A BSONObj comparator that supports unordered element comparison.
  */
 class UnorderedFieldsBSONObjComparator final : public BSONObj::ComparatorInterface {
 public:
-    static constexpr StringData::ComparatorInterface* kStringComparator = nullptr;
-
-    UnorderedFieldsBSONObjComparator() = default;
+    UnorderedFieldsBSONObjComparator(
+        const StringData::ComparatorInterface* stringComparator = nullptr)
+        : _stringComparator(stringComparator) {}
 
     int compare(const BSONObj& lhs, const BSONObj& rhs) const final {
         return lhs.woCompare(rhs,
                              BSONObj(),
                              ComparisonRules::kIgnoreFieldOrder |
                                  ComparisonRules::kConsiderFieldName,
-                             kStringComparator);
+                             _stringComparator);
     }
 
     void hash_combine(size_t& seed, const BSONObj& toHash) const final {
         hashCombineBSONObj(seed,
                            toHash,
                            ComparisonRules::kIgnoreFieldOrder | ComparisonRules::kConsiderFieldName,
-                           kStringComparator);
+                           _stringComparator);
     }
+
+private:
+    const StringData::ComparatorInterface* _stringComparator;
 };
 }  // namespace mongo

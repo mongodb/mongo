@@ -88,7 +88,7 @@ BucketCatalog::InsertResult BucketCatalog::insert(OperationContext* opCtx,
             metadata.appendNull(*metaField);
         }
     }
-    auto key = std::make_pair(ns, BucketMetadata{metadata.obj()});
+    auto key = std::make_pair(ns, BucketMetadata{metadata.obj(), viewDef});
 
     auto& stats = _executionStats[ns];
 
@@ -192,8 +192,8 @@ BucketCatalog::InsertResult BucketCatalog::insert(OperationContext* opCtx,
         _memoryUsage -= bucket->memoryUsage;
     }
     bucket->memoryUsage -= bucket->min.getMemoryUsage() + bucket->max.getMemoryUsage();
-    bucket->min.update(doc, options.getMetaField(), std::less<>());
-    bucket->max.update(doc, options.getMetaField(), std::greater<>());
+    bucket->min.update(doc, options.getMetaField(), viewDef->defaultCollator(), std::less<>());
+    bucket->max.update(doc, options.getMetaField(), viewDef->defaultCollator(), std::greater<>());
     bucket->memoryUsage +=
         newFieldNamesSize + bucket->min.getMemoryUsage() + bucket->max.getMemoryUsage();
     _memoryUsage += bucket->memoryUsage;
@@ -376,7 +376,9 @@ bool BucketCatalog::BucketMetadata::operator<(const BucketMetadata& other) const
 }
 
 bool BucketCatalog::BucketMetadata::operator==(const BucketMetadata& other) const {
-    return UnorderedFieldsBSONObjComparator().compare(metadata, other.metadata) == 0;
+    return view->defaultCollator() == other.view->defaultCollator() &&
+        UnorderedFieldsBSONObjComparator(view->defaultCollator())
+            .compare(metadata, other.metadata) == 0;
 }
 
 void BucketCatalog::Bucket::calculateBucketFieldsAndSizeChange(
@@ -411,6 +413,7 @@ void BucketCatalog::Bucket::calculateBucketFieldsAndSizeChange(
 
 void BucketCatalog::MinMax::update(const BSONObj& doc,
                                    boost::optional<StringData> metaField,
+                                   const StringData::ComparatorInterface* stringComparator,
                                    const std::function<bool(int, int)>& comp) {
     invariant(_type == Type::kObject || _type == Type::kUnset);
 
@@ -419,11 +422,13 @@ void BucketCatalog::MinMax::update(const BSONObj& doc,
         if (metaField && elem.fieldNameStringData() == metaField) {
             continue;
         }
-        _updateWithMemoryUsage(&_object[elem.fieldName()], elem, comp);
+        _updateWithMemoryUsage(&_object[elem.fieldName()], elem, stringComparator, comp);
     }
 }
 
-void BucketCatalog::MinMax::_update(BSONElement elem, const std::function<bool(int, int)>& comp) {
+void BucketCatalog::MinMax::_update(BSONElement elem,
+                                    const StringData::ComparatorInterface* stringComparator,
+                                    const std::function<bool(int, int)>& comp) {
     auto typeComp = [&](BSONType type) {
         return comp(elem.canonicalType() - canonicalizeBSONType(type), 0);
     };
@@ -438,7 +443,8 @@ void BucketCatalog::MinMax::_update(BSONElement elem, const std::function<bool(i
                 _memoryUsage = 0;
             }
             for (auto&& subElem : elem.Obj()) {
-                _updateWithMemoryUsage(&_object[subElem.fieldName()], subElem, comp);
+                _updateWithMemoryUsage(
+                    &_object[subElem.fieldName()], subElem, stringComparator, comp);
             }
         }
         return;
@@ -458,7 +464,7 @@ void BucketCatalog::MinMax::_update(BSONElement elem, const std::function<bool(i
                 _array.resize(elemArray.size());
             }
             for (size_t i = 0; i < elemArray.size(); i++) {
-                _updateWithMemoryUsage(&_array[i], elemArray[i], comp);
+                _updateWithMemoryUsage(&_array[i], elemArray[i], stringComparator, comp);
             }
         }
         return;
@@ -466,7 +472,8 @@ void BucketCatalog::MinMax::_update(BSONElement elem, const std::function<bool(i
 
     if (_type == Type::kUnset || (_type == Type::kObject && typeComp(Object)) ||
         (_type == Type::kArray && typeComp(Array)) ||
-        (_type == Type::kValue && comp(elem.woCompare(_value.firstElement(), false), 0))) {
+        (_type == Type::kValue &&
+         comp(elem.woCompare(_value.firstElement(), false, stringComparator), 0))) {
         _type = Type::kValue;
         _value = elem.wrap();
         _updated = true;
@@ -474,11 +481,13 @@ void BucketCatalog::MinMax::_update(BSONElement elem, const std::function<bool(i
     }
 }
 
-void BucketCatalog::MinMax::_updateWithMemoryUsage(MinMax* minMax,
-                                                   BSONElement elem,
-                                                   const std::function<bool(int, int)>& comp) {
+void BucketCatalog::MinMax::_updateWithMemoryUsage(
+    MinMax* minMax,
+    BSONElement elem,
+    const StringData::ComparatorInterface* stringComparator,
+    const std::function<bool(int, int)>& comp) {
     _memoryUsage -= minMax->getMemoryUsage();
-    minMax->_update(elem, comp);
+    minMax->_update(elem, stringComparator, comp);
     _memoryUsage += minMax->getMemoryUsage();
 }
 
