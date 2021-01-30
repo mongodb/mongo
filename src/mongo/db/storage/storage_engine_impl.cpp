@@ -33,6 +33,7 @@
 
 #include <algorithm>
 
+#include "mongo/db/audit.h"
 #include "mongo/db/catalog/catalog_control.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_catalog_helper.h"
@@ -797,6 +798,9 @@ Status StorageEngineImpl::_dropCollectionsNoTimestamp(OperationContext* opCtx,
             coll->getIndexCatalog()->getIndexIterator(opCtx, true /* includeUnfinishedIndexes */);
         while (ii->more()) {
             const IndexCatalogEntry* ice = ii->next();
+
+            audit::logDropIndex(&cc(), ice->descriptor()->indexName(), nss.ns());
+
             catalog::removeIndex(opCtx,
                                  ice->descriptor()->indexName(),
                                  coll->getCatalogId(),
@@ -804,6 +808,8 @@ Status StorageEngineImpl::_dropCollectionsNoTimestamp(OperationContext* opCtx,
                                  coll->ns(),
                                  ice->getSharedIdent());
         }
+
+        audit::logDropCollection(&cc(), nss.ns());
 
         Status result = catalog::dropCollection(
             opCtx, coll->ns(), coll->getCatalogId(), coll->getSharedIdent());

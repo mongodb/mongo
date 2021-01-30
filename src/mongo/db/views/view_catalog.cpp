@@ -40,6 +40,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/api_parameters.h"
+#include "mongo/db/audit.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/namespace_string.h"
@@ -246,6 +247,16 @@ Status ViewCatalog::_reload(OperationContext* opCtx, ViewCatalogLookupBehavior l
 
 void ViewCatalog::clear(const Database* db) {
     auto catalog = getViewCatalog(db).writer();
+
+    // First, iterate through the views on this database and audit them before they are dropped.
+    for (auto&& view : catalog->_viewMap) {
+        audit::logDropView(&cc(),
+                           (*view.second).name().ns(),
+                           (*view.second).viewOn().ns(),
+                           (*view.second).pipeline(),
+                           ErrorCodes::OK);
+    }
+
     catalog.writable()->_viewMap.clear();
     catalog.writable()->_viewGraph.clear();
     catalog.writable()->_valid = true;
@@ -266,7 +277,7 @@ void ViewCatalog::_requireValidCatalog() const {
             _valid);
 }
 
-void ViewCatalog::iterate(OperationContext* opCtx, ViewIteratorCallback callback) const {
+void ViewCatalog::iterate(ViewIteratorCallback callback) const {
     _requireValidCatalog();
     for (auto&& view : _viewMap) {
         if (!callback(*view.second)) {

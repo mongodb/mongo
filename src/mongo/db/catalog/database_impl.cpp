@@ -282,7 +282,8 @@ void DatabaseImpl::getStats(OperationContext* opCtx, BSONObjBuilder* output, dou
             return true;
         });
 
-    ViewCatalog::get(this)->iterate(opCtx, [&](const ViewDefinition& view) {
+
+    ViewCatalog::get(this)->iterate([&](const ViewDefinition& view) {
         nViews += 1;
         return true;
     });

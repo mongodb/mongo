@@ -80,7 +80,7 @@ public:
      * acquire locks or run for a long time. If the 'callback' returns false, the iterator exists
      * early.
      */
-    void iterate(OperationContext* opCtx, ViewIteratorCallback callback) const;
+    void iterate(ViewIteratorCallback callback) const;
 
     /**
      * Create a new view 'viewName' with contents defined by running the specified aggregation

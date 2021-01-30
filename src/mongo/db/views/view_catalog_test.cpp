@@ -649,7 +649,7 @@ TEST_F(ViewCatalogFixture, Iterate) {
     std::set<std::string> viewNames = {"db.view1", "db.view2", "db.view3"};
 
     Lock::DBLock dbLock(operationContext(), "db", MODE_IX);
-    getViewCatalog()->iterate(operationContext(), [&viewNames](const ViewDefinition& view) {
+    getViewCatalog()->iterate([&viewNames](const ViewDefinition& view) {
         std::string name = view.name().toString();
         ASSERT(viewNames.end() != viewNames.find(name));
         viewNames.erase(name);
