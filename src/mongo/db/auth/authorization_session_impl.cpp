@@ -964,8 +964,8 @@ bool AuthorizationSessionImpl::_isAuthorizedForPrivilege(const Privilege& privil
     return false;
 }
 
-void AuthorizationSessionImpl::setImpersonatedUserData(std::vector<UserName> usernames,
-                                                       std::vector<RoleName> roles) {
+void AuthorizationSessionImpl::setImpersonatedUserData(const std::vector<UserName>& usernames,
+                                                       const std::vector<RoleName>& roles) {
     _impersonatedUserNames = usernames;
     _impersonatedRoleNames = roles;
     _impersonationFlag = true;

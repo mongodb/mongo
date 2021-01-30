@@ -32,7 +32,6 @@
 #include "mongo/db/s/drop_database_coordinator.h"
 
 #include "mongo/db/api_parameters.h"
-#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/s/database_sharding_state.h"
@@ -98,13 +97,7 @@ void removeDatabaseMetadataFromConfig(OperationContext* opCtx, StringData dbName
 }  // namespace
 
 DropDatabaseCoordinator::DropDatabaseCoordinator(OperationContext* opCtx, StringData dbName)
-    : ShardingDDLCoordinator({dbName, ""}), _serviceContext(opCtx->getServiceContext()) {
-    auto authSession = AuthorizationSession::get(opCtx->getClient());
-    _users =
-        userNameIteratorToContainer<std::vector<UserName>>(authSession->getImpersonatedUserNames());
-    _roles =
-        roleNameIteratorToContainer<std::vector<RoleName>>(authSession->getImpersonatedRoleNames());
-}
+    : ShardingDDLCoordinator(opCtx, {dbName, ""}), _serviceContext(opCtx->getServiceContext()) {}
 
 SemiFuture<void> DropDatabaseCoordinator::runImpl(
     std::shared_ptr<executor::TaskExecutor> executor) {
@@ -113,9 +106,7 @@ SemiFuture<void> DropDatabaseCoordinator::runImpl(
             ThreadClient tc{"DropDatabaseCoordinator", _serviceContext};
             auto opCtxHolder = tc->makeOperationContext();
             auto* opCtx = opCtxHolder.get();
-
-            auto authSession = AuthorizationSession::get(opCtx->getClient());
-            authSession->setImpersonatedUserData(_users, _roles);
+            _forwardableOpMetadata.setOn(opCtx);
 
             const auto dbName = _nss.db();
             auto distLockManager = DistLockManager::get(_serviceContext);

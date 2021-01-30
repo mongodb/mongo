@@ -173,8 +173,8 @@ public:
 
     bool isAuthorizedForAnyActionOnResource(const ResourcePattern& resource) override;
 
-    void setImpersonatedUserData(std::vector<UserName> usernames,
-                                 std::vector<RoleName> roles) override;
+    void setImpersonatedUserData(const std::vector<UserName>& usernames,
+                                 const std::vector<RoleName>& roles) override;
 
     UserNameIterator getImpersonatedUserNames() override;
 

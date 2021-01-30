@@ -40,7 +40,8 @@
 
 namespace mongo {
 
-ShardingDDLCoordinator::ShardingDDLCoordinator(const NamespaceString& ns) : _nss(ns){};
+ShardingDDLCoordinator::ShardingDDLCoordinator(OperationContext* opCtx, const NamespaceString& ns)
+    : _nss(ns), _forwardableOpMetadata(opCtx){};
 
 SemiFuture<void> ShardingDDLCoordinator::run(OperationContext* opCtx) {
     // Check that the operation context has a database version for this namespace

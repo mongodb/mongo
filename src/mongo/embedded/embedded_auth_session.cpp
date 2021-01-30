@@ -229,7 +229,8 @@ public:
         return true;
     }
 
-    void setImpersonatedUserData(std::vector<UserName>, std::vector<RoleName>) override {
+    void setImpersonatedUserData(const std::vector<UserName>&,
+                                 const std::vector<RoleName>&) override {
         UASSERT_NOT_IMPLEMENTED;
     }
 

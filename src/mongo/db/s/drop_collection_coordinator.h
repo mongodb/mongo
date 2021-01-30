@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/db/auth/user_name.h"
 #include "mongo/db/s/sharding_ddl_coordinator.h"
 #include "mongo/s/shard_id.h"
 
@@ -49,8 +48,6 @@ private:
 
     ServiceContext* _serviceContext;
     std::vector<ShardId> _participants;
-    std::vector<UserName> _users;
-    std::vector<RoleName> _roles;
 };
 
 }  // namespace mongo

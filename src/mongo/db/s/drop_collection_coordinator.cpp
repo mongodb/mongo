@@ -32,7 +32,6 @@
 #include "mongo/db/s/drop_collection_coordinator.h"
 
 #include "mongo/db/api_parameters.h"
-#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/s/database_sharding_state.h"
@@ -53,13 +52,7 @@ namespace mongo {
 
 DropCollectionCoordinator::DropCollectionCoordinator(OperationContext* opCtx,
                                                      const NamespaceString& nss)
-    : ShardingDDLCoordinator(nss), _serviceContext(opCtx->getServiceContext()) {
-    auto authSession = AuthorizationSession::get(opCtx->getClient());
-    _users =
-        userNameIteratorToContainer<std::vector<UserName>>(authSession->getImpersonatedUserNames());
-    _roles =
-        roleNameIteratorToContainer<std::vector<RoleName>>(authSession->getImpersonatedRoleNames());
-}
+    : ShardingDDLCoordinator(opCtx, nss), _serviceContext(opCtx->getServiceContext()) {}
 
 void DropCollectionCoordinator::_sendDropCollToParticipants(OperationContext* opCtx) {
     auto* const shardRegistry = Grid::get(opCtx)->shardRegistry();
@@ -101,9 +94,7 @@ SemiFuture<void> DropCollectionCoordinator::runImpl(
             ThreadClient tc{"DropCollectionCoordinator", _serviceContext};
             auto opCtxHolder = tc->makeOperationContext();
             auto* opCtx = opCtxHolder.get();
-
-            auto authSession = AuthorizationSession::get(opCtx->getClient());
-            authSession->setImpersonatedUserData(_users, _roles);
+            _forwardableOpMetadata.setOn(opCtx);
 
             auto distLockManager = DistLockManager::get(_serviceContext);
             const auto dbDistLock = uassertStatusOK(distLockManager->lock(

@@ -320,8 +320,8 @@ public:
 
     // Replaces the data for users that a system user is impersonating with new data.
     // The auditing system adds these users and their roles to each audit record in the log.
-    virtual void setImpersonatedUserData(std::vector<UserName> usernames,
-                                         std::vector<RoleName> roles) = 0;
+    virtual void setImpersonatedUserData(const std::vector<UserName>& usernames,
+                                         const std::vector<RoleName>& roles) = 0;
 
     // Gets an iterator over the names of all users that the system user is impersonating.
     virtual UserNameIterator getImpersonatedUserNames() = 0;

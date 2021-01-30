@@ -331,6 +331,8 @@ env.Library(
         'flush_database_cache_updates_command.cpp',
         'flush_routing_table_cache_updates_command.cpp',
         'get_database_version_command.cpp',
+        'forwardable_operation_metadata.cpp',
+        'forwardable_operation_metadata.idl',
         'get_shard_version_command.cpp',
         'merge_chunks_command.cpp',
         'migration_chunk_cloner_source_legacy_commands.cpp',

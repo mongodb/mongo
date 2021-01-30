@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2020-present MongoDB, Inc.
+ *    Copyright (C) 2021-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,19 +29,25 @@
 
 #pragma once
 
-#include "mongo/db/s/sharding_ddl_coordinator.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/s/forwardable_operation_metadata_gen.h"
 
 namespace mongo {
 
-class DropDatabaseCoordinator final : public ShardingDDLCoordinator,
-                                      public std::enable_shared_from_this<DropDatabaseCoordinator> {
+/*
+ * Stores metadata of an operation context that needs to be forwarded to other nodes in the cluster.
+ *
+ * The metadata are captured from the original operation context through the constructor and can be
+ * attached to a new operation context by mean of the `attachTo` member function.
+ *
+ * example:
+ * 		auto opMetadata = ForwardableOperationMetadata(opCtx);
+ * 		setOn(newOpCtx);
+ */
+class ForwardableOperationMetadata : public ForwardableOperationMetadataBase {
 public:
-    DropDatabaseCoordinator(OperationContext* opCtx, StringData dbName);
-
-private:
-    SemiFuture<void> runImpl(std::shared_ptr<executor::TaskExecutor> executor) override;
-
-    ServiceContext* _serviceContext;
+    ForwardableOperationMetadata(OperationContext* opCtx);
+    void setOn(OperationContext* opCtx);
 };
 
 }  // namespace mongo

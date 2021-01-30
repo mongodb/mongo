@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2020-present MongoDB, Inc.
+ *    Copyright (C) 2021-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,21 +27,34 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/platform/basic.h"
 
-#include "mongo/db/s/sharding_ddl_coordinator.h"
+#include "mongo/db/s/forwardable_operation_metadata.h"
+
+#include "mongo/db/auth/authorization_session.h"
 
 namespace mongo {
 
-class DropDatabaseCoordinator final : public ShardingDDLCoordinator,
-                                      public std::enable_shared_from_this<DropDatabaseCoordinator> {
-public:
-    DropDatabaseCoordinator(OperationContext* opCtx, StringData dbName);
+ForwardableOperationMetadata::ForwardableOperationMetadata(OperationContext* opCtx) {
+    if (auto optComment = opCtx->getComment()) {
+        setComment(optComment->wrap());
+    }
+    auto authzSession = AuthorizationSession::get(opCtx->getClient());
+    setImpersonatedUserMetadata({userNameIteratorToContainer<std::vector<UserName>>(
+                                     authzSession->getImpersonatedUserNames()),
+                                 roleNameIteratorToContainer<std::vector<RoleName>>(
+                                     authzSession->getImpersonatedRoleNames())});
+}
 
-private:
-    SemiFuture<void> runImpl(std::shared_ptr<executor::TaskExecutor> executor) override;
+void ForwardableOperationMetadata::setOn(OperationContext* opCtx) {
+    if (const auto& comment = getComment()) {
+        opCtx->setComment(comment.get());
+    }
 
-    ServiceContext* _serviceContext;
-};
+    const auto& authMetadata = getImpersonatedUserMetadata();
+    if (!authMetadata.getUsers().empty() || !authMetadata.getRoles().empty())
+        AuthorizationSession::get(opCtx->getClient())
+            ->setImpersonatedUserData(authMetadata.getUsers(), authMetadata.getRoles());
+}
 
 }  // namespace mongo
