@@ -356,7 +356,7 @@ public:
                 if (!viewCatalog) {
                     continue;
                 }
-                viewCatalog->iterate(opCtx, [](const ViewDefinition& view) {
+                viewCatalog->iterate([](const ViewDefinition& view) {
                     uassert(ErrorCodes::CannotDowngrade,
                             str::stream()
                                 << "Cannot downgrade the cluster when there are time-series "
