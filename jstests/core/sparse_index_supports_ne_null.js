@@ -19,7 +19,7 @@ coll.drop();
 
 function checkQuery({query, shouldUseIndex, nResultsExpected, indexKeyPattern}) {
     const explain = assert.commandWorked(coll.find(query).explain());
-    const ixScans = getPlanStages(explain.queryPlanner.winningPlan, "IXSCAN");
+    const ixScans = getPlanStages(getWinningPlan(explain.queryPlanner), "IXSCAN");
 
     if (shouldUseIndex) {
         assert.gte(ixScans.length, 1, explain);

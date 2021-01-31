@@ -26,7 +26,7 @@ function checkQueryHasSameResultsWhenUsingIdIndex(query, sort, projection) {
 
 function checkQueryUsesSortType(query, sort, projection, isBlocking) {
     const explain = assert.commandWorked(coll.find(query, projection).sort(sort).explain());
-    const plan = explain.queryPlanner.winningPlan;
+    const plan = getWinningPlan(explain.queryPlanner);
 
     const ixScans = getPlanStages(plan, "IXSCAN");
     const sorts = getPlanStages(plan, "SORT");

@@ -1,7 +1,6 @@
 // @tags: [
 //   assumes_balancer_off,
 //   requires_getmore,
-//   sbe_incompatible,
 // ]
 
 // Test that even when the execution of a query fails, explain reports query

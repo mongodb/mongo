@@ -1,7 +1,4 @@
 // Tests to validate the input for sort on '$meta' operator.
-// @tags: [
-//   sbe_incompatible,
-// ]
 (function() {
 "use strict";
 const coll = db.sort_with_meta_operator;

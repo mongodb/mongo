@@ -1,10 +1,8 @@
 // SERVER-10176: Add $abs aggregation expression.
-// @tags: [
-//   sbe_incompatible,
-// ]
 
 // For assertErrorCode.
 load('jstests/aggregation/extras/utils.js');
+load("jstests/libs/sbe_assert_error_override.js");  // Override error-code-checking APIs.
 
 (function() {
 var coll = db.abs_expr;

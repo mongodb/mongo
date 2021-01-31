@@ -1,7 +1,4 @@
 // Test the distinct command with views.
-// @tags: [
-//   sbe_incompatible,
-// ]
 (function() {
 "use strict";
 

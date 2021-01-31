@@ -46,10 +46,10 @@ function assertResultsMatch({
 
         if (pipelineOptimizedAway) {
             assert(isQueryPlan(explain), explain);
-            result = explain.queryPlanner.winningPlan;
+            result = getWinningPlan(explain.queryPlanner);
         } else {
             assert(isAggregationPlan(explain), explain);
-            result = explain.stages[0].$cursor.queryPlanner.winningPlan;
+            result = getWinningPlan(explain.stages[0].$cursor.queryPlanner);
         }
 
         // Check that $project uses the query system.

@@ -94,7 +94,9 @@ ExpressionInternalJsEmit::ExpressionInternalJsEmit(ExpressionContext* const expC
     : Expression(expCtx, {std::move(thisRef)}),
       _emitState{{}, internalQueryMaxJsEmitBytes.load(), 0},
       _thisRef(_children[0]),
-      _funcSource(std::move(funcSource)) {}
+      _funcSource(std::move(funcSource)) {
+    expCtx->sbeCompatible = false;
+}
 
 void ExpressionInternalJsEmit::_doAddDependencies(mongo::DepsTracker* deps) const {
     _children[0]->addDependencies(deps);

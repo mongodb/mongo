@@ -1,10 +1,11 @@
 // SERVER-6239 reenable $add and $subtract with dates with better semantics
 // Note: error conditions tested also in server6240.js
 // @tags: [
-//   sbe_incompatible,
+//    sbe_incompatible,
 // ]
 
 load('jstests/aggregation/extras/utils.js');
+load("jstests/libs/sbe_assert_error_override.js");  // Override error-code-checking APIs.
 
 var millis = 12345;
 var num = 54312;

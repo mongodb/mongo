@@ -1,8 +1,5 @@
 /**
  * Tests for the $isNumber aggregation expression.
- * @tags: [
- *   sbe_incompatible,
- * ]
  */
 (function() {
 'use strict';

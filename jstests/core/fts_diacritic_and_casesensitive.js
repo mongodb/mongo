@@ -1,8 +1,5 @@
 // Integration tests for {$diacriticSensitive: true, $caseSensitive: true} option to $text query
 // operator.
-// @tags: [
-//   sbe_incompatible,
-// ]
 
 load('jstests/libs/fts.js');
 

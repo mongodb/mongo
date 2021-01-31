@@ -1,9 +1,6 @@
 //
 // Tests for polygon querying with varying levels of accuracy
 //
-// @tags: [
-//   sbe_incompatible,
-// ]
 
 (function() {
 "use strict";

@@ -3,6 +3,7 @@
 //   sbe_incompatible,
 // ]
 load('jstests/aggregation/extras/utils.js');
+load("jstests/libs/sbe_assert_error_override.js");  // Override error-code-checking APIs.
 
 c = db.s6570;
 c.drop();

@@ -3,7 +3,6 @@
 // @tags: [
 //   does_not_support_stepdowns,
 //   requires_non_retryable_commands,
-//   sbe_incompatible,
 //   uses_map_reduce_with_temp_collections,
 // ]
 

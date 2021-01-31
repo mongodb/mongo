@@ -16,6 +16,16 @@ function getWinningPlan(queryPlanner) {
 }
 
 /**
+ * Returns an element of explain output which represents a rejected candidate plan.
+ */
+function getRejectedPlan(rejectedPlan) {
+    // The 'queryPlan' format is used when the SBE engine is turned on. If this field is present,
+    // it will hold a serialized winning plan, otherwise it will be stored in the 'rejectedPlan'
+    // element itself.
+    return rejectedPlan.hasOwnProperty("queryPlan") ? rejectedPlan.queryPlan : rejectedPlan;
+}
+
+/**
  * Given the root stage of explain's JSON representation of a query plan ('root'), returns all
  * subdocuments whose stage is 'stage'. Returns an empty array if the plan does not have the
  * requested stage.

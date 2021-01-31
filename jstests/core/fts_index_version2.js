@@ -1,7 +1,4 @@
 // Integration tests for version 2 text index, ensuring that it maintains old behavior.
-// @tags: [
-//   sbe_incompatible,
-// ]
 
 load('jstests/libs/fts.js');
 

@@ -1,9 +1,6 @@
 /**
  * Test that queries containing $elemMatch correctly use an index if each child expression is
  * compatible with the index.
- * @tags: [
- *   sbe_incompatible,
- * ]
  */
 (function() {
 "use strict";
@@ -22,7 +19,7 @@ assert.commandWorked(coll.createIndex({a: 1}, {sparse: true}));
 
 function assertIndexResults(coll, query, useIndex, nReturned) {
     const explainPlan = coll.find(query).explain("executionStats");
-    assert.eq(isIxscan(db, explainPlan.queryPlanner.winningPlan), useIndex);
+    assert.eq(isIxscan(db, getWinningPlan(explainPlan.queryPlanner)), useIndex);
     assert.eq(explainPlan.executionStats.nReturned, nReturned);
 }
 

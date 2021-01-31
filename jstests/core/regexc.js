@@ -1,4 +1,5 @@
 // Multiple regular expressions using the same index
+// TODO SERVER-52734: remove sbe_incompatible tag
 // @tags: [
 //   sbe_incompatible,
 // ]

@@ -1,7 +1,4 @@
 // ensure strings containing null characters dont end at that null
-// @tags: [
-//   sbe_incompatible,
-// ]
 
 c = db.s6556;
 c.drop();

@@ -1,5 +1,6 @@
 
 /**
+ * TODO SERVER-50737: remove sbe_incompatible tag
  * @tags: [
  *   sbe_incompatible,
  * ]

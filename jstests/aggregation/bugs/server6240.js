@@ -5,9 +5,6 @@
  * null value. Prevously verify'd.
  *
  * This test also validates the error cases for SERVER-6239 (support $add and $subtract with dates)
- * @tags: [
- *   sbe_incompatible,
- * ]
  */
 
 /*
@@ -18,6 +15,7 @@
 
 // Load test utilities
 load('jstests/aggregation/extras/utils.js');
+load("jstests/libs/sbe_assert_error_override.js");  // Override error-code-checking APIs.
 
 // Clear db
 db.s6240.drop();

@@ -1,9 +1,6 @@
 // SERVER-23029 added a new expression, $reverseArray, which consumes an array or a nullish value
 // and produces either the reversed version of that array, or null. In this test file, we check the
 // behavior and error cases.
-// @tags: [
-//   sbe_incompatible,
-// ]
 load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
 
 (function() {

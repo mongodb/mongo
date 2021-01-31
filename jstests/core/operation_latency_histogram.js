@@ -9,7 +9,6 @@
 //   assumes_read_preference_unchanged,
 //   incompatible_with_embedded,
 //   requires_collstats,
-//   sbe_incompatible,
 // ]
 //
 

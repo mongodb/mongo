@@ -2,7 +2,6 @@
 // collection.
 // @tags: [
 //   assumes_no_implicit_index_creation,
-//   sbe_incompatible,
 // ]
 
 // Test distance queries with interleaved distances

@@ -1,9 +1,6 @@
 /**
  * Test that an $expr predicated which is eligible for being indexed with an $or pushdown executes
  * as expected.
- * @tags: [
- *   sbe_incompatible,
- * ]
  */
 (function() {
 "use strict";

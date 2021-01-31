@@ -1,7 +1,4 @@
 // SERVER-11675 Text search integration with aggregation
-// @tags: [
-//   sbe_incompatible,
-// ]
 (function() {
 load('jstests/aggregation/extras/utils.js');  // For 'assertErrorCode'.
 load('jstests/libs/fixture_helpers.js');      // For 'FixtureHelpers'

@@ -4,9 +4,6 @@ t.createIndex({geo: "2dsphere"});
 
 /**All the tests in this file are generally confirming intersections based upon
  * these three geo objects.
- * @tags: [
- *   sbe_incompatible,
- * ]
  */
 var canonLine = {
     name: 'canonLine',

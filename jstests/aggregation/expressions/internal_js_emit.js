@@ -1,8 +1,5 @@
 // Tests basic functionality of the $_internalJsEmit expression, which provides capability for the
 // map stage of MapReduce.
-// @tags: [
-//   sbe_incompatible,
-// ]
 (function() {
 "use strict";
 

@@ -1,9 +1,6 @@
 // Test where points are on _max (180)
 // Using GeoNearRandom because this test needs a lot of points in the index.
 // If there aren't enough points the test passes even if the code is broken.
-// @tags: [
-//   sbe_incompatible,
-// ]
 load("jstests/libs/geo_near_random.js");
 
 var test = new GeoNearRandomTest("geo_near_max");

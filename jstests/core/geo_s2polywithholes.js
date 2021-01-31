@@ -1,8 +1,3 @@
-/**
- * @tags: [
- *   sbe_incompatible,
- * ]
- */
 var t = db.geo_s2weirdpolys;
 t.drop();
 t.createIndex({geo: "2dsphere"});

@@ -1,9 +1,6 @@
 //
 // Test to make sure that invalid geo options are caught
 //
-// @tags: [
-//   sbe_incompatible,
-// ]
 
 var coll = db.geo_validate;
 coll.drop();

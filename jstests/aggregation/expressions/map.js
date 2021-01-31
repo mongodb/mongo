@@ -1,7 +1,4 @@
 // SERVER-9841 $map expression to map over arrays
-// @tags: [
-//   sbe_incompatible,
-// ]
 (function() {
 "use strict";
 load('jstests/aggregation/extras/utils.js');

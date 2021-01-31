@@ -1885,6 +1885,7 @@ StatusWithMatchExpression JSONSchemaParser::parse(
                     doc_validation_error::createAnnotation(expCtx, "$jsonSchema", oldAnnotation));
             }
         }
+        expCtx->sbeCompatible = false;
         return translation;
     } catch (const DBException& ex) {
         return {ex.toStatus()};

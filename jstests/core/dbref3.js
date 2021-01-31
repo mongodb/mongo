@@ -1,7 +1,6 @@
 // Make sure we only make a DBRef object for objects where the first field is a string named $ref
 // and the second field is $id with any type. Only the first two fields matter for deciding if it
 // is a DBRef. See http://docs.mongodb.org/manual/reference/database-references/#dbrefs.
-
 var t = db.dbref3;
 
 t.drop();

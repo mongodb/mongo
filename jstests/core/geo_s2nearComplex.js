@@ -1,7 +1,6 @@
 // @tags: [
 //   requires_getmore,
 //   requires_non_retryable_writes,
-//   sbe_incompatible,
 // ]
 
 var t = db.get_s2nearcomplex;

@@ -8,7 +8,6 @@
 //
 // @tags: [
 //   operations_longer_than_stepdown_interval_in_txns,
-//   sbe_incompatible,
 // ]
 
 var testDB = db.getSiblingDB('grow_hash_table');

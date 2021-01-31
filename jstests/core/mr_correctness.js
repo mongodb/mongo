@@ -5,7 +5,6 @@
 //   does_not_support_stepdowns,
 //   requires_fastcount,
 //   requires_getmore,
-//   sbe_incompatible,
 //   uses_map_reduce_with_temp_collections,
 // ]
 (function() {

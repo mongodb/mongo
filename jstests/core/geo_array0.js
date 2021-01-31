@@ -2,7 +2,6 @@
 // collection.
 // @tags: [
 //   assumes_no_implicit_index_creation,
-//   sbe_incompatible,
 // ]
 
 // Make sure the very basics of geo arrays are sane by creating a few multi location docs

@@ -2,7 +2,6 @@
  * Analyzes execution stats for indexed distinct.
  * @tags: [
  *   assumes_balancer_off,
- *   sbe_incompatible,
  * ]
  */
 (function() {
@@ -79,6 +78,6 @@ assert.commandWorked(coll.dropIndexes());
 assert.commandWorked(coll.createIndex({a: "hashed"}));
 explain = getDistinctExplainWithExecutionStats("a", {$or: [{a: 3}, {a: 5}]});
 assert.eq(188, explain.executionStats.nReturned);
-const indexScanStage = getPlanStage(explain.executionStats.executionStages, "IXSCAN");
+const indexScanStage = getPlanStage(getWinningPlan(explain.queryPlanner), "IXSCAN");
 assert.eq("hashed", indexScanStage.keyPattern.a);
 })();

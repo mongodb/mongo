@@ -2,7 +2,6 @@
 // collection.
 // @tags: [
 //   assumes_no_implicit_index_creation,
-//   sbe_incompatible,
 // ]
 
 // Make sure nesting of location arrays also works.

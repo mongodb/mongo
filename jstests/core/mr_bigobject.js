@@ -4,7 +4,6 @@
 //   does_not_support_causal_consistency,
 //   does_not_support_stepdowns,
 //   requires_fastcount,
-//   sbe_incompatible,
 //   uses_map_reduce_with_temp_collections,
 // ]
 (function() {

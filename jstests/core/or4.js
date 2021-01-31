@@ -3,7 +3,6 @@
 //   requires_fastcount,
 //   requires_getmore,
 //   requires_non_retryable_writes,
-//   sbe_incompatible,
 // ]
 
 load("jstests/aggregation/extras/utils.js");  // For resultsEq

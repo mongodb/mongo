@@ -4,9 +4,6 @@ const coll = db.index_dates;
 coll.drop();
 
 // Min value for JS Date().
-// @tags: [
-//   sbe_incompatible,
-// ]
 const d1 = new Date(-8640000000000000);
 assert.commandWorked(coll.insert({_id: 1, d: d1}));
 // Max value for JS Date().

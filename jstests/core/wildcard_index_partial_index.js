@@ -21,26 +21,26 @@ function testPartialWildcardIndex(indexKeyPattern, indexOptions) {
     // find() operations that should use the index.
     let explain = coll.explain("executionStats").find({x: 6, a: 1}).finish();
     assert.eq(1, explain.executionStats.nReturned);
-    assert(isIxscan(db, explain.queryPlanner.winningPlan));
+    assert(isIxscan(db, getWinningPlan(explain.queryPlanner)));
     explain = coll.explain("executionStats").find({x: {$gt: 1}, a: 1}).finish();
     assert.eq(1, explain.executionStats.nReturned);
-    assert(isIxscan(db, explain.queryPlanner.winningPlan));
+    assert(isIxscan(db, getWinningPlan(explain.queryPlanner)));
     explain = coll.explain("executionStats").find({x: 6, a: {$lte: 1}}).finish();
     assert.eq(1, explain.executionStats.nReturned);
-    assert(isIxscan(db, explain.queryPlanner.winningPlan));
+    assert(isIxscan(db, getWinningPlan(explain.queryPlanner)));
 
     // find() operations that should not use the index.
     explain = coll.explain("executionStats").find({x: 6, a: {$lt: 1.6}}).finish();
     assert.eq(1, explain.executionStats.nReturned);
-    assert(isCollscan(db, explain.queryPlanner.winningPlan));
+    assert(isCollscan(db, getWinningPlan(explain.queryPlanner)));
 
     explain = coll.explain("executionStats").find({x: 6}).finish();
     assert.eq(1, explain.executionStats.nReturned);
-    assert(isCollscan(db, explain.queryPlanner.winningPlan));
+    assert(isCollscan(db, getWinningPlan(explain.queryPlanner)));
 
     explain = coll.explain("executionStats").find({a: {$gte: 0}}).finish();
     assert.eq(2, explain.executionStats.nReturned);
-    assert(isCollscan(db, explain.queryPlanner.winningPlan));
+    assert(isCollscan(db, getWinningPlan(explain.queryPlanner)));
 }
 
 // Case where the partial filter expression is on a field in the index.

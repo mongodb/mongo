@@ -30,7 +30,7 @@ function assertWildcardProvidesCoveredSolution(query, proj, shouldFailToCover = 
     // Obtain the explain output for the given query and projection. We run the explain with
     // 'executionStats' so that we can subsequently validate the number of documents examined.
     const explainOut = assert.commandWorked(coll.find(query, proj).explain("executionStats"));
-    const winningPlan = explainOut.queryPlanner.winningPlan;
+    const winningPlan = getWinningPlan(explainOut.queryPlanner);
 
     // Verify that the $** index provided the winning solution for this query.
     const ixScans = getPlanStages(winningPlan, "IXSCAN");

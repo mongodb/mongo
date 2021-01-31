@@ -2,9 +2,6 @@
 "use strict";
 
 // Loads data into the namespace 'aggdb.articles'.
-// @tags: [
-//   sbe_incompatible,
-// ]
 load('jstests/aggregation/data/articles.js');
 load('jstests/aggregation/extras/utils.js');
 

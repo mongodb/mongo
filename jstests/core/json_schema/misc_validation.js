@@ -17,7 +17,6 @@
  *   requires_non_retryable_commands,
  *   requires_non_retryable_writes,
  *   requires_replication,
- *   sbe_incompatible,
  * ]
  */
 (function() {

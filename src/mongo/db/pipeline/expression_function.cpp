@@ -42,7 +42,9 @@ ExpressionFunction::ExpressionFunction(ExpressionContext* const expCtx,
       _passedArgs(_children[0]),
       _assignFirstArgToThis(assignFirstArgToThis),
       _funcSource(std::move(funcSource)),
-      _lang(std::move(lang)) {}
+      _lang(std::move(lang)) {
+    expCtx->sbeCompatible = false;
+}
 
 Value ExpressionFunction::serialize(bool explain) const {
     MutableDocument d;

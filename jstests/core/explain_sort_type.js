@@ -8,7 +8,6 @@
  *   assumes_unsharded_collection,
  *   # This test uses a non-retryable multi-update command.
  *   requires_non_retryable_writes,
- *   sbe_incompatible,
  * ]
  */
 (function() {
@@ -41,7 +40,8 @@ assert.eq(
     ],
     coll.find().sort({b: 1, a: 1}).toArray());
 explain = coll.find().sort({b: 1, a: 1}).explain();
-sortStage = getPlanStage(explain.queryPlanner.winningPlan, "SORT");
+let winningPlan = getWinningPlan(explain.queryPlanner);
+sortStage = getPlanStage(winningPlan, "SORT");
 assert.neq(null, sortStage, explain);
 assert.eq("simple", sortStage.type, explain);
 
@@ -57,7 +57,8 @@ assert.eq(
     ],
     coll.find({}, {key: {$meta: "sortKey"}}).sort({b: 1, a: 1}).toArray());
 explain = coll.find({}, {key: {$meta: "sortKey"}}).sort({b: 1, a: 1}).explain();
-sortStage = getPlanStage(explain.queryPlanner.winningPlan, "SORT");
+winningPlan = getWinningPlan(explain.queryPlanner);
+sortStage = getPlanStage(winningPlan, "SORT");
 assert.neq(null, sortStage, explain);
 assert.eq("simple", sortStage.type, explain);
 
@@ -67,9 +68,10 @@ assert.eq([{a: 1, b: 1}, {a: 2, b: 1}, {a: 1, b: 2}, {a: 2, b: 2}, {a: 1, b: 3},
           coll.find({a: {$gt: 0}}, {_id: 0, a: 1, b: 1}).sort({b: 1, a: 1}).toArray());
 explain = coll.find({a: {$gt: 0}}, {_id: 0, a: 1, b: 1}).sort({b: 1, a: 1}).explain();
 // Verify that the plan involves an IXSCAN but no fetch.
-assert.neq(null, getPlanStage(explain.queryPlanner.winningPlan, "IXSCAN"), explain);
-assert.eq(null, getPlanStage(explain.queryPlanner.winningPlan, "FETCH"), explain);
-sortStage = getPlanStage(explain.queryPlanner.winningPlan, "SORT");
+winningPlan = getWinningPlan(explain.queryPlanner);
+assert.neq(null, getPlanStage(winningPlan, "IXSCAN"), explain);
+assert.eq(null, getPlanStage(winningPlan, "FETCH"), explain);
+sortStage = getPlanStage(winningPlan, "SORT");
 assert.neq(null, sortStage, explain);
 assert.eq("default", sortStage.type, explain);
 
@@ -94,7 +96,8 @@ explain =
     coll.find({$text: {$search: "keyword"}}, {_id: 0, a: 1, b: 1, score: {$meta: "textScore"}})
         .sort({b: 1, a: 1})
         .explain();
-sortStage = getPlanStage(explain.queryPlanner.winningPlan, "SORT");
+winningPlan = getWinningPlan(explain.queryPlanner);
+sortStage = getPlanStage(winningPlan, "SORT");
 assert.neq(null, sortStage, explain);
 assert.eq("default", sortStage.type, explain);
 }());

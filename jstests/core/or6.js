@@ -1,5 +1,4 @@
 // A few rooted $or cases.
-
 var t = db.jstests_orq;
 t.drop();
 

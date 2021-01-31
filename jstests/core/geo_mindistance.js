@@ -2,7 +2,6 @@
 // @tags: [
 //   requires_fastcount,
 //   requires_getmore,
-//   sbe_incompatible,
 // ]
 
 (function() {

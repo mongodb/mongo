@@ -1,8 +1,5 @@
 // SERVER-9625 Making accumulators $sum, $min, $max, $avg, $stdDevSamp, and $stdDevPop available as
 // expressions.
-// @tags: [
-//   sbe_incompatible,
-// ]
 
 // For assertErrorCode.
 load('jstests/aggregation/extras/utils.js');

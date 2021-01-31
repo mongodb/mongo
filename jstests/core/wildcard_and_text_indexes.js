@@ -2,7 +2,6 @@
  * Tests that a {$**: 1} index can coexist with a {$**: 'text'} index in the same collection.
  * @tags: [
  *   assumes_balancer_off,
- *   sbe_incompatible,
  * ]
  */
 (function() {
@@ -23,7 +22,7 @@ coll.drop();
 function assertWildcardQuery(query, expectedPath) {
     // Explain the query, and determine whether an indexed solution is available.
     const explainOutput = coll.find(query).explain("executionStats");
-    const ixScans = getPlanStages(explainOutput.queryPlanner.winningPlan, "IXSCAN");
+    const ixScans = getPlanStages(getWinningPlan(explainOutput.queryPlanner), "IXSCAN");
     // Verify that the winning plan uses the $** index with the expected path.
     assert.eq(ixScans.length, FixtureHelpers.numberOfShardsForCollection(coll));
     assert.docEq(ixScans[0].keyPattern, {"$_path": 1, [expectedPath]: 1});
@@ -53,7 +52,7 @@ for (let textIndex of [{'$**': 'text'}, {a: 1, '$**': 'text'}]) {
     // when the query filter contains a compound field in the $text index.
     const textQuery = Object.assign(textIndex.a ? {a: 1} : {}, {$text: {$search: 'banana'}});
     let explainOut = assert.commandWorked(coll.find(textQuery).explain("executionStats"));
-    assert(planHasStage(coll.getDB(), explainOut.queryPlanner.winningPlan, "TEXT"));
+    assert(planHasStage(coll.getDB(), getWinningPlan(explainOut.queryPlanner), "TEXT"));
     assert.eq(getRejectedPlans(explainOut).length, 0);
     assert.eq(explainOut.executionStats.nReturned, 2);
 
@@ -61,7 +60,7 @@ for (let textIndex of [{'$**': 'text'}, {a: 1, '$**': 'text'}]) {
     // where the query filter contains a field which is not present in the text index.
     explainOut = assert.commandWorked(
         coll.find(Object.assign({_fts: {$gt: 0, $lt: 4}}, textQuery)).explain("executionStats"));
-    assert(planHasStage(coll.getDB(), explainOut.queryPlanner.winningPlan, "TEXT"));
+    assert(planHasStage(coll.getDB(), getWinningPlan(explainOut.queryPlanner), "TEXT"));
     assert.eq(getRejectedPlans(explainOut).length, 0);
     assert.eq(explainOut.executionStats.nReturned, 2);
 
@@ -71,7 +70,7 @@ for (let textIndex of [{'$**': 'text'}, {a: 1, '$**': 'text'}]) {
     assert.eq(getRejectedPlans(explainOut).length, 0);
     assert.eq(explainOut.executionStats.nReturned, 3);
 
-    const textOrWildcard = getPlanStages(explainOut.queryPlanner.winningPlan, "OR").shift();
+    const textOrWildcard = getPlanStages(getWinningPlan(explainOut.queryPlanner), "OR").shift();
     assert.eq(textOrWildcard.inputStages.length, 2);
     const textBranch = (textOrWildcard.inputStages[0].stage === "TEXT" ? 0 : 1);
     const wildcardBranch = (textBranch + 1) % 2;

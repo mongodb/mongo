@@ -1,4 +1,5 @@
 // Test nested $or clauses SERVER-2585 SERVER-3192
+// TODO SERVER-50737: remove sbe_incompatible tag
 // @tags: [
 //   sbe_incompatible,
 // ]

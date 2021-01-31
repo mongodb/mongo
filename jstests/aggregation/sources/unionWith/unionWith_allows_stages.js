@@ -3,7 +3,6 @@
  * Some of these stages cannot be used in facets.
  * @tags: [
  *   do_not_wrap_aggregations_in_facets,
- *   sbe_incompatible,
  * ]
  */
 

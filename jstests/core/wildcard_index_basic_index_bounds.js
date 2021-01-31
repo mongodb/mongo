@@ -7,7 +7,6 @@
  * @tags: [
  *   assumes_balancer_off,
  *   does_not_support_stepdowns,
- *   sbe_incompatible,
  * ]
  */
 (function() {
@@ -121,7 +120,7 @@ function runWildcardIndexTest(keyPattern, pathProjection, expectedPaths) {
 
             // Explain the query, and determine whether an indexed solution is available.
             const ixScans =
-                getPlanStages(coll.find(query).explain().queryPlanner.winningPlan, "IXSCAN");
+                getPlanStages(getWinningPlan(coll.find(query).explain().queryPlanner), "IXSCAN");
 
             // If we expect the current path to have been excluded based on the $** keyPattern
             // and projection, or if the current operation is not supported by $** indexes,
@@ -161,7 +160,7 @@ function runWildcardIndexTest(keyPattern, pathProjection, expectedPaths) {
         const explainedOr = assert.commandWorked(coll.find({$or: multiFieldPreds}).explain());
 
         // Obtain the list of index bounds from each individual IXSCAN stage across all shards.
-        const ixScanBounds = getPlanStages(explainedOr.queryPlanner.winningPlan, "IXSCAN")
+        const ixScanBounds = getPlanStages(getWinningPlan(explainedOr.queryPlanner), "IXSCAN")
                                  .map(elem => elem.indexBounds);
 
         // We should find that each branch of the $or has used a separate $** sub-index. In the
@@ -180,15 +179,16 @@ function runWildcardIndexTest(keyPattern, pathProjection, expectedPaths) {
         // Perform an $and for this operation across all indexed fields; for instance:
         // {$and: [{a: {$gte: 50}}, {'b.c': {$gte: 50}}, {'b.d.e': {$gte: 50}}]}.
         const explainedAnd = coll.find({$and: multiFieldPreds}).explain();
-        const winningIxScan = getPlanStages(explainedAnd.queryPlanner.winningPlan, "IXSCAN");
+        const winningIxScan = getPlanStages(getWinningPlan(explainedAnd.queryPlanner), "IXSCAN");
 
         // Extract information about the rejected plans. We should have one IXSCAN for each $**
         // candidate that wasn't the winner. Before SERVER-36521 banned them for $** indexes, a
         // number of AND_SORTED plans would also be generated here; we search for these in order
         // to verify that no such plans now exist.
-        const rejectedPlans = getRejectedPlans(explainedAnd);
         let rejectedIxScans = [], rejectedAndSorted = [];
+        const rejectedPlans = getRejectedPlans(explainedAnd);
         for (let rejectedPlan of rejectedPlans) {
+            rejectedPlan = getRejectedPlan(rejectedPlan);
             rejectedAndSorted = rejectedAndSorted.concat(getPlanStages(rejectedPlan, "AND_SORTED"));
             rejectedIxScans = rejectedIxScans.concat(getPlanStages(rejectedPlan, "IXSCAN"));
         }

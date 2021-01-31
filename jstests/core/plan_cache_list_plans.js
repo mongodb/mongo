@@ -12,7 +12,6 @@
 //   assumes_unsharded_collection,
 //   does_not_support_stepdowns,
 //   inspects_whether_plan_cache_entry_is_active,
-//   sbe_incompatible,
 // ]
 
 (function() {
