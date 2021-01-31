@@ -10557,6 +10557,7 @@ buildvariants:
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .txns
   - name: .sharding .common
+  - name: sharded_multi_stmt_txn_jscore_passthrough
   - name: snmp
   - name: .stitch
   - name: .updatefuzzer
