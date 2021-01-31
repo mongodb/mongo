@@ -1,9 +1,6 @@
 /**
  * Tests the behavior of the $geoNear stage by varying 'distanceField' and 'includeLocs'
  * (specifically, by specifying nested fields, overriding existing fields, and so on).
- * @tags: [
- *   sbe_incompatible,
- * ]
  */
 (function() {
 "use strict";

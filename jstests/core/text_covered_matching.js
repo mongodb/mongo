@@ -36,7 +36,7 @@ assert.commandWorked(coll.insert({a: "hello world", b: 3, c: 3}));
 //   - we return exactly one document.
 let explainResult = coll.find({$text: {$search: "hello"}, b: 1}).explain("executionStats");
 assert.commandWorked(explainResult);
-assert(planHasStage(db, explainResult.queryPlanner.winningPlan, "OR"));
+assert(planHasStage(db, getWinningPlan(explainResult.queryPlanner), "OR"));
 assert.eq(explainResult.executionStats.totalKeysExamined,
           2,
           "Unexpected number of keys examined: " + tojson(explainResult));
@@ -53,7 +53,7 @@ explainResult = coll.find({$text: {$search: "hello"}, b: 1},
                           {a: 1, b: 1, c: 1, textScore: {$meta: "textScore"}})
                     .explain("executionStats");
 assert.commandWorked(explainResult);
-assert(planHasStage(db, explainResult.queryPlanner.winningPlan, "TEXT_OR"));
+assert(planHasStage(db, getWinningPlan(explainResult.queryPlanner), "TEXT_OR"));
 assert.eq(explainResult.executionStats.totalKeysExamined,
           2,
           "Unexpected number of keys examined: " + tojson(explainResult));
@@ -76,7 +76,7 @@ assert.eq(explainResult.executionStats.nReturned,
 //   - we return exactly one document.
 explainResult = coll.find({$text: {$search: "hello"}, c: 1}).explain("executionStats");
 assert.commandWorked(explainResult);
-assert(planHasStage(db, explainResult.queryPlanner.winningPlan, "OR"));
+assert(planHasStage(db, getWinningPlan(explainResult.queryPlanner), "OR"));
 assert.eq(explainResult.executionStats.totalKeysExamined,
           2,
           "Unexpected number of keys examined: " + tojson(explainResult));
@@ -121,7 +121,7 @@ assert.commandWorked(coll.insert({a: "hello world", b: {d: 3}, c: {e: 3}}));
 //   - we return exactly one document.
 explainResult = coll.find({$text: {$search: "hello"}, "b.d": 1}).explain("executionStats");
 assert.commandWorked(explainResult);
-assert(planHasStage(db, explainResult.queryPlanner.winningPlan, "OR"));
+assert(planHasStage(db, getWinningPlan(explainResult.queryPlanner), "OR"));
 assert.eq(explainResult.executionStats.totalKeysExamined,
           2,
           "Unexpected number of keys examined: " + tojson(explainResult));
@@ -138,7 +138,7 @@ explainResult = coll.find({$text: {$search: "hello"}, "b.d": 1},
                           {a: 1, b: 1, c: 1, textScore: {$meta: "textScore"}})
                     .explain("executionStats");
 assert.commandWorked(explainResult);
-assert(planHasStage(db, explainResult.queryPlanner.winningPlan, "TEXT_OR"));
+assert(planHasStage(db, getWinningPlan(explainResult.queryPlanner), "TEXT_OR"));
 assert.eq(explainResult.executionStats.totalKeysExamined,
           2,
           "Unexpected number of keys examined: " + tojson(explainResult));
@@ -161,7 +161,7 @@ assert.eq(explainResult.executionStats.nReturned,
 //   - we return exactly one document.
 explainResult = coll.find({$text: {$search: "hello"}, "c.e": 1}).explain("executionStats");
 assert.commandWorked(explainResult);
-assert(planHasStage(db, explainResult.queryPlanner.winningPlan, "OR"));
+assert(planHasStage(db, getWinningPlan(explainResult.queryPlanner), "OR"));
 assert.eq(explainResult.executionStats.totalKeysExamined,
           2,
           "Unexpected number of keys examined: " + tojson(explainResult));

@@ -2,7 +2,6 @@
 // a partial index filter.
 // @tags: [
 //   requires_non_retryable_writes,
-//   sbe_incompatible,
 // ]
 
 (function() {

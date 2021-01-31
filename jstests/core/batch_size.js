@@ -1,3 +1,4 @@
+// TODO SERVER-50737: remove sbe_incompatible tag
 // @tags: [
 //   assumes_balancer_off,
 //   requires_getmore,

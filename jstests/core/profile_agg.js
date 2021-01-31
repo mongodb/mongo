@@ -1,3 +1,4 @@
+// TODO SERVER-50737: remove sbe_incompatible tag
 // @tags: [
 //   does_not_support_stepdowns,
 //   requires_profiling,

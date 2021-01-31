@@ -10,7 +10,6 @@
 // @tags: [
 //   assumes_unsharded_collection,
 //   do_not_wrap_aggregations_in_facets,
-//   sbe_incompatible,
 // ]
 load('jstests/libs/analyze_plan.js');
 

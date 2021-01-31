@@ -3,7 +3,6 @@
  *
  * @tags: [
  *   requires_non_retryable_commands,
- *   sbe_incompatible,
  * ]
  */
 (function() {

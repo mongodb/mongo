@@ -1,9 +1,3 @@
-// to run:
-//   ./mongo jstests/ref.js
-// @tags: [
-//   sbe_incompatible,
-// ]
-
 db.otherthings.drop();
 db.things.drop();
 

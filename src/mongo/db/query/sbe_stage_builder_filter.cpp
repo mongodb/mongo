@@ -955,8 +955,11 @@ public:
 
 private:
     void unsupportedExpression(const MatchExpression* expr) const {
-        uasserted(4822878,
-                  str::stream() << "Match expression is not supported in SBE: "
+        // We're guaranteed to not fire this assertion by implementing a mechanism in the upper
+        // layer which directs the query to the classic engine when an unsupported expression
+        // appears.
+        tasserted(4822878,
+                  str::stream() << "Unsupported match expression in SBE stage builder: "
                                 << expr->matchType());
     }
 

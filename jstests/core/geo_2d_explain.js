@@ -1,6 +1,5 @@
 // @tags: [
 //   assumes_balancer_off,
-//   sbe_incompatible,
 // ]
 
 var t = db.geo_2d_explain;

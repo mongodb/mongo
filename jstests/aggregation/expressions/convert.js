@@ -1,8 +1,5 @@
 /**
  * Tests behavior of $convert aggregation operator.
- * @tags: [
- *   sbe_incompatible,
- * ]
  */
 (function() {
 "use strict";

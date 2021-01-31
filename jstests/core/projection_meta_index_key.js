@@ -1,8 +1,5 @@
 // Test that indexKey $meta projection works in find and aggregate commands and produces correct
 // result depending on whether index key metadata is available or not.
-// @tags: [
-//   sbe_incompatible,
-// ]
 (function() {
 "use strict";
 

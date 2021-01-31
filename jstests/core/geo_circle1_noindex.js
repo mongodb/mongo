@@ -1,7 +1,4 @@
 // SERVER-7343: allow $within without a geo index.
-// @tags: [
-//   sbe_incompatible,
-// ]
 t = db.geo_circle1_noindex;
 t.drop();
 

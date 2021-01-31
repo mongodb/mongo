@@ -1,7 +1,4 @@
 // Verify that an aggregate with $geoNear always uses the index hinted to the aggregate command.
-// @tags: [
-//   sbe_incompatible,
-// ]
 (function() {
 "use strict";
 

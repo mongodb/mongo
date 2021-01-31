@@ -117,7 +117,7 @@ void statsToBSON(const QuerySolutionNode* node,
         }
         case STAGE_LIMIT: {
             auto ln = static_cast<const LimitNode*>(node);
-            bob->appendNumber("limitAmount", ln->limit);
+            bob->appendIntOrLL("limitAmount", ln->limit);
             break;
         }
         case STAGE_PROJECTION_DEFAULT:
@@ -129,7 +129,7 @@ void statsToBSON(const QuerySolutionNode* node,
         }
         case STAGE_SKIP: {
             auto sn = static_cast<const SkipNode*>(node);
-            bob->appendNumber("skipAmount", sn->skip);
+            bob->appendIntOrLL("skipAmount", sn->skip);
             break;
         }
         case STAGE_SORT_SIMPLE:
@@ -334,6 +334,7 @@ std::string PlanExplainerSBE::getPlanSummary() const {
     }
 
     StringBuilder sb;
+    bool seenLeaf = false;
     std::queue<const QuerySolutionNode*> queue;
     queue.push(_solution->root());
 
@@ -341,55 +342,59 @@ std::string PlanExplainerSBE::getPlanSummary() const {
         auto node = queue.front();
         queue.pop();
 
-        sb << stageTypeToString(node->getType());
+        if (node->children.empty()) {
+            if (seenLeaf) {
+                sb << ", ";
+            } else {
+                seenLeaf = true;
+            }
 
-        switch (node->getType()) {
-            case STAGE_COUNT_SCAN: {
-                auto csn = static_cast<const CountScanNode*>(node);
-                const KeyPattern keyPattern{csn->index.keyPattern};
-                sb << " " << keyPattern;
-                break;
+            sb << stageTypeToString(node->getType());
+
+            switch (node->getType()) {
+                case STAGE_COUNT_SCAN: {
+                    auto csn = static_cast<const CountScanNode*>(node);
+                    const KeyPattern keyPattern{csn->index.keyPattern};
+                    sb << " " << keyPattern;
+                    break;
+                }
+                case STAGE_DISTINCT_SCAN: {
+                    auto dn = static_cast<const DistinctNode*>(node);
+                    const KeyPattern keyPattern{dn->index.keyPattern};
+                    sb << " " << keyPattern;
+                    break;
+                }
+                case STAGE_GEO_NEAR_2D: {
+                    auto geo2d = static_cast<const GeoNear2DNode*>(node);
+                    const KeyPattern keyPattern{geo2d->index.keyPattern};
+                    sb << " " << keyPattern;
+                    break;
+                }
+                case STAGE_GEO_NEAR_2DSPHERE: {
+                    auto geo2dsphere = static_cast<const GeoNear2DSphereNode*>(node);
+                    const KeyPattern keyPattern{geo2dsphere->index.keyPattern};
+                    sb << " " << keyPattern;
+                    break;
+                }
+                case STAGE_IXSCAN: {
+                    auto ixn = static_cast<const IndexScanNode*>(node);
+                    const KeyPattern keyPattern{ixn->index.keyPattern};
+                    sb << " " << keyPattern;
+                    break;
+                }
+                case STAGE_TEXT: {
+                    auto tn = static_cast<const TextNode*>(node);
+                    const KeyPattern keyPattern{tn->indexPrefix};
+                    sb << " " << keyPattern;
+                    break;
+                }
+                default:
+                    break;
             }
-            case STAGE_DISTINCT_SCAN: {
-                auto dn = static_cast<const DistinctNode*>(node);
-                const KeyPattern keyPattern{dn->index.keyPattern};
-                sb << " " << keyPattern;
-                break;
-            }
-            case STAGE_GEO_NEAR_2D: {
-                auto geo2d = static_cast<const GeoNear2DNode*>(node);
-                const KeyPattern keyPattern{geo2d->index.keyPattern};
-                sb << " " << keyPattern;
-                break;
-            }
-            case STAGE_GEO_NEAR_2DSPHERE: {
-                auto geo2dsphere = static_cast<const GeoNear2DSphereNode*>(node);
-                const KeyPattern keyPattern{geo2dsphere->index.keyPattern};
-                sb << " " << keyPattern;
-                break;
-            }
-            case STAGE_IXSCAN: {
-                auto ixn = static_cast<const IndexScanNode*>(node);
-                const KeyPattern keyPattern{ixn->index.keyPattern};
-                sb << " " << keyPattern;
-                break;
-            }
-            case STAGE_TEXT: {
-                auto tn = static_cast<const TextNode*>(node);
-                const KeyPattern keyPattern{tn->indexPrefix};
-                sb << " " << keyPattern;
-                break;
-            }
-            default:
-                break;
         }
 
         for (auto&& child : node->children) {
             queue.push(child);
-        }
-
-        if (!queue.empty()) {
-            sb << ", ";
         }
     }
 

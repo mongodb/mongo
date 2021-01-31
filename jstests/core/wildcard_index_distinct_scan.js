@@ -1,8 +1,5 @@
 /**
  * Tests that a $** index can provide a DISTINCT_SCAN or indexed solution where appropriate.
- * @tags: [
- *   sbe_incompatible,
- * ]
  */
 (function() {
 "use strict";
@@ -46,7 +43,7 @@ function assertWildcardDistinctScan(
     assert.commandWorked(coll.dropIndexes());
 
     // Confirm that the distinct runs with a COLLSCAN.
-    let winningPlan = coll.explain().distinct(distinctKey, query).queryPlanner.winningPlan;
+    let winningPlan = getWinningPlan(coll.explain().distinct(distinctKey, query).queryPlanner);
     assert(planHasStage(coll.getDB(), winningPlan, "COLLSCAN"));
     // Run the distinct and confirm that it produces the expected results.
     assertArrayEq(coll.distinct(distinctKey, query), expectedResults);
@@ -65,7 +62,7 @@ function assertWildcardDistinctScan(
 
     // Explain the query, and determine whether an indexed solution is available. If
     // 'expectedPath' is null, then we do not expect the $** index to provide a plan.
-    winningPlan = coll.explain().distinct(distinctKey, query).queryPlanner.winningPlan;
+    winningPlan = getWinningPlan(coll.explain().distinct(distinctKey, query).queryPlanner);
     if (!expectedPath) {
         assert(planHasStage(coll.getDB(), winningPlan, "COLLSCAN"));
         assert.eq(expectedScanType, "COLLSCAN");

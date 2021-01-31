@@ -1,8 +1,3 @@
-/**
- * @tags: [
- *   sbe_incompatible,
- * ]
- */
 t = db.geo_qo1;
 t.drop();
 

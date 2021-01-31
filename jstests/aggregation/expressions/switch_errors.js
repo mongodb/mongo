@@ -1,9 +1,7 @@
 // SERVER-10689 introduced the $switch expression. In this file, we test the error cases of the
 // expression.
-// @tags: [
-//   sbe_incompatible,
-// ]
-load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
+load("jstests/aggregation/extras/utils.js");        // For assertErrorCode.
+load("jstests/libs/sbe_assert_error_override.js");  // Override error-code-checking APIs.
 
 (function() {
 "use strict";

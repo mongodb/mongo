@@ -1,8 +1,5 @@
 /**
  * Tests for the $$REMOVE system variable.
- * @tags: [
- *   sbe_incompatible,
- * ]
  */
 (function() {
 "use strict";

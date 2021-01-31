@@ -1,7 +1,4 @@
 // Test sorting with text score metadata.
-// @tags: [
-//   sbe_incompatible,
-// ]
 (function() {
 "use strict";
 

@@ -1,6 +1,5 @@
 // @tags: [
 //   requires_getmore,
-//   sbe_incompatible,
 // ]
 
 // Unsorted plan on {a:1}, sorted plan on {b:1}.  The unsorted plan exhausts its memory limit before

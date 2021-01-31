@@ -1,6 +1,5 @@
 // @tags: [
 //   requires_getmore,
-//   sbe_incompatible,
 // ]
 
 //

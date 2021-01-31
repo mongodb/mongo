@@ -3,7 +3,6 @@
 // TODO SERVER-29159: Enable test on passthroughs with sharded collections.
 // @tags: [
 //   assumes_unsharded_collection,
-//   sbe_incompatible,
 // ]
 (function() {
 "use strict";

@@ -3411,8 +3411,10 @@ private:
     }
 
     void unsupportedExpression(const char* op) const {
-        uasserted(ErrorCodes::InternalErrorNotSupported,
-                  str::stream() << "Expression is not supported in SBE: " << op);
+        // We're guaranteed to not fire this assertion by implementing a mechanism in the upper
+        // layer which directs the query to the classic engine when an unsupported expression
+        // appears.
+        tasserted(5182300, str::stream() << "Unsupported expression in SBE stage builder: " << op);
     }
 
     ExpressionVisitorContext* _context;

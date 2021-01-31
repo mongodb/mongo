@@ -1,8 +1,5 @@
 /**
  * Tests for the $dateToString expression with the optional 'onNull' parameter.
- * @tags: [
- *   sbe_incompatible,
- * ]
  */
 (function() {
 "use strict";

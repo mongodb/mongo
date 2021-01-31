@@ -4,7 +4,6 @@
  * Legacy find() queries do not support views, so must use the find() command.
  * @tags: [
  *   requires_find_command,
- *   sbe_incompatible,
  * ]
  */
 (function() {

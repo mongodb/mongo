@@ -1,8 +1,5 @@
 /**
  * Tests that a user can group on the text score.
- * @tags: [
- *   sbe_incompatible,
- * ]
  */
 (function() {
 "use strict";

@@ -13,7 +13,6 @@
  *   do_not_wrap_aggregations_in_facets,
  *   # Index filter commands do not support causal consistency.
  *   does_not_support_causal_consistency,
- *   sbe_incompatible,
  * ]
  */
 

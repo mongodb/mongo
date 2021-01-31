@@ -1438,7 +1438,9 @@ ExpressionDateFromString::ExpressionDateFromString(ExpressionContext* const expC
       _timeZone(_children[1]),
       _format(_children[2]),
       _onNull(_children[3]),
-      _onError(_children[4]) {}
+      _onError(_children[4]) {
+    expCtx->sbeCompatible = false;
+}
 
 intrusive_ptr<Expression> ExpressionDateFromString::optimize() {
     _dateString = _dateString->optimize();
@@ -1756,7 +1758,9 @@ ExpressionDateToString::ExpressionDateToString(ExpressionContext* const expCtx,
       _format(_children[0]),
       _date(_children[1]),
       _timeZone(_children[2]),
-      _onNull(_children[3]) {}
+      _onNull(_children[3]) {
+    expCtx->sbeCompatible = false;
+}
 
 intrusive_ptr<Expression> ExpressionDateToString::optimize() {
     _date = _date->optimize();
@@ -2097,7 +2101,9 @@ const char* ExpressionExp::getOpName() const {
 ExpressionObject::ExpressionObject(ExpressionContext* const expCtx,
                                    std::vector<boost::intrusive_ptr<Expression>> _children,
                                    vector<pair<string, intrusive_ptr<Expression>&>>&& expressions)
-    : Expression(expCtx, std::move(_children)), _expressions(std::move(expressions)) {}
+    : Expression(expCtx, std::move(_children)), _expressions(std::move(expressions)) {
+    expCtx->sbeCompatible = false;
+}
 
 boost::intrusive_ptr<ExpressionObject> ExpressionObject::create(
     ExpressionContext* const expCtx,
@@ -2684,7 +2690,9 @@ ExpressionMap::ExpressionMap(ExpressionContext* const expCtx,
       _varName(varName),
       _varId(varId),
       _input(_children[0]),
-      _each(_children[1]) {}
+      _each(_children[1]) {
+    expCtx->sbeCompatible = false;
+}
 
 intrusive_ptr<Expression> ExpressionMap::optimize() {
     // TODO handle when _input is constant
@@ -2821,7 +2829,9 @@ intrusive_ptr<Expression> ExpressionMeta::parse(ExpressionContext* const expCtx,
 }
 
 ExpressionMeta::ExpressionMeta(ExpressionContext* const expCtx, MetaType metaType)
-    : Expression(expCtx), _metaType(metaType) {}
+    : Expression(expCtx), _metaType(metaType) {
+    expCtx->sbeCompatible = false;
+}
 
 Value ExpressionMeta::serialize(bool explain) const {
     const auto nameIter = kMetaTypeToMetaName.find(_metaType);
@@ -6101,7 +6111,9 @@ ExpressionConvert::ExpressionConvert(ExpressionContext* const expCtx,
       _input(_children[0]),
       _to(_children[1]),
       _onError(_children[2]),
-      _onNull(_children[3]) {}
+      _onNull(_children[3]) {
+    expCtx->sbeCompatible = false;
+}
 
 intrusive_ptr<Expression> ExpressionConvert::parse(ExpressionContext* const expCtx,
                                                    BSONElement expr,
@@ -6702,7 +6714,9 @@ REGISTER_EXPRESSION(rand, ExpressionRandom::parse);
 
 static thread_local PseudoRandom threadLocalRNG(SecureRandom().nextInt64());
 
-ExpressionRandom::ExpressionRandom(ExpressionContext* const expCtx) : Expression(expCtx) {}
+ExpressionRandom::ExpressionRandom(ExpressionContext* const expCtx) : Expression(expCtx) {
+    expCtx->sbeCompatible = false;
+}
 
 intrusive_ptr<Expression> ExpressionRandom::parse(ExpressionContext* const expCtx,
                                                   BSONElement exprElement,

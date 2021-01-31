@@ -1,8 +1,3 @@
-/**
- * @tags: [
- *   sbe_incompatible,
- * ]
- */
 load("jstests/libs/fts.js");
 
 t = db.text_parition1;

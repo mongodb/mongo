@@ -916,10 +916,6 @@ protected:
 
     std::unique_ptr<SlotBasedPrepareExecutionResult> buildIdHackPlan(
         const IndexDescriptor* descriptor, QueryPlannerParams* plannerParams) final {
-        uassert(4822862,
-                "Queries that require sort key metadata are not supported by SBE yet",
-                !_cq->metadataDeps()[DocumentMetadataFields::kSortKey]);
-
         // Fall back to normal planning.
         return nullptr;
     }
@@ -1106,6 +1102,25 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
                                        std::move(nss),
                                        std::move(yieldPolicy));
 }
+
+// Checks if the given query can be executed with the SBE engine.
+inline bool isQuerySbeCompatible(const CanonicalQuery* const cq, size_t plannerOptions) {
+    invariant(cq);
+    auto expCtx = cq->getExpCtxRaw();
+    auto sortPattern = cq->getSortPattern();
+    const bool allExpressionsSupported = expCtx && expCtx->sbeCompatible;
+    const bool isNotCount = !(plannerOptions & QueryPlannerParams::IS_COUNT);
+    // Specifying 'ntoreturn' in an OP_QUERY style find may result in a QuerySolution with
+    // ENSURE_SORTED node, which is currently not supported by SBE.
+    const bool doesNotNeedEnsureSorted = !cq->getQueryRequest().getNToReturn();
+    const bool doesNotContainMetadataRequirements = cq->metadataDeps().none();
+    const bool doesNotSortOnDottedPath =
+        !sortPattern || std::all_of(sortPattern->begin(), sortPattern->end(), [](auto&& part) {
+            return part.fieldPath && part.fieldPath->getPathLength() == 1;
+        });
+    return allExpressionsSupported && isNotCount && doesNotNeedEnsureSorted &&
+        doesNotContainMetadataRequirements && doesNotSortOnDottedPath;
+}
 }  // namespace
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
@@ -1114,7 +1129,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
     std::unique_ptr<CanonicalQuery> canonicalQuery,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     size_t plannerOptions) {
-    return feature_flags::gSBE.isEnabledAndIgnoreFCV()
+    return feature_flags::gSBE.isEnabledAndIgnoreFCV() &&
+            isQuerySbeCompatible(canonicalQuery.get(), plannerOptions)
         ? getSlotBasedExecutor(
               opCtx, collection, std::move(canonicalQuery), yieldPolicy, plannerOptions)
         : getClassicExecutor(

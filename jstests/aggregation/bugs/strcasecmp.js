@@ -1,7 +1,4 @@
 // Aggregation $strcasecmp tests.
-// @tags: [
-//   sbe_incompatible,
-// ]
 
 t = db.jstests_aggregation_strcasecmp;
 t.drop();

@@ -1,8 +1,5 @@
 // Explode arrays when indexing non-geo fields in 2dsphere, and make sure that
 // we find them with queries.
-// @tags: [
-//   sbe_incompatible,
-// ]
 t = db.geo_s2nongeoarray;
 
 oldPoint = [40, 5];

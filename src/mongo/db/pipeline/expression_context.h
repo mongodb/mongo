@@ -365,6 +365,10 @@ public:
     // construction.
     const bool mayDbProfile = true;
 
+    // True if all expressions which use this expression context can be translated into equivalent
+    // SBE expressions.
+    bool sbeCompatible = true;
+
     // API Parameters pulled from OperationContext upon object creation.
     // This may become stale if OperationContext changes after object creation.
     // Expressions should reach APIParameters with this variable instead of using the decorator.

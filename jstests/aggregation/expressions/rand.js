@@ -1,8 +1,5 @@
 /**
  * Test the $rand expression.
- * @tags: [
- *   sbe_incompatible,
- * ]
  */
 (function() {
 "use strict";

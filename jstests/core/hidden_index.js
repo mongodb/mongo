@@ -21,7 +21,7 @@ let coll = assertDropAndRecreateCollection(db, collName);
 
 function numOfUsedIXSCAN(query) {
     const explain = assert.commandWorked(coll.find(query).explain());
-    const ixScans = getPlanStages(explain.queryPlanner.winningPlan, "IXSCAN");
+    const ixScans = getPlanStages(getWinningPlan(explain.queryPlanner), "IXSCAN");
     return ixScans.length;
 }
 

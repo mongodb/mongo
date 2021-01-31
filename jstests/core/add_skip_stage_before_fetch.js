@@ -6,7 +6,6 @@
 // @tags: [
 //   assumes_unsharded_collection,
 //   operations_longer_than_stepdown_interval_in_txns,
-//   sbe_incompatible,
 // ]
 
 (function() {

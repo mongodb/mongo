@@ -1,9 +1,3 @@
-
-/**
- * @tags: [
- *   sbe_incompatible,
- * ]
- */
 t = db.geo_box2;
 
 t.drop();

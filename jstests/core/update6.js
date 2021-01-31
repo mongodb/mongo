@@ -3,7 +3,6 @@
 // key.
 // @tags: [
 //   assumes_unsharded_collection,
-//   sbe_incompatible,
 // ]
 
 t = db.update6;

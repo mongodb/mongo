@@ -7,9 +7,6 @@ load("jstests/libs/sbe_assert_error_override.js");  // Override error-code-check
 const coll = db.dateFromParts;
 
 // Basic Sanity Checks
-// @tags: [
-//   sbe_incompatible,
-// ]
 coll.drop();
 
 assert.commandWorked(coll.insert([

@@ -6,9 +6,6 @@ t.createIndex({geo: "2dsphere"});
  * Test 1: check that intersection works on the meridian.  We insert a line
  * that crosses the meridian, and then run a geoIntersect with a line
  * that runs along the meridian.
- * @tags: [
- *   sbe_incompatible,
- * ]
  */
 
 meridianCrossingLine = {

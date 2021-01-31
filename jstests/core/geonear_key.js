@@ -1,8 +1,5 @@
 /**
  * Tests for the 'key' field accepted by the $geoNear aggregation stage.
- * @tags: [
- *   sbe_incompatible,
- * ]
  */
 (function() {
 "use strict";

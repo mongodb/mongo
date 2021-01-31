@@ -1,6 +1,5 @@
 // @tags: [
 //   requires_getmore,
-//   sbe_incompatible,
 // ]
 
 // SERVER-7343: allow $within without a geo index.

@@ -1,7 +1,4 @@
 // Tests for $geowithin $centerSphere operator with LineString and Polygon.
-// @tags: [
-//   sbe_incompatible,
-// ]
 (function() {
 
 function testGeoWithinCenterSphereLinePolygon(coll) {

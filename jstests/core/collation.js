@@ -6,7 +6,6 @@
 //   requires_capped,
 //   requires_non_retryable_commands,
 //   requires_non_retryable_writes,
-//   sbe_incompatible,
 // ]
 
 // Integration tests for the collation feature.
@@ -19,6 +18,14 @@ load("jstests/libs/get_index_helpers.js");
 load("jstests/concurrency/fsm_workload_helpers/server_types.js");
 // For isReplSet
 load("jstests/libs/fixture_helpers.js");
+
+// Note that the "getParameter" command is expected to fail in versions of mongod that do not yet
+// include the slot-based execution engine. When that happens, however, 'isSBEEnabled' still
+// correctly evaluates to false.
+const isSBEEnabled = (() => {
+    const getParam = db.adminCommand({getParameter: 1, featureFlagSBE: 1});
+    return getParam.hasOwnProperty("featureFlagSBE") && getParam.featureFlagSBE.value;
+})();
 
 var coll = db.collation;
 coll.drop();
@@ -46,10 +53,10 @@ var getQueryCollation = function(explainRes) {
         return explainRes.queryPlanner.collation;
     }
 
-    if (getWinningPlan(explainRes.queryPlanner).hasOwnProperty("shards") &&
-        getWinningPlan(explainRes.queryPlanner).shards.length > 0 &&
-        getWinningPlan(explainRes.queryPlanner).shards[0].hasOwnProperty("collation")) {
-        return getWinningPlan(explainRes.queryPlanner).shards[0].collation;
+    const winningPlan = getWinningPlan(explainRes.queryPlanner);
+    if (winningPlan.hasOwnProperty("shards") && winningPlan.shards.length > 0 &&
+        winningPlan.shards[0].hasOwnProperty("collation")) {
+        return winningPlan.shards[0].collation;
     }
 
     return null;
@@ -687,7 +694,8 @@ coll.drop();
 assert.commandWorked(db.createCollection(coll.getName(), {collation: {locale: "en_US"}}));
 explainRes = coll.explain("executionStats").find({_id: "foo"}).finish();
 assert.commandWorked(explainRes);
-planStage = getPlanStage(explainRes.executionStats.executionStages, "IDHACK");
+planStage =
+    getPlanStage(getWinningPlan(explainRes.queryPlanner), isSBEEnabled ? "IXSCAN" : "IDHACK");
 assert.neq(null, planStage);
 
 // Find should return correct results for query containing $expr when no collation specified and
@@ -729,8 +737,12 @@ if (db.getMongo().useReadCommands()) {
     explainRes =
         coll.explain("executionStats").find({_id: "foo"}).collation({locale: "en_US"}).finish();
     assert.commandWorked(explainRes);
-    planStage = getPlanStage(explainRes.executionStats.executionStages, "IDHACK");
-    assert.neq(null, planStage);
+    if (isSBEEnabled) {
+        planStage = getPlanStage(getWinningPlan(explainRes.queryPlanner), "IXSCAN");
+    } else {
+        planStage = getPlanStage(explainRes.executionStats.executionStages, "IDHACK");
+    }
+    assert.neq(null, planStage, explainRes);
 
     // Find on _id should not use idhack stage when query collation does not match collection
     // default.
@@ -739,7 +751,11 @@ if (db.getMongo().useReadCommands()) {
     explainRes =
         coll.explain("executionStats").find({_id: "foo"}).collation({locale: "fr_CA"}).finish();
     assert.commandWorked(explainRes);
-    planStage = getPlanStage(explainRes.executionStats.executionStages, "IDHACK");
+    if (isSBEEnabled) {
+        planStage = getPlanStage(getWinningPlan(explainRes.queryPlanner), "IXSCAN");
+    } else {
+        planStage = getPlanStage(explainRes.executionStats.executionStages, "IDHACK");
+    }
     assert.eq(null, planStage);
 }
 
@@ -831,7 +847,7 @@ assert.commandWorked(coll.createIndex({str: 1}, {collation: {locale: "fr_CA"}}))
 explainRes =
     coll.explain("executionStats").find({str: "foo"}).collation({locale: "fr_CA"}).finish();
 assert.commandWorked(explainRes);
-planStage = getPlanStage(explainRes.executionStats.executionStages, "IXSCAN");
+planStage = getPlanStage(getWinningPlan(explainRes.queryPlanner), "IXSCAN");
 assert.neq(null, planStage);
 assert.eq(planStage.collation, {
     locale: "fr_CA",
@@ -853,7 +869,7 @@ assert.commandWorked(db.createCollection(coll.getName(), {collation: {locale: "f
 assert.commandWorked(coll.createIndex({str: 1}));
 explainRes = coll.explain("executionStats").find({str: "foo"}).finish();
 assert.commandWorked(explainRes);
-planStage = getPlanStage(explainRes.executionStats.executionStages, "IXSCAN");
+planStage = getPlanStage(getWinningPlan(explainRes.queryPlanner), "IXSCAN");
 assert.neq(null, planStage);
 assert.eq(planStage.collation, {
     locale: "fr_CA",

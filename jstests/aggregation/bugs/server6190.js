@@ -1,8 +1,5 @@
 // $week returns a date's week of the year.  Week zero is comprised of any dates before the first
 // Sunday of the year.  SERVER-6190
-// @tags: [
-//   sbe_incompatible,
-// ]
 load('jstests/aggregation/extras/utils.js');
 
 t = db.jstests_aggregation_server6190;

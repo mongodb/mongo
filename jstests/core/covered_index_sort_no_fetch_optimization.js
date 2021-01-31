@@ -9,7 +9,6 @@
  *   assumes_unsharded_collection,
  *   # Sort optimizations added for hashed indexes in 4.7 can generate a different plan.
  *   requires_fcv_47,
- *   sbe_incompatible,
  * ]
  */
 (function() {
@@ -42,9 +41,10 @@ function assertExpectedResult(findCmd, expectedResult, isCovered, isBlockingSort
 
     const explainResult =
         assert.commandWorked(db.runCommand({explain: findCmd, verbosity: "executionStats"}));
-    assert.eq(isCovered, isIndexOnly(db, explainResult.queryPlanner.winningPlan), explainResult);
+    assert.eq(
+        isCovered, isIndexOnly(db, getWinningPlan(explainResult.queryPlanner)), explainResult);
     assert.eq(isBlockingSort,
-              planHasStage(db, explainResult.queryPlanner.winningPlan, "SORT"),
+              planHasStage(db, getWinningPlan(explainResult.queryPlanner), "SORT"),
               explainResult);
 }
 

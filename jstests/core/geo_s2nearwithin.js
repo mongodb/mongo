@@ -1,7 +1,4 @@
 // Test $geoNear + $within.
-// @tags: [
-//   sbe_incompatible,
-// ]
 (function() {
 t = db.geo_s2nearwithin;
 t.drop();

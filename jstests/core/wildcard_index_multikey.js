@@ -97,11 +97,11 @@ function assertWildcardQuery(query, expectedPath, explainStats = {}) {
     // If we expect the current path to have been excluded based on the $** keyPattern
     // or projection, confirm that no indexed solution was found.
     if (!expectedPath) {
-        assert.gt(getPlanStages(explainOutput.queryPlanner.winningPlan, "COLLSCAN").length, 0);
+        assert.gt(getPlanStages(getWinningPlan(explainOutput.queryPlanner), "COLLSCAN").length, 0);
         return;
     }
     // Verify that the winning plan uses the $** index with the expected path.
-    const ixScans = getPlanStages(explainOutput.queryPlanner.winningPlan, "IXSCAN");
+    const ixScans = getPlanStages(getWinningPlan(explainOutput.queryPlanner), "IXSCAN");
     assert.eq(ixScans.length, FixtureHelpers.numberOfShardsForCollection(coll));
     assert.docEq(ixScans[0].keyPattern, {"$_path": 1, [expectedPath]: 1});
     // Verify that the results obtained from the $** index are identical to a COLLSCAN.
@@ -236,7 +236,7 @@ const trimTestExplain = coll.find(trimTestQuery).explain("executionStats");
 // Verify that the expected number of documents were matched, and the $** index was used.
 // Matched documents: [_id:2, _id:3, _id:5, _id:6]
 assert.eq(trimTestExplain.executionStats.nReturned, 4);
-const trimTestIxScans = getPlanStages(trimTestExplain.queryPlanner.winningPlan, "IXSCAN");
+const trimTestIxScans = getPlanStages(getWinningPlan(trimTestExplain.queryPlanner), "IXSCAN");
 for (let ixScan of trimTestIxScans) {
     assert.eq(ixScan.keyPattern["$_path"], 1);
 }

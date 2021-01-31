@@ -1,8 +1,3 @@
-/**
- * @tags: [
- *   sbe_incompatible,
- * ]
- */
 load("jstests/aggregation/extras/utils.js");  // For assertErrorCode and assertErrMsgContains.
 
 (function() {

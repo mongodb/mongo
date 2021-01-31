@@ -1,7 +1,4 @@
 // SERVER-2386, general geo-indexing using very large and very small bounds
-// @tags: [
-//   sbe_incompatible,
-// ]
 
 load("jstests/libs/geo_near_random.js");
 

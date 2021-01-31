@@ -2,7 +2,6 @@
  * Tests that running mapReduce with explain behaves as expected.
  * @tags: [
  *   incompatible_with_embedded,
- *   sbe_incompatible,
  * ]
  */
 (function() {

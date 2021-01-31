@@ -3,7 +3,6 @@
 //   does_not_support_stepdowns,
 //   requires_getmore,
 //   requires_non_retryable_writes,
-//   sbe_incompatible,
 // ]
 
 // Tests whether the geospatial search is stable under btree updates

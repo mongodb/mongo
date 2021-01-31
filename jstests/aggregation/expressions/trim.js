@@ -1,8 +1,5 @@
 /**
  * Basic tests for the $trim, $ltrim, and $rtrim expressions.
- * @tags: [
- *   sbe_incompatible,
- * ]
  */
 (function() {
 "use strict";

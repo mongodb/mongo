@@ -38,7 +38,9 @@ REGISTER_TEST_EXPRESSION(_testApiVersion, ExpressionTestApiVersion::parse);
 ExpressionTestApiVersion::ExpressionTestApiVersion(ExpressionContext* const expCtx,
                                                    bool unstable,
                                                    bool deprecated)
-    : Expression(expCtx), _unstable(unstable), _deprecated(deprecated) {}
+    : Expression(expCtx), _unstable(unstable), _deprecated(deprecated) {
+    expCtx->sbeCompatible = false;
+}
 
 boost::intrusive_ptr<Expression> ExpressionTestApiVersion::parse(ExpressionContext* const expCtx,
                                                                  BSONElement expr,

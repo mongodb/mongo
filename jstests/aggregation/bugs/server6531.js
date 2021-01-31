@@ -1,7 +1,4 @@
 // SERVER-6531 support $within in $match aggregation operations
-// @tags: [
-//   sbe_incompatible,
-// ]
 
 c = db.s6531;
 c.drop();

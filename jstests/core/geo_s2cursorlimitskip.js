@@ -9,7 +9,6 @@
 //   requires_capped,
 //   requires_getmore,
 //   requires_profiling,
-//   sbe_incompatible,
 // ]
 
 var testDB = db.getSiblingDB("geo_s2cursorlimitskip");

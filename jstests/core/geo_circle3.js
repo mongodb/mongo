@@ -1,7 +1,4 @@
 // SERVER-848 and SERVER-1191.
-// @tags: [
-//   sbe_incompatible,
-// ]
 db.places.drop();
 
 n = 0;

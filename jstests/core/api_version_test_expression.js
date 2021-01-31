@@ -7,7 +7,6 @@
  *   assumes_against_mongod_not_mongos,
  *   assumes_unsharded_collection,
  *   requires_fcv_47,
- *   sbe_incompatible,
  *   uses_api_parameters,
  * ]
  */

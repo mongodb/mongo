@@ -1,7 +1,4 @@
 // Basic testing to confirm that the $match stage handles $expr correctly.
-// @tags: [
-//   sbe_incompatible,
-// ]
 (function() {
 "use strict";
 

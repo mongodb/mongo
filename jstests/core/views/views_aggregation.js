@@ -6,7 +6,6 @@
  *   requires_find_command,
  *   requires_getmore,
  *   requires_non_retryable_commands,
- *   sbe_incompatible,
  *   uses_$out,
  * ]
  */

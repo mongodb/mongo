@@ -2,11 +2,11 @@
 // for target collection of $lookup and $graphLookup.
 // @tags: [
 //   assumes_unsharded_collection,
-//   sbe_incompatible,
 // ]
 
 // In MongoDB 3.4, $graphLookup was introduced. In this file, we test the error cases.
-load("jstests/aggregation/extras/utils.js");  // For "assertErrorCode".
+load("jstests/aggregation/extras/utils.js");        // For "assertErrorCode".
+load("jstests/libs/sbe_assert_error_override.js");  // Override error-code-checking APIs.
 
 (function() {
 "use strict";

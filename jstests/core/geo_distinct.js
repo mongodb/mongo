@@ -4,7 +4,6 @@
 //
 // @tags: [
 //   requires_fastcount,
-//   sbe_incompatible,
 // ]
 
 (function() {

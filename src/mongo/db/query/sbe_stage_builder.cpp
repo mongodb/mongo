@@ -1403,8 +1403,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             {STAGE_SORT_MERGE, &SlotBasedStageBuilder::buildSortMerge},
             {STAGE_SHARDING_FILTER, &SlotBasedStageBuilder::buildShardFilter}};
 
-    uassert(4822884,
-            str::stream() << "Can't build exec tree for node: " << root->toString(),
+    tassert(4822884,
+            str::stream() << "Unsupported QSN in SBE stage builder: " << root->toString(),
             kStageBuilders.find(root->getType()) != kStageBuilders.end());
 
     // If this plan is for a tailable cursor scan, and we're not already in the process of building

@@ -5,7 +5,6 @@
 // @tags: [
 //   assumes_balancer_off,
 //   operations_longer_than_stepdown_interval_in_txns,
-//   sbe_incompatible,
 // ]
 (function() {
 "use strict";

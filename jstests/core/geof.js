@@ -2,9 +2,6 @@ t = db.geof;
 t.drop();
 
 // corners (dist ~0.98)
-// @tags: [
-//   sbe_incompatible,
-// ]
 t.insert({loc: [0.7, 0.7]});
 t.insert({loc: [0.7, -0.7]});
 t.insert({loc: [-0.7, 0.7]});
