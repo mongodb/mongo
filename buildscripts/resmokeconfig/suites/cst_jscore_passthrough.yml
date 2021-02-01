@@ -223,6 +223,7 @@ selector:
   - jstests/core/hint1.js
   - jstests/core/id1.js
   - jstests/core/idhack.js
+  - jstests/core/id_sbe.js
   - jstests/core/in.js
   - jstests/core/in2.js
   - jstests/core/in3.js
@@ -503,6 +504,7 @@ selector:
   - jstests/core/fts_trailing_fields.js
   - jstests/core/geo_2d_trailing_fields.js
   - jstests/core/idhack.js
+  - jstests/core/id_sbe.js
   - jstests/core/in7.js
   - jstests/core/index13.js
   - jstests/core/index_check2.js

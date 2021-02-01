@@ -917,9 +917,8 @@ protected:
     std::unique_ptr<SlotBasedPrepareExecutionResult> buildIdHackPlan(
         const IndexDescriptor* descriptor, QueryPlannerParams* plannerParams) final {
         uassert(4822862,
-                "IDHack plan is not supported by SBE yet",
-                !(_cq->metadataDeps()[DocumentMetadataFields::kSortKey] ||
-                  _cq->getQueryRequest().returnKey() || _cq->getProj()));
+                "Queries that require sort key metadata are not supported by SBE yet",
+                !_cq->metadataDeps()[DocumentMetadataFields::kSortKey]);
 
         // Fall back to normal planning.
         return nullptr;
