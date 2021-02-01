@@ -39,39 +39,33 @@
 
 namespace mongo {
 
-void handleHelloAuth(OperationContext* opCtx, BSONObj cmdObj, BSONObjBuilder* result) {
-    auto ssme = cmdObj[auth::kSaslSupportedMechanisms];
-    if (ssme.type() == BSONType::String) {
+void handleHelloAuth(OperationContext* opCtx, const HelloCommand& cmd, BSONObjBuilder* result) {
+    // saslSupportedMechs: UserName -> List[String]
+    if (auto userName = cmd.getSaslSupportedMechs()) {
         AuthenticationSession::doStep(
             opCtx, AuthenticationSession::StepType::kSaslSupportedMechanisms, [&](auto session) {
-                UserName userName = uassertStatusOK(UserName::parse(ssme.String()));
-
                 auto& saslMechanismRegistry =
                     SASLServerMechanismRegistry::get(opCtx->getServiceContext());
-                saslMechanismRegistry.advertiseMechanismNamesForUser(opCtx, userName, result);
+                saslMechanismRegistry.advertiseMechanismNamesForUser(opCtx, *userName, result);
             });
     }
 
-    auto sae = cmdObj[auth::kSpeculativeAuthenticate];
-    if (sae.eoo()) {
+    // speculativeAuthenticate: SaslStart -> SaslReply or Authenticate -> AuthenticateReply
+    auto specAuth = cmd.getSpeculativeAuthenticate();
+    if (!specAuth) {
         return;
     }
 
     uassert(ErrorCodes::BadValue,
-            str::stream() << "hello." << auth::kSpeculativeAuthenticate << " must be an Object",
-            sae.type() == Object);
-    auto specAuth = sae.Obj();
-
-    uassert(ErrorCodes::BadValue,
             str::stream() << "hello." << auth::kSpeculativeAuthenticate
                           << " must be a non-empty Object",
-            !specAuth.isEmpty());
-    auto specCmd = specAuth.firstElementFieldNameStringData();
+            !specAuth->isEmpty());
+    auto specCmd = specAuth->firstElementFieldNameStringData();
 
     if (specCmd == saslStartCommandName) {
-        doSpeculativeSaslStart(opCtx, specAuth, result);
+        doSpeculativeSaslStart(opCtx, *specAuth, result);
     } else if (specCmd == auth::kAuthenticateCommand) {
-        doSpeculativeAuthenticate(opCtx, specAuth, result);
+        doSpeculativeAuthenticate(opCtx, *specAuth, result);
     } else {
         uasserted(51769,
                   str::stream() << "hello." << auth::kSpeculativeAuthenticate

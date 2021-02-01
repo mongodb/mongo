@@ -39,6 +39,7 @@
 #include "mongo/client/dbclient_connection.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/server_status.h"
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
@@ -50,6 +51,7 @@
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/hello_auth.h"
+#include "mongo/db/repl/hello_gen.h"
 #include "mongo/db/repl/hello_response.h"
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/repl/replication_auth.h"
@@ -101,7 +103,7 @@ TopologyVersion appendReplicationInfo(OperationContext* opCtx,
                                       bool appendReplicationProcess,
                                       bool useLegacyResponseFields,
                                       boost::optional<TopologyVersion> clientTopologyVersion,
-                                      boost::optional<long long> maxAwaitTimeMS) {
+                                      boost::optional<std::int64_t> maxAwaitTimeMS) {
     TopologyVersion topologyVersion;
     ReplicationCoordinator* replCoord = ReplicationCoordinator::get(opCtx);
     if (replCoord->getSettings().usingReplSets()) {
@@ -237,11 +239,14 @@ public:
     }
 } oplogInfoServerStatus;
 
+const std::string kAutomationServiceDescriptorFieldName =
+    HelloCommandReply::kAutomationServiceDescriptorFieldName.toString();
+
 class CmdHello : public BasicCommandWithReplyBuilderInterface {
 public:
     CmdHello() : CmdHello(kHelloString, {}) {}
 
-    const std::set<std::string>& apiVersions() const {
+    const std::set<std::string>& apiVersions() const final {
         return kApiVersions1;
     }
 
@@ -271,13 +276,15 @@ public:
                              const BSONObj& cmdObj,
                              rpc::ReplyBuilderInterface* replyBuilder) final {
         CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
+        const bool apiStrict = APIParameters::get(opCtx).getAPIStrict().value_or(false);
+        auto cmd = HelloCommand::parse({"hello", apiStrict}, cmdObj);
 
         waitInHello.pauseWhileSet(opCtx);
 
         /* currently request to arbiter is (somewhat arbitrarily) an ismaster request that is not
            authenticated.
         */
-        if (cmdObj["forShell"].trueValue()) {
+        if (cmd.getForShell()) {
             LastError::get(opCtx->getClient()).disable();
         }
 
@@ -285,8 +292,7 @@ public:
         transport::Session::TagMask sessionTagsToUnset = 0;
 
         // Tag connections to avoid closing them on stepdown.
-        auto hangUpElement = cmdObj["hangUpOnStepDown"];
-        if (!hangUpElement.eoo() && !hangUpElement.trueValue()) {
+        if (!cmd.getHangUpOnStepDown()) {
             sessionTagsToSet |= transport::Session::kKeepOpen;
         }
 
@@ -299,51 +305,18 @@ public:
 
         // Parse the optional 'internalClient' field. This is provided by incoming connections from
         // mongod and mongos.
-        auto internalClientElement = cmdObj["internalClient"];
-        if (internalClientElement) {
+        if (auto internalClient = cmd.getInternalClient()) {
             sessionTagsToSet |= transport::Session::kInternalClient;
             sessionTagsToUnset |= transport::Session::kExternalClientKeepOpen;
 
-            uassert(ErrorCodes::TypeMismatch,
-                    str::stream() << "'internalClient' must be of type Object, but was of type "
-                                  << typeName(internalClientElement.type()),
-                    internalClientElement.type() == BSONType::Object);
-
-            bool foundMaxWireVersion = false;
-            for (auto&& elem : internalClientElement.Obj()) {
-                auto fieldName = elem.fieldNameStringData();
-                if (fieldName == "minWireVersion") {
-                    // We do not currently use 'internalClient.minWireVersion'.
-                    continue;
-                } else if (fieldName == "maxWireVersion") {
-                    foundMaxWireVersion = true;
-
-                    uassert(ErrorCodes::TypeMismatch,
-                            str::stream() << "'maxWireVersion' field of 'internalClient' must be "
-                                             "of type int, but was of type "
-                                          << typeName(elem.type()),
-                            elem.type() == BSONType::NumberInt);
-
-                    // All incoming connections from mongod/mongos of earlier versions should be
-                    // closed if the featureCompatibilityVersion is bumped to 3.6.
-                    if (elem.numberInt() >=
-                        WireSpec::instance().get()->incomingInternalClient.maxWireVersion) {
-                        sessionTagsToSet |=
-                            transport::Session::kLatestVersionInternalClientKeepOpen;
-                    } else {
-                        sessionTagsToUnset |=
-                            transport::Session::kLatestVersionInternalClientKeepOpen;
-                    }
-                } else {
-                    uasserted(ErrorCodes::BadValue,
-                              str::stream() << "Unrecognized field of 'internalClient': '"
-                                            << fieldName << "'");
-                }
+            // All incoming connections from mongod/mongos of earlier versions should be
+            // closed if the featureCompatibilityVersion is bumped to 3.6.
+            if (internalClient->getMaxWireVersion() >=
+                WireSpec::instance().get()->incomingInternalClient.maxWireVersion) {
+                sessionTagsToSet |= transport::Session::kLatestVersionInternalClientKeepOpen;
+            } else {
+                sessionTagsToUnset |= transport::Session::kLatestVersionInternalClientKeepOpen;
             }
-
-            uassert(ErrorCodes::BadValue,
-                    "Missing required field 'maxWireVersion' of 'internalClient'",
-                    foundMaxWireVersion);
         } else {
             sessionTagsToUnset |= (transport::Session::kInternalClient |
                                    transport::Session::kLatestVersionInternalClientKeepOpen);
@@ -369,53 +342,36 @@ public:
 
         // If a client is following the awaitable hello protocol, maxAwaitTimeMS should be
         // present if and only if topologyVersion is present in the request.
-        auto topologyVersionElement = cmdObj["topologyVersion"];
-        auto maxAwaitTimeMSField = cmdObj["maxAwaitTimeMS"];
+        auto clientTopologyVersion = cmd.getTopologyVersion();
+        auto maxAwaitTimeMS = cmd.getMaxAwaitTimeMS();
         auto curOp = CurOp::get(opCtx);
-
-        // The awaitable field is optional, but if it exists, it requires both other fields.
-        // Note that the awaitable field only exists to make filtering out these operations
-        // via currentOp queries easier and is not otherwise explicitly used.
-        {
-            bool awaitable = true;
-            Status status = bsonExtractBooleanField(cmdObj, "awaitable", &awaitable);
-            if (status.isOK() && (!topologyVersionElement || !maxAwaitTimeMSField)) {
-                uassert(5135800,
-                        "A request marked awaitable must contain both 'topologyVersion' and "
-                        "'maxAwaitTimeMS'",
-                        !awaitable);
-            }
-        }
-
-        boost::optional<TopologyVersion> clientTopologyVersion;
-        boost::optional<long long> maxAwaitTimeMS;
         boost::optional<ScopeGuard<std::function<void()>>> timerGuard;
-        if (topologyVersionElement && maxAwaitTimeMSField) {
-            clientTopologyVersion = TopologyVersion::parse(IDLParserErrorContext("TopologyVersion"),
-                                                           topologyVersionElement.Obj());
+        if (clientTopologyVersion && maxAwaitTimeMS) {
             uassert(31372,
                     "topologyVersion must have a non-negative counter",
                     clientTopologyVersion->getCounter() >= 0);
 
-            {
-                long long parsedMaxAwaitTimeMS;
-                uassertStatusOK(
-                    bsonExtractIntegerField(cmdObj, "maxAwaitTimeMS", &parsedMaxAwaitTimeMS));
-                maxAwaitTimeMS = parsedMaxAwaitTimeMS;
-            }
-
-            uassert(31373, "maxAwaitTimeMS must be a non-negative integer", *maxAwaitTimeMS >= 0);
-
-            LOGV2_DEBUG(23904, 3, "Using maxAwaitTimeMS for awaitable hello protocol.");
+            LOGV2_DEBUG(23904,
+                        3,
+                        "Using maxAwaitTimeMS for awaitable hello protocol",
+                        "maxAwaitTimeMS"_attr = maxAwaitTimeMS.get());
 
             curOp->pauseTimer();
             timerGuard.emplace([curOp]() { curOp->resumeTimer(); });
         } else {
+            // The awaitable field is optional, but if it exists, it requires both other fields.
+            // Note that the awaitable field only exists to make filtering out these operations
+            // via currentOp queries easier and is not otherwise explicitly used.
+            uassert(5135800,
+                    "A request marked awaitable must contain both 'topologyVersion' and "
+                    "'maxAwaitTimeMS'",
+                    !cmd.getAwaitable() || !cmd.getAwaitable());
+
             uassert(31368,
-                    (topologyVersionElement
+                    (clientTopologyVersion
                          ? "A request with a 'topologyVersion' must include 'maxAwaitTimeMS'"
                          : "A request with 'maxAwaitTimeMS' must include a 'topologyVersion'"),
-                    !topologyVersionElement && !maxAwaitTimeMSField);
+                    !clientTopologyVersion && !maxAwaitTimeMS);
         }
 
         auto result = replyBuilder->getBodyBuilder();
@@ -424,21 +380,18 @@ public:
         // handshake for an incoming connection if the client supports the hello command. Clients
         // that specify 'helloOk' do not rely on "not master" error message parsing, which means
         // that we can safely return "not primary" error messages instead.
-        bool helloOk = client->supportsHello();
-        Status status = bsonExtractBooleanField(cmdObj, "helloOk", &helloOk);
-        if (status.isOK()) {
+        if (auto helloOk = cmd.getHelloOk()) {
             // If the hello request contains a "helloOk" field, set _supportsHello on the Client
             // to the value.
-            client->setSupportsHello(helloOk);
+            client->setSupportsHello(*helloOk);
             // Attach helloOk: true to the response so that the client knows the server supports
             // the hello command.
-            result.append("helloOk", true);
-        } else if (status.code() != ErrorCodes::NoSuchKey) {
-            uassertStatusOK(status);
+            result.append(HelloCommandReply::kHelloOkFieldName, true);
         }
 
         if (MONGO_unlikely(appendHelloOkToHelloResponse.shouldFail())) {
-            result.append("clientSupportsHello", client->supportsHello());
+            result.append(HelloCommandReply::kClientSupportsHelloFieldName,
+                          client->supportsHello());
         }
 
         auto currentTopologyVersion = appendReplicationInfo(
@@ -447,35 +400,44 @@ public:
         timerGuard.reset();  // Resume curOp timer.
 
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-            const int configServerModeNumber = 2;
-            result.append("configsvr", configServerModeNumber);
+            constexpr int kConfigServerModeNumber = 2;
+            result.append(HelloCommandReply::kConfigsvrFieldName, kConfigServerModeNumber);
         }
 
-        result.appendNumber("maxBsonObjectSize", BSONObjMaxUserSize);
-        result.appendNumber("maxMessageSizeBytes", MaxMessageSizeBytes);
-        result.appendNumber("maxWriteBatchSize", write_ops::kMaxWriteBatchSize);
-        result.appendDate("localTime", jsTime());
-        result.append("logicalSessionTimeoutMinutes", localLogicalSessionTimeoutMinutes);
-        result.appendNumber("connectionId", opCtx->getClient()->getConnectionId());
+        result.appendNumber(HelloCommandReply::kMaxBsonObjectSizeFieldName, BSONObjMaxUserSize);
+        result.appendNumber(HelloCommandReply::kMaxMessageSizeBytesFieldName, MaxMessageSizeBytes);
+        result.appendNumber(HelloCommandReply::kMaxWriteBatchSizeFieldName,
+                            write_ops::kMaxWriteBatchSize);
+        result.appendDate(HelloCommandReply::kLocalTimeFieldName, jsTime());
+        result.append(HelloCommandReply::kLogicalSessionTimeoutMinutesFieldName,
+                      localLogicalSessionTimeoutMinutes);
+        result.appendNumber(HelloCommandReply::kConnectionIdFieldName,
+                            opCtx->getClient()->getConnectionId());
 
-        if (auto wireSpec = WireSpec::instance().get(); internalClientElement) {
-            result.append("minWireVersion", wireSpec->incomingInternalClient.minWireVersion);
-            result.append("maxWireVersion", wireSpec->incomingInternalClient.maxWireVersion);
+
+        if (auto wireSpec = WireSpec::instance().get(); cmd.getInternalClient()) {
+            result.append(HelloCommandReply::kMinWireVersionFieldName,
+                          wireSpec->incomingInternalClient.minWireVersion);
+            result.append(HelloCommandReply::kMaxWireVersionFieldName,
+                          wireSpec->incomingInternalClient.maxWireVersion);
         } else {
-            result.append("minWireVersion", wireSpec->incomingExternalClient.minWireVersion);
-            result.append("maxWireVersion", wireSpec->incomingExternalClient.maxWireVersion);
+            result.append(HelloCommandReply::kMinWireVersionFieldName,
+                          wireSpec->incomingExternalClient.minWireVersion);
+            result.append(HelloCommandReply::kMaxWireVersionFieldName,
+                          wireSpec->incomingExternalClient.maxWireVersion);
         }
 
-        result.append("readOnly", storageGlobalParams.readOnly);
+        result.append(HelloCommandReply::kReadOnlyFieldName, storageGlobalParams.readOnly);
 
         const auto& params = ServerParameterSet::getGlobal()->getMap();
-        if (auto iter = params.find("automationServiceDescriptor");
-            iter != params.end() && iter->second)
-            iter->second->append(opCtx, result, "automationServiceDescriptor");
+        if (auto iter = params.find(kAutomationServiceDescriptorFieldName);
+            iter != params.end() && iter->second) {
+            iter->second->append(opCtx, result, kAutomationServiceDescriptorFieldName);
+        }
 
         if (opCtx->getClient()->session()) {
             MessageCompressorManager::forSession(opCtx->getClient()->session())
-                .serverNegotiate(cmdObj, &result);
+                .serverNegotiate(cmd.getCompression(), &result);
         }
 
         if (opCtx->isExhaust()) {
@@ -483,7 +445,7 @@ public:
 
             uassert(51756,
                     "An isMaster or hello request with exhaust must specify 'maxAwaitTimeMS'",
-                    maxAwaitTimeMSField);
+                    maxAwaitTimeMS);
             invariant(clientTopologyVersion);
 
             InExhaustHello::get(opCtx->getClient()->session().get())
@@ -495,30 +457,45 @@ public:
                 // command parameters should be reused as the next BSONObj command parameters.
                 replyBuilder->setNextInvocation(boost::none);
             } else {
-                BSONObjBuilder nextInvocationBuilder;
-                for (auto&& elt : cmdObj) {
-                    if (elt.fieldNameStringData() == "topologyVersion"_sd) {
-                        BSONObjBuilder topologyVersionBuilder(
-                            nextInvocationBuilder.subobjStart("topologyVersion"));
-                        currentTopologyVersion.serialize(&topologyVersionBuilder);
+                BSONObjBuilder niBuilder;
+                for (const auto& elem : cmdObj) {
+                    if (elem.fieldNameStringData() == HelloCommand::kTopologyVersionFieldName) {
+                        BSONObjBuilder tvBuilder(
+                            niBuilder.subobjStart(HelloCommand::kTopologyVersionFieldName));
+                        currentTopologyVersion.serialize(&tvBuilder);
                     } else {
-                        nextInvocationBuilder.append(elt);
+                        niBuilder.append(elem);
                     }
                 }
-                replyBuilder->setNextInvocation(nextInvocationBuilder.obj());
+                replyBuilder->setNextInvocation(niBuilder.obj());
             }
         }
 
-        handleHelloAuth(opCtx, cmdObj, &result);
+        handleHelloAuth(opCtx, cmd, &result);
 
+        if (getTestCommandsEnabled()) {
+            validateResult(&result);
+        }
         return true;
+    }
+
+    void validateResult(BSONObjBuilder* result) {
+        auto ret = result->asTempObj();
+        if (ret[ErrorReply::kErrmsgFieldName].eoo()) {
+            // Nominal success case, parse the object as-is.
+            HelloCommandReply::parse({"hello.reply"}, ret);
+        } else {
+            // Something went wrong, still try to parse, but accept a few ignorable fields.
+            StringDataSet ignorable({ErrorReply::kCodeFieldName, ErrorReply::kErrmsgFieldName});
+            HelloCommandReply::parse({"hello.reply"}, ret.removeFields(ignorable));
+        }
     }
 
 protected:
     CmdHello(const StringData cmdName, const std::initializer_list<StringData>& alias)
         : BasicCommandWithReplyBuilderInterface(cmdName, alias) {}
 
-    virtual bool useLegacyResponseFields() {
+    virtual bool useLegacyResponseFields() const {
         return false;
     }
 
@@ -528,7 +505,7 @@ class CmdIsMaster : public CmdHello {
 public:
     CmdIsMaster() : CmdHello(kCamelCaseIsMasterString, {kLowerCaseIsMasterString}) {}
 
-    std::string help() const override {
+    std::string help() const final {
         return "Check if this server is primary for a replica set\n"
                "{ isMaster : 1 }";
     }
@@ -537,7 +514,7 @@ protected:
     // Parse the command name, which should be one of the following: hello, isMaster, or
     // ismaster. If the command is "hello", we must attach an "isWritablePrimary" response field
     // instead of "ismaster" and "secondaryDelaySecs" response field instead of "slaveDelay".
-    bool useLegacyResponseFields() override {
+    bool useLegacyResponseFields() const final {
         return true;
     }
 

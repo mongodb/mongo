@@ -8,6 +8,9 @@
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/parallel_shell_helpers.js");
 
+// ErrorCodes
+const kIDLParserComparisonError = 51024;
+
 // runTest takes in the hello command or its aliases, isMaster and ismaster.
 function runTest(db, cmd, logFailpoint) {
     // Check the command response contains a topologyVersion even if maxAwaitTimeMS and
@@ -110,7 +113,7 @@ function runTest(db, cmd, logFailpoint) {
     // Check that passing a topologyVersion not of type object fails.
     assert.commandFailedWithCode(
         db.runCommand({[cmd]: 1, topologyVersion: "topology_version_string", maxAwaitTimeMS: 0}),
-        10065);
+        ErrorCodes.TypeMismatch);
 
     // Check that a topologyVersion with an invalid processId and valid counter fails.
     assert.commandFailedWithCode(db.runCommand({
@@ -188,7 +191,7 @@ function runTest(db, cmd, logFailpoint) {
         topologyVersion: topologyVersionField,
         maxAwaitTimeMS: -1,
     }),
-                                 [31373, 51759]);
+                                 [31373, 51759, kIDLParserComparisonError]);
 
     // Check that the command fails if the awaitable flag is present but either the topologyVersion,
     // the maxAwaitTimeMS, or both are missing.

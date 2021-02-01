@@ -256,24 +256,23 @@ void MessageCompressorManager::clientFinish(const BSONObj& input) {
     }
 }
 
-void MessageCompressorManager::serverNegotiate(const BSONObj& input, BSONObjBuilder* output) {
+void MessageCompressorManager::serverNegotiate(
+    const boost::optional<std::vector<StringData>>& clientCompressors, BSONObjBuilder* result) {
     LOGV2_DEBUG(22934, 3, "Starting server-side compression negotiation");
 
-    auto elem = input.getField("compression");
-    // If the "compression" field is missing, then this isMaster request is requesting information
-    // rather than doing a negotiation
-    if (elem.eoo()) {
+    // No advertised compressions, just asking for the last negotiated result.
+    if (!clientCompressors) {
         // If we haven't negotiated any compressors yet, then don't append anything to the
         // output - this makes this compatible with older versions of MongoDB that don't
         // support compression.
-        if (_negotiated.size() > 0) {
-            BSONArrayBuilder sub(output->subarrayStart("compression"));
-            for (const auto& algo : _negotiated) {
-                sub.append(algo->getName());
-            }
-            sub.doneFast();
-        } else {
+        std::vector<std::string> ret;
+        if (_negotiated.empty()) {
             LOGV2_DEBUG(22935, 3, "Compression negotiation not requested by client");
+        } else {
+            BSONArrayBuilder sub(result->subarrayStart("compression"));
+            for (const auto& algo : _negotiated) {
+                sub << algo->getName();
+            }
         }
         return;
     }
@@ -283,16 +282,13 @@ void MessageCompressorManager::serverNegotiate(const BSONObj& input, BSONObjBuil
     _negotiated.clear();
 
     // First we go through all the compressor names that the client has requested support for
-    BSONObj theirObj = elem.Obj();
-
-    if (!theirObj.nFields()) {
+    if (clientCompressors->empty()) {
         LOGV2_DEBUG(22936, 3, "No compressors provided");
         return;
     }
 
-    for (const auto& elem : theirObj) {
+    for (const auto& curName : *clientCompressors) {
         MessageCompressorBase* cur;
-        auto curName = elem.checkAndGetStringData();
         // If the MessageCompressorRegistry knows about a compressor with that name, then it is
         // valid and we add it to our list of negotiated compressors.
         if ((cur = _registry->getCompressor(curName))) {
@@ -313,14 +309,13 @@ void MessageCompressorManager::serverNegotiate(const BSONObj& input, BSONObjBuil
 
     // If the number of compressors that were eventually negotiated is greater than 0, then
     // we should send that back to the client.
-    if (_negotiated.size() > 0) {
-        BSONArrayBuilder sub(output->subarrayStart("compression"));
-        for (auto algo : _negotiated) {
-            sub.append(algo->getName());
-        }
-        sub.doneFast();
-    } else {
+    if (_negotiated.empty()) {
         LOGV2_DEBUG(22939, 3, "Could not agree on compressor to use");
+    } else {
+        BSONArrayBuilder sub(result->subarrayStart("compression"));
+        for (const auto& algo : _negotiated) {
+            sub << algo->getName();
+        }
     }
 }
 

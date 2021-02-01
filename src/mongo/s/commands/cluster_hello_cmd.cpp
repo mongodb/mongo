@@ -34,11 +34,13 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/repl/hello_auth.h"
+#include "mongo/db/repl/hello_gen.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/metadata/client_metadata.h"
@@ -60,21 +62,22 @@ namespace {
 constexpr auto kHelloString = "hello"_sd;
 constexpr auto kCamelCaseIsMasterString = "isMaster"_sd;
 constexpr auto kLowerCaseIsMasterString = "ismaster"_sd;
-
+const std::string kAutomationServiceDescriptorFieldName =
+    HelloCommandReply::kAutomationServiceDescriptorFieldName.toString();
 
 class CmdHello : public BasicCommandWithReplyBuilderInterface {
 public:
     CmdHello() : CmdHello(kHelloString, {}) {}
 
-    const std::set<std::string>& apiVersions() const {
+    const std::set<std::string>& apiVersions() const final {
         return kApiVersions1;
     }
 
-    bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool supportsWriteConcern(const BSONObj& cmd) const final {
         return false;
     }
 
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const final {
         return AllowedOnSecondary::kAlways;
     }
 
@@ -84,11 +87,11 @@ public:
 
     void addRequiredPrivileges(const std::string& dbname,
                                const BSONObj& cmdObj,
-                               std::vector<Privilege>* out) const override {
+                               std::vector<Privilege>* out) const final {
         // No auth required
     }
 
-    bool requiresAuth() const override {
+    bool requiresAuth() const final {
         return false;
     }
 
@@ -97,6 +100,8 @@ public:
                              const BSONObj& cmdObj,
                              rpc::ReplyBuilderInterface* replyBuilder) final {
         CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
+        const bool apiStrict = APIParameters::get(opCtx).getAPIStrict().value_or(false);
+        auto cmd = HelloCommand::parse({"hello", apiStrict}, cmdObj);
 
         waitInHello.pauseWhileSet(opCtx);
 
@@ -105,51 +110,38 @@ public:
 
         // If a client is following the awaitable hello protocol, maxAwaitTimeMS should be
         // present if and only if topologyVersion is present in the request.
-        auto topologyVersionElement = cmdObj["topologyVersion"];
-        auto maxAwaitTimeMSField = cmdObj["maxAwaitTimeMS"];
+        auto clientTopologyVersion = cmd.getTopologyVersion();
+        auto maxAwaitTimeMS = cmd.getMaxAwaitTimeMS();
         auto curOp = CurOp::get(opCtx);
-
-        // The awaitable field is optional, but if it exists, it requires both other fields.
-        // Note that the awaitable field only exists to make filtering out these operations
-        // via currentOp queries easier and is not otherwise explicitly used.
-        {
-            bool awaitable = true;
-            Status status = bsonExtractBooleanField(cmdObj, "awaitable", &awaitable);
-            if (status.isOK() && (!topologyVersionElement || !maxAwaitTimeMSField)) {
-                uassert(5135801,
-                        "A request marked awaitable must contain both 'topologyVersion' and "
-                        "'maxAwaitTimeMS'",
-                        !awaitable);
-            }
-        }
-
-        boost::optional<TopologyVersion> clientTopologyVersion;
         boost::optional<Date_t> deadline;
         boost::optional<ScopeGuard<std::function<void()>>> timerGuard;
-        if (topologyVersionElement && maxAwaitTimeMSField) {
-            clientTopologyVersion = TopologyVersion::parse(IDLParserErrorContext("TopologyVersion"),
-                                                           topologyVersionElement.Obj());
+        if (clientTopologyVersion && maxAwaitTimeMS) {
             uassert(51758,
                     "topologyVersion must have a non-negative counter",
                     clientTopologyVersion->getCounter() >= 0);
 
-            long long maxAwaitTimeMS;
-            uassertStatusOK(bsonExtractIntegerField(cmdObj, "maxAwaitTimeMS", &maxAwaitTimeMS));
-
-            uassert(51759, "maxAwaitTimeMS must be a non-negative integer", maxAwaitTimeMS >= 0);
+            uassert(51759, "maxAwaitTimeMS must be a non-negative integer", *maxAwaitTimeMS >= 0);
 
             deadline = opCtx->getServiceContext()->getPreciseClockSource()->now() +
-                Milliseconds(maxAwaitTimeMS);
+                Milliseconds(*maxAwaitTimeMS);
 
             LOGV2_DEBUG(23871, 3, "Using maxAwaitTimeMS for awaitable hello protocol.");
             curOp->pauseTimer();
             timerGuard.emplace([curOp]() { curOp->resumeTimer(); });
         } else {
+            // The awaitable field is optional, but if it exists, it requires both other fields.
+            // Note that the awaitable field only exists to make filtering out these operations
+            // via currentOp queries easier and is not otherwise explicitly used.
+            uassert(5135801,
+                    "A request marked awaitable must contain both 'topologyVersion' and "
+                    "'maxAwaitTimeMS'",
+                    !cmd.getAwaitable() || !cmd.getAwaitable().get());
+
             uassert(51760,
-                    (topologyVersionElement
+                    (clientTopologyVersion
                          ? "A request with a 'topologyVersion' must include 'maxAwaitTimeMS'"
                          : "A request with 'maxAwaitTimeMS' must include a 'topologyVersion'"),
-                    !topologyVersionElement && !maxAwaitTimeMSField);
+                    !clientTopologyVersion && !maxAwaitTimeMS);
         }
 
         auto result = replyBuilder->getBodyBuilder();
@@ -166,52 +158,54 @@ public:
         // Try to parse the optional 'helloOk' field. On mongos, if we see this field, we will
         // respond with helloOk: true so the client knows that it can continue to send the hello
         // command to mongos.
-        bool helloOk;
-        Status status = bsonExtractBooleanField(cmdObj, "helloOk", &helloOk);
-        if (status.isOK()) {
+        if (auto helloOk = cmd.getHelloOk()) {
             // If the hello request contains a "helloOk" field, set _supportsHello on the Client
             // to the value.
-            client->setSupportsHello(helloOk);
+            client->setSupportsHello(*helloOk);
             // Attach helloOk: true to the response so that the client knows the server supports
             // the hello command.
             result.append("helloOk", true);
-        } else if (status.code() != ErrorCodes::NoSuchKey) {
-            uassertStatusOK(status);
         }
 
         if (MONGO_unlikely(appendHelloOkToHelloResponse.shouldFail())) {
             result.append("clientSupportsHello", client->supportsHello());
         }
 
-        result.appendNumber("maxBsonObjectSize", BSONObjMaxUserSize);
-        result.appendNumber("maxMessageSizeBytes", MaxMessageSizeBytes);
-        result.appendNumber("maxWriteBatchSize", write_ops::kMaxWriteBatchSize);
-        result.appendDate("localTime", jsTime());
-        result.append("logicalSessionTimeoutMinutes", localLogicalSessionTimeoutMinutes);
-        result.appendNumber("connectionId", opCtx->getClient()->getConnectionId());
+        result.appendNumber(HelloCommandReply::kMaxBsonObjectSizeFieldName, BSONObjMaxUserSize);
+        result.appendNumber(HelloCommandReply::kMaxMessageSizeBytesFieldName, MaxMessageSizeBytes);
+        result.appendNumber(HelloCommandReply::kMaxWriteBatchSizeFieldName,
+                            write_ops::kMaxWriteBatchSize);
+        result.appendDate(HelloCommandReply::kLocalTimeFieldName, jsTime());
+        result.append(HelloCommandReply::kLogicalSessionTimeoutMinutesFieldName,
+                      localLogicalSessionTimeoutMinutes);
+        result.appendNumber(HelloCommandReply::kConnectionIdFieldName,
+                            opCtx->getClient()->getConnectionId());
 
         // Mongos tries to keep exactly the same version range of the server for which
         // it is compiled.
         auto wireSpec = WireSpec::instance().get();
-        result.append("maxWireVersion", wireSpec->incomingExternalClient.maxWireVersion);
-        result.append("minWireVersion", wireSpec->incomingExternalClient.minWireVersion);
+        result.append(HelloCommandReply::kMaxWireVersionFieldName,
+                      wireSpec->incomingExternalClient.maxWireVersion);
+        result.append(HelloCommandReply::kMinWireVersionFieldName,
+                      wireSpec->incomingExternalClient.minWireVersion);
 
         {
             const auto& serverParams = ServerParameterSet::getGlobal()->getMap();
-            auto iter = serverParams.find("automationServiceDescriptor");
-            if (iter != serverParams.end() && iter->second)
-                iter->second->append(opCtx, result, "automationServiceDescriptor");
+            auto iter = serverParams.find(kAutomationServiceDescriptorFieldName);
+            if (iter != serverParams.end() && iter->second) {
+                iter->second->append(opCtx, result, kAutomationServiceDescriptorFieldName);
+            }
         }
 
         MessageCompressorManager::forSession(opCtx->getClient()->session())
-            .serverNegotiate(cmdObj, &result);
+            .serverNegotiate(cmd.getCompression(), &result);
 
         if (opCtx->isExhaust()) {
             LOGV2_DEBUG(23872, 3, "Using exhaust for hello protocol");
 
             uassert(51763,
                     "A hello/isMaster request with exhaust must specify 'maxAwaitTimeMS'",
-                    maxAwaitTimeMSField);
+                    maxAwaitTimeMS);
             invariant(clientTopologyVersion);
 
             InExhaustHello::get(opCtx->getClient()->session().get())
@@ -224,45 +218,59 @@ public:
                 // command parameters should be reused as the next BSONObj command parameters.
                 replyBuilder->setNextInvocation(boost::none);
             } else {
-                BSONObjBuilder nextInvocationBuilder;
-                for (auto&& elt : cmdObj) {
-                    if (elt.fieldNameStringData() == "topologyVersion"_sd) {
-                        BSONObjBuilder topologyVersionBuilder(
-                            nextInvocationBuilder.subobjStart("topologyVersion"));
-                        currentMongosTopologyVersion.serialize(&topologyVersionBuilder);
+                BSONObjBuilder niBuilder;
+                for (const auto& elem : cmdObj) {
+                    if (elem.fieldNameStringData() == HelloCommand::kTopologyVersionFieldName) {
+                        BSONObjBuilder tvBuilder(
+                            niBuilder.subobjStart(HelloCommand::kTopologyVersionFieldName));
+                        currentMongosTopologyVersion.serialize(&tvBuilder);
                     } else {
-                        nextInvocationBuilder.append(elt);
+                        niBuilder.append(elem);
                     }
                 }
-                replyBuilder->setNextInvocation(nextInvocationBuilder.obj());
+                replyBuilder->setNextInvocation(niBuilder.obj());
             }
         }
 
-        handleHelloAuth(opCtx, cmdObj, &result);
+        handleHelloAuth(opCtx, cmd, &result);
+
+        if (getTestCommandsEnabled()) {
+            validateResult(&result);
+        }
 
         return true;
+    }
+
+    void validateResult(BSONObjBuilder* result) {
+        auto ret = result->asTempObj();
+        if (ret[ErrorReply::kErrmsgFieldName].eoo()) {
+            // Nominal success case, parse the object as-is.
+            HelloCommandReply::parse({"hello.reply"}, ret);
+        } else {
+            // Something went wrong, still try to parse, but accept a few ignorable fields.
+            StringDataSet ignorable({ErrorReply::kCodeFieldName, ErrorReply::kErrmsgFieldName});
+            HelloCommandReply::parse({"hello.reply"}, ret.removeFields(ignorable));
+        }
     }
 
 protected:
     CmdHello(const StringData cmdName, const std::initializer_list<StringData>& alias)
         : BasicCommandWithReplyBuilderInterface(cmdName, alias) {}
 
-    virtual bool useLegacyResponseFields() {
+    virtual bool useLegacyResponseFields() const {
         return false;
     }
 
 } hello;
 
 class CmdIsMaster : public CmdHello {
-
 public:
     CmdIsMaster() : CmdHello(kCamelCaseIsMasterString, {kLowerCaseIsMasterString}) {}
 
 protected:
-    bool useLegacyResponseFields() override {
+    bool useLegacyResponseFields() const final {
         return true;
     }
-
 } isMaster;
 
 }  // namespace

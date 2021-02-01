@@ -1,0 +1,247 @@
+# Copyright (C) 2021-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+
+global:
+    cpp_namespace: "mongo"
+
+imports:
+    - "mongo/db/auth/auth_types.idl"
+    - "mongo/db/repl/replication_types.idl"
+    - "mongo/idl/basic_types.idl"
+    - "mongo/rpc/metadata/client_metadata.idl"
+    - "mongo/rpc/topology_version.idl"
+
+structs:
+    HelloInternalClientField:
+        description: "Specifies min/max wire protocol versions"
+        strict: true
+        fields:
+            minWireVersion:
+                # Currently ignored
+                type: safeInt
+                default: 0
+            maxWireVersion:
+                type: safeInt
+
+    HelloLastWrite:
+        description: "Most recent op/write times for this node"
+        strict: true
+        fields:
+            opTime:
+                type: optime
+                optional: true
+            lastWriteDate:
+                type: date
+                optional: true
+            majorityOpTime:
+                type: optime
+                optional: true
+            majorityWriteDate:
+                type: date
+                optional: true
+
+    HelloCommandReply:
+        description: "Reply to 'hello' command"
+        strict: true
+        fields:
+            helloOk:
+                type: bool
+                default: true
+            clientSupportsHello:
+                type: bool
+                optional: true
+            configsvr:
+                type: safeInt
+                optional: true
+            maxBsonObjectSize:
+                type: safeInt64
+                optional: true
+            maxMessageSizeBytes:
+                type: safeInt64
+                optional: true
+            maxWriteBatchSize:
+                type: safeInt64
+                optional: true
+            localTime:
+                type: date
+                optional: true
+            logicalSessionTimeoutMinutes:
+                type: safeInt
+                optional: true
+            connectionId:
+                type: safeInt64
+                optional: true
+            minWireVersion:
+                type: safeInt
+                optional: true
+            maxWireVersion:
+                type: safeInt
+                optional: true
+            readOnly:
+                type: bool
+                optional: true
+            compression:
+                type: array<string>
+                optional: true
+            automationServiceDescriptor:
+                type: string
+                optional: true
+            saslSupportedMechs:
+                type: array<string>
+                optional: true
+            speculativeAuthenticate:
+                type: object
+                optional: true
+            msg:
+                type: string
+                optional: true
+            ##
+            ## ReplicationInfo
+            ##
+            topologyVersion:
+                type: TopologyVersion
+            ismaster:
+                # Replies will contain 'ismaster' OR 'isWritablePrimary', not both
+                type: bool
+                optional: true
+            isWritablePrimary:
+                type: bool
+                optional: true
+            ##
+            ## Using ReplSets
+            ##
+            hosts:
+                type: array<string>
+                optional: true
+            passives:
+                type: array<string>
+                optional: true
+            arbiters:
+                type: array<string>
+                optional: true
+            setName:
+                type: string
+                optional: true
+            primary:
+                type: string
+                optional: true
+            secondary:
+                type: bool
+                optional: true
+            info:
+                type: string
+                optional: true
+            isreplicaset:
+                type: bool
+                optional: true
+            setVersion:
+                type: safeInt
+                optional: true
+            arbiterOnly:
+                type: bool
+                optional: true
+            passive:
+                type: bool
+                optional: true
+            hidden:
+                type: bool
+                optional: true
+            buildIndexes:
+                type: bool
+                optional: true
+            slaveDelay:
+                # Reply will contain either slaveDelay or secondaryDelaySecs, but not both.
+                type: safeInt64
+                optional: true
+            secondaryDelaySecs:
+                type: safeInt64
+                optional: true
+            tags:
+                type: object
+                optional: true
+            me:
+                type: string
+                optional: true
+            electionId:
+                type: objectid
+                optional: true
+            lastWrite:
+                type: HelloLastWrite
+                optional: true
+
+commands:
+    hello:
+        # Aliases: 'isMaster', 'ismaster'
+        description: "Check if this server is primary for a replica set { hello: 1 }"
+        command_name: hello
+        namespace: ignored
+        cpp_name: HelloCommand
+        api_version: "1"
+        reply_type: HelloCommandReply
+        strict: true
+        fields:
+            awaitable:
+                type: safeBool
+                optional: true
+                unstable: true
+            forShell:
+                type: safeBool
+                default: false
+                unstable: true
+            hostInfo:
+                type: string
+                default: false
+            hangUpOnStepDown:
+                type: safeBool
+                default: true
+            internalClient:
+                type: HelloInternalClientField
+                optional: true
+                unstable: true
+            client:
+                type: ClientMetadata
+                optional: true
+            topologyVersion:
+                type: TopologyVersion
+                optional: true
+            maxAwaitTimeMS:
+                type: safeInt64
+                optional: true
+                validator: { gte: 0 }
+            helloOk:
+                type: safeBool
+                optional: true
+            compression:
+                type: array<string>
+                optional: true
+            saslSupportedMechs:
+                type: UserName
+                optional: true
+            speculativeAuthenticate:
+                type: object
+                optional: true
