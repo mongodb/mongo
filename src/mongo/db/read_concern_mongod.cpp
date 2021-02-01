@@ -34,6 +34,7 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop_failpoint_helpers.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/read_concern.h"
@@ -46,6 +47,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/logv2/log.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/concurrency/notification.h"
 
@@ -149,14 +151,6 @@ Status makeNoopWriteIfNeeded(OperationContext* opCtx, LogicalTime clusterTime) {
                     "Failed noop write because sharding state has not been initialized"};
         }
 
-        auto myShard = isConfig ? Grid::get(opCtx)->shardRegistry()->getConfigShard()
-                                : Grid::get(opCtx)->shardRegistry()->getShard(
-                                      opCtx, ShardingState::get(opCtx)->shardId());
-
-        if (!myShard.isOK()) {
-            return myShard.getStatus();
-        }
-
         if (!remainingAttempts--) {
             std::stringstream ss;
             ss << "Requested clusterTime " << clusterTime.toString()
@@ -174,17 +168,21 @@ Status makeNoopWriteIfNeeded(OperationContext* opCtx, LogicalTime clusterTime) {
                             "attempts: {remainingAttempts}",
                             "clusterTime"_attr = clusterTime.toString(),
                             "remainingAttempts"_attr = remainingAttempts);
-                auto swRes = myShard.getValue()->runCommand(
+
+                auto onRemoteCmdScheduled = [](executor::TaskExecutor::CallbackHandle handle) {};
+                auto onRemoteCmdComplete = [](executor::TaskExecutor::CallbackHandle handle) {};
+                auto appendOplogNoteResponse = replCoord->runCmdOnPrimaryAndAwaitResponse(
                     opCtx,
-                    ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                    "admin",
+                    NamespaceString::kAdminDb.toString(),
                     BSON("appendOplogNote"
                          << 1 << "maxClusterTime" << clusterTime.asTimestamp() << "data"
                          << BSON("noop write for afterClusterTime read concern" << 1)
                          << WriteConcernOptions::kWriteConcernField
                          << WriteConcernOptions::kImplicitDefault),
-                    Shard::RetryPolicy::kIdempotent);
-                status = swRes.getStatus();
+                    onRemoteCmdScheduled,
+                    onRemoteCmdComplete);
+
+                status = getStatusFromCommandResult(appendOplogNoteResponse);
                 std::get<1>(myWriteRequest)->set(status);
                 writeRequests.deleteWriteRequest(clusterTime);
             } catch (const DBException& ex) {
@@ -210,6 +208,20 @@ Status makeNoopWriteIfNeeded(OperationContext* opCtx, LogicalTime clusterTime) {
         if (status.isOK()) {
             return status;
         }
+
+        // If the write failed with StaleClusterTime it means that the noop write to the primary was
+        // not necessary to bump the clusterTime. It could be a race where the secondary decides to
+        // issue the noop write while some writes have already happened on the primary that have
+        // bumped the clusterTime beyond the 'clusterTime' the noop write requested.
+        if (status == ErrorCodes::StaleClusterTime) {
+            LOGV2_DEBUG(54102,
+                        2,
+                        "appendOplogNote request on clusterTime {clusterTime} failed with "
+                        "StaleClusterTime",
+                        "clusterTime"_attr = clusterTime.asTimestamp());
+            return Status::OK();
+        }
+
         lastAppliedOpTime = LogicalTime(replCoord->getMyLastAppliedOpTime().getTimestamp());
     }
     // This is when the noop write failed but the opLog caught up to clusterTime by replicating.
