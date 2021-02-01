@@ -9800,6 +9800,7 @@ buildvariants:
             featureFlagUseSecondaryDelaySecs: true,
         }"
         --mongosSetParameters="{
+            featureFlagTimeseriesCollection: true,
             featureFlagWindowFunctions: true,
         }"
         --excludeWithAnyTags=incompatible_with_windows_tls
@@ -9903,6 +9904,7 @@ buildvariants:
             featureFlagUseSecondaryDelaySecs: true,
         }"
         --mongosSetParameters="{
+            featureFlagTimeseriesCollection: true,
             featureFlagWindowFunctions: true,
         }"
         --excludeWithAnyTags=incompatible_with_windows_tls
@@ -10467,6 +10469,7 @@ buildvariants:
             featureFlagUseSecondaryDelaySecs: true,
         }"
         --mongosSetParameters="{
+            featureFlagTimeseriesCollection: true,
             featureFlagWindowFunctions: true,
         }"
   tasks:
@@ -11782,6 +11785,7 @@ buildvariants:
             featureFlagUseSecondaryDelaySecs: true,
         }"
         --mongosSetParameters="{
+            featureFlagTimeseriesCollection: true,
             featureFlagWindowFunctions: true,
         }"
   tasks:
@@ -12789,6 +12793,7 @@ buildvariants:
             featureFlagUseSecondaryDelaySecs: true,
         }"
         --mongosSetParameters="{
+            featureFlagTimeseriesCollection: true,
             featureFlagWindowFunctions: true,
         }"
   tasks:
@@ -12956,6 +12961,7 @@ buildvariants:
             featureFlagUseSecondaryDelaySecs: true,
         }"
         --mongosSetParameters="{
+            featureFlagTimeseriesCollection: true,
             featureFlagWindowFunctions: true,
         }"
     multiversion_platform: ubuntu1804
@@ -13067,6 +13073,7 @@ buildvariants:
             featureFlagUseSecondaryDelaySecs: true,
         }"
         --mongosSetParameters="{
+            featureFlagTimeseriesCollection: true,
             featureFlagWindowFunctions: true,
         }"
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under {A,UB}SAN build.
