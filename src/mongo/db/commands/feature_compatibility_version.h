@@ -84,7 +84,8 @@ public:
         OperationContext* opCtx,
         ServerGlobalParams::FeatureCompatibility::Version fromVersion,
         ServerGlobalParams::FeatureCompatibility::Version newVersion,
-        bool isFromConfigServer);
+        bool isFromConfigServer,
+        bool setTargetVersion);
 
     /**
      * If there are no non-local databases, store the featureCompatibilityVersion document. If we

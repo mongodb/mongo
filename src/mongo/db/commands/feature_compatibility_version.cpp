@@ -259,8 +259,13 @@ void FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
     OperationContext* opCtx,
     ServerGlobalParams::FeatureCompatibility::Version fromVersion,
     ServerGlobalParams::FeatureCompatibility::Version newVersion,
-    bool isFromConfigServer) {
-    auto transitioningVersion = fromVersion == newVersion
+    bool isFromConfigServer,
+    bool setTargetVersion) {
+
+    // Only transition to fully upgraded or downgraded states when we
+    // have completed all required upgrade/downgrade behavior.
+    auto transitioningVersion = setTargetVersion &&
+            serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading(fromVersion)
         ? fromVersion
         : fcvTransitions.getTransitionalVersion(fromVersion, newVersion, isFromConfigServer);
     FeatureCompatibilityVersionDocument fcvDoc =

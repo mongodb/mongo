@@ -247,8 +247,14 @@ public:
         if (actualVersion < requestedVersion) {
             checkInitialSyncFinished(opCtx);
 
+            // Start transition to 'requestedVersion' by updating the local FCV document to a
+            // 'kUpgrading' state.
             FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
-                opCtx, actualVersion, requestedVersion, isFromConfigServer);
+                opCtx,
+                actualVersion,
+                requestedVersion,
+                isFromConfigServer,
+                true /* setTargetVersion */);
 
             // If the 'useSecondaryDelaySecs' feature flag is enabled in the upgraded FCV, issue a
             // reconfig to change the 'slaveDelay' field to 'secondaryDelaySecs'.
@@ -330,12 +336,14 @@ public:
             }
 
             hangWhileUpgrading.pauseWhileSet(opCtx);
-            // Completed transition to requestedVersion.
+            // Complete transition by updating the local FCV document to the fully upgraded
+            // requestedVersion.
             FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
                 opCtx,
                 serverGlobalParams.featureCompatibility.getVersion(),
                 requestedVersion,
-                isFromConfigServer);
+                isFromConfigServer,
+                false /* setTargetVersion */);
         } else {
             // Time-series collections are only supported in 5.0. If the user tries to downgrade the
             // cluster to an earlier version, they must first remove all time-series collections.
@@ -357,8 +365,14 @@ public:
 
             checkInitialSyncFinished(opCtx);
 
+            // Start transition to 'requestedVersion' by updating the local FCV document to a
+            // 'kDowngrading' state.
             FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
-                opCtx, actualVersion, requestedVersion, isFromConfigServer);
+                opCtx,
+                actualVersion,
+                requestedVersion,
+                isFromConfigServer,
+                true /* setTargetVersion */);
 
             // If the 'useSecondaryDelaySecs' feature flag is disabled in the downgraded FCV, issue
             // a reconfig to change the 'secondaryDelaySecs' field to 'slaveDelay'.
@@ -441,12 +455,14 @@ public:
             }
 
             hangWhileDowngrading.pauseWhileSet(opCtx);
-            // Completed transition to requestedVersion.
+            // Complete transition by updating the local FCV document to the fully downgraded
+            // requestedVersion.
             FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
                 opCtx,
                 serverGlobalParams.featureCompatibility.getVersion(),
                 requestedVersion,
-                isFromConfigServer);
+                isFromConfigServer,
+                false /* setTargetVersion */);
 
             if (request.getDowngradeOnDiskChanges()) {
                 invariant(requestedVersion == FeatureCompatibilityParams::kLastContinuous);
