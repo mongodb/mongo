@@ -510,11 +510,13 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::_initializeStateDoc(
 }
 
 void TenantMigrationRecipientService::Instance::_getStartOpTimesFromDonor(WithLock lk) {
-    if (_isCloneCompletedMarkerSet(lk)) {
-        invariant(_stateDoc.getStartApplyingDonorOpTime().has_value());
-        invariant(_stateDoc.getStartFetchingDonorOpTime().has_value());
+    if (_sharedData->isResuming()) {
+        // We are resuming a migration.
         return;
     }
+    // We only expect to already have start optimes populated if we are resuming a migration.
+    invariant(!_stateDoc.getStartApplyingDonorOpTime().has_value());
+    invariant(!_stateDoc.getStartFetchingDonorOpTime().has_value());
     // Get the last oplog entry at the read concern majority optime in the remote oplog.  It
     // does not matter which tenant it is for.
     auto oplogOpTimeFields =
@@ -601,7 +603,7 @@ void TenantMigrationRecipientService::Instance::_startOplogFetcher() {
     options.dropCollectionAtStartup = false;
     options.dropCollectionAtShutdown = false;
     options.useTemporaryCollection = false;
-    stdx::lock_guard lk(_mutex);
+    stdx::unique_lock lk(_mutex);
     invariant(_stateDoc.getStartFetchingDonorOpTime());
     _donorOplogBuffer = std::make_unique<OplogBufferCollection>(
         StorageInterface::get(opCtx.get()), getOplogBufferNs(getMigrationUUID()), options);
@@ -612,12 +614,16 @@ void TenantMigrationRecipientService::Instance::_startOplogFetcher() {
     _dataReplicatorExternalState = std::make_unique<DataReplicatorExternalStateTenantMigration>();
     auto startFetchOpTime = *_stateDoc.getStartFetchingDonorOpTime();
     auto resumingFromOplogBuffer = false;
-    if (_isCloneCompletedMarkerSet(lk)) {
-        auto topOfOplogBuffer = _donorOplogBuffer->lastObjectPushed(opCtx.get());
-        if (topOfOplogBuffer) {
+    if (_sharedData->isResuming()) {
+        // Release the mutex lock since we acquire a collection mode IS lock when checking the last
+        // object pushed in the oplog buffer.
+        lk.unlock();
+        // If the oplog buffer already contains fetched documents, we must be resuming a migration.
+        if (auto topOfOplogBuffer = _donorOplogBuffer->lastObjectPushed(opCtx.get())) {
             startFetchOpTime = uassertStatusOK(OpTime::parseFromOplogEntry(topOfOplogBuffer.get()));
             resumingFromOplogBuffer = true;
         }
+        lk.lock();
     }
     OplogFetcher::Config oplogFetcherConfig(
         startFetchOpTime,
