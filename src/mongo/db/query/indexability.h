@@ -176,7 +176,11 @@ private:
             me->matchType() == MatchExpression::GEO_NEAR ||
             me->matchType() == MatchExpression::EXISTS ||
             me->matchType() == MatchExpression::TEXT ||
-            me->matchType() == MatchExpression::INTERNAL_EXPR_EQ;
+            me->matchType() == MatchExpression::INTERNAL_EXPR_EQ ||
+            me->matchType() == MatchExpression::INTERNAL_EXPR_GT ||
+            me->matchType() == MatchExpression::INTERNAL_EXPR_GTE ||
+            me->matchType() == MatchExpression::INTERNAL_EXPR_LT ||
+            me->matchType() == MatchExpression::INTERNAL_EXPR_LTE;
     }
 };
 

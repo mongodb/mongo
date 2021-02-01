@@ -41,7 +41,7 @@
 #include "mongo/db/index/expression_params.h"
 #include "mongo/db/index/s2_common.h"
 #include "mongo/db/matcher/expression_geo.h"
-#include "mongo/db/matcher/expression_internal_expr_eq.h"
+#include "mongo/db/matcher/expression_internal_expr_comparison.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/expression_index.h"
@@ -626,6 +626,75 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
         // There is no need to sort intervals or merge overlapping intervals here since the output
         // is from one element.
         translateEquality(node->getData(), index, isHashed, oilOut, tightnessOut);
+    } else if (MatchExpression::LT == expr->matchType()) {
+        const LTMatchExpression* node = static_cast<const LTMatchExpression*>(expr);
+        BSONElement dataElt = node->getData();
+
+        // Everything is < MaxKey, except for MaxKey. However the bounds need to be inclusive to
+        // find the array [MaxKey] which is smaller for a comparison but equal in a multikey index.
+        if (MaxKey == dataElt.type()) {
+            oilOut->intervals.push_back(allValuesRespectingInclusion(
+                IndexBounds::makeBoundInclusionFromBoundBools(true, index.multikey)));
+            *tightnessOut = index.collator || index.multikey ? IndexBoundsBuilder::INEXACT_FETCH
+                                                             : IndexBoundsBuilder::EXACT;
+            return;
+        }
+
+        // Nothing is < NaN.
+        if (std::isnan(dataElt.numberDouble())) {
+            *tightnessOut = IndexBoundsBuilder::EXACT;
+            return;
+        }
+
+        BSONObjBuilder bob;
+        buildBoundsForQueryElementForLT(dataElt, index.collator, &bob);
+        BSONObj dataObj = bob.done().getOwned();
+        verify(dataObj.isOwned());
+        bool inclusiveBounds = dataElt.type() == BSONType::Array;
+        Interval interval =
+            makeRangeInterval(dataObj,
+                              IndexBounds::makeBoundInclusionFromBoundBools(
+                                  typeMatch(dataObj) || inclusiveBounds, inclusiveBounds));
+
+        // If the operand to LT is equal to the lower bound X, the interval [X, X) is invalid
+        // and should not be added to the bounds.
+        if (!interval.isNull()) {
+            oilOut->intervals.push_back(interval);
+        }
+
+        *tightnessOut = getInequalityPredicateTightness(interval, dataElt, index);
+    } else if (MatchExpression::INTERNAL_EXPR_LT == expr->matchType()) {
+        const auto* node = static_cast<const InternalExprLTMatchExpression*>(expr);
+        BSONElement dataElt = node->getData();
+
+        // Unlike the regular $lt match expression, $_internalExprLt does not make special checks
+        // for when dataElt is MaxKey or NaN because it doesn't do type bracketing for any operand.
+        // Another difference is that $internalExprLt predicates on multikey paths will not use an
+        // index.
+        tassert(3994304,
+                "$expr comparison predicates on multikey paths cannot use an index",
+                !index.pathHasMultikeyComponent(elt.fieldNameStringData()));
+
+        BSONObjBuilder bob;
+        bob.appendMinKey("");
+        CollationIndexKey::collationAwareIndexKeyAppend(dataElt, index.collator, &bob);
+        BSONObj dataObj = bob.obj();
+
+        // Generally all intervals for $_internalExprLt will exclude the end key, however because
+        // null and missing are conflated in the index but treated as distinct values for
+        // expressions (with missing ordered as less than null), when dataElt is null we must build
+        // index bounds [MinKey, null] to include missing values and filter out the literal null
+        // values with an INEXACT_FETCH.
+        Interval interval = makeRangeInterval(
+            dataObj, IndexBounds::makeBoundInclusionFromBoundBools(true, dataElt.isNull()));
+
+        // If the operand to $_internalExprLt is equal to the lower bound X, the interval [X, X) is
+        // invalid and should not be added to the bounds. Because $_internalExprLt doesn't perform
+        // type bracketing, here we need to avoid adding the interval [MinKey, MinKey).
+        if (!interval.isNull()) {
+            oilOut->intervals.push_back(interval);
+        }
+        *tightnessOut = getInequalityPredicateTightness(interval, dataElt, index);
     } else if (MatchExpression::LTE == expr->matchType()) {
         const LTEMatchExpression* node = static_cast<const LTEMatchExpression*>(expr);
         BSONElement dataElt = node->getData();
@@ -664,40 +733,32 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
         oilOut->intervals.push_back(interval);
 
         *tightnessOut = getInequalityPredicateTightness(interval, dataElt, index);
-    } else if (MatchExpression::LT == expr->matchType()) {
-        const LTMatchExpression* node = static_cast<const LTMatchExpression*>(expr);
+    } else if (MatchExpression::INTERNAL_EXPR_LTE == expr->matchType()) {
+        const auto* node = static_cast<const InternalExprLTEMatchExpression*>(expr);
         BSONElement dataElt = node->getData();
 
-        // Everything is < MaxKey, except for MaxKey. However the bounds need to be inclusive to
-        // find the array [MaxKey] which is smaller for a comparison but equal in a multikey index.
-        if (MaxKey == dataElt.type()) {
-            oilOut->intervals.push_back(allValuesRespectingInclusion(
-                IndexBounds::makeBoundInclusionFromBoundBools(true, index.multikey)));
-            *tightnessOut = index.collator || index.multikey ? IndexBoundsBuilder::INEXACT_FETCH
-                                                             : IndexBoundsBuilder::EXACT;
-            return;
-        }
-
-        // Nothing is < NaN.
-        if (std::isnan(dataElt.numberDouble())) {
-            *tightnessOut = IndexBoundsBuilder::EXACT;
-            return;
-        }
+        // Unlike the regular $lte match expression, $_internalExprLte does not make special checks
+        // for when dataElt is MaxKey or NaN because it doesn't do type bracketing for any operand.
+        // Another difference is that $internalExprLte predicates on multikey paths will not use an
+        // index.
+        tassert(3994305,
+                "$expr comparison predicates on multikey paths cannot use an index",
+                !index.pathHasMultikeyComponent(elt.fieldNameStringData()));
 
         BSONObjBuilder bob;
-        buildBoundsForQueryElementForLT(dataElt, index.collator, &bob);
-        BSONObj dataObj = bob.done().getOwned();
-        verify(dataObj.isOwned());
-        bool inclusiveBounds = dataElt.type() == BSONType::Array;
-        Interval interval =
-            makeRangeInterval(dataObj,
-                              IndexBounds::makeBoundInclusionFromBoundBools(
-                                  typeMatch(dataObj) || inclusiveBounds, inclusiveBounds));
+        bob.appendMinKey("");
+        CollationIndexKey::collationAwareIndexKeyAppend(dataElt, index.collator, &bob);
+        BSONObj dataObj = bob.obj();
 
-        // If the operand to LT is equal to the lower bound X, the interval [X, X) is invalid
-        // and should not be added to the bounds.
-        if (!interval.isNull()) {
-            oilOut->intervals.push_back(interval);
+        Interval interval = makeRangeInterval(dataObj, BoundInclusion::kIncludeBothStartAndEndKeys);
+        oilOut->intervals.push_back(interval);
+
+        // Expressions treat null and missing as distinct values, with missing ordered as less than
+        // null. Thus for $_internalExprLte when dataElt is null we can treat the bounds as EXACT,
+        // since both null and missing values should be included.
+        if (dataElt.isNull()) {
+            *tightnessOut = IndexBoundsBuilder::EXACT;
+            return;
         }
 
         *tightnessOut = getInequalityPredicateTightness(interval, dataElt, index);
@@ -737,6 +798,41 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
             oilOut->intervals.push_back(interval);
         }
         *tightnessOut = getInequalityPredicateTightness(interval, dataElt, index);
+    } else if (MatchExpression::INTERNAL_EXPR_GT == expr->matchType()) {
+        const auto* node = static_cast<const InternalExprGTMatchExpression*>(expr);
+        BSONElement dataElt = node->getData();
+
+        // Unlike the regular $gt match expression, $_internalExprGt does not make special checks
+        // for when dataElt is MinKey or NaN because it doesn't do type bracketing for any operand.
+        // Another difference is that $internalExprGt predicates on multikey paths will not use an
+        // index.
+        tassert(3994302,
+                "$expr comparison predicates on multikey paths cannot use an index",
+                !index.pathHasMultikeyComponent(elt.fieldNameStringData()));
+
+        BSONObjBuilder bob;
+        CollationIndexKey::collationAwareIndexKeyAppend(dataElt, index.collator, &bob);
+        bob.appendMaxKey("");
+        BSONObj dataObj = bob.obj();
+
+        Interval interval = makeRangeInterval(dataObj, BoundInclusion::kIncludeEndKeyOnly);
+
+        // If the operand to $_internalExprGt is equal to the upper bound X, the interval (X, X] is
+        // invalid and should not be added to the bounds. Because $_internalExprGt doesn't perform
+        // type bracketing, here we need to avoid adding the interval (MaxKey, MaxKey].
+        if (!interval.isNull()) {
+            oilOut->intervals.push_back(interval);
+        }
+
+        // Expressions treat null and missing as distinct values, with missing ordered as less than
+        // null. Thus for $_internalExprGt when dataElt is null we can treat the bounds as EXACT,
+        // since both null and missing values should be excluded.
+        if (dataElt.isNull()) {
+            *tightnessOut = IndexBoundsBuilder::EXACT;
+            return;
+        }
+
+        *tightnessOut = getInequalityPredicateTightness(interval, dataElt, index);
     } else if (MatchExpression::GTE == expr->matchType()) {
         const GTEMatchExpression* node = static_cast<const GTEMatchExpression*>(expr);
         BSONElement dataElt = node->getData();
@@ -772,6 +868,26 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
             dataObj, IndexBounds::makeBoundInclusionFromBoundBools(true, inclusiveBounds));
         oilOut->intervals.push_back(interval);
 
+        *tightnessOut = getInequalityPredicateTightness(interval, dataElt, index);
+    } else if (MatchExpression::INTERNAL_EXPR_GTE == expr->matchType()) {
+        const auto* node = static_cast<const InternalExprGTEMatchExpression*>(expr);
+        BSONElement dataElt = node->getData();
+
+        // Unlike the regular $gte match expression, $_internalExprGte does not make special checks
+        // for when dataElt is MinKey or NaN because it doesn't do type bracketing for any operand.
+        // Another difference is that $internalExprGte predicates on multikey paths will not use an
+        // index.
+        tassert(3994303,
+                "$expr comparison predicates on multikey paths cannot use an index",
+                !index.pathHasMultikeyComponent(elt.fieldNameStringData()));
+
+        BSONObjBuilder bob;
+        CollationIndexKey::collationAwareIndexKeyAppend(dataElt, index.collator, &bob);
+        bob.appendMaxKey("");
+        BSONObj dataObj = bob.obj();
+
+        Interval interval = makeRangeInterval(dataObj, BoundInclusion::kIncludeBothStartAndEndKeys);
+        oilOut->intervals.push_back(interval);
         *tightnessOut = getInequalityPredicateTightness(interval, dataElt, index);
     } else if (MatchExpression::REGEX == expr->matchType()) {
         const RegexMatchExpression* rme = static_cast<const RegexMatchExpression*>(expr);

@@ -806,6 +806,10 @@ public:
         generatePathError(*expr, kNormalReason, kInvertedReason);
     }
     void visit(const InternalExprEqMatchExpression* expr) final {}
+    void visit(const InternalExprGTMatchExpression* expr) final {}
+    void visit(const InternalExprGTEMatchExpression* expr) final {}
+    void visit(const InternalExprLTMatchExpression* expr) final {}
+    void visit(const InternalExprLTEMatchExpression* expr) final {}
     void visit(const InternalSchemaAllElemMatchFromIndexMatchExpression* expr) final {
         switch (toItemsKeywordType(*expr)) {
             case ItemsKeywordType::kItems: {
@@ -1794,6 +1798,10 @@ public:
     }
     void visit(const InMatchExpression* expr) final {}
     void visit(const InternalExprEqMatchExpression* expr) final {}
+    void visit(const InternalExprGTMatchExpression* expr) final {}
+    void visit(const InternalExprGTEMatchExpression* expr) final {}
+    void visit(const InternalExprLTMatchExpression* expr) final {}
+    void visit(const InternalExprLTEMatchExpression* expr) final {}
     void visit(const InternalSchemaAllElemMatchFromIndexMatchExpression* expr) final {}
     void visit(const InternalSchemaAllowedPropertiesMatchExpression* expr) final {
         if (_context->shouldGenerateError(*expr)) {
@@ -2002,6 +2010,10 @@ public:
         _context->finishCurrentError(expr);
     }
     void visit(const InternalExprEqMatchExpression* expr) final {}
+    void visit(const InternalExprGTMatchExpression* expr) final {}
+    void visit(const InternalExprGTEMatchExpression* expr) final {}
+    void visit(const InternalExprLTMatchExpression* expr) final {}
+    void visit(const InternalExprLTEMatchExpression* expr) final {}
     void visit(const InternalSchemaAllElemMatchFromIndexMatchExpression* expr) final {
         switch (toItemsKeywordType(*expr)) {
             case ItemsKeywordType::kItems:

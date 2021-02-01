@@ -104,6 +104,19 @@ public:
         }
     }
 
+    static bool isInternalExprComparison(MatchType matchType) {
+        switch (matchType) {
+            case MatchExpression::INTERNAL_EXPR_EQ:
+            case MatchExpression::INTERNAL_EXPR_GT:
+            case MatchExpression::INTERNAL_EXPR_GTE:
+            case MatchExpression::INTERNAL_EXPR_LT:
+            case MatchExpression::INTERNAL_EXPR_LTE:
+                return true;
+            default:
+                return false;
+        }
+    }
+
     ComparisonMatchExpressionBase(MatchType type,
                                   StringData path,
                                   Value rhs,

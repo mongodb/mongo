@@ -44,7 +44,7 @@
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_expr.h"
 #include "mongo/db/matcher/expression_geo.h"
-#include "mongo/db/matcher/expression_internal_expr_eq.h"
+#include "mongo/db/matcher/expression_internal_expr_comparison.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/matcher/expression_type.h"
@@ -1692,6 +1692,55 @@ StatusWithMatchExpression parseSubField(const BSONObj& context,
             return {std::move(exprEqExpr)};
         }
 
+        case PathAcceptingKeyword::INTERNAL_EXPR_GT: {
+            if (e.type() == BSONType::Undefined || e.type() == BSONType::Array) {
+                return {Status(ErrorCodes::BadValue,
+                               str::stream() << InternalExprGTMatchExpression::kName
+                                             << " cannot be used to compare to type: "
+                                             << typeName(e.type()))};
+            }
+
+            auto exprGtExpr = std::make_unique<InternalExprGTMatchExpression>(name, e);
+            exprGtExpr->setCollator(expCtx->getCollator());
+            return {std::move(exprGtExpr)};
+        }
+        case PathAcceptingKeyword::INTERNAL_EXPR_GTE: {
+            if (e.type() == BSONType::Undefined || e.type() == BSONType::Array) {
+                return {Status(ErrorCodes::BadValue,
+                               str::stream() << InternalExprGTEMatchExpression::kName
+                                             << " cannot be used to compare to type: "
+                                             << typeName(e.type()))};
+            }
+
+            auto exprGteExpr = std::make_unique<InternalExprGTEMatchExpression>(name, e);
+            exprGteExpr->setCollator(expCtx->getCollator());
+            return {std::move(exprGteExpr)};
+        }
+        case PathAcceptingKeyword::INTERNAL_EXPR_LT: {
+            if (e.type() == BSONType::Undefined || e.type() == BSONType::Array) {
+                return {Status(ErrorCodes::BadValue,
+                               str::stream() << InternalExprLTMatchExpression::kName
+                                             << " cannot be used to compare to type: "
+                                             << typeName(e.type()))};
+            }
+
+            auto exprLtExpr = std::make_unique<InternalExprLTMatchExpression>(name, e);
+            exprLtExpr->setCollator(expCtx->getCollator());
+            return {std::move(exprLtExpr)};
+        }
+        case PathAcceptingKeyword::INTERNAL_EXPR_LTE: {
+            if (e.type() == BSONType::Undefined || e.type() == BSONType::Array) {
+                return {Status(ErrorCodes::BadValue,
+                               str::stream() << InternalExprLTEMatchExpression::kName
+                                             << " cannot be used to compare to type: "
+                                             << typeName(e.type()))};
+            }
+
+            auto exprLteExpr = std::make_unique<InternalExprLTEMatchExpression>(name, e);
+            exprLteExpr->setCollator(expCtx->getCollator());
+            return {std::move(exprLteExpr)};
+        }
+
         // Handles bitwise query operators.
         case PathAcceptingKeyword::BITS_ALL_SET: {
             return parseBitTest<BitsAllSetMatchExpression>(name, e, expCtx);
@@ -1990,6 +2039,10 @@ MONGO_INITIALIZER(MatchExpressionParser)(InitializerContext* context) {
     queryOperatorMap =
         std::make_unique<StringMap<PathAcceptingKeyword>>(StringMap<PathAcceptingKeyword>{
             {"_internalExprEq", PathAcceptingKeyword::INTERNAL_EXPR_EQ},
+            {"_internalExprGt", PathAcceptingKeyword::INTERNAL_EXPR_GT},
+            {"_internalExprGte", PathAcceptingKeyword::INTERNAL_EXPR_GTE},
+            {"_internalExprLt", PathAcceptingKeyword::INTERNAL_EXPR_LT},
+            {"_internalExprLte", PathAcceptingKeyword::INTERNAL_EXPR_LTE},
             {"_internalSchemaAllElemMatchFromIndex",
              PathAcceptingKeyword::INTERNAL_SCHEMA_ALL_ELEM_MATCH_FROM_INDEX},
             {"_internalSchemaBinDataEncryptedType",

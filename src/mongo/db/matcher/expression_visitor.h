@@ -50,6 +50,10 @@ class GeoMatchExpression;
 class GeoNearMatchExpression;
 class InMatchExpression;
 class InternalExprEqMatchExpression;
+class InternalExprGTMatchExpression;
+class InternalExprGTEMatchExpression;
+class InternalExprLTMatchExpression;
+class InternalExprLTEMatchExpression;
 class InternalSchemaAllElemMatchFromIndexMatchExpression;
 class InternalSchemaAllowedPropertiesMatchExpression;
 class InternalSchemaBinDataEncryptedTypeExpression;
@@ -115,6 +119,12 @@ public:
     virtual void visit(tree_walker::MaybeConstPtr<IsConst, GeoNearMatchExpression> expr) = 0;
     virtual void visit(tree_walker::MaybeConstPtr<IsConst, InMatchExpression> expr) = 0;
     virtual void visit(tree_walker::MaybeConstPtr<IsConst, InternalExprEqMatchExpression> expr) = 0;
+    virtual void visit(tree_walker::MaybeConstPtr<IsConst, InternalExprGTMatchExpression> expr) = 0;
+    virtual void visit(
+        tree_walker::MaybeConstPtr<IsConst, InternalExprGTEMatchExpression> expr) = 0;
+    virtual void visit(tree_walker::MaybeConstPtr<IsConst, InternalExprLTMatchExpression> expr) = 0;
+    virtual void visit(
+        tree_walker::MaybeConstPtr<IsConst, InternalExprLTEMatchExpression> expr) = 0;
     virtual void visit(
         tree_walker::MaybeConstPtr<IsConst, InternalSchemaAllElemMatchFromIndexMatchExpression>
             expr) = 0;

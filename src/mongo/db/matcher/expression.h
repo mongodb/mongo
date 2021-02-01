@@ -108,9 +108,14 @@ public:
         // Expressions that are only created internally
         INTERNAL_2D_POINT_IN_ANNULUS,
 
-        // Used to represent an expression language equality in a match expression tree, since $eq
-        // in the expression language has different semantics than the equality match expression.
+        // Used to represent expression language comparisons in a match expression tree, since $eq,
+        // $gt, $gte, $lt and $lte in the expression language has different semantics than their
+        // respective match expressions.
         INTERNAL_EXPR_EQ,
+        INTERNAL_EXPR_GT,
+        INTERNAL_EXPR_GTE,
+        INTERNAL_EXPR_LT,
+        INTERNAL_EXPR_LTE,
 
         // JSON Schema expressions.
         INTERNAL_SCHEMA_ALLOWED_PROPERTIES,

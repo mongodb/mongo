@@ -43,7 +43,7 @@
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_expr.h"
 #include "mongo/db/matcher/expression_geo.h"
-#include "mongo/db/matcher/expression_internal_expr_eq.h"
+#include "mongo/db/matcher/expression_internal_expr_comparison.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_text.h"
 #include "mongo/db/matcher/expression_text_noop.h"
@@ -700,6 +700,10 @@ public:
     }
     void visit(const InMatchExpression* expr) final {}
     void visit(const InternalExprEqMatchExpression* expr) final {}
+    void visit(const InternalExprGTMatchExpression* expr) final {}
+    void visit(const InternalExprGTEMatchExpression* expr) final {}
+    void visit(const InternalExprLTMatchExpression* expr) final {}
+    void visit(const InternalExprLTEMatchExpression* expr) final {}
     void visit(const InternalSchemaAllElemMatchFromIndexMatchExpression* expr) final {
         unsupportedExpression(expr);
     }
@@ -1185,13 +1189,24 @@ public:
                               LeafTraversalMode::kArrayAndItsElements);
         }
     }
-
+    // The following are no-ops. The internal expr comparison match expression are produced
+    // internally by rewriting an $expr expression to an AND($expr, $_internalExpr[OP]), which can
+    // later be eliminated by via a conversion into EXACT index bounds, or remains present. In the
+    // latter case we can simply ignore it, as the result of AND($expr, $_internalExpr[OP]) is equal
+    // to just $expr.
     void visit(const InternalExprEqMatchExpression* expr) final {
-        // This is a no-op. The $_internalExprEq match expression is produced internally by
-        // rewriting an $expr expression to an AND($expr, $_internalExprEq), which can later be
-        // eliminated by via a conversion into EXACT index bounds, or remains present. In the latter
-        // case we can simply ignore it, as the result of AND($expr, $_internalExprEq) is equal to
-        // just $expr.
+        generateAlwaysBoolean(_context, true);
+    }
+    void visit(const InternalExprGTMatchExpression* expr) final {
+        generateAlwaysBoolean(_context, true);
+    }
+    void visit(const InternalExprGTEMatchExpression* expr) final {
+        generateAlwaysBoolean(_context, true);
+    }
+    void visit(const InternalExprLTMatchExpression* expr) final {
+        generateAlwaysBoolean(_context, true);
+    }
+    void visit(const InternalExprLTEMatchExpression* expr) final {
         generateAlwaysBoolean(_context, true);
     }
 
@@ -1388,6 +1403,10 @@ public:
     void visit(const GeoNearMatchExpression* expr) final {}
     void visit(const InMatchExpression* expr) final {}
     void visit(const InternalExprEqMatchExpression* expr) final {}
+    void visit(const InternalExprGTMatchExpression* expr) final {}
+    void visit(const InternalExprGTEMatchExpression* expr) final {}
+    void visit(const InternalExprLTMatchExpression* expr) final {}
+    void visit(const InternalExprLTEMatchExpression* expr) final {}
     void visit(const InternalSchemaAllElemMatchFromIndexMatchExpression* expr) final {}
     void visit(const InternalSchemaAllowedPropertiesMatchExpression* expr) final {}
     void visit(const InternalSchemaBinDataEncryptedTypeExpression* expr) final {}

@@ -33,7 +33,7 @@
 
 #include "mongo/db/matcher/rewrite_expr.h"
 
-#include "mongo/db/matcher/expression_internal_expr_eq.h"
+#include "mongo/db/matcher/expression_internal_expr_comparison.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/logv2/log.h"
@@ -141,6 +141,32 @@ std::unique_ptr<MatchExpression> RewriteExpr::_rewriteComparisonExpression(
         lhs = dynamic_cast<ExpressionFieldPath*>(operandList[1].get());
         rhs = dynamic_cast<ExpressionConstant*>(operandList[0].get());
         invariant(lhs && rhs);
+
+        // The MatchExpression is normalized so that the field path expression is on the left. For
+        // cases like {$gt: [1, "$x"]} where the order of the child expressions matter, we also
+        // change the comparison operator.
+        switch (cmpOperator) {
+            case ExpressionCompare::GT: {
+                cmpOperator = ExpressionCompare::LT;
+                break;
+            }
+            case ExpressionCompare::GTE: {
+                cmpOperator = ExpressionCompare::LTE;
+                break;
+            }
+            case ExpressionCompare::LT: {
+                cmpOperator = ExpressionCompare::GT;
+                break;
+            }
+            case ExpressionCompare::LTE: {
+                cmpOperator = ExpressionCompare::GTE;
+                break;
+            }
+            case ExpressionCompare::EQ:
+                break;
+            default:
+                MONGO_UNREACHABLE_TASSERT(3994306);
+        }
     }
 
     // Build argument for ComparisonMatchExpression.
@@ -155,20 +181,56 @@ std::unique_ptr<MatchExpression> RewriteExpr::_rewriteComparisonExpression(
 
 std::unique_ptr<MatchExpression> RewriteExpr::_buildComparisonMatchExpression(
     ExpressionCompare::CmpOp comparisonOp, BSONElement fieldAndValue) {
-    invariant(comparisonOp == ExpressionCompare::EQ);
+    tassert(3994301,
+            "comparisonOp must be one of the following: $eq, $gt, $gte, $lt, $lte",
+            comparisonOp == ExpressionCompare::EQ || comparisonOp == ExpressionCompare::GT ||
+                comparisonOp == ExpressionCompare::GTE || comparisonOp == ExpressionCompare::LT ||
+                comparisonOp == ExpressionCompare::LTE);
 
-    auto eqMatchExpr =
-        std::make_unique<InternalExprEqMatchExpression>(fieldAndValue.fieldName(), fieldAndValue);
-    eqMatchExpr->setCollator(_collator);
+    std::unique_ptr<MatchExpression> matchExpr;
 
-    return eqMatchExpr;
+    switch (comparisonOp) {
+        case ExpressionCompare::EQ: {
+            matchExpr = std::make_unique<InternalExprEqMatchExpression>(fieldAndValue.fieldName(),
+                                                                        fieldAndValue);
+            break;
+        }
+        case ExpressionCompare::GT: {
+            matchExpr = std::make_unique<InternalExprGTMatchExpression>(fieldAndValue.fieldName(),
+                                                                        fieldAndValue);
+            break;
+        }
+        case ExpressionCompare::GTE: {
+            matchExpr = std::make_unique<InternalExprGTEMatchExpression>(fieldAndValue.fieldName(),
+                                                                         fieldAndValue);
+            break;
+        }
+        case ExpressionCompare::LT: {
+            matchExpr = std::make_unique<InternalExprLTMatchExpression>(fieldAndValue.fieldName(),
+                                                                        fieldAndValue);
+            break;
+        }
+        case ExpressionCompare::LTE: {
+            matchExpr = std::make_unique<InternalExprLTEMatchExpression>(fieldAndValue.fieldName(),
+                                                                         fieldAndValue);
+            break;
+        }
+        default:
+            MONGO_UNREACHABLE_TASSERT(3994307);
+    }
+    matchExpr->setCollator(_collator);
+
+    return matchExpr;
 }
 
 bool RewriteExpr::_canRewriteComparison(
     const boost::intrusive_ptr<ExpressionCompare>& expression) const {
 
-    // Currently we only rewrite $eq expressions.
-    if (expression->getOp() != ExpressionCompare::EQ) {
+    // Currently we only rewrite $eq, $gt, $gte, $lt and $lte expressions.
+    auto op = expression->getOp();
+    if (op != ExpressionCompare::EQ && op != ExpressionCompare::GT &&
+        op != ExpressionCompare::GTE && op != ExpressionCompare::LT &&
+        op != ExpressionCompare::LTE) {
         return false;
     }
 

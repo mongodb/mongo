@@ -69,6 +69,25 @@ public:
     }
 
     /**
+     * Make a multikey IndexEntry with the provided key pattern and multikey paths.
+     */
+    IndexEntry buildMultikeyIndexEntry(const BSONObj& kp, const MultikeyPaths& mkp) {
+        return {kp,
+                IndexNames::nameToType(IndexNames::findPluginName(kp)),
+                IndexDescriptor::kLatestIndexVersion,
+                true,  // multikey
+                mkp,   // multikey paths
+                {},
+                false,
+                false,
+                IndexEntry::Identifier{"test_multikey"},
+                nullptr,
+                {},
+                nullptr,
+                nullptr};
+    }
+
+    /**
      * Given a list of queries in 'toUnion', translate into index bounds and return
      * the union of these bounds in the out-parameter 'oilOut'.
      */

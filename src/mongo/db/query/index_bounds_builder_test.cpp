@@ -38,6 +38,7 @@
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/expression_index.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {
@@ -1356,6 +1357,389 @@ TEST_F(IndexBoundsBuilderTest, IntersectizeBasic) {
     expectedIntersection.intervals = {Interval(BSON("" << 1 << "" << 5), false, false)};
 
     ASSERT_TRUE(oil2 == expectedIntersection);
+}
+
+TEST_F(IndexBoundsBuilderTest, TranslateInternalExprGT) {
+    BSONObj keyPattern = BSON("a" << 1);
+    BSONElement elt = keyPattern.firstElement();
+    auto testIndex = buildSimpleIndexEntry(keyPattern);
+    BSONObj obj = BSON("a" << BSON("$_internalExprGt" << 4));
+    auto expr = parseMatchExpression(obj);
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+    ASSERT_EQUALS(oil.name, "a");
+    ASSERT_EQUALS(oil.intervals.size(), 1U);
+    ASSERT_EQUALS(Interval::INTERVAL_EQUALS,
+                  oil.intervals[0].compare(Interval(maxKeyIntObj(4), false, true)));
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
+}
+
+TEST_F(IndexBoundsBuilderTest, TranslateInternalExprGTNull) {
+    BSONObj keyPattern = BSON("a" << 1);
+    BSONElement elt = keyPattern.firstElement();
+    auto testIndex = buildSimpleIndexEntry(keyPattern);
+    BSONObj obj = BSON("a" << BSON("$_internalExprGt" << BSONNULL));
+    auto expr = parseMatchExpression(obj);
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+    ASSERT_EQUALS(oil.name, "a");
+    ASSERT_EQUALS(oil.intervals.size(), 1U);
+    ASSERT_EQUALS(oil.intervals[0].toString(), "(null, MaxKey]");
+    ASSERT_FALSE(oil.intervals[0].startInclusive);
+    ASSERT_TRUE(oil.intervals[0].endInclusive);
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
+}
+
+TEST_F(IndexBoundsBuilderTest, TranslateInternalExprGTMaxKeyDoesNotGenerateBounds) {
+    BSONObj keyPattern = BSON("a" << 1);
+    BSONElement elt = keyPattern.firstElement();
+    auto testIndex = buildSimpleIndexEntry(keyPattern);
+    BSONObj obj = BSON("a" << BSON("$_internalExprGt" << MAXKEY));
+    auto expr = parseMatchExpression(obj);
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+    ASSERT_EQUALS(oil.name, "a");
+    ASSERT_EQUALS(oil.intervals.size(), 0U);
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
+}
+
+DEATH_TEST_F(IndexBoundsBuilderTest,
+             TranslateInternalExprGTMultikeyPathFails,
+             "$expr comparison predicates on multikey paths cannot use an index") {
+    BSONObj keyPattern = BSON("a" << 1 << "b" << 1);
+    BSONElement elt = keyPattern.firstElement();
+    auto testIndex = buildMultikeyIndexEntry(keyPattern, {{0U}, {}});
+    BSONObj obj = BSON("a" << BSON("$_internalExprGt" << 4));
+    auto expr = parseMatchExpression(obj);
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+}
+
+TEST_F(IndexBoundsBuilderTest, TranslateInternalExprGTNonMultikeyPathOnMultikeyIndexSucceeds) {
+    BSONObj keyPattern = BSON("a" << 1 << "b" << 1);
+    BSONElement elt = keyPattern.firstElement();
+    auto testIndex = buildMultikeyIndexEntry(keyPattern, {{}, {0U}});
+    BSONObj obj = BSON("a" << BSON("$_internalExprGt" << 4));
+    auto expr = parseMatchExpression(obj);
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+    ASSERT_EQUALS(oil.name, "a");
+    ASSERT_EQUALS(oil.intervals.size(), 1U);
+    ASSERT_EQUALS(Interval::INTERVAL_EQUALS,
+                  oil.intervals[0].compare(Interval(maxKeyIntObj(4), false, true)));
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
+}
+
+TEST_F(IndexBoundsBuilderTest, TranslateInternalExprGTSubObjectContainingBadValuesSucceeds) {
+    BSONObj keyPattern = BSON("_id" << 1);
+    BSONElement elt = keyPattern.firstElement();
+    auto testIndex = buildSimpleIndexEntry(keyPattern);
+    BSONObj subObj = BSON("subObj" << BSON("a" << BSONUndefined << "b" << BSON_ARRAY("array")));
+    BSONObj obj = BSON("_id" << BSON("$_internalExprGt" << subObj));
+    auto expr = parseMatchExpression(obj);
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+    ASSERT_EQUALS(oil.name, "_id");
+    ASSERT_EQUALS(oil.intervals.size(), 1U);
+    ASSERT_EQUALS(
+        Interval::INTERVAL_EQUALS,
+        oil.intervals[0].compare(Interval(BSON("" << subObj << "" << MAXKEY), false, true)));
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
+}
+
+TEST_F(IndexBoundsBuilderTest, TranslateInternalExprGTE) {
+    BSONObj keyPattern = BSON("a" << 1);
+    BSONElement elt = keyPattern.firstElement();
+    auto testIndex = buildSimpleIndexEntry(keyPattern);
+    BSONObj obj = BSON("a" << BSON("$_internalExprGte" << 4));
+    auto expr = parseMatchExpression(obj);
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+    ASSERT_EQUALS(oil.name, "a");
+    ASSERT_EQUALS(oil.intervals.size(), 1U);
+    ASSERT_EQUALS(Interval::INTERVAL_EQUALS,
+                  oil.intervals[0].compare(Interval(maxKeyIntObj(4), true, true)));
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
+}
+
+TEST_F(IndexBoundsBuilderTest, TranslateInternalExprGTENull) {
+    BSONObj keyPattern = BSON("a" << 1);
+    BSONElement elt = keyPattern.firstElement();
+    auto testIndex = buildSimpleIndexEntry(keyPattern);
+    BSONObj obj = BSON("a" << BSON("$_internalExprGte" << BSONNULL));
+    auto expr = parseMatchExpression(obj);
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+    ASSERT_EQUALS(oil.name, "a");
+    ASSERT_EQUALS(oil.intervals.size(), 1U);
+    ASSERT_EQUALS(oil.intervals[0].toString(), "[null, MaxKey]");
+    ASSERT_TRUE(oil.intervals[0].startInclusive);
+    ASSERT_TRUE(oil.intervals[0].endInclusive);
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_FETCH);
+}
+
+TEST_F(IndexBoundsBuilderTest, TranslateInternalExprGTEMaxKeyGeneratesBounds) {
+    BSONObj keyPattern = BSON("a" << 1);
+    BSONElement elt = keyPattern.firstElement();
+    auto testIndex = buildSimpleIndexEntry(keyPattern);
+    BSONObj obj = BSON("a" << BSON("$_internalExprGte" << MAXKEY));
+    auto expr = parseMatchExpression(obj);
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+    ASSERT_EQUALS(oil.name, "a");
+    ASSERT_EQUALS(oil.intervals.size(), 1U);
+    ASSERT_EQUALS(oil.intervals[0].toString(), "[MaxKey, MaxKey]");
+    ASSERT_TRUE(oil.intervals[0].startInclusive);
+    ASSERT_TRUE(oil.intervals[0].endInclusive);
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
+}
+
+DEATH_TEST_F(IndexBoundsBuilderTest,
+             TranslateInternalExprGTEMultikeyPathFails,
+             "$expr comparison predicates on multikey paths cannot use an index") {
+    BSONObj keyPattern = BSON("a" << 1 << "b" << 1);
+    BSONElement elt = keyPattern.firstElement();
+    auto testIndex = buildMultikeyIndexEntry(keyPattern, {{0U}, {}});
+    BSONObj obj = BSON("a" << BSON("$_internalExprGte" << 4));
+    auto expr = parseMatchExpression(obj);
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+}
+
+TEST_F(IndexBoundsBuilderTest, TranslateInternalExprGTENonMultikeyPathOnMultikeyIndexSucceeds) {
+    BSONObj keyPattern = BSON("a" << 1 << "b" << 1);
+    BSONElement elt = keyPattern.firstElement();
+    auto testIndex = buildMultikeyIndexEntry(keyPattern, {{}, {0U}});
+    BSONObj obj = BSON("a" << BSON("$_internalExprGte" << 4));
+    auto expr = parseMatchExpression(obj);
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+    ASSERT_EQUALS(oil.name, "a");
+    ASSERT_EQUALS(oil.intervals.size(), 1U);
+    ASSERT_EQUALS(Interval::INTERVAL_EQUALS,
+                  oil.intervals[0].compare(Interval(maxKeyIntObj(4), true, true)));
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
+}
+
+TEST_F(IndexBoundsBuilderTest, TranslateInternalExprGTESubObjectContainingBadValuesSucceeds) {
+    BSONObj keyPattern = BSON("_id" << 1);
+    BSONElement elt = keyPattern.firstElement();
+    auto testIndex = buildSimpleIndexEntry(keyPattern);
+    BSONObj subObj = BSON("subObj" << BSON("a" << BSONUndefined << "b" << BSON_ARRAY("array")));
+    BSONObj obj = BSON("_id" << BSON("$_internalExprGte" << subObj));
+    auto expr = parseMatchExpression(obj);
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+    ASSERT_EQUALS(oil.name, "_id");
+    ASSERT_EQUALS(oil.intervals.size(), 1U);
+    ASSERT_EQUALS(
+        Interval::INTERVAL_EQUALS,
+        oil.intervals[0].compare(Interval(BSON("" << subObj << "" << MAXKEY), true, true)));
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
+}
+
+TEST_F(IndexBoundsBuilderTest, TranslateInternalExprLT) {
+    BSONObj keyPattern = BSON("a" << 1);
+    BSONElement elt = keyPattern.firstElement();
+    auto testIndex = buildSimpleIndexEntry(keyPattern);
+    BSONObj obj = BSON("a" << BSON("$_internalExprLt" << 4));
+    auto expr = parseMatchExpression(obj);
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+    ASSERT_EQUALS(oil.name, "a");
+    ASSERT_EQUALS(oil.intervals.size(), 1U);
+    ASSERT_EQUALS(Interval::INTERVAL_EQUALS,
+                  oil.intervals[0].compare(Interval(minKeyIntObj(4), true, false)));
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
+}
+
+TEST_F(IndexBoundsBuilderTest, TranslateInternalExprLTNull) {
+    BSONObj keyPattern = BSON("a" << 1);
+    BSONElement elt = keyPattern.firstElement();
+    auto testIndex = buildSimpleIndexEntry(keyPattern);
+    BSONObj obj = BSON("a" << BSON("$_internalExprLt" << BSONNULL));
+    auto expr = parseMatchExpression(obj);
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+    ASSERT_EQUALS(oil.name, "a");
+    ASSERT_EQUALS(oil.intervals.size(), 1U);
+    ASSERT_EQUALS(oil.intervals[0].toString(), "[MinKey, null]");
+    ASSERT_TRUE(oil.intervals[0].startInclusive);
+    ASSERT_TRUE(oil.intervals[0].endInclusive);
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_FETCH);
+}
+
+TEST_F(IndexBoundsBuilderTest, TranslateInternalExprLTMinKeyDoesNotGenerateBounds) {
+    BSONObj keyPattern = BSON("a" << 1);
+    BSONElement elt = keyPattern.firstElement();
+    auto testIndex = buildSimpleIndexEntry(keyPattern);
+    BSONObj obj = BSON("a" << BSON("$_internalExprLt" << MINKEY));
+    auto expr = parseMatchExpression(obj);
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+    ASSERT_EQUALS(oil.name, "a");
+    ASSERT_EQUALS(oil.intervals.size(), 0U);
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
+}
+
+DEATH_TEST_F(IndexBoundsBuilderTest,
+             TranslateInternalExprLTMultikeyPathFails,
+             "$expr comparison predicates on multikey paths cannot use an index") {
+    BSONObj keyPattern = BSON("a" << 1 << "b" << 1);
+    BSONElement elt = keyPattern.firstElement();
+    auto testIndex = buildMultikeyIndexEntry(keyPattern, {{0U}, {}});
+    BSONObj obj = BSON("a" << BSON("$_internalExprLt" << 4));
+    auto expr = parseMatchExpression(obj);
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+}
+
+TEST_F(IndexBoundsBuilderTest, TranslateInternalExprLTNonMultikeyPathOnMultikeyIndexSucceeds) {
+    BSONObj keyPattern = BSON("a" << 1 << "b" << 1);
+    BSONElement elt = keyPattern.firstElement();
+    auto testIndex = buildMultikeyIndexEntry(keyPattern, {{}, {0U}});
+    BSONObj obj = BSON("a" << BSON("$_internalExprLt" << 4));
+    auto expr = parseMatchExpression(obj);
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+    ASSERT_EQUALS(oil.name, "a");
+    ASSERT_EQUALS(oil.intervals.size(), 1U);
+    ASSERT_EQUALS(Interval::INTERVAL_EQUALS,
+                  oil.intervals[0].compare(Interval(minKeyIntObj(4), true, false)));
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
+}
+
+TEST_F(IndexBoundsBuilderTest, TranslateInternalExprLTSubObjectContainingBadValuesSucceeds) {
+    BSONObj keyPattern = BSON("_id" << 1);
+    BSONElement elt = keyPattern.firstElement();
+    auto testIndex = buildSimpleIndexEntry(keyPattern);
+    BSONObj subObj = BSON("subObj" << BSON("a" << BSONUndefined << "b" << BSON_ARRAY("array")));
+    BSONObj obj = BSON("_id" << BSON("$_internalExprLt" << subObj));
+    auto expr = parseMatchExpression(obj);
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+    ASSERT_EQUALS(oil.name, "_id");
+    ASSERT_EQUALS(oil.intervals.size(), 1U);
+    ASSERT_EQUALS(
+        Interval::INTERVAL_EQUALS,
+        oil.intervals[0].compare(Interval(BSON("" << MINKEY << "" << subObj), true, false)));
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
+}
+
+TEST_F(IndexBoundsBuilderTest, TranslateInternalExprLTE) {
+    BSONObj keyPattern = BSON("a" << 1);
+    BSONElement elt = keyPattern.firstElement();
+    auto testIndex = buildSimpleIndexEntry(keyPattern);
+    BSONObj obj = BSON("a" << BSON("$_internalExprLte" << 4));
+    auto expr = parseMatchExpression(obj);
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+    ASSERT_EQUALS(oil.name, "a");
+    ASSERT_EQUALS(oil.intervals.size(), 1U);
+    ASSERT_EQUALS(Interval::INTERVAL_EQUALS,
+                  oil.intervals[0].compare(Interval(minKeyIntObj(4), true, true)));
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
+}
+
+TEST_F(IndexBoundsBuilderTest, TranslateInternalExprLTENull) {
+    BSONObj keyPattern = BSON("a" << 1);
+    BSONElement elt = keyPattern.firstElement();
+    auto testIndex = buildSimpleIndexEntry(keyPattern);
+    BSONObj obj = BSON("a" << BSON("$_internalExprLte" << BSONNULL));
+    auto expr = parseMatchExpression(obj);
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+    ASSERT_EQUALS(oil.name, "a");
+    ASSERT_EQUALS(oil.intervals.size(), 1U);
+    ASSERT_EQUALS(oil.intervals[0].toString(), "[MinKey, null]");
+    ASSERT_TRUE(oil.intervals[0].startInclusive);
+    ASSERT_TRUE(oil.intervals[0].endInclusive);
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
+}
+
+TEST_F(IndexBoundsBuilderTest, TranslateInternalExprLTEMinKeyGeneratesBounds) {
+    BSONObj keyPattern = BSON("a" << 1);
+    BSONElement elt = keyPattern.firstElement();
+    auto testIndex = buildSimpleIndexEntry(keyPattern);
+    BSONObj obj = BSON("a" << BSON("$_internalExprLte" << MINKEY));
+    auto expr = parseMatchExpression(obj);
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+    ASSERT_EQUALS(oil.name, "a");
+    ASSERT_EQUALS(oil.intervals.size(), 1U);
+    ASSERT_EQUALS(oil.intervals[0].toString(), "[MinKey, MinKey]");
+    ASSERT_TRUE(oil.intervals[0].startInclusive);
+    ASSERT_TRUE(oil.intervals[0].endInclusive);
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
+}
+
+DEATH_TEST_F(IndexBoundsBuilderTest,
+             TranslateInternalExprLTEMultikeyPathFails,
+             "$expr comparison predicates on multikey paths cannot use an index") {
+    BSONObj keyPattern = BSON("a" << 1 << "b" << 1);
+    BSONElement elt = keyPattern.firstElement();
+    auto testIndex = buildMultikeyIndexEntry(keyPattern, {{0U}, {}});
+
+    BSONObj obj = BSON("a" << BSON("$_internalExprLte" << 4));
+    auto expr = parseMatchExpression(obj);
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+}
+
+TEST_F(IndexBoundsBuilderTest, TranslateInternalExprLTENonMultikeyPathOnMultikeyIndexSucceeds) {
+    BSONObj keyPattern = BSON("a" << 1 << "b" << 1);
+    BSONElement elt = keyPattern.firstElement();
+    auto testIndex = buildMultikeyIndexEntry(keyPattern, {{}, {0U}});
+    BSONObj obj = BSON("a" << BSON("$_internalExprLte" << 4));
+    auto expr = parseMatchExpression(obj);
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+    ASSERT_EQUALS(oil.name, "a");
+    ASSERT_EQUALS(oil.intervals.size(), 1U);
+    ASSERT_EQUALS(Interval::INTERVAL_EQUALS,
+                  oil.intervals[0].compare(Interval(minKeyIntObj(4), true, true)));
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
+}
+
+TEST_F(IndexBoundsBuilderTest, TranslateInternalExprLTESubObjectContainingBadValuesSucceeds) {
+    BSONObj keyPattern = BSON("_id" << 1);
+    BSONElement elt = keyPattern.firstElement();
+    auto testIndex = buildSimpleIndexEntry(keyPattern);
+    BSONObj subObj = BSON("subObj" << BSON("a" << BSONUndefined << "b" << BSON_ARRAY("array")));
+    BSONObj obj = BSON("_id" << BSON("$_internalExprLte" << subObj));
+    auto expr = parseMatchExpression(obj);
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+    ASSERT_EQUALS(oil.name, "_id");
+    ASSERT_EQUALS(oil.intervals.size(), 1U);
+    ASSERT_EQUALS(
+        Interval::INTERVAL_EQUALS,
+        oil.intervals[0].compare(Interval(BSON("" << MINKEY << "" << subObj), true, true)));
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
 }
 
 }  // namespace

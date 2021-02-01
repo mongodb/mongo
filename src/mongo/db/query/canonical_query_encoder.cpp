@@ -190,7 +190,19 @@ const char* encodeMatchType(MatchExpression::MatchType mt) {
             return "xp";
 
         case MatchExpression::INTERNAL_EXPR_EQ:
-            return "ee";
+            return "eeq";
+
+        case MatchExpression::INTERNAL_EXPR_GT:
+            return "egt";
+
+        case MatchExpression::INTERNAL_EXPR_GTE:
+            return "ege";
+
+        case MatchExpression::INTERNAL_EXPR_LT:
+            return "elt";
+
+        case MatchExpression::INTERNAL_EXPR_LTE:
+            return "ele";
 
         case MatchExpression::INTERNAL_SCHEMA_ALL_ELEM_MATCH_FROM_INDEX:
             return "internalSchemaAllElemMatchFromIndex";
