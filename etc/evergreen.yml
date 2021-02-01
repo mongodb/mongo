@@ -9671,6 +9671,7 @@ buildvariants:
     multiversion_platform: windows
     multiversion_edition: enterprise
     large_distro_name: windows-64-vs2019-large
+    test_flags: &windows_common_test_excludes --excludeWithAnyTags=incompatible_with_windows_tls
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
@@ -9749,6 +9750,7 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: windows
     push_arch: x86_64-enterprise
+    test_flags: *windows_common_test_excludes
   tasks:
   - name: compile_and_archive_dist_test_then_package_TG
     distros:
@@ -9800,6 +9802,7 @@ buildvariants:
         --mongosSetParameters="{
             featureFlagWindowFunctions: true,
         }"
+        --excludeWithAnyTags=incompatible_with_windows_tls
 
 - &enterprise-windows-suggested-template
   name: enterprise-windows-suggested
@@ -9828,6 +9831,7 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: windows
     push_arch: x86_64-enterprise
+    test_flags: *windows_common_test_excludes
   tasks:
     - name: compile_test_and_package_serial_TG
       distros:
@@ -9901,6 +9905,7 @@ buildvariants:
         --mongosSetParameters="{
             featureFlagWindowFunctions: true,
         }"
+        --excludeWithAnyTags=incompatible_with_windows_tls
 
 - <<: *enterprise-windows-nopush-template
   name: enterprise-windows-benchmarks
@@ -9935,7 +9940,7 @@ buildvariants:
     compile_flags: --ssl MONGO_DISTMOD=windows CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --win-version-min=win10
     num_scons_link_jobs_available: 0.5
     python: '/cygdrive/c/python/python37/python.exe'
-    test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_journaling
+    test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_journaling,incompatible_with_windows_tls
     ext: zip
     scons_cache_scope: shared
     multiversion_platform: windows
@@ -9990,6 +9995,7 @@ buildvariants:
     ext: zip
     scons_cache_scope: shared
     large_distro_name: windows-64-vs2019-large
+    test_flags: *windows_common_test_excludes
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
@@ -10043,6 +10049,7 @@ buildvariants:
     python: '/cygdrive/c/python/python37/python.exe'
     ext: zip
     scons_cache_scope: shared
+    test_flags: *windows_common_test_excludes
   tasks:
   # This variant tests that unoptimized, DEBUG mongos and mongod binaries can run on Windows.
   # It has a minimal amount of tasks because unoptimized builds are slow, which causes
