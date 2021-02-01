@@ -31,6 +31,7 @@
 
 static void config_backup_incr(void);
 static void config_backup_incr_granularity(void);
+static void config_backup_incr_log_compatibility_check(void);
 static void config_backward_compatible(void);
 static void config_cache(void);
 static void config_checkpoint(void);
@@ -267,12 +268,8 @@ config_backup_incr(void)
      * archival doesn't seem as useful as testing backup, let the backup configuration override.
      */
     if (config_is_perm("backup.incremental")) {
-        if (g.c_backup_incr_flag == INCREMENTAL_LOG) {
-            if (g.c_logging_archive && config_is_perm("logging.archive"))
-                testutil_die(EINVAL, "backup.incremental=log is incompatible with logging.archive");
-            if (g.c_logging_archive)
-                config_single("logging.archive=0", false);
-        }
+        if (g.c_backup_incr_flag == INCREMENTAL_LOG)
+            config_backup_incr_log_compatibility_check();
         if (g.c_backup_incr_flag == INCREMENTAL_BLOCK)
             config_backup_incr_granularity();
         return;
@@ -761,6 +758,23 @@ config_in_memory_reset(void)
 }
 
 /*
+ * config_backup_incr_compatibility_check --
+ *     Backup incremental log compatibility check.
+ */
+static void
+config_backup_incr_log_compatibility_check(void)
+{
+    /*
+     * Incremental backup using log files is incompatible with logging archival. Disable logging
+     * archival if log incremental backup is set.
+     */
+    if (g.c_logging_archive && config_is_perm("logging.archive"))
+        testutil_die(EINVAL, "backup.incremental=log is incompatible with logging.archive");
+    if (g.c_logging_archive)
+        config_single("logging.archive=0", false);
+}
+
+/*
  * config_lsm_reset --
  *     LSM configuration review.
  */
@@ -784,11 +798,26 @@ config_lsm_reset(void)
         config_single("transaction.timestamps=off", false);
     }
 
-    /* LSM may not work with backups, turn off backups if lsm is configured. */
+    /*
+     * LSM does not work with block-based incremental backup, change the incremental backup
+     * mechanism if block based in configured.
+     */
     if (g.c_backups) {
-        if (config_is_perm("backup"))
-            testutil_die(EINVAL, "LSM is incompatible with backup configurations");
-        config_single("backup=off", false);
+        if (config_is_perm("backup.incremental") && g.c_backup_incr_flag == INCREMENTAL_BLOCK)
+            testutil_die(EINVAL, "LSM does not work with backup.incremental=block configuration.");
+
+        if (g.c_backup_incr_flag == INCREMENTAL_BLOCK)
+            switch (mmrand(NULL, 1, 2)) {
+            case 1:
+                /* 50% */
+                config_single("backup.incremental=off", false);
+                break;
+            case 2:
+                /* 50% */
+                config_single("backup.incremental=log", false);
+                config_backup_incr_log_compatibility_check();
+                break;
+            }
     }
 }
 
