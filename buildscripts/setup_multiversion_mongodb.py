@@ -71,7 +71,10 @@ def get_version_parts(version, for_sorting=False):
         # [2, 6, 0, -100] and [2, 6, 0, 0] sort in ascending order.
         version_parts.append(0)
 
-    return [float(part) for part in version_parts]
+    try:
+        return [float(part) for part in version_parts]
+    except ValueError:
+        return None
 
 
 def download_file(url, file_name, download_retries=5):
@@ -207,6 +210,10 @@ class MultiVersionDownloader(object):  # pylint: disable=too-many-instance-attri
         requested_version_parts = get_version_parts(version)
         for link_version, link_url in self.links.iteritems():
             link_version_parts = get_version_parts(link_version)
+            if link_version_parts is None:
+                print("Unable to parse version {}; ignoring".format(link_version))
+                continue
+
             if link_version_parts[:len(requested_version_parts)] == requested_version_parts:
                 # The 'link_version' is a candidate for the requested 'version' if
                 #   (a) it is a prefix of the requested version, or if
