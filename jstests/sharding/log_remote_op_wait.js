@@ -74,7 +74,7 @@ function getDuration(logLine) {
 const cursor = coll.aggregate(pipeline, {comment: pipelineComment, batchSize: 1});
 {
     const mongosLog = assert.commandWorked(st.s.adminCommand({getLog: "global"}));
-    const line = findMatchingLogLine(mongosLog.log, {comment: pipelineComment});
+    const line = findMatchingLogLine(mongosLog.log, {msg: "Slow query", comment: pipelineComment});
     assert(line, 'Failed to find a log line matching the comment');
     const remoteOpWait = getRemoteOpWait(line);
     const duration = getDuration(line);
@@ -87,7 +87,8 @@ cursor.next();
 cursor.hasNext();
 {
     const mongosLog = assert.commandWorked(st.s.adminCommand({getLog: "global"}));
-    const lines = [...findMatchingLogLines(mongosLog.log, {comment: pipelineComment})];
+    const lines =
+        [...findMatchingLogLines(mongosLog.log, {msg: "Slow query", comment: pipelineComment})];
     const line = lines.find(line => line.match(/command.{1,4}getMore/));
     assert(line, 'Failed to find a getMore log line matching the comment');
     const remoteOpWait = getRemoteOpWait(line);
@@ -100,7 +101,7 @@ const watchComment = 'example_watch_should_have_remote_op_wait';
 coll.watch([], {comment: watchComment}).hasNext();
 {
     const mongosLog = assert.commandWorked(st.s.adminCommand({getLog: "global"}));
-    const line = findMatchingLogLine(mongosLog.log, {comment: watchComment});
+    const line = findMatchingLogLine(mongosLog.log, {msg: "Slow query", comment: watchComment});
     assert(line, "Failed to find a log line matching the comment");
     const remoteOpWait = getRemoteOpWait(line);
     const duration = getDuration(line);
@@ -112,7 +113,8 @@ const findComment = 'example_find_should_not_have_remote_op_wait';
 coll.find().sort({x: 1}).comment(findComment).next();
 {
     const mongosLog = assert.commandWorked(st.s.adminCommand({getLog: "global"}));
-    const lines = [...findMatchingLogLines(mongosLog.log, {comment: findComment})];
+    const lines =
+        [...findMatchingLogLines(mongosLog.log, {msg: "Slow query", comment: findComment})];
     const line = lines.find(line => line.match(/command.{1,4}find/));
     assert(line, "Failed to find a 'find' log line matching the comment");
     assert(!line.match(/remoteOpWait/), `Log line unexpectedly contained remoteOpWait: ${line}`);
@@ -123,7 +125,8 @@ const listCollectionsComment = 'example_listCollections_should_not_have_remote_o
 coll.runCommand({listCollections: 1, comment: listCollectionsComment});
 {
     const mongosLog = assert.commandWorked(st.s.adminCommand({getLog: "global"}));
-    const lines = [...findMatchingLogLines(mongosLog.log, {comment: listCollectionsComment})];
+    const lines = [...findMatchingLogLines(mongosLog.log,
+                                           {msg: "Slow query", comment: listCollectionsComment})];
     const line = lines.find(line => line.match(/command.{1,4}listCollections/));
     assert(line, "Failed to find a 'listCollections' log line matching the comment");
     assert(!line.match(/remoteOpWait/), `Log line unexpectedly contained remoteOpWait: ${line}`);
@@ -143,7 +146,8 @@ coll.aggregate(pipeline2, {allowDiskUse: true, comment: pipelineComment2}).next(
     const shard0Log = assert.commandWorked(st.shard0.adminCommand({getLog: "global"}));
     const shard1Log = assert.commandWorked(st.shard1.adminCommand({getLog: "global"}));
     const bothShardsLogLines = shard0Log.log.concat(shard1Log.log);
-    const lines = [...findMatchingLogLines(bothShardsLogLines, {comment: pipelineComment2})];
+    const lines = [...findMatchingLogLines(bothShardsLogLines,
+                                           {msg: "Slow query", comment: pipelineComment2})];
     // The line we want is whichever had a $mergeCursors stage.
     const line = lines.find(line => line.match(/mergeCursors/));
     assert(line, `Failed to find a log line mentioning 'mergeCursors': ${lines}`);

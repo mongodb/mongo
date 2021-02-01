@@ -56,7 +56,8 @@ function runTest(conn) {
     assert.eq(0, coll.find().comment(comment1).itcount());
 
     let log = assert.commandWorked(db.adminCommand({getLog: "global"})).log;
-    assert(findMatchingLogLine(log, {comment: comment1}), `No log line for comment: ${comment1}`);
+    assert(findMatchingLogLine(log, {msg: "Slow query", comment: comment1}),
+           `No log line for comment: ${comment1}`);
     if (!isMongos) {
         assert(db.system.profile.findOne({'command.comment': comment1}),
                `No profiler entry for comment: ${comment1}`);
@@ -70,7 +71,7 @@ function runTest(conn) {
     assert.eq(0, coll.find().comment(comment2).itcount());
 
     log = assert.commandWorked(db.adminCommand({getLog: "global"})).log;
-    assert.eq(null, findMatchingLogLine(log, {comment: comment2}));
+    assert.eq(null, findMatchingLogLine(log, {msg: "Slow query", comment: comment2}));
     if (!isMongos) {
         assert.eq(null, db.system.profile.findOne({'command.comment': comment2}));
     }
@@ -94,8 +95,8 @@ function runTest(conn) {
         // Only the collscan plan should be logged and profiled. The ixscan plan has a low ratio of
         // docsExamined/nreturned, so the filter does not select it.
         log = assert.commandWorked(db.adminCommand({getLog: "global"})).log;
-        assert(findMatchingLogLine(log, {comment: collscanComment}));
-        assert.eq(null, findMatchingLogLine(log, {comment: ixscanComment}));
+        assert(findMatchingLogLine(log, {msg: "Slow query", comment: collscanComment}));
+        assert.eq(null, findMatchingLogLine(log, {msg: "Slow query", comment: ixscanComment}));
         assert(db.system.profile.findOne({'command.comment': collscanComment}));
         assert.eq(null, db.system.profile.findOne({'command.comment': ixscanComment}));
     }
