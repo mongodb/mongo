@@ -1,6 +1,10 @@
 /**
  * Tests that different write concerns are respected for time-series inserts, even if they are in
  * the same bucket.
+ *
+ * @tags: [
+ *   requires_replication,
+ * ]
  */
 (function() {
 'use strict';
