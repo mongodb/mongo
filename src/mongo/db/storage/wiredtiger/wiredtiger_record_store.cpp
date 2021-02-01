@@ -1516,19 +1516,14 @@ void WiredTigerRecordStore::reclaimOplog(OperationContext* opCtx, Timestamp mayT
         }
     }
 
-    LOGV2_DEBUG(22401,
-                1,
-                "Finished truncating the oplog, it now contains approximately "
-                "{sizeInfo_numRecords_load} records totaling to {sizeInfo_dataSize_load} bytes",
-                "sizeInfo_numRecords_load"_attr = _sizeInfo->numRecords.load(),
-                "sizeInfo_dataSize_load"_attr = _sizeInfo->dataSize.load());
     auto elapsedMicros = timer.micros();
     auto elapsedMillis = elapsedMicros / 1000;
     _totalTimeTruncating.fetchAndAdd(elapsedMicros);
     _truncateCount.fetchAndAdd(1);
     LOGV2(22402,
-          "WiredTiger record store oplog truncation finished in: {elapsedMillis}ms",
           "WiredTiger record store oplog truncation finished",
+          "numRecords"_attr = _sizeInfo->numRecords.load(),
+          "dataSize"_attr = _sizeInfo->dataSize.load(),
           "duration"_attr = Milliseconds(elapsedMillis));
 }
 
