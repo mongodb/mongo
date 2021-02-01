@@ -81,6 +81,10 @@ public:
         return _options.capped;
     }
 
+    virtual bool isClustered() const {
+        return false;
+    }
+
     virtual int64_t storageSize(OperationContext* opCtx,
                                 BSONObjBuilder* extraInfo = nullptr,
                                 int infoLevel = 0) const {

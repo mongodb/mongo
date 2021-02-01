@@ -64,7 +64,8 @@ CollectionScan::CollectionScan(ExpressionContext* expCtx,
     : RequiresCollectionStage(kStageType, expCtx, collection),
       _workingSet(workingSet),
       _filter((filter && !filter->isTriviallyTrue()) ? filter : nullptr),
-      _params(params) {
+      _params(params),
+      _isClustered(collection->getRecordStore()->isClustered()) {
     // Explain reports the direction of the collection scan.
     _specificStats.direction = params.direction;
     _specificStats.minTs = params.minTs;
@@ -149,7 +150,7 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
                 }
             }
 
-            if (_params.resumeAfterRecordId) {
+            if (_params.resumeAfterRecordId && !_params.resumeAfterRecordId->isNull()) {
                 invariant(!_params.tailable);
                 invariant(_lastSeenId.isNull());
                 // Seek to where we are trying to resume the scan from. Signal a KeyNotFound error

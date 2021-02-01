@@ -104,6 +104,7 @@ public:
         std::string ident;
         std::string engineName;
         bool isCapped;
+        bool isClustered;
         bool isEphemeral;
         int64_t cappedMaxSize;
         int64_t cappedMaxDocs;
@@ -123,6 +124,8 @@ public:
 
     // name of the RecordStore implementation
     virtual const char* name() const;
+
+    virtual bool isClustered() const;
 
     virtual long long dataSize(OperationContext* opCtx) const;
 
@@ -352,6 +355,8 @@ private:
     const std::string _engineName;
     // The capped settings should not be updated once operations have started
     const bool _isCapped;
+    // True if this record store is clustered.
+    const bool _isClustered;
     // True if the storage engine is an in-memory storage engine
     const bool _isEphemeral;
     // True if WiredTiger is logging updates to this table

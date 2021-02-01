@@ -228,6 +228,14 @@ public:
     }
 
     /**
+     * Collections with clustered indexes on _id use the ObjectId format for RecordId. All other
+     * RecordStores use int64_t for RecordId. Clustered RecordStores require callers to provide
+     * RecordIds and will not generate them automatically. The oplog is already clustered internally
+     * by timestamp, and cannot be clustered by ObjectId.
+     */
+    virtual bool isClustered() const = 0;
+
+    /**
      * The dataSize is an approximation of the sum of the sizes (in bytes) of the
      * documents or entries in the recordStore.
      */
@@ -321,6 +329,10 @@ public:
                                       const char* data,
                                       int len,
                                       Timestamp timestamp) {
+        // Clustered record stores do not generate unique ObjectIds for RecordIds. The expectation
+        // is for the caller to pass a non-null RecordId.
+        invariant(!isClustered());
+
         std::vector<Record> inOutRecords{Record{RecordId(), RecordData(data, len)}};
         Status status = insertRecords(opCtx, &inOutRecords, std::vector<Timestamp>{timestamp});
         if (!status.isOK())

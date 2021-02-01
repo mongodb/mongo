@@ -117,6 +117,7 @@ public:
         params.ident = ns;
         params.engineName = kWiredTigerEngineName;
         params.isCapped = false;
+        params.isClustered = NamespaceString(ns).isTimeseriesBucketsCollection();
         params.isEphemeral = false;
         params.cappedMaxSize = -1;
         params.cappedMaxDocs = -1;
@@ -164,6 +165,7 @@ public:
         params.ident = ident;
         params.engineName = kWiredTigerEngineName;
         params.isCapped = true;
+        params.isClustered = NamespaceString(ns).isTimeseriesBucketsCollection();
         params.isEphemeral = false;
         params.cappedMaxSize = cappedMaxSize;
         params.cappedMaxDocs = cappedMaxDocs;
@@ -252,6 +254,7 @@ TEST(WiredTigerRecordStoreTest, SizeStorer1) {
         params.ident = ident;
         params.engineName = kWiredTigerEngineName;
         params.isCapped = false;
+        params.isClustered = false;
         params.isEphemeral = false;
         params.cappedMaxSize = -1;
         params.cappedMaxDocs = -1;

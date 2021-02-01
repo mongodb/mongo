@@ -197,10 +197,13 @@ Status QueryRequest::validate() const {
         }
         if (!getResumeAfter().isEmpty()) {
             if (getResumeAfter().nFields() != 1 ||
-                getResumeAfter()["$recordId"].type() != BSONType::NumberLong) {
-                return Status(ErrorCodes::BadValue,
-                              "Malformed resume token: the '_resumeAfter' object must contain"
-                              " exactly one field named '$recordId', of type NumberLong.");
+                (getResumeAfter()["$recordId"].type() != BSONType::NumberLong &&
+                 getResumeAfter()["$recordId"].type() != BSONType::jstOID &&
+                 getResumeAfter()["$recordId"].type() != BSONType::jstNULL)) {
+                return Status(
+                    ErrorCodes::BadValue,
+                    "Malformed resume token: the '_resumeAfter' object must contain"
+                    " exactly one field named '$recordId', of type NumberLong, jstOID or jstNULL.");
             }
         }
     } else if (!getResumeAfter().isEmpty()) {

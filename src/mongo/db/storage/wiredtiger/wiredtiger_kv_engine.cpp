@@ -1464,6 +1464,7 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::getRecordStore(OperationContext
     params.ident = ident.toString();
     params.engineName = _canonicalName;
     params.isCapped = options.capped;
+    params.isClustered = NamespaceString(ns).isTimeseriesBucketsCollection();
     params.isEphemeral = _ephemeral;
     params.cappedCallback = nullptr;
     params.sizeStorer = _sizeStorer.get();
@@ -1601,6 +1602,7 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::makeTemporaryRecordStore(Operat
     params.ident = ident.toString();
     params.engineName = _canonicalName;
     params.isCapped = false;
+    params.isClustered = false;
     params.isEphemeral = _ephemeral;
     params.cappedCallback = nullptr;
     // Temporary collections do not need to persist size information to the size storer.

@@ -691,13 +691,26 @@ Status CollectionImpl::_insertDocuments(OperationContext* opCtx,
     for (auto it = begin; it != end; it++) {
         const auto& doc = it->doc;
 
+        RecordId recordId;
+        if (_shared->_recordStore->isClustered()) {
+            // Extract the ObjectId from the document's _id field.
+            BSONElement oidElem;
+            bool foundId = doc.getObjectID(oidElem);
+            uassert(ErrorCodes::BadValue,
+                    str::stream() << "Document " << redact(doc) << " is missing the '_id' field",
+                    foundId);
+
+            recordId = RecordId(oidElem.OID());
+        }
+
         if (MONGO_unlikely(corruptDocumentOnInsert.shouldFail())) {
             // Insert a truncated record that is half the expected size of the source document.
-            records.emplace_back(Record{RecordId(), RecordData(doc.objdata(), doc.objsize() / 2)});
+            records.emplace_back(Record{recordId, RecordData(doc.objdata(), doc.objsize() / 2)});
             timestamps.emplace_back(it->oplogSlot.getTimestamp());
             continue;
         }
-        records.emplace_back(Record{RecordId(), RecordData(doc.objdata(), doc.objsize())});
+
+        records.emplace_back(Record{recordId, RecordData(doc.objdata(), doc.objsize())});
         timestamps.emplace_back(it->oplogSlot.getTimestamp());
     }
     Status status = _shared->_recordStore->insertRecords(opCtx, &records, timestamps);
@@ -709,8 +722,13 @@ Status CollectionImpl::_insertDocuments(OperationContext* opCtx,
     int recordIndex = 0;
     for (auto it = begin; it != end; it++) {
         RecordId loc = records[recordIndex++].id;
-        invariant(RecordId::min<int64_t>() < loc);
-        invariant(loc < RecordId::max<int64_t>());
+        if (_shared->_recordStore->isClustered()) {
+            invariant(RecordId::min<OID>() < loc);
+            invariant(loc < RecordId::max<OID>());
+        } else {
+            invariant(RecordId::min<int64_t>() < loc);
+            invariant(loc < RecordId::max<int64_t>());
+        }
 
         BsonRecord bsonRecord = {loc, Timestamp(it->oplogSlot.getTimestamp()), &(it->doc)};
         bsonRecords.push_back(bsonRecord);

@@ -242,7 +242,18 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
     // Extract and assign the RecordId from the 'resumeAfter' token, if present.
     const BSONObj& resumeAfterObj = query.getQueryRequest().getResumeAfter();
     if (!resumeAfterObj.isEmpty()) {
-        csn->resumeAfterRecordId = RecordId(resumeAfterObj["$recordId"].numberLong());
+        BSONElement recordIdElem = resumeAfterObj["$recordId"];
+        switch (recordIdElem.type()) {
+            case jstNULL:
+                csn->resumeAfterRecordId = RecordId();
+                break;
+            case jstOID:
+                csn->resumeAfterRecordId = RecordId(recordIdElem.OID());
+                break;
+            case NumberLong:
+            default:
+                csn->resumeAfterRecordId = RecordId(recordIdElem.numberLong());
+        }
     }
 
     if (query.nss().isOplog() && csn->direction == 1) {

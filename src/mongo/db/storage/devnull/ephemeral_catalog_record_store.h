@@ -58,6 +58,10 @@ public:
 
     virtual const char* name() const;
 
+    virtual bool isClustered() const {
+        return false;
+    }
+
     virtual RecordData dataFor(OperationContext* opCtx, const RecordId& loc) const;
 
     virtual bool findRecord(OperationContext* opCtx, const RecordId& loc, RecordData* rd) const;

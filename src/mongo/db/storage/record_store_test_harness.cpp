@@ -404,5 +404,108 @@ TEST(RecordStoreTestHarness, Cursor1) {
         ASSERT(!cursor->next());
     }
 }
+
+TEST(RecordStoreTestHarness, ClusteredRecordStore) {
+    const std::string ns = "test.system.buckets.a";
+    const auto harnessHelper = newRecordStoreHarnessHelper();
+    std::unique_ptr<RecordStore> rs = harnessHelper->newNonCappedRecordStore(ns);
+    if (!rs->isClustered()) {
+        // ephemeralForTest does not support clustered indexes.
+        return;
+    }
+
+    auto opCtx = harnessHelper->newOperationContext();
+
+    const int numRecords = 100;
+    std::vector<Record> records;
+    std::vector<Timestamp> timestamps(numRecords, Timestamp());
+
+    for (int i = 0; i < numRecords; i++) {
+        BSONObj doc = BSON("i" << i);
+        RecordData recordData = RecordData(doc.objdata(), doc.objsize());
+        recordData.makeOwned();
+
+        records.push_back({RecordId(OID::gen()), recordData});
+    }
+
+    {
+        WriteUnitOfWork wuow(opCtx.get());
+        ASSERT_OK(rs->insertRecords(opCtx.get(), &records, timestamps));
+        wuow.commit();
+    }
+
+    {
+        int currRecord = 0;
+        auto cursor = rs->getCursor(opCtx.get(), /*forward=*/true);
+        while (auto record = cursor->next()) {
+            ASSERT_EQ(record->id, records.at(currRecord).id);
+            ASSERT_EQ(0, strcmp(records.at(currRecord).data.data(), record->data.data()));
+            currRecord++;
+        }
+
+        ASSERT_EQ(numRecords, currRecord);
+    }
+
+    {
+        // Verify random cursors work on ObjectId's.
+        auto cursor = rs->getRandomCursor(opCtx.get());
+        auto record = cursor->next();
+        ASSERT(record);
+
+        auto it =
+            std::find_if(records.begin(), records.end(), [&](const Record savedRecord) -> bool {
+                if (savedRecord.id == record->id) {
+                    return true;
+                }
+                return false;
+            });
+
+        ASSERT(it != records.end());
+        ASSERT_EQ(0, strcmp(it->data.data(), record->data.data()));
+    }
+
+    {
+        // Verify that find works with ObjectId.
+        for (int i = 0; i < numRecords; i += 10) {
+            RecordData rd;
+            ASSERT_TRUE(rs->findRecord(opCtx.get(), records.at(i).id, &rd));
+            ASSERT_EQ(0, strcmp(records.at(i).data.data(), rd.data()));
+        }
+
+        ASSERT_FALSE(rs->findRecord(opCtx.get(), RecordId::min<OID>(), nullptr));
+        ASSERT_FALSE(rs->findRecord(opCtx.get(), RecordId::max<OID>(), nullptr));
+    }
+
+    {
+        // Verify that update works with ObjectId.
+        BSONObj doc = BSON("i"
+                           << "updated");
+
+        WriteUnitOfWork wuow(opCtx.get());
+        for (int i = 0; i < numRecords; i += 10) {
+            ASSERT_OK(
+                rs->updateRecord(opCtx.get(), records.at(i).id, doc.objdata(), doc.objsize()));
+        }
+        wuow.commit();
+
+        for (int i = 0; i < numRecords; i += 10) {
+            RecordData rd;
+            ASSERT_TRUE(rs->findRecord(opCtx.get(), records.at(i).id, &rd));
+            ASSERT_EQ(0, strcmp(doc.objdata(), rd.data()));
+        }
+    }
+
+    {
+        // Verify that delete works with ObjectId.
+        WriteUnitOfWork wuow(opCtx.get());
+        for (int i = 0; i < numRecords; i += 10) {
+            rs->deleteRecord(opCtx.get(), records.at(i).id);
+        }
+        wuow.commit();
+
+        ASSERT_EQ(numRecords - 10, rs->numRecords(opCtx.get()));
+    }
+}
+
 }  // namespace
 }  // namespace mongo
