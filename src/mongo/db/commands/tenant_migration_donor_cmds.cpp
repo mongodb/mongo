@@ -34,9 +34,9 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/db/repl/tenant_migration_committed_info.h"
 #include "mongo/db/repl/tenant_migration_donor_service.h"
-#include "mongo/db/repl/tenant_migration_donor_util.h"
 
 namespace mongo {
 namespace {
@@ -233,7 +233,8 @@ public:
             // majority committed to verify that any durable data read up to this point is majority
             // committed.
             if (!donorPtr) {
-                tenant_migration_donor::performNoopWrite(opCtx, "NoSuchTenantMigration error");
+                tenant_migration_access_blocker::performNoopWrite(opCtx,
+                                                                  "NoSuchTenantMigration error");
 
                 auto& replClient = repl::ReplClientInfo::forClient(opCtx->getClient());
                 WriteConcernResult writeConcernResult;

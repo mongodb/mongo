@@ -35,10 +35,10 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/storage_interface.h"
-#include "mongo/db/repl/tenant_migration_access_blocker.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_executor.h"
 #include "mongo/db/repl/tenant_migration_committed_info.h"
 #include "mongo/db/repl/tenant_migration_conflict_info.h"
+#include "mongo/db/repl/tenant_migration_donor_access_blocker.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/cancelation.h"
 #include "mongo/util/fail_point.h"
@@ -55,9 +55,8 @@ const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
 
 }  // namespace
 
-TenantMigrationAccessBlocker::TenantMigrationAccessBlocker(ServiceContext* serviceContext,
-                                                           std::string tenantId,
-                                                           std::string recipientConnString)
+TenantMigrationDonorAccessBlocker::TenantMigrationDonorAccessBlocker(
+    ServiceContext* serviceContext, std::string tenantId, std::string recipientConnString)
     : _serviceContext(serviceContext),
       _tenantId(std::move(tenantId)),
       _recipientConnString(std::move(recipientConnString)) {
@@ -65,7 +64,7 @@ TenantMigrationAccessBlocker::TenantMigrationAccessBlocker(ServiceContext* servi
                                            .getOrCreateBlockedOperationsExecutor();
 }
 
-void TenantMigrationAccessBlocker::checkIfCanWriteOrThrow() {
+void TenantMigrationDonorAccessBlocker::checkIfCanWriteOrThrow() {
     stdx::lock_guard<Latch> lg(_mutex);
 
     switch (_state) {
@@ -85,8 +84,8 @@ void TenantMigrationAccessBlocker::checkIfCanWriteOrThrow() {
     }
 }
 
-Status TenantMigrationAccessBlocker::waitUntilCommittedOrAborted(OperationContext* opCtx,
-                                                                 OperationType operationType) {
+Status TenantMigrationDonorAccessBlocker::waitUntilCommittedOrAborted(OperationContext* opCtx,
+                                                                      OperationType operationType) {
     {
         stdx::unique_lock<Latch> ul(_mutex);
 
@@ -105,7 +104,7 @@ Status TenantMigrationAccessBlocker::waitUntilCommittedOrAborted(OperationContex
     auto executor = getAsyncBlockingOperationsExecutor();
     std::vector<ExecutorFuture<void>> futures;
 
-    futures.emplace_back(onCompletion().thenRunOn(executor));
+    futures.emplace_back(_onCompletion().thenRunOn(executor));
 
     if (opCtx->hasDeadline()) {
         auto deadlineReachedFuture =
@@ -121,7 +120,7 @@ Status TenantMigrationAccessBlocker::waitUntilCommittedOrAborted(OperationContex
     const auto& [status, idx] = waitResult.getValue();
 
     if (idx == 0) {
-        // onCompletion() finished first.
+        // _onCompletion() finished first.
         cancelTimeoutSource.cancel();
         return status;
     } else if (idx == 1) {
@@ -133,7 +132,8 @@ Status TenantMigrationAccessBlocker::waitUntilCommittedOrAborted(OperationContex
     MONGO_UNREACHABLE;
 }
 
-SharedSemiFuture<void> TenantMigrationAccessBlocker::getCanReadFuture(OperationContext* opCtx) {
+SharedSemiFuture<void> TenantMigrationDonorAccessBlocker::getCanReadFuture(
+    OperationContext* opCtx) {
     auto readConcernArgs = repl::ReadConcernArgs::get(opCtx);
     auto readTimestamp = [opCtx, &readConcernArgs]() -> std::optional<Timestamp> {
         if (auto afterClusterTime = readConcernArgs.getArgsAfterClusterTime()) {
@@ -153,7 +153,7 @@ SharedSemiFuture<void> TenantMigrationAccessBlocker::getCanReadFuture(OperationC
     return _getCanDoClusterTimeReadFuture(opCtx, *readTimestamp);
 }
 
-SharedSemiFuture<void> TenantMigrationAccessBlocker::_getCanDoClusterTimeReadFuture(
+SharedSemiFuture<void> TenantMigrationDonorAccessBlocker::_getCanDoClusterTimeReadFuture(
     OperationContext* opCtx, Timestamp readTimestamp) {
     stdx::unique_lock<Latch> ul(_mutex);
 
@@ -176,7 +176,7 @@ SharedSemiFuture<void> TenantMigrationAccessBlocker::_getCanDoClusterTimeReadFut
     return _transitionOutOfBlockingPromise.getFuture();
 }
 
-void TenantMigrationAccessBlocker::checkIfLinearizableReadWasAllowedOrThrow(
+void TenantMigrationDonorAccessBlocker::checkIfLinearizableReadWasAllowedOrThrow(
     OperationContext* opCtx) {
     stdx::lock_guard<Latch> lg(_mutex);
     uassert(TenantMigrationCommittedInfo(_tenantId, _recipientConnString),
@@ -184,7 +184,7 @@ void TenantMigrationAccessBlocker::checkIfLinearizableReadWasAllowedOrThrow(
             _state != State::kReject);
 }
 
-Status TenantMigrationAccessBlocker::checkIfCanBuildIndex() {
+Status TenantMigrationDonorAccessBlocker::checkIfCanBuildIndex() {
     stdx::lock_guard<Latch> lg(_mutex);
     switch (_state) {
         case State::kAllow:
@@ -201,7 +201,7 @@ Status TenantMigrationAccessBlocker::checkIfCanBuildIndex() {
     MONGO_UNREACHABLE;
 }
 
-void TenantMigrationAccessBlocker::startBlockingWrites() {
+void TenantMigrationDonorAccessBlocker::startBlockingWrites() {
     stdx::lock_guard<Latch> lg(_mutex);
 
     LOGV2(5093800, "Tenant migration starting to block writes", "tenantId"_attr = _tenantId);
@@ -214,7 +214,7 @@ void TenantMigrationAccessBlocker::startBlockingWrites() {
     _state = State::kBlockWrites;
 }
 
-void TenantMigrationAccessBlocker::startBlockingReadsAfter(const Timestamp& blockTimestamp) {
+void TenantMigrationDonorAccessBlocker::startBlockingReadsAfter(const Timestamp& blockTimestamp) {
     stdx::lock_guard<Latch> lg(_mutex);
 
     LOGV2(5093801,
@@ -231,7 +231,7 @@ void TenantMigrationAccessBlocker::startBlockingReadsAfter(const Timestamp& bloc
     _blockTimestamp = blockTimestamp;
 }
 
-void TenantMigrationAccessBlocker::rollBackStartBlocking() {
+void TenantMigrationDonorAccessBlocker::rollBackStartBlocking() {
     stdx::lock_guard<Latch> lg(_mutex);
 
     invariant(_state == State::kBlockWrites || _state == State::kBlockWritesAndReads);
@@ -243,7 +243,8 @@ void TenantMigrationAccessBlocker::rollBackStartBlocking() {
     _transitionOutOfBlockingPromise.setFrom(Status::OK());
 }
 
-void TenantMigrationAccessBlocker::setCommitOpTime(OperationContext* opCtx, repl::OpTime opTime) {
+void TenantMigrationDonorAccessBlocker::setCommitOpTime(OperationContext* opCtx,
+                                                        repl::OpTime opTime) {
     {
         stdx::lock_guard<Latch> lg(_mutex);
 
@@ -272,7 +273,8 @@ void TenantMigrationAccessBlocker::setCommitOpTime(OperationContext* opCtx, repl
     _onMajorityCommitCommitOpTime(lk);
 }
 
-void TenantMigrationAccessBlocker::setAbortOpTime(OperationContext* opCtx, repl::OpTime opTime) {
+void TenantMigrationDonorAccessBlocker::setAbortOpTime(OperationContext* opCtx,
+                                                       repl::OpTime opTime) {
     {
         stdx::lock_guard<Latch> lg(_mutex);
 
@@ -300,7 +302,7 @@ void TenantMigrationAccessBlocker::setAbortOpTime(OperationContext* opCtx, repl:
     _onMajorityCommitAbortOpTime(lk);
 }
 
-void TenantMigrationAccessBlocker::onMajorityCommitPointUpdate(repl::OpTime opTime) {
+void TenantMigrationDonorAccessBlocker::onMajorityCommitPointUpdate(repl::OpTime opTime) {
     stdx::unique_lock<Latch> lk(_mutex);
 
     if (_completionPromise.getFuture().isReady()) {
@@ -316,7 +318,8 @@ void TenantMigrationAccessBlocker::onMajorityCommitPointUpdate(repl::OpTime opTi
     }
 }
 
-void TenantMigrationAccessBlocker::_onMajorityCommitCommitOpTime(stdx::unique_lock<Latch>& lk) {
+void TenantMigrationDonorAccessBlocker::_onMajorityCommitCommitOpTime(
+    stdx::unique_lock<Latch>& lk) {
     invariant(_state == State::kBlockWritesAndReads);
     invariant(_blockTimestamp);
     invariant(_commitOpTime);
@@ -335,7 +338,7 @@ void TenantMigrationAccessBlocker::_onMajorityCommitCommitOpTime(stdx::unique_lo
           "tenantId"_attr = _tenantId);
 }
 
-void TenantMigrationAccessBlocker::_onMajorityCommitAbortOpTime(stdx::unique_lock<Latch>& lk) {
+void TenantMigrationDonorAccessBlocker::_onMajorityCommitAbortOpTime(stdx::unique_lock<Latch>& lk) {
     invariant(_state != State::kReject);
     invariant(!_commitOpTime);
     invariant(_state != State::kAborted);
@@ -351,16 +354,12 @@ void TenantMigrationAccessBlocker::_onMajorityCommitAbortOpTime(stdx::unique_loc
           "tenantId"_attr = _tenantId);
 }
 
-SharedSemiFuture<void> TenantMigrationAccessBlocker::onCompletion() {
-    return _completionPromise.getFuture();
-}
-
-void TenantMigrationAccessBlocker::appendInfoForServerStatus(BSONObjBuilder* builder) const {
+void TenantMigrationDonorAccessBlocker::appendInfoForServerStatus(BSONObjBuilder* builder) const {
     stdx::lock_guard<Latch> lg(_mutex);
     invariant(!_commitOpTime || !_abortOpTime);
 
     BSONObjBuilder tenantBuilder;
-    tenantBuilder.append("state", stateToString(_state));
+    tenantBuilder.append("state", _stateToString(_state));
     if (_blockTimestamp) {
         tenantBuilder.append("blockTimestamp", _blockTimestamp.get());
     }
@@ -373,7 +372,7 @@ void TenantMigrationAccessBlocker::appendInfoForServerStatus(BSONObjBuilder* bui
     builder->append(_tenantId, tenantBuilder.obj());
 }
 
-std::string TenantMigrationAccessBlocker::stateToString(State state) const {
+std::string TenantMigrationDonorAccessBlocker::_stateToString(State state) const {
     switch (state) {
         case State::kAllow:
             return "allow";
@@ -390,7 +389,7 @@ std::string TenantMigrationAccessBlocker::stateToString(State state) const {
     }
 }
 
-BSONObj TenantMigrationAccessBlocker::getDebugInfo() const {
+BSONObj TenantMigrationDonorAccessBlocker::getDebugInfo() const {
     return BSON("tenantId" << _tenantId << "recipientConnectionString" << _recipientConnString);
 }
 

@@ -43,7 +43,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index_build_entry_helpers.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/repl/tenant_migration_donor_util.h"
+#include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
@@ -185,7 +185,7 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
             // The check here catches empty index builds and also allows us to stop index
             // builds before waiting for throttling. It may race with the abort at the start
             // of migration so we do check again later.
-            uassertStatusOK(tenant_migration_donor::checkIfCanBuildIndex(opCtx, dbName));
+            uassertStatusOK(tenant_migration_access_blocker::checkIfCanBuildIndex(opCtx, dbName));
 
             stdx::unique_lock<Latch> lk(_throttlingMutex);
             opCtx->waitForConditionOrInterrupt(_indexBuildFinished, lk, [&] {
@@ -253,7 +253,8 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
         }
 
         if (opCtx->getClient()->isFromUserConnection()) {
-            auto migrationStatus = tenant_migration_donor::checkIfCanBuildIndex(opCtx, dbName);
+            auto migrationStatus =
+                tenant_migration_access_blocker::checkIfCanBuildIndex(opCtx, dbName);
             if (!migrationStatus.isOK()) {
                 LOGV2(4886200,
                       "Aborted index build before start due to tenant migration",

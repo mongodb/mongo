@@ -41,8 +41,8 @@
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/query/find_command_gen.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
-#include "mongo/db/repl/tenant_migration_access_blocker.h"
-#include "mongo/db/repl/tenant_migration_donor_util.h"
+#include "mongo/db/repl/tenant_migration_access_blocker_util.h"
+#include "mongo/db/repl/tenant_migration_donor_access_blocker.h"
 #include "mongo/db/repl/tenant_migration_state_machine_gen.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/executor/connection_pool.h"
@@ -70,12 +70,6 @@ const ReadPreferenceSetting kPrimaryOnlyReadPreference(ReadPreference::PrimaryOn
 
 const Seconds kRecipientSyncDataTimeout(30);
 const int kMaxRecipientKeyDocsFindAttempts = 10;
-
-std::shared_ptr<TenantMigrationAccessBlocker> getTenantMigrationAccessBlocker(
-    ServiceContext* const serviceContext, StringData tenantId) {
-    return TenantMigrationAccessBlockerRegistry::get(serviceContext)
-        .getTenantMigrationAccessBlockerForTenantId(tenantId);
-}
 
 bool shouldStopCreatingTTLIndex(Status status, const CancelationToken& token) {
     return status.isOK() || token.isCanceled();
@@ -133,7 +127,7 @@ TenantMigrationDonorService::Instance::Instance(ServiceContext* const serviceCon
                                                 const BSONObj& initialState)
     : repl::PrimaryOnlyService::TypedInstance<Instance>(),
       _serviceContext(serviceContext),
-      _stateDoc(tenant_migration_donor::parseDonorStateDocument(initialState)),
+      _stateDoc(tenant_migration_access_blocker::parseDonorStateDocument(initialState)),
       _instanceName(kServiceName + "-" + _stateDoc.getTenantId()),
       _recipientUri(
           uassertStatusOK(MongoURI::parse(_stateDoc.getRecipientConnectionString().toString()))) {
@@ -459,8 +453,9 @@ ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_updateState
                            case TenantMigrationDonorStateEnum::kBlocking: {
                                _stateDoc.setBlockTimestamp(oplogSlot.getTimestamp());
 
-                               auto mtab = getTenantMigrationAccessBlocker(_serviceContext,
-                                                                           _stateDoc.getTenantId());
+                               auto mtab = tenant_migration_access_blocker::
+                                   getTenantMigrationDonorAccessBlocker(_serviceContext,
+                                                                        _stateDoc.getTenantId());
                                invariant(mtab);
 
                                mtab->startBlockingWrites();
@@ -821,7 +816,8 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
                 return ExecutorFuture<void>(**executor, Status::OK());
             }
 
-            auto mtab = getTenantMigrationAccessBlocker(_serviceContext, _stateDoc.getTenantId());
+            auto mtab = tenant_migration_access_blocker::getTenantMigrationDonorAccessBlocker(
+                _serviceContext, _stateDoc.getTenantId());
             if (status == ErrorCodes::ConflictingOperationInProgress || !mtab) {
                 stdx::lock_guard<Latch> lg(_mutex);
                 if (!_initialDonorStateDurablePromise.getFuture().isReady()) {

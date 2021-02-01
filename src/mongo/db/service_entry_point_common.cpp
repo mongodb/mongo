@@ -71,7 +71,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/speculative_majority_read_info.h"
 #include "mongo/db/repl/storage_interface.h"
-#include "mongo/db/repl/tenant_migration_donor_util.h"
+#include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/db/request_execution_context.h"
 #include "mongo/db/run_op_kill_cursors.h"
 #include "mongo/db/s/operation_sharding_state.h"
@@ -793,12 +793,12 @@ Future<void> InvokeCommand::run(const bool checkoutSession) {
         return makeReadyFutureWith([] {})
             .then([this, anchor] {
                 auto execContext = _ecd->getExecutionContext();
-                tenant_migration_donor::checkIfCanReadOrBlock(
+                tenant_migration_access_blocker::checkIfCanReadOrBlock(
                     execContext->getOpCtx(), execContext->getRequest().getDatabase());
                 return _runInvocation();
             })
             .onError<ErrorCodes::TenantMigrationConflict>([this, anchor](Status status) {
-                tenant_migration_donor::handleTenantMigrationConflict(
+                tenant_migration_access_blocker::handleTenantMigrationConflict(
                     _ecd->getExecutionContext()->getOpCtx(), std::move(status));
             });
     });
@@ -814,7 +814,7 @@ Future<void> InvokeCommand::SessionCheckoutPath::run() {
             return makeReadyFutureWith([] {})
                 .then([this, anchor] {
                     auto execContext = _parent->_ecd->getExecutionContext();
-                    tenant_migration_donor::checkIfCanReadOrBlock(
+                    tenant_migration_access_blocker::checkIfCanReadOrBlock(
                         execContext->getOpCtx(), execContext->getRequest().getDatabase());
                     return _parent->_runInvocation();
                 })
@@ -823,7 +823,7 @@ Future<void> InvokeCommand::SessionCheckoutPath::run() {
                     // command to allow the stable timestamp on the node to advance.
                     _guard.reset();
 
-                    tenant_migration_donor::handleTenantMigrationConflict(
+                    tenant_migration_access_blocker::handleTenantMigrationConflict(
                         _parent->_ecd->getExecutionContext()->getOpCtx(), std::move(status));
                 })
                 .tapError([this, anchor](Status status) { return _tapError(std::move(status)); });
@@ -1076,7 +1076,8 @@ Future<bool> RunCommandImpl::_epilogue() {
         });
 
     behaviors.waitForLinearizableReadConcern(opCtx);
-    tenant_migration_donor::checkIfLinearizableReadWasAllowedOrThrow(opCtx, request.getDatabase());
+    tenant_migration_access_blocker::checkIfLinearizableReadWasAllowedOrThrow(
+        opCtx, request.getDatabase());
 
     // Wait for data to satisfy the read concern level, if necessary.
     behaviors.waitForSpeculativeMajorityReadConcern(opCtx);

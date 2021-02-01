@@ -80,8 +80,8 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/db/repl/tenant_migration_decoration.h"
-#include "mongo/db/repl/tenant_migration_donor_util.h"
 #include "mongo/db/repl/timestamp_block.h"
 #include "mongo/db/repl/transaction_oplog_application.h"
 #include "mongo/db/s/resharding_util.h"
@@ -295,7 +295,7 @@ void _logOpsInner(OperationContext* opCtx,
         });
 
         if (!isAbortIndexBuild) {
-            tenant_migration_donor::onWriteToDatabase(opCtx, nss.db());
+            tenant_migration_access_blocker::onWriteToDatabase(opCtx, nss.db());
         } else if (records->size() > 1) {
             str::stream ss;
             ss << "abortIndexBuild cannot be logged with other oplog entries ";
@@ -660,7 +660,7 @@ void createOplog(OperationContext* opCtx,
     });
 
     createSlimOplogView(opCtx, ctx.db());
-    tenant_migration_donor::createRetryableWritesView(opCtx, ctx.db());
+    tenant_migration_access_blocker::createRetryableWritesView(opCtx, ctx.db());
 
     /* sync here so we don't get any surprising lag later when we try to sync */
     service->getStorageEngine()->flushAllFiles(opCtx, /*callerHoldsReadLock*/ false);

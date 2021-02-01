@@ -30,7 +30,7 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
-#include "mongo/db/repl/tenant_migration_access_blocker.h"
+#include "mongo/db/repl/tenant_migration_donor_access_blocker.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {

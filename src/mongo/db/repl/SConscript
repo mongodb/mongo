@@ -64,7 +64,7 @@ env.Library(
         'repl_coordinator_interface',
         'repl_server_parameters',
         'repl_settings',
-        'tenant_migration_donor',
+        'tenant_migration_access_blocker',
         'timestamp_block',
     ],
 )
@@ -1194,7 +1194,7 @@ env.Library(
         'repl_sync_shared_data',
         'rollback_checker',
         'storage_interface',
-        'tenant_migration_donor'
+        'tenant_migration_access_blocker'
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/commands/feature_compatibility_parsers',
@@ -1334,14 +1334,14 @@ env.Library(
 )
 
 env.Library(
-    target='tenant_migration_donor',
+    target='tenant_migration_access_blocker',
     source=[
-        'tenant_migration_access_blocker.cpp',
         'tenant_migration_access_blocker_executor.cpp',
         'tenant_migration_access_blocker_registry.cpp',
         'tenant_migration_access_blocker_server_status_section.cpp',
+        'tenant_migration_access_blocker_util.cpp',
+        'tenant_migration_donor_access_blocker.cpp',
         'tenant_migration_donor_op_observer.cpp',
-        'tenant_migration_donor_util.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -1371,7 +1371,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/fetcher',
         'primary_only_service',
-        'tenant_migration_donor',
+        'tenant_migration_access_blocker',
         'tenant_migration_utils',
     ],
 )
@@ -1421,7 +1421,7 @@ env.Library(
         'replication_recovery',
         'reporter',
         'rollback_source_impl',
-        'tenant_migration_donor',
+        'tenant_migration_access_blocker',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/commands/mongod_fcv',

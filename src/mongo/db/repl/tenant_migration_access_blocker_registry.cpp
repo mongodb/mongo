@@ -28,7 +28,7 @@
  */
 
 #include "mongo/db/repl/tenant_migration_access_blocker_registry.h"
-#include "mongo/db/repl/tenant_migration_access_blocker.h"
+#include "mongo/db/repl/tenant_migration_donor_access_blocker.h"
 
 namespace mongo {
 

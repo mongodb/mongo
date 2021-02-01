@@ -32,7 +32,7 @@
 #include "mongo/platform/basic.h"
 #include "mongo/util/str.h"
 
-#include "mongo/db/repl/tenant_migration_donor_util.h"
+#include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands/tenant_migration_recipient_cmds_gen.h"
@@ -57,7 +57,7 @@ namespace mongo {
 // Failpoint that will cause recoverTenantMigrationAccessBlockers to return early.
 MONGO_FAIL_POINT_DEFINE(skipRecoverTenantMigrationAccessBlockers);
 
-namespace tenant_migration_donor {
+namespace tenant_migration_access_blocker {
 
 namespace {
 
@@ -68,6 +68,13 @@ constexpr char kNetName[] = "TenantMigrationWorkerNetwork";
 const auto donorStateDocToDeleteDecoration = OperationContext::declareDecoration<BSONObj>();
 
 }  // namespace
+
+std::shared_ptr<TenantMigrationDonorAccessBlocker> getTenantMigrationDonorAccessBlocker(
+    ServiceContext* const serviceContext, StringData tenantId) {
+    return checked_pointer_cast<TenantMigrationDonorAccessBlocker>(
+        TenantMigrationAccessBlockerRegistry::get(serviceContext)
+            .getTenantMigrationAccessBlockerForTenantId(tenantId));
+}
 
 TenantMigrationDonorDocument parseDonorStateDocument(const BSONObj& doc) {
     auto donorStateDoc =
@@ -203,12 +210,12 @@ void recoverTenantMigrationAccessBlockers(OperationContext* opCtx) {
     Query query;
 
     store.forEach(opCtx, query, [&](const TenantMigrationDonorDocument& doc) {
-        // Skip creating a TenantMigrationAccessBlocker for aborted migrations that have been
+        // Skip creating a TenantMigrationDonorAccessBlocker for aborted migrations that have been
         // marked as garbage collected.
         if (doc.getExpireAt() && doc.getState() == TenantMigrationDonorStateEnum::kAborted)
             return true;
 
-        auto mtab = std::make_shared<TenantMigrationAccessBlocker>(
+        auto mtab = std::make_shared<TenantMigrationDonorAccessBlocker>(
             opCtx->getServiceContext(),
             doc.getTenantId().toString(),
             doc.getRecipientConnectionString().toString());
@@ -304,6 +311,6 @@ void createRetryableWritesView(OperationContext* opCtx, Database* db) {
         });
 }
 
-}  // namespace tenant_migration_donor
+}  // namespace tenant_migration_access_blocker
 
 }  // namespace mongo

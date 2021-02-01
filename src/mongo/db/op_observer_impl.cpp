@@ -53,8 +53,8 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/db/repl/tenant_migration_decoration.h"
-#include "mongo/db/repl/tenant_migration_donor_util.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/session_catalog_mongod.h"
@@ -1232,7 +1232,7 @@ void OpObserverImpl::onUnpreparedTransactionCommit(OperationContext* opCtx,
     // Throw TenantMigrationConflict error if the database for the transaction statements is being
     // migrated. We only need check the namespace of the first statement since a transaction's
     // statements must all be for the same tenant.
-    tenant_migration_donor::onWriteToDatabase(opCtx, statements->begin()->getNss().db());
+    tenant_migration_access_blocker::onWriteToDatabase(opCtx, statements->begin()->getNss().db());
 
     if (MONGO_unlikely(hangAndFailUnpreparedCommitAfterReservingOplogSlot.shouldFail())) {
         hangAndFailUnpreparedCommitAfterReservingOplogSlot.pauseWhileSet(opCtx);
