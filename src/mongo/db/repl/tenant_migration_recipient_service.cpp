@@ -1075,6 +1075,8 @@ void TenantMigrationRecipientService::Instance::_cleanupOnDataSyncCompletion(Sta
         shutdownTarget(lk, _donorOplogFetcher);
         shutdownTargetWithOpCtx(lk, _donorOplogBuffer, opCtx.get());
 
+        _donorReplicaSetMonitor = nullptr;
+
         invariant(!status.isOK());
         setPromiseErrorifNotReady(lk, _stateDocPersistedPromise, status);
         setPromiseErrorifNotReady(lk, _dataSyncStartedPromise, status);
