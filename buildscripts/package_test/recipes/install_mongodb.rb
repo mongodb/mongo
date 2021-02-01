@@ -1,6 +1,5 @@
 artifacts_tarball = 'artifacts.tgz'
-user = node['current_user']
-homedir = node['etc']['passwd'][user]['dir']
+homedir = "/tmp"
 
 ruby_block 'allow sudo over tty' do
   block do
@@ -12,7 +11,7 @@ ruby_block 'allow sudo over tty' do
 end
 
 # This file limits processes to 1024. It therefore interfereres with `ulimit -u` when present.
-if platform_family? 'rhel'
+if platform_family? 'rhel' or platform_family? 'amazon'
   file '/etc/security/limits.d/90-nproc.conf' do
     action :delete
   end
@@ -88,9 +87,11 @@ if platform_family? 'debian'
   end
 end
 
-if platform_family? 'rhel'
+if platform_family? 'rhel' or platform_family? 'amazon'
   bash 'wait for yum updates if they are running' do
-    sleep 120
+    code <<-EOH
+      sleep 120
+    EOH
   end
   execute 'install mongod' do
     command 'yum install -y `find . -name "*server*.rpm"`'

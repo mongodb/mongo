@@ -21,7 +21,9 @@ verifier:
 
 provisioner:
   name: chef_solo
-  require_chef_omnibus: 12
+  require_chef_omnibus: 15
+  chef_license: accept
+  log_level: info
 
 platforms:
   - name: amazon-x86-64
@@ -77,6 +79,12 @@ platforms:
       image_id: ami-0c322300a1dd5dc79
     transport:
       username: ec2-user
+  - name: rhel82-arm64
+    driver:
+      image_id: ami-029ba835ddd43c34f
+      instance_type: m6g.medium
+    transport:
+      username: ec2-user
   - name: suse11-x86-64
     driver:
       image_id: ami-7f2e6015
@@ -112,11 +120,19 @@ platforms:
       image_id: ami-7ad76705
     transport:
       username: ubuntu
+  - name: ubuntu1804-arm64
+    driver:
+      image_id: ami-01ac7d9c1179d7b74
+      instance_type: a1.medium
   - name: ubuntu2004-x86-64
     driver:
       image_id: ami-068663a3c619dd892
     transport:
       username: ubuntu
+  - name: ubuntu2004-arm64
+    driver:
+      image_id: ami-00579fbb15b954340
+      instance_type: a1.medium
 
 transport:
   ssh_key: ~/.ssh/kitchen.pem
