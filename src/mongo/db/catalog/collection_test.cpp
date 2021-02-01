@@ -218,32 +218,40 @@ TEST_F(CollectionTest, CreateTimeseriesBucketCollection) {
 
     Lock::CollectionLock lk(operationContext(), nss, MODE_IX);
 
+    const BSONObj idxSpec = BSON("v" << IndexDescriptor::getDefaultIndexVersion() << "name"
+                                     << "_id_"
+                                     << "key" << BSON("_id" << 1));
+
     {
         WriteUnitOfWork wuow(operationContext());
 
-        ASSERT_THROWS_WITH_CHECK(
-            db->createCollection(operationContext(),
-                                 nss,
-                                 CollectionOptions(),
-                                 /*createIdIndex=*/true,
-                                 /*idIndex=*/
-                                 BSON("v" << IndexDescriptor::getDefaultIndexVersion() << "name"
-                                          << "_id_"
-                                          << "key" << BSON("_id" << 1))),
-            AssertionException,
-            [](const AssertionException& exception) {
-                ASSERT_EQ(exception.code(), ErrorCodes::CannotCreateIndex);
-                ASSERT_STRING_CONTAINS(
-                    exception.reason(),
-                    "cannot have an _id index on a time-series bucket collection");
-            });
+        // Database::createCollection() ignores the index spec if the _id index is not required on
+        // the collection.
+        Collection* collection = db->createCollection(operationContext(),
+                                                      nss,
+                                                      CollectionOptions(),
+                                                      /*createIdIndex=*/true,
+                                                      /*idIndex=*/
+                                                      idxSpec);
+        ASSERT(collection);
+        ASSERT_EQ(0, collection->getIndexCatalog()->numIndexesTotal(operationContext()));
+
+        StatusWith<BSONObj> swSpec = collection->getIndexCatalog()->createIndexOnEmptyCollection(
+            operationContext(), idxSpec);
+        ASSERT_NOT_OK(swSpec.getStatus());
+        ASSERT_EQ(swSpec.getStatus().code(), ErrorCodes::CannotCreateIndex);
+        ASSERT_STRING_CONTAINS(swSpec.getStatus().reason(),
+                               "cannot have an _id index on a time-series bucket collection");
+
+        // Rollback.
     }
 
     {
         WriteUnitOfWork wuow(operationContext());
-        auto coll = db->createCollection(
+        auto collection = db->createCollection(
             operationContext(), nss, CollectionOptions(), /*createIdIndex=*/false);
-        ASSERT(coll);
+        ASSERT(collection);
+        ASSERT_EQ(0, collection->getIndexCatalog()->numIndexesTotal(operationContext()));
         wuow.commit();
     }
 }

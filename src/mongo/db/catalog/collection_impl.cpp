@@ -359,6 +359,11 @@ bool CollectionImpl::requiresIdIndex() const {
         return false;
     }
 
+    if (_ns.isTimeseriesBucketsCollection()) {
+        // Time-series bucket collections have a clustered _id index.
+        return false;
+    }
+
     if (_ns.isSystem()) {
         StringData shortName = _ns.coll().substr(_ns.coll().find('.') + 1);
         if (shortName == "indexes" || shortName == "namespaces" || shortName == "profile") {
