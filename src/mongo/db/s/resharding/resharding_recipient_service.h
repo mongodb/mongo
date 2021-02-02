@@ -54,6 +54,12 @@ void createTemporaryReshardingCollectionLocally(OperationContext* opCtx,
                                                 const UUID& existingUUID,
                                                 Timestamp fetchTimestamp);
 
+std::vector<NamespaceString> ensureStashCollectionsExist(
+    OperationContext* opCtx,
+    const ChunkManager& cm,
+    const UUID& existingUUID,
+    std::vector<DonorShardMirroringEntry> donorShards);
+
 }  // namespace resharding
 
 class ReshardingRecipientService final : public repl::PrimaryOnlyService {

@@ -39,7 +39,9 @@
 
 namespace mongo::resharding::data_copy {
 
-void ensureCollectionExists(OperationContext* opCtx, const NamespaceString& nss) {
+void ensureCollectionExists(OperationContext* opCtx,
+                            const NamespaceString& nss,
+                            const CollectionOptions& options) {
     invariant(!opCtx->lockState()->isLocked());
     invariant(!opCtx->lockState()->inAWriteUnitOfWork());
 
@@ -50,7 +52,7 @@ void ensureCollectionExists(OperationContext* opCtx, const NamespaceString& nss)
         }
 
         WriteUnitOfWork wuow(opCtx);
-        coll.ensureDbExists()->createCollection(opCtx, nss);
+        coll.ensureDbExists()->createCollection(opCtx, nss, options);
         wuow.commit();
     });
 }

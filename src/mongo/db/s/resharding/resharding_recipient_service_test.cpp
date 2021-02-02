@@ -34,6 +34,8 @@
 #include "mongo/bson/unordered_fields_bsonobj_comparator.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface_impl.h"
@@ -133,13 +135,15 @@ public:
                                                         const NamespaceString& origNss,
                                                         const ShardKeyPattern& skey,
                                                         UUID uuid,
-                                                        OID epoch) {
+                                                        OID epoch,
+                                                        const BSONObj& collation = {}) {
         auto future = scheduleRoutingInfoForcedRefresh(tempNss);
 
         expectFindSendBSONObjVector(kConfigHostAndPort, [&]() {
             CollectionType coll(tempNss, epoch, Date_t::now(), uuid);
             coll.setKeyPattern(skey.getKeyPattern());
             coll.setUnique(false);
+            coll.setDefaultCollation(collation);
 
             TypeCollectionReshardingFields reshardingFields;
             reshardingFields.setUuid(uuid);
@@ -537,6 +541,49 @@ TEST_F(ReshardingRecipientServiceTest,
     future.default_timed_get();
 
     verifyCollectionAndIndexes(kReshardingNss, kReshardingUUID, indexes);
+}
+
+TEST_F(ReshardingRecipientServiceTest, StashCollectionsHaveSameCollationAsReshardingCollection) {
+    auto shards = setupNShards(2);
+
+    std::unique_ptr<CollatorInterfaceMock> collator =
+        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString);
+    auto collationSpec = collator->getSpec().toBSON();
+    auto srcChunkMgr = makeChunkManager(kOrigNss,
+                                        ShardKeyPattern(BSON("_id" << 1)),
+                                        std::move(collator),
+                                        false /* unique */,
+                                        {} /* splitPoints */);
+
+    // Create stash collections for both donor shards
+    auto stashCollections = resharding::ensureStashCollectionsExist(
+        operationContext(),
+        srcChunkMgr,
+        kOrigUUID,
+        {DonorShardMirroringEntry(ShardId("shard0"), true),
+         DonorShardMirroringEntry(ShardId("shard1"), true)});
+
+    // Verify that each stash collation has the collation we passed in above
+    {
+        auto opCtx = operationContext();
+
+        DBDirectClient client(opCtx);
+        auto collInfos = client.getCollectionInfos("config");
+        StringMap<BSONObj> nsToOptions;
+        for (const auto& coll : collInfos) {
+            nsToOptions[coll["name"].str()] = coll["options"].Obj();
+        }
+
+        for (const auto& coll : stashCollections) {
+            auto it = nsToOptions.find(coll.coll());
+            ASSERT(it != nsToOptions.end());
+            auto options = it->second;
+
+            ASSERT(options.hasField("collation"));
+            auto collation = options["collation"].Obj();
+            ASSERT_BSONOBJ_EQ(collationSpec, collation);
+        }
+    }
 }
 
 }  // namespace

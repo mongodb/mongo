@@ -40,7 +40,14 @@ class OperationContext;
 
 namespace resharding::data_copy {
 
-void ensureCollectionExists(OperationContext* opCtx, const NamespaceString& nss);
+/**
+ * Creates the specified collection with the given options if the collection does not already exist.
+ * If the collection already exists, we do not compare the options because the resharding process
+ * will always use the same options for the same namespace.
+ */
+void ensureCollectionExists(OperationContext* opCtx,
+                            const NamespaceString& nss,
+                            const CollectionOptions& options);
 
 /**
  * Drops the specified collection or returns without error if the collection has already been

@@ -86,7 +86,8 @@ public:
 
     static NamespaceString ensureStashCollectionExists(OperationContext* opCtx,
                                                        const UUID& existingUUID,
-                                                       const ShardId& donorShardId);
+                                                       const ShardId& donorShardId,
+                                                       const CollectionOptions& options);
 
 private:
     using OplogBatch = std::vector<repl::OplogEntry>;

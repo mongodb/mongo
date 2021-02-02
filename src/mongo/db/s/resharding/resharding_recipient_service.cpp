@@ -138,10 +138,33 @@ void createTemporaryReshardingCollectionLocally(OperationContext* opCtx,
     // Set the temporary resharding collection's UUID to the resharding UUID. Note that
     // BSONObj::addFields() replaces any fields that already exist.
     collOptions = collOptions.addFields(BSON("uuid" << reshardingUUID));
-
     CollectionOptionsAndIndexes optionsAndIndexes = {reshardingUUID, indexes, idIndex, collOptions};
     MigrationDestinationManager::cloneCollectionIndexesAndOptions(
         opCtx, reshardingNss, optionsAndIndexes);
+}
+
+std::vector<NamespaceString> ensureStashCollectionsExist(
+    OperationContext* opCtx,
+    const ChunkManager& cm,
+    const UUID& existingUUID,
+    std::vector<DonorShardMirroringEntry> donorShards) {
+    // Use the same collation for the stash collections as the temporary resharding collection
+    auto collator = cm.getDefaultCollator();
+    BSONObj collationSpec = collator ? collator->getSpec().toBSON() : BSONObj();
+
+    std::vector<NamespaceString> stashCollections;
+    stashCollections.reserve(donorShards.size());
+
+    {
+        CollectionOptions options;
+        options.collation = std::move(collationSpec);
+        for (const auto& donor : donorShards) {
+            stashCollections.emplace_back(ReshardingOplogApplier::ensureStashCollectionExists(
+                opCtx, existingUUID, donor.getId(), options));
+        }
+    }
+
+    return stashCollections;
 }
 
 }  // namespace resharding
@@ -420,16 +443,13 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
         return catalogCache->getShardedCollectionRoutingInfo(opCtx.get(), _recipientDoc.getNss());
     }();
 
-    std::vector<NamespaceString> stashCollections;
-    stashCollections.reserve(numDonors);
-
-    {
+    auto stashCollections = [&] {
         auto opCtx = cc().makeOperationContext();
-        for (const auto& donor : _recipientDoc.getDonorShardsMirroring()) {
-            stashCollections.emplace_back(ReshardingOplogApplier::ensureStashCollectionExists(
-                opCtx.get(), _recipientDoc.getExistingUUID(), donor.getId()));
-        }
-    }
+        return resharding::ensureStashCollectionsExist(opCtx.get(),
+                                                       sourceChunkMgr,
+                                                       _recipientDoc.getExistingUUID(),
+                                                       _recipientDoc.getDonorShardsMirroring());
+    }();
 
     size_t i = 0;
     auto futuresToWaitOn = std::move(_oplogFetcherFutures);

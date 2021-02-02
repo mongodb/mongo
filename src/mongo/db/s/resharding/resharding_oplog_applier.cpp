@@ -496,14 +496,16 @@ Timestamp ReshardingOplogApplier::_clearAppliedOpsAndStoreProgress(OperationCont
     return lastAppliedTs;
 }
 
-NamespaceString ReshardingOplogApplier::ensureStashCollectionExists(OperationContext* opCtx,
-                                                                    const UUID& existingUUID,
-                                                                    const ShardId& donorShardId) {
+NamespaceString ReshardingOplogApplier::ensureStashCollectionExists(
+    OperationContext* opCtx,
+    const UUID& existingUUID,
+    const ShardId& donorShardId,
+    const CollectionOptions& options) {
     auto nss = NamespaceString{NamespaceString::kConfigDb,
                                "localReshardingConflictStash.{}.{}"_format(
                                    existingUUID.toString(), donorShardId.toString())};
 
-    resharding::data_copy::ensureCollectionExists(opCtx, nss);
+    resharding::data_copy::ensureCollectionExists(opCtx, nss, options);
     return nss;
 }
 
