@@ -64,6 +64,11 @@ public:
 
     static void mergeMultikeyPaths(MultikeyPaths* toMergeInto, const MultikeyPaths& newPaths);
 
+    /**
+     * Return true iff the child's paths are a subset of the parent.
+     */
+    static bool covers(const MultikeyPaths& parent, const MultikeyPaths& child);
+
     // Decoration requires a default constructor.
     MultikeyPathTracker() = default;
 
