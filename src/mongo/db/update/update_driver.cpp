@@ -195,14 +195,15 @@ Status UpdateDriver::populateDocumentWithQueryFields(OperationContext* opCtx,
     // We canonicalize the query to collapse $and/$or, and the namespace is not needed.  Also,
     // because this is for the upsert case, where we insert a new document if one was not found, the
     // $where/$text clauses do not make sense, hence empty ExtensionsCallback.
-    auto qr = std::make_unique<QueryRequest>(NamespaceString(""));
-    qr->setFilter(query);
+    auto findCommand = std::make_unique<FindCommand>(NamespaceString(""));
+    findCommand->setFilter(query);
     const boost::intrusive_ptr<ExpressionContext> expCtx;
     // $expr is not allowed in the query for an upsert, since it is not clear what the equality
     // extraction behavior for $expr should be.
     auto statusWithCQ =
         CanonicalQuery::canonicalize(opCtx,
-                                     std::move(qr),
+                                     std::move(findCommand),
+                                     false,
                                      expCtx,
                                      ExtensionsCallbackNoop(),
                                      MatchExpressionParser::kAllowAllSpecialFeatures &

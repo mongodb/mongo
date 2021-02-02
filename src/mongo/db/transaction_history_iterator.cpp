@@ -35,7 +35,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/get_executor.h"
-#include "mongo/db/query/query_request.h"
+#include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/repl/local_oplog_info.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/transaction_history_iterator.h"
@@ -56,18 +56,19 @@ BSONObj findOneOplogEntry(OperationContext* opCtx,
     BSONObj oplogBSON;
     invariant(!opTime.isNull());
 
-    auto qr = std::make_unique<QueryRequest>(NamespaceString::kRsOplogNamespace);
-    qr->setFilter(opTime.asQuery());
+    auto findCommand = std::make_unique<FindCommand>(NamespaceString::kRsOplogNamespace);
+    findCommand->setFilter(opTime.asQuery());
 
     if (prevOpOnly) {
-        qr->setProj(
+        findCommand->setProjection(
             BSON("_id" << 0 << repl::OplogEntry::kPrevWriteOpTimeInTransactionFieldName << 1LL));
     }
 
     const boost::intrusive_ptr<ExpressionContext> expCtx;
 
     auto statusWithCQ = CanonicalQuery::canonicalize(opCtx,
-                                                     std::move(qr),
+                                                     std::move(findCommand),
+                                                     false,
                                                      expCtx,
                                                      ExtensionsCallbackNoop(),
                                                      MatchExpressionParser::kBanAllSpecialFeatures);

@@ -341,7 +341,7 @@ std::unique_ptr<QuerySolution> buildWholeIXSoln(const IndexEntry& index,
 }
 
 bool providesSort(const CanonicalQuery& query, const BSONObj& kp) {
-    return query.getQueryRequest().getSort().isPrefixOf(kp, SimpleBSONElementComparator::kInstance);
+    return query.getFindCommand().getSort().isPrefixOf(kp, SimpleBSONElementComparator::kInstance);
 }
 
 StatusWith<std::unique_ptr<PlanCacheIndexTree>> QueryPlanner::cacheDataFromTaggedTree(
@@ -609,7 +609,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
     }
 
     const bool canTableScan = !(params.options & QueryPlannerParams::NO_TABLE_SCAN);
-    const bool isTailable = query.getQueryRequest().isTailable();
+    const bool isTailable = query.getFindCommand().getTailable();
 
     // If the query requests a tailable cursor, the only solution is a collscan + filter with
     // tailable set on the collscan.
@@ -632,16 +632,16 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
 
     // The hint can be {$natural: +/-1}. If this happens, output a collscan. We expect any $natural
     // sort to have been normalized to a $natural hint upstream.
-    if (!query.getQueryRequest().getHint().isEmpty()) {
-        const BSONObj& hintObj = query.getQueryRequest().getHint();
-        if (hintObj[QueryRequest::kNaturalSortField]) {
+    if (!query.getFindCommand().getHint().isEmpty()) {
+        const BSONObj& hintObj = query.getFindCommand().getHint();
+        if (hintObj[query_request_helper::kNaturalSortField]) {
             LOGV2_DEBUG(20969, 5, "Forcing a table scan due to hinted $natural");
             if (!canTableScan) {
                 return Status(ErrorCodes::NoQueryExecutionPlans,
                               "hint $natural is not allowed, because 'notablescan' is enabled");
             }
-            if (!query.getQueryRequest().getMin().isEmpty() ||
-                !query.getQueryRequest().getMax().isEmpty()) {
+            if (!query.getFindCommand().getMin().isEmpty() ||
+                !query.getFindCommand().getMax().isEmpty()) {
                 return Status(ErrorCodes::NoQueryExecutionPlans,
                               "min and max are incompatible with $natural");
             }
@@ -661,7 +661,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
     // requested in the query.
     BSONObj hintedIndex;
     if (!params.indexFiltersApplied) {
-        hintedIndex = query.getQueryRequest().getHint();
+        hintedIndex = query.getFindCommand().getHint();
     }
 
     // Either the list of indices passed in by the caller, or the list of indices filtered according
@@ -717,16 +717,15 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
 
     // Deal with the .min() and .max() query options.  If either exist we can only use an index
     // that matches the object inside.
-    if (!query.getQueryRequest().getMin().isEmpty() ||
-        !query.getQueryRequest().getMax().isEmpty()) {
+    if (!query.getFindCommand().getMin().isEmpty() || !query.getFindCommand().getMax().isEmpty()) {
 
         if (!hintedIndexEntry) {
             return Status(ErrorCodes::Error(51173),
                           "When using min()/max() a hint of which index to use must be provided");
         }
 
-        BSONObj minObj = query.getQueryRequest().getMin();
-        BSONObj maxObj = query.getQueryRequest().getMax();
+        BSONObj minObj = query.getFindCommand().getMin();
+        BSONObj maxObj = query.getFindCommand().getMax();
 
         if ((!minObj.isEmpty() &&
              !indexCompatibleMaxMin(minObj, query.getCollator(), *hintedIndexEntry)) ||
@@ -788,7 +787,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
     //
     // TEXT and GEO_NEAR are special because they require the use of a text/geo index in order
     // to be evaluated correctly. Stripping these "mandatory assignments" is therefore invalid.
-    if (query.getQueryRequest().getProj().isEmpty() &&
+    if (query.getFindCommand().getProjection().isEmpty() &&
         !QueryPlannerCommon::hasNode(query.root(), MatchExpression::GEO_NEAR) &&
         !QueryPlannerCommon::hasNode(query.root(), MatchExpression::TEXT)) {
         QueryPlannerIXSelect::stripUnneededAssignments(query.root(), relevantIndices);

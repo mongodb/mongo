@@ -40,7 +40,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/getmore_request.h"
-#include "mongo/db/query/query_request.h"
+#include "mongo/db/query/query_request_helper.h"
 #include "mongo/logv2/log.h"
 #include "mongo/scripting/bson_template_evaluator.h"
 #include "mongo/stdx/thread.h"
@@ -207,23 +207,24 @@ void abortTransaction(DBClientBase* conn,
 }
 
 /**
- * Issues the query 'qr' against 'conn' using read commands. Returns the size of the result set
- * returned by the query.
+ * Issues the query 'findCommand' against 'conn' using read commands. Returns the size of the result
+ * set returned by the query.
  *
- * If 'qr' has the 'wantMore' flag set to false and the 'limit' option set to 1LL, then the caller
- * may optionally specify a pointer to an object in 'objOut', which will be filled in with the
- * single object in the query result set (or the empty object, if the result set is empty).
- * If 'qr' doesn't have these options set, then nullptr must be passed for 'objOut'.
+ * If 'findCommand' has the 'wantMore' flag set to false and the 'limit' option set to 1LL, then the
+ * caller may optionally specify a pointer to an object in 'objOut', which will be filled in with
+ * the single object in the query result set (or the empty object, if the result set is empty). If
+ * 'findCommand' doesn't have these options set, then nullptr must be passed for 'objOut'.
  *
  * On error, throws a AssertionException.
  */
 int runQueryWithReadCommands(DBClientBase* conn,
                              const boost::optional<LogicalSessionIdToClient>& lsid,
                              boost::optional<TxnNumber> txnNumber,
-                             std::unique_ptr<QueryRequest> qr,
+                             std::unique_ptr<FindCommand> findCommand,
                              Milliseconds delayBeforeGetMore,
                              BSONObj* objOut) {
-    const auto dbName = qr->nss().db().toString();
+    const auto dbName =
+        findCommand->getNamespaceOrUUID().nss().value_or(NamespaceString()).db().toString();
 
     BSONObj findCommandResult;
     uassert(ErrorCodes::CommandFailed,
@@ -231,7 +232,7 @@ int runQueryWithReadCommands(DBClientBase* conn,
             runCommandWithSession(
                 conn,
                 dbName,
-                qr->asFindCommand(),
+                findCommand->toBSON(BSONObj()),
                 // read command with txnNumber implies performing reads in a
                 // multi-statement transaction
                 txnNumber ? kStartTransactionOption | kMultiStatementTransactionOption : kNoOptions,
@@ -244,7 +245,8 @@ int runQueryWithReadCommands(DBClientBase* conn,
     int count = cursorResponse.getBatch().size();
 
     if (objOut) {
-        invariant(qr->getLimit() && *qr->getLimit() == 1 && qr->isSingleBatch());
+        invariant(findCommand->getLimit() && *findCommand->getLimit() == 1 &&
+                  findCommand->getSingleBatch());
         // Since this is a "single batch" query, we can simply grab the first item in the result set
         // and return here.
         *objOut = (count > 0) ? cursorResponse.getBatch()[0] : BSONObj();
@@ -255,11 +257,11 @@ int runQueryWithReadCommands(DBClientBase* conn,
         sleepFor(delayBeforeGetMore);
 
         GetMoreRequest getMoreRequest(
-            qr->nss(),
+            findCommand->getNamespaceOrUUID().nss().value_or(NamespaceString()),
             cursorResponse.getCursorId(),
-            qr->getBatchSize()
-                ? boost::optional<std::int64_t>(static_cast<std::int64_t>(*qr->getBatchSize()))
-                : boost::none,
+            findCommand->getBatchSize() ? boost::optional<std::int64_t>(static_cast<std::int64_t>(
+                                              *findCommand->getBatchSize()))
+                                        : boost::none,
             boost::none,   // maxTimeMS
             boost::none,   // term
             boost::none);  // lastKnownCommittedOpTime
@@ -291,16 +293,17 @@ void doNothing(const BSONObj&) {}
 Timestamp getLatestClusterTime(DBClientBase* conn) {
     // Sort by descending 'ts' in the query to the oplog collection. The first entry will have the
     // latest cluster time.
-    auto qr = std::make_unique<QueryRequest>(NamespaceString("local.oplog.rs"));
-    qr->setSort(BSON("$natural" << -1));
-    qr->setLimit(1LL);
-    qr->setSingleBatchField(true);
-    invariant(qr->validate());
-    const auto dbName = qr->nss().db().toString();
+    auto findCommand = std::make_unique<FindCommand>(NamespaceString("local.oplog.rs"));
+    findCommand->setSort(BSON("$natural" << -1));
+    findCommand->setLimit(1LL);
+    findCommand->setSingleBatch(true);
+    invariant(query_request_helper::validateFindCommand(*findCommand));
+    const auto dbName =
+        findCommand->getNamespaceOrUUID().nss().value_or(NamespaceString()).db().toString();
 
     BSONObj oplogResult;
     int count = runQueryWithReadCommands(
-        conn, boost::none, boost::none, std::move(qr), Milliseconds(0), &oplogResult);
+        conn, boost::none, boost::none, std::move(findCommand), Milliseconds(0), &oplogResult);
     uassert(ErrorCodes::OperationFailed,
             str::stream() << "Find cmd on the oplog collection failed; reply was: " << oplogResult,
             count == 1);
@@ -991,15 +994,15 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
             BSONObj fixedQuery = fixQuery(this->query, *state->bsonTemplateEvaluator);
             BSONObj result;
             if (this->useReadCmd) {
-                auto qr = std::make_unique<QueryRequest>(NamespaceString(this->ns));
-                qr->setFilter(fixedQuery);
-                qr->setProj(this->projection);
-                qr->setLimit(1LL);
-                qr->setSingleBatchField(true);
+                auto findCommand = std::make_unique<FindCommand>(NamespaceString(this->ns));
+                findCommand->setFilter(fixedQuery);
+                findCommand->setProjection(this->projection);
+                findCommand->setLimit(1LL);
+                findCommand->setSingleBatch(true);
                 if (config.useSnapshotReads) {
-                    qr->setReadConcern(readConcernSnapshot);
+                    findCommand->setReadConcern(readConcernSnapshot);
                 }
-                invariant(qr->validate());
+                invariant(query_request_helper::validateFindCommand(*findCommand));
 
                 BenchRunEventTrace _bret(&state->stats->findOneCounter);
                 boost::optional<TxnNumber> txnNumberForOp;
@@ -1009,7 +1012,7 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
                     state->inProgressMultiStatementTxn = true;
                 }
                 runQueryWithReadCommands(
-                    conn, lsid, txnNumberForOp, std::move(qr), Milliseconds(0), &result);
+                    conn, lsid, txnNumberForOp, std::move(findCommand), Milliseconds(0), &result);
             } else {
                 BenchRunEventTrace _bret(&state->stats->findOneCounter);
                 result = conn->findOne(
@@ -1074,17 +1077,17 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
                         "cannot use 'options' in combination with read commands",
                         !this->options);
 
-                auto qr = std::make_unique<QueryRequest>(NamespaceString(this->ns));
-                qr->setFilter(fixedQuery);
-                qr->setProj(this->projection);
+                auto findCommand = std::make_unique<FindCommand>(NamespaceString(this->ns));
+                findCommand->setFilter(fixedQuery);
+                findCommand->setProjection(this->projection);
                 if (this->skip) {
-                    qr->setSkip(this->skip);
+                    findCommand->setSkip(this->skip);
                 }
                 if (this->limit) {
-                    qr->setLimit(this->limit);
+                    findCommand->setLimit(this->limit);
                 }
                 if (this->batchSize) {
-                    qr->setBatchSize(this->batchSize);
+                    findCommand->setBatchSize(this->batchSize);
                 }
                 BSONObjBuilder readConcernBuilder;
                 if (config.useSnapshotReads) {
@@ -1098,9 +1101,9 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
                         conn, state->rng->nextInt32(this->useAClusterTimeWithinPastSeconds));
                     readConcernBuilder.append("atClusterTime", atClusterTime);
                 }
-                qr->setReadConcern(readConcernBuilder.obj());
+                findCommand->setReadConcern(readConcernBuilder.obj());
 
-                invariant(qr->validate());
+                invariant(query_request_helper::validateFindCommand(*findCommand));
 
                 BenchRunEventTrace _bret(&state->stats->queryCounter);
                 boost::optional<TxnNumber> txnNumberForOp;
@@ -1117,7 +1120,7 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
                 count = runQueryWithReadCommands(conn,
                                                  lsid,
                                                  txnNumberForOp,
-                                                 std::move(qr),
+                                                 std::move(findCommand),
                                                  Milliseconds(delayBeforeGetMore),
                                                  nullptr);
             } else {

@@ -45,7 +45,7 @@ MONGO_FAIL_POINT_DEFINE(planExecutorHangWhileYieldedInWaitForInserts);
 }
 
 bool shouldListenForInserts(OperationContext* opCtx, CanonicalQuery* cq) {
-    return cq && cq->getQueryRequest().isTailableAndAwaitData() &&
+    return cq && cq->getFindCommand().getTailable() && cq->getFindCommand().getAwaitData() &&
         awaitDataState(opCtx).shouldWaitForInserts && opCtx->checkForInterruptNoAssert().isOK() &&
         awaitDataState(opCtx).waitForInsertsDeadline >
         opCtx->getServiceContext()->getPreciseClockSource()->now();

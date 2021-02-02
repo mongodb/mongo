@@ -74,12 +74,13 @@ unique_ptr<CanonicalQuery> canonicalize(const BSONObj& queryObj) {
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
 
-    auto qr = std::make_unique<QueryRequest>(nss);
-    qr->setFilter(queryObj);
+    auto findCommand = std::make_unique<FindCommand>(nss);
+    findCommand->setFilter(queryObj);
     const boost::intrusive_ptr<ExpressionContext> expCtx;
     auto statusWithCQ =
         CanonicalQuery::canonicalize(opCtx.get(),
-                                     std::move(qr),
+                                     std::move(findCommand),
+                                     false,
                                      expCtx,
                                      ExtensionsCallbackNoop(),
                                      MatchExpressionParser::kAllowAllSpecialFeatures);
@@ -99,15 +100,16 @@ unique_ptr<CanonicalQuery> canonicalize(BSONObj query,
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
 
-    auto qr = std::make_unique<QueryRequest>(nss);
-    qr->setFilter(query);
-    qr->setSort(sort);
-    qr->setProj(proj);
-    qr->setCollation(collation);
+    auto findCommand = std::make_unique<FindCommand>(nss);
+    findCommand->setFilter(query);
+    findCommand->setSort(sort);
+    findCommand->setProjection(proj);
+    findCommand->setCollation(collation);
     const boost::intrusive_ptr<ExpressionContext> expCtx;
     auto statusWithCQ =
         CanonicalQuery::canonicalize(opCtx.get(),
-                                     std::move(qr),
+                                     std::move(findCommand),
+                                     false,
                                      expCtx,
                                      ExtensionsCallbackNoop(),
                                      MatchExpressionParser::kAllowAllSpecialFeatures);
@@ -134,23 +136,24 @@ unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
 
-    auto qr = std::make_unique<QueryRequest>(nss);
-    qr->setFilter(fromjson(queryStr));
-    qr->setSort(fromjson(sortStr));
-    qr->setProj(fromjson(projStr));
+    auto findCommand = std::make_unique<FindCommand>(nss);
+    findCommand->setFilter(fromjson(queryStr));
+    findCommand->setSort(fromjson(sortStr));
+    findCommand->setProjection(fromjson(projStr));
     if (skip) {
-        qr->setSkip(skip);
+        findCommand->setSkip(skip);
     }
     if (limit) {
-        qr->setLimit(limit);
+        findCommand->setLimit(limit);
     }
-    qr->setHint(fromjson(hintStr));
-    qr->setMin(fromjson(minStr));
-    qr->setMax(fromjson(maxStr));
+    findCommand->setHint(fromjson(hintStr));
+    findCommand->setMin(fromjson(minStr));
+    findCommand->setMax(fromjson(maxStr));
     const boost::intrusive_ptr<ExpressionContext> expCtx;
     auto statusWithCQ =
         CanonicalQuery::canonicalize(opCtx.get(),
-                                     std::move(qr),
+                                     std::move(findCommand),
+                                     false,
                                      expCtx,
                                      ExtensionsCallbackNoop(),
                                      MatchExpressionParser::kAllowAllSpecialFeatures);
@@ -170,24 +173,24 @@ unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
 
-    auto qr = std::make_unique<QueryRequest>(nss);
-    qr->setFilter(fromjson(queryStr));
-    qr->setSort(fromjson(sortStr));
-    qr->setProj(fromjson(projStr));
+    auto findCommand = std::make_unique<FindCommand>(nss);
+    findCommand->setFilter(fromjson(queryStr));
+    findCommand->setSort(fromjson(sortStr));
+    findCommand->setProjection(fromjson(projStr));
     if (skip) {
-        qr->setSkip(skip);
+        findCommand->setSkip(skip);
     }
     if (limit) {
-        qr->setLimit(limit);
+        findCommand->setLimit(limit);
     }
-    qr->setHint(fromjson(hintStr));
-    qr->setMin(fromjson(minStr));
-    qr->setMax(fromjson(maxStr));
-    qr->setExplain(explain);
+    findCommand->setHint(fromjson(hintStr));
+    findCommand->setMin(fromjson(minStr));
+    findCommand->setMax(fromjson(maxStr));
     const boost::intrusive_ptr<ExpressionContext> expCtx;
     auto statusWithCQ =
         CanonicalQuery::canonicalize(opCtx.get(),
-                                     std::move(qr),
+                                     std::move(findCommand),
+                                     explain,
                                      expCtx,
                                      ExtensionsCallbackNoop(),
                                      MatchExpressionParser::kAllowAllSpecialFeatures);
@@ -487,8 +490,7 @@ TEST(PlanCacheTest, ShouldNotCacheQueryExplain) {
                                                "{}",  // min, max
                                                true   // explain
                                                ));
-    const QueryRequest& qr = cq->getQueryRequest();
-    ASSERT_TRUE(qr.isExplain());
+    ASSERT_TRUE(cq->getExplain());
     assertShouldNotCacheQuery(*cq);
 }
 
@@ -1015,23 +1017,24 @@ protected:
         // Clean up any previous state from a call to runQueryFull or runQueryAsCommand.
         solns.clear();
 
-        auto qr = std::make_unique<QueryRequest>(nss);
-        qr->setFilter(query);
-        qr->setSort(sort);
-        qr->setProj(proj);
+        auto findCommand = std::make_unique<FindCommand>(nss);
+        findCommand->setFilter(query);
+        findCommand->setSort(sort);
+        findCommand->setProjection(proj);
         if (skip) {
-            qr->setSkip(skip);
+            findCommand->setSkip(skip);
         }
         if (limit) {
-            qr->setLimit(limit);
+            findCommand->setLimit(limit);
         }
-        qr->setHint(hint);
-        qr->setMin(minObj);
-        qr->setMax(maxObj);
+        findCommand->setHint(hint);
+        findCommand->setMin(minObj);
+        findCommand->setMax(maxObj);
         const boost::intrusive_ptr<ExpressionContext> expCtx;
         auto statusWithCQ =
             CanonicalQuery::canonicalize(opCtx.get(),
-                                         std::move(qr),
+                                         std::move(findCommand),
+                                         false,
                                          expCtx,
                                          ExtensionsCallbackNoop(),
                                          MatchExpressionParser::kAllowAllSpecialFeatures);
@@ -1049,13 +1052,14 @@ protected:
         solns.clear();
 
         const bool isExplain = false;
-        std::unique_ptr<QueryRequest> qr(
-            QueryRequest::makeFromFindCommandForTests(cmdObj, isExplain));
+        std::unique_ptr<FindCommand> findCommand(
+            query_request_helper::makeFromFindCommandForTests(cmdObj));
 
         const boost::intrusive_ptr<ExpressionContext> expCtx;
         auto statusWithCQ =
             CanonicalQuery::canonicalize(opCtx.get(),
-                                         std::move(qr),
+                                         std::move(findCommand),
+                                         isExplain,
                                          expCtx,
                                          ExtensionsCallbackNoop(),
                                          MatchExpressionParser::kAllowAllSpecialFeatures);
@@ -1121,15 +1125,16 @@ protected:
         QueryTestServiceContext serviceContext;
         auto opCtx = serviceContext.makeOperationContext();
 
-        auto qr = std::make_unique<QueryRequest>(nss);
-        qr->setFilter(query);
-        qr->setSort(sort);
-        qr->setProj(proj);
-        qr->setCollation(collation);
+        auto findCommand = std::make_unique<FindCommand>(nss);
+        findCommand->setFilter(query);
+        findCommand->setSort(sort);
+        findCommand->setProjection(proj);
+        findCommand->setCollation(collation);
         const boost::intrusive_ptr<ExpressionContext> expCtx;
         auto statusWithCQ =
             CanonicalQuery::canonicalize(opCtx.get(),
-                                         std::move(qr),
+                                         std::move(findCommand),
+                                         false,
                                          expCtx,
                                          ExtensionsCallbackNoop(),
                                          MatchExpressionParser::kAllowAllSpecialFeatures);

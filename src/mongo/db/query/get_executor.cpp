@@ -147,11 +147,11 @@ bool turnIxscanIntoCount(QuerySolution* soln);
  * Returns 'true' if 'query' on the given 'collection' can be answered using a special IDHACK plan.
  */
 bool isIdHackEligibleQuery(const CollectionPtr& collection, const CanonicalQuery& query) {
-    return !query.getQueryRequest().showRecordId() && query.getQueryRequest().getHint().isEmpty() &&
-        query.getQueryRequest().getMin().isEmpty() && query.getQueryRequest().getMax().isEmpty() &&
-        !query.getQueryRequest().getSkip() &&
-        CanonicalQuery::isSimpleIdQuery(query.getQueryRequest().getFilter()) &&
-        !query.getQueryRequest().isTailable() &&
+    const auto& findCommand = query.getFindCommand();
+    return !findCommand.getShowRecordId() && findCommand.getHint().isEmpty() &&
+        findCommand.getMin().isEmpty() && findCommand.getMax().isEmpty() &&
+        !findCommand.getSkip() && CanonicalQuery::isSimpleIdQuery(findCommand.getFilter()) &&
+        !findCommand.getTailable() &&
         CollatorInterface::collatorsMatch(query.getCollator(), collection->getDefaultCollator());
 }
 }  // namespace
@@ -351,7 +351,7 @@ void fillOutPlannerParams(OperationContext* opCtx,
     plannerParams->options |= QueryPlannerParams::SPLIT_LIMITED_SORT;
 
     if (shouldWaitForOplogVisibility(
-            opCtx, collection, canonicalQuery->getQueryRequest().isTailable())) {
+            opCtx, collection, canonicalQuery->getFindCommand().getTailable())) {
         plannerParams->options |= QueryPlannerParams::OPLOG_SCAN_WAIT_FOR_VISIBLE;
     }
 }
@@ -578,7 +578,7 @@ public:
 
         // If the canonical query does not have a user-specified collation and no one has given the
         // CanonicalQuery a collation already, set it from the collection default.
-        if (_cq->getQueryRequest().getCollation().isEmpty() && _cq->getCollator() == nullptr &&
+        if (_cq->getFindCommand().getCollation().isEmpty() && _cq->getCollator() == nullptr &&
             _collection->getDefaultCollator()) {
             _cq->setCollator(_collection->getDefaultCollator()->clone());
         }
@@ -598,7 +598,7 @@ public:
         }
 
         // Tailable: If the query requests tailable the collection must be capped.
-        if (_cq->getQueryRequest().isTailable() && !_collection->isCapped()) {
+        if (_cq->getFindCommand().getTailable() && !_collection->isCapped()) {
             return Status(ErrorCodes::BadValue,
                           str::stream() << "error processing query: " << _cq->toString()
                                         << " tailable cursor requested on non capped collection");
@@ -799,10 +799,10 @@ protected:
         // Add a SortKeyGeneratorStage if the query requested sortKey metadata.
         if (_cq->metadataDeps()[DocumentMetadataFields::kSortKey]) {
             stage = std::make_unique<SortKeyGeneratorStage>(
-                _cq->getExpCtxRaw(), std::move(stage), _ws, _cq->getQueryRequest().getSort());
+                _cq->getExpCtxRaw(), std::move(stage), _ws, _cq->getFindCommand().getSort());
         }
 
-        if (_cq->getQueryRequest().returnKey()) {
+        if (_cq->getFindCommand().getReturnKey()) {
             // If returnKey was requested, add ReturnKeyStage to return only the index keys in
             // the resulting documents. If a projection was also specified, it will be ignored,
             // with the exception the $meta sortKey projection, which can be used along with the
@@ -820,17 +820,19 @@ protected:
             // simple inclusion fast path.
             // Stuff the right data into the params depending on what proj impl we use.
             if (!cqProjection->isSimple()) {
-                stage = std::make_unique<ProjectionStageDefault>(_cq->getExpCtxRaw(),
-                                                                 _cq->getQueryRequest().getProj(),
-                                                                 _cq->getProj(),
-                                                                 _ws,
-                                                                 std::move(stage));
+                stage =
+                    std::make_unique<ProjectionStageDefault>(_cq->getExpCtxRaw(),
+                                                             _cq->getFindCommand().getProjection(),
+                                                             _cq->getProj(),
+                                                             _ws,
+                                                             std::move(stage));
             } else {
-                stage = std::make_unique<ProjectionStageSimple>(_cq->getExpCtxRaw(),
-                                                                _cq->getQueryRequest().getProj(),
-                                                                _cq->getProj(),
-                                                                _ws,
-                                                                std::move(stage));
+                stage =
+                    std::make_unique<ProjectionStageSimple>(_cq->getExpCtxRaw(),
+                                                            _cq->getFindCommand().getProjection(),
+                                                            _cq->getProj(),
+                                                            _ws,
+                                                            std::move(stage));
             }
         }
 
@@ -1112,7 +1114,7 @@ inline bool isQuerySbeCompatible(const CanonicalQuery* const cq, size_t plannerO
     const bool isNotCount = !(plannerOptions & QueryPlannerParams::IS_COUNT);
     // Specifying 'ntoreturn' in an OP_QUERY style find may result in a QuerySolution with
     // ENSURE_SORTED node, which is currently not supported by SBE.
-    const bool doesNotNeedEnsureSorted = !cq->getQueryRequest().getNToReturn();
+    const bool doesNotNeedEnsureSorted = !cq->getFindCommand().getNtoreturn();
     const bool doesNotContainMetadataRequirements = cq->metadataDeps().none();
     const bool doesNotSortOnDottedPath =
         !sortPattern || std::all_of(sortPattern->begin(), sortPattern->end(), [](auto&& part) {
@@ -1716,16 +1718,16 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCoun
     OperationContext* opCtx = expCtx->opCtx;
     std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
 
-    auto qr = std::make_unique<QueryRequest>(nss);
-    qr->setFilter(request.getQuery());
+    auto findCommand = std::make_unique<FindCommand>(nss);
+    findCommand->setFilter(request.getQuery());
     auto collation = request.getCollation().value_or(BSONObj());
-    qr->setCollation(collation);
-    qr->setHint(request.getHint());
-    qr->setExplain(explain);
+    findCommand->setCollation(collation);
+    findCommand->setHint(request.getHint());
 
     auto statusWithCQ = CanonicalQuery::canonicalize(
         opCtx,
-        std::move(qr),
+        std::move(findCommand),
+        explain,
         expCtx,
         collection ? static_cast<const ExtensionsCallback&>(
                          ExtensionsCallbackReal(opCtx, &collection->ns()))
@@ -1998,7 +2000,7 @@ QueryPlannerParams fillOutPlannerParamsForDistinct(OperationContext* opCtx,
     const bool mayUnwindArrays = !(plannerOptions & QueryPlannerParams::STRICT_DISTINCT_ONLY);
     std::unique_ptr<IndexCatalog::IndexIterator> ii =
         collection->getIndexCatalog()->getIndexIterator(opCtx, false);
-    auto query = parsedDistinct.getQuery()->getQueryRequest().getFilter();
+    auto query = parsedDistinct.getQuery()->getFindCommand().getFilter();
     while (ii->more()) {
         const IndexCatalogEntry* ice = ii->next();
         const IndexDescriptor* desc = ice->descriptor();
@@ -2043,7 +2045,7 @@ QueryPlannerParams fillOutPlannerParamsForDistinct(OperationContext* opCtx,
     }
 
     const CanonicalQuery* canonicalQuery = parsedDistinct.getQuery();
-    const BSONObj& hint = canonicalQuery->getQueryRequest().getHint();
+    const BSONObj& hint = canonicalQuery->getFindCommand().getHint();
 
     applyIndexFilters(collection, *canonicalQuery, &plannerParams);
 
@@ -2083,7 +2085,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorForS
     // If there's no query, we can just distinct-scan one of the indices. Not every index in
     // plannerParams.indices may be suitable. Refer to getDistinctNodeIndex().
     size_t distinctNodeIndex = 0;
-    if (!parsedDistinct->getQuery()->getQueryRequest().getFilter().isEmpty() ||
+    if (!parsedDistinct->getQuery()->getFindCommand().getFilter().isEmpty() ||
         parsedDistinct->getQuery()->getSortPattern() ||
         !getDistinctNodeIndex(
             plannerParams.indices, parsedDistinct->getKey(), collator, &distinctNodeIndex)) {
@@ -2204,14 +2206,15 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorWith
     size_t plannerOptions) {
     const auto& collection = *coll;
 
-    auto qr = std::make_unique<QueryRequest>(cq->getQueryRequest());
-    qr->setProj(BSONObj());
+    auto findCommand = std::make_unique<FindCommand>(cq->getFindCommand());
+    findCommand->setProjection(BSONObj());
 
     const boost::intrusive_ptr<ExpressionContext> expCtx;
     const ExtensionsCallbackReal extensionsCallback(opCtx, &collection->ns());
     auto cqWithoutProjection =
         CanonicalQuery::canonicalize(opCtx,
-                                     std::move(qr),
+                                     std::move(findCommand),
+                                     cq->getExplain(),
                                      expCtx,
                                      extensionsCallback,
                                      MatchExpressionParser::kAllowAllSpecialFeatures);

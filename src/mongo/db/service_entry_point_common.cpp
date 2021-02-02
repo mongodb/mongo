@@ -1343,9 +1343,9 @@ void ExecCommandDatabase::_initiateCommand() {
     StringMap<int> topLevelFields;
     for (auto&& element : request.body) {
         StringData fieldName = element.fieldNameStringData();
-        if (fieldName == QueryRequest::cmdOptionMaxTimeMS) {
+        if (fieldName == query_request_helper::cmdOptionMaxTimeMS) {
             cmdOptionMaxTimeMSField = element;
-        } else if (fieldName == QueryRequest::kMaxTimeMSOpOnlyField) {
+        } else if (fieldName == query_request_helper::kMaxTimeMSOpOnlyField) {
             uassert(ErrorCodes::InvalidOptions,
                     "Can not specify maxTimeMSOpOnly for non internal clients",
                     _isInternalClient());
@@ -1356,7 +1356,7 @@ void ExecCommandDatabase::_initiateCommand() {
             helpField = element;
         } else if (fieldName == "comment") {
             opCtx->setComment(element.wrap());
-        } else if (fieldName == QueryRequest::queryOptionMaxTimeMS) {
+        } else if (fieldName == query_request_helper::queryOptionMaxTimeMS) {
             uasserted(ErrorCodes::InvalidOptions,
                       "no such command option $maxTimeMs; use maxTimeMS instead");
         }

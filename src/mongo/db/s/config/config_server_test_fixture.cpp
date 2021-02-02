@@ -45,7 +45,7 @@
 #include "mongo/db/op_observer.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/query/cursor_response.h"
-#include "mongo/db/query/query_request.h"
+#include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_settings.h"

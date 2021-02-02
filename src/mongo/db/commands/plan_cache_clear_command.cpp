@@ -86,9 +86,9 @@ Status clear(OperationContext* opCtx,
                         "Query shape doesn't exist in PlanCache",
                         "namespace"_attr = ns,
                         "query"_attr = redact(cq->getQueryObj()),
-                        "sort"_attr = cq->getQueryRequest().getSort(),
-                        "projection"_attr = cq->getQueryRequest().getProj(),
-                        "collation"_attr = cq->getQueryRequest().getCollation());
+                        "sort"_attr = cq->getFindCommand().getSort(),
+                        "projection"_attr = cq->getFindCommand().getProjection(),
+                        "collation"_attr = cq->getFindCommand().getCollation());
             return Status::OK();
         }
 
@@ -99,9 +99,9 @@ Status clear(OperationContext* opCtx,
                     "Removed plan cache entry",
                     "namespace"_attr = ns,
                     "query"_attr = redact(cq->getQueryObj()),
-                    "sort"_attr = cq->getQueryRequest().getSort(),
-                    "projection"_attr = cq->getQueryRequest().getProj(),
-                    "collation"_attr = cq->getQueryRequest().getCollation());
+                    "sort"_attr = cq->getFindCommand().getSort(),
+                    "projection"_attr = cq->getFindCommand().getProjection(),
+                    "collation"_attr = cq->getFindCommand().getCollation());
 
         return Status::OK();
     }

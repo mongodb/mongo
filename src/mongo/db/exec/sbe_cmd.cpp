@@ -67,7 +67,7 @@ public:
         CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
         long long batchSize;
         uassertStatusOK(CursorRequest::parseCommandCursorOptions(
-            cmdObj, QueryRequest::kDefaultBatchSize, &batchSize));
+            cmdObj, query_request_helper::kDefaultBatchSize, &batchSize));
 
         sbe::Parser parser;
         auto root = parser.parse(opCtx, dbname, cmdObj["sbe"].String());

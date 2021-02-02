@@ -32,7 +32,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/concurrency/locker_noop.h"
-#include "mongo/db/query/query_request.h"
+#include "mongo/db/query/query_request_helper.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_database.h"
@@ -610,7 +610,7 @@ TEST_F(CatalogCacheRefreshTest, ChunkEpochChangeDuringIncrementalLoadRecoveryAft
     expectGetCollection(oldVersion.epoch(), shardKeyPattern);
     onFindCommand([&](const RemoteCommandRequest& request) {
         auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
-        auto diffQuery = QueryRequest::makeFromFindCommandForTests(opMsg.body, false);
+        auto diffQuery = query_request_helper::makeFromFindCommandForTests(opMsg.body);
         ASSERT_BSONOBJ_EQ(BSON("ns" << kNss.ns() << "lastmod"
                                     << BSON("$gte" << Timestamp(oldVersion.majorVersion(),
                                                                 oldVersion.minorVersion()))),
@@ -642,7 +642,7 @@ TEST_F(CatalogCacheRefreshTest, ChunkEpochChangeDuringIncrementalLoadRecoveryAft
         // Ensure it is a differential query but starting from version zero (to fetch all the
         // chunks) since the incremental refresh above produced a different version
         auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
-        auto diffQuery = QueryRequest::makeFromFindCommandForTests(opMsg.body, false);
+        auto diffQuery = query_request_helper::makeFromFindCommandForTests(opMsg.body);
         ASSERT_BSONOBJ_EQ(BSON("ns" << kNss.ns() << "lastmod" << BSON("$gte" << Timestamp(0, 0))),
                           diffQuery->getFilter());
 
@@ -696,7 +696,7 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterCollectionEpochChange) {
     onFindCommand([&](const RemoteCommandRequest& request) {
         // Ensure it is a differential query but starting from version zero
         auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
-        auto diffQuery = QueryRequest::makeFromFindCommandForTests(opMsg.body, false);
+        auto diffQuery = query_request_helper::makeFromFindCommandForTests(opMsg.body);
         ASSERT_BSONOBJ_EQ(BSON("ns" << kNss.ns() << "lastmod" << BSON("$gte" << Timestamp(0, 0))),
                           diffQuery->getFilter());
 
@@ -742,7 +742,7 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterSplit) {
     onFindCommand([&](const RemoteCommandRequest& request) {
         // Ensure it is a differential query
         auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
-        auto diffQuery = QueryRequest::makeFromFindCommandForTests(opMsg.body, false);
+        auto diffQuery = query_request_helper::makeFromFindCommandForTests(opMsg.body);
         ASSERT_BSONOBJ_EQ(
             BSON("ns" << kNss.ns() << "lastmod"
                       << BSON("$gte" << Timestamp(version.majorVersion(), version.minorVersion()))),

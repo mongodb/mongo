@@ -79,8 +79,8 @@ Document wrapAggAsExplain(Document aggregateCommand, ExplainOptions::Verbosity v
     MutableDocument explainCommandBuilder;
     explainCommandBuilder["explain"] = Value(aggregateCommand);
     // Downstream host targeting code expects queryOptions at the top level of the command object.
-    explainCommandBuilder[QueryRequest::kUnwrappedReadPrefField] =
-        Value(aggregateCommand[QueryRequest::kUnwrappedReadPrefField]);
+    explainCommandBuilder[query_request_helper::kUnwrappedReadPrefField] =
+        Value(aggregateCommand[query_request_helper::kUnwrappedReadPrefField]);
 
     // readConcern needs to be promoted to the top-level of the request.
     explainCommandBuilder[repl::ReadConcernArgs::kReadConcernFieldName] =

@@ -38,7 +38,7 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/projection.h"
 #include "mongo/db/query/projection_policies.h"
-#include "mongo/db/query/query_request.h"
+#include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/sort_pattern.h"
 
 namespace mongo {
@@ -77,7 +77,8 @@ public:
      */
     static StatusWith<std::unique_ptr<CanonicalQuery>> canonicalize(
         OperationContext* opCtx,
-        std::unique_ptr<QueryRequest> qr,
+        std::unique_ptr<FindCommand> findCommand,
+        bool explain = false,
         const boost::intrusive_ptr<ExpressionContext>& expCtx = nullptr,
         const ExtensionsCallback& extensionsCallback = ExtensionsCallbackNoop(),
         MatchExpressionParser::AllowedFeatureSet allowedFeatures =
@@ -117,13 +118,14 @@ public:
      * error.
      */
     static StatusWith<QueryMetadataBitSet> isValid(MatchExpression* root,
-                                                   const QueryRequest& request);
+                                                   const FindCommand& findCommand);
 
-    const NamespaceString& nss() const {
-        return _qr->nss();
+    const NamespaceString nss() const {
+        invariant(_findCommand->getNamespaceOrUUID().nss());
+        return *_findCommand->getNamespaceOrUUID().nss();
     }
-    const std::string& ns() const {
-        return _qr->nss().ns();
+    const std::string ns() const {
+        return nss().ns();
     }
 
     //
@@ -133,10 +135,10 @@ public:
         return _root.get();
     }
     const BSONObj& getQueryObj() const {
-        return _qr->getFilter();
+        return _findCommand->getFilter();
     }
-    const QueryRequest& getQueryRequest() const {
-        return *_qr;
+    const FindCommand& getFindCommand() const {
+        return *_findCommand;
     }
 
     /**
@@ -209,6 +211,19 @@ public:
         return _canHaveNoopMatchNodes;
     }
 
+    /**
+     * Return options as a bit vector.
+     */
+    int getOptions() const;
+
+    bool getExplain() const {
+        return _explain;
+    }
+
+    void setExplain(bool explain) {
+        _explain = explain;
+    }
+
     auto& getExpCtx() const {
         return _expCtx;
     }
@@ -222,7 +237,7 @@ private:
 
     Status init(OperationContext* opCtx,
                 boost::intrusive_ptr<ExpressionContext> expCtx,
-                std::unique_ptr<QueryRequest> qr,
+                std::unique_ptr<FindCommand> findCommand,
                 bool canHaveNoopMatchNodes,
                 std::unique_ptr<MatchExpression> root,
                 const ProjectionPolicies& projectionPolicies);
@@ -235,7 +250,7 @@ private:
 
     boost::intrusive_ptr<ExpressionContext> _expCtx;
 
-    std::unique_ptr<QueryRequest> _qr;
+    std::unique_ptr<FindCommand> _findCommand;
 
     std::unique_ptr<MatchExpression> _root;
 
@@ -247,6 +262,8 @@ private:
     QueryMetadataBitSet _metadataDeps;
 
     bool _canHaveNoopMatchNodes = false;
+
+    bool _explain = false;
 };
 
 }  // namespace mongo

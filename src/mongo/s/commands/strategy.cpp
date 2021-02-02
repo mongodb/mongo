@@ -58,7 +58,7 @@
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/getmore_request.h"
-#include "mongo/db/query/query_request.h"
+#include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/stats/api_version_metrics.h"
 #include "mongo/db/stats/counters.h"
@@ -498,9 +498,9 @@ void ParseAndRunCommand::_parseCommand() {
     // maxTimeMS altogether on a getMore command.
     uassert(ErrorCodes::InvalidOptions,
             "no such command option $maxTimeMs; use maxTimeMS instead",
-            request.body[QueryRequest::queryOptionMaxTimeMS].eoo());
+            request.body[query_request_helper::queryOptionMaxTimeMS].eoo());
     const int maxTimeMS =
-        uassertStatusOK(parseMaxTimeMS(request.body[QueryRequest::cmdOptionMaxTimeMS]));
+        uassertStatusOK(parseMaxTimeMS(request.body[query_request_helper::cmdOptionMaxTimeMS]));
     if (maxTimeMS > 0 && command->getLogicalOp() != LogicalOp::opGetMore) {
         opCtx->setDeadlineAfterNowBy(Milliseconds{maxTimeMS}, ErrorCodes::MaxTimeMSExpired);
     }
@@ -1096,29 +1096,29 @@ DbResponse Strategy::queryOp(OperationContext* opCtx, const NamespaceString& nss
                                      ExtensionsCallbackNoop(),
                                      MatchExpressionParser::kAllowAllSpecialFeatures));
 
-    const QueryRequest& queryRequest = canonicalQuery->getQueryRequest();
+    const FindCommand& findCommand = canonicalQuery->getFindCommand();
     // Handle query option $maxTimeMS (not used with commands).
-    if (queryRequest.getMaxTimeMS() > 0) {
+    if (findCommand.getMaxTimeMS().value_or(0) > 0) {
         uassert(50749,
                 "Illegal attempt to set operation deadline within DBDirectClient",
                 !opCtx->getClient()->isInDirectClient());
-        opCtx->setDeadlineAfterNowBy(Milliseconds{queryRequest.getMaxTimeMS()},
+        opCtx->setDeadlineAfterNowBy(Milliseconds{findCommand.getMaxTimeMS().value_or(0)},
                                      ErrorCodes::MaxTimeMSExpired);
     }
     opCtx->checkForInterrupt();  // May trigger maxTimeAlwaysTimeOut fail point.
 
     // If the $explain flag was set, we must run the operation on the shards as an explain command
     // rather than a find command.
-    if (queryRequest.isExplain()) {
-        const BSONObj findCommand = queryRequest.asFindCommand();
+    if (canonicalQuery->getExplain()) {
+        const BSONObj findCommandObj = findCommand.toBSON(BSONObj());
 
         // We default to allPlansExecution verbosity.
         const auto verbosity = ExplainOptions::Verbosity::kExecAllPlans;
 
         BSONObjBuilder explainBuilder;
         Strategy::explainFind(opCtx,
+                              findCommandObj,
                               findCommand,
-                              queryRequest,
                               verbosity,
                               ReadPreferenceSetting::get(opCtx),
                               &explainBuilder);
@@ -1444,12 +1444,12 @@ void Strategy::writeOp(std::shared_ptr<RequestExecutionContext> rec) {
 }
 
 void Strategy::explainFind(OperationContext* opCtx,
-                           const BSONObj& findCommand,
-                           const QueryRequest& qr,
+                           const BSONObj& findCommandObj,
+                           const FindCommand& findCommand,
                            ExplainOptions::Verbosity verbosity,
                            const ReadPreferenceSetting& readPref,
                            BSONObjBuilder* out) {
-    const auto explainCmd = ClusterExplain::wrapAsExplain(findCommand, verbosity);
+    const auto explainCmd = ClusterExplain::wrapAsExplain(findCommandObj, verbosity);
 
     long long millisElapsed;
     std::vector<AsyncRequestsSender::Response> shardResponses;
@@ -1460,18 +1460,20 @@ void Strategy::explainFind(OperationContext* opCtx,
         // We will time how long it takes to run the commands on the shards.
         Timer timer;
         try {
-            const auto routingInfo = uassertStatusOK(
-                Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, qr.nss()));
-            shardResponses =
-                scatterGatherVersionedTargetByRoutingTable(opCtx,
-                                                           qr.nss().db(),
-                                                           qr.nss(),
-                                                           routingInfo,
-                                                           explainCmd,
-                                                           readPref,
-                                                           Shard::RetryPolicy::kIdempotent,
-                                                           qr.getFilter(),
-                                                           qr.getCollation());
+            invariant(findCommand.getNamespaceOrUUID().nss());
+            const auto routingInfo =
+                uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(
+                    opCtx, *findCommand.getNamespaceOrUUID().nss()));
+            shardResponses = scatterGatherVersionedTargetByRoutingTable(
+                opCtx,
+                findCommand.getNamespaceOrUUID().nss()->db(),
+                *findCommand.getNamespaceOrUUID().nss(),
+                routingInfo,
+                explainCmd,
+                readPref,
+                Shard::RetryPolicy::kIdempotent,
+                findCommand.getFilter(),
+                findCommand.getCollation());
             millisElapsed = timer.millis();
             break;
         } catch (ExceptionFor<ErrorCodes::ShardInvalidatedForTargeting>&) {
@@ -1524,9 +1526,9 @@ void Strategy::explainFind(OperationContext* opCtx,
     }
 
     const char* mongosStageName =
-        ClusterExplain::getStageNameForReadOp(shardResponses.size(), findCommand);
+        ClusterExplain::getStageNameForReadOp(shardResponses.size(), findCommandObj);
 
     uassertStatusOK(ClusterExplain::buildExplainResult(
-        opCtx, shardResponses, mongosStageName, millisElapsed, findCommand, out));
+        opCtx, shardResponses, mongosStageName, millisElapsed, findCommandObj, out));
 }
 }  // namespace mongo

@@ -99,9 +99,9 @@ public:
     }
 
     unique_ptr<CanonicalQuery> canonicalize(const BSONObj& query) {
-        auto qr = std::make_unique<QueryRequest>(nss);
-        qr->setFilter(query);
-        auto statusWithCQ = CanonicalQuery::canonicalize(&_opCtx, std::move(qr));
+        auto findCommand = std::make_unique<FindCommand>(nss);
+        findCommand->setFilter(query);
+        auto statusWithCQ = CanonicalQuery::canonicalize(&_opCtx, std::move(findCommand));
         ASSERT_OK(statusWithCQ.getStatus());
         return std::move(statusWithCQ.getValue());
     }

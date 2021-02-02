@@ -828,9 +828,9 @@ TEST_F(QueryPlannerTest, CacheDataFromTaggedTreeFailsOnBadInput) {
     // No relevant index matching the index tag.
     relevantIndices.push_back(buildSimpleIndexEntry(BSON("a" << 1), "a_1"));
 
-    auto qr = std::make_unique<QueryRequest>(NamespaceString("test.collection"));
-    qr->setFilter(BSON("a" << 3));
-    auto statusWithCQ = CanonicalQuery::canonicalize(opCtx.get(), std::move(qr));
+    auto findCommand = std::make_unique<FindCommand>(NamespaceString("test.collection"));
+    findCommand->setFilter(BSON("a" << 3));
+    auto statusWithCQ = CanonicalQuery::canonicalize(opCtx.get(), std::move(findCommand));
     ASSERT_OK(statusWithCQ.getStatus());
     std::unique_ptr<CanonicalQuery> scopedCq = std::move(statusWithCQ.getValue());
     scopedCq->root()->setTag(new IndexTag(1));
@@ -842,9 +842,9 @@ TEST_F(QueryPlannerTest, CacheDataFromTaggedTreeFailsOnBadInput) {
 TEST_F(QueryPlannerTest, TagAccordingToCacheFailsOnBadInput) {
     const NamespaceString nss("test.collection");
 
-    auto qr = std::make_unique<QueryRequest>(nss);
-    qr->setFilter(BSON("a" << 3));
-    auto statusWithCQ = CanonicalQuery::canonicalize(opCtx.get(), std::move(qr));
+    auto findCommand = std::make_unique<FindCommand>(nss);
+    findCommand->setFilter(BSON("a" << 3));
+    auto statusWithCQ = CanonicalQuery::canonicalize(opCtx.get(), std::move(findCommand));
     ASSERT_OK(statusWithCQ.getStatus());
     std::unique_ptr<CanonicalQuery> scopedCq = std::move(statusWithCQ.getValue());
 
@@ -871,7 +871,7 @@ TEST_F(QueryPlannerTest, TagAccordingToCacheFailsOnBadInput) {
     ASSERT_OK(s);
 
     // Regenerate canonical query in order to clear tags.
-    auto newQR = std::make_unique<QueryRequest>(nss);
+    auto newQR = std::make_unique<FindCommand>(nss);
     newQR->setFilter(BSON("a" << 3));
     statusWithCQ = CanonicalQuery::canonicalize(opCtx.get(), std::move(newQR));
     ASSERT_OK(statusWithCQ.getStatus());

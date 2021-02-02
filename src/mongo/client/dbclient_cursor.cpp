@@ -47,7 +47,7 @@
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/getmore_request.h"
-#include "mongo/db/query/query_request.h"
+#include "mongo/db/query/query_request_helper.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -120,43 +120,46 @@ Message DBClientCursor::_assembleInit() {
     } else if (_useFindCommand) {
         // The caller supplies a 'query' object which may have $-prefixed directives in the format
         // expected for a legacy OP_QUERY. Therefore, we use the legacy parsing code supplied by
-        // QueryRequest. When actually issuing the request to the remote node, we will assemble a
-        // find command.
-        auto qr = QueryRequest::fromLegacyQuery(_nsOrUuid,
-                                                query,
-                                                fieldsToReturn ? *fieldsToReturn : BSONObj(),
-                                                nToSkip,
-                                                nextBatchSize(),
-                                                opts);
-        if (qr.isOK() && !qr.getValue()->isExplain()) {
+        // query_request_helper. When actually issuing the request to the remote node, we will
+        // assemble a find command.
+        bool explain = false;
+        auto findCommand =
+            query_request_helper::fromLegacyQuery(_nsOrUuid,
+                                                  query,
+                                                  fieldsToReturn ? *fieldsToReturn : BSONObj(),
+                                                  nToSkip,
+                                                  nextBatchSize(),
+                                                  opts,
+                                                  &explain);
+        if (findCommand.isOK() && !explain) {
             if (query.getBoolField("$readOnce")) {
                 // Legacy queries don't handle readOnce.
-                qr.getValue()->setReadOnce(true);
+                findCommand.getValue()->setReadOnce(true);
             }
             if (query.getBoolField(FindCommand::kRequestResumeTokenFieldName)) {
                 // Legacy queries don't handle requestResumeToken.
-                qr.getValue()->setRequestResumeToken(true);
+                findCommand.getValue()->setRequestResumeToken(true);
             }
             if (query.hasField(FindCommand::kResumeAfterFieldName)) {
                 // Legacy queries don't handle resumeAfter.
-                qr.getValue()->setResumeAfter(
+                findCommand.getValue()->setResumeAfter(
                     query.getObjectField(FindCommand::kResumeAfterFieldName));
             }
             if (auto replTerm = query[FindCommand::kTermFieldName]) {
                 // Legacy queries don't handle term.
-                qr.getValue()->setReplicationTerm(replTerm.numberLong());
+                findCommand.getValue()->setTerm(replTerm.numberLong());
             }
             // Legacy queries don't handle readConcern.
             // We prioritize the readConcern parsed from the query object over '_readConcernObj'.
             if (auto readConcern = query[repl::ReadConcernArgs::kReadConcernFieldName]) {
-                qr.getValue()->setReadConcern(readConcern.Obj());
+                findCommand.getValue()->setReadConcern(readConcern.Obj());
             } else if (_readConcernObj) {
-                qr.getValue()->setReadConcern(*_readConcernObj);
+                findCommand.getValue()->setReadConcern(_readConcernObj);
             }
-            BSONObj cmd = qr.getValue()->asFindCommand();
+            BSONObj cmd = findCommand.getValue()->toBSON(BSONObj());
 
             if (auto readPref = query["$readPreference"]) {
-                // QueryRequest doesn't handle $readPreference.
+                // FindCommand doesn't handle $readPreference.
                 cmd = BSONObjBuilder(std::move(cmd)).append(readPref).obj();
             }
             return assembleCommandRequest(_client, ns.db(), opts, std::move(cmd));
@@ -165,7 +168,7 @@ Message DBClientCursor::_assembleInit() {
         // Legacy OP_QUERY request does not support UUIDs.
         if (_nsOrUuid.uuid()) {
             // If there was a problem building the query request, report that.
-            uassertStatusOK(qr.getStatus());
+            uassertStatusOK(findCommand.getStatus());
             // Otherwise it must have been explain.
             uasserted(50937, "Query by UUID is not supported for explain queries.");
         }

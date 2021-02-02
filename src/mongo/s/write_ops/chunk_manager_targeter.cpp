@@ -180,7 +180,7 @@ bool isExactIdQuery(OperationContext* opCtx, const CanonicalQuery& query, const 
     }
 
     if (CollationIndexKey::isCollatableType(idElt.type()) && cm.isSharded() &&
-        !query.getQueryRequest().getCollation().isEmpty() &&
+        !query.getFindCommand().getCollation().isEmpty() &&
         !CollatorInterface::collatorsMatch(query.getCollator(), cm.getDefaultCollator())) {
 
         // The collation applies to the _id field, but the user specified a collation which doesn't
@@ -196,13 +196,14 @@ bool isExactIdQuery(OperationContext* opCtx,
                     const BSONObj query,
                     const BSONObj collation,
                     const ChunkManager& cm) {
-    auto qr = std::make_unique<QueryRequest>(nss);
-    qr->setFilter(query);
+    auto findCommand = std::make_unique<FindCommand>(nss);
+    findCommand->setFilter(query);
     if (!collation.isEmpty()) {
-        qr->setCollation(collation);
+        findCommand->setCollation(collation);
     }
     const auto cq = CanonicalQuery::canonicalize(opCtx,
-                                                 std::move(qr),
+                                                 std::move(findCommand),
+                                                 false, /* isExplain */
                                                  nullptr,
                                                  ExtensionsCallbackNoop(),
                                                  MatchExpressionParser::kAllowAllSpecialFeatures);
@@ -506,14 +507,15 @@ std::vector<ShardEndpoint> ChunkManagerTargeter::targetDelete(OperationContext* 
     // We failed to target a single shard.
 
     // Parse delete query.
-    auto qr = std::make_unique<QueryRequest>(_nss);
-    qr->setFilter(deleteOp.getQ());
+    auto findCommand = std::make_unique<FindCommand>(_nss);
+    findCommand->setFilter(deleteOp.getQ());
     if (!collation.isEmpty()) {
-        qr->setCollation(collation);
+        findCommand->setCollation(collation);
     }
     auto cq = uassertStatusOKWithContext(
         CanonicalQuery::canonicalize(opCtx,
-                                     std::move(qr),
+                                     std::move(findCommand),
+                                     false, /* isExplain */
                                      expCtx,
                                      ExtensionsCallbackNoop(),
                                      MatchExpressionParser::kAllowAllSpecialFeatures),

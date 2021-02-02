@@ -101,10 +101,10 @@ std::vector<AllowedIndexEntry> QuerySettings::getAllAllowedIndices() const {
 void QuerySettings::setAllowedIndices(const CanonicalQuery& canonicalQuery,
                                       const BSONObjSet& indexKeyPatterns,
                                       const stdx::unordered_set<std::string>& indexNames) {
-    const QueryRequest& qr = canonicalQuery.getQueryRequest();
-    const BSONObj& query = qr.getFilter();
-    const BSONObj& sort = qr.getSort();
-    const BSONObj& projection = qr.getProj();
+    const FindCommand& findCommand = canonicalQuery.getFindCommand();
+    const BSONObj& query = findCommand.getFilter();
+    const BSONObj& sort = findCommand.getSort();
+    const BSONObj& projection = findCommand.getProjection();
     const auto key = canonicalQuery.encodeKey();
     const BSONObj collation =
         canonicalQuery.getCollator() ? canonicalQuery.getCollator()->getSpec().toBSON() : BSONObj();

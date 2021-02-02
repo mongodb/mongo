@@ -44,7 +44,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/query/query_request.h"
+#include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/logv2/log.h"
@@ -79,13 +79,13 @@ BSONObj appendMaxTimeToCmdObj(Milliseconds maxTimeMSOverride, const BSONObj& cmd
 
     // Remove the user provided maxTimeMS so we can attach the one from the override
     for (const auto& elem : cmdObj) {
-        if (elem.fieldNameStringData() != QueryRequest::cmdOptionMaxTimeMS) {
+        if (elem.fieldNameStringData() != query_request_helper::cmdOptionMaxTimeMS) {
             updatedCmdBuilder.append(elem);
         }
     }
 
     if (maxTimeMSOverride < Milliseconds::max()) {
-        updatedCmdBuilder.append(QueryRequest::cmdOptionMaxTimeMS,
+        updatedCmdBuilder.append(query_request_helper::cmdOptionMaxTimeMS,
                                  durationCount<Milliseconds>(maxTimeMSOverride));
     }
 
@@ -376,20 +376,21 @@ StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(
     BSONObjBuilder findCmdBuilder;
 
     {
-        QueryRequest qr(nss);
-        qr.setFilter(query);
-        qr.setSort(sort);
-        qr.setReadConcern(readConcernObj);
-        qr.setLimit(limit ? static_cast<boost::optional<std::int64_t>>(*limit) : boost::none);
+        FindCommand findCommand(nss);
+        findCommand.setFilter(query.getOwned());
+        findCommand.setSort(sort.getOwned());
+        findCommand.setReadConcern(readConcernObj.getOwned());
+        findCommand.setLimit(limit ? static_cast<boost::optional<std::int64_t>>(*limit)
+                                   : boost::none);
         if (hint) {
-            qr.setHint(*hint);
+            findCommand.setHint(*hint);
         }
 
         if (maxTimeMS < Milliseconds::max()) {
-            qr.setMaxTimeMS(durationCount<Milliseconds>(maxTimeMS));
+            findCommand.setMaxTimeMS(durationCount<Milliseconds>(maxTimeMS));
         }
 
-        qr.asFindCommand(&findCmdBuilder);
+        findCommand.serialize(BSONObj(), &findCmdBuilder);
     }
 
     return _runExhaustiveCursorCommand(opCtx,

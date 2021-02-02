@@ -35,7 +35,7 @@
 
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/query/query_request.h"
+#include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
@@ -77,9 +77,9 @@ public:
                               rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
             auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
-            auto query = QueryRequest::makeFromFindCommandForTests(opMsg.body, false);
+            auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
-            ASSERT_EQ(query->nss().ns(), "config.version");
+            ASSERT_EQ(query->getNamespaceOrUUID().nss()->ns(), "config.version");
             ASSERT_BSONOBJ_EQ(query->getFilter(), BSONObj());
             ASSERT_FALSE(query->getLimit().is_initialized());
 

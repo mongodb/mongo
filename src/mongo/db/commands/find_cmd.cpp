@@ -65,31 +65,29 @@ namespace {
 
 const auto kTermField = "term"_sd;
 
-// Parses the command object to a QueryRequest. If the client request did not specify any runtime
+// Parses the command object to a FindCommand. If the client request did not specify any runtime
 // constants, make them available to the query here.
-std::unique_ptr<QueryRequest> parseCmdObjectToQueryRequest(OperationContext* opCtx,
-                                                           NamespaceString nss,
-                                                           BSONObj cmdObj,
-                                                           bool isExplain) {
-    auto qr =
-        QueryRequest::makeFromFindCommand(std::move(cmdObj),
-                                          isExplain,
-                                          std::move(nss),
-                                          APIParameters::get(opCtx).getAPIStrict().value_or(false));
-    if (!qr->getLegacyRuntimeConstants()) {
-        qr->setLegacyRuntimeConstants(Variables::generateRuntimeConstants(opCtx));
+std::unique_ptr<FindCommand> parseCmdObjectToFindCommand(OperationContext* opCtx,
+                                                         NamespaceString nss,
+                                                         BSONObj cmdObj) {
+    auto findCommand = query_request_helper::makeFromFindCommand(
+        std::move(cmdObj),
+        std::move(nss),
+        APIParameters::get(opCtx).getAPIStrict().value_or(false));
+    if (!findCommand->getLegacyRuntimeConstants()) {
+        findCommand->setLegacyRuntimeConstants(Variables::generateRuntimeConstants(opCtx));
     }
-    return qr;
+    return findCommand;
 }
 
 boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
     OperationContext* opCtx,
-    const QueryRequest& queryRequest,
+    const FindCommand& findCommand,
     boost::optional<ExplainOptions::Verbosity> verbosity) {
     std::unique_ptr<CollatorInterface> collator;
-    if (!queryRequest.getCollation().isEmpty()) {
+    if (!findCommand.getCollation().isEmpty()) {
         collator = uassertStatusOK(CollatorFactoryInterface::get(opCtx->getServiceContext())
-                                       ->makeFromBSON(queryRequest.getCollation()));
+                                       ->makeFromBSON(findCommand.getCollation()));
     }
 
     // Although both 'find' and 'aggregate' commands have an ExpressionContext, some of the data
@@ -106,23 +104,23 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
     //
     // As we change the code to make the find and agg systems more tightly coupled, it would make
     // sense to start initializing these fields for find operations as well.
-    auto expCtx =
-        make_intrusive<ExpressionContext>(opCtx,
-                                          verbosity,
-                                          false,  // fromMongos
-                                          false,  // needsMerge
-                                          queryRequest.allowDiskUse(),
-                                          false,  // bypassDocumentValidation
-                                          false,  // isMapReduceCommand
-                                          queryRequest.nss(),
-                                          queryRequest.getLegacyRuntimeConstants(),
-                                          std::move(collator),
-                                          nullptr,  // mongoProcessInterface
-                                          StringMap<ExpressionContext::ResolvedNamespace>{},
-                                          boost::none,                             // uuid
-                                          queryRequest.getLetParameters(),         // let
-                                          CurOp::get(opCtx)->dbProfileLevel() > 0  // mayDbProfile
-        );
+    auto expCtx = make_intrusive<ExpressionContext>(
+        opCtx,
+        verbosity,
+        false,  // fromMongos
+        false,  // needsMerge
+        findCommand.getAllowDiskUse(),
+        false,  // bypassDocumentValidation
+        false,  // isMapReduceCommand
+        findCommand.getNamespaceOrUUID().nss().value_or(NamespaceString()),
+        findCommand.getLegacyRuntimeConstants(),
+        std::move(collator),
+        nullptr,  // mongoProcessInterface
+        StringMap<ExpressionContext::ResolvedNamespace>{},
+        boost::none,                             // uuid
+        findCommand.getLet(),                    // let
+        CurOp::get(opCtx)->dbProfileLevel() > 0  // mayDbProfile
+    );
     expCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";
     return expCtx;
 }
@@ -250,16 +248,17 @@ public:
                         AutoGetCollectionViewMode::kViewsPermitted);
             const auto nss = ctx->getNss();
 
-            // Parse the command BSON to a QueryRequest.
-            const bool isExplain = true;
-            auto qr = parseCmdObjectToQueryRequest(opCtx, nss, _request.body, isExplain);
+            // Parse the command BSON to a FindCommand.
+            auto findCommand = parseCmdObjectToFindCommand(opCtx, nss, _request.body);
 
-            // Finish the parsing step by using the QueryRequest to create a CanonicalQuery.
+            // Finish the parsing step by using the FindCommand to create a CanonicalQuery.
             const ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
-            auto expCtx = makeExpressionContext(opCtx, *qr, verbosity);
+            auto expCtx = makeExpressionContext(opCtx, *findCommand, verbosity);
+            const bool isExplain = true;
             auto cq = uassertStatusOK(
                 CanonicalQuery::canonicalize(opCtx,
-                                             std::move(qr),
+                                             std::move(findCommand),
+                                             isExplain,
                                              std::move(expCtx),
                                              extensionsCallback,
                                              MatchExpressionParser::kAllowAllSpecialFeatures));
@@ -270,8 +269,9 @@ public:
 
                 // Convert the find command into an aggregation using $match (and other stages, as
                 // necessary), if possible.
-                const auto& qr = cq->getQueryRequest();
-                auto viewAggregationCommand = uassertStatusOK(qr.asAggregationCommand());
+                const auto& findCommand = cq->getFindCommand();
+                auto viewAggregationCommand =
+                    uassertStatusOK(query_request_helper::asAggregationCommand(findCommand));
 
                 auto viewAggCmd = OpMsgRequest::fromDBAndBody(_dbName, viewAggregationCommand).body;
                 // Create the agg request equivalent of the find operation, with the explain
@@ -329,31 +329,32 @@ public:
 
             const BSONObj& cmdObj = _request.body;
 
-            // Parse the command BSON to a QueryRequest. Pass in the parsedNss in case cmdObj does
+            // Parse the command BSON to a FindCommand. Pass in the parsedNss in case cmdObj does
             // not have a UUID.
             auto parsedNss = NamespaceString{CommandHelpers::parseNsFromCommand(_dbName, cmdObj)};
             const bool isExplain = false;
             const bool isOplogNss = (parsedNss == NamespaceString::kRsOplogNamespace);
-            auto qr = parseCmdObjectToQueryRequest(opCtx, std::move(parsedNss), cmdObj, isExplain);
+            auto findCommand = parseCmdObjectToFindCommand(opCtx, std::move(parsedNss), cmdObj);
 
             // Only allow speculative majority for internal commands that specify the correct flag.
             uassert(ErrorCodes::ReadConcernMajorityNotEnabled,
                     "Majority read concern is not enabled.",
                     !(repl::ReadConcernArgs::get(opCtx).isSpeculativeMajority() &&
-                      !qr->allowSpeculativeMajorityRead()));
+                      !findCommand->getAllowSpeculativeMajorityRead()));
 
             auto replCoord = repl::ReplicationCoordinator::get(opCtx);
             const auto txnParticipant = TransactionParticipant::get(opCtx);
             uassert(ErrorCodes::InvalidOptions,
                     "It is illegal to open a tailable cursor in a transaction",
-                    !(opCtx->inMultiDocumentTransaction() && qr->isTailable()));
+                    !(opCtx->inMultiDocumentTransaction() && findCommand->getTailable()));
 
             uassert(ErrorCodes::OperationNotSupportedInTransaction,
                     "The 'readOnce' option is not supported within a transaction.",
-                    !txnParticipant || !opCtx->inMultiDocumentTransaction() || !qr->isReadOnce());
+                    !txnParticipant || !opCtx->inMultiDocumentTransaction() ||
+                        !findCommand->getReadOnce());
 
             // Validate term before acquiring locks, if provided.
-            auto term = qr->getReplicationTerm();
+            auto term = findCommand->getTerm();
             if (term) {
                 // Note: updateTerm returns ok if term stayed the same.
                 uassertStatusOK(replCoord->updateTerm(opCtx, *term));
@@ -379,13 +380,13 @@ public:
             const auto& nss = ctx->getNss();
 
             uassert(ErrorCodes::NamespaceNotFound,
-                    str::stream() << "UUID " << qr->uuid().get()
+                    str::stream() << "UUID " << findCommand->getNamespaceOrUUID().uuid().get()
                                   << " specified in query request not found",
-                    ctx || !qr->uuid());
+                    ctx || !findCommand->getNamespaceOrUUID().uuid());
 
             // Set the namespace if a collection was found, as opposed to nothing or a view.
             if (ctx) {
-                qr->refreshNSS(ctx->getNss());
+                query_request_helper::refreshNSS(ctx->getNss(), findCommand.get());
             }
 
             // Check whether we are allowed to read from this node after acquiring our locks.
@@ -401,12 +402,13 @@ public:
             const int ntoskip = -1;
             beginQueryOp(opCtx, nss, _request.body, ntoreturn, ntoskip);
 
-            // Finish the parsing step by using the QueryRequest to create a CanonicalQuery.
+            // Finish the parsing step by using the FindCommand to create a CanonicalQuery.
             const ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
-            auto expCtx = makeExpressionContext(opCtx, *qr, boost::none /* verbosity */);
+            auto expCtx = makeExpressionContext(opCtx, *findCommand, boost::none /* verbosity */);
             auto cq = uassertStatusOK(
                 CanonicalQuery::canonicalize(opCtx,
-                                             std::move(qr),
+                                             std::move(findCommand),
+                                             isExplain,
                                              std::move(expCtx),
                                              extensionsCallback,
                                              MatchExpressionParser::kAllowAllSpecialFeatures));
@@ -417,8 +419,9 @@ public:
 
                 // Convert the find command into an aggregation using $match (and other stages, as
                 // necessary), if possible.
-                const auto& qr = cq->getQueryRequest();
-                auto viewAggregationCommand = uassertStatusOK(qr.asAggregationCommand());
+                const auto& findCommand = cq->getFindCommand();
+                auto viewAggregationCommand =
+                    uassertStatusOK(query_request_helper::asAggregationCommand(findCommand));
 
                 BSONObj aggResult = CommandHelpers::runCommandDirectly(
                     opCtx, OpMsgRequest::fromDBAndBody(_dbName, std::move(viewAggregationCommand)));
@@ -434,7 +437,7 @@ public:
 
             const auto& collection = ctx->getCollection();
 
-            if (cq->getQueryRequest().isReadOnce()) {
+            if (cq->getFindCommand().getReadOnce()) {
                 // The readOnce option causes any storage-layer cursors created during plan
                 // execution to assume read data will not be needed again and need not be cached.
                 opCtx->recoveryUnit()->setReadOnce(true);
@@ -463,7 +466,7 @@ public:
 
             FindCommon::waitInFindBeforeMakingBatch(opCtx, *exec->getCanonicalQuery());
 
-            const QueryRequest& originalQR = exec->getCanonicalQuery()->getQueryRequest();
+            const FindCommand& originalFC = exec->getCanonicalQuery()->getFindCommand();
 
             // Stream query results, adding them to a BSONArray as we go.
             CursorResponseBuilder::Options options;
@@ -479,7 +482,7 @@ public:
             ResourceConsumption::DocumentUnitCounter docUnitsReturned;
 
             try {
-                while (!FindCommon::enoughForFirstBatch(originalQR, numResults) &&
+                while (!FindCommon::enoughForFirstBatch(originalFC, numResults) &&
                        PlanExecutor::ADVANCED == (state = exec->getNext(&obj, nullptr))) {
                     // If we can't fit this result inside the current batch, then we stash it for
                     // later.

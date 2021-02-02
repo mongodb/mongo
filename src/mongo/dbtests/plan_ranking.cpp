@@ -230,10 +230,10 @@ public:
         addIndex(BSON("d" << 1));
 
         // Query: find({a: 1}).sort({d: 1})
-        auto qr = std::make_unique<QueryRequest>(nss);
-        qr->setFilter(BSON("a" << 1));
-        qr->setSort(BSON("d" << 1));
-        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
+        auto findCommand = std::make_unique<FindCommand>(nss);
+        findCommand->setFilter(BSON("a" << 1));
+        findCommand->setSort(BSON("d" << 1));
+        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(findCommand));
         ASSERT_OK(statusWithCQ.getStatus());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
         ASSERT(cq);
@@ -287,9 +287,9 @@ public:
 
         // Run the query {a:4, b:1}.
         {
-            auto qr = std::make_unique<QueryRequest>(nss);
-            qr->setFilter(BSON("a" << 100 << "b" << 1));
-            auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
+            auto findCommand = std::make_unique<FindCommand>(nss);
+            findCommand->setFilter(BSON("a" << 100 << "b" << 1));
+            auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(findCommand));
             verify(statusWithCQ.isOK());
             cq = std::move(statusWithCQ.getValue());
             ASSERT(cq.get());
@@ -306,9 +306,9 @@ public:
 
         // And run the same query again.
         {
-            auto qr = std::make_unique<QueryRequest>(nss);
-            qr->setFilter(BSON("a" << 100 << "b" << 1));
-            auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
+            auto findCommand = std::make_unique<FindCommand>(nss);
+            findCommand->setFilter(BSON("a" << 100 << "b" << 1));
+            auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(findCommand));
             verify(statusWithCQ.isOK());
             cq = std::move(statusWithCQ.getValue());
         }
@@ -341,9 +341,9 @@ public:
         addIndex(BSON("b" << 1));
 
         // Run the query {a:1, b:{$gt:1}.
-        auto qr = std::make_unique<QueryRequest>(nss);
-        qr->setFilter(BSON("a" << 1 << "b" << BSON("$gt" << 1)));
-        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
+        auto findCommand = std::make_unique<FindCommand>(nss);
+        findCommand->setFilter(BSON("a" << 1 << "b" << BSON("$gt" << 1)));
+        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(findCommand));
         verify(statusWithCQ.isOK());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
         ASSERT(nullptr != cq.get());
@@ -381,10 +381,10 @@ public:
         addIndex(BSON("a" << 1 << "b" << 1));
 
         // Query for a==27 with projection that wants 'a' and 'b'.
-        auto qr = std::make_unique<QueryRequest>(nss);
-        qr->setFilter(BSON("a" << 27));
-        qr->setProj(BSON("_id" << 0 << "a" << 1 << "b" << 1));
-        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
+        auto findCommand = std::make_unique<FindCommand>(nss);
+        findCommand->setFilter(BSON("a" << 27));
+        findCommand->setProjection(BSON("_id" << 0 << "a" << 1 << "b" << 1));
+        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(findCommand));
         ASSERT_OK(statusWithCQ.getStatus());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
         ASSERT(nullptr != cq.get());
@@ -416,9 +416,9 @@ public:
         addIndex(BSON("b" << 1));
 
         // There is no data that matches this query but we don't know that until EOF.
-        auto qr = std::make_unique<QueryRequest>(nss);
-        qr->setFilter(BSON("a" << 1 << "b" << 1 << "c" << 99));
-        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
+        auto findCommand = std::make_unique<FindCommand>(nss);
+        findCommand->setFilter(BSON("a" << 1 << "b" << 1 << "c" << 99));
+        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(findCommand));
         ASSERT_OK(statusWithCQ.getStatus());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
         ASSERT(nullptr != cq.get());
@@ -453,11 +453,11 @@ public:
 
         // There is no data that matches this query ({a:2}).  Both scans will hit EOF before
         // returning any data.
-        auto qr = std::make_unique<QueryRequest>(nss);
-        qr->setFilter(BSON("a" << 2));
-        qr->setProj(BSON("_id" << 0 << "a" << 1 << "b" << 1));
+        auto findCommand = std::make_unique<FindCommand>(nss);
+        findCommand->setFilter(BSON("a" << 2));
+        findCommand->setProjection(BSON("_id" << 0 << "a" << 1 << "b" << 1));
 
-        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
+        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(findCommand));
         ASSERT_OK(statusWithCQ.getStatus());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
         ASSERT(nullptr != cq.get());
@@ -488,9 +488,9 @@ public:
         addIndex(BSON("b" << 1));
 
         // Run the query {a:N+1, b:1}.  (No such document.)
-        auto qr = std::make_unique<QueryRequest>(nss);
-        qr->setFilter(BSON("a" << N + 1 << "b" << 1));
-        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
+        auto findCommand = std::make_unique<FindCommand>(nss);
+        findCommand->setFilter(BSON("a" << N + 1 << "b" << 1));
+        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(findCommand));
         verify(statusWithCQ.isOK());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
         ASSERT(nullptr != cq.get());
@@ -524,9 +524,9 @@ public:
         addIndex(BSON("b" << 1));
 
         // Run the query {a:N+1, b:1}.  (No such document.)
-        auto qr = std::make_unique<QueryRequest>(nss);
-        qr->setFilter(BSON("a" << BSON("$gte" << N + 1) << "b" << 1));
-        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
+        auto findCommand = std::make_unique<FindCommand>(nss);
+        findCommand->setFilter(BSON("a" << BSON("$gte" << N + 1) << "b" << 1));
+        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(findCommand));
         verify(statusWithCQ.isOK());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
         ASSERT(nullptr != cq.get());
@@ -553,10 +553,10 @@ public:
 
         // Run a query with a sort.  The blocking sort won't produce any data during the
         // evaluation period.
-        auto qr = std::make_unique<QueryRequest>(nss);
-        qr->setFilter(BSON("_id" << BSON("$gte" << 20 << "$lte" << 200)));
-        qr->setSort(BSON("c" << 1));
-        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
+        auto findCommand = std::make_unique<FindCommand>(nss);
+        findCommand->setFilter(BSON("_id" << BSON("$gte" << 20 << "$lte" << 200)));
+        findCommand->setSort(BSON("c" << 1));
+        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(findCommand));
         ASSERT_OK(statusWithCQ.getStatus());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
@@ -583,9 +583,9 @@ public:
         }
 
         // Look for A Space Odyssey.
-        auto qr = std::make_unique<QueryRequest>(nss);
-        qr->setFilter(BSON("foo" << 2001));
-        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
+        auto findCommand = std::make_unique<FindCommand>(nss);
+        findCommand->setFilter(BSON("foo" << 2001));
+        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(findCommand));
         verify(statusWithCQ.isOK());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
         ASSERT(nullptr != cq.get());
@@ -616,10 +616,10 @@ public:
         addIndex(BSON("d" << 1 << "e" << 1));
 
         // Query: find({a: 1}).sort({d: 1})
-        auto qr = std::make_unique<QueryRequest>(nss);
-        qr->setFilter(BSON("a" << 1));
-        qr->setSort(BSON("d" << 1));
-        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
+        auto findCommand = std::make_unique<FindCommand>(nss);
+        findCommand->setFilter(BSON("a" << 1));
+        findCommand->setSort(BSON("d" << 1));
+        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(findCommand));
         ASSERT_OK(statusWithCQ.getStatus());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
         ASSERT(nullptr != cq.get());
@@ -654,9 +654,9 @@ public:
         // Solutions using either 'a' or 'b' will take a long time to start producing
         // results. However, an index scan on 'b' will start producing results sooner
         // than an index scan on 'a'.
-        auto qr = std::make_unique<QueryRequest>(nss);
-        qr->setFilter(fromjson("{a: 1, b: 1, c: {$gte: 5000}}"));
-        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
+        auto findCommand = std::make_unique<FindCommand>(nss);
+        findCommand->setFilter(fromjson("{a: 1, b: 1, c: {$gte: 5000}}"));
+        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(findCommand));
         ASSERT_OK(statusWithCQ.getStatus());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
         ASSERT(nullptr != cq.get());
@@ -686,9 +686,9 @@ public:
         addIndex(BSON("b" << 1 << "c" << 1));
         addIndex(BSON("a" << 1));
 
-        auto qr = std::make_unique<QueryRequest>(nss);
-        qr->setFilter(fromjson("{a: 9, b: {$ne: 10}, c: 9}"));
-        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
+        auto findCommand = std::make_unique<FindCommand>(nss);
+        findCommand->setFilter(fromjson("{a: 9, b: {$ne: 10}, c: 9}"));
+        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(findCommand));
         ASSERT_OK(statusWithCQ.getStatus());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
         ASSERT(nullptr != cq.get());

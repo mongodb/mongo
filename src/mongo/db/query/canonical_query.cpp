@@ -65,33 +65,35 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const ExtensionsCallback& extensionsCallback,
     MatchExpressionParser::AllowedFeatureSet allowedFeatures) {
-    // Make QueryRequest.
-    auto qrStatus = QueryRequest::fromLegacyQueryMessage(qm);
-    if (!qrStatus.isOK()) {
-        return qrStatus.getStatus();
+    bool explain = false;
+    // Make FindCommand.
+    auto status = query_request_helper::fromLegacyQueryMessage(qm, &explain);
+    if (!status.isOK()) {
+        return status.getStatus();
     }
 
     return CanonicalQuery::canonicalize(
-        opCtx, std::move(qrStatus.getValue()), expCtx, extensionsCallback, allowedFeatures);
+        opCtx, std::move(status.getValue()), explain, expCtx, extensionsCallback, allowedFeatures);
 }
 
 // static
 StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
     OperationContext* opCtx,
-    std::unique_ptr<QueryRequest> qr,
+    std::unique_ptr<FindCommand> findCommand,
+    bool explain,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const ExtensionsCallback& extensionsCallback,
     MatchExpressionParser::AllowedFeatureSet allowedFeatures,
     const ProjectionPolicies& projectionPolicies) {
-    auto qrStatus = qr->validate();
-    if (!qrStatus.isOK()) {
-        return qrStatus;
+    auto status = query_request_helper::validateFindCommand(*findCommand);
+    if (!status.isOK()) {
+        return status;
     }
 
     std::unique_ptr<CollatorInterface> collator;
-    if (!qr->getCollation().isEmpty()) {
+    if (!findCommand->getCollation().isEmpty()) {
         auto statusWithCollator = CollatorFactoryInterface::get(opCtx->getServiceContext())
-                                      ->makeFromBSON(qr->getCollation());
+                                      ->makeFromBSON(findCommand->getCollation());
         if (!statusWithCollator.isOK()) {
             return statusWithCollator.getStatus();
         }
@@ -101,14 +103,15 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
     // Make MatchExpression.
     boost::intrusive_ptr<ExpressionContext> newExpCtx;
     if (!expCtx.get()) {
+        invariant(findCommand->getNamespaceOrUUID().nss());
         newExpCtx = make_intrusive<ExpressionContext>(opCtx,
                                                       std::move(collator),
-                                                      qr->nss(),
-                                                      qr->getLegacyRuntimeConstants(),
-                                                      qr->getLetParameters());
+                                                      *findCommand->getNamespaceOrUUID().nss(),
+                                                      findCommand->getLegacyRuntimeConstants(),
+                                                      findCommand->getLet());
     } else {
         newExpCtx = expCtx;
-        // A collator can enter through both the QueryRequest and ExpressionContext arguments.
+        // A collator can enter through both the FindCommand and ExpressionContext arguments.
         // This invariant ensures that both collators are the same because downstream we
         // pull the collator from only one of the ExpressionContext carrier.
         if (collator.get() && expCtx->getCollator()) {
@@ -118,17 +121,19 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
 
     // Make the CQ we'll hopefully return.
     std::unique_ptr<CanonicalQuery> cq(new CanonicalQuery());
+    cq->setExplain(explain);
 
     StatusWithMatchExpression statusWithMatcher = [&]() -> StatusWithMatchExpression {
         if (getTestCommandsEnabled() && internalQueryEnableCSTParser.load()) {
             try {
-                return cst::parseToMatchExpression(qr->getFilter(), newExpCtx, extensionsCallback);
+                return cst::parseToMatchExpression(
+                    findCommand->getFilter(), newExpCtx, extensionsCallback);
             } catch (const DBException& ex) {
                 return ex.toStatus();
             }
         } else {
             return MatchExpressionParser::parse(
-                qr->getFilter(), newExpCtx, extensionsCallback, allowedFeatures);
+                findCommand->getFilter(), newExpCtx, extensionsCallback, allowedFeatures);
         }
     }();
     if (!statusWithMatcher.isOK()) {
@@ -139,7 +144,7 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
     Status initStatus =
         cq->init(opCtx,
                  std::move(newExpCtx),
-                 std::move(qr),
+                 std::move(findCommand),
                  parsingCanProduceNoopMatchNodes(extensionsCallback, allowedFeatures),
                  std::move(me),
                  projectionPolicies);
@@ -153,24 +158,24 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
 // static
 StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
     OperationContext* opCtx, const CanonicalQuery& baseQuery, MatchExpression* root) {
-    auto qr = std::make_unique<QueryRequest>(baseQuery.nss());
+    auto findCommand = std::make_unique<FindCommand>(baseQuery.nss());
     BSONObjBuilder builder;
     root->serialize(&builder, true);
-    qr->setFilter(builder.obj());
-    qr->setProj(baseQuery.getQueryRequest().getProj());
-    qr->setSort(baseQuery.getQueryRequest().getSort());
-    qr->setCollation(baseQuery.getQueryRequest().getCollation());
-    qr->setExplain(baseQuery.getQueryRequest().isExplain());
-    auto qrStatus = qr->validate();
-    if (!qrStatus.isOK()) {
-        return qrStatus;
+    findCommand->setFilter(builder.obj());
+    findCommand->setProjection(baseQuery.getFindCommand().getProjection().getOwned());
+    findCommand->setSort(baseQuery.getFindCommand().getSort().getOwned());
+    findCommand->setCollation(baseQuery.getFindCommand().getCollation().getOwned());
+    auto status = query_request_helper::validateFindCommand(*findCommand);
+    if (!status.isOK()) {
+        return status;
     }
 
     // Make the CQ we'll hopefully return.
     std::unique_ptr<CanonicalQuery> cq(new CanonicalQuery());
+    cq->setExplain(baseQuery.getExplain());
     Status initStatus = cq->init(opCtx,
                                  baseQuery.getExpCtx(),
-                                 std::move(qr),
+                                 std::move(findCommand),
                                  baseQuery.canHaveNoopMatchNodes(),
                                  root->shallowClone(),
                                  ProjectionPolicies::findProjectionPolicies());
@@ -183,28 +188,31 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
 
 Status CanonicalQuery::init(OperationContext* opCtx,
                             boost::intrusive_ptr<ExpressionContext> expCtx,
-                            std::unique_ptr<QueryRequest> qr,
+                            std::unique_ptr<FindCommand> findCommand,
                             bool canHaveNoopMatchNodes,
                             std::unique_ptr<MatchExpression> root,
                             const ProjectionPolicies& projectionPolicies) {
     _expCtx = expCtx;
-    _qr = std::move(qr);
+    _findCommand = std::move(findCommand);
 
     _canHaveNoopMatchNodes = canHaveNoopMatchNodes;
 
     // Normalize and validate tree.
     _root = MatchExpression::normalize(std::move(root));
-    auto validStatus = isValid(_root.get(), *_qr);
+    auto validStatus = isValid(_root.get(), *_findCommand);
     if (!validStatus.isOK()) {
         return validStatus.getStatus();
     }
     auto unavailableMetadata = validStatus.getValue();
 
     // Validate the projection if there is one.
-    if (!_qr->getProj().isEmpty()) {
+    if (!_findCommand->getProjection().isEmpty()) {
         try {
-            _proj.emplace(projection_ast::parse(
-                expCtx, _qr->getProj(), _root.get(), _qr->getFilter(), projectionPolicies));
+            _proj.emplace(projection_ast::parse(expCtx,
+                                                _findCommand->getProjection(),
+                                                _root.get(),
+                                                _findCommand->getFilter(),
+                                                projectionPolicies));
 
             // Fail if any of the projection's dependencies are unavailable.
             DepsTracker{unavailableMetadata}.requestMetadata(_proj->metadataDeps());
@@ -216,7 +224,7 @@ Status CanonicalQuery::init(OperationContext* opCtx,
     }
 
     if (_proj && _proj->metadataDeps()[DocumentMetadataFields::kSortKey] &&
-        _qr->getSort().isEmpty()) {
+        _findCommand->getSort().isEmpty()) {
         return Status(ErrorCodes::BadValue, "cannot use sortKey $meta projection without a sort");
     }
 
@@ -228,7 +236,7 @@ Status CanonicalQuery::init(OperationContext* opCtx,
     }
 
     // If the 'returnKey' option is set, then the plan should produce index key metadata.
-    if (_qr->returnKey()) {
+    if (_findCommand->getReturnKey()) {
         _metadataDeps.set(DocumentMetadataFields::kIndexKey);
     }
 
@@ -236,7 +244,7 @@ Status CanonicalQuery::init(OperationContext* opCtx,
 }
 
 void CanonicalQuery::initSortPattern(QueryMetadataBitSet unavailableMetadata) {
-    if (_qr->getSort().isEmpty()) {
+    if (_findCommand->getSort().isEmpty()) {
         return;
     }
 
@@ -246,15 +254,15 @@ void CanonicalQuery::initSortPattern(QueryMetadataBitSet unavailableMetadata) {
     // We have already validated that if there is a $natural sort and a hint, that the hint
     // also specifies $natural with the same direction. Therefore, it is safe to clear the $natural
     // sort and rewrite it as a $natural hint.
-    if (_qr->getSort()[QueryRequest::kNaturalSortField]) {
-        _qr->setHint(_qr->getSort());
-        _qr->setSort(BSONObj{});
+    if (_findCommand->getSort()[query_request_helper::kNaturalSortField]) {
+        _findCommand->setHint(_findCommand->getSort().getOwned());
+        _findCommand->setSort(BSONObj{});
     }
 
     if (getTestCommandsEnabled() && internalQueryEnableCSTParser.load()) {
-        _sortPattern = cst::parseToSortPattern(_qr->getSort(), _expCtx);
+        _sortPattern = cst::parseToSortPattern(_findCommand->getSort(), _expCtx);
     } else {
-        _sortPattern = SortPattern{_qr->getSort(), _expCtx};
+        _sortPattern = SortPattern{_findCommand->getSort(), _expCtx};
     }
     _metadataDeps |= _sortPattern->metadataDeps(unavailableMetadata);
 
@@ -334,7 +342,7 @@ bool hasNodeInSubtree(MatchExpression* root,
 }
 
 StatusWith<QueryMetadataBitSet> CanonicalQuery::isValid(MatchExpression* root,
-                                                        const QueryRequest& request) {
+                                                        const FindCommand& findCommand) {
     QueryMetadataBitSet unavailableMetadata{};
 
     // There can only be one TEXT.  If there is a TEXT, it cannot appear inside a NOR.
@@ -378,9 +386,9 @@ StatusWith<QueryMetadataBitSet> CanonicalQuery::isValid(MatchExpression* root,
         unavailableMetadata |= DepsTracker::kAllGeoNearData;
     }
 
-    const BSONObj& sortObj = request.getSort();
+    const BSONObj& sortObj = findCommand.getSort();
     BSONElement sortNaturalElt = sortObj["$natural"];
-    const BSONObj& hintObj = request.getHint();
+    const BSONObj& hintObj = findCommand.getHint();
     BSONElement hintNaturalElt = hintObj["$natural"];
 
     if (sortNaturalElt && sortObj.nFields() != 1) {
@@ -422,12 +430,12 @@ StatusWith<QueryMetadataBitSet> CanonicalQuery::isValid(MatchExpression* root,
     }
 
     // TEXT and tailable are incompatible.
-    if (numText > 0 && request.isTailable()) {
+    if (numText > 0 && findCommand.getTailable()) {
         return Status(ErrorCodes::BadValue, "text and tailable cursor not allowed in same query");
     }
 
     // NEAR and tailable are incompatible.
-    if (numGeoNear > 0 && request.isTailable()) {
+    if (numGeoNear > 0 && findCommand.getTailable()) {
         return Status(ErrorCodes::BadValue,
                       "Tailable cursors and geo $near cannot be used together");
     }
@@ -448,59 +456,78 @@ StatusWith<QueryMetadataBitSet> CanonicalQuery::isValid(MatchExpression* root,
     return unavailableMetadata;
 }
 
+int CanonicalQuery::getOptions() const {
+    int options = 0;
+    if (_findCommand->getTailable()) {
+        options |= QueryOption_CursorTailable;
+    }
+    if (_findCommand->getAwaitData()) {
+        options |= QueryOption_AwaitData;
+    }
+    if (_findCommand->getNoCursorTimeout()) {
+        options |= QueryOption_NoCursorTimeout;
+    }
+    if (_findCommand->getAllowPartialResults()) {
+        options |= QueryOption_PartialResults;
+    }
+    return options;
+}
+
 std::string CanonicalQuery::toString() const {
     str::stream ss;
-    ss << "ns=" << _qr->nss().ns();
+    ss << "ns=" << _findCommand->getNamespaceOrUUID().nss().value_or(NamespaceString()).ns();
 
-    if (_qr->getBatchSize()) {
-        ss << " batchSize=" << *_qr->getBatchSize();
+    if (_findCommand->getBatchSize()) {
+        ss << " batchSize=" << *_findCommand->getBatchSize();
     }
 
-    if (_qr->getLimit()) {
-        ss << " limit=" << *_qr->getLimit();
+    if (_findCommand->getLimit()) {
+        ss << " limit=" << *_findCommand->getLimit();
     }
 
-    if (_qr->getSkip()) {
-        ss << " skip=" << *_qr->getSkip();
+    if (_findCommand->getSkip()) {
+        ss << " skip=" << *_findCommand->getSkip();
     }
 
-    if (_qr->getNToReturn()) {
-        ss << " ntoreturn=" << *_qr->getNToReturn() << '\n';
+    if (_findCommand->getNtoreturn()) {
+        ss << " ntoreturn=" << *_findCommand->getNtoreturn() << '\n';
     }
 
     // The expression tree puts an endl on for us.
     ss << "Tree: " << _root->debugString();
-    ss << "Sort: " << _qr->getSort().toString() << '\n';
-    ss << "Proj: " << _qr->getProj().toString() << '\n';
-    if (!_qr->getCollation().isEmpty()) {
-        ss << "Collation: " << _qr->getCollation().toString() << '\n';
+    ss << "Sort: " << _findCommand->getSort().toString() << '\n';
+    ss << "Proj: " << _findCommand->getProjection().toString() << '\n';
+    if (!_findCommand->getCollation().isEmpty()) {
+        ss << "Collation: " << _findCommand->getCollation().toString() << '\n';
     }
     return ss;
 }
 
 std::string CanonicalQuery::toStringShort() const {
     str::stream ss;
-    ss << "ns: " << _qr->nss().ns() << " query: " << _qr->getFilter().toString()
-       << " sort: " << _qr->getSort().toString() << " projection: " << _qr->getProj().toString();
+    ss << "ns: " << _findCommand->getNamespaceOrUUID().nss().value_or(NamespaceString()).ns()
+       << " query: " << _findCommand->getFilter().toString()
+       << " sort: " << _findCommand->getSort().toString()
+       << " projection: " << _findCommand->getProjection().toString();
 
-    if (!_qr->getCollation().isEmpty()) {
-        ss << " collation: " << _qr->getCollation().toString();
+    if (!_findCommand->getCollation().isEmpty()) {
+        ss << " collation: " << _findCommand->getCollation().toString();
     }
 
-    if (_qr->getBatchSize()) {
-        ss << " batchSize: " << *_qr->getBatchSize();
+    if (_findCommand->getBatchSize()) {
+        ss << " batchSize: " << *_findCommand->getBatchSize();
     }
 
-    if (_qr->getLimit()) {
-        ss << " limit: " << *_qr->getLimit();
+    if (_findCommand->getLimit()) {
+        ss << " limit: " << *_findCommand->getLimit();
     }
 
-    if (_qr->getSkip()) {
-        ss << " skip: " << *_qr->getSkip();
+    if (_findCommand->getSkip()) {
+        ss << " skip: " << *_findCommand->getSkip();
     }
 
-    if (_qr->getNToReturn()) {
-        ss << " ntoreturn=" << *_qr->getNToReturn();
+    if (_findCommand->getNtoreturn()) {
+        ss << " ntoreturn=" << *_findCommand->getNtoreturn();
     }
 
     return ss;

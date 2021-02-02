@@ -33,7 +33,7 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/query/query_request.h"
+#include "mongo/db/query/query_request_helper.h"
 
 namespace mongo {
 namespace count_request {

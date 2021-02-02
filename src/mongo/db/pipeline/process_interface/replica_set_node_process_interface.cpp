@@ -233,7 +233,8 @@ void ReplicaSetNodeProcessInterface::_attachGenericCommandArgs(OperationContext*
 
     auto maxTimeMS = opCtx->getRemainingMaxTimeMillis();
     if (maxTimeMS != Milliseconds::max()) {
-        cmd->append(QueryRequest::cmdOptionMaxTimeMS, durationCount<Milliseconds>(maxTimeMS));
+        cmd->append(query_request_helper::cmdOptionMaxTimeMS,
+                    durationCount<Milliseconds>(maxTimeMS));
     }
 
     logical_session_id_helpers::serializeLsidAndTxnNumber(opCtx, cmd);

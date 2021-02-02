@@ -121,7 +121,7 @@ StringBuilder& operator<<(StringBuilder& builder, const PlanCacheKey& key) {
 //
 
 bool PlanCache::shouldCacheQuery(const CanonicalQuery& query) {
-    const QueryRequest& qr = query.getQueryRequest();
+    const FindCommand& findCommand = query.getFindCommand();
     const MatchExpression* expr = query.root();
 
     // Collection scan
@@ -132,19 +132,19 @@ bool PlanCache::shouldCacheQuery(const CanonicalQuery& query) {
     }
 
     // Hint provided
-    if (!qr.getHint().isEmpty()) {
+    if (!findCommand.getHint().isEmpty()) {
         return false;
     }
 
     // Min provided
     // Min queries are a special case of hinted queries.
-    if (!qr.getMin().isEmpty()) {
+    if (!findCommand.getMin().isEmpty()) {
         return false;
     }
 
     // Max provided
     // Similar to min, max queries are a special case of hinted queries.
-    if (!qr.getMax().isEmpty()) {
+    if (!findCommand.getMax().isEmpty()) {
         return false;
     }
 
@@ -152,12 +152,12 @@ bool PlanCache::shouldCacheQuery(const CanonicalQuery& query) {
     // that explain queries don't affect cache state, and it also makes
     // sure that we can always generate information regarding rejected plans
     // and/or trial period execution of candidate plans.
-    if (qr.isExplain()) {
+    if (query.getExplain()) {
         return false;
     }
 
     // Tailable cursors won't get cached, just turn into collscans.
-    if (query.getQueryRequest().isTailable()) {
+    if (query.getFindCommand().getTailable()) {
         return false;
     }
 
@@ -204,9 +204,9 @@ std::unique_ptr<PlanCacheEntry> PlanCacheEntry::create(
     if (includeDebugInfo) {
         // Strip projections on $-prefixed fields, as these are added by internal callers of the
         // system and are not considered part of the user projection.
-        const QueryRequest& qr = query.getQueryRequest();
+        const FindCommand& findCommand = query.getFindCommand();
         BSONObjBuilder projBuilder;
-        for (auto elem : qr.getProj()) {
+        for (auto elem : findCommand.getProjection()) {
             if (elem.fieldName()[0] == '$') {
                 continue;
             }
@@ -214,8 +214,8 @@ std::unique_ptr<PlanCacheEntry> PlanCacheEntry::create(
         }
 
         CreatedFromQuery createdFromQuery{
-            qr.getFilter(),
-            qr.getSort(),
+            findCommand.getFilter(),
+            findCommand.getSort(),
             projBuilder.obj(),
             query.getCollator() ? query.getCollator()->getSpec().toBSON() : BSONObj()};
         debugInfo.emplace(std::move(createdFromQuery), std::move(decision));

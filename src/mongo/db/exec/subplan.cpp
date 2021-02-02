@@ -72,28 +72,28 @@ SubplanStage::SubplanStage(ExpressionContext* expCtx,
 }
 
 bool SubplanStage::canUseSubplanning(const CanonicalQuery& query) {
-    const QueryRequest& qr = query.getQueryRequest();
+    const FindCommand& findCommand = query.getFindCommand();
     const MatchExpression* expr = query.root();
 
     // Hint provided
-    if (!qr.getHint().isEmpty()) {
+    if (!findCommand.getHint().isEmpty()) {
         return false;
     }
 
     // Min provided
     // Min queries are a special case of hinted queries.
-    if (!qr.getMin().isEmpty()) {
+    if (!findCommand.getMin().isEmpty()) {
         return false;
     }
 
     // Max provided
     // Similar to min, max queries are a special case of hinted queries.
-    if (!qr.getMax().isEmpty()) {
+    if (!findCommand.getMax().isEmpty()) {
         return false;
     }
 
     // Tailable cursors won't get cached, just turn into collscans.
-    if (query.getQueryRequest().isTailable()) {
+    if (findCommand.getTailable()) {
         return false;
     }
 

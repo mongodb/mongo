@@ -1416,7 +1416,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         case STAGE_COLLSCAN:
         case STAGE_LIMIT:
         case STAGE_SKIP:
-            if (_cq.getQueryRequest().isTailable() &&
+            if (_cq.getFindCommand().getTailable() &&
                 !reqs.getIsBuildingUnionForTailableCollScan()) {
                 auto childReqs = reqs;
                 childReqs.setIsBuildingUnionForTailableCollScan(true);

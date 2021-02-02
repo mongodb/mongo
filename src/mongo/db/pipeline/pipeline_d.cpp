@@ -203,32 +203,34 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExe
     const AggregateCommand* aggRequest,
     const size_t plannerOpts,
     const MatchExpressionParser::AllowedFeatureSet& matcherFeatures) {
-    auto qr = std::make_unique<QueryRequest>(nss);
-    qr->setTailableMode(expCtx->tailableMode);
-    qr->setFilter(queryObj);
-    qr->setProj(projectionObj);
-    qr->setSort(sortObj);
+    auto findCommand = std::make_unique<FindCommand>(nss);
+    query_request_helper::setTailableMode(expCtx->tailableMode, findCommand.get());
+    findCommand->setFilter(queryObj.getOwned());
+    findCommand->setProjection(projectionObj.getOwned());
+    findCommand->setSort(sortObj.getOwned());
     if (auto skip = skipThenLimit.getSkip()) {
-        qr->setSkip(static_cast<std::int64_t>(*skip));
+        findCommand->setSkip(static_cast<std::int64_t>(*skip));
     }
     if (auto limit = skipThenLimit.getLimit()) {
-        qr->setLimit(static_cast<std::int64_t>(*limit));
+        findCommand->setLimit(static_cast<std::int64_t>(*limit));
     }
 
+    bool isExplain = false;
     if (aggRequest) {
-        qr->setExplain(static_cast<bool>(aggRequest->getExplain()));
-        qr->setHint(aggRequest->getHint().value_or(BSONObj()));
+        findCommand->setHint(aggRequest->getHint().value_or(BSONObj()).getOwned());
+        isExplain = static_cast<bool>(aggRequest->getExplain());
     }
 
     // The collation on the ExpressionContext has been resolved to either the user-specified
     // collation or the collection default. This BSON should never be empty even if the resolved
     // collator is simple.
-    qr->setCollation(expCtx->getCollatorBSON());
+    findCommand->setCollation(expCtx->getCollatorBSON().getOwned());
 
     const ExtensionsCallbackReal extensionsCallback(expCtx->opCtx, &nss);
 
     auto cq = CanonicalQuery::canonicalize(expCtx->opCtx,
-                                           std::move(qr),
+                                           std::move(findCommand),
+                                           isExplain,
                                            expCtx,
                                            extensionsCallback,
                                            matcherFeatures,

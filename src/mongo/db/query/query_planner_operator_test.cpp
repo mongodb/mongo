@@ -802,7 +802,7 @@ TEST_F(QueryPlannerTest, CompoundIndexWithEqualityPredicatesProvidesSort) {
 //
 
 TEST_F(QueryPlannerTest, SortLimit) {
-    // Negative limit indicates hard limit - see query_request.cpp
+    // Negative limit indicates hard limit - see query_request_helper.cpp
     runQuerySortProjSkipNToReturn(BSONObj(), fromjson("{a: 1}"), BSONObj(), 0, -3);
     assertNumSolutions(1U);
     assertSolutionExists(

@@ -34,7 +34,7 @@
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/canonical_query.h"
-#include "mongo/db/query/query_request.h"
+#include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/sessions_collection_rs.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/op_msg.h"
@@ -172,13 +172,14 @@ LogicalSessionIdSet SessionsCollectionSharded::findRemovedSessions(
         toSend =
             OpMsgRequest::fromDBAndBody(NamespaceString::kLogicalSessionsNamespace.db(), toSend)
                 .body;
-        auto qr = QueryRequest::makeFromFindCommand(
-            toSend, false, NamespaceString::kLogicalSessionsNamespace, apiStrict);
+        auto findCommand = query_request_helper::makeFromFindCommand(
+            toSend, NamespaceString::kLogicalSessionsNamespace, apiStrict);
 
         const boost::intrusive_ptr<ExpressionContext> expCtx;
         auto cq = uassertStatusOK(
             CanonicalQuery::canonicalize(opCtx,
-                                         std::move(qr),
+                                         std::move(findCommand),
+                                         false,
                                          expCtx,
                                          ExtensionsCallbackNoop(),
                                          MatchExpressionParser::kBanAllSpecialFeatures));

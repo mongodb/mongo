@@ -81,14 +81,14 @@ RecordId Helpers::findOne(OperationContext* opCtx,
     if (!collection)
         return RecordId();
 
-    auto qr = std::make_unique<QueryRequest>(collection->ns());
-    qr->setFilter(query);
-    return findOne(opCtx, collection, std::move(qr), requireIndex);
+    auto findCommand = std::make_unique<FindCommand>(collection->ns());
+    findCommand->setFilter(query);
+    return findOne(opCtx, collection, std::move(findCommand), requireIndex);
 }
 
 RecordId Helpers::findOne(OperationContext* opCtx,
                           const CollectionPtr& collection,
-                          std::unique_ptr<QueryRequest> qr,
+                          std::unique_ptr<FindCommand> findCommand,
                           bool requireIndex) {
     if (!collection)
         return RecordId();
@@ -98,7 +98,8 @@ RecordId Helpers::findOne(OperationContext* opCtx,
     const boost::intrusive_ptr<ExpressionContext> expCtx;
     auto statusWithCQ =
         CanonicalQuery::canonicalize(opCtx,
-                                     std::move(qr),
+                                     std::move(findCommand),
+                                     false,
                                      expCtx,
                                      extensionsCallback,
                                      MatchExpressionParser::kAllowAllSpecialFeatures);

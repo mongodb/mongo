@@ -55,15 +55,16 @@ unique_ptr<CanonicalQuery> canonicalize(BSONObj query,
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
 
-    auto qr = std::make_unique<QueryRequest>(nss);
-    qr->setFilter(query);
-    qr->setSort(sort);
-    qr->setProj(proj);
-    qr->setCollation(collation);
+    auto findCommand = std::make_unique<FindCommand>(nss);
+    findCommand->setFilter(query.getOwned());
+    findCommand->setSort(sort.getOwned());
+    findCommand->setProjection(proj.getOwned());
+    findCommand->setCollation(collation.getOwned());
     const boost::intrusive_ptr<ExpressionContext> expCtx;
     auto statusWithCQ =
         CanonicalQuery::canonicalize(opCtx.get(),
-                                     std::move(qr),
+                                     std::move(findCommand),
+                                     false,
                                      expCtx,
                                      ExtensionsCallbackNoop(),
                                      MatchExpressionParser::kAllowAllSpecialFeatures);

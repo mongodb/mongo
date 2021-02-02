@@ -384,23 +384,24 @@ void ChunkManager::getShardIdsForQuery(boost::intrusive_ptr<ExpressionContext> e
                                        const BSONObj& query,
                                        const BSONObj& collation,
                                        std::set<ShardId>* shardIds) const {
-    auto qr = std::make_unique<QueryRequest>(_rt->optRt->nss());
-    qr->setFilter(query);
+    auto findCommand = std::make_unique<FindCommand>(_rt->optRt->nss());
+    findCommand->setFilter(query.getOwned());
 
     if (auto uuid = getUUID())
         expCtx->uuid = uuid;
 
     if (!collation.isEmpty()) {
-        qr->setCollation(collation);
+        findCommand->setCollation(collation.getOwned());
     } else if (_rt->optRt->getDefaultCollator()) {
         auto defaultCollator = _rt->optRt->getDefaultCollator();
-        qr->setCollation(defaultCollator->getSpec().toBSON());
+        findCommand->setCollation(defaultCollator->getSpec().toBSON());
         expCtx->setCollator(defaultCollator->clone());
     }
 
     auto cq = uassertStatusOK(
         CanonicalQuery::canonicalize(expCtx->opCtx,
-                                     std::move(qr),
+                                     std::move(findCommand),
+                                     false, /* isExplain */
                                      expCtx,
                                      ExtensionsCallbackNoop(),
                                      MatchExpressionParser::kAllowAllSpecialFeatures));

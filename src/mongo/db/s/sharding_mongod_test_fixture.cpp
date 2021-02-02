@@ -43,7 +43,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer_registry.h"
 #include "mongo/db/query/cursor_response.h"
-#include "mongo/db/query/query_request.h"
+#include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/read_concern_args.h"

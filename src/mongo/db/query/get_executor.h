@@ -176,7 +176,7 @@ bool turnIxscanIntoDistinctIxscan(QuerySolution* soln,
  * A $group stage on a single field behaves similarly to a distinct command. If it has no
  * accumulators or only $first accumulators, the $group command only needs to visit one document for
  * each distinct value of the grouped-by (_id) field to compute its result. When there is a sort
- * order specified in parsedDistinct->getQuery()->getQueryRequest.getSort(), the DISTINCT_SCAN will
+ * order specified in parsedDistinct->getQuery()->getFindCommand().getSort(), the DISTINCT_SCAN will
  * follow that sort order, ensuring that it chooses the correct document from each group to compute
  * any $first accumulators.
  *
