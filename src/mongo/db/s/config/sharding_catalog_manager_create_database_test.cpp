@@ -72,55 +72,40 @@ TEST_F(CreateDatabaseTest, createDatabaseSuccessWithoutCustomPrimary) {
     // Prime the shard registry with information about the existing shards
     shardRegistry()->reload(operationContext());
 
+    const std::vector<int> shardSizes{10, 1, 100};
+    auto getShardSize = [&](const std::string& shardHost) {
+        for (std::vector<ShardType>::size_type i = 0; i < shards.size(); ++i) {
+            if (shardHost == shards[i].getHost()) {
+                return shardSizes[i];
+            }
+        }
+        FAIL(str::stream() << "Unexpected shard's host: " << shardHost);
+        MONGO_UNREACHABLE;
+    };
+
+    auto listDatabasesResponse = [&](const RemoteCommandRequest& request) -> StatusWith<BSONObj> {
+        ASSERT_EQUALS("admin", request.dbname);
+        ASSERT_EQUALS("listDatabases", std::string(request.cmdObj.firstElement().fieldName()));
+        ASSERT_FALSE(request.cmdObj.hasField(repl::ReadConcernArgs::kReadConcernFieldName));
+
+        ASSERT_BSONOBJ_EQ(
+            ReadPreferenceSetting(ReadPreference::PrimaryPreferred).toContainingBSON(),
+            rpc::TrackingMetadata::removeTrackingData(request.metadata));
+
+        const auto shardSize = getShardSize(request.target.toString());
+        return BSON("ok" << 1 << "totalSize" << shardSize);
+    };
+
     auto future = launchAsync([this, dbname] {
         ThreadClient tc("Test", getServiceContext());
         auto opCtx = tc->makeOperationContext();
         ShardingCatalogManager::get(opCtx.get())->createDatabase(opCtx.get(), dbname, ShardId());
     });
 
-    // Return size information about first shard
-    onCommand([&](const RemoteCommandRequest& request) {
-        ASSERT_EQUALS(shards[0].getHost(), request.target.toString());
-        ASSERT_EQUALS("admin", request.dbname);
-        std::string cmdName = request.cmdObj.firstElement().fieldName();
-        ASSERT_EQUALS("listDatabases", cmdName);
-        ASSERT_FALSE(request.cmdObj.hasField(repl::ReadConcernArgs::kReadConcernFieldName));
-
-        ASSERT_BSONOBJ_EQ(
-            ReadPreferenceSetting(ReadPreference::PrimaryPreferred).toContainingBSON(),
-            rpc::TrackingMetadata::removeTrackingData(request.metadata));
-
-        return BSON("ok" << 1 << "totalSize" << 10);
-    });
-
-    // Return size information about second shard
-    onCommand([&](const RemoteCommandRequest& request) {
-        ASSERT_EQUALS(shards[1].getHost(), request.target.toString());
-        ASSERT_EQUALS("admin", request.dbname);
-        std::string cmdName = request.cmdObj.firstElement().fieldName();
-        ASSERT_EQUALS("listDatabases", cmdName);
-        ASSERT_FALSE(request.cmdObj.hasField(repl::ReadConcernArgs::kReadConcernFieldName));
-
-        ASSERT_BSONOBJ_EQ(
-            ReadPreferenceSetting(ReadPreference::PrimaryPreferred).toContainingBSON(),
-            rpc::TrackingMetadata::removeTrackingData(request.metadata));
-
-        return BSON("ok" << 1 << "totalSize" << 1);
-    });
-
-    // Return size information about third shard
-    onCommand([&](const RemoteCommandRequest& request) {
-        ASSERT_EQUALS(shards[2].getHost(), request.target.toString());
-        ASSERT_EQUALS("admin", request.dbname);
-        std::string cmdName = request.cmdObj.firstElement().fieldName();
-        ASSERT_EQUALS("listDatabases", cmdName);
-
-        ASSERT_BSONOBJ_EQ(
-            ReadPreferenceSetting(ReadPreference::PrimaryPreferred).toContainingBSON(),
-            rpc::TrackingMetadata::removeTrackingData(request.metadata));
-
-        return BSON("ok" << 1 << "totalSize" << 100);
-    });
+    // Expect one listDatabase request for each shard
+    onCommand(listDatabasesResponse);
+    onCommand(listDatabasesResponse);
+    onCommand(listDatabasesResponse);
 
     // Return OK for _flushDatabaseCacheUpdates
     onCommand([&](const RemoteCommandRequest& request) {

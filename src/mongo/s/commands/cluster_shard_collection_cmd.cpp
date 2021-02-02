@@ -112,9 +112,12 @@ public:
 
         ShardId shardId;
         if (nss.db() == NamespaceString::kConfigDb) {
-            const auto shardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
+            auto shardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
             uassert(
                 ErrorCodes::IllegalOperation, "there are no shards to target", !shardIds.empty());
+            // Many tests assume the primary shard for configDb will be the shard
+            // with the first ID in ascending lexical order
+            std::sort(shardIds.begin(), shardIds.end());
             shardId = shardIds[0];
         } else {
             shardId = dbInfo.primaryId();

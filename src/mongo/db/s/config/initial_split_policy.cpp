@@ -45,6 +45,14 @@
 namespace mongo {
 namespace {
 
+std::vector<ShardId> getAllShardIdsSorted(OperationContext* opCtx) {
+    // Many tests assume that chunks will be placed on shards
+    // according to their IDs in ascending lexical order.
+    auto shardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIdsNoReload();
+    std::sort(shardIds.begin(), shardIds.end());
+    return shardIds;
+}
+
 /*
  * Creates a chunk based on the given arguments, appends it to 'chunks', and
  * increments the given chunk version
@@ -340,7 +348,7 @@ InitialSplitPolicy::ShardCollectionConfig SplitPointsBasedSplitPolicy::createFir
     OperationContext* opCtx, const ShardKeyPattern& shardKeyPattern, SplitPolicyParams params) {
 
     // On which shards are the generated chunks allowed to be placed.
-    const auto shardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIdsNoReload();
+    const auto shardIds = getAllShardIdsSorted(opCtx);
 
     const auto currentTime = VectorClock::get(opCtx)->getTime();
     return generateShardCollectionInitialChunks(params,
@@ -372,7 +380,7 @@ InitialSplitPolicy::ShardCollectionConfig AbstractTagsBasedSplitPolicy::createFi
     OperationContext* opCtx, const ShardKeyPattern& shardKeyPattern, SplitPolicyParams params) {
     invariant(!_tags.empty());
 
-    const auto shardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIdsNoReload();
+    const auto shardIds = getAllShardIdsSorted(opCtx);
     const auto currentTime = VectorClock::get(opCtx)->getTime();
     const auto validAfter = currentTime.clusterTime().asTimestamp();
     const auto& keyPattern = shardKeyPattern.getKeyPattern();

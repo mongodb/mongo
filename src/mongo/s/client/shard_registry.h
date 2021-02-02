@@ -111,12 +111,14 @@ public:
     std::shared_ptr<Shard> findByHostAndPort(const HostAndPort&) const;
 
     /**
-     * Returns an unsorted vector of all known shard ids.
+     * Returns a vector of all known shard ids.
+     * The order of the elements is not guaranteed.
      */
     std::vector<ShardId> getAllShardIds() const;
 
     /**
-     * Returns an unsorted vector of all known shard objects.
+     * Returns a vector of all known shard objects.
+     * The order of the elements is not guaranteed.
      */
     std::vector<std::shared_ptr<Shard>> getAllShards() const;
 
@@ -238,7 +240,8 @@ public:
     StatusWith<std::shared_ptr<Shard>> getShard(OperationContext* opCtx, const ShardId& shardId);
 
     /**
-     * Return a sorted vector containing all known shard ids.
+     * Returns a vector containing all known shard IDs.
+     * The order of the elements is not guaranteed.
      */
     std::vector<ShardId> getAllShardIds(OperationContext* opCtx);
 

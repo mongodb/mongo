@@ -355,13 +355,11 @@ std::vector<ShardId> ShardRegistry::getAllShardIds(OperationContext* opCtx) {
         reload(opCtx);
         shardIds = _getData(opCtx)->getAllShardIds();
     }
-    // Many logic in the codebase rely on this vector to be sorted.
-    std::sort(shardIds.begin(), shardIds.end());
     return shardIds;
 }
 
 int ShardRegistry::getNumShards(OperationContext* opCtx) {
-    return _getData(opCtx)->getAllShardIds().size();
+    return getAllShardIds(opCtx).size();
 }
 
 std::pair<std::vector<ShardRegistry::LatestConnStrings::value_type>, ShardRegistry::Increment>
@@ -578,10 +576,7 @@ std::shared_ptr<Shard> ShardRegistry::getShardForHostNoReload(const HostAndPort&
 }
 
 std::vector<ShardId> ShardRegistry::getAllShardIdsNoReload() const {
-    auto shardIds = _getCachedData()->getAllShardIds();
-    // Many logic in the codebase rely on this vector to be sorted.
-    std::sort(shardIds.begin(), shardIds.end());
-    return shardIds;
+    return _getCachedData()->getAllShardIds();
 }
 
 int ShardRegistry::getNumShardsNoReload() const {

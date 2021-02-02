@@ -270,7 +270,7 @@ public:
         auto proposedKey(request.getKey().getOwned());
         ShardKeyPattern shardKeyPattern(proposedKey);
 
-        const auto shardIds = shardRegistry->getAllShardIds(opCtx);
+        auto shardIds = shardRegistry->getAllShardIds(opCtx);
         uassert(ErrorCodes::IllegalOperation,
                 "cannot shard collections before there are shards",
                 !shardIds.empty());
@@ -303,6 +303,9 @@ public:
         // make a connection to the real primary shard for this database.
         const auto primaryShardId = [&] {
             if (nss.db() == NamespaceString::kConfigDb) {
+                // Many tests assume that the primary shard for configDb will be the shard
+                // with the first ID in ascending lexical order
+                std::sort(shardIds.begin(), shardIds.end());
                 return shardIds[0];
             } else {
                 return dbType.getPrimary();

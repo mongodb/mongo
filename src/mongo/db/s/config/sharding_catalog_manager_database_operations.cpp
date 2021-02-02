@@ -62,8 +62,12 @@ const ReadPreferenceSetting kConfigReadSelector(ReadPreference::Nearest, TagSet{
 ShardId selectShardForNewDatabase(OperationContext* opCtx, ShardRegistry* shardRegistry) {
     // Ensure the shard registry contains the most up-to-date list of available shards
     shardRegistry->reload(opCtx);
-    const auto allShardIds = shardRegistry->getAllShardIds(opCtx);
+    auto allShardIds = shardRegistry->getAllShardIds(opCtx);
     uassert(ErrorCodes::ShardNotFound, "No shards found", !allShardIds.empty());
+    // TODO SERVER-54231 stop sorting this vector.
+    // Ideally it should be shuffled so that the we choose a random candidate based only
+    // on shard size and not on their lexical order.
+    std::sort(allShardIds.begin(), allShardIds.end());
 
     ShardId candidateShardId = allShardIds[0];
 

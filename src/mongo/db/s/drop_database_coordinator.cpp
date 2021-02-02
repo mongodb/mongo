@@ -38,6 +38,7 @@
 #include "mongo/db/s/dist_lock_manager.h"
 #include "mongo/db/s/drop_collection_coordinator.h"
 #include "mongo/db/s/sharding_ddl_util.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_chunk.h"
@@ -54,10 +55,9 @@ namespace {
 void sendCommandToAllShards(OperationContext* opCtx,
                             StringData dbName,
                             StringData cmdName,
-                            BSONObj cmd) {
+                            BSONObj cmd,
+                            const std::vector<ShardId>& participants) {
     auto* const shardRegistry = Grid::get(opCtx)->shardRegistry();
-    const auto participants = shardRegistry->getAllShardIds(opCtx);
-
     for (const auto& shardId : participants) {
         const auto& shard = uassertStatusOK(shardRegistry->getShard(opCtx, shardId));
 
@@ -134,22 +134,40 @@ SemiFuture<void> DropDatabaseCoordinator::runImpl(
                 // namespace.
                 sharding_ddl_util::removeCollMetadataFromConfig(opCtx, nss, collectionUUID);
                 const auto dropCollParticipantCmd = ShardsvrDropCollectionParticipant(nss);
+                auto* const shardRegistry = Grid::get(opCtx)->shardRegistry();
                 sendCommandToAllShards(opCtx,
                                        dbName,
                                        ShardsvrDropCollectionParticipant::kCommandName,
-                                       dropCollParticipantCmd.toBSON({}));
+                                       dropCollParticipantCmd.toBSON({}),
+                                       shardRegistry->getAllShardIds(opCtx));
             }
 
             // Drop the DB itself.
             // The DistLockManager will prevent to re-create the database before each shard
             // have actually dropped it locally.
             removeDatabaseMetadataFromConfig(opCtx, dbName);
+
             auto dropDatabaseParticipantCmd = ShardsvrDropDatabaseParticipant();
             dropDatabaseParticipantCmd.setDbName(dbName);
+            // Drop DB first on primary shard
+            const auto primaryShardId = ShardingState::get(opCtx)->shardId();
             sendCommandToAllShards(opCtx,
                                    dbName,
                                    ShardsvrDropDatabaseParticipant::kCommandName,
-                                   dropDatabaseParticipantCmd.toBSON({}));
+                                   dropDatabaseParticipantCmd.toBSON({}),
+                                   {primaryShardId});
+
+            auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
+            // Remove prumary shard from participants
+            participants.erase(
+                std::remove(participants.begin(), participants.end(), primaryShardId),
+                participants.end());
+            // Drop DB on all other shards
+            sendCommandToAllShards(opCtx,
+                                   dbName,
+                                   ShardsvrDropDatabaseParticipant::kCommandName,
+                                   dropDatabaseParticipantCmd.toBSON({}),
+                                   participants);
         })
         .onError([this, anchor = shared_from_this()](const Status& status) {
             LOGV2_ERROR(5281131,
