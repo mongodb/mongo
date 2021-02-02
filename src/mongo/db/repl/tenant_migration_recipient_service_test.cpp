@@ -38,6 +38,7 @@
 #include "mongo/client/replica_set_monitor_protocol_test_util.h"
 #include "mongo/config.h"
 #include "mongo/db/client.h"
+#include "mongo/db/commands/feature_compatibility_version_document_gen.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/op_observer_impl.h"
 #include "mongo/db/op_observer_registry.h"
@@ -225,6 +226,10 @@ public:
 
         // Set the sslMode to allowSSL to avoid validation error.
         sslGlobalParams.sslMode.store(SSLParams::SSLMode_allowSSL);
+        // Skipped unless tested explicitly, as we will not receive an FCV document from the donor
+        // in these unittests without (unsightly) intervention.
+        auto compFp = globalFailPointRegistry().find("skipComparingRecipientAndDonorFCV");
+        compFp->setMode(FailPoint::alwaysOn);
 
         // Timestamps of "0 seconds" are not allowed, so we must advance our clock mock to the first
         // real second.
@@ -406,6 +411,18 @@ protected:
         initialStateDoc.setDataConsistentStopDonorOpTime(dataConsistentStopDonorOpTime);
         initialStateDoc.setStartApplyingDonorOpTime(startApplyingDonorOpTime);
         initialStateDoc.setStartFetchingDonorOpTime(startFetchingDonorOptime);
+    }
+
+    /**
+     * Sets the FCV on the donor so that it can respond to FCV requests appropriately.
+     * (Generic FCV reference): This FCV reference should exist across LTS binary versions.
+     */
+    void setDonorFCV(const TenantMigrationRecipientService::Instance* instance,
+                     ServerGlobalParams::FeatureCompatibility::Version version =
+                         ServerGlobalParams::FeatureCompatibility::kLatest) {
+        auto fcvDoc = FeatureCompatibilityVersionDocument(version);
+        auto client = getClient(instance);
+        client->insert(NamespaceString::kServerConfigurationNamespace.ns(), fcvDoc.toBSON());
     }
 
 private:
@@ -2793,6 +2810,51 @@ TEST_F(TenantMigrationRecipientServiceTest,
     // Wait for task completion failure.
     // The FCV should differ so we expect to exit with an error.
     std::int32_t expectedCode = 5356201;
+    ASSERT_EQ(expectedCode, instance->getDataSyncCompletionFuture().getNoThrow().code());
+    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+}
+
+TEST_F(TenantMigrationRecipientServiceTest,
+       TenantMigrationRecipientServiceDonorAndRecipientFCVMismatch) {
+    stopFailPointEnableBlock fp("fpAfterComparingRecipientAndDonorFCV");
+
+    // Tests skip this check by default but we are specifically testing it here.
+    auto compFp = globalFailPointRegistry().find("skipComparingRecipientAndDonorFCV");
+    compFp->setMode(FailPoint::off);
+
+    // Set to allow the donor to respond to FCV requests.
+    auto connFp =
+        globalFailPointRegistry().find("fpAfterConnectingTenantMigrationRecipientInstance");
+    auto initialTimesEntered = connFp->setMode(FailPoint::alwaysOn,
+                                               0,
+                                               BSON("action"
+                                                    << "hang"));
+
+    const UUID migrationUUID = UUID::gen();
+    MockReplicaSet replSet("donorSet", 3, true /* hasPrimary */, true /* dollarPrefixHosts */);
+
+    TenantMigrationRecipientDocument initialStateDocument(
+        migrationUUID,
+        replSet.getConnectionString(),
+        "tenantA",
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
+
+    // Create and start the instance.
+    auto opCtx = makeOperationContext();
+    auto instance = TenantMigrationRecipientService::Instance::getOrCreate(
+        opCtx.get(), _service, initialStateDocument.toBSON());
+    ASSERT(instance.get());
+
+    // Set the donor FCV to be different from 'latest'.
+    // (Generic FCV reference): This FCV reference should exist across LTS binary versions.
+    connFp->waitForTimesEntered(initialTimesEntered + 1);
+    setDonorFCV(instance.get(), ServerGlobalParams::FeatureCompatibility::kLastContinuous);
+    connFp->setMode(FailPoint::off);
+
+    // Wait for task completion failure.
+    // The FCVs should differ so we expect to exit with an error.
+    std::int32_t expectedCode = 5382301;
     ASSERT_EQ(expectedCode, instance->getDataSyncCompletionFuture().getNoThrow().code());
     ASSERT_OK(instance->getCompletionFuture().getNoThrow());
 }

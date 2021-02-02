@@ -419,7 +419,12 @@ public:
         /*
          * Returns the majority OpTime on the donor node that 'client' is connected to.
          */
+
         OpTime _getDonorMajorityOpTime(std::unique_ptr<mongo::DBClientConnection>& client);
+        /**
+         * Enforces that the donor and recipient share the same featureCompatibilityVersion.
+         */
+        void _compareRecipientAndDonorFCV() const;
 
         mutable Mutex _mutex = MONGO_MAKE_LATCH("TenantMigrationRecipientService::_mutex");
 

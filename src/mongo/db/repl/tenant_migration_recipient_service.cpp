@@ -79,6 +79,7 @@ NamespaceString getOplogBufferNs(const UUID& migrationUUID) {
 MONGO_FAIL_POINT_DEFINE(pauseBeforeRunTenantMigrationRecipientInstance);
 MONGO_FAIL_POINT_DEFINE(pauseAfterRunTenantMigrationRecipientInstance);
 MONGO_FAIL_POINT_DEFINE(skipTenantMigrationRecipientAuth);
+MONGO_FAIL_POINT_DEFINE(skipComparingRecipientAndDonorFCV);
 MONGO_FAIL_POINT_DEFINE(autoRecipientForgetMigration);
 MONGO_FAIL_POINT_DEFINE(pauseAfterCreatingOplogBuffer);
 
@@ -87,6 +88,7 @@ MONGO_FAIL_POINT_DEFINE(failWhilePersistingTenantMigrationRecipientInstanceState
 MONGO_FAIL_POINT_DEFINE(fpAfterPersistingTenantMigrationRecipientInstanceStateDoc);
 MONGO_FAIL_POINT_DEFINE(fpAfterConnectingTenantMigrationRecipientInstance);
 MONGO_FAIL_POINT_DEFINE(fpAfterRecordingRecipientPrimaryStartingFCV);
+MONGO_FAIL_POINT_DEFINE(fpAfterComparingRecipientAndDonorFCV);
 MONGO_FAIL_POINT_DEFINE(fpAfterRetrievingStartOpTimesMigrationRecipientInstance);
 MONGO_FAIL_POINT_DEFINE(fpAfterStartingOplogFetcherMigrationRecipientInstance);
 MONGO_FAIL_POINT_DEFINE(setTenantMigrationRecipientInstanceHostTimeout);
@@ -1263,6 +1265,39 @@ void TenantMigrationRecipientService::Instance::_fetchAndStoreDonorClusterTimeKe
         _scopedExecutor, std::move(keyDocs), token);
 }
 
+void TenantMigrationRecipientService::Instance::_compareRecipientAndDonorFCV() const {
+    if (skipComparingRecipientAndDonorFCV.shouldFail()) {  // Test-only.
+        return;
+    }
+
+    auto donorFCVbson =
+        _client->findOne(NamespaceString::kServerConfigurationNamespace.ns(),
+                         QUERY("_id" << FeatureCompatibilityVersionParser::kParameterName),
+                         nullptr,
+                         QueryOption_SecondaryOk,
+                         ReadConcernArgs(ReadConcernLevel::kMajorityReadConcern).toBSONInner());
+
+    uassert(5382302, "FCV on donor not set", !donorFCVbson.isEmpty());
+
+    auto swDonorFCV = FeatureCompatibilityVersionParser::parse(donorFCVbson);
+    uassertStatusOK(swDonorFCV.getStatus());
+
+    stdx::lock_guard lk(_mutex);
+    auto donorFCV = swDonorFCV.getValue();
+    auto recipientFCV = _stateDoc.getRecipientPrimaryStartingFCV();
+
+    if (donorFCV != recipientFCV) {
+        LOGV2_ERROR(5382300,
+                    "Donor and recipient FCV mismatch",
+                    "tenantId"_attr = getTenantId(),
+                    "migrationId"_attr = getMigrationUUID(),
+                    "donorConnString"_attr = _donorConnectionString,
+                    "donorFCV"_attr = donorFCV,
+                    "recipientFCV"_attr = recipientFCV);
+        uasserted(5382301, "Mismatch between donor and recipient FCV");
+    }
+}
+
 SemiFuture<void> TenantMigrationRecipientService::Instance::run(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancelationToken& token) noexcept {
@@ -1352,6 +1387,10 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
         })
         .then([this, self = shared_from_this()] {
             _stopOrHangOnFailPoint(&fpAfterRecordingRecipientPrimaryStartingFCV);
+            _compareRecipientAndDonorFCV();
+        })
+        .then([this, self = shared_from_this()] {
+            _stopOrHangOnFailPoint(&fpAfterComparingRecipientAndDonorFCV);
             stdx::lock_guard lk(_mutex);
             _getStartOpTimesFromDonor(lk);
             return _updateStateDocForMajority(lk);
