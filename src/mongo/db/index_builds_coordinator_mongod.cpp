@@ -35,6 +35,7 @@
 
 #include <algorithm>
 
+#include "mongo/db/audit.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/index_build_entry_gen.h"
 #include "mongo/db/concurrency/locker.h"
@@ -299,6 +300,10 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
 
     auto replState = invariant(_getIndexBuild(buildUUID));
 
+    // Since index builds occur in a separate thread, client attributes that are audited must be
+    // extracted from the client object and passed into the thread separately.
+    audit::ImpersonatedClientAttrs impersonatedClientAttrs(opCtx->getClient());
+
     // The thread pool task will be responsible for signalling the condition variable when the index
     // build thread is done running.
     onScopeExitGuard.dismiss();
@@ -315,7 +320,8 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
         startTimestamp,
         shardVersion,
         dbVersion,
-        resumeInfo
+        resumeInfo,
+        impersonatedClientAttrs = std::move(impersonatedClientAttrs)
     ](auto status) mutable noexcept {
         auto onScopeExitGuard = makeGuard([&] {
             stdx::unique_lock<Latch> lk(_throttlingMutex);
@@ -331,6 +337,13 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
         }
 
         auto opCtx = Client::getCurrent()->makeOperationContext();
+
+        // Load the external client's attributes into this thread's client for auditing.
+        auto authSession = AuthorizationSession::get(Client::getCurrent());
+        if (authSession) {
+            authSession->setImpersonatedUserData(std::move(impersonatedClientAttrs.userNames),
+                                                 std::move(impersonatedClientAttrs.roleNames));
+        }
 
         auto& oss = OperationShardingState::get(opCtx.get());
         oss.initializeClientRoutingVersions(nss, shardVersion, dbVersion);

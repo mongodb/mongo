@@ -31,6 +31,8 @@
 
 #if !MONGO_ENTERPRISE_AUDIT
 
+mongo::audit::ImpersonatedClientAttrs::ImpersonatedClientAttrs(Client* client) {}
+
 void mongo::audit::logAuthentication(Client* client,
                                      StringData mechanism,
                                      const UserName& user,
