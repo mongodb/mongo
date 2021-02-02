@@ -34,6 +34,7 @@
 #include <boost/optional.hpp>
 
 #include "mongo/base/status.h"
+#include "mongo/db/catalog/clustered_index_options_gen.h"
 #include "mongo/db/catalog/collection_options_gen.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
@@ -139,6 +140,9 @@ struct CollectionOptions {
 
     // The namespace's default collation.
     BSONObj collation;
+
+    // If present, defines how this collection is clustered on _id.
+    boost::optional<ClusteredIndexOptions> clusteredIndex;
 
     // View-related options.
     // The namespace of the view or collection that "backs" this view, or the empty string if this

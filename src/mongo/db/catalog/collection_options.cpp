@@ -193,6 +193,17 @@ StatusWith<CollectionOptions> CollectionOptions::parse(const BSONObj& options, P
             }
 
             collectionOptions.collation = e.Obj().getOwned();
+        } else if (fieldName == "clusteredIndex" && kind == parseForStorage) {
+            if (e.type() != mongo::Object) {
+                return Status(ErrorCodes::BadValue, "'clusteredIndex' has to be a document.");
+            }
+
+            try {
+                collectionOptions.clusteredIndex =
+                    ClusteredIndexOptions::parse({"CollectionOptions::parse"}, e.Obj());
+            } catch (const DBException& ex) {
+                return ex.toStatus();
+            }
         } else if (fieldName == "viewOn") {
             if (e.type() != mongo::String) {
                 return Status(ErrorCodes::BadValue, "'viewOn' has to be a string.");
@@ -351,6 +362,10 @@ void CollectionOptions::appendBSON(BSONObjBuilder* builder) const {
         builder->append("collation", collation);
     }
 
+    if (clusteredIndex) {
+        builder->append("clusteredIndex", clusteredIndex->toBSON());
+    }
+
     if (!viewOn.empty()) {
         builder->append("viewOn", viewOn);
     }
@@ -437,6 +452,12 @@ bool CollectionOptions::matchesStorageOptions(const CollectionOptions& other,
     if ((timeseries && other.timeseries &&
          timeseries->toBSON().woCompare(other.timeseries->toBSON()) != 0) ||
         (timeseries == boost::none) != (other.timeseries == boost::none)) {
+        return false;
+    }
+
+    if ((clusteredIndex && other.clusteredIndex &&
+         clusteredIndex->toBSON().woCompare(other.clusteredIndex->toBSON())) ||
+        (!clusteredIndex != !other.clusteredIndex)) {
         return false;
     }
 

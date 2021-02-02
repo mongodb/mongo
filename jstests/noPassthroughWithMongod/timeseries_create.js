@@ -41,10 +41,22 @@ const testOptions = function(allowed,
     if (allowed) {
         assert.commandWorked(res);
         const collections =
-            assert.commandWorked(testDB.runCommand({listCollections: 1, nameOnly: true}))
-                .cursor.firstBatch;
-        assert.contains({name: collName, type: "timeseries"}, collections);
-        assert.contains({name: bucketsCollName, type: "collection"}, collections);
+            assert.commandWorked(testDB.runCommand({listCollections: 1})).cursor.firstBatch;
+
+        const tsColl = collections.find(coll => coll.name == collName);
+        assert(tsColl, collections);
+        assert.eq(tsColl.type, "timeseries", tsColl);
+
+        const bucketsColl = collections.find(coll => coll.name == bucketsCollName);
+        assert(bucketsColl, collections);
+        assert.eq(bucketsColl.type, "collection", bucketsColl);
+        assert(bucketsColl.options.hasOwnProperty('clusteredIndex'), bucketsColl);
+        assert.eq(bucketsColl.options.clusteredIndex.keyFormat, 'OID', bucketsColl);
+        if (timeseriesOptions.expireAfterSeconds) {
+            assert.eq(bucketsColl.options.clusteredIndex.expireAfterSeconds,
+                      timeseriesOptions.expireAfterSeconds,
+                      bucketsColl);
+        }
 
         assert.commandFailedWithCode(testDB.runCommand({drop: bucketsCollName}),
                                      ErrorCodes.IllegalOperation);

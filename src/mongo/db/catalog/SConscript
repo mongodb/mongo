@@ -26,11 +26,23 @@ env.Library(
 )
 
 env.Library(
+    target='clustered_index_options_idl',
+    source=[
+        'clustered_index_options.idl',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/idl/idl_parser',
+    ],
+)
+
+env.Library(
     target='collection_options',
     source=[
         'collection_options.cpp',
     ],
     LIBDEPS=[
+        'clustered_index_options_idl',
         'collection_options_idl',
     ],
     LIBDEPS_PRIVATE=[
