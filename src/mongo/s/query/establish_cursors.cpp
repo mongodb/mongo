@@ -70,7 +70,7 @@ public:
     /**
      * Make a RequestSender and thus send requests.
      */
-    void sendRequests(const ReadPreferenceSetting readPref,
+    void sendRequests(const ReadPreferenceSetting& readPref,
                       const std::vector<std::pair<ShardId, BSONObj>>& remotes,
                       Shard::RetryPolicy retryPolicy);
 
@@ -115,7 +115,7 @@ private:
     std::vector<RemoteCursor> _remoteCursors;
 };
 
-void CursorEstablisher::sendRequests(const ReadPreferenceSetting readPref,
+void CursorEstablisher::sendRequests(const ReadPreferenceSetting& readPref,
                                      const std::vector<std::pair<ShardId, BSONObj>>& remotes,
                                      Shard::RetryPolicy retryPolicy) {
     // Construct the requests
