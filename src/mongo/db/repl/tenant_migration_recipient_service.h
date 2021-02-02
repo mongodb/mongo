@@ -325,6 +325,13 @@ public:
                                  const OplogFetcher::DocumentsInfo& info);
 
         /**
+         * Runs an aggregation that gets the entire oplog chain for every retryable write entry in
+         * `config.transactions` with `lastWriteOpTime` < `startFetchingOpTime`. Adds these oplog
+         * entries to the oplog buffer.
+         */
+        void _fetchRetryableWritesOplogBeforeStartOpTime();
+
+        /**
          * Starts the tenant oplog fetcher.
          */
         void _startOplogFetcher();

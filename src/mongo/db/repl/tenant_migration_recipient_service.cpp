@@ -588,6 +588,12 @@ void TenantMigrationRecipientService::Instance::_getStartOpTimesFromDonor(WithLo
     _stateDoc.setStartFetchingDonorOpTime(startFetchingDonorOpTime);
 }
 
+void TenantMigrationRecipientService::Instance::_fetchRetryableWritesOplogBeforeStartOpTime() {
+    // TODO SERVER-53319: Run the aggregation pipeline on the correct tenant donor's oplog. Move
+    // oplog buffer creation here and add the returned oplog entries to the buffer.
+    return;
+}
+
 void TenantMigrationRecipientService::Instance::_startOplogFetcher() {
     auto opCtx = cc().makeOperationContext();
     OplogBufferCollection::Options options;
@@ -1232,6 +1238,7 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
             _getStartOpTimesFromDonor(lk);
             return _updateStateDocForMajority(lk);
         })
+        .then([this, self = shared_from_this()] { _fetchRetryableWritesOplogBeforeStartOpTime(); })
         .then([this, self = shared_from_this()] {
             _stopOrHangOnFailPoint(&fpAfterRetrievingStartOpTimesMigrationRecipientInstance);
             _startOplogFetcher();
