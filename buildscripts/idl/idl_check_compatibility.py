@@ -114,7 +114,8 @@ def check_subset(ctxt: IDLCompatibilityContext, cmd_name: str, field_name: str, 
 def check_reply_field_type(ctxt: IDLCompatibilityContext,
                            old_field_type: Optional[Union[syntax.Enum, syntax.Struct, syntax.Type]],
                            new_field_type: Optional[Union[syntax.Enum, syntax.Struct, syntax.Type]],
-                           cmd_name: str, field_name: str, old_idl_file_path: str,
+                           cmd_name: str, field_name: str, old_idl_file: syntax.IDLParsedSpec,
+                           new_idl_file: syntax.IDLParsedSpec, old_idl_file_path: str,
                            new_idl_file_path: str):
     """Check compatibility between old and new reply field type."""
     # pylint: disable=too-many-arguments,too-many-branches
@@ -150,7 +151,10 @@ def check_reply_field_type(ctxt: IDLCompatibilityContext,
             ctxt.add_new_reply_field_type_not_enum_error(cmd_name, field_name, new_field_type.name,
                                                          old_field_type.name, new_idl_file_path)
     elif isinstance(old_field_type, syntax.Struct):
-        if not isinstance(new_field_type, syntax.Struct):
+        if isinstance(new_field_type, syntax.Struct):
+            check_reply_fields(ctxt, old_field_type, new_field_type, cmd_name, old_idl_file,
+                               new_idl_file, old_idl_file_path, new_idl_file_path)
+        else:
             ctxt.add_new_reply_field_type_not_struct_error(
                 cmd_name, field_name, new_field_type.name, old_field_type.name, new_idl_file_path)
 
@@ -170,17 +174,15 @@ def check_reply_field(ctxt: IDLCompatibilityContext, old_field: syntax.Field,
     new_field_type = get_field_type(new_field, new_idl_file, new_idl_file_path)
 
     check_reply_field_type(ctxt, old_field_type, new_field_type, cmd_name, old_field.name,
-                           old_idl_file_path, new_idl_file_path)
+                           old_idl_file, new_idl_file, old_idl_file_path, new_idl_file_path)
 
 
-def check_reply_fields(ctxt: IDLCompatibilityContext, old_cmd: syntax.Command,
-                       new_cmd: syntax.Command, old_idl_file: syntax.IDLParsedSpec,
+def check_reply_fields(ctxt: IDLCompatibilityContext, old_reply: syntax.Struct,
+                       new_reply: syntax.Struct, cmd_name: str, old_idl_file: syntax.IDLParsedSpec,
                        new_idl_file: syntax.IDLParsedSpec, old_idl_file_path: str,
                        new_idl_file_path: str):
     """Check compatibility between old and new reply fields."""
     # pylint: disable=too-many-arguments
-    old_reply = old_idl_file.spec.symbols.get_struct(old_cmd.reply_type)
-    new_reply = new_idl_file.spec.symbols.get_struct(new_cmd.reply_type)
     for old_field in old_reply.fields or []:
         if old_field.unstable:
             continue
@@ -189,14 +191,13 @@ def check_reply_fields(ctxt: IDLCompatibilityContext, old_cmd: syntax.Command,
         for new_field in new_reply.fields or []:
             if new_field.name == old_field.name:
                 new_field_exists = True
-                check_reply_field(ctxt, old_field, new_field, old_cmd.name, old_idl_file,
-                                  new_idl_file, old_idl_file_path, new_idl_file_path)
+                check_reply_field(ctxt, old_field, new_field, cmd_name, old_idl_file, new_idl_file,
+                                  old_idl_file_path, new_idl_file_path)
 
                 break
 
         if not new_field_exists:
-            ctxt.add_new_reply_field_missing_error(new_cmd.command_name, old_field.name,
-                                                   old_idl_file_path)
+            ctxt.add_new_reply_field_missing_error(cmd_name, old_field.name, old_idl_file_path)
 
 
 def check_compatibility(old_idl_dir: str, new_idl_dir: str,
@@ -252,8 +253,11 @@ def check_compatibility(old_idl_dir: str, new_idl_dir: str,
                     new_idl_file = new_command_file[old_cmd.command_name]
                     new_idl_file_path = new_command_file_path[old_cmd.command_name]
 
-                    check_reply_fields(ctxt, old_cmd, new_cmd, old_idl_file, new_idl_file,
-                                       old_idl_file_path, new_idl_file_path)
+                    old_reply = old_idl_file.spec.symbols.get_struct(old_cmd.reply_type)
+                    new_reply = new_idl_file.spec.symbols.get_struct(new_cmd.reply_type)
+                    check_reply_fields(ctxt, old_reply, new_reply, old_cmd.command_name,
+                                       old_idl_file, new_idl_file, old_idl_file_path,
+                                       new_idl_file_path)
 
     ctxt.errors.dump_errors()
     return ctxt.errors

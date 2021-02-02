@@ -69,7 +69,7 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
             path.join(dir_path, "compatibility_test_fail/new"), ["src"])
 
         self.assertTrue(error_collection.has_errors())
-        self.assertTrue(error_collection.count() == 17)
+        self.assertTrue(error_collection.count() == 19)
 
         invalid_api_version_new_error = error_collection.get_error_by_command_name(
             "invalidAPIVersionNew")
@@ -161,6 +161,20 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
         new_reply_field_type_bson_any_error = error_collection.get_error_by_error_id(
             idl_compatibility_errors.ERROR_ID_NEW_REPLY_FIELD_BSON_SERIALIZATION_TYPE_ANY)
         self.assertRegex(str(new_reply_field_type_bson_any_error), "newReplyFieldTypeBsonAny")
+
+        new_reply_field_type_struct_one_error = error_collection.get_error_by_command_name(
+            "newReplyFieldTypeStructRecursiveOne")
+        self.assertTrue(new_reply_field_type_struct_one_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_NEW_REPLY_FIELD_UNSTABLE)
+        self.assertRegex(
+            str(new_reply_field_type_struct_one_error), "newReplyFieldTypeStructRecursiveOne")
+
+        new_reply_field_type_struct_two_error = error_collection.get_error_by_command_name(
+            "newReplyFieldTypeStructRecursiveTwo")
+        self.assertTrue(new_reply_field_type_struct_two_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_COMMAND_NOT_SUBSET)
+        self.assertRegex(
+            str(new_reply_field_type_struct_two_error), "newReplyFieldTypeStructRecursiveTwo")
 
 
 if __name__ == '__main__':

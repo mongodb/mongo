@@ -152,6 +152,27 @@ structs:
             newBsonSerializationTypeAnyReplyField:
                 type: newBsonSerializationTypeAny
 
+    StructFieldTypeRecursiveReplyOne:
+        description: "This reply contains a field whose new type is a struct that is not 
+                      compatible with the old field type"
+        fields:
+            structReplyField:
+                type: UnstableNewFieldReply
+    
+    StructFieldTypeRecursiveReplyTwo:
+        description: "This reply contains a field whose new type is a struct that is not 
+                      compatible with the old field type"
+        fields:
+            structReplyField:
+                type: StructType
+
+    StructType:
+        description: "This struct contains a field whose new type is incompatible with the 
+                      old field type"
+        fields:
+            fieldOne:
+                type: BsonNotSubsetReply
+
 commands:
     invalidAPIVersionOld:
         description: "old command fails because of invalid API version"
@@ -302,3 +323,23 @@ commands:
         strict: true
         api_version: "1"
         reply_type: NewBsonSerializationTypeAnyReply
+
+    newReplyFieldTypeStructRecursiveOne:
+        description: "new command fails because its reply field type is a struct that is
+                      incompatible with the old reply field type struct"
+        command_name: newReplyFieldTypeStructRecursiveOne
+        namespace: ignored
+        cpp_name: newReplyFieldTypeStructRecursiveOne
+        strict: true
+        api_version: "1"
+        reply_type: StructFieldTypeRecursiveReplyOne
+
+    newReplyFieldTypeStructRecursiveTwo:
+        description: "new command fails because its reply field type is a struct that is
+                      incompatible with the old reply field type struct"
+        command_name: newReplyFieldTypeStructRecursiveTwo
+        namespace: ignored
+        cpp_name: newReplyFieldTypeStructRecursiveTwo
+        strict: true
+        api_version: "1"
+        reply_type: StructFieldTypeRecursiveReplyTwo

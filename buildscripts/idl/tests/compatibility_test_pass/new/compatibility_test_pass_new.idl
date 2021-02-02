@@ -109,12 +109,42 @@ structs:
             bsonSubsetReplyFieldTwo:
                 type: intStringBoolToIntString
 
+    StructFieldTypeRecursiveReplyOne:
+        description: "This reply contains a field whose new type is a struct that is 
+                      compatible with the old field type"
+        fields:
+            structReplyField:
+                type: StableNewFieldReply
+    
+    StructFieldTypeRecursiveReplyTwo:
+        description: "This reply contains a field whose new type is a struct that is 
+                      compatible with the old field type"
+        fields:
+            structReplyField:
+                type: StructType
+
+    StructType:
+        description: "This struct contains a field whose new type is compatible with the 
+                      old field type"
+        fields:
+            fieldOne:
+                type: BsonSubsetReply
+
 commands:
     testCommand:
         description: "new passing test command, there was no change from the old version"
         command_name: testCommand
         namespace: ignored
         cpp_name: testCommand
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    addedCommand:
+        description: "new command is added and should pass"
+        command_name: addedCommand
+        namespace: ignored
+        cpp_name: addedCommand
         strict: true
         api_version: "1"
         reply_type: OkReply
@@ -198,3 +228,23 @@ commands:
         strict: true
         api_version: "1"
         reply_type: BsonSubsetReplyTwo
+    
+    newReplyFieldTypeStructRecursiveOne:
+        description: "new command passes because its reply field type is a struct that is
+                      compatible with the old reply field type struct"
+        command_name: newReplyFieldTypeStructRecursiveOne
+        namespace: ignored
+        cpp_name: newReplyFieldTypeStructRecursiveOne
+        strict: true
+        api_version: "1"
+        reply_type: StructFieldTypeRecursiveReplyOne
+
+    newReplyFieldTypeStructRecursiveTwo:
+        description: "new command passes because its reply field type is a struct that is
+                      compatible with the old reply field type struct"
+        command_name: newReplyFieldTypeStructRecursiveTwo
+        namespace: ignored
+        cpp_name: newReplyFieldTypeStructRecursiveTwo
+        strict: true
+        api_version: "1"
+        reply_type: StructFieldTypeRecursiveReplyTwo
