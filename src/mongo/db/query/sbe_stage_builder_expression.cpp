@@ -2260,7 +2260,14 @@ public:
         unsupportedExpression(expr->getOpName());
     }
     void visit(ExpressionIsArray* expr) final {
-        unsupportedExpression(expr->getOpName());
+        auto frameId = _context->frameIdGenerator->generate();
+        auto binds = sbe::makeEs(_context->popExpr());
+        sbe::EVariable inputRef(frameId, 0);
+
+        auto exprIsArr = makeFillEmptyFalse(makeFunction("isArray", inputRef.clone()));
+
+        _context->pushExpr(
+            sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(exprIsArr)));
     }
     void visit(ExpressionRound* expr) final {
         unsupportedExpression(expr->getOpName());
