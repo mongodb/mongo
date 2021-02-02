@@ -113,7 +113,7 @@ Status KeysCollectionCache::_refreshExternalKeys(OperationContext* opCtx) {
         originalSize = _externalKeysCache.size();
     }
 
-    auto refreshStatus = _client->getNewExternalKeys(opCtx, _purpose, LogicalTime(), true);
+    auto refreshStatus = _client->getAllExternalKeys(opCtx, _purpose);
 
     if (!refreshStatus.isOK()) {
         return refreshStatus.getStatus();

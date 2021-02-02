@@ -50,10 +50,7 @@ StatusWith<std::vector<KeysCollectionDocument>> KeysCollectionClientSharded::get
 }
 
 StatusWith<std::vector<ExternalKeysCollectionDocument>>
-KeysCollectionClientSharded::getNewExternalKeys(OperationContext* opCtx,
-                                                StringData purpose,
-                                                const LogicalTime& newerThanThis,
-                                                bool useMajority) {
+KeysCollectionClientSharded::getAllExternalKeys(OperationContext* opCtx, StringData purpose) {
     return std::vector<ExternalKeysCollectionDocument>{};
 }
 

@@ -57,15 +57,11 @@ public:
         bool useMajority) = 0;
 
     /**
-     * Returns external keys (validation-only keys copied from other clusters) that match the given
-     * purpose and have an expiresAt value greater than newerThanThis. Uses readConcern level
-     * majority if possible.
+     * Returns all external keys (validation-only keys copied from other clusters) that match the
+     * given purpose.
      */
-    virtual StatusWith<std::vector<ExternalKeysCollectionDocument>> getNewExternalKeys(
-        OperationContext* opCtx,
-        StringData purpose,
-        const LogicalTime& newerThanThis,
-        bool useMajority) = 0;
+    virtual StatusWith<std::vector<ExternalKeysCollectionDocument>> getAllExternalKeys(
+        OperationContext* opCtx, StringData purpose) = 0;
 
     /**
      * Directly inserts a key document to the storage

@@ -139,10 +139,10 @@ ExternalKeysCollectionDocument makeExternalClusterTimeKeyDoc(ServiceContext* ser
 /*
  * For each given ExternalKeysCollectionDocument, inserts it if there is not an existing document in
  * admin.system.external_validation_keys for it with the same keyId and replicaSetName. Otherwise,
- * updates the ttlExpiresAt of the existing document if it is less than the new ttlExpiresAt. Waits
- * for the writes to be majority-committed, and refreshes the logical validator's cache.
+ * updates the ttlExpiresAt of the existing document if it is less than the new ttlExpiresAt.
+ * Refreshes the logical validator's cache before returning.
  */
-ExecutorFuture<void> storeExternalClusterTimeKeyDocsAndRefreshCache(
+void storeExternalClusterTimeKeyDocsAndRefreshCache(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     std::vector<ExternalKeysCollectionDocument> keyDocs,
     const CancelationToken& token);

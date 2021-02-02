@@ -58,7 +58,7 @@ ExternalKeysCollectionDocument makeExternalClusterTimeKeyDoc(ServiceContext* ser
     return externalKeyDoc;
 }
 
-ExecutorFuture<void> storeExternalClusterTimeKeyDocsAndRefreshCache(
+void storeExternalClusterTimeKeyDocsAndRefreshCache(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     std::vector<ExternalKeysCollectionDocument> keyDocs,
     const CancelationToken& token) {
@@ -88,23 +88,13 @@ ExecutorFuture<void> storeExternalClusterTimeKeyDocsAndRefreshCache(
         });
     }
 
-    const auto opTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
-
-    return WaitForMajorityService::get(opCtx->getServiceContext())
-        .waitUntilMajority(opTime)
-        .thenRunOn(**executor)
-        .then([] {
-            auto opCtxHolder = cc().makeOperationContext();
-            auto opCtx = opCtxHolder.get();
-
-            auto validator = LogicalTimeValidator::get(opCtx);
-            if (validator) {
-                // Refresh the keys cache to avoid validation errors for external cluster times with
-                // a keyId that matches the keyId of an internal key since the LogicalTimeValidator
-                // only refreshes the cache when it cannot find a matching internal key.
-                validator->refreshKeyManagerCache(opCtx);
-            }
-        });
+    auto validator = LogicalTimeValidator::get(opCtx);
+    if (validator) {
+        // Refresh the keys cache to avoid validation errors for external cluster times with
+        // a keyId that matches the keyId of an internal key since the LogicalTimeValidator
+        // only refreshes the cache when it cannot find a matching internal key.
+        validator->refreshKeyManagerCache(opCtx);
+    }
 }
 
 void createRetryableWritesView(OperationContext* opCtx, Database* db) {

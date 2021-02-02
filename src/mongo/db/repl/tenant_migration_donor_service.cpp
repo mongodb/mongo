@@ -399,7 +399,7 @@ TenantMigrationDonorService::Instance::_fetchAndStoreRecipientClusterTimeKeyDocs
         .then([this, self = shared_from_this(), executor, token](auto keyDocs) {
             checkIfReceivedDonorAbortMigration(token, _instanceCancelationSource.token());
 
-            return tenant_migration_util::storeExternalClusterTimeKeyDocsAndRefreshCache(
+            tenant_migration_util::storeExternalClusterTimeKeyDocsAndRefreshCache(
                 executor, std::move(keyDocs), _instanceCancelationSource.token());
         });
 }

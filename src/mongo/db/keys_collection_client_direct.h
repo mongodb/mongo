@@ -55,14 +55,10 @@ public:
         bool useMajority) override;
 
     /**
-     * Returns keys in admin.system.external_validation_keys that match the given purpose and have
-     * an expiresAt value greater than newerThanThis. Uses readConcern level majority if possible.
+     * Returns all keys in admin.system.external_validation_keys that match the given purpose.
      */
-    StatusWith<std::vector<ExternalKeysCollectionDocument>> getNewExternalKeys(
-        OperationContext* opCtx,
-        StringData purpose,
-        const LogicalTime& newerThanThis,
-        bool useMajority) override;
+    StatusWith<std::vector<ExternalKeysCollectionDocument>> getAllExternalKeys(
+        OperationContext* opCtx, StringData purpose) override;
 
     /**
      * Directly inserts a key document to the storage

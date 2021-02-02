@@ -1230,8 +1230,7 @@ SharedSemiFuture<void> TenantMigrationRecipientService::Instance::_updateStateDo
         .waitUntilMajority(repl::ReplClientInfo::forClient(cc()).getLastOp());
 }
 
-ExecutorFuture<void>
-TenantMigrationRecipientService::Instance::_fetchAndStoreDonorClusterTimeKeyDocs(
+void TenantMigrationRecipientService::Instance::_fetchAndStoreDonorClusterTimeKeyDocs(
     const CancelationToken& token) {
     std::vector<ExternalKeysCollectionDocument> keyDocs;
 
@@ -1244,7 +1243,7 @@ TenantMigrationRecipientService::Instance::_fetchAndStoreDonorClusterTimeKeyDocs
             _serviceContext, _donorUri.getSetName(), doc));
     }
 
-    return tenant_migration_util::storeExternalClusterTimeKeyDocsAndRefreshCache(
+    tenant_migration_util::storeExternalClusterTimeKeyDocsAndRefreshCache(
         _scopedExecutor, std::move(keyDocs), token);
 }
 
@@ -1306,7 +1305,7 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                 _stateDoc.getStartFetchingDonorOpTime().has_value());
         })
         .then([this, self = shared_from_this(), token] {
-            return _fetchAndStoreDonorClusterTimeKeyDocs(token);
+            _fetchAndStoreDonorClusterTimeKeyDocs(token);
         })
         .then([this, self = shared_from_this()] {
             _stopOrHangOnFailPoint(&fpAfterConnectingTenantMigrationRecipientInstance);

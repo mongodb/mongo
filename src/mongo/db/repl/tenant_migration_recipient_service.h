@@ -310,7 +310,7 @@ public:
          * Fetches all key documents from the donor's admin.system.keys collection, stores them in
          * admin.system.external_validation_keys, and refreshes the keys cache.
          */
-        ExecutorFuture<void> _fetchAndStoreDonorClusterTimeKeyDocs(const CancelationToken& token);
+        void _fetchAndStoreDonorClusterTimeKeyDocs(const CancelationToken& token);
 
         /**
          * Retrieves the start optimes from the donor and updates the in-memory state accordingly.

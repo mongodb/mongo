@@ -82,16 +82,16 @@ StatusWith<std::vector<KeysCollectionDocument>> KeysCollectionClientDirect::getN
 }
 
 StatusWith<std::vector<ExternalKeysCollectionDocument>>
-KeysCollectionClientDirect::getNewExternalKeys(OperationContext* opCtx,
-                                               StringData purpose,
-                                               const LogicalTime& newerThanThis,
-                                               bool useMajority) {
+KeysCollectionClientDirect::getAllExternalKeys(OperationContext* opCtx, StringData purpose) {
     return _getNewKeys<ExternalKeysCollectionDocument>(
         opCtx,
         NamespaceString::kExternalKeysCollectionNamespace,
         purpose,
-        newerThanThis,
-        useMajority);
+        LogicalTime(),
+        // It is safe to read external keys with local read concern because they are only used to
+        // validate incoming signatures, not to sign them. If a cached key is rolled back, it will
+        // eventually be reaped from the cache.
+        false /* useMajority */);
 }
 
 template <typename KeyDocumentType>
