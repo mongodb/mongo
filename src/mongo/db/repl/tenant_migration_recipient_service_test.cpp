@@ -171,6 +171,11 @@ public:
         ReplicaSetMonitorProtocolTestUtil::setRSMProtocol(ReplicaSetMonitorProtocol::kScanning);
         ConnectionString::setConnectionHook(mongo::MockConnRegistry::get()->getConnStrHook());
 
+        // Set up clocks.
+        serviceContext->setFastClockSource(std::make_unique<SharedClockSourceAdapter>(_clkSource));
+        serviceContext->setPreciseClockSource(
+            std::make_unique<SharedClockSourceAdapter>(_clkSource));
+
         WaitForMajorityService::get(getServiceContext()).setUp(getServiceContext());
 
         // Automatically mark the state doc garbage collectable after data sync completion.
@@ -220,11 +225,6 @@ public:
 
         // Set the sslMode to allowSSL to avoid validation error.
         sslGlobalParams.sslMode.store(SSLParams::SSLMode_allowSSL);
-
-        // Set up clocks.
-        serviceContext->setFastClockSource(std::make_unique<SharedClockSourceAdapter>(_clkSource));
-        serviceContext->setPreciseClockSource(
-            std::make_unique<SharedClockSourceAdapter>(_clkSource));
 
         // Timestamps of "0 seconds" are not allowed, so we must advance our clock mock to the first
         // real second.
