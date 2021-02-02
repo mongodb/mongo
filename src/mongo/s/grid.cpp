@@ -177,6 +177,10 @@ boost::optional<repl::OpTime> Grid::advanceConfigOpTime(OperationContext* opCtx,
 
 boost::optional<repl::OpTime> Grid::_advanceConfigOpTime(const repl::OpTime& opTime) {
     invariant(serverGlobalParams.clusterRole != ClusterRole::ConfigServer);
+    auto vectorClock = VectorClock::get(grid.owner(this));
+    if (vectorClock->isEnabled()) {
+        vectorClock->gossipInConfigOpTime(opTime);
+    }
     stdx::lock_guard<Latch> lk(_mutex);
     if (_configOpTime < opTime) {
         repl::OpTime prev = _configOpTime;

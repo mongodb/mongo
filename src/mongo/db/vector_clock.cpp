@@ -417,6 +417,13 @@ void VectorClock::_disable() {
     _isEnabled = false;
 }
 
+void VectorClock::gossipInConfigOpTime(const repl::OpTime& configOpTime) {
+    LogicalTimeArray newTimeArray;
+    newTimeArray[Component::ClusterTime] = LogicalTime(configOpTime.getTimestamp());
+    newTimeArray[Component::ConfigTime] = LogicalTime(configOpTime.getTimestamp());
+    _advanceTime(std::move(newTimeArray));
+}
+
 void VectorClock::resetVectorClock_forTest() {
     stdx::lock_guard<Latch> lock(_mutex);
     auto it = _vectorTime.begin();
