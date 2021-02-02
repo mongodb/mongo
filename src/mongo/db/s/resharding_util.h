@@ -230,8 +230,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> createOplogFetchingPipelineForReshard
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const ReshardingDonorOplogId& startAfter,
     UUID collUUID,
-    const ShardId& recipientShard,
-    bool doesDonorOwnMinKeyChunk);
+    const ShardId& recipientShard);
 
 /**
  * Returns the shard Id of the recipient shard that would own the document under the new shard

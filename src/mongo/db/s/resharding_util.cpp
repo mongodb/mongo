@@ -316,8 +316,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> createOplogFetchingPipelineForReshard
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const ReshardingDonorOplogId& startAfter,
     UUID collUUID,
-    const ShardId& recipientShard,
-    bool doesDonorOwnMinKeyChunk) {
+    const ShardId& recipientShard) {
     using Doc = Document;
     using Arr = std::vector<Value>;
     using V = Value;
@@ -330,10 +329,6 @@ std::unique_ptr<Pipeline, PipelineDeleter> createOplogFetchingPipelineForReshard
     // verification.
     stages.emplace_back(DocumentSourceMatch::create(
         Doc{{"ts", Doc{{"$gte", startAfter.getTs()}}}}.toBson(), expCtx));
-
-    const Value captureCommandsOnCollectionClause = doesDonorOwnMinKeyChunk
-        ? V{Doc{{"op", "c"_sd}, {"ui", collUUID}}}
-        : V{Doc{{"op", "c"_sd}, {"ui", collUUID}, {"o.drop", EXISTS}}};
 
     stages.emplace_back(DocumentSourceMatch::create(
         Doc{{"$or",
@@ -349,7 +344,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> createOplogFetchingPipelineForReshard
                        {"o.prepare", DNE}}},
                  V{Doc{{"op", "c"_sd}, {"o.commitTransaction", EXISTS}}},
                  V{Doc{{"op", "c"_sd}, {"o.abortTransaction", EXISTS}}},
-                 captureCommandsOnCollectionClause}}}
+                 V{Doc{{"op", "c"_sd}, {"ui", collUUID}}}}}}
             .toBson(),
         expCtx));
 

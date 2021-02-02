@@ -369,14 +369,6 @@ ReshardingRecipientService::RecipientStateMachine::_cloneThenTransitionToApplyin
         _oplogFetcherExecutor = makeTaskExecutor("ReshardingOplogFetcher"_sd, numDonors);
     }
 
-    const auto& minKeyChunkOwningShardId = [&] {
-        auto opCtx = cc().makeOperationContext();
-        auto catalogCache = Grid::get(opCtx.get())->catalogCache();
-        const auto sourceChunkMgr =
-            catalogCache->getShardedCollectionRoutingInfo(opCtx.get(), _recipientDoc.getNss());
-        return sourceChunkMgr.getMinKeyShardIdWithSimpleCollation();
-    }();
-
     const auto& recipientId = ShardingState::get(serviceContext)->shardId();
     for (const auto& donor : _recipientDoc.getDonorShardsMirroring()) {
         stdx::lock_guard<Latch> lk(_mutex);
@@ -390,7 +382,6 @@ ReshardingRecipientService::RecipientStateMachine::_cloneThenTransitionToApplyin
                                    *_recipientDoc.getFetchTimestamp()},
             donor.getId(),
             recipientId,
-            donor.getId() == minKeyChunkOwningShardId,
             getLocalOplogBufferNamespace(_recipientDoc.get_id(), donor.getId())));
 
         _oplogFetcherFutures.emplace_back(

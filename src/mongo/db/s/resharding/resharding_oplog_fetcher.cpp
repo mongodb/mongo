@@ -81,14 +81,12 @@ ReshardingOplogFetcher::ReshardingOplogFetcher(UUID reshardingUUID,
                                                ReshardingDonorOplogId startAt,
                                                ShardId donorShard,
                                                ShardId recipientShard,
-                                               bool doesDonorOwnMinKeyChunk,
                                                NamespaceString toWriteInto)
     : _reshardingUUID(reshardingUUID),
       _collUUID(collUUID),
       _startAt(startAt),
       _donorShard(donorShard),
       _recipientShard(recipientShard),
-      _doesDonorOwnMinKeyChunk(doesDonorOwnMinKeyChunk),
       _toWriteInto(toWriteInto) {
     auto [p, f] = makePromiseFuture<void>();
     stdx::lock_guard lk(_mutex);
@@ -245,8 +243,7 @@ AggregateCommand ReshardingOplogFetcher::_makeAggregateCommand(Client* client) {
     auto expCtx = _makeExpressionContext(opCtx);
 
     auto serializedPipeline =
-        createOplogFetchingPipelineForResharding(
-            expCtx, _startAt, _collUUID, _recipientShard, _doesDonorOwnMinKeyChunk)
+        createOplogFetchingPipelineForResharding(expCtx, _startAt, _collUUID, _recipientShard)
             ->serializeToBson();
 
     AggregateCommand aggRequest(NamespaceString::kRsOplogNamespace, std::move(serializedPipeline));

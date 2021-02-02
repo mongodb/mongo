@@ -55,7 +55,6 @@ public:
                            ReshardingDonorOplogId startAt,
                            ShardId donorShard,
                            ShardId recipientShard,
-                           bool doesDonorOwnMinKeyChunk,
                            NamespaceString toWriteInto);
 
     ~ReshardingOplogFetcher();
@@ -128,7 +127,6 @@ private:
     ReshardingDonorOplogId _startAt;
     const ShardId _donorShard;
     const ShardId _recipientShard;
-    const bool _doesDonorOwnMinKeyChunk;
     const NamespaceString _toWriteInto;
 
     int _numOplogEntriesCopied = 0;

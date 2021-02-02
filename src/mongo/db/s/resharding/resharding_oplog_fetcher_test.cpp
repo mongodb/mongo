@@ -324,7 +324,6 @@ TEST_F(ReshardingOplogFetcherTest, TestBasic) {
                                        {_fetchTimestamp, _fetchTimestamp},
                                        _donorShard,
                                        _destinationShard,
-                                       true,
                                        outputCollectionNss);
         fetcher.useReadConcernForTest(false);
         fetcher.setInitialBatchSizeForTest(2);
@@ -355,7 +354,6 @@ TEST_F(ReshardingOplogFetcherTest, TestTrackLastSeen) {
                                        {_fetchTimestamp, _fetchTimestamp},
                                        _donorShard,
                                        _destinationShard,
-                                       true,
                                        outputCollectionNss);
         fetcher.useReadConcernForTest(false);
         fetcher.setInitialBatchSizeForTest(2);
@@ -390,7 +388,6 @@ TEST_F(ReshardingOplogFetcherTest, TestFallingOffOplog) {
                                        {doesNotExist, doesNotExist},
                                        _donorShard,
                                        _destinationShard,
-                                       true,
                                        outputCollectionNss);
         fetcher.useReadConcernForTest(false);
 
@@ -431,7 +428,6 @@ TEST_F(ReshardingOplogFetcherTest, TestAwaitInsert) {
                                    startAt,
                                    _donorShard,
                                    _destinationShard,
-                                   true,
                                    outputCollectionNss);
 
     // The ReshardingOplogFetcher hasn't inserted a record for
