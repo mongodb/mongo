@@ -10,7 +10,6 @@
  *   requires_find_command,
  *   requires_non_retryable_commands,
  *   requires_non_retryable_writes,
- *   sbe_incompatible,
  * ]
  */
 (function() {
@@ -30,8 +29,8 @@ const coll = assertDropAndRecreateCollection(
 
 // Extracts the winning plan for the given query and projection from the explain output.
 const winningPlan = (query, proj) => FixtureHelpers.isMongos(db)
-    ? coll.find(query, proj).explain().queryPlanner.winningPlan.shards[0].winningPlan
-    : coll.find(query, proj).explain().queryPlanner.winningPlan;
+    ? getWinningPlan(coll.find(query, proj).explain().queryPlanner).shards[0].winningPlan
+    : getWinningPlan(coll.find(query, proj).explain().queryPlanner);
 
 // Runs the given query and confirms that: (1) the $** was used to answer the query, (2) the
 // results produced by the $** index match the given 'expectedResults', and (3) the same output

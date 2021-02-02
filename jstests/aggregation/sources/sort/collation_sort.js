@@ -1,7 +1,4 @@
 // Test that the $sort stage respects the collation.
-// @tags: [
-//   sbe_incompatible,
-// ]
 (function() {
 "use strict";
 

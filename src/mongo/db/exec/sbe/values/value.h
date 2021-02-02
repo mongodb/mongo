@@ -45,6 +45,7 @@
 #include "mongo/bson/ordering.h"
 #include "mongo/db/exec/shard_filterer.h"
 #include "mongo/db/query/bson_typemask.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/represent_as.h"
@@ -128,6 +129,9 @@ enum class TypeTags : uint8_t {
 
     // Pointer to a ShardFilterer for shard filtering.
     shardFilterer,
+
+    // Pointer to a collator interface object.
+    collator,
 };
 
 inline constexpr bool isNumber(TypeTags tag) noexcept {
@@ -164,6 +168,10 @@ inline constexpr bool isPcreRegex(TypeTags tag) noexcept {
     return tag == TypeTags::pcreRegex;
 }
 
+inline constexpr bool isCollatableType(TypeTags tag) noexcept {
+    return isString(tag) || isArray(tag) || isObject(tag);
+}
+
 BSONType tagToType(TypeTags tag) noexcept;
 
 /**
@@ -192,7 +200,9 @@ enum class SortDirection : uint8_t { Descending, Ascending };
  */
 void releaseValue(TypeTags tag, Value val) noexcept;
 std::pair<TypeTags, Value> copyValue(TypeTags tag, Value val);
-std::size_t hashValue(TypeTags tag, Value val) noexcept;
+std::size_t hashValue(TypeTags tag,
+                      Value val,
+                      const CollatorInterface* collator = nullptr) noexcept;
 
 /**
  * Overloads for writing values and tags to stream.
@@ -205,10 +215,12 @@ str::stream& operator<<(str::stream& str, const std::pair<TypeTags, Value>& valu
 /**
  * Three ways value comparison (aka spaceship operator).
  */
-std::pair<TypeTags, Value> compareValue(TypeTags lhsTag,
-                                        Value lhsValue,
-                                        TypeTags rhsTag,
-                                        Value rhsValue);
+std::pair<TypeTags, Value> compareValue(
+    TypeTags lhsTag,
+    Value lhsValue,
+    TypeTags rhsTag,
+    Value rhsValue,
+    const StringData::ComparatorInterface* comparator = nullptr);
 
 bool isNaN(TypeTags tag, Value val);
 
@@ -330,18 +342,31 @@ T bitcastTo(const Value in) noexcept {
  * Defines hash value for <TypeTags, Value> pair. To be used in associative containers.
  */
 struct ValueHash {
+    explicit ValueHash(const CollatorInterface* collator = nullptr) : _collator(collator) {}
+
     size_t operator()(const std::pair<TypeTags, Value>& p) const {
-        return hashValue(p.first, p.second);
+        return hashValue(p.first, p.second, _collator);
     }
+
+    const CollatorInterface* getCollator() const {
+        return _collator;
+    }
+
+private:
+    const CollatorInterface* _collator;
 };
 
 /**
  * Defines equivalence of two <TypeTags, Value> pairs. To be used in associative containers.
  */
 struct ValueEq {
+    explicit ValueEq(const CollatorInterface* collator = nullptr) : _collator(collator) {}
+
     bool operator()(const std::pair<TypeTags, Value>& lhs,
                     const std::pair<TypeTags, Value>& rhs) const {
-        auto [tag, val] = compareValue(lhs.first, lhs.second, rhs.first, rhs.second);
+        auto comparator = _collator;
+
+        auto [tag, val] = compareValue(lhs.first, lhs.second, rhs.first, rhs.second, comparator);
 
         if (tag != TypeTags::NumberInt32 || bitcastTo<int32_t>(val) != 0) {
             return false;
@@ -349,6 +374,13 @@ struct ValueEq {
             return true;
         }
     }
+
+    const CollatorInterface* getCollator() const {
+        return _collator;
+    }
+
+private:
+    const CollatorInterface* _collator;
 };
 
 template <typename T>
@@ -502,8 +534,11 @@ class ArraySet {
 public:
     using iterator = ValueSetType::iterator;
 
-    ArraySet() = default;
-    ArraySet(const ArraySet& other) {
+    explicit ArraySet(const CollatorInterface* collator = nullptr)
+        : _values(0, ValueHash(collator), ValueEq(collator)) {}
+
+    ArraySet(const ArraySet& other)
+        : _values(0, other._values.hash_function(), other._values.key_eq()) {
         reserve(other._values.size());
         for (const auto& p : other._values) {
             const auto copy = copyValue(p.first, p.second);
@@ -512,7 +547,9 @@ public:
             guard.reset();
         }
     }
+
     ArraySet(ArraySet&&) = default;
+
     ~ArraySet() {
         for (const auto& p : _values) {
             releaseValue(p.first, p.second);
@@ -532,6 +569,10 @@ public:
         // Normalize to at least 1.
         s = s ? s : 1;
         _values.reserve(s);
+    }
+
+    const CollatorInterface* getCollator() {
+        return _values.key_eq().getCollator();
     }
 
 private:
@@ -784,8 +825,8 @@ inline std::pair<TypeTags, Value> makeNewArray() {
     return {TypeTags::Array, reinterpret_cast<Value>(a)};
 }
 
-inline std::pair<TypeTags, Value> makeNewArraySet() {
-    auto a = new ArraySet;
+inline std::pair<TypeTags, Value> makeNewArraySet(const CollatorInterface* collator = nullptr) {
+    auto a = new ArraySet(collator);
     return {TypeTags::ArraySet, reinterpret_cast<Value>(a)};
 }
 
@@ -865,6 +906,10 @@ inline TimeZoneDatabase* getTimeZoneDBView(Value val) noexcept {
 
 inline ShardFilterer* getShardFiltererView(Value val) noexcept {
     return reinterpret_cast<ShardFilterer*>(val);
+}
+
+inline CollatorInterface* getCollatorView(Value val) noexcept {
+    return reinterpret_cast<CollatorInterface*>(val);
 }
 
 std::pair<TypeTags, Value> makeCopyKeyString(const KeyString::Value& inKey);
@@ -1134,7 +1179,9 @@ private:
  * Copies the content of the input array into an ArraySet. If the input has duplicate elements, they
  * will be removed.
  */
-std::pair<TypeTags, Value> arrayToSet(TypeTags tag, Value val);
+std::pair<TypeTags, Value> arrayToSet(TypeTags tag,
+                                      Value val,
+                                      CollatorInterface* collator = nullptr);
 
 }  // namespace value
 }  // namespace sbe

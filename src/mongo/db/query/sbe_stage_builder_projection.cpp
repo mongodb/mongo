@@ -521,7 +521,7 @@ public:
                                    sbe::makeSV(),
                                    _context->planNodeId);
 
-                auto isObjectOrArrayExpr = sbe::makeE<sbe::EPrimBinary>(
+                auto isObjectOrArrayExpr = makeBinaryOp(
                     sbe::EPrimBinary::logicOr,
                     makeFunction("isObject"sv, sbe::makeE<sbe::EVariable>(inputArraySlot)),
                     makeFunction("isArray"sv, sbe::makeE<sbe::EVariable>(inputArraySlot)));

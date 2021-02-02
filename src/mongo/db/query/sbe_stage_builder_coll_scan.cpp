@@ -44,6 +44,7 @@
 #include "mongo/db/exec/sbe/stages/union.h"
 #include "mongo/db/query/sbe_stage_builder.h"
 #include "mongo/db/query/sbe_stage_builder_filter.h"
+#include "mongo/db/query/sbe_stage_builder_helpers.h"
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/db/storage/oplog_hack.h"
 #include "mongo/logv2/log.h"
@@ -208,12 +209,11 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateOptimizedOplo
 
         stage = sbe::makeS<sbe::FilterStage<false, true>>(
             std::move(stage),
-            sbe::makeE<sbe::EPrimBinary>(
-                sbe::EPrimBinary::lessEq,
-                sbe::makeE<sbe::EVariable>(*tsSlot),
-                sbe::makeE<sbe::EConstant>(
-                    sbe::value::TypeTags::Timestamp,
-                    sbe::value::bitcastFrom<uint64_t>((*csn->maxTs).asULL()))),
+            makeBinaryOp(sbe::EPrimBinary::lessEq,
+                         sbe::makeE<sbe::EVariable>(*tsSlot),
+                         sbe::makeE<sbe::EConstant>(
+                             sbe::value::TypeTags::Timestamp,
+                             sbe::value::bitcastFrom<uint64_t>((*csn->maxTs).asULL()))),
             csn->nodeId());
     }
 

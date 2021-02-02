@@ -36,17 +36,20 @@
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/vm/datetime.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 
 namespace mongo {
 namespace sbe {
 namespace vm {
 template <typename Op>
-std::pair<value::TypeTags, value::Value> genericNumericCompare(value::TypeTags lhsTag,
-                                                               value::Value lhsValue,
-                                                               value::TypeTags rhsTag,
-                                                               value::Value rhsValue,
-                                                               Op op) {
+std::pair<value::TypeTags, value::Value> genericCompare(
+    value::TypeTags lhsTag,
+    value::Value lhsValue,
+    value::TypeTags rhsTag,
+    value::Value rhsValue,
+    const StringData::ComparatorInterface* comparator = nullptr,
+    Op op = {}) {
     if (value::isNumber(lhsTag) && value::isNumber(rhsTag)) {
         switch (getWidestNumericalType(lhsTag, rhsTag)) {
             case value::TypeTags::NumberInt32: {
@@ -75,7 +78,12 @@ std::pair<value::TypeTags, value::Value> genericNumericCompare(value::TypeTags l
     } else if (isString(lhsTag) && isString(rhsTag)) {
         auto lhsStr = getStringView(lhsTag, lhsValue);
         auto rhsStr = getStringView(rhsTag, rhsValue);
-        auto result = op(lhsStr.compare(rhsStr), 0);
+
+        auto result = op(comparator ? comparator->compare(StringData{lhsStr.data(), lhsStr.size()},
+                                                          StringData{rhsStr.data(), rhsStr.size()})
+                                    : lhsStr.compare(rhsStr),
+                         0);
+
         return {value::TypeTags::Boolean, value::bitcastFrom<bool>(result)};
     } else if (lhsTag == value::TypeTags::Date && rhsTag == value::TypeTags::Date) {
         auto result = op(value::bitcastTo<int64_t>(lhsValue), value::bitcastTo<int64_t>(rhsValue));
@@ -102,8 +110,9 @@ std::pair<value::TypeTags, value::Value> genericNumericCompare(value::TypeTags l
         auto result = op(0, 0);
         return {value::TypeTags::Boolean, value::bitcastFrom<bool>(result)};
     } else if ((value::isArray(lhsTag) && value::isArray(rhsTag)) ||
-               (value::isObject(lhsTag) && value::isObject(rhsTag))) {
-        auto [tag, val] = value::compareValue(lhsTag, lhsValue, rhsTag, rhsValue);
+               (value::isObject(lhsTag) && value::isObject(rhsTag)) ||
+               (value::isBinData(lhsTag) && value::isBinData(rhsTag))) {
+        auto [tag, val] = value::compareValue(lhsTag, lhsValue, rhsTag, rhsValue, comparator);
         if (tag == value::TypeTags::NumberInt32) {
             auto result = op(value::bitcastTo<int32_t>(val), 0);
             return {value::TypeTags::Boolean, value::bitcastFrom<bool>(result)};
@@ -111,6 +120,24 @@ std::pair<value::TypeTags, value::Value> genericNumericCompare(value::TypeTags l
     }
 
     return {value::TypeTags::Nothing, 0};
+}
+
+template <typename Op>
+std::pair<value::TypeTags, value::Value> genericCompare(value::TypeTags lhsTag,
+                                                        value::Value lhsValue,
+                                                        value::TypeTags rhsTag,
+                                                        value::Value rhsValue,
+                                                        value::TypeTags collTag,
+                                                        value::Value collValue,
+                                                        Op op = {}) {
+    if (collTag != value::TypeTags::collator) {
+        return {value::TypeTags::Nothing, 0};
+    }
+
+    auto comparator =
+        static_cast<StringData::ComparatorInterface*>(value::getCollatorView(collValue));
+
+    return genericCompare(lhsTag, lhsValue, rhsTag, rhsValue, comparator, op);
 }
 
 struct Instruction {
@@ -143,16 +170,28 @@ struct Instruction {
         // 3 way comparison (spaceship) with bson woCompare semantics.
         cmp3w,
 
-        fillEmpty,
+        // collation-aware comparison instructions
+        collLess,
+        collLessEq,
+        collGreater,
+        collGreaterEq,
+        collEq,
+        collNeq,
+        collCmp3w,
 
+        fillEmpty,
         getField,
         getElement,
+        collComparisonKey,
 
         aggSum,
         aggMin,
         aggMax,
         aggFirst,
         aggLast,
+
+        aggCollMin,
+        aggCollMax,
 
         exists,
         isNull,
@@ -200,6 +239,7 @@ enum class Builtin : uint8_t {
     dayOfWeek,
     datePartsWeekYear,
     dropFields,
+    newArray,
     newObj,
     ksToString,  // KeyString to string
     newKs,       // new KeyString
@@ -213,6 +253,7 @@ enum class Builtin : uint8_t {
     sqrt,
     addToArray,       // agg function to append to an array
     addToSet,         // agg function to append to a set
+    collAddToSet,     // agg function to append to a set (with collation)
     doubleDoubleSum,  // special double summation
     bitTestZero,      // test bitwise mask & value is zero
     bitTestMask,      // test bitwise mask & value is mask
@@ -238,6 +279,7 @@ enum class Builtin : uint8_t {
     tan,
     tanh,
     isMember,
+    collIsMember,
     indexOfBytes,
     indexOfCP,
     isTimeUnit,
@@ -245,6 +287,9 @@ enum class Builtin : uint8_t {
     setUnion,
     setIntersection,
     setDifference,
+    collSetUnion,
+    collSetIntersection,
+    collSetDifference,
     runJsPredicate,
     regexCompile,  // compile <pattern, options> into value::pcreRegex
     regexFind,
@@ -312,16 +357,40 @@ public:
     void appendCmp3w() {
         appendSimpleInstruction(Instruction::cmp3w);
     }
+    void appendCollLess() {
+        appendSimpleInstruction(Instruction::collLess);
+    }
+    void appendCollLessEq() {
+        appendSimpleInstruction(Instruction::collLessEq);
+    }
+    void appendCollGreater() {
+        appendSimpleInstruction(Instruction::collGreater);
+    }
+    void appendCollGreaterEq() {
+        appendSimpleInstruction(Instruction::collGreaterEq);
+    }
+    void appendCollEq() {
+        appendSimpleInstruction(Instruction::collEq);
+    }
+    void appendCollNeq() {
+        appendSimpleInstruction(Instruction::collNeq);
+    }
+    void appendCollCmp3w() {
+        appendSimpleInstruction(Instruction::collCmp3w);
+    }
     void appendFillEmpty() {
         appendSimpleInstruction(Instruction::fillEmpty);
     }
     void appendGetField();
     void appendGetElement();
+    void appendCollComparisonKey();
     void appendSum();
     void appendMin();
     void appendMax();
     void appendFirst();
     void appendLast();
+    void appendCollMin();
+    void appendCollMax();
     void appendExists();
     void appendIsNull();
     void appendIsObject();
@@ -430,40 +499,37 @@ private:
                                                                  value::Value operandValue);
     std::tuple<bool, value::TypeTags, value::Value> genericSqrt(value::TypeTags operandTag,
                                                                 value::Value operandValue);
-    std::tuple<bool, value::TypeTags, value::Value> genericNot(value::TypeTags tag,
-                                                               value::Value value);
+    std::pair<value::TypeTags, value::Value> genericNot(value::TypeTags tag, value::Value value);
     std::pair<value::TypeTags, value::Value> genericIsMember(value::TypeTags lhsTag,
-                                                             value::Value lhsValue,
+                                                             value::Value lhsVal,
                                                              value::TypeTags rhsTag,
-                                                             value::Value rhsValue);
+                                                             value::Value rhsVal,
+                                                             CollatorInterface* collator = nullptr);
+    std::pair<value::TypeTags, value::Value> genericIsMember(value::TypeTags lhsTag,
+                                                             value::Value lhsVal,
+                                                             value::TypeTags rhsTag,
+                                                             value::Value rhsVal,
+                                                             value::TypeTags collTag,
+                                                             value::Value collVal);
     std::tuple<bool, value::TypeTags, value::Value> genericNumConvert(value::TypeTags lhsTag,
                                                                       value::Value lhsValue,
                                                                       value::TypeTags rhsTag);
     std::pair<value::TypeTags, value::Value> genericNumConvertToPreciseInt64(value::TypeTags lhsTag,
                                                                              value::Value lhsValue);
-    template <typename Op>
-    std::pair<value::TypeTags, value::Value> genericCompare(value::TypeTags lhsTag,
-                                                            value::Value lhsValue,
-                                                            value::TypeTags rhsTag,
-                                                            value::Value rhsValue,
-                                                            Op op = {}) {
-        return genericNumericCompare(lhsTag, lhsValue, rhsTag, rhsValue, op);
-    }
 
-    std::pair<value::TypeTags, value::Value> genericCompareEq(value::TypeTags lhsTag,
-                                                              value::Value lhsValue,
-                                                              value::TypeTags rhsTag,
-                                                              value::Value rhsValue);
-
-    std::pair<value::TypeTags, value::Value> genericCompareNeq(value::TypeTags lhsTag,
-                                                               value::Value lhsValue,
-                                                               value::TypeTags rhsTag,
-                                                               value::Value rhsValue);
+    std::pair<value::TypeTags, value::Value> compare3way(
+        value::TypeTags lhsTag,
+        value::Value lhsValue,
+        value::TypeTags rhsTag,
+        value::Value rhsValue,
+        const StringData::ComparatorInterface* comparator = nullptr);
 
     std::pair<value::TypeTags, value::Value> compare3way(value::TypeTags lhsTag,
                                                          value::Value lhsValue,
                                                          value::TypeTags rhsTag,
-                                                         value::Value rhsValue);
+                                                         value::Value rhsValue,
+                                                         value::TypeTags collTag,
+                                                         value::Value collValue);
 
     std::tuple<bool, value::TypeTags, value::Value> getField(value::TypeTags objTag,
                                                              value::Value objValue,
@@ -499,6 +565,21 @@ private:
                                                             value::Value accValue,
                                                             value::TypeTags fieldTag,
                                                             value::Value fieldValue);
+
+    std::tuple<bool, value::TypeTags, value::Value> aggCollMin(value::TypeTags accTag,
+                                                               value::Value accValue,
+                                                               value::TypeTags collTag,
+                                                               value::Value collValue,
+                                                               value::TypeTags fieldTag,
+                                                               value::Value fieldValue);
+
+    std::tuple<bool, value::TypeTags, value::Value> aggCollMax(value::TypeTags accTag,
+                                                               value::Value accValue,
+                                                               value::TypeTags collTag,
+                                                               value::Value collValue,
+                                                               value::TypeTags fieldTag,
+                                                               value::Value fieldValue);
+
     std::tuple<bool, value::TypeTags, value::Value> convertBitTestValue(value::TypeTags maskTag,
                                                                         value::Value maskValue,
                                                                         value::TypeTags valueTag,
@@ -567,6 +648,7 @@ private:
     std::tuple<bool, value::TypeTags, value::Value> builtinRegexMatch(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinReplaceOne(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinDropFields(ArityType arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinNewArray(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinNewObj(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinKeyStringToString(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinNewKeyString(ArityType arity);
@@ -580,6 +662,7 @@ private:
     std::tuple<bool, value::TypeTags, value::Value> builtinSqrt(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinAddToArray(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinAddToSet(ArityType arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinCollAddToSet(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinDoubleDoubleSum(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinBitTestZero(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinBitTestMask(ArityType arity);
@@ -605,6 +688,7 @@ private:
     std::tuple<bool, value::TypeTags, value::Value> builtinTanh(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinConcat(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinIsMember(ArityType arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinCollIsMember(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinIndexOfBytes(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinIndexOfCP(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinIsTimeUnit(ArityType arity);
@@ -612,6 +696,9 @@ private:
     std::tuple<bool, value::TypeTags, value::Value> builtinSetUnion(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinSetIntersection(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinSetDifference(ArityType arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinCollSetUnion(ArityType arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinCollSetIntersection(ArityType arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinCollSetDifference(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinRunJsPredicate(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinRegexCompile(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinRegexFind(ArityType arity);

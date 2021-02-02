@@ -218,11 +218,11 @@ static constexpr auto kSyntax = R"(
                 EXPR <- EQOP_EXPR LOG_TOK EXPR / EQOP_EXPR
                 LOG_TOK <- <'&&'> / <'||'>
 
-                EQOP_EXPR <- RELOP_EXPR EQ_TOK EQOP_EXPR / RELOP_EXPR
+                EQOP_EXPR <- RELOP_EXPR EQ_TOK ('[' EXPR ']')? EQOP_EXPR / RELOP_EXPR
                 EQ_TOK <- <'=='> / <'!='>
 
-                RELOP_EXPR <- ADD_EXPR REL_TOK RELOP_EXPR / ADD_EXPR
-                REL_TOK <- <'<='> / <'<'> / <'>='> / <'>'>
+                RELOP_EXPR <- ADD_EXPR REL_TOK ('[' EXPR ']')? RELOP_EXPR / ADD_EXPR
+                REL_TOK <- <'<=>'> / <'<='> / <'<'> / <'>='> / <'>'>
 
                 ADD_EXPR <- MUL_EXPR ADD_TOK ADD_EXPR / MUL_EXPR
                 ADD_TOK <- <'+'> / <'-'>
@@ -417,13 +417,19 @@ void Parser::walkEqopExpr(AstQuery& ast) {
         EPrimBinary::Op op;
         if (ast.nodes[1]->token == "==") {
             op = EPrimBinary::eq;
-        }
-        if (ast.nodes[1]->token == "!=") {
+        } else if (ast.nodes[1]->token == "!=") {
             op = EPrimBinary::neq;
         }
 
-        ast.expr =
-            makeE<EPrimBinary>(op, std::move(ast.nodes[0]->expr), std::move(ast.nodes[2]->expr));
+        if (ast.nodes.size() == 4) {
+            ast.expr = makeE<EPrimBinary>(op,
+                                          std::move(ast.nodes[0]->expr),
+                                          std::move(ast.nodes[3]->expr),
+                                          std::move(ast.nodes[2]->expr));
+        } else {
+            ast.expr = makeE<EPrimBinary>(
+                op, std::move(ast.nodes[0]->expr), std::move(ast.nodes[2]->expr));
+        }
     }
 }
 
@@ -433,21 +439,27 @@ void Parser::walkRelopExpr(AstQuery& ast) {
         ast.expr = std::move(ast.nodes[0]->expr);
     } else {
         EPrimBinary::Op op;
-        if (ast.nodes[1]->token == "<=") {
+        if (ast.nodes[1]->token == "<=>") {
+            op = EPrimBinary::cmp3w;
+        } else if (ast.nodes[1]->token == "<=") {
             op = EPrimBinary::lessEq;
-        }
-        if (ast.nodes[1]->token == "<") {
+        } else if (ast.nodes[1]->token == "<") {
             op = EPrimBinary::less;
-        }
-        if (ast.nodes[1]->token == ">=") {
+        } else if (ast.nodes[1]->token == ">=") {
             op = EPrimBinary::greaterEq;
-        }
-        if (ast.nodes[1]->token == ">") {
+        } else if (ast.nodes[1]->token == ">") {
             op = EPrimBinary::greater;
         }
 
-        ast.expr =
-            makeE<EPrimBinary>(op, std::move(ast.nodes[0]->expr), std::move(ast.nodes[2]->expr));
+        if (ast.nodes.size() == 4) {
+            ast.expr = makeE<EPrimBinary>(op,
+                                          std::move(ast.nodes[0]->expr),
+                                          std::move(ast.nodes[3]->expr),
+                                          std::move(ast.nodes[2]->expr));
+        } else {
+            ast.expr = makeE<EPrimBinary>(
+                op, std::move(ast.nodes[0]->expr), std::move(ast.nodes[2]->expr));
+        }
     }
 }
 

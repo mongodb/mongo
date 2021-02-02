@@ -717,6 +717,12 @@ class ExpressionPostVisitor final : public ExpressionVisitor {
 public:
     ExpressionPostVisitor(ExpressionVisitorContext* context) : _context{context} {}
 
+    enum class SetOperation {
+        Difference,
+        Intersection,
+        Union,
+    };
+
     void visit(ExpressionConstant* expr) final {
         auto [tag, val] = convertFrom(expr->getValue());
         _context->pushExpr(sbe::makeE<sbe::EConstant>(tag, val));
@@ -749,12 +755,9 @@ public:
 
         auto generateNotNumberOrDate = [frameId](const sbe::value::SlotId slotId) {
             sbe::EVariable var{frameId, slotId};
-            return sbe::makeE<sbe::EPrimBinary>(
-                sbe::EPrimBinary::logicAnd,
-                sbe::makeE<sbe::EPrimUnary>(sbe::EPrimUnary::logicNot,
-                                            makeFunction("isNumber", var.clone())),
-                sbe::makeE<sbe::EPrimUnary>(sbe::EPrimUnary::logicNot,
-                                            makeFunction("isDate", var.clone())));
+            return makeBinaryOp(sbe::EPrimBinary::logicAnd,
+                                makeNot(makeFunction("isNumber", var.clone())),
+                                makeNot(makeFunction("isDate", var.clone())));
         };
 
         if (arity == 2) {
@@ -765,25 +768,24 @@ public:
             sbe::EVariable rhsVar{frameId, 1};
 
             auto addExpr = sbe::makeE<sbe::EIf>(
-                sbe::makeE<sbe::EPrimBinary>(sbe::EPrimBinary::logicOr,
-                                             generateNullOrMissing(frameId, 0),
-                                             generateNullOrMissing(frameId, 1)),
+                makeBinaryOp(sbe::EPrimBinary::logicOr,
+                             generateNullOrMissing(frameId, 0),
+                             generateNullOrMissing(frameId, 1)),
                 sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0),
                 sbe::makeE<sbe::EIf>(
-                    sbe::makeE<sbe::EPrimBinary>(sbe::EPrimBinary::logicOr,
-                                                 generateNotNumberOrDate(0),
-                                                 generateNotNumberOrDate(1)),
+                    makeBinaryOp(sbe::EPrimBinary::logicOr,
+                                 generateNotNumberOrDate(0),
+                                 generateNotNumberOrDate(1)),
                     sbe::makeE<sbe::EFail>(
                         ErrorCodes::Error{4974201},
                         "only numbers and dates are allowed in an $add expression"),
                     sbe::makeE<sbe::EIf>(
-                        sbe::makeE<sbe::EPrimBinary>(sbe::EPrimBinary::logicAnd,
-                                                     makeFunction("isDate", lhsVar.clone()),
-                                                     makeFunction("isDate", rhsVar.clone())),
+                        makeBinaryOp(sbe::EPrimBinary::logicAnd,
+                                     makeFunction("isDate", lhsVar.clone()),
+                                     makeFunction("isDate", rhsVar.clone())),
                         sbe::makeE<sbe::EFail>(ErrorCodes::Error{4974202},
                                                "only one date allowed in an $add expression"),
-                        sbe::makeE<sbe::EPrimBinary>(
-                            sbe::EPrimBinary::add, lhsVar.clone(), rhsVar.clone()))));
+                        makeBinaryOp(sbe::EPrimBinary::add, lhsVar.clone(), rhsVar.clone()))));
 
             _context->pushExpr(
                 sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(addExpr)));
@@ -811,22 +813,20 @@ public:
             std::reverse(std::begin(binds), std::end(binds));
 
             using iter_t = std::vector<std::unique_ptr<sbe::EExpression>>::iterator;
-            auto checkNullAllArguments =
-                std::accumulate(std::move_iterator<iter_t>(checkExprsNull.begin() + 1),
-                                std::move_iterator<iter_t>(checkExprsNull.end()),
-                                std::move(checkExprsNull.front()),
-                                [](auto&& acc, auto&& ex) {
-                                    return sbe::makeE<sbe::EPrimBinary>(
-                                        sbe::EPrimBinary::logicOr, std::move(acc), std::move(ex));
-                                });
-            auto checkNotNumberOrDateAllArguments =
-                std::accumulate(std::move_iterator<iter_t>(checkExprsNotNumberOrDate.begin() + 1),
-                                std::move_iterator<iter_t>(checkExprsNotNumberOrDate.end()),
-                                std::move(checkExprsNotNumberOrDate.front()),
-                                [](auto&& acc, auto&& ex) {
-                                    return sbe::makeE<sbe::EPrimBinary>(
-                                        sbe::EPrimBinary::logicOr, std::move(acc), std::move(ex));
-                                });
+            auto checkNullAllArguments = std::accumulate(
+                std::move_iterator<iter_t>(checkExprsNull.begin() + 1),
+                std::move_iterator<iter_t>(checkExprsNull.end()),
+                std::move(checkExprsNull.front()),
+                [](auto&& acc, auto&& ex) {
+                    return makeBinaryOp(sbe::EPrimBinary::logicOr, std::move(acc), std::move(ex));
+                });
+            auto checkNotNumberOrDateAllArguments = std::accumulate(
+                std::move_iterator<iter_t>(checkExprsNotNumberOrDate.begin() + 1),
+                std::move_iterator<iter_t>(checkExprsNotNumberOrDate.end()),
+                std::move(checkExprsNotNumberOrDate.front()),
+                [](auto&& acc, auto&& ex) {
+                    return makeBinaryOp(sbe::EPrimBinary::logicOr, std::move(acc), std::move(ex));
+                });
             auto addExpr = sbe::makeE<sbe::EIf>(
                 std::move(checkNullAllArguments),
                 sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0),
@@ -881,10 +881,9 @@ public:
             return sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(inExpression));
         }();
 
-        auto anyOfArgumentsIsNullish =
-            sbe::makeE<sbe::EPrimBinary>(sbe::EPrimBinary::logicOr,
-                                         generateNullOrMissing(arrayRef),
-                                         generateNullOrMissing(indexRef));
+        auto anyOfArgumentsIsNullish = makeBinaryOp(sbe::EPrimBinary::logicOr,
+                                                    generateNullOrMissing(arrayRef),
+                                                    generateNullOrMissing(indexRef));
         auto firstArgumentIsNotArray = makeNot(makeFunction("isArray", arrayRef.clone()));
         auto secondArgumentIsNotNumeric = generateNonNumericCheck(indexRef);
         auto arrayElemAtExpr = buildMultiBranchConditional(
@@ -987,27 +986,25 @@ public:
             MONGO_UNREACHABLE;
         }();
 
-        // We use the "cmp3e" primitive for every comparison, because it "type brackets" its
+        // We use the "cmp3w" primitive for every comparison, because it "type brackets" its
         // comparisons (for example, a number will always compare as less than a string). The other
         // comparison primitives are designed for comparing values of the same type.
-        auto cmp3w =
-            sbe::makeE<sbe::EPrimBinary>(sbe::EPrimBinary::cmp3w, lhsRef.clone(), rhsRef.clone());
+        auto cmp3w = makeBinaryOp(
+            sbe::EPrimBinary::cmp3w, lhsRef.clone(), rhsRef.clone(), _context->runtimeEnvironment);
         auto cmp = (comparisonOperator == sbe::EPrimBinary::cmp3w)
             ? std::move(cmp3w)
-            : sbe::makeE<sbe::EPrimBinary>(
-                  comparisonOperator,
-                  std::move(cmp3w),
-                  sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32,
-                                             sbe::value::bitcastFrom<int32_t>(0)));
+            : makeBinaryOp(comparisonOperator,
+                           std::move(cmp3w),
+                           sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32,
+                                                      sbe::value::bitcastFrom<int32_t>(0)));
 
         // If either operand evaluates to "Nothing," then the entire operation expressed by 'cmp'
         // will also evaluate to "Nothing." MQL comparisons, however, treat "Nothing" as if it is a
         // value that is less than everything other than MinKey. (Notably, two expressions that
         // evaluate to "Nothing" are considered equal to each other.)
-        auto nothingFallbackCmp =
-            sbe::makeE<sbe::EPrimBinary>(comparisonOperator,
-                                         makeFunction("exists", lhsRef.clone()),
-                                         makeFunction("exists", rhsRef.clone()));
+        auto nothingFallbackCmp = makeBinaryOp(comparisonOperator,
+                                               makeFunction("exists", lhsRef.clone()),
+                                               makeFunction("exists", rhsRef.clone()));
 
         auto cmpWithFallback =
             makeFunction("fillEmpty", std::move(cmp), std::move(nothingFallbackCmp));
@@ -1036,23 +1033,23 @@ public:
         std::reverse(std::begin(binds), std::end(binds));
 
         using iter_t = std::vector<std::unique_ptr<sbe::EExpression>>::iterator;
-        auto checkNullAnyArgument =
-            std::accumulate(std::move_iterator<iter_t>(checkNullArg.begin() + 1),
-                            std::move_iterator<iter_t>(checkNullArg.end()),
-                            std::move(checkNullArg.front()),
-                            [](auto&& acc, auto&& ex) {
-                                return sbe::makeE<sbe::EPrimBinary>(
-                                    sbe::EPrimBinary::logicOr, std::move(acc), std::move(ex));
-                            });
 
-        auto checkStringAllArguments =
-            std::accumulate(std::move_iterator<iter_t>(checkStringArg.begin() + 1),
-                            std::move_iterator<iter_t>(checkStringArg.end()),
-                            std::move(checkStringArg.front()),
-                            [](auto&& acc, auto&& ex) {
-                                return sbe::makeE<sbe::EPrimBinary>(
-                                    sbe::EPrimBinary::logicAnd, std::move(acc), std::move(ex));
-                            });
+        auto checkNullAnyArgument = std::accumulate(
+            std::move_iterator<iter_t>(checkNullArg.begin() + 1),
+            std::move_iterator<iter_t>(checkNullArg.end()),
+            std::move(checkNullArg.front()),
+            [](auto&& acc, auto&& ex) {
+                return makeBinaryOp(sbe::EPrimBinary::logicOr, std::move(acc), std::move(ex));
+            });
+
+        auto checkStringAllArguments = std::accumulate(
+            std::move_iterator<iter_t>(checkStringArg.begin() + 1),
+            std::move_iterator<iter_t>(checkStringArg.end()),
+            std::move(checkStringArg.front()),
+            [](auto&& acc, auto&& ex) {
+                return makeBinaryOp(sbe::EPrimBinary::logicAnd, std::move(acc), std::move(ex));
+            });
+
         auto concatExpr = sbe::makeE<sbe::EIf>(
             std::move(checkNullAnyArgument),
             sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0),
@@ -1100,14 +1097,13 @@ public:
 
         // Filter stage to EFail if an element is not an array, null, or missing, and EOF if an
         // element is null or missing: not(isNullOrMissing) && (isArray || EFail).
-        auto filterExpr = sbe::makeE<sbe::EPrimBinary>(
+        auto filterExpr = makeBinaryOp(
             sbe::EPrimBinary::logicAnd,
             makeNot(generateNullOrMissing(unionVar)),
-            sbe::makeE<sbe::EPrimBinary>(
-                sbe::EPrimBinary::logicOr,
-                makeFunction("isArray", unionVar.clone()),
-                sbe::makeE<sbe::EFail>(ErrorCodes::Error{5153400},
-                                       "$concatArrays only supports arrays")));
+            makeBinaryOp(sbe::EPrimBinary::logicOr,
+                         makeFunction("isArray", unionVar.clone()),
+                         sbe::makeE<sbe::EFail>(ErrorCodes::Error{5153400},
+                                                "$concatArrays only supports arrays")));
         auto filter = makeFilter<false, true>(
             std::move(unionEvalStage), std::move(filterExpr), _context->planNodeId);
 
@@ -1168,8 +1164,7 @@ public:
         // and concatenates elements into the output array.
         auto [nullExpr, nullStage] = makeNullLimitCoscanTree();
         auto nullIsMemberExpr =
-            makeFunction("isMember",
-                         sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0),
+            makeIsMember(sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0),
                          sbe::makeE<sbe::EVariable>(groupSlot));
         auto branchNullEvalStage =
             makeBranch(std::move(nullIsMemberExpr),
@@ -1333,18 +1328,17 @@ public:
                            << "]";
                 }
                 return std::make_pair(
-                    sbe::makeE<sbe::EPrimBinary>(
-                        sbe::EPrimBinary::logicAnd,
-                        sbe::makeE<sbe::EPrimBinary>(
-                            sbe::EPrimBinary::greaterEq,
-                            var.clone(),
-                            sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32,
-                                                       sbe::value::bitcastFrom<int32_t>(lower))),
-                        sbe::makeE<sbe::EPrimBinary>(
-                            sbe::EPrimBinary::lessEq,
-                            var.clone(),
-                            sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32,
-                                                       sbe::value::bitcastFrom<int32_t>(upper)))),
+                    makeBinaryOp(sbe::EPrimBinary::logicAnd,
+                                 makeBinaryOp(sbe::EPrimBinary::greaterEq,
+                                              var.clone(),
+                                              sbe::makeE<sbe::EConstant>(
+                                                  sbe::value::TypeTags::NumberInt32,
+                                                  sbe::value::bitcastFrom<int32_t>(lower))),
+                                 makeBinaryOp(sbe::EPrimBinary::lessEq,
+                                              var.clone(),
+                                              sbe::makeE<sbe::EConstant>(
+                                                  sbe::value::TypeTags::NumberInt32,
+                                                  sbe::value::bitcastFrom<int32_t>(upper)))),
                     sbe::makeE<sbe::EFail>(ErrorCodes::Error{4848972}, errMsg));
             };
 
@@ -1381,11 +1375,9 @@ public:
                 outerFrameId,
                 sbe::makeEs(expr->clone()),
                 sbe::makeE<sbe::EIf>(
-                    sbe::makeE<sbe::EPrimBinary>(
-                        sbe::EPrimBinary::logicOr,
-                        sbe::makeE<sbe::EPrimUnary>(sbe::EPrimUnary::logicNot,
-                                                    makeFunction("exists", outerSlotRef.clone())),
-                        makeFunction("isNull", outerSlotRef.clone())),
+                    makeBinaryOp(sbe::EPrimBinary::logicOr,
+                                 makeNot(makeFunction("exists", outerSlotRef.clone())),
+                                 makeFunction("isNull", outerSlotRef.clone())),
                     sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0),
                     sbe::makeE<sbe::ELocalBind>(
                         innerFrameId,
@@ -1534,14 +1526,13 @@ public:
                                                           generateNullOrMissing(frameId, 0));
 
         using iter_t = std::vector<std::unique_ptr<sbe::EExpression>>::iterator;
-        auto checkPartsForNull =
-            std::accumulate(std::move_iterator<iter_t>(nullExprs.begin() + 1),
-                            std::move_iterator<iter_t>(nullExprs.end()),
-                            std::move(nullExprs.front()),
-                            [](auto&& acc, auto&& b) {
-                                return sbe::makeE<sbe::EPrimBinary>(
-                                    sbe::EPrimBinary::logicOr, std::move(acc), std::move(b));
-                            });
+        auto checkPartsForNull = std::accumulate(
+            std::move_iterator<iter_t>(nullExprs.begin() + 1),
+            std::move_iterator<iter_t>(nullExprs.end()),
+            std::move(nullExprs.front()),
+            [](auto&& acc, auto&& b) {
+                return makeBinaryOp(sbe::EPrimBinary::logicOr, std::move(acc), std::move(b));
+            });
 
         // Invocation of the datePartsWeekYear and dateParts functions depend on a TimeZoneDatabase
         // for datetime computation. This global object is registered as an unowned value in the
@@ -1638,44 +1629,36 @@ public:
 
         // Determine whether to call dateToParts or isoDateToParts.
         auto checkIsoflagValue = buildMultiBranchConditional(
-            CaseValuePair{sbe::makeE<sbe::EPrimBinary>(
-                              sbe::EPrimBinary::eq,
-                              isoflagRef.clone(),
-                              sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Boolean, false)),
-                          sbe::makeE<sbe::EFunction>("dateToParts", std::move(args))},
+            CaseValuePair{
+                makeBinaryOp(sbe::EPrimBinary::eq,
+                             isoflagRef.clone(),
+                             sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Boolean, false)),
+                sbe::makeE<sbe::EFunction>("dateToParts", std::move(args))},
             sbe::makeE<sbe::EFunction>("isoDateToParts", std::move(isoargs)));
 
         // Check that each argument exists, is not null, and is the correct type.
         auto totalDateToPartsFunc = buildMultiBranchConditional(
             CaseValuePair{generateNullOrMissing(frameId, 1),
                           sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0)},
+            CaseValuePair{makeNot(makeFunction("isString", timezoneRef.clone())),
+                          sbe::makeE<sbe::EFail>(ErrorCodes::Error{4997701},
+                                                 "$dateToParts timezone must be a string")},
             CaseValuePair{
-                sbe::makeE<sbe::EPrimUnary>(sbe::EPrimUnary::logicNot,
-                                            makeFunction("isString", timezoneRef.clone())),
-                sbe::makeE<sbe::EFail>(ErrorCodes::Error{4997701},
-                                       "$dateToParts timezone must be a string")},
-            CaseValuePair{
-                sbe::makeE<sbe::EPrimUnary>(
-                    sbe::EPrimUnary::logicNot,
-                    makeFunction("isTimezone",
-                                 sbe::makeE<sbe::EVariable>(
-                                     _context->runtimeEnvironment->getSlot("timeZoneDB"_sd)),
-                                 timezoneRef.clone())),
+                makeNot(makeFunction("isTimezone",
+                                     sbe::makeE<sbe::EVariable>(
+                                         _context->runtimeEnvironment->getSlot("timeZoneDB"_sd)),
+                                     timezoneRef.clone())),
                 sbe::makeE<sbe::EFail>(ErrorCodes::Error{4997704},
                                        "$dateToParts timezone must be a valid timezone")},
             CaseValuePair{generateNullOrMissing(frameId, 2),
                           sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0)},
-            CaseValuePair{sbe::makeE<sbe::EPrimUnary>(
-                              sbe::EPrimUnary::logicNot,
-                              sbe::makeE<sbe::ETypeMatch>(isoflagRef.clone(), isoTypeMask)),
+            CaseValuePair{makeNot(sbe::makeE<sbe::ETypeMatch>(isoflagRef.clone(), isoTypeMask)),
                           sbe::makeE<sbe::EFail>(ErrorCodes::Error{4997702},
                                                  "$dateToParts iso8601 must be a boolean")},
             CaseValuePair{generateNullOrMissing(frameId, 0),
                           sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0)},
             CaseValuePair{
-                sbe::makeE<sbe::EPrimUnary>(
-                    sbe::EPrimUnary::logicNot,
-                    sbe::makeE<sbe::ETypeMatch>(dateRef.clone(), dateTypeMask())),
+                makeNot(sbe::makeE<sbe::ETypeMatch>(dateRef.clone(), dateTypeMask())),
                 sbe::makeE<sbe::EFail>(ErrorCodes::Error{4997703},
                                        "$dateToParts date must have the format of a date")},
             std::move(checkIsoflagValue));
@@ -1696,20 +1679,19 @@ public:
         sbe::EVariable lhsRef{frameId, 0};
         sbe::EVariable rhsRef{frameId, 1};
 
-        auto checkIsNumber = sbe::makeE<sbe::EPrimBinary>(sbe::EPrimBinary::logicAnd,
-                                                          makeFunction("isNumber", lhsRef.clone()),
-                                                          makeFunction("isNumber", rhsRef.clone()));
+        auto checkIsNumber = makeBinaryOp(sbe::EPrimBinary::logicAnd,
+                                          makeFunction("isNumber", lhsRef.clone()),
+                                          makeFunction("isNumber", rhsRef.clone()));
 
-        auto checkIsNullOrMissing = sbe::makeE<sbe::EPrimBinary>(sbe::EPrimBinary::logicOr,
-                                                                 generateNullOrMissing(lhsRef),
-                                                                 generateNullOrMissing(rhsRef));
+        auto checkIsNullOrMissing = makeBinaryOp(sbe::EPrimBinary::logicOr,
+                                                 generateNullOrMissing(lhsRef),
+                                                 generateNullOrMissing(rhsRef));
 
         auto divideExpr = buildMultiBranchConditional(
             CaseValuePair{std::move(checkIsNullOrMissing),
                           sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0)},
             CaseValuePair{std::move(checkIsNumber),
-                          sbe::makeE<sbe::EPrimBinary>(
-                              sbe::EPrimBinary::div, lhsRef.clone(), rhsRef.clone())},
+                          makeBinaryOp(sbe::EPrimBinary::div, lhsRef.clone(), rhsRef.clone())},
             sbe::makeE<sbe::EFail>(ErrorCodes::Error{5073101},
                                    "$divide only supports numeric types"));
 
@@ -1803,10 +1785,9 @@ public:
         auto binds = sbe::makeEs(std::move(input));
         sbe::EVariable inputRef(frameId, 0);
 
-        auto inputIsArrayOrNullish =
-            sbe::makeE<sbe::EPrimBinary>(sbe::EPrimBinary::logicOr,
-                                         generateNullOrMissing(inputRef),
-                                         makeFunction("isArray", inputRef.clone()));
+        auto inputIsArrayOrNullish = makeBinaryOp(sbe::EPrimBinary::logicOr,
+                                                  generateNullOrMissing(inputRef),
+                                                  makeFunction("isArray", inputRef.clone()));
         auto checkInputArrayType =
             sbe::makeE<sbe::EIf>(std::move(inputIsArrayOrNullish),
                                  inputRef.clone(),
@@ -2059,25 +2040,23 @@ public:
             sbe::makeE<sbe::ENumericConvert>(rhsVar.clone(), sbe::value::TypeTags::NumberInt32);
         auto rhsExpr = buildMultiBranchConditional(
             CaseValuePair{
-                sbe::makeE<sbe::EPrimBinary>(
+                makeBinaryOp(
                     sbe::EPrimBinary::logicAnd,
                     sbe::makeE<sbe::ETypeMatch>(
                         rhsVar.clone(), getBSONTypeMask(sbe::value::TypeTags::NumberDouble)),
-                    sbe::makeE<sbe::EPrimUnary>(
-                        sbe::EPrimUnary::logicNot,
-                        sbe::makeE<sbe::ETypeMatch>(
-                            lhsVar.clone(), getBSONTypeMask(sbe::value::TypeTags::NumberDouble)))),
+                    makeNot(sbe::makeE<sbe::ETypeMatch>(
+                        lhsVar.clone(), getBSONTypeMask(sbe::value::TypeTags::NumberDouble)))),
                 makeFunction("fillEmpty", std::move(numericConvert32), rhsVar.clone())},
             rhsVar.clone());
 
         auto modExpr = buildMultiBranchConditional(
-            CaseValuePair{sbe::makeE<sbe::EPrimBinary>(sbe::EPrimBinary::logicOr,
-                                                       generateNullOrMissing(lhsVar),
-                                                       generateNullOrMissing(rhsVar)),
+            CaseValuePair{makeBinaryOp(sbe::EPrimBinary::logicOr,
+                                       generateNullOrMissing(lhsVar),
+                                       generateNullOrMissing(rhsVar)),
                           sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0)},
-            CaseValuePair{sbe::makeE<sbe::EPrimBinary>(sbe::EPrimBinary::logicOr,
-                                                       generateNonNumericCheck(lhsVar),
-                                                       generateNonNumericCheck(rhsVar)),
+            CaseValuePair{makeBinaryOp(sbe::EPrimBinary::logicOr,
+                                       generateNonNumericCheck(lhsVar),
+                                       generateNonNumericCheck(rhsVar)),
                           sbe::makeE<sbe::EFail>(ErrorCodes::Error{5154000},
                                                  "$mod only supports numeric types")},
             makeFunction("mod", lhsVar.clone(), std::move(rhsExpr)));
@@ -2115,32 +2094,29 @@ public:
         std::reverse(std::begin(binds), std::end(binds));
 
         using iter_t = std::vector<std::unique_ptr<sbe::EExpression>>::iterator;
-        auto checkNullAnyArgument =
-            std::accumulate(std::move_iterator<iter_t>(checkExprsNull.begin() + 1),
-                            std::move_iterator<iter_t>(checkExprsNull.end()),
-                            std::move(checkExprsNull.front()),
-                            [](auto&& acc, auto&& ex) {
-                                return sbe::makeE<sbe::EPrimBinary>(
-                                    sbe::EPrimBinary::logicOr, std::move(acc), std::move(ex));
-                            });
+        auto checkNullAnyArgument = std::accumulate(
+            std::move_iterator<iter_t>(checkExprsNull.begin() + 1),
+            std::move_iterator<iter_t>(checkExprsNull.end()),
+            std::move(checkExprsNull.front()),
+            [](auto&& acc, auto&& ex) {
+                return makeBinaryOp(sbe::EPrimBinary::logicOr, std::move(acc), std::move(ex));
+            });
 
-        auto checkNumberAllArguments =
-            std::accumulate(std::move_iterator<iter_t>(checkExprsNumber.begin() + 1),
-                            std::move_iterator<iter_t>(checkExprsNumber.end()),
-                            std::move(checkExprsNumber.front()),
-                            [](auto&& acc, auto&& ex) {
-                                return sbe::makeE<sbe::EPrimBinary>(
-                                    sbe::EPrimBinary::logicAnd, std::move(acc), std::move(ex));
-                            });
+        auto checkNumberAllArguments = std::accumulate(
+            std::move_iterator<iter_t>(checkExprsNumber.begin() + 1),
+            std::move_iterator<iter_t>(checkExprsNumber.end()),
+            std::move(checkExprsNumber.front()),
+            [](auto&& acc, auto&& ex) {
+                return makeBinaryOp(sbe::EPrimBinary::logicAnd, std::move(acc), std::move(ex));
+            });
 
-        auto multiplication =
-            std::accumulate(std::move_iterator<iter_t>(variables.begin() + 1),
-                            std::move_iterator<iter_t>(variables.end()),
-                            std::move(variables.front()),
-                            [](auto&& acc, auto&& ex) {
-                                return sbe::makeE<sbe::EPrimBinary>(
-                                    sbe::EPrimBinary::mul, std::move(acc), std::move(ex));
-                            });
+        auto multiplication = std::accumulate(
+            std::move_iterator<iter_t>(variables.begin() + 1),
+            std::move_iterator<iter_t>(variables.end()),
+            std::move(variables.front()),
+            [](auto&& acc, auto&& ex) {
+                return makeBinaryOp(sbe::EPrimBinary::mul, std::move(acc), std::move(ex));
+            });
 
         auto multiplyExpr = buildMultiBranchConditional(
             CaseValuePair{std::move(checkNullAnyArgument),
@@ -2156,8 +2132,7 @@ public:
         auto frameId = _context->frameIdGenerator->generate();
         auto binds = sbe::makeEs(_context->popExpr());
 
-        auto notExpr = sbe::makeE<sbe::EPrimUnary>(sbe::EPrimUnary::logicNot,
-                                                   generateCoerceToBoolExpression({frameId, 0}));
+        auto notExpr = makeNot(generateCoerceToBoolExpression({frameId, 0}));
 
         _context->pushExpr(
             sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(notExpr)));
@@ -2201,14 +2176,14 @@ public:
         auto generateValidateParameter = [](const sbe::EVariable& paramRef,
                                             const sbe::EVariable& paramMissingRef,
                                             const std::string& paramName) {
-            return sbe::makeE<sbe::EPrimBinary>(
-                sbe::EPrimBinary::logicOr,
-                sbe::makeE<sbe::EPrimBinary>(sbe::EPrimBinary::logicOr,
+            return makeBinaryOp(sbe::EPrimBinary::logicOr,
+                                makeBinaryOp(sbe::EPrimBinary::logicOr,
                                              paramMissingRef.clone(),
                                              makeFunction("isString", paramRef.clone())),
-                sbe::makeE<sbe::EFail>(ErrorCodes::Error{5154400},
-                                       str::stream() << "$replaceOne requires that '" << paramName
-                                                     << "' be a string"));
+                                sbe::makeE<sbe::EFail>(ErrorCodes::Error{5154400},
+                                                       str::stream()
+                                                           << "$replaceOne requires that '"
+                                                           << paramName << "' be a string"));
         };
 
         auto inputIsStringOrFail =
@@ -2217,31 +2192,28 @@ public:
         auto replacementIsStringOrFail =
             generateValidateParameter(replacementRef, replacementNullOrMissingRef, "replacement");
 
-        auto checkNullExpr =
-            sbe::makeE<sbe::EPrimBinary>(sbe::EPrimBinary::logicOr,
-                                         sbe::makeE<sbe::EPrimBinary>(sbe::EPrimBinary::logicOr,
-                                                                      inputNullOrMissingRef.clone(),
-                                                                      findNullOrMissingRef.clone()),
-                                         replacementNullOrMissingRef.clone());
+        auto checkNullExpr = makeBinaryOp(sbe::EPrimBinary::logicOr,
+                                          makeBinaryOp(sbe::EPrimBinary::logicOr,
+                                                       inputNullOrMissingRef.clone(),
+                                                       findNullOrMissingRef.clone()),
+                                          replacementNullOrMissingRef.clone());
 
         // Order here is important because we want to preserve the precedence of failures in MQL.
-        auto isNullExpr = sbe::makeE<sbe::EPrimBinary>(
-            sbe::EPrimBinary::logicAnd,
-            sbe::makeE<sbe::EPrimBinary>(
-                sbe::EPrimBinary::logicAnd,
-                sbe::makeE<sbe::EPrimBinary>(sbe::EPrimBinary::logicAnd,
-                                             std::move(inputIsStringOrFail),
-                                             std::move(findIsStringOrFail)),
-                std::move(replacementIsStringOrFail)),
-            std::move(checkNullExpr));
+        auto isNullExpr = makeBinaryOp(sbe::EPrimBinary::logicAnd,
+                                       makeBinaryOp(sbe::EPrimBinary::logicAnd,
+                                                    makeBinaryOp(sbe::EPrimBinary::logicAnd,
+                                                                 std::move(inputIsStringOrFail),
+                                                                 std::move(findIsStringOrFail)),
+                                                    std::move(replacementIsStringOrFail)),
+                                       std::move(checkNullExpr));
 
         // Check if find string is empty, and if so return the the concatenation of the replacement
         // string and the input string, otherwise replace the first occurrence of the find string.
         auto [emptyStrTag, emptyStrVal] = sbe::value::makeNewString("");
-        auto isEmptyFindStr =
-            sbe::makeE<sbe::EPrimBinary>(sbe::EPrimBinary::eq,
-                                         findRef.clone(),
-                                         sbe::makeE<sbe::EConstant>(emptyStrTag, emptyStrVal));
+        auto isEmptyFindStr = makeBinaryOp(sbe::EPrimBinary::eq,
+                                           findRef.clone(),
+                                           sbe::makeE<sbe::EConstant>(emptyStrTag, emptyStrVal),
+                                           _context->runtimeEnvironment);
 
         auto replaceOrReturnInputExpr = sbe::makeE<sbe::EIf>(
             std::move(isEmptyFindStr),
@@ -2261,20 +2233,21 @@ public:
     }
     void visit(ExpressionSetDifference* expr) final {
         invariant(expr->getChildren().size() == 2);
-        generateSetExpression(expr, "setDifference");
+
+        generateSetExpression(expr, SetOperation::Difference);
     }
     void visit(ExpressionSetEquals* expr) final {
         unsupportedExpression(expr->getOpName());
     }
     void visit(ExpressionSetIntersection* expr) final {
-        generateSetExpression(expr, "setIntersection");
+        generateSetExpression(expr, SetOperation::Intersection);
     }
 
     void visit(ExpressionSetIsSubset* expr) final {
         unsupportedExpression(expr->getOpName());
     }
     void visit(ExpressionSetUnion* expr) final {
-        generateSetExpression(expr, "setUnion");
+        generateSetExpression(expr, SetOperation::Union);
     }
 
     void visit(ExpressionSize* expr) final {
@@ -2321,12 +2294,12 @@ public:
         arrayWithEmptyStringView->push_back(emptyStrTag, emptyStrVal);
         arrayWithEmptyStringGuard.reset();
 
-        auto generateIsEmptyString = [emptyStrTag = emptyStrTag,
-                                      emptyStrVal = emptyStrVal](const sbe::EVariable& var) {
-            return sbe::makeE<sbe::EPrimBinary>(
-                sbe::EPrimBinary::eq,
-                var.clone(),
-                sbe::makeE<sbe::EConstant>(emptyStrTag, emptyStrVal));
+        auto generateIsEmptyString = [this, emptyStrTag = emptyStrTag, emptyStrVal = emptyStrVal](
+                                         const sbe::EVariable& var) {
+            return makeBinaryOp(sbe::EPrimBinary::eq,
+                                var.clone(),
+                                sbe::makeE<sbe::EConstant>(emptyStrTag, emptyStrVal),
+                                _context->runtimeEnvironment);
         };
 
         // Check that each argument exists, is not null, and is a string. Fails if the delimiter is
@@ -2742,21 +2715,17 @@ private:
                                                  str::stream() << "$" << exprName.toString()
                                                                << " timezone must be a string")},
             CaseValuePair{
-                sbe::makeE<sbe::EPrimUnary>(sbe::EPrimUnary::logicNot,
-                                            makeFunction("isTimezone",
-                                                         sbe::makeE<sbe::EVariable>(timeZoneDBSlot),
-                                                         timezoneRef.clone())),
+                makeNot(makeFunction(
+                    "isTimezone", sbe::makeE<sbe::EVariable>(timeZoneDBSlot), timezoneRef.clone())),
                 sbe::makeE<sbe::EFail>(ErrorCodes::Error{4998201},
                                        str::stream() << "$" << exprName.toString()
                                                      << " timezone must be a valid timezone")},
             CaseValuePair{generateNullOrMissing(dateRef),
                           sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0)},
-            CaseValuePair{
-                sbe::makeE<sbe::EPrimUnary>(
-                    sbe::EPrimUnary::logicNot,
-                    sbe::makeE<sbe::ETypeMatch>(dateRef.clone(), dateTypeMask())),
-                sbe::makeE<sbe::EFail>(ErrorCodes::Error{4998202},
-                                       str::stream() << "$" << exprName.toString()
+            CaseValuePair{makeNot(sbe::makeE<sbe::ETypeMatch>(dateRef.clone(), dateTypeMask())),
+                          sbe::makeE<sbe::EFail>(ErrorCodes::Error{4998202},
+                                                 str::stream()
+                                                     << "$" << exprName.toString()
                                                      << " date must have a format of a date")},
             sbe::makeE<sbe::EFunction>(exprName.toString(), std::move(args)));
         _context->pushExpr(
@@ -2829,14 +2798,14 @@ private:
             lowerBound.inclusive ? sbe::EPrimBinary::greaterEq : sbe::EPrimBinary::greater;
         sbe::EPrimBinary::Op upperCmp =
             upperBound.inclusive ? sbe::EPrimBinary::lessEq : sbe::EPrimBinary::less;
-        auto checkBounds = sbe::makeE<sbe::EPrimBinary>(
+        auto checkBounds = makeBinaryOp(
             sbe::EPrimBinary::logicAnd,
-            sbe::makeE<sbe::EPrimBinary>(
+            makeBinaryOp(
                 lowerCmp,
                 inputRef.clone(),
                 sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberDouble,
                                            sbe::value::bitcastFrom<double>(lowerBound.bound))),
-            sbe::makeE<sbe::EPrimBinary>(
+            makeBinaryOp(
                 upperCmp,
                 inputRef.clone(),
                 sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberDouble,
@@ -2846,8 +2815,7 @@ private:
             generateNullOrMissing(frameId, 0),
             sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0),
             sbe::makeE<sbe::EIf>(
-                sbe::makeE<sbe::EPrimUnary>(sbe::EPrimUnary::logicNot,
-                                            makeFunction("isNumber", inputRef.clone())),
+                makeNot(makeFunction("isNumber", inputRef.clone())),
                 sbe::makeE<sbe::EFail>(ErrorCodes::Error{4995502},
                                        str::stream() << "$" << exprName.toString()
                                                      << " supports only numeric types"),
@@ -2982,7 +2950,9 @@ private:
     /**
      * Generic logic for building set expressions: setUnion, setIntersection, etc.
      */
-    void generateSetExpression(Expression* expr, const std::string& setFunction) {
+    void generateSetExpression(Expression* expr, SetOperation setOp) {
+        using namespace std::literals;
+
         size_t arity = expr->getChildren().size();
         _context->ensureArity(arity);
         auto frameId = _context->frameIdGenerator->generate();
@@ -3000,6 +2970,30 @@ private:
         argVars.reserve(arity);
         checkExprsNull.reserve(arity);
         checkExprsNotArray.reserve(arity);
+
+        auto collatorSlot = _context->runtimeEnvironment->getSlotIfExists("collator"_sd);
+
+        auto [operatorName, setFunctionName] = [setOp, collatorSlot]() {
+            switch (setOp) {
+                case SetOperation::Difference:
+                    return std::make_pair("setDifference"_sd,
+                                          collatorSlot ? "collSetDifference"sv : "setDifference"sv);
+                case SetOperation::Intersection:
+                    return std::make_pair("setIntersection"_sd,
+                                          collatorSlot ? "collSetIntersection"sv
+                                                       : "setIntersection"sv);
+                case SetOperation::Union:
+                    return std::make_pair("setUnion"_sd,
+                                          collatorSlot ? "collSetUnion"sv : "setUnion"sv);
+                default:
+                    MONGO_UNREACHABLE;
+            }
+        }();
+
+        if (collatorSlot) {
+            argVars.push_back(sbe::makeE<sbe::EVariable>(*collatorSlot));
+        }
+
         for (size_t idx = 0; idx < arity; ++idx) {
             binds.push_back(_context->popExpr());
             argVars.push_back(sbe::makeE<sbe::EVariable>(frameId, idx));
@@ -3012,30 +3006,29 @@ private:
         std::reverse(std::begin(binds), std::end(binds));
 
         using iter_t = std::vector<std::unique_ptr<sbe::EExpression>>::iterator;
-        auto checkNullAnyArgument =
-            std::accumulate(std::move_iterator<iter_t>(checkExprsNull.begin() + 1),
-                            std::move_iterator<iter_t>(checkExprsNull.end()),
-                            std::move(checkExprsNull.front()),
-                            [](auto&& acc, auto&& ex) {
-                                return sbe::makeE<sbe::EPrimBinary>(
-                                    sbe::EPrimBinary::logicOr, std::move(acc), std::move(ex));
-                            });
-        auto checkNotArrayAnyArgument =
-            std::accumulate(std::move_iterator<iter_t>(checkExprsNotArray.begin() + 1),
-                            std::move_iterator<iter_t>(checkExprsNotArray.end()),
-                            std::move(checkExprsNotArray.front()),
-                            [](auto&& acc, auto&& ex) {
-                                return sbe::makeE<sbe::EPrimBinary>(
-                                    sbe::EPrimBinary::logicOr, std::move(acc), std::move(ex));
-                            });
+        auto checkNullAnyArgument = std::accumulate(
+            std::move_iterator<iter_t>(checkExprsNull.begin() + 1),
+            std::move_iterator<iter_t>(checkExprsNull.end()),
+            std::move(checkExprsNull.front()),
+            [](auto&& acc, auto&& ex) {
+                return makeBinaryOp(sbe::EPrimBinary::logicOr, std::move(acc), std::move(ex));
+            });
+        auto checkNotArrayAnyArgument = std::accumulate(
+            std::move_iterator<iter_t>(checkExprsNotArray.begin() + 1),
+            std::move_iterator<iter_t>(checkExprsNotArray.end()),
+            std::move(checkExprsNotArray.front()),
+            [](auto&& acc, auto&& ex) {
+                return makeBinaryOp(sbe::EPrimBinary::logicOr, std::move(acc), std::move(ex));
+            });
         auto setExpr = buildMultiBranchConditional(
             CaseValuePair{std::move(checkNullAnyArgument),
                           sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0)},
             CaseValuePair{std::move(checkNotArrayAnyArgument),
                           sbe::makeE<sbe::EFail>(ErrorCodes::Error{5126900},
-                                                 str::stream() << "All operands of $" << setFunction
-                                                               << " must be arrays.")},
-            sbe::makeE<sbe::EFunction>(setFunction, std::move(argVars)));
+                                                 str::stream()
+                                                     << "All operands of $" << operatorName
+                                                     << " must be arrays.")},
+            sbe::makeE<sbe::EFunction>(setFunctionName, std::move(argVars)));
         _context->pushExpr(
             sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(setExpr)));
     }
@@ -3088,10 +3081,9 @@ private:
         sbe::EVariable resRef(innerFrameId, 0);
 
         auto regexWithErrorCheck = buildMultiBranchConditional(
-            CaseValuePair{sbe::makeE<sbe::EPrimBinary>(
-                              sbe::EPrimBinary::logicOr,
-                              generateNullOrMissing(inputRef),
-                              sbe::makeE<sbe::EFunction>("isNull", sbe::makeEs(regexRef.clone()))),
+            CaseValuePair{makeBinaryOp(sbe::EPrimBinary::logicOr,
+                                       generateNullOrMissing(inputRef),
+                                       makeFunction("isNull", regexRef.clone())),
                           generateRegexNullResponse(exprName)},
             CaseValuePair{generateNonStringCheck(inputRef),
                           sbe::makeE<sbe::EFail>(ErrorCodes::Error{5073401},
@@ -3099,16 +3091,13 @@ private:
                                                                << " expects input of type string")},
 
             CaseValuePair{
-                sbe::makeE<sbe::EPrimUnary>(
-                    sbe::EPrimUnary::logicNot,
-                    sbe::makeE<sbe::EFunction>("exists", sbe::makeEs(regexRef.clone()))),
+                makeNot(makeFunction("exists", regexRef.clone())),
                 sbe::makeE<sbe::EFail>(ErrorCodes::Error{5073402}, "Invalid regular expression")},
             sbe::makeE<sbe::ELocalBind>(
                 innerFrameId,
-                sbe::makeEs(sbe::makeE<sbe::EFunction>(
-                    exprName.toString(), sbe::makeEs(regexRef.clone(), inputRef.clone()))),
+                sbe::makeEs(makeFunction(exprName.toString(), regexRef.clone(), inputRef.clone())),
                 sbe::makeE<sbe::EIf>(
-                    sbe::makeE<sbe::EFunction>("exists", sbe::makeEs(resRef.clone())),
+                    makeFunction("exists", resRef.clone()),
                     resRef.clone(),
                     sbe::makeE<sbe::EFail>(ErrorCodes::Error{5073403},
                                            str::stream()
@@ -3182,14 +3171,13 @@ private:
         }
 
         using iter_t = std::vector<std::unique_ptr<sbe::EExpression>>::iterator;
-        auto checkNullAnyArgument =
-            std::accumulate(std::move_iterator<iter_t>(checkNullArg.begin() + 1),
-                            std::move_iterator<iter_t>(checkNullArg.end()),
-                            std::move(checkNullArg.front()),
-                            [](auto&& acc, auto&& ex) {
-                                return sbe::makeE<sbe::EPrimBinary>(
-                                    sbe::EPrimBinary::logicOr, std::move(acc), std::move(ex));
-                            });
+        auto checkNullAnyArgument = std::accumulate(
+            std::move_iterator<iter_t>(checkNullArg.begin() + 1),
+            std::move_iterator<iter_t>(checkNullArg.end()),
+            std::move(checkNullArg.front()),
+            [](auto&& acc, auto&& ex) {
+                return makeBinaryOp(sbe::EPrimBinary::logicOr, std::move(acc), std::move(ex));
+            });
 
         auto dateAddExpr = buildMultiBranchConditional(
             CaseValuePair{std::move(checkNullAnyArgument),
@@ -3266,39 +3254,41 @@ private:
 }  // namespace
 
 std::unique_ptr<sbe::EExpression> generateCoerceToBoolExpression(sbe::EVariable branchRef) {
-    // Make an expression that compares the value in 'branchRef' to the result of evaluating the
-    // 'valExpr' expression. The comparison uses cmp3w, so that can handle comparisons between
-    // values with different types.
-    auto makeNeqCheck = [&branchRef](std::unique_ptr<sbe::EExpression> valExpr) {
-        return sbe::makeE<sbe::EPrimBinary>(
+    auto makeNotNullOrUndefinedCheck = [&branchRef]() {
+        return makeNot(sbe::makeE<sbe::ETypeMatch>(branchRef.clone(),
+                                                   getBSONTypeMask(BSONType::jstNULL) |
+                                                       getBSONTypeMask(BSONType::Undefined)));
+    };
+
+    auto makeNeqFalseCheck = [&branchRef]() {
+        return makeBinaryOp(
             sbe::EPrimBinary::neq,
-            sbe::makeE<sbe::EPrimBinary>(
-                sbe::EPrimBinary::cmp3w, branchRef.clone(), std::move(valExpr)),
+            makeBinaryOp(sbe::EPrimBinary::cmp3w,
+                         branchRef.clone(),
+                         sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Boolean,
+                                                    sbe::value::bitcastFrom<bool>(false))),
             sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64,
                                        sbe::value::bitcastFrom<int64_t>(0)));
     };
 
-    // If any of these are false, the branch is considered false for the purposes of the
-    // any logical expression.
-    auto checkExists = makeFunction("exists", branchRef.clone());
-    auto checkNotNull = sbe::makeE<sbe::EPrimUnary>(
-        sbe::EPrimUnary::logicNot,
-        sbe::makeE<sbe::ETypeMatch>(branchRef.clone(),
-                                    getBSONTypeMask(BSONType::jstNULL) |
-                                        getBSONTypeMask(BSONType::Undefined)));
-    auto checkNotFalse = makeNeqCheck(sbe::makeE<sbe::EConstant>(
-        sbe::value::TypeTags::Boolean, sbe::value::bitcastFrom<bool>(false)));
-    auto checkNotZero = makeNeqCheck(sbe::makeE<sbe::EConstant>(
-        sbe::value::TypeTags::NumberInt64, sbe::value::bitcastFrom<int64_t>(0)));
+    auto makeNeqZeroCheck = [&branchRef]() {
+        return makeBinaryOp(
+            sbe::EPrimBinary::neq,
+            makeBinaryOp(sbe::EPrimBinary::cmp3w,
+                         branchRef.clone(),
+                         sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64,
+                                                    sbe::value::bitcastFrom<int64_t>(0))),
+            sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64,
+                                       sbe::value::bitcastFrom<int64_t>(0)));
+    };
 
-    return sbe::makeE<sbe::EPrimBinary>(
+    return makeBinaryOp(
         sbe::EPrimBinary::logicAnd,
-        std::move(checkExists),
-        sbe::makeE<sbe::EPrimBinary>(sbe::EPrimBinary::logicAnd,
-                                     std::move(checkNotNull),
-                                     sbe::makeE<sbe::EPrimBinary>(sbe::EPrimBinary::logicAnd,
-                                                                  std::move(checkNotFalse),
-                                                                  std::move(checkNotZero))));
+        makeFunction("exists", branchRef.clone()),
+        makeBinaryOp(
+            sbe::EPrimBinary::logicAnd,
+            makeNotNullOrUndefinedCheck(),
+            makeBinaryOp(sbe::EPrimBinary::logicAnd, makeNeqFalseCheck(), makeNeqZeroCheck())));
 }
 
 std::tuple<sbe::value::SlotId, std::unique_ptr<sbe::EExpression>, std::unique_ptr<sbe::PlanStage>>

@@ -20,6 +20,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/query/collation/collator_interface',
         '$BUILD_DIR/mongo/db/query/datetime/date_time_support',
         '$BUILD_DIR/mongo/db/storage/key_string',
         '$BUILD_DIR/mongo/util/regex_util',
@@ -137,6 +138,7 @@ env.CppUnitTest(
         'expressions/sbe_trunc_builtin_test.cpp',
         'parser/sbe_parser_test.cpp',
         'sbe_filter_test.cpp',
+        'sbe_hash_agg_test.cpp',
         'sbe_key_string_test.cpp',
         'sbe_limit_skip_test.cpp',
         'sbe_math_builtins_test.cpp',
@@ -151,6 +153,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
         '$BUILD_DIR/mongo/db/service_context_test_fixture',
         'query_sbe_parser',
         'sbe_plan_stage_test',

@@ -51,6 +51,7 @@
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/sbe_stage_builder.h"
+#include "mongo/db/query/sbe_stage_builder_helpers.h"
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/str.h"
@@ -603,10 +604,7 @@ generateGenericMultiIntervalIndexScan(const CollectionPtr& collection,
         std::move(unionStage),
         spoolId,
         makeSlotVector(resultSlot, std::move(indexKeySlots)),
-        sbe::makeE<sbe::EPrimUnary>(
-            sbe::EPrimUnary::logicNot,
-            sbe::makeE<sbe::EFunction>("isRecordId"sv,
-                                       sbe::makeEs(sbe::makeE<sbe::EVariable>(resultSlot)))),
+        makeNot(makeFunction("isRecordId"sv, sbe::makeE<sbe::EVariable>(resultSlot))),
         ixn->nodeId());
 
     // Finally, add a filter stage on top to filter out seek keys and return only recordIds.

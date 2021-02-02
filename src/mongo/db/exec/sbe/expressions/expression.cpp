@@ -116,117 +116,121 @@ std::vector<DebugPrinter::Block> EVariable::debugPrint() const {
 }
 
 std::unique_ptr<EExpression> EPrimBinary::clone() const {
-    return std::make_unique<EPrimBinary>(_op, _nodes[0]->clone(), _nodes[1]->clone());
+    if (_nodes.size() == 2) {
+        return std::make_unique<EPrimBinary>(_op, _nodes[0]->clone(), _nodes[1]->clone());
+    } else {
+        invariant(_nodes.size() == 3);
+        return std::make_unique<EPrimBinary>(
+            _op, _nodes[0]->clone(), _nodes[1]->clone(), _nodes[2]->clone());
+    }
 }
 
 std::unique_ptr<vm::CodeFragment> EPrimBinary::compile(CompileCtx& ctx) const {
+    const bool hasCollatorArg = (_nodes.size() == 3);
     auto code = std::make_unique<vm::CodeFragment>();
+
+    invariant(!hasCollatorArg || isComparisonOp(_op));
 
     auto lhs = _nodes[0]->compile(ctx);
     auto rhs = _nodes[1]->compile(ctx);
 
+    if (_op == EPrimBinary::logicAnd) {
+        auto codeFalseBranch = std::make_unique<vm::CodeFragment>();
+        codeFalseBranch->appendConstVal(value::TypeTags::Boolean, value::bitcastFrom<bool>(false));
+
+        // Jump to the merge point that will be right after the thenBranch (rhs).
+        codeFalseBranch->appendJump(rhs->instrs().size());
+
+        code->append(std::move(lhs));
+        code = wrapNothingTest(std::move(code), [&](std::unique_ptr<vm::CodeFragment> code) {
+            code->appendJumpTrue(codeFalseBranch->instrs().size());
+            code->append(std::move(codeFalseBranch), std::move(rhs));
+
+            return code;
+        });
+
+        return code;
+    } else if (_op == EPrimBinary::logicOr) {
+        auto codeTrueBranch = std::make_unique<vm::CodeFragment>();
+        codeTrueBranch->appendConstVal(value::TypeTags::Boolean, value::bitcastFrom<bool>(true));
+
+        // Jump to the merge point that will be right after the thenBranch (true branch).
+        rhs->appendJump(codeTrueBranch->instrs().size());
+
+        code->append(std::move(lhs));
+        code = wrapNothingTest(std::move(code), [&](std::unique_ptr<vm::CodeFragment> code) {
+            code->appendJumpTrue(rhs->instrs().size());
+            code->append(std::move(rhs), std::move(codeTrueBranch));
+
+            return code;
+        });
+
+        return code;
+    }
+
+    if (hasCollatorArg) {
+        auto collator = _nodes[2]->compile(ctx);
+        code->append(std::move(collator));
+    }
+
+    code->append(std::move(lhs));
+    code->append(std::move(rhs));
+
     switch (_op) {
         case EPrimBinary::add:
-            code->append(std::move(lhs));
-            code->append(std::move(rhs));
             code->appendAdd();
             break;
         case EPrimBinary::sub:
-            code->append(std::move(lhs));
-            code->append(std::move(rhs));
             code->appendSub();
             break;
         case EPrimBinary::mul:
-            code->append(std::move(lhs));
-            code->append(std::move(rhs));
             code->appendMul();
             break;
         case EPrimBinary::div:
-            code->append(std::move(lhs));
-            code->append(std::move(rhs));
             code->appendDiv();
             break;
         case EPrimBinary::less:
-            code->append(std::move(lhs));
-            code->append(std::move(rhs));
-            code->appendLess();
+            hasCollatorArg ? code->appendCollLess() : code->appendLess();
             break;
         case EPrimBinary::lessEq:
-            code->append(std::move(lhs));
-            code->append(std::move(rhs));
-            code->appendLessEq();
+            hasCollatorArg ? code->appendCollLessEq() : code->appendLessEq();
             break;
         case EPrimBinary::greater:
-            code->append(std::move(lhs));
-            code->append(std::move(rhs));
-            code->appendGreater();
+            hasCollatorArg ? code->appendCollGreater() : code->appendGreater();
             break;
         case EPrimBinary::greaterEq:
-            code->append(std::move(lhs));
-            code->append(std::move(rhs));
-            code->appendGreaterEq();
+            hasCollatorArg ? code->appendCollGreaterEq() : code->appendGreaterEq();
             break;
         case EPrimBinary::eq:
-            code->append(std::move(lhs));
-            code->append(std::move(rhs));
-            code->appendEq();
+            hasCollatorArg ? code->appendCollEq() : code->appendEq();
             break;
         case EPrimBinary::neq:
-            code->append(std::move(lhs));
-            code->append(std::move(rhs));
-            code->appendNeq();
+            hasCollatorArg ? code->appendCollNeq() : code->appendNeq();
             break;
         case EPrimBinary::cmp3w:
-            code->append(std::move(lhs));
-            code->append(std::move(rhs));
-            code->appendCmp3w();
+            hasCollatorArg ? code->appendCollCmp3w() : code->appendCmp3w();
             break;
-        case EPrimBinary::logicAnd: {
-            auto codeFalseBranch = std::make_unique<vm::CodeFragment>();
-            codeFalseBranch->appendConstVal(value::TypeTags::Boolean,
-                                            value::bitcastFrom<bool>(false));
-            // Jump to the merge point that will be right after the thenBranch (rhs).
-            codeFalseBranch->appendJump(rhs->instrs().size());
-
-            code->append(std::move(lhs));
-            code = wrapNothingTest(std::move(code), [&](std::unique_ptr<vm::CodeFragment> code) {
-                code->appendJumpTrue(codeFalseBranch->instrs().size());
-                code->append(std::move(codeFalseBranch), std::move(rhs));
-
-                return code;
-            });
-            break;
-        }
-        case EPrimBinary::logicOr: {
-            auto codeTrueBranch = std::make_unique<vm::CodeFragment>();
-            codeTrueBranch->appendConstVal(value::TypeTags::Boolean,
-                                           value::bitcastFrom<bool>(true));
-
-            // Jump to the merge point that will be right after the thenBranch (true branch).
-            rhs->appendJump(codeTrueBranch->instrs().size());
-
-            code->append(std::move(lhs));
-            code = wrapNothingTest(std::move(code), [&](std::unique_ptr<vm::CodeFragment> code) {
-                code->appendJumpTrue(rhs->instrs().size());
-                code->append(std::move(rhs), std::move(codeTrueBranch));
-
-                return code;
-            });
-            break;
-        }
         default:
             MONGO_UNREACHABLE;
-            break;
     }
     return code;
 }
 
 std::vector<DebugPrinter::Block> EPrimBinary::debugPrint() const {
+    bool hasCollatorArg = (_nodes.size() == 3);
     std::vector<DebugPrinter::Block> ret;
+
+    invariant(!hasCollatorArg || isComparisonOp(_op));
 
     DebugPrinter::addBlocks(ret, _nodes[0]->debugPrint());
 
     switch (_op) {
+        case EPrimBinary::logicAnd:
+            ret.emplace_back("&&");
+            break;
+        case EPrimBinary::logicOr:
+            ret.emplace_back("||");
+            break;
         case EPrimBinary::add:
             ret.emplace_back("+");
             break;
@@ -260,16 +264,16 @@ std::vector<DebugPrinter::Block> EPrimBinary::debugPrint() const {
         case EPrimBinary::cmp3w:
             ret.emplace_back("<=>");
             break;
-        case EPrimBinary::logicAnd:
-            ret.emplace_back("&&");
-            break;
-        case EPrimBinary::logicOr:
-            ret.emplace_back("||");
-            break;
         default:
             MONGO_UNREACHABLE;
-            break;
     }
+
+    if (hasCollatorArg) {
+        ret.emplace_back("`[`");
+        DebugPrinter::addBlocks(ret, _nodes[2]->debugPrint());
+        ret.emplace_back("`]");
+    }
+
     DebugPrinter::addBlocks(ret, _nodes[1]->debugPrint());
 
     return ret;
@@ -295,7 +299,6 @@ std::unique_ptr<vm::CodeFragment> EPrimUnary::compile(CompileCtx& ctx) const {
             break;
         default:
             MONGO_UNREACHABLE;
-            break;
     }
     return code;
 }
@@ -312,7 +315,6 @@ std::vector<DebugPrinter::Block> EPrimUnary::debugPrint() const {
             break;
         default:
             MONGO_UNREACHABLE;
-            break;
     }
 
     DebugPrinter::addBlocks(ret, _nodes[0]->debugPrint());
@@ -363,6 +365,7 @@ static stdx::unordered_map<std::string, BuiltinFn> kBuiltinFunctions = {
     {"regexMatch", BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::regexMatch, false}},
     {"replaceOne", BuiltinFn{[](size_t n) { return n == 3; }, vm::Builtin::replaceOne, false}},
     {"dropFields", BuiltinFn{[](size_t n) { return n > 0; }, vm::Builtin::dropFields, false}},
+    {"newArray", BuiltinFn{[](size_t n) { return n >= 0; }, vm::Builtin::newArray, false}},
     {"newObj", BuiltinFn{[](size_t n) { return n % 2 == 0; }, vm::Builtin::newObj, false}},
     {"ksToString", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::ksToString, false}},
     {"ks", BuiltinFn{[](size_t n) { return n > 2; }, vm::Builtin::newKs, false}},
@@ -376,6 +379,7 @@ static stdx::unordered_map<std::string, BuiltinFn> kBuiltinFunctions = {
     {"sqrt", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::sqrt, false}},
     {"addToArray", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::addToArray, true}},
     {"addToSet", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::addToSet, true}},
+    {"collAddToSet", BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::collAddToSet, true}},
     {"doubleDoubleSum",
      BuiltinFn{[](size_t n) { return n > 0; }, vm::Builtin::doubleDoubleSum, false}},
     {"bitTestZero", BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::bitTestZero, false}},
@@ -406,17 +410,23 @@ static stdx::unordered_map<std::string, BuiltinFn> kBuiltinFunctions = {
     {"tanh", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::tanh, false}},
     {"concat", BuiltinFn{[](size_t n) { return n > 0; }, vm::Builtin::concat, false}},
     {"isMember", BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::isMember, false}},
+    {"collIsMember", BuiltinFn{[](size_t n) { return n == 3; }, vm::Builtin::collIsMember, false}},
     {"indexOfBytes",
      BuiltinFn{[](size_t n) { return n == 3 || n == 4; }, vm::Builtin::indexOfBytes, false}},
     {"indexOfCP",
      BuiltinFn{[](size_t n) { return n == 3 || n == 4; }, vm::Builtin::indexOfCP, false}},
     {"isTimeUnit", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::isTimeUnit, false}},
     {"isTimezone", BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::isTimezone, false}},
-    {"setUnion", BuiltinFn{[](size_t n) { return n > 0; }, vm::Builtin::setUnion, false}},
+    {"setUnion", BuiltinFn{[](size_t n) { return n >= 0; }, vm::Builtin::setUnion, false}},
     {"setIntersection",
-     BuiltinFn{[](size_t n) { return n > 0; }, vm::Builtin::setIntersection, false}},
+     BuiltinFn{[](size_t n) { return n >= 0; }, vm::Builtin::setIntersection, false}},
     {"setDifference",
      BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::setDifference, false}},
+    {"collSetUnion", BuiltinFn{[](size_t n) { return n >= 1; }, vm::Builtin::collSetUnion, false}},
+    {"collSetIntersection",
+     BuiltinFn{[](size_t n) { return n >= 1; }, vm::Builtin::collSetIntersection, false}},
+    {"collSetDifference",
+     BuiltinFn{[](size_t n) { return n == 3; }, vm::Builtin::collSetDifference, false}},
     {"runJsPredicate",
      BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::runJsPredicate, false}},
     {"regexCompile", BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::regexCompile, false}},
@@ -451,6 +461,8 @@ static stdx::unordered_map<std::string, InstrFn> kInstrFunctions = {
      InstrFn{[](size_t n) { return n == 2; }, &vm::CodeFragment::appendGetField, false}},
     {"getElement",
      InstrFn{[](size_t n) { return n == 2; }, &vm::CodeFragment::appendGetElement, false}},
+    {"collComparisonKey",
+     InstrFn{[](size_t n) { return n == 2; }, &vm::CodeFragment::appendCollComparisonKey, false}},
     {"fillEmpty",
      InstrFn{[](size_t n) { return n == 2; }, &vm::CodeFragment::appendFillEmpty, false}},
     {"exists", InstrFn{[](size_t n) { return n == 1; }, &vm::CodeFragment::appendExists, false}},
@@ -477,6 +489,8 @@ static stdx::unordered_map<std::string, InstrFn> kInstrFunctions = {
     {"max", InstrFn{[](size_t n) { return n == 1; }, &vm::CodeFragment::appendMax, true}},
     {"first", InstrFn{[](size_t n) { return n == 1; }, &vm::CodeFragment::appendFirst, true}},
     {"last", InstrFn{[](size_t n) { return n == 1; }, &vm::CodeFragment::appendLast, true}},
+    {"collMin", InstrFn{[](size_t n) { return n == 2; }, &vm::CodeFragment::appendCollMin, true}},
+    {"collMax", InstrFn{[](size_t n) { return n == 2; }, &vm::CodeFragment::appendCollMax, true}},
     {"mod", InstrFn{[](size_t n) { return n == 2; }, &vm::CodeFragment::appendMod, false}},
 };
 }  // namespace
@@ -546,7 +560,7 @@ std::vector<DebugPrinter::Block> EFunction::debugPrint() const {
     ret.emplace_back("(`");
     for (size_t idx = 0; idx < _nodes.size(); ++idx) {
         if (idx) {
-            ret.emplace_back(DebugPrinter::Block("`,"));
+            ret.emplace_back("`,");
         }
 
         DebugPrinter::addBlocks(ret, _nodes[idx]->debugPrint());
@@ -594,10 +608,10 @@ std::vector<DebugPrinter::Block> EIf::debugPrint() const {
 
     // Print the condition.
     DebugPrinter::addBlocks(ret, _nodes[0]->debugPrint());
-    ret.emplace_back(DebugPrinter::Block("`,"));
+    ret.emplace_back("`,");
     // Print thenBranch.
     DebugPrinter::addBlocks(ret, _nodes[1]->debugPrint());
-    ret.emplace_back(DebugPrinter::Block("`,"));
+    ret.emplace_back("`,");
     // Print elseBranch.
     DebugPrinter::addBlocks(ret, _nodes[2]->debugPrint());
 
@@ -646,7 +660,7 @@ std::vector<DebugPrinter::Block> ELocalBind::debugPrint() const {
     ret.emplace_back("[`");
     for (size_t idx = 0; idx < _nodes.size() - 1; ++idx) {
         if (idx != 0) {
-            ret.emplace_back(DebugPrinter::Block("`,"));
+            ret.emplace_back("`,");
         }
 
         DebugPrinter::addIdentifier(ret, _frameId, idx);
@@ -715,7 +729,7 @@ std::vector<DebugPrinter::Block> ENumericConvert::debugPrint() const {
 
     DebugPrinter::addBlocks(ret, _nodes[0]->debugPrint());
 
-    ret.emplace_back(DebugPrinter::Block("`,"));
+    ret.emplace_back("`,");
 
     switch (_target) {
         case value::TypeTags::NumberInt32:
@@ -732,7 +746,6 @@ std::vector<DebugPrinter::Block> ENumericConvert::debugPrint() const {
             break;
         default:
             MONGO_UNREACHABLE;
-            break;
     }
 
     ret.emplace_back("`)");
@@ -761,7 +774,7 @@ std::vector<DebugPrinter::Block> ETypeMatch::debugPrint() const {
     ret.emplace_back("(`");
 
     DebugPrinter::addBlocks(ret, _nodes[0]->debugPrint());
-    ret.emplace_back(DebugPrinter::Block("`,"));
+    ret.emplace_back("`,");
     std::stringstream ss;
     ss << "0x" << std::setfill('0') << std::uppercase << std::setw(8) << std::hex << _typeMask;
     ret.emplace_back(ss.str());
@@ -773,7 +786,7 @@ std::vector<DebugPrinter::Block> ETypeMatch::debugPrint() const {
 
 RuntimeEnvironment::RuntimeEnvironment(const RuntimeEnvironment& other)
     : _state{other._state}, _isSmp{other._isSmp} {
-    for (auto&& [type, slot] : _state->slots) {
+    for (auto&& [name, slot] : _state->slots) {
         emplaceAccessor(slot.first, slot.second);
     }
 }
@@ -788,28 +801,36 @@ RuntimeEnvironment::~RuntimeEnvironment() {
     }
 }
 
-value::SlotId RuntimeEnvironment::registerSlot(StringData type,
+value::SlotId RuntimeEnvironment::registerSlot(StringData name,
                                                value::TypeTags tag,
                                                value::Value val,
                                                bool owned,
                                                value::SlotIdGenerator* slotIdGenerator) {
-    if (auto it = _state->slots.find(type); it == _state->slots.end()) {
+    if (auto it = _state->slots.find(name); it == _state->slots.end()) {
         invariant(slotIdGenerator);
         auto slot = slotIdGenerator->generate();
-        emplaceAccessor(slot, _state->pushSlot(type, slot));
+        emplaceAccessor(slot, _state->pushSlot(name, slot));
         _accessors.at(slot).reset(owned, tag, val);
         return slot;
     }
 
-    uasserted(4946303, str::stream() << "slot already registered:" << type);
+    uasserted(4946303, str::stream() << "slot already registered:" << name);
 }
 
-value::SlotId RuntimeEnvironment::getSlot(StringData type) {
-    if (auto it = _state->slots.find(type); it != _state->slots.end()) {
+value::SlotId RuntimeEnvironment::getSlot(StringData name) {
+    if (auto it = _state->slots.find(name); it != _state->slots.end()) {
         return it->second.first;
     }
 
-    uasserted(4946305, str::stream() << "environment slot is not registered for type: " << type);
+    uasserted(4946305, str::stream() << "environment slot is not registered: " << name);
+}
+
+boost::optional<value::SlotId> RuntimeEnvironment::getSlotIfExists(StringData name) {
+    if (auto it = _state->slots.find(name); it != _state->slots.end()) {
+        return it->second.first;
+    }
+
+    return boost::none;
 }
 
 void RuntimeEnvironment::resetSlot(value::SlotId slot,
@@ -846,11 +867,24 @@ std::unique_ptr<RuntimeEnvironment> RuntimeEnvironment::makeCopy(bool isSmp) {
 }
 
 void RuntimeEnvironment::debugString(StringBuilder* builder) {
+    using namespace std::literals;
+
     *builder << "env: { ";
-    for (auto&& [type, slot] : _state->slots) {
-        *builder << type << "=s" << slot.first << " ";
+    bool first = true;
+    for (auto&& [name, slot] : _state->slots) {
+        if (first) {
+            first = false;
+        } else {
+            *builder << ", ";
+        }
+
+        *builder << name << " = s" << slot.first;
+
+        std::stringstream ss;
+        ss << std::make_pair(_state->typeTags[slot.second], _state->vals[slot.second]);
+        *builder << " (" << ss.str() << ")";
     }
-    *builder << "}";
+    *builder << " }";
 }
 
 value::SlotAccessor* CompileCtx::getAccessor(value::SlotId slot) {

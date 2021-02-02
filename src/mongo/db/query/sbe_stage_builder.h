@@ -44,7 +44,9 @@ namespace mongo::stage_builder {
  * new environment.
  */
 std::unique_ptr<sbe::RuntimeEnvironment> makeRuntimeEnvironment(
-    OperationContext* opCtx, sbe::value::SlotIdGenerator* slotIdGenerator);
+    const CanonicalQuery& cq,
+    OperationContext* opCtx,
+    sbe::value::SlotIdGenerator* slotIdGenerator);
 
 class PlanStageReqs;
 

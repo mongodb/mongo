@@ -58,8 +58,10 @@ public:
     std::vector<DebugPrinter::Block> debugPrint() const final;
 
 private:
-    using TableType = stdx::
-        unordered_map<value::MaterializedRow, value::MaterializedRow, value::MaterializedRowHasher>;
+    using TableType = stdx::unordered_map<value::MaterializedRow,
+                                          value::MaterializedRow,
+                                          value::MaterializedRowHasher,
+                                          value::MaterializedRowEq>;
 
     using HashKeyAccessor = value::MaterializedRowKeyAccessor<TableType::iterator>;
     using HashAggAccessor = value::MaterializedRowValueAccessor<TableType::iterator>;
@@ -74,6 +76,7 @@ private:
     std::vector<std::unique_ptr<HashAggAccessor>> _outAggAccessors;
     std::vector<std::unique_ptr<vm::CodeFragment>> _aggCodes;
 
+    // TODO SERVER-54025: Update HashAggStage so that group-bys are collation-aware.
     TableType _ht;
     TableType::iterator _htIt;
 

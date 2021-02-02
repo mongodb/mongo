@@ -440,20 +440,6 @@ public:
         }
     }
 
-    bool operator==(const MaterializedRow& rhs) const {
-        for (size_t idx = 0; idx < size(); ++idx) {
-            auto [lhsTag, lhsVal] = getViewOfValue(idx);
-            auto [rhsTag, rhsVal] = rhs.getViewOfValue(idx);
-            auto [tag, val] = compareValue(lhsTag, lhsVal, rhsTag, rhsVal);
-
-            if (tag != value::TypeTags::NumberInt32 || value::bitcastTo<int32_t>(val) != 0) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
     // The following methods are used by the sorter only.
     struct SorterDeserializeSettings {};
     static MaterializedRow deserializeForSorter(BufReader& buf, const SorterDeserializeSettings&);
@@ -521,35 +507,20 @@ private:
     size_t _count{0};
 };
 
-
-struct MaterializedRowComparator {
-    MaterializedRowComparator(const std::vector<value::SortDirection>& direction)
-        : _direction(direction) {}
-
+struct MaterializedRowEq {
     bool operator()(const MaterializedRow& lhs, const MaterializedRow& rhs) const {
         for (size_t idx = 0; idx < lhs.size(); ++idx) {
             auto [lhsTag, lhsVal] = lhs.getViewOfValue(idx);
             auto [rhsTag, rhsVal] = rhs.getViewOfValue(idx);
             auto [tag, val] = compareValue(lhsTag, lhsVal, rhsTag, rhsVal);
-            if (tag != TypeTags::NumberInt32) {
-                return false;
-            }
-            if (bitcastTo<int32_t>(val) < 0 && _direction[idx] == SortDirection::Ascending) {
-                return true;
-            }
-            if (bitcastTo<int32_t>(val) > 0 && _direction[idx] == SortDirection::Descending) {
-                return true;
-            }
-            if (bitcastTo<int32_t>(val) != 0) {
+
+            if (tag != value::TypeTags::NumberInt32 || value::bitcastTo<int32_t>(val) != 0) {
                 return false;
             }
         }
 
-        return false;
+        return true;
     }
-
-    const std::vector<SortDirection>& _direction;
-    // TODO - add collator and whatnot.
 };
 
 struct MaterializedRowHasher {

@@ -43,6 +43,7 @@
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/vm/datetime.h"
+#include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/logv2/log.h"
@@ -87,16 +88,27 @@ int Instruction::stackOffset[Instruction::Tags::lastInstruction] = {
     -1,  // neq
     -1,  // cmp3w
 
-    -1,  // fillEmpty
+    -2,  // collLess
+    -2,  // collLessEq
+    -2,  // collGreater
+    -2,  // collGreaterEq
+    -2,  // collEq
+    -2,  // collNeq
+    -2,  // collCmp3w
 
+    -1,  // fillEmpty
     -1,  // getField
     -1,  // getElement
+    -1,  // collComparisonKey
 
-    -1,  // sum
-    -1,  // min
-    -1,  // max
-    -1,  // first
-    -1,  // last
+    -1,  // aggSum
+    -1,  // aggMin
+    -1,  // aggMax
+    -1,  // aggFirst
+    -1,  // aggLast
+
+    -1,  // aggCollMin
+    -1,  // aggCollMax
 
     0,  // exists
     0,  // isNull
@@ -281,6 +293,10 @@ void CodeFragment::appendGetElement() {
     appendSimpleInstruction(Instruction::getElement);
 }
 
+void CodeFragment::appendCollComparisonKey() {
+    appendSimpleInstruction(Instruction::collComparisonKey);
+}
+
 void CodeFragment::appendSum() {
     appendSimpleInstruction(Instruction::aggSum);
 }
@@ -299,6 +315,14 @@ void CodeFragment::appendFirst() {
 
 void CodeFragment::appendLast() {
     appendSimpleInstruction(Instruction::aggLast);
+}
+
+void CodeFragment::appendCollMin() {
+    appendSimpleInstruction(Instruction::aggCollMin);
+}
+
+void CodeFragment::appendCollMax() {
+    appendSimpleInstruction(Instruction::aggCollMax);
 }
 
 void CodeFragment::appendExists() {
@@ -581,6 +605,39 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::aggMin(value::TypeTags
     }
 
     auto [tag, val] = genericCompare<std::less<>>(accTag, accValue, fieldTag, fieldValue);
+
+    if (tag == value::TypeTags::Boolean && value::bitcastTo<bool>(val)) {
+        auto [tag, val] = value::copyValue(accTag, accValue);
+        return {true, tag, val};
+    } else {
+        auto [tag, val] = value::copyValue(fieldTag, fieldValue);
+        return {true, tag, val};
+    }
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::aggCollMin(value::TypeTags accTag,
+                                                                     value::Value accValue,
+                                                                     value::TypeTags collTag,
+                                                                     value::Value collValue,
+                                                                     value::TypeTags fieldTag,
+                                                                     value::Value fieldValue) {
+    // Skip aggregation step if we don't have the input or if the collation is Nothing or an
+    // unexpected type.
+    if (fieldTag == value::TypeTags::Nothing || collTag != value::TypeTags::collator) {
+        auto [tag, val] = value::copyValue(accTag, accValue);
+        return {true, tag, val};
+    }
+
+    // Initialize the accumulator.
+    if (accTag == value::TypeTags::Nothing) {
+        auto [tag, val] = value::copyValue(fieldTag, fieldValue);
+        return {true, tag, val};
+    }
+
+    auto collator = value::getCollatorView(collValue);
+
+    auto [tag, val] = genericCompare<std::less<>>(accTag, accValue, fieldTag, fieldValue, collator);
+
     if (tag == value::TypeTags::Boolean && value::bitcastTo<bool>(val)) {
         auto [tag, val] = value::copyValue(accTag, accValue);
         return {true, tag, val};
@@ -607,6 +664,40 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::aggMax(value::TypeTags
     }
 
     auto [tag, val] = genericCompare<std::greater<>>(accTag, accValue, fieldTag, fieldValue);
+
+    if (tag == value::TypeTags::Boolean && value::bitcastTo<bool>(val)) {
+        auto [tag, val] = value::copyValue(accTag, accValue);
+        return {true, tag, val};
+    } else {
+        auto [tag, val] = value::copyValue(fieldTag, fieldValue);
+        return {true, tag, val};
+    }
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::aggCollMax(value::TypeTags accTag,
+                                                                     value::Value accValue,
+                                                                     value::TypeTags collTag,
+                                                                     value::Value collValue,
+                                                                     value::TypeTags fieldTag,
+                                                                     value::Value fieldValue) {
+    // Skip aggregation step if we don't have the input or if the collation is Nothing or an
+    // unexpected type.
+    if (fieldTag == value::TypeTags::Nothing || collTag != value::TypeTags::collator) {
+        auto [tag, val] = value::copyValue(accTag, accValue);
+        return {true, tag, val};
+    }
+
+    // Initialize the accumulator.
+    if (accTag == value::TypeTags::Nothing) {
+        auto [tag, val] = value::copyValue(fieldTag, fieldValue);
+        return {true, tag, val};
+    }
+
+    auto collator = value::getCollatorView(collValue);
+
+    auto [tag, val] =
+        genericCompare<std::greater<>>(accTag, accValue, fieldTag, fieldValue, collator);
+
     if (tag == value::TypeTags::Boolean && value::bitcastTo<bool>(val)) {
         auto [tag, val] = value::copyValue(accTag, accValue);
         return {true, tag, val};
@@ -753,6 +844,22 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinDropFields(Arit
                 obj->push_back(sv, copyTag, copyVal);
             }
         }
+    }
+
+    guard.reset();
+    return {true, tag, val};
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinNewArray(ArityType arity) {
+    auto [tag, val] = value::makeNewArray();
+    value::ValueGuard guard{tag, val};
+
+    auto arr = value::getArrayView(val);
+
+    for (ArityType idx = 0; idx < arity; ++idx) {
+        auto [owned, tag, val] = getFromStack(idx);
+        auto [tagCopy, valCopy] = value::copyValue(tag, val);
+        arr->push_back(tagCopy, valCopy);
     }
 
     guard.reset();
@@ -932,10 +1039,8 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinAddToArray(Arit
 
     // Create a new array is it does not exist yet.
     if (tagAgg == value::TypeTags::Nothing) {
-        auto [tagNewAgg, valNewAgg] = value::makeNewArray();
         ownAgg = true;
-        tagAgg = tagNewAgg;
-        valAgg = valNewAgg;
+        std::tie(tagAgg, valAgg) = value::makeNewArray();
     } else {
         // Take ownership of the accumulator.
         topStack(false, value::TypeTags::Nothing, 0);
@@ -945,7 +1050,7 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinAddToArray(Arit
     invariant(ownAgg && tagAgg == value::TypeTags::Array);
     auto arr = value::getArrayView(valAgg);
 
-    // And push back the value. Note that array will ignore Nothing.
+    // Push back the value. Note that array will ignore Nothing.
     auto [tagCopy, valCopy] = value::copyValue(tagField, valField);
     arr->push_back(tagCopy, valCopy);
 
@@ -959,12 +1064,10 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinAddToSet(ArityT
 
     // Create a new array is it does not exist yet.
     if (tagAgg == value::TypeTags::Nothing) {
-        auto [tagNewAgg, valNewAgg] = value::makeNewArraySet();
         ownAgg = true;
-        tagAgg = tagNewAgg;
-        valAgg = valNewAgg;
+        std::tie(tagAgg, valAgg) = value::makeNewArraySet();
     } else {
-        // Take ownership of the accumulator
+        // Take ownership of the accumulator.
         topStack(false, value::TypeTags::Nothing, 0);
     }
     value::ValueGuard guard{tagAgg, valAgg};
@@ -972,7 +1075,40 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinAddToSet(ArityT
     invariant(ownAgg && tagAgg == value::TypeTags::ArraySet);
     auto arr = value::getArraySetView(valAgg);
 
-    // And push back the value. Note that array will ignore Nothing.
+    // Push back the value. Note that array will ignore Nothing.
+    auto [tagCopy, valCopy] = value::copyValue(tagField, valField);
+    arr->push_back(tagCopy, valCopy);
+
+    guard.reset();
+    return {ownAgg, tagAgg, valAgg};
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinCollAddToSet(ArityType arity) {
+    auto [ownAgg, tagAgg, valAgg] = getFromStack(0);
+    auto [ownColl, tagColl, valColl] = getFromStack(1);
+    auto [_, tagField, valField] = getFromStack(2);
+
+    // If the collator is Nothing or if it's some unexpected type, don't push back the value
+    // and just return the accumulator.
+    if (tagColl != value::TypeTags::collator) {
+        topStack(false, value::TypeTags::Nothing, 0);
+        return {ownAgg, tagAgg, valAgg};
+    }
+
+    // Create a new array is it does not exist yet.
+    if (tagAgg == value::TypeTags::Nothing) {
+        ownAgg = true;
+        std::tie(tagAgg, valAgg) = value::makeNewArraySet(value::getCollatorView(valColl));
+    } else {
+        // Take ownership of the accumulator.
+        topStack(false, value::TypeTags::Nothing, 0);
+    }
+    value::ValueGuard guard{tagAgg, valAgg};
+
+    invariant(ownAgg && tagAgg == value::TypeTags::ArraySet);
+    auto arr = value::getArraySetView(valAgg);
+
+    // Push back the value. Note that array will ignore Nothing.
     auto [tagCopy, valCopy] = value::copyValue(tagField, valField);
     arr->push_back(tagCopy, valCopy);
 
@@ -1052,7 +1188,7 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinReplaceOne(Arit
 }
 
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinDoubleDoubleSum(ArityType arity) {
-    invariant(arity > 0);
+    invariant(arity >= 1);
 
     value::TypeTags resultTag = value::TypeTags::NumberInt32;
     bool haveDate = false;
@@ -1716,45 +1852,71 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinConcat(ArityTyp
 }
 
 std::pair<value::TypeTags, value::Value> ByteCode::genericIsMember(value::TypeTags lhsTag,
-                                                                   value::Value lhsValue,
+                                                                   value::Value lhsVal,
                                                                    value::TypeTags rhsTag,
-                                                                   value::Value rhsValue) {
-    if (value::isArray(rhsTag)) {
-        switch (rhsTag) {
-            case value::TypeTags::ArraySet: {
-                auto arrSet = value::getArraySetView(rhsValue);
-                auto& values = arrSet->values();
-                return {value::TypeTags::Boolean,
-                        value::bitcastFrom<bool>(values.find({lhsTag, lhsValue}) != values.end())};
-            }
-            case value::TypeTags::Array:
-            case value::TypeTags::bsonArray: {
-                auto rhsArr = value::ArrayEnumerator{rhsTag, rhsValue};
-                while (!rhsArr.atEnd()) {
-                    auto [rhsTag, rhsVal] = rhsArr.getViewOfValue();
-                    auto [tag, val] = value::compareValue(lhsTag, lhsValue, rhsTag, rhsVal);
-                    if (tag == value::TypeTags::NumberInt32 &&
-                        value::bitcastTo<int32_t>(val) == 0) {
-                        return {value::TypeTags::Boolean, value::bitcastFrom<bool>(true)};
-                    }
-                    rhsArr.advance();
-                }
-                return {value::TypeTags::Boolean, value::bitcastFrom<bool>(false)};
-            }
-            default:
-                MONGO_UNREACHABLE;
+                                                                   value::Value rhsVal,
+                                                                   CollatorInterface* collator) {
+    if (!value::isArray(rhsTag)) {
+        return {value::TypeTags::Nothing, 0};
+    }
+
+    if (rhsTag == value::TypeTags::ArraySet) {
+        auto arrSet = value::getArraySetView(rhsVal);
+
+        if (CollatorInterface::collatorsMatch(collator, arrSet->getCollator())) {
+            auto& values = arrSet->values();
+            return {value::TypeTags::Boolean,
+                    value::bitcastFrom<bool>(values.find({lhsTag, lhsVal}) != values.end())};
         }
     }
-    return {value::TypeTags::Nothing, 0};
+
+    auto rhsArr = value::ArrayEnumerator{rhsTag, rhsVal};
+    while (!rhsArr.atEnd()) {
+        auto [rhsTag, rhsVal] = rhsArr.getViewOfValue();
+        auto [tag, val] = value::compareValue(lhsTag, lhsVal, rhsTag, rhsVal, collator);
+        if (tag == value::TypeTags::NumberInt32 && value::bitcastTo<int32_t>(val) == 0) {
+            return {value::TypeTags::Boolean, value::bitcastFrom<bool>(true)};
+        }
+        rhsArr.advance();
+    }
+    return {value::TypeTags::Boolean, value::bitcastFrom<bool>(false)};
+}
+
+std::pair<value::TypeTags, value::Value> ByteCode::genericIsMember(value::TypeTags lhsTag,
+                                                                   value::Value lhsVal,
+                                                                   value::TypeTags rhsTag,
+                                                                   value::Value rhsVal,
+                                                                   value::TypeTags collTag,
+                                                                   value::Value collVal) {
+    if (collTag != value::TypeTags::collator) {
+        return {value::TypeTags::Nothing, 0};
+    }
+
+    auto collator = value::getCollatorView(collVal);
+
+    return genericIsMember(lhsTag, lhsVal, rhsTag, rhsVal, collator);
 }
 
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinIsMember(ArityType arity) {
     invariant(arity == 2);
 
-    auto [ownedInput, inputTag, inputValue] = getFromStack(0);
-    auto [ownedArr, arrTag, arrValue] = getFromStack(1);
+    auto [ownedInput, inputTag, inputVal] = getFromStack(0);
+    auto [ownedArr, arrTag, arrVal] = getFromStack(1);
 
-    auto [resultTag, resultVal] = genericIsMember(inputTag, inputValue, arrTag, arrValue);
+    auto [resultTag, resultVal] = genericIsMember(inputTag, inputVal, arrTag, arrVal);
+    return {false, resultTag, resultVal};
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinCollIsMember(ArityType arity) {
+    invariant(arity == 3);
+
+    auto [ownedColl, collTag, collVal] = getFromStack(0);
+    auto [ownedInput, inputTag, inputVal] = getFromStack(1);
+    auto [ownedArr, arrTag, arrVal] = getFromStack(2);
+
+    auto [resultTag, resultVal] =
+        genericIsMember(inputTag, inputVal, arrTag, arrVal, collTag, collVal);
+
     return {false, resultTag, resultVal};
 }
 
@@ -1905,24 +2067,18 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinIsTimezone(Arit
     return {false, value::TypeTags::Boolean, false};
 }
 
-std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinSetUnion(ArityType arity) {
-    auto [_, tag, val] = getFromStack(0);
-    if (!value::isArray(tag)) {
-        return {false, value::TypeTags::Nothing, 0};
-    }
-
-    auto [resTag, resVal] = arrayToSet(tag, val);
-    if (arity == 1) {
-        return {true, resTag, resVal};
-    }
+namespace {
+std::tuple<bool, value::TypeTags, value::Value> setUnion(
+    const std::vector<value::TypeTags>& argTags,
+    const std::vector<value::Value>& argVals,
+    const CollatorInterface* collator = nullptr) {
+    auto [resTag, resVal] = value::makeNewArraySet(collator);
     value::ValueGuard resGuard{resTag, resVal};
     auto resView = value::getArraySetView(resVal);
 
-    for (size_t idx = 1; idx < arity; ++idx) {
-        auto [argOwned, argTag, argVal] = getFromStack(idx);
-        if (!value::isArray(argTag)) {
-            return {false, value::TypeTags::Nothing, 0};
-        }
+    for (size_t idx = 0; idx < argVals.size(); ++idx) {
+        auto argTag = argTags[idx];
+        auto argVal = argVals[idx];
 
         auto arrIter = value::ArrayEnumerator{argTag, argVal};
         while (!arrIter.atEnd()) {
@@ -1936,34 +2092,32 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinSetUnion(ArityT
     return {true, resTag, resVal};
 }
 
-std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinSetIntersection(ArityType arity) {
-    value::ValueMapType<size_t> intersectionMap;
+std::tuple<bool, value::TypeTags, value::Value> setIntersection(
+    const std::vector<value::TypeTags>& argTags,
+    const std::vector<value::Value>& argVals,
+    const CollatorInterface* collator = nullptr) {
+    auto intersectionMap =
+        value::ValueMapType<size_t>{0, value::ValueHash(collator), value::ValueEq(collator)};
 
-    for (size_t idx = 0; idx < arity; ++idx) {
-        auto [arrOwned, arrTag, arrVal] = getFromStack(idx);
-        if (!value::isArray(arrTag)) {
-            return {false, value::TypeTags::Nothing, 0};
-        }
-    }
-
-    auto [resTag, resVal] = value::makeNewArraySet();
+    auto [resTag, resVal] = value::makeNewArraySet(collator);
     value::ValueGuard resGuard{resTag, resVal};
 
-    for (ArityType idx = 0; idx < arity; ++idx) {
-        auto [arrOwned, arrTag, arrVal] = getFromStack(idx);
+    for (size_t idx = 0; idx < argVals.size(); ++idx) {
+        auto tag = argTags[idx];
+        auto val = argVals[idx];
 
         bool atLeastOneCommonElement = false;
-        auto enumerator = value::ArrayEnumerator{arrTag, arrVal};
+        auto enumerator = value::ArrayEnumerator{tag, val};
         while (!enumerator.atEnd()) {
             auto [elTag, elVal] = enumerator.getViewOfValue();
             if (idx == 0) {
                 intersectionMap[{elTag, elVal}] = 1;
             } else {
-                if (intersectionMap.find({elTag, elVal}) != intersectionMap.end()) {
-                    if (intersectionMap[{elTag, elVal}] == idx) {
-                        intersectionMap[{elTag, elVal}]++;
+                if (auto it = intersectionMap.find({elTag, elVal}); it != intersectionMap.end()) {
+                    if (it->second == idx) {
+                        it->second++;
+                        atLeastOneCommonElement = true;
                     }
-                    atLeastOneCommonElement = true;
                 }
             }
             enumerator.advance();
@@ -1977,7 +2131,7 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinSetIntersection
 
     auto resView = value::getArraySetView(resVal);
     for (auto&& [item, counter] : intersectionMap) {
-        if (counter == arity) {
+        if (counter == argVals.size()) {
             auto [elTag, elVal] = item;
             auto [copyTag, copyVal] = value::copyValue(elTag, elVal);
             resView->push_back(copyTag, copyVal);
@@ -1988,19 +2142,17 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinSetIntersection
     return {true, resTag, resVal};
 }
 
-std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinSetDifference(ArityType arity) {
-    auto [lhsOwned, lhsTag, lhsVal] = getFromStack(0);
-    auto [rhsOwned, rhsTag, rhsVal] = getFromStack(1);
-
-    if (!value::isArray(lhsTag) || !value::isArray(rhsTag)) {
-        return {false, value::TypeTags::Nothing, 0};
-    }
-
-    auto [resTag, resVal] = value::makeNewArraySet();
+std::tuple<bool, value::TypeTags, value::Value> setDifference(
+    value::TypeTags lhsTag,
+    value::Value lhsVal,
+    value::TypeTags rhsTag,
+    value::Value rhsVal,
+    const CollatorInterface* collator = nullptr) {
+    auto [resTag, resVal] = value::makeNewArraySet(collator);
     value::ValueGuard resGuard{resTag, resVal};
     auto resView = value::getArraySetView(resVal);
 
-    value::ValueSetType setValuesSecondArg;
+    value::ValueSetType setValuesSecondArg(0, value::ValueHash(collator), value::ValueEq(collator));
     auto rhsIter = value::ArrayEnumerator(rhsTag, rhsVal);
     while (!rhsIter.atEnd()) {
         auto [elTag, elVal] = rhsIter.getViewOfValue();
@@ -2020,6 +2172,121 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinSetDifference(A
 
     resGuard.reset();
     return {true, resTag, resVal};
+}
+}  // namespace
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinCollSetUnion(ArityType arity) {
+    invariant(arity >= 1);
+
+    auto [_, collTag, collVal] = getFromStack(0);
+    if (collTag != value::TypeTags::collator) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+
+    std::vector<value::TypeTags> argTags;
+    std::vector<value::Value> argVals;
+    for (size_t idx = 1; idx < arity; ++idx) {
+        auto [owned, tag, val] = getFromStack(idx);
+        if (!value::isArray(tag)) {
+            return {false, value::TypeTags::Nothing, 0};
+        }
+
+        argTags.push_back(tag);
+        argVals.push_back(val);
+    }
+
+    return setUnion(argTags, argVals, value::getCollatorView(collVal));
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinSetUnion(ArityType arity) {
+    std::vector<value::TypeTags> argTags;
+    std::vector<value::Value> argVals;
+
+    for (size_t idx = 0; idx < arity; ++idx) {
+        auto [_, tag, val] = getFromStack(idx);
+        if (!value::isArray(tag)) {
+            return {false, value::TypeTags::Nothing, 0};
+        }
+
+        argTags.push_back(tag);
+        argVals.push_back(val);
+    }
+
+    return setUnion(argTags, argVals);
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinCollSetIntersection(
+    ArityType arity) {
+    invariant(arity >= 1);
+
+    auto [_, collTag, collVal] = getFromStack(0);
+    if (collTag != value::TypeTags::collator) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+
+    std::vector<value::TypeTags> argTags;
+    std::vector<value::Value> argVals;
+
+    for (size_t idx = 1; idx < arity; ++idx) {
+        auto [owned, tag, val] = getFromStack(idx);
+        if (!value::isArray(tag)) {
+            return {false, value::TypeTags::Nothing, 0};
+        }
+
+        argTags.push_back(tag);
+        argVals.push_back(val);
+    }
+
+    return setIntersection(argTags, argVals, value::getCollatorView(collVal));
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinSetIntersection(ArityType arity) {
+    std::vector<value::TypeTags> argTags;
+    std::vector<value::Value> argVals;
+
+    for (size_t idx = 0; idx < arity; ++idx) {
+        auto [_, tag, val] = getFromStack(idx);
+        if (!value::isArray(tag)) {
+            return {false, value::TypeTags::Nothing, 0};
+        }
+
+        argTags.push_back(tag);
+        argVals.push_back(val);
+    }
+
+    return setIntersection(argTags, argVals);
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinCollSetDifference(
+    ArityType arity) {
+    invariant(arity == 3);
+
+    auto [_, collTag, collVal] = getFromStack(0);
+    if (collTag != value::TypeTags::collator) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+
+    auto [lhsOwned, lhsTag, lhsVal] = getFromStack(1);
+    auto [rhsOwned, rhsTag, rhsVal] = getFromStack(2);
+
+    if (!value::isArray(lhsTag) || !value::isArray(rhsTag)) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+
+    return setDifference(lhsTag, lhsVal, rhsTag, rhsVal, value::getCollatorView(collVal));
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinSetDifference(ArityType arity) {
+    invariant(arity == 2);
+
+    auto [lhsOwned, lhsTag, lhsVal] = getFromStack(0);
+    auto [rhsOwned, rhsTag, rhsVal] = getFromStack(1);
+
+    if (!value::isArray(lhsTag) || !value::isArray(rhsTag)) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+
+    return setDifference(lhsTag, lhsVal, rhsTag, rhsVal);
 }
 
 namespace {
@@ -2201,6 +2468,39 @@ std::tuple<bool, value::TypeTags, value::Value> genericPcreRegexSingleMatch(
 
     return pcreFirstMatch(pcreRegex, inputString, isMatch);
 }
+
+std::pair<value::TypeTags, value::Value> collComparisonKey(value::TypeTags tag,
+                                                           value::Value val,
+                                                           const CollatorInterface* collator) {
+    using namespace std::literals;
+
+    // This function should only be called if 'collator' is non-null and 'tag' is a collatable type.
+    invariant(collator);
+    invariant(value::isCollatableType(tag));
+
+    // For strings, call CollatorInterface::getComparisonKey() to obtain the comparison key.
+    if (value::isString(tag)) {
+        auto sv = value::getStringView(tag, val);
+        auto compKey = collator->getComparisonKey(StringData{sv.data(), sv.size()});
+        auto keyData = compKey.getKeyData();
+        return value::makeNewString(std::string_view{keyData.rawData(), keyData.size()});
+    }
+
+    // For collatable types other than strings (such as arrays and objects), we take the slow
+    // path and round-trip the value through BSON.
+    BSONObjBuilder input;
+    bson::appendValueToBsonObj<BSONObjBuilder>(input, ""sv, tag, val);
+
+    BSONObjBuilder output;
+    CollationIndexKey::collationAwareIndexKeyAppend(input.obj().firstElement(), collator, &output);
+
+    BSONObj outputView = output.done();
+    auto ptr = outputView.objdata();
+    auto be = ptr + 4;
+    auto end = ptr + ConstDataView(ptr).read<LittleEndian<uint32_t>>();
+    return bson::convertFrom(false, be, end, 0);
+}
+
 }  // namespace
 
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinRegexCompile(ArityType arity) {
@@ -2534,6 +2834,8 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builti
             return builtinReplaceOne(arity);
         case Builtin::dropFields:
             return builtinDropFields(arity);
+        case Builtin::newArray:
+            return builtinNewArray(arity);
         case Builtin::newObj:
             return builtinNewObj(arity);
         case Builtin::ksToString:
@@ -2560,6 +2862,8 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builti
             return builtinAddToArray(arity);
         case Builtin::addToSet:
             return builtinAddToSet(arity);
+        case Builtin::collAddToSet:
+            return builtinCollAddToSet(arity);
         case Builtin::doubleDoubleSum:
             return builtinDoubleDoubleSum(arity);
         case Builtin::bitTestZero:
@@ -2610,6 +2914,8 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builti
             return builtinConcat(arity);
         case Builtin::isMember:
             return builtinIsMember(arity);
+        case Builtin::collIsMember:
+            return builtinCollIsMember(arity);
         case Builtin::indexOfBytes:
             return builtinIndexOfBytes(arity);
         case Builtin::indexOfCP:
@@ -2624,6 +2930,12 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builti
             return builtinSetIntersection(arity);
         case Builtin::setDifference:
             return builtinSetDifference(arity);
+        case Builtin::collSetUnion:
+            return builtinCollSetUnion(arity);
+        case Builtin::collSetIntersection:
+            return builtinCollSetIntersection(arity);
+        case Builtin::collSetDifference:
+            return builtinCollSetDifference(arity);
         case Builtin::runJsPredicate:
             return builtinRunJsPredicate(arity);
         case Builtin::regexCompile:
@@ -2857,9 +3169,9 @@ std::tuple<uint8_t, value::TypeTags, value::Value> ByteCode::run(const CodeFragm
                 case Instruction::logicNot: {
                     auto [owned, tag, val] = getFromStack(0);
 
-                    auto [resultOwned, resultTag, resultVal] = genericNot(tag, val);
+                    auto [resultTag, resultVal] = genericNot(tag, val);
 
-                    topStack(resultOwned, resultTag, resultVal);
+                    topStack(false, resultTag, resultVal);
 
                     if (owned) {
                         value::releaseValue(tag, val);
@@ -2883,6 +3195,29 @@ std::tuple<uint8_t, value::TypeTags, value::Value> ByteCode::run(const CodeFragm
                     }
                     break;
                 }
+                case Instruction::collLess: {
+                    auto [rhsOwned, rhsTag, rhsVal] = getFromStack(0);
+                    popStack();
+                    auto [lhsOwned, lhsTag, lhsVal] = getFromStack(0);
+                    popStack();
+                    auto [collOwned, collTag, collVal] = getFromStack(0);
+
+                    auto [tag, val] = genericCompare<std::less<>>(
+                        lhsTag, lhsVal, rhsTag, rhsVal, collTag, collVal);
+
+                    topStack(false, tag, val);
+
+                    if (rhsOwned) {
+                        value::releaseValue(rhsTag, rhsVal);
+                    }
+                    if (lhsOwned) {
+                        value::releaseValue(lhsTag, lhsVal);
+                    }
+                    if (collOwned) {
+                        value::releaseValue(collTag, collVal);
+                    }
+                    break;
+                }
                 case Instruction::lessEq: {
                     auto [rhsOwned, rhsTag, rhsVal] = getFromStack(0);
                     popStack();
@@ -2898,6 +3233,29 @@ std::tuple<uint8_t, value::TypeTags, value::Value> ByteCode::run(const CodeFragm
                     }
                     if (lhsOwned) {
                         value::releaseValue(lhsTag, lhsVal);
+                    }
+                    break;
+                }
+                case Instruction::collLessEq: {
+                    auto [rhsOwned, rhsTag, rhsVal] = getFromStack(0);
+                    popStack();
+                    auto [lhsOwned, lhsTag, lhsVal] = getFromStack(0);
+                    popStack();
+                    auto [collOwned, collTag, collVal] = getFromStack(0);
+
+                    auto [tag, val] = genericCompare<std::less_equal<>>(
+                        lhsTag, lhsVal, rhsTag, rhsVal, collTag, collVal);
+
+                    topStack(false, tag, val);
+
+                    if (rhsOwned) {
+                        value::releaseValue(rhsTag, rhsVal);
+                    }
+                    if (lhsOwned) {
+                        value::releaseValue(lhsTag, lhsVal);
+                    }
+                    if (collOwned) {
+                        value::releaseValue(collTag, collVal);
                     }
                     break;
                 }
@@ -2919,6 +3277,29 @@ std::tuple<uint8_t, value::TypeTags, value::Value> ByteCode::run(const CodeFragm
                     }
                     break;
                 }
+                case Instruction::collGreater: {
+                    auto [rhsOwned, rhsTag, rhsVal] = getFromStack(0);
+                    popStack();
+                    auto [lhsOwned, lhsTag, lhsVal] = getFromStack(0);
+                    popStack();
+                    auto [collOwned, collTag, collVal] = getFromStack(0);
+
+                    auto [tag, val] = genericCompare<std::greater<>>(
+                        lhsTag, lhsVal, rhsTag, rhsVal, collTag, collVal);
+
+                    topStack(false, tag, val);
+
+                    if (rhsOwned) {
+                        value::releaseValue(rhsTag, rhsVal);
+                    }
+                    if (lhsOwned) {
+                        value::releaseValue(lhsTag, lhsVal);
+                    }
+                    if (collOwned) {
+                        value::releaseValue(collTag, collVal);
+                    }
+                    break;
+                }
                 case Instruction::greaterEq: {
                     auto [rhsOwned, rhsTag, rhsVal] = getFromStack(0);
                     popStack();
@@ -2937,12 +3318,36 @@ std::tuple<uint8_t, value::TypeTags, value::Value> ByteCode::run(const CodeFragm
                     }
                     break;
                 }
+                case Instruction::collGreaterEq: {
+                    auto [rhsOwned, rhsTag, rhsVal] = getFromStack(0);
+                    popStack();
+                    auto [lhsOwned, lhsTag, lhsVal] = getFromStack(0);
+                    popStack();
+                    auto [collOwned, collTag, collVal] = getFromStack(0);
+
+                    auto [tag, val] = genericCompare<std::greater_equal<>>(
+                        lhsTag, lhsVal, rhsTag, rhsVal, collTag, collVal);
+
+                    topStack(false, tag, val);
+
+                    if (rhsOwned) {
+                        value::releaseValue(rhsTag, rhsVal);
+                    }
+                    if (lhsOwned) {
+                        value::releaseValue(lhsTag, lhsVal);
+                    }
+                    if (collOwned) {
+                        value::releaseValue(collTag, collVal);
+                    }
+                    break;
+                }
                 case Instruction::eq: {
                     auto [rhsOwned, rhsTag, rhsVal] = getFromStack(0);
                     popStack();
                     auto [lhsOwned, lhsTag, lhsVal] = getFromStack(0);
 
-                    auto [tag, val] = genericCompareEq(lhsTag, lhsVal, rhsTag, rhsVal);
+                    auto [tag, val] =
+                        genericCompare<std::equal_to<>>(lhsTag, lhsVal, rhsTag, rhsVal);
 
                     topStack(false, tag, val);
 
@@ -2954,12 +3359,15 @@ std::tuple<uint8_t, value::TypeTags, value::Value> ByteCode::run(const CodeFragm
                     }
                     break;
                 }
-                case Instruction::neq: {
+                case Instruction::collEq: {
                     auto [rhsOwned, rhsTag, rhsVal] = getFromStack(0);
                     popStack();
                     auto [lhsOwned, lhsTag, lhsVal] = getFromStack(0);
+                    popStack();
+                    auto [collOwned, collTag, collVal] = getFromStack(0);
 
-                    auto [tag, val] = genericCompareNeq(lhsTag, lhsVal, rhsTag, rhsVal);
+                    auto [tag, val] = genericCompare<std::equal_to<>>(
+                        lhsTag, lhsVal, rhsTag, rhsVal, collTag, collVal);
 
                     topStack(false, tag, val);
 
@@ -2968,6 +3376,52 @@ std::tuple<uint8_t, value::TypeTags, value::Value> ByteCode::run(const CodeFragm
                     }
                     if (lhsOwned) {
                         value::releaseValue(lhsTag, lhsVal);
+                    }
+                    if (collOwned) {
+                        value::releaseValue(collTag, collVal);
+                    }
+                    break;
+                }
+                case Instruction::neq: {
+                    auto [rhsOwned, rhsTag, rhsVal] = getFromStack(0);
+                    popStack();
+                    auto [lhsOwned, lhsTag, lhsVal] = getFromStack(0);
+
+                    auto [tag, val] =
+                        genericCompare<std::equal_to<>>(lhsTag, lhsVal, rhsTag, rhsVal);
+                    std::tie(tag, val) = genericNot(tag, val);
+
+                    topStack(false, tag, val);
+
+                    if (rhsOwned) {
+                        value::releaseValue(rhsTag, rhsVal);
+                    }
+                    if (lhsOwned) {
+                        value::releaseValue(lhsTag, lhsVal);
+                    }
+                    break;
+                }
+                case Instruction::collNeq: {
+                    auto [rhsOwned, rhsTag, rhsVal] = getFromStack(0);
+                    popStack();
+                    auto [lhsOwned, lhsTag, lhsVal] = getFromStack(0);
+                    popStack();
+                    auto [collOwned, collTag, collVal] = getFromStack(0);
+
+                    auto [tag, val] = genericCompare<std::equal_to<>>(
+                        lhsTag, lhsVal, rhsTag, rhsVal, collTag, collVal);
+                    std::tie(tag, val) = genericNot(tag, val);
+
+                    topStack(false, tag, val);
+
+                    if (rhsOwned) {
+                        value::releaseValue(rhsTag, rhsVal);
+                    }
+                    if (lhsOwned) {
+                        value::releaseValue(lhsTag, lhsVal);
+                    }
+                    if (collOwned) {
+                        value::releaseValue(collTag, collVal);
                     }
                     break;
                 }
@@ -2985,6 +3439,28 @@ std::tuple<uint8_t, value::TypeTags, value::Value> ByteCode::run(const CodeFragm
                     }
                     if (lhsOwned) {
                         value::releaseValue(lhsTag, lhsVal);
+                    }
+                    break;
+                }
+                case Instruction::collCmp3w: {
+                    auto [rhsOwned, rhsTag, rhsVal] = getFromStack(0);
+                    popStack();
+                    auto [lhsOwned, lhsTag, lhsVal] = getFromStack(0);
+                    popStack();
+                    auto [collOwned, collTag, collVal] = getFromStack(0);
+
+                    auto [tag, val] = compare3way(lhsTag, lhsVal, rhsTag, rhsVal, collTag, collVal);
+
+                    topStack(false, tag, val);
+
+                    if (rhsOwned) {
+                        value::releaseValue(rhsTag, rhsVal);
+                    }
+                    if (lhsOwned) {
+                        value::releaseValue(lhsTag, lhsVal);
+                    }
+                    if (collOwned) {
+                        value::releaseValue(collTag, collVal);
                     }
                     break;
                 }
@@ -3040,6 +3516,36 @@ std::tuple<uint8_t, value::TypeTags, value::Value> ByteCode::run(const CodeFragm
                     }
                     break;
                 }
+                case Instruction::collComparisonKey: {
+                    auto [rhsOwned, rhsTag, rhsVal] = getFromStack(0);
+                    popStack();
+                    auto [lhsOwned, lhsTag, lhsVal] = getFromStack(0);
+
+                    if (lhsTag != value::TypeTags::Nothing && rhsTag == value::TypeTags::collator) {
+                        // If lhs is a collatable type, call collComparisonKey() to obtain the
+                        // comparison key. If lhs is not a collatable type, we can just leave it
+                        // on the stack as-is.
+                        if (value::isCollatableType(lhsTag)) {
+                            auto collator = value::getCollatorView(rhsVal);
+                            auto [tag, val] = collComparisonKey(lhsTag, lhsVal, collator);
+                            topStack(true, tag, val);
+                        } else {
+                            // Set 'lhsOwned' to false so that lhs doesn't get released below.
+                            lhsOwned = false;
+                        }
+                    } else {
+                        // If lhs was Nothing or rhs wasn't Collator, return Nothing.
+                        topStack(false, value::TypeTags::Nothing, 0);
+                    }
+
+                    if (rhsOwned) {
+                        value::releaseValue(rhsTag, rhsVal);
+                    }
+                    if (lhsOwned) {
+                        value::releaseValue(lhsTag, lhsVal);
+                    }
+                    break;
+                }
                 case Instruction::aggSum: {
                     auto [rhsOwned, rhsTag, rhsVal] = getFromStack(0);
                     popStack();
@@ -3074,6 +3580,29 @@ std::tuple<uint8_t, value::TypeTags, value::Value> ByteCode::run(const CodeFragm
                     }
                     break;
                 }
+                case Instruction::aggCollMin: {
+                    auto [rhsOwned, rhsTag, rhsVal] = getFromStack(0);
+                    popStack();
+                    auto [collOwned, collTag, collVal] = getFromStack(0);
+                    popStack();
+                    auto [lhsOwned, lhsTag, lhsVal] = getFromStack(0);
+
+                    auto [owned, tag, val] =
+                        aggCollMin(lhsTag, lhsVal, collTag, collVal, rhsTag, rhsVal);
+
+                    topStack(owned, tag, val);
+
+                    if (rhsOwned) {
+                        value::releaseValue(rhsTag, rhsVal);
+                    }
+                    if (collOwned) {
+                        value::releaseValue(collTag, collVal);
+                    }
+                    if (lhsOwned) {
+                        value::releaseValue(lhsTag, lhsVal);
+                    }
+                    break;
+                }
                 case Instruction::aggMax: {
                     auto [rhsOwned, rhsTag, rhsVal] = getFromStack(0);
                     popStack();
@@ -3085,6 +3614,29 @@ std::tuple<uint8_t, value::TypeTags, value::Value> ByteCode::run(const CodeFragm
 
                     if (rhsOwned) {
                         value::releaseValue(rhsTag, rhsVal);
+                    }
+                    if (lhsOwned) {
+                        value::releaseValue(lhsTag, lhsVal);
+                    }
+                    break;
+                }
+                case Instruction::aggCollMax: {
+                    auto [rhsOwned, rhsTag, rhsVal] = getFromStack(0);
+                    popStack();
+                    auto [collOwned, collTag, collVal] = getFromStack(0);
+                    popStack();
+                    auto [lhsOwned, lhsTag, lhsVal] = getFromStack(0);
+
+                    auto [owned, tag, val] =
+                        aggCollMax(lhsTag, lhsVal, collTag, collVal, rhsTag, rhsVal);
+
+                    topStack(owned, tag, val);
+
+                    if (rhsOwned) {
+                        value::releaseValue(rhsTag, rhsVal);
+                    }
+                    if (collOwned) {
+                        value::releaseValue(collTag, collVal);
                     }
                     if (lhsOwned) {
                         value::releaseValue(lhsTag, lhsVal);

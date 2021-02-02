@@ -62,7 +62,9 @@
 
 namespace mongo::stage_builder {
 std::unique_ptr<sbe::RuntimeEnvironment> makeRuntimeEnvironment(
-    OperationContext* opCtx, sbe::value::SlotIdGenerator* slotIdGenerator) {
+    const CanonicalQuery& cq,
+    OperationContext* opCtx,
+    sbe::value::SlotIdGenerator* slotIdGenerator) {
     auto env = std::make_unique<sbe::RuntimeEnvironment>();
 
     // Register an unowned global timezone database for datetime expression evaluation.
@@ -71,6 +73,15 @@ std::unique_ptr<sbe::RuntimeEnvironment> makeRuntimeEnvironment(
                       sbe::value::bitcastFrom<const TimeZoneDatabase*>(getTimeZoneDatabase(opCtx)),
                       false,
                       slotIdGenerator);
+
+    if (auto collator = cq.getCollator(); collator) {
+        env->registerSlot("collator"_sd,
+                          sbe::value::TypeTags::collator,
+                          sbe::value::bitcastFrom<const CollatorInterface*>(collator),
+                          false,
+                          slotIdGenerator);
+    }
+
     return env;
 }
 
@@ -137,7 +148,7 @@ SlotBasedStageBuilder::SlotBasedStageBuilder(OperationContext* opCtx,
                                              ShardFiltererFactoryInterface* shardFiltererFactory)
     : StageBuilder(opCtx, collection, cq, solution),
       _yieldPolicy(yieldPolicy),
-      _data(makeRuntimeEnvironment(_opCtx, &_slotIdGenerator)),
+      _data(makeRuntimeEnvironment(_cq, _opCtx, &_slotIdGenerator)),
       _shardFiltererFactory(shardFiltererFactory),
       _lockAcquisitionCallback(makeLockAcquisitionCallback(solution.shouldCheckCanServeReads())) {
     // SERVER-52803: In the future if we need to gather more information from the QuerySolutionNode
@@ -429,11 +440,18 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         // tracked by a 'reference tracker' at higher level.
         auto fieldName = part.fieldPath->getFieldName(0);
         auto fieldNameSV = std::string_view{fieldName.rawData(), fieldName.size()};
-        projectMap.emplace(
-            sortFieldVar,
-            sbe::makeE<sbe::EFunction>("getField"sv,
-                                       sbe::makeEs(sbe::makeE<sbe::EVariable>(outputs.get(kResult)),
-                                                   sbe::makeE<sbe::EConstant>(fieldNameSV))));
+
+        auto getSortFieldExpr = makeFunction("getField"sv,
+                                             sbe::makeE<sbe::EVariable>(outputs.get(kResult)),
+                                             sbe::makeE<sbe::EConstant>(fieldNameSV));
+
+        if (auto collatorSlot = _data.env->getSlotIfExists("collator"_sd); collatorSlot) {
+            getSortFieldExpr = makeFunction("collComparisonKey"sv,
+                                            std::move(getSortFieldExpr),
+                                            sbe::makeE<sbe::EVariable>(*collatorSlot));
+        }
+
+        projectMap.emplace(sortFieldVar, std::move(getSortFieldExpr));
     }
 
     inputStage =
@@ -454,16 +472,15 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         auto op = direction[idx] == sbe::value::SortDirection::Ascending
             ? sbe::EPrimBinary::less
             : sbe::EPrimBinary::greater;
-        auto minmax = sbe::makeE<sbe::EIf>(
-            sbe::makeE<sbe::EPrimBinary>(
-                op,
-                sbe::makeE<sbe::EPrimBinary>(sbe::EPrimBinary::cmp3w,
-                                             sbe::makeE<sbe::EVariable>(innerVar),
-                                             sbe::makeE<sbe::EVariable>(resultVar)),
-                sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64,
-                                           sbe::value::bitcastFrom<int64_t>(0))),
-            sbe::makeE<sbe::EVariable>(innerVar),
-            sbe::makeE<sbe::EVariable>(resultVar));
+        auto minmax =
+            sbe::makeE<sbe::EIf>(makeBinaryOp(op,
+                                              makeBinaryOp(sbe::EPrimBinary::cmp3w,
+                                                           sbe::makeE<sbe::EVariable>(innerVar),
+                                                           sbe::makeE<sbe::EVariable>(resultVar)),
+                                              makeConstant(sbe::value::TypeTags::NumberInt64,
+                                                           sbe::value::bitcastFrom<int64_t>(0))),
+                                 sbe::makeE<sbe::EVariable>(innerVar),
+                                 sbe::makeE<sbe::EVariable>(resultVar));
 
         inputStage = sbe::makeS<sbe::TraverseStage>(std::move(inputStage),
                                                     std::move(innerBranch),
@@ -555,11 +572,18 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
             auto fieldName = part.fieldPath->getFieldName(0);
             auto fieldNameSV = std::string_view{fieldName.rawData(), fieldName.size()};
-            projectMap.emplace(sortFieldSlot,
-                               sbe::makeE<sbe::EFunction>(
-                                   "getField"sv,
-                                   sbe::makeEs(sbe::makeE<sbe::EVariable>(outputs.get(kResult)),
-                                               sbe::makeE<sbe::EConstant>(fieldNameSV))));
+
+            auto getSortFieldExpr = makeFunction("getField"sv,
+                                                 sbe::makeE<sbe::EVariable>(outputs.get(kResult)),
+                                                 sbe::makeE<sbe::EConstant>(fieldNameSV));
+
+            if (auto collatorSlot = _data.env->getSlotIfExists("collator"_sd); collatorSlot) {
+                getSortFieldExpr = makeFunction("collComparisonKey"sv,
+                                                std::move(getSortFieldExpr),
+                                                sbe::makeE<sbe::EVariable>(*collatorSlot));
+            }
+
+            projectMap.emplace(sortFieldSlot, std::move(getSortFieldExpr));
         }
 
         stage =
@@ -1034,10 +1058,7 @@ SlotBasedStageBuilder::makeUnionForTailableCollScan(const QuerySolutionNode* roo
     auto&& [anchorBranchSlots, anchorBranch] = makeUnionBranch(false);
     anchorBranch = sbe::makeS<sbe::FilterStage<true>>(
         std::move(anchorBranch),
-        sbe::makeE<sbe::EPrimUnary>(
-            sbe::EPrimUnary::logicNot,
-            sbe::makeE<sbe::EFunction>(
-                "exists"sv, sbe::makeEs(sbe::makeE<sbe::EVariable>(resumeRecordIdSlot)))),
+        makeNot(makeFunction("exists"sv, sbe::makeE<sbe::EVariable>(resumeRecordIdSlot))),
         root->nodeId());
 
     // Build a resume branch of the union and add a constant filter on op of it, so that it would
@@ -1134,11 +1155,10 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     auto arrayChecks = makeNot(sbe::makeE<sbe::EFunction>(
         "exists", sbe::makeEs(sbe::makeE<sbe::EVariable>(fieldSlots[0]))));
     for (size_t ind = 1; ind < fieldSlots.size(); ++ind) {
-        arrayChecks = sbe::makeE<sbe::EPrimBinary>(
+        arrayChecks = makeBinaryOp(
             sbe::EPrimBinary::Op::logicOr,
             std::move(arrayChecks),
-            makeNot(sbe::makeE<sbe::EFunction>(
-                "exists", sbe::makeEs(sbe::makeE<sbe::EVariable>(fieldSlots[ind])))));
+            makeNot(makeFunction("exists", sbe::makeE<sbe::EVariable>(fieldSlots[ind]))));
     }
     arrayChecks = sbe::makeE<sbe::EIf>(std::move(arrayChecks),
                                        sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Nothing, 0),

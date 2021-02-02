@@ -34,6 +34,7 @@
 #include "mongo/db/exec/js_function.h"
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/value_builder.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/util/regex_util.h"
@@ -93,12 +94,12 @@ size_t PcreRegex::getNumberCaptures() const {
 }
 
 std::pair<TypeTags, Value> makeCopyJsFunction(const JsFunction& jsFunction) {
-    auto ownedJsFunction = sbe::value::bitcastFrom<JsFunction*>(new JsFunction(jsFunction));
+    auto ownedJsFunction = bitcastFrom<JsFunction*>(new JsFunction(jsFunction));
     return {TypeTags::jsFunction, ownedJsFunction};
 }
 
 std::pair<TypeTags, Value> makeCopyShardFilterer(const ShardFilterer& filterer) {
-    auto filter = sbe::value::bitcastFrom<ShardFilterer*>(filterer.clone().release());
+    auto filter = bitcastFrom<ShardFilterer*>(filterer.clone().release());
     return {TypeTags::shardFilterer, filter};
 }
 
@@ -237,6 +238,9 @@ void writeTagToStream(T& stream, const TypeTags tag) {
         case TypeTags::shardFilterer:
             stream << "shardFilterer";
             break;
+        case TypeTags::collator:
+            stream << "Collator";
+            break;
         default:
             stream << "unknown tag";
             break;
@@ -246,28 +250,28 @@ void writeTagToStream(T& stream, const TypeTags tag) {
 template <typename T>
 void writeValueToStream(T& stream, TypeTags tag, Value val) {
     switch (tag) {
-        case value::TypeTags::NumberInt32:
+        case TypeTags::NumberInt32:
             stream << bitcastTo<int32_t>(val);
             break;
-        case value::TypeTags::NumberInt64:
+        case TypeTags::NumberInt64:
             stream << bitcastTo<int64_t>(val);
             break;
-        case value::TypeTags::NumberDouble:
+        case TypeTags::NumberDouble:
             stream << bitcastTo<double>(val);
             break;
-        case value::TypeTags::NumberDecimal:
+        case TypeTags::NumberDecimal:
             stream << bitcastTo<Decimal128>(val).toString();
             break;
-        case value::TypeTags::Date:
+        case TypeTags::Date:
             stream << bitcastTo<int64_t>(val);
             break;
-        case value::TypeTags::Boolean:
+        case TypeTags::Boolean:
             stream << (bitcastTo<bool>(val) ? "true" : "false");
             break;
-        case value::TypeTags::Null:
+        case TypeTags::Null:
             stream << "null";
             break;
-        case value::TypeTags::Array: {
+        case TypeTags::Array: {
             auto arr = getArrayView(val);
             stream << '[';
             for (size_t idx = 0; idx < arr->size(); ++idx) {
@@ -280,7 +284,7 @@ void writeValueToStream(T& stream, TypeTags tag, Value val) {
             stream << ']';
             break;
         }
-        case value::TypeTags::ArraySet: {
+        case TypeTags::ArraySet: {
             auto arr = getArraySetView(val);
             stream << '[';
             bool first = true;
@@ -294,7 +298,7 @@ void writeValueToStream(T& stream, TypeTags tag, Value val) {
             stream << ']';
             break;
         }
-        case value::TypeTags::Object: {
+        case TypeTags::Object: {
             auto obj = getObjectView(val);
             stream << '{';
             for (size_t idx = 0; idx < obj->size(); ++idx) {
@@ -309,21 +313,21 @@ void writeValueToStream(T& stream, TypeTags tag, Value val) {
             stream << '}';
             break;
         }
-        case value::TypeTags::ObjectId: {
+        case TypeTags::ObjectId: {
             auto objId = getObjectIdView(val);
             stream << "ObjectId(\"" << OID::from(objId->data()).toString() << "\")";
             break;
         }
-        case value::TypeTags::Nothing:
+        case TypeTags::Nothing:
             stream << "---===*** NOTHING ***===---";
             break;
-        case value::TypeTags::MinKey:
+        case TypeTags::MinKey:
             stream << "minKey";
             break;
-        case value::TypeTags::MaxKey:
+        case TypeTags::MaxKey:
             stream << "maxKey";
             break;
-        case value::TypeTags::bsonArray: {
+        case TypeTags::bsonArray: {
             const char* be = getRawPointerView(val);
             const char* end = be + ConstDataView(be).read<LittleEndian<uint32_t>>();
             bool first = true;
@@ -346,7 +350,7 @@ void writeValueToStream(T& stream, TypeTags tag, Value val) {
             stream << ']';
             break;
         }
-        case value::TypeTags::bsonObject: {
+        case TypeTags::bsonObject: {
             const char* be = getRawPointerView(val);
             const char* end = be + ConstDataView(be).read<LittleEndian<uint32_t>>();
             bool first = true;
@@ -371,9 +375,9 @@ void writeValueToStream(T& stream, TypeTags tag, Value val) {
             stream << '}';
             break;
         }
-        case value::TypeTags::StringSmall:
-        case value::TypeTags::StringBig:
-        case value::TypeTags::bsonString: {
+        case TypeTags::StringSmall:
+        case TypeTags::StringBig:
+        case TypeTags::bsonString: {
             auto sv = getStringView(tag, val);
             if (sv.length() <= kStringMaxDisplayLength) {
                 stream << '"' << StringData{sv.data(), sv.size()} << '"';
@@ -383,14 +387,14 @@ void writeValueToStream(T& stream, TypeTags tag, Value val) {
             }
             break;
         }
-        case value::TypeTags::bsonObjectId:
+        case TypeTags::bsonObjectId:
             stream << "---===*** bsonObjectId ***===---";
             break;
-        case value::TypeTags::bsonBinData: {
-            auto data = reinterpret_cast<const char*>(
-                getBSONBinDataCompat(value::TypeTags::bsonBinData, val));
-            auto len = getBSONBinDataSizeCompat(value::TypeTags::bsonBinData, val);
-            auto type = getBSONBinDataSubtype(value::TypeTags::bsonBinData, val);
+        case TypeTags::bsonBinData: {
+            auto data =
+                reinterpret_cast<const char*>(getBSONBinDataCompat(TypeTags::bsonBinData, val));
+            auto len = getBSONBinDataSizeCompat(TypeTags::bsonBinData, val);
+            auto type = getBSONBinDataSubtype(TypeTags::bsonBinData, val);
 
             // If the BinData is a correctly sized newUUID, display it as such.
             if (type == newUUID && len == kNewUUIDLength) {
@@ -412,41 +416,43 @@ void writeValueToStream(T& stream, TypeTags tag, Value val) {
             }
             break;
         }
-        case value::TypeTags::bsonUndefined:
+        case TypeTags::bsonUndefined:
             stream << "undefined";
             break;
-        case value::TypeTags::ksValue: {
+        case TypeTags::ksValue: {
             auto ks = getKeyStringView(val);
             stream << "KS(" << ks->toString() << ")";
             break;
         }
-        case value::TypeTags::Timestamp: {
+        case TypeTags::Timestamp: {
             Timestamp ts{bitcastTo<uint64_t>(val)};
             stream << ts.toString();
             break;
         }
-        case value::TypeTags::pcreRegex: {
+        case TypeTags::pcreRegex: {
             auto regex = getPcreRegexView(val);
             stream << "/" << regex->pattern() << "/" << regex->options();
             break;
         }
-        case value::TypeTags::timeZoneDB: {
+        case TypeTags::timeZoneDB: {
             auto tzdb = getTimeZoneDBView(val);
             auto timeZones = tzdb->getTimeZoneStrings();
             stream << "TimeZoneDatabase(" + timeZones.front() + "..." + timeZones.back() + ")";
             break;
         }
-        case value::TypeTags::RecordId:
+        case TypeTags::RecordId:
             stream << "RecordId(" << bitcastTo<int64_t>(val) << ")";
             break;
-        case value::TypeTags::jsFunction:
+        case TypeTags::jsFunction:
             // TODO: Also include code.
             stream << "jsFunction";
             break;
-        case value::TypeTags::shardFilterer: {
+        case TypeTags::shardFilterer:
             stream << "ShardFilterer";
             break;
-        }
+        case TypeTags::collator:
+            stream << "Collator(" << getCollatorView(val)->getSpec().toBSON().toString() << ")";
+            break;
         default:
             MONGO_UNREACHABLE;
     }
@@ -529,7 +535,7 @@ BSONType tagToType(TypeTags tag) noexcept {
     }
 }
 
-std::size_t hashValue(TypeTags tag, Value val) noexcept {
+std::size_t hashValue(TypeTags tag, Value val, const CollatorInterface* collator) noexcept {
     switch (tag) {
         case TypeTags::NumberInt32:
             return absl::Hash<int32_t>{}(bitcastTo<int32_t>(val));
@@ -573,7 +579,14 @@ std::size_t hashValue(TypeTags tag, Value val) noexcept {
         case TypeTags::StringBig:
         case TypeTags::bsonString: {
             auto sv = getStringView(tag, val);
-            return absl::Hash<std::string_view>{}(sv);
+            if (collator) {
+                auto key = collator->getComparisonKey(StringData{sv.data(), sv.size()});
+                auto keyData = key.getKeyData();
+                return absl::Hash<std::string_view>{}(
+                    std::string_view{keyData.rawData(), keyData.size()});
+            } else {
+                return absl::Hash<std::string_view>{}(sv);
+            }
         }
         case TypeTags::ObjectId: {
             auto id = getObjectIdView(val);
@@ -592,7 +605,7 @@ std::size_t hashValue(TypeTags tag, Value val) noexcept {
             // There should be enough entropy in the first 4 elements.
             for (int i = 0; i < 4 && !arr.atEnd(); ++i) {
                 auto [elemTag, elemVal] = arr.getViewOfValue();
-                res = hashCombine(res, hashValue(elemTag, elemVal));
+                res = hashCombine(res, hashValue(elemTag, elemVal, collator));
                 arr.advance();
             }
 
@@ -606,7 +619,7 @@ std::size_t hashValue(TypeTags tag, Value val) noexcept {
             // There should be enough entropy in the first 4 elements.
             for (int i = 0; i < 4 && !obj.atEnd(); ++i) {
                 auto [elemTag, elemVal] = obj.getViewOfValue();
-                res = hashCombine(res, hashValue(elemTag, elemVal));
+                res = hashCombine(res, hashValue(elemTag, elemVal, collator));
                 obj.advance();
             }
 
@@ -655,7 +668,8 @@ int32_t compareHelper(const T lhs, const T rhs) noexcept {
 std::pair<TypeTags, Value> compareValue(TypeTags lhsTag,
                                         Value lhsValue,
                                         TypeTags rhsTag,
-                                        Value rhsValue) {
+                                        Value rhsValue,
+                                        const StringData::ComparatorInterface* comparator) {
     if (isNumber(lhsTag) && isNumber(rhsTag)) {
         switch (getWidestNumericalType(lhsTag, rhsTag)) {
             case TypeTags::NumberInt32: {
@@ -684,7 +698,11 @@ std::pair<TypeTags, Value> compareValue(TypeTags lhsTag,
     } else if (isString(lhsTag) && isString(rhsTag)) {
         auto lhsStr = getStringView(lhsTag, lhsValue);
         auto rhsStr = getStringView(rhsTag, rhsValue);
-        auto result = lhsStr.compare(rhsStr);
+
+        auto result = comparator ? comparator->compare(StringData{lhsStr.data(), lhsStr.size()},
+                                                       StringData{rhsStr.data(), rhsStr.size()})
+                                 : lhsStr.compare(rhsStr);
+
         return {TypeTags::NumberInt32, bitcastFrom<int32_t>(compareHelper(result, 0))};
     } else if (lhsTag == TypeTags::Date && rhsTag == TypeTags::Date) {
         auto result = compareHelper(bitcastTo<int64_t>(lhsValue), bitcastTo<int64_t>(rhsValue));
@@ -723,7 +741,7 @@ std::pair<TypeTags, Value> compareValue(TypeTags lhsTag,
             auto [lhsTag, lhsVal] = lhsArr.getViewOfValue();
             auto [rhsTag, rhsVal] = rhsArr.getViewOfValue();
 
-            auto [tag, val] = compareValue(lhsTag, lhsVal, rhsTag, rhsVal);
+            auto [tag, val] = compareValue(lhsTag, lhsVal, rhsTag, rhsVal, comparator);
             if (tag != TypeTags::NumberInt32 || bitcastTo<int32_t>(val) != 0) {
                 return {tag, val};
             }
@@ -749,7 +767,7 @@ std::pair<TypeTags, Value> compareValue(TypeTags lhsTag,
             auto [lhsTag, lhsVal] = lhsObj.getViewOfValue();
             auto [rhsTag, rhsVal] = rhsObj.getViewOfValue();
 
-            auto [tag, val] = compareValue(lhsTag, lhsVal, rhsTag, rhsVal);
+            auto [tag, val] = compareValue(lhsTag, lhsVal, rhsTag, rhsVal, comparator);
             if (tag != TypeTags::NumberInt32 || bitcastTo<int32_t>(val) != 0) {
                 return {tag, val};
             }
@@ -938,34 +956,32 @@ void readKeyStringValueIntoAccessors(const KeyString::Value& keyString,
     valBuilder.readValues(accessors);
 }
 
-std::pair<TypeTags, Value> arrayToSet(TypeTags tag, Value val) {
+std::pair<TypeTags, Value> arrayToSet(TypeTags tag, Value val, CollatorInterface* collator) {
     if (!isArray(tag)) {
-        return {value::TypeTags::Nothing, 0};
+        return {TypeTags::Nothing, 0};
     }
-    switch (tag) {
-        case TypeTags::ArraySet: {
-            return makeCopyArraySet(*getArraySetView(val));
-        }
-        case TypeTags::Array:
-        case TypeTags::bsonArray: {
-            auto [setTag, setVal] = makeNewArraySet();
-            ValueGuard guard{setTag, setVal};
-            auto setView = getArraySetView(setVal);
 
-            auto arrIter = ArrayEnumerator{tag, val};
-            while (!arrIter.atEnd()) {
-                auto [elTag, elVal] = arrIter.getViewOfValue();
-                auto [copyTag, copyVal] = copyValue(elTag, elVal);
-                setView->push_back(copyTag, copyVal);
-                arrIter.advance();
-            }
-            guard.reset();
-            return {setTag, setVal};
-        }
+    if (tag == TypeTags::ArraySet) {
+        auto arrSet = getArraySetView(val);
 
-        default:
-            MONGO_UNREACHABLE;
+        if (CollatorInterface::collatorsMatch(collator, arrSet->getCollator())) {
+            return makeCopyArraySet(*arrSet);
+        }
     }
+
+    auto [setTag, setVal] = makeNewArraySet(collator);
+    ValueGuard guard{setTag, setVal};
+    auto setView = getArraySetView(setVal);
+
+    auto arrIter = ArrayEnumerator{tag, val};
+    while (!arrIter.atEnd()) {
+        auto [elTag, elVal] = arrIter.getViewOfValue();
+        auto [copyTag, copyVal] = copyValue(elTag, elVal);
+        setView->push_back(copyTag, copyVal);
+        arrIter.advance();
+    }
+    guard.reset();
+    return {setTag, setVal};
 }
 }  // namespace value
 }  // namespace sbe

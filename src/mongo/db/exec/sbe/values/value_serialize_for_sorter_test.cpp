@@ -124,6 +124,6 @@ TEST(ValueSerializeForSorter, Serialize) {
     BufReader reader(buffer.get(), buffer.capacity());
     value::MaterializedRow roundTripRow = value::MaterializedRow::deserializeForSorter(reader, {});
 
-    ASSERT(originalRow == roundTripRow);
+    ASSERT(value::MaterializedRowEq()(originalRow, roundTripRow));
 }
 }  // namespace mongo::sbe

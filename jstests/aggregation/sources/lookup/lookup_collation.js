@@ -4,7 +4,6 @@
  * the fix for SERVER-43350.
  * @tags: [
  *   assumes_unsharded_collection,
- *   sbe_incompatible,
  * ]
  */
 load("jstests/aggregation/extras/utils.js");  // For anyEq.

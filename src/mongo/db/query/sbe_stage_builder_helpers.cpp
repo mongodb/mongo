@@ -44,13 +44,68 @@
 
 namespace mongo::stage_builder {
 
+std::unique_ptr<sbe::EExpression> makeUnaryOp(sbe::EPrimUnary::Op unaryOp,
+                                              std::unique_ptr<sbe::EExpression> operand) {
+    return sbe::makeE<sbe::EPrimUnary>(unaryOp, std::move(operand));
+}
+
+std::unique_ptr<sbe::EExpression> makeNot(std::unique_ptr<sbe::EExpression> e) {
+    return makeUnaryOp(sbe::EPrimUnary::logicNot, std::move(e));
+}
+
+std::unique_ptr<sbe::EExpression> makeBinaryOp(sbe::EPrimBinary::Op binaryOp,
+                                               std::unique_ptr<sbe::EExpression> lhs,
+                                               std::unique_ptr<sbe::EExpression> rhs,
+                                               std::unique_ptr<sbe::EExpression> collator) {
+    using namespace std::literals;
+
+    if (collator && sbe::EPrimBinary::isComparisonOp(binaryOp)) {
+        return sbe::makeE<sbe::EPrimBinary>(
+            binaryOp, std::move(lhs), std::move(rhs), std::move(collator));
+    } else {
+        return sbe::makeE<sbe::EPrimBinary>(binaryOp, std::move(lhs), std::move(rhs));
+    }
+}
+
+std::unique_ptr<sbe::EExpression> makeBinaryOp(sbe::EPrimBinary::Op binaryOp,
+                                               std::unique_ptr<sbe::EExpression> lhs,
+                                               std::unique_ptr<sbe::EExpression> rhs,
+                                               sbe::RuntimeEnvironment* env) {
+    invariant(env);
+
+    auto collatorSlot = env->getSlotIfExists("collator"_sd);
+    auto collatorVar = collatorSlot ? sbe::makeE<sbe::EVariable>(*collatorSlot) : nullptr;
+
+    return makeBinaryOp(binaryOp, std::move(lhs), std::move(rhs), std::move(collatorVar));
+}
+
+std::unique_ptr<sbe::EExpression> makeIsMember(std::unique_ptr<sbe::EExpression> input,
+                                               std::unique_ptr<sbe::EExpression> arr,
+                                               std::unique_ptr<sbe::EExpression> collator) {
+    if (collator) {
+        return makeFunction("collIsMember", std::move(collator), std::move(input), std::move(arr));
+    } else {
+        return makeFunction("isMember", std::move(input), std::move(arr));
+    }
+}
+
+std::unique_ptr<sbe::EExpression> makeIsMember(std::unique_ptr<sbe::EExpression> input,
+                                               std::unique_ptr<sbe::EExpression> arr,
+                                               sbe::RuntimeEnvironment* env) {
+    invariant(env);
+
+    auto collatorSlot = env->getSlotIfExists("collator"_sd);
+    auto collatorVar = collatorSlot ? sbe::makeE<sbe::EVariable>(*collatorSlot) : nullptr;
+
+    return makeIsMember(std::move(input), std::move(arr), std::move(collatorVar));
+}
+
 std::unique_ptr<sbe::EExpression> generateNullOrMissing(const sbe::EVariable& var) {
-    return sbe::makeE<sbe::EPrimBinary>(
-        sbe::EPrimBinary::logicOr,
-        makeNot(makeFunction("exists", var.clone())),
-        sbe::makeE<sbe::ETypeMatch>(var.clone(),
-                                    getBSONTypeMask(BSONType::jstNULL) |
-                                        getBSONTypeMask(BSONType::Undefined)));
+    return makeBinaryOp(sbe::EPrimBinary::logicOr,
+                        makeNot(makeFunction("exists", var.clone())),
+                        sbe::makeE<sbe::ETypeMatch>(var.clone(),
+                                                    getBSONTypeMask(BSONType::jstNULL) |
+                                                        getBSONTypeMask(BSONType::Undefined)));
 }
 
 std::unique_ptr<sbe::EExpression> generateNullOrMissing(const sbe::FrameId frameId,
@@ -60,66 +115,54 @@ std::unique_ptr<sbe::EExpression> generateNullOrMissing(const sbe::FrameId frame
 }
 
 std::unique_ptr<sbe::EExpression> generateNonNumericCheck(const sbe::EVariable& var) {
-    return sbe::makeE<sbe::EPrimUnary>(
-        sbe::EPrimUnary::logicNot,
-        sbe::makeE<sbe::EFunction>("isNumber", sbe::makeEs(var.clone())));
+    return makeNot(makeFunction("isNumber", var.clone()));
 }
 
 std::unique_ptr<sbe::EExpression> generateLongLongMinCheck(const sbe::EVariable& var) {
-    return sbe::makeE<sbe::EPrimBinary>(
+    return makeBinaryOp(
         sbe::EPrimBinary::logicAnd,
         sbe::makeE<sbe::ETypeMatch>(var.clone(),
                                     MatcherTypeSet{BSONType::NumberLong}.getBSONTypeMask()),
-        sbe::makeE<sbe::EPrimBinary>(
-            sbe::EPrimBinary::eq,
-            var.clone(),
-            sbe::makeE<sbe::EConstant>(
-                sbe::value::TypeTags::NumberInt64,
-                sbe::value::bitcastFrom<int64_t>(std::numeric_limits<int64_t>::min()))));
+        makeBinaryOp(sbe::EPrimBinary::eq,
+                     var.clone(),
+                     sbe::makeE<sbe::EConstant>(
+                         sbe::value::TypeTags::NumberInt64,
+                         sbe::value::bitcastFrom<int64_t>(std::numeric_limits<int64_t>::min()))));
 }
 
 std::unique_ptr<sbe::EExpression> generateNaNCheck(const sbe::EVariable& var) {
-    return sbe::makeE<sbe::EFunction>("isNaN", sbe::makeEs(var.clone()));
+    return makeFunction("isNaN", var.clone());
 }
 
 std::unique_ptr<sbe::EExpression> generateNonPositiveCheck(const sbe::EVariable& var) {
-    return sbe::makeE<sbe::EPrimBinary>(
-        sbe::EPrimBinary::EPrimBinary::lessEq,
-        var.clone(),
-        sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32,
-                                   sbe::value::bitcastFrom<int32_t>(0)));
+    return makeBinaryOp(sbe::EPrimBinary::EPrimBinary::lessEq,
+                        var.clone(),
+                        sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32,
+                                                   sbe::value::bitcastFrom<int32_t>(0)));
 }
 
 std::unique_ptr<sbe::EExpression> generateNegativeCheck(const sbe::EVariable& var) {
-    return sbe::makeE<sbe::EPrimBinary>(
-        sbe::EPrimBinary::EPrimBinary::less,
-        var.clone(),
-        sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32,
-                                   sbe::value::bitcastFrom<int32_t>(0)));
+    return makeBinaryOp(sbe::EPrimBinary::EPrimBinary::less,
+                        var.clone(),
+                        sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32,
+                                                   sbe::value::bitcastFrom<int32_t>(0)));
 }
 
 std::unique_ptr<sbe::EExpression> generateNonObjectCheck(const sbe::EVariable& var) {
-    return sbe::makeE<sbe::EPrimUnary>(
-        sbe::EPrimUnary::logicNot,
-        sbe::makeE<sbe::EFunction>("isObject", sbe::makeEs(var.clone())));
+    return makeNot(makeFunction("isObject", var.clone()));
 }
 
 std::unique_ptr<sbe::EExpression> generateNonStringCheck(const sbe::EVariable& var) {
-    return sbe::makeE<sbe::EPrimUnary>(
-        sbe::EPrimUnary::logicNot,
-        sbe::makeE<sbe::EFunction>("isString", sbe::makeEs(var.clone())));
+    return makeNot(makeFunction("isString", var.clone()));
 }
 
 std::unique_ptr<sbe::EExpression> generateNullishOrNotRepresentableInt32Check(
     const sbe::EVariable& var) {
     auto numericConvert32 =
         sbe::makeE<sbe::ENumericConvert>(var.clone(), sbe::value::TypeTags::NumberInt32);
-    return sbe::makeE<sbe::EPrimBinary>(
-        sbe::EPrimBinary::logicOr,
-        generateNullOrMissing(var),
-        sbe::makeE<sbe::EPrimUnary>(
-            sbe::EPrimUnary::logicNot,
-            sbe::makeE<sbe::EFunction>("exists", sbe::makeEs(std::move(numericConvert32)))));
+    return makeBinaryOp(sbe::EPrimBinary::logicOr,
+                        generateNullOrMissing(var),
+                        makeNot(makeFunction("exists", std::move(numericConvert32))));
 }
 
 template <>
@@ -139,33 +182,26 @@ std::unique_ptr<sbe::PlanStage> makeLimitCoScanTree(PlanNodeId planNodeId, long 
         sbe::makeS<sbe::CoScanStage>(planNodeId), limit, boost::none, planNodeId);
 }
 
-std::unique_ptr<sbe::EExpression> makeNot(std::unique_ptr<sbe::EExpression> e) {
-    return sbe::makeE<sbe::EPrimUnary>(sbe::EPrimUnary::logicNot, std::move(e));
-}
-
 std::unique_ptr<sbe::EExpression> makeFillEmptyFalse(std::unique_ptr<sbe::EExpression> e) {
     using namespace std::literals;
-    return sbe::makeE<sbe::EFunction>(
-        "fillEmpty"sv,
-        sbe::makeEs(std::move(e),
-                    sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Boolean,
-                                               sbe::value::bitcastFrom<bool>(false))));
+    return makeFunction("fillEmpty"sv,
+                        std::move(e),
+                        sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Boolean,
+                                                   sbe::value::bitcastFrom<bool>(false)));
 }
 
 std::unique_ptr<sbe::EExpression> makeFillEmptyNull(std::unique_ptr<sbe::EExpression> e) {
     using namespace std::literals;
-    return sbe::makeE<sbe::EFunction>(
-        "fillEmpty"sv,
-        sbe::makeEs(std::move(e), sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0)));
+    return makeFunction(
+        "fillEmpty"sv, std::move(e), sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0));
 }
 
 std::unique_ptr<sbe::EExpression> makeNothingArrayCheck(
     std::unique_ptr<sbe::EExpression> isArrayInput, std::unique_ptr<sbe::EExpression> otherwise) {
     using namespace std::literals;
-    return sbe::makeE<sbe::EIf>(
-        sbe::makeE<sbe::EFunction>("isArray"sv, sbe::makeEs(std::move(isArrayInput))),
-        sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Nothing, 0),
-        std::move(otherwise));
+    return sbe::makeE<sbe::EIf>(makeFunction("isArray"sv, std::move(isArrayInput)),
+                                sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Nothing, 0),
+                                std::move(otherwise));
 }
 
 std::unique_ptr<sbe::EExpression> generateShardKeyBinding(
@@ -177,12 +213,11 @@ std::unique_ptr<sbe::EExpression> generateShardKeyBinding(
     invariant(level >= 0);
 
     auto makeGetFieldKeyPattern = [&](std::unique_ptr<sbe::EExpression> slot) {
-        return makeFillEmptyNull(sbe::makeE<sbe::EFunction>(
-            "getField"sv,
-            sbe::makeEs(std::move(slot), sbe::makeE<sbe::EConstant>([&]() {
-                            const auto fieldName = keyPatternField[level];
-                            return std::string_view{fieldName.rawData(), fieldName.size()};
-                        }()))));
+        return makeFillEmptyNull(
+            makeFunction("getField"sv, std::move(slot), sbe::makeE<sbe::EConstant>([&]() {
+                             const auto fieldName = keyPatternField[level];
+                             return std::string_view{fieldName.rawData(), fieldName.size()};
+                         }())));
     };
 
     if (level == keyPatternField.numParts() - 1) {
@@ -467,11 +502,10 @@ std::pair<sbe::value::SlotVector, std::unique_ptr<sbe::PlanStage>> generateVirtu
         projectSlots.emplace_back(slotIdGenerator->generate());
         projections.emplace(
             projectSlots.back(),
-            sbe::makeE<sbe::EFunction>(
-                "getElement"sv,
-                sbe::makeEs(sbe::makeE<sbe::EVariable>(scanSlot),
-                            sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32,
-                                                       sbe::value::bitcastFrom<int32_t>(i)))));
+            makeFunction("getElement"sv,
+                         sbe::makeE<sbe::EVariable>(scanSlot),
+                         sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32,
+                                                    sbe::value::bitcastFrom<int32_t>(i))));
     }
 
     return {std::move(projectSlots),

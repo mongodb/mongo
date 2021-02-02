@@ -250,18 +250,17 @@ EvalExprStagePair generatePathTraversal(EvalStage inputStage,
 
     // Generate the traverse stage for the current nested level.
     auto traverseOutputSlot = slotIdGenerator->generate();
-    auto outputStage =
-        makeTraverse(std::move(fromBranch),
-                     std::move(innerBranch),  // NOLINT(bugprone-use-after-move)
-                     fieldSlot,
-                     traverseOutputSlot,
-                     innerSlot,
-                     sbe::makeE<sbe::EPrimBinary>(sbe::EPrimBinary::logicOr,
-                                                  sbe::makeE<sbe::EVariable>(traverseOutputSlot),
-                                                  sbe::makeE<sbe::EVariable>(innerSlot)),
-                     sbe::makeE<sbe::EVariable>(traverseOutputSlot),
-                     planNodeId,
-                     1);
+    auto outputStage = makeTraverse(std::move(fromBranch),
+                                    std::move(innerBranch),  // NOLINT(bugprone-use-after-move)
+                                    fieldSlot,
+                                    traverseOutputSlot,
+                                    innerSlot,
+                                    makeBinaryOp(sbe::EPrimBinary::logicOr,
+                                                 sbe::makeE<sbe::EVariable>(traverseOutputSlot),
+                                                 sbe::makeE<sbe::EVariable>(innerSlot)),
+                                    sbe::makeE<sbe::EVariable>(traverseOutputSlot),
+                                    planNodeId,
+                                    1);
 
     auto outputSlot = slotIdGenerator->generate();
     outputStage = makeProject(std::move(outputStage),
@@ -279,13 +278,12 @@ EvalExprStagePair generatePathTraversal(EvalStage inputStage,
         EvalExpr outputExpr;
         std::tie(outputExpr, outputStage) = makePredicate(fieldSlot, std::move(outputStage));
 
-        outputExpr = sbe::makeE<sbe::EPrimBinary>(
+        outputExpr = makeBinaryOp(
             sbe::EPrimBinary::logicOr,
             sbe::makeE<sbe::EVariable>(outputSlot),
-            sbe::makeE<sbe::EPrimBinary>(
+            makeBinaryOp(
                 sbe::EPrimBinary::logicAnd,
-                makeFillEmptyFalse(sbe::makeE<sbe::EFunction>(
-                    "isArray", sbe::makeEs(sbe::makeE<sbe::EVariable>(fieldSlot)))),
+                makeFillEmptyFalse(makeFunction("isArray", sbe::makeE<sbe::EVariable>(fieldSlot))),
                 outputExpr.extractExpr()));
 
         return {std::move(outputExpr), std::move(outputStage)};  // NOLINT(bugprone-use-after-move)
@@ -351,39 +349,36 @@ void generateArraySize(MatchExpressionVisitorContext* context,
                                                    sbe::value::bitcastFrom<int64_t>(1)));
 
         auto traverseSlot = context->slotIdGenerator->generate();
-        auto traverseStage =
-            makeTraverse(EvalStage{},
-                         std::move(innerBranch),
-                         inputSlot,
-                         traverseSlot,
-                         innerSlot,
-                         sbe::makeE<sbe::EPrimBinary>(sbe::EPrimBinary::add,
-                                                      sbe::makeE<sbe::EVariable>(traverseSlot),
-                                                      sbe::makeE<sbe::EVariable>(innerSlot)),
-                         nullptr,
-                         context->planNodeId,
-                         1);
+        auto traverseStage = makeTraverse(EvalStage{},
+                                          std::move(innerBranch),
+                                          inputSlot,
+                                          traverseSlot,
+                                          innerSlot,
+                                          makeBinaryOp(sbe::EPrimBinary::add,
+                                                       sbe::makeE<sbe::EVariable>(traverseSlot),
+                                                       sbe::makeE<sbe::EVariable>(innerSlot)),
+                                          nullptr,
+                                          context->planNodeId,
+                                          1);
 
         // If the traversal result was not Nothing, compare it to the user provided value. If the
         // traversal result was Nothing, that means the array was empty, so replace Nothing with 0
         // and compare it to the user provided value.
-        auto sizeOutput = sbe::makeE<sbe::EPrimBinary>(
+        auto sizeOutput = makeBinaryOp(
             sbe::EPrimBinary::eq,
             sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64,
                                        sbe::value::bitcastFrom<int64_t>(size)),
-            sbe::makeE<sbe::EIf>(
-                sbe::makeE<sbe::EFunction>("exists",
-                                           sbe::makeEs(sbe::makeE<sbe::EVariable>(traverseSlot))),
-                sbe::makeE<sbe::EVariable>(traverseSlot),
-                sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64,
-                                           sbe::value::bitcastFrom<int64_t>(0))));
+            sbe::makeE<sbe::EIf>(makeFunction("exists", sbe::makeE<sbe::EVariable>(traverseSlot)),
+                                 sbe::makeE<sbe::EVariable>(traverseSlot),
+                                 sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64,
+                                                            sbe::value::bitcastFrom<int64_t>(0))));
 
         std::vector<EvalExprStagePair> branches;
 
         // Check that the thing we are about traverse is indeed an array.
-        branches.emplace_back(makeFillEmptyFalse(sbe::makeE<sbe::EFunction>(
-                                  "isArray", sbe::makeEs(sbe::makeE<sbe::EVariable>(inputSlot)))),
-                              EvalStage{});
+        branches.emplace_back(
+            makeFillEmptyFalse(makeFunction("isArray", sbe::makeE<sbe::EVariable>(inputSlot))),
+            EvalStage{});
 
         branches.emplace_back(std::move(sizeOutput), std::move(traverseStage));
 
@@ -410,8 +405,8 @@ void generateArraySize(MatchExpressionVisitorContext* context,
 void generateComparison(MatchExpressionVisitorContext* context,
                         const ComparisonMatchExpression* expr,
                         sbe::EPrimBinary::Op binaryOp) {
-    auto makePredicate = [expr, binaryOp](sbe::value::SlotId inputSlot,
-                                          EvalStage inputStage) -> EvalExprStagePair {
+    auto makePredicate = [context, expr, binaryOp](sbe::value::SlotId inputSlot,
+                                                   EvalStage inputStage) -> EvalExprStagePair {
         const auto& rhs = expr->getData();
         auto [tagView, valView] = sbe::bson::convertFrom(
             true, rhs.rawdata(), rhs.rawdata() + rhs.size(), rhs.fieldNameSize() - 1);
@@ -479,11 +474,11 @@ void generateComparison(MatchExpressionVisitorContext* context,
                     break;
             }
         }
-        return {
-            makeFillEmptyFalse(sbe::makeE<sbe::EPrimBinary>(binaryOp,
-                                                            sbe::makeE<sbe::EVariable>(inputSlot),
-                                                            sbe::makeE<sbe::EConstant>(tag, val))),
-            std::move(inputStage)};
+        return {makeFillEmptyFalse(makeBinaryOp(binaryOp,
+                                                sbe::makeE<sbe::EVariable>(inputSlot),
+                                                sbe::makeE<sbe::EConstant>(tag, val),
+                                                context->env)),
+                std::move(inputStage)};
     };
 
     generatePredicate(context, expr->path(), std::move(makePredicate));
@@ -551,8 +546,7 @@ void generateBitTest(MatchExpressionVisitorContext* context,
 
             // The AnyClear case is the negation of the AllSet case.
             if (bitTestBehavior == sbe::BitTestBehavior::AnyClear) {
-                numericBitTestEExpr = sbe::makeE<sbe::EPrimUnary>(sbe::EPrimUnary::logicNot,
-                                                                  std::move(numericBitTestEExpr));
+                numericBitTestEExpr = makeNot(std::move(numericBitTestEExpr));
             }
         } else if (bitTestBehavior == sbe::BitTestBehavior::AllClear ||
                    bitTestBehavior == sbe::BitTestBehavior::AnySet) {
@@ -562,8 +556,7 @@ void generateBitTest(MatchExpressionVisitorContext* context,
 
             // The AnySet case is the negation of the AllClear case.
             if (bitTestBehavior == sbe::BitTestBehavior::AnySet) {
-                numericBitTestEExpr = sbe::makeE<sbe::EPrimUnary>(sbe::EPrimUnary::logicNot,
-                                                                  std::move(numericBitTestEExpr));
+                numericBitTestEExpr = makeNot(std::move(numericBitTestEExpr));
             }
         } else {
             MONGO_UNREACHABLE;
@@ -873,10 +866,10 @@ public:
             auto [predicateSlot, predicateStage] = projectEvalExpr(
                 std::move(expr), std::move(stage), _context->planNodeId, _context->slotIdGenerator);
 
-            auto isObjectOrArrayExpr = sbe::makeE<sbe::EPrimBinary>(
-                sbe::EPrimBinary::logicOr,
-                makeFunction("isObject", sbe::makeE<sbe::EVariable>(childInputSlot)),
-                makeFunction("isArray", sbe::makeE<sbe::EVariable>(childInputSlot)));
+            auto isObjectOrArrayExpr =
+                makeBinaryOp(sbe::EPrimBinary::logicOr,
+                             makeFunction("isObject", sbe::makeE<sbe::EVariable>(childInputSlot)),
+                             makeFunction("isArray", sbe::makeE<sbe::EVariable>(childInputSlot)));
             predicateStage = makeFilter<true>(
                 std::move(predicateStage), std::move(isObjectOrArrayExpr), _context->planNodeId);
             return std::make_pair(predicateSlot, std::move(predicateStage));
@@ -906,9 +899,9 @@ public:
                 childInputSlot,
                 traverseSlot,
                 filterSlot,
-                sbe::makeE<sbe::EPrimBinary>(sbe::EPrimBinary::logicOr,
-                                             sbe::makeE<sbe::EVariable>(traverseSlot),
-                                             sbe::makeE<sbe::EVariable>(filterSlot)),
+                makeBinaryOp(sbe::EPrimBinary::logicOr,
+                             sbe::makeE<sbe::EVariable>(traverseSlot),
+                             sbe::makeE<sbe::EVariable>(filterSlot)),
                 sbe::makeE<sbe::EVariable>(traverseSlot),
                 _context->planNodeId,
                 1);
@@ -977,9 +970,9 @@ public:
                 childInputSlot,
                 traverseSlot,
                 filterSlot,
-                sbe::makeE<sbe::EPrimBinary>(sbe::EPrimBinary::logicOr,
-                                             sbe::makeE<sbe::EVariable>(traverseSlot),
-                                             sbe::makeE<sbe::EVariable>(filterSlot)),
+                makeBinaryOp(sbe::EPrimBinary::logicOr,
+                             sbe::makeE<sbe::EVariable>(traverseSlot),
+                             sbe::makeE<sbe::EVariable>(filterSlot)),
                 sbe::makeE<sbe::EVariable>(traverseSlot),
                 _context->planNodeId,
                 1);
@@ -1059,7 +1052,6 @@ public:
         auto arrSet = sbe::value::getArraySetView(arrSetVal);
 
         for (auto&& equality : equalities) {
-
             auto [tagView, valView] = sbe::bson::convertFrom(true,
                                                              equality.rawdata(),
                                                              equality.rawdata() + equality.size(),
@@ -1080,10 +1072,9 @@ public:
                 // makePredicate function can be invoked multiple times in 'generateTraverse'.
                 auto [equalitiesTag, equalitiesVal] = sbe::value::copyValue(arrSetTag, arrSetVal);
 
-                return {sbe::makeE<sbe::EFunction>(
-                            "isMember",
-                            sbe::makeEs(sbe::makeE<sbe::EVariable>(inputSlot),
-                                        sbe::makeE<sbe::EConstant>(equalitiesTag, equalitiesVal))),
+                return {makeIsMember(sbe::makeE<sbe::EVariable>(inputSlot),
+                                     sbe::makeE<sbe::EConstant>(equalitiesTag, equalitiesVal),
+                                     _context->env),
                         std::move(inputStage)};
             };
 
@@ -1139,18 +1130,18 @@ public:
                                     sbe::makeEs(sbe::makeE<sbe::EVariable>(regexArraySlot),
                                                 sbe::makeE<sbe::EVariable>(inputSlot)))));
 
-                auto regexStage = makeTraverse(
-                    std::move(regexFromStage),
-                    std::move(regexInnerStage),
-                    regexArraySlot,
-                    regexOutputSlot,
-                    regexInputSlot,
-                    sbe::makeE<sbe::EPrimBinary>(sbe::EPrimBinary::logicOr,
-                                                 sbe::makeE<sbe::EVariable>(regexOutputSlot),
-                                                 sbe::makeE<sbe::EVariable>(regexInputSlot)),
-                    sbe::makeE<sbe::EVariable>(regexOutputSlot),
-                    _context->planNodeId,
-                    0);
+                auto regexStage =
+                    makeTraverse(std::move(regexFromStage),
+                                 std::move(regexInnerStage),
+                                 regexArraySlot,
+                                 regexOutputSlot,
+                                 regexInputSlot,
+                                 makeBinaryOp(sbe::EPrimBinary::logicOr,
+                                              sbe::makeE<sbe::EVariable>(regexOutputSlot),
+                                              sbe::makeE<sbe::EVariable>(regexInputSlot)),
+                                 sbe::makeE<sbe::EVariable>(regexOutputSlot),
+                                 _context->planNodeId,
+                                 0);
 
                 // If equalities are present in addition to regexes, build a limit-1/union
                 // short-circuiting OR between a filter stage that checks membership of the field
@@ -1160,10 +1151,9 @@ public:
                         sbe::value::copyValue(arrSetTag, arrSetVal);
                     std::vector<EvalExprStagePair> branches;
                     branches.emplace_back(
-                        sbe::makeE<sbe::EFunction>(
-                            "isMember",
-                            sbe::makeEs(sbe::makeE<sbe::EVariable>(inputSlot),
-                                        sbe::makeE<sbe::EConstant>(equalitiesTag, equalitiesVal))),
+                        makeIsMember(sbe::makeE<sbe::EVariable>(inputSlot),
+                                     sbe::makeE<sbe::EConstant>(equalitiesTag, equalitiesVal),
+                                     _context->env),
                         EvalStage{});
                     branches.emplace_back(regexOutputSlot, std::move(regexStage));
 
@@ -1249,7 +1239,7 @@ public:
                                            sbe::makeEs(sbe::makeE<sbe::EVariable>(inputSlot))),
                 sbe::value::TypeTags::NumberInt64);
 
-            return {makeFillEmptyFalse(sbe::makeE<sbe::EPrimBinary>(
+            return {makeFillEmptyFalse(makeBinaryOp(
                         sbe::EPrimBinary::eq,
                         sbe::makeE<sbe::EFunction>(
                             "mod",

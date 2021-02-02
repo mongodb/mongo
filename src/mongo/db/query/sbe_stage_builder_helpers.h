@@ -42,6 +42,32 @@
 
 namespace mongo::stage_builder {
 
+std::unique_ptr<sbe::EExpression> makeUnaryOp(sbe::EPrimUnary::Op unaryOp,
+                                              std::unique_ptr<sbe::EExpression> operand);
+
+/**
+ * Wrap expression into logical negation.
+ */
+std::unique_ptr<sbe::EExpression> makeNot(std::unique_ptr<sbe::EExpression> e);
+
+std::unique_ptr<sbe::EExpression> makeBinaryOp(sbe::EPrimBinary::Op binaryOp,
+                                               std::unique_ptr<sbe::EExpression> lhs,
+                                               std::unique_ptr<sbe::EExpression> rhs,
+                                               std::unique_ptr<sbe::EExpression> collator = {});
+
+std::unique_ptr<sbe::EExpression> makeBinaryOp(sbe::EPrimBinary::Op binaryOp,
+                                               std::unique_ptr<sbe::EExpression> lhs,
+                                               std::unique_ptr<sbe::EExpression> rhs,
+                                               sbe::RuntimeEnvironment* env);
+
+std::unique_ptr<sbe::EExpression> makeIsMember(std::unique_ptr<sbe::EExpression> input,
+                                               std::unique_ptr<sbe::EExpression> arr,
+                                               std::unique_ptr<sbe::EExpression> collator = {});
+
+std::unique_ptr<sbe::EExpression> makeIsMember(std::unique_ptr<sbe::EExpression> input,
+                                               std::unique_ptr<sbe::EExpression> arr,
+                                               sbe::RuntimeEnvironment* env);
+
 /**
  * Generates an EExpression that checks if the input expression is null or missing.
  */
@@ -144,11 +170,6 @@ EvalStage makeLimitCoScanStage(PlanNodeId planNodeId, long long limit = 1);
  * If 'stage.stage' is 'nullptr', return limit-1/coscan tree. Otherwise, return stage.
  */
 EvalStage stageOrLimitCoScan(EvalStage stage, PlanNodeId planNodeId, long long limit = 1);
-
-/**
- * Wrap expression into logical negation.
- */
-std::unique_ptr<sbe::EExpression> makeNot(std::unique_ptr<sbe::EExpression> e);
 
 /**
  * Check if expression returns Nothing and return boolean false if so. Otherwise, return the

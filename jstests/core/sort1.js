@@ -1,8 +1,3 @@
-/**
- * @tags: [
- *   sbe_incompatible,
- * ]
- */
 (function() {
 'use strict';
 
