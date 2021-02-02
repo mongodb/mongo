@@ -107,6 +107,41 @@ ExecutorFuture<void> storeExternalClusterTimeKeyDocsAndRefreshCache(
         });
 }
 
+void createRetryableWritesView(OperationContext* opCtx, Database* db) {
+    writeConflictRetry(
+        opCtx, "createDonorOplogView", "local.system.tenantMigration.oplogView", [&] {
+            {
+                // Create 'system.views' in a separate WUOW if it does not exist.
+                WriteUnitOfWork wuow(opCtx);
+                CollectionPtr coll = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(
+                    opCtx, NamespaceString(db->getSystemViewsName()));
+                if (!coll) {
+                    coll = db->createCollection(opCtx, NamespaceString(db->getSystemViewsName()));
+                }
+                invariant(coll);
+                wuow.commit();
+            }
+
+            // First match entries with a `stmtId` so that we're filtering for retryable writes
+            // oplog entries. Pass the result into the next stage of the pipeline and only project
+            // the fields that a tenant migration recipient needs to refetch retryable writes oplog
+            // entries: `ts`, `prevOpTime`, `preImageOpTime`, and `postImageOpTime`.
+            CollectionOptions options;
+            options.viewOn = NamespaceString::kRsOplogNamespace.coll().toString();
+            options.pipeline = BSON_ARRAY(
+                BSON("$match" << BSON("stmtId" << BSON("$exists" << true)))
+                << BSON("$project" << BSON("_id"
+                                           << "$ts"
+                                           << "ns" << 1 << "ts" << 1 << "prevOpTime" << 1
+                                           << "preImageOpTime" << 1 << "postImageOpTime" << 1)));
+
+            WriteUnitOfWork wuow(opCtx);
+            uassertStatusOK(db->createView(
+                opCtx, NamespaceString("local.system.tenantMigration.oplogView"), options));
+            wuow.commit();
+        });
+}
+
 }  // namespace tenant_migration_util
 
 }  // namespace mongo

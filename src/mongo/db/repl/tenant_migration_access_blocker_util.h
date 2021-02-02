@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/db/catalog/database.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/tenant_migration_donor_cmds_gen.h"
 #include "mongo/db/operation_context.h"
@@ -99,12 +98,6 @@ void handleTenantMigrationConflict(OperationContext* opCtx, Status status);
  * Append a no-op to the oplog.
  */
 void performNoopWrite(OperationContext* opCtx, StringData msg);
-
-/**
- * Creates a view on the oplog that allows a tenant migration recipient to fetch retryable writes
- * from a tenant migration donor.
- */
-void createRetryableWritesView(OperationContext* opCtx, Database* db);
 
 }  // namespace tenant_migration_access_blocker
 

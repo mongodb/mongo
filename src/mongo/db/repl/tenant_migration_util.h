@@ -35,6 +35,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/client/mongo_uri.h"
 #include "mongo/config.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/keys_collection_document_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/executor/scoped_task_executor.h"
@@ -145,6 +146,12 @@ ExecutorFuture<void> storeExternalClusterTimeKeyDocsAndRefreshCache(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     std::vector<ExternalKeysCollectionDocument> keyDocs,
     const CancelationToken& token);
+
+/**
+ * Creates a view on the oplog that allows a tenant migration recipient to fetch retryable writes
+ * from a tenant migration donor.
+ */
+void createRetryableWritesView(OperationContext* opCtx, Database* db);
 
 }  // namespace tenant_migration_util
 
