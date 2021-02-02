@@ -419,6 +419,12 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
     long long nInvalid = 0;
     long long numCorruptRecordsSizeBytes = 0;
 
+    ON_BLOCK_EXIT([&]() {
+        output->appendNumber("nInvalidDocuments", nInvalid);
+        output->appendNumber("nrecords", _numRecords);
+        _progress->finished();
+    });
+
     results->valid = true;
     RecordId prevRecordId;
 
@@ -435,6 +441,11 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
     {
         stdx::unique_lock<Client> lk(*opCtx->getClient());
         _progress.set(CurOp::get(opCtx)->setProgress_inlock(curopMessage, totalRecords));
+    }
+
+    if (_validateState->getFirstRecordId().isNull()) {
+        // The record store is empty if the first RecordId isn't initialized.
+        return;
     }
 
     bool corruptRecordsSizeLimitWarning = false;
@@ -538,11 +549,6 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
         _validateState->getCollection()->getRecordStore()->updateStatsAfterRepair(
             opCtx, _numRecords, dataSizeTotal);
     }
-
-    _progress->finished();
-
-    output->appendNumber("nInvalidDocuments", nInvalid);
-    output->appendNumber("nrecords", _numRecords);
 }
 
 void ValidateAdaptor::validateIndexKeyCount(const IndexCatalogEntry* index,
