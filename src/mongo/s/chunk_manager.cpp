@@ -772,6 +772,36 @@ RoutingTableHistory RoutingTableHistory::makeUpdated(
                                std::move(chunkMap));
 }
 
+RoutingTableHistory RoutingTableHistory::makeUpdatedReplacingTimestamp(
+    const boost::optional<Timestamp>& timestamp) const {
+    invariant(getVersion().getTimestamp().is_initialized() != timestamp.is_initialized());
+
+    ChunkMap newMap(getVersion().epoch(), timestamp, _chunkMap.size());
+    _chunkMap.forEach([&](const std::shared_ptr<ChunkInfo>& chunkInfo) {
+        const ChunkVersion oldVersion = chunkInfo->getLastmod();
+        newMap.appendChunk(std::make_shared<ChunkInfo>(chunkInfo->getRange(),
+                                                       chunkInfo->getMaxKeyString(),
+                                                       chunkInfo->getShardId(),
+                                                       ChunkVersion(oldVersion.minorVersion(),
+                                                                    oldVersion.majorVersion(),
+                                                                    oldVersion.epoch(),
+                                                                    timestamp),
+                                                       chunkInfo->getHistory(),
+                                                       chunkInfo->isJumbo(),
+                                                       chunkInfo->getWritesTracker()));
+        return true;
+    });
+
+    return RoutingTableHistory(_nss,
+                               _uuid,
+                               getShardKeyPattern().getKeyPattern(),
+                               CollatorInterface::cloneCollator(getDefaultCollator()),
+                               _unique,
+                               _reshardingFields,
+                               _allowMigrations,
+                               std::move(newMap));
+}
+
 AtomicWord<uint64_t> ComparableChunkVersion::_epochDisambiguatingSequenceNumSource{1ULL};
 AtomicWord<uint64_t> ComparableChunkVersion::_forcedRefreshSequenceNumSource{1ULL};
 
@@ -785,6 +815,13 @@ ComparableChunkVersion ComparableChunkVersion::makeComparableChunkVersion(
 ComparableChunkVersion ComparableChunkVersion::makeComparableChunkVersionForForcedRefresh() {
     return ComparableChunkVersion(_forcedRefreshSequenceNumSource.addAndFetch(2) - 1,
                                   boost::none,
+                                  _epochDisambiguatingSequenceNumSource.fetchAndAdd(1));
+}
+
+ComparableChunkVersion ComparableChunkVersion::makeComparableChunkVersionForForcedRefresh(
+    const ChunkVersion& version) {
+    return ComparableChunkVersion(_forcedRefreshSequenceNumSource.addAndFetch(1),
+                                  version,
                                   _epochDisambiguatingSequenceNumSource.fetchAndAdd(1));
 }
 

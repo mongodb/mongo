@@ -123,16 +123,29 @@ public:
     static ComparableDatabaseVersion makeComparableDatabaseVersion(const DatabaseVersion& version);
 
     /**
+     * Creates a new instance which will artificially be greater than any
+     * previously created ComparableDatabaseVersion and smaller than any instance
+     * created afterwards. Used as means to cause the collections cache to
+     * attempt a refresh in situations where causal consistency cannot be
+     * inferred.
+     */
+    static ComparableDatabaseVersion makeComparableDatabaseVersionForForcedRefresh();
+
+    /**
+     * Creates a new instance which will artificially be greater than any
+     * previously created ComparableDatabaseVersion. Instances created afterwards
+     * will be compared as-if this object was a normal (i.e. non-forced) ComparableDatabaseVersion.
+     */
+    static ComparableDatabaseVersion makeComparableDatabaseVersionForForcedRefresh(
+        const DatabaseVersion& version);
+
+    /**
      * Empty constructor needed by the ReadThroughCache.
      *
      * Instances created through this constructor will be always less then the ones created through
      * the static constructor.
      */
     ComparableDatabaseVersion() = default;
-
-    const DatabaseVersion& getVersion() const {
-        return *_dbVersion;
-    }
 
     BSONObj toBSONForLogging() const;
 
@@ -163,10 +176,14 @@ public:
 
 private:
     static AtomicWord<uint64_t> _uuidDisambiguatingSequenceNumSource;
+    static AtomicWord<uint64_t> _forcedRefreshSequenceNumSource;
 
-    ComparableDatabaseVersion(const DatabaseVersion& version,
-                              uint64_t uuidDisambiguatingSequenceNum)
-        : _dbVersion(version), _uuidDisambiguatingSequenceNum(uuidDisambiguatingSequenceNum) {}
+    ComparableDatabaseVersion(boost::optional<DatabaseVersion> version,
+                              uint64_t uuidDisambiguatingSequenceNum,
+                              uint64_t forcedRefreshSequenceNum)
+        : _dbVersion(std::move(version)),
+          _uuidDisambiguatingSequenceNum(uuidDisambiguatingSequenceNum),
+          _forcedRefreshSequenceNum(forcedRefreshSequenceNum) {}
 
     boost::optional<DatabaseVersion> _dbVersion;
 
@@ -174,6 +191,7 @@ private:
     // different UUIDs. Each new comparableDatabaseVersion will have a greater sequence number then
     // the ones created before.
     uint64_t _uuidDisambiguatingSequenceNum{0};
+    uint64_t _forcedRefreshSequenceNum{0};
 };
 
 

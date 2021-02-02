@@ -39,7 +39,6 @@ TEST(ComparableChunkVersionTest, VersionsEqual) {
     auto versionsEqual = [](const ChunkVersion& v1, const ChunkVersion& v2) {
         const auto version1 = ComparableChunkVersion::makeComparableChunkVersion(v1);
         const auto version2 = ComparableChunkVersion::makeComparableChunkVersion(v2);
-        ASSERT(version1.getVersion() == version2.getVersion());
         ASSERT(version1 == version2);
     };
 
@@ -344,6 +343,40 @@ TEST(ComparableChunkVersionTest, CompareTwoForcedRefreshVersions) {
     ASSERT_FALSE(forcedRefreshVersion1 == forcedRefreshVersion2);
     ASSERT(forcedRefreshVersion1 < forcedRefreshVersion2);
     ASSERT_FALSE(forcedRefreshVersion1 > forcedRefreshVersion2);
+}
+
+TEST(ComparableChunkVersionTest, CompareTwoVersionsWithVersionedForcedRefresh) {
+    auto compareTwoVersionsWithVersionedForcedRefresh = [](const ChunkVersion& oldV,
+                                                           const ChunkVersion& newV) {
+        const auto newVersionBeforeForce = ComparableChunkVersion::makeComparableChunkVersion(newV);
+        const auto oldVersionBeforeForce = ComparableChunkVersion::makeComparableChunkVersion(oldV);
+        ASSERT(oldVersionBeforeForce < newVersionBeforeForce);
+
+        const auto oldVersionWithForce =
+            ComparableChunkVersion::makeComparableChunkVersionForForcedRefresh(oldV);
+        ASSERT(oldVersionBeforeForce < oldVersionWithForce);
+        ASSERT(newVersionBeforeForce < oldVersionWithForce);
+
+        const auto newVersionAfterForce = ComparableChunkVersion::makeComparableChunkVersion(newV);
+        const auto oldVersionAfterForce = ComparableChunkVersion::makeComparableChunkVersion(oldV);
+        ASSERT(oldVersionAfterForce < newVersionAfterForce);
+
+        ASSERT(newVersionBeforeForce != newVersionAfterForce);
+        ASSERT(oldVersionBeforeForce != oldVersionAfterForce);
+
+        ASSERT(oldVersionWithForce < newVersionAfterForce);
+        ASSERT_FALSE(oldVersionWithForce < oldVersionAfterForce);
+        ASSERT_FALSE(oldVersionWithForce > oldVersionAfterForce);
+        ASSERT(oldVersionWithForce == oldVersionAfterForce);
+    };
+
+    const auto epoch = OID::gen();
+    compareTwoVersionsWithVersionedForcedRefresh(
+        ChunkVersion(100, 0, epoch, boost::none /* timestamp */),
+        ChunkVersion(100, 1, epoch, boost::none /* timestamp */));
+
+    compareTwoVersionsWithVersionedForcedRefresh(ChunkVersion(100, 0, epoch, Timestamp(1)),
+                                                 ChunkVersion(100, 1, epoch, Timestamp(1)));
 }
 
 }  // namespace

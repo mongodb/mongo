@@ -476,7 +476,7 @@ CatalogCache::DatabaseCache::DatabaseCache(ServiceContext* service,
                               const std::string& dbName,
                               const ValueHandle& db,
                               const ComparableDatabaseVersion& previousDbVersion) {
-                           return _lookupDatabase(opCtx, dbName, previousDbVersion);
+                           return _lookupDatabase(opCtx, dbName, db, previousDbVersion);
                        },
                        kDatabaseCacheSize),
       _catalogCacheLoader(catalogCacheLoader) {}
@@ -484,6 +484,7 @@ CatalogCache::DatabaseCache::DatabaseCache(ServiceContext* service,
 CatalogCache::DatabaseCache::LookupResult CatalogCache::DatabaseCache::_lookupDatabase(
     OperationContext* opCtx,
     const std::string& dbName,
+    const DatabaseTypeValueHandle& previousDbType,
     const ComparableDatabaseVersion& previousDbVersion) {
     // TODO (SERVER-34164): Track and increment stats for database refreshes
 
@@ -496,8 +497,14 @@ CatalogCache::DatabaseCache::LookupResult CatalogCache::DatabaseCache::_lookupDa
             Grid::get(opCtx)->shardRegistry()->getShard(opCtx, newDb.getPrimary()),
             str::stream() << "The primary shard for database " << dbName << " does not exist");
 
-        auto newDbVersion =
-            ComparableDatabaseVersion::makeComparableDatabaseVersion(newDb.getVersion());
+        const bool mustReplaceEntryDueToUpgradeOrDowngrade = previousDbType &&
+            (previousDbType->getVersion().getTimestamp().is_initialized() !=
+             newDb.getVersion().getTimestamp().is_initialized());
+
+        auto newDbVersion = mustReplaceEntryDueToUpgradeOrDowngrade
+            ? ComparableDatabaseVersion::makeComparableDatabaseVersionForForcedRefresh(
+                  newDb.getVersion())
+            : ComparableDatabaseVersion::makeComparableDatabaseVersion(newDb.getVersion());
 
         LOGV2_FOR_CATALOG_REFRESH(24101,
                                   1,
@@ -591,15 +598,25 @@ CatalogCache::CollectionCache::LookupResult CatalogCache::CollectionCache::_look
 
         auto collectionAndChunks = _catalogCacheLoader.getChunksSince(nss, lookupVersion).get();
 
+        bool mustReplaceEntryDueToUpgradeOrDowngrade = false;
         auto newRoutingHistory = [&] {
             // If we have routing info already and it's for the same collection epoch, we're
             // updating. Otherwise, we're making a whole new routing table.
             if (isIncremental &&
                 existingHistory->optRt->getVersion().epoch() == collectionAndChunks.epoch) {
-
-                return existingHistory->optRt->makeUpdated(collectionAndChunks.reshardingFields,
-                                                           collectionAndChunks.allowMigrations,
-                                                           collectionAndChunks.changedChunks);
+                if (existingHistory->optRt->getVersion().getTimestamp().is_initialized() !=
+                    collectionAndChunks.creationTime.is_initialized()) {
+                    mustReplaceEntryDueToUpgradeOrDowngrade = true;
+                    return existingHistory->optRt
+                        ->makeUpdatedReplacingTimestamp(collectionAndChunks.creationTime)
+                        .makeUpdated(collectionAndChunks.reshardingFields,
+                                     collectionAndChunks.allowMigrations,
+                                     collectionAndChunks.changedChunks);
+                } else {
+                    return existingHistory->optRt->makeUpdated(collectionAndChunks.reshardingFields,
+                                                               collectionAndChunks.allowMigrations,
+                                                               collectionAndChunks.changedChunks);
+                }
             }
 
             auto defaultCollator = [&]() -> std::unique_ptr<CollatorInterface> {
@@ -635,8 +652,10 @@ CatalogCache::CollectionCache::LookupResult CatalogCache::CollectionCache::_look
                                                      << " references shard which does not exist");
         }
 
-        const auto newVersion =
-            ComparableChunkVersion::makeComparableChunkVersion(newRoutingHistory.getVersion());
+        auto newVersion = (mustReplaceEntryDueToUpgradeOrDowngrade)
+            ? ComparableChunkVersion::makeComparableChunkVersionForForcedRefresh(
+                  newRoutingHistory.getVersion())
+            : ComparableChunkVersion::makeComparableChunkVersion(newRoutingHistory.getVersion());
 
         invariant(isIncremental == false ||
                       (existingHistory->optRt->getVersion().epoch() !=
@@ -656,7 +675,8 @@ CatalogCache::CollectionCache::LookupResult CatalogCache::CollectionCache::_look
                                   "duration"_attr = Milliseconds(t.millis()));
         _updateRefreshesStats(isIncremental, false);
 
-        return LookupResult(OptionalRoutingTableHistory(std::move(newRoutingHistory)), newVersion);
+        return LookupResult(OptionalRoutingTableHistory(std::move(newRoutingHistory)),
+                            std::move(newVersion));
     } catch (const DBException& ex) {
         _stats.countFailedRefreshes.addAndFetch(1);
         _updateRefreshesStats(isIncremental, false);

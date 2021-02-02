@@ -238,6 +238,7 @@ private:
     private:
         LookupResult _lookupDatabase(OperationContext* opCtx,
                                      const std::string& dbName,
+                                     const ValueHandle& dbType,
                                      const ComparableDatabaseVersion& previousDbVersion);
 
         CatalogCacheLoader& _catalogCacheLoader;

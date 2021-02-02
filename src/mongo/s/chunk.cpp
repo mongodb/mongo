@@ -50,6 +50,21 @@ ChunkInfo::ChunkInfo(const ChunkType& from)
     uassertStatusOK(from.validate());
 }
 
+ChunkInfo::ChunkInfo(ChunkRange range,
+                     std::string maxKeyString,
+                     ShardId shardId,
+                     ChunkVersion version,
+                     std::vector<ChunkHistory> history,
+                     bool jumbo,
+                     std::shared_ptr<ChunkWritesTracker> writesTracker)
+    : _range(std::move(range)),
+      _maxKeyString(std::move(maxKeyString)),
+      _shardId(shardId),
+      _lastmod(std::move(version)),
+      _history(std::move(history)),
+      _jumbo(jumbo),
+      _writesTracker(writesTracker) {}
+
 const ShardId& ChunkInfo::getShardIdAt(const boost::optional<Timestamp>& ts) const {
     // This chunk was refreshed from FCV 3.6 config server so it doesn't have history
     if (_history.empty()) {

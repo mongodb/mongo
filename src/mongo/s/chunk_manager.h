@@ -190,6 +190,13 @@ public:
         bool allowMigrations,
         const std::vector<ChunkType>& changedChunks) const;
 
+    /**
+     * Constructs a new instance with the same routing table but adding or removing timestamp on all
+     * chunks
+     */
+    RoutingTableHistory makeUpdatedReplacingTimestamp(
+        const boost::optional<Timestamp>& timestamp) const;
+
     const NamespaceString& nss() const {
         return _nss;
     }
@@ -372,12 +379,21 @@ public:
     static ComparableChunkVersion makeComparableChunkVersion(const ChunkVersion& version);
 
     /**
-     * Creates a ComparableChunkVersion object, which will artificially be greater than any that
-     * were previously created by `makeComparableChunkVersion`. Used as means to cause the
-     * collections cache to attempt a refresh in situations where causal consistency cannot be
+     * Creates a new instance which will artificially be greater than any
+     * previously created ComparableChunkVersion and smaller than any instance
+     * created afterwards. Used as means to cause the collections cache to
+     * attempt a refresh in situations where causal consistency cannot be
      * inferred.
      */
     static ComparableChunkVersion makeComparableChunkVersionForForcedRefresh();
+
+    /**
+     * Creates a new instance which will artificially be greater than any
+     * previously created ComparableChunkVersion. Instances created afterwards
+     * will be compared as-if this object was a normal (i.e. non-forced) ComparableChunkVersion.
+     */
+    static ComparableChunkVersion makeComparableChunkVersionForForcedRefresh(
+        const ChunkVersion& version);
 
     /**
      * Empty constructor needed by the ReadThroughCache.
@@ -387,10 +403,6 @@ public:
      * for comparison purposes.
      */
     ComparableChunkVersion() = default;
-
-    const ChunkVersion& getVersion() const {
-        return *_chunkVersion;
-    }
 
     BSONObj toBSONForLogging() const;
 

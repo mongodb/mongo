@@ -45,6 +45,14 @@ class ChunkInfo {
 public:
     explicit ChunkInfo(const ChunkType& from);
 
+    ChunkInfo(ChunkRange range,
+              std::string maxKeyString,
+              ShardId shardId,
+              ChunkVersion version,
+              std::vector<ChunkHistory> history,
+              bool jumbo,
+              std::shared_ptr<ChunkWritesTracker> writesTracker);
+
     const auto& getRange() const {
         return _range;
     }
@@ -59,6 +67,10 @@ public:
 
     const std::string& getMaxKeyString() const {
         return _maxKeyString;
+    }
+
+    const ShardId& getShardId() const {
+        return _shardId;
     }
 
     const ShardId& getShardIdAt(const boost::optional<Timestamp>& ts) const;
