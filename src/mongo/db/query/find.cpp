@@ -85,8 +85,8 @@ bool shouldSaveCursor(OperationContext* opCtx,
                       const CollectionPtr& collection,
                       PlanExecutor::ExecState finalState,
                       PlanExecutor* exec) {
-    const QueryRequest& qr = exec->getCanonicalQuery()->getQueryRequest();
-    if (qr.isSingleBatch()) {
+    const FindCommand& findCommand = exec->getCanonicalQuery()->getFindCommand();
+    if (findCommand.getSingleBatch()) {
         return false;
     }
 
@@ -96,7 +96,7 @@ bool shouldSaveCursor(OperationContext* opCtx,
     // SERVER-13955: we should be able to create a tailable cursor that waits on
     // an empty collection. Right now we do not keep a cursor if the collection
     // has zero records.
-    if (qr.isTailable()) {
+    if (findCommand.getTailable()) {
         return collection && collection->numRecords(opCtx) != 0U;
     }
 
@@ -614,30 +614,34 @@ bool runQuery(OperationContext* opCtx,
     // Parse, canonicalize, plan, transcribe, and get a plan executor.
     AutoGetCollectionForReadCommandMaybeLockFree collection(
         opCtx, nss, AutoGetCollectionViewMode::kViewsForbidden);
-    const QueryRequest& qr = cq->getQueryRequest();
 
-    opCtx->setExhaust(qr.isExhaust());
+    const bool isExhaust = (q.queryOptions & QueryOption_Exhaust) != 0;
+    opCtx->setExhaust(isExhaust);
 
     {
         // Allow the query to run on secondaries if the read preference permits it. If no read
         // preference was specified, allow the query to run iff slaveOk has been set.
-        const bool slaveOK = qr.hasReadPref()
+        const bool isSecondaryOk = (q.queryOptions & QueryOption_SecondaryOk) != 0;
+        const bool hasReadPref = q.query.hasField(query_request_helper::kWrappedReadPrefField);
+        const bool secondaryOk = hasReadPref
             ? uassertStatusOK(ReadPreferenceSetting::fromContainingBSON(q.query))
                   .canRunOnSecondary()
-            : qr.isSlaveOk();
-        uassertStatusOK(
-            repl::ReplicationCoordinator::get(opCtx)->checkCanServeReadsFor(opCtx, nss, slaveOK));
+            : isSecondaryOk;
+        uassertStatusOK(repl::ReplicationCoordinator::get(opCtx)->checkCanServeReadsFor(
+            opCtx, nss, secondaryOk));
     }
 
+    const FindCommand& findCommand = cq->getFindCommand();
     // Get the execution plan for the query.
     constexpr auto verbosity = ExplainOptions::Verbosity::kExecAllPlans;
-    expCtx->explain = qr.isExplain() ? boost::make_optional(verbosity) : boost::none;
+    const bool isExplain = cq->getExplain();
+    expCtx->explain = isExplain ? boost::make_optional(verbosity) : boost::none;
     auto exec =
         uassertStatusOK(getExecutorLegacyFind(opCtx, &collection.getCollection(), std::move(cq)));
 
     // If it's actually an explain, do the explain and return rather than falling through
     // to the normal query execution loop.
-    if (qr.isExplain()) {
+    if (isExplain) {
         BufBuilder bb;
         bb.skip(sizeof(QueryResult::Value));
 
@@ -666,12 +670,13 @@ bool runQuery(OperationContext* opCtx,
         return false;
     }
 
+    int maxTimeMS = findCommand.getMaxTimeMS() ? static_cast<int>(*findCommand.getMaxTimeMS()) : 0;
     // Handle query option $maxTimeMS (not used with commands).
-    if (qr.getMaxTimeMS() > 0) {
+    if (maxTimeMS > 0) {
         uassert(40116,
                 "Illegal attempt to set operation deadline within DBDirectClient",
                 !opCtx->getClient()->isInDirectClient());
-        opCtx->setDeadlineAfterNowBy(Milliseconds{qr.getMaxTimeMS()}, ErrorCodes::MaxTimeMSExpired);
+        opCtx->setDeadlineAfterNowBy(Milliseconds{maxTimeMS}, ErrorCodes::MaxTimeMSExpired);
     }
     opCtx->checkForInterrupt();  // May trigger maxTimeAlwaysTimeOut fail point.
 
@@ -713,12 +718,12 @@ bool runQuery(OperationContext* opCtx,
 
             docUnitsReturned.observeOne(obj.objsize());
 
-            if (FindCommon::enoughForFirstBatch(qr, numResults)) {
+            if (FindCommon::enoughForFirstBatch(findCommand, numResults)) {
                 LOGV2_DEBUG(20915,
                             5,
                             "Enough for first batch",
-                            "wantMore"_attr = !qr.isSingleBatch(),
-                            "numToReturn"_attr = qr.getNToReturn().value_or(0),
+                            "wantMore"_attr = !findCommand.getSingleBatch(),
+                            "numToReturn"_attr = findCommand.getNtoreturn().value_or(0),
                             "numResults"_attr = numResults);
                 break;
             }

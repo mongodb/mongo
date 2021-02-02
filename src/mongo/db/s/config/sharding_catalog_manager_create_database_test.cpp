@@ -34,7 +34,7 @@
 #include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/query/query_request.h"
+#include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"

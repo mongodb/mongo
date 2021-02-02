@@ -289,11 +289,11 @@ public:
         BSONObj sort = BSON("files_id" << 1 << "n" << 1);
 
         return writeConflictRetry(opCtx, "filemd5", dbname, [&] {
-            auto qr = std::make_unique<QueryRequest>(nss);
-            qr->setFilter(query);
-            qr->setSort(sort);
+            auto findCommand = std::make_unique<FindCommand>(nss);
+            findCommand->setFilter(query.getOwned());
+            findCommand->setSort(sort.getOwned());
 
-            auto statusWithCQ = CanonicalQuery::canonicalize(opCtx, std::move(qr));
+            auto statusWithCQ = CanonicalQuery::canonicalize(opCtx, std::move(findCommand));
             if (!statusWithCQ.isOK()) {
                 uasserted(17240, "Can't canonicalize query " + query.toString());
                 return false;

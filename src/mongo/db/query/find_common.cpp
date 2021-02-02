@@ -37,7 +37,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/query/canonical_query.h"
-#include "mongo/db/query/query_request.h"
+#include "mongo/db/query/query_request_helper.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 
@@ -58,13 +58,15 @@ MONGO_FAIL_POINT_DEFINE(failGetMoreAfterCursorCheckout);
 const OperationContext::Decoration<AwaitDataState> awaitDataState =
     OperationContext::declareDecoration<AwaitDataState>();
 
-bool FindCommon::enoughForFirstBatch(const QueryRequest& qr, long long numDocs) {
-    if (!qr.getEffectiveBatchSize()) {
+bool FindCommon::enoughForFirstBatch(const FindCommand& findCommand, long long numDocs) {
+    auto effectiveBatchSize =
+        findCommand.getBatchSize() ? findCommand.getBatchSize() : findCommand.getNtoreturn();
+    if (!effectiveBatchSize) {
         // We enforce a default batch size for the initial find if no batch size is specified.
-        return numDocs >= QueryRequest::kDefaultBatchSize;
+        return numDocs >= query_request_helper::kDefaultBatchSize;
     }
 
-    return numDocs >= qr.getEffectiveBatchSize().value();
+    return numDocs >= effectiveBatchSize.value();
 }
 
 bool FindCommon::haveSpaceForNext(const BSONObj& nextDoc, long long numDocs, int bytesBuffered) {

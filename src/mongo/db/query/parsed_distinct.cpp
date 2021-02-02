@@ -37,7 +37,7 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/distinct_command_gen.h"
-#include "mongo/db/query/query_request.h"
+#include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/str.h"
@@ -171,8 +171,9 @@ StatusWith<BSONObj> ParsedDistinct::asAggregationCommand() const {
     BSONObjBuilder aggregationBuilder;
 
     invariant(_query);
-    const QueryRequest& qr = _query->getQueryRequest();
-    aggregationBuilder.append("aggregate", qr.nss().coll());
+    const FindCommand& findCommand = _query->getFindCommand();
+    aggregationBuilder.append(
+        "aggregate", findCommand.getNamespaceOrUUID().nss().value_or(NamespaceString()).coll());
 
     // Build a pipeline that accomplishes the distinct request. The building code constructs a
     // pipeline that looks like this, assuming the distinct is on the key "a.b.c"
@@ -201,9 +202,9 @@ StatusWith<BSONObj> ParsedDistinct::asAggregationCommand() const {
     // Any arrays remaining after the $unwinds must have been nested arrays, so in order to match
     // the behavior of the distinct() command, we filter them out before the $group.
     BSONArrayBuilder pipelineBuilder(aggregationBuilder.subarrayStart("pipeline"));
-    if (!qr.getFilter().isEmpty()) {
+    if (!findCommand.getFilter().isEmpty()) {
         BSONObjBuilder matchStageBuilder(pipelineBuilder.subobjStart());
-        matchStageBuilder.append("$match", qr.getFilter());
+        matchStageBuilder.append("$match", findCommand.getFilter());
         matchStageBuilder.doneFast();
     }
 
@@ -225,19 +226,21 @@ StatusWith<BSONObj> ParsedDistinct::asAggregationCommand() const {
     groupStageBuilder.doneFast();
     pipelineBuilder.doneFast();
 
-    aggregationBuilder.append(kCollationField, qr.getCollation());
+    aggregationBuilder.append(kCollationField, findCommand.getCollation());
 
-    if (qr.getMaxTimeMS() > 0) {
-        aggregationBuilder.append(QueryRequest::cmdOptionMaxTimeMS, qr.getMaxTimeMS());
+    int maxTimeMS = findCommand.getMaxTimeMS() ? static_cast<int>(*findCommand.getMaxTimeMS()) : 0;
+    if (maxTimeMS > 0) {
+        aggregationBuilder.append(query_request_helper::cmdOptionMaxTimeMS, maxTimeMS);
     }
 
-    if (qr.getReadConcern() && !qr.getReadConcern()->isEmpty()) {
+    if (findCommand.getReadConcern() && !findCommand.getReadConcern()->isEmpty()) {
         aggregationBuilder.append(repl::ReadConcernArgs::kReadConcernFieldName,
-                                  *qr.getReadConcern());
+                                  *findCommand.getReadConcern());
     }
 
-    if (!qr.getUnwrappedReadPref().isEmpty()) {
-        aggregationBuilder.append(QueryRequest::kUnwrappedReadPrefField, qr.getUnwrappedReadPref());
+    if (!findCommand.getUnwrappedReadPref().isEmpty()) {
+        aggregationBuilder.append(query_request_helper::kUnwrappedReadPrefField,
+                                  findCommand.getUnwrappedReadPref());
     }
 
     // Specify the 'cursor' option so that aggregation uses the cursor interface.
@@ -261,7 +264,7 @@ StatusWith<ParsedDistinct> ParsedDistinct::parse(OperationContext* opCtx,
         return exceptionToStatus();
     }
 
-    auto qr = std::make_unique<QueryRequest>(nss);
+    auto findCommand = std::make_unique<FindCommand>(nss);
 
     if (parsedDistinct.getKey().find('\0') != std::string::npos) {
         return Status(ErrorCodes::Error(31032), "Key field cannot contain an embedded null byte");
@@ -269,14 +272,14 @@ StatusWith<ParsedDistinct> ParsedDistinct::parse(OperationContext* opCtx,
 
     // Create a projection on the fields needed by the distinct command, so that the query planner
     // will produce a covered plan if possible.
-    qr->setProj(getDistinctProjection(std::string(parsedDistinct.getKey())));
+    findCommand->setProjection(getDistinctProjection(std::string(parsedDistinct.getKey())));
 
     if (auto query = parsedDistinct.getQuery()) {
-        qr->setFilter(query.get());
+        findCommand->setFilter(query.get().getOwned());
     }
 
     if (auto collation = parsedDistinct.getCollation()) {
-        qr->setCollation(collation.get());
+        findCommand->setCollation(collation.get().getOwned());
     }
 
     // The IDL parser above does not handle generic command arguments. Since the underlying query
@@ -289,33 +292,32 @@ StatusWith<ParsedDistinct> ParsedDistinct::parse(OperationContext* opCtx,
                               << "\" had the wrong type. Expected " << typeName(BSONType::Object)
                               << ", found " << typeName(readConcernElt.type()));
         }
-        qr->setReadConcern(readConcernElt.embeddedObject());
+        findCommand->setReadConcern(readConcernElt.embeddedObject().getOwned());
     }
 
-    if (auto queryOptionsElt = cmdObj[QueryRequest::kUnwrappedReadPrefField]) {
+    if (auto queryOptionsElt = cmdObj[query_request_helper::kUnwrappedReadPrefField]) {
         if (queryOptionsElt.type() != BSONType::Object) {
             return Status(ErrorCodes::TypeMismatch,
                           str::stream()
-                              << "\"" << QueryRequest::kUnwrappedReadPrefField
+                              << "\"" << query_request_helper::kUnwrappedReadPrefField
                               << "\" had the wrong type. Expected " << typeName(BSONType::Object)
                               << ", found " << typeName(queryOptionsElt.type()));
         }
-        qr->setUnwrappedReadPref(queryOptionsElt.embeddedObject());
+        findCommand->setUnwrappedReadPref(queryOptionsElt.embeddedObject().getOwned());
     }
 
-    if (auto maxTimeMSElt = cmdObj[QueryRequest::cmdOptionMaxTimeMS]) {
+    if (auto maxTimeMSElt = cmdObj[query_request_helper::cmdOptionMaxTimeMS]) {
         auto maxTimeMS = parseMaxTimeMS(maxTimeMSElt);
         if (!maxTimeMS.isOK()) {
             return maxTimeMS.getStatus();
         }
-        qr->setMaxTimeMS(static_cast<unsigned int>(maxTimeMS.getValue()));
+        findCommand->setMaxTimeMS(static_cast<unsigned int>(maxTimeMS.getValue()));
     }
-
-    qr->setExplain(isExplain);
 
     const boost::intrusive_ptr<ExpressionContext> expCtx;
     auto cq = CanonicalQuery::canonicalize(opCtx,
-                                           std::move(qr),
+                                           std::move(findCommand),
+                                           isExplain,
                                            expCtx,
                                            extensionsCallback,
                                            MatchExpressionParser::kAllowAllSpecialFeatures);
@@ -323,7 +325,7 @@ StatusWith<ParsedDistinct> ParsedDistinct::parse(OperationContext* opCtx,
         return cq.getStatus();
     }
 
-    if (cq.getValue()->getQueryRequest().getCollation().isEmpty() && defaultCollator) {
+    if (cq.getValue()->getFindCommand().getCollation().isEmpty() && defaultCollator) {
         cq.getValue()->setCollator(defaultCollator->clone());
     }
 

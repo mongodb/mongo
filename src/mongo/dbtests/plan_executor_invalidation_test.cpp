@@ -81,8 +81,8 @@ public:
             new CollectionScan(_expCtx.get(), collection(), params, ws.get(), nullptr));
 
         // Create a plan executor to hold it
-        auto qr = std::make_unique<QueryRequest>(nss);
-        auto statusWithCQ = CanonicalQuery::canonicalize(&_opCtx, std::move(qr));
+        auto findCommand = std::make_unique<FindCommand>(nss);
+        auto statusWithCQ = CanonicalQuery::canonicalize(&_opCtx, std::move(findCommand));
         ASSERT_OK(statusWithCQ.getStatus());
         std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 

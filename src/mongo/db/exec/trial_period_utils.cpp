@@ -54,11 +54,11 @@ size_t getTrialPeriodNumToReturn(const CanonicalQuery& query) {
     // Determine the number of results which we will produce during the plan ranking phase before
     // stopping.
     size_t numResults = static_cast<size_t>(internalQueryPlanEvaluationMaxResults.load());
-    if (query.getQueryRequest().getNToReturn()) {
+    if (query.getFindCommand().getNtoreturn()) {
         numResults =
-            std::min(static_cast<size_t>(*query.getQueryRequest().getNToReturn()), numResults);
-    } else if (query.getQueryRequest().getLimit()) {
-        numResults = std::min(static_cast<size_t>(*query.getQueryRequest().getLimit()), numResults);
+            std::min(static_cast<size_t>(*query.getFindCommand().getNtoreturn()), numResults);
+    } else if (query.getFindCommand().getLimit()) {
+        numResults = std::min(static_cast<size_t>(*query.getFindCommand().getLimit()), numResults);
     }
 
     return numResults;

@@ -39,7 +39,7 @@ class Collection;
 class CollectionPtr;
 class Database;
 class OperationContext;
-class QueryRequest;
+class FindCommand;
 
 /**
  * db helpers are helper functions and classes that let us easily manipulate the local
@@ -75,7 +75,7 @@ struct Helpers {
                             bool requireIndex);
     static RecordId findOne(OperationContext* opCtx,
                             const CollectionPtr& collection,
-                            std::unique_ptr<QueryRequest> qr,
+                            std::unique_ptr<FindCommand> qr,
                             bool requireIndex);
 
     /**

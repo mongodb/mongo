@@ -40,7 +40,7 @@
 #include "mongo/db/error_labels.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops.h"
-#include "mongo/db/query/query_request.h"
+#include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/s/balancer/type_migration.h"
 #include "mongo/db/s/type_lockpings.h"
 #include "mongo/db/s/type_locks.h"
@@ -101,15 +101,14 @@ OpMsg runCommandInLocalTxn(OperationContext* opCtx,
 void startTransactionWithNoopFind(OperationContext* opCtx,
                                   const NamespaceString& nss,
                                   TxnNumber txnNumber) {
-    BSONObjBuilder findCmdBuilder;
-    QueryRequest qr(nss);
-    qr.setBatchSize(0);
-    qr.setSingleBatchField(true);
-    qr.asFindCommand(&findCmdBuilder);
+    FindCommand findCommand(nss);
+    findCommand.setBatchSize(0);
+    findCommand.setSingleBatch(true);
 
-    auto res = runCommandInLocalTxn(
-                   opCtx, nss.db(), true /*startTransaction*/, txnNumber, findCmdBuilder.done())
-                   .body;
+    auto res =
+        runCommandInLocalTxn(
+            opCtx, nss.db(), true /*startTransaction*/, txnNumber, findCommand.toBSON(BSONObj()))
+            .body;
     uassertStatusOK(getStatusFromCommandResult(res));
 }
 

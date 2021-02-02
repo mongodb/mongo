@@ -49,7 +49,7 @@
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_replace_root.h"
 #include "mongo/db/pipeline/sharded_agg_helpers.h"
-#include "mongo/db/query/query_request.h"
+#include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding_util.h"
 #include "mongo/db/service_context.h"
@@ -218,11 +218,12 @@ Value ReshardingCollectionCloner::_findHighestInsertedId(OperationContext* opCtx
                           << "' did not already exist",
             outputColl);
 
-    auto qr = std::make_unique<QueryRequest>(_outputNss);
-    qr->setLimit(1);
-    qr->setSort(BSON("_id" << -1));
+    auto findCommand = std::make_unique<FindCommand>(_outputNss);
+    findCommand->setLimit(1);
+    findCommand->setSort(BSON("_id" << -1));
 
-    auto recordId = Helpers::findOne(opCtx, *outputColl, std::move(qr), true /* requireIndex */);
+    auto recordId =
+        Helpers::findOne(opCtx, *outputColl, std::move(findCommand), true /* requireIndex */);
     if (recordId.isNull()) {
         return Value{};
     }

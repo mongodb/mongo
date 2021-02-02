@@ -70,8 +70,9 @@ public:
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeTailableQueryPlan(
     OperationContext* opCtx, const CollectionPtr& collection) {
-    auto qr = std::make_unique<QueryRequest>(collection->ns());
-    qr->setTailableMode(TailableModeEnum::kTailableAndAwaitData);
+    auto findCommand = std::make_unique<FindCommand>(collection->ns());
+    query_request_helper::setTailableMode(TailableModeEnum::kTailableAndAwaitData,
+                                          findCommand.get());
 
     awaitDataState(opCtx).shouldWaitForInserts = true;
     awaitDataState(opCtx).waitForInsertsDeadline =
@@ -81,7 +82,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeTailableQueryPlan(
     const boost::intrusive_ptr<ExpressionContext> expCtx;
 
     auto statusWithCQ = CanonicalQuery::canonicalize(opCtx,
-                                                     std::move(qr),
+                                                     std::move(findCommand),
+                                                     false,
                                                      expCtx,
                                                      ExtensionsCallbackNoop(),
                                                      MatchExpressionParser::kBanAllSpecialFeatures);

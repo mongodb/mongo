@@ -68,9 +68,10 @@ public:
      * Builds a PlanStage using the given WorkingSet and QuerySolution.
      */
     std::unique_ptr<PlanStage> buildPlanStage(std::unique_ptr<QuerySolution> querySolution) {
-        auto qr = std::make_unique<QueryRequest>(kNss);
+        auto findCommand = std::make_unique<FindCommand>(kNss);
         auto expCtx = make_intrusive<ExpressionContext>(opCtx(), nullptr, kNss);
-        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr), expCtx);
+        auto statusWithCQ =
+            CanonicalQuery::canonicalize(opCtx(), std::move(findCommand), false, expCtx);
         ASSERT_OK(statusWithCQ.getStatus());
 
         stage_builder::ClassicStageBuilder builder{

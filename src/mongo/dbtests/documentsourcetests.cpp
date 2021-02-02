@@ -93,11 +93,11 @@ protected:
         dbtests::WriteContextForTests ctx(opCtx(), nss.ns());
         _coll = ctx.getCollection();
 
-        auto qr = std::make_unique<QueryRequest>(nss);
+        auto findCommand = std::make_unique<FindCommand>(nss);
         if (hint) {
-            qr->setHint(*hint);
+            findCommand->setHint(*hint);
         }
-        auto cq = uassertStatusOK(CanonicalQuery::canonicalize(opCtx(), std::move(qr)));
+        auto cq = uassertStatusOK(CanonicalQuery::canonicalize(opCtx(), std::move(findCommand)));
 
         auto exec = uassertStatusOK(getExecutor(opCtx(),
                                                 &_coll,
@@ -312,11 +312,12 @@ TEST_F(DocumentSourceCursorTest, TailableAwaitDataCursorShouldErrorAfterTimeout)
                                                            collScanParams,
                                                            workingSet.get(),
                                                            matchExpression.get());
-    auto queryRequest = std::make_unique<QueryRequest>(nss);
-    queryRequest->setFilter(filter);
-    queryRequest->setTailableMode(TailableModeEnum::kTailableAndAwaitData);
+    auto findCommand = std::make_unique<FindCommand>(nss);
+    findCommand->setFilter(filter);
+    query_request_helper::setTailableMode(TailableModeEnum::kTailableAndAwaitData,
+                                          findCommand.get());
     auto canonicalQuery = unittest::assertGet(
-        CanonicalQuery::canonicalize(opCtx(), std::move(queryRequest), nullptr));
+        CanonicalQuery::canonicalize(opCtx(), std::move(findCommand), false, nullptr));
     auto planExecutor =
         uassertStatusOK(plan_executor_factory::make(std::move(canonicalQuery),
                                                     std::move(workingSet),
@@ -355,10 +356,10 @@ TEST_F(DocumentSourceCursorTest, NonAwaitDataCursorShouldErrorAfterTimeout) {
                                                            collScanParams,
                                                            workingSet.get(),
                                                            matchExpression.get());
-    auto queryRequest = std::make_unique<QueryRequest>(nss);
-    queryRequest->setFilter(filter);
+    auto findCommand = std::make_unique<FindCommand>(nss);
+    findCommand->setFilter(filter);
     auto canonicalQuery = unittest::assertGet(
-        CanonicalQuery::canonicalize(opCtx(), std::move(queryRequest), nullptr));
+        CanonicalQuery::canonicalize(opCtx(), std::move(findCommand), false, nullptr));
     auto planExecutor =
         uassertStatusOK(plan_executor_factory::make(std::move(canonicalQuery),
                                                     std::move(workingSet),
@@ -407,11 +408,12 @@ TEST_F(DocumentSourceCursorTest, TailableAwaitDataCursorShouldErrorAfterBeingKil
                                                            collScanParams,
                                                            workingSet.get(),
                                                            matchExpression.get());
-    auto queryRequest = std::make_unique<QueryRequest>(nss);
-    queryRequest->setFilter(filter);
-    queryRequest->setTailableMode(TailableModeEnum::kTailableAndAwaitData);
+    auto findCommand = std::make_unique<FindCommand>(nss);
+    findCommand->setFilter(filter);
+    query_request_helper::setTailableMode(TailableModeEnum::kTailableAndAwaitData,
+                                          findCommand.get());
     auto canonicalQuery = unittest::assertGet(
-        CanonicalQuery::canonicalize(opCtx(), std::move(queryRequest), nullptr));
+        CanonicalQuery::canonicalize(opCtx(), std::move(findCommand), false, nullptr));
     auto planExecutor = uassertStatusOK(
         plan_executor_factory::make(std::move(canonicalQuery),
                                     std::move(workingSet),
@@ -449,10 +451,10 @@ TEST_F(DocumentSourceCursorTest, NormalCursorShouldErrorAfterBeingKilled) {
                                                            collScanParams,
                                                            workingSet.get(),
                                                            matchExpression.get());
-    auto queryRequest = std::make_unique<QueryRequest>(nss);
-    queryRequest->setFilter(filter);
+    auto findCommand = std::make_unique<FindCommand>(nss);
+    findCommand->setFilter(filter);
     auto canonicalQuery = unittest::assertGet(
-        CanonicalQuery::canonicalize(opCtx(), std::move(queryRequest), nullptr));
+        CanonicalQuery::canonicalize(opCtx(), std::move(findCommand), false, nullptr));
     auto planExecutor = uassertStatusOK(
         plan_executor_factory::make(std::move(canonicalQuery),
                                     std::move(workingSet),

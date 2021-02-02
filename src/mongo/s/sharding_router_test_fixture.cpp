@@ -44,7 +44,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/query/collation/collator_factory_mock.h"
-#include "mongo/db/query/query_request.h"
+#include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/vector_clock_metadata_hook.h"
 #include "mongo/executor/task_executor_pool.h"
@@ -257,8 +257,8 @@ void ShardingTestFixture::expectGetShards(const std::vector<ShardType>& shards) 
 
         // If there is no '$db', append it.
         auto cmd = OpMsgRequest::fromDBAndBody(nss.db(), request.cmdObj).body;
-        auto query = QueryRequest::makeFromFindCommandForTests(cmd, false, nss);
-        ASSERT_EQ(query->nss(), ShardType::ConfigNS);
+        auto query = query_request_helper::makeFromFindCommandForTests(cmd, nss);
+        ASSERT_EQ(*query->getNamespaceOrUUID().nss(), ShardType::ConfigNS);
 
         ASSERT_BSONOBJ_EQ(query->getFilter(), BSONObj());
         ASSERT_BSONOBJ_EQ(query->getSort(), BSONObj());

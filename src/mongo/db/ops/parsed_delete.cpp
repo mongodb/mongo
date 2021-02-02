@@ -90,12 +90,11 @@ Status ParsedDelete::parseQueryToCQ() {
 
     // The projection needs to be applied after the delete operation, so we do not specify a
     // projection during canonicalization.
-    auto qr = std::make_unique<QueryRequest>(_request->getNsString());
-    qr->setFilter(_request->getQuery());
-    qr->setSort(_request->getSort());
-    qr->setCollation(_request->getCollation());
-    qr->setExplain(_request->getIsExplain());
-    qr->setHint(_request->getHint());
+    auto findCommand = std::make_unique<FindCommand>(_request->getNsString());
+    findCommand->setFilter(_request->getQuery().getOwned());
+    findCommand->setSort(_request->getSort().getOwned());
+    findCommand->setCollation(_request->getCollation().getOwned());
+    findCommand->setHint(_request->getHint());
 
     // Limit should only used for the findAndModify command when a sort is specified. If a sort
     // is requested, we want to use a top-k sort for efficiency reasons, so should pass the
@@ -104,19 +103,20 @@ Status ParsedDelete::parseQueryToCQ() {
     // has not actually deleted a document. This behavior is fine for findAndModify, but should
     // not apply to deletes in general.
     if (!_request->getMulti() && !_request->getSort().isEmpty()) {
-        qr->setLimit(1);
+        findCommand->setLimit(1);
     }
 
     // If the delete request has runtime constants or let parameters attached to it, pass them to
-    // the QueryRequest.
+    // the FindCommand.
     if (auto& runtimeConstants = _request->getLegacyRuntimeConstants())
-        qr->setLegacyRuntimeConstants(*runtimeConstants);
+        findCommand->setLegacyRuntimeConstants(*runtimeConstants);
     if (auto& letParams = _request->getLet())
-        qr->setLetParameters(*letParams);
+        findCommand->setLet(*letParams);
 
     auto statusWithCQ =
         CanonicalQuery::canonicalize(_opCtx,
-                                     std::move(qr),
+                                     std::move(findCommand),
+                                     _request->getIsExplain(),
                                      _expCtx,
                                      extensionsCallback,
                                      MatchExpressionParser::kAllowAllSpecialFeatures);

@@ -321,27 +321,28 @@ void QueryPlannerTest::runQueryFull(const BSONObj& query,
                                     const BSONObj& maxObj) {
     clearState();
 
-    auto qr = std::make_unique<QueryRequest>(nss);
-    qr->setFilter(query);
-    qr->setSort(sort);
-    qr->setProj(proj);
+    auto findCommand = std::make_unique<FindCommand>(nss);
+    findCommand->setFilter(query);
+    findCommand->setSort(sort);
+    findCommand->setProjection(proj);
     if (skip) {
-        qr->setSkip(skip);
+        findCommand->setSkip(skip);
     }
     if (ntoreturn) {
         if (ntoreturn < 0) {
             ASSERT_NE(ntoreturn, std::numeric_limits<long long>::min());
             ntoreturn = -ntoreturn;
-            qr->setSingleBatchField(true);
+            findCommand->setSingleBatch(true);
         }
-        qr->setNToReturn(ntoreturn);
+        findCommand->setNtoreturn(ntoreturn);
     }
-    qr->setHint(hint);
-    qr->setMin(minObj);
-    qr->setMax(maxObj);
+    findCommand->setHint(hint);
+    findCommand->setMin(minObj);
+    findCommand->setMax(maxObj);
     auto statusWithCQ =
         CanonicalQuery::canonicalize(opCtx.get(),
-                                     std::move(qr),
+                                     std::move(findCommand),
+                                     false,
                                      expCtx,
                                      ExtensionsCallbackNoop(),
                                      MatchExpressionParser::kAllowAllSpecialFeatures);
@@ -401,27 +402,28 @@ void QueryPlannerTest::runInvalidQueryFull(const BSONObj& query,
                                            const BSONObj& maxObj) {
     clearState();
 
-    auto qr = std::make_unique<QueryRequest>(nss);
-    qr->setFilter(query);
-    qr->setSort(sort);
-    qr->setProj(proj);
+    auto findCommand = std::make_unique<FindCommand>(nss);
+    findCommand->setFilter(query);
+    findCommand->setSort(sort);
+    findCommand->setProjection(proj);
     if (skip) {
-        qr->setSkip(skip);
+        findCommand->setSkip(skip);
     }
     if (ntoreturn) {
         if (ntoreturn < 0) {
             ASSERT_NE(ntoreturn, std::numeric_limits<long long>::min());
             ntoreturn = -ntoreturn;
-            qr->setSingleBatchField(true);
+            findCommand->setSingleBatch(true);
         }
-        qr->setNToReturn(ntoreturn);
+        findCommand->setNtoreturn(ntoreturn);
     }
-    qr->setHint(hint);
-    qr->setMin(minObj);
-    qr->setMax(maxObj);
+    findCommand->setHint(hint);
+    findCommand->setMin(minObj);
+    findCommand->setMax(maxObj);
     auto statusWithCQ =
         CanonicalQuery::canonicalize(opCtx.get(),
-                                     std::move(qr),
+                                     std::move(findCommand),
+                                     false,
                                      expCtx,
                                      ExtensionsCallbackNoop(),
                                      MatchExpressionParser::kAllowAllSpecialFeatures);
@@ -443,12 +445,13 @@ void QueryPlannerTest::runQueryAsCommand(const BSONObj& cmdObj) {
 
     // If there is no '$db', append it.
     auto cmd = OpMsgRequest::fromDBAndBody(nss.db(), cmdObj).body;
-    std::unique_ptr<QueryRequest> qr(
-        QueryRequest::makeFromFindCommandForTests(cmd, isExplain, nss));
+    std::unique_ptr<FindCommand> findCommand(
+        query_request_helper::makeFromFindCommandForTests(cmd, nss));
 
     auto statusWithCQ =
         CanonicalQuery::canonicalize(opCtx.get(),
-                                     std::move(qr),
+                                     std::move(findCommand),
+                                     isExplain,
                                      expCtx,
                                      ExtensionsCallbackNoop(),
                                      MatchExpressionParser::kAllowAllSpecialFeatures);
@@ -469,12 +472,13 @@ void QueryPlannerTest::runInvalidQueryAsCommand(const BSONObj& cmdObj) {
 
     // If there is no '$db', append it.
     auto cmd = OpMsgRequest::fromDBAndBody(nss.db(), cmdObj).body;
-    std::unique_ptr<QueryRequest> qr(
-        QueryRequest::makeFromFindCommandForTests(cmd, isExplain, nss));
+    std::unique_ptr<FindCommand> findCommand(
+        query_request_helper::makeFromFindCommandForTests(cmd, nss));
 
     auto statusWithCQ =
         CanonicalQuery::canonicalize(opCtx.get(),
-                                     std::move(qr),
+                                     std::move(findCommand),
+                                     isExplain,
                                      expCtx,
                                      ExtensionsCallbackNoop(),
                                      MatchExpressionParser::kAllowAllSpecialFeatures);

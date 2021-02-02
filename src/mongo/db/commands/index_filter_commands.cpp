@@ -303,15 +303,16 @@ Status ClearFilters::clear(OperationContext* opCtx,
         AllowedIndexEntry entry = *i;
 
         // Create canonical query.
-        auto qr = std::make_unique<QueryRequest>(nss);
-        qr->setFilter(entry.query);
-        qr->setSort(entry.sort);
-        qr->setProj(entry.projection);
-        qr->setCollation(entry.collation);
+        auto findCommand = std::make_unique<FindCommand>(nss);
+        findCommand->setFilter(entry.query);
+        findCommand->setSort(entry.sort);
+        findCommand->setProjection(entry.projection);
+        findCommand->setCollation(entry.collation);
         const boost::intrusive_ptr<ExpressionContext> expCtx;
         auto statusWithCQ =
             CanonicalQuery::canonicalize(opCtx,
-                                         std::move(qr),
+                                         std::move(findCommand),
+                                         false,
                                          expCtx,
                                          extensionsCallback,
                                          MatchExpressionParser::kAllowAllSpecialFeatures);

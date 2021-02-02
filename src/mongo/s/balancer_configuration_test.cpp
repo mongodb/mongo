@@ -38,7 +38,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/query/query_request.h"
+#include "mongo/db/query/query_request_helper.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/rpc/metadata/tracking_metadata.h"
@@ -80,10 +80,10 @@ protected:
                               rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
             auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
-            auto query = QueryRequest::makeFromFindCommandForTests(opMsg.body, false);
+            auto findCommand = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
-            ASSERT_EQ(query->nss().ns(), "config.settings");
-            ASSERT_BSONOBJ_EQ(query->getFilter(), BSON("_id" << key));
+            ASSERT_EQ(findCommand->getNamespaceOrUUID().nss()->ns(), "config.settings");
+            ASSERT_BSONOBJ_EQ(findCommand->getFilter(), BSON("_id" << key));
 
             checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 

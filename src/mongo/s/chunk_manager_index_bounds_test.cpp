@@ -56,13 +56,14 @@ protected:
     std::unique_ptr<CanonicalQuery> canonicalize(const char* queryStr) {
         BSONObj queryObj = fromjson(queryStr);
         const NamespaceString nss("test.foo");
-        auto qr = std::make_unique<QueryRequest>(nss);
-        qr->setFilter(queryObj);
+        auto findCommand = std::make_unique<FindCommand>(nss);
+        findCommand->setFilter(queryObj);
         boost::intrusive_ptr<ExpressionContextForTest> expCtx(
             new ExpressionContextForTest(operationContext()));
         auto statusWithCQ =
             CanonicalQuery::canonicalize(operationContext(),
-                                         std::move(qr),
+                                         std::move(findCommand),
+                                         false,
                                          expCtx,
                                          ExtensionsCallbackNoop(),
                                          MatchExpressionParser::kAllowAllSpecialFeatures);

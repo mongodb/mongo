@@ -150,7 +150,7 @@ PlanExecutorImpl::PlanExecutorImpl(OperationContext* opCtx,
         _nss = collection->ns();
     } else {
         invariant(_cq);
-        _nss = _cq->getQueryRequest().nss();
+        _nss = _cq->getFindCommand().getNamespaceOrUUID().nss().value_or(NamespaceString());
     }
 
     uassertStatusOK(_pickBestPlan());

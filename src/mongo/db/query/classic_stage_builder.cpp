@@ -161,7 +161,7 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
             auto pn = static_cast<const ProjectionNodeDefault*>(root);
             auto childStage = build(pn->children[0]);
             return std::make_unique<ProjectionStageDefault>(_cq.getExpCtx(),
-                                                            _cq.getQueryRequest().getProj(),
+                                                            _cq.getFindCommand().getProjection(),
                                                             _cq.getProj(),
                                                             _ws,
                                                             std::move(childStage));
@@ -170,7 +170,7 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
             auto pn = static_cast<const ProjectionNodeCovered*>(root);
             auto childStage = build(pn->children[0]);
             return std::make_unique<ProjectionStageCovered>(_cq.getExpCtxRaw(),
-                                                            _cq.getQueryRequest().getProj(),
+                                                            _cq.getFindCommand().getProjection(),
                                                             _cq.getProj(),
                                                             _ws,
                                                             std::move(childStage),
@@ -180,7 +180,7 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
             auto pn = static_cast<const ProjectionNodeSimple*>(root);
             auto childStage = build(pn->children[0]);
             return std::make_unique<ProjectionStageSimple>(_cq.getExpCtxRaw(),
-                                                           _cq.getQueryRequest().getProj(),
+                                                           _cq.getFindCommand().getProjection(),
                                                            _cq.getProj(),
                                                            _ws,
                                                            std::move(childStage));

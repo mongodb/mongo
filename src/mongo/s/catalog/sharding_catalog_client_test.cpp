@@ -37,7 +37,7 @@
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/ops/write_ops.h"
-#include "mongo/db/query/query_request.h"
+#include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/time_proof_service.h"
 #include "mongo/executor/task_executor.h"
@@ -101,10 +101,11 @@ TEST_F(ShardingCatalogClientTest, GetCollectionExisting) {
                               rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
             auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
-            auto query = QueryRequest::makeFromFindCommandForTests(opMsg.body, false);
+            auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
             // Ensure the query is correct
-            ASSERT_EQ(query->nss(), CollectionType::ConfigNS);
+            ASSERT_EQ(query->getNamespaceOrUUID().nss().value_or(NamespaceString()),
+                      CollectionType::ConfigNS);
             ASSERT_BSONOBJ_EQ(query->getFilter(),
                               BSON(CollectionType::kNssFieldName << expectedColl.getNss().ns()));
             ASSERT_BSONOBJ_EQ(query->getSort(), BSONObj());
@@ -171,9 +172,10 @@ TEST_F(ShardingCatalogClientTest, GetDatabaseExisting) {
                           rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
         auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
-        auto query = QueryRequest::makeFromFindCommandForTests(opMsg.body, false);
+        auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
-        ASSERT_EQ(query->nss(), DatabaseType::ConfigNS);
+        ASSERT_EQ(query->getNamespaceOrUUID().nss().value_or(NamespaceString()),
+                  DatabaseType::ConfigNS);
         ASSERT_BSONOBJ_EQ(query->getFilter(), BSON(DatabaseType::name(expectedDb.getName())));
         ASSERT_BSONOBJ_EQ(query->getSort(), BSONObj());
         ASSERT(!query->getLimit());
@@ -300,9 +302,10 @@ TEST_F(ShardingCatalogClientTest, GetAllShardsValid) {
                           rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
         auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
-        auto query = QueryRequest::makeFromFindCommandForTests(opMsg.body, false);
+        auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
-        ASSERT_EQ(query->nss(), ShardType::ConfigNS);
+        ASSERT_EQ(query->getNamespaceOrUUID().nss().value_or(NamespaceString()),
+                  ShardType::ConfigNS);
         ASSERT_BSONOBJ_EQ(query->getFilter(), BSONObj());
         ASSERT_BSONOBJ_EQ(query->getSort(), BSONObj());
         ASSERT_FALSE(query->getLimit().is_initialized());
@@ -397,9 +400,10 @@ TEST_F(ShardingCatalogClientTest, GetChunksForNSWithSortAndLimit) {
                               rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
             auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
-            auto query = QueryRequest::makeFromFindCommandForTests(opMsg.body, false);
+            auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
-            ASSERT_EQ(query->nss(), ChunkType::ConfigNS);
+            ASSERT_EQ(query->getNamespaceOrUUID().nss().value_or(NamespaceString()),
+                      ChunkType::ConfigNS);
             ASSERT_BSONOBJ_EQ(query->getFilter(), chunksQuery);
             ASSERT_BSONOBJ_EQ(query->getSort(), BSON(ChunkType::lastmod() << -1));
             ASSERT_EQ(query->getLimit().get(), 1);
@@ -454,9 +458,10 @@ TEST_F(ShardingCatalogClientTest, GetChunksForNSNoSortNoLimit) {
                           rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
         auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
-        auto query = QueryRequest::makeFromFindCommandForTests(opMsg.body, false);
+        auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
-        ASSERT_EQ(query->nss(), ChunkType::ConfigNS);
+        ASSERT_EQ(query->getNamespaceOrUUID().nss().value_or(NamespaceString()),
+                  ChunkType::ConfigNS);
         ASSERT_BSONOBJ_EQ(query->getFilter(), chunksQuery);
         ASSERT_BSONOBJ_EQ(query->getSort(), BSONObj());
         ASSERT_FALSE(query->getLimit().is_initialized());
@@ -766,9 +771,10 @@ TEST_F(ShardingCatalogClientTest, GetCollectionsValidResultsNoDb) {
                           rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
         auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
-        auto query = QueryRequest::makeFromFindCommandForTests(opMsg.body, false);
+        auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
-        ASSERT_EQ(query->nss(), CollectionType::ConfigNS);
+        ASSERT_EQ(query->getNamespaceOrUUID().nss().value_or(NamespaceString()),
+                  CollectionType::ConfigNS);
         ASSERT_BSONOBJ_EQ(query->getFilter(), BSONObj());
         ASSERT_BSONOBJ_EQ(query->getSort(), BSONObj());
 
@@ -813,9 +819,10 @@ TEST_F(ShardingCatalogClientTest, GetCollectionsValidResultsWithDb) {
                           rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
         auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
-        auto query = QueryRequest::makeFromFindCommandForTests(opMsg.body, false);
+        auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
-        ASSERT_EQ(query->nss(), CollectionType::ConfigNS);
+        ASSERT_EQ(query->getNamespaceOrUUID().nss().value_or(NamespaceString()),
+                  CollectionType::ConfigNS);
         {
             BSONObjBuilder b;
             b.appendRegex(CollectionType::kNssFieldName, "^test\\.");
@@ -850,9 +857,10 @@ TEST_F(ShardingCatalogClientTest, GetCollectionsInvalidCollectionType) {
                           rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
         auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
-        auto query = QueryRequest::makeFromFindCommandForTests(opMsg.body, false);
+        auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
-        ASSERT_EQ(query->nss(), CollectionType::ConfigNS);
+        ASSERT_EQ(query->getNamespaceOrUUID().nss().value_or(NamespaceString()),
+                  CollectionType::ConfigNS);
         {
             BSONObjBuilder b;
             b.appendRegex(CollectionType::kNssFieldName, "^test\\.");
@@ -886,9 +894,10 @@ TEST_F(ShardingCatalogClientTest, GetDatabasesForShardValid) {
                           rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
         auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
-        auto query = QueryRequest::makeFromFindCommandForTests(opMsg.body, false);
+        auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
-        ASSERT_EQ(query->nss(), DatabaseType::ConfigNS);
+        ASSERT_EQ(query->getNamespaceOrUUID().nss().value_or(NamespaceString()),
+                  DatabaseType::ConfigNS);
         ASSERT_BSONOBJ_EQ(query->getFilter(),
                           BSON(DatabaseType::primary(dbt1.getPrimary().toString())));
         ASSERT_BSONOBJ_EQ(query->getSort(), BSONObj());
@@ -954,9 +963,10 @@ TEST_F(ShardingCatalogClientTest, GetTagsForCollection) {
                           rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
         auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
-        auto query = QueryRequest::makeFromFindCommandForTests(opMsg.body, false);
+        auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
-        ASSERT_EQ(query->nss(), TagsType::ConfigNS);
+        ASSERT_EQ(query->getNamespaceOrUUID().nss().value_or(NamespaceString()),
+                  TagsType::ConfigNS);
         ASSERT_BSONOBJ_EQ(query->getFilter(), BSON(TagsType::ns("TestDB.TestColl")));
         ASSERT_BSONOBJ_EQ(query->getSort(), BSON(TagsType::min() << 1));
 
@@ -1301,14 +1311,15 @@ TEST_F(ShardingCatalogClientTest, GetNewKeys) {
         ASSERT_EQ("admin", request.dbname);
 
         auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
-        auto query = QueryRequest::makeFromFindCommandForTests(opMsg.body, false);
+        auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
 
         BSONObj expectedQuery(
             fromjson("{purpose: 'none',"
                      "expiresAt: {$gt: {$timestamp: {t: 1234, i: 5678}}}}"));
 
-        ASSERT_EQ(NamespaceString::kKeysCollectionNamespace, query->nss());
+        ASSERT_EQ(NamespaceString::kKeysCollectionNamespace,
+                  query->getNamespaceOrUUID().nss().value_or(NamespaceString()));
         ASSERT_BSONOBJ_EQ(expectedQuery, query->getFilter());
         ASSERT_BSONOBJ_EQ(BSON("expiresAt" << 1), query->getSort());
         ASSERT_FALSE(query->getLimit().is_initialized());
@@ -1353,13 +1364,14 @@ TEST_F(ShardingCatalogClientTest, GetNewKeysWithEmptyCollection) {
         ASSERT_EQ("admin", request.dbname);
 
         auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
-        auto query = QueryRequest::makeFromFindCommandForTests(opMsg.body, false);
+        auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
         BSONObj expectedQuery(
             fromjson("{purpose: 'none',"
                      "expiresAt: {$gt: {$timestamp: {t: 1234, i: 5678}}}}"));
 
-        ASSERT_EQ(NamespaceString::kKeysCollectionNamespace, query->nss());
+        ASSERT_EQ(NamespaceString::kKeysCollectionNamespace,
+                  query->getNamespaceOrUUID().nss().value_or(NamespaceString()));
         ASSERT_BSONOBJ_EQ(expectedQuery, query->getFilter());
         ASSERT_BSONOBJ_EQ(BSON("expiresAt" << 1), query->getSort());
         ASSERT_FALSE(query->getLimit().is_initialized());

@@ -223,9 +223,9 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
         params.options & QueryPlannerParams::OPLOG_SCAN_WAIT_FOR_VISIBLE;
 
     // If the hint is {$natural: +-1} this changes the direction of the collection scan.
-    const BSONObj& hint = query.getQueryRequest().getHint();
+    const BSONObj& hint = query.getFindCommand().getHint();
     if (!hint.isEmpty()) {
-        BSONElement natural = hint[QueryRequest::kNaturalSortField];
+        BSONElement natural = hint[query_request_helper::kNaturalSortField];
         if (natural) {
             csn->direction = natural.numberInt() >= 0 ? 1 : -1;
         }
@@ -234,13 +234,13 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
     // If the client requested a resume token and we are scanning the oplog, prepare
     // the collection scan to return timestamp-based tokens. Otherwise, we should
     // return generic RecordId-based tokens.
-    if (query.getQueryRequest().getRequestResumeToken()) {
+    if (query.getFindCommand().getRequestResumeToken()) {
         csn->shouldTrackLatestOplogTimestamp = query.nss().isOplog();
         csn->requestResumeToken = !query.nss().isOplog();
     }
 
     // Extract and assign the RecordId from the 'resumeAfter' token, if present.
-    const BSONObj& resumeAfterObj = query.getQueryRequest().getResumeAfter();
+    const BSONObj& resumeAfterObj = query.getFindCommand().getResumeAfter();
     if (!resumeAfterObj.isEmpty()) {
         BSONElement recordIdElem = resumeAfterObj["$recordId"];
         switch (recordIdElem.type()) {
@@ -1129,7 +1129,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::buildIndexedAnd(
             for (size_t i = 0; i < andResult->children.size(); ++i) {
                 andResult->children[i]->computeProperties();
                 if (andResult->children[i]->providedSorts().contains(
-                        query.getQueryRequest().getSort())) {
+                        query.getFindCommand().getSort())) {
                     std::swap(andResult->children[i], andResult->children.back());
                     break;
                 }
@@ -1230,7 +1230,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::buildIndexedOr(
             // If all ixscanNodes can provide the sort, shouldReverseScan is populated with which
             // scans to reverse.
             shouldReverseScan =
-                canProvideSortWithMergeSort(ixscanNodes, query.getQueryRequest().getSort());
+                canProvideSortWithMergeSort(ixscanNodes, query.getFindCommand().getSort());
         }
 
         if (!shouldReverseScan.empty()) {
@@ -1244,7 +1244,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::buildIndexedOr(
             }
 
             auto msn = std::make_unique<MergeSortNode>();
-            msn->sort = query.getQueryRequest().getSort();
+            msn->sort = query.getFindCommand().getSort();
             msn->addChildren(std::move(ixscanNodes));
             orResult = std::move(msn);
         } else {

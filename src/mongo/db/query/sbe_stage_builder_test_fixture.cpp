@@ -49,9 +49,10 @@ SbeStageBuilderTestFixture::buildPlanStage(
     std::unique_ptr<QuerySolution> querySolution,
     bool hasRecordId,
     std::unique_ptr<ShardFiltererFactoryInterface> shardFiltererInterface) {
-    auto qr = std::make_unique<QueryRequest>(_nss);
+    auto findCommand = std::make_unique<FindCommand>(_nss);
     const boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContextForTest(_nss));
-    auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr), expCtx);
+    auto statusWithCQ =
+        CanonicalQuery::canonicalize(opCtx(), std::move(findCommand), false, expCtx);
     ASSERT_OK(statusWithCQ.getStatus());
 
     stage_builder::SlotBasedStageBuilder builder{opCtx(),

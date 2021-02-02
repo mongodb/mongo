@@ -54,7 +54,7 @@ extern const OperationContext::Decoration<AwaitDataState> awaitDataState;
 
 class BSONObj;
 class CanonicalQuery;
-class QueryRequest;
+class FindCommand;
 
 // Failpoint for making find hang.
 extern FailPoint waitInFindBeforeMakingBatch;
@@ -101,7 +101,7 @@ public:
      *
      * If 'qr' does not have a batchSize, the default batchSize is respected.
      */
-    static bool enoughForFirstBatch(const QueryRequest& qr, long long numDocs);
+    static bool enoughForFirstBatch(const FindCommand& findCommand, long long numDocs);
 
     /**
      * Returns true if the batchSize for the getMore has been satisfied.

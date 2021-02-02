@@ -74,11 +74,11 @@ unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
 
-    auto qr = std::make_unique<QueryRequest>(nss);
-    qr->setFilter(fromjson(queryStr));
-    qr->setSort(fromjson(sortStr));
-    qr->setProj(fromjson(projStr));
-    auto statusWithCQ = CanonicalQuery::canonicalize(opCtx.get(), std::move(qr));
+    auto findCommand = std::make_unique<FindCommand>(nss);
+    findCommand->setFilter(fromjson(queryStr));
+    findCommand->setSort(fromjson(sortStr));
+    findCommand->setProjection(fromjson(projStr));
+    auto statusWithCQ = CanonicalQuery::canonicalize(opCtx.get(), std::move(findCommand));
     ASSERT_OK(statusWithCQ.getStatus());
     return std::move(statusWithCQ.getValue());
 }

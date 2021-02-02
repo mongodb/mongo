@@ -372,7 +372,7 @@ std::unique_ptr<QuerySolutionNode> addSortKeyGeneratorStageIfNeeded(
     const CanonicalQuery& query, bool hasSortStage, std::unique_ptr<QuerySolutionNode> solnRoot) {
     if (!hasSortStage && query.metadataDeps()[DocumentMetadataFields::kSortKey]) {
         auto keyGenNode = std::make_unique<SortKeyGeneratorNode>();
-        keyGenNode->sortSpec = query.getQueryRequest().getSort();
+        keyGenNode->sortSpec = query.getFindCommand().getSort();
         keyGenNode->children.push_back(solnRoot.release());
         return keyGenNode;
     }
@@ -539,8 +539,8 @@ std::unique_ptr<QuerySolutionNode> tryPushdownProjectBeneathSort(
 bool canUseSimpleSort(const QuerySolutionNode& solnRoot,
                       const CanonicalQuery& cq,
                       const QueryPlannerParams& plannerParams) {
-    const bool splitLimitedSortEligible = cq.getQueryRequest().getNToReturn() &&
-        !cq.getQueryRequest().isSingleBatch() &&
+    const bool splitLimitedSortEligible = cq.getFindCommand().getNtoreturn() &&
+        !cq.getFindCommand().getSingleBatch() &&
         plannerParams.options & QueryPlannerParams::SPLIT_LIMITED_SORT;
 
     // The simple sort stage discards any metadata other than sort key metadata. It can only be used
@@ -622,7 +622,7 @@ bool QueryPlannerAnalysis::explodeForSort(const CanonicalQuery& query,
     // Find explodable nodes in the subtree rooted at 'toReplace'.
     getExplodableNodes(toReplace, &explodableNodes);
 
-    const BSONObj& desiredSort = query.getQueryRequest().getSort();
+    const BSONObj& desiredSort = query.getFindCommand().getSort();
 
     // How many scan leaves will result from our expansion?
     size_t totalNumScans = 0;
@@ -764,8 +764,8 @@ QuerySolutionNode* QueryPlannerAnalysis::analyzeSort(const CanonicalQuery& query
                                                      bool* blockingSortOut) {
     *blockingSortOut = false;
 
-    const QueryRequest& qr = query.getQueryRequest();
-    const BSONObj& sortObj = qr.getSort();
+    const FindCommand& findCommand = query.getFindCommand();
+    const BSONObj& sortObj = findCommand.getSort();
 
     if (sortObj.isEmpty()) {
         return solnRoot;
@@ -776,7 +776,7 @@ QuerySolutionNode* QueryPlannerAnalysis::analyzeSort(const CanonicalQuery& query
 
     // If the sort is $natural, we ignore it, assuming that the caller has detected that and
     // outputted a collscan to satisfy the desired order.
-    if (sortObj[QueryRequest::kNaturalSortField]) {
+    if (sortObj[query_request_helper::kNaturalSortField]) {
         return solnRoot;
     }
 
@@ -838,19 +838,19 @@ QuerySolutionNode* QueryPlannerAnalysis::analyzeSort(const CanonicalQuery& query
     // When setting the limit on the sort, we need to consider both
     // the limit N and skip count M. The sort should return an ordered list
     // N + M items so that the skip stage can discard the first M results.
-    if (qr.getLimit()) {
+    if (findCommand.getLimit()) {
         // We have a true limit. The limit can be combined with the SORT stage.
-        sortNodeRaw->limit =
-            static_cast<size_t>(*qr.getLimit()) + static_cast<size_t>(qr.getSkip().value_or(0));
-    } else if (qr.getNToReturn()) {
+        sortNodeRaw->limit = static_cast<size_t>(*findCommand.getLimit()) +
+            static_cast<size_t>(findCommand.getSkip().value_or(0));
+    } else if (findCommand.getNtoreturn()) {
         // We have an ntoreturn specified by an OP_QUERY style find. This is used
         // by clients to mean both batchSize and limit.
         //
         // Overflow here would be bad and could cause a nonsense limit. Cast
         // skip and limit values to unsigned ints to make sure that the
         // sum is never stored as signed. (See SERVER-13537).
-        sortNodeRaw->limit =
-            static_cast<size_t>(*qr.getNToReturn()) + static_cast<size_t>(qr.getSkip().value_or(0));
+        sortNodeRaw->limit = static_cast<size_t>(*findCommand.getNtoreturn()) +
+            static_cast<size_t>(findCommand.getSkip().value_or(0));
 
         // This is a SORT with a limit. The wire protocol has a single quantity called "numToReturn"
         // which could mean either limit or batchSize.  We have no idea what the client intended.
@@ -876,7 +876,8 @@ QuerySolutionNode* QueryPlannerAnalysis::analyzeSort(const CanonicalQuery& query
         //
         // Not allowed for geo or text, because we assume elsewhere that those stages appear just
         // once.
-        if (!qr.isSingleBatch() && params.options & QueryPlannerParams::SPLIT_LIMITED_SORT &&
+        if (!findCommand.getSingleBatch() &&
+            params.options & QueryPlannerParams::SPLIT_LIMITED_SORT &&
             !QueryPlannerCommon::hasNode(query.root(), MatchExpression::TEXT) &&
             !QueryPlannerCommon::hasNode(query.root(), MatchExpression::GEO) &&
             !QueryPlannerCommon::hasNode(query.root(), MatchExpression::GEO_NEAR)) {
@@ -973,17 +974,17 @@ std::unique_ptr<QuerySolution> QueryPlannerAnalysis::analyzeDataAccess(
     bool hasAndHashStage = solnRoot->hasNode(STAGE_AND_HASH);
     soln->hasBlockingStage = hasSortStage || hasAndHashStage;
 
-    const QueryRequest& qr = query.getQueryRequest();
+    const FindCommand& findCommand = query.getFindCommand();
 
-    if (qr.getSkip()) {
+    if (findCommand.getSkip()) {
         auto skip = std::make_unique<SkipNode>();
-        skip->skip = *qr.getSkip();
+        skip->skip = *findCommand.getSkip();
         skip->children.push_back(solnRoot.release());
         solnRoot = std::move(skip);
     }
 
     // Project the results.
-    if (qr.returnKey()) {
+    if (findCommand.getReturnKey()) {
         // We don't need a projection stage if returnKey was requested since the intended behavior
         // is that the projection is ignored when returnKey is specified.
         solnRoot = std::make_unique<ReturnKeyNode>(
@@ -1012,16 +1013,16 @@ std::unique_ptr<QuerySolution> QueryPlannerAnalysis::analyzeDataAccess(
     if (!hasSortStage) {
         // We don't have a sort stage. This means that, if there is a limit, we will have
         // to enforce it ourselves since it's not handled inside SORT.
-        if (qr.getLimit()) {
+        if (findCommand.getLimit()) {
             LimitNode* limit = new LimitNode();
-            limit->limit = *qr.getLimit();
+            limit->limit = *findCommand.getLimit();
             limit->children.push_back(solnRoot.release());
             solnRoot.reset(limit);
-        } else if (qr.getNToReturn() && qr.isSingleBatch()) {
+        } else if (findCommand.getNtoreturn() && findCommand.getSingleBatch()) {
             // We have a "legacy limit", i.e. a negative ntoreturn value from an OP_QUERY style
             // find.
             LimitNode* limit = new LimitNode();
-            limit->limit = *qr.getNToReturn();
+            limit->limit = *findCommand.getNtoreturn();
             limit->children.push_back(solnRoot.release());
             solnRoot.reset(limit);
         }

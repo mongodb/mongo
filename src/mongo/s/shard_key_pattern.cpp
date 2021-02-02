@@ -390,13 +390,14 @@ BSONObj ShardKeyPattern::emplaceMissingShardKeyValuesForDocument(const BSONObj d
 StatusWith<BSONObj> ShardKeyPattern::extractShardKeyFromQuery(OperationContext* opCtx,
                                                               const NamespaceString& nss,
                                                               const BSONObj& basicQuery) const {
-    auto qr = std::make_unique<QueryRequest>(nss);
-    qr->setFilter(basicQuery);
+    auto findCommand = std::make_unique<FindCommand>(nss);
+    findCommand->setFilter(basicQuery.getOwned());
 
     const boost::intrusive_ptr<ExpressionContext> expCtx;
     auto statusWithCQ =
         CanonicalQuery::canonicalize(opCtx,
-                                     std::move(qr),
+                                     std::move(findCommand),
+                                     false, /* isExplain */
                                      expCtx,
                                      ExtensionsCallbackNoop(),
                                      MatchExpressionParser::kAllowAllSpecialFeatures);
@@ -409,15 +410,16 @@ StatusWith<BSONObj> ShardKeyPattern::extractShardKeyFromQuery(OperationContext* 
 
 StatusWith<BSONObj> ShardKeyPattern::extractShardKeyFromQuery(
     boost::intrusive_ptr<ExpressionContext> expCtx, const BSONObj& basicQuery) const {
-    auto qr = std::make_unique<QueryRequest>(expCtx->ns);
-    qr->setFilter(basicQuery);
+    auto findCommand = std::make_unique<FindCommand>(expCtx->ns);
+    findCommand->setFilter(basicQuery.getOwned());
     if (!expCtx->getCollatorBSON().isEmpty()) {
-        qr->setCollation(expCtx->getCollatorBSON());
+        findCommand->setCollation(expCtx->getCollatorBSON().getOwned());
     }
 
     auto statusWithCQ =
         CanonicalQuery::canonicalize(expCtx->opCtx,
-                                     std::move(qr),
+                                     std::move(findCommand),
+                                     false, /* isExplain */
                                      expCtx,
                                      ExtensionsCallbackNoop(),
                                      MatchExpressionParser::kAllowAllSpecialFeatures);

@@ -68,9 +68,7 @@ struct ClientCursorParams {
           apiParameters(std::move(apiParameters)),
           writeConcernOptions(std::move(writeConcernOptions)),
           readConcernArgs(std::move(readConcernArgs)),
-          queryOptions(exec->getCanonicalQuery()
-                           ? exec->getCanonicalQuery()->getQueryRequest().getOptions()
-                           : 0),
+          queryOptions(exec->getCanonicalQuery() ? exec->getCanonicalQuery()->getOptions() : 0),
           originatingCommandObj(originatingCommandObj.getOwned()),
           originatingPrivileges(std::move(originatingPrivileges)) {
         while (authenticatedUsersIter.more()) {

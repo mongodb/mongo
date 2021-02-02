@@ -215,9 +215,9 @@ Once we have parsed the command and checked authorization, we move on to parsing
 parts of the query. Once again, we will focus on the find and aggregate commands.
 
 ### Find command parsing
-The find command is parsed entirely by the IDL. Initially the IDL parser creates a QueryRequest. As
+The find command is parsed entirely by the IDL. Initially the IDL parser creates a FindCommand. As
 mentioned above, the IDL parser does all of the required type checking and stores all options for
-the query. The QueryRequest is then turned into a CanonicalQuery. The CanonicalQuery
+the query. The FindCommand is then turned into a CanonicalQuery. The CanonicalQuery
 parses the collation and the filter while just holding the rest of the IDL parsed fields.
 The parsing of the collation is straightforward: for each field that is allowed to be in the object,
 we check for that field and then build the collation from the parsed fields.
@@ -270,7 +270,7 @@ give a summary of how each is parsed, but not get into the same level of detail.
 * count : Parsed by IDL and then turned into a CountStage which can be executed in a similar way to
   a find command.
 * distinct : The distinct specific arguments are parsed by IDL, and the generic command arguments
-  are parsed by custom code. They are then combined into a QueryRequest (mentioned above),
+  are parsed by custom code. They are then combined into a FindCommand (mentioned above),
   canonicalized, packaged into a ParsedDistinct, which is eventually turned into an executable
   stage.
 * mapReduce : Parsed by IDL and then turned into an equivalent aggregation command.

@@ -69,20 +69,20 @@ MatchExpression* parseMatchExpression(const BSONObj& obj) {
  * (expression tree, query request) tuple passes CanonicalQuery::isValid().
  * Returns Status::OK() if the tuple is valid, else returns an error Status.
  */
-Status isValid(const std::string& queryStr, const QueryRequest& qrRaw) {
+Status isValid(const std::string& queryStr, const FindCommand& findCommand) {
     BSONObj queryObj = fromjson(queryStr);
     std::unique_ptr<MatchExpression> me(parseMatchExpression(queryObj));
     me = MatchExpression::optimize(std::move(me));
-    return CanonicalQuery::isValid(me.get(), qrRaw).getStatus();
+    return CanonicalQuery::isValid(me.get(), findCommand).getStatus();
 }
 
 TEST(ExpressionOptimizeTest, IsValidText) {
-    // Filter inside QueryRequest is not used.
-    auto qr = std::make_unique<QueryRequest>(nss);
-    ASSERT_OK(qr->validate());
+    // Filter inside FindCommand is not used.
+    auto findCommand = std::make_unique<FindCommand>(nss);
+    ASSERT_OK(query_request_helper::validateFindCommand(*findCommand));
 
     // Valid: regular TEXT.
-    ASSERT_OK(isValid("{$text: {$search: 's'}}", *qr));
+    ASSERT_OK(isValid("{$text: {$search: 's'}}", *findCommand));
 
     // Valid: TEXT inside OR.
     ASSERT_OK(
@@ -90,13 +90,13 @@ TEST(ExpressionOptimizeTest, IsValidText) {
                 "    {$text: {$search: 's'}},"
                 "    {a: 1}"
                 "]}",
-                *qr));
+                *findCommand));
 
     // Valid: TEXT outside NOR.
-    ASSERT_OK(isValid("{$text: {$search: 's'}, $nor: [{a: 1}, {b: 1}]}", *qr));
+    ASSERT_OK(isValid("{$text: {$search: 's'}, $nor: [{a: 1}, {b: 1}]}", *findCommand));
 
     // Invalid: TEXT inside NOR.
-    ASSERT_NOT_OK(isValid("{$nor: [{$text: {$search: 's'}}, {a: 1}]}", *qr));
+    ASSERT_NOT_OK(isValid("{$nor: [{$text: {$search: 's'}}, {a: 1}]}", *findCommand));
 
     // Invalid: TEXT inside NOR.
     ASSERT_NOT_OK(
@@ -107,7 +107,7 @@ TEST(ExpressionOptimizeTest, IsValidText) {
                 "    ]},"
                 "    {a: 2}"
                 "]}",
-                *qr));
+                *findCommand));
 
     // Invalid: >1 TEXT.
     ASSERT_NOT_OK(
@@ -115,7 +115,7 @@ TEST(ExpressionOptimizeTest, IsValidText) {
                 "    {$text: {$search: 's'}},"
                 "    {$text: {$search: 't'}}"
                 "]}",
-                *qr));
+                *findCommand));
 
     // Invalid: >1 TEXT.
     ASSERT_NOT_OK(
@@ -129,26 +129,26 @@ TEST(ExpressionOptimizeTest, IsValidText) {
                 "        {b: 1}"
                 "    ]}"
                 "]}",
-                *qr));
+                *findCommand));
 }
 
 TEST(ExpressionOptimizeTest, IsValidTextTailable) {
-    // Filter inside QueryRequest is not used.
-    auto qr = std::make_unique<QueryRequest>(nss);
-    qr->setTailableMode(TailableModeEnum::kTailable);
-    ASSERT_OK(qr->validate());
+    // Filter inside FindCommand is not used.
+    auto findCommand = std::make_unique<FindCommand>(nss);
+    query_request_helper::setTailableMode(TailableModeEnum::kTailable, findCommand.get());
+    ASSERT_OK(query_request_helper::validateFindCommand(*findCommand));
 
     // Invalid: TEXT and tailable.
-    ASSERT_NOT_OK(isValid("{$text: {$search: 's'}}", *qr));
+    ASSERT_NOT_OK(isValid("{$text: {$search: 's'}}", *findCommand));
 }
 
 TEST(ExpressionOptimizeTest, IsValidGeo) {
-    // Filter inside QueryRequest is not used.
-    auto qr = std::make_unique<QueryRequest>(nss);
-    ASSERT_OK(qr->validate());
+    // Filter inside FindCommand is not used.
+    auto findCommand = std::make_unique<FindCommand>(nss);
+    ASSERT_OK(query_request_helper::validateFindCommand(*findCommand));
 
     // Valid: regular GEO_NEAR.
-    ASSERT_OK(isValid("{a: {$near: [0, 0]}}", *qr));
+    ASSERT_OK(isValid("{a: {$near: [0, 0]}}", *findCommand));
 
     // Valid: GEO_NEAR inside nested AND.
     ASSERT_OK(
@@ -159,7 +159,7 @@ TEST(ExpressionOptimizeTest, IsValidGeo) {
                 "    ]},"
                 "    {c: 1}"
                 "]}",
-                *qr));
+                *findCommand));
 
     // Invalid: >1 GEO_NEAR.
     ASSERT_NOT_OK(
@@ -167,7 +167,7 @@ TEST(ExpressionOptimizeTest, IsValidGeo) {
                 "    {a: {$near: [0, 0]}},"
                 "    {b: {$near: [0, 0]}}"
                 "]}",
-                *qr));
+                *findCommand));
 
     // Invalid: >1 GEO_NEAR.
     ASSERT_NOT_OK(
@@ -175,7 +175,7 @@ TEST(ExpressionOptimizeTest, IsValidGeo) {
                 "    {a: {$geoNear: [0, 0]}},"
                 "    {b: {$near: [0, 0]}}"
                 "]}",
-                *qr));
+                *findCommand));
 
     // Invalid: >1 GEO_NEAR.
     ASSERT_NOT_OK(
@@ -189,7 +189,7 @@ TEST(ExpressionOptimizeTest, IsValidGeo) {
                 "        {d: 1}"
                 "    ]}"
                 "]}",
-                *qr));
+                *findCommand));
 
     // Invalid: GEO_NEAR inside NOR.
     ASSERT_NOT_OK(
@@ -197,7 +197,7 @@ TEST(ExpressionOptimizeTest, IsValidGeo) {
                 "    {a: {$near: [0, 0]}},"
                 "    {b: 1}"
                 "]}",
-                *qr));
+                *findCommand));
 
     // Invalid: GEO_NEAR inside OR.
     ASSERT_NOT_OK(
@@ -205,19 +205,19 @@ TEST(ExpressionOptimizeTest, IsValidGeo) {
                 "    {a: {$near: [0, 0]}},"
                 "    {b: 1}"
                 "]}",
-                *qr));
+                *findCommand));
 }
 
 TEST(ExpressionOptimizeTest, IsValidTextAndGeo) {
-    // Filter inside QueryRequest is not used.
-    auto qr = std::make_unique<QueryRequest>(nss);
-    ASSERT_OK(qr->validate());
+    // Filter inside FindCommand is not used.
+    auto findCommand = std::make_unique<FindCommand>(nss);
+    ASSERT_OK(query_request_helper::validateFindCommand(*findCommand));
 
     // Invalid: TEXT and GEO_NEAR.
-    ASSERT_NOT_OK(isValid("{$text: {$search: 's'}, a: {$near: [0, 0]}}", *qr));
+    ASSERT_NOT_OK(isValid("{$text: {$search: 's'}, a: {$near: [0, 0]}}", *findCommand));
 
     // Invalid: TEXT and GEO_NEAR.
-    ASSERT_NOT_OK(isValid("{$text: {$search: 's'}, a: {$geoNear: [0, 0]}}", *qr));
+    ASSERT_NOT_OK(isValid("{$text: {$search: 's'}, a: {$geoNear: [0, 0]}}", *findCommand));
 
     // Invalid: TEXT and GEO_NEAR.
     ASSERT_NOT_OK(
@@ -226,89 +226,85 @@ TEST(ExpressionOptimizeTest, IsValidTextAndGeo) {
                 "    {a: 1}"
                 " ],"
                 " b: {$near: [0, 0]}}",
-                *qr));
+                *findCommand));
 }
 
 TEST(ExpressionOptimizeTest, IsValidTextAndNaturalAscending) {
-    // Filter inside QueryRequest is not used.
-    auto qr = std::make_unique<QueryRequest>(nss);
-    qr->setSort(fromjson("{$natural: 1}"));
-    ASSERT_OK(qr->validate());
+    // Filter inside FindCommand is not used.
+    auto findCommand = std::make_unique<FindCommand>(nss);
+    findCommand->setSort(fromjson("{$natural: 1}"));
+    ASSERT_OK(query_request_helper::validateFindCommand(*findCommand));
 
     // Invalid: TEXT and {$natural: 1} sort order.
-    ASSERT_NOT_OK(isValid("{$text: {$search: 's'}}", *qr));
+    ASSERT_NOT_OK(isValid("{$text: {$search: 's'}}", *findCommand));
 }
 
 TEST(ExpressionOptimizeTest, IsValidTextAndNaturalDescending) {
-    // Filter inside QueryRequest is not used.
-    auto qr = std::make_unique<QueryRequest>(nss);
-    qr->setSort(fromjson("{$natural: -1}"));
-    ASSERT_OK(qr->validate());
+    // Filter inside FindCommand is not used.
+    auto findCommand = std::make_unique<FindCommand>(nss);
+    findCommand->setSort(fromjson("{$natural: -1}"));
+    ASSERT_OK(query_request_helper::validateFindCommand(*findCommand));
 
     // Invalid: TEXT and {$natural: -1} sort order.
-    ASSERT_NOT_OK(isValid("{$text: {$search: 's'}}", *qr));
+    ASSERT_NOT_OK(isValid("{$text: {$search: 's'}}", *findCommand));
 }
 
 TEST(ExpressionOptimizeTest, IsValidTextAndHint) {
-    // Filter inside QueryRequest is not used.
-    auto qr = std::make_unique<QueryRequest>(nss);
-    qr->setHint(fromjson("{a: 1}"));
-    ASSERT_OK(qr->validate());
+    // Filter inside FindCommand is not used.
+    auto findCommand = std::make_unique<FindCommand>(nss);
+    findCommand->setHint(fromjson("{a: 1}"));
+    ASSERT_OK(query_request_helper::validateFindCommand(*findCommand));
 
     // Invalid: TEXT and {$natural: -1} sort order.
-    ASSERT_NOT_OK(isValid("{$text: {$search: 's'}}", *qr));
+    ASSERT_NOT_OK(isValid("{$text: {$search: 's'}}", *findCommand));
 }
 
 // SERVER-14366
 TEST(ExpressionOptimizeTest, IsValidGeoNearNaturalSort) {
-    // Filter inside QueryRequest is not used.
-    auto qr = std::make_unique<QueryRequest>(nss);
-    qr->setSort(fromjson("{$natural: 1}"));
-    ASSERT_OK(qr->validate());
+    // Filter inside FindCommand is not used.
+    auto findCommand = std::make_unique<FindCommand>(nss);
+    findCommand->setSort(fromjson("{$natural: 1}"));
+    ASSERT_OK(query_request_helper::validateFindCommand(*findCommand));
 
     // Invalid: GEO_NEAR and {$natural: 1} sort order.
-    ASSERT_NOT_OK(isValid("{a: {$near: {$geometry: {type: 'Point', coordinates: [0, 0]}}}}", *qr));
+    ASSERT_NOT_OK(
+        isValid("{a: {$near: {$geometry: {type: 'Point', coordinates: [0, 0]}}}}", *findCommand));
 }
 
 // SERVER-14366
 TEST(ExpressionOptimizeTest, IsValidGeoNearNaturalHint) {
-    // Filter inside QueryRequest is not used.
-    auto qr = std::make_unique<QueryRequest>(nss);
-    qr->setHint(fromjson("{$natural: 1}"));
-    ASSERT_OK(qr->validate());
+    // Filter inside FindCommand is not used.
+    auto findCommand = std::make_unique<FindCommand>(nss);
+    findCommand->setHint(fromjson("{$natural: 1}"));
+    ASSERT_OK(query_request_helper::validateFindCommand(*findCommand));
 
     // Invalid: GEO_NEAR and {$natural: 1} hint.
-    ASSERT_NOT_OK(isValid("{a: {$near: {$geometry: {type: 'Point', coordinates: [0, 0]}}}}", *qr));
+    ASSERT_NOT_OK(
+        isValid("{a: {$near: {$geometry: {type: 'Point', coordinates: [0, 0]}}}}", *findCommand));
 }
 
 TEST(ExpressionOptimizeTest, IsValidNaturalSortIndexHint) {
-    const bool isExplain = false;
-    auto qr = QueryRequest::makeFromFindCommandForTests(
-        fromjson("{find: 'testcoll', sort: {$natural: 1}, hint: {a: 1}, '$db': 'test'}"),
-        isExplain);
+    auto findCommand = query_request_helper::makeFromFindCommandForTests(
+        fromjson("{find: 'testcoll', sort: {$natural: 1}, hint: {a: 1}, '$db': 'test'}"));
 
     // Invalid: {$natural: 1} sort order and index hint.
-    ASSERT_NOT_OK(isValid("{}", *qr));
+    ASSERT_NOT_OK(isValid("{}", *findCommand));
 }
 
 TEST(ExpressionOptimizeTest, IsValidNaturalSortNaturalHint) {
-    const bool isExplain = false;
-    auto qr = QueryRequest::makeFromFindCommandForTests(
-        fromjson("{find: 'testcoll', sort: {$natural: 1}, hint: {$natural: 1}, '$db': 'test'}"),
-        isExplain);
+    auto findCommand = query_request_helper::makeFromFindCommandForTests(
+        fromjson("{find: 'testcoll', sort: {$natural: 1}, hint: {$natural: 1}, '$db': 'test'}"));
 
     // Valid: {$natural: 1} sort order and {$natural: 1} hint.
-    ASSERT_OK(isValid("{}", *qr));
+    ASSERT_OK(isValid("{}", *findCommand));
 }
 
 TEST(ExpressionOptimizeTest, IsValidNaturalSortNaturalHintDifferentDirections) {
-    const bool isExplain = false;
-    auto qr = QueryRequest::makeFromFindCommandForTests(
-        fromjson("{find: 'testcoll', sort: {$natural: 1}, hint: {$natural: -1}, '$db': 'test'}"),
-        isExplain);
+    auto findCommand = query_request_helper::makeFromFindCommandForTests(
+        fromjson("{find: 'testcoll', sort: {$natural: 1}, hint: {$natural: -1}, '$db': 'test'}"));
 
     // Invalid: {$natural: 1} sort order and {$natural: -1} hint.
-    ASSERT_NOT_OK(isValid("{}", *qr));
+    ASSERT_NOT_OK(isValid("{}", *findCommand));
 }
 
 TEST(ExpressionOptimizeTest, NormalizeWithInPreservesTags) {

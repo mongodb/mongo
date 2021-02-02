@@ -37,7 +37,7 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/query/cursor_request.h"
-#include "mongo/db/query/query_request.h"
+#include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/idl/command_generic_argument.h"

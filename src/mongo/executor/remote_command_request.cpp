@@ -36,7 +36,7 @@
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/query/query_request.h"
+#include "mongo/db/query/query_request_helper.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/str.h"
 
@@ -79,8 +79,8 @@ RemoteCommandRequestBase::RemoteCommandRequestBase(RequestId requestId,
     // the OpCtx.  It should never be specified explicitly.
     uassert(4924403,
             str::stream() << "Command request object should not manually specify "
-                          << QueryRequest::kMaxTimeMSOpOnlyField,
-            !cmdObj.hasField(QueryRequest::kMaxTimeMSOpOnlyField));
+                          << query_request_helper::kMaxTimeMSOpOnlyField,
+            !cmdObj.hasField(query_request_helper::kMaxTimeMSOpOnlyField));
 
     if (hedgeOptions) {
         operationKey.emplace(UUID::gen());

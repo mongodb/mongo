@@ -60,9 +60,9 @@ namespace {
 std::unique_ptr<CanonicalQuery> canonicalQueryFromFilterObj(OperationContext* opCtx,
                                                             const NamespaceString& nss,
                                                             BSONObj filter) {
-    auto qr = std::make_unique<QueryRequest>(nss);
-    qr->setFilter(filter);
-    auto statusWithCQ = CanonicalQuery::canonicalize(opCtx, std::move(qr));
+    auto findCommand = std::make_unique<FindCommand>(nss);
+    findCommand->setFilter(filter);
+    auto statusWithCQ = CanonicalQuery::canonicalize(opCtx, std::move(findCommand));
     uassertStatusOK(statusWithCQ.getStatus());
     return std::move(statusWithCQ.getValue());
 }
@@ -187,9 +187,9 @@ TEST_F(QueryStageCachedPlan, QueryStageCachedPlanFailureMemoryLimitExceeded) {
     ASSERT(collection);
 
     // Query can be answered by either index on "a" or index on "b".
-    auto qr = std::make_unique<QueryRequest>(nss);
-    qr->setFilter(fromjson("{a: {$gte: 8}, b: 1}"));
-    auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
+    auto findCommand = std::make_unique<FindCommand>(nss);
+    findCommand->setFilter(fromjson("{a: {$gte: 8}, b: 1}"));
+    auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(findCommand));
     ASSERT_OK(statusWithCQ.getStatus());
     const std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
@@ -237,9 +237,9 @@ TEST_F(QueryStageCachedPlan, QueryStageCachedPlanHitMaxWorks) {
     ASSERT(collection);
 
     // Query can be answered by either index on "a" or index on "b".
-    auto qr = std::make_unique<QueryRequest>(nss);
-    qr->setFilter(fromjson("{a: {$gte: 8}, b: 1}"));
-    auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
+    auto findCommand = std::make_unique<FindCommand>(nss);
+    findCommand->setFilter(fromjson("{a: {$gte: 8}, b: 1}"));
+    auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(findCommand));
     ASSERT_OK(statusWithCQ.getStatus());
     const std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
@@ -448,8 +448,8 @@ TEST_F(QueryStageCachedPlan, ThrowsOnYieldRecoveryWhenIndexIsDroppedBeforePlanSe
     ASSERT(collection);
 
     // Query can be answered by either index on "a" or index on "b".
-    auto qr = std::make_unique<QueryRequest>(nss);
-    auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
+    auto findCommand = std::make_unique<FindCommand>(nss);
+    auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(findCommand));
     ASSERT_OK(statusWithCQ.getStatus());
     const std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
@@ -492,8 +492,8 @@ TEST_F(QueryStageCachedPlan, DoesNotThrowOnYieldRecoveryWhenIndexIsDroppedAferPl
     ASSERT(collection);
 
     // Query can be answered by either index on "a" or index on "b".
-    auto qr = std::make_unique<QueryRequest>(nss);
-    auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(qr));
+    auto findCommand = std::make_unique<FindCommand>(nss);
+    auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(findCommand));
     ASSERT_OK(statusWithCQ.getStatus());
     const std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 

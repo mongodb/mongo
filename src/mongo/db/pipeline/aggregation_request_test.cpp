@@ -39,7 +39,7 @@
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/query/query_request.h"
+#include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -221,7 +221,7 @@ TEST(AggregationRequestTest, ShouldSerializeOptionalValuesIfSet) {
                  {AggregateCommand::kPipelineFieldName, std::vector<Value>{}},
                  {AggregateCommand::kAllowDiskUseFieldName, true},
                  {AggregateCommand::kCursorFieldName, Value(Document({{kBatchSizeFieldName, 10}}))},
-                 {QueryRequest::cmdOptionMaxTimeMS, 10},
+                 {query_request_helper::cmdOptionMaxTimeMS, 10},
                  {AggregateCommand::kBypassDocumentValidationFieldName, true},
                  {repl::ReadConcernArgs::kReadConcernFieldName, readConcernObj},
                  {AggregateCommand::kCollationFieldName, collationObj},
@@ -229,7 +229,7 @@ TEST(AggregationRequestTest, ShouldSerializeOptionalValuesIfSet) {
                  {AggregateCommand::kLetFieldName, letParamsObj},
                  {AggregateCommand::kNeedsMergeFieldName, true},
                  {AggregateCommand::kFromMongosFieldName, true},
-                 {QueryRequest::kUnwrappedReadPrefField, readPrefObj},
+                 {query_request_helper::kUnwrappedReadPrefField, readPrefObj},
                  {AggregateCommand::kRequestReshardingResumeTokenFieldName, true},
                  {AggregateCommand::kIsMapReduceCommandFieldName, true},
                  {AggregateCommand::kCollectionUUIDFieldName, uuid}};
