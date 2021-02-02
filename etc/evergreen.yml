@@ -9737,7 +9737,7 @@ buildvariants:
 - &enterprise-windows-required-template
   name: enterprise-windows-required
   display_name: "! Enterprise Windows"
-  batchtime: 120 # 2 hours
+  batchtime: 240 # 4 hours
   modules:
   - enterprise
   run_on:
@@ -10330,7 +10330,7 @@ buildvariants:
 - &enterprise-rhel-80-64-bit-dynamic-required-template
   name: enterprise-rhel-80-64-bit-dynamic-required
   display_name: "! Shared Library Enterprise RHEL 8.0"
-  batchtime: 60 # 1 hour
+  batchtime: 240 # 4 hour
   modules:
   - enterprise
   run_on:
@@ -10448,7 +10448,7 @@ buildvariants:
 
 - name: enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required
   display_name: "! Shared Library Enterprise RHEL 8.0 (all feature flags)"
-  batchtime: 60 # 1 hour
+  batchtime: 240 # 4 hour
   stepback: false
   modules:
   - enterprise
