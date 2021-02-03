@@ -36,8 +36,8 @@ const expectedMetrics = {
     numIdleBuckets: 0,
 };
 
-const checkServerStatus = function(empty = false) {
-    const metrics = assert.commandWorked(testDB.serverStatus({bucketCatalog: 1})).bucketCatalog;
+const checkServerStatus = function() {
+    const metrics = assert.commandWorked(testDB.serverStatus()).bucketCatalog;
 
     const invalidMetricMsg = function(metric) {
         return "Invalid '" + metric + "' value in serverStatus: " + tojson(metrics);
@@ -47,11 +47,14 @@ const checkServerStatus = function(empty = false) {
         assert.eq(metrics[metric], value, invalidMetricMsg(metric));
     }
 
-    if (empty) {
-        assert.eq(metrics.memoryUsage, 0, invalidMetricMsg('memoryUsage'));
-    } else {
-        assert.gt(metrics.memoryUsage, 0, invalidMetricMsg('memoryUsage'));
-    }
+    assert.gt(metrics.memoryUsage, 0, invalidMetricMsg('memoryUsage'));
+};
+
+const checkNoServerStatus = function() {
+    const serverStatus = assert.commandWorked(testDB.serverStatus());
+    assert(!serverStatus.hasOwnProperty('bucketCatalog'),
+           'Found unexpected bucketCatalog section in serverStatus: ' +
+               tojson(serverStatus.bucketCatalog));
 };
 
 const testWithInsertPaused = function(docs) {
@@ -69,7 +72,7 @@ const testWithInsertPaused = function(docs) {
     awaitInsert();
 };
 
-checkServerStatus(true);
+checkNoServerStatus();
 
 // Inserting the first measurement will open a new bucket.
 expectedMetrics.numBuckets++;
@@ -102,6 +105,9 @@ testWithInsertPaused({[timeFieldName]: ISODate("2021-01-01T01:00:00Z"), [metaFie
 // Once the insert is complete, the new bucket becomes idle.
 expectedMetrics.numIdleBuckets++;
 checkServerStatus();
+
+assert(coll.drop());
+checkNoServerStatus();
 
 MongoRunner.stopMongod(conn);
 })();

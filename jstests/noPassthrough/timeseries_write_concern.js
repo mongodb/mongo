@@ -53,8 +53,9 @@ const awaitInsert = startParallelShell(
 
 // Wait for the {w: 2} insert to open a bucket.
 assert.soon(() => {
-    return assert.commandWorked(testDB.serverStatus({bucketCatalog: 1}))
-               .bucketCatalog.numOpenBuckets === 1;
+    const serverStatus = assert.commandWorked(testDB.serverStatus());
+    return serverStatus.hasOwnProperty('bucketCatalog') &&
+        serverStatus.bucketCatalog.numOpenBuckets === 1;
 });
 
 // A {w: 1} insert should still be able to complete despite going into the same bucket as the {w: 2}
@@ -75,7 +76,7 @@ awaitInsert();
 assert.docEq(coll.find().toArray(), docs);
 const buckets = bucketsColl.find().toArray();
 assert.eq(buckets.length, 1, 'Expected one bucket but found: ' + tojson(buckets));
-const serverStatus = assert.commandWorked(testDB.serverStatus({bucketCatalog: 1})).bucketCatalog;
+const serverStatus = assert.commandWorked(testDB.serverStatus()).bucketCatalog;
 assert.eq(serverStatus.numOpenBuckets, 1, 'Expected one bucket but found: ' + tojson(serverStatus));
 
 replTest.stopSet();

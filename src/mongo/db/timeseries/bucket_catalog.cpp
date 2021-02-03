@@ -638,12 +638,16 @@ public:
     ServerStatus() : ServerStatusSection("bucketCatalog") {}
 
     bool includeByDefault() const override {
-        return false;
+        return true;
     }
 
     BSONObj generateSection(OperationContext* opCtx, const BSONElement&) const override {
         const auto& bucketCatalog = BucketCatalog::get(opCtx);
         stdx::lock_guard lk(bucketCatalog._mutex);
+
+        if (bucketCatalog._executionStats.empty()) {
+            return {};
+        }
 
         BSONObjBuilder builder;
         builder.appendNumber("numBuckets", bucketCatalog._buckets.size());

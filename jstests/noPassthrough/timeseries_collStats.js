@@ -190,8 +190,7 @@ const testIdleBucketExpiry = function(docFn) {
     let shouldExpire = false;
     for (let i = 0; i < numDocs; i++) {
         assert.commandWorked(coll.insert(docFn(i)));
-        const memoryUsage =
-            assert.commandWorked(testDB.serverStatus({bucketCatalog: 1})).bucketCatalog.memoryUsage;
+        const memoryUsage = assert.commandWorked(testDB.serverStatus()).bucketCatalog.memoryUsage;
 
         expectedStats.bucketCount++;
         expectedStats.numBucketInserts++;
