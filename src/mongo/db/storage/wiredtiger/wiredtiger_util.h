@@ -253,6 +253,10 @@ public:
                            const std::string& uri,
                            std::vector<std::string>* errors = NULL);
 
+    static void notifyStartupComplete();
+
+    static void resetTableLoggingInfo();
+
     static bool useTableLogging(NamespaceString ns, bool replEnabled);
 
     static Status setTableLogging(OperationContext* opCtx, const std::string& uri, bool on);
@@ -273,6 +277,12 @@ private:
      */
     template <typename T>
     static T _castStatisticsValue(uint64_t statisticsValue, T maximumResultType);
+
+    static stdx::mutex _tableLoggingInfoMutex;
+    static struct TableLoggingInfo {
+        bool isInitializing = true;
+        bool isFirstTable = true;
+    } _tableLoggingInfo;
 };
 
 class WiredTigerConfigParser {

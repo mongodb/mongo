@@ -54,6 +54,20 @@ class SnapshotManager;
 
 class KVEngine {
 public:
+    /**
+     * During the startup process, the storage engine is one of the first components to be started
+     * up and fully initialized. But that fully initialized storage engine may not be recognized as
+     * the end for the remaining storage startup tasks that still need to be performed.
+     *
+     * For example, after the storage engine has been fully initialized, we need to access it in
+     * order to set up all of the collections and indexes based on the metadata, or perform some
+     * corrective measures on the data files, etc.
+     *
+     * When all of the storage startup tasks are completed as a whole, then this function is called
+     * by the external force managing the startup process.
+     */
+    virtual void notifyStartupComplete() {}
+
     virtual RecoveryUnit* newRecoveryUnit() = 0;
 
     // ---------

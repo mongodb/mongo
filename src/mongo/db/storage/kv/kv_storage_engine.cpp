@@ -478,6 +478,10 @@ KVStorageEngine::~KVStorageEngine() {}
 
 void KVStorageEngine::finishInit() {}
 
+void KVStorageEngine::notifyStartupComplete() {
+    _engine->notifyStartupComplete();
+}
+
 RecoveryUnit* KVStorageEngine::newRecoveryUnit() {
     if (!_engine) {
         // shutdown

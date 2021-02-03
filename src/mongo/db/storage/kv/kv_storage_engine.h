@@ -83,6 +83,8 @@ public:
 
     virtual void finishInit();
 
+    virtual void notifyStartupComplete();
+
     virtual RecoveryUnit* newRecoveryUnit();
 
     virtual void listDatabases(std::vector<std::string>* out) const;

@@ -77,6 +77,7 @@ ServiceContextMongoDTest::ServiceContextMongoDTest(std::string engine, RepairAct
     storageGlobalParams.dbpath = _tempDir.path();
 
     initializeStorageEngine(serviceContext, StorageEngineInitFlags::kNone);
+    serviceContext->getStorageEngine()->notifyStartupComplete();
 
     // Set up UUID Catalog observer. This is necessary because the Collection destructor contains an
     // invariant to ensure the UUID corresponding to that Collection object is no longer associated

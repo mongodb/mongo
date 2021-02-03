@@ -53,6 +53,9 @@ namespace mongo {
 
 using std::string;
 
+stdx::mutex WiredTigerUtil::_tableLoggingInfoMutex;
+WiredTigerUtil::TableLoggingInfo WiredTigerUtil::_tableLoggingInfo;
+
 Status wtRCToStatus_slow(int retCode, const char* prefix) {
     if (retCode == 0)
         return Status::OK();
@@ -533,6 +536,22 @@ int WiredTigerUtil::verifyTable(OperationContext* opCtx,
     return (session->verify)(session, uri.c_str(), NULL);
 }
 
+void WiredTigerUtil::notifyStartupComplete() {
+    stdx::lock_guard<stdx::mutex> lk(_tableLoggingInfoMutex);
+    invariant(_tableLoggingInfo.isInitializing);
+    _tableLoggingInfo.isInitializing = false;
+
+    if (!_tableLoggingInfo.isFirstTable) {
+        // Only log this if there were existing tables during startup.
+        log() << "Finished adjusting the table logging settings for existing WiredTiger tables";
+    }
+}
+
+void WiredTigerUtil::resetTableLoggingInfo() {
+    stdx::lock_guard<stdx::mutex> lk(_tableLoggingInfoMutex);
+    _tableLoggingInfo = TableLoggingInfo();
+}
+
 bool WiredTigerUtil::useTableLogging(NamespaceString ns, bool replEnabled) {
     if (!replEnabled) {
         // All tables on standalones are logged.
@@ -571,6 +590,14 @@ Status WiredTigerUtil::setTableLogging(OperationContext* opCtx, const std::strin
 }
 
 Status WiredTigerUtil::setTableLogging(WT_SESSION* session, const std::string& uri, bool on) {
+    {
+        stdx::lock_guard<stdx::mutex> lk(_tableLoggingInfoMutex);
+        if (_tableLoggingInfo.isFirstTable && _tableLoggingInfo.isInitializing) {
+            log() << "Starting to check the table logging settings for existing WiredTiger tables";
+            _tableLoggingInfo.isFirstTable = false;
+        }
+    }
+
     std::string setting;
     if (on) {
         setting = "log=(enabled=true)";

@@ -302,6 +302,10 @@ ServiceContext* initialize(const char* yaml_config) {
         invariant(serverGlobalParams.featureCompatibility.isVersionInitialized());
     }
 
+    // Notify the storage engine that startup is completed before repair exits below, as repair sets
+    // the upgrade flag to true.
+    serviceContext->getStorageEngine()->notifyStartupComplete();
+
     if (storageGlobalParams.upgrade) {
         log() << "finished checking dbs";
         exitCleanly(EXIT_CLEAN);
