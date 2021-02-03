@@ -245,14 +245,16 @@ public:
      * service. This is called by the OpObserver when a state document in this service's state
      * document collection is deleted, and is the main way that instances get removed from
      * _instances and deleted.
+     * If 'status' is not OK, it is passed as argument to the interrupt() method on the instance.
      */
-    void releaseInstance(const InstanceID& id);
+    void releaseInstance(const InstanceID& id, Status status);
 
     /**
      * Releases all Instances from _instances. Called by the OpObserver if this service's state
      * document collection is dropped.
+     * If 'status' is not OK, it is passed as argument to the interrupt() method on each instance.
      */
-    void releaseAllInstances();
+    void releaseAllInstances(Status status);
 
     /**
      * Returns whether this service is currently running.  This is true only when the node is in

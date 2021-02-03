@@ -70,7 +70,10 @@ void PrimaryOnlyServiceOpObserver::onDelete(OperationContext* opCtx,
     if (!service) {
         return;
     }
-    service->releaseInstance(documentId);
+    // Passing OK() as an argument does not invoke the interrupt() method on the instance.
+    // TODO(SERVER-54460): when state document deletion race is fixed in resharding, release with
+    // error as in 'onDropCollection()'.
+    service->releaseInstance(documentId, Status::OK());
 }
 
 
@@ -81,7 +84,11 @@ repl::OpTime PrimaryOnlyServiceOpObserver::onDropCollection(OperationContext* op
                                                             const CollectionDropType dropType) {
     auto service = _registry->lookupServiceByNamespace(collectionName);
     if (service) {
-        service->releaseAllInstances();
+        // Dropping the state doc collection also interrups all the instances with 'interrupted'
+        // status.
+        service->releaseAllInstances(Status(ErrorCodes::Interrupted,
+                                            str::stream() << collectionName << " is dropped",
+                                            BSON("collection" << collectionName.toString())));
     }
     return {};
 }
