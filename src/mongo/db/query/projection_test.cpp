@@ -78,7 +78,7 @@ projection_ast::Projection createFindProjection(const char* queryStr, const char
     return createProjection(query, projObj, ProjectionPolicies::findProjectionPolicies());
 }
 
-void assertInvalidProjection(const char* queryStr, const char* projStr) {
+void assertInvalidFindProjection(const char* queryStr, const char* projStr, size_t errCode) {
     BSONObj query = fromjson(queryStr);
     BSONObj projObj = fromjson(projStr);
     QueryTestServiceContext serviceCtx;
@@ -88,9 +88,13 @@ void assertInvalidProjection(const char* queryStr, const char* projStr) {
     StatusWithMatchExpression statusWithMatcher = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(statusWithMatcher.getStatus());
     std::unique_ptr<MatchExpression> queryMatchExpr = std::move(statusWithMatcher.getValue());
-    ASSERT_THROWS(
-        projection_ast::parse(expCtx, projObj, queryMatchExpr.get(), query, ProjectionPolicies{}),
-        DBException);
+    ASSERT_THROWS_CODE(projection_ast::parse(expCtx,
+                                             projObj,
+                                             queryMatchExpr.get(),
+                                             query,
+                                             ProjectionPolicies::findProjectionPolicies()),
+                       DBException,
+                       errCode);
 }
 
 TEST(QueryProjectionTest, MakeEmptyProjection) {
@@ -153,32 +157,31 @@ TEST(QueryProjectionTest, MakeSingleFieldFalseIdBoolean) {
 //
 
 TEST(QueryProjectionTest, InvalidPositionalOperatorProjections) {
-    assertInvalidProjection("{}", "{'a.$': 1}");
-    assertInvalidProjection("{a: 1}", "{'b.$': 1}");
-    assertInvalidProjection("{a: 1}", "{'a.$': 0}");
-    assertInvalidProjection("{a: 1}", "{'a.$.d.$': 1}");
-    assertInvalidProjection("{a: 1}", "{'a.$.$': 1}");
-    assertInvalidProjection("{a: 1, b: 1, c: 1}", "{'abc.$': 1}");
-    assertInvalidProjection("{$or: [{a: 1}, {$or: [{b: 1}, {c: 1}]}]}", "{'d.$': 1}");
-    assertInvalidProjection("{a: [1, 2, 3]}", "{'.$': 1}");
+    assertInvalidFindProjection("{a: 1}", "{'a.$': 0}", 31395);
+    assertInvalidFindProjection("{a: 1}", "{'a.$.d.$': 1}", 31394);
+    assertInvalidFindProjection("{a: 1}", "{'a.$.$': 1}", 31394);
+    assertInvalidFindProjection("{a: [1, 2, 3]}", "{'.$': 1}", 5392900);
 }
 
 TEST(QueryProjectionTest, InvalidElemMatchTextProjection) {
-    assertInvalidProjection("{}", "{a: {$elemMatch: {$text: {$search: 'str'}}}}");
+    assertInvalidFindProjection(
+        "{}", "{a: {$elemMatch: {$text: {$search: 'str'}}}}", ErrorCodes::BadValue);
 }
 
 TEST(QueryProjectionTest, InvalidElemMatchWhereProjection) {
-    assertInvalidProjection("{}", "{a: {$elemMatch: {$where: 'this.a == this.b'}}}");
+    assertInvalidFindProjection(
+        "{}", "{a: {$elemMatch: {$where: 'this.a == this.b'}}}", ErrorCodes::BadValue);
 }
 
 TEST(QueryProjectionTest, InvalidElemMatchGeoNearProjection) {
-    assertInvalidProjection(
+    assertInvalidFindProjection(
         "{}",
-        "{a: {$elemMatch: {$nearSphere: {$geometry: {type: 'Point', coordinates: [0, 0]}}}}}");
+        "{a: {$elemMatch: {$nearSphere: {$geometry: {type: 'Point', coordinates: [0, 0]}}}}}",
+        ErrorCodes::BadValue);
 }
 
 TEST(QueryProjectionTest, InvalidElemMatchExprProjection) {
-    assertInvalidProjection("{}", "{a: {$elemMatch: {$expr: 5}}}");
+    assertInvalidFindProjection("{}", "{a: {$elemMatch: {$expr: 5}}}", ErrorCodes::BadValue);
 }
 
 TEST(QueryProjectionTest, ValidPositionalOperatorProjections) {

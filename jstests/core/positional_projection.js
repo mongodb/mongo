@@ -2,6 +2,7 @@
 // @tags: [
 //   requires_getmore,
 //   sbe_incompatible,
+//   requires_fcv_49
 // ]
 (function() {
 "use strict";
@@ -103,7 +104,7 @@ assert(coll.drop());
 
 // Tests with invalid positional projection operator.
 assert.commandWorked(coll.insert([{x: [{a: 1, b: 2}, {a: 2, c: 3}, {a: 1, d: 5}], y: [{aa: 1}]}]));
-const err = assert.throws(() => coll.find({x: 1}, {'x.$': {'$slice': 1}}).toArray());
+let err = assert.throws(() => coll.find({x: 1}, {'x.$': {'$slice': 1}}).toArray());
 assert.commandFailedWithCode(err, 31271);
 
 assert.throws(function() {
@@ -113,4 +114,9 @@ assert.throws(function() {
 assert.throws(function() {
     coll.find({'x.a': 1, 'y.aa': 1}, {'x.$': 1, 'y.$': 1}).toArray();
 }, []);
+
+err = assert.throws(function() {
+    coll.find({}, {".$": 1}).toArray();
+}, []);
+assert.commandFailedWithCode(err, 5392900);
 }());
