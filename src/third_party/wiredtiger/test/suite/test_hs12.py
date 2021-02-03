@@ -27,6 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wiredtiger, wttest, time
+from wtscenario import make_scenarios
 
 def timestamp_str(t):
     return '%x' % t
@@ -36,10 +37,17 @@ def timestamp_str(t):
 class test_hs12(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=2MB,statistics=(all),eviction=(threads_max=1)'
     session_config = 'isolation=snapshot'
+    key_format_values = [
+        # The commented columnar tests needs to be enabled once columnar
+        # Modify type update is fixed in (WT-5550).
+        # ('column', dict(key_format='r')),
+        ('integer', dict(key_format='i')),
+    ]
+    scenarios = make_scenarios(key_format_values)
 
     def test_modify_append_to_string(self):
         uri = "table:test_reverse_modify01_notimestamp"
-        create_params = 'value_format=S,key_format=i'
+        create_params = 'value_format=S,key_format={}'.format(self.key_format)
         value1 = 'abcedfghijklmnopqrstuvwxyz' * 5
         value2 = 'b' * 100
         valuebig = 'e' * 1000

@@ -88,6 +88,12 @@ list_init_block(WT_SESSION *session, const char *key, WT_BLOCK *block)
     wt_api = session->connection->get_extension_api(session->connection);
     if ((ret = wt_api->metadata_search(wt_api, session, key, &config)) != 0)
         WT_ERR(util_err(session, ret, "%s: WT_EXTENSION_API.metadata_search", key));
+    /*
+     * The config variable should be set and not NULL, but Coverity is convinced otherwise. This is
+     * an infrequent code path. Just add this extra conditional to make it happy.
+     */
+    if (config == NULL)
+        goto err;
     if ((ret = wt_api->config_parser_open(wt_api, session, config, strlen(config), &parser)) != 0)
         WT_ERR(util_err(session, ret, "WT_EXTENSION_API.config_parser_open"));
     if ((ret = parser->get(parser, "allocation_size", &cval)) == 0)

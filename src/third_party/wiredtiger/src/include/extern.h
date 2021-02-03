@@ -763,8 +763,8 @@ extern int __wt_hs_delete_key_from_ts(
   WT_SESSION_IMPL *session, uint32_t btree_id, const WT_ITEM *key, wt_timestamp_t ts, bool reinsert)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_hs_find_upd(WT_SESSION_IMPL *session, WT_ITEM *key, const char *value_format,
-  uint64_t recno, WT_UPDATE_VALUE *upd_value, bool allow_prepare, WT_ITEM *on_disk_buf,
-  WT_TIME_WINDOW *on_disk_tw) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+  uint64_t recno, WT_UPDATE_VALUE *upd_value, bool allow_prepare, WT_ITEM *base_value_buf)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_hs_get_btree(WT_SESSION_IMPL *session, WT_BTREE **hs_btreep)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_PAGE *page, WT_MULTI *multi)
@@ -2070,7 +2070,10 @@ static inline int __wt_txn_read(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, 
   uint64_t recno, WT_UPDATE *upd, WT_CELL_UNPACK_KV *vpack)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static inline int __wt_txn_read_upd_list(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
-  WT_UPDATE *upd, WT_UPDATE **prepare_updp) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+  WT_UPDATE *upd) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+static inline int __wt_txn_read_upd_list_internal(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
+  WT_UPDATE *upd, WT_UPDATE **prepare_updp, WT_UPDATE **restored_updp)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static inline int __wt_txn_search_check(WT_SESSION_IMPL *session)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static inline int __wt_txn_update_check(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,

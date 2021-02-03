@@ -252,18 +252,19 @@ struct __wt_btree {
  * Flag values up to 0xff are reserved for WT_DHANDLE_XXX. We don't automatically generate these
  * flag values for that reason, there's no way to start at an offset.
  */
-#define WT_BTREE_ALTER 0x000100u         /* Handle is for alter */
-#define WT_BTREE_BULK 0x000200u          /* Bulk-load handle */
-#define WT_BTREE_CLOSED 0x000400u        /* Handle closed */
-#define WT_BTREE_IGNORE_CACHE 0x000800u  /* Cache-resident object */
-#define WT_BTREE_IN_MEMORY 0x001000u     /* Cache-resident object */
-#define WT_BTREE_NO_CHECKPOINT 0x002000u /* Disable checkpoints */
-#define WT_BTREE_NO_LOGGING 0x004000u    /* Disable logging */
-#define WT_BTREE_READONLY 0x008000u      /* Handle is readonly */
-#define WT_BTREE_SALVAGE 0x010000u       /* Handle is for salvage */
-#define WT_BTREE_SKIP_CKPT 0x020000u     /* Handle skipped checkpoint */
-#define WT_BTREE_UPGRADE 0x040000u       /* Handle is for upgrade */
-#define WT_BTREE_VERIFY 0x080000u        /* Handle is for verify */
+#define WT_BTREE_ALTER 0x000100u          /* Handle is for alter */
+#define WT_BTREE_BULK 0x000200u           /* Bulk-load handle */
+#define WT_BTREE_CLOSED 0x000400u         /* Handle closed */
+#define WT_BTREE_IGNORE_CACHE 0x000800u   /* Cache-resident object */
+#define WT_BTREE_IN_MEMORY 0x001000u      /* Cache-resident object */
+#define WT_BTREE_NO_CHECKPOINT 0x002000u  /* Disable checkpoints */
+#define WT_BTREE_NO_LOGGING 0x004000u     /* Disable logging */
+#define WT_BTREE_OBSOLETE_PAGES 0x008000u /* Handle has obsolete pages */
+#define WT_BTREE_READONLY 0x010000u       /* Handle is readonly */
+#define WT_BTREE_SALVAGE 0x020000u        /* Handle is for salvage */
+#define WT_BTREE_SKIP_CKPT 0x040000u      /* Handle skipped checkpoint */
+#define WT_BTREE_UPGRADE 0x080000u        /* Handle is for upgrade */
+#define WT_BTREE_VERIFY 0x100000u         /* Handle is for verify */
     uint32_t flags;
 };
 

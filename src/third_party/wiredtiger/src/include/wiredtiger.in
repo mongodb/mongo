@@ -5875,12 +5875,16 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_TXN_RTS_KEYS_RESTORED		1468
 /*! transaction: rollback to stable restored tombstones from history store */
 #define	WT_STAT_CONN_TXN_RTS_HS_RESTORE_TOMBSTONES	1469
+/*! transaction: rollback to stable restored updates from history store */
+#define	WT_STAT_CONN_TXN_RTS_HS_RESTORE_UPDATES		1470
 /*! transaction: rollback to stable sweeping history store keys */
-#define	WT_STAT_CONN_TXN_RTS_SWEEP_HS_KEYS		1470
+#define	WT_STAT_CONN_TXN_RTS_SWEEP_HS_KEYS		1471
 /*! transaction: rollback to stable updates removed from history store */
-#define	WT_STAT_CONN_TXN_RTS_HS_REMOVED			1471
+#define	WT_STAT_CONN_TXN_RTS_HS_REMOVED			1472
+/*! transaction: transaction checkpoints due to obsolete pages */
+#define	WT_STAT_CONN_TXN_CHECKPOINT_OBSOLETE_APPLIED	1473
 /*! transaction: update conflicts */
-#define	WT_STAT_CONN_TXN_UPDATE_CONFLICT		1472
+#define	WT_STAT_CONN_TXN_UPDATE_CONFLICT		1474
 
 /*!
  * @}
@@ -6484,12 +6488,16 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_DSRC_TXN_RTS_KEYS_RESTORED		2201
 /*! transaction: rollback to stable restored tombstones from history store */
 #define	WT_STAT_DSRC_TXN_RTS_HS_RESTORE_TOMBSTONES	2202
+/*! transaction: rollback to stable restored updates from history store */
+#define	WT_STAT_DSRC_TXN_RTS_HS_RESTORE_UPDATES		2203
 /*! transaction: rollback to stable sweeping history store keys */
-#define	WT_STAT_DSRC_TXN_RTS_SWEEP_HS_KEYS		2203
+#define	WT_STAT_DSRC_TXN_RTS_SWEEP_HS_KEYS		2204
 /*! transaction: rollback to stable updates removed from history store */
-#define	WT_STAT_DSRC_TXN_RTS_HS_REMOVED			2204
+#define	WT_STAT_DSRC_TXN_RTS_HS_REMOVED			2205
+/*! transaction: transaction checkpoints due to obsolete pages */
+#define	WT_STAT_DSRC_TXN_CHECKPOINT_OBSOLETE_APPLIED	2206
 /*! transaction: update conflicts */
-#define	WT_STAT_DSRC_TXN_UPDATE_CONFLICT		2205
+#define	WT_STAT_DSRC_TXN_UPDATE_CONFLICT		2207
 
 /*!
  * @}

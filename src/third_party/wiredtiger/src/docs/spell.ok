@@ -17,6 +17,7 @@ Christoph
 Collet's
 Coverity
 Coverity's
+CURSTD
 DB's
 DBTs
 DHANDLE
@@ -51,6 +52,8 @@ Google's
 HyperDex
 HyperLevelDB
 IEC
+IMPL
+ITER
 JDK
 JIRA
 JavaScript
@@ -114,6 +117,7 @@ Yann
 Za
 Zstd
 aR
+abc
 abstime
 ack'ed
 ajn
@@ -149,6 +153,7 @@ bufs
 builtin
 builtins
 bzip
+cacheable
 cachesize
 calc
 callbk
@@ -180,6 +185,7 @@ crashless
 crc
 curfile
 cursortype
+curtable
 customerABC
 cv
 dN
@@ -197,6 +203,7 @@ dbformat
 dbm
 dbt
 decl
+decrement
 decrementing
 decrypt
 decrypted
@@ -291,6 +298,7 @@ html
 htmlinclude
 huffman
 hugepage
+iSi
 icount
 ie
 iflag
@@ -299,6 +307,7 @@ indices
 init
 insn
 intl
+intpack
 inuse
 io
 ip
@@ -469,6 +478,7 @@ rmw
 ro
 rotn
 rpc
+rts
 runnable
 runtime
 rwlock
@@ -497,6 +507,7 @@ src
 ssd
 startsync
 startuml
+startup
 statlog
 stderr
 stdout

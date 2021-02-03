@@ -184,6 +184,10 @@ WiredTiger has a Python API that is useful for scripting and experimentation.
 
 Row Stores are Btrees that have a variable size key and data.
 
+@subpage arch-rts
+
+Rollback to stable to remove the unstable updates from the database.
+
 @subpage arch-schema
 
 A schema defines the format of the application data in WiredTiger.

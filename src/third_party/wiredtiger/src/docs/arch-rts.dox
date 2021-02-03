@@ -1,0 +1,113 @@
+/*! @arch_page arch-rts Rollback to stable
+
+Rollback to stable is an operation that retains only the modifications that
+are stable according to the stable timestamp and recovered checkpoint snapshot.
+The checkpoint transaction snapshot details are saved at the end of every
+checkpoint are recovered and used as a recovered checkpoint snapshot.
+
+@section rts-overview Overview of rollback to stable
+
+Rollback to stable scans each and every table present in the database except
+metadata @ref arch-metadata to remove the modifications from the table
+that are more than stable timestamp and recovered checkpoint snapshot.
+
+In the process of removing newer modifications from the table, all the in-memory
+updates are aborted and the on-disk version updates are replaced with an update
+from history store otherwise the data store version is removed.
+
+Rollback to stable is performed in three phases
+1. WT startup
+2. WT shutdown
+3. Application initiated
+
+To improve the performance of rollback to stable operation, rollback to stable
+will perform only on particular tables that need rollback. Rollback to stable
+doesn't operate on logged tables as the updates on these are stable when the
+transaction gets committed.
+
+@section rts-stable-update Stable update of rollback to stable
+
+According to rollback to stable, the stable version of update is an update that
+has durable timestamp of less than or equal to the stable timestamp and it's
+transaction id must be committed according to the checkpoint snapshot.
+
+@section rts-preconditions Pre-conditions required for rollback to stable
+
+To perform rollback to stable, there shouldn't be any transaction activity happening
+in the WiredTiger.
+
+@section rts-table-check Checks performed on a table by rollback to stable
+
+Rollback to stable consider a table to be processed for rollback based on the following
+conditions.
+1. Table is modified
+2. The checkpoint durable start/stop timestamp is greater than the rollback timestamp.
+3. There is no durable timestamp in any checkpoint.
+4. Has prepared updates
+5. Has updates from transactions greater than checkpoint snapshot (only in restart phase)
+
+There are some special conditions where the table is skipped for rollback to stable.
+1. Empty file
+2. Table has timestamp updates but there is no stable timestamp set.
+3. Files that don't exist
+4. Files that are corrupted.
+
+If the table has no timestamp updates, then the history store table is
+scanned to remove any historical versions related to this table as these
+older versions no longer required.
+
+Once all the tables are process for rollback to stable, at the end the history store
+is processed to remove any unstable updates more than the stable timestamp.
+
+@section rts-how How rollback to stable fixes the unstable updates
+
+Once a table is identified to perform rollback to stable, it reads the pages into
+the cache if they don't exist and process it to remove the unstable updates.
+
+There are two types of rollbacks that rollback to stable performs:
+1. Rolling back unstable fast truncate
+2. Rolling back unstable updates
+
+All internal pages are traversed to rollback unstable fast truncate operations and
+leaf pages are traversed to remove the unstable updates.
+
+Once the leaf page is identified to rollback the updates, it is performed in the
+following order.
+1. Check smallest insert lists on the page
+2. Traverse through all the on-disk keys
+    a. Check update list
+    b. Check insert list
+    c. Check the on-disk version if no stable update found in the update list.
+3. Traverse through the reconciled pages to abort any history store updates.
+
+@section rts-abort-update How rollback to stable aborts in-memory updates
+
+Traverse through all the updates in the update list and abort them until a stable
+update is found.
+
+@section rts-abort-on-disk-update How rollback to stable aborts on-disk update
+
+If the start time pair is not stable try to find a valid update from the history
+store that is stable to replace the on-disk version otherwise remove the on-disk
+key. In case if the stop time pair if exists and if its not stable, restore the
+on-disk update again into the update list.
+
+To remove any existing update, rollback to stable adds globally visible tombstone to
+the key update list and this key will get removed later during the reconciliation.
+
+Note: As of now, rollback to stable don't work on removing on-disk columnar updates.
+
+@section rts-hs-search Rollback to stable history store search
+
+Rollback to stable searches the history store to find a stable update to replace an
+unstable update in the data store. It searches the history store with the given data
+store key with a maximum timestamp and traverse back till a stable update found. If
+no valid update is found the data store key is removed.
+
+@section rts-page-skip Skipping reading unnecessary pages into memory
+
+Rollback to stable doesn't load the pages that don't have any unstable updates to be
+removed to improve the performance of rollback to stable by verifying the time aggregated
+values with the stable timestamp or recovered checkpoint snapshot during the tree walk.
+
+*/
