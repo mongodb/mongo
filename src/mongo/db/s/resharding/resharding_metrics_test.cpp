@@ -27,22 +27,30 @@
  *    it in the license file.
  */
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
+
 #include <fmt/format.h>
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/logv2/log.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
+namespace {
+
+using namespace fmt::literals;
+
+constexpr auto kOpTimeRemaining = "remainingOperationTimeEstimatedMillis"_sd;
 
 class ReshardingMetricsTest : public ServiceContextTest {
 public:
-    void setUp() {
+    void setUp() override {
         auto clockSource = std::make_unique<ClockSourceMock>();
         _clockSource = clockSource.get();
         getGlobalServiceContext()->setFastClockSource(std::move(clockSource));
@@ -55,8 +63,8 @@ public:
     // Timer step in milliseconds
     static constexpr auto kTimerStep = 100;
 
-    void advanceTime(Milliseconds interval = Milliseconds(kTimerStep)) {
-        _clockSource->advance(interval);
+    void advanceTime(Milliseconds step = Milliseconds{kTimerStep}) {
+        _clockSource->advance(step);
     }
 
     auto getReport() {
@@ -371,4 +379,68 @@ TEST_F(ReshardingMetricsTest, CurrentOpReportForCoordinator) {
     ASSERT_BSONOBJ_EQ(expected, report);
 }
 
+TEST_F(ReshardingMetricsTest, EstimatedRemainingOperationTimeCloning) {
+    // Copy N docs @ timePerDoc. Check the progression of the estimated time remaining.
+    auto m = getMetrics();
+    m->onStart();
+    m->setRecipientState(RecipientStateEnum::kCloning);
+    auto timePerDocument = Milliseconds{123};
+    int64_t bytesPerDocument = 1024;
+    int64_t documentsToCopy = 409;
+    int64_t bytesToCopy = bytesPerDocument * documentsToCopy;
+    m->setDocumentsToCopy(documentsToCopy, bytesToCopy);
+    auto remainingTime = 2 * timePerDocument * documentsToCopy;
+    double maxAbsRelErr = 0;
+    for (int64_t copied = 0; copied < documentsToCopy; ++copied) {
+        double output = getReport()[kOpTimeRemaining].Number();
+        if (copied == 0) {
+            ASSERT_EQ(output, -1);
+        } else {
+            ASSERT_GTE(output, 0);
+            auto expected = durationCount<Milliseconds>(remainingTime);
+            // Check that error is pretty small (it should get better as the operation progresses)
+            double absRelErr = std::abs((output - expected) / expected);
+            ASSERT_LT(absRelErr, 0.05)
+                << "output={}, expected={}, copied={}"_format(output, expected, copied);
+            maxAbsRelErr = std::max(maxAbsRelErr, absRelErr);
+        }
+        m->onDocumentsCopied(1, bytesPerDocument);
+        advanceTime(timePerDocument);
+        remainingTime -= timePerDocument;
+    }
+    LOGV2_DEBUG(
+        5422700, 3, "Max absolute relative error observed", "maxAbsRelErr"_attr = maxAbsRelErr);
+}
+
+TEST_F(ReshardingMetricsTest, EstimatedRemainingOperationTimeApplying) {
+    // Perform N ops @ timePerOp. Check the progression of the estimated time remaining.
+    auto m = getMetrics();
+    m->onStart();
+    m->setRecipientState(RecipientStateEnum::kApplying);
+    auto timePerOp = Milliseconds{123};
+    int64_t fetched = 10000;
+    m->onOplogEntriesFetched(fetched);
+    auto remainingTime = timePerOp * fetched;
+    double maxAbsRelErr = 0;
+    for (int64_t applied = 0; applied < fetched; ++applied) {
+        double output = getReport()[kOpTimeRemaining].Number();
+        if (applied == 0) {
+            ASSERT_EQ(output, -1);
+        } else {
+            auto expected = durationCount<Milliseconds>(remainingTime);
+            // Check that error is pretty small (it should get better as the operation progresses)
+            double absRelErr = std::abs((output - expected) / expected);
+            ASSERT_LT(absRelErr, 0.05)
+                << "output={}, expected={}, applied={}"_format(output, expected, applied);
+            maxAbsRelErr = std::max(maxAbsRelErr, absRelErr);
+        }
+        advanceTime(timePerOp);
+        m->onOplogEntriesApplied(1);
+        remainingTime -= timePerOp;
+    }
+    LOGV2_DEBUG(
+        5422701, 3, "Max absolute relative error observed", "maxAbsRelErr"_attr = maxAbsRelErr);
+}
+
+}  // namespace
 }  // namespace mongo
