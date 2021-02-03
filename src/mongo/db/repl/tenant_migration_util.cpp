@@ -58,9 +58,8 @@ ExternalKeysCollectionDocument makeExternalClusterTimeKeyDoc(ServiceContext* ser
     return externalKeyDoc;
 }
 
-void storeExternalClusterTimeKeyDocsAndRefreshCache(
-    std::shared_ptr<executor::ScopedTaskExecutor> executor,
-    std::vector<ExternalKeysCollectionDocument> keyDocs) {
+void storeExternalClusterTimeKeyDocs(std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                                     std::vector<ExternalKeysCollectionDocument> keyDocs) {
     auto opCtxHolder = cc().makeOperationContext();
     auto opCtx = opCtxHolder.get();
     auto nss = NamespaceString::kExternalKeysCollectionNamespace;
@@ -81,14 +80,6 @@ void storeExternalClusterTimeKeyDocsAndRefreshCache(
                             updateMod,
                             /*fromMigrate=*/false);
         });
-    }
-
-    auto validator = LogicalTimeValidator::get(opCtx);
-    if (validator) {
-        // Refresh the keys cache to avoid validation errors for external cluster times with
-        // a keyId that matches the keyId of an internal key since the LogicalTimeValidator
-        // only refreshes the cache when it cannot find a matching internal key.
-        validator->refreshKeyManagerCache(opCtx);
     }
 }
 

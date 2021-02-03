@@ -32,7 +32,6 @@
 #include "mongo/db/keys_collection_cache.h"
 
 #include "mongo/db/keys_collection_client.h"
-#include "mongo/db/keys_collection_document_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/util/str.h"
 
@@ -202,6 +201,11 @@ void KeysCollectionCache::resetCache() {
         _internalKeysCache.clear();
         _externalKeysCache.clear();
     }
+}
+
+void KeysCollectionCache::cacheExternalKey(ExternalKeysCollectionDocument key) {
+    stdx::lock_guard<Latch> lk(_cacheMutex);
+    _externalKeysCache.emplace(key.getKeyId(), std::move(key));
 }
 
 }  // namespace mongo

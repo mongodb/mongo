@@ -201,6 +201,15 @@ void KeysCollectionManager::clearCache() {
     _keysCache.resetCache();
 }
 
+void KeysCollectionManager::cacheExternalKey(ExternalKeysCollectionDocument key) {
+    // If the refresher has been shut down, we don't cache external keys because refresh is relied
+    // on to clear expired keys. This is OK because the refresher is only shut down in cases where
+    // keys aren't needed, like on an arbiter.
+    if (!_refresher.isInShutdown()) {
+        _keysCache.cacheExternalKey(std::move(key));
+    }
+}
+
 void KeysCollectionManager::PeriodicRunner::refreshNow(OperationContext* opCtx) {
     auto refreshRequest = [this]() {
         stdx::lock_guard<Latch> lk(_mutex);
@@ -363,6 +372,11 @@ void KeysCollectionManager::PeriodicRunner::stop() {
 
 bool KeysCollectionManager::PeriodicRunner::hasSeenKeys() const noexcept {
     return _hasSeenKeys.load();
+}
+
+bool KeysCollectionManager::PeriodicRunner::isInShutdown() const {
+    stdx::lock_guard<Latch> lock(_mutex);
+    return _inShutdown;
 }
 
 }  // namespace mongo
