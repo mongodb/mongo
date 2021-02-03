@@ -1,6 +1,8 @@
 // Tests that the ShardingTaskExecutorPoolReplicaSetMatchingPolicy is correctly set when the default
 // "automatic" value is used for the ShardingTaskExecutorPoolReplicaSetMatching parameter (on
 // mongos, "matchPrimaryNode" should be set; on mongod, the policy should be "disabled").
+//
+// @tags: [sets_replica_set_matching_strategy]
 
 (function() {
 "use strict";
