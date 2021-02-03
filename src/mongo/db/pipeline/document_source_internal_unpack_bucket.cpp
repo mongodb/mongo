@@ -38,6 +38,7 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/matcher/expression_internal_expr_comparison.h"
+#include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_project.h"
 #include "mongo/db/pipeline/document_source_sample.h"
@@ -297,7 +298,7 @@ void BucketUnpacker::reset(BSONObj&& bucket) {
         // Includes a field when '_unpackerBehavior' is 'kInclude' and it's found in 'fieldSet' or
         // _unpackerBehavior is 'kExclude' and it's not found in 'fieldSet'.
         if (determineIncludeField(colName, _unpackerBehavior, _spec)) {
-            _fieldIters.push_back({colName.toString(), BSONObjIterator{elem.Obj()}});
+            _fieldIters.emplace_back(colName.toString(), BSONObjIterator{elem.Obj()});
         }
     }
 
@@ -766,6 +767,21 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
 
     // Optimize the pipeline after the $unpackBucket.
     optimizeEndOfPipeline(itr, container);
+
+    {
+        // Check if the rest of the pipeline needs any fields. For example we might only be
+        // interested in $count.
+        auto deps = Pipeline::getDependenciesForContainer(
+            pExpCtx, Pipeline::SourceContainer{std::next(itr), container->end()}, boost::none);
+        if (deps.hasNoRequirements()) {
+            _bucketUnpacker.setBucketSpecAndBehavior({_bucketUnpacker.bucketSpec().timeField,
+                                                      _bucketUnpacker.bucketSpec().metaField,
+                                                      {}},
+                                                     BucketUnpacker::Behavior::kInclude);
+
+            // Keep going for next optimization.
+        }
+    }
 
     if (auto nextMatch = dynamic_cast<DocumentSourceMatch*>((*std::next(itr)).get())) {
         // Attempt to push predicates on the metaField past $_internalUnpackBucket.
