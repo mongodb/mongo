@@ -71,6 +71,9 @@ dataSyncFp.wait();
 // Release the racy thread; it should block.
 indexBuildFp.off();
 
+// Wait for the racy index to check migration status.
+checkLog.containsJson(donorPrimary, 4886202);
+
 // Should be able to create an index on a non-existent collection.  Since the collection is
 // guaranteed to be empty and to have always been empty, this is safe.
 assert.commandWorked(db[kNewCollName1].createIndex({a: 1}));
