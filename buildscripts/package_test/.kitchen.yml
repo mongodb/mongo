@@ -58,7 +58,7 @@ platforms:
       instance_type: t2.small
   - name: rhel70
     driver:
-      image_id: ami-60a1e808
+      image_id: ami-2051294a
     transport:
       username: root
   - name: rhel80
