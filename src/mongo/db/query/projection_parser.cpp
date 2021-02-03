@@ -401,6 +401,7 @@ void parseInclusion(ParseContext* ctx,
         }
     } else {
         verifyComputedFieldsAllowed(ctx->policies);
+        StringData elemFieldName = elem.fieldNameStringData();
 
         uassert(31276,
                 "Cannot specify more than one positional projection per query.",
@@ -409,10 +410,15 @@ void parseInclusion(ParseContext* ctx,
         uassert(31256, "Cannot specify positional operator and $elemMatch.", !ctx->hasElemMatch);
         uassert(51050, "Projections with a positional operator require a matcher", ctx->query);
 
+        // Special case: ".$" is not considered a valid projection.
+        uassert(5392900,
+                str::stream() << "Projection on field " << elemFieldName << " is invalid",
+                elemFieldName != ".$");
+
         // Get everything up to the first positional operator.
-        // Should at least be ".$"
-        StringData elemFieldName = elem.fieldNameStringData();
-        invariant(elemFieldName.size() > 2);
+        uassert(5392901,
+                "Expected element field name size to be greater than 2",
+                elemFieldName.size() > 2);
         StringData pathWithoutPositionalOperator =
             elemFieldName.substr(0, elemFieldName.size() - 2);
 

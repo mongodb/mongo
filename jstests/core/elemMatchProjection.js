@@ -105,8 +105,11 @@ assert.eq(1,
               .x.length,
           "single object match with elemMatch");
 
-const err = assert.throws(() => coll.find({'group': 2, x: 1}, {'x.$': {'$slice': 1}}).toArray());
+let err = assert.throws(() => coll.find({'group': 2, x: 1}, {'x.$': {'$slice': 1}}).toArray());
 assert.commandFailedWithCode(err, 31271);
+
+err = assert.throws(() => coll.find({}, {".$": 1}).toArray());
+assert.commandFailedWithCode(err, 5392900);
 
 assert.eq(1,
           coll.find({'group': 12, 'x.y.a': 1}, {'x.y.$': 1}).toArray()[0].x.y.length,
