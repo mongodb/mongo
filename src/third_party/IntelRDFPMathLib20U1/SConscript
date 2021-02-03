@@ -362,16 +362,28 @@ libenv = env.Clone()
 # that on macOS, whereas we might not on libgcc platforms where we
 # could end up binding to the shadow version.
 def export_file_generator(target, source, env, for_signature):
-    if env.ToolchainIs('msvc'):
-        return
-    elif env.TargetOSIs('darwin'):
+    if env.TargetOSIs('darwin'):
         script = env.File(env.subst("${TARGET.base}.exported_symbols_list", target=target))
-        return script.get_csig() if for_signature else "-Wl,-exported_symbols_list," + str(script)
+        ret_value = script.get_csig() if for_signature else "-Wl,-exported_symbols_list," + str(script)
     elif env.TargetOSIs('posix'):
         script = env.File(env.subst("${TARGET.base}.version_script", target=target))
-        return script.get_csig() if for_signature else "-Wl,--version-script," + str(script)
+        ret_value = script.get_csig() if for_signature else "-Wl,--version-script," + str(script)
     else:
-        pass
+        script = None
+        ret_value = None
+
+
+    if script and not for_signature:
+        # ninja workaround:
+        #   This is redundant for scons because the content signiture of this generator
+        #   will cause the targets to be out of date. However ninja is not able to
+        #   content signature checks for expansions, so we setup the explicit depends
+        #   to create this dependency for ninja.
+        #
+        # TODO remove this after https://jira.mongodb.org/browse/SERVER-54253
+        env.Depends(target, script)
+
+    return ret_value
 
 libenv['EXPORT_FILE_SHLINKFLAGS'] = export_file_generator
 libenv.AppendUnique(
