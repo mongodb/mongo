@@ -43,9 +43,18 @@ namespace mongo {
  */
 class PlanExecutorPipeline final : public PlanExecutor {
 public:
+    /**
+     * Determines the type of resumable scan being run by the PlanExecutorPipeline.
+     */
+    enum class ResumableScanType {
+        kNone,          // No resuming. This is the default.
+        kChangeStream,  // For change stream pipelines.
+        kOplogScan      // For non-changestream resumable oplog scans.
+    };
+
     PlanExecutorPipeline(boost::intrusive_ptr<ExpressionContext> expCtx,
                          std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
-                         bool isChangeStream);
+                         ResumableScanType resumableScanType);
 
     CanonicalQuery* getCanonicalQuery() const override {
         return nullptr;
@@ -148,15 +157,27 @@ private:
     boost::optional<Document> _getNext();
 
     /**
+     * For a change stream or resumable oplog scan, updates the scan state based on the latest
+     * document returned by the underlying pipeline.
+     */
+    void _updateResumableScanState(const boost::optional<Document>& document);
+
+    /**
      * If this is a change stream, advance the cluster time and post batch resume token based on the
      * latest document returned by the underlying pipeline.
      */
-    void _performChangeStreamsAccounting(const boost::optional<Document>);
+    void _performChangeStreamsAccounting(const boost::optional<Document>&);
 
     /**
      * Verifies that the docs's resume token has not been modified.
      */
-    void _validateResumeToken(const Document& event) const;
+    void _validateChangeStreamsResumeToken(const Document& event) const;
+
+    /**
+     * For a non-changestream resumable oplog scan, updates the latest oplog timestamp and
+     * postBatchResumeToken value from the underlying pipeline.
+     */
+    void _performResumableOplogScanAccounting();
 
     /**
      * Set the speculative majority read timestamp if we have scanned up to a certain oplog
@@ -164,13 +185,16 @@ private:
      */
     void _setSpeculativeReadTimestamp();
 
+    /**
+     * For a change stream or resumable oplog scan, initializes the scan state.
+     */
+    void _initializeResumableScanState();
+
     boost::intrusive_ptr<ExpressionContext> _expCtx;
 
     std::unique_ptr<Pipeline, PipelineDeleter> _pipeline;
 
     PlanExplainerPipeline _planExplainer;
-
-    const bool _isChangeStream;
 
     std::queue<BSONObj> _stash;
 
@@ -182,8 +206,10 @@ private:
     // pipeline has indicated end-of-stream.
     bool _pipelineIsEof = false;
 
-    // If '_pipeline' is a change stream, these track the latest timestamp seen while scanning the
-    // oplog, as well as the most recent PBRT.
+    const ResumableScanType _resumableScanType{ResumableScanType::kNone};
+
+    // If '_pipeline' is a change stream or other resumable scan type, these track the latest
+    // timestamp seen while scanning the oplog, as well as the most recent PBRT.
     Timestamp _latestOplogTimestamp;
     BSONObj _postBatchResumeToken;
 };

@@ -49,7 +49,9 @@ namespace aggregation_request_helper {
 /**
  * Validate the aggregate command object.
  */
-void validate(const BSONObj& cmdObj, boost::optional<ExplainOptions::Verbosity> explainVerbosity);
+void validate(const BSONObj& cmdObj,
+              const NamespaceString& nss,
+              boost::optional<ExplainOptions::Verbosity> explainVerbosity);
 
 AggregateCommand parseFromBSON(const std::string& dbName,
                                const BSONObj& cmdObj,
@@ -109,8 +111,7 @@ AggregateCommand parseFromBSON(NamespaceString nss,
         request.setExplain(explainVerbosity);
     }
 
-    validate(cmdObj, explainVerbosity);
-
+    validate(cmdObj, nss, explainVerbosity);
     return request;
 }
 
@@ -148,7 +149,9 @@ Document serializeToCommandDoc(const AggregateCommand& request) {
     return Document(request.toBSON(BSONObj()).getOwned());
 }
 
-void validate(const BSONObj& cmdObj, boost::optional<ExplainOptions::Verbosity> explainVerbosity) {
+void validate(const BSONObj& cmdObj,
+              const NamespaceString& nss,
+              boost::optional<ExplainOptions::Verbosity> explainVerbosity) {
     bool hasAllowDiskUseElem = cmdObj.hasField(AggregateCommand::kAllowDiskUseFieldName);
     bool hasCursorElem = cmdObj.hasField(AggregateCommand::kCursorFieldName);
     bool hasExplainElem = cmdObj.hasField(AggregateCommand::kExplainFieldName);
@@ -178,6 +181,19 @@ void validate(const BSONObj& cmdObj, boost::optional<ExplainOptions::Verbosity> 
             str::stream() << "The '" << AggregateCommand::kAllowDiskUseFieldName
                           << "' option is not permitted in read-only mode.",
             (!hasAllowDiskUseElem || !storageGlobalParams.readOnly));
+
+    auto requestReshardingResumeTokenElem =
+        cmdObj[AggregateCommand::kRequestReshardingResumeTokenFieldName];
+    uassert(ErrorCodes::FailedToParse,
+            str::stream() << AggregateCommand::kRequestReshardingResumeTokenFieldName
+                          << " must be a boolean type",
+            !requestReshardingResumeTokenElem || requestReshardingResumeTokenElem.isBoolean());
+    bool hasRequestReshardingResumeToken =
+        requestReshardingResumeTokenElem && requestReshardingResumeTokenElem.boolean();
+    uassert(ErrorCodes::FailedToParse,
+            str::stream() << AggregateCommand::kRequestReshardingResumeTokenFieldName
+                          << " must only be set for the oplog namespace, not " << nss,
+            !hasRequestReshardingResumeToken || nss.isOplog());
 }
 
 void validateRequestForAPIVersion(const OperationContext* opCtx, const AggregateCommand& request) {
@@ -205,6 +221,21 @@ void validateRequestForAPIVersion(const OperationContext* opCtx, const Aggregate
     }
 }
 
+PlanExecutorPipeline::ResumableScanType getResumableScanType(const AggregateCommand& request,
+                                                             bool isChangeStream) {
+    // $changeStream cannot be run on the oplog, and $_requestReshardingResumeToken can only be run
+    // on the oplog. An aggregation request with both should therefore never reach this point.
+    tassert(5353400,
+            "$changeStream can't be combined with _requestReshardingResumeToken: true",
+            !(isChangeStream && request.getRequestReshardingResumeToken()));
+    if (isChangeStream) {
+        return PlanExecutorPipeline::ResumableScanType::kChangeStream;
+    }
+    if (request.getRequestReshardingResumeToken()) {
+        return PlanExecutorPipeline::ResumableScanType::kOplogScan;
+    }
+    return PlanExecutorPipeline::ResumableScanType::kNone;
+}
 }  // namespace aggregation_request_helper
 
 // Custom serializers/deserializers for AggregateCommand.

@@ -180,9 +180,9 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> make(
     boost::intrusive_ptr<ExpressionContext> expCtx,
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
-    bool isChangeStream) {
+    PlanExecutorPipeline::ResumableScanType resumableScanType) {
     auto* opCtx = expCtx->opCtx;
-    auto exec = new PlanExecutorPipeline(std::move(expCtx), std::move(pipeline), isChangeStream);
+    auto exec = new PlanExecutorPipeline(std::move(expCtx), std::move(pipeline), resumableScanType);
     return {exec, PlanExecutor::Deleter{opCtx}};
 }
 

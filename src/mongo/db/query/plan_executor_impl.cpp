@@ -467,10 +467,6 @@ void PlanExecutorImpl::markAsKilled(Status killStatus) {
 }
 
 void PlanExecutorImpl::dispose(OperationContext* opCtx) {
-    if (_currentState == kDisposed) {
-        return;
-    }
-
     _currentState = kDisposed;
 }
 

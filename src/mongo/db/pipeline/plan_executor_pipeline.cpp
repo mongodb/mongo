@@ -40,11 +40,11 @@ namespace mongo {
 
 PlanExecutorPipeline::PlanExecutorPipeline(boost::intrusive_ptr<ExpressionContext> expCtx,
                                            std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
-                                           bool isChangeStream)
+                                           ResumableScanType resumableScanType)
     : _expCtx(std::move(expCtx)),
       _pipeline(std::move(pipeline)),
       _planExplainer{_pipeline.get()},
-      _isChangeStream(isChangeStream) {
+      _resumableScanType{resumableScanType} {
     // Pipeline plan executors must always have an ExpressionContext.
     invariant(_expCtx);
 
@@ -53,13 +53,9 @@ PlanExecutorPipeline::PlanExecutorPipeline(boost::intrusive_ptr<ExpressionContex
     // again when it is destroyed.
     _pipeline.get_deleter().dismissDisposal();
 
-    if (_isChangeStream) {
-        // Set _postBatchResumeToken to the initial PBRT that was added to the expression context
-        // during pipeline construction, and use it to obtain the starting time for
-        // _latestOplogTimestamp.
-        invariant(!_expCtx->initialPostBatchResumeToken.isEmpty());
-        _postBatchResumeToken = _expCtx->initialPostBatchResumeToken.getOwned();
-        _latestOplogTimestamp = ResumeToken::parse(_postBatchResumeToken).getData().clusterTime;
+    if (ResumableScanType::kNone != resumableScanType) {
+        // For a resumable scan, set the initial _latestOplogTimestamp and _postBatchResumeToken.
+        _initializeResumableScanState();
     }
 }
 
@@ -121,18 +117,35 @@ boost::optional<Document> PlanExecutorPipeline::_getNext() {
         _pipelineIsEof = true;
     }
 
-    if (_isChangeStream) {
-        _performChangeStreamsAccounting(nextDoc);
+    if (ResumableScanType::kNone != _resumableScanType) {
+        _updateResumableScanState(nextDoc);
     }
     return nextDoc;
 }
 
-void PlanExecutorPipeline::_performChangeStreamsAccounting(const boost::optional<Document> doc) {
-    invariant(_isChangeStream);
+void PlanExecutorPipeline::_updateResumableScanState(const boost::optional<Document>& document) {
+    switch (_resumableScanType) {
+        case ResumableScanType::kChangeStream:
+            _performChangeStreamsAccounting(document);
+            break;
+        case ResumableScanType::kOplogScan:
+            _performResumableOplogScanAccounting();
+            break;
+        case ResumableScanType::kNone:
+            break;
+        default:
+            MONGO_UNREACHABLE_TASSERT(5353402);
+    }
+}
+
+void PlanExecutorPipeline::_performChangeStreamsAccounting(const boost::optional<Document>& doc) {
+    tassert(5353405,
+            "expected _resumableScanType == kChangeStream",
+            ResumableScanType::kChangeStream == _resumableScanType);
     if (doc) {
         // While we have more results to return, we track both the timestamp and the resume token of
         // the latest event observed in the oplog, the latter via its sort key metadata field.
-        _validateResumeToken(*doc);
+        _validateChangeStreamsResumeToken(*doc);
         _latestOplogTimestamp = PipelineD::getLatestOplogTimestamp(_pipeline.get());
         _postBatchResumeToken = doc->metadata().getSortKey().getDocument().toBson();
         _setSpeculativeReadTimestamp();
@@ -152,7 +165,7 @@ void PlanExecutorPipeline::_performChangeStreamsAccounting(const boost::optional
     }
 }
 
-void PlanExecutorPipeline::_validateResumeToken(const Document& event) const {
+void PlanExecutorPipeline::_validateChangeStreamsResumeToken(const Document& event) const {
     // If we are producing output to be merged on mongoS, then no stages can have modified the _id.
     if (_expCtx->needsMerge) {
         return;
@@ -175,11 +188,46 @@ void PlanExecutorPipeline::_validateResumeToken(const Document& event) const {
                 idField.binaryEqual(resumeToken.getDocument().toBson()));
 }
 
+void PlanExecutorPipeline::_performResumableOplogScanAccounting() {
+    tassert(5353404,
+            "expected _resumableScanType == kOplogScan",
+            ResumableScanType::kOplogScan == _resumableScanType);
+
+    // Update values of latest oplog timestamp and postBatchResumeToken.
+    _latestOplogTimestamp = PipelineD::getLatestOplogTimestamp(_pipeline.get());
+    _postBatchResumeToken = PipelineD::getPostBatchResumeToken(_pipeline.get());
+    _setSpeculativeReadTimestamp();
+}
+
 void PlanExecutorPipeline::_setSpeculativeReadTimestamp() {
     repl::SpeculativeMajorityReadInfo& speculativeMajorityReadInfo =
         repl::SpeculativeMajorityReadInfo::get(_expCtx->opCtx);
     if (speculativeMajorityReadInfo.isSpeculativeRead() && !_latestOplogTimestamp.isNull()) {
         speculativeMajorityReadInfo.setSpeculativeReadTimestampForward(_latestOplogTimestamp);
+    }
+}
+
+void PlanExecutorPipeline::_initializeResumableScanState() {
+    switch (_resumableScanType) {
+        case ResumableScanType::kChangeStream:
+            // Set _postBatchResumeToken to the initial PBRT that was added to the expression
+            // context during pipeline construction, and use it to obtain the starting time for
+            // _latestOplogTimestamp.
+            tassert(5353403,
+                    "expected initialPostBatchResumeToken to be not empty",
+                    !_expCtx->initialPostBatchResumeToken.isEmpty());
+            _postBatchResumeToken = _expCtx->initialPostBatchResumeToken.getOwned();
+            _latestOplogTimestamp = ResumeToken::parse(_postBatchResumeToken).getData().clusterTime;
+            break;
+        case ResumableScanType::kOplogScan:
+            // Initialize the oplog timestamp and postBatchResumeToken here in case the request has
+            // batchSize 0, in which case the PBRT of the first batch would be empty.
+            _performResumableOplogScanAccounting();
+            break;
+        case ResumableScanType::kNone:
+            break;
+        default:
+            MONGO_UNREACHABLE_TASSERT(5353401);
     }
 }
 

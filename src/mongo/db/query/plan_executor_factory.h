@@ -34,6 +34,7 @@
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/plan_executor_pipeline.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_yield_policy_sbe.h"
 #include "mongo/db/query/query_solution.h"
@@ -136,6 +137,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> make(
     boost::intrusive_ptr<ExpressionContext> expCtx,
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
-    bool isChangeStream);
+    PlanExecutorPipeline::ResumableScanType resumableScanType =
+        PlanExecutorPipeline::ResumableScanType::kNone);
 
 }  // namespace mongo::plan_executor_factory

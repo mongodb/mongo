@@ -99,6 +99,12 @@ public:
         return _latestOplogTimestamp;
     }
 
+    /**
+     * Returns a postBatchResumeToken compatible with resharding oplog sync, if available.
+     * Otherwise, returns an empty object.
+     */
+    BSONObj getPostBatchResumeToken() const;
+
     const std::string& getPlanSummaryStr() const {
         return _planSummary;
     }
@@ -246,8 +252,8 @@ private:
     // True if we are tracking the latest observed oplog timestamp, false otherwise.
     bool _trackOplogTS = false;
 
-    // If we are tailing the oplog and tracking the latest observed oplog time, this is the latest
-    // timestamp seen in the collection. Otherwise, this is a null timestamp.
+    // If we are tracking the latest observed oplog time, this is the latest timestamp seen in the
+    // oplog. Otherwise, this is a null timestamp.
     Timestamp _latestOplogTimestamp;
 
     // Specific stats for $cursor stage.
