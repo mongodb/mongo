@@ -428,11 +428,12 @@ void ReshardingDonorService::DonorStateMachine::_transitionState(
     emplaceMinFetchTimestampIfExists(replacementDoc, minFetchTimestamp);
     emplaceAbortReasonIfExists(replacementDoc, abortReason);
 
+    auto newState = replacementDoc.getState();
     _updateDonorDocument(std::move(replacementDoc));
 
     LOGV2_INFO(5279505,
                "Transitioned resharding donor state",
-               "newState"_attr = DonorState_serializer(replacementDoc.getState()),
+               "newState"_attr = DonorState_serializer(newState),
                "oldState"_attr = DonorState_serializer(_donorDoc.getState()),
                "ns"_attr = _donorDoc.getNss(),
                "collectionUUID"_attr = _donorDoc.getExistingUUID(),

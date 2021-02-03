@@ -516,11 +516,13 @@ void ReshardingRecipientService::RecipientStateMachine::_transitionState(
 
     emplaceFetchTimestampIfExists(replacementDoc, std::move(fetchTimestamp));
     emplaceAbortReasonIfExists(replacementDoc, std::move(abortReason));
+
+    auto newState = replacementDoc.getState();
     _updateRecipientDocument(std::move(replacementDoc));
 
     LOGV2_INFO(5279506,
                "Transitioned resharding recipient state",
-               "newState"_attr = RecipientState_serializer(replacementDoc.getState()),
+               "newState"_attr = RecipientState_serializer(newState),
                "oldState"_attr = RecipientState_serializer(_recipientDoc.getState()),
                "ns"_attr = _recipientDoc.getNss(),
                "collectionUUID"_attr = _recipientDoc.getExistingUUID(),
