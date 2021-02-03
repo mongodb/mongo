@@ -149,6 +149,40 @@ commands:
                 before the rename."
                 default: false
 
+    _shardsvrRenameCollectionParticipant:
+        command_name: _shardsvrRenameCollectionParticipant
+        cpp_name: ShardsvrRenameCollectionParticipant
+        description: "Internal command sent to shard participating in a rename collection procedure"
+        strict: false
+        api_version: ""
+        namespace: concatenate_with_db
+        fields:
+            to:
+                type: namespacestring
+                description: "The new namespace for the collection being renamed."
+            dropTarget:
+                type: bool
+                description: "If true, mongod will drop the target of renameCollection prior to
+                renaming the collection."
+                default: false
+            stayTemp:
+                type: bool
+                description: "If true, the original collection will remain temp if it was temp
+                before the rename."
+                default: false
+
+    _shardsvrRenameCollectionUnblockParticipant:
+        command_name: _shardsvrRenameCollectionUnblockParticipant
+        cpp_name: ShardsvrRenameCollectionUnblockParticipant
+        description: "Parser for the _shardsvrRenameCollectionUnblockParticipant command"
+        strict: false
+        api_version: ""
+        namespace: concatenate_with_db
+        fields:
+            to:
+                type: namespacestring
+                description: "The new namespace for the collection being renamed."
+
     _shardsvrRefineCollectionShardKey:
         description: "Parser for the _shardsvrRefineCollectionShardKey command"
         command_name: _shardsvrRefineCollectionShardKey

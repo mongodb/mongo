@@ -47,6 +47,33 @@ namespace mongo {
 
 namespace sharding_ddl_util {
 
+namespace {
+
+void cloneTags(OperationContext* opCtx,
+               const NamespaceString& fromNss,
+               const NamespaceString& toNss) {
+    auto catalogClient = Grid::get(opCtx)->catalogClient();
+    auto tags = uassertStatusOK(catalogClient->getTagsForCollection(opCtx, fromNss));
+
+    if (tags.empty()) {
+        return;
+    }
+
+    // Wait for majority just for last tag
+    auto lastTag = tags.back();
+    tags.pop_back();
+    for (auto& tag : tags) {
+        tag.setNS(toNss);
+        uassertStatusOK(catalogClient->insertConfigDocument(
+            opCtx, TagsType::ConfigNS, tag.toBSON(), ShardingCatalogClient::kLocalWriteConcern));
+    }
+    lastTag.setNS(toNss);
+    uassertStatusOK(catalogClient->insertConfigDocument(
+        opCtx, TagsType::ConfigNS, lastTag.toBSON(), ShardingCatalogClient::kMajorityWriteConcern));
+}
+
+}  // namespace
+
 void removeCollMetadataFromConfig(OperationContext* opCtx,
                                   NamespaceString nss,
                                   const boost::optional<UUID>& collectionUUID) {
@@ -85,15 +112,14 @@ void shardedRenameMetadata(OperationContext* opCtx,
                            const NamespaceString& fromNss,
                            const NamespaceString& toNss) {
     auto catalogClient = Grid::get(opCtx)->catalogClient();
+
+    // Delete eventual TO chunk/collection entries referring a dropped collection
+    removeCollMetadataFromConfig(opCtx, toNss, boost::none);
+
+    // Clone FROM tags to TO
+    cloneTags(opCtx, fromNss, toNss);
+
     auto collType = catalogClient->getCollection(opCtx, fromNss);
-
-    // Delete the FROM collection entry
-    uassertStatusOK(
-        catalogClient->removeConfigDocuments(opCtx,
-                                             CollectionType::ConfigNS,
-                                             BSON(CollectionType::kNssFieldName << fromNss.ns()),
-                                             ShardingCatalogClient::kMajorityWriteConcern));
-
     collType.setNss(toNss);
     // Insert the TO collection entry
     uassertStatusOK(
@@ -102,10 +128,10 @@ void shardedRenameMetadata(OperationContext* opCtx,
                                             collType.toBSON(),
                                             ShardingCatalogClient::kMajorityWriteConcern));
 
+    // Update source chunks to target collection
     // Super-inefficient due to limitation of the catalogClient (no multi-document update), but just
-    // temporary: TODO on SERVER-53105 completion, throw out the following scope
+    // temporary: TODO on SERVER-53105 completion, throw out the following scope.
     {
-        // Update all config.chunks entries for the given collection
         repl::OpTime opTime;
         auto chunks = uassertStatusOK(Grid::get(opCtx)->catalogClient()->getChunks(
             opCtx,
@@ -115,17 +141,32 @@ void shardedRenameMetadata(OperationContext* opCtx,
             &opTime,
             repl::ReadConcernLevel::kMajorityReadConcern));
 
+        if (!chunks.empty()) {
+            // Wait for majority just for last tag
+            auto lastChunk = chunks.back();
+            chunks.pop_back();
+            for (auto& chunk : chunks) {
+                uassertStatusOK(catalogClient->updateConfigDocument(
+                    opCtx,
+                    ChunkType::ConfigNS,
+                    BSON(ChunkType::name(chunk.getName())),
+                    BSON("$set" << BSON(ChunkType::ns(toNss.ns()))),
+                    false, /* upsert */
+                    ShardingCatalogClient::kLocalWriteConcern));
+            }
 
-        for (auto& chunk : chunks) {
             uassertStatusOK(
                 catalogClient->updateConfigDocument(opCtx,
                                                     ChunkType::ConfigNS,
-                                                    BSON(ChunkType::name(chunk.getName())),
+                                                    BSON(ChunkType::name(lastChunk.getName())),
                                                     BSON("$set" << BSON(ChunkType::ns(toNss.ns()))),
                                                     false, /* upsert */
                                                     ShardingCatalogClient::kMajorityWriteConcern));
         }
     }
+
+    // Delete FROM tag/collection entries
+    removeCollMetadataFromConfig(opCtx, fromNss, boost::none);
 }
 
 void checkShardedRenamePreconditions(OperationContext* opCtx,
