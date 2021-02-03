@@ -81,7 +81,6 @@ structs:
         chained_structs:
             keysCollectionDocumentBase: keysCollectionDocumentBase
         fields:
-            # TODO (SERVER-53406): Add ttlExpiresAt field.
             _id:
                 type: objectid
                 description: "Unique identifier for this key document."
@@ -92,9 +91,9 @@ structs:
                     NumberLong representation of the cluster time at which the key was created.
                     Corresponds to the _id of the admin.system.keys document for this key.
                 cpp_name: keyId
-            replicaSetName:
-                type: string
-                description: "The name of the replica set that created this key."
+            migrationId:
+                type: uuid
+                description: "The id of the tenant migration that inserted this key."
             ttlExpiresAt:
                 type: date
                 description: >-

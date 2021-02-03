@@ -109,8 +109,7 @@ private:
     // Stores keys for validating cluster times created by other clusters. These key documents
     // cannot be stored in a regular map like _internalKeysCache since expiresAt and keyId are not
     // necessarily unique across clusters so there is chance of collision.
-    stdx::unordered_map<long long, StringMap<ExternalKeysCollectionDocument>>
-        _externalKeysCache;  // keyId -> (replicaSetName -> ExternalKeysDocument)
+    std::multimap<long long, ExternalKeysCollectionDocument> _externalKeysCache;
 };
 
 }  // namespace mongo

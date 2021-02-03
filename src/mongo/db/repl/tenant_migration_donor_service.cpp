@@ -351,7 +351,7 @@ TenantMigrationDonorService::Instance::_fetchAndStoreRecipientClusterTimeKeyDocs
                 const auto& data = dataStatus.getValue();
                 for (const BSONObj& doc : data.documents) {
                     keyDocs.push_back(tenant_migration_util::makeExternalClusterTimeKeyDoc(
-                        _serviceContext, _recipientUri.getSetName(), doc.getOwned()));
+                        _serviceContext, _stateDoc.getId(), doc.getOwned()));
                 }
                 fetchStatus = Status::OK();
 
@@ -401,7 +401,7 @@ TenantMigrationDonorService::Instance::_fetchAndStoreRecipientClusterTimeKeyDocs
                 checkIfReceivedDonorAbortMigration(serviceToken, instanceToken);
 
                 tenant_migration_util::storeExternalClusterTimeKeyDocsAndRefreshCache(
-                    executor, std::move(keyDocs), instanceToken);
+                    executor, std::move(keyDocs));
             });
 }
 

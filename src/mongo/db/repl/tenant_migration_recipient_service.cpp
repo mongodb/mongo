@@ -1258,11 +1258,11 @@ void TenantMigrationRecipientService::Instance::_fetchAndStoreDonorClusterTimeKe
     while (cursor->more()) {
         const auto doc = cursor->nextSafe().getOwned();
         keyDocs.push_back(tenant_migration_util::makeExternalClusterTimeKeyDoc(
-            _serviceContext, _donorUri.getSetName(), doc));
+            _serviceContext, _migrationUuid, doc));
     }
 
-    tenant_migration_util::storeExternalClusterTimeKeyDocsAndRefreshCache(
-        _scopedExecutor, std::move(keyDocs), token);
+    tenant_migration_util::storeExternalClusterTimeKeyDocsAndRefreshCache(_scopedExecutor,
+                                                                          std::move(keyDocs));
 }
 
 void TenantMigrationRecipientService::Instance::_compareRecipientAndDonorFCV() const {

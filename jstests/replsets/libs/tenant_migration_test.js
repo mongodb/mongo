@@ -272,9 +272,6 @@ function TenantMigrationTest({
             this.checkTenantDBHashes(tenantId);
         }
 
-        this.assertNoDuplicatedExternalKeyDocs(this.getDonorRst());
-        this.assertNoDuplicatedExternalKeyDocs(this.getRecipientRst());
-
         return stateRes;
     };
 
@@ -575,22 +572,6 @@ function TenantMigrationTest({
             }
             assert(success, 'dbhash mismatch between donor and recipient primaries');
         }
-    };
-
-    /**
-     * Asserts that there are no admin.system.external_validation_keys docs with the same keyId
-     * and replicaSetName.
-     */
-    this.assertNoDuplicatedExternalKeyDocs = function(rst) {
-        grantFindExternalClusterTimeKeysPrivilegeIfNeeded(rst);
-
-        const docs = rst.getPrimary().getDB("admin").system.external_validation_keys.find();
-        let aggRes = rst.getPrimary().getDB("admin").system.external_validation_keys.aggregate([
-            {$group: {_id: {keyId: "$keyId", replicaSetName: "$replicaSetName"}, count: {$sum: 1}}}
-        ]);
-        aggRes.forEach(doc => {
-            assert.eq(1, doc.count, "all external key docs: " + tojson(docs.toArray()));
-        });
     };
 
     /**

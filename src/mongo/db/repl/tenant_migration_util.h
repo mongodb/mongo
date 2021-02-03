@@ -133,7 +133,7 @@ inline Status validatePrivateKeyPEMPayload(const StringData& payload) {
  * document from the given the admin.system.keys document BSONObj.
  */
 ExternalKeysCollectionDocument makeExternalClusterTimeKeyDoc(ServiceContext* serviceContext,
-                                                             std::string rsName,
+                                                             UUID migrationId,
                                                              BSONObj keyDoc);
 
 /*
@@ -144,8 +144,7 @@ ExternalKeysCollectionDocument makeExternalClusterTimeKeyDoc(ServiceContext* ser
  */
 void storeExternalClusterTimeKeyDocsAndRefreshCache(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
-    std::vector<ExternalKeysCollectionDocument> keyDocs,
-    const CancelationToken& token);
+    std::vector<ExternalKeysCollectionDocument> keyDocs);
 
 /**
  * Creates a view on the oplog that allows a tenant migration recipient to fetch retryable writes

@@ -129,7 +129,7 @@ Status KeysCollectionCache::_refreshExternalKeys(OperationContext* opCtx) {
     }
 
     for (auto&& key : newKeys) {
-        _externalKeysCache[key.getKeyId()].emplace(key.getReplicaSetName(), std::move(key));
+        _externalKeysCache.emplace(key.getKeyId(), std::move(key));
     }
 
     return Status::OK();
@@ -157,21 +157,25 @@ StatusWith<std::vector<ExternalKeysCollectionDocument>> KeysCollectionCache::get
     stdx::lock_guard<Latch> lk(_cacheMutex);
     std::vector<ExternalKeysCollectionDocument> keys;
 
-    auto keysIter = _externalKeysCache.find(keyId);
-
-    if (keysIter == _externalKeysCache.end()) {
+    if (_externalKeysCache.empty()) {
         return {ErrorCodes::KeyNotFound,
                 str::stream() << "Cache Reader No external keys found for " << _purpose
                               << " with id: " << keyId};
     }
 
-    invariant(!keysIter->second.empty());
-
-    for (auto keyIter = keysIter->second.begin(); keyIter != keysIter->second.end(); keyIter++) {
+    auto keysRange = _externalKeysCache.equal_range(keyId);
+    for (auto keyIter = keysRange.first; keyIter != keysRange.second; keyIter++) {
         auto key = keyIter->second;
         if (key.getExpiresAt() > forThisTime) {
             keys.push_back(key);
         }
+    }
+
+    if (keys.empty()) {
+        return {ErrorCodes::KeyNotFound,
+                str::stream() << "Cache Reader No external keys found for " << _purpose
+                              << " that is valid for time: " << forThisTime.toString()
+                              << " with id: " << keyId};
     }
 
     return std::move(keys);

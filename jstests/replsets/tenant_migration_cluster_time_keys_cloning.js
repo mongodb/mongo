@@ -20,7 +20,7 @@ const kExternalKeysNs = "admin.system.external_validation_keys";
  * Asserts that the donor and recipient have copied each other's cluster time keys into
  * admin.system.external_validation_keys.
  */
-function assertCopiedExternalKeys(tenantMigrationTest) {
+function assertCopiedExternalKeys(tenantMigrationTest, migrationId) {
     const donorPrimary = tenantMigrationTest.getDonorPrimary();
     const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
 
@@ -29,7 +29,7 @@ function assertCopiedExternalKeys(tenantMigrationTest) {
             keyId: internalKeyDoc._id,
             key: internalKeyDoc.key,
             expiresAt: internalKeyDoc.expiresAt,
-            replicaSetName: tenantMigrationTest.getRecipientRst().name
+            migrationId,
         }));
     });
 
@@ -38,12 +38,23 @@ function assertCopiedExternalKeys(tenantMigrationTest) {
             keyId: internalKeyDoc._id,
             key: internalKeyDoc.key,
             expiresAt: internalKeyDoc.expiresAt,
-            replicaSetName: tenantMigrationTest.getDonorRst().name
+            migrationId,
         }));
     });
 }
 
-const kTenantId = "testTenantId";
+function runMigrationAndAssertExternalKeysCopied(tenantMigrationTest, tenantId) {
+    const migrationId = UUID();
+    const migrationOpts = {
+        migrationIdString: extractUUIDFromObject(migrationId),
+        tenantId: tenantId,
+    };
+    assert.commandWorked(tenantMigrationTest.runMigration(migrationOpts));
+    assertCopiedExternalKeys(tenantMigrationTest, migrationId);
+}
+
+const kTenantId1 = "testTenantId1";
+const kTenantId2 = "testTenantId2";
 const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
 
 (() => {
@@ -59,10 +70,14 @@ const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
     const migrationId = UUID();
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(migrationId),
-        tenantId: kTenantId,
+        tenantId: kTenantId1,
     };
     assert.commandWorked(tenantMigrationTest.runMigration(migrationOpts));
-    assertCopiedExternalKeys(tenantMigrationTest);
+    assertCopiedExternalKeys(tenantMigrationTest, migrationId);
+
+    // After another migration, the first's keys should still exist.
+    runMigrationAndAssertExternalKeysCopied(tenantMigrationTest, kTenantId2);
+    assertCopiedExternalKeys(tenantMigrationTest, migrationId);
 
     tenantMigrationTest.stop();
 })();
@@ -86,11 +101,15 @@ const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
     const migrationId = UUID();
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(migrationId),
-        tenantId: kTenantId,
+        tenantId: kTenantId1,
         readPreference: {mode: "secondary"}
     };
     assert.commandWorked(tenantMigrationTest.runMigration(migrationOpts));
-    assertCopiedExternalKeys(tenantMigrationTest);
+    assertCopiedExternalKeys(tenantMigrationTest, migrationId);
+
+    // After another migration, the first's keys should still exist.
+    runMigrationAndAssertExternalKeysCopied(tenantMigrationTest, kTenantId2);
+    assertCopiedExternalKeys(tenantMigrationTest, migrationId);
 
     recipientRst.stopSet();
     tenantMigrationTest.stop();
@@ -119,7 +138,7 @@ const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
     const migrationId = UUID();
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(migrationId),
-        tenantId: kTenantId,
+        tenantId: kTenantId1,
     };
     assert.commandWorked(tenantMigrationTest.startMigration(migrationOpts));
     fp.wait();
@@ -132,7 +151,11 @@ const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
     assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(
         migrationOpts, true /* retryOnRetryableErrors */));
 
-    assertCopiedExternalKeys(tenantMigrationTest);
+    assertCopiedExternalKeys(tenantMigrationTest, migrationId);
+
+    // After another migration, the first's keys should still exist.
+    runMigrationAndAssertExternalKeysCopied(tenantMigrationTest, kTenantId2);
+    assertCopiedExternalKeys(tenantMigrationTest, migrationId);
 
     donorRst.stopSet();
     tenantMigrationTest.stop();
@@ -162,7 +185,7 @@ const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
     const migrationId = UUID();
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(migrationId),
-        tenantId: kTenantId,
+        tenantId: kTenantId1,
     };
     assert.commandWorked(tenantMigrationTest.startMigration(migrationOpts));
     fp.wait();
@@ -175,7 +198,11 @@ const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
     assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(
         migrationOpts, true /* retryOnRetryableErrors */));
 
-    assertCopiedExternalKeys(tenantMigrationTest);
+    assertCopiedExternalKeys(tenantMigrationTest, migrationId);
+
+    // After another migration, the first's keys should still exist.
+    runMigrationAndAssertExternalKeysCopied(tenantMigrationTest, kTenantId2);
+    assertCopiedExternalKeys(tenantMigrationTest, migrationId);
 
     recipientRst.stopSet();
     tenantMigrationTest.stop();
