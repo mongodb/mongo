@@ -57,16 +57,8 @@ std::string mockTypeToString(CollatorInterfaceMock::MockType type) {
 
 }  // namespace
 
-Collation makeCollation(StringData locale, StringData version) {
-    Collation collation(locale.toString());
-    // "backwards" is optional. The ICU collator always sets it to true/false based on the locale.
-    collation.setBackwards(false);
-    collation.setVersion(version);
-    return collation;
-}
-
 CollatorInterfaceMock::CollatorInterfaceMock(MockType mockType)
-    : CollatorInterface(makeCollation(mockTypeToString(mockType), "mock_version")),
+    : CollatorInterface(CollationSpec(mockTypeToString(mockType), "mock_version")),
       _mockType(mockType) {}
 
 std::unique_ptr<CollatorInterface> CollatorInterfaceMock::clone() const {

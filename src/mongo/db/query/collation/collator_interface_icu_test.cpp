@@ -64,8 +64,8 @@ bool isExpectedComparison(int cmp, ExpectedComparison expectedCmp) {
 }
 
 void assertEnUSComparison(StringData left, StringData right, ExpectedComparison expectedCmp) {
-    Collation collationSpec;
-    collationSpec.setLocale("en_US");
+    CollationSpec collationSpec;
+    collationSpec.localeID = "en_US";
     UErrorCode status = U_ZERO_ERROR;
     std::unique_ptr<icu::Collator> coll(
         icu::Collator::createInstance(icu::Locale("en", "US"), status));
@@ -101,8 +101,8 @@ void assertNotEqualEnUS(StringData left, StringData right) {
 }
 
 TEST(CollatorInterfaceICUTest, ClonedCollatorMatchesOriginal) {
-    Collation collationSpec;
-    collationSpec.setLocale("en_US");
+    CollationSpec collationSpec;
+    collationSpec.localeID = "en_US";
 
     UErrorCode status = U_ZERO_ERROR;
     std::unique_ptr<icu::Collator> coll(
@@ -115,8 +115,8 @@ TEST(CollatorInterfaceICUTest, ClonedCollatorMatchesOriginal) {
 }
 
 TEST(CollatorInterfaceICUTest, ASCIIComparisonWorksForUSEnglishCollation) {
-    Collation collationSpec;
-    collationSpec.setLocale("en_US");
+    CollationSpec collationSpec;
+    collationSpec.localeID = "en_US";
 
     UErrorCode status = U_ZERO_ERROR;
     std::unique_ptr<icu::Collator> coll(
@@ -130,10 +130,10 @@ TEST(CollatorInterfaceICUTest, ASCIIComparisonWorksForUSEnglishCollation) {
 }
 
 TEST(CollatorInterfaceICUTest, ASCIIComparisonWorksUsingLocaleStringParsing) {
-    Collation collationSpec;
-    collationSpec.setLocale("en_US");
+    CollationSpec collationSpec;
+    collationSpec.localeID = "en_US";
 
-    auto locale = icu::Locale::createFromName(collationSpec.getLocale().toString().c_str());
+    auto locale = icu::Locale::createFromName(collationSpec.localeID.c_str());
     ASSERT_EQ(std::string("en"), locale.getLanguage());
     ASSERT_EQ(std::string("US"), locale.getCountry());
 
@@ -148,10 +148,10 @@ TEST(CollatorInterfaceICUTest, ASCIIComparisonWorksUsingLocaleStringParsing) {
 }
 
 TEST(CollatorInterfaceICUTest, ASCIIComparisonWorksUsingComparisonKeys) {
-    Collation collationSpec;
-    collationSpec.setLocale("en_US");
+    CollationSpec collationSpec;
+    collationSpec.localeID = "en_US";
 
-    auto locale = icu::Locale::createFromName(collationSpec.getLocale().toString().c_str());
+    auto locale = icu::Locale::createFromName(collationSpec.localeID.c_str());
     ASSERT_EQ(std::string("en"), locale.getLanguage());
     ASSERT_EQ(std::string("US"), locale.getCountry());
 
@@ -176,8 +176,8 @@ TEST(CollatorInterfaceICUTest, ASCIIComparisonWorksUsingComparisonKeys) {
 }
 
 TEST(CollatorInterfaceICUTest, ZeroLengthStringsCompareCorrectly) {
-    Collation collationSpec;
-    collationSpec.setLocale("en_US");
+    CollationSpec collationSpec;
+    collationSpec.localeID = "en_US";
 
     UErrorCode status = U_ZERO_ERROR;
     std::unique_ptr<icu::Collator> coll(
@@ -191,8 +191,8 @@ TEST(CollatorInterfaceICUTest, ZeroLengthStringsCompareCorrectly) {
 }
 
 TEST(CollatorInterfaceICUTest, ZeroLengthStringsCompareCorrectlyUsingComparisonKeys) {
-    Collation collationSpec;
-    collationSpec.setLocale("en_US");
+    CollationSpec collationSpec;
+    collationSpec.localeID = "en_US";
 
     UErrorCode status = U_ZERO_ERROR;
     std::unique_ptr<icu::Collator> coll(
@@ -208,8 +208,8 @@ TEST(CollatorInterfaceICUTest, ZeroLengthStringsCompareCorrectlyUsingComparisonK
 }
 
 TEST(CollatorInterfaceICUTest, EmptyNullTerminatedStringComparesCorrectly) {
-    Collation collationSpec;
-    collationSpec.setLocale("en_US");
+    CollationSpec collationSpec;
+    collationSpec.localeID = "en_US";
 
     UErrorCode status = U_ZERO_ERROR;
     std::unique_ptr<icu::Collator> coll(
@@ -227,8 +227,8 @@ TEST(CollatorInterfaceICUTest, EmptyNullTerminatedStringComparesCorrectly) {
 }
 
 TEST(CollatorInterfaceICUTest, EmptyNullTerminatedStringComparesCorrectlyUsingComparisonKeys) {
-    Collation collationSpec;
-    collationSpec.setLocale("en_US");
+    CollationSpec collationSpec;
+    collationSpec.localeID = "en_US";
 
     UErrorCode status = U_ZERO_ERROR;
     std::unique_ptr<icu::Collator> coll(
@@ -248,8 +248,8 @@ TEST(CollatorInterfaceICUTest, EmptyNullTerminatedStringComparesCorrectlyUsingCo
 }
 
 TEST(CollatorInterfaceICUTest, LengthOneStringWithNullByteComparesCorrectly) {
-    Collation collationSpec;
-    collationSpec.setLocale("en_US");
+    CollationSpec collationSpec;
+    collationSpec.localeID = "en_US";
 
     UErrorCode status = U_ZERO_ERROR;
     std::unique_ptr<icu::Collator> coll(
@@ -267,8 +267,8 @@ TEST(CollatorInterfaceICUTest, LengthOneStringWithNullByteComparesCorrectly) {
 }
 
 TEST(CollatorInterfaceICUTest, LengthOneStringWithNullByteComparesCorrectlyUsingComparisonKeys) {
-    Collation collationSpec;
-    collationSpec.setLocale("en_US");
+    CollationSpec collationSpec;
+    collationSpec.localeID = "en_US";
 
     UErrorCode status = U_ZERO_ERROR;
     std::unique_ptr<icu::Collator> coll(
@@ -288,8 +288,8 @@ TEST(CollatorInterfaceICUTest, LengthOneStringWithNullByteComparesCorrectlyUsing
 }
 
 TEST(CollatorInterfaceICUTest, StringsWithEmbeddedNullByteCompareCorrectly) {
-    Collation collationSpec;
-    collationSpec.setLocale("en_US");
+    CollationSpec collationSpec;
+    collationSpec.localeID = "en_US";
 
     UErrorCode status = U_ZERO_ERROR;
     std::unique_ptr<icu::Collator> coll(
@@ -308,8 +308,8 @@ TEST(CollatorInterfaceICUTest, StringsWithEmbeddedNullByteCompareCorrectly) {
 }
 
 TEST(CollatorInterfaceICUTest, StringsWithEmbeddedNullByteCompareCorrectlyUsingComparisonKeys) {
-    Collation collationSpec;
-    collationSpec.setLocale("en_US");
+    CollationSpec collationSpec;
+    collationSpec.localeID = "en_US";
 
     UErrorCode status = U_ZERO_ERROR;
     std::unique_ptr<icu::Collator> coll(
@@ -330,9 +330,9 @@ TEST(CollatorInterfaceICUTest, StringsWithEmbeddedNullByteCompareCorrectlyUsingC
 }
 
 TEST(CollatorInterfaceICUTest, TwoUSEnglishCollationsAreEqual) {
-    Collation collationSpec;
-    collationSpec.setLocale("en_US");
-    auto locale = icu::Locale::createFromName(collationSpec.getLocale().toString().c_str());
+    CollationSpec collationSpec;
+    collationSpec.localeID = "en_US";
+    auto locale = icu::Locale::createFromName(collationSpec.localeID.c_str());
 
     UErrorCode status = U_ZERO_ERROR;
     std::unique_ptr<icu::Collator> coll1(icu::Collator::createInstance(locale, status));
@@ -348,13 +348,13 @@ TEST(CollatorInterfaceICUTest, TwoUSEnglishCollationsAreEqual) {
 }
 
 TEST(CollatorInterfaceICUTest, USEnglishAndBritishEnglishCollationsAreNotEqual) {
-    Collation collationSpec1;
-    collationSpec1.setLocale("en_US");
-    auto locale1 = icu::Locale::createFromName(collationSpec1.getLocale().toString().c_str());
+    CollationSpec collationSpec1;
+    collationSpec1.localeID = "en_US";
+    auto locale1 = icu::Locale::createFromName(collationSpec1.localeID.c_str());
 
-    Collation collationSpec2;
-    collationSpec2.setLocale("en_UK");
-    auto locale2 = icu::Locale::createFromName(collationSpec2.getLocale().toString().c_str());
+    CollationSpec collationSpec2;
+    collationSpec2.localeID = "en_UK";
+    auto locale2 = icu::Locale::createFromName(collationSpec2.localeID.c_str());
 
     UErrorCode status = U_ZERO_ERROR;
     std::unique_ptr<icu::Collator> coll1(icu::Collator::createInstance(locale1, status));
@@ -370,8 +370,8 @@ TEST(CollatorInterfaceICUTest, USEnglishAndBritishEnglishCollationsAreNotEqual) 
 }
 
 TEST(CollatorInterfaceICUTest, FrenchCanadianCollatorComparesCorrectly) {
-    Collation collationSpec;
-    collationSpec.setLocale("fr_CA");
+    CollationSpec collationSpec;
+    collationSpec.localeID = "fr_CA";
 
     UErrorCode status = U_ZERO_ERROR;
     std::unique_ptr<icu::Collator> coll(
@@ -394,8 +394,8 @@ TEST(CollatorInterfaceICUTest, FrenchCanadianCollatorComparesCorrectly) {
 }
 
 TEST(CollatorInterfaceICUTest, FrenchCanadianCollatorComparesCorrectlyUsingComparisonKeys) {
-    Collation collationSpec;
-    collationSpec.setLocale("fr_CA");
+    CollationSpec collationSpec;
+    collationSpec.localeID = "fr_CA";
 
     UErrorCode status = U_ZERO_ERROR;
     std::unique_ptr<icu::Collator> coll(
@@ -567,8 +567,8 @@ TEST(CollatorInterfaceICUTest, DifferentEmbeddedInvalidSequencesAndDifferentFina
 }
 
 TEST(CollatorInterfaceICUTest, ComparisonKeysForEnUsCollatorCorrect) {
-    Collation collationSpec;
-    collationSpec.setLocale("en_US");
+    CollationSpec collationSpec;
+    collationSpec.localeID = "en_US";
     UErrorCode status = U_ZERO_ERROR;
     std::unique_ptr<icu::Collator> coll(
         icu::Collator::createInstance(icu::Locale("en", "US"), status));
@@ -581,8 +581,8 @@ TEST(CollatorInterfaceICUTest, ComparisonKeysForEnUsCollatorCorrect) {
 }
 
 TEST(CollatorInterfaceICUTest, ComparisonKeysForFrCaCollatorCorrect) {
-    Collation collationSpec;
-    collationSpec.setLocale("fr_CA");
+    CollationSpec collationSpec;
+    collationSpec.localeID = "fr_CA";
     UErrorCode status = U_ZERO_ERROR;
     std::unique_ptr<icu::Collator> coll(
         icu::Collator::createInstance(icu::Locale("fr", "CA"), status));

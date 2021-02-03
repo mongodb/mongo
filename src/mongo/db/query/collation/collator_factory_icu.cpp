@@ -49,7 +49,7 @@ namespace {
 
 constexpr StringData kFallbackLocaleName = "root"_sd;
 
-// Helper methods for converting between ICU attributes and types used by Collation.
+// Helper methods for converting between ICU attributes and types used by CollationSpec.
 
 UColAttributeValue boolToAttribute(bool value) {
     if (value) {
@@ -69,218 +69,300 @@ bool attributeToBool(UColAttributeValue attribute) {
     }
 }
 
-UColAttributeValue getCaseFirstAttribute(CollationCaseFirstEnum caseFirst) {
+UColAttributeValue getCaseFirstAttribute(CollationSpec::CaseFirstType caseFirst) {
     switch (caseFirst) {
-        case CollationCaseFirstEnum::kUpper:
+        case CollationSpec::CaseFirstType::kUpper:
             return UCOL_UPPER_FIRST;
-        case CollationCaseFirstEnum::kLower:
+        case CollationSpec::CaseFirstType::kLower:
             return UCOL_LOWER_FIRST;
-        case CollationCaseFirstEnum::kOff:
+        case CollationSpec::CaseFirstType::kOff:
             return UCOL_OFF;
-        default:
-            MONGO_UNREACHABLE;
     }
 
     MONGO_UNREACHABLE;
 }
 
-CollationCaseFirstEnum getCaseFirstFromAttribute(UColAttributeValue caseFirstAttribute) {
+CollationSpec::CaseFirstType getCaseFirstFromAttribute(UColAttributeValue caseFirstAttribute) {
     switch (caseFirstAttribute) {
         case UCOL_UPPER_FIRST:
-            return CollationCaseFirstEnum::kUpper;
+            return CollationSpec::CaseFirstType::kUpper;
         case UCOL_LOWER_FIRST:
-            return CollationCaseFirstEnum::kLower;
+            return CollationSpec::CaseFirstType::kLower;
         case UCOL_OFF:
-            return CollationCaseFirstEnum::kOff;
+            return CollationSpec::CaseFirstType::kOff;
         default:
             MONGO_UNREACHABLE;
     }
 }
 
-UColAttributeValue getStrengthAttribute(int strength) {
-    switch (static_cast<CollationStrength>(strength)) {
-        case CollationStrength::kPrimary:
+UColAttributeValue getStrengthAttribute(CollationSpec::StrengthType strength) {
+    switch (strength) {
+        case CollationSpec::StrengthType::kPrimary:
             return UCOL_PRIMARY;
-        case CollationStrength::kSecondary:
+        case CollationSpec::StrengthType::kSecondary:
             return UCOL_SECONDARY;
-        case CollationStrength::kTertiary:
+        case CollationSpec::StrengthType::kTertiary:
             return UCOL_TERTIARY;
-        case CollationStrength::kQuaternary:
+        case CollationSpec::StrengthType::kQuaternary:
             return UCOL_QUATERNARY;
-        case CollationStrength::kIdentical:
+        case CollationSpec::StrengthType::kIdentical:
             return UCOL_IDENTICAL;
-        default:
-            MONGO_UNREACHABLE;
     }
 
     MONGO_UNREACHABLE;
 }
 
-int getStrengthFromAttribute(UColAttributeValue strengthAttribute) {
+CollationSpec::StrengthType getStrengthFromAttribute(UColAttributeValue strengthAttribute) {
     switch (strengthAttribute) {
         case UCOL_PRIMARY:
-            return static_cast<int>(CollationStrength::kPrimary);
+            return CollationSpec::StrengthType::kPrimary;
         case UCOL_SECONDARY:
-            return static_cast<int>(CollationStrength::kSecondary);
+            return CollationSpec::StrengthType::kSecondary;
         case UCOL_TERTIARY:
-            return static_cast<int>(CollationStrength::kTertiary);
+            return CollationSpec::StrengthType::kTertiary;
         case UCOL_QUATERNARY:
-            return static_cast<int>(CollationStrength::kQuaternary);
+            return CollationSpec::StrengthType::kQuaternary;
         case UCOL_IDENTICAL:
-            return static_cast<int>(CollationStrength::kIdentical);
+            return CollationSpec::StrengthType::kIdentical;
         default:
             MONGO_UNREACHABLE;
     }
 }
 
-UColAttributeValue getAlternateAttribute(CollationAlternateEnum alternate) {
+UColAttributeValue getAlternateAttribute(CollationSpec::AlternateType alternate) {
     switch (alternate) {
-        case CollationAlternateEnum::kNonIgnorable:
+        case CollationSpec::AlternateType::kNonIgnorable:
             return UCOL_NON_IGNORABLE;
-        case CollationAlternateEnum::kShifted:
+        case CollationSpec::AlternateType::kShifted:
             return UCOL_SHIFTED;
-        default:
-            MONGO_UNREACHABLE;
     }
 
     MONGO_UNREACHABLE;
 }
 
-CollationAlternateEnum getAlternateFromAttribute(UColAttributeValue alternateAttribute) {
+CollationSpec::AlternateType getAlternateFromAttribute(UColAttributeValue alternateAttribute) {
     switch (alternateAttribute) {
         case UCOL_NON_IGNORABLE:
-            return CollationAlternateEnum::kNonIgnorable;
+            return CollationSpec::AlternateType::kNonIgnorable;
         case UCOL_SHIFTED:
-            return CollationAlternateEnum::kShifted;
+            return CollationSpec::AlternateType::kShifted;
         default:
             MONGO_UNREACHABLE;
     }
 }
 
-UColReorderCode getMaxVariableReorderCode(CollationMaxVariableEnum maxVariable) {
+UColReorderCode getMaxVariableReorderCode(CollationSpec::MaxVariableType maxVariable) {
     switch (maxVariable) {
-        case CollationMaxVariableEnum::kPunct:
+        case CollationSpec::MaxVariableType::kPunct:
             return UCOL_REORDER_CODE_PUNCTUATION;
-        case CollationMaxVariableEnum::kSpace:
+        case CollationSpec::MaxVariableType::kSpace:
             return UCOL_REORDER_CODE_SPACE;
-        default:
-            MONGO_UNREACHABLE;
     }
 
     MONGO_UNREACHABLE;
 }
 
-CollationMaxVariableEnum getMaxVariableFromReorderCode(UColReorderCode maxVariableReorderCode) {
+CollationSpec::MaxVariableType getMaxVariableFromReorderCode(
+    UColReorderCode maxVariableReorderCode) {
     switch (maxVariableReorderCode) {
         case UCOL_REORDER_CODE_PUNCTUATION:
-            return CollationMaxVariableEnum::kPunct;
+            return CollationSpec::MaxVariableType::kPunct;
         case UCOL_REORDER_CODE_SPACE:
-            return CollationMaxVariableEnum::kSpace;
+            return CollationSpec::MaxVariableType::kSpace;
         default:
             MONGO_UNREACHABLE;
     }
 }
 
-// Sets the Collation's localeID to 'localeID'. For each collation option, if the user specified the
-// option then set it on icuCollation, otherwise copy icuCollation's default to the Collation.
-Status updateCollationSpecFromICUCollator(const BSONObj& spec,
-                                          const std::string& localeID,
-                                          icu::Collator* icuCollator,
-                                          Collation* collation) {
+// Helper methods for converting from constants to types used by CollationSpec.
+
+StatusWith<CollationSpec::CaseFirstType> stringToCaseFirstType(const std::string& caseFirst) {
+    if (caseFirst == CollationSpec::kCaseFirstUpper) {
+        return CollationSpec::CaseFirstType::kUpper;
+    } else if (caseFirst == CollationSpec::kCaseFirstLower) {
+        return CollationSpec::CaseFirstType::kLower;
+    } else if (caseFirst == CollationSpec::kCaseFirstOff) {
+        return CollationSpec::CaseFirstType::kOff;
+    } else {
+        return {ErrorCodes::FailedToParse,
+                str::stream() << "Field '" << CollationSpec::kCaseFirstField << "' must be '"
+                              << CollationSpec::kCaseFirstUpper << "', '"
+                              << CollationSpec::kCaseFirstLower << "', or '"
+                              << CollationSpec::kCaseFirstOff << "'. Got: " << caseFirst};
+    }
+}
+
+StatusWith<CollationSpec::StrengthType> integerToStrengthType(long long strength) {
+    switch (strength) {
+        case static_cast<int>(CollationSpec::StrengthType::kPrimary):
+            return CollationSpec::StrengthType::kPrimary;
+        case static_cast<int>(CollationSpec::StrengthType::kSecondary):
+            return CollationSpec::StrengthType::kSecondary;
+        case static_cast<int>(CollationSpec::StrengthType::kTertiary):
+            return CollationSpec::StrengthType::kTertiary;
+        case static_cast<int>(CollationSpec::StrengthType::kQuaternary):
+            return CollationSpec::StrengthType::kQuaternary;
+        case static_cast<int>(CollationSpec::StrengthType::kIdentical):
+            return CollationSpec::StrengthType::kIdentical;
+    }
+    return {ErrorCodes::FailedToParse,
+            str::stream() << "Field '" << CollationSpec::kStrengthField
+                          << "' must be an integer 1 through 5. Got: " << strength};
+}
+
+StatusWith<CollationSpec::AlternateType> stringToAlternateType(const std::string& alternate) {
+    if (alternate == CollationSpec::kAlternateNonIgnorable) {
+        return CollationSpec::AlternateType::kNonIgnorable;
+    } else if (alternate == CollationSpec::kAlternateShifted) {
+        return CollationSpec::AlternateType::kShifted;
+    } else {
+        return {ErrorCodes::FailedToParse,
+                str::stream() << "Field '" << CollationSpec::kAlternateField << "' must be '"
+                              << CollationSpec::kAlternateNonIgnorable << "' or '"
+                              << CollationSpec::kAlternateShifted << "'. Got: " << alternate};
+    }
+}
+
+StatusWith<CollationSpec::MaxVariableType> stringToMaxVariableType(const std::string& maxVariable) {
+    if (maxVariable == CollationSpec::kMaxVariablePunct) {
+        return CollationSpec::MaxVariableType::kPunct;
+    } else if (maxVariable == CollationSpec::kMaxVariableSpace) {
+        return CollationSpec::MaxVariableType::kSpace;
+    } else {
+        return {ErrorCodes::FailedToParse,
+                str::stream() << "Field '" << CollationSpec::kMaxVariableField << "' must be '"
+                              << CollationSpec::kMaxVariablePunct << "' or '"
+                              << CollationSpec::kMaxVariableSpace << "'. Got: " << maxVariable};
+    }
+}
+
+// Extracts the collation options from 'spec', performs validation, and sets the options in
+// 'icuCollator' and the output CollationSpec.
+// Sets the localeID in the CollationSpec to 'localeID'.
+StatusWith<CollationSpec> parseToCollationSpec(const BSONObj& spec,
+                                               const std::string& localeID,
+                                               icu::Collator* icuCollator) {
+    CollationSpec parsedSpec;
+
     // Set the localeID.
-    collation->setLocale(localeID);
+    parsedSpec.localeID = localeID;
+
+    // Count the number of fields we have parsed from 'spec'.
+    // Begin this at 1 since the locale has already been parsed.
+    int parsedFields = 1;
 
     // Set caseLevel.
-    if (!spec.hasField(Collation::kCaseLevelFieldName)) {
+    Status parseStatus =
+        bsonExtractBooleanField(spec, CollationSpec::kCaseLevelField, &parsedSpec.caseLevel);
+    if (parseStatus == ErrorCodes::NoSuchKey) {
         UErrorCode status = U_ZERO_ERROR;
         UColAttributeValue caseLevelAttribute = icuCollator->getAttribute(UCOL_CASE_LEVEL, status);
         if (U_FAILURE(status)) {
             icu::ErrorCode icuError;
             icuError.set(status);
             return {ErrorCodes::OperationFailed,
-                    str::stream() << "Failed to get '" << Collation::kCaseLevelFieldName
+                    str::stream() << "Failed to get '" << CollationSpec::kCaseLevelField
                                   << "' attribute from icu::Collator: " << icuError.errorName()
                                   << ". Collation spec: " << spec};
         }
-        collation->setCaseLevel(attributeToBool(caseLevelAttribute));
+        parsedSpec.caseLevel = attributeToBool(caseLevelAttribute);
+    } else if (!parseStatus.isOK()) {
+        return parseStatus;
     } else {
+        ++parsedFields;
         UErrorCode status = U_ZERO_ERROR;
-        icuCollator->setAttribute(
-            UCOL_CASE_LEVEL, boolToAttribute(collation->getCaseLevel()), status);
+        icuCollator->setAttribute(UCOL_CASE_LEVEL, boolToAttribute(parsedSpec.caseLevel), status);
         if (U_FAILURE(status)) {
             icu::ErrorCode icuError;
             icuError.set(status);
             return {ErrorCodes::OperationFailed,
-                    str::stream() << "Failed to set '" << Collation::kCaseLevelFieldName
+                    str::stream() << "Failed to set '" << CollationSpec::kCaseLevelField
                                   << "' attribute: " << icuError.errorName()
                                   << ". Collation spec: " << spec};
         }
     }
 
     // Set caseFirst.
-    if (!spec.hasField(Collation::kCaseFirstFieldName)) {
+    std::string caseFirst;
+    parseStatus = bsonExtractStringField(spec, CollationSpec::kCaseFirstField, &caseFirst);
+    if (parseStatus == ErrorCodes::NoSuchKey) {
         UErrorCode status = U_ZERO_ERROR;
         UColAttributeValue caseFirstAttribute = icuCollator->getAttribute(UCOL_CASE_FIRST, status);
         if (U_FAILURE(status)) {
             icu::ErrorCode icuError;
             icuError.set(status);
             return {ErrorCodes::OperationFailed,
-                    str::stream() << "Failed to get '" << Collation::kCaseFirstFieldName
+                    str::stream() << "Failed to get '" << CollationSpec::kCaseFirstField
                                   << "' attribute from icu::Collator: " << icuError.errorName()
                                   << ". Collation spec: " << spec};
         }
-        collation->setCaseFirst(getCaseFirstFromAttribute(caseFirstAttribute));
+        parsedSpec.caseFirst = getCaseFirstFromAttribute(caseFirstAttribute);
+    } else if (!parseStatus.isOK()) {
+        return parseStatus;
     } else {
+        ++parsedFields;
+
+        auto caseFirstStatus = stringToCaseFirstType(caseFirst);
+        if (!caseFirstStatus.isOK()) {
+            return caseFirstStatus.getStatus();
+        }
+        parsedSpec.caseFirst = caseFirstStatus.getValue();
+
         UErrorCode status = U_ZERO_ERROR;
         icuCollator->setAttribute(
-            UCOL_CASE_FIRST, getCaseFirstAttribute(collation->getCaseFirst()), status);
+            UCOL_CASE_FIRST, getCaseFirstAttribute(parsedSpec.caseFirst), status);
         if (U_FAILURE(status)) {
             icu::ErrorCode icuError;
             icuError.set(status);
             return {ErrorCodes::OperationFailed,
-                    str::stream() << "Failed to set '" << Collation::kCaseFirstFieldName
+                    str::stream() << "Failed to set '" << CollationSpec::kCaseFirstField
                                   << "' attribute: " << icuError.errorName()
                                   << ". Collation spec: " << spec};
         }
     }
 
     // Set strength.
-    if (!spec.hasField(Collation::kStrengthFieldName)) {
+    long long strength;
+    parseStatus = bsonExtractIntegerField(spec, CollationSpec::kStrengthField, &strength);
+    if (parseStatus == ErrorCodes::NoSuchKey) {
         UErrorCode status = U_ZERO_ERROR;
         UColAttributeValue strengthAttribute = icuCollator->getAttribute(UCOL_STRENGTH, status);
         if (U_FAILURE(status)) {
             icu::ErrorCode icuError;
             icuError.set(status);
             return {ErrorCodes::OperationFailed,
-                    str::stream() << "Failed to get '" << Collation::kStrengthFieldName
+                    str::stream() << "Failed to get '" << CollationSpec::kStrengthField
                                   << "' attribute from icu::Collator: " << icuError.errorName()
                                   << ". Collation spec: " << spec};
         }
-        collation->setStrength(getStrengthFromAttribute(strengthAttribute));
+        parsedSpec.strength = getStrengthFromAttribute(strengthAttribute);
+    } else if (!parseStatus.isOK()) {
+        return parseStatus;
     } else {
-        try {
-            // For backwards compatibility, "strength" is parsed from any int, long, or double.
-            // Check it matches an enum value.
-            CollationStrength_parse({"collation.strength"}, collation->getStrength());
-        } catch (const DBException& exc) {
-            return exc.toStatus();
+        ++parsedFields;
+
+        auto strengthStatus = integerToStrengthType(strength);
+        if (!strengthStatus.isOK()) {
+            return strengthStatus.getStatus();
         }
+        parsedSpec.strength = strengthStatus.getValue();
 
         UErrorCode status = U_ZERO_ERROR;
-        icuCollator->setAttribute(
-            UCOL_STRENGTH, getStrengthAttribute(collation->getStrength()), status);
+        icuCollator->setAttribute(UCOL_STRENGTH, getStrengthAttribute(parsedSpec.strength), status);
         if (U_FAILURE(status)) {
             icu::ErrorCode icuError;
             icuError.set(status);
             return {ErrorCodes::OperationFailed,
-                    str::stream() << "Failed to set '" << Collation::kStrengthFieldName
+                    str::stream() << "Failed to set '" << CollationSpec::kStrengthField
                                   << "' attribute: " << icuError.errorName()
                                   << ". Collation spec: " << spec};
         }
     }
 
     // Set numericOrdering.
-    if (!spec.hasField(Collation::kNumericOrderingFieldName)) {
+    parseStatus = bsonExtractBooleanField(
+        spec, CollationSpec::kNumericOrderingField, &parsedSpec.numericOrdering);
+    if (parseStatus == ErrorCodes::NoSuchKey) {
         UErrorCode status = U_ZERO_ERROR;
         UColAttributeValue numericOrderingAttribute =
             icuCollator->getAttribute(UCOL_NUMERIC_COLLATION, status);
@@ -288,27 +370,32 @@ Status updateCollationSpecFromICUCollator(const BSONObj& spec,
             icu::ErrorCode icuError;
             icuError.set(status);
             return {ErrorCodes::OperationFailed,
-                    str::stream() << "Failed to get '" << Collation::kNumericOrderingFieldName
+                    str::stream() << "Failed to get '" << CollationSpec::kNumericOrderingField
                                   << "' attribute from icu::Collator: " << icuError.errorName()
                                   << ". Collation spec: " << spec};
         }
-        collation->setNumericOrdering(attributeToBool(numericOrderingAttribute));
+        parsedSpec.numericOrdering = attributeToBool(numericOrderingAttribute);
+    } else if (!parseStatus.isOK()) {
+        return parseStatus;
     } else {
+        ++parsedFields;
         UErrorCode status = U_ZERO_ERROR;
         icuCollator->setAttribute(
-            UCOL_NUMERIC_COLLATION, boolToAttribute(collation->getNumericOrdering()), status);
+            UCOL_NUMERIC_COLLATION, boolToAttribute(parsedSpec.numericOrdering), status);
         if (U_FAILURE(status)) {
             icu::ErrorCode icuError;
             icuError.set(status);
             return {ErrorCodes::OperationFailed,
-                    str::stream() << "Failed to set '" << Collation::kNumericOrderingFieldName
+                    str::stream() << "Failed to set '" << CollationSpec::kNumericOrderingField
                                   << "' attribute: " << icuError.errorName()
                                   << ". Collation spec: " << spec};
         }
     }
 
     // Set alternate.
-    if (!spec.hasField(Collation::kAlternateFieldName)) {
+    std::string alternate;
+    parseStatus = bsonExtractStringField(spec, CollationSpec::kAlternateField, &alternate);
+    if (parseStatus == ErrorCodes::NoSuchKey) {
         UErrorCode status = U_ZERO_ERROR;
         UColAttributeValue alternateAttribute =
             icuCollator->getAttribute(UCOL_ALTERNATE_HANDLING, status);
@@ -316,43 +403,67 @@ Status updateCollationSpecFromICUCollator(const BSONObj& spec,
             icu::ErrorCode icuError;
             icuError.set(status);
             return {ErrorCodes::OperationFailed,
-                    str::stream() << "Failed to get '" << Collation::kAlternateFieldName
+                    str::stream() << "Failed to get '" << CollationSpec::kAlternateField
                                   << "' attribute from icu::Collator: " << icuError.errorName()
                                   << ". Collation spec: " << spec};
         }
-        collation->setAlternate(getAlternateFromAttribute(alternateAttribute));
+        parsedSpec.alternate = getAlternateFromAttribute(alternateAttribute);
+    } else if (!parseStatus.isOK()) {
+        return parseStatus;
     } else {
+        ++parsedFields;
+
+        auto alternateStatus = stringToAlternateType(alternate);
+        if (!alternateStatus.isOK()) {
+            return alternateStatus.getStatus();
+        }
+        parsedSpec.alternate = alternateStatus.getValue();
+
         UErrorCode status = U_ZERO_ERROR;
         icuCollator->setAttribute(
-            UCOL_ALTERNATE_HANDLING, getAlternateAttribute(collation->getAlternate()), status);
+            UCOL_ALTERNATE_HANDLING, getAlternateAttribute(parsedSpec.alternate), status);
         if (U_FAILURE(status)) {
             icu::ErrorCode icuError;
             icuError.set(status);
             return {ErrorCodes::OperationFailed,
-                    str::stream() << "Failed to set '" << Collation::kAlternateFieldName
+                    str::stream() << "Failed to set '" << CollationSpec::kAlternateField
                                   << "' attribute: " << icuError.errorName()
                                   << ". Collation spec: " << spec};
         }
     }
 
     // Set maxVariable.
-    if (!spec.hasField(Collation::kMaxVariableFieldName)) {
-        collation->setMaxVariable(getMaxVariableFromReorderCode(icuCollator->getMaxVariable()));
+    std::string maxVariable;
+    parseStatus = bsonExtractStringField(spec, CollationSpec::kMaxVariableField, &maxVariable);
+    if (parseStatus == ErrorCodes::NoSuchKey) {
+        parsedSpec.maxVariable = getMaxVariableFromReorderCode(icuCollator->getMaxVariable());
+    } else if (!parseStatus.isOK()) {
+        return parseStatus;
     } else {
+        ++parsedFields;
+
+        auto maxVariableStatus = stringToMaxVariableType(maxVariable);
+        if (!maxVariableStatus.isOK()) {
+            return maxVariableStatus.getStatus();
+        }
+        parsedSpec.maxVariable = maxVariableStatus.getValue();
+
         UErrorCode status = U_ZERO_ERROR;
-        icuCollator->setMaxVariable(getMaxVariableReorderCode(collation->getMaxVariable()), status);
+        icuCollator->setMaxVariable(getMaxVariableReorderCode(parsedSpec.maxVariable), status);
         if (U_FAILURE(status)) {
             icu::ErrorCode icuError;
             icuError.set(status);
             return {ErrorCodes::OperationFailed,
-                    str::stream() << "Failed to set '" << Collation::kMaxVariableFieldName
+                    str::stream() << "Failed to set '" << CollationSpec::kMaxVariableField
                                   << "' attribute: " << icuError.errorName()
                                   << ". Collation spec: " << spec};
         }
     }
 
     // Set normalization.
-    if (!spec.hasField(Collation::kNormalizationFieldName)) {
+    parseStatus = bsonExtractBooleanField(
+        spec, CollationSpec::kNormalizationField, &parsedSpec.normalization);
+    if (parseStatus == ErrorCodes::NoSuchKey) {
         UErrorCode status = U_ZERO_ERROR;
         UColAttributeValue normalizationAttribute =
             icuCollator->getAttribute(UCOL_NORMALIZATION_MODE, status);
@@ -360,27 +471,32 @@ Status updateCollationSpecFromICUCollator(const BSONObj& spec,
             icu::ErrorCode icuError;
             icuError.set(status);
             return {ErrorCodes::OperationFailed,
-                    str::stream() << "Failed to get '" << Collation::kNormalizationFieldName
+                    str::stream() << "Failed to get '" << CollationSpec::kNormalizationField
                                   << "' attribute from icu::Collator: " << icuError.errorName()
                                   << ". Collation spec: " << spec};
         }
-        collation->setNormalization(attributeToBool(normalizationAttribute));
+        parsedSpec.normalization = attributeToBool(normalizationAttribute);
+    } else if (!parseStatus.isOK()) {
+        return parseStatus;
     } else {
+        ++parsedFields;
         UErrorCode status = U_ZERO_ERROR;
         icuCollator->setAttribute(
-            UCOL_NORMALIZATION_MODE, boolToAttribute(collation->getNormalization()), status);
+            UCOL_NORMALIZATION_MODE, boolToAttribute(parsedSpec.normalization), status);
         if (U_FAILURE(status)) {
             icu::ErrorCode icuError;
             icuError.set(status);
             return {ErrorCodes::OperationFailed,
-                    str::stream() << "Failed to set '" << Collation::kNormalizationFieldName
+                    str::stream() << "Failed to set '" << CollationSpec::kNormalizationField
                                   << "' attribute: " << icuError.errorName()
                                   << ". Collation spec: " << spec};
         }
     }
 
     // Set backwards.
-    if (!spec.hasField(Collation::kBackwardsFieldName)) {
+    parseStatus =
+        bsonExtractBooleanField(spec, CollationSpec::kBackwardsField, &parsedSpec.backwards);
+    if (parseStatus == ErrorCodes::NoSuchKey) {
         UErrorCode status = U_ZERO_ERROR;
         UColAttributeValue backwardsAttribute =
             icuCollator->getAttribute(UCOL_FRENCH_COLLATION, status);
@@ -388,43 +504,81 @@ Status updateCollationSpecFromICUCollator(const BSONObj& spec,
             icu::ErrorCode icuError;
             icuError.set(status);
             return {ErrorCodes::OperationFailed,
-                    str::stream() << "Failed to get '" << Collation::kBackwardsFieldName
+                    str::stream() << "Failed to get '" << CollationSpec::kBackwardsField
                                   << "' attribute from icu::Collator: " << icuError.errorName()
                                   << ". Collation spec: " << spec};
         }
-        collation->setBackwards(attributeToBool(backwardsAttribute));
+        parsedSpec.backwards = attributeToBool(backwardsAttribute);
+    } else if (!parseStatus.isOK()) {
+        return parseStatus;
     } else {
+        ++parsedFields;
         UErrorCode status = U_ZERO_ERROR;
-        // collation->getBackwards should be engaged if spec has a "backwards" field.
-        invariant(collation->getBackwards().is_initialized());
         icuCollator->setAttribute(
-            UCOL_FRENCH_COLLATION, boolToAttribute(*collation->getBackwards()), status);
+            UCOL_FRENCH_COLLATION, boolToAttribute(parsedSpec.backwards), status);
         if (U_FAILURE(status)) {
             icu::ErrorCode icuError;
             icuError.set(status);
             return {ErrorCodes::OperationFailed,
-                    str::stream() << "Failed to set '" << Collation::kBackwardsFieldName
+                    str::stream() << "Failed to set '" << CollationSpec::kBackwardsField
                                   << "' attribute: " << icuError.errorName()
                                   << ". Collation spec: " << spec};
         }
     }
 
-    if (!collation->getVersion()) {
-        collation->setVersion(StringData(U_ICU_VERSION));
+    // Populate the spec with the ICU version information.
+    parsedSpec.version = U_ICU_VERSION;
+
+    // Parse the version string, if present in the spec. If the version string does not match the
+    // ICU version currently in use we must return an "IncompatibleCollationVersion" error.
+    std::string specVersionStr;
+    parseStatus = bsonExtractStringField(spec, CollationSpec::kVersionField, &specVersionStr);
+    if (parseStatus == ErrorCodes::NoSuchKey) {
+        // The BSON spec does not have any particular version. We've already populated it with the
+        // ICU version string above.
+        invariant(!parsedSpec.version.empty());
+    } else if (!parseStatus.isOK()) {
+        return parseStatus;
     } else {
-        if (U_ICU_VERSION != *collation->getVersion()) {
+        if (specVersionStr != parsedSpec.version) {
             return {ErrorCodes::IncompatibleCollationVersion,
-                    str::stream() << "Requested collation version " << collation->getVersion()
+                    str::stream() << "Requested collation version " << specVersionStr
                                   << " but the only available collator version was "
-                                  << U_ICU_VERSION << ". Requested collation spec: " << spec};
+                                  << parsedSpec.version << ". Requested collation spec: " << spec};
         }
+
+        ++parsedFields;
     }
 
-    return Status::OK();
+    // Check for unknown fields.
+    invariant(parsedFields <= spec.nFields());
+    if (parsedFields < spec.nFields()) {
+        return {ErrorCodes::FailedToParse,
+                str::stream() << "Collation spec contains unknown field. Collation spec: " << spec};
+    }
+
+    return parsedSpec;
+}
+
+// Extracts the localeID from 'spec', if present.
+StatusWith<std::string> parseLocaleID(const BSONObj& spec) {
+    std::string localeID;
+    Status status = bsonExtractStringField(spec, CollationSpec::kLocaleField, &localeID);
+    if (!status.isOK()) {
+        return status;
+    }
+    if (localeID.find('\0') != std::string::npos) {
+        return {ErrorCodes::BadValue,
+                str::stream() << "Field '" << CollationSpec::kLocaleField
+                              << "' cannot contain null byte. Collation spec: " << spec};
+    }
+    return localeID;
 }
 
 // Returns a non-OK status if any part of the locale ID is invalid or not recognized by ICU.
-Status validateLocaleID(const BSONObj& spec, StringData originalID, const icu::Collator& collator) {
+Status validateLocaleID(const BSONObj& spec,
+                        const std::string& originalID,
+                        const icu::Collator& collator) {
     UErrorCode status = U_ZERO_ERROR;
     icu::Locale collatorLocale = collator.getLocale(ULOC_VALID_LOCALE, status);
     if (U_FAILURE(status)) {
@@ -437,7 +591,7 @@ Status validateLocaleID(const BSONObj& spec, StringData originalID, const icu::C
 
     if (originalID.empty()) {
         return {ErrorCodes::BadValue,
-                str::stream() << "Field '" << Collation::kLocaleFieldName
+                str::stream() << "Field '" << CollationSpec::kLocaleField
                               << "' cannot be the empty string in: " << spec};
     }
 
@@ -450,7 +604,7 @@ Status validateLocaleID(const BSONObj& spec, StringData originalID, const icu::C
     auto collatorLocaleName = StringData(collatorLocale.getName());
     if (originalID != collatorLocaleName) {
         str::stream ss;
-        ss << "Field '" << Collation::kLocaleFieldName << "' is invalid in: " << spec;
+        ss << "Field '" << CollationSpec::kLocaleField << "' is invalid in: " << spec;
 
         if ((collatorLocaleName != kFallbackLocaleName) && !collatorLocaleName.empty()) {
             ss << ". Did you mean '" << collatorLocaleName << "'?";
@@ -463,29 +617,28 @@ Status validateLocaleID(const BSONObj& spec, StringData originalID, const icu::C
 }
 
 // Returns a non-OK status if 'spec' contains any invalid combinations of options.
-Status validateCollationSpec(const Collation& collation, const BSONObj& spec) {
+Status validateCollationSpec(const CollationSpec& spec) {
     // The backwards option specifically means backwards secondary weighting, and therefore only
     // affects the secondary comparison level. It has no effect at strength 1.
-    if (collation.getBackwards().value_or(false) &&
-        static_cast<CollationStrength>(collation.getStrength()) == CollationStrength::kPrimary) {
+    if (spec.backwards && spec.strength == CollationSpec::StrengthType::kPrimary) {
         return {ErrorCodes::BadValue,
-                str::stream() << "'" << Collation::kBackwardsFieldName << "' is invalid with '"
-                              << Collation::kStrengthFieldName << "' of "
-                              << static_cast<int>(CollationStrength::kPrimary) << " in: " << spec};
+                str::stream() << "'" << CollationSpec::kBackwardsField << "' is invalid with '"
+                              << CollationSpec::kStrengthField << "' of "
+                              << static_cast<int>(CollationSpec::StrengthType::kPrimary)
+                              << " in: " << spec.toBSON()};
     }
 
     // The caseFirst option only affects tertiary level or caseLevel comparisons. It will have no
     // affect if caseLevel is off and strength is 1 or 2.
-    if (collation.getCaseFirst() != CollationCaseFirstEnum::kOff && !collation.getCaseLevel() &&
-        (static_cast<CollationStrength>(collation.getStrength()) == CollationStrength::kPrimary ||
-         static_cast<CollationStrength>(collation.getStrength()) ==
-             CollationStrength::kSecondary)) {
+    if (spec.caseFirst != CollationSpec::CaseFirstType::kOff && !spec.caseLevel &&
+        (spec.strength == CollationSpec::StrengthType::kPrimary ||
+         spec.strength == CollationSpec::StrengthType::kSecondary)) {
         return {ErrorCodes::BadValue,
-                str::stream() << "'" << Collation::kCaseFirstFieldName << "' is invalid unless '"
-                              << Collation::kCaseLevelFieldName << "' is on or '"
-                              << Collation::kStrengthFieldName << "' is greater than "
-                              << static_cast<int>(CollationStrength::kSecondary)
-                              << " in: " << spec};
+                str::stream() << "'" << CollationSpec::kCaseFirstField << "' is invalid unless '"
+                              << CollationSpec::kCaseLevelField << "' is on or '"
+                              << CollationSpec::kStrengthField << "' is greater than "
+                              << static_cast<int>(CollationSpec::StrengthType::kSecondary)
+                              << " in: " << spec.toBSON()};
     }
 
     return Status::OK();
@@ -493,33 +646,32 @@ Status validateCollationSpec(const Collation& collation, const BSONObj& spec) {
 
 }  // namespace
 
+// TODO (SERVER-52538): Use Collation parser from basic_types.idl
 StatusWith<std::unique_ptr<CollatorInterface>> CollatorFactoryICU::makeFromBSON(
     const BSONObj& spec) {
-
-    Collation collation;
-    try {
-        collation = Collation::parse({"collation"}, spec);
-    } catch (const DBException& ex) {
-        return ex.toStatus();
-    }
-
-    if (collation.getLocale().find('\0') != std::string::npos) {
-        return {ErrorCodes::BadValue,
-                str::stream() << "Field '" << Collation::kLocaleFieldName
-                              << "' cannot contain null byte. Collation spec: " << spec};
+    // Parse the locale ID out of the spec.
+    auto parsedLocaleID = parseLocaleID(spec);
+    if (!parsedLocaleID.isOK()) {
+        return parsedLocaleID.getStatus();
     }
 
     // If spec = {locale: "simple"}, return a null pointer. A null CollatorInterface indicates
     // simple binary compare.
-    if (collation.getLocale() == CollationSpec::kSimpleBinaryComparison) {
+    if (parsedLocaleID.getValue() == CollationSpec::kSimpleBinaryComparison) {
+        if (spec.nFields() > 1) {
+            return {ErrorCodes::FailedToParse,
+                    str::stream() << "If " << CollationSpec::kLocaleField << "="
+                                  << CollationSpec::kSimpleBinaryComparison
+                                  << ", no other fields should be present in: " << spec};
+        }
         return {nullptr};
     }
 
     // Construct an icu::Locale.
-    auto userLocale = icu::Locale::createFromName(collation.getLocale().toString().c_str());
+    auto userLocale = icu::Locale::createFromName(parsedLocaleID.getValue().c_str());
     if (userLocale.isBogus()) {
         return {ErrorCodes::BadValue,
-                str::stream() << "Field '" << Collation::kLocaleFieldName
+                str::stream() << "Field '" << CollationSpec::kLocaleField
                               << "' is not valid in: " << spec};
     }
 
@@ -534,26 +686,25 @@ StatusWith<std::unique_ptr<CollatorInterface>> CollatorFactoryICU::makeFromBSON(
                               << ". Collation spec: " << spec};
     }
 
-    Status localeValidationStatus = validateLocaleID(spec, collation.getLocale(), *icuCollator);
+    Status localeValidationStatus = validateLocaleID(spec, parsedLocaleID.getValue(), *icuCollator);
     if (!localeValidationStatus.isOK()) {
         return localeValidationStatus;
     }
 
-    // Update the Collation's options with the defaults in icuCollator.
+    // Construct a CollationSpec using the options provided in spec or the defaults in icuCollator.
     // Use userLocale.getName() for the localeID, since it is canonicalized and includes options.
-    auto updateCollationSpecStatus = updateCollationSpecFromICUCollator(
-        spec, userLocale.getName(), icuCollator.get(), &collation);
-    if (!updateCollationSpecStatus.isOK()) {
-        return updateCollationSpecStatus;
+    auto parsedSpec = parseToCollationSpec(spec, userLocale.getName(), icuCollator.get());
+    if (!parsedSpec.isOK()) {
+        return parsedSpec.getStatus();
     }
 
-    auto validateSpecStatus = validateCollationSpec(collation, spec);
+    auto validateSpecStatus = validateCollationSpec(parsedSpec.getValue());
     if (!validateSpecStatus.isOK()) {
         return validateSpecStatus;
     }
 
-    auto mongoCollator =
-        std::make_unique<CollatorInterfaceICU>(std::move(collation), std::move(icuCollator));
+    auto mongoCollator = std::make_unique<CollatorInterfaceICU>(std::move(parsedSpec.getValue()),
+                                                                std::move(icuCollator));
     return {std::move(mongoCollator)};
 }
 

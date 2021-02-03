@@ -32,14 +32,169 @@
 #include <string>
 
 #include "mongo/bson/bsonobj.h"
-#include "mongo/idl/basic_types_gen.h"
 
-namespace mongo::CollationSpec {
+namespace mongo {
 
-constexpr const char* kSimpleBinaryComparison = "simple";
+// TODO (SERVER-52538): Factor with IDL-generated Collation struct.
+/**
+ * A CollationSpec is a parsed representation of a user-provided collation BSONObj.
+ */
+struct CollationSpec {
+    // Controls whether uppercase sorts before lowercase or vice versa.
+    enum class CaseFirstType {
+        // Sort uppercase before lowercase.
+        kUpper,
 
-// Collation spec which the user can supply to represent the "simple" locale.
-const static BSONObj kSimpleSpec =
-    BSON(Collation::kLocaleFieldName << CollationSpec::kSimpleBinaryComparison);
+        // Sort lowercase before uppercase.
+        kLower,
 
-}  // namespace mongo::CollationSpec
+        // Use default sorting behavior for the strength.
+        kOff,
+
+        // Update this if you add another value.
+        kMax = kOff,
+    };
+
+    // Controls the set of characteristics used to compare strings.
+    enum class StrengthType {
+        // Only consider base character differences.
+        kPrimary = 1,
+
+        // Additionally consider accent differences.
+        kSecondary = 2,
+
+        // Additionally consider case differences.
+        kTertiary = 3,
+
+        // Additionally consider punctuation and space differences. (If alternate=shifted, spaces
+        // and punctuation are not considered base characters, and are only considered at this
+        // strength.)
+        kQuaternary = 4,
+
+        // Equal Unicode point values.
+        // E.g. Hebrew cantillation marks are only distinguished at this level.
+        kIdentical = 5,
+
+        // Update this if you add another value.
+        kMax = kIdentical,
+    };
+
+    // Controls whether spaces and punctuation are considered base characters.
+    enum class AlternateType {
+        // Spaces and punctuation are considered base characters.
+        kNonIgnorable,
+
+        // Spaces and punctuation are not considered base characters, and are only distinguished at
+        // strength > 3.
+        kShifted,
+
+        // Update this if you add another value.
+        kMax = kShifted,
+    };
+
+    // Controls which characters are affected by alternate=shifted.
+    enum class MaxVariableType {
+        // Punctuation and spaces are affected.
+        kPunct,
+
+        // Only spaces are affected
+        kSpace,
+
+        // Update this if you add another value.
+        kMax = kSpace,
+    };
+
+
+    // Field name constants.
+    static const char* kLocaleField;
+    static const char* kCaseLevelField;
+    static const char* kCaseFirstField;
+    static const char* kStrengthField;
+    static const char* kNumericOrderingField;
+    static const char* kAlternateField;
+    static const char* kMaxVariableField;
+    static const char* kNormalizationField;
+    static const char* kBackwardsField;
+    static const char* kVersionField;
+
+    // Field value constants.
+    static const char* kSimpleBinaryComparison;
+    static const char* kCaseFirstUpper;
+    static const char* kCaseFirstLower;
+    static const char* kCaseFirstOff;
+    static const char* kAlternateNonIgnorable;
+    static const char* kAlternateShifted;
+    static const char* kMaxVariablePunct;
+    static const char* kMaxVariableSpace;
+
+    // Collation spec which the user can supply to represent the "simple" locale.
+    static const BSONObj kSimpleSpec;
+
+    /**
+     * Constructs a CollationSpec with no locale, where all other fields have their default values.
+     */
+    CollationSpec() = default;
+
+    /**
+     * Constructs a CollationSpec for the given locale, where all other fields have their default
+     * values.
+     */
+    CollationSpec(std::string locale, std::string version)
+        : localeID(std::move(locale)), version(std::move(version)) {}
+
+    /**
+     * Serializes this CollationSpec to its BSON format.
+     */
+    BSONObj toBSON() const;
+
+    // A string such as "en_US", identifying the language, country, or other attributes of the
+    // locale for this collation.
+    // Required.
+    std::string localeID;
+
+    // Turns case sensitivity on at strength 1 or 2.
+    bool caseLevel = false;
+
+    CaseFirstType caseFirst = CaseFirstType::kOff;
+
+    StrengthType strength = StrengthType::kTertiary;
+
+    // Order numbers based on numerical order and not lexicographic order.
+    bool numericOrdering = false;
+
+    AlternateType alternate = AlternateType::kNonIgnorable;
+
+    MaxVariableType maxVariable = MaxVariableType::kPunct;
+
+    // Any language that uses multiple combining characters such as Arabic, ancient Greek, Hebrew,
+    // Hindi, Thai or Vietnamese either requires Normalization Checking to be on, or the text to go
+    // through a normalization process before collation.
+    bool normalization = false;
+
+    // Causes accent differences to be considered in reverse order, as it is done in the French
+    // language.
+    bool backwards = false;
+
+    // Indicates the version of the collator. It is used to ensure that we do not mix versions by,
+    // for example, constructing an index with one version of ICU and then attempting to use this
+    // index with a server that is built against a newer ICU version.
+    std::string version;
+};
+
+/**
+ * Returns whether 'left' and 'right' are logically equivalent collations.
+ */
+inline bool operator==(const CollationSpec& left, const CollationSpec& right) {
+    return ((left.localeID == right.localeID) && (left.caseLevel == right.caseLevel) &&
+            (left.caseFirst == right.caseFirst) && (left.strength == right.strength) &&
+            (left.numericOrdering == right.numericOrdering) &&
+            (left.alternate == right.alternate) && (left.maxVariable == right.maxVariable) &&
+            (left.normalization == right.normalization) && (left.backwards == right.backwards) &&
+            (left.version == right.version));
+}
+
+inline bool operator!=(const CollationSpec& left, const CollationSpec& right) {
+    return !(left == right);
+}
+
+}  // namespace mongo

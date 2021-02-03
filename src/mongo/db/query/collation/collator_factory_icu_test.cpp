@@ -46,7 +46,7 @@ TEST(CollatorFactoryICUTest, LocaleStringParsesSuccessfully) {
     auto collator = factory.makeFromBSON(BSON("locale"
                                               << "en_US"));
     ASSERT_OK(collator.getStatus());
-    ASSERT_EQ("en_US", collator.getValue()->getSpec().getLocale());
+    ASSERT_EQ("en_US", collator.getValue()->getSpec().localeID);
 }
 
 TEST(CollatorFactoryICUTest, SimpleLocaleReturnsNullPointer) {
@@ -55,6 +55,15 @@ TEST(CollatorFactoryICUTest, SimpleLocaleReturnsNullPointer) {
                                               << "simple"));
     ASSERT_OK(collator.getStatus());
     ASSERT_TRUE(collator.getValue() == nullptr);
+}
+
+TEST(CollatorFactoryICUTest, SimpleLocaleWithOtherFieldsFailsToParse) {
+    CollatorFactoryICU factory;
+    auto collator = factory.makeFromBSON(BSON("locale"
+                                              << "simple"
+                                              << "caseLevel" << true));
+    ASSERT_NOT_OK(collator.getStatus());
+    ASSERT_EQ(collator.getStatus(), ErrorCodes::FailedToParse);
 }
 
 TEST(CollatorFactoryICUTest, LocaleFieldNotAStringFailsToParse) {
@@ -389,7 +398,7 @@ TEST(CollatorFactoryICUTest, MissingLocaleStringFailsToParse) {
     CollatorFactoryICU factory;
     auto collator = factory.makeFromBSON(BSONObj());
     ASSERT_NOT_OK(collator.getStatus());
-    ASSERT_EQ(collator.getStatus().code(), 40414);
+    ASSERT_EQ(collator.getStatus(), ErrorCodes::NoSuchKey);
 }
 
 TEST(CollatorFactoryICUTest, UnknownSpecFieldFailsToParse) {
@@ -400,6 +409,7 @@ TEST(CollatorFactoryICUTest, UnknownSpecFieldFailsToParse) {
     CollatorFactoryICU factory;
     auto collator = factory.makeFromBSON(spec);
     ASSERT_NOT_OK(collator.getStatus());
+    ASSERT_EQ(collator.getStatus(), ErrorCodes::FailedToParse);
 }
 
 TEST(CollatorFactoryICUTest, DefaultsSetSuccessfully) {
@@ -407,18 +417,18 @@ TEST(CollatorFactoryICUTest, DefaultsSetSuccessfully) {
     auto collator = factory.makeFromBSON(BSON("locale"
                                               << "en_US"));
     ASSERT_OK(collator.getStatus());
-    ASSERT_FALSE(collator.getValue()->getSpec().getCaseLevel());
-    ASSERT_EQ(static_cast<int>(CollationCaseFirstEnum::kOff),
-              static_cast<int>(collator.getValue()->getSpec().getCaseFirst()));
-    ASSERT_EQ(static_cast<int>(CollationStrength::kTertiary),
-              collator.getValue()->getSpec().getStrength());
-    ASSERT_FALSE(collator.getValue()->getSpec().getNumericOrdering());
-    ASSERT_EQ(static_cast<int>(CollationAlternateEnum::kNonIgnorable),
-              static_cast<int>(collator.getValue()->getSpec().getAlternate()));
-    ASSERT_EQ(static_cast<int>(CollationMaxVariableEnum::kPunct),
-              static_cast<int>(collator.getValue()->getSpec().getMaxVariable()));
-    ASSERT_FALSE(collator.getValue()->getSpec().getNormalization());
-    ASSERT_FALSE(*collator.getValue()->getSpec().getBackwards());
+    ASSERT_FALSE(collator.getValue()->getSpec().caseLevel);
+    ASSERT_EQ(static_cast<int>(CollationSpec::CaseFirstType::kOff),
+              static_cast<int>(collator.getValue()->getSpec().caseFirst));
+    ASSERT_EQ(static_cast<int>(CollationSpec::StrengthType::kTertiary),
+              static_cast<int>(collator.getValue()->getSpec().strength));
+    ASSERT_FALSE(collator.getValue()->getSpec().numericOrdering);
+    ASSERT_EQ(static_cast<int>(CollationSpec::AlternateType::kNonIgnorable),
+              static_cast<int>(collator.getValue()->getSpec().alternate));
+    ASSERT_EQ(static_cast<int>(CollationSpec::MaxVariableType::kPunct),
+              static_cast<int>(collator.getValue()->getSpec().maxVariable));
+    ASSERT_FALSE(collator.getValue()->getSpec().normalization);
+    ASSERT_FALSE(collator.getValue()->getSpec().backwards);
 }
 
 TEST(CollatorFactoryICUTest, LanguageDependentDefaultsSetSuccessfully) {
@@ -426,7 +436,7 @@ TEST(CollatorFactoryICUTest, LanguageDependentDefaultsSetSuccessfully) {
     auto collator = factory.makeFromBSON(BSON("locale"
                                               << "fr_CA"));
     ASSERT_OK(collator.getStatus());
-    ASSERT_TRUE(*collator.getValue()->getSpec().getBackwards());
+    ASSERT_TRUE(collator.getValue()->getSpec().backwards);
 }
 
 TEST(CollatorFactoryICUTest, CaseLevelFalseParsesSuccessfully) {
@@ -435,7 +445,7 @@ TEST(CollatorFactoryICUTest, CaseLevelFalseParsesSuccessfully) {
                                               << "en_US"
                                               << "caseLevel" << false));
     ASSERT_OK(collator.getStatus());
-    ASSERT_FALSE(collator.getValue()->getSpec().getCaseLevel());
+    ASSERT_FALSE(collator.getValue()->getSpec().caseLevel);
 }
 
 TEST(CollatorFactoryICUTest, CaseLevelTrueParsesSuccessfully) {
@@ -444,7 +454,7 @@ TEST(CollatorFactoryICUTest, CaseLevelTrueParsesSuccessfully) {
                                               << "en_US"
                                               << "caseLevel" << true));
     ASSERT_OK(collator.getStatus());
-    ASSERT_TRUE(collator.getValue()->getSpec().getCaseLevel());
+    ASSERT_TRUE(collator.getValue()->getSpec().caseLevel);
 }
 
 TEST(CollatorFactoryICUTest, CaseFirstOffParsesSuccessfully) {
@@ -454,8 +464,8 @@ TEST(CollatorFactoryICUTest, CaseFirstOffParsesSuccessfully) {
                                               << "caseFirst"
                                               << "off"));
     ASSERT_OK(collator.getStatus());
-    ASSERT_EQ(static_cast<int>(CollationCaseFirstEnum::kOff),
-              static_cast<int>(collator.getValue()->getSpec().getCaseFirst()));
+    ASSERT_EQ(static_cast<int>(CollationSpec::CaseFirstType::kOff),
+              static_cast<int>(collator.getValue()->getSpec().caseFirst));
 }
 
 TEST(CollatorFactoryICUTest, CaseFirstUpperParsesSuccessfully) {
@@ -465,8 +475,8 @@ TEST(CollatorFactoryICUTest, CaseFirstUpperParsesSuccessfully) {
                                               << "caseFirst"
                                               << "upper"));
     ASSERT_OK(collator.getStatus());
-    ASSERT_EQ(static_cast<int>(CollationCaseFirstEnum::kUpper),
-              static_cast<int>(collator.getValue()->getSpec().getCaseFirst()));
+    ASSERT_EQ(static_cast<int>(CollationSpec::CaseFirstType::kUpper),
+              static_cast<int>(collator.getValue()->getSpec().caseFirst));
 }
 
 TEST(CollatorFactoryICUTest, CaseFirstLowerParsesSuccessfully) {
@@ -476,8 +486,8 @@ TEST(CollatorFactoryICUTest, CaseFirstLowerParsesSuccessfully) {
                                               << "caseFirst"
                                               << "lower"));
     ASSERT_OK(collator.getStatus());
-    ASSERT_EQ(static_cast<int>(CollationCaseFirstEnum::kLower),
-              static_cast<int>(collator.getValue()->getSpec().getCaseFirst()));
+    ASSERT_EQ(static_cast<int>(CollationSpec::CaseFirstType::kLower),
+              static_cast<int>(collator.getValue()->getSpec().caseFirst));
 }
 
 TEST(CollatorFactoryICUTest, PrimaryStrengthParsesSuccessfully) {
@@ -486,8 +496,8 @@ TEST(CollatorFactoryICUTest, PrimaryStrengthParsesSuccessfully) {
                                               << "en_US"
                                               << "strength" << 1));
     ASSERT_OK(collator.getStatus());
-    ASSERT_EQ(static_cast<int>(CollationStrength::kPrimary),
-              collator.getValue()->getSpec().getStrength());
+    ASSERT_EQ(static_cast<int>(CollationSpec::StrengthType::kPrimary),
+              static_cast<int>(collator.getValue()->getSpec().strength));
 }
 
 TEST(CollatorFactoryICUTest, SecondaryStrengthParsesSuccessfully) {
@@ -496,8 +506,8 @@ TEST(CollatorFactoryICUTest, SecondaryStrengthParsesSuccessfully) {
                                               << "en_US"
                                               << "strength" << 2));
     ASSERT_OK(collator.getStatus());
-    ASSERT_EQ(static_cast<int>(CollationStrength::kSecondary),
-              collator.getValue()->getSpec().getStrength());
+    ASSERT_EQ(static_cast<int>(CollationSpec::StrengthType::kSecondary),
+              static_cast<int>(collator.getValue()->getSpec().strength));
 }
 
 TEST(CollatorFactoryICUTest, TertiaryStrengthParsesSuccessfully) {
@@ -506,8 +516,8 @@ TEST(CollatorFactoryICUTest, TertiaryStrengthParsesSuccessfully) {
                                               << "en_US"
                                               << "strength" << 3));
     ASSERT_OK(collator.getStatus());
-    ASSERT_EQ(static_cast<int>(CollationStrength::kTertiary),
-              collator.getValue()->getSpec().getStrength());
+    ASSERT_EQ(static_cast<int>(CollationSpec::StrengthType::kTertiary),
+              static_cast<int>(collator.getValue()->getSpec().strength));
 }
 
 TEST(CollatorFactoryICUTest, QuaternaryStrengthParsesSuccessfully) {
@@ -516,8 +526,8 @@ TEST(CollatorFactoryICUTest, QuaternaryStrengthParsesSuccessfully) {
                                               << "en_US"
                                               << "strength" << 4));
     ASSERT_OK(collator.getStatus());
-    ASSERT_EQ(static_cast<int>(CollationStrength::kQuaternary),
-              collator.getValue()->getSpec().getStrength());
+    ASSERT_EQ(static_cast<int>(CollationSpec::StrengthType::kQuaternary),
+              static_cast<int>(collator.getValue()->getSpec().strength));
 }
 
 TEST(CollatorFactoryICUTest, IdenticalStrengthParsesSuccessfully) {
@@ -526,8 +536,8 @@ TEST(CollatorFactoryICUTest, IdenticalStrengthParsesSuccessfully) {
                                               << "en_US"
                                               << "strength" << 5));
     ASSERT_OK(collator.getStatus());
-    ASSERT_EQ(static_cast<int>(CollationStrength::kIdentical),
-              collator.getValue()->getSpec().getStrength());
+    ASSERT_EQ(static_cast<int>(CollationSpec::StrengthType::kIdentical),
+              static_cast<int>(collator.getValue()->getSpec().strength));
 }
 
 TEST(CollatorFactoryICUTest, NumericOrderingFalseParsesSuccessfully) {
@@ -536,7 +546,7 @@ TEST(CollatorFactoryICUTest, NumericOrderingFalseParsesSuccessfully) {
                                               << "en_US"
                                               << "numericOrdering" << false));
     ASSERT_OK(collator.getStatus());
-    ASSERT_FALSE(collator.getValue()->getSpec().getNumericOrdering());
+    ASSERT_FALSE(collator.getValue()->getSpec().numericOrdering);
 }
 
 TEST(CollatorFactoryICUTest, NumericOrderingTrueParsesSuccessfully) {
@@ -545,7 +555,7 @@ TEST(CollatorFactoryICUTest, NumericOrderingTrueParsesSuccessfully) {
                                               << "en_US"
                                               << "numericOrdering" << true));
     ASSERT_OK(collator.getStatus());
-    ASSERT_TRUE(collator.getValue()->getSpec().getNumericOrdering());
+    ASSERT_TRUE(collator.getValue()->getSpec().numericOrdering);
 }
 
 TEST(CollatorFactoryICUTest, AlternateNonIgnorableParsesSuccessfully) {
@@ -555,8 +565,8 @@ TEST(CollatorFactoryICUTest, AlternateNonIgnorableParsesSuccessfully) {
                                               << "alternate"
                                               << "non-ignorable"));
     ASSERT_OK(collator.getStatus());
-    ASSERT_EQ(static_cast<int>(CollationAlternateEnum::kNonIgnorable),
-              static_cast<int>(collator.getValue()->getSpec().getAlternate()));
+    ASSERT_EQ(static_cast<int>(CollationSpec::AlternateType::kNonIgnorable),
+              static_cast<int>(collator.getValue()->getSpec().alternate));
 }
 
 TEST(CollatorFactoryICUTest, AlternateShiftedParsesSuccessfully) {
@@ -566,8 +576,8 @@ TEST(CollatorFactoryICUTest, AlternateShiftedParsesSuccessfully) {
                                               << "alternate"
                                               << "shifted"));
     ASSERT_OK(collator.getStatus());
-    ASSERT_EQ(static_cast<int>(CollationAlternateEnum::kShifted),
-              static_cast<int>(collator.getValue()->getSpec().getAlternate()));
+    ASSERT_EQ(static_cast<int>(CollationSpec::AlternateType::kShifted),
+              static_cast<int>(collator.getValue()->getSpec().alternate));
 }
 
 TEST(CollatorFactoryICUTest, MaxVariablePunctParsesSuccessfully) {
@@ -577,8 +587,8 @@ TEST(CollatorFactoryICUTest, MaxVariablePunctParsesSuccessfully) {
                                               << "maxVariable"
                                               << "punct"));
     ASSERT_OK(collator.getStatus());
-    ASSERT_EQ(static_cast<int>(CollationMaxVariableEnum::kPunct),
-              static_cast<int>(collator.getValue()->getSpec().getMaxVariable()));
+    ASSERT_EQ(static_cast<int>(CollationSpec::MaxVariableType::kPunct),
+              static_cast<int>(collator.getValue()->getSpec().maxVariable));
 }
 
 TEST(CollatorFactoryICUTest, MaxVariableSpaceParsesSuccessfully) {
@@ -588,8 +598,8 @@ TEST(CollatorFactoryICUTest, MaxVariableSpaceParsesSuccessfully) {
                                               << "maxVariable"
                                               << "space"));
     ASSERT_OK(collator.getStatus());
-    ASSERT_EQ(static_cast<int>(CollationMaxVariableEnum::kSpace),
-              static_cast<int>(collator.getValue()->getSpec().getMaxVariable()));
+    ASSERT_EQ(static_cast<int>(CollationSpec::MaxVariableType::kSpace),
+              static_cast<int>(collator.getValue()->getSpec().maxVariable));
 }
 
 TEST(CollatorFactoryICUTest, NormalizationFalseParsesSuccessfully) {
@@ -598,7 +608,7 @@ TEST(CollatorFactoryICUTest, NormalizationFalseParsesSuccessfully) {
                                               << "en_US"
                                               << "normalization" << false));
     ASSERT_OK(collator.getStatus());
-    ASSERT_FALSE(collator.getValue()->getSpec().getNormalization());
+    ASSERT_FALSE(collator.getValue()->getSpec().normalization);
 }
 
 TEST(CollatorFactoryICUTest, NormalizationTrueParsesSuccessfully) {
@@ -607,7 +617,7 @@ TEST(CollatorFactoryICUTest, NormalizationTrueParsesSuccessfully) {
                                               << "en_US"
                                               << "normalization" << true));
     ASSERT_OK(collator.getStatus());
-    ASSERT_TRUE(collator.getValue()->getSpec().getNormalization());
+    ASSERT_TRUE(collator.getValue()->getSpec().normalization);
 }
 
 TEST(CollatorFactoryICUTest, BackwardsFalseParsesSuccessfully) {
@@ -616,7 +626,7 @@ TEST(CollatorFactoryICUTest, BackwardsFalseParsesSuccessfully) {
                                               << "en_US"
                                               << "backwards" << false));
     ASSERT_OK(collator.getStatus());
-    ASSERT_FALSE(*collator.getValue()->getSpec().getBackwards());
+    ASSERT_FALSE(collator.getValue()->getSpec().backwards);
 }
 
 TEST(CollatorFactoryICUTest, BackwardsTrueParsesSuccessfully) {
@@ -625,7 +635,7 @@ TEST(CollatorFactoryICUTest, BackwardsTrueParsesSuccessfully) {
                                               << "en_US"
                                               << "backwards" << true));
     ASSERT_OK(collator.getStatus());
-    ASSERT_TRUE(*collator.getValue()->getSpec().getBackwards());
+    ASSERT_TRUE(collator.getValue()->getSpec().backwards);
 }
 
 TEST(CollatorFactoryICUTest, LongStrengthFieldParsesSuccessfully) {
@@ -634,8 +644,8 @@ TEST(CollatorFactoryICUTest, LongStrengthFieldParsesSuccessfully) {
                                               << "en_US"
                                               << "strength" << 1LL));
     ASSERT_OK(collator.getStatus());
-    ASSERT_EQ(static_cast<int>(CollationStrength::kPrimary),
-              collator.getValue()->getSpec().getStrength());
+    ASSERT_EQ(static_cast<int>(CollationSpec::StrengthType::kPrimary),
+              static_cast<int>(collator.getValue()->getSpec().strength));
 }
 
 TEST(CollatorFactoryICUTest, DoubleStrengthFieldParsesSuccessfully) {
@@ -644,8 +654,8 @@ TEST(CollatorFactoryICUTest, DoubleStrengthFieldParsesSuccessfully) {
                                               << "en_US"
                                               << "strength" << 1.0));
     ASSERT_OK(collator.getStatus());
-    ASSERT_EQ(static_cast<int>(CollationStrength::kPrimary),
-              collator.getValue()->getSpec().getStrength());
+    ASSERT_EQ(static_cast<int>(CollationSpec::StrengthType::kPrimary),
+              static_cast<int>(collator.getValue()->getSpec().strength));
 }
 
 TEST(CollatorFactoryICUTest, NonBooleanCaseLevelFieldFailsToParse) {
@@ -674,7 +684,7 @@ TEST(CollatorFactoryICUTest, InvalidStringCaseFirstFieldFailsToParse) {
                                               << "caseFirst"
                                               << "invalid"));
     ASSERT_NOT_OK(collator.getStatus());
-    ASSERT_EQ(collator.getStatus(), ErrorCodes::BadValue);
+    ASSERT_EQ(collator.getStatus(), ErrorCodes::FailedToParse);
 }
 
 TEST(CollatorFactoryICUTest, NonNumberStrengthFieldFailsToParse) {
@@ -693,7 +703,7 @@ TEST(CollatorFactoryICUTest, TooLargeStrengthFieldFailsToParse) {
                                               << "en_US"
                                               << "strength" << 2147483648LL));
     ASSERT_NOT_OK(collator.getStatus());
-    ASSERT_EQ(collator.getStatus().code(), 51024);
+    ASSERT_EQ(collator.getStatus(), ErrorCodes::FailedToParse);
 }
 
 TEST(CollatorFactoryICUTest, FractionalStrengthFieldFailsToParse) {
@@ -711,7 +721,7 @@ TEST(CollatorFactoryICUTest, NegativeStrengthFieldFailsToParse) {
                                               << "en_US"
                                               << "strength" << -1));
     ASSERT_NOT_OK(collator.getStatus());
-    ASSERT_EQ(collator.getStatus().code(), 51024);
+    ASSERT_EQ(collator.getStatus(), ErrorCodes::FailedToParse);
 }
 
 TEST(CollatorFactoryICUTest, InvalidIntegerStrengthFieldFailsToParse) {
@@ -720,7 +730,7 @@ TEST(CollatorFactoryICUTest, InvalidIntegerStrengthFieldFailsToParse) {
                                               << "en_US"
                                               << "strength" << 6));
     ASSERT_NOT_OK(collator.getStatus());
-    ASSERT_EQ(collator.getStatus().code(), 51024);
+    ASSERT_EQ(collator.getStatus(), ErrorCodes::FailedToParse);
 }
 
 TEST(CollatorFactoryICUTest, NonBoolNumericOrderingFieldFailsToParse) {
@@ -749,7 +759,7 @@ TEST(CollatorFactoryICUTest, InvalidStringAlternateFieldFailsToParse) {
                                               << "alternate"
                                               << "invalid"));
     ASSERT_NOT_OK(collator.getStatus());
-    ASSERT_EQ(collator.getStatus(), ErrorCodes::BadValue);
+    ASSERT_EQ(collator.getStatus(), ErrorCodes::FailedToParse);
 }
 
 TEST(CollatorFactoryICUTest, NonStringMaxVariableFieldFailsToParse) {
@@ -768,7 +778,7 @@ TEST(CollatorFactoryICUTest, InvalidStringMaxVariableFieldFailsToParse) {
                                               << "maxVariable"
                                               << "invalid"));
     ASSERT_NOT_OK(collator.getStatus());
-    ASSERT_EQ(collator.getStatus(), ErrorCodes::BadValue);
+    ASSERT_EQ(collator.getStatus(), ErrorCodes::FailedToParse);
 }
 
 TEST(CollatorFactoryICUTest, NonBoolNormalizationFieldFailsToParse) {
@@ -798,7 +808,7 @@ TEST(CollatorFactoryICUTest, VersionFieldParsesSuccessfully) {
                                               << "version"
                                               << "57.1"));
     ASSERT_OK(collator.getStatus());
-    ASSERT_EQ("57.1", *collator.getValue()->getSpec().getVersion());
+    ASSERT_EQ("57.1", collator.getValue()->getSpec().version);
 }
 
 TEST(CollatorFactoryICUTest, VersionFieldPopulatedWhenOmitted) {
@@ -806,7 +816,7 @@ TEST(CollatorFactoryICUTest, VersionFieldPopulatedWhenOmitted) {
     auto collator = factory.makeFromBSON(BSON("locale"
                                               << "en_US"));
     ASSERT_OK(collator.getStatus());
-    ASSERT_EQ("57.1", *collator.getValue()->getSpec().getVersion());
+    ASSERT_EQ("57.1", collator.getValue()->getSpec().version);
 }
 
 TEST(CollatorFactoryICUTest, NonStringVersionFieldFailsToParse) {

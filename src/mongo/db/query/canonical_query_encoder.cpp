@@ -343,8 +343,11 @@ void encodeGeoNearMatchExpression(const GeoNearMatchExpression* tree, StringBuil
 
 template <class T>
 char encodeEnum(T val) {
-    // Ensure val can be encoded as a digit between '0' and '9' inclusive.
-    invariant(static_cast<int>(val) < 10);
+    static_assert(static_cast<int>(T::kMax) <= 9,
+                  "enum has too many values to encode as a value between '0' and '9'. You must "
+                  "change the encoding scheme");
+    invariant(val <= T::kMax);
+
     return static_cast<char>(val) + '0';
 }
 
@@ -353,21 +356,21 @@ void encodeCollation(const CollatorInterface* collation, StringBuilder* keyBuild
         return;
     }
 
-    const Collation& spec = collation->getSpec();
+    const CollationSpec& spec = collation->getSpec();
 
     *keyBuilder << kEncodeCollationSection;
-    *keyBuilder << spec.getLocale();
-    *keyBuilder << spec.getCaseLevel();
+    *keyBuilder << spec.localeID;
+    *keyBuilder << spec.caseLevel;
 
     // Ensure that we can encode this value with a single ascii byte '0' through '9'.
-    *keyBuilder << encodeEnum(spec.getCaseFirst());
-    *keyBuilder << encodeEnum(spec.getStrength());
-    *keyBuilder << spec.getNumericOrdering();
+    *keyBuilder << encodeEnum(spec.caseFirst);
+    *keyBuilder << encodeEnum(spec.strength);
+    *keyBuilder << spec.numericOrdering;
 
-    *keyBuilder << encodeEnum(spec.getAlternate());
-    *keyBuilder << encodeEnum(spec.getMaxVariable());
-    *keyBuilder << spec.getNormalization();
-    *keyBuilder << spec.getBackwards().value_or(false);
+    *keyBuilder << encodeEnum(spec.alternate);
+    *keyBuilder << encodeEnum(spec.maxVariable);
+    *keyBuilder << spec.normalization;
+    *keyBuilder << spec.backwards;
 
     // We do not encode 'spec.version' because query shape strings are never persisted, and need
     // not be stable between versions.

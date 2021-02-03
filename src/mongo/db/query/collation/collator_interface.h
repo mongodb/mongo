@@ -89,7 +89,7 @@ public:
     /**
      * Constructs a CollatorInterface capable of computing the collation described by 'spec'.
      */
-    CollatorInterface(Collation spec) : _spec(std::move(spec)) {}
+    CollatorInterface(CollationSpec spec) : _spec(std::move(spec)) {}
 
     virtual ~CollatorInterface() {}
 
@@ -136,9 +136,9 @@ public:
     }
 
     /**
-     * Returns a reference to the Collation.
+     * Returns a reference to the CollationSpec.
      */
-    const Collation& getSpec() const {
+    const CollationSpec& getSpec() const {
         return _spec;
     }
 
@@ -171,7 +171,7 @@ protected:
     }
 
 private:
-    const Collation _spec;
+    const CollationSpec _spec;
 };
 
 }  // namespace mongo

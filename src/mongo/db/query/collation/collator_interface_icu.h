@@ -45,7 +45,7 @@ namespace mongo {
  */
 class CollatorInterfaceICU final : public CollatorInterface {
 public:
-    CollatorInterfaceICU(Collation spec, std::unique_ptr<icu::Collator> collator);
+    CollatorInterfaceICU(CollationSpec spec, std::unique_ptr<icu::Collator> collator);
 
     std::unique_ptr<CollatorInterface> clone() const final;
 

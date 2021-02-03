@@ -191,9 +191,9 @@ TEST(CollatorInterfaceMockSelfTest, MockCollatorReportsMockVersionString) {
     CollatorInterfaceMock reverseCollator(CollatorInterfaceMock::MockType::kReverseString);
     CollatorInterfaceMock alwaysEqualCollator(CollatorInterfaceMock::MockType::kAlwaysEqual);
     CollatorInterfaceMock toLowerCollator(CollatorInterfaceMock::MockType::kToLowerString);
-    ASSERT_EQ(*reverseCollator.getSpec().getVersion(), "mock_version");
-    ASSERT_EQ(*alwaysEqualCollator.getSpec().getVersion(), "mock_version");
-    ASSERT_EQ(*toLowerCollator.getSpec().getVersion(), "mock_version");
+    ASSERT_EQ(reverseCollator.getSpec().version, "mock_version");
+    ASSERT_EQ(alwaysEqualCollator.getSpec().version, "mock_version");
+    ASSERT_EQ(toLowerCollator.getSpec().version, "mock_version");
 }
 
 TEST(CollatorInterfaceMockSelfTest, StringsAreHashedWithRespectToCollation) {
