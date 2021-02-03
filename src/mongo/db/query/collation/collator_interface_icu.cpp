@@ -40,8 +40,7 @@
 
 namespace mongo {
 
-CollatorInterfaceICU::CollatorInterfaceICU(CollationSpec spec,
-                                           std::unique_ptr<icu::Collator> collator)
+CollatorInterfaceICU::CollatorInterfaceICU(Collation spec, std::unique_ptr<icu::Collator> collator)
     : CollatorInterface(std::move(spec)), _collator(std::move(collator)) {}
 
 std::unique_ptr<CollatorInterface> CollatorInterfaceICU::clone() const {

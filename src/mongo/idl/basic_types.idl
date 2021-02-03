@@ -263,19 +263,29 @@ enums:
             kLower: lower
             kOff: off
 
+    CollationStrength:
+        description: Controls the set of characteristics used to compare strings.
+        type: int
+        values:
+            kPrimary: 1
+            kSecondary: 2
+            kTertiary: 3
+            kQuaternary: 4
+            kIdentical: 5
+
     CollationAlternate:
         description: Whether collation should consider whitespace and punctuation as base characters for purposes of comparison.
         type: string
         values:
-            kAlternateNonIgnorable: non-ignorable
-            kAlternateShifted: shifted
+            kNonIgnorable: non-ignorable
+            kShifted: shifted
 
     CollationMaxVariable:
         description: Up to which characters are considered ignorable when alternate is "shifted".
         type: string
         values:
-            kMaxVariablePunct: punct
-            kMaxVariableSpace: space
+            kPunct: punct
+            kSpace: space
 
 structs:
     OkReply:
@@ -344,31 +354,43 @@ structs:
         fields:
             locale:
                 type: string
+            # Turns case sensitivity on at strength 1 or 2.
             caseLevel:
                 type: bool
-                optional: true
+                default: false
             caseFirst:
                 type: CollationCaseFirst
-                optional: true
+                default: kOff
+            # For backwards-compatibility, we must accept longs, ints, and doubles, so we cannot
+            # use the int-typed CollationStrength enum directly.
             strength:
-                type: exactInt64
-                optional: true
+                type: safeInt
+                default: static_cast<int>(CollationStrength::kTertiary)
                 validator: { gte: 0, lte: 5 }
+            # Order numbers based on numerical order and not lexicographic order.
             numericOrdering:
                 type: bool
-                optional: true
+                default: false
             alternate:
                 type: CollationAlternate
-                optional: true
+                default: kNonIgnorable
             maxVariable:
                 type: CollationMaxVariable
-                optional: true
+                default: kPunct
+            # Any language that uses multiple combining characters such as Arabic, ancient Greek,
+            # Hebrew, Hindi, Thai or Vietnamese either requires Normalization Checking to be on, or
+            # the text to go through a normalization process before collation.
             normalization:
                 type: bool
-                optional: true
+                default: false
+            # Causes accent differences to be considered in reverse order, as it is done in the
+            # French language.
             backwards:
                 type: bool
                 optional: true
+            # Indicates the version of the collator. It is used to ensure that we do not mix
+            # versions by, for example, constructing an index with one version of ICU and then
+            # attempting to use this index with a server that is built against a newer ICU version.
             version:
                 type: string
                 optional: true
