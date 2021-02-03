@@ -55,6 +55,9 @@ TenantMigrationAccessBlockerExecutor::getOrCreateBlockedOperationsExecutor() {
     threadPoolOptions.maxThreads = kBlockedOpsPoolSize;
     threadPoolOptions.threadNamePrefix = "TenantMigrationBlockerAsync-";
     threadPoolOptions.poolName = "TenantMigrationBlockerAsyncThreadPool";
+    threadPoolOptions.onCreateThread = [](const std::string& threadName) {
+        Client::initThread(threadName.c_str());
+    };
     auto executor = std::make_shared<executor::ThreadPoolTaskExecutor>(
         std::make_unique<ThreadPool>(threadPoolOptions),
         executor::makeNetworkInterface("TenantMigrationBlockerNet"));

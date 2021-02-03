@@ -1342,6 +1342,7 @@ env.Library(
         'tenant_migration_access_blocker_util.cpp',
         'tenant_migration_donor_access_blocker.cpp',
         'tenant_migration_donor_op_observer.cpp',
+        'tenant_migration_recipient_access_blocker.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -1498,6 +1499,7 @@ env.CppUnitTest(
         'tenant_oplog_batcher_test.cpp',
         'vote_requester_test.cpp',
         'wait_for_majority_service_test.cpp',
+        'tenant_migration_recipient_access_blocker_test.cpp',
         'tenant_migration_recipient_entry_helpers_test.cpp',
         'tenant_migration_recipient_service_test.cpp',
     ],
