@@ -50,6 +50,9 @@ public:
     }
 
 protected:
+    const UUID kMigrationId1 = UUID::gen();
+    const UUID kMigrationId2 = UUID::gen();
+
     void setUp() override {
         ConfigServerTestFixture::setUp();
 
@@ -366,6 +369,76 @@ TEST_F(KeysManagerShardedTest, HasSeenKeysIsFalseUntilKeysAreFound) {
     ASSERT_OK(keyStatus.getStatus());
 
     ASSERT_EQ(true, keyManager()->hasSeenKeys());
+}
+
+TEST_F(KeysManagerShardedTest, CacheExternalKeyBasic) {
+    keyManager()->startMonitoring(getServiceContext());
+
+    auto externalKeysTTLExpiresAt = getServiceContext()->getFastClockSource()->now() + Seconds(30);
+    ExternalKeysCollectionDocument externalKey1(
+        OID::gen(), 1, kMigrationId1, externalKeysTTLExpiresAt);
+    externalKey1.setKeysCollectionDocumentBase(
+        {"dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(100, 0))});
+
+    keyManager()->cacheExternalKey(externalKey1);
+
+    {
+        auto keyStatus =
+            keyManager()->getKeysForValidation(operationContext(), 1, LogicalTime(Timestamp(1, 0)));
+        ASSERT_OK(keyStatus.getStatus());
+        ASSERT_EQ(1, keyStatus.getValue().size());
+
+        auto key = keyStatus.getValue().front();
+        ASSERT_EQ(1, key.getKeyId());
+
+        ASSERT_EQ(externalKey1.getKeyId(), key.getKeyId());
+        ASSERT_EQ(externalKey1.getPurpose(), key.getPurpose());
+        ASSERT_EQ(externalKey1.getExpiresAt().asTimestamp(), key.getExpiresAt().asTimestamp());
+    }
+}
+
+TEST_F(KeysManagerShardedTest, WillNotCacheExternalKeyWhenMonitoringIsStopped) {
+    keyManager()->startMonitoring(getServiceContext());
+
+    // Insert an internal key so the key manager won't attempt to refresh after the refresher is
+    // stopped.
+    KeysCollectionDocument internalKey(1);
+    internalKey.setKeysCollectionDocumentBase(
+        {"dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(100, 0))});
+    ASSERT_OK(insertToConfigCollection(
+        operationContext(), NamespaceString::kKeysCollectionNamespace, internalKey.toBSON()));
+
+    auto externalKeysTTLExpiresAt = getServiceContext()->getFastClockSource()->now() + Seconds(30);
+    ExternalKeysCollectionDocument externalKey1(
+        OID::gen(), 1, kMigrationId1, externalKeysTTLExpiresAt);
+    externalKey1.setKeysCollectionDocumentBase(
+        {"dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(100, 0))});
+
+    keyManager()->cacheExternalKey(externalKey1);
+
+    {
+        auto keyStatus =
+            keyManager()->getKeysForValidation(operationContext(), 1, LogicalTime(Timestamp(1, 0)));
+        ASSERT_OK(keyStatus.getStatus());
+        ASSERT_EQ(2, keyStatus.getValue().size());
+    }
+
+    keyManager()->stopMonitoring();
+
+    ExternalKeysCollectionDocument externalKey2(
+        OID::gen(), 1, kMigrationId2, externalKeysTTLExpiresAt);
+    externalKey2.setKeysCollectionDocumentBase(
+        {"dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(100, 0))});
+
+    keyManager()->cacheExternalKey(externalKey2);
+
+    // There should still be only the first external key in the cache.
+    {
+        auto keyStatus =
+            keyManager()->getKeysForValidation(operationContext(), 1, LogicalTime(Timestamp(1, 0)));
+        ASSERT_OK(keyStatus.getStatus());
+        ASSERT_EQ(2, keyStatus.getValue().size());
+    }
 }
 
 LogicalTime addSeconds(const LogicalTime& logicalTime, const Seconds& seconds) {

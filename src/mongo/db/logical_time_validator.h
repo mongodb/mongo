@@ -31,6 +31,7 @@
 
 #include <memory>
 
+#include "mongo/db/keys_collection_document_gen.h"
 #include "mongo/db/signed_logical_time.h"
 #include "mongo/db/time_proof_service.h"
 #include "mongo/platform/mutex.h"
@@ -109,9 +110,9 @@ public:
     void stopKeyManager();
 
     /**
-     * Forces the key manager cache to refresh.
+     * Load the given external key into the key manager's keys cache.
      */
-    void refreshKeyManagerCache(OperationContext* opCtx);
+    void cacheExternalKey(ExternalKeysCollectionDocument key);
 
     /**
      * Reset the key manager cache of keys.

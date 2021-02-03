@@ -83,6 +83,11 @@ public:
      */
     void resetCache();
 
+    /**
+     * Loads the given external key into the cache.
+     */
+    void cacheExternalKey(ExternalKeysCollectionDocument key);
+
 private:
     /**
      * Checks if there are new internal key documents (see definition below) with expiresAt greater

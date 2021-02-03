@@ -220,9 +220,9 @@ bool LogicalTimeValidator::shouldGossipLogicalTime() {
     return _getKeyManagerCopy()->hasSeenKeys();
 }
 
-void LogicalTimeValidator::refreshKeyManagerCache(OperationContext* opCtx) {
+void LogicalTimeValidator::cacheExternalKey(ExternalKeysCollectionDocument key) {
     invariant(_keyManager);
-    _keyManager->refreshNow(opCtx);
+    _keyManager->cacheExternalKey(std::move(key));
 }
 
 void LogicalTimeValidator::resetKeyManagerCache() {

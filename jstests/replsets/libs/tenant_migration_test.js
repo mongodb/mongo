@@ -39,14 +39,17 @@ function TenantMigrationTest({
     donorRst = donorPassedIn ? donorRst : performSetUp(true /* isDonor */);
     recipientRst = recipientPassedIn ? recipientRst : performSetUp(false /* isDonor */);
 
-    donorRst.getPrimary();
-    donorRst.awaitReplication();
+    donorRst.asCluster(donorRst.nodes, () => {
+        donorRst.getPrimary();
+        donorRst.awaitReplication();
+        createFindInternalClusterTimeKeysRoleIfNotExist(donorRst);
+    });
 
-    recipientRst.getPrimary();
-    recipientRst.awaitReplication();
-
-    createFindInternalClusterTimeKeysRoleIfNotExist(donorRst);
-    createFindInternalClusterTimeKeysRoleIfNotExist(recipientRst);
+    recipientRst.asCluster(recipientRst.nodes, () => {
+        recipientRst.getPrimary();
+        recipientRst.awaitReplication();
+        createFindInternalClusterTimeKeysRoleIfNotExist(recipientRst);
+    });
 
     /**
      * Creates a ReplSetTest instance. The repl set will have 2 nodes if not otherwise specified.
@@ -154,16 +157,17 @@ function TenantMigrationTest({
      * Returns whether tenant migration commands are supported.
      */
     this.isFeatureFlagEnabled = function() {
-        const donorPrimary = this.getDonorPrimary();
-        const recipientPrimary = this.getRecipientPrimary();
-
-        function supportsTenantMigrations(conn) {
-            return assert
-                .commandWorked(conn.adminCommand({getParameter: 1, featureFlagTenantMigrations: 1}))
-                .featureFlagTenantMigrations.value;
+        function supportsTenantMigrations(rst) {
+            const conn = rst.getPrimary();
+            return rst.asCluster(conn, () => {
+                return assert
+                    .commandWorked(
+                        conn.adminCommand({getParameter: 1, featureFlagTenantMigrations: 1}))
+                    .featureFlagTenantMigrations.value;
+            });
         }
-        const retVal =
-            (supportsTenantMigrations(donorPrimary) && supportsTenantMigrations(recipientPrimary));
+        const retVal = (supportsTenantMigrations(this.getDonorRst()) &&
+                        supportsTenantMigrations(this.getRecipientRst()));
         if (!retVal) {
             jsTestLog("At least one of the donor or recipient replica sets do not support tenant " +
                       "migration commands. Terminating any replica sets started by the " +

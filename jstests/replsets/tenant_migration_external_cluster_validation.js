@@ -28,17 +28,17 @@ const kTestUser = {
     pwd: "pwd",
 };
 
-function createUsers(primary) {
-    const adminDB = primary.getDB("admin");
-    assert.commandWorked(
-        adminDB.runCommand({createUser: kAdminUser.name, pwd: kAdminUser.pwd, roles: ["root"]}));
-    assert.eq(1, adminDB.auth(kAdminUser.name, kAdminUser.pwd));
+function createUsers(rst) {
+    const primary = rst.getPrimary();
+    rst.asCluster(primary, () => {
+        const adminDB = primary.getDB("admin");
+        assert.commandWorked(adminDB.runCommand(
+            {createUser: kAdminUser.name, pwd: kAdminUser.pwd, roles: ["root"]}));
 
-    const testDB = primary.getDB(kDbName);
-    assert.commandWorked(
-        testDB.runCommand({createUser: kTestUser.name, pwd: kTestUser.pwd, roles: ["readWrite"]}));
-
-    adminDB.logout();
+        const testDB = primary.getDB(kDbName);
+        assert.commandWorked(testDB.runCommand(
+            {createUser: kTestUser.name, pwd: kTestUser.pwd, roles: ["readWrite"]}));
+    });
 }
 
 const kTenantId = "testTenantId";
@@ -48,7 +48,7 @@ const kCollName = "testColl";
 
 const x509Options = TenantMigrationUtil.makeX509OptionsForTest();
 const donorRst = new ReplSetTest({
-    nodes: 1,
+    nodes: 2,
     name: "donor",
     keyFile: "jstests/libs/key1",
     nodeOptions: Object.assign(
@@ -57,7 +57,7 @@ const donorRst = new ReplSetTest({
 });
 
 const recipientRst = new ReplSetTest({
-    nodes: 1,
+    nodes: 2,
     name: "recipient",
     keyFile: "jstests/libs/key1",
     nodeOptions: Object.assign(
@@ -77,14 +77,10 @@ const recipientPrimary = recipientRst.getPrimary();
 const donorAdminDB = donorPrimary.getDB("admin");
 const recipientAdminDB = recipientPrimary.getDB("admin");
 
-const donorTestDB = donorPrimary.getDB(kDbName);
-const recipientTestDB = recipientPrimary.getDB(kDbName);
-
-createUsers(donorPrimary);
-createUsers(recipientPrimary);
-
-assert.eq(1, donorAdminDB.auth(kAdminUser.name, kAdminUser.pwd));
-assert.eq(1, recipientAdminDB.auth(kAdminUser.name, kAdminUser.pwd));
+const donorPrimaryTestDB = donorPrimary.getDB(kDbName);
+const recipientPrimaryTestDB = recipientPrimary.getDB(kDbName);
+const donorSecondaryTestDB = donorRst.getSecondary().getDB(kDbName);
+const recipientSecondaryTestDB = recipientRst.getSecondary().getDB(kDbName);
 
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), donorRst, recipientRst});
 if (!tenantMigrationTest.isFeatureFlagEnabled()) {
@@ -94,16 +90,19 @@ if (!tenantMigrationTest.isFeatureFlagEnabled()) {
     return;
 }
 
-donorAdminDB.logout();
-recipientAdminDB.logout();
+createUsers(donorRst);
+createUsers(recipientRst);
 
-assert.eq(1, donorTestDB.auth(kTestUser.name, kTestUser.pwd));
-assert.eq(1, recipientTestDB.auth(kTestUser.name, kTestUser.pwd));
+assert.eq(1, donorPrimaryTestDB.auth(kTestUser.name, kTestUser.pwd));
+assert.eq(1, recipientPrimaryTestDB.auth(kTestUser.name, kTestUser.pwd));
+
+assert.eq(1, donorSecondaryTestDB.auth(kTestUser.name, kTestUser.pwd));
+assert.eq(1, recipientSecondaryTestDB.auth(kTestUser.name, kTestUser.pwd));
 
 const donorClusterTime =
-    assert.commandWorked(donorTestDB.runCommand({find: kCollName})).$clusterTime;
+    assert.commandWorked(donorPrimaryTestDB.runCommand({find: kCollName})).$clusterTime;
 const recipientClusterTime =
-    assert.commandWorked(recipientTestDB.runCommand({find: kCollName})).$clusterTime;
+    assert.commandWorked(recipientPrimaryTestDB.runCommand({find: kCollName})).$clusterTime;
 jsTest.log("donor's clusterTime " + tojson(donorClusterTime));
 jsTest.log("recipient's clusterTime " + tojson(recipientClusterTime));
 
@@ -111,14 +110,24 @@ jsTest.log("Verify that prior to the migration, the donor and recipient fail to 
            "other's clusterTime");
 
 assert.commandFailedWithCode(
-    donorTestDB.runCommand({find: kCollName, $clusterTime: recipientClusterTime}),
+    donorPrimaryTestDB.runCommand({find: kCollName, $clusterTime: recipientClusterTime}),
     [ErrorCodes.TimeProofMismatch, ErrorCodes.KeyNotFound]);
 assert.commandFailedWithCode(
-    recipientTestDB.runCommand({find: kCollName, $clusterTime: donorClusterTime}),
+    recipientPrimaryTestDB.runCommand({find: kCollName, $clusterTime: donorClusterTime}),
     [ErrorCodes.TimeProofMismatch, ErrorCodes.KeyNotFound]);
 
-donorTestDB.logout();
-recipientTestDB.logout();
+assert.commandFailedWithCode(
+    donorSecondaryTestDB.runCommand({find: kCollName, $clusterTime: recipientClusterTime}),
+    [ErrorCodes.TimeProofMismatch, ErrorCodes.KeyNotFound]);
+assert.commandFailedWithCode(
+    recipientSecondaryTestDB.runCommand({find: kCollName, $clusterTime: donorClusterTime}),
+    [ErrorCodes.TimeProofMismatch, ErrorCodes.KeyNotFound]);
+
+donorPrimaryTestDB.logout();
+recipientPrimaryTestDB.logout();
+
+donorSecondaryTestDB.logout();
+recipientSecondaryTestDB.logout();
 
 assert.eq(1, donorAdminDB.auth(kAdminUser.name, kAdminUser.pwd));
 assert.eq(1, recipientAdminDB.auth(kAdminUser.name, kAdminUser.pwd));
@@ -134,13 +143,29 @@ donorAdminDB.logout();
 recipientAdminDB.logout();
 
 jsTest.log("Verify that after the migration, the donor and recipient can validate each other's" +
-           "clusterTime");
+           " clusterTime");
 
-assert.eq(1, donorTestDB.auth(kTestUser.name, kTestUser.pwd));
-assert.eq(1, recipientTestDB.auth(kTestUser.name, kTestUser.pwd));
+assert.eq(1, donorPrimaryTestDB.auth(kTestUser.name, kTestUser.pwd));
+assert.eq(1, recipientPrimaryTestDB.auth(kTestUser.name, kTestUser.pwd));
 
-assert.commandWorked(donorTestDB.runCommand({find: kCollName, $clusterTime: recipientClusterTime}));
-assert.commandWorked(recipientTestDB.runCommand({find: kCollName, $clusterTime: donorClusterTime}));
+assert.eq(1, donorSecondaryTestDB.auth(kTestUser.name, kTestUser.pwd));
+assert.eq(1, recipientSecondaryTestDB.auth(kTestUser.name, kTestUser.pwd));
+
+assert.commandWorked(
+    donorPrimaryTestDB.runCommand({find: kCollName, $clusterTime: recipientClusterTime}));
+assert.commandWorked(
+    recipientPrimaryTestDB.runCommand({find: kCollName, $clusterTime: donorClusterTime}));
+
+assert.commandWorked(
+    donorSecondaryTestDB.runCommand({find: kCollName, $clusterTime: recipientClusterTime}));
+assert.commandWorked(
+    recipientSecondaryTestDB.runCommand({find: kCollName, $clusterTime: donorClusterTime}));
+
+donorPrimaryTestDB.logout();
+recipientPrimaryTestDB.logout();
+
+donorSecondaryTestDB.logout();
+recipientSecondaryTestDB.logout();
 
 tenantMigrationTest.stop();
 donorRst.stopSet();

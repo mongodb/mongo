@@ -400,13 +400,12 @@ TenantMigrationDonorService::Instance::_fetchAndStoreRecipientClusterTimeKeyDocs
 
             return keyDocs;
         })
-        .then(
-            [this, self = shared_from_this(), executor, serviceToken, instanceToken](auto keyDocs) {
-                checkIfReceivedDonorAbortMigration(serviceToken, instanceToken);
+        .then([this, self = shared_from_this(), executor, serviceToken, instanceToken](
+                  auto keyDocs) {
+            checkIfReceivedDonorAbortMigration(serviceToken, instanceToken);
 
-                tenant_migration_util::storeExternalClusterTimeKeyDocsAndRefreshCache(
-                    executor, std::move(keyDocs));
-            });
+            tenant_migration_util::storeExternalClusterTimeKeyDocs(executor, std::move(keyDocs));
+        });
 }
 
 ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_insertStateDoc(

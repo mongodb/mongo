@@ -124,6 +124,11 @@ public:
      */
     void clearCache();
 
+    /**
+     * Loads the given external key into the keys collection cache.
+     */
+    void cacheExternalKey(ExternalKeysCollectionDocument key);
+
 private:
     /**
      * This is responsible for periodically performing refresh in the background.
@@ -174,6 +179,11 @@ private:
          */
         bool hasSeenKeys() const noexcept;
 
+        /**
+         * Returns if the periodic runner has entered shutdown.
+         */
+        bool isInShutdown() const;
+
     private:
         void _doPeriodicRefresh(ServiceContext* service,
                                 std::string threadName,
@@ -182,7 +192,7 @@ private:
         AtomicWord<bool> _hasSeenKeys{false};
 
         // protects all the member variables below.
-        Mutex _mutex = MONGO_MAKE_LATCH("PeriodicRunner::_mutex");
+        mutable Mutex _mutex = MONGO_MAKE_LATCH("PeriodicRunner::_mutex");
         std::shared_ptr<Notification<void>> _refreshRequest;
         stdx::condition_variable _refreshNeededCV;
 

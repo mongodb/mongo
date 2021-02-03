@@ -45,6 +45,7 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/keys_collection_document_gen.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer_util.h"
@@ -512,6 +513,19 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
         for (auto it = first; it != last; it++) {
             ReadWriteConcernDefaults::get(opCtx).observeDirectWriteToConfigSettings(
                 opCtx, it->doc["_id"], it->doc);
+        }
+    } else if (nss == NamespaceString::kExternalKeysCollectionNamespace) {
+        for (auto it = first; it != last; it++) {
+            auto externalKey = ExternalKeysCollectionDocument::parse(
+                IDLParserErrorContext("externalKey"), it->doc);
+            opCtx->recoveryUnit()->onCommit(
+                [this, opCtx, externalKey = std::move(externalKey)](
+                    boost::optional<Timestamp> unusedCommitTime) mutable {
+                    auto validator = LogicalTimeValidator::get(opCtx);
+                    if (validator) {
+                        validator->cacheExternalKey(externalKey);
+                    }
+                });
         }
     }
 }

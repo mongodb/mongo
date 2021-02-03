@@ -204,6 +204,8 @@ var ReplSetTest = function(opts) {
         }
     }
 
+    this.asCluster = asCluster;
+
     /**
      * Returns 'true' if the "conn" has been configured to run without journaling enabled.
      */

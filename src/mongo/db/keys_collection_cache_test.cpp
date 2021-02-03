@@ -47,8 +47,8 @@ namespace {
 
 class CacheTest : public ConfigServerTestFixture {
 protected:
-    const UUID migrationId1 = UUID::gen();
-    const UUID migrationId2 = UUID::gen();
+    const UUID kMigrationId1 = UUID::gen();
+    const UUID kMigrationId2 = UUID::gen();
 
     void setUp() override {
         ConfigServerTestFixture::setUp();
@@ -180,13 +180,13 @@ TEST_F(CacheTest, GetKeyShouldReturnCorrectKeysAfterRefreshDirectClient) {
 
     // Use external keys with the same keyId and expiresAt as the internal key to test that the
     // cache correctly tackles key collisions.
-    ExternalKeysCollectionDocument origKey1(OID::gen(), 1, migrationId1, externalKeysTTLExpiresAt);
+    ExternalKeysCollectionDocument origKey1(OID::gen(), 1, kMigrationId1, externalKeysTTLExpiresAt);
     origKey1.setKeysCollectionDocumentBase(
         {"test", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0))});
     insertDocument(
         operationContext(), NamespaceString::kExternalKeysCollectionNamespace, origKey1.toBSON());
 
-    ExternalKeysCollectionDocument origKey2(OID::gen(), 1, migrationId2, externalKeysTTLExpiresAt);
+    ExternalKeysCollectionDocument origKey2(OID::gen(), 1, kMigrationId2, externalKeysTTLExpiresAt);
     origKey2.setKeysCollectionDocumentBase(
         {"test", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(205, 0))});
     insertDocument(
@@ -394,7 +394,7 @@ TEST_F(CacheTest, RefreshShouldNotGetExternalKeysForOtherPurpose) {
     const auto externalKeysTTLExpiresAt =
         ServiceContext().getFastClockSource()->now() + Seconds(30);
 
-    ExternalKeysCollectionDocument origKey1(OID::gen(), 1, migrationId1, externalKeysTTLExpiresAt);
+    ExternalKeysCollectionDocument origKey1(OID::gen(), 1, kMigrationId1, externalKeysTTLExpiresAt);
     origKey1.setKeysCollectionDocumentBase(
         {"dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0))});
     insertDocument(
@@ -408,7 +408,7 @@ TEST_F(CacheTest, RefreshShouldNotGetExternalKeysForOtherPurpose) {
         ASSERT_EQ(ErrorCodes::KeyNotFound, swKey.getStatus());
     }
 
-    ExternalKeysCollectionDocument origKey2(OID::gen(), 2, migrationId1, externalKeysTTLExpiresAt);
+    ExternalKeysCollectionDocument origKey2(OID::gen(), 2, kMigrationId1, externalKeysTTLExpiresAt);
     origKey2.setKeysCollectionDocumentBase(
         {"test", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(110, 0))});
     insertDocument(
@@ -491,6 +491,32 @@ TEST_F(CacheTest, RefreshCanIncrementallyGetNewKeys) {
         ASSERT_EQ("test", key.getPurpose());
         ASSERT_EQ(Timestamp(110, 0), key.getExpiresAt().asTimestamp());
     }
+}
+
+TEST_F(CacheTest, CacheExternalKeyBasic) {
+    const auto externalKeysTTLExpiresAt =
+        ServiceContext().getFastClockSource()->now() + Seconds(30);
+    KeysCollectionCache cache("test", catalogClient());
+
+    auto swExternalKeys = cache.getExternalKeysById(5, LogicalTime(Timestamp(10, 1)));
+    ASSERT_EQ(ErrorCodes::KeyNotFound, swExternalKeys.getStatus());
+
+    ExternalKeysCollectionDocument externalKey(
+        OID::gen(), 5, kMigrationId1, externalKeysTTLExpiresAt);
+    externalKey.setKeysCollectionDocumentBase(
+        {"test", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(100, 0))});
+
+    cache.cacheExternalKey(externalKey);
+
+    swExternalKeys = cache.getExternalKeysById(5, LogicalTime(Timestamp(10, 1)));
+    ASSERT_OK(swExternalKeys.getStatus());
+    ASSERT_EQ(1, swExternalKeys.getValue().size());
+
+    auto cachedKey = swExternalKeys.getValue().front();
+    ASSERT_EQ(externalKey.getId(), cachedKey.getId());
+    ASSERT_EQ(externalKey.getPurpose(), cachedKey.getPurpose());
+    ASSERT_EQ(externalKey.getExpiresAt().asTimestamp(), cachedKey.getExpiresAt().asTimestamp());
+    ASSERT_EQ(externalKey.getTTLExpiresAt(), cachedKey.getTTLExpiresAt());
 }
 
 }  // namespace

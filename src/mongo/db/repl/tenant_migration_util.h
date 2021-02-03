@@ -140,11 +140,9 @@ ExternalKeysCollectionDocument makeExternalClusterTimeKeyDoc(ServiceContext* ser
  * For each given ExternalKeysCollectionDocument, inserts it if there is not an existing document in
  * admin.system.external_validation_keys for it with the same keyId and replicaSetName. Otherwise,
  * updates the ttlExpiresAt of the existing document if it is less than the new ttlExpiresAt.
- * Refreshes the logical validator's cache before returning.
  */
-void storeExternalClusterTimeKeyDocsAndRefreshCache(
-    std::shared_ptr<executor::ScopedTaskExecutor> executor,
-    std::vector<ExternalKeysCollectionDocument> keyDocs);
+void storeExternalClusterTimeKeyDocs(std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                                     std::vector<ExternalKeysCollectionDocument> keyDocs);
 
 /**
  * Creates a view on the oplog that allows a tenant migration recipient to fetch retryable writes
