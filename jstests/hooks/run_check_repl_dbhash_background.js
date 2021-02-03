@@ -420,6 +420,7 @@
         }
 
         print(errorBlob);
-        throw new Error(`dbhash mismatch (search for the following headings): ${tojson(headings)}`);
+        throw new Error(
+            `data consistency checks (point-in-time) failed (search for the following headings): ${tojson(headings)}`);
     }
 })();
