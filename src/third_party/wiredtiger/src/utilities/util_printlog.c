@@ -15,10 +15,10 @@ usage(void)
       "display key and value items in hexadecimal format", "-l",
       "the start LSN from which the log will be printed, optionally the end LSN can also be "
       "specified",
-      NULL, NULL};
+      "-m", "output log message records only", "-u", "print user data, don't redact", NULL, NULL};
 
     util_usage(
-      "printlog [-x] [-f output-file] [-l start-file,start-offset]|[-l "
+      "printlog [-mux] [-f output-file] [-l start-file,start-offset]|[-l "
       "start-file,start-offset,end-file,end-offset]",
       "options:", options);
     return (1);
@@ -39,8 +39,12 @@ util_printlog(WT_SESSION *session, int argc, char *argv[])
     end_set = start_set = false;
     flags = 0;
     ofile = NULL;
-
-    while ((ch = __wt_getopt(progname, argc, argv, "f:l:mx")) != EOF)
+    /*
+     * By default redact user data. This way if any support people are using this on customer data,
+     * it is redacted unless they make the effort to keep it in. It lessens the risk of doing the
+     * wrong command.
+     */
+    while ((ch = __wt_getopt(progname, argc, argv, "f:l:mux")) != EOF)
         switch (ch) {
         case 'f': /* output file */
             ofile = __wt_optarg;
@@ -61,6 +65,9 @@ util_printlog(WT_SESSION *session, int argc, char *argv[])
             break;
         case 'm': /* messages only */
             LF_SET(WT_TXN_PRINTLOG_MSG);
+            break;
+        case 'u': /* print user data, don't redact */
+            LF_SET(WT_TXN_PRINTLOG_UNREDACT);
             break;
         case 'x': /* hex output */
             LF_SET(WT_TXN_PRINTLOG_HEX);

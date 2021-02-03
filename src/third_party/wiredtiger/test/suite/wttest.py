@@ -26,6 +26,10 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
+# [TEST_TAGS]
+# ignored_file
+# [END_TAGS]
+#
 # WiredTigerTestCase
 #   parent class for all test cases
 #
