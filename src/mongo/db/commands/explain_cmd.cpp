@@ -31,6 +31,7 @@
 
 #include "mongo/db/command_can_run_here.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/explain_gen.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/util/str.h"
 
@@ -151,16 +152,15 @@ private:
 std::unique_ptr<CommandInvocation> CmdExplain::parse(OperationContext* opCtx,
                                                      const OpMsgRequest& request) {
     CommandHelpers::uassertNoDocumentSequences(getName(), request);
-    std::string dbname = request.getDatabase().toString();
-    const BSONObj& cmdObj = request.body;
-    uassert(ErrorCodes::FailedToParse,
-            "Unrecognized field 'jsonSchema'. This command may be meant for a mongocryptd process.",
-            !cmdObj.hasField("jsonSchema"_sd));
-    ExplainOptions::Verbosity verbosity = uassertStatusOK(ExplainOptions::parseCmdBSON(cmdObj));
-    uassert(ErrorCodes::BadValue,
-            "explain command requires a nested object",
-            cmdObj.firstElement().type() == Object);
-    auto explainedObj = cmdObj.firstElement().Obj();
+
+    // To enforce API versioning
+    auto cmdObj = ExplainCmd::parse(
+        IDLParserErrorContext(ExplainCmd::kCommandName,
+                              APIParameters::get(opCtx).getAPIStrict().value_or(false)),
+        request.body);
+    std::string dbname = cmdObj.getDbName().toString();
+    ExplainOptions::Verbosity verbosity = cmdObj.getVerbosity();
+    auto explainedObj = cmdObj.getCommandParameter();
 
     // Extract 'comment' field from the 'explainedObj' only if there is no top-level comment.
     auto commentField = explainedObj["comment"];

@@ -37,66 +37,10 @@
 
 namespace mongo {
 
-constexpr StringData ExplainOptions::kCommandName;
 constexpr StringData ExplainOptions::kVerbosityName;
-constexpr StringData ExplainOptions::kQueryPlannerVerbosityStr;
-constexpr StringData ExplainOptions::kExecStatsVerbosityStr;
-constexpr StringData ExplainOptions::kAllPlansExecutionVerbosityStr;
 
 StringData ExplainOptions::verbosityString(ExplainOptions::Verbosity verbosity) {
-    switch (verbosity) {
-        case Verbosity::kQueryPlanner:
-            return kQueryPlannerVerbosityStr;
-        case Verbosity::kExecStats:
-            return kExecStatsVerbosityStr;
-        case Verbosity::kExecAllPlans:
-            return kAllPlansExecutionVerbosityStr;
-        default:
-            MONGO_UNREACHABLE;
-    }
-}
-
-StatusWith<ExplainOptions::Verbosity> ExplainOptions::parseCmdBSON(const BSONObj& cmdObj) {
-    auto verbosity = Verbosity::kExecAllPlans;
-    for (auto&& field : cmdObj) {
-        auto fieldName = field.fieldNameStringData();
-
-        if (fieldName == kCommandName) {
-            if (BSONType::Object != field.type()) {
-                return Status(ErrorCodes::FailedToParse,
-                              "explain command requires a nested object");
-            }
-        } else if (fieldName == kVerbosityName) {
-            if (field.type() != BSONType::String) {
-                return Status(ErrorCodes::FailedToParse, "explain verbosity must be a string");
-            }
-
-            auto verbStr = field.valueStringData();
-            if (verbStr == kQueryPlannerVerbosityStr) {
-                verbosity = Verbosity::kQueryPlanner;
-            } else if (verbStr == kExecStatsVerbosityStr) {
-                verbosity = Verbosity::kExecStats;
-            } else if (verbStr != kAllPlansExecutionVerbosityStr) {
-                return Status(ErrorCodes::FailedToParse,
-                              str::stream()
-                                  << "verbosity string must be one of {'"
-                                  << kQueryPlannerVerbosityStr << "', '" << kExecStatsVerbosityStr
-                                  << "', '" << kAllPlansExecutionVerbosityStr << "'}");
-            }
-        } else if (fieldName == "collation" || fieldName == "use44SortKeys" ||
-                   fieldName == "useNewUpsert") {
-            // TODO SERVER-48560: we ingest these fields for compatibility with 4.4,
-            // whose mongoS incorrectly adds them to the explain command for an
-            // aggregation instead of adding them into the wrapped aggregate command
-            // itself. Remove this block when 5.0 becomes last-lts.
-            continue;
-        } else if (!isGenericArgument(fieldName)) {
-            return Status(ErrorCodes::InvalidOptions,
-                          str::stream() << "unexpected field '" << fieldName
-                                        << "' in explain command object");
-        }
-    }
-    return verbosity;
+    return Verbosity_serializer(verbosity);
 }
 
 BSONObj ExplainOptions::toBSON(ExplainOptions::Verbosity verbosity) {

@@ -48,5 +48,5 @@ assertCommandFailsWithCorrectError(
 
 // Explain
 assertCommandFailsWithCorrectError({explain: {count: coll.getName()}, jsonSchema: {}},
-                                   [ErrorCodes.FailedToParse, 40415]);
+                                   [ErrorCodes.FailedToParse, 40415, 4662500]);
 }());

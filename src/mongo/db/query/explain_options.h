@@ -31,6 +31,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/query/explain_verbosity_gen.h"
 
 namespace mongo {
 
@@ -44,42 +45,14 @@ public:
      * The various supported verbosity levels for explain. The order is significant: the enum values
      * are assigned in order of increasing verbosity.
      */
-    enum class Verbosity {
-        // At all verbosities greater than or equal to QUERY_PLANNER, we display information about
-        // the plan selected and alternate rejected plans. Does not include any execution- related
-        // info. String alias is "queryPlanner".
-        kQueryPlanner = 0,
+    using Verbosity = explain::VerbosityEnum;
 
-        // At all verbosities greater than or equal to EXEC_STATS, we display a section of output
-        // containing both overall execution stats, and stats per stage in the execution tree.
-        // String alias is "execStats".
-        kExecStats = 1,
-
-        // At this verbosity level, we generate the execution stats for each rejected plan as well
-        // as the winning plan. String alias is "allPlansExecution".
-        kExecAllPlans = 2,
-    };
-
-    static constexpr StringData kCommandName = "explain"_sd;
     static constexpr StringData kVerbosityName = "verbosity"_sd;
-
-    // String representations for verbosity levels.
-    static constexpr StringData kQueryPlannerVerbosityStr = "queryPlanner"_sd;
-    static constexpr StringData kExecStatsVerbosityStr = "executionStats"_sd;
-    static constexpr StringData kAllPlansExecutionVerbosityStr = "allPlansExecution"_sd;
 
     /**
      * Converts an explain verbosity to its string representation.
      */
     static StringData verbosityString(ExplainOptions::Verbosity verbosity);
-
-    /**
-     * Does some basic validation of the command BSON, then extracts and returns the explain
-     * verbosity.
-     *
-     * Returns a non-OK status if parsing fails.
-     */
-    static StatusWith<ExplainOptions::Verbosity> parseCmdBSON(const BSONObj& cmdObj);
 
     /**
      * Converts 'verbosity' to its corresponding representation as a BSONObj containing explain

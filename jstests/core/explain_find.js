@@ -1,4 +1,9 @@
-// Tests for explaining find through the explain command.
+/**
+ * Tests for explaining find through the explain command.
+ * @tags: [
+ *   requires_fcv_49
+ * ]
+ */
 
 (function() {
 "use strict";
@@ -38,10 +43,10 @@ if (!db.getMongo().useReadCommands()) {
 let error = assert.throws(function() {
     t.explain("foobar").find().finish();
 });
-assert.commandFailedWithCode(error, ErrorCodes.FailedToParse);
+assert.commandFailedWithCode(error, ErrorCodes.BadValue);
 
 error = assert.throws(function() {
     t.find().explain("foobar");
 });
-assert.commandFailedWithCode(error, ErrorCodes.FailedToParse);
+assert.commandFailedWithCode(error, ErrorCodes.BadValue);
 }());

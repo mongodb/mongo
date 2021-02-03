@@ -126,6 +126,7 @@ env.Library(
     target="explain_options",
     source=[
         "explain_options.cpp",
+        "explain_verbosity.idl"
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
@@ -289,7 +290,6 @@ env.CppUnitTest(
         "classic_stage_builder_test.cpp",
         "count_command_test.cpp",
         "cursor_response_test.cpp",
-        "explain_options_test.cpp",
         "get_executor_test.cpp",
         "getmore_request_test.cpp",
         "hint_parser_test.cpp",

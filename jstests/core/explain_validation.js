@@ -18,7 +18,7 @@ assert.commandWorked(testDB.test.createIndex({a: 1}));
 
 // Test that an unknown field is rejected during explain command parsing.
 assert.commandFailedWithCode(testDB.runCommand({explain: {find: "test"}, unknownField: true}),
-                             ErrorCodes.InvalidOptions);
+                             40415);
 
 // Test that a generic argument will be accepted by command parsing.
 assert.commandWorked(testDB.runCommand({explain: {find: "test"}, comment: true}));

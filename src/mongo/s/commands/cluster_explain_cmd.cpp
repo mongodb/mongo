@@ -30,6 +30,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/commands.h"
+#include "mongo/db/explain_gen.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/idl/command_generic_argument.h"
 #include "mongo/s/query/cluster_find.h"
@@ -172,17 +173,18 @@ BSONObj makeExplainedObj(const BSONObj& outerObj, StringData dbName) {
 std::unique_ptr<CommandInvocation> ClusterExplainCmd::parse(OperationContext* opCtx,
                                                             const OpMsgRequest& request) {
     CommandHelpers::uassertNoDocumentSequences(getName(), request);
-    std::string dbName = request.getDatabase().toString();
-    const BSONObj& cmdObj = request.body;
-    uassert(ErrorCodes::FailedToParse,
-            "Unrecognized field 'jsonSchema'. This command may be meant for a mongocryptd process.",
-            !cmdObj.hasField("jsonSchema"_sd));
-    ExplainOptions::Verbosity verbosity = uassertStatusOK(ExplainOptions::parseCmdBSON(cmdObj));
 
+    // To enforce API versioning
+    auto cmdObj = ExplainCmd::parse(
+        IDLParserErrorContext(ExplainCmd::kCommandName,
+                              APIParameters::get(opCtx).getAPIStrict().value_or(false)),
+        request.body);
+    std::string dbName = cmdObj.getDbName().toString();
+    ExplainOptions::Verbosity verbosity = cmdObj.getVerbosity();
     // This is the nested command which we are explaining. We need to propagate generic
     // arguments into the inner command since it is what is passed to the virtual
     // CommandInvocation::explain() method.
-    const BSONObj explainedObj = makeExplainedObj(cmdObj, dbName);
+    const BSONObj explainedObj = makeExplainedObj(request.body, dbName);
 
     // Extract 'comment' field from the 'explainedObj' only if there is no top-level comment.
     auto commentField = explainedObj["comment"];
