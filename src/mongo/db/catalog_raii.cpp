@@ -172,6 +172,10 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
 
     _view = ViewCatalog::get(db)->lookup(opCtx, _resolvedNss.ns());
     uassert(ErrorCodes::CommandNotSupportedOnView,
+            str::stream() << "Namespace " << _resolvedNss.ns() << " is a timeseries collection",
+            !_view || viewMode == AutoGetCollectionViewMode::kViewsPermitted ||
+                !_view->timeseries());
+    uassert(ErrorCodes::CommandNotSupportedOnView,
             str::stream() << "Namespace " << _resolvedNss.ns() << " is a view, not a collection",
             !_view || viewMode == AutoGetCollectionViewMode::kViewsPermitted);
 }
@@ -279,6 +283,10 @@ AutoGetCollectionLockFree::AutoGetCollectionLockFree(OperationContext* opCtx,
     }
 
     _view = viewCatalog->lookup(opCtx, _resolvedNss.ns());
+    uassert(ErrorCodes::CommandNotSupportedOnView,
+            str::stream() << "Namespace " << _resolvedNss.ns() << " is a timeseries collection",
+            !_view || viewMode == AutoGetCollectionViewMode::kViewsPermitted ||
+                !_view->timeseries());
     uassert(ErrorCodes::CommandNotSupportedOnView,
             str::stream() << "Namespace " << _resolvedNss.ns() << " is a view, not a collection",
             !_view || viewMode == AutoGetCollectionViewMode::kViewsPermitted);

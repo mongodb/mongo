@@ -572,10 +572,17 @@ Status runAggregate(OperationContext* opCtx,
             // a stream on an entire db or across the cluster.
             if (!origNss.isCollectionlessAggregateNS()) {
                 auto viewCatalog = DatabaseHolder::get(opCtx)->getViewCatalog(opCtx, origNss.db());
-                uassert(ErrorCodes::CommandNotSupportedOnView,
-                        str::stream()
-                            << "Namespace " << origNss.ns() << " is a view, not a collection",
-                        !viewCatalog || !viewCatalog->lookup(opCtx, origNss.ns()));
+                if (viewCatalog) {
+                    auto view = viewCatalog->lookup(opCtx, origNss.ns());
+                    uassert(ErrorCodes::CommandNotSupportedOnView,
+                            str::stream()
+                                << "Namespace " << origNss.ns() << " is a timeseries collection",
+                            !view || !view->timeseries());
+                    uassert(ErrorCodes::CommandNotSupportedOnView,
+                            str::stream()
+                                << "Namespace " << origNss.ns() << " is a view, not a collection",
+                            !view);
+                }
             }
 
             // If the user specified an explicit collation, adopt it; otherwise, use the simple
