@@ -1244,6 +1244,23 @@ buildvariants:
     - name: genny_patch_tasks
     - name: genny_auto_tasks
 
+- name: linux-shard-lite-all-feature-flags
+  display_name: Linux Shard Lite (all feature flags)
+  batchtime: 10080  # 7 days
+  modules: *modules
+  expansions:
+    mongodb_setup: shard-lite-all-feature-flags
+    infrastructure_provisioning: shard-lite
+    platform: linux
+    project_dir: *project_dir
+    authentication: enabled
+    storageEngine: wiredTiger
+  run_on:
+    - "rhel70-perf-shard-lite"
+  depends_on: *_compile_amazon2
+  tasks:
+    - name: genny_patch_tasks
+    - name: genny_auto_tasks
 
 - name: linux-3-node-replSet
   display_name: Linux 3-Node ReplSet
@@ -1332,12 +1349,14 @@ buildvariants:
         variant: compile-amazon2
   tasks: *3nodetasks
 
+# Note that the "disabled-feature-flags" part of the name is kept to avoid breaking
+# history even though the display name is "all feature flags"
 - name: linux-3-node-replSet-disabled-feature-flags
-  display_name: Linux 3-Node ReplSet (disabled feature flags)
+  display_name: Linux 3-Node ReplSet (all feature flags)
   batchtime: 10080  # 7 days
   modules: *modules
   expansions:
-    mongodb_setup: replica-disabled-feature-flags
+    mongodb_setup: replica-all-feature-flags
     infrastructure_provisioning: replica
     platform: linux
     project_dir: *project_dir
