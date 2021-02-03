@@ -84,7 +84,6 @@ void removeCollMetadataFromConfig(OperationContext* opCtx,
 void shardedRenameMetadata(OperationContext* opCtx,
                            const NamespaceString& fromNss,
                            const NamespaceString& toNss) {
-    // TODO SERVER-53871: enclose the following operations into a transaction
     auto catalogClient = Grid::get(opCtx)->catalogClient();
     auto collType = catalogClient->getCollection(opCtx, fromNss);
 
