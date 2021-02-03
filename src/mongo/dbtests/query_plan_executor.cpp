@@ -222,8 +222,7 @@ TEST_F(PlanExecutorTest, DropIndexScanAgg) {
         collection, std::move(innerExec), _expCtx, DocumentSourceCursor::CursorType::kRegular);
     auto pipeline = Pipeline::create({cursorSource}, _expCtx);
 
-    auto outerExec =
-        plan_executor_factory::make(_expCtx, std::move(pipeline), false /* isChangeStream */);
+    auto outerExec = plan_executor_factory::make(_expCtx, std::move(pipeline));
 
     dropCollection();
 

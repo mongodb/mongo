@@ -205,6 +205,10 @@ bool handleCursorCommand(OperationContext* opCtx,
         }
 
         if (state == PlanExecutor::IS_EOF) {
+            // If this executor produces a postBatchResumeToken, add it to the cursor response. We
+            // call this on EOF because the PBRT may advance even when there are no further results.
+            responseBuilder.setPostBatchResumeToken(exec->getPostBatchResumeToken());
+
             if (!cursor->isTailable()) {
                 // Make it an obvious error to use cursor or executor after this point.
                 cursor = nullptr;
@@ -795,10 +799,12 @@ Status runAggregate(OperationContext* opCtx,
                 // There are separate ExpressionContexts for each exchange pipeline, so make sure to
                 // pass the pipeline's ExpressionContext to the plan executor factory.
                 auto pipelineExpCtx = pipelineIt->getContext();
-                execs.emplace_back(
-                    plan_executor_factory::make(std::move(pipelineExpCtx),
-                                                std::move(pipelineIt),
-                                                liteParsedPipeline.hasChangeStream()));
+
+                execs.emplace_back(plan_executor_factory::make(
+                    std::move(pipelineExpCtx),
+                    std::move(pipelineIt),
+                    aggregation_request_helper::getResumableScanType(
+                        request, liteParsedPipeline.hasChangeStream())));
             }
 
             // With the pipelines created, we can relinquish locks as they will manage the locks

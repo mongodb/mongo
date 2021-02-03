@@ -58,7 +58,7 @@ const Document kDefaultCursorOptionDocument{
 
 TEST(AggregationRequestTest, ShouldParseAllKnownOptions) {
     // Using oplog namespace so that validation of $_requestReshardingResumeToken succeeds.
-    NamespaceString nss("oplog.rs");
+    NamespaceString nss("local.oplog.rs");
     BSONObj inputBson = fromjson(
         "{aggregate: 'oplog.rs', pipeline: [{$match: {a: 'abc'}}], explain: false, allowDiskUse: "
         "true, fromMongos: true, "
@@ -489,10 +489,19 @@ TEST(AggregationRequestTest, ShouldRejectExplainExecStatsVerbosityWithWriteConce
                       .getStatus());
 }
 
+TEST(AggregationRequestTest, ShouldRejectRequestReshardingResumeTokenIfNonBooleanType) {
+    NamespaceString nss("a.collection");
+    const BSONObj inputBson = fromjson(
+        "{aggregate: 'collection', pipeline: [], $_requestReshardingResumeToken: 'yes', $db: 'a', "
+        "cursor: {}}");
+    ASSERT_NOT_OK(aggregation_request_helper::parseFromBSONForTests(nss, inputBson).getStatus());
+}
+
 TEST(AggregationRequestTest, ShouldRejectRequestReshardingResumeTokenIfNonOplogNss) {
     NamespaceString nss("a.collection");
     const BSONObj inputBson = fromjson(
-        "{aggregate: 'collection', pipeline: [], $_requestReshardingResumeToken: true, $db: 'a'}");
+        "{aggregate: 'collection', pipeline: [], $_requestReshardingResumeToken: true, $db: 'a', "
+        "cursor: {}}");
     ASSERT_NOT_OK(aggregation_request_helper::parseFromBSONForTests(nss, inputBson).getStatus());
 }
 
@@ -561,14 +570,14 @@ TEST(AggregationRequestTest, ParseFromBSONOverloadsShouldProduceIdenticalRequest
 TEST(AggregationRequestTest, ShouldRejectExchangeNotObject) {
     NamespaceString nss("a.collection");
     const BSONObj inputBson =
-        fromjson("{aggregate: 'collection', pipeline: [], exchage: '42', $db: 'a'}");
+        fromjson("{aggregate: 'collection', pipeline: [], exchange: '42', $db: 'a', cursor: {}}");
     ASSERT_NOT_OK(aggregation_request_helper::parseFromBSONForTests(nss, inputBson).getStatus());
 }
 
 TEST(AggregationRequestTest, ShouldRejectExchangeInvalidSpec) {
     NamespaceString nss("a.collection");
     const BSONObj inputBson =
-        fromjson("{aggregate: 'collection', pipeline: [], exchage: {}, $db: 'a'}");
+        fromjson("{aggregate: 'collection', pipeline: [], exchange: {}, $db: 'a', cursor: {}}");
     ASSERT_NOT_OK(aggregation_request_helper::parseFromBSONForTests(nss, inputBson).getStatus());
 }
 
@@ -583,7 +592,8 @@ TEST(AggregationRequestTest, ShouldRejectInvalidWriteConcern) {
 TEST(AggregationRequestTest, ShouldRejectInvalidCollectionUUID) {
     NamespaceString nss("a.collection");
     const BSONObj inputBSON = fromjson(
-        "{aggregate: 'collection', pipeline: [{$match: {}}], collectionUUID: 2, $db: 'a'}");
+        "{aggregate: 'collection', pipeline: [{$match: {}}], collectionUUID: 2, $db: 'a', cursor: "
+        "{}}");
     ASSERT_EQUALS(
         aggregation_request_helper::parseFromBSONForTests(nss, inputBSON).getStatus().code(),
         ErrorCodes::TypeMismatch);

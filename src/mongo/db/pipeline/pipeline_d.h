@@ -122,6 +122,12 @@ public:
     static Timestamp getLatestOplogTimestamp(const Pipeline* pipeline);
 
     /**
+     * Retrieves postBatchResumeToken from the 'pipeline' if it is available. Returns an empty
+     * object otherwise.
+     */
+    static BSONObj getPostBatchResumeToken(const Pipeline* pipeline);
+
+    /**
      * Resolves the collator to either the user-specified collation or, if none was specified, to
      * the collection-default collation.
      */

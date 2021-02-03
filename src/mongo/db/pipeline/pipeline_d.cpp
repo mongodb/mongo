@@ -589,9 +589,11 @@ PipelineD::buildInnerQueryExecutorGeneric(const CollectionPtr& collection,
         ? DocumentSourceCursor::CursorType::kEmptyDocuments
         : DocumentSourceCursor::CursorType::kRegular;
 
-    // If this is a change stream pipeline, make sure that we tell DSCursor to track the oplog time.
+    // If this is a change stream pipeline or a resharding resume token has been requested, make
+    // sure that we tell DSCursor to track the oplog time.
     const bool trackOplogTS =
-        (pipeline->peekFront() && pipeline->peekFront()->constraints().isChangeStreamStage());
+        (pipeline->peekFront() && pipeline->peekFront()->constraints().isChangeStreamStage()) ||
+        (aggRequest && aggRequest->getRequestReshardingResumeToken());
 
     auto attachExecutorCallback =
         [cursorType, trackOplogTS](const CollectionPtr& collection,
@@ -804,5 +806,13 @@ Timestamp PipelineD::getLatestOplogTimestamp(const Pipeline* pipeline) {
         return docSourceCursor->getLatestOplogTimestamp();
     }
     return Timestamp();
+}
+
+BSONObj PipelineD::getPostBatchResumeToken(const Pipeline* pipeline) {
+    if (auto docSourceCursor =
+            dynamic_cast<DocumentSourceCursor*>(pipeline->_sources.front().get())) {
+        return docSourceCursor->getPostBatchResumeToken();
+    }
+    return BSONObj{};
 }
 }  // namespace mongo

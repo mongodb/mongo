@@ -38,6 +38,7 @@
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/exchange_spec_gen.h"
 #include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
+#include "mongo/db/pipeline/plan_executor_pipeline.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/idl/basic_types_gen.h"
@@ -119,6 +120,12 @@ BSONObj serializeToCommandObj(const AggregateCommand& request);
  */
 void validateRequestForAPIVersion(const OperationContext* opCtx, const AggregateCommand& request);
 
+/**
+ * Returns the type of resumable scan required by this aggregation, if applicable. Otherwise returns
+ * ResumableScanType::kNone.
+ */
+PlanExecutorPipeline::ResumableScanType getResumableScanType(const AggregateCommand& request,
+                                                             bool isChangeStream);
 }  // namespace aggregation_request_helper
 
 /**

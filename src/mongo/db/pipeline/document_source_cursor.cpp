@@ -41,6 +41,7 @@
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/resharding/resume_token_gen.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
 
@@ -164,9 +165,10 @@ void DocumentSourceCursor::loadBatch() {
 
         invariant(state == PlanExecutor::IS_EOF);
 
-        // Special case for tailable cursor -- EOF doesn't preclude more results, so keep
-        // the PlanExecutor alive.
-        if (pExpCtx->isTailableAwaitData()) {
+        // Keep the inner PlanExecutor alive if the cursor is tailable, since more results may
+        // become available in the future, or if we are tracking the latest oplog timestamp, since
+        // we will need to retrieve the last timestamp the executor observed before hitting EOF.
+        if (_trackOplogTS || pExpCtx->isTailableAwaitData()) {
             _exec->saveState();
             return;
         }
@@ -176,8 +178,8 @@ void DocumentSourceCursor::loadBatch() {
         throw;
     }
 
-    // If we got here, there won't be any more documents, so destroy our PlanExecutor. Note we must
-    // hold a collection lock to destroy '_exec'.
+    // If we got here, there won't be any more documents and we no longer need our PlanExecutor, so
+    // destroy it.
     cleanupExecutor();
 }
 
@@ -276,6 +278,13 @@ void DocumentSourceCursor::cleanupExecutor() {
     if (!pExpCtx->explain) {
         _exec.reset();
     }
+}
+
+BSONObj DocumentSourceCursor::getPostBatchResumeToken() const {
+    if (_trackOplogTS) {
+        return ResumeTokenOplogTimestamp{getLatestOplogTimestamp()}.toBSON();
+    }
+    return BSONObj{};
 }
 
 DocumentSourceCursor::~DocumentSourceCursor() {

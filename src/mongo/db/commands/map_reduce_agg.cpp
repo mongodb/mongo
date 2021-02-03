@@ -130,8 +130,7 @@ bool runAggregationMapReduce(OperationContext* opCtx,
         return expCtx->mongoProcessInterface->attachCursorSourceToPipelineForLocalRead(
             pipeline.release());
     }();
-    auto exec = plan_executor_factory::make(
-        expCtx, std::move(runnablePipeline), false /* isChangeStream */);
+    auto exec = plan_executor_factory::make(expCtx, std::move(runnablePipeline));
     auto&& explainer = exec->getPlanExplainer();
 
     {
