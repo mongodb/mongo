@@ -414,7 +414,7 @@ public:
         /**
          * Updates the state doc in the database and waits for that to be propagated to a majority.
          */
-        SharedSemiFuture<void> _updateStateDocForMajority(WithLock lk) const;
+        SemiFuture<void> _updateStateDocForMajority(WithLock lk) const;
 
         /*
          * Returns the majority OpTime on the donor node that 'client' is connected to.
