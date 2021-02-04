@@ -27,8 +27,12 @@ function isIgnorableError(codeName) {
 /**
  * Returns true if the error code indicates the node is currently shutting down.
  */
-function isShutdownError(code) {
-    return code === ErrorCodes.ShutdownInProgress || code === ErrorCodes.InterruptedAtShutdown;
+function isShutdownError(error) {
+    // TODO (SERVER-54026): Remove check for error message once the shell correctly
+    // propagates the error code.
+    return error.code === ErrorCodes.ShutdownInProgress ||
+        error.code === ErrorCodes.InterruptedAtShutdown ||
+        error.message.includes("The server is in quiesce mode and will shut down");
 }
 
 /**
@@ -149,7 +153,7 @@ try {
                    return regex.test(e.message);
                })) {
         jsTestLog("Ignoring replica set monitor error" + tojson(e));
-    } else if (isShutdownError(e.code)) {
+    } else if (isShutdownError(e)) {
         // It's possible that the primary we passed in gets killed by the kill primary hook.
         // During shutdown, mongod will respond to incoming hello requests with ShutdownInProgress
         // or InterruptedAtShutdown. This hook should ignore both cases and wait until we have a
