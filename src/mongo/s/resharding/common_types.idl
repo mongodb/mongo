@@ -139,6 +139,16 @@ structs:
                              coordinator itself." 
                 optional: true 
 
+    ReshardingCloneSize:
+        description: "Not meant to be used directly. Only use internal fields."
+        fields:
+            bytesToClone:
+                type: long
+                optional: true
+            documentsToClone:
+                type: long
+                optional: true
+
     ReshardingSourceId:
         description: "Identifier for a shard involved in a particular resharding operation."
         fields:
