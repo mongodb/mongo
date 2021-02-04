@@ -67,6 +67,8 @@
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/commands/feature_compatibility_version_gen.h"
 #include "mongo/db/commands/shutdown.h"
+#include "mongo/db/commands/test_commands.h"
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/flow_control_ticketholder.h"
 #include "mongo/db/concurrency/lock_state.h"
@@ -153,6 +155,7 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/backup_cursor_hooks.h"
 #include "mongo/db/storage/control/storage_control.h"
+#include "mongo/db/storage/durable_history_pin.h"
 #include "mongo/db/storage/encryption_hooks.h"
 #include "mongo/db/storage/flow_control.h"
 #include "mongo/db/storage/flow_control_parameters_gen.h"
@@ -490,6 +493,11 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
 
     if (gFlowControlEnabled.load()) {
         LOGV2(20536, "Flow Control is enabled on this deployment");
+    }
+
+    {
+        Lock::GlobalWrite globalLk(startupOpCtx.get());
+        DurableHistoryRegistry::get(serviceContext)->reconcilePins(startupOpCtx.get());
     }
 
     // Notify the storage engine that startup is completed before repair exits below, as repair sets
@@ -998,8 +1006,11 @@ void setUpReplication(ServiceContext* serviceContext) {
 void setUpObservers(ServiceContext* serviceContext) {
     auto opObserverRegistry = std::make_unique<OpObserverRegistry>();
     if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
+        DurableHistoryRegistry::get(serviceContext)
+            ->registerPin(std::make_unique<ReshardingHistoryHook>());
         opObserverRegistry->addObserver(std::make_unique<OpObserverShardingImpl>());
         opObserverRegistry->addObserver(std::make_unique<ShardServerOpObserver>());
+        opObserverRegistry->addObserver(std::make_unique<ReshardingOpObserver>());
     } else if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
         opObserverRegistry->addObserver(std::make_unique<OpObserverImpl>());
         opObserverRegistry->addObserver(std::make_unique<ConfigServerOpObserver>());
@@ -1380,6 +1391,16 @@ int mongod_main(int argc, char* argv[]) {
             quickExit(EXIT_FAILURE);
         }
     }();
+
+    {
+        // Create the durable history registry prior to calling the `setUp*` methods. They may
+        // depend on it existing at this point.
+        DurableHistoryRegistry::set(service, std::make_unique<DurableHistoryRegistry>());
+        DurableHistoryRegistry* registry = DurableHistoryRegistry::get(service);
+        if (getTestCommandsEnabled()) {
+            registry->registerPin(std::make_unique<TestingDurableHistoryPin>());
+        }
+    }
 
     setUpCollectionShardingState(service);
     setUpCatalog(service);

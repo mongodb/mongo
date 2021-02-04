@@ -46,6 +46,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/elapsed_tracker.h"
 
 namespace mongo {
@@ -345,10 +346,18 @@ public:
         return _clockSource;
     }
 
-    StatusWith<Timestamp> pinOldestTimestamp(const std::string& requestingServiceName,
+    StatusWith<Timestamp> pinOldestTimestamp(OperationContext* opCtx,
+                                             const std::string& requestingServiceName,
                                              Timestamp requestedTimestamp,
                                              bool roundUpIfTooOld) override;
 
+private:
+    StatusWith<Timestamp> _pinOldestTimestamp(WithLock,
+                                              const std::string& requestingServiceName,
+                                              Timestamp requestedTimestamp,
+                                              bool roundUpIfTooOld);
+
+public:
     void unpinOldestTimestamp(const std::string& requestingServiceName) override;
 
     std::map<std::string, Timestamp> getPinnedTimestampRequests();

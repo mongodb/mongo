@@ -532,8 +532,13 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
             // 1) The feature stores the desired pin timestamp in some local collection.
             // 2) This temporary pinning lasts long enough for the catalog to be loaded and
             //    accessed.
-            uassertStatusOK(pinOldestTimestamp(
-                kPinOldestTimestampAtStartupName, Timestamp(_oldestTimestamp.load()), false));
+            {
+                stdx::lock_guard<Latch> lk(_oldestTimestampPinRequestsMutex);
+                uassertStatusOK(_pinOldestTimestamp(lk,
+                                                    kPinOldestTimestampAtStartupName,
+                                                    Timestamp(_oldestTimestamp.load()),
+                                                    false));
+            }
 
             setStableTimestamp(_recoveryTimestamp, false);
 
@@ -2342,7 +2347,10 @@ Timestamp WiredTigerKVEngine::getPinnedOplog() const {
 }
 
 StatusWith<Timestamp> WiredTigerKVEngine::pinOldestTimestamp(
-    const std::string& requestingServiceName, Timestamp requestedTimestamp, bool roundUpIfTooOld) {
+    OperationContext* opCtx,
+    const std::string& requestingServiceName,
+    Timestamp requestedTimestamp,
+    bool roundUpIfTooOld) {
     stdx::lock_guard<Latch> lock(_oldestTimestampPinRequestsMutex);
     Timestamp oldest = getOldestTimestamp();
     LOGV2(5380104,
@@ -2352,6 +2360,40 @@ StatusWith<Timestamp> WiredTigerKVEngine::pinOldestTimestamp(
           "roundUpIfTooOld"_attr = roundUpIfTooOld,
           "currOldestTs"_attr = oldest);
 
+    Timestamp previousTimestamp = _oldestTimestampPinRequests[requestingServiceName];
+    auto swPinnedTimestamp =
+        _pinOldestTimestamp(lock, requestingServiceName, requestedTimestamp, roundUpIfTooOld);
+    if (!swPinnedTimestamp.isOK()) {
+        return swPinnedTimestamp;
+    }
+
+    if (opCtx->lockState()->inAWriteUnitOfWork()) {
+        // If we've moved the pin and are in a `WriteUnitOfWork`, assume the caller has a write that
+        // should be atomic with this pin request. If the `WriteUnitOfWork` is rolled back, either
+        // unpin the oldest timestamp or repin the previous value.
+        opCtx->recoveryUnit()->onRollback(
+            [this, svcName = requestingServiceName, previousTimestamp]() {
+                if (previousTimestamp.isNull()) {
+                    unpinOldestTimestamp(svcName);
+                } else {
+                    stdx::lock_guard<Latch> lock(_oldestTimestampPinRequestsMutex);
+                    // When a write is updating the value from an earlier pin to a later one, use
+                    // rounding to make a best effort to repin the earlier value.
+                    invariant(_pinOldestTimestamp(lock, svcName, previousTimestamp, true).isOK());
+                }
+            });
+    }
+
+    return swPinnedTimestamp;
+}
+
+StatusWith<Timestamp> WiredTigerKVEngine::_pinOldestTimestamp(
+    WithLock,
+    const std::string& requestingServiceName,
+    Timestamp requestedTimestamp,
+    bool roundUpIfTooOld) {
+
+    Timestamp oldest = getOldestTimestamp();
     if (requestedTimestamp < oldest) {
         if (roundUpIfTooOld) {
             requestedTimestamp = oldest;
@@ -2363,7 +2405,6 @@ StatusWith<Timestamp> WiredTigerKVEngine::pinOldestTimestamp(
     }
 
     _oldestTimestampPinRequests[requestingServiceName] = requestedTimestamp;
-
     return {requestedTimestamp};
 }
 
@@ -2371,9 +2412,10 @@ void WiredTigerKVEngine::unpinOldestTimestamp(const std::string& requestingServi
     stdx::lock_guard<Latch> lock(_oldestTimestampPinRequestsMutex);
     auto it = _oldestTimestampPinRequests.find(requestingServiceName);
     if (it == _oldestTimestampPinRequests.end()) {
-        LOGV2_WARNING(5380105,
-                      "The requested service had nothing to unpin",
-                      "service"_attr = requestingServiceName);
+        LOGV2_DEBUG(2,
+                    5380105,
+                    "The requested service had nothing to unpin",
+                    "service"_attr = requestingServiceName);
         return;
     }
     LOGV2(5380103,

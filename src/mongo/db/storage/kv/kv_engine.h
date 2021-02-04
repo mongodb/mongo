@@ -386,7 +386,8 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    virtual StatusWith<Timestamp> pinOldestTimestamp(const std::string& requestingServiceName,
+    virtual StatusWith<Timestamp> pinOldestTimestamp(OperationContext* opCtx,
+                                                     const std::string& requestingServiceName,
                                                      Timestamp requestedTimestamp,
                                                      bool roundUpIfTooOld) {
         MONGO_UNREACHABLE;

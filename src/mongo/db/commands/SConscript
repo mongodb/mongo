@@ -365,7 +365,6 @@ env.Library(
     ],
 )
 
-# Commands required by the shell to connect
 env.Library(
     target="shell_protocol",
     source=[
@@ -376,6 +375,8 @@ env.Library(
         '$BUILD_DIR/mongo/db/catalog/catalog_helpers',
         '$BUILD_DIR/mongo/db/catalog/collection',
         '$BUILD_DIR/mongo/db/commands',
+        '$BUILD_DIR/mongo/db/db_raii',
+        '$BUILD_DIR/mongo/db/ops/write_ops_exec',
         'test_commands_enabled',
     ],
 )

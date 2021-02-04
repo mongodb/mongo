@@ -675,8 +675,12 @@ public:
      * | requested >= oldest | false/true      | <OK, requested timestamp> |
      * | requested < oldest  | false           | <SnapshotTooOld>          |
      * | requested < oldest  | true            | <OK, oldest timestamp>    |
+     *
+     * If the input OperationContext is in a WriteUnitOfWork, an `onRollback` handler will be
+     * registered to return the pin for the `requestingServiceName` to the previous value.
      */
-    virtual StatusWith<Timestamp> pinOldestTimestamp(const std::string& requestingServiceName,
+    virtual StatusWith<Timestamp> pinOldestTimestamp(OperationContext* opCtx,
+                                                     const std::string& requestingServiceName,
                                                      Timestamp requestedTimestamp,
                                                      bool roundUpIfTooOld) = 0;
 

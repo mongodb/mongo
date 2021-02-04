@@ -239,6 +239,7 @@ const allCommands = {
     },
     mergeChunks: {skip: isPrimaryOnly},
     moveChunk: {skip: isPrimaryOnly},
+    pinHistoryReplicated: {skip: isAnInternalCommand},
     ping: {skip: isNotAUserDataRead},
     planCacheClear: {skip: isNotAUserDataRead},
     planCacheClearFilters: {skip: isNotAUserDataRead},

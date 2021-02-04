@@ -43,6 +43,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/storage/durable_catalog_feature_tracker.h"
+#include "mongo/db/storage/durable_history_pin.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/kv/temporary_kv_record_store.h"
 #include "mongo/db/storage/storage_repair_observer.h"
@@ -1002,6 +1003,7 @@ StatusWith<Timestamp> StorageEngineImpl::recoverToStableTimestamp(OperationConte
     }
 
     catalog::openCatalog(opCtx, state, swTimestamp.getValue());
+    DurableHistoryRegistry::get(opCtx)->reconcilePins(opCtx);
 
     LOGV2(22259,
           "recoverToStableTimestamp successful",
@@ -1253,8 +1255,12 @@ int64_t StorageEngineImpl::sizeOnDiskForDb(OperationContext* opCtx, StringData d
 }
 
 StatusWith<Timestamp> StorageEngineImpl::pinOldestTimestamp(
-    const std::string& requestingServiceName, Timestamp requestedTimestamp, bool roundUpIfTooOld) {
-    return _engine->pinOldestTimestamp(requestingServiceName, requestedTimestamp, roundUpIfTooOld);
+    OperationContext* opCtx,
+    const std::string& requestingServiceName,
+    Timestamp requestedTimestamp,
+    bool roundUpIfTooOld) {
+    return _engine->pinOldestTimestamp(
+        opCtx, requestingServiceName, requestedTimestamp, roundUpIfTooOld);
 }
 
 void StorageEngineImpl::unpinOldestTimestamp(const std::string& requestingServiceName) {

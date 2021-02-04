@@ -111,8 +111,6 @@ Timestamp generateMinFetchTimestamp(const ReshardingDonorDocument& donorDoc) {
     uassertStatusOK(waitForWriteConcern(
         opCtx.get(), generatedOpTime, WriteConcerns::kMajorityWriteConcern, &result));
 
-    // TODO notify storage engine to pin the minFetchTimestamp
-
     return generatedOpTime.getTimestamp();
 }
 

@@ -196,7 +196,8 @@ public:
         return nullptr;
     }
 
-    StatusWith<Timestamp> pinOldestTimestamp(const std::string& requestingServiceName,
+    StatusWith<Timestamp> pinOldestTimestamp(OperationContext* opCtx,
+                                             const std::string& requestingServiceName,
                                              Timestamp requestedTimestamp,
                                              bool roundUpIfTooOld) final {
         return Status::OK();

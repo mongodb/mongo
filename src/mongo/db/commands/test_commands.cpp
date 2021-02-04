@@ -33,6 +33,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/commands/test_commands.h"
+
 #include "mongo/base/init.h"
 #include "mongo/db/catalog/capped_utils.h"
 #include "mongo/db/catalog/collection.h"
@@ -41,12 +43,19 @@
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index_builds_coordinator.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer.h"
+#include "mongo/db/ops/insert.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo {
+
+namespace {
+const NamespaceString kDurableHistoryTestNss("mdb_testing.pinned_timestamp");
+const std::string kTestingDurableHistoryPinName = "_testing";
+}  // namespace
 
 using repl::UnreplicatedWritesBlock;
 using std::endl;
@@ -213,4 +222,105 @@ public:
 };
 
 MONGO_REGISTER_TEST_COMMAND(EmptyCapped);
+
+class DurableHistoryReplicatedTestCmd : public BasicCommand {
+public:
+    DurableHistoryReplicatedTestCmd() : BasicCommand("pinHistoryReplicated") {}
+
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+        return AllowedOnSecondary::kNever;
+    }
+
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return true;
+    }
+
+    bool adminOnly() const override {
+        return true;
+    }
+
+    bool requiresAuth() const override {
+        return false;
+    }
+
+    // No auth needed because it only works when enabled via command line.
+    void addRequiredPrivileges(const std::string& dbname,
+                               const BSONObj& cmdObj,
+                               std::vector<Privilege>* out) const override {}
+
+    std::string help() const override {
+        return "pins the oldest timestamp";
+    }
+
+    bool run(OperationContext* opCtx,
+             const std::string& dbname,
+             const BSONObj& cmdObj,
+             BSONObjBuilder& result) override {
+        const Timestamp requestedPinTs = cmdObj.firstElement().timestamp();
+        const bool round = cmdObj["round"].booleanSafe();
+
+        AutoGetOrCreateDb db(opCtx, kDurableHistoryTestNss.db(), MODE_IX);
+        Lock::CollectionLock collLock(opCtx, kDurableHistoryTestNss, MODE_IX);
+        if (!CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(
+                opCtx,
+                kDurableHistoryTestNss)) {  // someone else may have beat us to it.
+            uassertStatusOK(userAllowedCreateNS(kDurableHistoryTestNss));
+            WriteUnitOfWork wuow(opCtx);
+            CollectionOptions defaultCollectionOptions;
+            uassertStatusOK(
+                db.getDb()->userCreateNS(opCtx, kDurableHistoryTestNss, defaultCollectionOptions));
+            wuow.commit();
+        }
+
+        AutoGetCollection autoColl(opCtx, kDurableHistoryTestNss, MODE_IX);
+        WriteUnitOfWork wuow(opCtx);
+
+        // Note, this write will replicate to secondaries, but a secondary will not in-turn pin the
+        // oldest timestamp. The write otherwise must be timestamped in a storage engine table with
+        // logging disabled. This is to test that rolling back the written document also results in
+        // the pin being lifted.
+        Timestamp pinTs =
+            uassertStatusOK(opCtx->getServiceContext()->getStorageEngine()->pinOldestTimestamp(
+                opCtx, kTestingDurableHistoryPinName, requestedPinTs, round));
+
+        uassertStatusOK(autoColl->insertDocument(
+            opCtx,
+            InsertStatement(fixDocumentForInsert(opCtx, BSON("pinTs" << pinTs)).getValue()),
+            nullptr));
+        wuow.commit();
+
+        result.append("requestedPinTs", requestedPinTs);
+        result.append("pinTs", pinTs);
+        return true;
+    }
+};
+
+MONGO_REGISTER_TEST_COMMAND(DurableHistoryReplicatedTestCmd);
+
+std::string TestingDurableHistoryPin::getName() {
+    return kTestingDurableHistoryPinName;
+}
+
+boost::optional<Timestamp> TestingDurableHistoryPin::calculatePin(OperationContext* opCtx) {
+    AutoGetCollectionForRead autoColl(opCtx, kDurableHistoryTestNss);
+    if (!autoColl) {
+        return boost::none;
+    }
+
+    Timestamp ret = Timestamp::max();
+    auto cursor = autoColl->getCursor(opCtx);
+    for (auto doc = cursor->next(); doc; doc = cursor->next()) {
+        const BSONObj obj = doc.get().data.toBson();
+        const Timestamp ts = obj["pinTs"].timestamp();
+        ret = std::min(ret, ts);
+    }
+
+    if (ret == Timestamp::min()) {
+        return boost::none;
+    }
+
+    return ret;
+}
+
+
 }  // namespace mongo

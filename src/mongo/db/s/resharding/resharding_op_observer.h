@@ -31,7 +31,22 @@
 
 #include "mongo/db/op_observer.h"
 
+#include <boost/optional.hpp>
+
+#include "mongo/db/storage/durable_history_pin.h"
+
 namespace mongo {
+
+class ReshardingHistoryHook : public DurableHistoryPin {
+public:
+    static constexpr StringData kName = "resharding"_sd;
+
+    std::string getName() override {
+        return kName.toString();
+    }
+
+    boost::optional<Timestamp> calculatePin(OperationContext* opCtx) override;
+};
 
 /**
  * OpObserver for observing writes to internal resharding collections. This includes collections
@@ -82,7 +97,7 @@ public:
                    OptionalCollectionUUID uuid,
                    std::vector<InsertStatement>::const_iterator begin,
                    std::vector<InsertStatement>::const_iterator end,
-                   bool fromMigrate) override {}
+                   bool fromMigrate) override;
 
     void onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) override;
 
@@ -95,7 +110,7 @@ public:
                   OptionalCollectionUUID uuid,
                   StmtId stmtId,
                   bool fromMigrate,
-                  const boost::optional<BSONObj>& deletedDoc) override {}
+                  const boost::optional<BSONObj>& deletedDoc) override;
 
     void onInternalOpMessage(OperationContext* opCtx,
                              const NamespaceString& nss,

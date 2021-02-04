@@ -118,6 +118,7 @@ env.Library(
     target='storage_control',
     source=[
         'control/storage_control.cpp',
+        'durable_history_pin.cpp',
     ],
     LIBDEPS=[
         'checkpointer',
@@ -125,6 +126,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
         '$BUILD_DIR/mongo/db/service_context',
         'storage_options',
     ],
@@ -586,6 +588,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/resumable_index_builds_idl',
         '$BUILD_DIR/mongo/db/storage/storage_repair_observer',
         '$BUILD_DIR/mongo/db/vector_clock',
+        'storage_control',
         'storage_util',
         'two_phase_index_build_knobs_idl',
     ],

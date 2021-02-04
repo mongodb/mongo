@@ -495,6 +495,7 @@ let testCases = {
     movePrimary: {skip: "does not accept read or write concern"},
     multicast: {skip: "does not accept read or write concern"},
     netstat: {skip: "internal command"},
+    pinHistoryReplicated: {skip: "internal command"},
     ping: {skip: "does not accept read or write concern"},
     planCacheClear: {skip: "does not accept read or write concern"},
     planCacheClearFilters: {skip: "does not accept read or write concern"},

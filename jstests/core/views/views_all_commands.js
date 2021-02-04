@@ -414,6 +414,7 @@ let viewsCommandTests = {
     movePrimary: {skip: "Tested in sharding/movePrimary1.js"},
     multicast: {skip: isUnrelated},
     netstat: {skip: isAnInternalCommand},
+    pinHistoryReplicated: {skip: isAnInternalCommand},
     ping: {command: {ping: 1}},
     planCacheClear: {command: {planCacheClear: "view"}, expectFailure: true},
     planCacheClearFilters: {command: {planCacheClearFilters: "view"}, expectFailure: true},
