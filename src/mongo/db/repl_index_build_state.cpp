@@ -34,6 +34,7 @@
 #include "mongo/db/repl_index_build_state.h"
 
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo {
@@ -84,6 +85,8 @@ std::string indexBuildActionToString(IndexBuildAction action) {
         return "Initial sync abort";
     } else if (action == IndexBuildAction::kRollbackAbort) {
         return "Rollback abort";
+    } else if (action == IndexBuildAction::kTenantMigrationAbort) {
+        return "Tenant migration abort";
     } else if (action == IndexBuildAction::kPrimaryAbort) {
         return "Primary abort";
     } else if (action == IndexBuildAction::kSinglePhaseCommit) {
@@ -97,7 +100,7 @@ std::string indexBuildActionToString(IndexBuildAction action) {
 void IndexBuildState::setState(StateFlag state,
                                bool skipCheck,
                                boost::optional<Timestamp> timestamp,
-                               boost::optional<std::string> abortReason) {
+                               boost::optional<Status> abortStatus) {
     if (!skipCheck) {
         invariant(checkIfValidTransition(_state, state),
                   str::stream() << "current state :" << toString(_state)
@@ -106,9 +109,9 @@ void IndexBuildState::setState(StateFlag state,
     _state = state;
     if (timestamp)
         _timestamp = timestamp;
-    if (abortReason) {
+    if (abortStatus) {
         invariant(_state == kAborted);
-        _abortReason = abortReason;
+        _abortStatus = *abortStatus;
     }
 }
 
@@ -204,6 +207,15 @@ std::string ReplIndexBuildState::getAbortReason() const {
     return *reason;
 }
 
+Status ReplIndexBuildState::getAbortStatus() const {
+    stdx::unique_lock<Latch> lk(_mutex);
+    invariant(_indexBuildState.isAborted(),
+              str::stream() << "Index build: " << buildUUID
+                            << ",  index build state: " << _indexBuildState.toString());
+    Status abortStatus = _indexBuildState.getAbortStatus();
+    return abortStatus;
+}
+
 void ReplIndexBuildState::setCommitQuorumSatisfied(OperationContext* opCtx) {
     stdx::unique_lock<Latch> lk(_mutex);
     if (!_waitForNextAction->getFuture().isReady()) {
@@ -297,7 +309,8 @@ ReplIndexBuildState::TryAbortResult ReplIndexBuildState::tryAbort(OperationConte
         // When the node steps down, the caller of this function, dropIndexes/createIndexes
         // command (user operation) will also get interrupted. So, we no longer need to
         // abort the index build on step down.
-        if (signalAction == IndexBuildAction::kPrimaryAbort) {
+        if (signalAction == IndexBuildAction::kPrimaryAbort ||
+            signalAction == IndexBuildAction::kTenantMigrationAbort) {
             // Indicate if the index build is already being committed or aborted.
             if (nextAction == IndexBuildAction::kPrimaryAbort) {
                 return TryAbortResult::kAlreadyAborted;
@@ -319,8 +332,16 @@ ReplIndexBuildState::TryAbortResult ReplIndexBuildState::tryAbort(OperationConte
         boost::make_optional<Timestamp>(!opCtx->recoveryUnit()->getCommitTimestamp().isNull(),
                                         opCtx->recoveryUnit()->getCommitTimestamp());
     auto skipCheck = _shouldSkipIndexBuildStateTransitionCheck(opCtx);
-    _indexBuildState.setState(IndexBuildState::kAborted, skipCheck, abortTimestamp, reason);
+    Status abortStatus = signalAction == IndexBuildAction::kTenantMigrationAbort
+        ? tenant_migration_access_blocker::checkIfCanBuildIndex(opCtx, dbName)
+        : Status(ErrorCodes::IndexBuildAborted, reason);
+    invariant(!abortStatus.isOK());
+    _indexBuildState.setState(IndexBuildState::kAborted, skipCheck, abortTimestamp, abortStatus);
 
+    // Aside from setting the tenantMigrationAbortStatus, tenant migration aborts are identical to
+    // primary aborts.
+    if (signalAction == IndexBuildAction::kTenantMigrationAbort)
+        signalAction = IndexBuildAction::kPrimaryAbort;
     // Interrupt the builder thread so that it can no longer acquire locks or make progress.
     // It is possible that the index build thread may have completed its operation and removed
     // itself from the ServiceContext. This may happen in the case of an explicit db.killOp()

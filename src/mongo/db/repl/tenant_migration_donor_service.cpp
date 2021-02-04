@@ -38,6 +38,7 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/query/find_command_gen.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
@@ -721,6 +722,16 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
             }
 
             checkIfReceivedDonorAbortMigration(token, _instanceCancelationSource.token());
+
+            // Before starting data sync, abort any in-progress index builds.  No new index
+            // builds can start while we are doing this because the mtab prevents it.
+            {
+                auto opCtxHolder = cc().makeOperationContext();
+                auto* opCtx = opCtxHolder.get();
+                auto* indexBuildsCoordinator = IndexBuildsCoordinator::get(opCtx);
+                indexBuildsCoordinator->abortTenantIndexBuilds(
+                    opCtx, _stateDoc.getTenantId(), "tenant migration");
+            }
 
             return _sendRecipientSyncDataCommand(executor, recipientTargeterRS)
                 .then([this, self = shared_from_this()] {

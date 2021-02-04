@@ -62,6 +62,11 @@ public:
     static BSONObj buildMajorityWaitRequest(Timestamp operationTime);
 
     /**
+     * Checks if the database belongs to the given tenant.
+     */
+    static bool isDatabaseForTenant(StringData db, StringData prefix);
+
+    /**
      * Checks if the collection belongs to the given tenant.
      */
     static bool isNamespaceForTenant(NamespaceString nss, StringData prefix);

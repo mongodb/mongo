@@ -1376,6 +1376,9 @@ env.Library(
         'tenant_migration_access_blocker',
         'tenant_migration_utils',
     ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/index_builds_coordinator_interface",
+    ],
 )
 
 env.Library(

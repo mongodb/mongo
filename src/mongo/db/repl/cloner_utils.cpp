@@ -55,8 +55,12 @@ BSONObj ClonerUtils::buildMajorityWaitRequest(Timestamp operationTime) {
     return bob.obj();
 }
 
+bool ClonerUtils::isDatabaseForTenant(StringData db, StringData prefix) {
+    return db.startsWith(prefix + "_");
+}
+
 bool ClonerUtils::isNamespaceForTenant(NamespaceString nss, StringData prefix) {
-    return nss.db().startsWith(prefix + "_");
+    return isDatabaseForTenant(nss.db(), prefix);
 }
 
 }  // namespace repl

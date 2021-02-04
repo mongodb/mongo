@@ -49,6 +49,7 @@
 #include "mongo/db/index_build_entry_helpers.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/cloner_utils.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/timestamp_block.h"
@@ -765,6 +766,34 @@ void IndexBuildsCoordinator::abortDatabaseIndexBuilds(OperationContext* opCtx,
     }
 }
 
+void IndexBuildsCoordinator::abortTenantIndexBuilds(OperationContext* opCtx,
+                                                    StringData tenantId,
+                                                    const std::string& reason) {
+    LOGV2(4886203,
+          "About to abort all index builders running for collections belonging to the given tenant",
+          "tenantId"_attr = tenantId,
+          "reason"_attr = reason);
+
+    auto builds = [&]() -> std::vector<std::shared_ptr<ReplIndexBuildState>> {
+        auto indexBuildFilter = [=](const auto& replState) {
+            return repl::ClonerUtils::isDatabaseForTenant(replState.dbName, tenantId);
+        };
+        return activeIndexBuilds.filterIndexBuilds(indexBuildFilter);
+    }();
+    for (auto replState : builds) {
+        if (!abortIndexBuildByBuildUUID(
+                opCtx, replState->buildUUID, IndexBuildAction::kTenantMigrationAbort, reason)) {
+            // The index build may already be in the midst of tearing down.
+            LOGV2(4886204,
+                  "Index build: failed to abort index build for tenant migration",
+                  "tenantId"_attr = tenantId,
+                  "buildUUID"_attr = replState->buildUUID,
+                  "db"_attr = replState->dbName,
+                  "collectionUUID"_attr = replState->collectionUUID);
+        }
+    }
+}
+
 void IndexBuildsCoordinator::abortAllIndexBuildsForInitialSync(OperationContext* opCtx,
                                                                const std::string& reason) {
     LOGV2(4833200, "About to abort all index builders running", "reason"_attr = reason);
@@ -1079,7 +1108,8 @@ bool IndexBuildsCoordinator::abortIndexBuildByBuildUUID(OperationContext* opCtx,
                 signalAction = IndexBuildAction::kInitialSyncAbort;
             }
 
-            if (IndexBuildAction::kPrimaryAbort == signalAction &&
+            if ((IndexBuildAction::kPrimaryAbort == signalAction ||
+                 IndexBuildAction::kTenantMigrationAbort == signalAction) &&
                 !replCoord->canAcceptWritesFor(opCtx, dbAndUUID)) {
                 uassertStatusOK({ErrorCodes::NotWritablePrimary,
                                  str::stream()
@@ -1168,6 +1198,7 @@ void IndexBuildsCoordinator::_completeAbort(OperationContext* opCtx,
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     switch (signalAction) {
         // Replicates an abortIndexBuild oplog entry and deletes the index from the durable catalog.
+        case IndexBuildAction::kTenantMigrationAbort:
         case IndexBuildAction::kPrimaryAbort: {
             // Single-phase builds are aborted on step-down, so it's possible to no longer be
             // primary after we process an abort. We must continue with the abort, but since
@@ -2090,6 +2121,8 @@ void IndexBuildsCoordinator::_runIndexBuildInner(
     // commit-time, there is no work to do. This is the most routine case, since index
     // constraint checking happens at commit-time for index builds.
     if (replState->isAborted()) {
+        if (ErrorCodes::isTenantMigrationError(replState->getAbortStatus()))
+            uassertStatusOK(replState->getAbortStatus());
         uassertStatusOK(status);
     }
 

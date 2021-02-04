@@ -672,6 +672,9 @@ void IndexBuildsCoordinatorMongod::_waitForNextIndexBuildActionAndCommit(
               "buildUUID"_attr = replState->buildUUID,
               "action"_attr = indexBuildActionToString(nextAction));
 
+        // Tenant migration abort should have been re-written as primary abort before reaching here.
+        invariant(nextAction != IndexBuildAction::kTenantMigrationAbort);
+
         // If the index build was aborted, this serves as a final interruption point. Since the
         // index builder thread is interrupted before the action is set, this must fail if the build
         // was aborted.
@@ -707,6 +710,7 @@ void IndexBuildsCoordinatorMongod::_waitForNextIndexBuildActionAndCommit(
             case IndexBuildAction::kRollbackAbort:
             case IndexBuildAction::kInitialSyncAbort:
             case IndexBuildAction::kPrimaryAbort:
+            case IndexBuildAction::kTenantMigrationAbort:
                 // The calling thread should have interrupted us before signaling an abort action.
                 LOGV2_FATAL(4698901, "Index build abort should have interrupted this operation");
             case IndexBuildAction::kNoAction:

@@ -20,8 +20,10 @@ if (!tenantMigrationTest.isFeatureFlagEnabled()) {
     return;
 }
 
-const kTenantId = "testTenantId";
+const kTenantId = "testTenantId1";
+const kUnrelatedTenantId = "testTenantId2";
 const kDbName = tenantMigrationTest.tenantDB(kTenantId, "testDB");
+const kUnrelatedDbName = tenantMigrationTest.tenantDB(kUnrelatedTenantId, "testDB");
 const kEmptyCollName = "testEmptyColl";
 const kNonEmptyCollName = "testNonEmptyColl";
 const kNewCollName1 = "testNewColl1";
@@ -38,6 +40,13 @@ function createIndexShouldFail(
     assert.commandFailedWithCode(db[collName].createIndex(indexSpec), errorCode);
 }
 
+// Attempts to create an index on a collection and checks that it succeeds
+function createIndex(primaryHost, dbName, collName, indexSpec) {
+    const donorPrimary = new Mongo(primaryHost);
+    const db = donorPrimary.getDB(dbName);
+    assert.commandWorked(db[collName].createIndex(indexSpec));
+}
+
 const migrationId = UUID();
 const migrationOpts = {
     migrationIdString: extractUUIDFromObject(migrationId),
@@ -46,18 +55,42 @@ const migrationOpts = {
 };
 const donorRstArgs = TenantMigrationUtil.createRstArgs(tenantMigrationTest.getDonorRst());
 
-// Put some data in the non-empty collection, and create the empty one.
+// Put some data in the non-empty collections, and create the empty one.
 const db = donorPrimary.getDB(kDbName);
+const unrelatedDb = donorPrimary.getDB(kUnrelatedDbName);
 assert.commandWorked(db[kNonEmptyCollName].insert([{a: 1, b: 1}, {a: 2, b: 2}, {a: 3, b: 3}]));
+assert.commandWorked(
+    unrelatedDb[kNonEmptyCollName].insert([{x: 1, y: 1}, {x: 2, b: 2}, {x: 3, y: 3}]));
 assert.commandWorked(db.createCollection(kEmptyCollName));
 
+// Start index builds and have them hang in the builder thread.  This fail point must be an
+// interruptible one.  The index build for the migrating tenant will be retried once the migration
+// is done.
+
+var initFpCount =
+    assert
+        .commandWorked(donorPrimary.adminCommand(
+            {configureFailPoint: "hangAfterInitializingIndexBuild", mode: "alwaysOn"}))
+        .count;
+const abortedIndexThread =
+    new Thread(createIndexShouldFail, donorPrimary.host, kDbName, kNonEmptyCollName, {b: 1});
+const unrelatedIndexThread =
+    new Thread(createIndex, donorPrimary.host, kUnrelatedDbName, kNonEmptyCollName, {y: 1});
+abortedIndexThread.start();
+unrelatedIndexThread.start();
+assert.commandWorked(donorPrimary.adminCommand({
+    waitForFailPoint: "hangAfterInitializingIndexBuild",
+    timesEntered: initFpCount + 2,
+    maxTimeMS: kDefaultWaitForFailPointTimeout
+}));
+
 // Start an index build and pause it after acquiring a slot but before registering itself.
-const indexBuildFp = configureFailPoint(donorPrimary, "hangAfterAcquiringIndexBuildSlot");
+const indexBuildSlotFp = configureFailPoint(donorPrimary, "hangAfterAcquiringIndexBuildSlot");
 jsTestLog("Starting the racy index build");
 const racyIndexThread =
     new Thread(createIndexShouldFail, donorPrimary.host, kDbName, kNonEmptyCollName, {a: 1});
 racyIndexThread.start();
-indexBuildFp.wait();
+indexBuildSlotFp.wait();
 
 jsTestLog("Starting a migration and pausing after majority-committing the initial state doc.");
 // Start a migration, and pause it after the donor has majority-committed the initial state doc.
@@ -68,8 +101,14 @@ const migrationThread =
 migrationThread.start();
 dataSyncFp.wait();
 
+// Release the previously-started index build thread and allow the donor to abort index builds
+assert.commandWorked(donorPrimary.adminCommand(
+    {configureFailPoint: "hangAfterInitializingIndexBuild", mode: "off"}));
+jsTestLog("Waiting for the unrelated index build to finish");
+unrelatedIndexThread.join();
+
 // Release the racy thread; it should block.
-indexBuildFp.off();
+indexBuildSlotFp.off();
 
 // Should be able to create an index on a non-existent collection.  Since the collection is
 // guaranteed to be empty and to have always been empty, this is safe.
@@ -96,6 +135,7 @@ assert.commandWorked(migrationThread.returnData());
 
 // The index creation threads should be done.
 racyIndexThread.join();
+abortedIndexThread.join();
 emptyIndexThread.join();
 nonEmptyIndexThread.join();
 

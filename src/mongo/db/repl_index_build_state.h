@@ -87,6 +87,10 @@ enum class IndexBuildAction {
      */
     kInitialSyncAbort,
     /**
+     * Abort signal set on donor when tenant migration starts.
+     */
+    kTenantMigrationAbort,
+    /**
      * Abort signal set by createIndexes cmd or by drop databases/collections/indexes cmds
      */
     kPrimaryAbort,
@@ -149,13 +153,13 @@ public:
     /**
      * Transitions this index build to new 'state'.
      * Invariants if the requested transition is not valid and 'skipCheck' is true.
-     * 'timestamp' and 'abortReason' may be provided for certain states such as 'commit' and
+     * 'timestamp', 'abortStatus' may be provided for certain states such as 'commit' and
      * 'abort'.
      */
     void setState(StateFlag state,
                   bool skipCheck,
                   boost::optional<Timestamp> timestamp = boost::none,
-                  boost::optional<std::string> abortReason = boost::none);
+                  boost::optional<Status> abortStatus = boost::none);
 
     bool isCommitPrepared() const {
         return _state == kPrepareCommit;
@@ -178,7 +182,11 @@ public:
     }
 
     boost::optional<std::string> getAbortReason() const {
-        return _abortReason;
+        return boost::make_optional(!_abortStatus.isOK(), _abortStatus.reason());
+    }
+
+    Status getAbortStatus() const {
+        return _abortStatus;
     }
 
     std::string toString() const {
@@ -208,8 +216,8 @@ private:
     // It represents the commit or abort timestamp communicated via
     // commitIndexBuild and abortIndexBuild oplog entry.
     boost::optional<Timestamp> _timestamp;
-    // Reason for abort reason.
-    boost::optional<std::string> _abortReason;
+    // Reason for abort, if any.
+    Status _abortStatus = Status::OK();
 };
 
 /**
@@ -281,6 +289,11 @@ public:
      * Returns abort reason. Invariants if not in aborted state.
      */
     std::string getAbortReason() const;
+
+    /**
+     * Returns abort status. Invariants if not in aborted state.
+     */
+    Status getAbortStatus() const;
 
     /**
      * Called when commit quorum is satisfied.
