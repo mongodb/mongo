@@ -177,16 +177,7 @@ function testDonorForgetMigrationInterrupt(interruptFunc) {
         ErrorCodes.NoSuchTenantMigration);
 
     assert.commandWorked(forgetMigrationThread.returnData());
-    // After forgetMigrationThread returns, check that the recipient state doc is correctly marked
-    // as garbage collectable.
-    const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
-    const recipientStateDoc =
-        recipientPrimary.getCollection(TenantMigrationTest.kConfigRecipientsNS).findOne({
-            _id: migrationId
-        });
-    assert(recipientStateDoc.expireAt);
-    tenantMigrationTest.waitForMigrationGarbageCollection(
-        donorRst.nodes, migrationId, migrationOpts.tenantId);
+    tenantMigrationTest.waitForMigrationGarbageCollection(migrationId, migrationOpts.tenantId);
 
     tenantMigrationTest.stop();
     donorRst.stopSet();

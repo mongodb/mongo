@@ -479,6 +479,9 @@ public:
     };
 
 private:
+    ExecutorFuture<void> _rebuildService(std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                                         const CancelationToken& token) override;
+
     ServiceContext* const _serviceContext;
 
     /*

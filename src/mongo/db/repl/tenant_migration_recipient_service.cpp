@@ -64,6 +64,8 @@
 namespace mongo {
 namespace repl {
 namespace {
+const std::string kTTLIndexName = "TenantMigrationRecipientTTLIndex";
+const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
 constexpr StringData kOplogBufferPrefix = "repl.migration.oplog_"_sd;
 
 NamespaceString getOplogBufferNs(const UUID& migrationUUID) {
@@ -177,6 +179,31 @@ ThreadPool::Limits TenantMigrationRecipientService::getThreadPoolLimits() const 
     ThreadPool::Limits limits;
     limits.maxThreads = maxTenantMigrationRecipientThreadPoolSize;
     return limits;
+}
+
+ExecutorFuture<void> TenantMigrationRecipientService::_rebuildService(
+    std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancelationToken& token) {
+    return AsyncTry([this] {
+               auto nss = getStateDocumentsNS();
+
+               AllowOpCtxWhenServiceRebuildingBlock allowOpCtxBlock(Client::getCurrent());
+               auto opCtxHolder = cc().makeOperationContext();
+               auto opCtx = opCtxHolder.get();
+               DBDirectClient client(opCtx);
+
+               BSONObj result;
+               client.runCommand(
+                   nss.db().toString(),
+                   BSON("createIndexes"
+                        << nss.coll().toString() << "indexes"
+                        << BSON_ARRAY(BSON("key" << BSON("expireAt" << 1) << "name" << kTTLIndexName
+                                                 << "expireAfterSeconds" << 0))),
+                   result);
+               uassertStatusOK(getStatusFromCommandResult(result));
+           })
+        .until([token](Status status) { return status.isOK() || token.isCanceled(); })
+        .withBackoffBetweenIterations(kExponentialBackoff)
+        .on(**executor, CancelationToken::uncancelable());
 }
 
 std::shared_ptr<PrimaryOnlyService::Instance> TenantMigrationRecipientService::constructInstance(

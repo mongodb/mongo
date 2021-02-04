@@ -17,6 +17,8 @@ load("jstests/replsets/libs/tenant_migration_util.js");
 const kTenantId = "testTenantId";
 
 const kMaxSleepTimeMS = 250;
+
+// Set the delay before a donor state doc is garbage collected to be short to speed up the test.
 const kGarbageCollectionDelayMS = 5 * 1000;
 
 const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
@@ -27,7 +29,9 @@ const recipientRst = new ReplSetTest({
     nodeOptions: Object.assign(migrationX509Options.recipient, {
         setParameter: {
             // TODO SERVER-52719: Remove the failpoint 'returnResponseOkForRecipientSyncDataCmd'.
-            'failpoint.returnResponseOkForRecipientSyncDataCmd': tojson({mode: 'alwaysOn'})
+            'failpoint.returnResponseOkForRecipientSyncDataCmd': tojson({mode: 'alwaysOn'}),
+            tenantMigrationGarbageCollectionDelayMS: kGarbageCollectionDelayMS,
+            ttlMonitorSleepSecs: 1,
         }
     })
 });
@@ -64,8 +68,6 @@ function testRollBack(setUpFunc, rollbackOpsFunc, steadyStateFunc) {
         settings: {chainingAllowed: false},
         nodeOptions: Object.assign(migrationX509Options.donor, {
             setParameter: {
-                // Set the delay before a donor state doc is garbage collected to be short to speed
-                // up the test.
                 tenantMigrationGarbageCollectionDelayMS: kGarbageCollectionDelayMS,
                 ttlMonitorSleepSecs: 1,
             }
@@ -237,15 +239,8 @@ function testRollBackMarkingStateGarbageCollectable() {
     let steadyStateFunc = (tenantMigrationTest, donorPrimary, donorSecondary) => {
         // Verify that the migration state got garbage collected successfully despite the rollback.
         assert.commandWorked(forgetMigrationThread.returnData());
-        // Check that the recipient state doc is correctly marked as garbage collectable.
-        const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
-        const recipientStateDoc =
-            recipientPrimary.getCollection(TenantMigrationTest.kConfigRecipientsNS).findOne({
-                _id: migrationId
-            });
-        assert(recipientStateDoc.expireAt);
         tenantMigrationTest.waitForMigrationGarbageCollection(
-            [donorPrimary, donorSecondary], migrationId, migrationOpts.tenantId);
+            migrationId, migrationOpts.tenantId, [donorPrimary, donorSecondary]);
     };
 
     testRollBack(setUpFunc, rollbackOpsFunc, steadyStateFunc);

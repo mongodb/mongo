@@ -14,22 +14,26 @@ load("jstests/replsets/libs/tenant_migration_util.js");
 load("jstests/libs/uuid_util.js");
 
 const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
+const kGarbageCollectionParams = {
+    // Set the delay before a donor state doc is garbage collected to be short to speed up
+    // the test.
+    tenantMigrationGarbageCollectionDelayMS: 3 * 1000,
+
+    // Set the TTL monitor to run at a smaller interval to speed up the test.
+    ttlMonitorSleepSecs: 1,
+};
+
 const donorRst = new ReplSetTest({
     nodes: 1,
     name: "donor",
-    nodeOptions: Object.assign(migrationX509Options.donor, {
-        setParameter: {
-            // Set the delay before a donor state doc is garbage collected to be short to speed up
-            // the test.
-            tenantMigrationGarbageCollectionDelayMS: 3 * 1000,
-
-            // Set the TTL monitor to run at a smaller interval to speed up the test.
-            ttlMonitorSleepSecs: 1,
-        }
-    })
+    nodeOptions: Object.assign(migrationX509Options.donor, {setParameter: kGarbageCollectionParams})
 });
-const recipientRst =
-    new ReplSetTest({nodes: 1, name: "recipient", nodeOptions: migrationX509Options.recipient});
+const recipientRst = new ReplSetTest({
+    nodes: 1,
+    name: "recipient",
+    nodeOptions:
+        Object.assign(migrationX509Options.recipient, {setParameter: kGarbageCollectionParams})
+});
 
 donorRst.startSet();
 donorRst.initiate();
@@ -198,7 +202,7 @@ assert.commandWorked(tenantMigrationTest.runMigration(migrationOpts));
 const donorDoc =
     donorPrimary.getCollection(TenantMigrationTest.kConfigDonorsNS).findOne({tenantId: kTenantId});
 
-tenantMigrationTest.waitForMigrationGarbageCollection(donorRst.nodes, migrationId, kTenantId);
+tenantMigrationTest.waitForMigrationGarbageCollection(migrationId, kTenantId);
 
 // Test the aggregation pipeline the recipient would use for getting the config.transactions entries
 // and oplog chains for the retryable writes that committed before startFetchingTimestamp. The

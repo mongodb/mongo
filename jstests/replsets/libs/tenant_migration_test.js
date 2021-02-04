@@ -17,14 +17,24 @@ load("jstests/replsets/libs/tenant_migration_util.js");
  * @param {string} [name] the name of the replica sets
  * @param {Object} [donorRst] the ReplSetTest instance to adopt for the donor
  * @param {Object} [recipientRst] the ReplSetTest instance to adopt for the recipient
+ * @param {Object} [sharedOptions] an object that can contain 'nodes' <number>, the number of nodes
+ *     each RST will contain, and 'setParameter' <object>, an object with various server parameters.
  */
-function TenantMigrationTest(
-    {name = "TenantMigrationTest", enableRecipientTesting = true, donorRst, recipientRst}) {
+function TenantMigrationTest({
+    name = "TenantMigrationTest",
+    enableRecipientTesting = true,
+    donorRst,
+    recipientRst,
+    sharedOptions = {}
+}) {
     const donorPassedIn = (donorRst !== undefined);
     const recipientPassedIn = (recipientRst !== undefined);
 
     const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
     const migrationCertificates = TenantMigrationUtil.makeMigrationCertificatesForTest();
+
+    const nodes = sharedOptions.nodes || 2;
+    let setParameterOpts = sharedOptions.setParameter || {};
 
     donorRst = donorPassedIn ? donorRst : performSetUp(true /* isDonor */);
     recipientRst = recipientPassedIn ? recipientRst : performSetUp(false /* isDonor */);
@@ -39,10 +49,9 @@ function TenantMigrationTest(
     createFindInternalClusterTimeKeysRoleIfNotExist(recipientRst);
 
     /**
-     * Creates a ReplSetTest instance. The repl set will have 2 nodes.
+     * Creates a ReplSetTest instance. The repl set will have 2 nodes if not otherwise specified.
      */
     function performSetUp(isDonor) {
-        let setParameterOpts = {};
         if (TestData.logComponentVerbosity) {
             setParameterOpts["logComponentVerbosity"] =
                 tojsononeline(TestData.logComponentVerbosity);
@@ -57,7 +66,7 @@ function TenantMigrationTest(
         nodeOptions["setParameter"] = setParameterOpts;
 
         const rstName = `${name}_${(isDonor ? "donor" : "recipient")}`;
-        const rst = new ReplSetTest({name: rstName, nodes: 2, nodeOptions});
+        const rst = new ReplSetTest({name: rstName, nodes, nodeOptions});
         rst.startSet();
         rst.initiateWithHighElectionTimeout();
 
@@ -328,10 +337,14 @@ function TenantMigrationTest(
      * Asserts that durable and in-memory state for the migration 'migrationId' and 'tenantId' is
      * eventually deleted from the given nodes.
      */
-    this.waitForMigrationGarbageCollection = function(nodes, migrationId, tenantId) {
-        nodes.forEach(node => {
-            const configDonorsColl = node.getCollection("config.tenantMigrationDonors");
-            assert.soon(() => 0 === configDonorsColl.count({_id: migrationId}));
+    this.waitForMigrationGarbageCollection = function(
+        migrationId, tenantId, donorNodes, recipientNodes) {
+        donorNodes = donorNodes || donorRst.nodes;
+        recipientNodes = recipientNodes || recipientRst.nodes;
+
+        donorNodes.forEach(node => {
+            const configDonorsColl = node.getCollection(TenantMigrationTest.kConfigDonorsNS);
+            assert.soon(() => 0 === configDonorsColl.count({_id: migrationId}), tojson(node));
 
             let mtabs;
             assert.soon(() => {
@@ -339,6 +352,12 @@ function TenantMigrationTest(
                             .tenantMigrationAccessBlocker;
                 return !mtabs || !mtabs[tenantId];
             }, tojson(mtabs));
+        });
+
+        recipientNodes.forEach(node => {
+            const configRecipientsColl =
+                node.getCollection(TenantMigrationTest.kConfigRecipientsNS);
+            assert.soon(() => 0 === configRecipientsColl.count({_id: migrationId}));
         });
     };
 

@@ -574,7 +574,7 @@ void PrimaryOnlyService::_rebuildInstances(long long term) noexcept {
                     2,
                     "Querying {ns} to look for state documents while rebuilding PrimaryOnlyService "
                     "{service}",
-                    "Querying to look for state documents while rebuiding PrimaryOnlyService",
+                    "Querying to look for state documents while rebuilding PrimaryOnlyService",
                     "ns"_attr = ns,
                     "service"_attr = serviceName);
 

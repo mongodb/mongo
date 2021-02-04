@@ -17,24 +17,25 @@ load("jstests/replsets/rslib.js");
 load("jstests/libs/uuid_util.js");
 
 const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
+const kGarbageCollectionParams = {
+    // Set the delay before a donor state doc is garbage collected to be short to speed up
+    // the test.
+    tenantMigrationGarbageCollectionDelayMS: 3 * 1000,
+
+    // Set the TTL monitor to run at a smaller interval to speed up the test.
+    ttlMonitorSleepSecs: 1,
+};
+
 const donorRst = new ReplSetTest({
     nodes: 1,
     name: "donor",
-    nodeOptions: Object.assign(migrationX509Options.donor, {
-        setParameter: {
-            // Set the delay before a donor state doc is garbage collected to be short to speed up
-            // the test.
-            tenantMigrationGarbageCollectionDelayMS: 3 * 1000,
-
-            // Set the TTL monitor to run at a smaller interval to speed up the test.
-            ttlMonitorSleepSecs: 1,
-        }
-    })
+    nodeOptions: Object.assign(migrationX509Options.donor, {setParameter: kGarbageCollectionParams})
 });
 const recipientRst = new ReplSetTest({
     nodes: [{}, {rsConfig: {priority: 0}}, {rsConfig: {priority: 0}}],
     name: "recipient",
-    nodeOptions: migrationX509Options.recipient
+    nodeOptions:
+        Object.assign(migrationX509Options.recipient, {setParameter: kGarbageCollectionParams})
 });
 
 donorRst.startSet();
@@ -89,7 +90,7 @@ assert.commandWorked(tenantMigrationTest.runMigration(migrationOpts));
 const donorDoc =
     donorPrimary.getCollection(TenantMigrationTest.kConfigDonorsNS).findOne({tenantId: kTenantId});
 
-tenantMigrationTest.waitForMigrationGarbageCollection(donorRst.nodes, migrationId, kTenantId);
+tenantMigrationTest.waitForMigrationGarbageCollection(migrationId, kTenantId);
 
 {
     jsTest.log("Run another transaction after the migration");
