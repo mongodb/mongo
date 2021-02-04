@@ -2806,9 +2806,14 @@ Value ExpressionMeta::evaluate(const Document& root, Variables* variables) const
             // Be sure that a RecordId can be represented by a long long.
             static_assert(RecordId::kMinRepr >= std::numeric_limits<long long>::min());
             static_assert(RecordId::kMaxRepr <= std::numeric_limits<long long>::max());
-            return metadata.hasRecordId()
-                ? Value{static_cast<long long>(metadata.getRecordId().as<int64_t>())}
-                : Value();
+            if (!metadata.hasRecordId()) {
+                return Value();
+            }
+
+            return metadata.getRecordId().withFormat(
+                [](RecordId::Null n) { return Value(); },
+                [](const int64_t rid) { return Value{static_cast<long long>(rid)}; },
+                [](const OID& oid) { return Value(oid); });
         case MetaType::kIndexKey:
             return metadata.hasIndexKey() ? Value(metadata.getIndexKey()) : Value();
         case MetaType::kSortKey:
