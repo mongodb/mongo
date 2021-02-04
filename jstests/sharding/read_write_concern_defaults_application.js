@@ -519,7 +519,7 @@ let testCases = {
         command: {renameCollection: nss, to: nss + "2"},
         db: "admin",
         checkReadConcern: false,
-        checkWriteConcern: true,
+        checkWriteConcern: false,
     },
     repairDatabase: {skip: "does not accept read or write concern"},
     replSetAbortPrimaryCatchUp: {skip: "does not accept read or write concern"},
