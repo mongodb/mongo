@@ -975,7 +975,13 @@ protected:
         auto requestParser = RequestParser(opCtx, cmdObj);
 
         auto cmdDone = runWithRequestParser(opCtx, db, cmdObj, requestParser, result);
-        validateResult(result.asTempObj());
+
+        // Only validate results in test mode so that we don't expose users to errors if we
+        // construct an invalid reply.
+        if (getTestCommandsEnabled()) {
+            validateResult(result.asTempObj());
+        }
+
         return cmdDone;
     }
 
