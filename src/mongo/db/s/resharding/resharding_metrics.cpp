@@ -288,8 +288,8 @@ void ReshardingMetrics::OperationMetrics::append(BSONObjBuilder* bob, Role role)
             bob->append(kCompletionStatus, OperationStatus_serializer(operationStatus));
             break;
         case Role::kRecipient:
-            // TODO SERVER-51021
-            MONGO_UNREACHABLE;
+            bob->append(kRecipientState, RecipientState_serializer(recipientState));
+            bob->append(kCompletionStatus, OperationStatus_serializer(operationStatus));
             break;
         case Role::kCoordinator:
             // TODO SERVER-50976

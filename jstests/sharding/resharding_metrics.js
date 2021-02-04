@@ -109,7 +109,27 @@ function verifyCurrentOpOutput(reshardingTest, inputCollection) {
         });
     });
 
-    // TODO SERVER-51021 verify currentOp output for recipients
+    reshardingTest.recipientShardNames.forEach(function(shardName) {
+        checkCurrentOp(new Mongo(topology.shards[shardName].primary), shardName, "Recipient", {
+            "type": "op",
+            "op": "command",
+            "ns": kNamespace,
+            "originatingCommand": undefined,
+            "totalOperationTimeElapsed": undefined,
+            "remainingOperationTimeEstimated": undefined,
+            "approxDocumentsToCopy": undefined,
+            "approxBytesToCopy": undefined,
+            "documentsCopied": undefined,
+            "bytesCopied": undefined,
+            "totalCopyTimeElapsed": undefined,
+            "oplogEntriesFetched": undefined,
+            "oplogEntriesApplied": undefined,
+            "totalApplyTimeElapsed": undefined,
+            "recipientState": undefined,
+            "opStatus": "actively running",
+        });
+    });
+
     // TODO SERVER-50976 verify currentOp output for the coordinator
 }
 

@@ -256,4 +256,75 @@ TEST_F(ReshardingMetricsTest, CurrentOpReportForDonor) {
     ASSERT_BSONOBJ_EQ(expected, report);
 }
 
+TEST_F(ReshardingMetricsTest, CurrentOpReportForRecipient) {
+    const auto kRecipientState = RecipientStateEnum::kCloning;
+
+    constexpr auto kDocumentsToCopy = 500;
+    constexpr auto kDocumentsCopied = kDocumentsToCopy * 0.5;
+    static_assert(kDocumentsToCopy >= kDocumentsCopied);
+
+    constexpr auto kBytesToCopy = 8192;
+    constexpr auto kBytesCopied = kBytesToCopy * 0.5;
+    static_assert(kBytesToCopy >= kBytesCopied);
+
+    constexpr auto kDelayBeforeCloning = Seconds(2);
+    getMetrics()->onStart();
+    advanceTime(kDelayBeforeCloning);
+
+    constexpr auto kTimeSpentCloning = Seconds(3);
+    getMetrics()->setRecipientState(kRecipientState);
+    getMetrics()->setDocumentsToCopy(kDocumentsToCopy, kBytesToCopy);
+    advanceTime(kTimeSpentCloning);
+    getMetrics()->onDocumentsCopied(kDocumentsCopied, kBytesCopied);
+
+    const auto kTimeToCopyRemainingSeconds =
+        durationCount<Seconds>(kTimeSpentCloning) * (kBytesToCopy / kBytesCopied - 1);
+    const auto kRemainingOperationTimeSeconds =
+        durationCount<Seconds>(kTimeSpentCloning) + 2 * kTimeToCopyRemainingSeconds;
+
+    const ReshardingMetrics::ReporterOptions options(
+        ReshardingMetrics::ReporterOptions::Role::kRecipient,
+        UUID::parse("12345678-1234-1234-1234-123456789def").getValue(),
+        NamespaceString("db", "collection"),
+        BSON("id" << 1),
+        false);
+
+    const auto expected =
+        fromjson(fmt::format("{{ type: \"op\","
+                             "desc: \"ReshardingRecipientService {0}\","
+                             "op: \"command\","
+                             "ns: \"{1}\","
+                             "originatingCommand: {{ reshardCollection: \"{1}\","
+                             "key: {2},"
+                             "unique: {3},"
+                             "collation: {{ locale: \"simple\" }} }},"
+                             "totalOperationTimeElapsed: {4},"
+                             "remainingOperationTimeEstimated: {5},"
+                             "approxDocumentsToCopy: {6},"
+                             "documentsCopied: {7},"
+                             "approxBytesToCopy: {8},"
+                             "bytesCopied: {9},"
+                             "totalCopyTimeElapsed: {10},"
+                             "oplogEntriesFetched: 0,"
+                             "oplogEntriesApplied: 0,"
+                             "totalApplyTimeElapsed: 0,"
+                             "recipientState: \"{11}\","
+                             "opStatus: \"actively running\" }}",
+                             options.id.toString(),
+                             options.nss.toString(),
+                             options.shardKey.toString(),
+                             options.unique ? "true" : "false",
+                             durationCount<Seconds>(kDelayBeforeCloning + kTimeSpentCloning),
+                             kRemainingOperationTimeSeconds,
+                             kDocumentsToCopy,
+                             kDocumentsCopied,
+                             kBytesToCopy,
+                             kBytesCopied,
+                             durationCount<Seconds>(kTimeSpentCloning),
+                             RecipientState_serializer(kRecipientState)));
+
+    const auto report = getMetrics()->reportForCurrentOp(options);
+    ASSERT_BSONOBJ_EQ(expected, report);
+}
+
 }  // namespace mongo

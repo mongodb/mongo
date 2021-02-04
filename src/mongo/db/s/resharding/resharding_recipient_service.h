@@ -107,14 +107,9 @@ public:
         return _completionPromise.getFuture();
     }
 
-    /**
-     * TODO(SERVER-51021) Report ReshardingRecipientService Instances in currentOp().
-     */
     boost::optional<BSONObj> reportForCurrentOp(
-        MongoProcessInterface::CurrentOpConnectionsMode connMode,
-        MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept final {
-        return boost::none;
-    }
+        MongoProcessInterface::CurrentOpConnectionsMode,
+        MongoProcessInterface::CurrentOpSessionsMode) noexcept override;
 
     void onReshardingFieldsChanges(const TypeCollectionReshardingFields& reshardingFields);
 

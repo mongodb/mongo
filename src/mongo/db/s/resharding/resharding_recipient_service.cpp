@@ -40,6 +40,7 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/s/migration_destination_manager.h"
 #include "mongo/db/s/resharding/resharding_collection_cloner.h"
+#include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding_util.h"
 #include "mongo/db/s/shard_key_util.h"
@@ -236,6 +237,17 @@ void ReshardingRecipientService::RecipientStateMachine::interrupt(Status status)
     if (!_completionPromise.getFuture().isReady()) {
         _completionPromise.setError(status);
     }
+}
+
+boost::optional<BSONObj> ReshardingRecipientService::RecipientStateMachine::reportForCurrentOp(
+    MongoProcessInterface::CurrentOpConnectionsMode,
+    MongoProcessInterface::CurrentOpSessionsMode) noexcept {
+    ReshardingMetrics::ReporterOptions options(ReshardingMetrics::ReporterOptions::Role::kRecipient,
+                                               _id,
+                                               _recipientDoc.getNss(),
+                                               _recipientDoc.getReshardingKey().toBSON(),
+                                               false);
+    return ReshardingMetrics::get(cc().getServiceContext())->reportForCurrentOp(options);
 }
 
 void ReshardingRecipientService::RecipientStateMachine::onReshardingFieldsChanges(
