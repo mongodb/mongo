@@ -60,7 +60,7 @@ public:
         std::vector<BSONObj> docs;
         BSONObj bucketMin;  // The full min/max if this is the bucket's first commit, or the updates
         BSONObj bucketMax;  // since the previous commit if not.
-        uint16_t numCommittedMeasurements;
+        uint32_t numCommittedMeasurements;
         StringSet newFieldNamesToBeInserted;
 
         BSONObj toBSON() const;
@@ -226,17 +226,17 @@ private:
 
         // The total size in bytes of the bucket's BSON serialization, including measurements to be
         // inserted.
-        uint32_t size = 0;
+        uint64_t size = 0;
 
         // The total number of measurements in the bucket, including uncommitted measurements and
         // measurements to be inserted.
-        uint16_t numMeasurements = 0;
+        uint32_t numMeasurements = 0;
 
         // The number of measurements that were most recently returned from a call to commit().
-        uint16_t numPendingCommitMeasurements = 0;
+        uint32_t numPendingCommitMeasurements = 0;
 
         // The number of committed measurements in the bucket.
-        uint16_t numCommittedMeasurements = 0;
+        uint32_t numCommittedMeasurements = 0;
 
         // The number of current writers for the bucket.
         uint32_t numWriters = 0;

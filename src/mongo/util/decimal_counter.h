@@ -33,6 +33,7 @@
 #include <limits>
 
 #include "mongo/base/string_data.h"
+#include "mongo/util/itoa.h"
 
 namespace mongo {
 /**
@@ -44,6 +45,9 @@ template <typename T>
 class DecimalCounter {
 public:
     static_assert(std::is_unsigned<T>::value, "DecimalCounter requires an unsigned type");
+
+    DecimalCounter<T>(T start = 0) : _lastDigitIndex(_getLastDigitIndex(start)), _counter(start) {}
+
     constexpr operator StringData() const {
         return {_digits, static_cast<size_t>(_lastDigitIndex + 1)};
     }
@@ -95,10 +99,19 @@ public:
     }
 
 private:
+    uint8_t _getLastDigitIndex(T start) {
+        if (!start) {
+            return 0;
+        }
+        StringData startStr = ItoA(start);
+        std::memcpy(_digits, startStr.rawData(), startStr.size());
+        return startStr.size() - 1;
+    }
+
     // Add 1, because digit10 is 1 less than the maximum number of digits, and 1 for the final '\0'.
     static constexpr size_t kBufSize = std::numeric_limits<T>::digits10 + 2;
     char _digits[kBufSize] = {'0'};  // Remainder is zero-initialized.
-    uint8_t _lastDigitIndex = 0;     // Indicates the last digit in _digits.
-    T _counter = 0;
+    uint8_t _lastDigitIndex;         // Indicates the last digit in _digits.
+    T _counter;
 };
 }  // namespace mongo

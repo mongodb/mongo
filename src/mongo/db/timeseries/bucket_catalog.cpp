@@ -39,6 +39,15 @@
 namespace mongo {
 namespace {
 const auto getBucketCatalog = ServiceContext::declareDecoration<BucketCatalog>();
+
+uint8_t numDigits(uint32_t num) {
+    uint8_t numDigits = 0;
+    while (num) {
+        num /= 10;
+        ++numDigits;
+    }
+    return numDigits;
+}
 }  // namespace
 
 BSONObj BucketCatalog::CommitData::toBSON() const {
@@ -222,7 +231,7 @@ BucketCatalog::CommitData BucketCatalog::commit(const OID& bucketId,
     stats.numMeasurementsCommitted += measurements.size();
 
     // Inform waiters that their measurements have been committed.
-    for (uint16_t i = 1; i < bucket.numPendingCommitMeasurements; i++) {
+    for (uint32_t i = 1; i < bucket.numPendingCommitMeasurements; i++) {
         bucket.promises.front().emplaceValue(*previousCommitInfo);
         bucket.promises.pop();
     }
@@ -390,7 +399,7 @@ void BucketCatalog::Bucket::calculateBucketFieldsAndSizeChange(
     newFieldNamesToBeInserted->clear();
     *newFieldNamesSize = 0;
     *sizeToBeAdded = 0;
-    auto numMeasurementsFieldLength = std::to_string(numMeasurements).size();
+    auto numMeasurementsFieldLength = numDigits(numMeasurements);
     for (const auto& elem : doc) {
         if (elem.fieldNameStringData() == metaField) {
             // Ignore the metadata field since it will not be inserted.
@@ -583,11 +592,12 @@ bool BucketCatalog::MinMax::_appendUpdates(BSONObjBuilder* builder) {
         }
     } else {
         builder->append(doc_diff::kArrayHeader, true);
-        for (size_t i = 0; i < _array.size(); i++) {
-            auto& minMax = _array[i];
+        DecimalCounter<size_t> count;
+        for (auto& minMax : _array) {
             invariant(minMax._type != Type::kUnset);
             if (minMax._updated) {
-                auto updateFieldName = doc_diff::kUpdateSectionFieldName + std::to_string(i);
+                std::string updateFieldName = str::stream()
+                    << doc_diff::kUpdateSectionFieldName << StringData(count);
                 if (minMax._type == Type::kObject) {
                     BSONObjBuilder subObj(builder->subobjStart(updateFieldName));
                     minMax._append(&subObj);
@@ -603,11 +613,13 @@ bool BucketCatalog::MinMax::_appendUpdates(BSONObjBuilder* builder) {
                 BSONObjBuilder subDiff;
                 if (minMax._appendUpdates(&subDiff)) {
                     // An update occurred at a lower level, so append the sub diff.
-                    builder->append(doc_diff::kSubDiffSectionFieldPrefix + std::to_string(i),
+                    builder->append(str::stream() << doc_diff::kSubDiffSectionFieldPrefix
+                                                  << StringData(count),
                                     subDiff.done());
                     appended = true;
                 }
             }
+            ++count;
         }
     }
 

@@ -122,28 +122,6 @@ bool isTimeseries(OperationContext* opCtx, const NamespaceString& ns) {
 const int kTimeseriesControlVersion = 1;
 
 /**
- * Returns $set expressions for the bucket's data field.
- * If 'metadataElem' is not empty, the time-series collection was created with a metadata field.
- * All measurements in a bucket share the same value in the 'meta' field, so there is no need to add
- * the metadata to the data field.
- */
-void appendTimeseriesDataFields(const std::vector<BSONObj>& docs,
-                                BSONElement metadataElem,
-                                uint16_t count,
-                                BSONObjBuilder* builder) {
-    for (const auto& doc : docs) {
-        for (const auto& elem : doc) {
-            auto key = elem.fieldNameStringData();
-            if (metadataElem && key == metadataElem.fieldNameStringData()) {
-                continue;
-            }
-            builder->appendAs(elem, str::stream() << "data." << key << "." << count);
-        }
-        count++;
-    }
-}
-
-/**
  * Transforms a single time-series insert to an update request on an existing bucket.
  */
 write_ops::UpdateOpEntry makeTimeseriesUpdateOpEntry(const OID& bucketId,
@@ -168,7 +146,7 @@ write_ops::UpdateOpEntry makeTimeseriesUpdateOpEntry(const OID& bucketId,
         // doc_diff::kSubDiffSectionFieldPrefix + <field name> => {<index_0>: ..., <index_1>: ...}
         StringDataMap<BSONObjBuilder> dataFieldBuilders;
         auto metadataElem = metadata.firstElement();
-        auto count = data.numCommittedMeasurements;
+        DecimalCounter<uint32_t> count(data.numCommittedMeasurements);
         for (const auto& doc : data.docs) {
             for (const auto& elem : doc) {
                 auto key = elem.fieldNameStringData();
@@ -176,9 +154,9 @@ write_ops::UpdateOpEntry makeTimeseriesUpdateOpEntry(const OID& bucketId,
                     continue;
                 }
                 auto& builder = dataFieldBuilders[key];
-                builder.appendAs(elem, std::to_string(count));
+                builder.appendAs(elem, count);
             }
-            count++;
+            ++count;
         }
 
         // doc_diff::kSubDiffSectionFieldPrefix + <field name>
@@ -220,16 +198,16 @@ BSONArray makeTimeseriesInsertDocument(const OID& bucketId,
     auto metadataElem = metadata.firstElement();
 
     StringDataMap<BSONObjBuilder> dataBuilders;
-    uint16_t count = 0;
+    DecimalCounter<uint32_t> count;
     for (const auto& doc : data.docs) {
-        auto countFieldName = std::to_string(count++);
         for (const auto& elem : doc) {
             auto key = elem.fieldNameStringData();
             if (metadataElem && key == metadataElem.fieldNameStringData()) {
                 continue;
             }
-            dataBuilders[key].appendAs(elem, countFieldName);
+            dataBuilders[key].appendAs(elem, count);
         }
+        ++count;
     }
 
     BSONArrayBuilder builder;
