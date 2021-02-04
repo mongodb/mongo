@@ -259,9 +259,8 @@ function runChecksAfterFCVDowngrade() {
                 {getParameter: 1, featureFlagShardingFullDDLSupportTimestampedVersion: 1}))
             .featureFlagShardingFullDDLSupportTimestampedVersion.value;
 
-    testAllowedMigrationsFieldChecksAfterFCVDowngrade();
-
     if (isFeatureFlagEnabled) {
+        testAllowedMigrationsFieldChecksAfterFCVDowngrade();
         testTimestampFieldChecksAfterFCVDowngrade();
         testChunkCollectionUuidFieldChecksAfterFCVDowngrade();
     } else {
@@ -295,6 +294,21 @@ for (let oldVersion of [lastLTSFCV, lastContinuousFCV]) {
     // Upgrade the entire cluster to the latest version.
     jsTest.log('upgrading cluster');
     st.upgradeCluster(latestFCV);
+
+    const isFeatureFlagEnabled =
+        assert
+            .commandWorked(st.configRS.getPrimary().adminCommand(
+                {getParameter: 1, featureFlagShardingFullDDLSupportTimestampedVersion: 1}))
+            .featureFlagShardingFullDDLSupportTimestampedVersion.value;
+
+    if (isFeatureFlagEnabled) {
+        // TODO SERVER-53104: do not skip this test once this ticket is completed
+        jsTest.log(
+            'Skipping test since it is not compatible with featureFlagShardingFullDDLSupportTimestampedVersion yet');
+        st.stop();
+        return;
+    }
+
     assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
 
     // Tests after upgrade

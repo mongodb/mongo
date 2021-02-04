@@ -27,6 +27,20 @@ const st = new ShardingTest({
     other: {mongosOptions: {binVersion: "latest"}}
 });
 
+const isFeatureFlagEnabled =
+    assert
+        .commandWorked(st.configRS.getPrimary().adminCommand(
+            {getParameter: 1, featureFlagShardingFullDDLSupportTimestampedVersion: 1}))
+        .featureFlagShardingFullDDLSupportTimestampedVersion.value;
+
+if (isFeatureFlagEnabled) {
+    // TODO SERVER-53104: do not skip this test once this ticket is completed
+    jsTest.log(
+        'Skipping test since it is not compatible with featureFlagShardingFullDDLSupportTimestampedVersion yet');
+    st.stop();
+    return;
+}
+
 let shardedColl = st.s.getDB(dbName)[collName];
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
 st.ensurePrimaryShard(dbName, st.shard0.shardName);

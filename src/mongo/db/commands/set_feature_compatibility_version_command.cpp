@@ -56,7 +56,6 @@
 #include "mongo/db/s/active_migrations_registry.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/migration_util.h"
-#include "mongo/db/s/shard_metadata_util.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/views/view_catalog.h"
@@ -422,14 +421,6 @@ public:
 
             if (failDowngrading.shouldFail())
                 return false;
-
-            if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
-                if (requestedVersion < FeatureCompatibilityParams::Version::kVersion49) {
-                    // SERVER-52632: Remove once 5.0 becomes the LastLTS
-                    shardmetadatautil::downgradeShardConfigDatabasesEntriesToPre49(opCtx);
-                    shardmetadatautil::downgradeShardConfigCollectionEntriesToPre49(opCtx);
-                }
-            }
 
             if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
                 // Downgrade shards before config finishes its downgrade.

@@ -96,10 +96,10 @@ private:
      * apply a set up updated chunks to the shard persisted metadata store or to drop the persisted
      * metadata for a specific collection.
      */
-    struct collAndChunkTask {
-        collAndChunkTask(const collAndChunkTask&) = delete;
-        collAndChunkTask& operator=(const collAndChunkTask&) = delete;
-        collAndChunkTask(collAndChunkTask&&) = default;
+    struct CollAndChunkTask {
+        CollAndChunkTask(const CollAndChunkTask&) = delete;
+        CollAndChunkTask& operator=(const CollAndChunkTask&) = delete;
+        CollAndChunkTask(CollAndChunkTask&&) = default;
 
         /**
          * Initializes a task for either dropping or updating the persisted metadata for the
@@ -109,15 +109,20 @@ private:
          * Note: statusWithCollectionAndChangedChunks must always be NamespaceNotFound or
          * OK, otherwise the constructor will invariant because there is no task to complete.
          *
+         * if 'metadataFormatChanged' is true, this task updates the persistent
+         * metadata format of the collection and its chunks. This specific kind
+         * of task doesn't have changed chunks.
+         *
          * 'collectionAndChangedChunks' is only initialized if 'dropped' is false.
          * 'minimumQueryVersion' sets 'minQueryVersion'.
          * 'maxQueryVersion' is either set to the highest chunk version in
          * 'collectionAndChangedChunks' or ChunkVersion::UNSHARDED().
          */
-        collAndChunkTask(
+        CollAndChunkTask(
             StatusWith<CollectionAndChangedChunks> statusWithCollectionAndChangedChunks,
             ChunkVersion minimumQueryVersion,
-            long long currentTerm);
+            long long currentTerm,
+            bool metadataFormatChanged = false);
 
         // Always-incrementing task number to uniquely identify different tasks
         uint64_t taskNum;
@@ -139,8 +144,22 @@ private:
         // Indicates whether the collection metadata must be cleared.
         bool dropped{false};
 
+        // Indicates whether the collection metadata and all its chunks must be updated due to a
+        // metadata format change.
+        bool updateMetadataFormat{false};
+
         // The term in which the loader scheduled this task.
         uint32_t termCreated;
+    };
+
+    /* This class represents the results of a _getEnqueuedMetadata call. It contains information
+     * about:
+     *	- Whether we must patch up the metadata results that are sent back to the CatalogCache.
+     *	- The Collection and the changed chunks.
+     */
+    struct EnqueuedMetadataResults {
+        bool mustPatchUpMetadataResults{false};
+        CollectionAndChangedChunks collAndChangedChunks;
     };
 
     /**
@@ -164,7 +183,7 @@ private:
          * don't waste time applying changes we will just delete. If the one remaining task in the
          * list is already a drop task, the new one isn't added because it is redundant.
          */
-        void addTask(collAndChunkTask task);
+        void addTask(CollAndChunkTask task);
 
         auto& front() {
             invariant(!_tasks.empty());
@@ -218,10 +237,11 @@ private:
          * Iterates over the task list to retrieve the enqueued metadata. Only retrieves collects
          * data from tasks that have terms matching the specified 'term'.
          */
-        CollectionAndChangedChunks getEnqueuedMetadataForTerm(const long long term) const;
+        EnqueuedMetadataResults getEnqueuedMetadataForTerm(const long long term) const;
+
 
     private:
-        std::list<collAndChunkTask> _tasks{};
+        std::list<CollAndChunkTask> _tasks{};
 
         // Condition variable which will be signaled whenever the active task from the tasks list is
         // completed. Must be used in conjunction with the loader's mutex.
@@ -312,13 +332,6 @@ private:
          */
         void waitForActiveTaskCompletion(stdx::unique_lock<Latch>& lg);
 
-        /**
-         * Checks whether 'term' matches the term of the latest task in the task list. This is
-         * useful to check whether the task list has outdated data that's no longer valid to use in
-         * the current/new term specified by 'term'.
-         */
-        bool hasTasksFromThisTerm(long long term) const;
-
     private:
         std::list<DBTask> _tasks{};
 
@@ -406,7 +419,7 @@ private:
      *
      * Only run on the shard primary.
      */
-    std::pair<bool, CollectionAndChangedChunks> _getEnqueuedMetadata(
+    std::pair<bool, EnqueuedMetadataResults> _getEnqueuedMetadata(
         const NamespaceString& nss,
         const ChunkVersion& catalogCacheSinceVersion,
         const long long term);
@@ -423,7 +436,7 @@ private:
      */
     void _ensureMajorityPrimaryAndScheduleCollAndChunksTask(OperationContext* opCtx,
                                                             const NamespaceString& nss,
-                                                            collAndChunkTask task);
+                                                            CollAndChunkTask task);
 
     void _ensureMajorityPrimaryAndScheduleDbTask(OperationContext* opCtx,
                                                  StringData dbName,

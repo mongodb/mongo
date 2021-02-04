@@ -401,6 +401,26 @@ Status updateShardChunks(OperationContext* opCtx,
     }
 }
 
+void updateTimestampOnShardCollections(OperationContext* opCtx,
+                                       const NamespaceString& nss,
+                                       const boost::optional<Timestamp>& timestamp) {
+    write_ops::Update clearFields(NamespaceString::kShardConfigCollectionsNamespace, [&] {
+        write_ops::UpdateOpEntry u;
+        u.setQ(BSON(ShardCollectionType::kNssFieldName << nss.ns()));
+        BSONObj updateOp = (timestamp)
+            ? BSON("$set" << BSON(CollectionType::kTimestampFieldName << *timestamp))
+            : BSON("$unset" << BSON(ShardCollectionType::kPre50CompatibleAllowMigrationsFieldName
+                                    << "" << CollectionType::kTimestampFieldName << ""));
+        u.setU(write_ops::UpdateModification::parseFromClassicUpdate(updateOp));
+        return std::vector{u};
+    }());
+
+    DBDirectClient client(opCtx);
+    const auto commandResult = client.runCommand(clearFields.serialize({}));
+
+    uassertStatusOK(getStatusFromWriteCommandResponse(commandResult->getCommandReply()));
+}
+
 Status dropChunksAndDeleteCollectionsEntry(OperationContext* opCtx, const NamespaceString& nss) {
     try {
         DBDirectClient client(opCtx);
@@ -485,66 +505,6 @@ Status deleteDatabasesEntry(OperationContext* opCtx, StringData dbName) {
     } catch (const DBException& ex) {
         return ex.toStatus();
     }
-}
-
-void downgradeShardConfigDatabasesEntriesToPre49(OperationContext* opCtx) {
-    LOGV2(5258804, "Starting downgrade of config.cache.databases");
-    if (feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabledAndIgnoreFCV()) {
-        write_ops::Update clearFields(NamespaceString::kShardConfigDatabasesNamespace, [] {
-            write_ops::UpdateOpEntry u;
-            u.setQ({});
-            u.setU(write_ops::UpdateModification::parseFromClassicUpdate(
-                BSON("$unset" << BSON(
-                         ShardDatabaseType::version() + "." + DatabaseVersion::kTimestampFieldName
-                         << ""))));
-            u.setMulti(true);
-            return std::vector{u};
-        }());
-
-        clearFields.setWriteCommandBase([] {
-            write_ops::WriteCommandBase base;
-            base.setOrdered(false);
-            return base;
-        }());
-
-        DBDirectClient client(opCtx);
-        const auto commandResult = client.runCommand(clearFields.serialize({}));
-
-        uassertStatusOK(getStatusFromWriteCommandResponse(commandResult->getCommandReply()));
-        LOGV2(5258805, "Successfully downgraded config.cache.databases");
-    }
-}
-
-void downgradeShardConfigCollectionEntriesToPre49(OperationContext* opCtx) {
-    // Clear the 'allowMigrations' and 'timestamp' fields from config.cache.collections
-    LOGV2(5189100, "Starting downgrade of config.cache.collections");
-    write_ops::Update clearFields(NamespaceString::kShardConfigCollectionsNamespace, [] {
-        BSONObj unsetFields =
-            BSON(ShardCollectionType::kPre50CompatibleAllowMigrationsFieldName << "");
-        if (feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabledAndIgnoreFCV()) {
-            unsetFields = unsetFields.addFields(BSON(CollectionType::kTimestampFieldName << ""));
-        }
-
-        write_ops::UpdateOpEntry u;
-        u.setQ({});
-        u.setU(
-            write_ops::UpdateModification::parseFromClassicUpdate(BSON("$unset" << unsetFields)));
-        u.setMulti(true);
-        return std::vector{u};
-    }());
-
-    clearFields.setWriteCommandBase([] {
-        write_ops::WriteCommandBase base;
-        base.setOrdered(false);
-        return base;
-    }());
-
-    DBDirectClient client(opCtx);
-    const auto commandResult = client.runCommand(clearFields.serialize({}));
-
-    uassertStatusOK(getStatusFromWriteCommandResponse(commandResult->getCommandReply()));
-
-    LOGV2(5189101, "Successfully downgraded config.cache.collections");
 }
 
 }  // namespace shardmetadatautil

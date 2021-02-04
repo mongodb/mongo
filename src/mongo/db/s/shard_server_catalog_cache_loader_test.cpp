@@ -29,10 +29,13 @@
 
 #include "mongo/platform/basic.h"
 
+#include <boost/optional/optional_io.hpp>
+
 #include "mongo/db/s/shard_server_catalog_cache_loader.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
+#include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog_cache_loader_mock.h"
 
 namespace mongo {
@@ -186,7 +189,8 @@ ShardServerCatalogCacheLoaderTest::makeCombinedOriginalFiveChunksAndThreeNewChun
 
 CollectionType ShardServerCatalogCacheLoaderTest::makeCollectionType(
     const ChunkVersion& collVersion) {
-    CollectionType coll(kNss, collVersion.epoch(), Date_t::now(), UUID::gen());
+    CollectionType coll(
+        kNss, collVersion.epoch(), collVersion.getTimestamp(), Date_t::now(), UUID::gen());
     coll.setKeyPattern(kKeyPattern);
     coll.setUnique(false);
     return coll;
@@ -429,6 +433,77 @@ TEST_F(ShardServerCatalogCacheLoaderTest, PrimaryLoadFromShardedAndFindMixedChun
         ASSERT_EQUALS(collAndChunksRes.changedChunks[i].getVersion(),
                       chunksWithNewEpoch[i].getVersion());
     }
+}
+
+TEST_F(ShardServerCatalogCacheLoaderTest,
+       PrimaryLoadFromShardedAndFindCollAndChunksMetadataFormatChanged) {
+    // First set up the shard chunk loader as sharded.
+    vector<ChunkType> chunks = setUpChunkLoaderWithFiveChunks();
+
+    // Simulating that the config server added timestamps to all chunks
+    {
+        vector<ChunkType> newChunks = chunks;
+        for (auto& chunk : newChunks) {
+            const ChunkVersion v = chunk.getVersion();
+            chunk.setVersion(
+                ChunkVersion(v.majorVersion(), v.minorVersion(), v.epoch(), Timestamp(42)));
+        }
+
+        CollectionType collectionTypeWithNewEpoch =
+            makeCollectionType(newChunks.back().getVersion());
+        _remoteLoaderMock->setCollectionRefreshReturnValue(collectionTypeWithNewEpoch);
+        _remoteLoaderMock->setChunkRefreshReturnValue(newChunks);
+
+        auto collAndChunksRes = _shardLoader->getChunksSince(kNss, newChunks[0].getVersion()).get();
+        ASSERT_EQUALS(collAndChunksRes.epoch, collectionTypeWithNewEpoch.getEpoch());
+        ASSERT_EQUALS(collAndChunksRes.creationTime, Timestamp(42));
+        ASSERT_EQUALS(collAndChunksRes.changedChunks.size(), 5UL);
+        for (const auto& changedChunk : collAndChunksRes.changedChunks) {
+            ASSERT_EQUALS(changedChunk.getVersion().getTimestamp(), Timestamp(42));
+            ASSERT_EQUALS(changedChunk.getVersion().epoch(), collAndChunksRes.epoch);
+        }
+    }
+
+    // Simulating that the config server removed timestamps from all chunks
+    {
+        vector<ChunkType> newChunks = chunks;
+        for (auto& chunk : newChunks) {
+            const ChunkVersion v = chunk.getVersion();
+            chunk.setVersion(
+                ChunkVersion(v.majorVersion(), v.minorVersion(), v.epoch(), boost::none));
+        }
+
+        CollectionType collectionTypeWithNewEpoch =
+            makeCollectionType(newChunks.back().getVersion());
+        _remoteLoaderMock->setCollectionRefreshReturnValue(collectionTypeWithNewEpoch);
+        _remoteLoaderMock->setChunkRefreshReturnValue(newChunks);
+
+        auto collAndChunksRes = _shardLoader->getChunksSince(kNss, newChunks[0].getVersion()).get();
+        ASSERT_EQUALS(collAndChunksRes.epoch, collectionTypeWithNewEpoch.getEpoch());
+        ASSERT_EQUALS(collAndChunksRes.creationTime, boost::none);
+        ASSERT_EQUALS(collAndChunksRes.changedChunks.size(), 5UL);
+        for (const auto& changedChunk : collAndChunksRes.changedChunks) {
+            ASSERT_EQUALS(changedChunk.getVersion().getTimestamp(), boost::none);
+            ASSERT_EQUALS(changedChunk.getVersion().epoch(), collAndChunksRes.epoch);
+        }
+    }
+}
+
+TEST_F(ShardServerCatalogCacheLoaderTest, PrimaryLoadFromShardedAndFindDbMetadataFormatChanged) {
+    const std::string dbName("dbName");
+    DatabaseVersion version(UUID::gen());
+    DatabaseType dbType(dbName, kShardId, true /* sharded */, version);
+
+    _remoteLoaderMock->setDatabaseRefreshReturnValue(dbType);
+    auto newDbType = _shardLoader->getDatabase(dbName).get();
+    ASSERT_EQUALS(dbType.getVersion().getUuid(), newDbType.getVersion().getUuid());
+    ASSERT_EQUALS(dbType.getVersion().getTimestamp(), newDbType.getVersion().getTimestamp());
+
+    dbType.setVersion(DatabaseVersion(UUID::gen(), Timestamp(42)));
+    _remoteLoaderMock->setDatabaseRefreshReturnValue(dbType);
+    newDbType = _shardLoader->getDatabase(dbName).get();
+    ASSERT_EQUALS(dbType.getVersion().getUuid(), newDbType.getVersion().getUuid());
+    ASSERT_EQUALS(dbType.getVersion().getTimestamp(), newDbType.getVersion().getTimestamp());
 }
 
 }  // namespace

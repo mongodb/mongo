@@ -202,6 +202,13 @@ Status updateShardChunks(OperationContext* opCtx,
                          const OID& currEpoch);
 
 /**
+ * Adds/removes the timestamp of the  'nss' entry in config.cache.collections
+ */
+void updateTimestampOnShardCollections(OperationContext* opCtx,
+                                       const NamespaceString& nss,
+                                       const boost::optional<Timestamp>& timestamp);
+
+/**
  * Deletes locally persisted chunk metadata associated with 'nss': drops the chunks collection
  * and removes the collections collection entry.
  *
@@ -221,20 +228,6 @@ void dropChunks(OperationContext* opCtx, const NamespaceString& nss);
  * collection entry.
  */
 Status deleteDatabasesEntry(OperationContext* opCtx, StringData dbName);
-
-/**
- * Downgrades the config.cache.databases entries to prior 4.9 version. More specifically, it removes
- * the 'version.timestamp' field from all the documents in config.cache.databases.
- *
- */
-void downgradeShardConfigDatabasesEntriesToPre49(OperationContext* opCtx);
-
-/**
- * Downgrades the config.cache.collections entries to prior 4.9 version. More specifically, it
- * removes the allowMigrations and timestamp fields from all the documents of
- * config.cache.collections
- */
-void downgradeShardConfigCollectionEntriesToPre49(OperationContext* opCtx);
 
 }  // namespace shardmetadatautil
 }  // namespace mongo
