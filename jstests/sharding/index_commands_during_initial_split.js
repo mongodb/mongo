@@ -59,6 +59,17 @@ function runCommandDuringShardCollection(st, ns, shardKey, zones, failpointName,
 
 const numShards = 4;
 const st = new ShardingTest({shards: numShards});
+
+const featureFlagParam = assert.commandWorked(
+    st.configRS.getPrimary().adminCommand({getParameter: 1, featureFlagShardingFullDDLSupport: 1}));
+
+if (featureFlagParam.featureFlagShardingFullDDLSupport.value) {
+    jsTest.log(
+        'Skipping test because featureFlagShardingFullDDLSupport feature flag is enabled and this test expects the exacty legacy steps, so, it is incompatible with the new path.');
+    st.stop();
+    return;
+}
+
 const allShards = [];
 for (let i = 0; i < numShards; i++) {
     allShards.push(st["shard" + i]);

@@ -32,10 +32,10 @@ global:
 imports:
     - "mongo/db/drop_database.idl"
     - "mongo/db/commands/rename_collection.idl"
-    - "mongo/idl/basic_types.idl"
-    - "mongo/s/database_version.idl"
-    - "mongo/s/chunk_version.idl"
     - "mongo/db/keypattern.idl"
+    - "mongo/idl/basic_types.idl"
+    - "mongo/s/chunk_version.idl"
+    - "mongo/s/database_version.idl"
 
 structs:
     RenameCollectionResponse:
@@ -93,6 +93,29 @@ commands:
                 type: object
                 description: "The collation to use for the shard key index."
                 optional: true
+    
+    _shardsvrCreateCollectionParticipant:
+        command_name: _shardsvrCreateCollectionParticipant
+        cpp_name: ShardsvrCreateCollectionParticipant
+        description: "Command to create a collection on participant shards, when called, assumes the primary shard is under the critical section for that namespace."
+        strict: false
+        namespace: concatenate_with_db
+        api_version: ""
+        fields:
+            indexes:
+                type: array<object>
+                description: "Collection indexes."
+            options:
+                type: object
+                description: "Collection options."
+            collectionUUID:
+                type: uuid
+                description: "Collection uuid."
+                optional: true
+            idIndex:
+                type: object
+                description: "Id index."
+            
 
     _shardsvrDropDatabase:
         description: "Internal command sent to the primary shard of a database to drop it."

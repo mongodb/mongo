@@ -51,6 +51,7 @@
 #include "mongo/db/s/shard_collection_legacy.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/shard_key_util.h"
+#include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
@@ -101,38 +102,11 @@ void uassertStatusOKWithWarning(const Status& status) {
     }
 }
 
-/**
- * Throws an exception if the collection is already sharded with different options.
- *
- * If the collection is already sharded with the same options, returns the existing collection's
- * full spec, else returns boost::none.
- */
 boost::optional<CreateCollectionResponse> checkIfCollectionAlreadyShardedWithSameOptions(
     OperationContext* opCtx, const ShardsvrShardCollectionRequest& request) {
     const auto& nss = *request.get_shardsvrShardCollection();
-    auto cm = uassertStatusOK(
-        Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(opCtx, nss));
-
-    if (!cm.isSharded()) {
-        return boost::none;
-    }
-
-    auto defaultCollator =
-        cm.getDefaultCollator() ? cm.getDefaultCollator()->getSpec().toBSON() : BSONObj();
-
-    // If the collection is already sharded, fail if the deduced options in this request do not
-    // match the options the collection was originally sharded with.
-    uassert(ErrorCodes::AlreadyInitialized,
-            str::stream() << "sharding already enabled for collection " << nss,
-            SimpleBSONObjComparator::kInstance.evaluate(cm.getShardKeyPattern().toBSON() ==
-                                                        request.getKey()) &&
-                SimpleBSONObjComparator::kInstance.evaluate(defaultCollator ==
-                                                            *request.getCollation()) &&
-                cm.isUnique() == request.getUnique());
-
-    CreateCollectionResponse response(cm.getVersion());
-    response.setCollectionUUID(cm.getUUID());
-    return response;
+    return mongo::sharding_ddl_util::checkIfCollectionAlreadySharded(
+        opCtx, nss, request.getKey(), *request.getCollation(), request.getUnique());
 }
 
 void checkForExistingChunks(OperationContext* opCtx, const NamespaceString& nss) {
@@ -584,7 +558,7 @@ CreateCollectionResponse shardCollection(OperationContext* opCtx,
         // path.
         boost::optional<DistLockManager::ScopedDistLock> dbDistLock;
         boost::optional<DistLockManager::ScopedDistLock> collDistLock;
-        if (!mustTakeDistLock) {
+        if (mustTakeDistLock) {
             dbDistLock.emplace(uassertStatusOK(DistLockManager::get(opCtx)->lock(
                 opCtx, nss.db(), "shardCollection", DistLockManager::kDefaultLockTimeout)));
             collDistLock.emplace(uassertStatusOK(DistLockManager::get(opCtx)->lock(
@@ -604,14 +578,20 @@ CreateCollectionResponse shardCollection(OperationContext* opCtx,
 
         // If DistLock must not be taken, then the request came from the config server, there is no
         // need to check this here.
-        if (!mustTakeDistLock) {
+        if (mustTakeDistLock) {
             if (nss.db() == NamespaceString::kConfigDb) {
-                BSONObj countResult;
-                DBDirectClient client(opCtx);
-                if (!client.runCommand(
-                        nss.db().toString(), BSON("count" << nss.coll()), countResult))
-                    uassertStatusOK(getStatusFromCommandResult(countResult));
-                auto numDocs = countResult["n"].Int();
+                auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+
+                auto findReponse = uassertStatusOK(configShard->exhaustiveFindOnConfig(
+                    opCtx,
+                    ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                    repl::ReadConcernLevel::kMajorityReadConcern,
+                    nss,
+                    BSONObj(),
+                    BSONObj(),
+                    1));
+
+                auto numDocs = findReponse.docs.size();
 
                 // If this is a collection on the config db, it must be empty to be sharded.
                 uassert(ErrorCodes::IllegalOperation,
@@ -642,11 +622,12 @@ CreateCollectionResponse shardCollection(OperationContext* opCtx,
         splitPolicy =
             InitialSplitPolicy::calculateOptimizationStrategy(opCtx,
                                                               targetState->shardKeyPattern,
-                                                              request,
+                                                              request.getNumInitialChunks(),
+                                                              request.getPresplitHashedZones(),
+                                                              request.getInitialSplitPoints(),
                                                               targetState->tags,
                                                               getNumShards(opCtx),
                                                               targetState->collectionIsEmpty);
-
         boost::optional<CollectionUUID> optCollectionUUID;
         if (shouldUseUUIDForChunkIndexing) {
             optCollectionUUID = targetState->uuid;
@@ -709,7 +690,7 @@ CreateCollectionResponse shardCollection(OperationContext* opCtx,
 CreateCollectionResponse shardCollectionLegacy(OperationContext* opCtx,
                                                const NamespaceString& nss,
                                                const BSONObj& cmdObj,
-                                               bool legacyPath) {
+                                               bool requestFromCSRS) {
     auto request = ShardsvrShardCollectionRequest::parse(
         IDLParserErrorContext("_shardsvrShardCollection"), cmdObj);
     if (!request.getCollation())
@@ -732,8 +713,12 @@ CreateCollectionResponse shardCollectionLegacy(OperationContext* opCtx,
         response = scopedShardCollection.getResponse().get();
     } else {
         try {
-            response = shardCollection(
-                opCtx, nss, cmdObj, request, ShardingState::get(opCtx)->shardId(), legacyPath);
+            response = shardCollection(opCtx,
+                                       nss,
+                                       cmdObj,
+                                       request,
+                                       ShardingState::get(opCtx)->shardId(),
+                                       !requestFromCSRS);
         } catch (const DBException& e) {
             scopedShardCollection.emplaceResponse(e.toStatus());
             throw;

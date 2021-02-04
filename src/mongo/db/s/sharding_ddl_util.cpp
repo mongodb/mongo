@@ -206,5 +206,34 @@ void checkShardedRenamePreconditions(OperationContext* opCtx,
             tags.empty());
 }
 
+boost::optional<CreateCollectionResponse> checkIfCollectionAlreadySharded(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const BSONObj& key,
+    const BSONObj& collation,
+    bool unique) {
+    auto cm = uassertStatusOK(
+        Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(opCtx, nss));
+
+    if (!cm.isSharded()) {
+        return boost::none;
+    }
+
+    auto defaultCollator =
+        cm.getDefaultCollator() ? cm.getDefaultCollator()->getSpec().toBSON() : BSONObj();
+
+    // If the collection is already sharded, fail if the deduced options in this request do not
+    // match the options the collection was originally sharded with.
+    uassert(ErrorCodes::AlreadyInitialized,
+            str::stream() << "sharding already enabled for collection " << nss,
+            SimpleBSONObjComparator::kInstance.evaluate(cm.getShardKeyPattern().toBSON() == key) &&
+                SimpleBSONObjComparator::kInstance.evaluate(defaultCollator == collation) &&
+                cm.isUnique() == unique);
+
+    CreateCollectionResponse response(cm.getVersion());
+    response.setCollectionUUID(cm.getUUID());
+    return response;
+}
+
 }  // namespace sharding_ddl_util
 }  // namespace mongo

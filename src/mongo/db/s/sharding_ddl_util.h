@@ -29,6 +29,7 @@
 
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 
 namespace mongo {
 namespace sharding_ddl_util {
@@ -60,6 +61,19 @@ void shardedRenameMetadata(OperationContext* opCtx,
 void checkShardedRenamePreconditions(OperationContext* opCtx,
                                      const NamespaceString& toNss,
                                      const bool dropTarget);
+
+/**
+ * Throws an exception if the collection is already sharded with different options.
+ *
+ * If the collection is already sharded with the same options, returns the existing collection's
+ * full spec, else returns boost::none.
+ */
+boost::optional<CreateCollectionResponse> checkIfCollectionAlreadySharded(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const BSONObj& key,
+    const BSONObj& collation,
+    bool unique);
 
 }  // namespace sharding_ddl_util
 }  // namespace mongo

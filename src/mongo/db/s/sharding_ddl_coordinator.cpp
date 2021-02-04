@@ -44,28 +44,29 @@ ShardingDDLCoordinator::ShardingDDLCoordinator(OperationContext* opCtx, const Na
     : _nss(ns), _forwardableOpMetadata(opCtx){};
 
 SemiFuture<void> ShardingDDLCoordinator::run(OperationContext* opCtx) {
-    // Check that the operation context has a database version for this namespace
-    const auto clientDbVersion = OperationShardingState::get(opCtx).getDbVersion(_nss.db());
-    uassert(ErrorCodes::IllegalOperation,
-            str::stream() << "Request sent without attaching database version",
-            clientDbVersion);
+    if (!_nss.isConfigDB()) {
+        // Check that the operation context has a database version for this namespace
+        const auto clientDbVersion = OperationShardingState::get(opCtx).getDbVersion(_nss.db());
+        uassert(ErrorCodes::IllegalOperation,
+                str::stream() << "Request sent without attaching database version",
+                clientDbVersion);
 
-    // Checks that this is the primary shard for the namespace's db
-    const auto dbPrimaryShardId = [&]() {
-        Lock::DBLock dbWriteLock(opCtx, _nss.db(), MODE_IS);
-        auto dss = DatabaseShardingState::get(opCtx, _nss.db());
-        auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, dss);
-        // The following call will also ensure that the database version matches
-        return dss->getDatabaseInfo(opCtx, dssLock).getPrimary();
-    }();
+        // Checks that this is the primary shard for the namespace's db
+        const auto dbPrimaryShardId = [&]() {
+            Lock::DBLock dbWriteLock(opCtx, _nss.db(), MODE_IS);
+            auto dss = DatabaseShardingState::get(opCtx, _nss.db());
+            auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, dss);
+            // The following call will also ensure that the database version matches
+            return dss->getDatabaseInfo(opCtx, dssLock).getPrimary();
+        }();
 
-    const auto thisShardId = ShardingState::get(opCtx)->shardId();
+        const auto thisShardId = ShardingState::get(opCtx)->shardId();
 
-    uassert(ErrorCodes::IllegalOperation,
-            str::stream() << "This is not the primary shard for db " << _nss.db()
-                          << " expected: " << dbPrimaryShardId << " shardId: " << thisShardId,
-            dbPrimaryShardId == thisShardId);
-
+        uassert(ErrorCodes::IllegalOperation,
+                str::stream() << "This is not the primary shard for db " << _nss.db()
+                              << " expected: " << dbPrimaryShardId << " shardId: " << thisShardId,
+                dbPrimaryShardId == thisShardId);
+    }
     return runImpl(Grid::get(opCtx)->getExecutorPool()->getFixedExecutor());
 }
 

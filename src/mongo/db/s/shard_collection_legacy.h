@@ -34,9 +34,14 @@
 
 namespace mongo {
 
+/**
+ * Executes the legacy path of shard collection. If requestFromCSRS is false, then the checks and
+ * operations performed by the config server (like taking the distributed lock on the database and
+ * the collection) must be done on the shard instead.
+ */
 CreateCollectionResponse shardCollectionLegacy(OperationContext* opCtx,
                                                const NamespaceString& nss,
                                                const BSONObj& cmdObj,
-                                               bool mustTakeDistLock);
+                                               bool requestFromCSRS);
 
 }  // namespace mongo
