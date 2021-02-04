@@ -123,7 +123,8 @@ private:
     void _transitionStateAndUpdateCoordinator(
         DonorStateEnum endState,
         boost::optional<Timestamp> minFetchTimestamp = boost::none,
-        boost::optional<Status> abortReason = boost::none);
+        boost::optional<Status> abortReason = boost::none,
+        boost::optional<ReshardingCloneSize> cloneSizeEstimate = boost::none);
 
     // Inserts 'doc' on-disk and sets '_donorDoc' in-memory.
     void _insertDonorDocument(const ReshardingDonorDocument& doc);

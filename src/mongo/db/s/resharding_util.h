@@ -171,6 +171,13 @@ UUID getCollectionUUIDFromChunkManger(const NamespaceString& nss, const ChunkMan
 NamespaceString constructTemporaryReshardingNss(StringData db, const UUID& sourceUuid);
 
 /**
+ * Gets the recipient shards for a resharding operation.
+ */
+std::set<ShardId> getRecipientShards(OperationContext* opCtx,
+                                     const NamespaceString& reshardNss,
+                                     const UUID& reshardingUUID);
+
+/**
  * Sends _flushRoutingTableCacheUpdatesWithWriteConcern to a list of shards. Throws if one of the
  * shards fails to refresh.
  */

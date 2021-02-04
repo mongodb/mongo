@@ -50,6 +50,9 @@ structs:
             state:
                 type: DonorState
                 optional: true
+            cloneSizeInfo:
+                type: ReshardingCloneSize
+                optional: true
 
     RecipientShardEntry:
         description: "Represents a recipient shard for a particular resharding operation on the
