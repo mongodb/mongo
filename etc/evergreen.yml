@@ -536,7 +536,8 @@ functions:
         rpm -ivh http://boxes.10gen.com/build/libpcap-devel-0.9.4-15.el5.x86_64.rpm
 
         ### SPLUNK
-        sed -i.bak "s/built-without-version-string/3.6.17-SERVER-42525-splunk/" common/options/options.go
+        #sed -i.bak "s/built-without-version-string/3.6.17-SERVER-42525-splunk/" common/options/options.go
+        sed -i.bak "s/built-without-version-string/3.6.17-linux-splunk-v2/" common/options/options.go
         sed -i.bak "s/built-without-git-spec/$(git rev-parse HEAD)/" common/options/options.go
 
         # Move the vendor source to make compatible with gccgo
