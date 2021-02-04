@@ -232,6 +232,12 @@ public:
         auto compFp = globalFailPointRegistry().find("skipComparingRecipientAndDonorFCV");
         compFp->setMode(FailPoint::alwaysOn);
 
+        // Skip fetching retryable writes, as we will test this logic entirely in integration
+        // tests.
+        auto fetchRetryableWritesFp =
+            globalFailPointRegistry().find("skipFetchingRetryableWritesEntriesBeforeStartOpTime");
+        fetchRetryableWritesFp->setMode(FailPoint::alwaysOn);
+
         // Skip fetching committed transactions, as we will test this logic entirely in integration
         // tests.
         auto fetchCommittedTransactionsFp =

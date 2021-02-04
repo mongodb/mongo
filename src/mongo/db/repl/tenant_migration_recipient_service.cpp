@@ -122,6 +122,8 @@ MONGO_FAIL_POINT_DEFINE(fpAfterConnectingTenantMigrationRecipientInstance);
 MONGO_FAIL_POINT_DEFINE(fpAfterRecordingRecipientPrimaryStartingFCV);
 MONGO_FAIL_POINT_DEFINE(fpAfterComparingRecipientAndDonorFCV);
 MONGO_FAIL_POINT_DEFINE(fpAfterRetrievingStartOpTimesMigrationRecipientInstance);
+MONGO_FAIL_POINT_DEFINE(skipFetchingRetryableWritesEntriesBeforeStartOpTime);
+MONGO_FAIL_POINT_DEFINE(fpAfterFetchingRetryableWritesEntriesBeforeStartOpTime);
 MONGO_FAIL_POINT_DEFINE(fpAfterStartingOplogFetcherMigrationRecipientInstance);
 MONGO_FAIL_POINT_DEFINE(setTenantMigrationRecipientInstanceHostTimeout);
 MONGO_FAIL_POINT_DEFINE(pauseAfterRetrievingLastTxnMigrationRecipientInstance);
@@ -796,12 +798,6 @@ void TenantMigrationRecipientService::Instance::_getStartOpTimesFromDonor(WithLo
     _stateDoc.setStartFetchingDonorOpTime(startFetchingDonorOpTime);
 }
 
-void TenantMigrationRecipientService::Instance::_fetchRetryableWritesOplogBeforeStartOpTime() {
-    // TODO SERVER-53319: Run the aggregation pipeline on the correct tenant donor's oplog. Move
-    // oplog buffer creation here and add the returned oplog entries to the buffer.
-    return;
-}
-
 AggregateCommand TenantMigrationRecipientService::Instance::_makeCommittedTransactionsAggregation()
     const {
 
@@ -869,7 +865,7 @@ void TenantMigrationRecipientService::Instance::_fetchCommittedTransactionsBefor
     }
 }
 
-void TenantMigrationRecipientService::Instance::_startOplogFetcher() {
+void TenantMigrationRecipientService::Instance::_createOplogBuffer() {
     auto opCtx = cc().makeOperationContext();
     OplogBufferCollection::Options options;
     options.peekCacheSize = static_cast<size_t>(tenantMigrationOplogBufferPeekCacheSize);
@@ -901,6 +897,71 @@ void TenantMigrationRecipientService::Instance::_startOplogFetcher() {
     }
 
     pauseAfterCreatingOplogBuffer.pauseWhileSet();
+}
+
+void TenantMigrationRecipientService::Instance::_fetchRetryableWritesOplogBeforeStartOpTime() {
+    if (MONGO_unlikely(
+            skipFetchingRetryableWritesEntriesBeforeStartOpTime.shouldFail())) {  // Test-only.
+        return;
+    }
+
+    auto opCtx = cc().makeOperationContext();
+    auto expCtx = makeExpressionContext(opCtx.get());
+
+    Timestamp startFetchingTimestamp;
+    {
+        stdx::lock_guard lk(_mutex);
+        invariant(_stateDoc.getStartFetchingDonorOpTime());
+        startFetchingTimestamp = _stateDoc.getStartFetchingDonorOpTime().get().getTimestamp();
+    }
+
+    // Fetch the oplog chains of all retryable writes that occurred before startFetchingTimestamp
+    // on this tenant.
+    auto serializedPipeline =
+        tenant_migration_util::createRetryableWritesOplogFetchingPipelineForTenantMigrations(
+            expCtx, startFetchingTimestamp, getTenantId())
+            ->serializeToBson();
+
+    AggregateCommand aggRequest(NamespaceString::kSessionTransactionsTableNamespace,
+                                std::move(serializedPipeline));
+
+    auto readConcernArgs = repl::ReadConcernArgs(
+        boost::optional<repl::ReadConcernLevel>(repl::ReadConcernLevel::kMajorityReadConcern));
+    aggRequest.setReadConcern(readConcernArgs.toBSONInner());
+    // We must set a writeConcern on internal commands.
+    aggRequest.setWriteConcern(WriteConcernOptions());
+
+    std::unique_ptr<DBClientCursor> cursor = uassertStatusOK(DBClientCursor::fromAggregationRequest(
+        _client.get(), std::move(aggRequest), true /* secondaryOk */, false /* useExhaust */));
+
+    // Similar to the OplogFetcher, we keep track of each oplog entry to apply and the number of
+    // the bytes of the documents read off the network.
+    while (cursor->more()) {
+        // cursor->more() will automatically request more from the server if necessary.
+        std::vector<BSONObj> retryableWritesEntries;
+        retryableWritesEntries.reserve(cursor->objsLeftInBatch());
+        auto toApplyDocumentBytes = 0;
+
+        while (cursor->moreInCurrentBatch()) {
+            // Gather entries from current batch.
+            BSONObj doc = cursor->next();
+            toApplyDocumentBytes += doc.objsize();
+            retryableWritesEntries.push_back(doc);
+        }
+
+        if (retryableWritesEntries.size() != 0) {
+            // Wait for enough space.
+            _donorOplogBuffer->waitForSpace(opCtx.get(), toApplyDocumentBytes);
+            // Buffer retryable writes entries.
+            _donorOplogBuffer->push(
+                opCtx.get(), retryableWritesEntries.begin(), retryableWritesEntries.end());
+        }
+    }
+}
+
+void TenantMigrationRecipientService::Instance::_startOplogFetcher() {
+    auto opCtx = cc().makeOperationContext();
+    stdx::unique_lock lk(_mutex);
 
     _dataReplicatorExternalState = std::make_unique<DataReplicatorExternalStateTenantMigration>();
     auto startFetchOpTime = *_stateDoc.getStartFetchingDonorOpTime();
@@ -1617,11 +1678,14 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                        return _updateStateDocForMajority(lk);
                    })
                    .then([this, self = shared_from_this()] {
+                       _stopOrHangOnFailPoint(
+                           &fpAfterRetrievingStartOpTimesMigrationRecipientInstance);
+                       _createOplogBuffer();
                        _fetchRetryableWritesOplogBeforeStartOpTime();
                    })
                    .then([this, self = shared_from_this()] {
                        _stopOrHangOnFailPoint(
-                           &fpAfterRetrievingStartOpTimesMigrationRecipientInstance);
+                           &fpAfterFetchingRetryableWritesEntriesBeforeStartOpTime);
                        _startOplogFetcher();
                    })
                    .then([this, self = shared_from_this()] {

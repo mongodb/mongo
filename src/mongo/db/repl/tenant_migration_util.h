@@ -166,6 +166,17 @@ std::unique_ptr<Pipeline, PipelineDeleter> createCommittedTransactionsPipelineFo
  */
 Status upsertCommittedTransactionEntry(OperationContext* opCtx, const BSONObj& entry);
 
+/**
+ * Creates a pipeline that can be serialized into a query for fetching retryable writes oplog
+ * entries before `startFetchingTimestamp`. We use `tenantId` to fetch entries specific to a
+ * particular set of tenant databases.
+ */
+std::unique_ptr<Pipeline, PipelineDeleter>
+createRetryableWritesOplogFetchingPipelineForTenantMigrations(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const Timestamp& startFetchingTimestamp,
+    const std::string& tenantId);
+
 }  // namespace tenant_migration_util
 
 }  // namespace mongo
