@@ -3624,7 +3624,12 @@ def doConfigure(myenv):
         else:
             myenv.ConfError("Running on ppc64le, but can't find a correct vec_vbpermq output index.  Compiler or platform not supported")
 
-    return conf.Finish()
+    myenv = conf.Finish()
+
+    if env['TARGET_ARCH'] == "aarch64":
+        AddToCCFLAGSIfSupported(myenv, "-moutline-atomics")
+
+    return myenv
 
 env = doConfigure( env )
 
