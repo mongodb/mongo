@@ -23,7 +23,8 @@ st.ensurePrimaryShard(dbName, st.shard0.shardName);
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
 assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 0}}));
-assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: st.shard1.shardName}));
+assert.commandWorked(st.s.adminCommand(
+    {moveChunk: ns, find: {_id: 0}, to: st.shard1.shardName, _waitForDelete: true}));
 
 // Determine the unscaled index size.
 let res = assert.commandWorked(coll.stats());
