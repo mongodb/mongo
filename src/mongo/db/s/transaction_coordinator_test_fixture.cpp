@@ -66,7 +66,7 @@ void TransactionCoordinatorTestFixture::setUp() {
         shardTargeter->setFindHostReturnValue(makeHostAndPort(shardId));
     }
 
-    WaitForMajorityService::get(getServiceContext()).startup(getServiceContext());
+    WaitForMajorityService::get(getServiceContext()).setUp(getServiceContext());
 }
 
 void TransactionCoordinatorTestFixture::tearDown() {

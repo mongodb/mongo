@@ -39,7 +39,6 @@
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
-#include "mongo/util/cancelation.h"
 #include "mongo/util/fail_point.h"
 
 namespace mongo {
@@ -59,9 +58,7 @@ ExecutorFuture<void> waitForMajorityWithHangFailpoint(ServiceContext* service,
                                                       repl::OpTime opTime) {
     auto executor = Grid::get(service)->getExecutorPool()->getFixedExecutor();
     auto waitForWC = [service, executor](repl::OpTime opTime) {
-        return WaitForMajorityService::get(service)
-            .waitUntilMajority(opTime, CancelationToken::uncancelable())
-            .thenRunOn(executor);
+        return WaitForMajorityService::get(service).waitUntilMajority(opTime).thenRunOn(executor);
     };
 
     if (auto sfp = failpoint.scoped(); MONGO_unlikely(sfp.isActive())) {

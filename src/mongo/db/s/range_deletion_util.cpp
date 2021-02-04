@@ -407,7 +407,7 @@ ExecutorFuture<void> waitForDeletionsToMajorityReplicate(
 
         // Asynchronously wait for majority write concern.
         return WaitForMajorityService::get(opCtx->getServiceContext())
-            .waitUntilMajority(clientOpTime, CancelationToken::uncancelable())
+            .waitUntilMajority(clientOpTime)
             .thenRunOn(executor);
     });
 }

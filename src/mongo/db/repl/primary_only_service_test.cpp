@@ -300,7 +300,7 @@ public:
         ServiceContextMongoDTest::setUp();
         auto serviceContext = getServiceContext();
 
-        WaitForMajorityService::get(serviceContext).startup(serviceContext);
+        WaitForMajorityService::get(getServiceContext()).setUp(getServiceContext());
 
         {
             auto opCtx = cc().makeOperationContext();

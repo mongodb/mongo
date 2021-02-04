@@ -57,7 +57,7 @@ public:
 
     void setUp() override {
         ShardServerTestFixture::setUp();
-        WaitForMajorityService::get(getServiceContext()).startup(getServiceContext());
+        WaitForMajorityService::get(getServiceContext()).setUp(getServiceContext());
         // Set up replication coordinator to be primary and have no replication delay.
         auto replCoord = std::make_unique<repl::ReplicationCoordinatorMock>(getServiceContext());
         replCoord->setCanAcceptNonLocalWrites(true);

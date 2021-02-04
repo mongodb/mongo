@@ -206,7 +206,7 @@ public:
      * iteration of the loop body threw an exception or otherwise returned an error status, the
      * returned ExecutorFuture will contain that error.
      */
-    auto on(ExecutorPtr executor, CancelationToken cancelToken)&& {
+    auto on(std::shared_ptr<executor::TaskExecutor> executor, CancelationToken cancelToken)&& {
         auto loop = std::make_shared<TryUntilLoop>(
             std::move(executor), std::move(_body), std::move(_condition), std::move(cancelToken));
         // Launch the recursive chain using the helper class.
@@ -245,7 +245,7 @@ private:
      * Mostly needed to clean up lambda captures and make the looping logic more readable.
      */
     struct TryUntilLoop : public std::enable_shared_from_this<TryUntilLoop> {
-        TryUntilLoop(ExecutorPtr executor,
+        TryUntilLoop(std::shared_ptr<executor::TaskExecutor> executor,
                      BodyCallable executeLoopBody,
                      ConditionCallable shouldStopIteration,
                      CancelationToken cancelToken)
@@ -274,7 +274,7 @@ private:
                 });
         }
 
-        ExecutorPtr executor;
+        std::shared_ptr<executor::TaskExecutor> executor;
         BodyCallable executeLoopBody;
         ConditionCallable shouldStopIteration;
         CancelationToken cancelToken;

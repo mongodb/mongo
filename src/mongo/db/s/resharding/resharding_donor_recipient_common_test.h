@@ -212,7 +212,7 @@ public:
     void setUp() override {
         ShardServerTestFixture::setUp();
 
-        WaitForMajorityService::get(getServiceContext()).startup(getServiceContext());
+        WaitForMajorityService::get(getServiceContext()).setUp(getServiceContext());
 
         _registry = repl::PrimaryOnlyServiceRegistry::get(getServiceContext());
 

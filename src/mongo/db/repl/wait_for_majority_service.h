@@ -33,56 +33,14 @@
 #include <memory>
 #include <vector>
 
-#include <boost/optional.hpp>
-#include <boost/utility/in_place_factory.hpp>
-
-#include "mongo/db/client_strand.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/thread.h"
-#include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/future.h"
 
 namespace mongo {
-
-namespace detail {
-
-class AsyncConditionVariable {
-public:
-    AsyncConditionVariable() : _current(boost::in_place()) {}
-
-    SemiFuture<void> onNotify() {
-        stdx::lock_guard lk(_mutex);
-        return _current->getFuture().semi();
-    }
-
-    void notifyAllAndReset() {
-        stdx::lock_guard lk(_mutex);
-        if (_inShutdown) {
-            return;
-        }
-        _current->emplaceValue();
-        _current = boost::in_place();
-    }
-
-    void notifyAllAndClose() {
-        stdx::lock_guard lk(_mutex);
-        if (_inShutdown) {
-            return;
-        }
-        _inShutdown = true;
-        _current->emplaceValue();
-    }
-
-private:
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("AsyncConditionVariable::_mutex");
-    boost::optional<SharedPromise<void>> _current;
-    bool _inShutdown{false};
-};
-}  // namespace detail
-
 
 /**
  * Provides a facility for asynchronously waiting a local opTime to be majority committed.
@@ -94,10 +52,9 @@ public:
     static WaitForMajorityService& get(ServiceContext* service);
 
     /**
-     * Sets up the background thread pool responsible for waiting for opTimes to be majority
-     * committed.
+     * Sets up the background thread responsible for waiting for opTimes to be majority committed.
      */
-    void startup(ServiceContext* ctx);
+    void setUp(ServiceContext* service);
 
     /**
      * Blocking method, which shuts down and joins the background thread.
@@ -107,40 +64,16 @@ public:
     /**
      * Enqueue a request to wait for the given opTime to be majority committed.
      */
-    SemiFuture<void> waitUntilMajority(const repl::OpTime& opTime,
-                                       const CancelationToken& cancelToken);
+    SharedSemiFuture<void> waitUntilMajority(const repl::OpTime& opTime);
 
 private:
-    enum class State { kNotStarted, kRunning, kShutdown };
-    // State is kNotStarted on construction, kRunning after WaitForMajorityService::startup() has
-    // been called, and kShutdown after WaitForMajorityService::shutdown() has been called. It is
-    // illegal to call WaitForMajorityService::waitUntilMajority before calling startup.
-    State _state{State::kNotStarted};
-    /**
-     * Internal representation of an individual request to wait on some particular optime.
-     */
-    struct Request {
-        explicit Request(Promise<void> promise)
-            : hasBeenProcessed{false}, result(std::move(promise)) {}
-        AtomicWord<bool> hasBeenProcessed;
-        Promise<void> result;
-    };
-
-    using OpTimeWaitingMap = std::multimap<repl::OpTime, std::shared_ptr<Request>>;
+    using OpTimeWaitingMap = std::map<repl::OpTime, SharedPromise<void>>;
 
     /**
      * Periodically checks the list of opTimes to wait for majority committed.
      */
-    SemiFuture<void> _periodicallyWaitForMajority();
+    void _periodicallyWaitForMajority(ServiceContext* service);
 
-    // The pool of threads available to wait on opTimes and cancel existing requests.
-    std::shared_ptr<ThreadPool> _pool;
-
-    // This future is completed when the service has finished all of its work and is ready for
-    // shutdown.
-    boost::optional<SemiFuture<void>> _backgroundWorkComplete;
-
-    // This mutex synchronizes access to the members declared below.
     Mutex _mutex = MONGO_MAKE_LATCH("WaitForMajorityService::_mutex");
 
     // Contains an ordered list of opTimes to wait to be majority comitted.
@@ -150,15 +83,18 @@ private:
     // majority comitted.
     repl::OpTime _lastOpTimeWaited;
 
+    // The background thread.
+    stdx::thread _thread;
+
     // Use for signalling new opTime requests being queued.
-    detail::AsyncConditionVariable _hasNewOpTimeCV;
+    stdx::condition_variable _hasNewOpTimeCV;
 
-    // Manages the Client responsible for the thread that waits on opTimes.
-    ClientStrandPtr _waitForMajorityClient;
+    // If set, contains a reference to the opCtx being used by the background thread.
+    // Only valid when _thread.joinable() and not nullptr.
+    OperationContext* _opCtx{nullptr};
 
-    // Manages the Client responsible for the thread that cancels existing requests to wait on
-    // opTimes.
-    ClientStrandPtr _waitForMajorityCancelationClient;
+    // Flag is set to true after shutDown() is called.
+    bool _inShutDown{false};
 };
 
 }  // namespace mongo

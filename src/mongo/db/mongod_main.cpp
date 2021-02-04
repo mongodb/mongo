@@ -572,7 +572,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
             "**          This mode should only be used to manually repair corrupted auth data");
     }
 
-    WaitForMajorityService::get(serviceContext).startup(serviceContext);
+    WaitForMajorityService::get(serviceContext).setUp(serviceContext);
 
     // This function may take the global lock.
     auto shardingInitialized = ShardingInitializationMongoD::get(startupOpCtx.get())

@@ -570,7 +570,7 @@ TenantMigrationDonorService::Instance::_markStateDocAsGarbageCollectable(
 ExecutorFuture<void> TenantMigrationDonorService::Instance::_waitForMajorityWriteConcern(
     std::shared_ptr<executor::ScopedTaskExecutor> executor, repl::OpTime opTime) {
     return WaitForMajorityService::get(_serviceContext)
-        .waitUntilMajority(std::move(opTime), CancelationToken::uncancelable())
+        .waitUntilMajority(std::move(opTime))
         .thenRunOn(**executor)
         .then([this, self = shared_from_this()] {
             stdx::lock_guard<Latch> lg(_mutex);
