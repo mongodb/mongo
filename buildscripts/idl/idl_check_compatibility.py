@@ -42,7 +42,7 @@ import os
 import sys
 from typing import Dict, List, Optional, Tuple, Union
 
-from idl import parser, syntax, errors
+from idl import parser, syntax, errors, common
 from idl.compiler import CompilerImportResolver
 from idl_compatibility_errors import IDLCompatibilityContext, IDLCompatibilityErrorCollection
 
@@ -91,7 +91,7 @@ def get_new_commands(
     return new_commands, new_command_file, new_command_file_path
 
 
-def get_field_type(field: syntax.Field, idl_file: syntax.IDLParsedSpec,
+def get_field_type(field: Union[syntax.Field, syntax.Command], idl_file: syntax.IDLParsedSpec,
                    idl_file_path: str) -> Optional[Union[syntax.Enum, syntax.Struct, syntax.Type]]:
     """Resolve and get field type of a field from the IDL file."""
     parser_ctxt = errors.ParserContext(idl_file_path, errors.ParserErrorCollection())
@@ -109,6 +109,15 @@ def check_subset(ctxt: IDLCompatibilityContext, cmd_name: str, field_name: str, 
     """Check if sub_list is a subset of the super_list and log an error if not."""
     if not set(sub_list).issubset(super_list):
         ctxt.add_command_not_subset_error(cmd_name, field_name, type_name, file_path)
+
+
+def check_type_superset(ctxt: IDLCompatibilityContext, cmd_name: str, type_name: str,
+                        sub_list: List[Union[str, syntax.EnumValue]],
+                        super_list: List[Union[str, syntax.EnumValue]], file_path: str):
+    # pylint: disable=too-many-arguments
+    """Check if sub_list is a subset of the super_list and log an error if not."""
+    if not set(sub_list).issubset(super_list):
+        ctxt.add_command_type_not_superset_error(cmd_name, type_name, file_path)
 
 
 def check_reply_field_type(ctxt: IDLCompatibilityContext,
@@ -159,6 +168,96 @@ def check_reply_field_type(ctxt: IDLCompatibilityContext,
                 cmd_name, field_name, new_field_type.name, old_field_type.name, new_idl_file_path)
 
 
+def check_command_type(ctxt: IDLCompatibilityContext,
+                       old_type: Optional[Union[syntax.Enum, syntax.Struct, syntax.Type]],
+                       new_type: Optional[Union[syntax.Enum, syntax.Struct, syntax.Type]],
+                       cmd_name: str, old_idl_file: syntax.IDLParsedSpec,
+                       new_idl_file: syntax.IDLParsedSpec, old_idl_file_path: str,
+                       new_idl_file_path: str):
+    """Check compatibility between old and new command type."""
+    # pylint: disable=too-many-arguments,too-many-branches
+    if old_type is None:
+        ctxt.add_command_type_invalid_error(cmd_name, old_idl_file_path)
+        ctxt.errors.dump_errors()
+        sys.exit(1)
+    if new_type is None:
+        ctxt.add_command_type_invalid_error(cmd_name, new_idl_file_path)
+        ctxt.errors.dump_errors()
+        sys.exit(1)
+
+    if isinstance(old_type, syntax.Type):
+        if isinstance(new_type, syntax.Type):
+            if "any" in old_type.bson_serialization_type:
+                ctxt.add_old_command_type_bson_any_error(cmd_name, old_type.name, old_idl_file_path)
+            elif "any" in new_type.bson_serialization_type:
+                ctxt.add_new_command_type_bson_any_error(cmd_name, new_type.name, new_idl_file_path)
+            else:
+                check_type_superset(ctxt, cmd_name, new_type.name, old_type.bson_serialization_type,
+                                    new_type.bson_serialization_type, new_idl_file_path)
+        else:
+            ctxt.add_new_command_type_enum_or_struct_error(cmd_name, new_type.name, old_type.name,
+                                                           new_idl_file_path)
+    elif isinstance(old_type, syntax.Enum):
+        if isinstance(new_type, syntax.Enum):
+            check_type_superset(ctxt, cmd_name, new_type.name, old_type.values, new_type.values,
+                                new_idl_file_path)
+        else:
+            ctxt.add_new_command_type_not_enum_error(cmd_name, new_type.name, old_type.name,
+                                                     new_idl_file_path)
+    elif isinstance(old_type, syntax.Struct):
+        if isinstance(new_type, syntax.Struct):
+            check_command_type_struct_fields(ctxt, old_type, new_type, cmd_name, old_idl_file,
+                                             new_idl_file, old_idl_file_path, new_idl_file_path)
+        else:
+            ctxt.add_new_command_type_not_struct_error(cmd_name, new_type.name, old_type.name,
+                                                       new_idl_file_path)
+
+
+def check_command_type_struct_field(
+        ctxt: IDLCompatibilityContext, type_name: str, old_field: syntax.Field,
+        new_field: syntax.Field, cmd_name: str, old_idl_file: syntax.IDLParsedSpec,
+        new_idl_file: syntax.IDLParsedSpec, old_idl_file_path: str, new_idl_file_path: str):
+    """Check compatibility between old and new type struct field."""
+    # pylint: disable=too-many-arguments
+    if new_field.unstable:
+        ctxt.add_new_command_type_field_unstable_error(cmd_name, type_name, new_field.name,
+                                                       new_idl_file_path)
+    if old_field.optional and not new_field.optional:
+        ctxt.add_new_command_type_field_required_error(cmd_name, type_name, new_field.name,
+                                                       new_idl_file_path)
+
+    old_field_type = get_field_type(old_field, old_idl_file, old_idl_file_path)
+    new_field_type = get_field_type(new_field, new_idl_file, new_idl_file_path)
+
+    check_command_type(ctxt, old_field_type, new_field_type, cmd_name, old_idl_file, new_idl_file,
+                       old_idl_file_path, new_idl_file_path)
+
+
+def check_command_type_struct_fields(
+        ctxt: IDLCompatibilityContext, old_type: syntax.Struct, new_type: syntax.Struct,
+        cmd_name: str, old_idl_file: syntax.IDLParsedSpec, new_idl_file: syntax.IDLParsedSpec,
+        old_idl_file_path: str, new_idl_file_path: str):
+    """Check compatibility between old and new type fields."""
+    # pylint: disable=too-many-arguments
+    for old_field in old_type.fields or []:
+        if old_field.unstable:
+            continue
+
+        new_field_exists = False
+        for new_field in new_type.fields or []:
+            if new_field.name == old_field.name:
+                new_field_exists = True
+                check_command_type_struct_field(ctxt, old_type.name, old_field, new_field, cmd_name,
+                                                old_idl_file, new_idl_file, old_idl_file_path,
+                                                new_idl_file_path)
+
+                break
+
+        if not new_field_exists:
+            ctxt.add_new_command_type_field_missing_error(cmd_name, old_type.name, old_field.name,
+                                                          old_idl_file_path)
+
+
 def check_reply_field(ctxt: IDLCompatibilityContext, old_field: syntax.Field,
                       new_field: syntax.Field, cmd_name: str, old_idl_file: syntax.IDLParsedSpec,
                       new_idl_file: syntax.IDLParsedSpec, old_idl_file_path: str,
@@ -198,6 +297,46 @@ def check_reply_fields(ctxt: IDLCompatibilityContext, old_reply: syntax.Struct,
 
         if not new_field_exists:
             ctxt.add_new_reply_field_missing_error(cmd_name, old_field.name, old_idl_file_path)
+
+
+def check_namespace(ctxt: IDLCompatibilityContext, old_cmd: syntax.Command, new_cmd: syntax.Command,
+                    old_idl_file: syntax.IDLParsedSpec, new_idl_file: syntax.IDLParsedSpec,
+                    old_idl_file_path: str, new_idl_file_path: str):
+    """Check compatibility between old and new namespace."""
+    # pylint: disable=too-many-arguments
+    old_namespace = old_cmd.namespace
+    new_namespace = new_cmd.namespace
+
+    # IDL parser already checks that namespace must be one of these 4 types.
+    if old_namespace == common.COMMAND_NAMESPACE_IGNORED:
+        if new_namespace != common.COMMAND_NAMESPACE_IGNORED:
+            ctxt.add_new_namespace_incompatible_error(old_cmd.command_name, old_namespace,
+                                                      new_namespace, new_idl_file_path)
+    elif old_namespace == common.COMMAND_NAMESPACE_CONCATENATE_WITH_DB_OR_UUID:
+        if new_namespace not in (common.COMMAND_NAMESPACE_IGNORED,
+                                 common.COMMAND_NAMESPACE_CONCATENATE_WITH_DB_OR_UUID):
+            ctxt.add_new_namespace_incompatible_error(old_cmd.command_name, old_namespace,
+                                                      new_namespace, new_idl_file_path)
+    elif old_namespace == common.COMMAND_NAMESPACE_CONCATENATE_WITH_DB:
+        if new_namespace == common.COMMAND_NAMESPACE_TYPE:
+            ctxt.add_new_namespace_incompatible_error(old_cmd.command_name, old_namespace,
+                                                      new_namespace, new_idl_file_path)
+    elif old_namespace == common.COMMAND_NAMESPACE_TYPE:
+        old_type = get_field_type(old_cmd, old_idl_file, old_idl_file_path)
+        if new_namespace == common.COMMAND_NAMESPACE_TYPE:
+            new_type = get_field_type(new_cmd, new_idl_file, new_idl_file_path)
+            check_command_type(ctxt, old_type, new_type, old_cmd.command_name, old_idl_file,
+                               new_idl_file, old_idl_file_path, new_idl_file_path)
+
+        # If old type is "namespacestring", the new namespace can be changed to any
+        # of the other namespace types.
+        elif old_type.name != "namespacestring":
+            # Otherwise, the new namespace can only be changed to "ignored".
+            if new_namespace != common.COMMAND_NAMESPACE_IGNORED:
+                ctxt.add_new_namespace_incompatible_error(old_cmd.command_name, old_namespace,
+                                                          new_namespace, new_idl_file_path)
+    else:
+        assert False, 'unrecognized namespace option'
 
 
 def check_compatibility(old_idl_dir: str, new_idl_dir: str,
@@ -252,6 +391,9 @@ def check_compatibility(old_idl_dir: str, new_idl_dir: str,
                     new_cmd = new_commands[old_cmd.command_name]
                     new_idl_file = new_command_file[old_cmd.command_name]
                     new_idl_file_path = new_command_file_path[old_cmd.command_name]
+
+                    check_namespace(ctxt, old_cmd, new_cmd, old_idl_file, new_idl_file,
+                                    old_idl_file_path, new_idl_file_path)
 
                     old_reply = old_idl_file.spec.symbols.get_struct(old_cmd.reply_type)
                     new_reply = new_idl_file.spec.symbols.get_struct(new_cmd.reply_type)

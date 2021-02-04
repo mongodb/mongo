@@ -69,7 +69,7 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
             path.join(dir_path, "compatibility_test_fail/new"), ["src"])
 
         self.assertTrue(error_collection.has_errors())
-        self.assertTrue(error_collection.count() == 19)
+        self.assertTrue(error_collection.count() == 34)
 
         invalid_api_version_new_error = error_collection.get_error_by_command_name(
             "invalidAPIVersionNew")
@@ -175,6 +175,85 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
                         idl_compatibility_errors.ERROR_ID_COMMAND_NOT_SUBSET)
         self.assertRegex(
             str(new_reply_field_type_struct_two_error), "newReplyFieldTypeStructRecursiveTwo")
+
+        new_namespace_not_ignored_error = error_collection.get_error_by_command_name(
+            "newNamespaceNotIgnored")
+        self.assertTrue(new_namespace_not_ignored_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_NEW_NAMESPACE_INCOMPATIBLE)
+        self.assertRegex(str(new_namespace_not_ignored_error), "newNamespaceNotIgnored")
+
+        new_namespace_not_concatenate_with_db_or_uuid_error = error_collection.get_error_by_command_name(
+            "newNamespaceNotConcatenateWithDbOrUuid")
+        self.assertTrue(new_namespace_not_concatenate_with_db_or_uuid_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_NEW_NAMESPACE_INCOMPATIBLE)
+        self.assertRegex(
+            str(new_namespace_not_concatenate_with_db_or_uuid_error),
+            "newNamespaceNotConcatenateWithDbOrUuid")
+
+        new_namespace_not_concatenate_with_db_error = error_collection.get_error_by_command_name(
+            "newNamespaceNotConcatenateWithDb")
+        self.assertTrue(new_namespace_not_concatenate_with_db_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_NEW_NAMESPACE_INCOMPATIBLE)
+        self.assertRegex(
+            str(new_namespace_not_concatenate_with_db_error), "newNamespaceNotConcatenateWithDb")
+
+        new_namespace_not_type_error = error_collection.get_error_by_command_name(
+            "newNamespaceNotType")
+        self.assertTrue(new_namespace_not_type_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_NEW_NAMESPACE_INCOMPATIBLE)
+        self.assertRegex(str(new_namespace_not_type_error), "newNamespaceNotType")
+
+        old_type_bson_any_error = error_collection.get_error_by_error_id(
+            idl_compatibility_errors.ERROR_ID_OLD_COMMAND_TYPE_BSON_SERIALIZATION_TYPE_ANY)
+        self.assertRegex(str(old_type_bson_any_error), "oldTypeBsonAny")
+
+        new_type_bson_any_error = error_collection.get_error_by_error_id(
+            idl_compatibility_errors.ERROR_ID_NEW_COMMAND_TYPE_BSON_SERIALIZATION_TYPE_ANY)
+        self.assertRegex(str(new_type_bson_any_error), "newTypeBsonAny")
+
+        new_type_not_enum_error = error_collection.get_error_by_error_id(
+            idl_compatibility_errors.ERROR_ID_NEW_COMMAND_TYPE_NOT_ENUM)
+        self.assertRegex(str(new_type_not_enum_error), "newTypeNotEnum")
+
+        new_type_not_struct_error = error_collection.get_error_by_error_id(
+            idl_compatibility_errors.ERROR_ID_NEW_COMMAND_TYPE_NOT_STRUCT)
+        self.assertRegex(str(new_type_not_struct_error), "newTypeNotStruct")
+
+        new_type_enum_or_struct_error = error_collection.get_error_by_error_id(
+            idl_compatibility_errors.ERROR_ID_NEW_COMMAND_TYPE_ENUM_OR_STRUCT)
+        self.assertRegex(str(new_type_enum_or_struct_error), "newTypeEnumOrStruct")
+
+        new_type_not_superset_error = error_collection.get_error_by_command_name(
+            "newTypeNotSuperset")
+        self.assertTrue(new_type_not_superset_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_COMMAND_TYPE_NOT_SUPERSET)
+        self.assertRegex(str(new_type_not_superset_error), "newTypeNotSuperset")
+
+        new_type_enum_not_superset_error = error_collection.get_error_by_command_name(
+            "newTypeEnumNotSuperset")
+        self.assertTrue(new_type_enum_not_superset_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_COMMAND_TYPE_NOT_SUPERSET)
+        self.assertRegex(str(new_type_enum_not_superset_error), "newTypeEnumNotSuperset")
+
+        new_type_struct_recursive_error = error_collection.get_error_by_command_name(
+            "newTypeStructRecursive")
+        self.assertTrue(new_type_struct_recursive_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_NEW_COMMAND_TYPE_FIELD_UNSTABLE)
+        self.assertRegex(str(new_type_struct_recursive_error), "newTypeStructRecursive")
+
+        new_type_field_unstable_error = error_collection.get_error_by_command_name(
+            "newTypeFieldUnstable")
+        self.assertTrue(new_type_field_unstable_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_NEW_COMMAND_TYPE_FIELD_UNSTABLE)
+        self.assertRegex(str(new_type_field_unstable_error), "newTypeFieldUnstable")
+
+        new_type_field_required_error = error_collection.get_error_by_error_id(
+            idl_compatibility_errors.ERROR_ID_NEW_COMMAND_TYPE_FIELD_REQUIRED)
+        self.assertRegex(str(new_type_field_required_error), "newTypeFieldRequired")
+
+        new_type_field_missing_error = error_collection.get_error_by_error_id(
+            idl_compatibility_errors.ERROR_ID_NEW_COMMAND_TYPE_FIELD_MISSING)
+        self.assertRegex(str(new_type_field_missing_error), "newTypeFieldMissing")
 
 
 if __name__ == '__main__':

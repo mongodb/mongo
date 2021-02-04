@@ -54,6 +54,17 @@ ERROR_ID_NEW_REPLY_FIELD_BSON_SERIALIZATION_TYPE_ANY = "ID0010"
 ERROR_ID_NEW_REPLY_FIELD_TYPE_ENUM_OR_STRUCT = "ID0011"
 ERROR_ID_REPLY_FIELD_TYPE_INVALID = "ID0012"
 ERROR_ID_COMMAND_NOT_SUBSET = "ID0013"
+ERROR_ID_NEW_NAMESPACE_INCOMPATIBLE = "ID0014"
+ERROR_ID_COMMAND_TYPE_NOT_SUPERSET = "ID0015"
+ERROR_ID_COMMAND_TYPE_INVALID = "ID0016"
+ERROR_ID_OLD_COMMAND_TYPE_BSON_SERIALIZATION_TYPE_ANY = "ID0017"
+ERROR_ID_NEW_COMMAND_TYPE_BSON_SERIALIZATION_TYPE_ANY = "ID0018"
+ERROR_ID_NEW_COMMAND_TYPE_FIELD_MISSING = "ID0019"
+ERROR_ID_NEW_COMMAND_TYPE_FIELD_REQUIRED = "ID0020"
+ERROR_ID_NEW_COMMAND_TYPE_FIELD_UNSTABLE = "ID0021"
+ERROR_ID_NEW_COMMAND_TYPE_NOT_STRUCT = "ID0022"
+ERROR_ID_NEW_COMMAND_TYPE_NOT_ENUM = "ID0023"
+ERROR_ID_NEW_COMMAND_TYPE_ENUM_OR_STRUCT = "ID0024"
 
 
 class IDLCompatibilityCheckerError(Exception):
@@ -165,6 +176,8 @@ class IDLCompatibilityContext(object):
     - single class responsible for producing actual error messages.
     """
 
+    # pylint:disable=too-many-public-methods
+
     def __init__(self, old_idl_dir: str, new_idl_dir: str,
                  errors: IDLCompatibilityErrorCollection) -> None:
         """Construct a new IDLCompatibilityContext."""
@@ -199,6 +212,85 @@ class IDLCompatibilityContext(object):
             ERROR_ID_COMMAND_NOT_SUBSET, command_name,
             "'%s' has field '%s' with type '%s' that is not a subset of the other version of this command."
             % (command_name, field_name, type_name), file)
+
+    def add_command_type_invalid_error(self, command_name: str, file: str) -> None:
+        """Add an error about the command type being invalid."""
+        self._add_error(ERROR_ID_COMMAND_TYPE_INVALID, command_name,
+                        ("'%s' has an invalid type") % (command_name), file)
+
+    def add_command_type_not_superset_error(self, command_name: str, type_name: str,
+                                            file: str) -> None:
+        """Add an error about the command type not being a subset."""
+        self._add_error(
+            ERROR_ID_COMMAND_TYPE_NOT_SUPERSET, command_name,
+            "'%s' has type '%s' that is not a subset of the other version of this command." %
+            (command_name, type_name), file)
+
+    def add_new_command_type_bson_any_error(self, command_name: str, new_type: str,
+                                            file: str) -> None:
+        """Add an error about the new command type's bson serialization type being of type "any"."""
+        self._add_error(ERROR_ID_NEW_COMMAND_TYPE_BSON_SERIALIZATION_TYPE_ANY, command_name,
+                        ("'%s' has type '%s' that has a bson serialization type 'any'") %
+                        (command_name, new_type), file)
+
+    def add_new_command_type_enum_or_struct_error(self, command_name: str, new_type: str,
+                                                  old_type: str, file: str) -> None:
+        # pylint: disable=too-many-arguments
+        """Add an error when the new command type is an enum or struct and the old one is a non-enum or struct type."""
+        self._add_error(ERROR_ID_NEW_COMMAND_TYPE_ENUM_OR_STRUCT, command_name,
+                        ("'%s' has type '%s' that is an enum or struct while the corresponding "
+                         "old type was a non-enum or struct of type '%s'.") %
+                        (command_name, new_type, old_type), file)
+
+    def add_new_command_type_field_missing_error(self, command_name: str, type_name: str,
+                                                 field_name: str, file: str) -> None:
+        """Add an error about the new command type missing a field that exists in the old command."""
+        self._add_error(
+            ERROR_ID_NEW_COMMAND_TYPE_FIELD_MISSING, command_name,
+            "'%s' has type '%s' that is missing a field '%s' that exists in the old command." %
+            (command_name, type_name, field_name), file)
+
+    def add_new_command_type_field_required_error(self, command_name: str, type_name: str,
+                                                  field_name: str, file: str) -> None:
+        """Add an error about the new command type field being required when the old type field is not."""
+        self._add_error(
+            ERROR_ID_NEW_COMMAND_TYPE_FIELD_REQUIRED, command_name,
+            "'%s' has type '%s' with a required type field '%s' that was optional in the old command."
+            % (command_name, type_name, field_name), file)
+
+    def add_new_command_type_field_unstable_error(self, command_name: str, type_name,
+                                                  field_name: str, file: str) -> None:
+        """Add an error about the new command type field being unstable when the old one is stable."""
+        self._add_error(
+            ERROR_ID_NEW_COMMAND_TYPE_FIELD_UNSTABLE, command_name,
+            "'%s' has type '%s' with an unstable field '%s' that was stable in the old command." %
+            (command_name, type_name, field_name), file)
+
+    def add_new_command_type_not_enum_error(self, command_name: str, new_type: str, old_type: str,
+                                            file: str) -> None:
+        # pylint: disable=too-many-arguments
+        """Add an error about the new command type not being an enum when the old one is."""
+        self._add_error(ERROR_ID_NEW_COMMAND_TYPE_NOT_ENUM, command_name,
+                        ("'%s' has type '%s' that is not an enum while the corresponding "
+                         "old type was an enum of type '%s'.") % (command_name, new_type, old_type),
+                        file)
+
+    def add_new_command_type_not_struct_error(self, command_name: str, new_type: str, old_type: str,
+                                              file: str) -> None:
+        # pylint: disable=too-many-arguments
+        """Add an error about the new command type not being a struct when the old one is."""
+        self._add_error(
+            ERROR_ID_NEW_COMMAND_TYPE_NOT_STRUCT, command_name,
+            ("'%s' has type '%s' that is not a struct while the corresponding "
+             "old type was a struct of type '%s'.") % (command_name, new_type, old_type), file)
+
+    def add_new_namespace_incompatible_error(self, command_name: str, old_namespace: str,
+                                             new_namespace: str, file: str) -> None:
+        """Add an error about the new namespace being incompatible with the old namespace."""
+        self._add_error(
+            ERROR_ID_NEW_NAMESPACE_INCOMPATIBLE, command_name,
+            "'%s' has namespace '%s' that is incompatible with the old namespace '%s'." %
+            (command_name, new_namespace, old_namespace), file)
 
     def add_new_reply_field_missing_error(self, command_name: str, field_name: str,
                                           file: str) -> None:
@@ -262,6 +354,13 @@ class IDLCompatibilityContext(object):
             ERROR_ID_NEW_REPLY_FIELD_UNSTABLE, command_name,
             "'%s' has an unstable reply field '%s' that was stable in the old command." %
             (command_name, field_name), file)
+
+    def add_old_command_type_bson_any_error(self, command_name: str, old_type: str,
+                                            file: str) -> None:
+        """Add an error about the old command type's bson serialization type being of type "any"."""
+        self._add_error(ERROR_ID_OLD_COMMAND_TYPE_BSON_SERIALIZATION_TYPE_ANY, command_name,
+                        ("'%s' has type '%s' that has a bson serialization type 'any'") %
+                        (command_name, old_type), file)
 
     def add_old_reply_field_bson_any_error(self, command_name: str, field_name: str,
                                            old_field_type: str, file: str) -> None:

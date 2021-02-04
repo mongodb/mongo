@@ -65,6 +65,15 @@ types:
         description: "The new bson_serialization_type contains 'any'"
         cpp_type: "std::int32_t"
 
+    intStringBoolToIntString:
+        bson_serialization_type:
+                                - int
+                                - string
+        description: "The bson_serialization_type changes from [int, string, bool] in the old
+                      command's reply field type to [int, string] in the new command's reply
+                      field type"
+        cpp_type: "std::int32_t"
+
 enums:
     NewReplyFieldEnumNotSubset:
         description: "The new reply type is an enum that is not a subset of the old reply type's 
@@ -74,6 +83,13 @@ enums:
             valueOne: "one"
             valueTwo: "two"
             valueThree: "three"
+
+    EnumNotSuperset:
+        description: "The new enum is not a superset of the old enum values"
+        type: string
+        values:
+            valueOne: "one"
+            valueTwo: "two"
 
 structs:
     UnstableNewFieldReply:
@@ -95,6 +111,13 @@ structs:
     MissingNewFieldReply:
         description: "This reply contains a field that exists in the old command but is
                       missing in the new command."
+    
+    RequiredNewField:
+        description: "This struct contains a field that is optional in the old command but is
+                      required in the new command."
+        fields:
+            requiredNewField:
+                type: string
 
     EnumNotSubsetReply:
         description: "This reply contains an enum field where the new enum values is not a subset
@@ -353,3 +376,163 @@ commands:
         strict: true
         api_version: "1"
         reply_type: StructFieldTypeRecursiveReplyTwo
+
+    newNamespaceNotIgnored:
+        description: "new command fails because its namespace is not ignored"
+        command_name: newNamespaceNotIgnored
+        namespace: concatenate_with_db_or_uuid
+        cpp_name: newNamespaceNotIgnored
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    newNamespaceNotConcatenateWithDbOrUuid:
+        description: "new command fails because its namespace is not concatenate_with_db_or_uuid
+                      or ignored"
+        command_name: newNamespaceNotConcatenateWithDbOrUuid
+        namespace: concatenate_with_db
+        cpp_name: newNamespaceNotConcatenateWithDbOrUuid
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    newNamespaceNotConcatenateWithDb:
+        description: "new command fails because its namespace changes to type"
+        command_name: newNamespaceNotConcatenateWithDb
+        namespace: type
+        type: string
+        cpp_name: newNamespaceNotConcatenateWithDb
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    newNamespaceNotType:
+        description: "new command fails because its namespace changes from type in
+                      an incompatible way"
+        command_name: newNamespaceNotType
+        namespace: concatenate_with_db
+        cpp_name: newNamespaceNotType
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    oldTypeBsonAny:
+        description: "old command fails because its type has a bson_serialization_type
+                      that contains 'any'"
+        command_name: oldTypeBsonAny
+        namespace: type
+        type: oldBsonSerializationTypeAny
+        cpp_name: oldTypeBsonAny
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    newTypeBsonAny:
+        description: "new command fails because its type has a bson_serialization_type
+                      that contains 'any'"
+        command_name: newTypeBsonAny
+        namespace: type
+        type: newBsonSerializationTypeAny
+        cpp_name: newTypeBsonAny
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    newTypeNotSuperset:
+        description: "new command fails because its type is not a superset
+                      of the old type"
+        command_name: newTypeNotSuperset
+        namespace: type
+        type: intStringBoolToIntString
+        cpp_name: newTypeNotSuperset
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    newTypeEnumNotSuperset:
+        description: "new command fails because its type is an enum that is not
+                      a superset of the corresponding old type's enum values"
+        command_name: newTypeEnumNotSuperset
+        namespace: type
+        type: EnumNotSuperset
+        cpp_name: newTypeEnumNotSuperset
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    newTypeNotEnum:
+        description: "new command fails because its type is not an enum when the
+                      old type is an enum"
+        command_name: newTypeNotEnum
+        namespace: type
+        type: StructType
+        cpp_name: newTypeNotEnum
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    newTypeNotStruct:
+        description: "new command fails because its type is not a struct when the
+                      old type is a struct"
+        command_name: newTypeNotStruct
+        namespace: type
+        type: EnumNotSuperset
+        cpp_name: newTypeNotStruct
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    newTypeEnumOrStruct:
+        description: "new command fails because the type is a non-enum or struct
+                      type in the old command, and an enum or struct in the new command"
+        command_name: newTypeEnumOrStruct
+        namespace: type
+        type: StructType
+        cpp_name: newTypeEnumOrStruct
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    newTypeStructRecursive:
+        description: "new command fails because its type is a struct that is
+                      incompatible with the old type struct"
+        command_name: newTypeStructRecursive
+        namespace: type
+        type: StructFieldTypeRecursiveReplyOne
+        cpp_name: newTypeStructRecursive
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    newTypeFieldUnstable:
+        description: "new command fails because it contains an unstable type field that is stable
+                      in the corresponding old command"
+        command_name: newTypeFieldUnstable
+        namespace: type
+        type: UnstableNewFieldReply
+        cpp_name: newTypeFieldUnstable
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    newTypeFieldRequired:
+        description: "new command fails because it contains a required reply field that is
+                      optional in the corresponding old command"
+        command_name: newTypeFieldRequired
+        namespace: type
+        type: RequiredNewField
+        cpp_name: newTypeFieldRequired
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    newTypeFieldMissing:
+        description: "new command fails because it is missing a type field that exists in
+                      the corresponding old command"
+        command_name: newTypeFieldMissing
+        namespace: type
+        type: MissingNewFieldReply
+        cpp_name: newTypeFieldMissing
+        strict: true
+        api_version: "1"
+        reply_type: OkReply

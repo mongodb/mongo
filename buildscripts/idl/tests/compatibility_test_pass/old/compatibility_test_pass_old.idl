@@ -51,6 +51,15 @@ types:
                       command's reply field type to [int, string] in the new command's reply
                       field type"
         cpp_type: "std::int32_t"
+    
+    intStringToIntStringBool:
+        bson_serialization_type:
+                                - int
+                                - string
+        description: "The bson_serialization_type changes from [int, string] in the old command's
+                      reply field type to [int, string, bool] in the new command's reply field
+                      type"
+        cpp_type: "std::int32_t"
 
 enums:
     NewReplyFieldEnumSubset:
@@ -61,6 +70,13 @@ enums:
             valueOne: "one"
             valueTwo: "two"
             valueThree: "three"
+    
+    EnumSuperset:
+        description: "The new enum is not a superset of the old enum values"
+        type: string
+        values:
+            valueOne: "one"
+            valueTwo: "two"
 
 structs:
     StableNewFieldReply:
@@ -73,11 +89,18 @@ structs:
 
     RequiredNewFieldReply:
         description: "This reply contains a field that is optional in the old command but is
-                      unstable in the new command."
+                      required in the new command."
         fields:
             requiredNewField:
                 type: string
                 optional: true
+    
+    OptionalNewField:
+        description: "This struct contains a field that is required in the old command but is
+                      optional in the new command."
+        fields:
+            optionalNewField:
+                type: string
     
     AddedNewFieldReply:
         description: "This reply contains a field that is added in the new command."
@@ -250,3 +273,87 @@ commands:
         strict: true
         api_version: "1"
         reply_type: StructFieldTypeRecursiveReplyTwo
+
+    newNamespaceIgnored:
+        description: "new command passes when its namespace is changed to ignored"
+        command_name: newNamespaceIgnored
+        namespace: concatenate_with_db_or_uuid
+        cpp_name: newNamespaceIgnored
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    newNamespaceConcatenateWithDbOrUuid:
+        description: "new command passes when its namespace is changed to concatenate_with_db_or_uuid
+                      from concatenate_with_db"
+        command_name: newNamespaceConcatenateWithDbOrUuid
+        namespace: concatenate_with_db
+        cpp_name: newNamespaceConcatenateWithDbOrUuid
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    newNamespaceTypeToIgnored:
+        description: "new command passes when its namespace is changed from type to ignored"
+        command_name: newNamespaceTypeToIgnored
+        namespace: type
+        type: string
+        cpp_name: newNamespaceTypeToIgnored
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    oldNamespaceTypeNamespaceString:
+        description: "If old command has namespace: type and type: namespacestring, the new namespace
+                      can be changed to concatenate_with_db"
+        command_name: oldNamespaceTypeNamespaceString
+        namespace: type
+        type: namespacestring
+        cpp_name: oldNamespaceTypeNamespaceString
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    oldNamespaceTypeNamespaceStringTwo:
+        description: "If old command has namespace: type and type: namespacestring, the new namespace
+                      can be changed to concatenate_with_db_or_uuid"
+        command_name: oldNamespaceTypeNamespaceStringTwo
+        namespace: type
+        type: namespacestring
+        cpp_name: oldNamespaceTypeNamespaceStringTwo
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    newTypeSuperset:
+        description: "new command passes because its type is a superset
+                      of the old type"
+        command_name: newTypeSuperset
+        namespace: type
+        type: intStringToIntStringBool
+        cpp_name: newTypeSuperset
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    newTypeEnumSuperset:
+        description: "new command passes because its type is an enum that is
+                      a superset of the corresponding old type's enum values"
+        command_name: newTypeEnumSuperset
+        namespace: type
+        type: EnumSuperset
+        cpp_name: newTypeEnumSuperset
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    newTypeFieldOptional:
+        description: "new command type contains an optional field that is required
+                      in the corresponding old command and still passes"
+        command_name: newTypeFieldOptional
+        namespace: type
+        type: OptionalNewField
+        cpp_name: newTypeFieldOptional
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
