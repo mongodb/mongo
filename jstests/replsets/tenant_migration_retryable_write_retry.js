@@ -204,9 +204,9 @@ const donorDoc =
 
 tenantMigrationTest.waitForMigrationGarbageCollection(migrationId, kTenantId);
 
-// Test the aggregation pipeline the recipient would use for getting the config.transactions entries
-// and oplog chains for the retryable writes that committed before startFetchingTimestamp. The
-// recipient would use the real startFetchingTimestamp, but this test uses the donor's commit
+// Test the aggregation pipeline the recipient would use for getting the oplog chain where
+// "ts" < "startFetchingOpTime" for all retryable writes entries in config.transactions. The
+// recipient would use the real "startFetchingOpTime", but this test uses the donor's commit
 // timestamp as a substitute.
 const startFetchingTimestamp = donorDoc.commitOrAbortOpTime.ts;
 
@@ -215,30 +215,50 @@ const lsid7 = {
     id: UUID()
 };
 const sessionTag7 = "retryable insert after migration";
+// Make sure this write is in the majority snapshot.
 assert.commandWorked(donorPrimary.getDB(kDbName).runCommand({
     insert: kCollName,
     documents: [{_id: 7, x: 7, tag: sessionTag7}],
     txnNumber: NumberLong(0),
-    lsid: lsid7
+    lsid: lsid7,
+    writeConcern: {w: "majority"}
 }));
 
-// The aggregation pipeline will return an array of oplog entries (pre-image/post-image oplog
-// entries included) for retryable writes that committed before 'startFetchingTimestamp' sorted
-// in ascending order of "ts".
+// The aggregation pipeline will return an array of retryable writes oplog entries (pre-image/
+// post-image oplog entries included) with "ts" < "startFetchingTimestamp" and sorted in ascending
+// order of "ts".
 const aggRes = donorPrimary.getDB("config").runCommand({
     aggregate: "transactions",
     pipeline: [
-        // Fetch the config.transactions entries.
-        {$match: {"lastWriteOpTime.ts": {$lt: startFetchingTimestamp}}},
+        // Fetch the config.transactions entries that do not have a "state" field, which indicates a
+        // retryable write.
+        {$match: {"state": {$exists: false}}},
         // Fetch latest oplog entry for each config.transactions entry from the oplog view.
         {$lookup: {
             from: {db: "local", coll: "system.tenantMigration.oplogView"},
-            localField: "lastWriteOpTime.ts",
-            foreignField: "ts",
-            // This array is expected to contain exactly one element.
+            let: { tenant_ts: "$lastWriteOpTime.ts"},
+            pipeline: [{
+                $match: {
+                    $expr: {
+                        $and: [
+                            {$regexMatch: {
+                                input: "$ns",
+                                regex: new RegExp(`^${kTenantId}_`)
+                            }},
+                            {$eq: [ "$ts", "$$tenant_ts"]}
+                        ]
+                    }
+                }
+            }],
+            // This array is expected to contain exactly one element if `ns` contains
+            // `kTenantId`. Otherwise, it will be empty.
             as: "lastOps"
         }},
-        // Replace the single-element 'lastOps' array field with a single 'lastOp' field.
+        // Entries that don't have the correct `ns` will return an empty `lastOps` array. Filter
+        // these results before the next stage.
+        {$match: {"lastOps": {$ne: [] }}},
+        // All remaining results should correspond to the correct `kTenantId`. Replace the
+        // single-element 'lastOps' array field with a single 'lastOp' field.
         {$addFields: {lastOp: {$first: "$lastOps"}}},
         {$unset: "lastOps"},
         // Fetch preImage oplog entry for findAndModify from the oplog view.
@@ -266,7 +286,18 @@ const aggRes = donorPrimary.getDB("config").runCommand({
             connectFromField: "prevOpTime.ts",
             connectToField: "ts",
             as: "history",
-            depthField: "depthForTenantMigration",
+            depthField: "depthForTenantMigration"
+        }},
+        // Now that we have the whole chain, filter out entries that occurred after
+        // `startFetchingTimestamp`, since these entries will be fetched during the oplog fetching
+        // phase.
+        {$set: {
+            history: {
+                $filter: {
+                    input: "$history",
+                    cond: {$lt: ["$$this.ts", startFetchingTimestamp]}
+                }
+            }
         }},
         // Sort the oplog entries in each oplog chain.
         {$set: {
@@ -301,7 +332,7 @@ const aggRes = donorPrimary.getDB("config").runCommand({
         {$unwind: "$completeOplogEntry"},
         {$replaceRoot: {newRoot: "$completeOplogEntry"}},
     ],
-    readConcern: {level: "majority", afterClusterTime: startFetchingTimestamp},
+    readConcern: {level: "majority"},
     cursor: {},
 });
 

@@ -355,6 +355,12 @@ public:
                                  const OplogFetcher::DocumentsInfo& info);
 
         /**
+         * Creates the oplog buffer that will be populated by donor oplog entries from the retryable
+         * writes fetching stage and oplog fetching stage.
+         */
+        void _createOplogBuffer();
+
+        /**
          * Runs an aggregation that gets the entire oplog chain for every retryable write entry in
          * `config.transactions` with `lastWriteOpTime` < `startFetchingOpTime`. Adds these oplog
          * entries to the oplog buffer.

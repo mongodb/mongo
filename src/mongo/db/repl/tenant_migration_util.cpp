@@ -34,9 +34,12 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/logical_time_validator.h"
+#include "mongo/db/pipeline/document_source_add_fields.h"
+#include "mongo/db/pipeline/document_source_graph_lookup.h"
 #include "mongo/db/pipeline/document_source_lookup.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_project.h"
+#include "mongo/db/pipeline/document_source_replace_root.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
@@ -193,6 +196,153 @@ Status upsertCommittedTransactionEntry(OperationContext* opCtx, const BSONObj& e
         Helpers::upsert(opCtx, nss.ns(), entry, false /* fromMigrate */);
         return Status::OK();
     });
+}
+
+std::unique_ptr<Pipeline, PipelineDeleter>
+createRetryableWritesOplogFetchingPipelineForTenantMigrations(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const Timestamp& startFetchingTimestamp,
+    const std::string& tenantId) {
+
+    using Doc = Document;
+    const Value DNE = Value{Doc{{"$exists", false}}};
+
+    Pipeline::SourceContainer stages;
+
+    // 1. Match config.transactions entries that do not have a `state` field, which indicates that
+    //    the last write on the session was a retryable write and not a transaction.
+    stages.emplace_back(DocumentSourceMatch::create(Doc{{"state", DNE}}.toBson(), expCtx));
+
+    // 2. Fetch latest oplog entry for each config.transactions entry from the oplog view. `lastOps`
+    //    is expected to contain exactly one element, unless `ns` does not contain the correct
+    //    `tenantId`. In that case, it will be empty.
+    stages.emplace_back(DocumentSourceLookUp::createFromBson(fromjson("{\
+                    $lookup: {\
+                        from: {db: 'local', coll: 'system.tenantMigration.oplogView'},\
+                        let: { tenant_ts: '$lastWriteOpTime.ts'},\
+                        pipeline: [{\
+                            $match: {\
+                                $expr: {\
+                                    $and: [\
+                                        {$regexMatch: {\
+                                            input: '$ns',\
+                                            regex: /^" + tenantId + "_/\
+                                        }},\
+                                        {$eq: ['$ts', '$$tenant_ts']}\
+                                    ]\
+                                }\
+                            }\
+                        }],\
+                        as: 'lastOps'\
+                    }}")
+                                                                 .firstElement(),
+                                                             expCtx));
+
+    // 3. Filter out entries with an empty `lastOps` array since they do not correspond to the
+    //    correct tenant.
+    stages.emplace_back(DocumentSourceMatch::create(fromjson("{'lastOps': {$ne: []}}"), expCtx));
+
+    // 4. Replace the single-element 'lastOps' array field with a single 'lastOp' field.
+    stages.emplace_back(
+        DocumentSourceAddFields::create(fromjson("{lastOp: {$first: '$lastOps'}}"), expCtx));
+
+    // 5. Remove `lastOps` in favor of `lastOp`.
+    stages.emplace_back(DocumentSourceProject::createUnset(FieldPath("lastOps"), expCtx));
+
+    // 6. Fetch preImage oplog entry for `findAndModify` from the oplog view. `preImageOps` is not
+    //    expected to contain exactly one element if the `preImageOpTime` field is not null.
+    stages.emplace_back(DocumentSourceLookUp::createFromBson(
+        Doc{{"$lookup",
+             Doc{{"from", Doc{{"db", "local"_sd}, {"coll", "system.tenantMigration.oplogView"_sd}}},
+                 {"localField", "lastOp.preImageOpTime.ts"_sd},
+                 {"foreignField", "ts"_sd},
+                 {"as", "preImageOps"_sd}}}}
+            .toBson()
+            .firstElement(),
+        expCtx));
+
+
+    // 7. Fetch postImage oplog entry for `findAndModify` from the oplog view. `postImageOps` is not
+    //    expected to contain exactly one element if the `postImageOpTime` field is not null.
+    stages.emplace_back(DocumentSourceLookUp::createFromBson(
+        Doc{{"$lookup",
+             Doc{{"from", Doc{{"db", "local"_sd}, {"coll", "system.tenantMigration.oplogView"_sd}}},
+                 {"localField", "lastOp.postImageOpTime.ts"_sd},
+                 {"foreignField", "ts"_sd},
+                 {"as", "postImageOps"_sd}}}}
+            .toBson()
+            .firstElement(),
+        expCtx));
+
+
+    // 8. Fetch oplog entries in each chain from the oplog view.
+    stages.emplace_back(DocumentSourceGraphLookUp::createFromBson(
+        Doc{{"$graphLookup",
+             Doc{{"from", Doc{{"db", "local"_sd}, {"coll", "system.tenantMigration.oplogView"_sd}}},
+                 {"startWith", "$lastOp.ts"_sd},
+                 {"connectFromField", "prevOpTime.ts"_sd},
+                 {"connectToField", "ts"_sd},
+                 {"as", "history"_sd},
+                 {"depthField", "depthForTenantMigration"_sd}}}}
+            .toBson()
+            .firstElement(),
+        expCtx));
+
+    // 9. Filter out all oplog entries from the `history` arrary that occur after
+    //    `startFetchingTimestamp`. Since the oplog fetching and application stages will already
+    //    capture entries after `startFetchingTimestamp`, we only need the earlier part of the oplog
+    //    chain.
+    stages.emplace_back(DocumentSourceAddFields::create(fromjson("{\
+                    history: {$filter: {\
+                        input: '$history',\
+                        cond: {$lt: ['$$this.ts', " + startFetchingTimestamp.toString() +
+                                                                 "]}}}}"),
+                                                        expCtx));
+
+    // 10. Sort the oplog entries in each oplog chain. The $reduce expression sorts the `history`
+    //    array in ascending `depthForTenantMigration` order. The $reverseArray expression will
+    //    give an array in ascending timestamp order.
+    stages.emplace_back(DocumentSourceAddFields::create(fromjson("{\
+                    history: {$reverseArray: {$reduce: {\
+                        input: '$history',\
+                        initialValue: {$range: [0, {$size: '$history'}]},\
+                        in: {$concatArrays: [\
+                            {$slice: ['$$value', '$$this.depthForTenantMigration']},\
+                            ['$$this'],\
+                            {$slice: [\
+                                '$$value',\
+                                {$subtract: [\
+                                    {$add: ['$$this.depthForTenantMigration', 1]},\
+                                    {$size: '$history'}]}]}]}}}}}"),
+                                                        expCtx));
+
+    // 11. Combine the oplog entries.
+    stages.emplace_back(DocumentSourceAddFields::create(fromjson("{\
+                        'history': {$concatArrays: [\
+                            '$preImageOps', '$postImageOps', '$history']}}"),
+                                                        expCtx));
+
+    // 12. Fetch the complete oplog entries. `completeOplogEntry` is expected to contain exactly one
+    //     element.
+    stages.emplace_back(DocumentSourceLookUp::createFromBson(
+        Doc{{"$lookup",
+             Doc{{"from", Doc{{"db", "local"_sd}, {"coll", "oplog.rs"_sd}}},
+                 {"localField", "history.ts"_sd},
+                 {"foreignField", "ts"_sd},
+                 {"as", "completeOplogEntry"_sd}}}}
+            .toBson()
+            .firstElement(),
+        expCtx));
+
+    // 13. Unwind oplog entries in each chain to the top-level array.
+    stages.emplace_back(
+        DocumentSourceUnwind::create(expCtx, "completeOplogEntry", false, boost::none));
+
+    // 14. Replace root.
+    stages.emplace_back(DocumentSourceReplaceRoot::createFromBson(
+        fromjson("{$replaceRoot: {newRoot: '$completeOplogEntry'}}").firstElement(), expCtx));
+
+    return Pipeline::create(std::move(stages), expCtx);
 }
 
 }  // namespace tenant_migration_util
