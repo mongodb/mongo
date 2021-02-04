@@ -52,6 +52,9 @@ class TaskExecutor;
 
 class OperationContext;
 
+/**
+ * Transfer config.transaction information from a given source shard to this shard.
+ */
 class ReshardingTxnCloner {
 public:
     ReshardingTxnCloner(ReshardingSourceId sourceId, Timestamp fetchTimestamp);
@@ -88,11 +91,10 @@ private:
 
     ServiceContext::UniqueOperationContext _makeOperationContext(ServiceContext* serviceContext);
 
-    ExecutorFuture<std::pair<ServiceContext::UniqueOperationContext,
-                             std::unique_ptr<MongoDOperationContextSession>>>
-    _checkOutSession(ServiceContext* serviceContext,
-                     std::shared_ptr<executor::TaskExecutor> executor,
-                     SessionTxnRecord donorRecord);
+    ExecutorFuture<LogicalSessionId> _checkOutAndUpdateSession(
+        ServiceContext* serviceContext,
+        std::shared_ptr<executor::TaskExecutor> executor,
+        SessionTxnRecord donorRecord);
 
     void _updateSessionRecord(OperationContext* opCtx);
 

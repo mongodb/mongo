@@ -173,11 +173,10 @@ ServiceContext::UniqueOperationContext ReshardingTxnCloner::_makeOperationContex
     return opCtx;
 }
 
-ExecutorFuture<std::pair<ServiceContext::UniqueOperationContext,
-                         std::unique_ptr<MongoDOperationContextSession>>>
-ReshardingTxnCloner::_checkOutSession(ServiceContext* serviceContext,
-                                      std::shared_ptr<executor::TaskExecutor> executor,
-                                      SessionTxnRecord donorRecord) {
+ExecutorFuture<LogicalSessionId> ReshardingTxnCloner::_checkOutAndUpdateSession(
+    ServiceContext* serviceContext,
+    std::shared_ptr<executor::TaskExecutor> executor,
+    SessionTxnRecord donorRecord) {
     auto opCtx = _makeOperationContext(serviceContext);
     opCtx->setLogicalSessionId(donorRecord.getSessionId());
     opCtx->setTxnNumber(donorRecord.getTxnNum());
@@ -200,7 +199,7 @@ ReshardingTxnCloner::_checkOutSession(ServiceContext* serviceContext,
             // txnParticipant.transactionIsPrepared()
             return txnParticipant.onExitPrepare().thenRunOn(executor).then(
                 [this, serviceContext, executor, donorRecord = std::move(donorRecord)] {
-                    return _checkOutSession(
+                    return _checkOutAndUpdateSession(
                         serviceContext, std::move(executor), std::move(donorRecord));
                 });
         } else {
@@ -208,7 +207,11 @@ ReshardingTxnCloner::_checkOutSession(ServiceContext* serviceContext,
         }
     }
 
-    return ExecutorFuture(std::move(executor), std::make_pair(std::move(opCtx), std::move(ocs)));
+    if (ocs) {
+        _updateSessionRecord(opCtx.get());
+    }
+
+    return ExecutorFuture(std::move(executor), *opCtx->getLogicalSessionId());
 }
 
 void ReshardingTxnCloner::_updateSessionRecord(OperationContext* opCtx) {
@@ -225,6 +228,7 @@ void ReshardingTxnCloner::_updateSessionRecord(OperationContext* opCtx) {
     oplogEntry.setStatementId(kIncompleteHistoryStmtId);
     oplogEntry.setPrevWriteOpTimeInTransaction(repl::OpTime());
     oplogEntry.setWallClockTime(Date_t::now());
+    oplogEntry.setFromMigrate(true);
 
     auto txnParticipant = TransactionParticipant::get(opCtx);
     writeConflictRetry(
@@ -248,10 +252,12 @@ void ReshardingTxnCloner::_updateSessionRecord(OperationContext* opCtx) {
                                   << redact(oplogEntry.toBSON()),
                     !opTime.isNull());
 
+            // Use the same wallTime as oplog since SessionUpdateTracker looks at the oplog entry
+            // wallTime when replicating.
             SessionTxnRecord sessionTxnRecord(*opCtx->getLogicalSessionId(),
                                               *opCtx->getTxnNumber(),
                                               std::move(opTime),
-                                              Date_t::now());
+                                              oplogEntry.getWallClockTime());
 
             txnParticipant.onRetryableWriteCloningCompleted(
                 opCtx, {kIncompleteHistoryStmtId}, sessionTxnRecord);
@@ -309,16 +315,7 @@ ExecutorFuture<void> ReshardingTxnCloner::_updateSessionRecordsUntilPipelineExha
     auto donorRecord = SessionTxnRecord::parse(
         IDLParserErrorContext("resharding config.transactions cloning"), doc->toBson());
 
-    return _checkOutSession(serviceContext, executor, std::move(donorRecord))
-        .then([this](auto x) {
-            const auto& [opCtx, ocs] = x;
-            // _checkOutSession() doesn't leave the session checked out if its record shouldn't be
-            // updated as a result of the donor's record.
-            if (ocs) {
-                _updateSessionRecord(opCtx.get());
-            }
-            return *opCtx->getLogicalSessionId();
-        })
+    return _checkOutAndUpdateSession(serviceContext, executor, std::move(donorRecord))
         .then([this, serviceContext, progressCounter](auto progressLsid) {
             if (progressCounter == 0) {
                 _withTemporaryOperationContext(serviceContext, [&](auto* opCtx) {
