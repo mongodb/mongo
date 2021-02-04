@@ -216,6 +216,9 @@ Status insertOplogAndUpdateConfigForRetryable(OperationContext* opCtx,
             sessionTxnRecord.setSessionId(*oplog.getSessionId());
             sessionTxnRecord.setTxnNum(txnNumber);
             sessionTxnRecord.setLastWriteOpTime(oplogOpTime);
+
+            // Use the same wallTime as oplog since SessionUpdateTracker looks at the oplog entry
+            // wallTime when replicating.
             sessionTxnRecord.setLastWriteDate(noOpOplog.getWallClockTime());
             txnParticipant.onRetryableWriteCloningCompleted(opCtx, {stmtId}, sessionTxnRecord);
 

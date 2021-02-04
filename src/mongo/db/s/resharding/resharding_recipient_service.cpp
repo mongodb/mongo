@@ -43,6 +43,7 @@
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
+#include "mongo/db/s/resharding/resharding_txn_cloner.h"
 #include "mongo/db/s/resharding/resharding_txn_cloner_progress_gen.h"
 #include "mongo/db/s/resharding_util.h"
 #include "mongo/db/s/shard_key_util.h"
@@ -342,6 +343,22 @@ void ReshardingRecipientService::RecipientStateMachine::
     _transitionState(RecipientStateEnum::kCloning);
 }
 
+void ReshardingRecipientService::RecipientStateMachine::_initTxnCloner(
+    OperationContext* opCtx, const Timestamp& fetchTimestamp) {
+    auto catalogCache = Grid::get(opCtx)->catalogCache();
+    auto routingInfo = catalogCache->getShardedCollectionRoutingInfo(opCtx, _recipientDoc.getNss());
+    std::set<ShardId> shardList;
+
+    const auto myShardId = ShardingState::get(opCtx)->shardId();
+    routingInfo.getAllShardIds(&shardList);
+    shardList.erase(myShardId);
+
+    for (const auto& shard : shardList) {
+        _txnCloners.push_back(
+            std::make_unique<ReshardingTxnCloner>(ReshardingSourceId(_id, shard), fetchTimestamp));
+    }
+}
+
 ExecutorFuture<void>
 ReshardingRecipientService::RecipientStateMachine::_cloneThenTransitionToApplying(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
@@ -361,6 +378,11 @@ ReshardingRecipientService::RecipientStateMachine::_cloneThenTransitionToApplyin
         ShardingState::get(serviceContext)->shardId(),
         *_recipientDoc.getFetchTimestamp(),
         std::move(tempNss));
+
+    auto scopedOpCtx = cc().makeOperationContext();
+    auto opCtx = scopedOpCtx.get();
+
+    _initTxnCloner(opCtx, *_recipientDoc.getFetchTimestamp());
 
     auto numDonors = _recipientDoc.getDonorShardsMirroring().size();
     _oplogFetchers.reserve(numDonors);
@@ -395,9 +417,22 @@ ReshardingRecipientService::RecipientStateMachine::_cloneThenTransitionToApplyin
                 }));
     }
 
-    return _collectionCloner->run(**executor, cancelToken).then([this] {
-        _transitionStateAndUpdateCoordinator(RecipientStateEnum::kApplying);
-    });
+    return _collectionCloner->run(**executor, cancelToken)
+        .then([this, executor] {
+            if (_txnCloners.empty()) {
+                return SemiFuture<void>::makeReady();
+            }
+
+            auto serviceContext = Client::getCurrent()->getServiceContext();
+
+            std::vector<ExecutorFuture<void>> txnClonerFutures;
+            for (auto&& txnCloner : _txnCloners) {
+                txnClonerFutures.push_back(txnCloner->run(serviceContext, **executor));
+            }
+
+            return whenAllSucceed(std::move(txnClonerFutures));
+        })
+        .then([this] { _transitionStateAndUpdateCoordinator(RecipientStateEnum::kApplying); });
 }
 
 void ReshardingRecipientService::RecipientStateMachine::_applyThenTransitionToSteadyState() {

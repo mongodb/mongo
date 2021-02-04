@@ -53,6 +53,10 @@ class TaskExecutor;
 class OperationContext;
 class ServiceContext;
 
+/**
+ * Responsible for copying data from multiple source shards that will belong to this shard based on
+ * the new resharding chunk distribution.
+ */
 class ReshardingCollectionCloner {
 public:
     ReshardingCollectionCloner(ShardKeyPattern newShardKeyPattern,

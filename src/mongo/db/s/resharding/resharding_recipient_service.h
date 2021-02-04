@@ -39,6 +39,7 @@
 namespace mongo {
 
 class ReshardingCollectionCloner;
+class ReshardingTxnCloner;
 
 namespace resharding {
 
@@ -163,6 +164,9 @@ private:
     // all conflict stash collections that are associated with the in-progress operation.
     void _dropOplogCollections(OperationContext* opCtx);
 
+    // Initializes the txn cloners for this resharding operation.
+    void _initTxnCloner(OperationContext* opCtx, const Timestamp& fetchTimestamp);
+
     // The in-memory representation of the underlying document in
     // config.localReshardingOperations.recipient.
     ReshardingRecipientDocument _recipientDoc;
@@ -171,6 +175,7 @@ private:
     const UUID _id;
 
     std::unique_ptr<ReshardingCollectionCloner> _collectionCloner;
+    std::vector<std::unique_ptr<ReshardingTxnCloner>> _txnCloners;
 
     std::vector<std::unique_ptr<ReshardingOplogApplier>> _oplogAppliers;
     std::vector<std::unique_ptr<ThreadPool>> _oplogApplierWorkers;

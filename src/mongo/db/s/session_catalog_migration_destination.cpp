@@ -289,7 +289,11 @@ ProcessOplogResult processSessionOplog(const BSONObj& oplogBSON,
                 sessionTxnRecord.setSessionId(result.sessionId);
                 sessionTxnRecord.setTxnNum(result.txnNum);
                 sessionTxnRecord.setLastWriteOpTime(oplogOpTime);
+
+                // Use the same wallTime as oplog since SessionUpdateTracker looks at the oplog
+                // entry wallTime when replicating.
                 sessionTxnRecord.setLastWriteDate(oplogEntry.getWallClockTime());
+
                 // We do not migrate transaction oplog entries so don't set the txn state.
                 txnParticipant.onRetryableWriteCloningCompleted(opCtx, {stmtId}, sessionTxnRecord);
             }
