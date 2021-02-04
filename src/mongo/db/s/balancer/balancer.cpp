@@ -529,6 +529,7 @@ bool Balancer::_checkOIDs(OperationContext* opCtx) {
                                                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                                 "admin",
                                                 BSON("features" << 1),
+                                                Seconds(30),
                                                 Shard::RetryPolicy::kIdempotent));
         uassertStatusOK(result.commandStatus);
         BSONObj f = std::move(result.response);
@@ -551,6 +552,7 @@ bool Balancer::_checkOIDs(OperationContext* opCtx) {
                     ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                     "admin",
                     BSON("features" << 1 << "oidReset" << 1),
+                    Seconds(30),
                     Shard::RetryPolicy::kIdempotent));
                 uassertStatusOK(result.commandStatus);
 
@@ -562,6 +564,7 @@ bool Balancer::_checkOIDs(OperationContext* opCtx) {
                             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                             "admin",
                             BSON("features" << 1 << "oidReset" << 1),
+                            Seconds(30),
                             Shard::RetryPolicy::kIdempotent));
                     uassertStatusOK(result.commandStatus);
                 }
