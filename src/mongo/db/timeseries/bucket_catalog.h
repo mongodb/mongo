@@ -45,6 +45,28 @@ public:
     // measurements held in a bucket.
     static constexpr auto kTimeseriesBucketMaxTimeRange = Hours(1);
 
+    class BucketId {
+    public:
+        const OID& operator*() const;
+        const OID* operator->() const;
+
+        bool operator==(const BucketId& other) const;
+        bool operator<(const BucketId& other) const;
+
+        template <typename H>
+        friend H AbslHashValue(H h, const BucketId& bucketId) {
+            return H::combine(std::move(h), bucketId._num);
+        }
+
+    protected:
+        BucketId(uint64_t num) : _num(num) {}
+
+        std::shared_ptr<OID> _id{std::make_shared<OID>(OID::gen())};
+
+    private:
+        uint64_t _num;
+    };
+
     struct CommitInfo {
         StatusWith<SingleWriteResult> result;
         boost::optional<repl::OpTime> opTime;
@@ -52,7 +74,7 @@ public:
     };
 
     struct InsertResult {
-        OID bucketId;
+        BucketId bucketId;
         boost::optional<Future<CommitInfo>> commitInfo;
     };
 
@@ -82,7 +104,7 @@ public:
      * Returns an empty document if the given bucket cannot be found or if this time-series
      * collection was not created with a metadata field name.
      */
-    BSONObj getMetadata(const OID& bucketId) const;
+    BSONObj getMetadata(const BucketId& bucketId) const;
 
     /**
      * Returns the id of the bucket that the document belongs in, and a Future to wait on if the
@@ -96,13 +118,13 @@ public:
      * committed for the given bucket. This should be called continuously by the committer until
      * there are no more uncommitted measurements.
      */
-    CommitData commit(const OID& bucketId,
+    CommitData commit(const BucketId& bucketId,
                       boost::optional<CommitInfo> previousCommitInfo = boost::none);
 
     /**
      * Clears the given bucket.
      */
-    void clear(const OID& bucketId);
+    void clear(const BucketId& bucketId);
 
     /**
      * Clears the buckets for the given namespace.
@@ -224,6 +246,9 @@ private:
         // The maximum values for each field in the bucket.
         MinMax max;
 
+        // The latest time that has been inserted into the bucket.
+        Date_t latestTime;
+
         // The total size in bytes of the bucket's BSON serialization, including measurements to be
         // inserted.
         uint64_t size = 0;
@@ -262,6 +287,11 @@ private:
                                                 StringSet* newFieldNamesToBeInserted,
                                                 uint32_t* newFieldNamesSize,
                                                 uint32_t* sizeToBeAdded) const;
+
+        /**
+         * Returns whether BucketCatalog::commit has been called on this bucket.
+         */
+        bool hasBeenCommitted() const;
     };
 
     struct ExecutionStats {
@@ -278,16 +308,26 @@ private:
         long long numMeasurementsCommitted = 0;
     };
 
+    class BucketIdInternal : public BucketId {
+    public:
+        static BucketIdInternal min();
+
+        BucketIdInternal(const Date_t& time, uint64_t num);
+
+        Date_t getTime() const;
+        void setTime(const Date_t& time);
+    };
+
     class ServerStatus;
 
-    using OrderedBuckets = std::set<std::tuple<NamespaceString, BucketMetadata, OID>>;
-    using IdleBuckets = std::set<OID>;
+    using NsBuckets = std::set<std::tuple<NamespaceString, BucketId>>;
+    using IdleBuckets = std::set<BucketId>;
 
     /**
      * Removes the given bucket from the bucket catalog's internal data structures.
      */
-    void _removeBucket(const OID& bucketId,
-                       boost::optional<OrderedBuckets::iterator> orderedBucketsIt = boost::none,
+    void _removeBucket(const BucketId& bucketId,
+                       boost::optional<NsBuckets::iterator> nsBucketsIt = boost::none,
                        boost::optional<IdleBuckets::iterator> idleBucketsIt = boost::none);
 
     /**
@@ -298,19 +338,22 @@ private:
     mutable Mutex _mutex = MONGO_MAKE_LATCH("BucketCatalog");
 
     // All buckets currently in the catalog, including buckets which are full but not yet committed.
-    stdx::unordered_map<OID, Bucket, OID::Hasher> _buckets;
+    stdx::unordered_map<BucketId, Bucket> _buckets;
 
     // The _id of the current bucket for each namespace and metadata pair.
-    stdx::unordered_map<std::pair<NamespaceString, BucketMetadata>, OID> _bucketIds;
+    stdx::unordered_map<std::tuple<NamespaceString, BucketMetadata>, BucketIdInternal> _bucketIds;
 
-    // All namespace, metadata, and _id tuples which currently have a bucket in the catalog.
-    OrderedBuckets _orderedBuckets;
+    // All buckets ordered by their namespaces.
+    NsBuckets _nsBuckets;
 
     // Buckets that do not have any writers.
     IdleBuckets _idleBuckets;
 
     // Per-collection execution stats.
     stdx::unordered_map<NamespaceString, ExecutionStats> _executionStats;
+
+    // Counter for buckets created by the bucket catalog.
+    uint64_t _bucketNum = 0;
 
     // Approximate memory usage of the bucket catalog.
     uint64_t _memoryUsage = 0;

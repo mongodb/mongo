@@ -36,7 +36,7 @@ assert.contains(bucketsColl.getName(), testDB.getCollectionNames());
 
 // Insert enough documents with large enough metadata so that the bucket catalog memory threshold is
 // reached and idle buckets are expired.
-const numDocs = 50;
+const numDocs = 100;
 const metaValue = 'a'.repeat(1024 * 1024);
 for (let i = 0; i < numDocs; i++) {
     assert.commandWorked(

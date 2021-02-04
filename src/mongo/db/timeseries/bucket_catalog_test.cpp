@@ -43,7 +43,7 @@ protected:
     void setUp() override;
     virtual BSONObj _makeTimeseriesOptionsForCreate() const;
 
-    void _commit(const OID& bucketId, uint16_t numCommittedMeasurements);
+    void _commit(const BucketCatalog::BucketId& bucketId, uint16_t numCommittedMeasurements);
     void _insertOneAndCommit(const NamespaceString& ns, uint16_t numCommittedMeasurements);
 
     OperationContext* _opCtx;
@@ -86,7 +86,8 @@ BSONObj BucketCatalogWithoutMetadataTest::_makeTimeseriesOptionsForCreate() cons
     return BSON("timeField" << _timeField);
 }
 
-void BucketCatalogTest::_commit(const OID& bucketId, uint16_t numCommittedMeasurements) {
+void BucketCatalogTest::_commit(const BucketCatalog::BucketId& bucketId,
+                                uint16_t numCommittedMeasurements) {
     auto data = _bucketCatalog->commit(bucketId);
     ASSERT_EQ(data.docs.size(), 1);
     ASSERT_EQ(data.numCommittedMeasurements, numCommittedMeasurements);
@@ -129,7 +130,9 @@ TEST_F(BucketCatalogTest, InsertIntoSameBucket) {
 }
 
 TEST_F(BucketCatalogTest, GetMetadataReturnsEmptyDocOnMissingBucket) {
-    auto bucketId = OID::gen();
+    auto bucketId =
+        _bucketCatalog->insert(_opCtx, _ns1, BSON(_timeField << Date_t::now())).bucketId;
+    _bucketCatalog->clear(bucketId);
     ASSERT_BSONOBJ_EQ(BSONObj(), _bucketCatalog->getMetadata(bucketId));
 }
 
@@ -233,7 +236,7 @@ TEST_F(BucketCatalogWithoutMetadataTest, CommitReturnsNewFields) {
     // the first measurement as new fields.
     auto [overflowBucketId, unusedCommitInfo] = _bucketCatalog->insert(
         _opCtx, _ns1, BSON(_timeField << Date_t::now() << "a" << gTimeseriesBucketMaxCount));
-    ASSERT_NE(bucketId, overflowBucketId);
+    ASSERT_NE(*bucketId, *overflowBucketId);
     data = _bucketCatalog->commit(overflowBucketId);
     ASSERT_EQ(2U, data.newFieldNamesToBeInserted.size()) << data.toBSON();
     ASSERT(data.newFieldNamesToBeInserted.count(_timeField)) << data.toBSON();

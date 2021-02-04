@@ -124,7 +124,7 @@ const int kTimeseriesControlVersion = 1;
 /**
  * Transforms a single time-series insert to an update request on an existing bucket.
  */
-write_ops::UpdateOpEntry makeTimeseriesUpdateOpEntry(const OID& bucketId,
+write_ops::UpdateOpEntry makeTimeseriesUpdateOpEntry(const BucketCatalog::BucketId& bucketId,
                                                      const BucketCatalog::CommitData& data,
                                                      const BSONObj& metadata) {
     BSONObjBuilder updateBuilder;
@@ -183,16 +183,16 @@ write_ops::UpdateOpEntry makeTimeseriesUpdateOpEntry(const OID& bucketId,
         }
     }
     write_ops::UpdateModification u(updateBuilder.obj(), write_ops::UpdateModification::DiffTag{});
-    write_ops::UpdateOpEntry update(BSON("_id" << bucketId), std::move(u));
-    invariant(!update.getMulti(), bucketId.toString());
-    invariant(!update.getUpsert(), bucketId.toString());
+    write_ops::UpdateOpEntry update(BSON("_id" << *bucketId), std::move(u));
+    invariant(!update.getMulti(), bucketId->toString());
+    invariant(!update.getUpsert(), bucketId->toString());
     return update;
 }
 
 /**
  * Returns the single-element array to use as the vector of documents for inserting a new bucket.
  */
-BSONArray makeTimeseriesInsertDocument(const OID& bucketId,
+BSONArray makeTimeseriesInsertDocument(const BucketCatalog::BucketId& bucketId,
                                        const BucketCatalog::CommitData& data,
                                        const BSONObj& metadata) {
     auto metadataElem = metadata.firstElement();
@@ -213,7 +213,7 @@ BSONArray makeTimeseriesInsertDocument(const OID& bucketId,
     BSONArrayBuilder builder;
     {
         BSONObjBuilder bucketBuilder(builder.subobjStart());
-        bucketBuilder.append("_id", bucketId);
+        bucketBuilder.append("_id", *bucketId);
         {
             BSONObjBuilder bucketControlBuilder(bucketBuilder.subobjStart("control"));
             bucketControlBuilder.append("version", kTimeseriesControlVersion);
@@ -583,7 +583,7 @@ public:
 
         StatusWith<SingleWriteResult> _performTimeseriesInsert(
             OperationContext* opCtx,
-            const OID& bucketId,
+            const BucketCatalog::BucketId& bucketId,
             const BucketCatalog::CommitData& data,
             const BSONObj& metadata) const {
             auto bucketsNs = ns().makeTimeseriesBucketsNamespace();
@@ -617,7 +617,7 @@ public:
 
         StatusWith<SingleWriteResult> _performTimeseriesUpdate(
             OperationContext* opCtx,
-            const OID& bucketId,
+            const BucketCatalog::BucketId& bucketId,
             const BucketCatalog::CommitData& data,
             const BSONObj& metadata) const {
             auto update = makeTimeseriesUpdateOpEntry(bucketId, data, metadata);
@@ -648,7 +648,7 @@ public:
         }
 
         void _commitTimeseriesBucket(OperationContext* opCtx,
-                                     const OID& bucketId,
+                                     const BucketCatalog::BucketId& bucketId,
                                      size_t index,
                                      std::vector<BSONObj>* errors,
                                      boost::optional<repl::OpTime>* opTime,
@@ -705,7 +705,7 @@ public:
             const boost::optional<std::vector<size_t>>& indices = boost::none) const {
             auto& bucketCatalog = BucketCatalog::get(opCtx);
 
-            std::vector<std::pair<OID, size_t>> bucketsToCommit;
+            std::vector<std::pair<BucketCatalog::BucketId, size_t>> bucketsToCommit;
             std::vector<std::pair<Future<BucketCatalog::CommitInfo>, size_t>> bucketsToWaitOn;
             auto insert = [&](size_t index) {
                 auto [bucketId, commitInfo] =

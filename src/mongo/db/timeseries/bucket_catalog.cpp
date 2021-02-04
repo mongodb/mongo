@@ -66,7 +66,7 @@ BucketCatalog& BucketCatalog::get(OperationContext* opCtx) {
     return get(opCtx->getServiceContext());
 }
 
-BSONObj BucketCatalog::getMetadata(const OID& bucketId) const {
+BSONObj BucketCatalog::getMetadata(const BucketId& bucketId) const {
     stdx::lock_guard lk(_mutex);
     auto it = _buckets.find(bucketId);
     if (it == _buckets.cend()) {
@@ -95,23 +95,21 @@ BucketCatalog::InsertResult BucketCatalog::insert(OperationContext* opCtx,
             metadata.appendNull(*metaField);
         }
     }
-    auto key = std::make_pair(ns, BucketMetadata{metadata.obj(), viewDef});
+    auto key = std::make_tuple(ns, BucketMetadata{metadata.obj(), viewDef});
 
     auto& stats = _executionStats[ns];
 
     auto time = doc[options.getTimeField()].Date();
     auto createNewBucketId = [&] {
         _expireIdleBuckets(&stats);
-        auto bucketId = OID::gen();
-        bucketId.setTimestamp(durationCount<Seconds>(time.toDurationSinceEpoch()));
-        return bucketId;
+        return BucketIdInternal{time, ++_bucketNum};
     };
 
     auto it = _bucketIds.find(key);
     if (it == _bucketIds.end()) {
         // A bucket for this namespace and metadata pair does not yet exist.
         it = _bucketIds.insert({std::move(key), createNewBucketId()}).first;
-        _orderedBuckets.insert({ns, it->first.second, it->second});
+        _nsBuckets.insert({ns, it->second});
         stats.numBucketsOpenedDueToMetadata++;
     }
 
@@ -136,14 +134,19 @@ BucketCatalog::InsertResult BucketCatalog::insert(OperationContext* opCtx,
             stats.numBucketsClosedDueToSize++;
             return true;
         }
-        auto bucketTime = it->second.asDateT();
+        auto bucketTime = it->second.getTime();
         if (time - bucketTime >= kTimeseriesBucketMaxTimeRange) {
             stats.numBucketsClosedDueToTimeForward++;
             return true;
         }
         if (time < bucketTime) {
-            stats.numBucketsClosedDueToTimeBackward++;
-            return true;
+            if (!bucket->hasBeenCommitted() &&
+                bucket->latestTime - time < kTimeseriesBucketMaxTimeRange) {
+                it->second.setTime(time);
+            } else {
+                stats.numBucketsClosedDueToTimeBackward++;
+                return true;
+            }
         }
         return false;
     };
@@ -156,12 +159,12 @@ BucketCatalog::InsertResult BucketCatalog::insert(OperationContext* opCtx,
             // remove it now. Otherwise, we must keep the bucket around until it is committed.
             _memoryUsage -= bucket->memoryUsage;
             _buckets.erase(it->second);
-            _orderedBuckets.erase({it->first.first, it->first.second, it->second});
+            _nsBuckets.erase({std::get<NamespaceString>(it->first), it->second});
         } else {
             bucket->full = true;
         }
         it->second = createNewBucketId();
-        _orderedBuckets.insert({ns, it->first.second, it->second});
+        _nsBuckets.insert({ns, it->second});
         bucket = &_buckets[it->second];
         bucket->calculateBucketFieldsAndSizeChange(doc,
                                                    options.getMetaField(),
@@ -184,17 +187,20 @@ BucketCatalog::InsertResult BucketCatalog::insert(OperationContext* opCtx,
     bucket->size += sizeToBeAdded;
     bucket->measurementsToBeInserted.push_back(doc);
     bucket->newFieldNamesToBeInserted.merge(newFieldNamesToBeInserted);
+    if (time > bucket->latestTime) {
+        bucket->latestTime = time;
+    }
     if (bucket->ns.isEmpty()) {
         // The namespace and metadata only need to be set if this bucket was newly created.
         bucket->ns = ns;
-        bucket->metadata = it->first.second;
+        bucket->metadata = std::get<BucketMetadata>(it->first);
 
-        // The namespace is stored three times: the bucket itself, _bucketIds, and _orderedBuckets.
-        // The metadata is stored three times: the bucket itself, _bucketIds, and _orderedBuckets.
-        // The bucketId is stored four times: _buckets, _bucketIds, _orderedBuckets, and
+        // The namespace is stored three times: the bucket itself, _bucketIds, and _nsBuckets.
+        // The metadata is stored two times: the bucket itself and _bucketIds.
+        // The bucketId is stored four times: _buckets, _bucketIds, _nsBuckets, and
         // _idleBuckets.
-        bucket->memoryUsage +=
-            (ns.size() * 3) + (bucket->metadata.metadata.objsize() * 3) + (sizeof(OID) * 4);
+        bucket->memoryUsage += (ns.size() * 3) + (bucket->metadata.metadata.objsize() * 2) +
+            ((sizeof(BucketId) + sizeof(OID)) * 4);
     } else {
         _memoryUsage -= bucket->memoryUsage;
     }
@@ -208,7 +214,7 @@ BucketCatalog::InsertResult BucketCatalog::insert(OperationContext* opCtx,
     return {it->second, std::move(commitInfoFuture)};
 }
 
-BucketCatalog::CommitData BucketCatalog::commit(const OID& bucketId,
+BucketCatalog::CommitData BucketCatalog::commit(const BucketId& bucketId,
                                                 boost::optional<CommitInfo> previousCommitInfo) {
     stdx::lock_guard lk(_mutex);
     auto it = _buckets.find(bucketId);
@@ -217,8 +223,7 @@ BucketCatalog::CommitData BucketCatalog::commit(const OID& bucketId,
 
     // The only case in which previousCommitInfo should not be provided is the first time a given
     // committer calls this function.
-    invariant(!previousCommitInfo || bucket.numCommittedMeasurements != 0 ||
-              bucket.numPendingCommitMeasurements != 0);
+    invariant(!previousCommitInfo || bucket.hasBeenCommitted());
 
     auto newFieldNamesToBeInserted = bucket.newFieldNamesToBeInserted;
     bucket.fieldNames.merge(bucket.newFieldNamesToBeInserted);
@@ -263,8 +268,7 @@ BucketCatalog::CommitData BucketCatalog::commit(const OID& bucketId,
             // Everything in the bucket has been committed, and nothing more will be added since the
             // bucket is full. Thus, we can remove it.
             _memoryUsage -= bucket.memoryUsage;
-            _orderedBuckets.erase(
-                {std::move(it->second.ns), std::move(it->second.metadata), bucketId});
+            _nsBuckets.erase({std::move(it->second.ns), bucketId});
             _buckets.erase(it);
         } else if (bucket.numWriters == 0) {
             _idleBuckets.insert(bucketId);
@@ -281,7 +285,7 @@ BucketCatalog::CommitData BucketCatalog::commit(const OID& bucketId,
     return data;
 }
 
-void BucketCatalog::clear(const OID& bucketId) {
+void BucketCatalog::clear(const BucketId& bucketId) {
     stdx::lock_guard lk(_mutex);
 
     auto it = _buckets.find(bucketId);
@@ -292,7 +296,7 @@ void BucketCatalog::clear(const OID& bucketId) {
 
     while (!bucket.promises.empty()) {
         bucket.promises.front().setError({ErrorCodes::TimeseriesBucketCleared,
-                                          str::stream() << "Time-series bucket " << bucketId
+                                          str::stream() << "Time-series bucket " << *bucketId
                                                         << " for " << bucket.ns << " was cleared"});
         bucket.promises.pop();
     }
@@ -307,11 +311,11 @@ void BucketCatalog::clear(const NamespaceString& ns) {
         return ns.coll().empty() ? ns.db() == bucketNs.db() : ns == bucketNs;
     };
 
-    for (auto it = _orderedBuckets.lower_bound({ns, {}, {}});
-         it != _orderedBuckets.end() && shouldClear(std::get<NamespaceString>(*it));) {
+    for (auto it = _nsBuckets.lower_bound({ns, BucketIdInternal::min()});
+         it != _nsBuckets.end() && shouldClear(std::get<NamespaceString>(*it));) {
         auto nextIt = std::next(it);
         _executionStats.erase(std::get<NamespaceString>(*it));
-        _removeBucket(std::get<OID>(*it), it);
+        _removeBucket(std::get<BucketId>(*it), it);
         it = nextIt;
     }
 }
@@ -346,16 +350,16 @@ void BucketCatalog::appendExecutionStats(const NamespaceString& ns, BSONObjBuild
     }
 }
 
-void BucketCatalog::_removeBucket(const OID& bucketId,
-                                  boost::optional<OrderedBuckets::iterator> orderedBucketsIt,
+void BucketCatalog::_removeBucket(const BucketId& bucketId,
+                                  boost::optional<NsBuckets::iterator> nsBucketsIt,
                                   boost::optional<IdleBuckets::iterator> idleBucketsIt) {
     auto it = _buckets.find(bucketId);
     _memoryUsage -= it->second.memoryUsage;
 
-    if (orderedBucketsIt) {
-        _orderedBuckets.erase(*orderedBucketsIt);
+    if (nsBucketsIt) {
+        _nsBuckets.erase(*nsBucketsIt);
     } else {
-        _orderedBuckets.erase({it->second.ns, it->second.metadata, it->first});
+        _nsBuckets.erase({it->second.ns, it->first});
     }
 
     if (idleBucketsIt) {
@@ -418,6 +422,10 @@ void BucketCatalog::Bucket::calculateBucketFieldsAndSizeChange(
         // accounts for a null terminator whereas the stringified position does not.
         *sizeToBeAdded += elem.size() - elem.fieldNameSize() + numMeasurementsFieldLength + 1;
     }
+}
+
+bool BucketCatalog::Bucket::hasBeenCommitted() const {
+    return numCommittedMeasurements != 0 || numPendingCommitMeasurements != 0;
 }
 
 void BucketCatalog::MinMax::update(const BSONObj& doc,
@@ -643,6 +651,39 @@ void BucketCatalog::MinMax::_clearUpdated() {
 
 uint64_t BucketCatalog::MinMax::getMemoryUsage() const {
     return _memoryUsage + (sizeof(MinMax) * (_object.size() + _array.size()));
+}
+
+const OID& BucketCatalog::BucketId::operator*() const {
+    return *_id;
+}
+
+const OID* BucketCatalog::BucketId::operator->() const {
+    return _id.get();
+}
+
+bool BucketCatalog::BucketId::operator==(const BucketId& other) const {
+    return _num == other._num;
+}
+
+bool BucketCatalog::BucketId::operator<(const BucketId& other) const {
+    return _num < other._num;
+}
+
+BucketCatalog::BucketIdInternal BucketCatalog::BucketIdInternal::min() {
+    return {{}, 0};
+}
+
+BucketCatalog::BucketIdInternal::BucketIdInternal(const Date_t& time, uint64_t num)
+    : BucketId(num) {
+    setTime(time);
+}
+
+Date_t BucketCatalog::BucketIdInternal::getTime() const {
+    return _id->asDateT();
+}
+
+void BucketCatalog::BucketIdInternal::setTime(const Date_t& time) {
+    _id->setTimestamp(durationCount<Seconds>(time.toDurationSinceEpoch()));
 }
 
 class BucketCatalog::ServerStatus : public ServerStatusSection {
