@@ -105,5 +105,5 @@ commands:
             includePendingDrops:
                 type: safeBool
                 unstable: true
-                default: false
+                optional: true
         reply_type: ListCollectionsReply

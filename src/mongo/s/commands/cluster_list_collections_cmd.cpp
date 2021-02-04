@@ -35,6 +35,8 @@
 #include "mongo/bson/mutable/document.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/list_collections_gen.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/query/store_possible_cursor.h"
 
@@ -68,6 +70,7 @@ bool cursorCommandPassthroughPrimaryShard(OperationContext* opCtx,
                             privileges));
 
     CommandHelpers::filterCommandReplyForPassthrough(transformedResponse, out);
+    uassertStatusOK(getStatusFromCommandResult(out->asTempObj()));
     return true;
 }
 
@@ -150,30 +153,40 @@ BSONObj rewriteCommandForListingOwnCollections(OperationContext* opCtx,
     // Attach our new composite filter back onto the listCollections command object.
     uassertStatusOK(rewrittenCmdObj.root().pushBack(newFilter));
 
-    return rewrittenCmdObj.getObject();
+    auto rewrittenCmd = rewrittenCmdObj.getObject();
+
+    // Make sure the modified request still conforms to the IDL spec. We only want to run this while
+    // testing because an error while parsing indicates an internal error, not something that should
+    // surface to a user.
+    if (getTestCommandsEnabled()) {
+        ListCollections::parse(IDLParserErrorContext("ListCollectionsForOwnCollections"),
+                               rewrittenCmd);
+    }
+
+    return rewrittenCmd;
 }
 
-class CmdListCollections : public BasicCommand {
+class CmdListCollections : public BasicCommandWithRequestParser<CmdListCollections> {
 public:
-    CmdListCollections() : BasicCommand("listCollections") {}
+    using Request = ListCollections;
 
-    const std::set<std::string>& apiVersions() const {
+    const std::set<std::string>& apiVersions() const final {
         return kApiVersions1;
     }
 
-    bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return false;
-    }
-
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const final {
         return AllowedOnSecondary::kAlways;
     }
 
-    bool maintenanceOk() const override {
+    bool maintenanceOk() const final {
         return false;
     }
 
-    bool adminOnly() const override {
+    bool adminOnly() const final {
+        return false;
+    }
+
+    bool supportsWriteConcern(const BSONObj& cmd) const final {
         return false;
     }
 
@@ -181,34 +194,30 @@ public:
                                const std::string& dbname,
                                const BSONObj& cmdObj) const final {
         AuthorizationSession* authzSession = AuthorizationSession::get(client);
-
-        if (authzSession->checkAuthorizedToListCollections(dbname, cmdObj).isOK()) {
-            return Status::OK();
-        }
-
-        return Status(ErrorCodes::Unauthorized,
-                      str::stream() << "Not authorized to list collections on db: " << dbname);
+        return authzSession->checkAuthorizedToListCollections(dbname, cmdObj).getStatus();
     }
 
-    bool run(OperationContext* opCtx,
-             const std::string& dbName,
-             const BSONObj& cmdObj,
-             BSONObjBuilder& result) override {
+    bool runWithRequestParser(OperationContext* opCtx,
+                              const std::string& dbName,
+                              const BSONObj& cmdObj,
+                              const RequestParser& requestParser,
+                              BSONObjBuilder& output) final {
         CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
 
         const auto nss(NamespaceString::makeListCollectionsNSS(dbName));
 
         BSONObj newCmd = cmdObj;
 
+        const bool authorizedCollections = requestParser.request().getAuthorizedCollections();
         AuthorizationSession* authzSession = AuthorizationSession::get(opCtx->getClient());
-        if (authzSession->getAuthorizationManager().isAuthEnabled() &&
-            newCmd["authorizedCollections"].trueValue()) {
+        if (authzSession->getAuthorizationManager().isAuthEnabled() && authorizedCollections) {
             newCmd = rewriteCommandForListingOwnCollections(opCtx, dbName, cmdObj);
         }
 
         auto dbInfoStatus = Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbName);
         if (!dbInfoStatus.isOK()) {
-            return appendEmptyResultSet(opCtx, result, dbInfoStatus.getStatus(), nss.ns());
+            appendEmptyResultSet(opCtx, output, dbInfoStatus.getStatus(), nss.ns());
+            return true;
         }
 
         return cursorCommandPassthroughPrimaryShard(
@@ -217,9 +226,17 @@ public:
             dbInfoStatus.getValue(),
             applyReadWriteConcern(opCtx, this, newCmd),
             nss,
-            &result,
+            &output,
+            // Use the original command object rather than the rewritten one to preserve whether
+            // 'authorizedCollections' field is set.
             uassertStatusOK(AuthorizationSession::get(opCtx->getClient())
                                 ->checkAuthorizedToListCollections(dbName, cmdObj)));
+    }
+
+    void validateResult(const BSONObj& result) final {
+        StringDataSet ignorableFields({ErrorReply::kOkFieldName});
+        ListCollectionsReply::parse(IDLParserErrorContext("ListCollectionsReply"),
+                                    result.removeFields(ignorableFields));
     }
 
 } cmdListCollections;

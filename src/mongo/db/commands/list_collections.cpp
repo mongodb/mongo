@@ -215,34 +215,29 @@ BSONObj buildCollectionBson(OperationContext* opCtx,
     return b.obj();
 }
 
-void appendListCollectionsCursorReply(CursorId cursorId,
-                                      const NamespaceString& cursorNss,
-                                      std::vector<mongo::ListCollectionsReplyItem>&& firstBatch,
-                                      BSONObjBuilder& result) {
-    auto reply = ListCollectionsReply(
+ListCollectionsReply createListCollectionsCursorReply(
+    CursorId cursorId,
+    const NamespaceString& cursorNss,
+    std::vector<mongo::ListCollectionsReplyItem>&& firstBatch) {
+    return ListCollectionsReply(
         ListCollectionsReplyCursor(cursorId, cursorNss, std::move(firstBatch)));
-    reply.serialize(&result);
 }
 
-class CmdListCollections : public BasicCommand {
+class CmdListCollections : public ListCollectionsCmdVersion1Gen<CmdListCollections> {
 public:
-    const std::set<std::string>& apiVersions() const {
-        return kApiVersions1;
-    }
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const final {
         return AllowedOnSecondary::kOptIn;
     }
-    bool maintenanceOk() const override {
-        return false;
-    }
-    bool adminOnly() const final {
-        return false;
-    }
-    bool supportsWriteConcern(const BSONObj& cmd) const final {
+
+    bool maintenanceOk() const final {
         return false;
     }
 
-    bool collectsResourceConsumptionMetrics() const override {
+    bool adminOnly() const final {
+        return false;
+    }
+
+    bool collectsResourceConsumptionMetrics() const final {
         return true;
     }
 
@@ -250,219 +245,223 @@ public:
         return "list collections for this db";
     }
 
-    Status checkAuthForCommand(Client* client,
-                               const std::string& dbname,
-                               const BSONObj& cmdObj) const final {
-
-        AuthorizationSession* authzSession = AuthorizationSession::get(client);
-
-        if (authzSession->checkAuthorizedToListCollections(dbname, cmdObj).isOK()) {
-            return Status::OK();
+    class Invocation final : public InvocationBaseGen {
+    public:
+        using InvocationBaseGen::InvocationBaseGen;
+        virtual bool supportsWriteConcern() const final {
+            return false;
         }
 
-        return Status(ErrorCodes::Unauthorized,
-                      str::stream() << "Not authorized to list collections on db: " << dbname);
-    }
+        void doCheckAuthorization(OperationContext* opCtx) const final {
+            AuthorizationSession* authzSession = AuthorizationSession::get(opCtx->getClient());
 
-    CmdListCollections() : BasicCommand("listCollections") {}
-
-    bool run(OperationContext* opCtx,
-             const string& dbname,
-             const BSONObj& jsobj,
-             BSONObjBuilder& result) final {
-        CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
-        unique_ptr<MatchExpression> matcher;
-        const auto as = AuthorizationSession::get(opCtx->getClient());
-
-        auto parsed = ListCollections::parse(
-            IDLParserErrorContext("listCollections",
-                                  APIParameters::get(opCtx).getAPIStrict().value_or(false)),
-            jsobj);
-        const bool nameOnly = parsed.getNameOnly();
-        const bool authorizedCollections = parsed.getAuthorizedCollections();
-
-        // The collator is null because collection objects are compared using binary comparison.
-        auto expCtx = make_intrusive<ExpressionContext>(
-            opCtx, std::unique_ptr<CollatorInterface>(nullptr), NamespaceString(dbname));
-
-        if (parsed.getFilter()) {
-            matcher = uassertStatusOK(MatchExpressionParser::parse(*parsed.getFilter(), expCtx));
+            auto dbName = request().getDbName();
+            auto cmdObj = request().toBSON({});
+            uassertStatusOK(authzSession->checkAuthorizedToListCollections(dbName, cmdObj));
         }
 
-        // Check for 'includePendingDrops' flag. The default is to not include drop-pending
-        // collections.
-        bool includePendingDrops;
-        Status status = bsonExtractBooleanFieldWithDefault(
-            jsobj, "includePendingDrops", false, &includePendingDrops);
-        uassertStatusOK(status);
+        NamespaceString ns() const final {
+            return NamespaceString(request().getDbName());
+        }
 
-        const NamespaceString cursorNss = NamespaceString::makeListCollectionsNSS(dbname);
-        std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec;
-        std::vector<mongo::ListCollectionsReplyItem> firstBatch;
-        {
-            // Acquire only the global lock and set up a consistent in-memory catalog and storage
-            // snapshot.
-            AutoGetDbForReadMaybeLockFree lockFreeReadBlock(opCtx, dbname);
-            auto viewCatalog = DatabaseHolder::get(opCtx)->getViewCatalog(opCtx, dbname);
+        Reply typedRun(OperationContext* opCtx) final {
+            CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
+            unique_ptr<MatchExpression> matcher;
+            const auto as = AuthorizationSession::get(opCtx->getClient());
 
-            CurOpFailpointHelpers::waitWhileFailPointEnabled(
-                &hangBeforeListCollections, opCtx, "hangBeforeListCollections", []() {}, cursorNss);
+            const auto listCollRequest = request();
+            const auto dbName = listCollRequest.getDbName();
+            const bool nameOnly = listCollRequest.getNameOnly();
+            const bool authorizedCollections = listCollRequest.getAuthorizedCollections();
 
-            auto ws = std::make_unique<WorkingSet>();
-            auto root = std::make_unique<QueuedDataStage>(expCtx.get(), ws.get());
+            // The collator is null because collection objects are compared using binary comparison.
+            auto expCtx = make_intrusive<ExpressionContext>(
+                opCtx, std::unique_ptr<CollatorInterface>(nullptr), NamespaceString(dbName));
 
-            // If the ViewCatalog pointer is valid, then the database exists.
-            if (viewCatalog) {
-                if (auto collNames = _getExactNameMatches(matcher.get())) {
-                    for (auto&& collName : *collNames) {
-                        auto nss = NamespaceString(dbname, collName);
+            if (listCollRequest.getFilter()) {
+                matcher = uassertStatusOK(
+                    MatchExpressionParser::parse(*listCollRequest.getFilter(), expCtx));
+            }
 
-                        // Only validate on a per-collection basis if the user requested
-                        // a list of authorized collections
-                        if (authorizedCollections &&
-                            (!as->isAuthorizedForAnyActionOnResource(
-                                ResourcePattern::forExactNamespace(nss)))) {
-                            continue;
-                        }
+            // Check for 'includePendingDrops' flag. The default is to not include drop-pending
+            // collections.
+            bool includePendingDrops = listCollRequest.getIncludePendingDrops().value_or(false);
 
-                        // In case lock-free reads are disabled, we must be able to take a
-                        // collection lock.
-                        boost::optional<Lock::CollectionLock> clk;
-                        if (!opCtx->isLockFreeReadsOp()) {
-                            clk.emplace(opCtx, nss, MODE_IS);
-                        }
+            const NamespaceString cursorNss = NamespaceString::makeListCollectionsNSS(dbName);
+            std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec;
+            std::vector<mongo::ListCollectionsReplyItem> firstBatch;
+            {
+                // Acquire only the global lock and set up a consistent in-memory catalog and
+                // storage snapshot.
+                AutoGetDbForReadMaybeLockFree lockFreeReadBlock(opCtx, dbName);
+                auto viewCatalog = DatabaseHolder::get(opCtx)->getViewCatalog(opCtx, dbName);
 
-                        CollectionPtr collection =
-                            CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
-                        BSONObj collBson =
-                            buildCollectionBson(opCtx, collection, includePendingDrops, nameOnly);
-                        if (!collBson.isEmpty()) {
-                            _addWorkingSetMember(
-                                opCtx, collBson, matcher.get(), ws.get(), root.get());
-                        }
-                    }
-                } else {
-                    auto perCollectionWork = [&](const CollectionPtr& collection) {
-                        if (authorizedCollections &&
-                            (!as->isAuthorizedForAnyActionOnResource(
-                                ResourcePattern::forExactNamespace(collection->ns())))) {
-                            return true;
-                        }
-                        BSONObj collBson =
-                            buildCollectionBson(opCtx, collection, includePendingDrops, nameOnly);
-                        if (!collBson.isEmpty()) {
-                            _addWorkingSetMember(
-                                opCtx, collBson, matcher.get(), ws.get(), root.get());
-                        }
-                        return true;
-                    };
+                CurOpFailpointHelpers::waitWhileFailPointEnabled(&hangBeforeListCollections,
+                                                                 opCtx,
+                                                                 "hangBeforeListCollections",
+                                                                 []() {},
+                                                                 cursorNss);
 
-                    // If we are lock-free we can just iterate over our collection catalog without
-                    // needing to yield as we don't take any locks.
-                    if (opCtx->isLockFreeReadsOp()) {
-                        auto collectionCatalog = CollectionCatalog::get(opCtx);
-                        for (auto it = collectionCatalog->begin(opCtx, dbname);
-                             it != collectionCatalog->end(opCtx);
-                             ++it) {
-                            perCollectionWork(*it);
+                auto ws = std::make_unique<WorkingSet>();
+                auto root = std::make_unique<QueuedDataStage>(expCtx.get(), ws.get());
+
+                // If the ViewCatalog pointer is valid, then the database exists.
+                if (viewCatalog) {
+                    if (auto collNames = _getExactNameMatches(matcher.get())) {
+                        for (auto&& collName : *collNames) {
+                            auto nss = NamespaceString(dbName, collName);
+
+                            // Only validate on a per-collection basis if the user requested
+                            // a list of authorized collections
+                            if (authorizedCollections &&
+                                (!as->isAuthorizedForAnyActionOnResource(
+                                    ResourcePattern::forExactNamespace(nss)))) {
+                                continue;
+                            }
+
+                            // In case lock-free reads are disabled, we must be able to take a
+                            // collection lock.
+                            boost::optional<Lock::CollectionLock> clk;
+                            if (!opCtx->isLockFreeReadsOp()) {
+                                clk.emplace(opCtx, nss, MODE_IS);
+                            }
+
+                            CollectionPtr collection =
+                                CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx,
+                                                                                           nss);
+                            BSONObj collBson = buildCollectionBson(
+                                opCtx, collection, includePendingDrops, nameOnly);
+                            if (!collBson.isEmpty()) {
+                                _addWorkingSetMember(
+                                    opCtx, collBson, matcher.get(), ws.get(), root.get());
+                            }
                         }
                     } else {
-                        mongo::catalog::forEachCollectionFromDb(
-                            opCtx, dbname, MODE_IS, perCollectionWork);
+                        auto perCollectionWork = [&](const CollectionPtr& collection) {
+                            if (authorizedCollections &&
+                                (!as->isAuthorizedForAnyActionOnResource(
+                                    ResourcePattern::forExactNamespace(collection->ns())))) {
+                                return true;
+                            }
+                            BSONObj collBson = buildCollectionBson(
+                                opCtx, collection, includePendingDrops, nameOnly);
+                            if (!collBson.isEmpty()) {
+                                _addWorkingSetMember(
+                                    opCtx, collBson, matcher.get(), ws.get(), root.get());
+                            }
+                            return true;
+                        };
+
+                        // If we are lock-free we can just iterate over our collection catalog
+                        // without
+                        // needing to yield as we don't take any locks.
+                        if (opCtx->isLockFreeReadsOp()) {
+                            auto collectionCatalog = CollectionCatalog::get(opCtx);
+                            for (auto it = collectionCatalog->begin(opCtx, dbName);
+                                 it != collectionCatalog->end(opCtx);
+                                 ++it) {
+                                perCollectionWork(*it);
+                            }
+                        } else {
+                            mongo::catalog::forEachCollectionFromDb(
+                                opCtx, dbName, MODE_IS, perCollectionWork);
+                        }
+                    }
+
+                    // Skipping views is only necessary for internal cloning operations.
+                    bool skipViews = listCollRequest.getFilter() &&
+                        SimpleBSONObjComparator::kInstance.evaluate(
+                            *listCollRequest.getFilter() ==
+                            ListCollectionsFilter::makeTypeCollectionFilter());
+
+                    if (!skipViews) {
+                        viewCatalog->iterate(opCtx, [&](const ViewDefinition& view) {
+                            if (authorizedCollections &&
+                                !as->isAuthorizedForAnyActionOnResource(
+                                    ResourcePattern::forExactNamespace(view.name()))) {
+                                return;
+                            }
+
+                            BSONObj viewBson = buildViewBson(view, nameOnly);
+                            if (!viewBson.isEmpty()) {
+                                _addWorkingSetMember(
+                                    opCtx, viewBson, matcher.get(), ws.get(), root.get());
+                            }
+                        });
                     }
                 }
 
-                // Skipping views is only necessary for internal cloning operations.
-                bool skipViews = parsed.getFilter() &&
-                    SimpleBSONObjComparator::kInstance.evaluate(
-                        *parsed.getFilter() == ListCollectionsFilter::makeTypeCollectionFilter());
+                exec = uassertStatusOK(
+                    plan_executor_factory::make(expCtx,
+                                                std::move(ws),
+                                                std::move(root),
+                                                &CollectionPtr::null,
+                                                PlanYieldPolicy::YieldPolicy::NO_YIELD,
+                                                false, /* whether owned BSON must be returned */
+                                                cursorNss));
 
-                if (!skipViews) {
-                    viewCatalog->iterate(opCtx, [&](const ViewDefinition& view) {
-                        if (authorizedCollections &&
-                            !as->isAuthorizedForAnyActionOnResource(
-                                ResourcePattern::forExactNamespace(view.name()))) {
-                            return;
-                        }
-
-                        BSONObj viewBson = buildViewBson(view, nameOnly);
-                        if (!viewBson.isEmpty()) {
-                            _addWorkingSetMember(
-                                opCtx, viewBson, matcher.get(), ws.get(), root.get());
-                        }
-                    });
-                }
-            }
-
-            exec = uassertStatusOK(
-                plan_executor_factory::make(expCtx,
-                                            std::move(ws),
-                                            std::move(root),
-                                            &CollectionPtr::null,
-                                            PlanYieldPolicy::YieldPolicy::NO_YIELD,
-                                            false, /* whether owned BSON must be returned */
-                                            cursorNss));
-
-            long long batchSize = std::numeric_limits<long long>::max();
-            if (parsed.getCursor() && parsed.getCursor()->getBatchSize()) {
-                batchSize = *parsed.getCursor()->getBatchSize();
-            }
-
-            int bytesBuffered = 0;
-            for (long long objCount = 0; objCount < batchSize; objCount++) {
-                BSONObj nextDoc;
-                PlanExecutor::ExecState state = exec->getNext(&nextDoc, nullptr);
-                if (state == PlanExecutor::IS_EOF) {
-                    break;
-                }
-                invariant(state == PlanExecutor::ADVANCED);
-
-                // If we can't fit this result inside the current batch, then we stash it for later.
-                if (!FindCommon::haveSpaceForNext(nextDoc, objCount, bytesBuffered)) {
-                    exec->enqueue(nextDoc);
-                    break;
+                long long batchSize = std::numeric_limits<long long>::max();
+                if (listCollRequest.getCursor() && listCollRequest.getCursor()->getBatchSize()) {
+                    batchSize = *listCollRequest.getCursor()->getBatchSize();
                 }
 
-                try {
-                    firstBatch.push_back(ListCollectionsReplyItem::parse(
-                        IDLParserErrorContext("ListCollectionsReplyItem"), nextDoc));
-                } catch (const DBException& exc) {
-                    LOGV2_ERROR(5254300,
-                                "Could not parse catalog entry while replying to listCollections",
-                                "entry"_attr = nextDoc,
-                                "error"_attr = exc);
-                    fassertFailed(5254301);
+                int bytesBuffered = 0;
+                for (long long objCount = 0; objCount < batchSize; objCount++) {
+                    BSONObj nextDoc;
+                    PlanExecutor::ExecState state = exec->getNext(&nextDoc, nullptr);
+                    if (state == PlanExecutor::IS_EOF) {
+                        break;
+                    }
+                    invariant(state == PlanExecutor::ADVANCED);
+
+                    // If we can't fit this result inside the current batch, then we stash it for
+                    // later.
+                    if (!FindCommon::haveSpaceForNext(nextDoc, objCount, bytesBuffered)) {
+                        exec->enqueue(nextDoc);
+                        break;
+                    }
+
+                    try {
+                        firstBatch.push_back(ListCollectionsReplyItem::parse(
+                            IDLParserErrorContext("ListCollectionsReplyItem"), nextDoc));
+                    } catch (const DBException& exc) {
+                        LOGV2_ERROR(
+                            5254300,
+                            "Could not parse catalog entry while replying to listCollections",
+                            "entry"_attr = nextDoc,
+                            "error"_attr = exc);
+                        fassertFailed(5254301);
+                    }
+                    bytesBuffered += nextDoc.objsize();
                 }
-                bytesBuffered += nextDoc.objsize();
-            }
-            if (exec->isEOF()) {
-                appendListCollectionsCursorReply(
-                    0 /* cursorId */, cursorNss, std::move(firstBatch), result);
-                return true;
-            }
-            exec->saveState();
-            exec->detachFromOperationContext();
-        }  // Drop db lock. Global cursor registration must be done without holding any locks.
+                if (exec->isEOF()) {
+                    return createListCollectionsCursorReply(
+                        0 /* cursorId */, cursorNss, std::move(firstBatch));
+                }
+                exec->saveState();
+                exec->detachFromOperationContext();
+            }  // Drop db lock. Global cursor registration must be done without holding any locks.
 
-        auto pinnedCursor = CursorManager::get(opCtx)->registerCursor(
-            opCtx,
-            {std::move(exec),
-             cursorNss,
-             AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
-             APIParameters::get(opCtx),
-             opCtx->getWriteConcern(),
-             repl::ReadConcernArgs::get(opCtx),
-             jsobj,
-             uassertStatusOK(AuthorizationSession::get(opCtx->getClient())
-                                 ->checkAuthorizedToListCollections(dbname, jsobj))});
+            auto cmdObj = listCollRequest.toBSON({});
+            auto pinnedCursor = CursorManager::get(opCtx)->registerCursor(
+                opCtx,
+                {std::move(exec),
+                 cursorNss,
+                 AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
+                 APIParameters::get(opCtx),
+                 opCtx->getWriteConcern(),
+                 repl::ReadConcernArgs::get(opCtx),
+                 cmdObj,
+                 uassertStatusOK(AuthorizationSession::get(opCtx->getClient())
+                                     ->checkAuthorizedToListCollections(dbName, cmdObj))});
 
-        pinnedCursor->incNBatches();
-        pinnedCursor->incNReturnedSoFar(firstBatch.size());
+            pinnedCursor->incNBatches();
+            pinnedCursor->incNReturnedSoFar(firstBatch.size());
 
-        appendListCollectionsCursorReply(
-            pinnedCursor.getCursor()->cursorid(), cursorNss, std::move(firstBatch), result);
-        return true;
-    }
+            return createListCollectionsCursorReply(
+                pinnedCursor.getCursor()->cursorid(), cursorNss, std::move(firstBatch));
+        }
+    };
 } cmdListCollections;
 
 }  // namespace
