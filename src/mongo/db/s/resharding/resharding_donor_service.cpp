@@ -43,6 +43,7 @@
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
+#include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding_util.h"
 #include "mongo/db/s/sharding_state.h"
@@ -219,6 +220,17 @@ void ReshardingDonorService::DonorStateMachine::interrupt(Status status) {
     if (!_completionPromise.getFuture().isReady()) {
         _completionPromise.setError(status);
     }
+}
+
+boost::optional<BSONObj> ReshardingDonorService::DonorStateMachine::reportForCurrentOp(
+    MongoProcessInterface::CurrentOpConnectionsMode connMode,
+    MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept {
+    ReshardingMetrics::ReporterOptions options(ReshardingMetrics::ReporterOptions::Role::kDonor,
+                                               _id,
+                                               _donorDoc.getNss(),
+                                               _donorDoc.getReshardingKey().toBSON(),
+                                               false);
+    return ReshardingMetrics::get(cc().getServiceContext())->reportForCurrentOp(options);
 }
 
 void ReshardingDonorService::DonorStateMachine::onReshardingFieldsChanges(

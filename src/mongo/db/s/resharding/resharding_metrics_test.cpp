@@ -30,11 +30,13 @@
 #include <fmt/format.h>
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 
@@ -53,8 +55,8 @@ public:
     // Timer step in milliseconds
     static constexpr auto kTimerStep = 100;
 
-    void advanceTime() {
-        _clockSource->advance(Milliseconds(kTimerStep));
+    void advanceTime(Milliseconds interval = Milliseconds(kTimerStep)) {
+        _clockSource->advance(interval);
     }
 
     auto getReport() {
@@ -213,6 +215,45 @@ TEST_F(ReshardingMetricsTest, EstimatedRemainingOperationTime) {
     advanceTime();
     // So far, the time to apply oplog entries equals `kTimerStep` milliseconds.
     checkMetrics(kTag, kTimerStep * (kOplogEntriesFetched / kOplogEntriesApplied - 1));
+}
+
+TEST_F(ReshardingMetricsTest, CurrentOpReportForDonor) {
+    const auto kDonorState = DonorStateEnum::kPreparingToMirror;
+    getMetrics()->onStart();
+    advanceTime(Seconds(2));
+    getMetrics()->setDonorState(kDonorState);
+    advanceTime(Seconds(3));
+
+    const ReshardingMetrics::ReporterOptions options(
+        ReshardingMetrics::ReporterOptions::Role::kDonor,
+        UUID::parse("12345678-1234-1234-1234-123456789abc").getValue(),
+        NamespaceString("db", "collection"),
+        BSON("id" << 1),
+        true);
+
+    const auto expected =
+        fromjson(fmt::format("{{ type: \"op\","
+                             "desc: \"ReshardingDonorService {0}\","
+                             "op: \"command\","
+                             "ns: \"{1}\","
+                             "originatingCommand: {{ reshardCollection: \"{1}\","
+                             "key: {2},"
+                             "unique: {3},"
+                             "collation: {{ locale: \"simple\" }} }},"
+                             "totalOperationTimeElapsed: 5,"
+                             "remainingOperationTimeEstimated: -1,"
+                             "countWritesDuringCriticalSection: 0,"
+                             "totalCriticalSectionTimeElapsed : 3,"
+                             "donorState: \"{4}\","
+                             "opStatus: \"actively running\" }}",
+                             options.id.toString(),
+                             options.nss.toString(),
+                             options.shardKey.toString(),
+                             options.unique ? "true" : "false",
+                             DonorState_serializer(kDonorState)));
+
+    const auto report = getMetrics()->reportForCurrentOp(options);
+    ASSERT_BSONOBJ_EQ(expected, report);
 }
 
 }  // namespace mongo
