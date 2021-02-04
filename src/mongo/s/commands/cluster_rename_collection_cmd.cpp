@@ -87,10 +87,8 @@ public:
                 opCtx,
                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                 fromNss.db().toString(),
-                applyReadWriteConcern(opCtx,
-                                      this,
-                                      appendDbVersionIfPresent(renameCollRequest.toBSON({}),
-                                                               dbInfo.databaseVersion())),
+                CommandHelpers::appendMajorityWriteConcern(appendDbVersionIfPresent(
+                    renameCollRequest.toBSON({}), dbInfo.databaseVersion())),
                 Shard::RetryPolicy::kNoRetry));
 
             uassertStatusOK(cmdResponse.commandStatus);

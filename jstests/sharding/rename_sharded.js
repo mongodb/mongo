@@ -3,6 +3,7 @@
  *
  * @tags: [multiversion_incompatible]
  */
+load("jstests/libs/uuid_util.js");
 
 /**
  * Initialize a "from" sharded collection with 2 chunks - on 2 different nodes - each containing 1
@@ -22,7 +23,8 @@ function testRename(st, dbName, toNs, dropTarget, mustFail) {
     fromColl.insert({x: 2});
     assert.commandWorked(mongos.adminCommand({split: fromNs, middle: {x: 1}}));
 
-    const aChunk = mongos.getDB('config').chunks.findOne({ns: fromNs});
+    const fromUUID = getUUIDFromConfigCollections(mongos, fromNs);
+    const aChunk = mongos.getDB('config').chunks.findOne({uuid: fromUUID});
     assert.commandWorked(mongos.adminCommand(
         {moveChunk: fromNs, bounds: [aChunk.min, aChunk.max], to: st.shard1.shardName}));
 
@@ -34,7 +36,8 @@ function testRename(st, dbName, toNs, dropTarget, mustFail) {
 
     assert.commandWorked(res);
 
-    const chunks = mongos.getDB('config').chunks.find({ns: toNs});
+    const toUUID = getUUIDFromConfigCollections(mongos, toNs);
+    const chunks = mongos.getDB('config').chunks.find({uuid: toUUID});
     const chunk0 = chunks.next();
     const chunk1 = chunks.next();
 
@@ -75,7 +78,8 @@ if (isDDLFeatureFlagEnabled) {
         toColl.insert({a: 2});
         assert.commandWorked(mongos.adminCommand({split: toNs, middle: {a: 1}}));
 
-        const aChunk = mongos.getDB('config').chunks.findOne({ns: toNs});
+        const toUUID = getUUIDFromConfigCollections(mongos, toNs);
+        const aChunk = mongos.getDB('config').chunks.findOne({uuid: toUUID});
         assert.commandWorked(mongos.adminCommand(
             {moveChunk: toNs, bounds: [aChunk.min, aChunk.max], to: st.shard1.shardName}));
 
