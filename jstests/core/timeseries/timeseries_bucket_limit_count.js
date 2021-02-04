@@ -58,36 +58,36 @@ const runTest = function(numDocsPerInsert) {
 
     // Check bucket collection.
     const bucketDocs = bucketsColl.find().sort({_id: 1}).toArray();
-    assert.eq(2, bucketDocs.length, bucketDocs);
+    assert.eq(2, bucketDocs.length, tojson(bucketDocs));
 
     // Check both buckets.
     // First bucket should be full with 'bucketMaxCount' documents.
     assert.eq(0,
               bucketDocs[0].control.min._id,
-              'invalid control.min for _id in first bucket: ' + tojson(bucketDocs[0].control));
+              'invalid control.min for _id in first bucket: ' + tojson(bucketDocs));
     assert.eq(0,
               bucketDocs[0].control.min.x,
-              'invalid control.min for x in first bucket: ' + tojson(bucketDocs[0].control));
+              'invalid control.min for x in first bucket: ' + tojson(bucketDocs));
     assert.eq(bucketMaxCount - 1,
               bucketDocs[0].control.max._id,
-              'invalid control.max for _id in first bucket: ' + tojson(bucketDocs[0].control));
+              'invalid control.max for _id in first bucket: ' + tojson(bucketDocs));
     assert.eq(bucketMaxCount - 1,
               bucketDocs[0].control.max.x,
-              'invalid control.max for x in first bucket: ' + tojson(bucketDocs[0].control));
+              'invalid control.max for x in first bucket: ' + tojson(bucketDocs));
 
     // Second bucket should contain the remaining documents.
     assert.eq(bucketMaxCount,
               bucketDocs[1].control.min._id,
-              'invalid control.min for _id in second bucket: ' + tojson(bucketDocs[1].control));
+              'invalid control.min for _id in second bucket: ' + tojson(bucketDocs));
     assert.eq(bucketMaxCount,
               bucketDocs[1].control.min.x,
-              'invalid control.min for x in second bucket: ' + tojson(bucketDocs[1].control));
+              'invalid control.min for x in second bucket: ' + tojson(bucketDocs));
     assert.eq(numDocs - 1,
               bucketDocs[1].control.max._id,
-              'invalid control.max for _id in second bucket: ' + tojson(bucketDocs[1].control));
+              'invalid control.max for _id in second bucket: ' + tojson(bucketDocs));
     assert.eq(numDocs - 1,
               bucketDocs[1].control.max.x,
-              'invalid control.max for x in second bucket: ' + tojson(bucketDocs[1].control));
+              'invalid control.max for x in second bucket: ' + tojson(bucketDocs));
 };
 
 runTest(1);
