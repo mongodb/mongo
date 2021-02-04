@@ -16,6 +16,8 @@ load("jstests/sharding/libs/find_chunks_util.js");
 
 function checkTimestampConsistencyInPersistentMetadata(nss, timestampInConfig) {
     // Checking consistency on local shard collection: config.cache.collections
+    st.shard0.adminCommand({_flushRoutingTableCacheUpdates: nss, syncFromConfig: true});
+
     let timestampInShard =
         st.shard0.getDB('config').cache.collections.findOne({_id: nss}).timestamp;
     assert.neq(null, timestampInShard);
