@@ -1,10 +1,6 @@
 /**
  * Checks that top removes entries after dropping a collection or database.
- *
- * @tags: [
- *   assumes_against_mongod_not_mongos,
- *   requires_non_retryable_writes,
- * ]
+ * TODO(SERVER-21167): Move this test from noPassthrough to core.
  */
 (function() {
 "use strict";
