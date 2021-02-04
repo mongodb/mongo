@@ -47,7 +47,7 @@ variables:
 - &task_template
   name: template
   depends_on:
-  - name: archive_dist_test
+  - name: archive_dist_test_debug
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -89,7 +89,7 @@ variables:
 - &run_jepsen_template
   name: run_jepsen_template
   depends_on:
-  - name: archive_dist_test
+  - name: archive_dist_test_debug
   commands:
   - func: "do setup"
   - func: "do jepsen setup"
@@ -3343,7 +3343,6 @@ tasks:
       vars:
         targets: >-
           install-dist-test
-          install-dist-test-debug
           ${additional_compile_targets|}
         task_compile_flags: >-
           --separate-debug
@@ -3357,8 +3356,18 @@ tasks:
       vars:
         targets: >-
           archive-dist-test
+        task_compile_flags: >-
+          --separate-debug
+          PREFIX=dist-test
+
+- name: archive_dist_test_debug
+  depends_on:
+    - name: archive_dist_test
+  commands:
+    - func: "scons compile"
+      vars:
+        targets: >-
           archive-dist-test-debug
-          ${additional_compile_targets|}
         task_compile_flags: >-
           --separate-debug
           PREFIX=dist-test
@@ -4055,7 +4064,7 @@ tasks:
 
 - name: test_api_version_compatibility
   depends_on:
-    - name: archive_dist_test
+    - name: archive_dist_test_debug
   commands:
     - command: manifest.load
     - func: "git get project"
@@ -5182,7 +5191,7 @@ tasks:
 
 - name: burn_in_tags_gen
   depends_on:
-    - name: archive_dist_test
+    - name: archive_dist_test_debug
   commands:
   - command: manifest.load
   - func: "git get project"
@@ -7278,7 +7287,7 @@ tasks:
 - name: powercycle_smoke
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on:
-  - name: archive_dist_test
+  - name: archive_dist_test_debug
   commands:
   - func: "do setup"
   - func: "set up remote credentials"
@@ -7292,7 +7301,7 @@ tasks:
   tags: ["powercycle"]
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on:
-  - name: archive_dist_test
+  - name: archive_dist_test_debug
   commands:
   - func: "do setup"
   - func: "set up remote credentials"
@@ -7306,7 +7315,7 @@ tasks:
   tags: ["powercycle"]
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on:
-  - name: archive_dist_test
+  - name: archive_dist_test_debug
   commands:
   - func: "do setup"
   - func: "set up remote credentials"
@@ -7320,7 +7329,7 @@ tasks:
   tags: ["powercycle"]
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on:
-  - name: archive_dist_test
+  - name: archive_dist_test_debug
   commands:
   - func: "do setup"
   - func: "set up remote credentials"
@@ -7334,7 +7343,7 @@ tasks:
   tags: ["powercycle"]
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on:
-  - name: archive_dist_test
+  - name: archive_dist_test_debug
   commands:
   - func: "do setup"
   - func: "set up remote credentials"
@@ -7347,7 +7356,7 @@ tasks:
 - name: powercycle_replication_smalloplog
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on:
-  - name: archive_dist_test
+  - name: archive_dist_test_debug
   commands:
   - func: "do setup"
   - func: "set up remote credentials"
@@ -7361,7 +7370,7 @@ tasks:
   tags: ["powercycle"]
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on:
-  - name: archive_dist_test
+  - name: archive_dist_test_debug
   commands:
   - func: "do setup"
   - func: "set up remote credentials"
@@ -7374,7 +7383,7 @@ tasks:
 - name: powercycle_write_concern_majority
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on:
-  - name: archive_dist_test
+  - name: archive_dist_test_debug
   commands:
   - func: "do setup"
   - func: "set up remote credentials"
@@ -7385,7 +7394,7 @@ tasks:
 
 - name: idl_tests
   depends_on:
-  - name: archive_dist_test
+  - name: archive_dist_test_debug
   commands:
   - command: manifest.load
   - func: "git get project"
@@ -8319,12 +8328,14 @@ task_groups:
   tasks:
   - compile_dist_test
   - archive_dist_test
+  - archive_dist_test_debug
 
 - <<: *compile_task_group_template
   name: compile_and_archive_dist_test_then_package_TG
   tasks:
   - compile_dist_test
   - archive_dist_test
+  - archive_dist_test_debug
   - package
 
 - <<: *compile_task_group_template
@@ -8383,6 +8394,7 @@ task_groups:
   tasks:
   - compile_dist_test
   - archive_dist_test
+  - archive_dist_test_debug
   - compile_unittests
   - run_unittests
   - compile_dbtest
@@ -8405,6 +8417,7 @@ task_groups:
   tasks:
   - compile_dist_test
   - archive_dist_test
+  - archive_dist_test_debug
   - compile_all
   - package
 

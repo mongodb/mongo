@@ -754,7 +754,7 @@ class EvergreenConfigGenerator(object):
 
     def _get_dependencies(self) -> Set[TaskDependency]:
         """Get the set of dependency tasks for these suites."""
-        dependencies = {TaskDependency("archive_dist_test")}
+        dependencies = {TaskDependency("archive_dist_test_debug")}
         if not self.options.is_patch:
             # Don"t worry about task dependencies in patch builds, only mainline.
             if self.options.depends_on:

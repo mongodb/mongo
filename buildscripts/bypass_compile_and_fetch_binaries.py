@@ -312,7 +312,7 @@ def find_previous_compile_task(build: Build) -> Task:
     :param build: Build containing the desired compile task.
     :return: Evergreen.py object containing data about the desired compile task.
     """
-    tasks = [task for task in build.get_tasks() if task.display_name == "archive_dist_test"]
+    tasks = [task for task in build.get_tasks() if task.display_name == "archive_dist_test_debug"]
     assert len(tasks) == 1
     return tasks[0]
 
