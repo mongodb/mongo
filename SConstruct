@@ -3899,6 +3899,9 @@ def doConfigure(myenv):
 
     myenv = conf.Finish()
 
+    if env['TARGET_ARCH'] == "aarch64":
+        AddToCCFLAGSIfSupported(myenv, "-moutline-atomics")
+
     conf = Configure(myenv)
     usdt_enabled = get_option('enable-usdt-probes')
     usdt_provider = None
