@@ -296,8 +296,7 @@ public:
     }
 };
 
-// Only one instance of the ClientCursorMonitor exists
-ClientCursorMonitor clientCursorMonitor;
+auto getClientCursorMonitor = ServiceContext::declareDecoration<ClientCursorMonitor>();
 
 void _appendCursorStats(BSONObjBuilder& b) {
     b.append("note", "deprecated, use server status metrics");
@@ -310,7 +309,7 @@ void _appendCursorStats(BSONObjBuilder& b) {
 }  // namespace
 
 void startClientCursorMonitor() {
-    clientCursorMonitor.go();
+    getClientCursorMonitor(getGlobalServiceContext()).go();
 }
 
 }  // namespace mongo
