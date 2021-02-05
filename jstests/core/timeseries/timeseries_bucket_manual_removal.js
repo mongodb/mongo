@@ -22,17 +22,14 @@ if (!TimeseriesTest.timeseriesCollectionsEnabled(db.getMongo())) {
     return;
 }
 
-const testDB = db.getSiblingDB(jsTestName());
-
-const coll = testDB.getCollection('t');
-const bucketsColl = testDB.getCollection('system.buckets.' + coll.getName());
+const coll = db.timeseries_bucket_manual_removal;
+const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
 
 const timeFieldName = 'time';
 
 coll.drop();
-assert.commandWorked(
-    testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
-assert.contains(bucketsColl.getName(), testDB.getCollectionNames());
+assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
+assert.contains(bucketsColl.getName(), db.getCollectionNames());
 
 const docs1 = [
     {

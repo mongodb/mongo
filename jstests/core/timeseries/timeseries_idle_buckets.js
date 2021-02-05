@@ -20,19 +20,16 @@ if (!TimeseriesTest.timeseriesCollectionsEnabled(db.getMongo())) {
     return;
 }
 
-const dbName = jsTestName();
-const testDB = db.getSiblingDB(dbName);
-assert.commandWorked(testDB.dropDatabase());
-
-const coll = testDB.getCollection('t');
-const bucketsColl = testDB.getCollection('system.buckets.' + coll.getName());
+const coll = db.timeseries_idle_buckets;
+const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
 
 const timeFieldName = 'time';
 const metaFieldName = 'meta';
 
-assert.commandWorked(testDB.createCollection(
+coll.drop();
+assert.commandWorked(db.createCollection(
     coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
-assert.contains(bucketsColl.getName(), testDB.getCollectionNames());
+assert.contains(bucketsColl.getName(), db.getCollectionNames());
 
 // Insert enough documents with large enough metadata so that the bucket catalog memory threshold is
 // reached and idle buckets are expired.
