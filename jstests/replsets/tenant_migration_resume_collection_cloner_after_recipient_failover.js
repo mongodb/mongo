@@ -64,7 +64,7 @@ const migrationThread =
     new Thread(TenantMigrationUtil.runMigrationAsync, migrationOpts, donorRstArgs);
 migrationThread.start();
 hangDuringCollectionClone.wait();
-assert.eq(2, recipientColl.find().itcount());
+assert.soon(() => recipientColl.find().itcount() === 2);
 
 // Insert some documents that will be fetched by the recipient. This is to test that on failover,
 // the fetcher will resume fetching from where it left off. The system is expected to crash if
