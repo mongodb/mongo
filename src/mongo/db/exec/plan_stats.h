@@ -52,7 +52,7 @@ struct SpecificStats {
     /**
      * Make a deep copy.
      */
-    virtual SpecificStats* clone() const = 0;
+    virtual std::unique_ptr<SpecificStats> clone() const = 0;
 
     virtual uint64_t estimateObjectSizeInBytes() const = 0;
 
@@ -125,7 +125,7 @@ struct BasePlanStageStats {
     BasePlanStageStats<C, T>* clone() const {
         auto stats = new BasePlanStageStats<C, T>(common, stageType);
         if (specific.get()) {
-            stats->specific.reset(specific->clone());
+            stats->specific = specific->clone();
         }
         for (size_t i = 0; i < children.size(); ++i) {
             invariant(children[i]);
@@ -173,9 +173,8 @@ using PlanStageStats = BasePlanStageStats<CommonStats, StageType>;
 struct AndHashStats : public SpecificStats {
     AndHashStats() = default;
 
-    SpecificStats* clone() const final {
-        AndHashStats* specific = new AndHashStats(*this);
-        return specific;
+    std::unique_ptr<SpecificStats> clone() const final {
+        return std::make_unique<AndHashStats>(*this);
     }
 
     uint64_t estimateObjectSizeInBytes() const {
@@ -200,9 +199,8 @@ struct AndHashStats : public SpecificStats {
 struct AndSortedStats : public SpecificStats {
     AndSortedStats() = default;
 
-    SpecificStats* clone() const final {
-        AndSortedStats* specific = new AndSortedStats(*this);
-        return specific;
+    std::unique_ptr<SpecificStats> clone() const final {
+        return std::make_unique<AndSortedStats>(*this);
     }
 
     uint64_t estimateObjectSizeInBytes() const {
@@ -216,8 +214,8 @@ struct AndSortedStats : public SpecificStats {
 struct CachedPlanStats : public SpecificStats {
     CachedPlanStats() = default;
 
-    SpecificStats* clone() const final {
-        return new CachedPlanStats(*this);
+    std::unique_ptr<SpecificStats> clone() const final {
+        return std::make_unique<CachedPlanStats>(*this);
     }
 
     uint64_t estimateObjectSizeInBytes() const {
@@ -230,9 +228,8 @@ struct CachedPlanStats : public SpecificStats {
 struct CollectionScanStats : public SpecificStats {
     CollectionScanStats() : docsTested(0), direction(1) {}
 
-    SpecificStats* clone() const final {
-        CollectionScanStats* specific = new CollectionScanStats(*this);
-        return specific;
+    std::unique_ptr<SpecificStats> clone() const final {
+        return std::make_unique<CollectionScanStats>(*this);
     }
 
     uint64_t estimateObjectSizeInBytes() const {
@@ -261,9 +258,8 @@ struct CollectionScanStats : public SpecificStats {
 struct CountStats : public SpecificStats {
     CountStats() : nCounted(0), nSkipped(0) {}
 
-    SpecificStats* clone() const final {
-        CountStats* specific = new CountStats(*this);
-        return specific;
+    std::unique_ptr<SpecificStats> clone() const final {
+        return std::make_unique<CountStats>(*this);
     }
 
     uint64_t estimateObjectSizeInBytes() const {
@@ -286,8 +282,8 @@ struct CountScanStats : public SpecificStats {
           isUnique(false),
           keysExamined(0) {}
 
-    SpecificStats* clone() const final {
-        CountScanStats* specific = new CountScanStats(*this);
+    std::unique_ptr<SpecificStats> clone() const final {
+        auto specific = std::make_unique<CountScanStats>(*this);
         // BSON objects have to be explicitly copied.
         specific->keyPattern = keyPattern.getOwned();
         specific->collation = collation.getOwned();
@@ -341,8 +337,8 @@ struct CountScanStats : public SpecificStats {
 struct DeleteStats : public SpecificStats {
     DeleteStats() = default;
 
-    SpecificStats* clone() const final {
-        return new DeleteStats(*this);
+    std::unique_ptr<SpecificStats> clone() const final {
+        return std::make_unique<DeleteStats>(*this);
     }
 
     uint64_t estimateObjectSizeInBytes() const {
@@ -353,8 +349,8 @@ struct DeleteStats : public SpecificStats {
 };
 
 struct DistinctScanStats : public SpecificStats {
-    SpecificStats* clone() const final {
-        DistinctScanStats* specific = new DistinctScanStats(*this);
+    std::unique_ptr<SpecificStats> clone() const final {
+        auto specific = std::make_unique<DistinctScanStats>(*this);
         // BSON objects have to be explicitly copied.
         specific->keyPattern = keyPattern.getOwned();
         specific->collation = collation.getOwned();
@@ -405,9 +401,8 @@ struct DistinctScanStats : public SpecificStats {
 struct EnsureSortedStats : public SpecificStats {
     EnsureSortedStats() : nDropped(0) {}
 
-    SpecificStats* clone() const final {
-        EnsureSortedStats* specific = new EnsureSortedStats(*this);
-        return specific;
+    std::unique_ptr<SpecificStats> clone() const final {
+        return std::make_unique<EnsureSortedStats>(*this);
     }
 
     uint64_t estimateObjectSizeInBytes() const {
@@ -421,9 +416,8 @@ struct EnsureSortedStats : public SpecificStats {
 struct FetchStats : public SpecificStats {
     FetchStats() = default;
 
-    SpecificStats* clone() const final {
-        FetchStats* specific = new FetchStats(*this);
-        return specific;
+    std::unique_ptr<SpecificStats> clone() const final {
+        return std::make_unique<FetchStats>(*this);
     }
 
     uint64_t estimateObjectSizeInBytes() const {
@@ -440,9 +434,8 @@ struct FetchStats : public SpecificStats {
 struct IDHackStats : public SpecificStats {
     IDHackStats() : keysExamined(0), docsExamined(0) {}
 
-    SpecificStats* clone() const final {
-        IDHackStats* specific = new IDHackStats(*this);
-        return specific;
+    std::unique_ptr<SpecificStats> clone() const final {
+        return std::make_unique<IDHackStats>(*this);
     }
 
     uint64_t estimateObjectSizeInBytes() const {
@@ -459,8 +452,8 @@ struct IDHackStats : public SpecificStats {
 };
 
 struct ReturnKeyStats : public SpecificStats {
-    SpecificStats* clone() const final {
-        return new ReturnKeyStats(*this);
+    std::unique_ptr<SpecificStats> clone() const final {
+        return std::make_unique<ReturnKeyStats>(*this);
     }
 
     uint64_t estimateObjectSizeInBytes() const {
@@ -481,8 +474,8 @@ struct IndexScanStats : public SpecificStats {
           keysExamined(0),
           seeks(0) {}
 
-    SpecificStats* clone() const final {
-        IndexScanStats* specific = new IndexScanStats(*this);
+    std::unique_ptr<SpecificStats> clone() const final {
+        auto specific = std::make_unique<IndexScanStats>(*this);
         // BSON objects have to be explicitly copied.
         specific->keyPattern = keyPattern.getOwned();
         specific->collation = collation.getOwned();
@@ -546,9 +539,8 @@ struct IndexScanStats : public SpecificStats {
 struct LimitStats : public SpecificStats {
     LimitStats() : limit(0) {}
 
-    SpecificStats* clone() const final {
-        LimitStats* specific = new LimitStats(*this);
-        return specific;
+    std::unique_ptr<SpecificStats> clone() const final {
+        return std::make_unique<LimitStats>(*this);
     }
 
     uint64_t estimateObjectSizeInBytes() const {
@@ -561,8 +553,8 @@ struct LimitStats : public SpecificStats {
 struct MockStats : public SpecificStats {
     MockStats() {}
 
-    SpecificStats* clone() const final {
-        return new MockStats(*this);
+    std::unique_ptr<SpecificStats> clone() const final {
+        return std::make_unique<MockStats>(*this);
     }
 
     uint64_t estimateObjectSizeInBytes() const {
@@ -573,8 +565,8 @@ struct MockStats : public SpecificStats {
 struct MultiPlanStats : public SpecificStats {
     MultiPlanStats() {}
 
-    SpecificStats* clone() const final {
-        return new MultiPlanStats(*this);
+    std::unique_ptr<SpecificStats> clone() const final {
+        return std::make_unique<MultiPlanStats>(*this);
     }
 
     uint64_t estimateObjectSizeInBytes() const {
@@ -585,9 +577,8 @@ struct MultiPlanStats : public SpecificStats {
 struct OrStats : public SpecificStats {
     OrStats() = default;
 
-    SpecificStats* clone() const final {
-        OrStats* specific = new OrStats(*this);
-        return specific;
+    std::unique_ptr<SpecificStats> clone() const final {
+        return std::make_unique<OrStats>(*this);
     }
 
     uint64_t estimateObjectSizeInBytes() const {
@@ -601,9 +592,8 @@ struct OrStats : public SpecificStats {
 struct ProjectionStats : public SpecificStats {
     ProjectionStats() {}
 
-    SpecificStats* clone() const final {
-        ProjectionStats* specific = new ProjectionStats(*this);
-        return specific;
+    std::unique_ptr<SpecificStats> clone() const final {
+        return std::make_unique<ProjectionStats>(*this);
     }
 
     uint64_t estimateObjectSizeInBytes() const {
@@ -619,9 +609,8 @@ struct SortStats : public SpecificStats {
     SortStats(uint64_t limit, uint64_t maxMemoryUsageBytes)
         : limit(limit), maxMemoryUsageBytes(maxMemoryUsageBytes) {}
 
-    SpecificStats* clone() const {
-        SortStats* specific = new SortStats(*this);
-        return specific;
+    std::unique_ptr<SpecificStats> clone() const {
+        return std::make_unique<SortStats>(*this);
     }
 
     uint64_t estimateObjectSizeInBytes() const {
@@ -662,9 +651,8 @@ struct SortStats : public SpecificStats {
 struct MergeSortStats : public SpecificStats {
     MergeSortStats() = default;
 
-    SpecificStats* clone() const final {
-        MergeSortStats* specific = new MergeSortStats(*this);
-        return specific;
+    std::unique_ptr<SpecificStats> clone() const final {
+        return std::make_unique<MergeSortStats>(*this);
     }
 
     uint64_t estimateObjectSizeInBytes() const {
@@ -681,9 +669,8 @@ struct MergeSortStats : public SpecificStats {
 struct ShardingFilterStats : public SpecificStats {
     ShardingFilterStats() : chunkSkips(0) {}
 
-    SpecificStats* clone() const final {
-        ShardingFilterStats* specific = new ShardingFilterStats(*this);
-        return specific;
+    std::unique_ptr<SpecificStats> clone() const final {
+        return std::make_unique<ShardingFilterStats>(*this);
     }
 
     uint64_t estimateObjectSizeInBytes() const {
@@ -696,9 +683,8 @@ struct ShardingFilterStats : public SpecificStats {
 struct SkipStats : public SpecificStats {
     SkipStats() : skip(0) {}
 
-    SpecificStats* clone() const final {
-        SkipStats* specific = new SkipStats(*this);
-        return specific;
+    std::unique_ptr<SpecificStats> clone() const final {
+        return std::make_unique<SkipStats>(*this);
     }
 
     uint64_t estimateObjectSizeInBytes() const {
@@ -725,8 +711,8 @@ struct IntervalStats {
 struct NearStats : public SpecificStats {
     NearStats() : indexVersion(0) {}
 
-    SpecificStats* clone() const final {
-        return new NearStats(*this);
+    std::unique_ptr<SpecificStats> clone() const final {
+        return std::make_unique<NearStats>(*this);
     }
 
     uint64_t estimateObjectSizeInBytes() const {
@@ -744,8 +730,8 @@ struct NearStats : public SpecificStats {
 struct UpdateStats : public SpecificStats {
     UpdateStats() : nMatched(0), nModified(0), isModUpdate(false), nUpserted(0) {}
 
-    SpecificStats* clone() const final {
-        return new UpdateStats(*this);
+    std::unique_ptr<SpecificStats> clone() const final {
+        return std::make_unique<UpdateStats>(*this);
     }
 
     uint64_t estimateObjectSizeInBytes() const {
@@ -771,9 +757,8 @@ struct UpdateStats : public SpecificStats {
 struct TextStats : public SpecificStats {
     TextStats() : parsedTextQuery(), textIndexVersion(0) {}
 
-    SpecificStats* clone() const final {
-        TextStats* specific = new TextStats(*this);
-        return specific;
+    std::unique_ptr<SpecificStats> clone() const final {
+        return std::make_unique<TextStats>(*this);
     }
 
     uint64_t estimateObjectSizeInBytes() const {
@@ -795,9 +780,8 @@ struct TextStats : public SpecificStats {
 struct TextMatchStats : public SpecificStats {
     TextMatchStats() : docsRejected(0) {}
 
-    SpecificStats* clone() const final {
-        TextMatchStats* specific = new TextMatchStats(*this);
-        return specific;
+    std::unique_ptr<SpecificStats> clone() const final {
+        return std::make_unique<TextMatchStats>(*this);
     }
 
     uint64_t estimateObjectSizeInBytes() const {
@@ -810,9 +794,8 @@ struct TextMatchStats : public SpecificStats {
 struct TextOrStats : public SpecificStats {
     TextOrStats() : fetches(0) {}
 
-    SpecificStats* clone() const final {
-        TextOrStats* specific = new TextOrStats(*this);
-        return specific;
+    std::unique_ptr<SpecificStats> clone() const final {
+        return std::make_unique<TextOrStats>(*this);
     }
 
     uint64_t estimateObjectSizeInBytes() const {
@@ -823,9 +806,8 @@ struct TextOrStats : public SpecificStats {
 };
 
 struct TrialStats : public SpecificStats {
-    SpecificStats* clone() const final {
-        TrialStats* specific = new TrialStats(*this);
-        return specific;
+    std::unique_ptr<SpecificStats> clone() const final {
+        return std::make_unique<TrialStats>(*this);
     }
 
     uint64_t estimateObjectSizeInBytes() const {
@@ -843,8 +825,8 @@ struct TrialStats : public SpecificStats {
 };
 
 struct GroupStats : public SpecificStats {
-    SpecificStats* clone() const final {
-        return new GroupStats(*this);
+    std::unique_ptr<SpecificStats> clone() const final {
+        return std::make_unique<GroupStats>(*this);
     }
 
     uint64_t estimateObjectSizeInBytes() const {
@@ -859,8 +841,8 @@ struct GroupStats : public SpecificStats {
 };
 
 struct DocumentSourceCursorStats : public SpecificStats {
-    SpecificStats* clone() const final {
-        return new DocumentSourceCursorStats(*this);
+    std::unique_ptr<SpecificStats> clone() const final {
+        return std::make_unique<DocumentSourceCursorStats>(*this);
     }
 
     uint64_t estimateObjectSizeInBytes() const {
@@ -876,8 +858,8 @@ struct DocumentSourceCursorStats : public SpecificStats {
 };
 
 struct DocumentSourceLookupStats : public SpecificStats {
-    SpecificStats* clone() const final {
-        return new DocumentSourceLookupStats(*this);
+    std::unique_ptr<SpecificStats> clone() const final {
+        return std::make_unique<DocumentSourceLookupStats>(*this);
     }
 
     uint64_t estimateObjectSizeInBytes() const {
@@ -894,8 +876,8 @@ struct DocumentSourceLookupStats : public SpecificStats {
 };
 
 struct UnionWithStats final : public SpecificStats {
-    SpecificStats* clone() const final {
-        return new UnionWithStats(*this);
+    std::unique_ptr<SpecificStats> clone() const final {
+        return std::make_unique<UnionWithStats>(*this);
     }
 
     uint64_t estimateObjectSizeInBytes() const {

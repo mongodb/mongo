@@ -71,8 +71,8 @@ struct CommonStats {
 using PlanStageStats = BasePlanStageStats<CommonStats>;
 
 struct ScanStats final : public SpecificStats {
-    SpecificStats* clone() const final {
-        return new ScanStats(*this);
+    std::unique_ptr<SpecificStats> clone() const final {
+        return std::make_unique<ScanStats>(*this);
     }
 
     uint64_t estimateObjectSizeInBytes() const final {
@@ -87,8 +87,8 @@ struct ScanStats final : public SpecificStats {
 };
 
 struct IndexScanStats final : public SpecificStats {
-    SpecificStats* clone() const final {
-        return new IndexScanStats(*this);
+    std::unique_ptr<SpecificStats> clone() const final {
+        return std::make_unique<IndexScanStats>(*this);
     }
 
     uint64_t estimateObjectSizeInBytes() const {
@@ -104,8 +104,8 @@ struct IndexScanStats final : public SpecificStats {
 };
 
 struct FilterStats final : public SpecificStats {
-    SpecificStats* clone() const final {
-        return new FilterStats(*this);
+    std::unique_ptr<SpecificStats> clone() const final {
+        return std::make_unique<FilterStats>(*this);
     }
 
     uint64_t estimateObjectSizeInBytes() const final {
@@ -116,8 +116,8 @@ struct FilterStats final : public SpecificStats {
 };
 
 struct LimitSkipStats final : public SpecificStats {
-    SpecificStats* clone() const final {
-        return new LimitSkipStats(*this);
+    std::unique_ptr<SpecificStats> clone() const final {
+        return std::make_unique<LimitSkipStats>(*this);
     }
 
     uint64_t estimateObjectSizeInBytes() const final {
@@ -129,8 +129,8 @@ struct LimitSkipStats final : public SpecificStats {
 };
 
 struct UniqueStats : public SpecificStats {
-    SpecificStats* clone() const final {
-        return new UniqueStats(*this);
+    std::unique_ptr<SpecificStats> clone() const final {
+        return std::make_unique<UniqueStats>(*this);
     }
 
     uint64_t estimateObjectSizeInBytes() const final {
@@ -142,8 +142,8 @@ struct UniqueStats : public SpecificStats {
 };
 
 struct BranchStats final : public SpecificStats {
-    SpecificStats* clone() const final {
-        return new BranchStats(*this);
+    std::unique_ptr<SpecificStats> clone() const final {
+        return std::make_unique<BranchStats>(*this);
     }
 
     uint64_t estimateObjectSizeInBytes() const final {
@@ -158,8 +158,8 @@ struct BranchStats final : public SpecificStats {
 };
 
 struct CheckBoundsStats final : public SpecificStats {
-    SpecificStats* clone() const final {
-        return new CheckBoundsStats(*this);
+    std::unique_ptr<SpecificStats> clone() const final {
+        return std::make_unique<CheckBoundsStats>(*this);
     }
 
     uint64_t estimateObjectSizeInBytes() const final {
@@ -170,8 +170,8 @@ struct CheckBoundsStats final : public SpecificStats {
 };
 
 struct LoopJoinStats final : public SpecificStats {
-    SpecificStats* clone() const final {
-        return new LoopJoinStats(*this);
+    std::unique_ptr<SpecificStats> clone() const final {
+        return std::make_unique<LoopJoinStats>(*this);
     }
 
     uint64_t estimateObjectSizeInBytes() const final {
@@ -183,8 +183,8 @@ struct LoopJoinStats final : public SpecificStats {
 };
 
 struct TraverseStats : public SpecificStats {
-    SpecificStats* clone() const final {
-        return new TraverseStats(*this);
+    std::unique_ptr<SpecificStats> clone() const final {
+        return std::make_unique<TraverseStats>(*this);
     }
 
     uint64_t estimateObjectSizeInBytes() const final {
