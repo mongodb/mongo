@@ -1129,7 +1129,9 @@ private:
 class SSLManagerOpenSSL : public SSLManagerInterface,
                           public std::enable_shared_from_this<SSLManagerOpenSSL> {
 public:
-    explicit SSLManagerOpenSSL(const SSLParams& params, bool isServer);
+    explicit SSLManagerOpenSSL(const SSLParams& params,
+                               const std::optional<TransientSSLParams>& transientSSLParams,
+                               bool isServer);
     ~SSLManagerOpenSSL() {
         stopJobs();
     }
@@ -1140,7 +1142,6 @@ public:
      */
     Status initSSLContext(SSL_CTX* context,
                           const SSLParams& params,
-                          const TransientSSLParams& transientParams,
                           ConnectionDirection direction) final;
 
     SSLConnectionInterface* connect(Socket* socket) final;
@@ -1168,6 +1169,10 @@ public:
     const SSLConfiguration& getSSLConfiguration() const final {
         return _sslConfiguration;
     }
+
+    bool isTransient() const final;
+
+    std::string getTargetedClusterConnectionString() const final;
 
     int SSL_read(SSLConnectionInterface* conn, void* buf, int num) final;
 
@@ -1198,6 +1203,9 @@ private:
     bool _allowInvalidHostnames;
     bool _suppressNoCertificateWarning;
     SSLConfiguration _sslConfiguration;
+    // If set, this manager is an instance providing authentication with remote server specified
+    // with TransientSSLParams::targetedClusterConnectionString.
+    const std::optional<TransientSSLParams> _transientSSLParams;
 
     Mutex _sharedResponseMutex = MONGO_MAKE_LATCH("OCSPStaplingJobRunner::_sharedResponseMutex");
     std::shared_ptr<OCSPStaplingContext> _ocspStaplingContext;
@@ -1263,6 +1271,7 @@ private:
 
         std::string _prompt;
     };
+
     PasswordFetcher _serverPEMPassword;
     PasswordFetcher _clusterPEMPassword;
 
@@ -1444,9 +1453,17 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(SSLManager, ("SetupOpenSSL", "EndStartupOpt
     }
 }
 
+std::shared_ptr<SSLManagerInterface> SSLManagerInterface::create(
+    const SSLParams& params,
+    const std::optional<TransientSSLParams>& transientSSLParams,
+    bool isServer) {
+    return std::make_shared<SSLManagerOpenSSL>(params, transientSSLParams, isServer);
+}
+
 std::shared_ptr<SSLManagerInterface> SSLManagerInterface::create(const SSLParams& params,
                                                                  bool isServer) {
-    return std::make_shared<SSLManagerOpenSSL>(params, isServer);
+    return std::make_shared<SSLManagerOpenSSL>(
+        params, std::optional<TransientSSLParams>{}, isServer);
 }
 
 SSLX509Name getCertificateSubjectX509Name(X509* cert) {
@@ -1537,18 +1554,28 @@ SSLConnectionOpenSSL::~SSLConnectionOpenSSL() {
     }
 }
 
-SSLManagerOpenSSL::SSLManagerOpenSSL(const SSLParams& params, bool isServer)
+SSLManagerOpenSSL::SSLManagerOpenSSL(const SSLParams& params,
+                                     const std::optional<TransientSSLParams>& transientSSLParams,
+                                     bool isServer)
     : _serverContext(nullptr),
       _clientContext(nullptr),
       _weakValidation(params.sslWeakCertificateValidation),
       _allowInvalidCertificates(params.sslAllowInvalidCertificates),
       _allowInvalidHostnames(params.sslAllowInvalidHostnames),
       _suppressNoCertificateWarning(params.suppressNoTLSPeerCertificateWarning),
+      _transientSSLParams(transientSSLParams),
       _fetcher(this),
       _serverPEMPassword(params.sslPEMKeyPassword, "Enter PEM passphrase"),
       _clusterPEMPassword(params.sslClusterPassword, "Enter cluster certificate passphrase") {
     if (!_initSynchronousSSLContext(&_clientContext, params, ConnectionDirection::kOutgoing)) {
         uasserted(16768, "ssl initialization problem");
+    }
+
+    if (_transientSSLParams.has_value()) {
+        // No other initialization is necessary: this is egress connection manager that
+        // is not using local PEM files.
+        LOGV2_DEBUG(54090, 1, "Default params are ignored for transient SSL manager");
+        return;
     }
 
     // pick the certificate for use in outgoing connections,
@@ -2131,11 +2158,28 @@ Milliseconds SSLManagerOpenSSL::updateOcspStaplingContextWithResponse(
     return swResponse.getValue().fetchNewResponseDuration();
 }
 
+bool SSLManagerOpenSSL::isTransient() const {
+    return _transientSSLParams.has_value();
+}
+
+std::string SSLManagerOpenSSL::getTargetedClusterConnectionString() const {
+    if (_transientSSLParams.has_value()) {
+        return (*_transientSSLParams).targetedClusterConnectionString.toString();
+    }
+    return {};
+}
 
 Status SSLManagerOpenSSL::initSSLContext(SSL_CTX* context,
                                          const SSLParams& params,
-                                         const TransientSSLParams& transientParams,
                                          ConnectionDirection direction) {
+    if (isTransient()) {
+        LOGV2_DEBUG(5270602,
+                    2,
+                    "Initializing transient egress SSL context",
+                    "targetClusterConnectionString"_attr =
+                        (*_transientSSLParams).targetedClusterConnectionString);
+    }
+
     // SSL_OP_ALL - Activate all bug workaround options, to support buggy client SSL's.
     // SSL_OP_NO_SSLv2 - Disable SSL v2 support
     // SSL_OP_NO_SSLv3 - Disable SSL v3 support
@@ -2197,24 +2241,24 @@ Status SSLManagerOpenSSL::initSSLContext(SSL_CTX* context,
     }
 
 
-    if (direction == ConnectionDirection::kOutgoing &&
-        !transientParams.sslClusterPEMPayload.empty()) {
+    if (direction == ConnectionDirection::kOutgoing && _transientSSLParams) {
 
         // Transient params for outgoing connection have priority over global params.
         if (!_setupPEMFromMemoryPayload(
                 context,
-                transientParams.sslClusterPEMPayload,
+                (*_transientSSLParams).sslClusterPEMPayload,
                 &_clusterPEMPassword,
-                transientParams.targetedClusterConnectionString.toString())) {
+                (*_transientSSLParams).targetedClusterConnectionString.toString())) {
             return Status(ErrorCodes::InvalidSSLConfiguration,
                           str::stream() << "Can not set up transient ssl cluster certificate for "
-                                        << transientParams.targetedClusterConnectionString);
+                                        << (*_transientSSLParams).targetedClusterConnectionString);
         }
 
-        auto status = _parseAndValidateCertificateFromMemory(transientParams.sslClusterPEMPayload,
-                                                             &_clusterPEMPassword,
-                                                             &_sslConfiguration.clientSubjectName,
-                                                             nullptr);
+        auto status =
+            _parseAndValidateCertificateFromMemory((*_transientSSLParams).sslClusterPEMPayload,
+                                                   &_clusterPEMPassword,
+                                                   &_sslConfiguration.clientSubjectName,
+                                                   nullptr);
         if (!status.isOK()) {
             return status.withContext("Could not validate transient certificate");
         }
@@ -2317,7 +2361,7 @@ bool SSLManagerOpenSSL::_initSynchronousSSLContext(UniqueSSLContext* contextPtr,
                                                    ConnectionDirection direction) {
     *contextPtr = UniqueSSLContext(SSL_CTX_new(SSLv23_method()));
 
-    uassertStatusOK(initSSLContext(contextPtr->get(), params, TransientSSLParams(), direction));
+    uassertStatusOK(initSSLContext(contextPtr->get(), params, direction));
 
     // If renegotiation is needed, don't return from recv() or send() until it's successful.
     // Note: this is for blocking sockets only.
