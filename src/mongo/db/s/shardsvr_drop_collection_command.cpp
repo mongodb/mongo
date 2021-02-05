@@ -60,6 +60,13 @@ void dropCollectionLegacy(OperationContext* opCtx, const NamespaceString& nss) {
 
 class ShardsvrDropCollectionCommand final : public TypedCommand<ShardsvrDropCollectionCommand> {
 public:
+    using Request = ShardsvrDropCollection;
+
+    std::string help() const override {
+        return "Internal command, which is exported by the primary sharding server. Do not call "
+               "directly. Drops a collection.";
+    }
+
     bool acceptsAnyApiVersionParameters() const override {
         return true;
     }
@@ -67,13 +74,6 @@ public:
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return Command::AllowedOnSecondary::kNever;
     }
-
-    std::string help() const override {
-        return "Internal command, which is exported by the primary sharding server. Do not call "
-               "directly. Drops a collection.";
-    }
-
-    using Request = ShardsvrDropCollection;
 
     class Invocation final : public InvocationBase {
     public:
@@ -88,10 +88,16 @@ public:
                                   << opCtx->getWriteConcern().wMode,
                     opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
 
-            if (!feature_flags::gShardingFullDDLSupport.isEnabled(
-                    serverGlobalParams.featureCompatibility) ||
-                feature_flags::gDisableIncompleteShardingDDLSupport.isEnabled(
-                    serverGlobalParams.featureCompatibility)) {
+            bool useNewPath = [&] {
+                // TODO (SERVER-53092): Use the FCV lock in order to "reserve" operation as running
+                // in new or legacy mode
+                return feature_flags::gShardingFullDDLSupport.isEnabled(
+                           serverGlobalParams.featureCompatibility) &&
+                    feature_flags::gDisableIncompleteShardingDDLSupport.isEnabled(
+                        serverGlobalParams.featureCompatibility);
+            }();
+
+            if (!useNewPath) {
                 LOGV2_DEBUG(5280951,
                             1,
                             "Running legacy drop collection procedure",
