@@ -589,21 +589,15 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
                     "namespace"_attr = coll);
             }
 
-            const bool foundIdent = engineIdents.find(indexIdent) != engineIdents.end();
-            // An index drop will immediately remove the ident, but the `indexMetaData` catalog
-            // entry still exists implying the drop hasn't necessarily been replicated to a
-            // majority of nodes. The code will rebuild the index, despite potentially
-            // encountering another `dropIndex` command.
-            if (indexMetaData.ready && !foundIdent) {
-                LOGV2(22252,
-                      "Expected index data is missing, rebuilding. Collection: {namespace} Index: "
-                      "{index}",
-                      "Expected index data is missing, rebuilding",
-                      "index"_attr = indexName,
-                      "namespace"_attr = coll);
-                reconcileResult.indexesToRebuild.push_back({entry.catalogId, coll, indexName});
-                continue;
-            }
+            // Two-phase index drop ensures that the underlying data table for an index in the
+            // catalog is not dropped until the index removal from the catalog has been majority
+            // committed and become part of the latest checkpoint. Therefore, there should never be
+            // a case where the index catalog entry remains but the index table (identified by
+            // ident) has been removed.
+            invariant(engineIdents.find(indexIdent) != engineIdents.end(),
+                      str::stream() << "Failed to find an index data table matching " << indexIdent
+                                    << " for durable index catalog entry " << indexMetaData.spec
+                                    << " in collection " << coll);
 
             // Any index build with a UUID is an unfinished two-phase build and must be restarted.
             // There are no special cases to handle on primaries or secondaries. An index build may
@@ -638,10 +632,9 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
             }
 
             // If the index was kicked off as a background secondary index build, replication
-            // recovery will not run into the oplog entry to recreate the index. If the index
-            // table is not found, or the index build did not successfully complete, this code
-            // will return the index to be rebuilt.
-            if (indexMetaData.isBackgroundSecondaryBuild && (!foundIdent || !indexMetaData.ready)) {
+            // recovery will not run into the oplog entry to recreate the index. If the index build
+            // did not successfully complete, this code will return the index to be rebuilt.
+            if (indexMetaData.isBackgroundSecondaryBuild && !indexMetaData.ready) {
                 LOGV2(22255,
                       "Expected background index build did not complete, rebuilding in foreground "
                       "- see SERVER-43097",

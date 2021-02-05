@@ -62,6 +62,7 @@ TEST_F(StorageEngineTest, ReconcileIdentsTest) {
     // the `ident` name given to the collection.
     auto swCollInfo = createCollection(opCtx.get(), NamespaceString("db.coll1"));
     ASSERT_OK(swCollInfo.getStatus());
+
     // Create a table in the KVEngine not reflected in the DurableCatalog. This should be dropped
     // when reconciling.
     ASSERT_OK(createCollTable(opCtx.get(), NamespaceString("db.coll2")));
@@ -72,33 +73,13 @@ TEST_F(StorageEngineTest, ReconcileIdentsTest) {
 
     auto identsVec = getAllKVEngineIdents(opCtx.get());
     auto idents = std::set<std::string>(identsVec.begin(), identsVec.end());
+
     // There are two idents. `_mdb_catalog` and the ident for `db.coll1`.
     ASSERT_EQUALS(static_cast<const unsigned long>(2), idents.size());
     ASSERT_TRUE(idents.find(swCollInfo.getValue().ident) != idents.end());
     ASSERT_TRUE(idents.find("_mdb_catalog") != idents.end());
 
-    // Create a catalog entry for the `_id` index. Drop the created the table.
-    {
-        WriteUnitOfWork wuow(opCtx.get());
-        ASSERT_OK(createIndex(opCtx.get(),
-                              NamespaceString("db.coll1"),
-                              "_id",
-                              false /* isBackgroundSecondaryBuild */));
-        wuow.commit();
-    }
-
-    ASSERT_OK(dropIndexTable(opCtx.get(), NamespaceString("db.coll1"), "_id"));
-    // The reconcile response should include this index as needing to be rebuilt.
-    reconcileResult = unittest::assertGet(reconcile(opCtx.get()));
-    ASSERT_EQUALS(1UL, reconcileResult.indexesToRebuild.size());
-    ASSERT_EQUALS(0UL, reconcileResult.indexBuildsToRestart.size());
-    ASSERT_EQUALS(0UL, reconcileResult.indexBuildsToResume.size());
-
-    StorageEngine::IndexIdentifier& toRebuild = reconcileResult.indexesToRebuild[0];
-    ASSERT_EQUALS("db.coll1", toRebuild.nss.ns());
-    ASSERT_EQUALS("_id", toRebuild.indexName);
-
-    // Now drop the `db.coll1` table, while leaving the DurableCatalog entry.
+    // Drop the `db.coll1` table, while leaving the DurableCatalog entry.
     ASSERT_OK(dropIdent(opCtx.get()->recoveryUnit(), swCollInfo.getValue().ident));
     ASSERT_EQUALS(static_cast<const unsigned long>(1), getAllKVEngineIdents(opCtx.get()).size());
 
