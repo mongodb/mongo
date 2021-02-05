@@ -9,8 +9,8 @@
 
 let st = new ShardingTest({shards: 2});
 
-assert.commandWorked(st.s.adminCommand({enableSharding: 'test'}));
-st.ensurePrimaryShard('test', st.shard0.shardName);
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: 'test', primaryShard: st.shard0.shardName}));
 assert.commandWorked(st.s.adminCommand({shardCollection: 'test.foo', key: {x: 1}}));
 assert.commandWorked(st.s.adminCommand({split: 'test.foo', middle: {x: 0}}));
 assert.commandWorked(st.s.adminCommand({shardCollection: 'test.bar', key: {x: 1}}));
@@ -46,9 +46,13 @@ assert.commandWorked(
 assert.commandWorked(
     st.s.adminCommand({moveChunk: 'test.bar', find: {x: 0}, to: st.shard1.shardName}));
 
-let shardDB = st.rs0.getPrimary().getDB('test');
-let serverStatusRes = shardDB.runCommand({serverStatus: 1});
-assert.eq(3, serverStatusRes.shardingStatistics.rangeDeleterTasks);
+assert.soon(() => {
+    return 3 ===
+        st.rs0.getPrimary()
+            .getDB('test')
+            .runCommand({serverStatus: 1})
+            .shardingStatistics.rangeDeleterTasks;
+});
 
 // Close the cursors so the range deleter tasks can proceed and so there won't be tasks that
 // can't make progress when the check orphan hooks runs.
