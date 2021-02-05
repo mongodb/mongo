@@ -205,7 +205,6 @@ selector:
   - jstests/sharding/inserts_consistent.js
   - jstests/sharding/shard4.js
   - jstests/sharding/migration_with_source_ops.js
-  - jstests/sharding/basic_drop_coll.js
   - jstests/sharding/migration_failure.js
   - jstests/sharding/query/views.js
   - jstests/sharding/shard2.js
