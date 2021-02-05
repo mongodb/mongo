@@ -175,9 +175,7 @@ auto makeSetStatusOnRemoteExhaustCommandCompletionClosure(
             return;
         }
         ++(*responseCount);
-        if (!cbData.response.moreToCome) {
-            *outStatus = cbData.response.status;
-        }
+        *outStatus = cbData.response.status;
     };
 }
 
@@ -780,7 +778,9 @@ COMMON_EXECUTOR_TEST(ScheduleExhaustRemoteCommandIsResolvedWhenMoreToComeFlagIsF
         std::make_pair(startTime, RemoteCommandResponse(BSONObj{}, Microseconds(), true)),
         std::make_pair(startTime + Milliseconds(2),
                        RemoteCommandResponse(BSONObj{}, Microseconds(), false))};
-    net->scheduleResponses(noi, responses);
+    for (auto& [when, response] : responses) {
+        net->scheduleResponse(noi, when, response);
+    }
     net->runUntil(startTime + Milliseconds(3));
     ASSERT(!net->hasReadyRequests());
     net->exitNetwork();
@@ -789,6 +789,60 @@ COMMON_EXECUTOR_TEST(ScheduleExhaustRemoteCommandIsResolvedWhenMoreToComeFlagIsF
     executor.wait(cbHandle);
     ASSERT_OK(status);
     ASSERT_EQUALS(numTimesCallbackCalled, 2);
+
+    shutdownExecutorThread();
+    joinExecutorThread();
+}
+
+COMMON_EXECUTOR_TEST(ScheduleExhaustRemoteCommandIsResolvedWhenCanceled) {
+    TaskExecutor& executor = getExecutor();
+
+    size_t numTimesCallbackCalled = 0;
+    Status status = getDetectableErrorStatus();
+
+    TaskExecutor::CallbackHandle cbHandle =
+        unittest::assertGet(executor.scheduleExhaustRemoteCommand(
+            kDummyRequest,
+            makeSetStatusOnRemoteExhaustCommandCompletionClosure(
+                &kDummyRequest, &status, &numTimesCallbackCalled)));
+
+    launchExecutorThread();
+
+    auto net = getNet();
+
+    net->enterNetwork();
+    // Respond to the request.
+    ASSERT(net->hasReadyRequests());
+    NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
+    const Date_t startTime = net->now();
+    std::list responses = {
+        std::make_pair(startTime, RemoteCommandResponse(BSONObj{}, Microseconds(), true)),
+        std::make_pair(startTime + Milliseconds(2),
+                       RemoteCommandResponse(BSONObj{}, Microseconds(), false))};
+    for (auto& [when, response] : responses) {
+        net->scheduleResponse(noi, when, response);
+    }
+
+    net->runUntil(startTime + Milliseconds(1));
+    ASSERT_EQUALS(numTimesCallbackCalled, 1);
+    ASSERT_OK(status);
+
+    net->cancelCommand(cbHandle);
+    net->runReadyNetworkOperations();
+    ASSERT_EQUALS(numTimesCallbackCalled, 2);
+    ASSERT_EQUALS(status, ErrorCodes::CallbackCanceled);
+
+    ASSERT(!net->hasReadyRequests());
+    net->exitNetwork();
+
+    // Response should be ready.
+    executor.wait(cbHandle);
+
+    net->enterNetwork();
+    // Since we canceled before T+2, we do not observe the final response.
+    net->runUntil(startTime + Milliseconds(2));
+    ASSERT_EQUALS(numTimesCallbackCalled, 2);
+    net->exitNetwork();
 
     shutdownExecutorThread();
     joinExecutorThread();
@@ -820,7 +874,9 @@ COMMON_EXECUTOR_TEST(ScheduleExhaustRemoteCommandSwallowsErrorsWhenMoreToComeFla
     std::list responses = {std::make_pair(startTime, error_response),
                            std::make_pair(startTime + Milliseconds(2),
                                           RemoteCommandResponse(BSONObj{}, Microseconds(), false))};
-    net->scheduleResponses(noi, responses);
+    for (auto& [when, response] : responses) {
+        net->scheduleResponse(noi, when, response);
+    }
     net->runUntil(startTime + Milliseconds(3));
     ASSERT(!net->hasReadyRequests());
     net->exitNetwork();
@@ -898,7 +954,9 @@ COMMON_EXECUTOR_TEST(ScheduleExhaustRemoteCommandFutureIsResolvedWhenMoreToComeF
         std::make_pair(startTime, RemoteCommandResponse(BSONObj{}, Microseconds(), true)),
         std::make_pair(startTime + Milliseconds(2),
                        RemoteCommandResponse(BSONObj{}, Microseconds(), false))};
-    net->scheduleResponses(noi, responses);
+    for (auto& [when, response] : responses) {
+        net->scheduleResponse(noi, when, response);
+    }
     net->runUntil(startTime + Milliseconds(1));
 
     ASSERT_EQUALS(numTimesCallbackCalled, 1);
@@ -980,11 +1038,12 @@ COMMON_EXECUTOR_TEST(ScheduleExhaustRemoteCommandFutureSwallowsErrorsWhenMoreToC
     NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
     RemoteCommandResponse error_response{ErrorCodes::NoSuchKey, "I'm missing"};
     error_response.moreToCome = true;
-    net->scheduleResponses(
-        noi,
-        {std::make_pair(startTime, error_response),
-         std::make_pair(startTime + Milliseconds(2),
-                        RemoteCommandResponse(BSONObj{}, Microseconds(), false))});
+    auto responses = {std::make_pair(startTime, error_response),
+                      std::make_pair(startTime + Milliseconds(2),
+                                     RemoteCommandResponse(BSONObj{}, Microseconds(), false))};
+    for (auto& [when, response] : responses) {
+        net->scheduleResponse(noi, when, response);
+    }
     net->runUntil(startTime + Milliseconds(1));
 
     ASSERT_EQUALS(numTimesCallbackCalled, 1);
@@ -1028,7 +1087,9 @@ COMMON_EXECUTOR_TEST(ScheduleExhaustRemoteCommandFutureIsResolvedWithErrorOnCanc
         std::make_pair(startTime, RemoteCommandResponse(BSONObj{}, Microseconds(), true)),
         std::make_pair(startTime + Milliseconds(2),
                        RemoteCommandResponse(BSONObj{}, Microseconds(), false))};
-    net->scheduleResponses(noi, responses);
+    for (auto& [when, response] : responses) {
+        net->scheduleResponse(noi, when, response);
+    }
     net->runUntil(startTime + Milliseconds(1));
 
     cancelSource.cancel();
