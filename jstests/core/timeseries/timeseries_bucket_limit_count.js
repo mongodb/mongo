@@ -20,8 +20,7 @@ if (!TimeseriesTest.timeseriesCollectionsEnabled(db.getMongo())) {
     return;
 }
 
-const testDB = db.getSiblingDB(jsTestName());
-assert.commandWorked(testDB.dropDatabase());
+const collNamePrefix = 'timeseries_bucket_limit_count_';
 
 // Assumes each bucket has a limit of 1000 measurements.
 const bucketMaxCount = 1000;
@@ -30,13 +29,13 @@ const numDocs = bucketMaxCount + 100;
 const timeFieldName = 'time';
 
 const runTest = function(numDocsPerInsert) {
-    const coll = testDB.getCollection('t_' + numDocsPerInsert);
-    const bucketsColl = testDB.getCollection('system.buckets.' + coll.getName());
+    const coll = db.getCollection(collNamePrefix + numDocsPerInsert);
+    const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
     coll.drop();
 
     assert.commandWorked(
-        testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
-    assert.contains(bucketsColl.getName(), testDB.getCollectionNames());
+        db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
+    assert.contains(bucketsColl.getName(), db.getCollectionNames());
 
     let docs = [];
     for (let i = 0; i < numDocs; i++) {
