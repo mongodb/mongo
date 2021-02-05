@@ -102,8 +102,8 @@ bool ErrorLabelBuilder::isResumableChangeStreamError() const {
     // Do enough parsing to confirm that this is a well-formed pipeline with a $changeStream.
     const auto swLitePipe = [&nss, &cmdObj, apiStrict]() -> StatusWith<LiteParsedPipeline> {
         try {
-            auto aggRequest = uassertStatusOK(
-                aggregation_request_helper::parseFromBSON(nss, cmdObj, boost::none, apiStrict));
+            auto aggRequest =
+                aggregation_request_helper::parseFromBSON(nss, cmdObj, boost::none, apiStrict);
             return LiteParsedPipeline(aggRequest);
         } catch (const DBException& ex) {
             return ex.toStatus();

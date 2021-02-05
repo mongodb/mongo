@@ -141,8 +141,8 @@ void PeriodicShardedIndexConsistencyChecker::_launchShardedIndexConsistencyCheck
                         continue;
                     }
 
-                    auto request = uassertStatusOK(aggregation_request_helper::parseFromBSON(
-                        nss, aggRequestBSON, boost::none, false));
+                    auto request = aggregation_request_helper::parseFromBSON(
+                        nss, aggRequestBSON, boost::none, false);
 
                     auto catalogCache = Grid::get(opCtx)->catalogCache();
                     shardVersionRetry(
