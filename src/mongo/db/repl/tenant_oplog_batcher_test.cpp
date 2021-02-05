@@ -60,6 +60,8 @@ public:
     }
 
     void tearDown() override {
+        _executor->shutdown();
+        _executor->join();
         Client::releaseCurrent();
     }
 
