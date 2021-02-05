@@ -1,7 +1,7 @@
 //
 // When a $text query includes an additional predicate that can be covered with a suffix of a $text
-// index, we expect the query planner to attach that predicate as a "filter" to the TEXT_OR or OR
-// stage, so that it can be used to filter non-matching documents without fetching them.
+// index, we expect the query planner to attach that predicate as a "filter" to the TEXT_OR or OR or
+// IXSCAN stage, so that it can be used to filter non-matching documents without fetching them.
 //
 // SERVER-26833 changes how the text index is searched in the case when the projection does not
 // include the 'textScore' meta field, so we are adding this test to ensure that we still get the
@@ -36,7 +36,9 @@ assert.commandWorked(coll.insert({a: "hello world", b: 3, c: 3}));
 //   - we return exactly one document.
 let explainResult = coll.find({$text: {$search: "hello"}, b: 1}).explain("executionStats");
 assert.commandWorked(explainResult);
-assert(planHasStage(db, explainResult.queryPlanner.winningPlan, "OR"));
+assert(!planHasStage(db, explainResult.queryPlanner.winningPlan, "TEXT_OR"));
+assert(!planHasStage(db, explainResult.queryPlanner.winningPlan, "OR"));
+assert(planHasStage(db, explainResult.queryPlanner.winningPlan, "IXSCAN"));
 assert.eq(explainResult.executionStats.totalKeysExamined,
           2,
           "Unexpected number of keys examined: " + tojson(explainResult));
@@ -46,9 +48,13 @@ assert.eq(explainResult.executionStats.totalDocsExamined,
 assert.eq(explainResult.executionStats.nReturned,
           1,
           "Unexpected number of results returned: " + tojson(explainResult));
+let filteringStage = getPlanStage(explainResult, "IXSCAN");
+assert.hasFields(
+    filteringStage, ["filter"], "No filter found on IXSCAN: " + tojson(filteringStage));
+assert.docEq(filteringStage.filter, {"b": {"$eq": 1}}, "Incorrect filter on IXSCAN.");
 
-// When we include the text score in the projection, we use a TEXT_OR instead of an OR in our
-// query plan, which changes how filtering is done. We should get the same result, however.
+// When we include the text score in the projection, we use a TEXT_OR in our query plan, which
+// changes how filtering is done. We should get the same result, however.
 explainResult = coll.find({$text: {$search: "hello"}, b: 1},
                           {a: 1, b: 1, c: 1, textScore: {$meta: "textScore"}})
                     .explain("executionStats");
@@ -63,6 +69,28 @@ assert.eq(explainResult.executionStats.totalDocsExamined,
 assert.eq(explainResult.executionStats.nReturned,
           1,
           "Unexpected number of results returned: " + tojson(explainResult));
+filteringStage = getPlanStage(explainResult, "TEXT_OR");
+assert.hasFields(
+    filteringStage, ["filter"], "No filter found on TEXT_OR: " + tojson(filteringStage));
+assert.docEq(filteringStage.filter, {"b": {"$eq": 1}}, "Incorrect filter on TEXT_OR.");
+
+// When we search more than one term, we perform filtering in the OR stage rather than the
+// underlying IXSCANs, but we should get an equivalent result.
+explainResult = coll.find({$text: {$search: "hello world"}, b: 1}).explain("executionStats");
+assert.commandWorked(explainResult);
+assert(planHasStage(db, explainResult.queryPlanner.winningPlan, "OR"));
+assert.eq(explainResult.executionStats.totalKeysExamined,
+          4,
+          "Unexpected number of keys examined: " + tojson(explainResult));
+assert.eq(explainResult.executionStats.totalDocsExamined,
+          1,
+          "Unexpected number of documents examined: " + tojson(explainResult));
+assert.eq(explainResult.executionStats.nReturned,
+          1,
+          "Unexpected number of results returned: " + tojson(explainResult));
+filteringStage = getPlanStage(explainResult, "OR");
+assert.hasFields(filteringStage, ["filter"], "No filter found on OR: " + tojson(filteringStage));
+assert.docEq(filteringStage.filter, {"b": {"$eq": 1}}, "Incorrect filter on OR.");
 
 //
 // Test the query {$text: {$search: "hello"}, c: 1} with and without the 'textScore' in the
@@ -76,7 +104,7 @@ assert.eq(explainResult.executionStats.nReturned,
 //   - we return exactly one document.
 explainResult = coll.find({$text: {$search: "hello"}, c: 1}).explain("executionStats");
 assert.commandWorked(explainResult);
-assert(planHasStage(db, explainResult.queryPlanner.winningPlan, "OR"));
+assert(!planHasStage(db, explainResult.queryPlanner.winningPlan, "TEXT_OR"));
 assert.eq(explainResult.executionStats.totalKeysExamined,
           2,
           "Unexpected number of keys examined: " + tojson(explainResult));
@@ -121,7 +149,7 @@ assert.commandWorked(coll.insert({a: "hello world", b: {d: 3}, c: {e: 3}}));
 //   - we return exactly one document.
 explainResult = coll.find({$text: {$search: "hello"}, "b.d": 1}).explain("executionStats");
 assert.commandWorked(explainResult);
-assert(planHasStage(db, explainResult.queryPlanner.winningPlan, "OR"));
+assert(!planHasStage(db, explainResult.queryPlanner.winningPlan, "TEXT_OR"));
 assert.eq(explainResult.executionStats.totalKeysExamined,
           2,
           "Unexpected number of keys examined: " + tojson(explainResult));
@@ -132,8 +160,8 @@ assert.eq(explainResult.executionStats.nReturned,
           1,
           "Unexpected number of results returned: " + tojson(explainResult));
 
-// When we include the text score in the projection, we use a TEXT_OR instead of an OR in our
-// query plan, which changes how filtering is done. We should get the same result, however.
+// When we include the text score in the projection, we use a TEXT_OR in our query plan, which
+// changes how filtering is done. We should get the same result, however.
 explainResult = coll.find({$text: {$search: "hello"}, "b.d": 1},
                           {a: 1, b: 1, c: 1, textScore: {$meta: "textScore"}})
                     .explain("executionStats");
@@ -161,7 +189,7 @@ assert.eq(explainResult.executionStats.nReturned,
 //   - we return exactly one document.
 explainResult = coll.find({$text: {$search: "hello"}, "c.e": 1}).explain("executionStats");
 assert.commandWorked(explainResult);
-assert(planHasStage(db, explainResult.queryPlanner.winningPlan, "OR"));
+assert(!planHasStage(db, explainResult.queryPlanner.winningPlan, "TEXT_OR"));
 assert.eq(explainResult.executionStats.totalKeysExamined,
           2,
           "Unexpected number of keys examined: " + tojson(explainResult));

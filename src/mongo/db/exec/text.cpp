@@ -100,6 +100,10 @@ unique_ptr<PlanStage> TextStage::buildTextTree(OperationContext* opCtx,
                                                WorkingSet* ws,
                                                const MatchExpression* filter,
                                                bool wantTextScore) const {
+    // If the query requires the "textScore" field or involves multiple search terms, a TEXT_OR or
+    // OR stage is needed. Otherwise, we can use a single index scan directly.
+    const bool needOrStage = wantTextScore || _params.query.getTermsForBounds().size() > 1;
+    const MatchExpression* emptyFilter = nullptr;
     // Get all the index scans for each term in our query.
     std::vector<std::unique_ptr<PlanStage>> indexScanList;
     for (const auto& term : _params.query.getTermsForBounds()) {
@@ -112,11 +116,11 @@ unique_ptr<PlanStage> TextStage::buildTextTree(OperationContext* opCtx,
         ixparams.bounds.isSimpleRange = true;
         ixparams.direction = -1;
         ixparams.shouldDedup = _params.index->getEntry()->isMultikey();
-
-        indexScanList.push_back(
-            std::make_unique<IndexScan>(expCtx(), collection, ixparams, ws, nullptr));
+        // If we will be adding a TEXT_OR or OR stage, then it is responsible for applying the
+        // filter. Otherwise, the index scan applies the filter.
+        indexScanList.push_back(std::make_unique<IndexScan>(
+            expCtx(), collection, ixparams, ws, needOrStage ? emptyFilter : filter));
     }
-
     // Build the union of the index scans as a TEXT_OR or an OR stage, depending on whether the
     // projection requires the "textScore" $meta field.
     std::unique_ptr<PlanStage> textMatchStage;
@@ -132,15 +136,23 @@ unique_ptr<PlanStage> TextStage::buildTextTree(OperationContext* opCtx,
             expCtx(), std::move(textScorer), _params.query, _params.spec, ws);
     } else {
         // Because we don't need the text score, we can use a non-blocking OR stage to get the union
-        // of the index scans.
-        auto textSearcher = std::make_unique<OrStage>(expCtx(), ws, true, filter);
-
-        textSearcher->addChildren(std::move(indexScanList));
+        // of the index scans or use the index scan directly if there is only one.
+        std::unique_ptr<mongo::PlanStage> textSearcher;
+        if (indexScanList.size() == 1) {
+            tassert(5397400,
+                    "If there is only one index scan and we do not need textScore, needOrStage "
+                    "should be false",
+                    !needOrStage);
+            textSearcher = std::move(indexScanList[0]);
+        } else {
+            auto orTextSearcher = std::make_unique<OrStage>(expCtx(), ws, true, filter);
+            orTextSearcher->addChildren(std::move(indexScanList));
+            textSearcher = std::move(orTextSearcher);
+        }
 
         // Unlike the TEXT_OR stage, the OR stage does not fetch the documents that it outputs. We
         // add our own FETCH stage to satisfy the requirement of the TEXT_MATCH stage that its
         // WorkingSetMember inputs have fetched data.
-        const MatchExpression* emptyFilter = nullptr;
         auto fetchStage = std::make_unique<FetchStage>(
             expCtx(), ws, std::move(textSearcher), emptyFilter, collection);
 
