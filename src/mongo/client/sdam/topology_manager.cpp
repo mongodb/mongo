@@ -62,16 +62,16 @@ bool isStaleTopologyVersion(boost::optional<TopologyVersion> lastTopologyVersion
 }  // namespace
 
 
-TopologyManager::TopologyManager(SdamConfiguration config,
-                                 ClockSource* clockSource,
-                                 TopologyEventsPublisherPtr eventsPublisher)
+TopologyManagerImpl::TopologyManagerImpl(SdamConfiguration config,
+                                         ClockSource* clockSource,
+                                         TopologyEventsPublisherPtr eventsPublisher)
     : _config(std::move(config)),
       _clockSource(clockSource),
       _topologyDescription(TopologyDescription::create(_config)),
       _topologyStateMachine(std::make_unique<TopologyStateMachine>(_config)),
       _topologyEventsPublisher(eventsPublisher) {}
 
-bool TopologyManager::onServerDescription(const HelloOutcome& helloOutcome) {
+bool TopologyManagerImpl::onServerDescription(const HelloOutcome& helloOutcome) {
     stdx::lock_guard<mongo::Mutex> lock(_mutex);
 
     boost::optional<HelloRTT> lastRTT;
@@ -116,12 +116,12 @@ bool TopologyManager::onServerDescription(const HelloOutcome& helloOutcome) {
     return true;
 }
 
-const std::shared_ptr<TopologyDescription> TopologyManager::getTopologyDescription() const {
+const std::shared_ptr<TopologyDescription> TopologyManagerImpl::getTopologyDescription() const {
     stdx::lock_guard<mongo::Mutex> lock(_mutex);
     return _topologyDescription;
 }
 
-void TopologyManager::onServerRTTUpdated(HostAndPort hostAndPort, HelloRTT rtt) {
+void TopologyManagerImpl::onServerRTTUpdated(HostAndPort hostAndPort, HelloRTT rtt) {
     {
         stdx::lock_guard<mongo::Mutex> lock(_mutex);
 
@@ -146,13 +146,13 @@ void TopologyManager::onServerRTTUpdated(HostAndPort hostAndPort, HelloRTT rtt) 
           "replicaSet"_attr = getTopologyDescription()->getSetName());
 }
 
-SemiFuture<std::vector<HostAndPort>> TopologyManager::executeWithLock(
+SemiFuture<std::vector<HostAndPort>> TopologyManagerImpl::executeWithLock(
     std::function<SemiFuture<std::vector<HostAndPort>>(const TopologyDescriptionPtr&)> func) {
     stdx::lock_guard<mongo::Mutex> lock(_mutex);
     return func(_topologyDescription);
 }
 
-void TopologyManager::_publishTopologyDescriptionChanged(
+void TopologyManagerImpl::_publishTopologyDescriptionChanged(
     const TopologyDescriptionPtr& oldTopologyDescription,
     const TopologyDescriptionPtr& newTopologyDescription) const {
     if (_topologyEventsPublisher)

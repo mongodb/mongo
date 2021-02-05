@@ -86,7 +86,9 @@ env.Library(
 env.Library(
     target='sdam_test',
     source=[
+        'mock_topology_manager.cpp',
         'server_description_builder.cpp',
+        'topology_description_builder.cpp',
         'topology_listener_mock.cpp',
     ],
     LIBDEPS=[

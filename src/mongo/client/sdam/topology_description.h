@@ -179,5 +179,6 @@ private:
     boost::optional<int> _logicalSessionTimeoutMinutes;
 
     friend class TopologyStateMachine;
+    friend class TopologyDescriptionBuilder;
 };
 }  // namespace mongo::sdam

@@ -35,19 +35,35 @@
 #include "mongo/client/sdam/topology_state_machine.h"
 
 namespace mongo::sdam {
+
+class TopologyManager {
+public:
+    virtual ~TopologyManager() {}
+
+    virtual bool onServerDescription(const HelloOutcome& helloOutcome) = 0;
+
+    virtual void onServerRTTUpdated(HostAndPort hostAndPort, HelloRTT rtt) = 0;
+
+    virtual const TopologyDescriptionPtr getTopologyDescription() const = 0;
+
+    virtual SemiFuture<std::vector<HostAndPort>> executeWithLock(
+        std::function<SemiFuture<std::vector<HostAndPort>>(const TopologyDescriptionPtr&)>
+            func) = 0;
+};
+
 /**
  * This class serves as the public interface to the functionality described in the Service Discovery
  * and Monitoring spec:
  *   https://github.com/mongodb/specifications/blob/master/source/server-discovery-and-monitoring/server-discovery-and-monitoring.rst
  */
-class TopologyManager {
-    TopologyManager() = delete;
-    TopologyManager(const TopologyManager&) = delete;
+class TopologyManagerImpl : public TopologyManager {
+    TopologyManagerImpl() = delete;
+    TopologyManagerImpl(const TopologyManagerImpl&) = delete;
 
 public:
-    explicit TopologyManager(SdamConfiguration config,
-                             ClockSource* clockSource,
-                             TopologyEventsPublisherPtr eventsPublisher = nullptr);
+    explicit TopologyManagerImpl(SdamConfiguration config,
+                                 ClockSource* clockSource,
+                                 TopologyEventsPublisherPtr eventsPublisher = nullptr);
 
     /**
      * This function atomically:
@@ -60,8 +76,7 @@ public:
      * HelloOutcomes serially, as required by:
      *   https://github.com/mongodb/specifications/blob/master/source/server-discovery-and-monitoring/server-discovery-and-monitoring.rst#process-one-ismaster-outcome-at-a-time
      */
-    bool onServerDescription(const HelloOutcome& helloOutcome);
-
+    bool onServerDescription(const HelloOutcome& helloOutcome) override;
 
     /**
      * This function updates the RTT value for a server without executing any state machine actions.
@@ -72,18 +87,19 @@ public:
      *   3. Installs the cloned ServerDescription into the TopologyDescription from step 1
      *   4. Installs the cloned TopologyDescription as the current one.
      */
-    void onServerRTTUpdated(HostAndPort hostAndPort, HelloRTT rtt);
+    void onServerRTTUpdated(HostAndPort hostAndPort, HelloRTT rtt) override;
 
     /**
      * Get the current TopologyDescription. This is safe to call from multiple threads.
      */
-    const TopologyDescriptionPtr getTopologyDescription() const;
+    const TopologyDescriptionPtr getTopologyDescription() const override;
 
     /**
      * Executes the given function with the current TopologyDescription while holding the mutex.
      */
     SemiFuture<std::vector<HostAndPort>> executeWithLock(
-        std::function<SemiFuture<std::vector<HostAndPort>>(const TopologyDescriptionPtr&)> func);
+        std::function<SemiFuture<std::vector<HostAndPort>>(const TopologyDescriptionPtr&)> func)
+        override;
 
 private:
     void _publishTopologyDescriptionChanged(

@@ -74,7 +74,7 @@ protected:
 
 TEST_F(TopologyManagerTestFixture, ShouldUpdateTopologyVersionOnSuccess) {
     auto config = SdamConfiguration(kOneServer);
-    TopologyManager topologyManager(config, clockSource);
+    TopologyManagerImpl topologyManager(config, clockSource);
 
     auto topologyDescription = topologyManager.getTopologyDescription();
     ASSERT_EQUALS(topologyDescription->getServers().size(), 1);
@@ -116,7 +116,7 @@ TEST_F(TopologyManagerTestFixture,
     };
 
     auto config = SdamConfiguration(kThreeServers);
-    TopologyManager topologyManager(config, clockSource);
+    TopologyManagerImpl topologyManager(config, clockSource);
     checkServerTopologyDescriptionMatches(topologyManager.getTopologyDescription());
 
     auto topologyDescription = topologyManager.getTopologyDescription();
@@ -133,7 +133,7 @@ TEST_F(TopologyManagerTestFixture,
 
 TEST_F(TopologyManagerTestFixture, ShouldUpdateTopologyVersionOnErrorIfSent) {
     auto config = SdamConfiguration(kOneServer);
-    TopologyManager topologyManager(config, clockSource);
+    TopologyManagerImpl topologyManager(config, clockSource);
 
     auto topologyDescription = topologyManager.getTopologyDescription();
     ASSERT_EQUALS(topologyDescription->getServers().size(), 1);
@@ -162,7 +162,7 @@ TEST_F(TopologyManagerTestFixture, ShouldUpdateTopologyVersionOnErrorIfSent) {
 
 TEST_F(TopologyManagerTestFixture, ShouldNotUpdateServerDescriptionIfNewTopologyVersionOlder) {
     auto config = SdamConfiguration(kOneServer);
-    TopologyManager topologyManager(config, clockSource);
+    TopologyManagerImpl topologyManager(config, clockSource);
 
     auto topologyDescription = topologyManager.getTopologyDescription();
     ASSERT_EQUALS(topologyDescription->getServers().size(), 1);

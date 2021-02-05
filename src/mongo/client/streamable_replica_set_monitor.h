@@ -86,6 +86,8 @@ public:
 
     void init() override;
 
+    void initForTesting(sdam::TopologyManagerPtr topologyManager);
+
     void drop() override;
 
     static ReplicaSetMonitorPtr make(const MongoURI& uri,
