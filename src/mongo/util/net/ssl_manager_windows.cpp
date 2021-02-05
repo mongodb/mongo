@@ -269,8 +269,7 @@ public:
      */
     Status initSSLContext(SCHANNEL_CRED* cred,
                           const SSLParams& params,
-                          const TransientSSLParams& transientParams,
-                          ConnectionDirection direction) override final;
+                          ConnectionDirection direction) final;
 
     SSLConnectionInterface* connect(Socket* socket) final;
 
@@ -393,8 +392,10 @@ SSLConnectionWindows::~SSLConnectionWindows() {}
 // Global variable indicating if this is a server or a client instance
 bool isSSLServer = false;
 
-std::shared_ptr<SSLManagerInterface> SSLManagerInterface::create(const SSLParams& params,
-                                                                 bool isServer) {
+std::shared_ptr<SSLManagerInterface> SSLManagerInterface::create(
+    const SSLParams& params,
+    const std::optional<TransientSSLParams>& transientSSLParams,
+    bool isServer) {
     return std::make_shared<SSLManagerWindows>(params, isServer);
 }
 
@@ -416,8 +417,7 @@ SSLManagerWindows::SSLManagerWindows(const SSLParams& params, bool isServer)
 
     uassertStatusOK(_loadCertificates(params));
 
-    uassertStatusOK(
-        initSSLContext(&_clientCred, params, TransientSSLParams(), ConnectionDirection::kOutgoing));
+    uassertStatusOK(initSSLContext(&_clientCred, params, ConnectionDirection::kOutgoing));
 
     // Certificates may not have been loaded. This typically occurs in unit tests.
     if (_clientCertificates[0] != nullptr) {
@@ -427,8 +427,7 @@ SSLManagerWindows::SSLManagerWindows(const SSLParams& params, bool isServer)
 
     // SSL server specific initialization
     if (isServer) {
-        uassertStatusOK(initSSLContext(
-            &_serverCred, params, TransientSSLParams(), ConnectionDirection::kIncoming));
+        uassertStatusOK(initSSLContext(&_serverCred, params, ConnectionDirection::kIncoming));
 
         if (_serverCertificates[0] != nullptr) {
             SSLX509Name subjectName;
@@ -1345,7 +1344,6 @@ Status SSLManagerWindows::_loadCertificates(const SSLParams& params) {
 
 Status SSLManagerWindows::initSSLContext(SCHANNEL_CRED* cred,
                                          const SSLParams& params,
-                                         const TransientSSLParams& transientParams,
                                          ConnectionDirection direction) {
 
     memset(cred, 0, sizeof(*cred));
@@ -1440,7 +1438,6 @@ SSLConnectionInterface* SSLManagerWindows::accept(Socket* socket,
 void SSLManagerWindows::_handshake(SSLConnectionWindows* conn, bool client) {
     initSSLContext(conn->_cred,
                    getSSLGlobalParams(),
-                   TransientSSLParams(),
                    client ? SSLManagerInterface::ConnectionDirection::kOutgoing
                           : SSLManagerInterface::ConnectionDirection::kIncoming);
 
