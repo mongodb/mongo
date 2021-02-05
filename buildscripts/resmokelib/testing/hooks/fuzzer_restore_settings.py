@@ -16,9 +16,5 @@ class FuzzerRestoreSettings(jsfile.JSHook):
         """Run fuzzer cleanup."""
         description = "Clean up unwanted changes from fuzzer"
         js_filename = os.path.join("jstests", "hooks", "run_fuzzer_restore_settings.js")
-        shell_options = shell_options or {}
-        # If the fuzz test by chance enabled the requireApiVersion parameter, permit the shell
-        # to connect anyway and disable requireApiVersion.
-        shell_options.setdefault("apiVersion", 1)
         jsfile.JSHook.__init__(self, hook_logger, fixture, js_filename, description,
                                shell_options=shell_options)
