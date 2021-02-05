@@ -631,7 +631,7 @@ void RollbackImpl::_correctRecordStoreCounts(OperationContext* opCtx) {
                               "namespace"_attr = nss.ns(),
                               "uuid"_attr = uuid.toString(),
                               "ident"_attr = ident,
-                              "error"_attr = exec->statestr(state));
+                              "error"_attr = exec->stateToStr(state));
                 continue;
             }
             newCount = countFromScan;

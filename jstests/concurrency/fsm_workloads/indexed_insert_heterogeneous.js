@@ -6,6 +6,10 @@
  * Inserts multiple documents into an indexed collection. Asserts that all
  * documents appear in both a collection scan and an index scan. The indexed
  * value is a different BSON type, depending on the thread's id.
+ *
+ * @tags: [
+ *   sbe_incompatible,
+ * ]
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js');           // for extendWorkload
 load('jstests/concurrency/fsm_workloads/indexed_insert_base.js');  // for $config

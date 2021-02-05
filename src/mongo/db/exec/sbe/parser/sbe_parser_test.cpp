@@ -81,9 +81,10 @@ namespace {
 class SBEParserTest : public unittest::Test {
 protected:
     SBEParserTest() : planNodeId(12345) {
+        auto fakeUuid = unittest::assertGet(UUID::parse("00000000-0000-0000-0000-000000000000"));
         stages = makeVector(
             // PSCAN
-            sbe::makeS<sbe::ParallelScanStage>(NamespaceString{"testDb", "testCollection"},
+            sbe::makeS<sbe::ParallelScanStage>(fakeUuid,
                                                sbe::value::SlotId{1},
                                                sbe::value::SlotId{2},
                                                std::vector<std::string>{"a", "b"},

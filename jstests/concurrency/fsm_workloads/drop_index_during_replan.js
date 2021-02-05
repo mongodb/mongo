@@ -7,6 +7,11 @@
  * provokes a replan by running a query of the same shape which should use index {b: 1}. At the same
  * time, other threads may be dropping {b: 1}. This tests that the replanning process is robust to
  * index drops.
+ *
+ * TODO SERVER-50737: Remove tag once SBE supports 'AND_SORTED'.
+ * @tags: [
+ *   sbe_incompatible,
+ * ]
  */
 var $config = (function() {
     let data = {

@@ -32,35 +32,15 @@
 #include "mongo/db/query/plan_yield_policy_sbe.h"
 
 namespace mongo {
-
-Status PlanYieldPolicySBE::yield(OperationContext* opCtx, std::function<void()> whileYieldingFn) {
-    if (_yieldingPlans.empty()) {
-        // This yield policy isn't bound to an execution tree yet.
-        return Status::OK();
+void PlanYieldPolicySBE::saveState(OperationContext* opCtx) {
+    for (auto&& root : _yieldingPlans) {
+        root->saveState();
     }
+}
 
-    try {
-        for (auto&& root : _yieldingPlans) {
-            root->saveState();
-        }
-
-        opCtx->recoveryUnit()->abandonSnapshot();
-
-        if (whileYieldingFn) {
-            whileYieldingFn();
-        }
-
-        if (_duringAllYieldsFn) {
-            _duringAllYieldsFn(opCtx);
-        }
-
-        for (auto&& root : _yieldingPlans) {
-            root->restoreState();
-        }
-    } catch (...) {
-        return exceptionToStatus();
+void PlanYieldPolicySBE::restoreState(OperationContext* opCtx, const Yieldable*) {
+    for (auto&& root : _yieldingPlans) {
+        root->restoreState();
     }
-
-    return Status::OK();
 }
 }  // namespace mongo

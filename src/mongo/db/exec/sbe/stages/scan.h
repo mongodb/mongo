@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/db/exec/sbe/stages/lock_acquisition_callback.h"
+#include "mongo/db/exec/sbe/stages/collection_helpers.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/storage/record_store.h"
@@ -40,7 +40,7 @@ using ScanOpenCallback = std::function<void(OperationContext*, const CollectionP
 
 class ScanStage final : public PlanStage {
 public:
-    ScanStage(const NamespaceStringOrUUID& name,
+    ScanStage(CollectionUUID collectionUuid,
               boost::optional<value::SlotId> recordSlot,
               boost::optional<value::SlotId> recordIdSlot,
               std::vector<std::string> fields,
@@ -73,13 +73,15 @@ protected:
     void doAttachToTrialRunTracker(TrialRunTracker* tracker) override;
 
 private:
-    const NamespaceStringOrUUID _name;
+    const CollectionUUID _collUuid;
     const boost::optional<value::SlotId> _recordSlot;
     const boost::optional<value::SlotId> _recordIdSlot;
     const std::vector<std::string> _fields;
     const value::SlotVector _vars;
     const boost::optional<value::SlotId> _seekKeySlot;
     const bool _forward;
+
+    NamespaceString _collName;
 
     // If provided, used during a trial run to accumulate certain execution stats. Once the trial
     // run is complete, this pointer is reset to nullptr.
@@ -117,7 +119,7 @@ class ParallelScanStage final : public PlanStage {
     };
 
 public:
-    ParallelScanStage(const NamespaceStringOrUUID& name,
+    ParallelScanStage(CollectionUUID collectionUuid,
                       boost::optional<value::SlotId> recordSlot,
                       boost::optional<value::SlotId> recordIdSlot,
                       std::vector<std::string> fields,
@@ -126,7 +128,7 @@ public:
                       PlanNodeId nodeId);
 
     ParallelScanStage(const std::shared_ptr<ParallelState>& state,
-                      const NamespaceStringOrUUID& name,
+                      CollectionUUID collectionUuid,
                       boost::optional<value::SlotId> recordSlot,
                       boost::optional<value::SlotId> recordIdSlot,
                       std::vector<std::string> fields,
@@ -161,11 +163,13 @@ private:
         _currentRange = std::numeric_limits<std::size_t>::max();
     }
 
-    const NamespaceStringOrUUID _name;
+    const CollectionUUID _collUuid;
     const boost::optional<value::SlotId> _recordSlot;
     const boost::optional<value::SlotId> _recordIdSlot;
     const std::vector<std::string> _fields;
     const value::SlotVector _vars;
+
+    NamespaceString _collName;
 
     std::shared_ptr<ParallelState> _state;
 

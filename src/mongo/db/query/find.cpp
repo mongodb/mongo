@@ -520,7 +520,7 @@ Message getMore(OperationContext* opCtx,
         LOGV2_DEBUG(20910,
                     5,
                     "getMore NOT saving client cursor",
-                    "planExecutorState"_attr = PlanExecutor::statestr(state));
+                    "planExecutorState"_attr = PlanExecutor::stateToStr(state));
     } else {
         cursorFreer.dismiss();
         // Continue caching the ClientCursor.
@@ -531,7 +531,7 @@ Message getMore(OperationContext* opCtx,
         LOGV2_DEBUG(20911,
                     5,
                     "getMore saving client cursor",
-                    "planExecutorState"_attr = PlanExecutor::statestr(state));
+                    "planExecutorState"_attr = PlanExecutor::stateToStr(state));
 
         // Set 'exhaust' if the client requested exhaust and the cursor is not exhausted.
         *exhaust = opCtx->isExhaust();

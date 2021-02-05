@@ -3,7 +3,6 @@
 
 const kFailPointName = "setYieldAllLocksHang";
 const kCommandComment = "interruptedWhileYieldedComment";
-const kUseSbe = true;
 
 const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod was unable to start up");

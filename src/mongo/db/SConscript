@@ -1209,8 +1209,9 @@ env.Library(
         'query/find.cpp',
         'query/get_executor.cpp',
         'query/internal_plans.cpp',
-        'query/plan_executor_impl.cpp',
+        'query/plan_executor.cpp',
         'query/plan_executor_factory.cpp',
+        'query/plan_executor_impl.cpp',
         'query/plan_executor_sbe.cpp',
         'query/plan_explainer_factory.cpp',
         'query/plan_explainer_impl.cpp',
@@ -1233,6 +1234,7 @@ env.Library(
         'query/shard_filterer_factory_impl.cpp',
         'query/stage_builder_util.cpp',
         'query/wildcard_multikey_paths.cpp',
+        'query/yield_policy_callbacks_impl.cpp',
         'run_op_kill_cursors.cpp',
     ],
     LIBDEPS=[

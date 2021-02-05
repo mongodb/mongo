@@ -507,17 +507,16 @@ SlotBasedStageBuilder::makeLoopJoinForFetch(std::unique_ptr<sbe::PlanStage> inpu
     auto recordIdSlot = _slotIdGenerator.generate();
 
     // Scan the collection in the range [seekKeySlot, Inf).
-    auto scanStage = sbe::makeS<sbe::ScanStage>(
-        NamespaceStringOrUUID{_collection->ns().db().toString(), _collection->uuid()},
-        resultSlot,
-        recordIdSlot,
-        std::vector<std::string>{},
-        sbe::makeSV(),
-        seekKeySlot,
-        true,
-        nullptr,
-        planNodeId,
-        _lockAcquisitionCallback);
+    auto scanStage = sbe::makeS<sbe::ScanStage>(_collection->uuid(),
+                                                resultSlot,
+                                                recordIdSlot,
+                                                std::vector<std::string>{},
+                                                sbe::makeSV(),
+                                                seekKeySlot,
+                                                true,
+                                                nullptr,
+                                                planNodeId,
+                                                _lockAcquisitionCallback);
 
     // Get the recordIdSlot from the outer side (e.g., IXSCAN) and feed it to the inner side,
     // limiting the result set to 1 row.

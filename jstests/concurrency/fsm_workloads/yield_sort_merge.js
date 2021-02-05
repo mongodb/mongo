@@ -5,7 +5,12 @@
  *
  * Intersperse queries which use the SORT_MERGE stage with updates and deletes of documents they
  * may match.
- * Other workloads that need an index { a: 1, b: 1 } can extend this
+ *
+ * Other workloads that need an index { a: 1, b: 1 } can extend this.
+ *
+ * @tags: [
+ *   sbe_incompatible,
+ * ]
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
 load('jstests/concurrency/fsm_workloads/yield.js');       // for $config

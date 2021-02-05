@@ -6425,7 +6425,7 @@ tasks:
   # TODO: SERVER-35964 revert the addition of UBSAN concurrency_replication suites.
 - <<: *task_template
   name: concurrency_replication_ubsan
-  tags: ["concurrency", "ubsan"]
+  tags: ["concurrency", "ubsan", "repl"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -6435,7 +6435,7 @@ tasks:
 
 - <<: *task_template
   name: concurrency_replication_causal_consistency_ubsan
-  tags: ["concurrency", "ubsan"]
+  tags: ["concurrency", "ubsan", "repl"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -6445,7 +6445,7 @@ tasks:
 
 - <<: *task_template
   name: concurrency_replication_multi_stmt_txn_ubsan
-  tags: ["concurrency", "ubsan"]
+  tags: ["concurrency", "ubsan", "repl"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -6483,7 +6483,7 @@ tasks:
       resmoke_jobs_max: 1
 
 - name: concurrency_sharded_replication_multiversion_gen
-  tags: ["multiversion_passthrough"]
+  tags: ["multiversion_passthrough", "sharded"]
   commands:
   - func: "generate implicit multiversion tasks"
     vars:
@@ -6688,7 +6688,7 @@ tasks:
 
 - <<: *task_template
   name: concurrency_simultaneous_replication
-  tags: ["concurrency", "common", "large"]
+  tags: ["concurrency", "common", "large", "repl"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -10508,6 +10508,7 @@ buildvariants:
     distros:
     - rhel62-medium
   - name: .aggregation !.no_async !.secondary_reads !.read_write_concern !.sharded !.unwind !aggregation_disabled_optimization
+  - name: .concurrency !.large !.ubsan !.no_txns !.debug_only !.sharded !.repl
   - name: .jscore !.sharding !.decimal !.compat !cst_jscore_passthrough
   - name: noPassthrough_gen
     distros:

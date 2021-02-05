@@ -38,7 +38,7 @@
 #include "mongo/db/index/index_access_method.h"
 
 namespace mongo::sbe {
-IndexScanStage::IndexScanStage(const NamespaceStringOrUUID& name,
+IndexScanStage::IndexScanStage(CollectionUUID collUuid,
                                std::string_view indexName,
                                bool forward,
                                boost::optional<value::SlotId> recordSlot,
@@ -51,7 +51,7 @@ IndexScanStage::IndexScanStage(const NamespaceStringOrUUID& name,
                                PlanNodeId nodeId,
                                LockAcquisitionCallback lockAcquisitionCallback)
     : PlanStage(seekKeySlotLow ? "ixseek"_sd : "ixscan"_sd, yieldPolicy, nodeId),
-      _name(name),
+      _collUuid(collUuid),
       _indexName(indexName),
       _forward(forward),
       _recordSlot(recordSlot),
@@ -69,7 +69,7 @@ IndexScanStage::IndexScanStage(const NamespaceStringOrUUID& name,
 }
 
 std::unique_ptr<PlanStage> IndexScanStage::clone() const {
-    return std::make_unique<IndexScanStage>(_name,
+    return std::make_unique<IndexScanStage>(_collUuid,
                                             _indexName,
                                             _forward,
                                             _recordSlot,
@@ -104,6 +104,8 @@ void IndexScanStage::prepare(CompileCtx& ctx) {
     if (_seekKeySlotHigh) {
         _seekKeyHiAccessor = ctx.getAccessor(*_seekKeySlotHigh);
     }
+
+    _collName = acquireCollection(_opCtx, _collUuid, _lockAcquisitionCallback, _coll);
 }
 
 value::SlotAccessor* IndexScanStage::getAccessor(CompileCtx& ctx, value::SlotId slot) {
@@ -139,10 +141,7 @@ void IndexScanStage::doRestoreState() {
         return;
     }
 
-    _coll.emplace(_opCtx, _name);
-    if (_lockAcquisitionCallback) {
-        _lockAcquisitionCallback(_opCtx, *_coll);
-    }
+    restoreCollection(_opCtx, _collName, _collUuid, _lockAcquisitionCallback, _coll);
 
     if (_cursor) {
         _cursor->restore();
@@ -173,18 +172,21 @@ void IndexScanStage::open(bool reOpen) {
     auto optTimer(getOptTimer(_opCtx));
 
     _commonStats.opens++;
-
     invariant(_opCtx);
-    if (!reOpen) {
-        invariant(!_cursor);
-        invariant(!_coll);
-        _coll.emplace(_opCtx, _name);
-        if (_lockAcquisitionCallback) {
-            _lockAcquisitionCallback(_opCtx, *_coll);
-        }
+
+    if (_open) {
+        tassert(5071006, "reopened IndexScanStage but reOpen=false", reOpen);
+        tassert(5071007, "IndexScanStage is open but _coll is not held", _coll.has_value());
+        tassert(
+            5071008, "IndexScanStage is open but don't have _cursor", static_cast<bool>(_cursor));
     } else {
-        invariant(_cursor);
-        invariant(_coll);
+        tassert(5071009, "first open to IndexScanStage but reOpen=true", !reOpen);
+        if (!_coll) {
+            // We're being opened after 'close()'. We need to re-acquire '_coll' in this case and
+            // make some validity checks (the collection has not been dropped, renamed, etc.).
+            tassert(5071010, "IndexScanStage is not open but have _cursor", !_cursor);
+            restoreCollection(_opCtx, _collName, _collUuid, _lockAcquisitionCallback, _coll);
+        }
     }
 
     _open = true;
@@ -388,7 +390,7 @@ std::vector<DebugPrinter::Block> IndexScanStage::debugPrint() const {
     ret.emplace_back(DebugPrinter::Block("`]"));
 
     ret.emplace_back("@\"`");
-    DebugPrinter::addIdentifier(ret, _name.toString());
+    DebugPrinter::addIdentifier(ret, _collUuid.toString());
     ret.emplace_back("`\"");
 
     ret.emplace_back("@\"`");

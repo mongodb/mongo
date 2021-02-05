@@ -8,6 +8,12 @@
  * is dropped.
  *
  * This workload was designed to reproduce SERVER-24761.
+ *
+ * TODO SERVER-49385: Re-enable once SBE fails cleanly if an index required by the execution plan is
+ * dropped.
+ * @tags: [
+ *   sbe_incompatible,
+ * ]
  */
 load("jstests/concurrency/fsm_workload_helpers/assert_handle_fail_in_transaction.js");
 var $config = (function() {

@@ -4,7 +4,6 @@
  *
  * @tags: [
  *   requires_find_command,
- *   sbe_incompatible,
  * ]
  */
 (function() {

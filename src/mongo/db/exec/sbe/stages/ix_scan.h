@@ -31,7 +31,7 @@
 
 #include "mongo/bson/ordering.h"
 #include "mongo/db/db_raii.h"
-#include "mongo/db/exec/sbe/stages/lock_acquisition_callback.h"
+#include "mongo/db/exec/sbe/stages/collection_helpers.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/sorted_data_interface.h"
@@ -59,7 +59,7 @@ namespace mongo::sbe {
  */
 class IndexScanStage final : public PlanStage {
 public:
-    IndexScanStage(const NamespaceStringOrUUID& name,
+    IndexScanStage(CollectionUUID collUuid,
                    std::string_view indexName,
                    bool forward,
                    boost::optional<value::SlotId> recordSlot,
@@ -93,7 +93,7 @@ protected:
     void doAttachToTrialRunTracker(TrialRunTracker* tracker) override;
 
 private:
-    const NamespaceStringOrUUID _name;
+    const CollectionUUID _collUuid;
     const std::string _indexName;
     const bool _forward;
     const boost::optional<value::SlotId> _recordSlot;
@@ -102,6 +102,8 @@ private:
     const value::SlotVector _vars;
     const boost::optional<value::SlotId> _seekKeySlotLow;
     const boost::optional<value::SlotId> _seekKeySlotHigh;
+
+    NamespaceString _collName;
 
     LockAcquisitionCallback _lockAcquisitionCallback;
 

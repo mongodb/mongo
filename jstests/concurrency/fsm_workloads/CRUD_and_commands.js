@@ -122,12 +122,14 @@ var $config = (function() {
                             throw e;
                         }
                     } else {
-                        // dropIndex can cause queries to throw if these queries yield.
+                        // dropIndex or collection drops can cause queries to throw if these queries
+                        // yield.
                         assertAlways.contains(
                             e.code,
                             [
-                                ErrorCodes.QueryPlanKilled,
+                                ErrorCodes.NamespaceNotFound,
                                 ErrorCodes.OperationFailed,
+                                ErrorCodes.QueryPlanKilled,
                             ],
                             'unexpected error code: ' + e.code + ': ' + e.message);
                     }

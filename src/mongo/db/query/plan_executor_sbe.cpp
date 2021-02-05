@@ -113,9 +113,11 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
 
 void PlanExecutorSBE::saveState() {
     _root->saveState();
+    _yieldPolicy->setYieldable(nullptr);
 }
 
 void PlanExecutorSBE::restoreState(const RestoreContext& context) {
+    _yieldPolicy->setYieldable(context.collection());
     _root->restoreState();
 }
 
@@ -157,6 +159,8 @@ void PlanExecutorSBE::enqueue(const BSONObj& obj) {
 PlanExecutor::ExecState PlanExecutorSBE::getNextDocument(Document* objOut, RecordId* dlOut) {
     invariant(!_isDisposed);
 
+    checkFailPointPlanExecAlwaysFails();
+
     BSONObj obj;
     auto result = getNext(&obj, dlOut);
     if (result == PlanExecutor::ExecState::ADVANCED) {
@@ -167,6 +171,8 @@ PlanExecutor::ExecState PlanExecutorSBE::getNextDocument(Document* objOut, Recor
 
 PlanExecutor::ExecState PlanExecutorSBE::getNext(BSONObj* out, RecordId* dlOut) {
     invariant(!_isDisposed);
+
+    checkFailPointPlanExecAlwaysFails();
 
     if (!_stash.empty()) {
         auto&& [doc, recordId] = _stash.front();

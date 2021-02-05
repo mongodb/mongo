@@ -2,7 +2,6 @@
 //   does_not_support_stepdowns,
 //   requires_getmore,
 //   requires_replication,
-//   sbe_incompatible,
 // ]
 //
 // Uses getMore to pin an open cursor.

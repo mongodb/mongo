@@ -8,6 +8,12 @@
  * operation occurs.
  *
  * This workload was designed to reproduce SERVER-25039.
+ *
+ * TODO SERVER-49385: Re-enable once SBE fails cleanly if an index required by the execution plan is
+ * dropped.
+ * @tags: [
+ *   sbe_incompatible,
+ * ]
  */
 
 load('jstests/concurrency/fsm_libs/extend_workload.js');      // for extendWorkload

@@ -34,11 +34,34 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/elapsed_tracker.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 
 class ClockSource;
 class Yieldable;
+
+class YieldPolicyCallbacks {
+public:
+    virtual ~YieldPolicyCallbacks() = default;
+
+    /**
+     * Called once the execution plan has been fully saved, all locks have been relinquished, and
+     * the storage engine snapshot has been abandoned.
+     */
+    virtual void duringYield(OperationContext*) const = 0;
+
+    /**
+     * Called if the PlanYieldPolicy observes a WriteConflictException while attempting to restore
+     * an execution plan.
+     */
+    virtual void handledWriteConflict(OperationContext*) const = 0;
+
+    /**
+     * If the yield policy is INTERRUPT_ONLY, this is called prior to checking for interrupt.
+     */
+    virtual void preCheckInterruptOnly(OperationContext* opCtx) const = 0;
+};
 
 class PlanYieldPolicy {
 public:
@@ -135,23 +158,33 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    /**
-     * Hangs or waits if mandated by the 'setYieldAllLocksHang' and 'setYieldAllLocksWait'
-     * failpoints. Concrete implementations of 'PlanYieldPolicy' should call this during a yield in
-     * order to allow tests to take advantage of these failpoints.
-     */
-    static void handleDuringYieldFailpoints(OperationContext* opCtx,
-                                            const NamespaceString& planExecNs);
+    static void throwCollectionDroppedError(UUID collUuid) {
+        uasserted(ErrorCodes::QueryPlanKilled,
+                  str::stream() << "collection dropped. UUID " << collUuid);
+    }
+
+    static void throwCollectionRenamedError(const NamespaceString& oldNss,
+                                            const NamespaceString& newNss,
+                                            UUID collUuid) {
+        uasserted(ErrorCodes::QueryPlanKilled,
+                  str::stream() << "collection renamed from '" << oldNss << "' to '" << newNss
+                                << "'. UUID " << collUuid);
+    }
 
     /**
      * Constructs a PlanYieldPolicy of the given 'policy' type. This class uses an ElapsedTracker
      * to keep track of elapsed time, which is initialized from the parameters 'cs',
      * 'yieldIterations' and 'yieldPeriod'.
+     *
+     * If provided, the given 'yieldable' is released and restored by the 'PlanYieldPolicy' (in
+     * addition to releasing/restoring locks and the storage engine snapshot).
      */
     PlanYieldPolicy(YieldPolicy policy,
                     ClockSource* cs,
                     int yieldIterations,
-                    Milliseconds yieldPeriod);
+                    Milliseconds yieldPeriod,
+                    const Yieldable* yieldable,
+                    std::unique_ptr<const YieldPolicyCallbacks> callbacks);
 
     virtual ~PlanYieldPolicy() = default;
 
@@ -180,8 +213,8 @@ public:
      * Calls 'whileYieldingFn' after relinquishing locks and before reacquiring the locks that have
      * been relinquished.
      */
-    Status yieldOrInterrupt(OperationContext* opCtx,
-                            std::function<void()> whileYieldingFn = nullptr);
+    virtual Status yieldOrInterrupt(OperationContext* opCtx,
+                                    std::function<void()> whileYieldingFn = nullptr);
 
     /**
      * All calls to shouldYieldOrInterrupt() will return true until the next call to
@@ -239,25 +272,31 @@ public:
         return _policy;
     }
 
-    /**
-     * Set new yieldable instance if policy supports it.
-     */
-    virtual void setYieldable(const Yieldable* yieldable) {}
+    void setYieldable(const Yieldable* yieldable) {
+        _yieldable = yieldable;
+    }
 
 private:
     /**
-     * Yields locks and calls 'abandonSnapshot()'. Calls 'whileYieldingFn()', if provided, while
-     * locks are not held.
+     * Functions to be implemented by derived classes which save and restore query execution state.
+     * Concrete implementations may be aware of the details of how to save and restore state for
+     * specific query execution engines.
      */
-    virtual Status yield(OperationContext* opCtx,
-                         std::function<void()> whileYieldingFn = nullptr) = 0;
+    virtual void saveState(OperationContext* opCtx) = 0;
+    virtual void restoreState(OperationContext* opCtx, const Yieldable* yieldable) = 0;
 
     /**
-     * If the yield policy is INTERRUPT_ONLY, this is called prior to checking for interrupt.
+     * Relinquishes and reacquires lock manager locks and catalog state. Also responsible for
+     * checking interrupt during yield and calling 'abandonSnapshot()' to relinquish the query's
+     * storage engine snapshot.
      */
-    virtual void preCheckInterruptOnly(OperationContext* opCtx) {}
+    void performYield(OperationContext* opCtx,
+                      const Yieldable* yieldable,
+                      std::function<void()> whileYieldingFn);
 
     const YieldPolicy _policy;
+    const Yieldable* _yieldable;
+    std::unique_ptr<const YieldPolicyCallbacks> _callbacks;
 
     bool _forceYield = false;
     ElapsedTracker _elapsedTracker;

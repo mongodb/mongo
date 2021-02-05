@@ -275,8 +275,9 @@ protected:
 };
 
 /**
- * Provides a methods which can be used to check if the current operation has been interrupted.
- * Maintains an internal state to maintain the interrupt check period.
+ * Provides a method which can be used to check if the current operation has been interrupted.
+ * Maintains an internal state to maintain the interrupt check period. Also responsible for
+ * triggering yields if this object has been configured with a yield policy.
  */
 class CanInterrupt {
 public:
@@ -294,12 +295,15 @@ public:
     void checkForInterrupt(OperationContext* opCtx) {
         invariant(opCtx);
 
-        if (--_interruptCounter == 0) {
-            _interruptCounter = kInterruptCheckPeriod;
-            opCtx->checkForInterrupt();
-        }
-
-        if (_yieldPolicy && _yieldPolicy->shouldYieldOrInterrupt(opCtx)) {
+        if (!_yieldPolicy) {
+            // Yielding has been disabled, but interrupt checking can never be disabled (all
+            // SBE operations must be interruptible). When yielding is enabled, it is responsible
+            // for interrupt checking, but when disabled we do it ourselves.
+            if (--_interruptCounter == 0) {
+                _interruptCounter = kInterruptCheckPeriod;
+                opCtx->checkForInterrupt();
+            }
+        } else if (_yieldPolicy->shouldYieldOrInterrupt(opCtx)) {
             uassertStatusOK(_yieldPolicy->yieldOrInterrupt(opCtx));
         }
     }

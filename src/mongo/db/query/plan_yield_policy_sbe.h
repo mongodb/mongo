@@ -40,9 +40,10 @@ public:
                        ClockSource* clockSource,
                        int yieldFrequency,
                        Milliseconds yieldPeriod,
-                       std::function<void(OperationContext*)> duringAllYieldsFn)
-        : PlanYieldPolicy(policy, clockSource, yieldFrequency, yieldPeriod),
-          _duringAllYieldsFn(std::move(duringAllYieldsFn)) {
+                       const Yieldable* yieldable,
+                       std::unique_ptr<YieldPolicyCallbacks> callbacks)
+        : PlanYieldPolicy(
+              policy, clockSource, yieldFrequency, yieldPeriod, yieldable, std::move(callbacks)) {
         uassert(4822879,
                 "WRITE_CONFLICT_RETRY_ONLY yield policy is not supported in SBE",
                 policy != YieldPolicy::WRITE_CONFLICT_RETRY_ONLY);
@@ -64,12 +65,9 @@ public:
     }
 
 private:
-    Status yield(OperationContext* opCtx, std::function<void()> whileYieldingFn = nullptr) override;
+    void saveState(OperationContext* opCtx) override;
 
-    // A function provided on construction which gets called every time a yield is triggered. This
-    // is in contrast to the 'whileYieldFn'parameter to the 'yield()' method, which can be different
-    // on each yield. Both functions will get called as part of an SBE plan yielding.
-    std::function<void(OperationContext*)> _duringAllYieldsFn;
+    void restoreState(OperationContext* opCtx, const Yieldable* yieldable) override;
 
     // The list of plans registered to yield when the configured policy triggers a yield.
     std::vector<sbe::PlanStage*> _yieldingPlans;
