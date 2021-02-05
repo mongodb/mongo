@@ -116,6 +116,10 @@ verify_branches()
             echo "$1/wt verifying $2 access method $am..."
             dir="$2/test/format/RUNDIR.$am"
             WIREDTIGER_CONFIG="$EXT" ./wt $(bflag $1) -h "../$dir" verify table:wt
+
+            echo "$1/wt dump and load $2 access method $am..."
+            WIREDTIGER_CONFIG="$EXT" ./wt $(bflag $1) -h "../$dir" dump table:wt > dump_wt.txt
+            WIREDTIGER_CONFIG="$EXT" ./wt $(bflag $1) -h "../$dir" load -f dump_wt.txt
         done
 }
 

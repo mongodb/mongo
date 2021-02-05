@@ -35,6 +35,13 @@ Why is my CPU busy? FlameGraphs help visually summarize on-CPU call stacks and
 allow for the quick identification of hot code paths. Here we explain how to
 generate FlameGraphs from WiredTiger `perf` data.
 
+@subpage tool-libfuzzer
+
+LLVM LibFuzzer is an in-process, coverage-guided, evolutionary fuzzing engine. It feeds a series of
+fuzzed inputs via a "target" function and attempts to trigger crashes, memory bugs and undefined
+behavior. This article explains how to build and run existing fuzzers, implement new ones and
+visualize coverage provided by a fuzzer.
+
 @section tool-other Other Resources
 
 The WiredTiger @ref command_line has facilities for examining tables

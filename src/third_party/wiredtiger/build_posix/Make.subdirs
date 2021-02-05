@@ -34,6 +34,7 @@ test/csuite
 test/cursor_order
 test/fops
 test/format
+test/fuzz POSIX_HOST LIBFUZZER
 test/huge
 test/import
 test/manydbs

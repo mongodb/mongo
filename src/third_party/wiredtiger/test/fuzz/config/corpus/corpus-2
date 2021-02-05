@@ -1,0 +1,1 @@
+log|value_format=S,allocation_size=1024,key_format=u,log=(enabled)

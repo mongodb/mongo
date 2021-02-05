@@ -1,0 +1,1 @@
+key_format|columns=(name,age,city),key_format=S,colgroups=(name,age)

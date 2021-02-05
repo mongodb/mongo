@@ -266,4 +266,21 @@ if test "$wt_cv_enable_llvm" = "yes"; then
 	fi
 fi
 AM_CONDITIONAL([LLVM], [test x$wt_cv_enable_llvm = xyes])
+
+AC_MSG_CHECKING(if --enable-libfuzzer option specified)
+AC_ARG_ENABLE(libfuzzer,
+	[AS_HELP_STRING([--enable-libfuzzer],
+		[Configure with LibFuzzer.])], r=$enableval, r=no)
+case "$r" in
+no)	wt_cv_enable_libfuzzer=no;;
+*)	wt_cv_enable_libfuzzer=yes;;
+esac
+AC_MSG_RESULT($wt_cv_enable_libfuzzer)
+if test "$wt_cv_enable_libfuzzer" = "yes"; then
+	AX_CHECK_COMPILE_FLAG([-fsanitize=fuzzer-no-link], [wt_cv_libfuzzer_works=yes])
+        if test "$wt_cv_libfuzzer_works" != "yes"; then
+		AC_MSG_ERROR([--enable-libfuzzer requires a Clang version that supports -fsanitize=fuzzer-no-link])
+	fi
+fi
+AM_CONDITIONAL([LIBFUZZER], [test x$wt_cv_enable_libfuzzer = xyes])
 ])

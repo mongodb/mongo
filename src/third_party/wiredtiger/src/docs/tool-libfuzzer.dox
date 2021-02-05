@@ -1,0 +1,206 @@
+/*! @page tool-libfuzzer Testing with LLVM LibFuzzer
+
+# Building and running an LLVM LibFuzzer fuzzer
+
+LLVM LibFuzzer is an in-process, coverage-guided, evolutionary fuzzing engine. It feeds a series of
+fuzzed inputs via a user-provided "target" function and attempts to trigger crashes, memory bugs and
+undefined behavior.
+
+A fuzzer is a program that consists of the aforementioned target function linked against the
+LibFuzzer runtime. The LibFuzzer runtime provides the entry-point to the program and repeatedly
+calls the target function with generated inputs.
+
+## Step 1: Configure with Clang as your C compiler and enable LibFuzzer
+
+Support for LibFuzzer is implemented as a compiler flag in Clang. WiredTiger's build configuration
+checks whether the compiler in use supports \c -fsanitize=fuzzer-no-link and if so, elects to build
+the tests.
+
+Compiling with Clang's Address Sanitizer isn't mandatory but it is recommended since fuzzing often
+exposes memory bugs.
+
+@code
+$ cd build_posix/
+$ ../configure --enable-libfuzzer CC="clang-8" CFLAGS="-fsanitize=address"
+@endcode
+
+## Step 2: Build as usual
+
+@code
+$ cd build_posix
+$ make
+@endcode
+
+## Step 3: Run a fuzzer
+
+Each fuzzer is a program under \c build_posix/test/fuzz/. WiredTiger provides the
+\c test/fuzz/fuzz_run.sh script to quickly get started using a fuzzer. It performs a limited
+number of runs, automatically cleans up after itself in between runs and provides a sensible set of
+parameters which users can add to. For example:
+
+@code
+$ cd build_posix/test/fuzz/
+$ bash ../../../test/fuzz/fuzz_run.sh ./fuzz_modify
+@endcode
+
+In general the usage is:
+
+@code
+fuzz_run.sh <fuzz-test-binary> [fuzz-test-args]
+@endcode
+
+Each fuzzer will produce a few outputs:
+
+- \c crash-<input-hash>: If an error occurs, a file will be produced containing the input that
+crashed the target.
+
+- \c fuzz-N.log: The LibFuzzer log for worker N. This is just an ID that LibFuzzer assigns to each
+worker ranging from 0 => the number of workers - 1.
+
+- \c WT_TEST_<pid>: The home directory for a given worker process.
+
+- \c WT_TEST_<pid>.profraw: If the fuzzer is running with Clang coverage (more on this later), files
+containing profiling data for a given worker will be produced. These will be used by
+\c fuzz_coverage.
+
+### Corpus
+
+LibFuzzer is a coverage based fuzzer meaning that it notices when a particular input hits a new code
+path and adds it to a corpus of interesting data inputs. It then uses existing data in the corpus to
+mutate and come up with new inputs.
+
+While LibFuzzer will automatically add to its corpus when it finds an interesting input, some fuzz
+targets (especially those that expect data in a certain format) require a corpus to start things off
+in order to be effective. The fuzzer \c fuzz_config is one example of this as it expects its data
+sliced with a separator so the fuzzing engine needs some examples to guide it. The corpus is
+supplied as the first positional argument to both \c fuzz_run.sh and the underlying fuzzer itself.
+For example:
+
+@code
+$ cd build_posix/test/fuzz/
+$ bash ../../../test/fuzz/fuzz_run.sh ./fuzz_config ../../../test/fuzz/config/corpus/
+@endcode
+
+# Implementing an LLVM LibFuzzer fuzzer
+
+## Overview
+
+Creating a fuzzer with LLVM LibFuzzer requires an implementation of a single function called
+\c LLVMFuzzerTestOneInput. It has the following prototype:
+
+@code
+int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size);
+@endcode
+
+When supplied with the \c -fsanitize=fuzzer flag, Clang will use its own \c main function and
+repeatedly call the provided \c LLVMFuzzerTestOneInput with various inputs. There is a lot of
+information online about best practices when writing fuzzing targets but to summarize, the
+requirements are much like those for writing unit tests: they should be fast, deterministic and
+stateless (as possible). The [LLVM LibFuzzer reference page](https://llvm.org/docs/LibFuzzer.html)
+is a good place to start to learn more.
+
+## Fuzz Utilities
+
+WiredTiger has a small fuzz utilities library containing common functionality required for writing
+fuzz targets. Most of the important functions here are about manipulating fuzz input into something
+that targets can use with the WiredTiger API.
+
+### Slicing inputs
+
+If the function that a target is testing can accept a binary blob of data, then the target will be
+straightforward as it'll more or less just pass the input to the function under test. But for
+functions that require more structured input, this can pose a challenge. As an example, the
+\c fuzz_config target requires two inputs that can be variable length: a configuration string and a
+key to search for. In order to do this, the target can use an arbitrary separator sequence to split
+the input into multiple parts with the following API:
+
+@snippet fuzz_util.h fuzzutil sliced input api
+
+Using this API, the target can supply a data buffer, a separator sequence and the number of inputs
+it needs. If it doesn't find the right number of separators in the provided input,
+\c fuzzutil_sliced_input_init will return \c false and the target should return out of the
+\c LLVMFuzzerTestOneInput function. While this may seem like the target will reject a lot of input,
+the fuzzing engine is able to figure out (especially if an initial corpus is supplied), that inputs
+with the right number of separators tend to yield better code coverage and will bias its generated
+inputs towards this format.
+
+In \c fuzz_config, we use the \c | character as a separator since this cannot appear in a
+configuration string. So an input separated correctly will look like this:
+
+@code
+allocation_size|key_format=u,value_format=u,allocation_size=512,log=(enabled)
+@endcode
+
+But for data where there is no distinct character that can be used as a sentinel, we can provide
+a byte sequence such as \c 0xdeadbeef. So in that case, a valid input may look like this:
+
+@code
+0xaa 0xaa 0xde 0xad 0xbe 0xef 0xff 0xff
+@endcode
+
+# Viewing code coverage for an LLVM LibFuzzer fuzzer
+
+After implementing a new fuzzing target, developers typically want to validate that it's doing
+something useful. If the fuzzer is not producing failures, it's either because the code under test
+is robust or the fuzzing target isn't doing a good job of exercising different code paths.
+
+## Step 1: Configure your build to compile with Clang coverage
+
+In order to view code coverage information, the build will need to be configured with the
+\c -fprofile-instr-generate and \c -fcoverage-mapping flags to tell Clang to instrument WiredTiger
+with profiling information. It's important that these are added to both the \c CFLAGS and
+\c LINKFLAGS variables.
+
+@code
+$ cd build_posix/
+$ ../configure CC="clang-8" CFLAGS="-fprofile-instr-generate -fcoverage-mapping" LINKFLAGS="-fprofile-instr-generate -fcoverage-mapping"
+@endcode
+
+## Step 2: Build and run fuzzer
+
+Build and invoke \c fuzz_run.sh for the desired fuzzer as described in the section above.
+
+## Step 3: Generate code coverage information
+
+After running the fuzzer with Clang coverage switched on, there should be a number of \c profraw
+files in the working directory.
+
+Those files contain the raw profiling data however, some post-processing is required to get it into
+a readable form. WiredTiger provides a script called \c fuzz_coverage.sh that handles this. It
+expects to be called from the same directory that the fuzzer was executed in.
+
+@code
+$ cd build_posix/test/fuzz
+$ bash ../../../test/fuzz/fuzz_coverage.sh ./fuzz_modify
+@endcode
+
+In general the usage is:
+
+@code
+fuzz_coverage.sh <fuzz-test-binary>
+@endcode
+
+The \c fuzz_coverage.sh script produces a few outputs:
+
+- \c <fuzz-test-binary>_cov.txt: A coverage report in text format. It can be inspected with the
+\c less command and searched for functions of interest. The numbers on the left of each line of code
+indicate how many times they were hit in the fuzzer.
+- \c <fuzz-test-binary>_cov.html: A coverage report in html format. If a web browser is available,
+this might be a nicer way to visualize the coverage.
+
+The \c fuzz_coverage.sh script uses a few optional environment variables to modify its behavior.
+
+- \c PROFDATA_BINARY: The binary used to merge the profiling data. The script defaults to using
+\c llvm-profdata.
+- \c COV_BINARY: The binary used to generate coverage information. The script defaults to using
+\c llvm-cov.
+
+For consistency, the script should use the \c llvm-profdata and \c llvm-cov binaries from the same
+LLVM release as the \c clang compiler used to build with. In the example above, \c clang-8 was used
+in the configuration, so the corresponding \c fuzz_coverage.sh invocation should look like this:
+
+@code
+$ PROFDATA_BINARY=llvm-profdata-8 COV_BINARY=llvm-cov-8 bash ../../../test/fuzz/fuzz_coverage.sh ./fuzz_modify
+@endcode
+
+*/
