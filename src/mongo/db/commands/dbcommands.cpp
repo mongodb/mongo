@@ -41,6 +41,7 @@
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/user_management_commands_parser.h"
@@ -316,8 +317,8 @@ public:
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const final {
-            uassertStatusOK(AuthorizationSession::get(opCtx->getClient())
-                                ->checkAuthForCreate(request(), false));
+            uassertStatusOK(auth::checkAuthForCreate(
+                AuthorizationSession::get(opCtx->getClient()), request(), false));
         }
 
         NamespaceString ns() const final {
@@ -745,7 +746,7 @@ public:
                                        const std::string& dbname,
                                        const BSONObj& cmdObj) const {
         const NamespaceString nss(parseNs(dbname, cmdObj));
-        return AuthorizationSession::get(client)->checkAuthForCollMod(nss, cmdObj, false);
+        return auth::checkAuthForCollMod(AuthorizationSession::get(client), nss, cmdObj, false);
     }
 
     bool runWithRequestParser(OperationContext* opCtx,

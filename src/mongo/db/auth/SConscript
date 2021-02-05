@@ -77,6 +77,9 @@ env.Library(
     LIBDEPS=[
         'auth_impl_internal',
     ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+    ]
 )
 
 env.Library(
@@ -86,7 +89,6 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
         'auth',
         'auth_options',
         'authprivilege',
@@ -100,7 +102,6 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
         '$BUILD_DIR/mongo/bson/util/bson_extract',
         'auth',
         'user',
@@ -134,14 +135,10 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/base/secure_allocator',
-        '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
         '$BUILD_DIR/mongo/bson/util/bson_extract',
-        '$BUILD_DIR/mongo/db/catalog/document_validation',
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/db/global_settings',
         '$BUILD_DIR/mongo/db/namespace_string',
-        '$BUILD_DIR/mongo/db/pipeline/lite_parsed_document_source',
-        '$BUILD_DIR/mongo/db/update/update_driver',
         '$BUILD_DIR/mongo/util/concurrency/thread_pool',
         '$BUILD_DIR/mongo/util/icu',
         '$BUILD_DIR/mongo/util/net/ssl_manager',
@@ -161,6 +158,31 @@ env.Library(
         '$BUILD_DIR/mongo/db/stats/counters',
         '$BUILD_DIR/mongo/idl/server_parameter',
         '$BUILD_DIR/mongo/util/caching',
+    ],
+)
+
+env.Library(
+    target='auth_checks',
+    source=[
+        'authorization_checks.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/catalog/document_validation',
+        '$BUILD_DIR/mongo/db/common',
+        '$BUILD_DIR/mongo/db/namespace_string',
+        '$BUILD_DIR/mongo/db/pipeline/lite_parsed_document_source',
+        '$BUILD_DIR/mongo/db/update/update_driver',
+        'auth',
+        'authorization_manager_global',
+        'authprivilege',
+        'builtin_roles',
+        'user',
+        'user_document_parser',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/audit',
+        '$BUILD_DIR/mongo/idl/server_parameter',
     ],
 )
 

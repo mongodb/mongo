@@ -80,6 +80,10 @@ public:
         UASSERT_NOT_IMPLEMENTED;
     }
 
+    bool shouldIgnoreAuthChecks() override {
+        return true;
+    }
+
     bool isAuthenticated() override {
         // It should always be okay to check whether you're authenticated, but on embedded
         // it should always return false
@@ -110,56 +114,6 @@ public:
         UASSERT_NOT_IMPLEMENTED;
     }
 
-    Status checkAuthForFind(const NamespaceString&, bool) override {
-        return Status::OK();
-    }
-
-    Status checkAuthForGetMore(const NamespaceString&, long long, bool) override {
-        return Status::OK();
-    }
-
-    Status checkAuthForUpdate(OperationContext*,
-                              const NamespaceString&,
-                              const BSONObj&,
-                              const write_ops::UpdateModification&,
-                              bool) override {
-        return Status::OK();
-    }
-
-    Status checkAuthForInsert(OperationContext*, const NamespaceString&) override {
-        return Status::OK();
-    }
-
-    Status checkAuthForDelete(OperationContext*, const NamespaceString&, const BSONObj&) override {
-        return Status::OK();
-    }
-
-    Status checkAuthForKillCursors(const NamespaceString&, UserNameIterator) override {
-        return Status::OK();
-    }
-
-    StatusWith<PrivilegeVector> getPrivilegesForAggregate(const NamespaceString&,
-                                                          const AggregateCommand&,
-                                                          bool) override {
-        return PrivilegeVector();
-    }
-
-    Status checkAuthForCreate(const CreateCommand&, bool) override {
-        return Status::OK();
-    }
-
-    Status checkAuthForCollMod(const NamespaceString&, const BSONObj&, bool) override {
-        return Status::OK();
-    }
-
-    Status checkAuthorizedToGrantPrivilege(const Privilege&) override {
-        return Status::OK();
-    }
-
-    Status checkAuthorizedToRevokePrivilege(const Privilege&) override {
-        return Status::OK();
-    }
-
     StatusWith<PrivilegeVector> checkAuthorizedToListCollections(StringData,
                                                                  const BSONObj&) override {
         return PrivilegeVector();
@@ -181,23 +135,7 @@ public:
         return true;
     }
 
-    bool isAuthorizedToGrantRole(const RoleName&) override {
-        return true;
-    }
-
-    bool isAuthorizedToRevokeRole(const RoleName&) override {
-        return true;
-    }
-
     bool isAuthorizedToChangeAsUser(const UserName&, ActionType) override {
-        return true;
-    }
-
-    bool isAuthorizedToChangeOwnPasswordAsUser(const UserName&) override {
-        return true;
-    }
-
-    bool isAuthorizedToChangeOwnCustomDataAsUser(const UserName&) override {
         return true;
     }
 

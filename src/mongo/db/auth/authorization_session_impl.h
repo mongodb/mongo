@@ -30,7 +30,6 @@
 #pragma once
 
 #include <memory>
-#include <string>
 #include <vector>
 
 #include "mongo/base/status.h"
@@ -42,7 +41,6 @@
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/auth/user_set.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/pipeline/aggregate_command_gen.h"
 
 namespace mongo {
 
@@ -80,6 +78,8 @@ public:
 
     User* lookupUser(const UserName& name) override;
 
+    bool shouldIgnoreAuthChecks() override;
+
     bool isAuthenticated() override;
 
     User* getSingleUser() override;
@@ -96,43 +96,8 @@ public:
 
     PrivilegeVector getDefaultPrivileges() override;
 
-    Status checkAuthForFind(const NamespaceString& ns, bool hasTerm) override;
-
-    Status checkAuthForGetMore(const NamespaceString& ns,
-                               long long cursorID,
-                               bool hasTerm) override;
-
-    Status checkAuthForUpdate(OperationContext* opCtx,
-                              const NamespaceString& ns,
-                              const BSONObj& query,
-                              const write_ops::UpdateModification& update,
-                              bool upsert) override;
-
-    Status checkAuthForInsert(OperationContext* opCtx, const NamespaceString& ns) override;
-
-    Status checkAuthForDelete(OperationContext* opCtx,
-                              const NamespaceString& ns,
-                              const BSONObj& query) override;
-
-    Status checkAuthForKillCursors(const NamespaceString& cursorNss,
-                                   UserNameIterator cursorOwner) override;
-
-    StatusWith<PrivilegeVector> getPrivilegesForAggregate(const NamespaceString& ns,
-                                                          const AggregateCommand& request,
-                                                          bool isMongos) override;
-
-    Status checkAuthForCreate(const CreateCommand& cmd, bool isMongos) override;
-
-    Status checkAuthForCollMod(const NamespaceString& ns,
-                               const BSONObj& cmdObj,
-                               bool isMongos) override;
-
     StatusWith<PrivilegeVector> checkAuthorizedToListCollections(StringData dbname,
                                                                  const BSONObj& cmdObj) override;
-
-    Status checkAuthorizedToGrantPrivilege(const Privilege& privilege) override;
-
-    Status checkAuthorizedToRevokePrivilege(const Privilege& privilege) override;
 
     bool isUsingLocalhostBypass() override;
 
@@ -142,15 +107,7 @@ public:
 
     bool isAuthorizedToCreateRole(const RoleName& roleName) override;
 
-    bool isAuthorizedToGrantRole(const RoleName& role) override;
-
-    bool isAuthorizedToRevokeRole(const RoleName& role) override;
-
     bool isAuthorizedToChangeAsUser(const UserName& userName, ActionType actionType) override;
-
-    bool isAuthorizedToChangeOwnPasswordAsUser(const UserName& userName) override;
-
-    bool isAuthorizedToChangeOwnCustomDataAsUser(const UserName& userName) override;
 
     bool isAuthenticatedAsUserWithRole(const RoleName& roleName) override;
 

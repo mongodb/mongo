@@ -50,6 +50,29 @@
 
 namespace mongo {
 namespace auth {
+namespace {
+
+Status checkAuthorizedToGrantPrivilege(AuthorizationSession* authzSession,
+                                       const Privilege& privilege) {
+    const ResourcePattern& resource = privilege.getResourcePattern();
+    if (resource.isDatabasePattern() || resource.isExactNamespacePattern()) {
+        if (!authzSession->isAuthorizedForActionsOnResource(
+                ResourcePattern::forDatabaseName(resource.databaseToMatch()),
+                ActionType::grantRole)) {
+            return Status(ErrorCodes::Unauthorized,
+                          str::stream() << "Not authorized to grant privileges on the "
+                                        << resource.databaseToMatch() << "database");
+        }
+    } else if (!authzSession->isAuthorizedForActionsOnResource(
+                   ResourcePattern::forDatabaseName("admin"), ActionType::grantRole)) {
+        return Status(ErrorCodes::Unauthorized,
+                      "To grant privileges affecting multiple databases or the cluster,"
+                      " must be authorized to grant roles from the admin database");
+    }
+    return Status::OK();
+}
+
+}  // namespace
 
 std::vector<RoleName> resolveRoleNames(const std::vector<RoleNameOrString>& possibleRoles,
                                        StringData dbname) {
@@ -64,7 +87,8 @@ std::vector<RoleName> resolveRoleNames(const std::vector<RoleNameOrString>& poss
 Status checkAuthorizedToGrantRoles(AuthorizationSession* authzSession,
                                    const std::vector<RoleName>& roles) {
     for (size_t i = 0; i < roles.size(); ++i) {
-        if (!authzSession->isAuthorizedToGrantRole(roles[i])) {
+        if (!authzSession->isAuthorizedForActionsOnResource(
+                ResourcePattern::forDatabaseName(roles[i].getDB()), ActionType::grantRole)) {
             return Status(ErrorCodes::Unauthorized,
                           str::stream()
                               << "Not authorized to grant role: " << roles[i].getFullName());
@@ -77,7 +101,7 @@ Status checkAuthorizedToGrantRoles(AuthorizationSession* authzSession,
 Status checkAuthorizedToGrantPrivileges(AuthorizationSession* authzSession,
                                         const PrivilegeVector& privileges) {
     for (PrivilegeVector::const_iterator it = privileges.begin(); it != privileges.end(); ++it) {
-        Status status = authzSession->checkAuthorizedToGrantPrivilege(*it);
+        Status status = checkAuthorizedToGrantPrivilege(authzSession, *it);
         if (!status.isOK()) {
             return status;
         }
@@ -89,7 +113,8 @@ Status checkAuthorizedToGrantPrivileges(AuthorizationSession* authzSession,
 Status checkAuthorizedToRevokeRoles(AuthorizationSession* authzSession,
                                     const std::vector<RoleName>& roles) {
     for (size_t i = 0; i < roles.size(); ++i) {
-        if (!authzSession->isAuthorizedToRevokeRole(roles[i])) {
+        if (!authzSession->isAuthorizedForActionsOnResource(
+                ResourcePattern::forDatabaseName(roles[i].getDB()), ActionType::revokeRole)) {
             return Status(ErrorCodes::Unauthorized,
                           str::stream()
                               << "Not authorized to revoke role: " << roles[i].getFullName());
@@ -98,10 +123,31 @@ Status checkAuthorizedToRevokeRoles(AuthorizationSession* authzSession,
     return Status::OK();
 }
 
+
+Status checkAuthorizedToRevokePrivilege(AuthorizationSession* authzSession,
+                                        const Privilege& privilege) {
+    const ResourcePattern& resource = privilege.getResourcePattern();
+    if (resource.isDatabasePattern() || resource.isExactNamespacePattern()) {
+        if (!authzSession->isAuthorizedForActionsOnResource(
+                ResourcePattern::forDatabaseName(resource.databaseToMatch()),
+                ActionType::revokeRole)) {
+            return Status(ErrorCodes::Unauthorized,
+                          str::stream() << "Not authorized to revoke privileges on the "
+                                        << resource.databaseToMatch() << "database");
+        }
+    } else if (!authzSession->isAuthorizedForActionsOnResource(
+                   ResourcePattern::forDatabaseName("admin"), ActionType::revokeRole)) {
+        return Status(ErrorCodes::Unauthorized,
+                      "To revoke privileges affecting multiple databases or the cluster,"
+                      " must be authorized to revoke roles from the admin database");
+    }
+    return Status::OK();
+}
+
 Status checkAuthorizedToRevokePrivileges(AuthorizationSession* authzSession,
                                          const PrivilegeVector& privileges) {
     for (PrivilegeVector::const_iterator it = privileges.begin(); it != privileges.end(); ++it) {
-        Status status = authzSession->checkAuthorizedToRevokePrivilege(*it);
+        Status status = checkAuthorizedToRevokePrivilege(authzSession, *it);
         if (!status.isOK()) {
             return status;
         }
@@ -122,6 +168,16 @@ Status checkAuthorizedToSetRestrictions(AuthorizationSession* authzSession,
     }
 
     return Status::OK();
+}
+
+bool isAuthorizedToChangeOwnPasswordAsUser(AuthorizationSession* authzSession,
+                                           const UserName& userName) {
+    return authzSession->isAuthorizedToChangeAsUser(userName, ActionType::changeOwnPassword);
+}
+
+bool isAuthorizedToChangeOwnCustomDataAsUser(AuthorizationSession* authzSession,
+                                             const UserName& userName) {
+    return authzSession->isAuthorizedToChangeAsUser(userName, ActionType::changeOwnCustomData);
 }
 
 void checkAuthForTypedCommand(Client* client, const CreateUserCommand& request) {
@@ -148,7 +204,7 @@ void checkAuthForTypedCommand(Client* client, const UpdateUserCommand& request) 
     uassert(
         ErrorCodes::Unauthorized,
         str::stream() << "Not authorized to change password of user: " << userName.getFullName(),
-        (request.getPwd() == boost::none) || as->isAuthorizedToChangeOwnPasswordAsUser(userName) ||
+        (request.getPwd() == boost::none) || isAuthorizedToChangeOwnPasswordAsUser(as, userName) ||
             as->isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(dbname),
                                                  ActionType::changePassword));
 
@@ -156,7 +212,7 @@ void checkAuthForTypedCommand(Client* client, const UpdateUserCommand& request) 
             str::stream() << "Not authorized to change customData of user: "
                           << userName.getFullName(),
             (request.getCustomData() == boost::none) ||
-                as->isAuthorizedToChangeOwnCustomDataAsUser(userName) ||
+                isAuthorizedToChangeOwnCustomDataAsUser(as, userName) ||
                 as->isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(dbname),
                                                      ActionType::changeCustomData));
 

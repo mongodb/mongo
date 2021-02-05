@@ -42,10 +42,6 @@
 
 namespace mongo {
 
-namespace mutablebson {
-class Document;
-}  // namespace mutablebson
-
 /**
  * Common implementation of AuthzManagerExternalState for systems where role
  * and user information are stored locally.

@@ -34,6 +34,7 @@
 #include <memory>
 #include <string>
 
+#include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/client.h"
@@ -283,8 +284,8 @@ public:
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const override {
-            uassertStatusOK(AuthorizationSession::get(opCtx->getClient())
-                                ->checkAuthForGetMore(_request.nss,
+            uassertStatusOK(auth::checkAuthForGetMore(AuthorizationSession::get(opCtx->getClient()),
+                                                      _request.nss,
                                                       _request.cursorid,
                                                       _request.term.is_initialized()));
         }

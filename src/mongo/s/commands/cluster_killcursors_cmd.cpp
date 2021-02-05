@@ -29,6 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands/killcursors_common.h"
 #include "mongo/s/grid.h"
@@ -45,7 +46,7 @@ struct ClusterKillCursorsCmd {
                               CursorId cursorId) {
         auto const authzSession = AuthorizationSession::get(opCtx->getClient());
         auto authChecker = [&authzSession, &nss](UserNameIterator userNames) -> Status {
-            return authzSession->checkAuthForKillCursors(nss, userNames);
+            return auth::checkAuthForKillCursors(authzSession, nss, userNames);
         };
 
         return Grid::get(opCtx)->getCursorManager()->checkAuthForKillCursors(

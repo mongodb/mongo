@@ -44,8 +44,6 @@
 #include "mongo/db/commands/create_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/ops/write_ops_parsers.h"
-#include "mongo/db/pipeline/aggregate_command_gen.h"
 
 namespace mongo {
 
@@ -154,6 +152,9 @@ public:
     // multiple users are authenticated, this method will throw an exception.
     virtual User* getSingleUser() = 0;
 
+    // Is auth disabled? Returns true if auth is disabled.
+    virtual bool shouldIgnoreAuthChecks() = 0;
+
     // Is authenticated as at least one user.
     virtual bool isAuthenticated() = 0;
 
@@ -181,64 +182,6 @@ public:
     // into a state where the first user can be created.
     virtual PrivilegeVector getDefaultPrivileges() = 0;
 
-    // Checks if this connection has the privileges necessary to perform a find operation
-    // on the supplied namespace identifier.
-    virtual Status checkAuthForFind(const NamespaceString& ns, bool hasTerm) = 0;
-
-    // Checks if this connection has the privileges necessary to perform a getMore operation on
-    // the identified cursor, supposing that cursor is associated with the supplied namespace
-    // identifier.
-    virtual Status checkAuthForGetMore(const NamespaceString& ns,
-                                       long long cursorID,
-                                       bool hasTerm) = 0;
-
-    // Checks if this connection has the privileges necessary to perform the given update on the
-    // given namespace.
-    virtual Status checkAuthForUpdate(OperationContext* opCtx,
-                                      const NamespaceString& ns,
-                                      const BSONObj& query,
-                                      const write_ops::UpdateModification& update,
-                                      bool upsert) = 0;
-
-    // Checks if this connection has the privileges necessary to insert to the given namespace.
-    virtual Status checkAuthForInsert(OperationContext* opCtx, const NamespaceString& ns) = 0;
-
-    // Checks if this connection has the privileges necessary to perform a delete on the given
-    // namespace.
-    virtual Status checkAuthForDelete(OperationContext* opCtx,
-                                      const NamespaceString& ns,
-                                      const BSONObj& query) = 0;
-
-    // Checks if this connection has the privileges necessary to perform a killCursor on
-    // the identified cursor, supposing that cursor is associated with the supplied namespace
-    // identifier.
-    virtual Status checkAuthForKillCursors(const NamespaceString& cursorNss,
-                                           UserNameIterator cursorOwner) = 0;
-
-    // Attempts to get the privileges necessary to run the aggregation pipeline specified in
-    // 'request' on the namespace 'ns' either directly on mongoD or via mongoS.
-    virtual StatusWith<PrivilegeVector> getPrivilegesForAggregate(const NamespaceString& ns,
-                                                                  const AggregateCommand& request,
-                                                                  bool isMongos) = 0;
-
-    // Checks if this connection has the privileges necessary to create 'ns' with the options
-    // supplied in 'cmdObj' either directly on mongoD or via mongoS.
-    virtual Status checkAuthForCreate(const CreateCommand& cmd, bool isMongos) = 0;
-
-    // Checks if this connection has the privileges necessary to modify 'ns' with the options
-    // supplied in 'cmdObj' either directly on mongoD or via mongoS.
-    virtual Status checkAuthForCollMod(const NamespaceString& ns,
-                                       const BSONObj& cmdObj,
-                                       bool isMongos) = 0;
-
-    // Checks if this connection has the privileges necessary to grant the given privilege
-    // to a role.
-    virtual Status checkAuthorizedToGrantPrivilege(const Privilege& privilege) = 0;
-
-    // Checks if this connection has the privileges necessary to revoke the given privilege
-    // from a role.
-    virtual Status checkAuthorizedToRevokePrivilege(const Privilege& privilege) = 0;
-
     // Checks if the current session is authorized to list the collections in the given
     // database. If it is, return a privilegeVector containing the privileges used to authorize
     // this command.
@@ -259,25 +202,9 @@ public:
     // Checks if this connection has the privileges necessary to create a new role
     virtual bool isAuthorizedToCreateRole(const RoleName& roleName) = 0;
 
-    // Utility function for isAuthorizedForActionsOnResource(
-    //         ResourcePattern::forDatabaseName(role.getDB()), ActionType::grantAnyRole)
-    virtual bool isAuthorizedToGrantRole(const RoleName& role) = 0;
-
-    // Utility function for isAuthorizedForActionsOnResource(
-    //         ResourcePattern::forDatabaseName(role.getDB()), ActionType::grantAnyRole)
-    virtual bool isAuthorizedToRevokeRole(const RoleName& role) = 0;
-
     // Utility function for isAuthorizedToChangeOwnPasswordAsUser and
     // isAuthorizedToChangeOwnCustomDataAsUser
     virtual bool isAuthorizedToChangeAsUser(const UserName& userName, ActionType actionType) = 0;
-
-    // Returns true if the current session is authenticated as the given user and that user
-    // is allowed to change his/her own password
-    virtual bool isAuthorizedToChangeOwnPasswordAsUser(const UserName& userName) = 0;
-
-    // Returns true if the current session is authenticated as the given user and that user
-    // is allowed to change his/her own customData.
-    virtual bool isAuthorizedToChangeOwnCustomDataAsUser(const UserName& userName) = 0;
 
     // Returns true if any of the authenticated users on this session have the given role.
     // NOTE: this does not refresh any of the users even if they are marked as invalid.

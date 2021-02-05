@@ -116,6 +116,7 @@ env.CppUnitTest(
         'standalone_process_interface_test.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/query/query_test_service_context',
         '$BUILD_DIR/mongo/db/service_context_test_fixture',
         '$BUILD_DIR/mongo/db/vector_clock_mongod',

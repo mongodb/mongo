@@ -34,9 +34,6 @@
 #include "mongo/db/auth/authz_manager_external_state_local.h"
 
 #include "mongo/base/status.h"
-#include "mongo/bson/mutable/algorithm.h"
-#include "mongo/bson/mutable/document.h"
-#include "mongo/bson/mutable/element.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/auth/address_restriction.h"
 #include "mongo/db/auth/auth_options_gen.h"

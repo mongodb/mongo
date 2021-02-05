@@ -32,6 +32,7 @@
 #include <boost/optional.hpp>
 
 #include "mongo/client/read_preference.h"
+#include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
@@ -145,8 +146,8 @@ public:
          */
         void doCheckAuthorization(OperationContext* opCtx) const final {
             auto hasTerm = _request.body.hasField(kTermField);
-            uassertStatusOK(
-                AuthorizationSession::get(opCtx->getClient())->checkAuthForFind(ns(), hasTerm));
+            uassertStatusOK(auth::checkAuthForFind(
+                AuthorizationSession::get(opCtx->getClient()), ns(), hasTerm));
         }
 
         void explain(OperationContext* opCtx,

@@ -29,6 +29,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/bson/util/bson_check.h"
+#include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/document_validation.h"
@@ -105,7 +106,7 @@ Status OplogApplicationChecks::checkOperationAuthorization(OperationContext* opC
     }
 
     if (opType == "i"_sd) {
-        return authSession->checkAuthForInsert(opCtx, ns);
+        return auth::checkAuthForInsert(authSession, opCtx, ns);
     } else if (opType == "u"_sd) {
         BSONElement o2Elem = oplogEntry["o2"];
         checkBSONType(BSONType::Object, o2Elem);
@@ -119,11 +120,15 @@ Status OplogApplicationChecks::checkOperationAuthorization(OperationContext* opC
 
         const bool upsert = b || alwaysUpsert;
 
-        return authSession->checkAuthForUpdate(
-            opCtx, ns, o2, write_ops::UpdateModification::parseFromOplogEntry(o), upsert);
+        return auth::checkAuthForUpdate(authSession,
+                                        opCtx,
+                                        ns,
+                                        o2,
+                                        write_ops::UpdateModification::parseFromOplogEntry(o),
+                                        upsert);
     } else if (opType == "d"_sd) {
 
-        return authSession->checkAuthForDelete(opCtx, ns, o);
+        return auth::checkAuthForDelete(authSession, opCtx, ns, o);
     } else if (opType == "db"_sd) {
         // It seems that 'db' isn't used anymore. Require all actions to prevent casual use.
         ActionSet allActions;

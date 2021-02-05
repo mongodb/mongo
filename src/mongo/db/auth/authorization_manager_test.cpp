@@ -32,7 +32,6 @@
 #include <memory>
 
 #include "mongo/base/status.h"
-#include "mongo/bson/mutable/document.h"
 #include "mongo/config.h"
 #include "mongo/crypto/mechanism_scram.h"
 #include "mongo/crypto/sha1_block.h"

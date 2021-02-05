@@ -40,6 +40,7 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/server_discovery_monitor.h"
 #include "mongo/db/audit.h"
+#include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/impersonation_session.h"
 #include "mongo/db/client.h"
@@ -1893,7 +1894,7 @@ DbResponse receivedQuery(OperationContext* opCtx,
 
     try {
         Client* client = opCtx->getClient();
-        Status status = AuthorizationSession::get(client)->checkAuthForFind(nss, false);
+        Status status = auth::checkAuthForFind(AuthorizationSession::get(client), nss, false);
         audit::logQueryAuthzCheck(client, nss, q.query, status.code());
         uassertStatusOK(status);
 
@@ -1955,8 +1956,8 @@ void receivedInsert(OperationContext* opCtx, const NamespaceString& nsString, co
     invariant(insertOp.getNamespace() == nsString);
 
     for (const auto& obj : insertOp.getDocuments()) {
-        Status status =
-            AuthorizationSession::get(opCtx->getClient())->checkAuthForInsert(opCtx, nsString);
+        Status status = auth::checkAuthForInsert(
+            AuthorizationSession::get(opCtx->getClient()), opCtx, nsString);
         audit::logInsertAuthzCheck(opCtx->getClient(), nsString, obj, status.code());
         uassertStatusOK(status);
     }
@@ -1969,8 +1970,8 @@ void receivedUpdate(OperationContext* opCtx, const NamespaceString& nsString, co
     auto& singleUpdate = updateOp.getUpdates()[0];
     invariant(updateOp.getNamespace() == nsString);
 
-    Status status = AuthorizationSession::get(opCtx->getClient())
-                        ->checkAuthForUpdate(opCtx,
+    Status status = auth::checkAuthForUpdate(AuthorizationSession::get(opCtx->getClient()),
+                                             opCtx,
                                              nsString,
                                              singleUpdate.getQ(),
                                              singleUpdate.getU(),
@@ -1993,8 +1994,8 @@ void receivedDelete(OperationContext* opCtx, const NamespaceString& nsString, co
     auto& singleDelete = deleteOp.getDeletes()[0];
     invariant(deleteOp.getNamespace() == nsString);
 
-    Status status = AuthorizationSession::get(opCtx->getClient())
-                        ->checkAuthForDelete(opCtx, nsString, singleDelete.getQ());
+    Status status = auth::checkAuthForDelete(
+        AuthorizationSession::get(opCtx->getClient()), opCtx, nsString, singleDelete.getQ());
     audit::logDeleteAuthzCheck(opCtx->getClient(), nsString, singleDelete.getQ(), status.code());
     uassertStatusOK(status);
 
@@ -2033,8 +2034,8 @@ DbResponse receivedGetMore(OperationContext* opCtx,
                 str::stream() << "Invalid ns [" << ns << "]",
                 nsString.isValid());
 
-        Status status = AuthorizationSession::get(opCtx->getClient())
-                            ->checkAuthForGetMore(nsString, cursorid, false);
+        Status status = auth::checkAuthForGetMore(
+            AuthorizationSession::get(opCtx->getClient()), nsString, cursorid, false);
         audit::logGetMoreAuthzCheck(opCtx->getClient(), nsString, cursorid, status.code());
         uassertStatusOK(status);
 

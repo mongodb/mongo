@@ -29,6 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/run_aggregate.h"
@@ -78,10 +79,11 @@ public:
             explainVerbosity,
             APIParameters::get(opCtx).getAPIStrict().value_or(false));
 
-        auto privileges =
-            uassertStatusOK(AuthorizationSession::get(opCtx->getClient())
-                                ->getPrivilegesForAggregate(
-                                    aggregationRequest.getNamespace(), aggregationRequest, false));
+        auto privileges = uassertStatusOK(
+            auth::getPrivilegesForAggregate(AuthorizationSession::get(opCtx->getClient()),
+                                            aggregationRequest.getNamespace(),
+                                            aggregationRequest,
+                                            false));
 
         return std::make_unique<Invocation>(
             this, opMsgRequest, std::move(aggregationRequest), std::move(privileges));

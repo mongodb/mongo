@@ -31,6 +31,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/coll_mod_gen.h"
 #include "mongo/db/coll_mod_reply_validation.h"
@@ -69,7 +70,7 @@ public:
                                const std::string& dbname,
                                const BSONObj& cmdObj) const override {
         const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbname, cmdObj));
-        return AuthorizationSession::get(client)->checkAuthForCollMod(nss, cmdObj, true);
+        return auth::checkAuthForCollMod(AuthorizationSession::get(client), nss, cmdObj, true);
     }
 
     bool supportsWriteConcern(const BSONObj& cmd) const override {

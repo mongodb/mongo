@@ -38,6 +38,7 @@
 #include "mongo/base/data_cursor.h"
 #include "mongo/base/init.h"
 #include "mongo/db/audit.h"
+#include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
@@ -494,7 +495,7 @@ Status CursorManager::checkAuthForKillCursors(OperationContext* opCtx, CursorId 
     // after the cursor's creation. We're guaranteed that the cursor won't get destroyed while we're
     // reading from it because we hold the partition's lock.
     AuthorizationSession* as = AuthorizationSession::get(opCtx->getClient());
-    return as->checkAuthForKillCursors(cursor->nss(), cursor->getAuthenticatedUsers());
+    return auth::checkAuthForKillCursors(as, cursor->nss(), cursor->getAuthenticatedUsers());
 }
 
 }  // namespace mongo

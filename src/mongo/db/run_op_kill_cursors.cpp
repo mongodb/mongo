@@ -33,6 +33,7 @@
 
 #include "mongo/base/data_cursor.h"
 #include "mongo/db/audit.h"
+#include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/cursor_id.h"
 #include "mongo/db/cursor_manager.h"
@@ -68,7 +69,7 @@ bool killCursorIfAuthorized(OperationContext* opCtx, CursorId id) {
 
     AuthorizationSession* as = AuthorizationSession::get(opCtx->getClient());
     auto cursorOwner = pin.getValue().getCursor()->getAuthenticatedUsers();
-    auto authStatus = as->checkAuthForKillCursors(nss, cursorOwner);
+    auto authStatus = auth::checkAuthForKillCursors(as, nss, cursorOwner);
     if (!authStatus.isOK()) {
         audit::logKillCursorsAuthzCheck(opCtx->getClient(), nss, id, authStatus.code());
         return false;

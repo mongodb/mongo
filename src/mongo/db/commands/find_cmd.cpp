@@ -31,6 +31,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
@@ -231,7 +232,8 @@ public:
                     authSession->isAuthorizedToParseNamespaceElement(_request.body.firstElement()));
 
             const auto hasTerm = _request.body.hasField(kTermField);
-            uassertStatusOK(authSession->checkAuthForFind(
+            uassertStatusOK(auth::checkAuthForFind(
+                authSession,
                 CollectionCatalog::get(opCtx)->resolveNamespaceStringOrUUID(
                     opCtx, CommandHelpers::parseNsOrUUID(_dbName, _request.body)),
                 hasTerm));

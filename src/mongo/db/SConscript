@@ -1221,6 +1221,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/auth/auth_checks',
         '$BUILD_DIR/mongo/db/index/index_access_methods',
         '$BUILD_DIR/mongo/db/s/resharding_util',
         '$BUILD_DIR/mongo/s/common_s',

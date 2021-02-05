@@ -36,8 +36,6 @@
 #include "mongo/base/init.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
-#include "mongo/bson/mutable/algorithm.h"
-#include "mongo/bson/mutable/document.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/authenticate.h"
 #include "mongo/client/sasl_client_authenticate.h"

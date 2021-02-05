@@ -42,6 +42,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
@@ -1061,7 +1062,7 @@ DbResponse Strategy::queryOp(OperationContext* opCtx, const NamespaceString& nss
         opCtx->setComment(commentField.wrap());
     }
 
-    Status status = authSession->checkAuthForFind(nss, false);
+    Status status = auth::checkAuthForFind(authSession, nss, false);
     audit::logQueryAuthzCheck(client, nss, q.query, status.code());
     uassertStatusOK(status);
 
@@ -1382,7 +1383,7 @@ void Strategy::killCursors(OperationContext* opCtx, DbMessage* dbm) {
 
         auto authzSession = AuthorizationSession::get(client);
         auto authChecker = [&authzSession, &nss](UserNameIterator userNames) -> Status {
-            return authzSession->checkAuthForKillCursors(*nss, userNames);
+            return auth::checkAuthForKillCursors(authzSession, *nss, userNames);
         };
         auto authzStatus = manager->checkAuthForKillCursors(opCtx, *nss, cursorId, authChecker);
         audit::logKillCursorsAuthzCheck(client, *nss, cursorId, authzStatus.code());

@@ -33,7 +33,6 @@
 
 #include <algorithm>
 
-#include "mongo/bson/mutable/document.h"
 #include "mongo/db/auth/builtin_roles.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/sequence_util.h"

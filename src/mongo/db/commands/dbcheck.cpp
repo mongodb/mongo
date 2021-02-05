@@ -31,6 +31,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/database.h"
@@ -522,14 +523,15 @@ public:
         const NamespaceString nss(parseNs(dbname, cmdObj));
 
         // First, check that we can read this collection.
-        Status status = AuthorizationSession::get(client)->checkAuthForFind(nss, false);
+        auto authSession = AuthorizationSession::get(client);
+        Status status = auth::checkAuthForFind(authSession, nss, false);
 
         if (!status.isOK()) {
             return status;
         }
 
         // Then check that we can read the health log.
-        return AuthorizationSession::get(client)->checkAuthForFind(HealthLog::nss, false);
+        return auth::checkAuthForFind(authSession, HealthLog::nss, false);
     }
 
     virtual bool run(OperationContext* opCtx,

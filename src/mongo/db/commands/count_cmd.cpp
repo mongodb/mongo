@@ -31,6 +31,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
@@ -125,10 +126,10 @@ public:
         }
 
         const auto hasTerm = false;
-        return authSession->checkAuthForFind(
-            CollectionCatalog::get(opCtx)->resolveNamespaceStringOrUUID(
-                opCtx, CommandHelpers::parseNsOrUUID(dbname, cmdObj)),
-            hasTerm);
+        return auth::checkAuthForFind(authSession,
+                                      CollectionCatalog::get(opCtx)->resolveNamespaceStringOrUUID(
+                                          opCtx, CommandHelpers::parseNsOrUUID(dbname, cmdObj)),
+                                      hasTerm);
     }
 
     Status explain(OperationContext* opCtx,

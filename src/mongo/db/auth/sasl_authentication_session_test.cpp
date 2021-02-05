@@ -30,9 +30,6 @@
 #include <string>
 #include <vector>
 
-#include "mongo/bson/mutable/algorithm.h"
-#include "mongo/bson/mutable/document.h"
-#include "mongo/bson/mutable/element.h"
 #include "mongo/client/sasl_client_session.h"
 #include "mongo/crypto/mechanism_scram.h"
 #include "mongo/db/auth/authorization_manager.h"
