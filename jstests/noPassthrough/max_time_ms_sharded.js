@@ -1,13 +1,21 @@
 // Test mongos implementation of time-limited operations: verify that mongos correctly forwards max
 // time to shards, and that mongos correctly times out max time sharded getmore operations (which
-// are run in series on shards).
-//
-// Note that mongos does not time out commands or query ops (which remains responsibility of mongod,
-// pending development of an interrupt framework for mongos).
+// are run in parallel on shards).
+// @tags: [
+//   requires_journaling,
+// ]
 (function() {
 'use strict';
 
-var st = new ShardingTest({shards: 2});
+var st = new ShardingTest({
+    mongos: 1,
+    config: 1,
+    shards: 2,
+    rs: {nodes: 1},
+    // The maxTimeAlwaysTimeOut failpoint interferes with the maxAwaitTimeMS parameter sent by the
+    // streamable RSM so we have mongos use the non-streamable version here.
+    mongosOptions: {setParameter: {replicaSetMonitorProtocol: "sdam"}},
+});
 
 var mongos = st.s0;
 var shards = [st.shard0, st.shard1];
@@ -26,7 +34,7 @@ var configureMaxTimeAlwaysTimeOut = function(mode) {
         {configureFailPoint: "maxTimeAlwaysTimeOut", mode: mode}));
 };
 
-// Helper function to configure "maxTimeAlwaysTimeOut" fail point on shards, which prohibits
+// Helper function to configure "maxTimeNeverTimeOut" fail point on shards, which prohibits
 // mongod from enforcing time limits. See fail point declaration for complete description.
 var configureMaxTimeNeverTimeOut = function(mode) {
     assert.commandWorked(shards[0].getDB("admin").runCommand(
@@ -85,16 +93,17 @@ assert.doesNotThrow(function() {
 
 configureMaxTimeNeverTimeOut("alwaysOn");
 
-// Positive test. ~10s operation, 2s limit. The operation takes ~10s because each shard
-// processes 250 batches of ~40ms each, and the shards are processing getMores in parallel.
+// ~30s operation with a 10s limit. Each shard will process 250 batches, each of which takes 60ms*2
+// = 120ms. We do not expect the first operation (one batch) to time out, but iterating the cursor
+// should exhaust the 10s limit.
 cursor = coll.find({
     $where: function() {
-        sleep(20);
+        sleep(60);
         return true;
     }
 });
 cursor.batchSize(2);
-cursor.maxTimeMS(2 * 1000);
+cursor.maxTimeMS(10 * 1000);
 assert.doesNotThrow(
     () => cursor.next(), [], "did not expect mongos to time out first batch of query");
 assert.throws(() => cursor.itcount(), [], "expected mongos to abort getmore due to time limit");
@@ -210,19 +219,20 @@ assert.commandWorked(coll.runCommand("aggregate", {pipeline: [], cursor: {}, max
 // mongos blocking.
 
 // Manually run a find here so we can be sure cursor establishment happens with batch size 0.
+const kTimeoutMS = 10 * 1000;
 res = assert.commandWorked(coll.runCommand({
     find: coll.getName(),
     filter: {
         $where: function() {
             if (this._id < 0) {
                 // Slow down the query only on one of the shards. Each shard has 500 documents
-                // so we expect this shard to take ~10 seconds to return a batch of 500.
-                sleep(20);
+                // so we expect the slow shard to take ~30 seconds to return a batch of 500.
+                sleep(60);
             }
             return true;
         }
     },
-    maxTimeMS: 2000,
+    maxTimeMS: kTimeoutMS,
     batchSize: 0
 }));
 // Use a batch size of 500 to allow returning results from the fast shard as soon as they're
@@ -236,35 +246,12 @@ for (let i = 0; i < nDocsPerShard; ++i) {
     assert.gte(next._id, 0);
 }
 // Sleep on the client-side so mongos's time budget is not being used.
-sleep(3 * 1000);
+sleep(kTimeoutMS);
 // Even though mongos has not been blocking this whole time, the shard has been busy computing
 // the next batch and should have timed out.
 assert.throws(() => cursor.next(), [], "expected mongos to abort getMore due to time limit");
 
-// The moveChunk tests are disabled due to SERVER-30179
-//
-// // Positive test for "moveChunk".
-// configureMaxTimeAlwaysTimeOut("alwaysOn");
-// res = admin.runCommand({
-// moveChunk: coll.getFullName(),
-// find: {_id: 0},
-// to: st.shard0.shardName,
-// maxTimeMS: 1000 * 60 * 60 * 24
-// });
-// assert.commandFailed(
-// res,
-// "expected moveChunk to fail due to maxTimeAlwaysTimeOut fail point, but instead got: " +
-// tojson(res));
-
-// // Negative test for "moveChunk".
-// configureMaxTimeAlwaysTimeOut("off");
-// assert.commandWorked(admin.runCommand({
-// moveChunk: coll.getFullName(),
-// find: {_id: 0},
-// to: st.shard0.shardName,
-// maxTimeMS: 1000 * 60 * 60 * 24
-// }),
-// "expected moveChunk to not hit time limit in mongod");
+// TODO SERVER-30179: Re-introduce tests for moveChunk and maxTimeMS.
 
 st.stop();
 })();
