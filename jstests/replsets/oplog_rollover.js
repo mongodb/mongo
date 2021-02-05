@@ -5,6 +5,8 @@
 (function() {
 "use strict";
 
+load("jstests/libs/fail_point_util.js");
+
 function doTest(storageEngine) {
     jsTestLog("Testing with storageEngine: " + storageEngine);
 
@@ -33,8 +35,16 @@ function doTest(storageEngine) {
     const secondaryOplog = secondary.getDB("local").oplog.rs;
 
     // Verify that the oplog cap maintainer thread is paused.
-    checkLog.containsJson(primary, 5095500);
-    checkLog.containsJson(secondary, 5095500);
+    assert.commandWorked(primary.adminCommand({
+        waitForFailPoint: "hangOplogCapMaintainerThread",
+        timesEntered: 1,
+        maxTimeMS: kDefaultWaitForFailPointTimeout
+    }));
+    assert.commandWorked(secondary.adminCommand({
+        waitForFailPoint: "hangOplogCapMaintainerThread",
+        timesEntered: 1,
+        maxTimeMS: kDefaultWaitForFailPointTimeout
+    }));
 
     const coll = primary.getDB("test").foo;
     // 400KB each so that oplog can keep at most two insert oplog entries.
