@@ -1237,7 +1237,7 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinDoubleDoubleSum
             auto [own, tag, val] = getFromStack(idx);
             if (tag == value::TypeTags::NumberInt32) {
                 sum.addInt(value::numericCast<int32_t>(tag, val));
-            } else if (tag == value::TypeTags::NumberInt64 || tag == value::TypeTags::Date) {
+            } else if (tag == value::TypeTags::NumberInt64) {
                 sum.addLong(value::numericCast<int64_t>(tag, val));
             } else if (tag == value::TypeTags::NumberDouble) {
                 sum.addDouble(value::numericCast<double>(tag, val));
