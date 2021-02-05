@@ -4,6 +4,10 @@
  * indexed_insert_heterogeneous_noindex.js
  *
  * Executes the indexed_insert_heterogeneous.js workload after dropping its index.
+ *
+ * @tags: [
+ *   sbe_incompatible,
+ * ]
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js');                    // for extendWorkload
 load('jstests/concurrency/fsm_workloads/indexed_insert_heterogeneous.js');  // for $config

@@ -140,7 +140,12 @@ public:
     /**
      * Helper method to aid in displaying an ExecState for debug or other recreational purposes.
      */
-    static std::string statestr(ExecState s);
+    static std::string stateToStr(ExecState s);
+
+    /**
+     * Throws a user exception if "planExecutorAlwaysFails" is enabled.
+     */
+    static void checkFailPointPlanExecAlwaysFails();
 
     /**
      * A PlanExecutor must be disposed before destruction. In most cases, this will happen

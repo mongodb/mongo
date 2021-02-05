@@ -4,6 +4,8 @@
  *
  * @tags: [
  *   requires_replication,
+ *   # TODO SERVER-54889: Re-enable this test with SBE.
+ *   sbe_incompatible,
  * ]
  */
 (function() {

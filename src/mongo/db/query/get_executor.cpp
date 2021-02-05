@@ -89,6 +89,7 @@
 #include "mongo/db/query/stage_builder_util.h"
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/db/query/wildcard_multikey_paths.h"
+#include "mongo/db/query/yield_policy_callbacks_impl.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
@@ -1043,16 +1044,14 @@ std::unique_ptr<sbe::RuntimePlanner> makeRuntimePlannerIfNeeded(
 std::unique_ptr<PlanYieldPolicySBE> makeSbeYieldPolicy(
     OperationContext* opCtx,
     PlanYieldPolicy::YieldPolicy requestedYieldPolicy,
+    const Yieldable* yieldable,
     NamespaceString nss) {
-    auto whileYieldingFn = [nss = std::move(nss)](OperationContext* yieldingOpCtx) {
-        CurOp::get(yieldingOpCtx)->yielded();
-        PlanYieldPolicy::handleDuringYieldFailpoints(yieldingOpCtx, nss);
-    };
     return std::make_unique<PlanYieldPolicySBE>(requestedYieldPolicy,
                                                 opCtx->getServiceContext()->getFastClockSource(),
                                                 internalQueryExecYieldIterations.load(),
                                                 Milliseconds{internalQueryExecYieldPeriodMS.load()},
-                                                std::move(whileYieldingFn));
+                                                yieldable,
+                                                std::make_unique<YieldPolicyCallbacksImpl>(nss));
 }
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExecutor(
@@ -1063,7 +1062,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
     size_t plannerOptions) {
     invariant(cq);
     auto nss = cq->nss();
-    auto yieldPolicy = makeSbeYieldPolicy(opCtx, requestedYieldPolicy, nss);
+    auto yieldPolicy = makeSbeYieldPolicy(opCtx, requestedYieldPolicy, collection, nss);
     SlotBasedPrepareExecutionHelper helper{
         opCtx, *collection, cq.get(), yieldPolicy.get(), plannerOptions};
     auto executionResult = helper.prepare();

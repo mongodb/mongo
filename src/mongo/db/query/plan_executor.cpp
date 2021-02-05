@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2020-present MongoDB, Inc.
+ *    Copyright (C) 2021-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,29 +27,32 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/platform/basic.h"
 
-#include "mongo/db/query/plan_executor_impl.h"
-#include "mongo/db/query/plan_yield_policy.h"
-#include "mongo/db/yieldable.h"
+#include "mongo/db/query/plan_executor.h"
+
+#include "mongo/util/fail_point.h"
 
 namespace mongo {
+namespace {
+MONGO_FAIL_POINT_DEFINE(planExecutorAlwaysFails);
+}  // namespace
 
-class PlanYieldPolicyImpl final : public PlanYieldPolicy {
-public:
-    PlanYieldPolicyImpl(PlanExecutorImpl* exec,
-                        PlanYieldPolicy::YieldPolicy policy,
-                        const Yieldable* yieldable,
-                        std::unique_ptr<YieldPolicyCallbacks> callbacks);
+std::string PlanExecutor::stateToStr(ExecState execState) {
+    switch (execState) {
+        case PlanExecutor::ADVANCED:
+            return "ADVANCED";
+        case PlanExecutor::IS_EOF:
+            return "IS_EOF";
+    }
+    MONGO_UNREACHABLE;
+}
 
-private:
-    void saveState(OperationContext* opCtx) override;
-
-    void restoreState(OperationContext* opCtx, const Yieldable* yieldable) override;
-
-    // The plan executor which this yield policy is responsible for yielding. Must not outlive the
-    // plan executor.
-    PlanExecutorImpl* const _planYielding;
-};
+void PlanExecutor::checkFailPointPlanExecAlwaysFails() {
+    if (MONGO_unlikely(planExecutorAlwaysFails.shouldFail())) {
+        uasserted(ErrorCodes::Error(4382101),
+                  "PlanExecutor hit planExecutorAlwaysFails fail point");
+    }
+}
 
 }  // namespace mongo

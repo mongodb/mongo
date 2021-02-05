@@ -179,11 +179,12 @@ var $config = (function() {
                     // killOp.
                     assertAlways.contains(e.code,
                                           [
+                                              ErrorCodes.CursorKilled,
+                                              ErrorCodes.CursorNotFound,
+                                              ErrorCodes.Interrupted,
+                                              ErrorCodes.NamespaceNotFound,
                                               ErrorCodes.OperationFailed,
                                               ErrorCodes.QueryPlanKilled,
-                                              ErrorCodes.CursorNotFound,
-                                              ErrorCodes.CursorKilled,
-                                              ErrorCodes.Interrupted,
                                           ],
                                           'unexpected error code: ' + e.code + ': ' + e.message);
                 }

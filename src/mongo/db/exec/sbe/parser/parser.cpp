@@ -1691,16 +1691,20 @@ std::unique_ptr<PlanStage> Parser::parse(OperationContext* opCtx,
     return std::move(ast->stage);
 }
 
-NamespaceStringOrUUID Parser::getCollectionUuid(const std::string& collName) {
-    const auto ns = collName.find('.') == std::string::npos ? NamespaceString(_defaultDb, collName)
-                                                            : NamespaceString(collName);
-    if (_opCtx) {
-        AutoGetCollectionForRead collection(_opCtx, ns);
-        if (collection) {
-            return NamespaceStringOrUUID{ns.db().toString(), collection->uuid()};
-        }
+CollectionUUID Parser::getCollectionUuid(const std::string& collName) {
+    if (!_opCtx) {
+        // The SBE plan cannot actually run without a valid UUID, but it's useful to allow the
+        // parser to run in isolation for unit testing.
+        auto uuid = UUID::parse("00000000-0000-0000-0000-000000000000");
+        invariant(uuid.isOK());
+        return uuid.getValue();
     }
-    return ns;
+
+    auto uuid = CollectionCatalog::get(_opCtx)->lookupUUIDByNSS(_opCtx, NamespaceString{collName});
+    uassert(5162900,
+            str::stream() << "SBE command parser could not find collection: " << collName,
+            uuid);
+    return *uuid;
 }
 
 PlanNodeId Parser::getCurrentPlanNodeId() {

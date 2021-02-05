@@ -82,7 +82,7 @@ CandidatePlans MultiPlanner::finalizeExecutionPlans(
     // in the plan executor.
     if (!stats.candidatePlanStats[winnerIdx]->common.isEOF && winner.exitedEarly) {
         winner.root->close();
-        winner.root->open(true);
+        winner.root->open(false);
         // Clear the results queue.
         winner.results = decltype(winner.results){};
     }

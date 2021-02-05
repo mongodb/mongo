@@ -8,7 +8,12 @@
  * index has completed and the test no longer needs to execute more transitions.
  * The first thread (tid = 0) will be the one that creates the background index.
  *
- * @tags: [assumes_balancer_off, creates_background_indexes]
+ * @tags: [
+ *   assumes_balancer_off,
+ *   creates_background_indexes,
+ *   # TODO SERVER-50737: Depends on SBE supporting 'AND_SORTED'.
+ *   sbe_incompatible,
+ * ]
  */
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMongos
 

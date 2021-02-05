@@ -7,6 +7,7 @@
  *
  */
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMongod
+load('jstests/libs/analyze_plan.js');
 
 var $config = (function() {
     var data = {
@@ -51,7 +52,7 @@ var $config = (function() {
             assertAlways(res.queryPlanner, tojson(res));
             assertAlways(res.queryPlanner.winningPlan, tojson(res));
             if (isMongod(db)) {
-                assertAlways.eq(res.queryPlanner.winningPlan.stage, 'EOF', tojson(res));
+                assertAlways.eq(getWinningPlan(res.queryPlanner).stage, 'EOF', tojson(res));
             } else {
                 // In the sharding case, each shard has a winningPlan
                 res.queryPlanner.winningPlan.shards.forEach(function(shard) {

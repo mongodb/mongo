@@ -31,6 +31,8 @@
 
 #include "mongo/db/exec/requires_collection_stage.h"
 
+#include "mongo/db/query/plan_yield_policy.h"
+
 namespace mongo {
 
 void RequiresCollectionStage::doSaveState() {
@@ -38,17 +40,6 @@ void RequiresCollectionStage::doSaveState() {
 }
 
 void RequiresCollectionStage::doRestoreState(const RestoreContext& context) {
-    auto collectionDropped = [this]() {
-        uasserted(ErrorCodes::QueryPlanKilled,
-                  str::stream() << "collection dropped. UUID " << _collectionUUID);
-    };
-
-    auto collectionRenamed = [this](const NamespaceString& newNss) {
-        uasserted(ErrorCodes::QueryPlanKilled,
-                  str::stream() << "collection renamed from '" << _nss << "' to '" << newNss
-                                << "'. UUID " << _collectionUUID);
-    };
-
     if (context.type() == RestoreContext::RestoreType::kExternal) {
         // RequiresCollectionStage requires a collection to be provided in restore. However, it may
         // be null in case the collection got dropped or renamed.
@@ -63,7 +54,7 @@ void RequiresCollectionStage::doRestoreState(const RestoreContext& context) {
         // If collection exists uuid does not match assume lookup was over namespace and treat this
         // as a drop.
         if (coll && coll->uuid() != _collectionUUID) {
-            collectionDropped();
+            PlanYieldPolicy::throwCollectionDroppedError(_collectionUUID);
         }
 
         // If we didn't get a valid collection but can still find the UUID in the catalog then we
@@ -72,7 +63,7 @@ void RequiresCollectionStage::doRestoreState(const RestoreContext& context) {
             auto catalog = CollectionCatalog::get(opCtx());
             auto newNss = catalog->lookupNSSByUUID(opCtx(), _collectionUUID);
             if (newNss && *newNss != _nss) {
-                collectionRenamed(*newNss);
+                PlanYieldPolicy::throwCollectionRenamedError(_nss, *newNss, _collectionUUID);
             }
         }
     }
@@ -80,13 +71,13 @@ void RequiresCollectionStage::doRestoreState(const RestoreContext& context) {
     const auto& coll = *_collection;
 
     if (!coll) {
-        collectionDropped();
+        PlanYieldPolicy::throwCollectionDroppedError(_collectionUUID);
     }
 
     // TODO SERVER-31695: Allow queries to survive collection rename, rather than throwing here
     // when a rename has happened during yield.
     if (const auto& newNss = coll->ns(); newNss != _nss) {
-        collectionRenamed(newNss);
+        PlanYieldPolicy::throwCollectionRenamedError(_nss, newNss, _collectionUUID);
     }
 
     uassert(ErrorCodes::QueryPlanKilled,

@@ -42,4 +42,28 @@ namespace mongo::sbe {
 using LockAcquisitionCallback =
     std::function<void(OperationContext*, const AutoGetCollectionForReadMaybeLockFree&)>;
 
+/**
+ * Given a collection UUID, acquires 'coll', invokes the provided 'lockAcquisiionCallback', and
+ * returns the collection's name.
+ *
+ * This is intended for use during the preparation of an SBE plan. The caller must hold the
+ * appropriate db_raii object in order to ensure that SBE plan preparation sees a consistent view of
+ * the catalog.
+ */
+NamespaceString acquireCollection(OperationContext* opCtx,
+                                  CollectionUUID collUuid,
+                                  const LockAcquisitionCallback& lockAcquisitionCallback,
+                                  boost::optional<AutoGetCollectionForReadMaybeLockFree>& coll);
+
+/**
+ * Re-acquires 'coll', intended for use during SBE yield recovery or when a closed SBE plan is
+ * re-opened. In addition to acquiring 'coll', throws a UserException if the collection has been
+ * dropped or renamed. SBE query execution currently cannot survive such events if they occur during
+ * a yield or between getMores.
+ */
+void restoreCollection(OperationContext* opCtx,
+                       const NamespaceString& collName,
+                       CollectionUUID collUuid,
+                       const LockAcquisitionCallback& lockAcquisitionCallback,
+                       boost::optional<AutoGetCollectionForReadMaybeLockFree>& coll);
 }  // namespace mongo::sbe

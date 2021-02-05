@@ -6,6 +6,10 @@
  * Creates a collection and then repeatedly executes the renameCollection
  * command against it, specifying a different database name in the namespace.
  * Inserts documents into the "to" namespace and specifies dropTarget=true.
+ *
+ * @tags: [
+ *   sbe_incompatible,
+ * ]
  */
 
 var $config = (function() {

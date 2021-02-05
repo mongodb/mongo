@@ -337,19 +337,18 @@ generateOptimizedMultiIntervalIndexScan(
                                    sbe::makeEs(sbe::makeE<sbe::EVariable>(unwindSlot),
                                                sbe::makeE<sbe::EConstant>("h"sv))));
 
-    auto ixscan = sbe::makeS<sbe::IndexScanStage>(
-        NamespaceStringOrUUID{collection->ns().db().toString(), collection->uuid()},
-        indexName,
-        forward,
-        boost::none,  // recordSlot
-        recordIdSlot,
-        indexKeysToInclude,
-        std::move(indexKeySlots),
-        lowKeySlot,
-        highKeySlot,
-        yieldPolicy,
-        planNodeId,
-        std::move(lockAcquisitionCallback));
+    auto ixscan = sbe::makeS<sbe::IndexScanStage>(collection->uuid(),
+                                                  indexName,
+                                                  forward,
+                                                  boost::none,  // recordSlot
+                                                  recordIdSlot,
+                                                  indexKeysToInclude,
+                                                  std::move(indexKeySlots),
+                                                  lowKeySlot,
+                                                  highKeySlot,
+                                                  yieldPolicy,
+                                                  planNodeId,
+                                                  std::move(lockAcquisitionCallback));
 
     // Finally, get the keys from the outer side and feed them to the inner side (ixscan).
     return {recordIdSlot,
@@ -420,19 +419,18 @@ makeRecursiveBranchForGenericIndexScan(const CollectionPtr& collection,
         lowKeySlot,
         sbe::makeE<sbe::EVariable>(seekKeySlot));
 
-    auto ixscan = sbe::makeS<sbe::IndexScanStage>(
-        NamespaceStringOrUUID{collection->ns().db().toString(), collection->uuid()},
-        indexName,
-        params.direction == 1,
-        resultSlot,
-        recordIdSlot,
-        indexKeysToInclude,
-        std::move(savedIndexKeySlots),
-        lowKeySlot,
-        boost::none,
-        yieldPolicy,
-        planNodeId,
-        std::move(lockAcquisitionCallback));
+    auto ixscan = sbe::makeS<sbe::IndexScanStage>(collection->uuid(),
+                                                  indexName,
+                                                  params.direction == 1,
+                                                  resultSlot,
+                                                  recordIdSlot,
+                                                  indexKeysToInclude,
+                                                  std::move(savedIndexKeySlots),
+                                                  lowKeySlot,
+                                                  boost::none,
+                                                  yieldPolicy,
+                                                  planNodeId,
+                                                  std::move(lockAcquisitionCallback));
 
     // Get the low key from the outer side and feed it to the inner side (ixscan).
     auto nlj = sbe::makeS<sbe::LoopJoinStage>(std::move(project),
@@ -652,19 +650,18 @@ std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>> generateSingleInt
     // Scan the index in the range {'lowKeySlot', 'highKeySlot'} (subject to inclusive or
     // exclusive boundaries), and produce a single field recordIdSlot that can be used to
     // position into the collection.
-    auto ixscan = sbe::makeS<sbe::IndexScanStage>(
-        NamespaceStringOrUUID{collection->ns().db().toString(), collection->uuid()},
-        indexName,
-        forward,
-        recordSlot,
-        recordIdSlot,
-        indexKeysToInclude,
-        std::move(indexKeySlots),
-        lowKeySlot,
-        highKeySlot,
-        yieldPolicy,
-        planNodeId,
-        std::move(lockAcquisitionCallback));
+    auto ixscan = sbe::makeS<sbe::IndexScanStage>(collection->uuid(),
+                                                  indexName,
+                                                  forward,
+                                                  recordSlot,
+                                                  recordIdSlot,
+                                                  indexKeysToInclude,
+                                                  std::move(indexKeySlots),
+                                                  lowKeySlot,
+                                                  highKeySlot,
+                                                  yieldPolicy,
+                                                  planNodeId,
+                                                  std::move(lockAcquisitionCallback));
 
     // Finally, get the keys from the outer side and feed them to the inner side.
     return {recordIdSlot,

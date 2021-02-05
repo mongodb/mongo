@@ -162,8 +162,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateOptimizedOplo
     auto&& [fields, slots, tsSlot] = makeOplogTimestampSlotsIfNeeded(
         collection, slotIdGenerator, shouldTrackLatestOplogTimestamp);
 
-    NamespaceStringOrUUID nss{collection->ns().db().toString(), collection->uuid()};
-    auto stage = sbe::makeS<sbe::ScanStage>(nss,
+    auto stage = sbe::makeS<sbe::ScanStage>(collection->uuid(),
                                             resultSlot,
                                             recordIdSlot,
                                             std::move(fields),
@@ -242,7 +241,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateOptimizedOplo
         // result, the branch) to EOF immediately. Note that the resultSlot and recordIdSlot
         // arguments to the ScanStage are boost::none, as we do not need them.
         auto minTsBranch = sbe::makeS<sbe::FilterStage<false, true>>(
-            sbe::makeS<sbe::ScanStage>(nss,
+            sbe::makeS<sbe::ScanStage>(collection->uuid(),
                                        boost::none,
                                        boost::none,
                                        std::move(fields),
@@ -367,7 +366,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateOptimizedOplo
 
             stage = sbe::makeS<sbe::LoopJoinStage>(
                 sbe::makeS<sbe::LimitSkipStage>(std::move(stage), 1, boost::none, csn->nodeId()),
-                sbe::makeS<sbe::ScanStage>(nss,
+                sbe::makeS<sbe::ScanStage>(collection->uuid(),
                                            resultSlot,
                                            recordIdSlot,
                                            std::move(fields),
@@ -436,8 +435,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateGenericCollSc
     auto&& [fields, slots, tsSlot] = makeOplogTimestampSlotsIfNeeded(
         collection, slotIdGenerator, csn->shouldTrackLatestOplogTimestamp);
 
-    NamespaceStringOrUUID nss{collection->ns().db().toString(), collection->uuid()};
-    auto stage = sbe::makeS<sbe::ScanStage>(nss,
+    auto stage = sbe::makeS<sbe::ScanStage>(collection->uuid(),
                                             resultSlot,
                                             recordIdSlot,
                                             std::move(fields),
@@ -468,7 +466,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateGenericCollSc
         // produce EOF.
         auto seekBranch =
             sbe::makeS<sbe::LoopJoinStage>(std::move(projStage),
-                                           sbe::makeS<sbe::ScanStage>(nss,
+                                           sbe::makeS<sbe::ScanStage>(collection->uuid(),
                                                                       boost::none,
                                                                       boost::none,
                                                                       std::vector<std::string>{},

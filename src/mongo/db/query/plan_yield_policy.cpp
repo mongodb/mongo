@@ -31,23 +31,24 @@
 
 #include "mongo/db/query/plan_yield_policy.h"
 
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
-namespace {
-MONGO_FAIL_POINT_DEFINE(setYieldAllLocksHang);
-MONGO_FAIL_POINT_DEFINE(setYieldAllLocksHangSecond);
-MONGO_FAIL_POINT_DEFINE(setYieldAllLocksWait);
-}  // namespace
 
 PlanYieldPolicy::PlanYieldPolicy(YieldPolicy policy,
                                  ClockSource* cs,
                                  int yieldIterations,
-                                 Milliseconds yieldPeriod)
-    : _policy(policy), _elapsedTracker(cs, yieldIterations, yieldPeriod) {}
+                                 Milliseconds yieldPeriod,
+                                 const Yieldable* yieldable,
+                                 std::unique_ptr<const YieldPolicyCallbacks> callbacks)
+    : _policy(policy),
+      _yieldable(yieldable),
+      _callbacks(std::move(callbacks)),
+      _elapsedTracker(cs, yieldIterations, yieldPeriod) {}
 
 bool PlanYieldPolicy::shouldYieldOrInterrupt(OperationContext* opCtx) {
     if (_policy == YieldPolicy::INTERRUPT_ONLY) {
@@ -72,10 +73,11 @@ Status PlanYieldPolicy::yieldOrInterrupt(OperationContext* opCtx,
     if (_policy == YieldPolicy::INTERRUPT_ONLY) {
         ON_BLOCK_EXIT([this]() { resetTimer(); });
         invariant(opCtx);
-        preCheckInterruptOnly(opCtx);
+        if (_callbacks) {
+            _callbacks->preCheckInterruptOnly(opCtx);
+        }
         return opCtx->checkForInterruptNoAssert();
     }
-
 
     invariant(!opCtx->lockState()->inAWriteUnitOfWork());
 
@@ -85,35 +87,109 @@ Status PlanYieldPolicy::yieldOrInterrupt(OperationContext* opCtx,
     ON_BLOCK_EXIT([this]() { resetTimer(); });
     _forceYield = false;
 
-    return yield(opCtx, whileYieldingFn);
+    for (int attempt = 1; true; attempt++) {
+        try {
+            // Saving and restoring can modifies '_yieldable', so we make a copy before we start.
+            const Yieldable* yieldable = _yieldable;
+
+            try {
+                saveState(opCtx);
+            } catch (const WriteConflictException&) {
+                // Saving the state of an execution plan must never throw WCE.
+                MONGO_UNREACHABLE;
+            }
+
+            if (getPolicy() == PlanYieldPolicy::YieldPolicy::WRITE_CONFLICT_RETRY_ONLY) {
+                // This yield policy doesn't release locks, but it does relinquish our storage
+                // snapshot.
+                opCtx->recoveryUnit()->abandonSnapshot();
+            } else {
+                performYield(opCtx, yieldable, whileYieldingFn);
+            }
+
+            restoreState(opCtx, yieldable);
+            return Status::OK();
+        } catch (const WriteConflictException&) {
+            if (_callbacks) {
+                _callbacks->handledWriteConflict(opCtx);
+            }
+            WriteConflictException::logAndBackoff(attempt, "query yield", ""_sd);
+            // Retry the yielding process.
+        } catch (...) {
+            // Errors other than write conflicts don't get retried, and should instead result in
+            // the PlanExecutor dying. We propagate all such errors as status codes.
+            return exceptionToStatus();
+        }
+    }
+
+    MONGO_UNREACHABLE;
 }
 
-void PlanYieldPolicy::handleDuringYieldFailpoints(OperationContext* opCtx,
-                                                  const NamespaceString& planExecNs) {
-    auto failPointHang = [opCtx, &planExecNs](FailPoint* fp) {
-        fp->executeIf(
-            [opCtx, fp, &planExecNs](const BSONObj& config) {
-                fp->pauseWhileSet();
+void PlanYieldPolicy::performYield(OperationContext* opCtx,
+                                   const Yieldable* yieldable,
+                                   std::function<void()> whileYieldingFn) {
+    // Things have to happen here in a specific order:
+    //   * Release 'yieldable'.
+    //   * Release lock mgr locks.
+    //   * Check for interrupt if the yield policy requires.
+    //   * Abondon the query's current storage engine snapshot.
+    //   * Reacquire lock mgr locks.
+    //   * Restore 'yieldable'.
+    Locker* locker = opCtx->lockState();
 
-                if (config.getField("checkForInterruptAfterHang").trueValue()) {
-                    // Throws.
-                    opCtx->checkForInterrupt();
-                }
-            },
-            [&planExecNs](const BSONObj& config) {
-                StringData ns = config.getStringField("namespace");
-                return ns.empty() || ns == planExecNs.ns();
-            });
-    };
-    failPointHang(&setYieldAllLocksHang);
-    failPointHang(&setYieldAllLocksHangSecond);
+    if (locker->isGlobalLockedRecursively()) {
+        // No purpose in yielding if the locks are recursively held and cannot be released.
+        return;
+    }
 
-    setYieldAllLocksWait.executeIf(
-        [&](const BSONObj& data) { sleepFor(Milliseconds(data["waitForMillis"].numberInt())); },
-        [&](const BSONObj& config) {
-            BSONElement dataNs = config["namespace"];
-            return !dataNs || planExecNs.ns() == dataNs.str();
-        });
+    // Since the locks are not recursively held, this is a top level operation and we can safely
+    // clear the 'yieldable' state before unlocking and then re-establish it after re-locking.
+    if (yieldable) {
+        yieldable->yield();
+    }
+
+    Locker::LockSnapshot snapshot;
+    auto unlocked = locker->saveLockStateAndUnlock(&snapshot);
+
+    // After all steps to relinquish locks and save the execution plan have been taken, check
+    // for interrupt. This is the main interrupt check during query execution. Yield points and
+    // interrupt points are one and the same.
+    if (getPolicy() == PlanYieldPolicy::YieldPolicy::YIELD_AUTO) {
+        opCtx->checkForInterrupt();  // throws
+    }
+
+    if (!unlocked) {
+        // Nothing was unlocked. Recursively held locks are not the only reason locks cannot be
+        // released. Restore the 'yieldable' state before returning.
+        if (yieldable) {
+            yieldable->restore();
+        }
+        return;
+    }
+
+    // Top-level locks are freed, release any potential low-level (storage engine-specific
+    // locks). If we are yielding, we are at a safe place to do so.
+    opCtx->recoveryUnit()->abandonSnapshot();
+
+    if (_callbacks) {
+        _callbacks->duringYield(opCtx);
+    }
+
+    if (whileYieldingFn) {
+        whileYieldingFn();
+    }
+
+    locker->restoreLockState(opCtx, snapshot);
+
+    // A yield has occurred, but there still may not be a 'yieldable'. This is true, for example,
+    // when executing a getMore for the slot-based execution engine. SBE uses the "locks internally"
+    // lock policy, and therefore the getMore code path does not acquire any db_raii object. As a
+    // result, there is no db_raii object to restore here when executing a getMore against a cursor
+    // using SBE.
+    if (yieldable) {
+        // Yieldable restore may set a new read source if necessary.
+        yieldable->restore();
+    }
 }
 
 }  // namespace mongo

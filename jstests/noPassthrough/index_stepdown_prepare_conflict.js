@@ -12,8 +12,10 @@
  *    block stepDown.
  *
  * @tags: [
- *     uses_transactions,
+ *     # TODO SERVER-54889: Re-enable this test with SBE.
+ *     sbe_incompatible,
  *     uses_prepare_transaction,
+ *     uses_transactions,
  * ]
  */
 load('jstests/noPassthrough/libs/index_build.js');

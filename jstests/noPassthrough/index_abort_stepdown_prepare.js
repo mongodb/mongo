@@ -13,6 +13,8 @@
  *    eventually completes on the new primary.
  *
  * @tags: [
+ *     # TODO SERVER-54889: Re-enable this test with SBE.
+ *     sbe_incompatible,
  *     uses_transactions,
  *     uses_prepare_transaction,
  * ]
