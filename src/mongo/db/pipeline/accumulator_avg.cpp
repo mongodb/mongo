@@ -36,7 +36,7 @@
 #include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/window_function_expression.h"
+#include "mongo/db/pipeline/window_function/window_function_expression.h"
 #include "mongo/platform/decimal128.h"
 
 namespace mongo {

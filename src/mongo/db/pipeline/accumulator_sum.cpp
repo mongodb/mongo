@@ -37,7 +37,7 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/pipeline/expression.h"
-#include "mongo/db/pipeline/window_function_expression.h"
+#include "mongo/db/pipeline/window_function/window_function_expression.h"
 #include "mongo/util/summation.h"
 
 namespace mongo {

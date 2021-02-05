@@ -29,7 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/pipeline/window_function_expression.h"
+#include "mongo/db/pipeline/window_function/window_function_expression.h"
 
 using boost::intrusive_ptr;
 using boost::optional;

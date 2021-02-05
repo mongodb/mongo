@@ -33,8 +33,8 @@
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_set_window_fields_gen.h"
-#include "mongo/db/pipeline/window_bounds.h"
-#include "mongo/db/pipeline/window_function_expression.h"
+#include "mongo/db/pipeline/window_function/window_bounds.h"
+#include "mongo/db/pipeline/window_function/window_function_expression.h"
 
 namespace mongo {
 

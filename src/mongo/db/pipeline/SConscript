@@ -126,8 +126,8 @@ env.Library(
         'accumulator_push.cpp',
         'accumulator_std_dev.cpp',
         'accumulator_sum.cpp',
-        'window_bounds.cpp',
-        'window_function_expression.cpp',
+        'window_function/window_bounds.cpp',
+        'window_function/window_function_expression.cpp',
         ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/exec/document_value/document_value',
@@ -421,6 +421,7 @@ env.CppUnitTest(
         'skip_and_limit_test.cpp',
         'tee_buffer_test.cpp',
         'window_function/partition_iterator_test.cpp',
+        'window_function/window_function_exec_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',

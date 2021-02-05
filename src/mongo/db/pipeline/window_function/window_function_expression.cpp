@@ -37,7 +37,7 @@
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 
-#include "mongo/db/pipeline/window_function_expression.h"
+#include "mongo/db/pipeline/window_function/window_function_expression.h"
 
 using boost::intrusive_ptr;
 using boost::optional;
