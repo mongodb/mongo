@@ -106,8 +106,16 @@ TEST_F(TopologyListenerTestFixture, TestListenersRefCounts) {
 
     getEventsPublisher()->onServerPingSucceededEvent(Microseconds(1), HostAndPort("abc.def:1"));
 
+    // Wait for asynchronous event processing to complete and release the shared_ptr.
+    do {
+        // Even this has a tiny chance of race because the event is delivered before the
+        // shared_ptr is released.
+        sleepFor(Milliseconds(1));
+    } while (!l1->hasPingResponse(HostAndPort("abc.def:1")));
+
     ASSERT_EQ(1, l1.use_count());
-    // Deletes the l1 listener, as it has only one owner.
+    // Deletes the l1 listener, as it has only one owner. The next event should not
+    // trigger any ASAN/TSAN error as the weak pointer is handled properly.
     l1.reset();
 
     getEventsPublisher()->onServerPingSucceededEvent(Microseconds(1), HostAndPort("abc.def:2"));
