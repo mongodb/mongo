@@ -184,12 +184,12 @@ public:
     using Request = ShardsvrCreateCollection;
     using Response = CreateCollectionResponse;
 
-    std::string help() const override {
-        return "Internal command. Do not call directly. Creates a collection.";
-    }
-
     bool adminOnly() const override {
         return false;
+    }
+
+    std::string help() const override {
+        return "Internal command. Do not call directly. Creates a collection.";
     }
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
@@ -215,26 +215,18 @@ public:
                     "Create Collection path has not been implemented",
                     request().getShardKey());
 
-            bool useNewPath = [&] {
-                // TODO (SERVER-53092): Use the FCV lock in order to "reserve" operation as running
-                // in new or legacy mode
-                return feature_flags::gShardingFullDDLSupport.isEnabled(
-                           serverGlobalParams.featureCompatibility) &&
-                    feature_flags::gDisableIncompleteShardingDDLSupport.isEnabled(
-                        serverGlobalParams.featureCompatibility);
-            }();
-
-            if (!useNewPath) {
+            if (feature_flags::gShardingFullDDLSupport.isEnabled(
+                    serverGlobalParams.featureCompatibility)) {
+                LOGV2_DEBUG(
+                    5277910, 1, "Running new create collection procedure", "namespace"_attr = ns());
+                return createCollection(opCtx, ns(), request());
+            } else {
                 LOGV2_DEBUG(5277911,
                             1,
                             "Running legacy create collection procedure",
                             "namespace"_attr = ns());
                 return createCollectionLegacy(opCtx, ns(), request());
             }
-
-            LOGV2_DEBUG(
-                5277910, 1, "Running new create collection procedure", "namespace"_attr = ns());
-            return createCollection(opCtx, ns(), request());
         }
 
     private:
