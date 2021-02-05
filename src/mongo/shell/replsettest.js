@@ -1659,7 +1659,7 @@ var ReplSetTest = function(opts) {
             // Since assert.soon() timeout is 10 minutes (default), setting
             // awaitNodesAgreeOnPrimary() timeout as 1 minute to allow retry of replSetStepUp
             // command on failure of the replica set to agree on the primary.
-            const timeout = 60 * 100;
+            const timeout = 60 * 1000;
             this.awaitNodesAgreeOnPrimary(timeout, this.nodes, node);
 
             // getPrimary() guarantees that there will be only one writable primary for a replica
