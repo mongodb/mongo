@@ -77,6 +77,10 @@ public:
 
     Status setTimestamp(Timestamp timestamp) override;
 
+    bool isTimestamped() const override {
+        return _isTimestamped;
+    }
+
     void setTimestampReadSource(ReadSource readSource,
                                 boost::optional<Timestamp> provided) override;
 
@@ -125,6 +129,8 @@ private:
 
     Timestamp _prepareTimestamp = Timestamp::min();
     Timestamp _commitTimestamp = Timestamp::min();
+
+    bool _isTimestamped = false;
 
     // Specifies which external source to use when setting read timestamps on transactions.
     ReadSource _timestampReadSource = ReadSource::kNoTimestamp;

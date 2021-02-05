@@ -90,7 +90,13 @@ void runWithTransaction(OperationContext* opCtx, unique_function<void(OperationC
 
     func(asr.opCtx());
 
-    txnParticipant.commitUnpreparedTransaction(asr.opCtx());
+    if (txnParticipant.retrieveCompletedTransactionOperations(asr.opCtx()).size() > 0) {
+        // Similar to the `isTimestamped` check in `applyOperation`, we only want to commit the
+        // transaction if we're doing replicated writes.
+        txnParticipant.commitUnpreparedTransaction(asr.opCtx());
+    } else {
+        txnParticipant.abortTransaction(asr.opCtx());
+    }
     txnParticipant.stashTransactionResources(asr.opCtx());
 
     guard.dismiss();
@@ -162,7 +168,20 @@ Status ReshardingOplogApplicationRules::applyOperation(OperationContext* opCtx,
                     MONGO_UNREACHABLE;
             }
 
-            wuow.commit();
+            if (opCtx->recoveryUnit()->isTimestamped()) {
+                // Resharding oplog application does two kinds of writes:
+                //
+                // 1) The (obvious) write for applying oplog entries to documents being resharded.
+                // 2) An unreplicated no-op write that on a document in the output collection to
+                //    ensure serialization of concurrent transactions.
+                //
+                // Some of the code paths can end up where only the second kind of write is made. In
+                // that case, there is no timestamp associated with the write. This results in a
+                // mixed-mode update chain within WT that is problematic with durable history. We
+                // roll back those transactions by only committing the `WriteUnitOfWork` when there
+                // is a timestamp set.
+                wuow.commit();
+            }
 
             return Status::OK();
         } catch (const DBException& ex) {
