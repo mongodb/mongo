@@ -37,6 +37,7 @@
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding_util.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/logv2/log.h"
@@ -943,6 +944,18 @@ void ReshardingCoordinatorService::ReshardingCoordinator::interrupt(Status statu
     if (!_completionPromise.getFuture().isReady()) {
         _completionPromise.setError(status);
     }
+}
+
+boost::optional<BSONObj> ReshardingCoordinatorService::ReshardingCoordinator::reportForCurrentOp(
+    MongoProcessInterface::CurrentOpConnectionsMode,
+    MongoProcessInterface::CurrentOpSessionsMode) noexcept {
+    ReshardingMetrics::ReporterOptions options(
+        ReshardingMetrics::ReporterOptions::Role::kCoordinator,
+        _coordinatorDoc.get_id(),
+        _coordinatorDoc.getNss(),
+        _coordinatorDoc.getReshardingKey().toBSON(),
+        false);
+    return ReshardingMetrics::get(cc().getServiceContext())->reportForCurrentOp(options);
 }
 
 std::shared_ptr<ReshardingCoordinatorObserver>

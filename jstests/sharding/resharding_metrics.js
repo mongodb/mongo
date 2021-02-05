@@ -130,7 +130,16 @@ function verifyCurrentOpOutput(reshardingTest, inputCollection) {
         });
     });
 
-    // TODO SERVER-50976 verify currentOp output for the coordinator
+    checkCurrentOp(new Mongo(topology.configsvr.nodes[0]), "configsvr", "Coordinator", {
+        "type": "op",
+        "op": "command",
+        "ns": kNamespace,
+        "originatingCommand": undefined,
+        "totalOperationTimeElapsed": undefined,
+        "remainingOperationTimeEstimated": undefined,
+        "coordinatorState": undefined,
+        "opStatus": "actively running",
+    });
 }
 
 const reshardingTest = new ReshardingTest({numDonors: 2, numRecipients: 2, reshardInPlace: true});

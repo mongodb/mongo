@@ -327,4 +327,43 @@ TEST_F(ReshardingMetricsTest, CurrentOpReportForRecipient) {
     ASSERT_BSONOBJ_EQ(expected, report);
 }
 
+TEST_F(ReshardingMetricsTest, CurrentOpReportForCoordinator) {
+    const auto kCoordinatorState = CoordinatorStateEnum::kInitializing;
+    const auto kSomeDuration = Seconds(10);
+
+    getMetrics()->onStart();
+    getMetrics()->setCoordinatorState(kCoordinatorState);
+    advanceTime(kSomeDuration);
+
+    const ReshardingMetrics::ReporterOptions options(
+        ReshardingMetrics::ReporterOptions::Role::kCoordinator,
+        UUID::parse("12345678-1234-1234-1234-123456789cba").getValue(),
+        NamespaceString("db", "collection"),
+        BSON("id" << 1),
+        false);
+
+    const auto expected =
+        fromjson(fmt::format("{{ type: \"op\","
+                             "desc: \"ReshardingCoordinatorService {0}\","
+                             "op: \"command\","
+                             "ns: \"{1}\","
+                             "originatingCommand: {{ reshardCollection: \"{1}\","
+                             "key: {2},"
+                             "unique: {3},"
+                             "collation: {{ locale: \"simple\" }} }},"
+                             "totalOperationTimeElapsed: {4},"
+                             "remainingOperationTimeEstimated: -1,"
+                             "coordinatorState: \"{5}\","
+                             "opStatus: \"actively running\" }}",
+                             options.id.toString(),
+                             options.nss.toString(),
+                             options.shardKey.toString(),
+                             options.unique ? "true" : "false",
+                             durationCount<Seconds>(kSomeDuration),
+                             CoordinatorState_serializer(kCoordinatorState)));
+
+    const auto report = getMetrics()->reportForCurrentOp(options);
+    ASSERT_BSONOBJ_EQ(expected, report);
+}
+
 }  // namespace mongo
