@@ -1284,6 +1284,7 @@ env.Library(
         'stats/serveronly_stats',
         'storage/remove_saver',
         'storage/storage_options',
+        'timeseries/timeseries_idl',
         'update/update_driver',
     ],
     LIBDEPS_PRIVATE=[
