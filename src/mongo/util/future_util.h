@@ -357,6 +357,18 @@ inline constexpr bool isFutureOrExecutorFuture<ExecutorFuture<T>> = true;
 static inline const std::string kWhenAllSucceedEmptyInputInvariantMsg =
     "Must pass at least one future to whenAllSucceed";
 
+/**
+ * Turns a variadic parameter pack into a vector without invoking copies if possible via static
+ * casts.
+ */
+template <typename... U, typename T = std::common_type_t<U...>>
+std::vector<T> variadicArgsToVector(U&&... elems) {
+    std::vector<T> vector;
+    vector.reserve(sizeof...(elems));
+    (vector.push_back(std::forward<U>(elems)), ...);
+    return vector;
+}
+
 }  // namespace future_util_details
 
 /**
@@ -603,6 +615,36 @@ SemiFuture<Result> whenAny(std::vector<FutureT>&& futures) {
     return std::move(future).semi();
 }
 
+/**
+ * Variadic template overloads for the above helper functions. Though not strictly necessary,
+ * we peel off the first element of each input list in order to assist the compiler in type
+ * inference and to prevent 0 length lists from compiling.
+ */
+TEMPLATE(typename... FuturePack,
+         typename FutureLike = std::common_type_t<FuturePack...>,
+         typename Value = typename FutureLike::value_type,
+         typename ResultVector = std::vector<Value>)
+REQUIRES(future_util_details::isFutureOrExecutorFuture<FutureLike>)
+auto whenAllSucceed(FuturePack&&... futures) {
+    return whenAllSucceed(
+        future_util_details::variadicArgsToVector(std::forward<FuturePack>(futures)...));
+}
+
+template <typename... FuturePack,
+          typename FutureT = std::common_type_t<FuturePack...>,
+          typename Value = typename FutureT::value_type,
+          typename ResultVector = std::vector<StatusOrStatusWith<Value>>>
+SemiFuture<ResultVector> whenAll(FuturePack&&... futures) {
+    return whenAll(future_util_details::variadicArgsToVector(std::forward<FuturePack>(futures)...));
+}
+
+template <typename... FuturePack,
+          typename FutureT = std::common_type_t<FuturePack...>,
+          typename Result = WhenAnyResult<typename FutureT::value_type>>
+SemiFuture<Result> whenAny(FuturePack&&... futures) {
+    return whenAny(future_util_details::variadicArgsToVector(std::forward<FuturePack>(futures)...));
+}
+
 namespace future_util {
 
 /**
@@ -690,4 +732,5 @@ auto makeState(Args&&... args) {
 }
 
 }  // namespace future_util
+
 }  // namespace mongo
