@@ -103,7 +103,8 @@ private:
         if (!start) {
             return 0;
         }
-        StringData startStr = ItoA(start);
+        ItoA startItoA(start);
+        StringData startStr(startItoA);
         std::memcpy(_digits, startStr.rawData(), startStr.size());
         return startStr.size() - 1;
     }
