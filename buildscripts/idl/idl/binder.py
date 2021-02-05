@@ -562,6 +562,7 @@ def _bind_command(ctxt, parsed_spec, command):
     ast_command.api_version = command.api_version
     ast_command.is_deprecated = command.is_deprecated
     ast_command.command_name = command.command_name
+    ast_command.command_alias = command.command_alias
 
     # Inject special fields used for command parsing
     _inject_hidden_command_fields(command)

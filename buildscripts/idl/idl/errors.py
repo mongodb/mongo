@@ -122,6 +122,7 @@ ERROR_ID_VARIANT_NO_DEFAULT = "ID0079"
 ERROR_ID_VARIANT_DUPLICATE_TYPES = "ID0080"
 ERROR_ID_VARIANT_STRUCTS = "ID0081"
 ERROR_ID_NO_VARIANT_ENUM = "ID0082"
+ERROR_ID_COMMAND_DUPLICATES_NAME_AND_ALIAS = "ID0083"
 
 
 class IDLError(Exception):
@@ -906,6 +907,13 @@ class ParserContext(object):
         self._add_error(
             location, ERROR_ID_ILLEGAL_FIELD_ALWAYS_SERIALIZE_NOT_OPTIONAL,
             ("Field '%s' specifies 'always_serialize' but 'optional' isn't true.") % (field_name))
+
+    def add_duplicate_command_name_and_alias(self, node):
+        # type: (yaml.nodes.Node) -> None
+        """Add an error about a command name and command alias having the same name."""
+        # pylint: disable=invalid-name
+        self._add_node_error(node, ERROR_ID_COMMAND_DUPLICATES_NAME_AND_ALIAS,
+                             "Duplicate command_name and command_alias found.")
 
 
 def _assert_unique_error_messages():

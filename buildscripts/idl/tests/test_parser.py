@@ -1610,6 +1610,26 @@ class TestParser(testcase.IDLTestcase):
         """Negative generic reply fields list test cases."""
         self._test_field_list_negative("generic_reply_field_lists", "forward_from_shards")
 
+    def test_command_alias(self):
+        # type: () -> None
+        """Test the 'command_alis' field."""
+
+        # The 'command_name' and 'command_alias' fields cannot have same value.
+        self.assert_parse_fail(
+            textwrap.dedent(f"""
+        commands:
+            foo:
+                description: foo
+                command_name: foo
+                command_alias: foo
+                namespace: ignored
+                api_version: 1
+                fields:
+                    foo:
+                        type: bar
+                reply_type: foo_reply_struct
+            """), idl.errors.ERROR_ID_COMMAND_DUPLICATES_NAME_AND_ALIAS)
+
 
 if __name__ == '__main__':
 

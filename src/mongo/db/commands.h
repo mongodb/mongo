@@ -1118,9 +1118,7 @@ public:
     InvocationBaseInternal(OperationContext* opCtx,
                            const Command* command,
                            const OpMsgRequest& opMsgRequest)
-        : CommandInvocation(command),
-
-          _request{_parseRequest(opCtx, command->getName(), opMsgRequest)} {}
+        : CommandInvocation(command), _request{_parseRequest(opCtx, command, opMsgRequest)} {}
 
 protected:
     const RequestType& request() const {
@@ -1129,11 +1127,22 @@ protected:
 
 private:
     static RequestType _parseRequest(OperationContext* opCtx,
-                                     StringData name,
+                                     const Command* command,
                                      const OpMsgRequest& opMsgRequest) {
-        return RequestType::parse(
-            IDLParserErrorContext(name, APIParameters::get(opCtx).getAPIStrict().value_or(false)),
-            opMsgRequest);
+
+        bool apiStrict = APIParameters::get(opCtx).getAPIStrict().value_or(false);
+
+        // A command with 'apiStrict' cannot be invoked with alias.
+        if (opMsgRequest.getCommandName() != command->getName() && apiStrict) {
+            uasserted(ErrorCodes::APIStrictError,
+                      str::stream() << "Command invocation with name '"
+                                    << opMsgRequest.getCommandName().toString()
+                                    << "' is not allowed in 'apiStrict' mode, use '"
+                                    << command->getName() << "' instead");
+        }
+
+        return RequestType::parse(IDLParserErrorContext(command->getName(), apiStrict),
+                                  opMsgRequest);
     }
 
     RequestType _request;

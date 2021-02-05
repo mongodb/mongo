@@ -131,7 +131,7 @@ class SymbolTable(object):
                 ctxt.add_duplicate_symbol_error(location, name, duplicate_class_name, entity_type)
                 return True
             if entity_type == "command":
-                if item.command_name == name:
+                if name in [item.command_name, item.command_alias if item.command_alias else '']:
                     ctxt.add_duplicate_symbol_error(location, name, duplicate_class_name,
                                                     entity_type)
                     return True
@@ -159,7 +159,8 @@ class SymbolTable(object):
     def add_command(self, ctxt, command):
         # type: (errors.ParserContext, Command) -> None
         """Add an IDL command to the symbol table and check for duplicates."""
-        if not self._is_duplicate(ctxt, command, command.name, "command"):
+        if (not self._is_duplicate(ctxt, command, command.name, "command")
+                and not self._is_duplicate(ctxt, command, command.command_alias, "command")):
             self.commands.append(command)
 
     def add_generic_argument_list(self, ctxt, field_list):
@@ -529,6 +530,7 @@ class Command(Struct):
         """Construct a Command."""
         self.namespace = None  # type: str
         self.command_name = None  # type: str
+        self.command_alias = None  # type: str
         self.type = None  # type: FieldType
         self.reply_type = None  # type: str
         self.api_version = None  # type: str

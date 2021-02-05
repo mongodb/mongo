@@ -685,6 +685,7 @@ def _parse_enum(ctxt, spec, name, node):
 def _parse_command(ctxt, spec, name, node):
     # type: (errors.ParserContext, syntax.IDLSpec, str, Union[yaml.nodes.MappingNode, yaml.nodes.ScalarNode, yaml.nodes.SequenceNode]) -> None
     """Parse a command section in the IDL file."""
+
     # pylint: disable=too-many-branches
 
     if not ctxt.is_mapping_node(node, "command"):
@@ -703,6 +704,7 @@ def _parse_command(ctxt, spec, name, node):
             "cpp_name": _RuleDesc('scalar'),
             "type": _RuleDesc('scalar_or_mapping', mapping_parser_func=_parse_field_type),
             "command_name": _RuleDesc('scalar'),
+            "command_alias": _RuleDesc('scalar'),
             "reply_type": _RuleDesc('scalar'),
             "api_version": _RuleDesc('scalar'),
             "is_deprecated": _RuleDesc('bool_scalar'),
@@ -724,6 +726,9 @@ def _parse_command(ctxt, spec, name, node):
 
     if command.api_version is None:
         ctxt.add_missing_required_field_error(node, "command", "api_version")
+
+    if command.command_alias and command.command_alias == command.command_name:
+        ctxt.add_duplicate_command_name_and_alias(node)
 
     if command.namespace:
         if command.namespace not in valid_commands:

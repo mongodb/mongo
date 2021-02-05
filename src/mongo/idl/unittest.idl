@@ -1042,6 +1042,16 @@ commands:
         api_version: "1"
         reply_type: OkReply
 
+    # Test whether the C++ code for a command with alias name is currently generated.
+    APIVersion1CommandWithAlias:
+        description: A versioned API command with alias
+        command_name: NewCommandName
+        command_alias: OldCommandName
+        namespace: ignored
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
 ##################################################################################################
 #
 # Test field lists

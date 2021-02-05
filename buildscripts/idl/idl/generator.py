@@ -725,6 +725,13 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                 common.template_args('static constexpr auto kCommandName = "${command_name}"_sd;',
                                      command_name=struct.command_name))
 
+            # Initialize constexpr for command alias if specified in the IDL spec.
+            if struct.command_alias:
+                self._writer.write_line(
+                    common.template_args(
+                        'static constexpr auto kCommandAlias = "${command_alias}"_sd;',
+                        command_alias=struct.command_alias))
+
     def gen_enum_functions(self, idl_enum):
         # type: (ast.Enum) -> None
         """Generate the declaration for an enum's supporting functions."""
@@ -899,7 +906,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                 # Explicit custom constructor.
                 self._writer.write_line(cls.name + '(StringData name, ServerParameterType spt);')
             else:
-                #Inherit base constructor.
+                # Inherit base constructor.
                 self._writer.write_line('using ServerParameter::ServerParameter;')
             self.write_empty_line()
 
@@ -934,6 +941,20 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
         """Generate a type alias declaration."""
         self._writer.write_line(
             'using %s = %s;' % (new_type_name, common.title_case(old_type_name)))
+
+    def gen_derived_class_constructor(self, command_name, api_version, base_class,
+                                      *base_class_args):
+        # type: (str, str, str, *str) -> None
+        """Generate a derived class constructor."""
+        class_name = common.title_case(command_name) + "CmdVersion" + api_version + "Gen"
+        args = ", ".join(base_class_args)
+        self._writer.write_line('%s(): %s(%s) {}' % (class_name, base_class, args))
+
+    def gen_derived_class_destructor(self, command_name, api_version):
+        # type: (str, str) -> None
+        """Generate a derived class destructor."""
+        class_name = common.title_case(command_name) + "CmdVersion" + api_version + "Gen"
+        self._writer.write_line('virtual ~%s() = default;' % (class_name))
 
     def gen_api_version_fn(self, is_api_versions, api_version):
         # type: (bool, Union[str, bool]) -> None
@@ -979,6 +1000,20 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
             # Write type aliases for Request and Reply.
             self.gen_type_alias_declaration("Request", command.cpp_name)
             self.gen_type_alias_declaration("Reply", command.reply_type.type.cpp_type)
+
+            # Generate a constructor for generated derived class if command alias is specified.
+            if command.command_alias:
+                self.write_empty_line()
+                self.gen_derived_class_constructor(command.command_name, command.api_version,
+                                                   'TypedCommand<Derived>', 'Request::kCommandName',
+                                                   'Request::kCommandAlias')
+
+            self.write_empty_line()
+
+            # Generate a destructor for generated derived class.
+            self.gen_derived_class_destructor(command.command_name, command.api_version)
+
+            self.write_empty_line()
 
             # Write apiVersions() and deprecatedApiVersions() functions.
             self.gen_api_version_fn(True, command.api_version)
@@ -2157,6 +2192,12 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             self._writer.write_line(
                 common.template_args('constexpr StringData ${class_name}::kCommandName;',
                                      class_name=common.title_case(struct.cpp_name)))
+
+            # Declare constexp for commmand alias if specified in the IDL spec.
+            if struct.command_alias:
+                self._writer.write_line(
+                    common.template_args('constexpr StringData ${class_name}::kCommandAlias;',
+                                         class_name=common.title_case(struct.cpp_name)))
 
     def gen_enum_definition(self, idl_enum):
         # type: (ast.Enum) -> None
