@@ -239,7 +239,7 @@ void StreamableReplicaSetMonitor::init() {
               "StreamableReplicaSetMonitor::init() is invoked when there is no owner");
 
     _eventsPublisher = std::make_shared<sdam::TopologyEventsPublisher>(_executor);
-    _topologyManager = std::make_unique<TopologyManager>(
+    _topologyManager = std::make_unique<TopologyManagerImpl>(
         _sdamConfig, getGlobalServiceContext()->getPreciseClockSource(), _eventsPublisher);
 
     _eventsPublisher->registerListener(weak_from_this());
@@ -254,6 +254,18 @@ void StreamableReplicaSetMonitor::init() {
 
     _isDropped.store(false);
 
+    ReplicaSetMonitorManager::get()->getNotifier().onFoundSet(getName());
+}
+
+void StreamableReplicaSetMonitor::initForTesting(sdam::TopologyManagerPtr topologyManager) {
+    stdx::lock_guard lock(_mutex);
+
+    _eventsPublisher = std::make_shared<sdam::TopologyEventsPublisher>(_executor);
+    _topologyManager = std::move(topologyManager);
+
+    _eventsPublisher->registerListener(weak_from_this());
+
+    _isDropped.store(false);
     ReplicaSetMonitorManager::get()->getNotifier().onFoundSet(getName());
 }
 
@@ -273,8 +285,14 @@ void StreamableReplicaSetMonitor::drop() {
           "Closing Replica Set Monitor",
           "replicaSet"_attr = getName());
     _queryProcessor->shutdown();
-    _pingMonitor->shutdown();
-    _serverDiscoveryMonitor->shutdown();
+
+    if (_pingMonitor) {
+        _pingMonitor->shutdown();
+    }
+
+    if (_serverDiscoveryMonitor) {
+        _serverDiscoveryMonitor->shutdown();
+    }
 
     ReplicaSetMonitorManager::get()->getNotifier().onDroppedSet(getName());
     LOGV2(4333210,
@@ -324,7 +342,10 @@ SemiFuture<std::vector<HostAndPort>> StreamableReplicaSetMonitor::getHostsOrRefr
         return {*immediateResult};
     }
 
-    _serverDiscoveryMonitor->requestImmediateCheck();
+    if (_serverDiscoveryMonitor) {
+        _serverDiscoveryMonitor->requestImmediateCheck();
+    }
+
     LOGV2_DEBUG(4333212,
                 kLowerLogLevel,
                 "RSM {replicaSet} start async getHosts with {readPref}",
@@ -483,7 +504,7 @@ void StreamableReplicaSetMonitor::_doErrorActions(
         if (errorActions.dropConnections)
             _connectionManager->dropConnections(host);
 
-        if (errorActions.requestImmediateCheck)
+        if (errorActions.requestImmediateCheck && _serverDiscoveryMonitor)
             _serverDiscoveryMonitor->requestImmediateCheck();
     }
 
@@ -814,7 +835,7 @@ void StreamableReplicaSetMonitor::_processOutstanding(
     }
 
     // If there remain unresolved queries, enable expedited mode.
-    if (hadUnresolvedQuery) {
+    if (hadUnresolvedQuery && _serverDiscoveryMonitor) {
         _serverDiscoveryMonitor->requestImmediateCheck();
     }
 }

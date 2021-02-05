@@ -454,7 +454,7 @@ public:
                                                 _replicaSetName);
 
         auto clockSource = std::make_unique<ClockSourceMock>();
-        TopologyManager topology(*config, clockSource.get());
+        TopologyManagerImpl topology(*config, clockSource.get());
 
         TestCaseResult result{{}, _testFilePath, _testName};
 
