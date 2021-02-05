@@ -544,7 +544,11 @@ function RollbackTestDeluxe(name = "FiveNodeDoubleRollbackTest", replSet) {
         lastStandbySecondaryRBID =
             assert.commandWorked(standbySecondary.adminCommand("replSetGetRBID")).rbid;
 
-        if (jsTest.options().enableMajorityReadConcern === false) {
+        const isMajorityReadConcernEnabledOnRollbackNode =
+            assert.commandWorked(rollbackSecondary.adminCommand({serverStatus: 1}))
+                .storageEngine.supportsCommittedReads;
+        const isInMemory = jsTest.options().storageEngine === "inMemory";
+        if (!isMajorityReadConcernEnabledOnRollbackNode && isInMemory) {
             this.awaitPrimaryAppliedSurpassesRollbackApplied();
         }
 

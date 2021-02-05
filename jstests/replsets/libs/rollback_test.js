@@ -416,7 +416,8 @@ function RollbackTest(name = "RollbackTest", replSet) {
         const isMajorityReadConcernEnabledOnRollbackNode =
             assert.commandWorked(curSecondary.adminCommand({serverStatus: 1}))
                 .storageEngine.supportsCommittedReads;
-        if (!isMajorityReadConcernEnabledOnRollbackNode) {
+        const isInMemoryStorageEngine = jsTest.options().storageEngine === "inMemory";
+        if (!isMajorityReadConcernEnabledOnRollbackNode && isInMemoryStorageEngine) {
             this.awaitPrimaryAppliedSurpassesRollbackApplied();
         }
 
