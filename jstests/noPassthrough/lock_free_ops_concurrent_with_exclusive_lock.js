@@ -55,8 +55,16 @@ jsTestLog("Waiting for collMod to acquire a database lock.");
 collModFailPoint.wait();
 
 jsTestLog("Starting lock-free find command.");
-const findResult = coll.find({});
-assert.eq(3, findResult.toArray().length);
+// Set a batch size of 1, so there are more documents for the subsequent getMore command to fetch.
+const findResult = db.runCommand({find: collName, batchSize: 1});
+assert.commandWorked(findResult);
+assert.eq(1, findResult.cursor.firstBatch.length);
+
+jsTestLog("Starting lock-free getMore command");
+const getMoreResult =
+    db.runCommand({getMore: NumberLong(findResult.cursor.id), collection: collName, batchSize: 1});
+assert.commandWorked(getMoreResult);
+assert.eq(1, getMoreResult.cursor.nextBatch.length);
 
 jsTestLog("Starting lock-free count command.");
 const countResult = coll.find().count();
