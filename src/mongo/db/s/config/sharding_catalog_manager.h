@@ -326,14 +326,6 @@ public:
     void enableSharding(OperationContext* opCtx, StringData dbName, const ShardId& primaryShard);
 
     /**
-     * Retrieves all databases for a shard.
-     *
-     * Returns a !OK status if an error occurs.
-     */
-    StatusWith<std::vector<std::string>> getDatabasesForShard(OperationContext* opCtx,
-                                                              const ShardId& shardId);
-
-    /**
      * Updates metadata in config.databases collection to show the given primary database on its
      * new shard.
      */
@@ -627,9 +619,6 @@ private:
     //
 
     Mutex _mutex = MONGO_MAKE_LATCH("ShardingCatalogManager::_mutex");
-
-    // True if shutDown() has been called. False, otherwise.
-    bool _inShutdown{false};  // (M)
 
     // True if startup() has been called.
     bool _started{false};  // (M)

@@ -183,8 +183,6 @@ void triggerFireAndForgetShardRefreshes(OperationContext* opCtx, const Collectio
     }
 }
 
-}  // namespace
-
 void sendDropCollectionToAllShards(OperationContext* opCtx, const NamespaceString& nss) {
     const auto catalogClient = Grid::get(opCtx)->catalogClient();
 
@@ -314,6 +312,8 @@ void removeTagsForDroppedCollection(OperationContext* opCtx, const NamespaceStri
                                              ShardingCatalogClient::kMajorityWriteConcern));
 }
 
+}  // namespace
+
 void ShardingCatalogManager::dropCollection(OperationContext* opCtx, const NamespaceString& nss) {
     uassertStatusOK(ShardingLogging::get(opCtx)->logChangeChecked(
         opCtx,
@@ -338,7 +338,7 @@ void ShardingCatalogManager::dropCollection(OperationContext* opCtx, const Names
 
     try {
         const auto catalogClient = Grid::get(opCtx)->catalogClient();
-        auto collType = Grid::get(opCtx)->catalogClient()->getCollection(opCtx, nss);
+        auto collType = catalogClient->getCollection(opCtx, nss);
         const auto nssOrUUID = [&]() {
             if (collType.getTimestamp()) {
                 return NamespaceStringOrUUID(std::string(), collType.getUuid());

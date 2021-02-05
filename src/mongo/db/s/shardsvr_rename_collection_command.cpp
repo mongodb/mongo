@@ -207,12 +207,12 @@ public:
     using Request = ShardsvrRenameCollection;
     using Response = RenameCollectionResponse;
 
-    bool adminOnly() const override {
-        return false;
-    }
-
     std::string help() const override {
         return "Internal command. Do not call directly. Renames a collection.";
+    }
+
+    bool adminOnly() const override {
+        return false;
     }
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
@@ -229,10 +229,17 @@ public:
 
             auto const shardingState = ShardingState::get(opCtx);
             uassertStatusOK(shardingState->canAcceptShardedCommands());
-            bool newPath = feature_flags::gShardingFullDDLSupport.isEnabled(
-                serverGlobalParams.featureCompatibility);
 
-            if (!isCollectionSharded(opCtx, fromNss) || !newPath) {
+            bool useNewPath = [&] {
+                // TODO (SERVER-53092): Use the FCV lock in order to "reserve" operation as running
+                // in new or legacy mode
+                return feature_flags::gShardingFullDDLSupport.isEnabled(
+                           serverGlobalParams.featureCompatibility) &&
+                    !feature_flags::gDisableIncompleteShardingDDLSupport.isEnabled(
+                        serverGlobalParams.featureCompatibility);
+            }();
+
+            if (!isCollectionSharded(opCtx, fromNss) || !useNewPath) {
                 return renameUnshardedCollection(opCtx, req, fromNss);
             }
 

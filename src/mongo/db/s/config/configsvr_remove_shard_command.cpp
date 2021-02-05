@@ -110,6 +110,7 @@ public:
             return shard->getId();
         }();
 
+        const auto catalogClient = Grid::get(opCtx)->catalogClient();
         const auto shardingCatalogManager = ShardingCatalogManager::get(opCtx);
 
         const auto shardDrainingStatus = [&] {
@@ -125,8 +126,7 @@ public:
             }
         }();
 
-        const auto databases =
-            uassertStatusOK(shardingCatalogManager->getDatabasesForShard(opCtx, shardId));
+        const auto databases = uassertStatusOK(catalogClient->getDatabasesForShard(opCtx, shardId));
 
         // Get BSONObj containing:
         // 1) note about moving or dropping databases in a shard

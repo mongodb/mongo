@@ -327,6 +327,7 @@ void ShardingCatalogManager::startup() {
     if (_started) {
         return;
     }
+
     _started = true;
     _executorForAddShard->startup();
 
@@ -336,11 +337,6 @@ void ShardingCatalogManager::startup() {
 }
 
 void ShardingCatalogManager::shutDown() {
-    {
-        stdx::lock_guard<Latch> lk(_mutex);
-        _inShutdown = true;
-    }
-
     Grid::get(_serviceContext)->setCustomConnectionPoolStatsFn(nullptr);
 
     _executorForAddShard->shutdown();

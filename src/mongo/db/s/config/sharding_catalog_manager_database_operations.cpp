@@ -255,34 +255,6 @@ void ShardingCatalogManager::enableSharding(OperationContext* opCtx,
         ShardingCatalogClient::kLocalWriteConcern));
 }
 
-StatusWith<std::vector<std::string>> ShardingCatalogManager::getDatabasesForShard(
-    OperationContext* opCtx, const ShardId& shardId) {
-    auto findStatus = Grid::get(opCtx)->catalogClient()->_exhaustiveFindOnConfig(
-        opCtx,
-        kConfigReadSelector,
-        repl::ReadConcernLevel::kLocalReadConcern,
-        DatabaseType::ConfigNS,
-        BSON(DatabaseType::primary(shardId.toString())),
-        BSONObj(),
-        boost::none);  // no limit
-
-    if (!findStatus.isOK())
-        return findStatus.getStatus();
-
-    std::vector<std::string> dbs;
-    for (const BSONObj& obj : findStatus.getValue().value) {
-        std::string dbName;
-        Status status = bsonExtractStringField(obj, DatabaseType::name(), &dbName);
-        if (!status.isOK()) {
-            return status;
-        }
-
-        dbs.push_back(dbName);
-    }
-
-    return dbs;
-}
-
 Status ShardingCatalogManager::commitMovePrimary(OperationContext* opCtx,
                                                  const StringData dbname,
                                                  const ShardId& toShard) {
