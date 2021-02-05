@@ -54,8 +54,8 @@ const docs = [
     {_id: 2, [timeFieldName]: ISODate(), [metaFieldName]: {a: ['B'], c: 'D'}}
 ];
 
-assert.commandWorked(coll.insert([docs[0], docs[1]]));
-assert.commandWorked(coll.insert(docs[2]));
+assert.commandWorked(coll.insert([docs[0], docs[1]], {ordered: false}));
+assert.commandWorked(coll.insert(docs[2], {ordered: false}));
 
 // The metadata of all of the inserted documents matches based on the collation, so when returned
 // they will all have the metadata from the document that was inserted first.

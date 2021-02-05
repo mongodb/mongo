@@ -46,7 +46,7 @@ clearColl();
 
 const insert = function(doc, expectedMin, expectedMax) {
     doc[timeFieldName] = ISODate();
-    assert.commandWorked(coll.insert(doc));
+    assert.commandWorked(coll.insert(doc, {ordered: false}));
 
     const bucketDocs = bucketsColl
                            .find({}, {

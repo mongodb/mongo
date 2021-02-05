@@ -84,7 +84,7 @@ const checkCollStats = function(empty = false) {
 checkCollStats(true);
 
 let docs = Array(2).fill({[timeFieldName]: ISODate(), [metaFieldName]: {a: 1}});
-assert.commandWorked(coll.insert(docs));
+assert.commandWorked(coll.insert(docs, {ordered: false}));
 expectedStats.bucketCount++;
 expectedStats.numBucketInserts++;
 expectedStats.numBucketsOpenedDueToMetadata++;
@@ -94,7 +94,8 @@ expectedStats.numMeasurementsCommitted += 2;
 expectedStats.avgNumMeasurementsPerCommit = 2;
 checkCollStats();
 
-assert.commandWorked(coll.insert({[timeFieldName]: ISODate(), [metaFieldName]: {a: 2}}));
+assert.commandWorked(
+    coll.insert({[timeFieldName]: ISODate(), [metaFieldName]: {a: 2}}, {ordered: false}));
 expectedStats.bucketCount++;
 expectedStats.numBucketInserts++;
 expectedStats.numBucketsOpenedDueToMetadata++;
@@ -103,14 +104,15 @@ expectedStats.numMeasurementsCommitted++;
 expectedStats.avgNumMeasurementsPerCommit = 1;
 checkCollStats();
 
-assert.commandWorked(coll.insert({[timeFieldName]: ISODate(), [metaFieldName]: {a: 2}}));
+assert.commandWorked(
+    coll.insert({[timeFieldName]: ISODate(), [metaFieldName]: {a: 2}}, {ordered: false}));
 expectedStats.numBucketUpdates++;
 expectedStats.numCommits++;
 expectedStats.numMeasurementsCommitted++;
 checkCollStats();
 
 docs = Array(5).fill({[timeFieldName]: ISODate(), [metaFieldName]: {a: 2}});
-assert.commandWorked(coll.insert(docs));
+assert.commandWorked(coll.insert(docs, {ordered: false}));
 expectedStats.numBucketUpdates++;
 expectedStats.numCommits++;
 expectedStats.numWaits += 4;
@@ -118,8 +120,8 @@ expectedStats.numMeasurementsCommitted += 5;
 expectedStats.avgNumMeasurementsPerCommit = 2;
 checkCollStats();
 
-assert.commandWorked(
-    coll.insert({[timeFieldName]: ISODate("2021-01-01T01:00:00Z"), [metaFieldName]: {a: 1}}));
+assert.commandWorked(coll.insert(
+    {[timeFieldName]: ISODate("2021-01-01T01:00:00Z"), [metaFieldName]: {a: 1}}, {ordered: false}));
 expectedStats.bucketCount++;
 expectedStats.numBucketInserts++;
 expectedStats.numCommits++;
@@ -131,7 +133,7 @@ checkCollStats();
 const bucketMaxCount = 1000;
 let numDocs = bucketMaxCount + 100;
 docs = Array(numDocs).fill({[timeFieldName]: ISODate(), [metaFieldName]: {a: 'limit_count'}});
-assert.commandWorked(coll.insert(docs));
+assert.commandWorked(coll.insert(docs, {ordered: false}));
 expectedStats.bucketCount += 2;
 expectedStats.numBucketInserts += 2;
 expectedStats.numBucketsOpenedDueToMetadata++;
@@ -151,7 +153,7 @@ numDocs = 2;
 let largeValue = 'x'.repeat((bucketMaxSizeKB - 1) * 1024);
 docs = Array(numDocs).fill(
     {[timeFieldName]: ISODate(), x: largeValue, [metaFieldName]: {a: 'limit_size'}});
-assert.commandWorked(coll.insert(docs));
+assert.commandWorked(coll.insert(docs, {ordered: false}));
 expectedStats.bucketCount += numDocs;
 expectedStats.numBucketInserts += numDocs;
 expectedStats.numBucketsOpenedDueToMetadata++;
@@ -169,7 +171,7 @@ docs = [];
 for (let i = 0; i < numDocs; i++) {
     docs.push({[timeFieldName]: docTimes[i], [metaFieldName]: {a: 'limit_time_range'}});
 }
-assert.commandWorked(coll.insert(docs));
+assert.commandWorked(coll.insert(docs, {ordered: false}));
 expectedStats.bucketCount += numDocs;
 expectedStats.numBucketInserts += numDocs;
 expectedStats.numBucketsOpenedDueToMetadata++;
@@ -189,7 +191,7 @@ const testIdleBucketExpiry = function(docFn) {
 
     let shouldExpire = false;
     for (let i = 0; i < numDocs; i++) {
-        assert.commandWorked(coll.insert(docFn(i)));
+        assert.commandWorked(coll.insert(docFn(i), {ordered: false}));
         const memoryUsage = assert.commandWorked(testDB.serverStatus()).bucketCatalog.memoryUsage;
 
         expectedStats.bucketCount++;

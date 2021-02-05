@@ -55,7 +55,7 @@ const docs2 = [
     },
 ];
 
-assert.commandWorked(coll.insert(docs1));
+assert.commandWorked(coll.insert(docs1, {ordered: false}));
 assert.docEq(coll.find().toArray(), docs1);
 let buckets = bucketsColl.find().toArray();
 assert.eq(buckets.length, 1, 'Expected one bucket but found ' + tojson(buckets));
@@ -66,7 +66,7 @@ assert.docEq(coll.find().toArray(), []);
 buckets = bucketsColl.find().toArray();
 assert.eq(buckets.length, 0, 'Expected no buckets but found ' + tojson(buckets));
 
-assert.commandWorked(coll.insert(docs2));
+assert.commandWorked(coll.insert(docs2, {ordered: false}));
 assert.docEq(coll.find().toArray(), docs2);
 buckets = bucketsColl.find().toArray();
 assert.eq(buckets.length, 1, 'Expected one bucket but found ' + tojson(buckets));

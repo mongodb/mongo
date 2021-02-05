@@ -76,7 +76,7 @@ for (let i = 0; i < numDocs; i++) {
 
     jsTestLog('Inserting doc into time-series collection: ' + i + ': ' + tojson(doc));
     let start = new Date();
-    assert.commandWorked(coll.insert(doc));
+    assert.commandWorked(coll.insert(doc, {ordered: false}));
     jsTestLog('Insertion took ' + ((new Date()).getTime() - start.getTime()) +
               ' ms. Retrieving doc from view: ' + i);
     start = new Date();

@@ -52,7 +52,7 @@ const doc = {
     [timeFieldName]: t,
     x: 0
 };
-assert.commandWorked(coll.insert(doc), 'failed to insert doc: ' + tojson(doc));
+assert.commandWorked(coll.insert(doc, {ordered: false}), 'failed to insert doc: ' + tojson(doc));
 jsTestLog('Insertion took ' + ((new Date()).getTime() - start.getTime()) + ' ms.');
 
 // Wait for the document to be removed.

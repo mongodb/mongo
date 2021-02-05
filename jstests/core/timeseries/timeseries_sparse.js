@@ -45,9 +45,9 @@ const runTest = function(docsInsert, docsUpdate) {
         testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
     assert.contains(bucketsColl.getName(), testDB.getCollectionNames());
 
-    assert.commandWorked(coll.insert(docsInsert),
+    assert.commandWorked(coll.insert(docsInsert, {ordered: false}),
                          'failed to create bucket with initial docs: ' + tojson(docsInsert));
-    assert.commandWorked(coll.insert(docsUpdate),
+    assert.commandWorked(coll.insert(docsUpdate, {ordered: false}),
                          'failed to append docs to bucket : ' + tojson(docsUpdate));
 
     // Check view.

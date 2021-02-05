@@ -60,7 +60,7 @@ assert.soon(() => {
 
 // A {w: 1} insert should still be able to complete despite going into the same bucket as the {w: 2}
 // insert, which is still outstanding.
-assert.commandWorked(coll.insert(docs[1], {writeConcern: {w: 1}}));
+assert.commandWorked(coll.insert(docs[1], {writeConcern: {w: 1}, ordered: false}));
 
 // Ensure the {w: 2} insert has not yet completed.
 assert.eq(

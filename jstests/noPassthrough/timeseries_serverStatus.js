@@ -62,7 +62,8 @@ const testWithInsertPaused = function(docs) {
 
     const awaitInsert = startParallelShell(
         funWithArgs(function(dbName, collName, docs) {
-            assert.commandWorked(db.getSiblingDB(dbName).getCollection(collName).insert(docs));
+            assert.commandWorked(
+                db.getSiblingDB(dbName).getCollection(collName).insert(docs, {ordered: false}));
         }, dbName, coll.getName(), docs), conn.port);
 
     fp.wait();

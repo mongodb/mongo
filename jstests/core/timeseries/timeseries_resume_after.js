@@ -49,7 +49,8 @@ for (let i = 0; i < 100; i++) {
         time: ISODate(),
         fields: host.fields,
         tags: host.tags,
-    }));
+    },
+                                     {ordered: false}));
 }
 
 // Run the initial query and request to return a resume token. We're interested only in a single

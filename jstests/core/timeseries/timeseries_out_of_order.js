@@ -42,7 +42,7 @@ const runTest = function(bucketsFn) {
         testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
     assert.contains(bucketsColl.getName(), testDB.getCollectionNames());
 
-    assert.commandWorked(coll.insert(docs));
+    assert.commandWorked(coll.insert(docs, {ordered: false}));
     assert.docEq(coll.find().sort({_id: 1}).toArray(), docs);
 
     const buckets = bucketsColl.find().sort({_id: 1}).toArray();

@@ -48,7 +48,8 @@ const runTest = function(docsBucketA, docsBucketB) {
     assert.contains(bucketsColl.getName(), testDB.getCollectionNames());
 
     let docs = docsBucketA.concat(docsBucketB);
-    assert.commandWorked(coll.insert(docs), 'failed to insert docs: ' + tojson(docs));
+    assert.commandWorked(coll.insert(docs, {ordered: false}),
+                         'failed to insert docs: ' + tojson(docs));
 
     // Check view.
     const viewDocs = coll.find({}).sort({_id: 1}).toArray();

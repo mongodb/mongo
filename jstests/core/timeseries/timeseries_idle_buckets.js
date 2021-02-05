@@ -40,19 +40,21 @@ const numDocs = 100;
 const metaValue = 'a'.repeat(1024 * 1024);
 for (let i = 0; i < numDocs; i++) {
     assert.commandWorked(
-        coll.insert({[timeFieldName]: ISODate(), [metaFieldName]: {[i.toString()]: metaValue}}));
+        coll.insert({[timeFieldName]: ISODate(), [metaFieldName]: {[i.toString()]: metaValue}},
+                    {ordered: false}));
 }
 
 // Insert a document with the metadata of a bucket which should have been expired. Thus, a new
 // bucket will be created.
-assert.commandWorked(coll.insert({[timeFieldName]: ISODate(), [metaFieldName]: {0: metaValue}}));
+assert.commandWorked(
+    coll.insert({[timeFieldName]: ISODate(), [metaFieldName]: {0: metaValue}}, {ordered: false}));
 let bucketDocs = bucketsColl.find({meta: {0: metaValue}}).toArray();
 assert.eq(bucketDocs.length, 2, 'Invalid number of buckets for metadata 0: ' + tojson(bucketDocs));
 
 // Insert a document with the metadata of a bucket with should still be open. Thus, the existing
 // bucket will be used.
-assert.commandWorked(
-    coll.insert({[timeFieldName]: ISODate(), [metaFieldName]: {[numDocs - 1]: metaValue}}));
+assert.commandWorked(coll.insert(
+    {[timeFieldName]: ISODate(), [metaFieldName]: {[numDocs - 1]: metaValue}}, {ordered: false}));
 bucketDocs = bucketsColl.find({meta: {[numDocs - 1]: metaValue}}).toArray();
 assert.eq(bucketDocs.length,
           1,

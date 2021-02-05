@@ -41,7 +41,8 @@ const runTest = function(numDocsPerInsert) {
     for (let i = 0; i < numDocs; i++) {
         docs.push({_id: i, [timeFieldName]: ISODate(), x: i});
         if ((i + 1) % numDocsPerInsert === 0) {
-            assert.commandWorked(coll.insert(docs), 'failed to insert docs: ' + tojson(docs));
+            assert.commandWorked(coll.insert(docs, {ordered: false}),
+                                 'failed to insert docs: ' + tojson(docs));
             docs = [];
         }
     }
