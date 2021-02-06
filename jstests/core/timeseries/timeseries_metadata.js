@@ -21,8 +21,7 @@ if (!TimeseriesTest.timeseriesCollectionsEnabled(db.getMongo())) {
     return;
 }
 
-const testDB = db.getSiblingDB(jsTestName());
-assert.commandWorked(testDB.dropDatabase());
+const collNamePrefix = 'timeseries_metadata_';
 
 const timeFieldName = 'time';
 const metaFieldName = 'meta';
@@ -35,17 +34,17 @@ let collCount = 0;
  * time-series collection.
  */
 const runTest = function(docsBucketA, docsBucketB) {
-    const coll = testDB.getCollection('t_' + collCount++);
-    const bucketsColl = testDB.getCollection('system.buckets.' + coll.getName());
+    const coll = db.getCollection(collNamePrefix + collCount++);
+    const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
     coll.drop();
 
     jsTestLog('Running test: collection: ' + coll.getFullName() +
               '; bucket collection: ' + bucketsColl.getFullName() +
               '; bucketA: ' + tojson(docsBucketA) + '; bucketB: ' + tojson(docsBucketB));
 
-    assert.commandWorked(testDB.createCollection(
+    assert.commandWorked(db.createCollection(
         coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
-    assert.contains(bucketsColl.getName(), testDB.getCollectionNames());
+    assert.contains(bucketsColl.getName(), db.getCollectionNames());
 
     let docs = docsBucketA.concat(docsBucketB);
     assert.commandWorked(coll.insert(docs, {ordered: false}),

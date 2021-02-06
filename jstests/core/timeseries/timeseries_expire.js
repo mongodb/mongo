@@ -26,20 +26,17 @@ if (true) {
     return;
 }
 
-const testDB = db.getSiblingDB(jsTestName());
-assert.commandWorked(testDB.dropDatabase());
-
-const coll = testDB.getCollection('t');
-const bucketsColl = testDB.getCollection('system.buckets.' + coll.getName());
+const coll = db.timeseries_expire;
+const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
 
 coll.drop();
 
 const timeFieldName = 'time';
 const expireAfterSeconds = NumberLong(5);
-assert.commandWorked(testDB.createCollection(
+assert.commandWorked(db.createCollection(
     coll.getName(),
     {timeseries: {timeField: timeFieldName, expireAfterSeconds: expireAfterSeconds}}));
-assert.contains(bucketsColl.getName(), testDB.getCollectionNames());
+assert.contains(bucketsColl.getName(), db.getCollectionNames());
 
 // Inserts a measurement with a time in the past to ensure the measurement will be removed
 // immediately.
