@@ -32,7 +32,6 @@ selector:
   - jstests/sharding/cursor1.js
   - jstests/sharding/diffservers1.js
   - jstests/sharding/disable_autosplit.js
-  - jstests/sharding/drop_sharded_db.js
   - jstests/sharding/findandmodify1.js
   - jstests/sharding/findandmodify_autosplit.js
   - jstests/sharding/query/geo_near_sharded.js

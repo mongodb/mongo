@@ -132,37 +132,6 @@ s.printCollectionInfo("test.foo", "after counts");
 assert.eq(0, primary.count(), "p count after drop");
 assert.eq(0, secondary.count(), "s count after drop");
 
-print("*** dropDatabase setup");
-
-s.printShardingStatus();
-assert.commandWorked(s.s0.adminCommand({shardcollection: "test.foo", key: {num: 1}}));
-a.save({num: 2});
-a.save({num: 3});
-assert.commandWorked(s.s0.adminCommand({split: "test.foo", middle: {num: 2}}));
-assert.commandWorked(s.s0.adminCommand({
-    movechunk: "test.foo",
-    find: {num: 3},
-    to: s.getOther(s.getPrimaryShard("test")).name,
-    _waitForDelete: true
-}));
-s.printShardingStatus();
-
-s.printCollectionInfo("test.foo", "after dropDatabase setup");
-doCounts("after dropDatabase setup2");
-s.printCollectionInfo("test.foo", "after dropDatabase setup3");
-
-print("*** ready to call dropDatabase");
-assert.commandWorked(s.s0.getDB("test").dropDatabase());
-
-// Waiting for SERVER-2253
-assert.eq(0,
-          s.config.databases.count({_id: "test"}),
-          "database 'test' was dropped but still appears in configDB");
-
-s.printShardingStatus();
-s.printCollectionInfo("test.foo", "after dropDatabase call 1");
-assert.eq(0, doCounts("after dropDatabase called"));
-
 // ---- retry commands SERVER-1471 ----
 
 assert.commandWorked(s.s0.adminCommand({enablesharding: "test2"}));

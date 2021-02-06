@@ -149,7 +149,7 @@ MongoRunner.stopMongod(conn);
 const st = new ShardingTest({shards: 2});
 db = st.s.getDB(jsTest.name());
 coll = db[collName];
-st.shardColl(coll.getFullName(), {_id: 1}, {_id: "hashed"});
+st.shardColl(coll, {_id: 1}, {_id: "hashed"});
 
 runTests(db, coll);
 

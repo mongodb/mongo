@@ -27,7 +27,7 @@ selector:
   - jstests/sharding/safe_secondary_reads_drop_recreate.js
   - jstests/sharding/stale_mongos_updates_and_removes.js
   - jstests/sharding/read_pref.js
-  - jstests/sharding/drop_sharded_db.js
+  - jstests/sharding/drop_database.js
   - jstests/sharding/enforce_zone_policy.js
   - jstests/sharding/rs_stepdown_and_pooling.js
   - jstests/sharding/primary_config_server_blackholed_from_mongos.js
@@ -232,7 +232,6 @@ selector:
   - jstests/sharding/shard_collection_verify_initial_chunks.js
   - jstests/sharding/query/geo_near_sort.js
   - jstests/sharding/noUpdateButN1inAnotherCollection.js
-  - jstests/sharding/shard_with_special_db_names.js
   - jstests/sharding/large_skip_one_shard.js
   - jstests/sharding/min_optime_recovery_on_successful_move_chunk_commit.js
   - jstests/sharding/autosplit.js
