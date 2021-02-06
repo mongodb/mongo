@@ -1,7 +1,5 @@
-// TODO SERVER-52734: remove sbe_incompatible tag
 // @tags: [
 //   assumes_balancer_off,
-//   sbe_incompatible,
 // ]
 
 t = db.regex3;

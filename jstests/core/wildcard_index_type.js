@@ -1,9 +1,5 @@
 /**
  * Test $** support for the $type operator.
- * TODO SERVER-52734: remove sbe_incompatible tag
- * @tags: [
- *   sbe_incompatible,
- * ]
  */
 (function() {
 "use strict";
@@ -37,7 +33,7 @@ function assertExpectedDocAnswersWildcardIndexQuery(doc, query, match, expectedB
     assert.eq(1, explain.executionStats.nReturned, explain);
 
     // Winning plan uses a wildcard index scan.
-    const winningPlan = explain.queryPlanner.winningPlan;
+    const winningPlan = getWinningPlan(explain.queryPlanner);
     const ixScans = getPlanStages(winningPlan, "IXSCAN");
     assert.gt(ixScans.length, 0, explain);
     ixScans.forEach((ixScan) => assert(ixScan.keyPattern.$_path));

@@ -113,6 +113,8 @@ using MakePredicateFn =
  * A struct for storing context across calls to visit() methods in MatchExpressionVisitor's.
  */
 struct MatchExpressionVisitorContext {
+    // Construct a visitor context to generate a filter expression from a single input slot
+    // holding a document against which to perform the match.
     MatchExpressionVisitorContext(OperationContext* opCtx,
                                   sbe::value::SlotIdGenerator* slotIdGenerator,
                                   sbe::value::FrameIdGenerator* frameIdGenerator,
@@ -132,6 +134,49 @@ struct MatchExpressionVisitorContext {
           stateHelper{stateHelper} {
         // Set up the top-level EvalFrame.
         evalStack.emplaceFrame(std::move(inputStage), inputSlot);
+
+        // If the root node is an $and, store it in 'topLevelAnd'.
+        // TODO: SERVER-50673: Revisit how we implement the top-level $and optimization.
+        if (root->matchType() == MatchExpression::AND) {
+            topLevelAnd = root;
+        }
+    }
+
+    // Construct a visitor context to generate a filter expression that is attached to an index
+    // scan and can evaluate an expression from the index keys without fetching an entire document.
+    // Instead of a single input slot holding the root document, it takes a vector of 'keySlots' and
+    // 'keyFields' which represent a subset of the fields of the index key pattern that are depended
+    // on to evaluate the predicate, and corresponding slots for each of the key fields.
+    MatchExpressionVisitorContext(OperationContext* opCtx,
+                                  sbe::value::SlotIdGenerator* slotIdGenerator,
+                                  sbe::value::FrameIdGenerator* frameIdGenerator,
+                                  EvalStage inputStage,
+                                  sbe::value::SlotVector keySlots,
+                                  std::vector<std::string> keyFields,
+                                  const MatchExpression* root,
+                                  sbe::RuntimeEnvironment* env,
+                                  PlanNodeId planNodeId,
+                                  const FilterStateHelper& stateHelper)
+        : opCtx{opCtx},
+          slotIdGenerator{slotIdGenerator},
+          frameIdGenerator{frameIdGenerator},
+          topLevelAnd{nullptr},
+          env{env},
+          planNodeId{planNodeId},
+          stateHelper{stateHelper} {
+        // Set up the top-level EvalFrame.
+        evalStack.emplaceFrame(std::move(inputStage), boost::none);
+
+        tassert(5273400, "Index key slots vector is empty", keySlots.size() > 0);
+        tassert(5273401,
+                "Mismatch between index key slots and fields",
+                keySlots.size() == keyFields.size());
+
+        for (size_t idx = 0; idx < keySlots.size(); ++idx) {
+            auto&& field = keyFields[idx];
+            tassert(5273410, "Index key field is empty", !field.empty());
+            indexKeySlots[field] = keySlots[idx];
+        }
 
         // If the root node is an $and, store it in 'topLevelAnd'.
         // TODO: SERVER-50673: Revisit how we implement the top-level $and optimization.
@@ -166,14 +211,26 @@ struct MatchExpressionVisitorContext {
     }
 
     struct FrameData {
-        sbe::value::SlotId inputSlot;
+        // For an index filter we don't build a traversal sub-tree, and do not use complex
+        // expressions, such as $elemMatch or nested logical $and/$or/$nor. As such, we don't need
+        // to create nested EvalFrames, and we don't need an 'inputSlot' for the frame, because
+        // values are read from the 'indexKeySlots' map  stored in the context. Yet, we still need a
+        // top-level EvalFrame, as the the entire filter generator logic is based on the assumption
+        // that we've got at least one EvalFrame. Hence, the 'inputSlot' is declared optional.
+        boost::optional<sbe::value::SlotId> inputSlot;
 
-        FrameData(sbe::value::SlotId inputSlot) : inputSlot{inputSlot} {}
+        FrameData(boost::optional<sbe::value::SlotId> inputSlot) : inputSlot{inputSlot} {}
     };
 
     OperationContext* opCtx;
     EvalStack<FrameData> evalStack;
-    sbe::value::SlotId inputSlot;
+    // The current context must be initialized either with an 'inputSlot' over which an entire match
+    // expression needs to be evaluated, or a pair of 'keySlots' and 'keyFields' vectors
+    // representing a subset of the fields of the index key pattern that are depended on to evaluate
+    // the predicate, and corresponding slots for each of the fields, which are stored in
+    // 'indexKeySlots' map.
+    boost::optional<sbe::value::SlotId> inputSlot;
+    StringMap<sbe::value::SlotId> indexKeySlots;
     sbe::value::SlotIdGenerator* slotIdGenerator;
     sbe::value::FrameIdGenerator* frameIdGenerator;
     const MatchExpression* topLevelAnd;
@@ -401,24 +458,47 @@ void generatePredicate(MatchExpressionVisitorContext* context,
                        LeafTraversalMode mode = LeafTraversalMode::kArrayAndItsElements,
                        bool useCombinator = true) {
     auto& frame = context->evalStack.topFrame();
+
     auto&& [expr, stage] = [&]() {
-        if (!path.empty()) {
-            return generatePathTraversal(frame.extractStage(),
-                                         frame.data().inputSlot,
-                                         FieldRef{path},
-                                         0,
-                                         context->planNodeId,
-                                         context->slotIdGenerator,
-                                         context->frameIdGenerator,
-                                         makePredicate,
-                                         mode,
-                                         context->stateHelper);
+        if (frame.data().inputSlot) {
+            if (!path.empty()) {
+                return generatePathTraversal(frame.extractStage(),
+                                             *frame.data().inputSlot,
+                                             FieldRef{path},
+                                             0,
+                                             context->planNodeId,
+                                             context->slotIdGenerator,
+                                             context->frameIdGenerator,
+                                             makePredicate,
+                                             mode,
+                                             context->stateHelper);
+            } else {
+                // If matchExpr's parent is a ElemMatchValueMatchExpression, then
+                // matchExpr()->path() will be empty. In this case, 'inputSlot' will be a
+                // "correlated slot" that holds the value of the ElemMatchValueMatchExpression's
+                // field path, and we should apply the predicate directly on 'inputSlot' without
+                // array traversal.
+                auto result = makePredicate(*frame.data().inputSlot, frame.extractStage());
+                if (useCombinator) {
+                    return context->stateHelper.makePredicateCombinator(std::move(result));
+                }
+                return result;
+            }
         } else {
-            // If matchExpr's parent is a ElemMatchValueMatchExpression, then matchExpr()->path()
-            // will be empty. In this case, 'inputSlot' will be a "correlated slot" that holds the
-            // value of the ElemMatchValueMatchExpression's field path, and we should apply the
-            // predicate directly on 'inputSlot' without array traversal.
-            auto result = makePredicate(frame.data().inputSlot, frame.extractStage());
+            // If an input slot for the current frame is not defined, then we must generating a
+            // filter predicate for an index scan. In this case we don't need to perform any complex
+            // path traversal but rather evaluate the predicate directly on the input slot for the
+            // current field path - the index scan will extract the value for this field path and
+            // will store it in a corresponding slot in the 'indexKeySlots' map.
+
+            tassert(5273402, "Field path cannot be empty for an index filter", !path.empty());
+
+            auto it = context->indexKeySlots.find(path.toString());
+            tassert(5273403,
+                    str::stream() << "Unknown field path in index filter: " << path,
+                    it != context->indexKeySlots.end());
+
+            auto result = makePredicate(it->second, frame.extractStage());
             if (useCombinator) {
                 return context->stateHelper.makePredicateCombinator(std::move(result));
             }
@@ -1028,7 +1108,10 @@ public:
 
         // Extract the input slot, the output, and the stage from of the child's EvalFrame, and
         // remove the child's EvalFrame from the stack.
-        auto childInputSlot = _context->evalStack.topFrame().data().inputSlot;
+        tassert(5273405,
+                "Eval frame's input slot is not defined",
+                static_cast<bool>(_context->evalStack.topFrame().data().inputSlot));
+        auto childInputSlot = *_context->evalStack.topFrame().data().inputSlot;
         auto [filterSlot, filterStage] = [&]() {
             auto [expr, stage] = _context->evalStack.popFrame();
             auto [predicateSlot, predicateStage] = projectEvalExpr(
@@ -1068,7 +1151,10 @@ public:
         auto numChildren = matchExpr->numChildren();
         invariant(numChildren >= 1);
 
-        auto childInputSlot = _context->evalStack.topFrame().data().inputSlot;
+        tassert(5273406,
+                "Eval frame's input slot is not defined",
+                static_cast<bool>(_context->evalStack.topFrame().data().inputSlot));
+        auto childInputSlot = *_context->evalStack.topFrame().data().inputSlot;
 
         // Move the children's outputs off of the evalStack into a vector in preparation for
         // calling generateShortCircuitingLogicalOp().
@@ -1132,8 +1218,16 @@ public:
 
         // The $expr expression must by applied to the current $$ROOT document, so make sure that
         // an input slot associated with the current frame is the same slot as the input slot for
-        // the entire match expression we're translating.
-        invariant(frame.data().inputSlot == _context->inputSlot);
+        // the entire match expression we're translating
+        tassert(5273407,
+                "Match expression's input slot is not defined",
+                static_cast<bool>(_context->inputSlot));
+        tassert(5273408,
+                "Eval frame's input slot is not defined",
+                static_cast<bool>(frame.data().inputSlot));
+        tassert(5273409,
+                "Eval frame for $expr is not computed over expression's input slot",
+                *frame.data().inputSlot == *_context->inputSlot);
 
         auto currentStage = stageOrLimitCoScan(frame.extractStage(), _context->planNodeId);
         auto&& [_, expr, stage] = generateExpression(_context->opCtx,
@@ -1141,7 +1235,7 @@ public:
                                                      std::move(currentStage.stage),
                                                      _context->slotIdGenerator,
                                                      _context->frameIdGenerator,
-                                                     frame.data().inputSlot,
+                                                     *frame.data().inputSlot,
                                                      _context->env,
                                                      _context->planNodeId,
                                                      &currentStage.outSlots);
@@ -1626,5 +1720,53 @@ std::pair<boost::optional<sbe::value::SlotId>, std::unique_ptr<sbe::PlanStage>> 
 
     auto [resultSlot, resultStage] = context.done();
     return {resultSlot, std::move(resultStage.stage)};
+}
+
+std::unique_ptr<sbe::PlanStage> generateIndexFilter(OperationContext* opCtx,
+                                                    const MatchExpression* root,
+                                                    std::unique_ptr<sbe::PlanStage> stage,
+                                                    sbe::value::SlotIdGenerator* slotIdGenerator,
+                                                    sbe::value::FrameIdGenerator* frameIdGenerator,
+                                                    sbe::value::SlotVector keySlots,
+                                                    std::vector<std::string> keyFields,
+                                                    sbe::RuntimeEnvironment* env,
+                                                    sbe::value::SlotVector relevantSlots,
+                                                    PlanNodeId planNodeId) {
+    // The planner adds an $and expression without the operands if the query was empty. We can bail
+    // out early without generating the filter plan stage if this is the case.
+    if (root->matchType() == MatchExpression::AND && root->numChildren() == 0) {
+        return stage;
+    }
+
+    // If 'keySlots' are not present within 'relevantSlots', add them now.
+    for (auto keySlot : keySlots) {
+        if (!std::count(relevantSlots.begin(), relevantSlots.end(), keySlot)) {
+            relevantSlots.push_back(keySlot);
+        }
+    }
+
+    // Index filters never need to track the index of a matching element in the array as they cannot
+    // be used with a positional projection.
+    const bool trackIndex = false;
+    auto stateHelper = makeFilterStateHelper(trackIndex);
+    MatchExpressionVisitorContext context{opCtx,
+                                          slotIdGenerator,
+                                          frameIdGenerator,
+                                          EvalStage{std::move(stage), std::move(relevantSlots)},
+                                          std::move(keySlots),
+                                          std::move(keyFields),
+                                          root,
+                                          env,
+                                          planNodeId,
+                                          *stateHelper};
+    MatchExpressionPreVisitor preVisitor{&context};
+    MatchExpressionInVisitor inVisitor{&context};
+    MatchExpressionPostVisitor postVisitor{&context};
+    MatchExpressionWalker walker{&preVisitor, &inVisitor, &postVisitor};
+    tree_walker::walk<true, MatchExpression>(root, &walker);
+
+    auto [resultSlot, resultStage] = context.done();
+    tassert(5273409, "Index filter must not track a matching element index", !resultSlot);
+    return std::move(resultStage.stage);
 }
 }  // namespace mongo::stage_builder

@@ -1,10 +1,5 @@
 // Test $or with predicates that generate inexact bounds. The access planner
 // has special logic for such queries.
-// TODO SERVER-52734: remove sbe_incompatible tag
-// @tags: [
-//   sbe_incompatible,
-// ]
-
 var t = db.jstests_or_inexact;
 var cursor;
 

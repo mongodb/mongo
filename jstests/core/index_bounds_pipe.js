@@ -1,7 +1,6 @@
 /**
  * Tests the tightness of index bounds when attempting to match a regex that contains escaped and
  * non-escaped pipe '|' characters.
- * TODO SERVER-52734: remove sbe_incompatible tag
  * @tags: [
  *   sbe_incompatible,
  * ]

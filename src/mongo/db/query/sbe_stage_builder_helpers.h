@@ -718,4 +718,32 @@ sbe::value::SlotVector makeIndexKeyOutputSlotsMatchingParentReqs(
     sbe::IndexKeysInclusionSet childIndexKeyReqs,
     sbe::value::SlotVector childOutputSlots);
 
+/**
+ * Given an index key pattern, and a subset of the fields of the index key pattern that are depended
+ * on to compute the query, returns the corresponding 'IndexKeysInclusionSet' bit vector and field
+ * name vector.
+ *
+ * For example, suppose that we have an index key pattern {d: 1, c: 1, b: 1, a: 1}, and the caller
+ * depends on the set of 'requiredFields' {"b", "d"}. In this case, the pair of return values would
+ * be:
+ *  - 'IndexKeysInclusionSet' bit vector of 1010
+ *  - Field name vector of <"d", "b">
+ */
+template <typename T>
+std::pair<sbe::IndexKeysInclusionSet, std::vector<std::string>> makeIndexKeyInclusionSet(
+    const BSONObj& indexKeyPattern, const T& requiredFields) {
+    sbe::IndexKeysInclusionSet indexKeyBitset;
+    std::vector<std::string> keyFieldNames;
+    size_t i = 0;
+    for (auto&& elt : indexKeyPattern) {
+        if (requiredFields.count(elt.fieldName())) {
+            indexKeyBitset.set(i);
+            keyFieldNames.push_back(elt.fieldName());
+        }
+
+        ++i;
+    }
+
+    return {std::move(indexKeyBitset), std::move(keyFieldNames)};
+}
 }  // namespace mongo::stage_builder

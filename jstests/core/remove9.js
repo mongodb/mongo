@@ -1,8 +1,6 @@
-// TODO SERVER-52734: remove sbe_incompatible tag
 // @tags: [
 //   requires_getmore,
 //   requires_non_retryable_writes,
-//   sbe_incompatible,
 //   uses_multiple_connections,
 //   uses_parallel_shell,
 // ]
