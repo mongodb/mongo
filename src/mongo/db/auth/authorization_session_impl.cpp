@@ -90,14 +90,17 @@ Status checkAuthForCreateOrModifyView(AuthorizationSession* authzSession,
         return Status::OK();
     }
 
-    auto request = aggregation_request_helper::parseFromBSON(
+    auto status = aggregation_request_helper::parseFromBSON(
         viewNs,
         BSON("aggregate" << viewOnNs.coll() << "pipeline" << viewPipeline << "cursor" << BSONObj()
                          << "$db" << viewOnNs.db()),
         boost::none,
         false);
+    if (!status.isOK())
+        return status.getStatus();
 
-    auto statusWithPrivs = authzSession->getPrivilegesForAggregate(viewOnNs, request, isMongos);
+    auto statusWithPrivs =
+        authzSession->getPrivilegesForAggregate(viewOnNs, status.getValue(), isMongos);
     PrivilegeVector privileges = uassertStatusOK(statusWithPrivs);
     if (!authzSession->isAuthorizedForPrivileges(privileges)) {
         return Status(ErrorCodes::Unauthorized, "unauthorized");

@@ -138,13 +138,15 @@ public:
                 viewAggCmd,
                 verbosity,
                 APIParameters::get(opCtx).getAPIStrict().value_or(false));
-
+            if (!aggRequestOnView.isOK()) {
+                return aggRequestOnView.getStatus();
+            }
 
             auto bodyBuilder = result->getBodyBuilder();
             // An empty PrivilegeVector is acceptable because these privileges are only checked on
             // getMore and explain will not open a cursor.
             return ClusterAggregate::retryOnViewError(opCtx,
-                                                      aggRequestOnView,
+                                                      aggRequestOnView.getValue(),
                                                       *ex.extraInfo<ResolvedView>(),
                                                       nss,
                                                       PrivilegeVector(),
@@ -214,8 +216,9 @@ public:
                 viewAggCmd,
                 boost::none,
                 APIParameters::get(opCtx).getAPIStrict().value_or(false));
+            uassertStatusOK(aggRequestOnView.getStatus());
 
-            auto resolvedAggRequest = ex->asExpandedViewAggregation(aggRequestOnView);
+            auto resolvedAggRequest = ex->asExpandedViewAggregation(aggRequestOnView.getValue());
             auto resolvedAggCmd =
                 aggregation_request_helper::serializeToCommandObj(resolvedAggRequest);
 

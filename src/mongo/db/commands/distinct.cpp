@@ -166,11 +166,18 @@ public:
                 viewAggCmd,
                 verbosity,
                 APIParameters::get(opCtx).getAPIStrict().value_or(false));
+            if (!viewAggRequest.isOK()) {
+                return viewAggRequest.getStatus();
+            }
 
             // An empty PrivilegeVector is acceptable because these privileges are only checked on
             // getMore and explain will not open a cursor.
-            return runAggregate(
-                opCtx, nss, viewAggRequest, viewAggregation.getValue(), PrivilegeVector(), result);
+            return runAggregate(opCtx,
+                                nss,
+                                viewAggRequest.getValue(),
+                                viewAggregation.getValue(),
+                                PrivilegeVector(),
+                                result);
         }
 
         const auto& collection = ctx->getCollection();

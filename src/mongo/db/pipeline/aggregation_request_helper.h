@@ -58,18 +58,19 @@ static constexpr StringData kBatchSizeField = "batchSize"_sd;
 static constexpr long long kDefaultBatchSize = 101;
 
 /**
- * Create a new instance of AggregateCommand by parsing the raw command object. Throws an exception
- * if a required field was missing, if there was an unrecognized field name, or if there was a bad
- * value for one of the fields.
+ * Create a new instance of AggregateCommand by parsing the raw command object. Returns a
+ * non-OK status if a required field was missing, if there was an unrecognized field name or if
+ * there was a bad value for one of the fields.
  *
  * If we are parsing a request for an explained aggregation with an explain verbosity provided,
  * then 'explainVerbosity' contains this information. In this case, 'cmdObj' may not itself
  * contain the explain specifier. Otherwise, 'explainVerbosity' should be boost::none.
  */
-AggregateCommand parseFromBSON(NamespaceString nss,
-                               const BSONObj& cmdObj,
-                               boost::optional<ExplainOptions::Verbosity> explainVerbosity,
-                               bool apiStrict);
+StatusWith<AggregateCommand> parseFromBSON(
+    NamespaceString nss,
+    const BSONObj& cmdObj,
+    boost::optional<ExplainOptions::Verbosity> explainVerbosity,
+    bool apiStrict);
 
 StatusWith<AggregateCommand> parseFromBSONForTests(
     NamespaceString nss,
@@ -81,10 +82,11 @@ StatusWith<AggregateCommand> parseFromBSONForTests(
  * Convenience overload which constructs the request's NamespaceString from the given database
  * name and command object.
  */
-AggregateCommand parseFromBSON(const std::string& dbName,
-                               const BSONObj& cmdObj,
-                               boost::optional<ExplainOptions::Verbosity> explainVerbosity,
-                               bool apiStrict);
+StatusWith<AggregateCommand> parseFromBSON(
+    const std::string& dbName,
+    const BSONObj& cmdObj,
+    boost::optional<ExplainOptions::Verbosity> explainVerbosity,
+    bool apiStrict);
 
 StatusWith<AggregateCommand> parseFromBSONForTests(
     const std::string& dbName,
@@ -111,6 +113,11 @@ NamespaceString parseNs(const std::string& dbname, const BSONObj& cmdObj);
 Document serializeToCommandDoc(const AggregateCommand& request);
 
 BSONObj serializeToCommandObj(const AggregateCommand& request);
+
+/**
+ * Validate the aggregate command object.
+ */
+Status validate(const BSONObj& cmdObj, boost::optional<ExplainOptions::Verbosity> explainVerbosity);
 }  // namespace aggregation_request_helper
 
 /**

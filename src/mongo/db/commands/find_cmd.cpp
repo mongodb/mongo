@@ -274,11 +274,11 @@ public:
                 auto viewAggCmd = OpMsgRequest::fromDBAndBody(_dbName, viewAggregationCommand).body;
                 // Create the agg request equivalent of the find operation, with the explain
                 // verbosity included.
-                auto aggRequest = aggregation_request_helper::parseFromBSON(
+                auto aggRequest = uassertStatusOK(aggregation_request_helper::parseFromBSON(
                     nss,
                     viewAggCmd,
                     verbosity,
-                    APIParameters::get(opCtx).getAPIStrict().value_or(false));
+                    APIParameters::get(opCtx).getAPIStrict().value_or(false)));
 
                 try {
                     // An empty PrivilegeVector is acceptable because these privileges are only

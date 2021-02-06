@@ -198,11 +198,11 @@ public:
                 auto viewAggregationCommand =
                     OpMsgRequest::fromDBAndBody(_dbName, aggCmdOnView).body;
 
-                auto aggRequestOnView = aggregation_request_helper::parseFromBSON(
+                auto aggRequestOnView = uassertStatusOK(aggregation_request_helper::parseFromBSON(
                     ns(),
                     viewAggregationCommand,
                     verbosity,
-                    APIParameters::get(opCtx).getAPIStrict().value_or(false));
+                    APIParameters::get(opCtx).getAPIStrict().value_or(false)));
 
                 // An empty PrivilegeVector is acceptable because these privileges are only checked
                 // on getMore and explain will not open a cursor.
@@ -264,11 +264,11 @@ public:
                 auto viewAggregationCommand =
                     OpMsgRequest::fromDBAndBody(_dbName, aggCmdOnView).body;
 
-                auto aggRequestOnView = aggregation_request_helper::parseFromBSON(
+                auto aggRequestOnView = uassertStatusOK(aggregation_request_helper::parseFromBSON(
                     ns(),
                     viewAggregationCommand,
                     boost::none,
-                    APIParameters::get(opCtx).getAPIStrict().value_or(false));
+                    APIParameters::get(opCtx).getAPIStrict().value_or(false)));
 
                 auto bodyBuilder = result->getBodyBuilder();
                 uassertStatusOK(ClusterAggregate::retryOnViewError(
