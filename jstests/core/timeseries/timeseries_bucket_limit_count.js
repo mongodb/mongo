@@ -60,6 +60,8 @@ const runTest = function(numDocsPerInsert) {
     const bucketDocs = bucketsColl.find().sort({_id: 1}).toArray();
     assert.eq(2, bucketDocs.length, tojson(bucketDocs));
 
+    jsTestLog('Collection stats for ' + coll.getFullName() + ': ' + tojson(coll.stats()));
+
     // Check both buckets.
     // First bucket should be full with 'bucketMaxCount' documents.
     assert.eq(0,
