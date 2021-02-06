@@ -2,7 +2,6 @@
 // and error cases of the expression.
 // @tags: [
 //   assumes_no_implicit_collection_creation_after_drop,
-//   sbe_incompatible,
 // ]
 load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
 

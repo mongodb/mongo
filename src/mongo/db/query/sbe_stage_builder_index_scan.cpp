@@ -51,6 +51,7 @@
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/sbe_stage_builder.h"
+#include "mongo/db/query/sbe_stage_builder_filter.h"
 #include "mongo/db/query/sbe_stage_builder_helpers.h"
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/logv2/log.h"
@@ -680,10 +681,11 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
     const IndexScanNode* ixn,
     PlanStageReqs reqs,
     sbe::value::SlotIdGenerator* slotIdGenerator,
+    sbe::value::SlotIdGenerator* frameIdGenerator,
     sbe::value::SpoolIdGenerator* spoolIdGenerator,
     PlanYieldPolicy* yieldPolicy,
+    sbe::RuntimeEnvironment* env,
     sbe::LockAcquisitionCallback lockAcquisitionCallback) {
-    uassert(4822864, "Index scans with a filter are not supported in SBE", !ixn->filter);
 
     auto descriptor =
         collection->getIndexCatalog()->findIndexByName(opCtx, ixn->index.identifier.catalogName);
@@ -700,6 +702,25 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
     std::unique_ptr<sbe::EExpression> keyExpr;
 
     PlanStageSlots outputs;
+
+    // Save the bit vector describing the fields from the index that our caller requires. If an
+    // index filter is defined, we may require additional index fields which are not needed by the
+    // parent stage. We will need the parent's reqs later on so that we can hand the correct slot
+    // vector for these fields back to our parent.
+    auto parentIndexKeyBitset = reqs.getIndexKeyBitset();
+
+    // Determine the set of fields from the index required to apply the filter and union those with
+    // the set of fields from the index required by the parent stage.
+    auto [indexFilterKeyBitset, indexFilterKeyFields] = [&]() {
+        if (ixn->filter) {
+            DepsTracker tracker;
+            ixn->filter->addDependencies(&tracker);
+            return makeIndexKeyInclusionSet(ixn->index.keyPattern, tracker.fields);
+        }
+        return std::make_pair(sbe::IndexKeysInclusionSet{}, std::vector<std::string>{});
+    }();
+    reqs.getIndexKeyBitset() =
+        parentIndexKeyBitset.value_or(sbe::IndexKeysInclusionSet{}) | indexFilterKeyBitset;
 
     if (reqs.has(PlanStageSlots::kResult) || reqs.has(PlanStageSlots::kReturnKey)) {
         // If either 'reqs.result' or 'reqs.returnKey' is true, we need to get all parts of the
@@ -788,6 +809,23 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
             std::move(stage), sbe::makeSV(outputs.get(PlanStageSlots::kRecordId)), ixn->nodeId());
     }
 
+    if (ixn->filter) {
+        // We only need to pass those index key slots to the filter generator which correspond to
+        // the fields of the index key pattern that are depended on to compute the predicate.
+        auto indexFilterKeySlots = makeIndexKeyOutputSlotsMatchingParentReqs(
+            ixn->index.keyPattern, indexFilterKeyBitset, indexKeyBitset, indexKeySlots);
+        stage = generateIndexFilter(opCtx,
+                                    ixn->filter.get(),
+                                    std::move(stage),
+                                    slotIdGenerator,
+                                    frameIdGenerator,
+                                    std::move(indexFilterKeySlots),
+                                    std::move(indexFilterKeyFields),
+                                    env,
+                                    sbe::makeSV(outputs.get(PlanStageSlots::kRecordId)),
+                                    ixn->nodeId());
+    }
+
     if (reqs.has(PlanStageSlots::kResult) || reqs.has(PlanStageSlots::kReturnKey)) {
         if (reqs.has(PlanStageSlots::kResult)) {
             outputs.set(PlanStageSlots::kResult, slotIdGenerator->generate());
@@ -811,23 +849,14 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
                                           outputs.get(PlanStageSlots::kReturnKey),
                                           std::move(keyExpr));
         }
-
-        // If either 'reqs.result' or 'reqs.returnKey' is true, then at this point 'indexKeySlots'
-        // contain slots for _all_ parts of the index key. However, we only want to return the slots
-        // that were explicitly requested as given by 'reqs.indexKeyBitset'.
-        if (reqs.getIndexKeyBitset()) {
-            sbe::value::SlotVector outputIndexKeySlots;
-            for (size_t keyIndex = 0; keyIndex < indexKeySlots.size(); ++keyIndex) {
-                if ((*reqs.getIndexKeyBitset())[keyIndex]) {
-                    outputIndexKeySlots.push_back(indexKeySlots[keyIndex]);
-                }
-            }
-
-            outputs.setIndexKeySlots(std::move(outputIndexKeySlots));
-        }
-    } else if (reqs.getIndexKeyBitset()) {
-        outputs.setIndexKeySlots(std::move(indexKeySlots));
     }
+
+    // We only need to return the slots which were explicitly requested by our parent stage.
+    outputs.setIndexKeySlots(
+        !parentIndexKeyBitset
+            ? boost::none
+            : boost::optional<sbe::value::SlotVector>{makeIndexKeyOutputSlotsMatchingParentReqs(
+                  ixn->index.keyPattern, *parentIndexKeyBitset, indexKeyBitset, indexKeySlots)});
 
     return {std::move(stage), std::move(outputs)};
 }

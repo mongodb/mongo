@@ -137,36 +137,6 @@ sbe::LockAcquisitionCallback makeLockAcquisitionCallback(bool checkNodeCanServeR
             opCtx, coll.getNss(), true));
     };
 }
-
-/**
- * Given an index key pattern, and a subset of the fields of the index key pattern that are depended
- * on to compute the query, returns the corresponding 'IndexKeysInclusionSet' bit vector and field
- * name vector.
- *
- * For example, suppose that we have an index key pattern {d: 1, c: 1, b: 1, a: 1}, and the caller
- * depends on the set of 'requiredFields' {"b", "d"}. In this case, the pair of return values would
- * be:
- *  - 'IndexKeysInclusionSet' bit vector of 1010
- *  - Field name vector of <"d", "b">
- */
-template <typename T>
-std::pair<sbe::IndexKeysInclusionSet, std::vector<std::string>> makeIndexKeyInclusionSet(
-    const BSONObj& indexKeyPattern, const T& requiredFields) {
-    sbe::IndexKeysInclusionSet indexKeyBitset;
-    std::vector<std::string> keyFieldNames;
-    size_t i = 0;
-    for (auto&& elt : indexKeyPattern) {
-        if (requiredFields.count(elt.fieldNameStringData())) {
-            indexKeyBitset.set(i);
-            keyFieldNames.push_back(elt.fieldName());
-        }
-
-        ++i;
-    }
-
-    return {std::move(indexKeyBitset), std::move(keyFieldNames)};
-}
-
 }  // namespace
 
 SlotBasedStageBuilder::SlotBasedStageBuilder(OperationContext* opCtx,
@@ -345,8 +315,10 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                              ixn,
                              reqs,
                              &_slotIdGenerator,
+                             &_frameIdGenerator,
                              &_spoolIdGenerator,
                              _yieldPolicy,
+                             _data.env,
                              _lockAcquisitionCallback);
 }
 

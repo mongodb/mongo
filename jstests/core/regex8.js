@@ -1,10 +1,3 @@
-
-/**
- * TODO SERVER-52734: remove sbe_incompatible tag
- * @tags: [
- *   sbe_incompatible,
- * ]
- */
 t = db.regex8;
 t.drop();
 

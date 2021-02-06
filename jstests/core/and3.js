@@ -1,10 +1,8 @@
 // Check key match with sub matchers - part of SERVER-3192
-// TODO SERVER-52734: remove sbe_incompatible tag
 // @tags: [
 //   assumes_balancer_off,
 //   # Uses $where operator
 //   requires_scripting,
-//   sbe_incompatible,
 // ]
 
 t = db.jstests_and3;
