@@ -104,13 +104,16 @@ env.Library(
     target='sbe_plan_stage_test',
     source=[
         'sbe_plan_stage_test.cpp',
-        ],
+    ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/query/sbe_stage_builder_helpers',
         '$BUILD_DIR/mongo/unittest/unittest',
         'query_sbe',
-        ]
-    )
+    ],
+    LIBDEPS_TYPEINFO=[
+        '$BUILD_DIR/mongo/db/service_context_test_fixture'
+    ],
+)
 
 env.CppUnitTest(
     target='db_sbe_test',

@@ -2,6 +2,7 @@
 
 Import('env')
 Import("get_option")
+Import('wiredtiger')
 
 env = env.Clone()
 
@@ -339,48 +340,49 @@ env.Library(
     ],
 )
 
-env.CppUnitTest(
-    target='client_test',
-    source=[
-        'authenticate_test.cpp',
-        'connection_string_test.cpp',
-        'dbclient_cursor_test.cpp',
-        'fetcher_test.cpp',
-        'index_spec_test.cpp',
-        'mongo_uri_test.cpp',
-        'read_preference_test.cpp',
-        'remote_command_retry_scheduler_test.cpp',
-        'replica_set_monitor_server_parameters_test.cpp',
-        'server_discovery_monitor_expedited_test.cpp',
-        'server_discovery_monitor_test.cpp',
-        'server_ping_monitor_test.cpp',
-        'streamable_replica_set_monitor_error_handler_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/client/sdam/sdam',
-        '$BUILD_DIR/mongo/client/sdam/sdam_test',
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/service_context_test_fixture',
-        '$BUILD_DIR/mongo/db/write_concern_options',
-        '$BUILD_DIR/mongo/dbtests/mocklib',
-        '$BUILD_DIR/mongo/executor/network_interface_mock',
-        '$BUILD_DIR/mongo/executor/task_executor_test_fixture',
-        '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
-        '$BUILD_DIR/mongo/rpc/command_status',
-        '$BUILD_DIR/mongo/transport/transport_layer_egress_init',
-        '$BUILD_DIR/mongo/unittest/task_executor_proxy',
-        '$BUILD_DIR/mongo/util/md5',
-        '$BUILD_DIR/mongo/util/net/network',
-        'authentication',
-        'clientdriver_minimal',
-        'clientdriver_network',
-        'connection_string',
-        'fetcher',
-        'read_preference',
-        'remote_command_retry_scheduler',
-        'replica_set_monitor_protocol_test_util',
-    ],
-)
+if wiredtiger:
+    env.CppUnitTest(
+        target='client_test',
+        source=[
+            'authenticate_test.cpp',
+            'connection_string_test.cpp',
+            'dbclient_cursor_test.cpp',
+            'fetcher_test.cpp',
+            'index_spec_test.cpp',
+            'mongo_uri_test.cpp',
+            'read_preference_test.cpp',
+            'remote_command_retry_scheduler_test.cpp',
+            'replica_set_monitor_server_parameters_test.cpp',
+            'server_discovery_monitor_expedited_test.cpp',
+            'server_discovery_monitor_test.cpp',
+            'server_ping_monitor_test.cpp',
+            'streamable_replica_set_monitor_error_handler_test.cpp',
+        ],
+        LIBDEPS=[
+            '$BUILD_DIR/mongo/client/sdam/sdam',
+            '$BUILD_DIR/mongo/client/sdam/sdam_test',
+            '$BUILD_DIR/mongo/db/auth/authmocks',
+            '$BUILD_DIR/mongo/db/service_context_test_fixture',
+            '$BUILD_DIR/mongo/db/write_concern_options',
+            '$BUILD_DIR/mongo/dbtests/mocklib',
+            '$BUILD_DIR/mongo/executor/network_interface_mock',
+            '$BUILD_DIR/mongo/executor/task_executor_test_fixture',
+            '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
+            '$BUILD_DIR/mongo/rpc/command_status',
+            '$BUILD_DIR/mongo/transport/transport_layer_egress_init',
+            '$BUILD_DIR/mongo/unittest/task_executor_proxy',
+            '$BUILD_DIR/mongo/util/md5',
+            '$BUILD_DIR/mongo/util/net/network',
+            'authentication',
+            'clientdriver_minimal',
+            'clientdriver_network',
+            'connection_string',
+            'fetcher',
+            'read_preference',
+            'remote_command_retry_scheduler',
+            'replica_set_monitor_protocol_test_util',
+        ],
+    )
 
 env.CppIntegrationTest(
     target='replica_set_monitor_integration_test',

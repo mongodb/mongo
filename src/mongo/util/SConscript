@@ -318,11 +318,11 @@ if env['MONGO_ALLOCATOR'] in ['tcmalloc', 'tcmalloc-experimental']:
             'heap_profiler.cpp',
         ],
         LIBDEPS=[
-            '$BUILD_DIR/mongo/transport/service_executor',
         ],
         LIBDEPS_PRIVATE=[
             '$BUILD_DIR/mongo/db/commands/server_status',
             '$BUILD_DIR/mongo/idl/server_parameter',
+            '$BUILD_DIR/mongo/transport/service_executor',
             'processinfo',
         ],
         LIBDEPS_DEPENDENTS=[
@@ -331,8 +331,7 @@ if env['MONGO_ALLOCATOR'] in ['tcmalloc', 'tcmalloc-experimental']:
         ],
         LIBDEPS_TAGS=[
             'lint-allow-nonprivate-on-deps-dependents',
-        ]
-
+        ],
     )
 
 env.Library(

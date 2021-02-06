@@ -147,32 +147,33 @@ env.Library(
     ],
 )
 
-env.CppUnitTest(
-    target='rpc_test',
-    source=[
-        'get_status_from_command_result_test.cpp',
-        'legacy_request_test.cpp',
-        'metadata/client_metadata_test.cpp',
-        'metadata/config_server_metadata_test.cpp',
-        'metadata/egress_metadata_hook_list_test.cpp',
-        'metadata/oplog_query_metadata_test.cpp',
-        'metadata/repl_set_metadata_test.cpp',
-        'metadata/sharding_metadata_test.cpp',
-        'metadata/tracking_metadata_test.cpp',
-        'metadata_test.cpp',
-        'object_check_test.cpp',
-        'op_msg_test.cpp',
-        'protocol_test.cpp',
-        'reply_builder_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/client/clientdriver_minimal',
-        '$BUILD_DIR/third_party/wiredtiger/wiredtiger_checksum',
-        'client_metadata',
-        'metadata',
-        'rpc',
-    ]
-)
+if wiredtiger:
+    env.CppUnitTest(
+        target='rpc_test',
+        source=[
+            'get_status_from_command_result_test.cpp',
+            'legacy_request_test.cpp',
+            'metadata/client_metadata_test.cpp',
+            'metadata/config_server_metadata_test.cpp',
+            'metadata/egress_metadata_hook_list_test.cpp',
+            'metadata/oplog_query_metadata_test.cpp',
+            'metadata/repl_set_metadata_test.cpp',
+            'metadata/sharding_metadata_test.cpp',
+            'metadata/tracking_metadata_test.cpp',
+            'metadata_test.cpp',
+            'object_check_test.cpp',
+            'op_msg_test.cpp',
+            'protocol_test.cpp',
+            'reply_builder_test.cpp',
+        ],
+        LIBDEPS=[
+            '$BUILD_DIR/mongo/client/clientdriver_minimal',
+            '$BUILD_DIR/third_party/wiredtiger/wiredtiger_checksum',
+            'client_metadata',
+            'metadata',
+            'rpc',
+        ]
+    )
 
 env.CppIntegrationTest(
     target='rpc_integration_test',

@@ -550,7 +550,7 @@ class LibdepLinter:
         if self._check_for_lint_tags('lint-allow-nonprivate-on-deps-dependents'):
             return
 
-        if (libdep.dependency_type != deptype.Private
+        if (libdep.dependency_type != deptype.Private and libdep.dependency_type != deptype.Global
             and len(self._get_deps_dependents()) > 0):
 
             target_type = self.target[0].builder.get_name(self.env)
