@@ -514,5 +514,84 @@ TEST(LegacyWriteOpsParsers, Remove) {
     }
 }
 
+/**
+ * Test OpTime serializer and deserializer when OpTime does not have term initailized.
+ */
+TEST(OpTimeSerdes, OpTimeWithoutTerm) {
+    const auto fieldName = "opTime";
+    repl::OpTime opTime(Timestamp(10, 20), repl::OpTime::kUninitializedTerm);
+    BSONObjBuilder bob;
+
+    write_ops::opTimeSerializerWithTermCheck(opTime, "opTime", &bob);
+
+    auto bsonObj = bob.done();
+    auto bsonElem = bsonObj[fieldName];
+
+    ASSERT_FALSE(bsonElem.eoo());
+
+    repl::OpTime retOpTime = write_ops::opTimeParser(bsonElem);
+
+    ASSERT_EQ(opTime.getTimestamp(), retOpTime.getTimestamp());
+    ASSERT_EQ(opTime.getTerm(), retOpTime.getTerm());
+}
+
+/**
+ * Test OpTime serializer and deserializer when OpTime have term initailized.
+ */
+TEST(OpTimeSerdes, OpTimeWithTerm) {
+    const auto fieldName = "opTime";
+    repl::OpTime opTime(Timestamp(10, 20), 10);
+    BSONObjBuilder bob;
+
+    write_ops::opTimeSerializerWithTermCheck(opTime, "opTime", &bob);
+
+    auto bsonObj = bob.done();
+    auto bsonElem = bsonObj[fieldName];
+
+    ASSERT_FALSE(bsonElem.eoo());
+
+    repl::OpTime retOpTime = write_ops::opTimeParser(bsonElem);
+
+    ASSERT_EQ(opTime.getTimestamp(), retOpTime.getTimestamp());
+    ASSERT_EQ(opTime.getTerm(), retOpTime.getTerm());
+}
+
+/**
+ * Test OpTime deserializer by directly passing Timestamp to the OpTime deserializer.
+ */
+TEST(OpTimeSerdes, DeserializeWithTimestamp) {
+    const auto fieldName = "opTime";
+    Timestamp timestamp(10, 20);
+    BSONObjBuilder bob;
+
+    bob.append(fieldName, timestamp);
+
+    auto bsonObj = bob.done();
+    auto bsonElem = bsonObj[fieldName];
+
+    ASSERT_FALSE(bsonElem.eoo());
+
+    repl::OpTime retOpTime = write_ops::opTimeParser(bsonElem);
+
+    ASSERT_EQ(timestamp, retOpTime.getTimestamp());
+    ASSERT_EQ(repl::OpTime::kUninitializedTerm, retOpTime.getTerm());
+}
+
+/**
+ * Test OpTime deserializer by passing invalid BSON type.
+ */
+TEST(OpTimeSerdes, DeserializeWithInvalidBSONType) {
+    const auto fieldName = "opTime";
+    BSONObjBuilder bob;
+
+    bob.append(fieldName, 100);
+
+    auto bsonObj = bob.done();
+    auto bsonElem = bsonObj[fieldName];
+
+    ASSERT_FALSE(bsonElem.eoo());
+    ASSERT_THROWS_CODE(write_ops::opTimeParser(bsonElem), DBException, ErrorCodes::TypeMismatch);
+}
+
 }  // namespace
 }  // namespace mongo

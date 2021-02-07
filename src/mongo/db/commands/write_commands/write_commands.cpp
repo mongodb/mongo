@@ -235,14 +235,6 @@ BSONArray makeTimeseriesInsertDocument(const BucketCatalog::BucketId& bucketId,
     return builder.arr();
 }
 
-void appendOpTime(const repl::OpTime& opTime, BSONObjBuilder* out) {
-    if (opTime.getTerm() == repl::OpTime::kUninitializedTerm) {
-        out->append("opTime", opTime.getTimestamp());
-    } else {
-        opTime.append(out, "opTime");
-    }
-}
-
 /**
  * Returns true if the time-series write is retryable.
  */
@@ -254,50 +246,6 @@ bool isTimeseriesWriteRetryable(OperationContext* opCtx) {
     if (opCtx->inMultiDocumentTransaction()) {
         return false;
     }
-
-    return true;
-}
-
-/**
- * Returns true if the retryable time-series write has been executed.
- */
-bool isRetryableTimeseriesWriteExecuted(OperationContext* opCtx,
-                                        const write_ops::Insert& insert,
-                                        BSONObjBuilder* result) {
-
-    if (!isTimeseriesWriteRetryable(opCtx)) {
-        return false;
-    }
-
-    if (insert.getDocuments().empty()) {
-        return false;
-    }
-
-    auto txnParticipant = TransactionParticipant::get(opCtx);
-    const auto& writeCommandBase = insert.getWriteCommandBase();
-
-    uassert(ErrorCodes::OperationFailed,
-            str::stream() << "Retryable time-series insert operations are limited to one document "
-                             "per command request",
-            insert.getDocuments().size() == 1U);
-
-    auto stmtId = write_ops::getStmtIdForWriteAt(writeCommandBase, 0);
-    if (!txnParticipant.checkStatementExecutedNoOplogEntryFetch(stmtId)) {
-        return false;
-    }
-
-    // This retryable write has been executed previously. Fill in command result before returning.
-    result->appendNumber("n", 1);
-
-    auto* replCoord = repl::ReplicationCoordinator::get(opCtx->getServiceContext());
-    if (replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet) {
-        appendOpTime(repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp(), result);
-        result->append("electionId", replCoord->getElectionId());
-    }
-
-    auto retryStats = RetryableWritesStats::get(opCtx);
-    retryStats->incrementRetriedStatementsCount();
-    retryStats->incrementRetriedCommandsCount();
 
     return true;
 }
@@ -390,87 +338,7 @@ boost::optional<BSONObj> generateError(OperationContext* opCtx,
     return error.obj();
 }
 
-enum class ReplyStyle { kUpdate, kNotUpdate };  // update has extra fields.
-void serializeReply(OperationContext* opCtx,
-                    ReplyStyle replyStyle,
-                    bool continueOnError,
-                    size_t opsInBatch,
-                    write_ops_exec::WriteResult result,
-                    BSONObjBuilder* out) {
-    if (shouldSkipOutput(opCtx))
-        return;
-
-    if (continueOnError) {
-        invariant(!result.results.empty());
-        const auto& lastResult = result.results.back();
-
-        if (lastResult == ErrorCodes::StaleDbVersion ||
-            ErrorCodes::isStaleShardVersionError(lastResult.getStatus()) ||
-            ErrorCodes::isTenantMigrationError(lastResult.getStatus())) {
-            // For ordered:false commands we need to duplicate these error results for all ops after
-            // we stopped. See handleError() in write_ops_exec.cpp for more info.
-            //
-            // Omit the reason from the duplicate unordered responses so it doesn't consume BSON
-            // object space
-            result.results.resize(opsInBatch, lastResult.getStatus().withReason(""));
-        }
-    }
-
-    long long nVal = 0;
-    long long nModified = 0;
-    std::vector<BSONObj> upsertInfo;
-    std::vector<BSONObj> errors;
-    BSONSizeTracker upsertInfoSizeTracker;
-
-    for (size_t i = 0; i < result.results.size(); i++) {
-        if (auto error = generateError(opCtx, result.results[i], i, errors.size())) {
-            errors.push_back(*error);
-            continue;
-        }
-
-        const auto& opResult = result.results[i].getValue();
-        nVal += opResult.getN();  // Always there.
-        if (replyStyle == ReplyStyle::kUpdate) {
-            nModified += opResult.getNModified();
-            if (auto idElement = opResult.getUpsertedId().firstElement()) {
-                BSONObjBuilder upsertedId(upsertInfoSizeTracker);
-                upsertedId.append("index", int(i));
-                upsertedId.appendAs(idElement, "_id");
-                upsertInfo.push_back(upsertedId.obj());
-            }
-        }
-    }
-
-    out->appendNumber("n", nVal);
-
-    if (replyStyle == ReplyStyle::kUpdate) {
-        out->appendNumber("nModified", nModified);
-        if (!upsertInfo.empty()) {
-            out->append("upserted", upsertInfo);
-        }
-    }
-
-    if (!errors.empty()) {
-        out->append("writeErrors", errors);
-    }
-
-    // writeConcernError field is handled by command processor.
-
-    {
-        // Undocumented repl fields that mongos depends on.
-        auto* replCoord = repl::ReplicationCoordinator::get(opCtx->getServiceContext());
-        const auto replMode = replCoord->getReplicationMode();
-        if (replMode != repl::ReplicationCoordinator::modeNone) {
-            appendOpTime(repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp(), out);
-
-            if (replMode == repl::ReplicationCoordinator::modeReplSet) {
-                out->append("electionId", replCoord->getElectionId());
-            }
-        }
-    }
-}
-
-template <typename DerivedT>
+template <typename CommandReplyType>
 class WriteCommand : public Command {
 public:
     explicit WriteCommand(StringData name) : Command(name) {}
@@ -496,17 +364,147 @@ private:
     }
 };
 
-template <typename DerivedT>
-class WriteCommand<DerivedT>::InvocationBase : public CommandInvocation {
+template <typename CommandReplyType>
+class WriteCommand<CommandReplyType>::InvocationBase : public CommandInvocation {
 public:
-    using DerivedInvocation = typename DerivedT::Invocation;
     InvocationBase(const WriteCommand* writeCommand, const OpMsgRequest& request)
         : CommandInvocation(writeCommand), _request(&request) {}
 
-    bool getBypass() const {
-        return checked_cast<const DerivedInvocation*>(this)
-            ->request()
-            .getBypassDocumentValidation();
+protected:
+    /**
+     * Contains hooks that are used by 'populateReply' method.
+     */
+    struct PopulateReplyHooks {
+        // Called for each 'SingleWriteResult' processed by 'populateReply' method.
+        std::function<void(const SingleWriteResult&, int)> singleWriteResultHandler;
+
+        // Called after all 'SingleWriteResult' processing is completed by 'populateReply' method.
+        // This is called as the last method.
+        std::function<void()> postProcessHandler;
+    };
+
+    /**
+     * Method to populate a write command reply message. It takes 'result' parameter as an input
+     * source and populate the fields of 'cmdReply'.
+     */
+    void populateReply(OperationContext* opCtx,
+                       bool continueOnError,
+                       size_t opsInBatch,
+                       write_ops_exec::WriteResult result,
+                       CommandReplyType* cmdReply,
+                       boost::optional<PopulateReplyHooks> hooks = boost::none) {
+
+        invariant(cmdReply);
+
+        if (shouldSkipOutput(opCtx))
+            return;
+
+        if (continueOnError) {
+            invariant(!result.results.empty());
+            const auto& lastResult = result.results.back();
+
+            if (lastResult == ErrorCodes::StaleDbVersion ||
+                ErrorCodes::isStaleShardVersionError(lastResult.getStatus()) ||
+                ErrorCodes::isTenantMigrationError(lastResult.getStatus())) {
+                // For ordered:false commands we need to duplicate these error results for all ops
+                // after we stopped. See handleError() in write_ops_exec.cpp for more info.
+                //
+                // Omit the reason from the duplicate unordered responses so it doesn't consume BSON
+                // object space
+                result.results.resize(opsInBatch, lastResult.getStatus().withReason(""));
+            }
+        }
+
+        long long nVal = 0;
+        std::vector<BSONObj> errors;
+
+        for (size_t i = 0; i < result.results.size(); i++) {
+            if (auto error = generateError(opCtx, result.results[i], i, errors.size())) {
+                errors.push_back(*error);
+                continue;
+            }
+
+            const auto& opResult = result.results[i].getValue();
+            nVal += opResult.getN();  // Always there.
+
+            // Handle custom processing of each result.
+            if (hooks && hooks->singleWriteResultHandler)
+                hooks->singleWriteResultHandler(opResult, i);
+        }
+
+        auto& replyBase = cmdReply->getWriteReplyBase();
+        replyBase.setN(nVal);
+
+        if (!errors.empty()) {
+            replyBase.setWriteErrors(errors);
+        }
+
+        // writeConcernError field is handled by command processor.
+
+        {
+            // Undocumented repl fields that mongos depends on.
+            auto* replCoord = repl::ReplicationCoordinator::get(opCtx->getServiceContext());
+            const auto replMode = replCoord->getReplicationMode();
+            if (replMode != repl::ReplicationCoordinator::modeNone) {
+                replyBase.setOpTime(
+                    repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp());
+
+                if (replMode == repl::ReplicationCoordinator::modeReplSet) {
+                    replyBase.setElectionId(replCoord->getElectionId());
+                }
+            }
+        }
+
+        // Call the called-defined post processing handler.
+        if (hooks && hooks->postProcessHandler)
+            hooks->postProcessHandler();
+    }
+
+    /**
+     * Returns true if the retryable time-series write has been executed.
+     */
+    bool isRetryableTimeseriesWriteExecuted(OperationContext* opCtx,
+                                            const write_ops::Insert& insert,
+                                            CommandReplyType* reply) const {
+        if (!isTimeseriesWriteRetryable(opCtx)) {
+            return false;
+        }
+
+        if (insert.getDocuments().empty()) {
+            return false;
+        }
+
+        auto txnParticipant = TransactionParticipant::get(opCtx);
+        const auto& writeCommandBase = insert.getWriteCommandBase();
+
+        uassert(
+            ErrorCodes::OperationFailed,
+            str::stream() << "Retryable time-series insert operations are limited to one document "
+                             "per command request",
+            insert.getDocuments().size() == 1U);
+
+        auto stmtId = write_ops::getStmtIdForWriteAt(writeCommandBase, 0);
+        if (!txnParticipant.checkStatementExecutedNoOplogEntryFetch(stmtId)) {
+            return false;
+        }
+
+        auto& baseReply = reply->getWriteReplyBase();
+
+        // This retryable write has been executed previously. Fill in command reply before
+        // returning.
+        baseReply.setN(1);
+
+        auto* replCoord = repl::ReplicationCoordinator::get(opCtx->getServiceContext());
+        if (replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet) {
+            baseReply.setOpTime(repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp());
+            baseReply.setElectionId(replCoord->getElectionId());
+        }
+
+        auto retryStats = RetryableWritesStats::get(opCtx);
+        retryStats->incrementRetriedStatementsCount();
+        retryStats->incrementRetriedCommandsCount();
+
+        return true;
     }
 
 private:
@@ -514,13 +512,14 @@ private:
     virtual void doCheckAuthorizationImpl(AuthorizationSession* authzSession) const = 0;
 
     // Customization point for 'run'.
-    virtual void runImpl(OperationContext* opCtx, BSONObjBuilder& result) const = 0;
+    virtual CommandReplyType runImpl(OperationContext* opCtx) = 0;
 
     void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* result) final {
         try {
             _transactionChecks(opCtx);
             BSONObjBuilder bob = result->getBodyBuilder();
-            runImpl(opCtx, bob);
+            CommandReplyType cmdReply = runImpl(opCtx);
+            cmdReply.serialize(&bob);
             CommandHelpers::extractOrAppendOk(bob);
         } catch (const DBException& ex) {
             LastError::get(opCtx->getClient()).setLastError(ex.code(), ex.reason());
@@ -558,7 +557,7 @@ private:
     const OpMsgRequest* _request;
 };
 
-class CmdInsert final : public WriteCommand<CmdInsert> {
+class CmdInsert final : public WriteCommand<write_ops::InsertReply> {
 public:
     CmdInsert() : WriteCommand("insert") {}
 
@@ -574,6 +573,11 @@ public:
         const auto& request() const {
             return _batch;
         }
+
+        bool getBypass() const {
+            return request().getBypassDocumentValidation();
+        }
+
 
     private:
         NamespaceString ns() const override {
@@ -809,8 +813,10 @@ public:
                               << redact(_batch.toBSON({})));
         }
 
-        void _performTimeseriesWrites(OperationContext* opCtx, BSONObjBuilder* result) const {
-            if (isRetryableTimeseriesWriteExecuted(opCtx, _batch, result)) {
+        void _performTimeseriesWrites(OperationContext* opCtx,
+                                      write_ops::InsertReply* insertReply) const {
+
+            if (isRetryableTimeseriesWriteExecuted(opCtx, _batch, insertReply)) {
                 return;
             }
 
@@ -818,50 +824,57 @@ public:
             boost::optional<repl::OpTime> opTime;
             boost::optional<OID> electionId;
 
+            auto& baseReply = insertReply->getWriteReplyBase();
+
             if (_batch.getOrdered()) {
                 for (size_t i = 0; i < _batch.getDocuments().size(); ++i) {
                     _performTimeseriesWritesSubset(opCtx, i, 1, &errors, &opTime, &electionId);
                     if (!errors.empty()) {
-                        result->appendNumber("n", i);
+                        baseReply.setN(i);
                         break;
                     }
                 }
             } else {
                 _performTimeseriesWritesSubset(
                     opCtx, 0, _batch.getDocuments().size(), &errors, &opTime, &electionId);
-                result->appendNumber("n", _batch.getDocuments().size() - errors.size());
+                baseReply.setN(_batch.getDocuments().size() - errors.size());
             }
 
             if (!errors.empty()) {
-                result->append("writeErrors", errors);
+                baseReply.setWriteErrors(errors);
             }
             if (opTime) {
-                appendOpTime(*opTime, result);
+                baseReply.setOpTime(*opTime);
             }
             if (electionId) {
-                result->append("electionId", *electionId);
+                baseReply.setElectionId(*electionId);
             }
         }
 
-        void runImpl(OperationContext* opCtx, BSONObjBuilder& result) const override {
+        write_ops::InsertReply runImpl(OperationContext* opCtx) override {
+            write_ops::InsertReply insertReply;
+
             if (isTimeseries(opCtx, ns())) {
                 // Re-throw parsing exceptions to be consistent with CmdInsert::Invocation's
                 // constructor.
                 try {
-                    _performTimeseriesWrites(opCtx, &result);
+                    _performTimeseriesWrites(opCtx, &insertReply);
                 } catch (DBException& ex) {
                     ex.addContext(str::stream() << "time-series insert failed: " << ns().ns());
                     throw;
                 }
-                return;
+
+                return insertReply;
             }
             auto reply = write_ops_exec::performInserts(opCtx, _batch);
-            serializeReply(opCtx,
-                           ReplyStyle::kNotUpdate,
-                           !_batch.getWriteCommandBase().getOrdered(),
-                           _batch.getDocuments().size(),
-                           std::move(reply),
-                           &result);
+
+            populateReply(opCtx,
+                          !_batch.getWriteCommandBase().getOrdered(),
+                          _batch.getDocuments().size(),
+                          std::move(reply),
+                          &insertReply);
+
+            return insertReply;
         }
 
         write_ops::Insert _batch;
@@ -881,7 +894,7 @@ public:
     }
 } cmdInsert;
 
-class CmdUpdate final : public WriteCommand<CmdUpdate> {
+class CmdUpdate final : public WriteCommand<write_ops::UpdateReply> {
 public:
     CmdUpdate() : WriteCommand("update"), _updateMetrics{"update"} {}
 
@@ -915,6 +928,10 @@ public:
 
         const auto& request() const {
             return _batch;
+        }
+
+        bool getBypass() const {
+            return request().getBypassDocumentValidation();
         }
 
         bool supportsReadMirroring() const override {
@@ -955,14 +972,38 @@ public:
             auth::checkAuthForUpdateCommand(authzSession, getBypass(), _batch);
         }
 
-        void runImpl(OperationContext* opCtx, BSONObjBuilder& result) const override {
+        write_ops::UpdateReply runImpl(OperationContext* opCtx) override {
+            write_ops::UpdateReply updateReply;
+            long long nModified = 0;
+
+            // Tracks the upserted information. The memory of this variable gets moved in the
+            // 'postProcessHandler' and should not be accessed afterwards.
+            std::vector<write_ops::Upserted> upsertedInfoVec;
+
             auto reply = write_ops_exec::performUpdates(opCtx, _batch);
-            serializeReply(opCtx,
-                           ReplyStyle::kUpdate,
-                           !_batch.getWriteCommandBase().getOrdered(),
-                           _batch.getUpdates().size(),
-                           std::move(reply),
-                           &result);
+
+            // Handler to process each 'SingleWriteResult'.
+            auto singleWriteHandler = [&](const SingleWriteResult& opResult, int index) {
+                nModified += opResult.getNModified();
+                BSONSizeTracker upsertInfoSizeTracker;
+
+                if (auto idElement = opResult.getUpsertedId().firstElement())
+                    upsertedInfoVec.emplace_back(write_ops::Upserted(index, idElement));
+            };
+
+            // Handler to do the post-processing.
+            auto postProcessHandler = [&]() {
+                updateReply.setNModified(nModified);
+                if (!upsertedInfoVec.empty())
+                    updateReply.setUpserted(std::move(upsertedInfoVec));
+            };
+
+            populateReply(opCtx,
+                          !_batch.getWriteCommandBase().getOrdered(),
+                          _batch.getUpdates().size(),
+                          std::move(reply),
+                          &updateReply,
+                          PopulateReplyHooks{singleWriteHandler, postProcessHandler});
 
             // Collect metrics.
             for (auto&& update : _batch.getUpdates()) {
@@ -981,6 +1022,8 @@ public:
                     _updateMetrics->incrementExecutedWithArrayFilters();
                 }
             }
+
+            return updateReply;
         }
 
         void explain(OperationContext* opCtx,
@@ -1047,7 +1090,7 @@ public:
     UpdateMetrics _updateMetrics;
 } cmdUpdate;
 
-class CmdDelete final : public WriteCommand<CmdDelete> {
+class CmdDelete final : public WriteCommand<write_ops::DeleteReply> {
 public:
     CmdDelete() : WriteCommand("delete") {}
 
@@ -1066,6 +1109,11 @@ public:
             return _batch;
         }
 
+        bool getBypass() const {
+            return request().getBypassDocumentValidation();
+        }
+
+
     private:
         NamespaceString ns() const override {
             return _batch.getNamespace();
@@ -1075,14 +1123,17 @@ public:
             auth::checkAuthForDeleteCommand(authzSession, getBypass(), _batch);
         }
 
-        void runImpl(OperationContext* opCtx, BSONObjBuilder& result) const override {
+        write_ops::DeleteReply runImpl(OperationContext* opCtx) override {
+            write_ops::DeleteReply deleteReply;
+
             auto reply = write_ops_exec::performDeletes(opCtx, _batch);
-            serializeReply(opCtx,
-                           ReplyStyle::kNotUpdate,
-                           !_batch.getWriteCommandBase().getOrdered(),
-                           _batch.getDeletes().size(),
-                           std::move(reply),
-                           &result);
+            populateReply(opCtx,
+                          !_batch.getWriteCommandBase().getOrdered(),
+                          _batch.getDeletes().size(),
+                          std::move(reply),
+                          &deleteReply);
+
+            return deleteReply;
         }
 
         void explain(OperationContext* opCtx,

@@ -30,6 +30,7 @@ global:
     cpp_namespace: "mongo::write_ops"
     cpp_includes:
         - "mongo/db/ops/write_ops_parsers.h"
+        - "mongo/db/repl/optime.h"
 
 imports:
     - "mongo/db/logical_session_id.idl"
@@ -55,7 +56,71 @@ types:
         serializer: "mongo::write_ops::UpdateModification::serializeToBSON"
         deserializer: "mongo::write_ops::UpdateModification::parseFromBSON"
 
+    write_cmd_optime:
+        bson_serialization_type: any
+        description: "Holds the operation-time for write commands."
+        cpp_type: "mongo::repl::OpTime"
+        serializer: "::mongo::write_ops::opTimeSerializerWithTermCheck"
+        deserializer: "::mongo::write_ops::opTimeParser"
+
 structs:
+
+    WriteReplyBase:
+        description: "Contains fields that is common in all the write commands reply."
+        fields:
+            n:
+                description: "For insert: number of documents inserted.
+                              For update: number of documents that matched the query predicate.
+                              For delete: number of documents deleted."
+                type: int
+                default: 0
+            electionId:
+                description: "Replication coordinator election id."
+                type: objectid
+                optional: true
+            opTime:
+                description: "Operation time for the command."
+                type: write_cmd_optime
+                optional: true
+            writeErrors:
+                description: "Contains all the errors encoutered."
+                type: array<object>
+                optional: true
+
+    InsertReply:
+        description: "Contains information related to insert command reply."
+        chained_structs:
+            WriteReplyBase: writeReplyBase
+
+    Upserted:
+        description: "Contains documents that have been upserted."
+        fields:
+            index:
+                description: "Index of the document."
+                type: int
+            _id:
+                description: "ID of the document."
+                type: IDLAnyTypeOwned
+
+    UpdateReply:
+        description: "Contains information related to update command reply."
+        fields:
+            upserted:
+                description: "An array contains information about upserted documents."
+                type: array<Upserted>
+                optional: true
+            nModified:
+                description: "Number of updated documents."
+                type: int
+                default: 0
+
+        chained_structs:
+            WriteReplyBase: writeReplyBase
+
+    DeleteReply:
+        description: "Contains information related to delete command reply."
+        chained_structs:
+            WriteReplyBase: writeReplyBase
 
     WriteCommandBase:
         description: "Contains basic information included by all write commands"
@@ -184,7 +249,8 @@ commands:
         command_name: insert
         strict: true
         namespace: concatenate_with_db
-        api_version: ""
+        api_version: "1"
+        reply_type: InsertReply
         chained_structs:
             WriteCommandBase: writeCommandBase
         fields:
@@ -198,7 +264,8 @@ commands:
         command_name: update
         strict: true
         namespace: concatenate_with_db
-        api_version: ""
+        api_version: "1"
+        reply_type: UpdateReply
         chained_structs:
             WriteCommandBase: writeCommandBase
         fields:
@@ -223,7 +290,8 @@ commands:
         command_name: delete
         strict: true
         namespace: concatenate_with_db
-        api_version: ""
+        api_version: "1"
+        reply_type: DeleteReply
         chained_structs:
             WriteCommandBase: writeCommandBase
         fields:

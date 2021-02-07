@@ -100,6 +100,26 @@ void writeMultiDeleteProperty(bool isMulti, StringData fieldName, BSONObjBuilder
     builder->append(fieldName, isMulti ? 0 : 1);
 }
 
+void opTimeSerializerWithTermCheck(repl::OpTime opTime, StringData fieldName, BSONObjBuilder* bob) {
+    if (opTime.getTerm() == repl::OpTime::kUninitializedTerm) {
+        bob->append(fieldName, opTime.getTimestamp());
+    } else {
+        opTime.append(bob, fieldName.toString());
+    }
+}
+
+repl::OpTime opTimeParser(BSONElement elem) {
+    if (elem.type() == BSONType::Object) {
+        return repl::OpTime::parse(elem.Obj());
+    } else if (elem.type() == BSONType::bsonTimestamp) {
+        return repl::OpTime(elem.timestamp(), repl::OpTime::kUninitializedTerm);
+    }
+
+    uasserted(ErrorCodes::TypeMismatch,
+              str::stream() << "Expected BSON type " << BSONType::Object << " or "
+                            << BSONType::bsonTimestamp << ", but found " << elem.type());
+}
+
 int32_t getStmtIdForWriteAt(const WriteCommandBase& writeCommandBase, size_t writePos) {
     const auto& stmtIds = writeCommandBase.getStmtIds();
 

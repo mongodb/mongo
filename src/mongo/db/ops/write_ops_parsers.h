@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/update/document_diff_serialization.h"
 #include "mongo/stdx/variant.h"
 #include "mongo/util/visit_helper.h"
@@ -57,6 +58,18 @@ bool readMultiDeleteProperty(const BSONElement& limitElement);
  * Writes the 'isMulti' value as a limit property.
  */
 void writeMultiDeleteProperty(bool isMulti, StringData fieldName, BSONObjBuilder* builder);
+
+/**
+ * Serializes the opTime fields to specified BSON builder. A 'term' field will be included only
+ * when it is intialized.
+ */
+void opTimeSerializerWithTermCheck(repl::OpTime opTime, StringData fieldName, BSONObjBuilder* bob);
+
+/**
+ * Method to deserialize the specified BSON element to opTime. This method is used by the IDL
+ * parser to generate the deserializer code.
+ */
+repl::OpTime opTimeParser(BSONElement elem);
 
 class UpdateModification {
 public:
