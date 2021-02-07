@@ -22,7 +22,7 @@ if (!TimeseriesTest.timeseriesCollectionsEnabled(db.getMongo())) {
     return;
 }
 
-const testDB = db.getSiblingDB(jsTestName());
+const collNamePrefix = 'timeseries_out_of_order_';
 
 const timeFieldName = 'time';
 const times = [
@@ -34,13 +34,13 @@ let docs = [{_id: 0, [timeFieldName]: times[1]}, {_id: 1, [timeFieldName]: times
 
 let collCount = 0;
 const runTest = function(bucketsFn) {
-    const coll = testDB.getCollection('t_' + collCount++);
-    const bucketsColl = testDB.getCollection('system.buckets.' + coll.getName());
+    const coll = db.getCollection(collNamePrefix + collCount++);
+    const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
     coll.drop();
 
     assert.commandWorked(
-        testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
-    assert.contains(bucketsColl.getName(), testDB.getCollectionNames());
+        db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
+    assert.contains(bucketsColl.getName(), db.getCollectionNames());
 
     assert.commandWorked(coll.insert(docs, {ordered: false}));
     assert.docEq(coll.find().sort({_id: 1}).toArray(), docs);

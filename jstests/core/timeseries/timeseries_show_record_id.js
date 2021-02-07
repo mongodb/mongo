@@ -20,16 +20,12 @@ if (!TimeseriesTest.timeseriesCollectionsEnabled(db.getMongo())) {
     return;
 }
 
-const testDB = db.getSiblingDB(jsTestName());
-assert.commandWorked(testDB.dropDatabase());
-
 const timeFieldName = "time";
 
-const coll = testDB.getCollection("a");
+const coll = db.timeseries_show_record_id;
 coll.drop();
 
-assert.commandWorked(
-    testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
+assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
 
 Random.setRandomSeed();
 
@@ -62,6 +58,6 @@ const error = assert.throws(() => {
 });
 assert.commandFailedWithCode(error, ErrorCodes.InvalidPipelineOperator);
 
-const bucketsColl = testDB.getCollection("system.buckets." + coll.getName());
+const bucketsColl = db.getCollection("system.buckets." + coll.getName());
 checkRecordId(bucketsColl.find().showRecordId().toArray());
 })();

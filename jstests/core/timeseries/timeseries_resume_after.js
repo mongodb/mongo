@@ -22,18 +22,14 @@ if (!TimeseriesTest.timeseriesCollectionsEnabled(db.getMongo())) {
     return;
 }
 
-const testDB = db.getSiblingDB(jsTestName());
-assert.commandWorked(testDB.dropDatabase());
-
 const timeFieldName = "time";
 
-const coll = testDB.getCollection("a");
+const coll = db.timeseries_resume_after;
 coll.drop();
 
-assert.commandWorked(
-    testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
+assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
 
-const bucketsColl = testDB.getCollection("system.buckets." + coll.getName());
+const bucketsColl = db.getCollection("system.buckets." + coll.getName());
 
 Random.setRandomSeed();
 
@@ -55,7 +51,7 @@ for (let i = 0; i < 100; i++) {
 
 // Run the initial query and request to return a resume token. We're interested only in a single
 // document, so 'batchSize' is set to 1.
-let res = assert.commandWorked(testDB.runCommand(
+let res = assert.commandWorked(db.runCommand(
     {find: bucketsColl.getName(), hint: {$natural: 1}, batchSize: 1, $_requestResumeToken: true}));
 
 // Make sure the query returned a resume token which will be used to resume the query from.
@@ -66,11 +62,10 @@ jsTestLog("Got resume token " + tojson(resumeToken));
 assert.neq(null, resumeToken.$recordId);
 
 // Kill the cursor before attempting to resume.
-assert.commandWorked(
-    testDB.runCommand({killCursors: bucketsColl.getName(), cursors: [res.cursor.id]}));
+assert.commandWorked(db.runCommand({killCursors: bucketsColl.getName(), cursors: [res.cursor.id]}));
 
 // Try to resume the query from the saved resume token.
-res = assert.commandWorked(testDB.runCommand({
+res = assert.commandWorked(db.runCommand({
     find: bucketsColl.getName(),
     hint: {$natural: 1},
     batchSize: 1,
@@ -85,7 +80,7 @@ jsTestLog("Got resume token " + tojson(resumeToken));
 assert.eq(null, resumeToken.$recordId);
 
 // Try to resume from a null '$recordId'.
-res = assert.commandWorked(testDB.runCommand({
+res = assert.commandWorked(db.runCommand({
     find: bucketsColl.getName(),
     hint: {$natural: 1},
     batchSize: 1,
