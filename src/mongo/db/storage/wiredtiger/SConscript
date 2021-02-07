@@ -1,11 +1,18 @@
 # -*- mode: python -*-
 Import("env")
 Import("wiredtiger")
+Import("get_option")
 
 if not wiredtiger:
     Return()
 
 env = env.Clone()
+
+using_ubsan = False
+sanitizer_list = get_option('sanitize')
+if sanitizer_list:
+    using_ubsan = 'undefined' in sanitizer_list.split(',')
+
 
 env.Library(
     target='storage_wiredtiger_customization_hooks',
@@ -189,30 +196,34 @@ wtEnv.Library(
 )
 
 
-wtEnv.CppUnitTest(
-    target='storage_wiredtiger_record_store_and_index_test',
-    source=[
-        'wiredtiger_standard_index_test.cpp',
-        'wiredtiger_standard_record_store_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
-        '$BUILD_DIR/mongo/db/repl/replmocks',
-        '$BUILD_DIR/mongo/db/service_context_test_fixture',
-        'additional_wiredtiger_index_tests',
-        'additional_wiredtiger_record_store_tests',
-    ],
-)
+# All of these tests fail to compile under undefined behavior
+# sanitizer due to unexpressed circular dependency edges. In particular
+# they all need a definition from the 'catalog'.
+if not using_ubsan:
+    wtEnv.CppUnitTest(
+        target='storage_wiredtiger_record_store_and_index_test',
+        source=[
+            'wiredtiger_standard_index_test.cpp',
+            'wiredtiger_standard_record_store_test.cpp',
+        ],
+        LIBDEPS=[
+            '$BUILD_DIR/mongo/db/auth/authmocks',
+            '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
+            '$BUILD_DIR/mongo/db/repl/replmocks',
+            '$BUILD_DIR/mongo/db/service_context_test_fixture',
+            'additional_wiredtiger_index_tests',
+            'additional_wiredtiger_record_store_tests',
+        ],
+    )
 
-wtEnv.Benchmark(
-    target='storage_wiredtiger_begin_transaction_block_bm',
-    source='wiredtiger_begin_transaction_block_bm.cpp',
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/db/storage/durable_catalog_impl',
-        '$BUILD_DIR/mongo/unittest/unittest',
-        '$BUILD_DIR/mongo/util/clock_source_mock',
-        'storage_wiredtiger_core',
-    ],
-)
+    wtEnv.Benchmark(
+        target='storage_wiredtiger_begin_transaction_block_bm',
+        source='wiredtiger_begin_transaction_block_bm.cpp',
+        LIBDEPS=[
+            '$BUILD_DIR/mongo/db/service_context',
+            '$BUILD_DIR/mongo/db/storage/durable_catalog_impl',
+            '$BUILD_DIR/mongo/unittest/unittest',
+            '$BUILD_DIR/mongo/util/clock_source_mock',
+            'storage_wiredtiger_core',
+        ],
+    )
