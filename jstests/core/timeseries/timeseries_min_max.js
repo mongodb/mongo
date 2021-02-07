@@ -21,8 +21,7 @@ if (!TimeseriesTest.timeseriesCollectionsEnabled(db.getMongo())) {
     return;
 }
 
-const testDB = db.getSiblingDB(jsTestName());
-assert.commandWorked(testDB.dropDatabase());
+const collNamePrefix = 'timeseries_min_max_';
 
 const timeFieldName = 'time';
 const metaFieldName = 'meta';
@@ -32,15 +31,15 @@ let coll;
 let bucketsColl;
 
 const clearColl = function() {
-    coll = testDB.getCollection('t_' + collCount++);
-    bucketsColl = testDB.getCollection('system.buckets.' + coll.getName());
+    coll = db.getCollection(collNamePrefix + collCount++);
+    bucketsColl = db.getCollection('system.buckets.' + coll.getName());
 
     coll.drop();
 
     const timeFieldName = 'time';
-    assert.commandWorked(testDB.createCollection(
+    assert.commandWorked(db.createCollection(
         coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
-    assert.contains(bucketsColl.getName(), testDB.getCollectionNames());
+    assert.contains(bucketsColl.getName(), db.getCollectionNames());
 };
 clearColl();
 

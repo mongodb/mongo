@@ -6,7 +6,7 @@
 
 load("jstests/core/timeseries/libs/timeseries.js");
 
-const coll = db.getCollection(jsTestName());
+const coll = db.timeseries_insert;
 coll.drop();
 
 Random.setRandomSeed();
