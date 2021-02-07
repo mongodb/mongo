@@ -10417,7 +10417,10 @@ buildvariants:
   - name: .integration
     distros:
     - rhel80-medium
-  - name: .jscore .common
+  - name: jsCore
+    distros:
+    - rhel80-xlarge
+  - name: .jscore .common !jsCore
   - name: jsCore_minimum_batch_size
   - name: jsCore_op_query
   - name: jsCore_txns_large_txns_format
