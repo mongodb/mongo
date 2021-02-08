@@ -2,6 +2,15 @@
  * Utilities for testing tenant migrations.
  */
 var TenantMigrationUtil = (function() {
+    const kExternalKeysNs = "config.external_validation_keys";
+
+    /**
+     * Returns the external keys for the given migration id.
+     */
+    function getExternalKeys(conn, migrationId) {
+        return conn.getCollection(kExternalKeysNs).find({migrationId}).toArray();
+    }
+
     /**
      * Returns whether tenant migration commands are supported.
      */
@@ -231,6 +240,8 @@ var TenantMigrationUtil = (function() {
     }
 
     return {
+        kExternalKeysNs,
+        getExternalKeys,
         runMigrationAsync,
         forgetMigrationAsync,
         tryAbortMigrationAsync,

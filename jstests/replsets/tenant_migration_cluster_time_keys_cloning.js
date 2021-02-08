@@ -1,6 +1,6 @@
 /**
  * Test that tenant migration donor and recipient correctly copy each other cluster time keys into
- * their admin.system.external_validation_keys collection.
+ * their config.external_validation_keys collection.
  *
  * @tags: [requires_fcv_47, requires_majority_read_concern, incompatible_with_eft,
  * incompatible_with_windows_tls]
@@ -14,11 +14,11 @@ load("jstests/libs/uuid_util.js");
 load("jstests/replsets/libs/tenant_migration_test.js");
 
 const kInternalKeysNs = "admin.system.keys";
-const kExternalKeysNs = "admin.system.external_validation_keys";
+const kExternalKeysNs = "config.external_validation_keys";
 
 /**
  * Asserts that the donor and recipient have copied each other's cluster time keys into
- * admin.system.external_validation_keys.
+ * config.external_validation_keys.
  */
 function assertCopiedExternalKeys(tenantMigrationTest, migrationId) {
     const donorPrimary = tenantMigrationTest.getDonorPrimary();

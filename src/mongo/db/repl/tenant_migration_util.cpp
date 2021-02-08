@@ -32,8 +32,11 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/logical_time_validator.h"
+#include "mongo/db/ops/update.h"
+#include "mongo/db/ops/update_request.h"
 #include "mongo/db/pipeline/document_source_add_fields.h"
 #include "mongo/db/pipeline/document_source_graph_lookup.h"
 #include "mongo/db/pipeline/document_source_lookup.h"
@@ -49,17 +52,15 @@ namespace mongo {
 
 namespace tenant_migration_util {
 
-ExternalKeysCollectionDocument makeExternalClusterTimeKeyDoc(ServiceContext* serviceContext,
-                                                             UUID migrationId,
-                                                             BSONObj keyDoc) {
+MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationBeforeMarkingExternalKeysGarbageCollectable);
+
+const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
+
+ExternalKeysCollectionDocument makeExternalClusterTimeKeyDoc(UUID migrationId, BSONObj keyDoc) {
     auto originalKeyDoc = KeysCollectionDocument::parse(IDLParserErrorContext("keyDoc"), keyDoc);
 
     ExternalKeysCollectionDocument externalKeyDoc(
-        OID::gen(),
-        originalKeyDoc.getKeyId(),
-        migrationId,
-        serviceContext->getFastClockSource()->now() +
-            Seconds{repl::tenantMigrationExternalKeysRemovalDelaySecs.load()});
+        OID::gen(), originalKeyDoc.getKeyId(), migrationId);
     externalKeyDoc.setKeysCollectionDocumentBase(originalKeyDoc.getKeysCollectionDocumentBase());
 
     return externalKeyDoc;
@@ -343,6 +344,63 @@ createRetryableWritesOplogFetchingPipelineForTenantMigrations(
         fromjson("{$replaceRoot: {newRoot: '$completeOplogEntry'}}").firstElement(), expCtx));
 
     return Pipeline::create(std::move(stages), expCtx);
+}
+
+bool shouldStopUpdatingExternalKeys(Status status, const CancelationToken& token) {
+    return status.isOK() || token.isCanceled();
+}
+
+ExecutorFuture<void> markExternalKeysAsGarbageCollectable(
+    ServiceContext* serviceContext,
+    std::shared_ptr<executor::ScopedTaskExecutor> executor,
+    std::shared_ptr<executor::TaskExecutor> parentExecutor,
+    UUID migrationId,
+    const CancelationToken& token) {
+    auto ttlExpiresAt = serviceContext->getFastClockSource()->now() +
+        Milliseconds{repl::tenantMigrationGarbageCollectionDelayMS.load()} +
+        Seconds{repl::tenantMigrationExternalKeysRemovalBufferSecs.load()};
+    return AsyncTry([executor, migrationId, ttlExpiresAt] {
+               return ExecutorFuture(**executor).then([migrationId, ttlExpiresAt] {
+                   auto opCtxHolder = cc().makeOperationContext();
+                   auto opCtx = opCtxHolder.get();
+
+                   pauseTenantMigrationBeforeMarkingExternalKeysGarbageCollectable.pauseWhileSet(
+                       opCtx);
+
+                   const auto& nss = NamespaceString::kExternalKeysCollectionNamespace;
+                   AutoGetCollection coll(opCtx, nss, MODE_IX);
+
+                   writeConflictRetry(
+                       opCtx, "TenantMigrationMarkExternalKeysAsGarbageCollectable", nss.ns(), [&] {
+                           auto request = UpdateRequest();
+                           request.setNamespaceString(nss);
+                           request.setQuery(
+                               BSON(ExternalKeysCollectionDocument::kMigrationIdFieldName
+                                    << migrationId));
+                           request.setUpdateModification(
+                               write_ops::UpdateModification::parseFromClassicUpdate(BSON(
+                                   "$set"
+                                   << BSON(ExternalKeysCollectionDocument::kTTLExpiresAtFieldName
+                                           << ttlExpiresAt))));
+                           request.setMulti(true);
+
+                           // Note marking keys garbage collectable is not atomic with marking the
+                           // state document garbage collectable, so after a failover this update
+                           // may fail to match any keys if they were previously marked garbage
+                           // collectable and deleted by the TTL monitor. Because of this we can't
+                           // assert on the update result's numMatched or numDocsModified.
+                           update(opCtx, coll.getDb(), request);
+                       });
+               });
+           })
+        .until([token](Status status) { return shouldStopUpdatingExternalKeys(status, token); })
+        .withBackoffBetweenIterations(kExponentialBackoff)
+        // Due to the issue in SERVER-54735, using AsyncTry with a scoped executor can lead to a
+        // BrokenPromise error if the executor is shut down. To work around this, schedule the
+        // AsyncTry itself on an executor that won't shut down.
+        //
+        // TODO SERVER-54735: Stop using the parent executor here.
+        .on(parentExecutor, CancelationToken::uncancelable());
 }
 
 }  // namespace tenant_migration_util

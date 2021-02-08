@@ -84,8 +84,8 @@ const NamespaceString NamespaceString::kShardConfigDatabasesNamespace(NamespaceS
                                                                       "cache.databases");
 const NamespaceString NamespaceString::kKeysCollectionNamespace(NamespaceString::kAdminDb,
                                                                 "system.keys");
-const NamespaceString NamespaceString::kExternalKeysCollectionNamespace(
-    NamespaceString::kAdminDb, "system.external_validation_keys");
+const NamespaceString NamespaceString::kExternalKeysCollectionNamespace(NamespaceString::kConfigDb,
+                                                                        "external_validation_keys");
 const NamespaceString NamespaceString::kRsOplogNamespace(NamespaceString::kLocalDb, "oplog.rs");
 const NamespaceString NamespaceString::kSystemReplSetNamespace(NamespaceString::kLocalDb,
                                                                "system.replset");
@@ -131,8 +131,6 @@ bool NamespaceString::isLegalClientSystemNS() const {
         if (coll() == kServerConfigurationNamespace.coll())
             return true;
         if (coll() == kKeysCollectionNamespace.coll())
-            return true;
-        if (coll() == kExternalKeysCollectionNamespace.coll())
             return true;
         if (coll() == "system.backup_users")
             return true;

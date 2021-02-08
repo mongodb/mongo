@@ -120,6 +120,11 @@ Status KeysCollectionCache::_refreshExternalKeys(OperationContext* opCtx) {
 
     auto& newKeys = refreshStatus.getValue();
 
+    std::multimap<long long, ExternalKeysCollectionDocument> newExternalKeysCache;
+    for (auto&& key : newKeys) {
+        newExternalKeysCache.emplace(key.getKeyId(), std::move(key));
+    }
+
     stdx::lock_guard<Latch> lk(_cacheMutex);
     if (originalSize > _externalKeysCache.size()) {
         // _externalKeysCache cleared while we were getting the new keys, just return so the next
@@ -127,9 +132,9 @@ Status KeysCollectionCache::_refreshExternalKeys(OperationContext* opCtx) {
         return Status::OK();
     }
 
-    for (auto&& key : newKeys) {
-        _externalKeysCache.emplace(key.getKeyId(), std::move(key));
-    }
+    // Replace the cached keys with the newly loaded ones. Note because all external keys are loaded
+    // when refreshing them, this will remove keys that have been deleted from the collection.
+    std::swap(_externalKeysCache, newExternalKeysCache);
 
     return Status::OK();
 }

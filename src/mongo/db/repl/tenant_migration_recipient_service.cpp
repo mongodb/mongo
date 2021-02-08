@@ -1533,8 +1533,8 @@ void TenantMigrationRecipientService::Instance::_fetchAndStoreDonorClusterTimeKe
                        Query().readPref(_readPreference.pref, _readPreference.tags.getTagBSON()));
     while (cursor->more()) {
         const auto doc = cursor->nextSafe().getOwned();
-        keyDocs.push_back(tenant_migration_util::makeExternalClusterTimeKeyDoc(
-            _serviceContext, _migrationUuid, doc));
+        keyDocs.push_back(
+            tenant_migration_util::makeExternalClusterTimeKeyDoc(_migrationUuid, doc));
     }
 
     tenant_migration_util::storeExternalClusterTimeKeyDocs(_scopedExecutor, std::move(keyDocs));
@@ -1946,6 +1946,18 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
             // Schedule on the _scopedExecutor to make sure we are still the primary when
             // waiting for the recipientForgetMigration command.
             return _receivedRecipientForgetMigrationPromise.getFuture();
+        })
+        .then([this, self = shared_from_this(), token] {
+            // Note marking the keys as garbage collectable is not atomic with marking the
+            // state document garbage collectable, so an interleaved failover can lead the
+            // keys to be deleted before the state document has an expiration date. This is
+            // acceptable because the decision to forget a migration is not reversible.
+            return tenant_migration_util::markExternalKeysAsGarbageCollectable(
+                _serviceContext,
+                _scopedExecutor,
+                _recipientService->getInstanceCleanupExecutor(),
+                _migrationUuid,
+                token);
         })
         .then([this, self = shared_from_this()] { return _markStateDocAsGarbageCollectable(); })
         .then([this, self = shared_from_this()] {
