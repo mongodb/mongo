@@ -13,6 +13,7 @@
 (function() {
 "use strict";
 
+load("jstests/libs/fail_point_util.js");
 load("jstests/libs/write_concern_util.js");  // for stopReplicationOnSecondaries.
 const replTest = new ReplSetTest({nodes: 3});
 replTest.startSet();
@@ -28,10 +29,16 @@ stopReplicationOnSecondaries(replTest);
 jsTestLog("Executing write to primary.");
 assert.commandWorked(testDB.foo.insert({x: 2}));
 
+// To ensure that we kill the shutdown operation during step down, we wait
+// until we hit the 'hangInShutdownBeforeStepdown' failpoint.
+const failPoint = configureFailPoint(primary, 'hangInShutdownBeforeStepdown');
+
 jsTestLog("Shutting down primary in a parallel shell");
 const shutdownShell = startParallelShell(function() {
     db.adminCommand({shutdown: 1, timeoutSecs: 60, force: true});
 }, primary.port);
+failPoint.wait();
+failPoint.off();
 
 let shutdownOpID = -1;
 let res = {};

@@ -42,6 +42,7 @@
 namespace mongo {
 
 namespace {
+MONGO_FAIL_POINT_DEFINE(hangInShutdownBeforeStepdown);
 MONGO_FAIL_POINT_DEFINE(hangInShutdownAfterStepdown);
 }  // namespace
 
@@ -53,6 +54,11 @@ Status stepDownForShutdown(OperationContext* opCtx,
     // for any secondaries. Ignore stepdown.
     if (replCoord->getConfig().getNumMembers() != 1) {
         try {
+            if (MONGO_unlikely(hangInShutdownBeforeStepdown.shouldFail())) {
+                LOGV2(5436600, "hangInShutdownBeforeStepdown failpoint enabled");
+                hangInShutdownBeforeStepdown.pauseWhileSet(opCtx);
+            }
+
             // Specify a high freeze time, so that if there is a stall during shut down, the node
             // does not run for election.
             replCoord->stepDown(opCtx, false /* force */, waitTime, Days(1));

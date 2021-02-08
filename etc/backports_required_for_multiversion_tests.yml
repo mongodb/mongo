@@ -126,6 +126,8 @@ all:
     test_file: jstests/core/txns/timestamped_reads_wait_for_prepare_oplog_visibility.js
   - ticket: SERVER-53985
     test_file: jstests/replsets/unconditional_step_down.js
+  - ticket: SERVER-54366
+    test_file: jstests/replsets/force_shutdown_primary.js
 
 # Tests that should only be excluded from particular suites should be listed under that suite.
 suites:
