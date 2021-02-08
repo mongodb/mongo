@@ -310,13 +310,6 @@ private:
                                      const BSONObj& doc,
                                      unsigned long long iteration) const;
 
-    const IndexCatalogEntry* _findSmallestReferenceIdx(OperationContext* opCtx,
-                                                       const CollectionPtr& collection) const;
-
-    Status _scanReferenceIdxInsertAndCommit(OperationContext* opCtx,
-                                            const CollectionPtr& collection,
-                                            const IndexCatalogEntry* refIdx);
-
     Status _insert(OperationContext* opCtx, const BSONObj& wholeDocument, const RecordId& loc);
 
     // Is set during init() and ensures subsequent function calls act on the same Collection.
@@ -327,8 +320,6 @@ private:
     IndexBuildMethod _method = IndexBuildMethod::kHybrid;
 
     bool _ignoreUnique = false;
-
-    std::size_t _eachIndexBuildMaxMemoryUsageBytes = 0;
 
     // Set to true when no work remains to be done, the object can safely destruct without leaving
     // incorrect state set anywhere.
