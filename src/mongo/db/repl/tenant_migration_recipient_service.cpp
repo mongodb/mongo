@@ -99,6 +99,7 @@ MONGO_FAIL_POINT_DEFINE(fpAfterDataConsistentMigrationRecipientInstance);
 MONGO_FAIL_POINT_DEFINE(hangBeforeTaskCompletion);
 MONGO_FAIL_POINT_DEFINE(fpAfterReceivingRecipientForgetMigration);
 MONGO_FAIL_POINT_DEFINE(hangAfterCreatingRSM);
+MONGO_FAIL_POINT_DEFINE(skipRetriesWhenConnectingToDonorHost);
 
 namespace {
 // We never restart just the oplog fetcher.  If a failure occurs, we restart the whole state machine
@@ -531,31 +532,49 @@ TenantMigrationRecipientService::Instance::_createAndConnectClients() {
                    });
            })
         .until([this, self = shared_from_this(), kDelayedMajorityOpTimeErrorCode](
-                   const StatusWith<ConnectionPair>& status) {
-            if (!status.isOK()) {
-                LOGV2_ERROR(4880404,
-                            "Connecting to donor failed",
-                            "tenantId"_attr = getTenantId(),
-                            "migrationId"_attr = getMigrationUUID(),
-                            "error"_attr = status.getStatus());
+                   const StatusWith<ConnectionPair>& statusWith) {
+            auto status = statusWith.getStatus();
 
-                // Make sure we don't end up with a partially initialized set of connections.
-                stdx::lock_guard lk(_mutex);
-                _client = nullptr;
-                _oplogFetcherClient = nullptr;
-
-                // If the future chain has been interrupted, stop retrying.
-                if (_taskState.isInterrupted()) {
-                    return true;
-                }
-
-                // If the connection failed because the majority snapshot OpTime on the donor host
-                // was not ahead of our stored 'startApplyingDonorOpTime, choose another donor host
-                // to connect to.
-                if (status.getStatus() == ErrorCodes::Error(kDelayedMajorityOpTimeErrorCode)) {
-                    return false;
-                }
+            if (status.isOK()) {
+                return true;
             }
+
+            LOGV2_ERROR(4880404,
+                        "Connecting to donor failed",
+                        "tenantId"_attr = getTenantId(),
+                        "migrationId"_attr = getMigrationUUID(),
+                        "error"_attr = status);
+
+            // Make sure we don't end up with a partially initialized set of connections.
+            stdx::lock_guard lk(_mutex);
+            _client = nullptr;
+            _oplogFetcherClient = nullptr;
+
+            // If the future chain has been interrupted, stop retrying.
+            if (_taskState.isInterrupted()) {
+                return true;
+            }
+
+            if (MONGO_unlikely(skipRetriesWhenConnectingToDonorHost.shouldFail())) {
+                LOGV2(5425600,
+                      "skipRetriesWhenConnectingToDonorHost failpoint enabled, migration "
+                      "proceeding with error from connecting to sync source");
+                return true;
+            }
+
+            /*
+             * Retry sync source selection if we encountered any of the following errors:
+             * 1) The RSM couldn't find a suitable donor host
+             * 2) The majority snapshot OpTime on the donor host was not ahead of our stored
+             * 'startApplyingDonorOpTime'
+             * 3) Some other retriable error
+             */
+            if (status == ErrorCodes::FailedToSatisfyReadPreference ||
+                status == ErrorCodes::Error(kDelayedMajorityOpTimeErrorCode) ||
+                ErrorCodes::isRetriableError(status)) {
+                return false;
+            }
+
             return true;
         })
         .on(**_scopedExecutor, CancelationToken::uncancelable())
