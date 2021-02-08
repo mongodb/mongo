@@ -85,12 +85,13 @@ wiredtiger_config_parser_open(
 }
 
 /*
- * wiredtiger_config_validate --
- *     Validate a configuration string.
+ * __config_validate --
+ *     Validate a configuration string. Taking a function pointer to the matching function for the
+ *     given configuration set.
  */
-int
-wiredtiger_config_validate(
-  WT_SESSION *wt_session, WT_EVENT_HANDLER *event_handler, const char *name, const char *config)
+static int
+__config_validate(WT_SESSION *wt_session, WT_EVENT_HANDLER *event_handler, const char *name,
+  const char *config, const WT_CONFIG_ENTRY *config_matcher(const char *))
 {
     const WT_CONFIG_ENTRY *ep, **epp;
     WT_CONNECTION_IMPL *conn, dummy_conn;
@@ -132,7 +133,7 @@ wiredtiger_config_validate(
      * added).
      */
     if (session == NULL || conn == NULL || conn->config_entries == NULL)
-        ep = __wt_conn_config_match(name);
+        ep = config_matcher(name);
     else {
         ep = NULL;
         for (epp = conn->config_entries; *epp != NULL && (*epp)->method != NULL; ++epp)
@@ -145,6 +146,28 @@ wiredtiger_config_validate(
         WT_RET_MSG(session, EINVAL, "unknown or unsupported configuration API: %s", name);
 
     return (__wt_config_check(session, ep, config, 0));
+}
+
+/*
+ * wiredtiger_config_validate --
+ *     Validate a configuration string.
+ */
+int
+wiredtiger_config_validate(
+  WT_SESSION *wt_session, WT_EVENT_HANDLER *event_handler, const char *name, const char *config)
+{
+    return (__config_validate(wt_session, event_handler, name, config, __wt_conn_config_match));
+}
+
+/*
+ * wiredtiger_test_config_validate --
+ *     Validate a test configuration string.
+ */
+int
+wiredtiger_test_config_validate(
+  WT_SESSION *wt_session, WT_EVENT_HANDLER *event_handler, const char *name, const char *config)
+{
+    return (__config_validate(wt_session, event_handler, name, config, __wt_test_config_match));
 }
 
 /*

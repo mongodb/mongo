@@ -690,10 +690,18 @@ __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_PAGE *page, WT_MULTI *multi)
 
             /*
              * Calculate reverse modify and clear the history store records with timestamps when
-             * inserting the first update.
+             * inserting the first update. Always write on-disk data store updates to the history
+             * store as a full update because the on-disk update will be the base update for all the
+             * updates that are older than the on-disk update.
+             *
+             * Due to concurrent operation of checkpoint and eviction, it is possible that history
+             * store may have more recent versions of a key than the on-disk version. Without a
+             * proper base value in the history store, it can lead to wrong value being restored by
+             * the RTS.
              */
             nentries = MAX_REVERSE_MODIFY_NUM;
-            if (upd->type == WT_UPDATE_MODIFY && enable_reverse_modify &&
+            if (!F_ISSET(upd, WT_UPDATE_DS) && upd->type == WT_UPDATE_MODIFY &&
+              enable_reverse_modify &&
               __wt_calc_modify(session, prev_full_value, full_value, prev_full_value->size / 10,
                 entries, &nentries) == 0) {
                 WT_ERR(__wt_modify_pack(cursor, entries, nentries, &modify_value));

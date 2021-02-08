@@ -29,18 +29,20 @@ define([AC_LIBTOOL_LANG_F77_CONFIG], [:])dnl
 # reason to believe "c++" can build compatible objects.
 #
 # Check whether the C++ compiler works by linking a trivial program.
-if test "$CC" = "cc"; then
-	AC_CACHE_CHECK([whether the C++ compiler works],
-		       [wt_cv_prog_cxx_works],
-		       [AC_LANG_PUSH([C++])
-			AC_LINK_IFELSE([AC_LANG_PROGRAM([], [])],
-				       [wt_cv_prog_cxx_works=yes],
-				       [wt_cv_prog_cxx_works=no])
-			AC_LANG_POP([C++])])
-else
-	AC_MSG_WARN([C++ compiler ignored unless compiler is named "cc"])
-	wt_cv_prog_cxx_works=no
-fi
+AM_CONDITIONAL([IS_CXX_OK], [test "$CC" = "cc"])
+AM_COND_IF([IS_CXX_OK], [], AM_CONDITIONAL([IS_CXX_OK], [test $(expr `"$CC" --version | head -n 1 | grep -o -E "[[[[:digit:]]]].[[[[:digit:]]]].[[[[:digit:]]]]" | uniq`) = $(expr `"$CXX" --version | head -n 1 | grep -o -E "[[[[:digit:]]]].[[[[:digit:]]]].[[[[:digit:]]]]" | uniq`)]))
+
+AM_COND_IF([IS_CXX_OK],
+        [AC_CACHE_CHECK([whether the C++ compiler works],
+                       [wt_cv_prog_cxx_works],
+                       [AC_LANG_PUSH([C++])
+                        AC_LINK_IFELSE([AC_LANG_PROGRAM([], [])],
+                                       [wt_cv_prog_cxx_works=yes],
+                                       [wt_cv_prog_cxx_works=no])
+                        AC_LANG_POP([C++])])],
+        [AC_MSG_WARN([C++ compiler ignored unless compiler is named "cc" or gcc and g++ versions match])
+        wt_cv_prog_cxx_works=no])
+
 AM_CONDITIONAL([HAVE_CXX], [test "$wt_cv_prog_cxx_works" = "yes"])
 
 LT_PREREQ(2.2.6)

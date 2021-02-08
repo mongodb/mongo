@@ -73,7 +73,7 @@ run()
 # already parallelize internally.
 run "sh ./s_readme $force"
 run "sh ./s_install $force"
-run "python api_config.py"
+run "python api_config_gen.py"
 run "python api_err.py"
 run "python flags.py"
 run "python log.py"

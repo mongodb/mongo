@@ -254,10 +254,15 @@ __rollback_row_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW 
 
         /*
          * Do not include history store updates greater than on-disk data store version to construct
-         * a full update to restore. Comparing with timestamps here has no problem unlike in search
-         * flow where the timestamps may be reset during reconciliation. RTS detects an on-disk
-         * update is unstable based on the written proper timestamp, so comparing against it with
-         * history store shouldn't have any problem.
+         * a full update to restore. Include the most recent updates than the on-disk version
+         * shouldn't be problem as the on-disk version in history store is always a full update. It
+         * is better to not to include those updates as it unnecessarily increases the rollback to
+         * stable time.
+         *
+         * Comparing with timestamps here has no problem unlike in search flow where the timestamps
+         * may be reset during reconciliation. RTS detects an on-disk update is unstable based on
+         * the written proper timestamp, so comparing against it with history store shouldn't have
+         * any problem.
          */
         if (hs_start_ts <= unpack->tw.start_ts) {
             if (type == WT_UPDATE_MODIFY)
@@ -267,7 +272,13 @@ __rollback_row_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW 
                 WT_ASSERT(session, type == WT_UPDATE_STANDARD);
                 WT_ERR(__wt_buf_set(session, &full_value, hs_value->data, hs_value->size));
             }
-        }
+        } else
+            __wt_verbose(session, WT_VERB_RECOVERY_RTS(session),
+              "history store update more recent than on-disk update with start timestamp: %s,"
+              " durable timestamp: %s, stop timestamp: %s and type: %" PRIu8,
+              __wt_timestamp_to_string(hs_start_ts, ts_string[0]),
+              __wt_timestamp_to_string(hs_durable_ts, ts_string[1]),
+              __wt_timestamp_to_string(hs_stop_durable_ts, ts_string[2]), type);
 
         /*
          * Verify the history store timestamps are in order. The start timestamp may be equal to the
