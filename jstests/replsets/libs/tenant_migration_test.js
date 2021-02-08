@@ -140,7 +140,7 @@ function TenantMigrationTest({
     }
 
     /**
-     * Creates a role for running find command against admin.system.external_validation_keys if it
+     * Creates a role for running find command against config.external_validation_keys if it
      * doesn't exist.
      */
     function createFindExternalClusterTimeKeysRoleIfNotExist(rst) {
@@ -153,7 +153,7 @@ function TenantMigrationTest({
         assert.commandWorked(adminDB.runCommand({
             createRole: "findExternalClusterTimeKeysRole",
             privileges: [{
-                resource: {db: "admin", collection: "system.external_validation_keys"},
+                resource: {db: "config", collection: "external_validation_keys"},
                 actions: ["find"]
             }],
             roles: []
@@ -162,7 +162,7 @@ function TenantMigrationTest({
 
     /**
      * Gives the current admin database user the privilege to run find commands against
-     * admin.system.external_validation_keys if it does not have that privilege. Used by
+     * config.external_validation_keys if it does not have that privilege. Used by
      * 'assertNoDuplicatedExternalKeyDocs' below.
      */
     function grantFindExternalClusterTimeKeysPrivilegeIfNeeded(rst) {
@@ -323,8 +323,8 @@ function TenantMigrationTest({
             cmdObj, this.getDonorRst(), retryOnRetryableErrors);
 
         // If the command succeeded, we expect that the migration is marked garbage collectable on
-        // the donor and the recipient. Check the state docs for expireAt, and check that the oplog
-        // buffer collection has been dropped.
+        // the donor and the recipient. Check the state docs for expireAt, check that the oplog
+        // buffer collection has been dropped, and external keys have ttlExpiresAt.
         if (res.ok) {
             const donorPrimary = this.getDonorPrimary();
             const recipientPrimary = this.getRecipientPrimary();
@@ -348,6 +348,26 @@ function TenantMigrationTest({
             const configDBCollections = recipientPrimary.getDB('config').getCollectionNames();
             assert(!configDBCollections.includes('repl.migration.oplog_' + migrationIdString),
                    configDBCollections);
+
+            this.getDonorRst().asCluster(donorPrimary, () => {
+                const donorKeys =
+                    TenantMigrationUtil.getExternalKeys(donorPrimary, UUID(migrationIdString));
+                if (donorKeys.length) {
+                    donorKeys.forEach(key => {
+                        assert(key.hasOwnProperty("ttlExpiresAt"), tojson(key));
+                    });
+                }
+            });
+
+            this.getRecipientRst().asCluster(recipientPrimary, () => {
+                const recipientKeys =
+                    TenantMigrationUtil.getExternalKeys(recipientPrimary, UUID(migrationIdString));
+                if (recipientKeys.length) {
+                    recipientKeys.forEach(key => {
+                        assert(key.hasOwnProperty("ttlExpiresAt"), tojson(key));
+                    });
+                }
+            });
         }
 
         return res;

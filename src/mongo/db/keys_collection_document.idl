@@ -46,7 +46,7 @@ structs:
     keysCollectionDocumentBase:
         description: >-
             Contains the fields shared by key documents stored in admin.system.keys and
-            admin.system.external_validation_keys.
+            config.external_validation_keys.
         strict: true
         fields:
             purpose:
@@ -75,7 +75,7 @@ structs:
 
     externalKeysCollectionDocument:
         description: >-
-            Represents a key document stored in admin.system.external_validation_keys.
+            Represents a key document stored in config.external_validation_keys.
         strict: true
         inline_chained_structs: true
         chained_structs:
@@ -100,3 +100,4 @@ structs:
                     The wall-clock time at which this key document should be removed by the
                     TTL monitor.
                 cpp_name: TTLExpiresAt
+                optional: true

@@ -130,20 +130,29 @@ inline Status validatePrivateKeyPEMPayload(const StringData& payload) {
 }
 
 /*
- * Creates an ExternalKeysCollectionDocument representing an admin.system.external_validation_keys
+ * Creates an ExternalKeysCollectionDocument representing an config.external_validation_keys
  * document from the given the admin.system.keys document BSONObj.
  */
-ExternalKeysCollectionDocument makeExternalClusterTimeKeyDoc(ServiceContext* serviceContext,
-                                                             UUID migrationId,
-                                                             BSONObj keyDoc);
+ExternalKeysCollectionDocument makeExternalClusterTimeKeyDoc(UUID migrationId, BSONObj keyDoc);
 
 /*
  * For each given ExternalKeysCollectionDocument, inserts it if there is not an existing document in
- * admin.system.external_validation_keys for it with the same keyId and replicaSetName. Otherwise,
+ * config.external_validation_keys for it with the same keyId and replicaSetName. Otherwise,
  * updates the ttlExpiresAt of the existing document if it is less than the new ttlExpiresAt.
  */
 void storeExternalClusterTimeKeyDocs(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                      std::vector<ExternalKeysCollectionDocument> keyDocs);
+
+/**
+ * Sets the "ttlExpiresAt" field for the external keys so they can be garbage collected by the ttl
+ * monitor.
+ */
+ExecutorFuture<void> markExternalKeysAsGarbageCollectable(
+    ServiceContext* serviceContext,
+    std::shared_ptr<executor::ScopedTaskExecutor> executor,
+    std::shared_ptr<executor::TaskExecutor> parentExecutor,
+    UUID migrationId,
+    const CancelationToken& token);
 
 /**
  * Creates a view on the oplog that allows a tenant migration recipient to fetch retryable writes

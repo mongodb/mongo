@@ -55,7 +55,7 @@ public:
         bool useMajority) override;
 
     /**
-     * Returns all keys in admin.system.external_validation_keys that match the given purpose.
+     * Returns all keys in config.external_validation_keys that match the given purpose.
      */
     StatusWith<std::vector<ExternalKeysCollectionDocument>> getAllExternalKeys(
         OperationContext* opCtx, StringData purpose) override;

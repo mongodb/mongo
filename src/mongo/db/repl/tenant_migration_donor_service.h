@@ -65,8 +65,8 @@ public:
 
     std::shared_ptr<PrimaryOnlyService::Instance> constructInstance(
         BSONObj initialState) const override {
-        return std::make_shared<TenantMigrationDonorService::Instance>(_serviceContext,
-                                                                       initialState);
+        return std::make_shared<TenantMigrationDonorService::Instance>(
+            _serviceContext, this, initialState);
     }
 
     class Instance final : public PrimaryOnlyService::TypedInstance<Instance> {
@@ -76,7 +76,9 @@ public:
             boost::optional<Status> abortReason;
         };
 
-        explicit Instance(ServiceContext* const serviceContext, const BSONObj& initialState);
+        explicit Instance(ServiceContext* const serviceContext,
+                          const TenantMigrationDonorService* donorService,
+                          const BSONObj& initialState);
 
         ~Instance();
 
@@ -157,7 +159,7 @@ public:
 
         /**
          * Fetches all key documents from the recipient's admin.system.keys collection, stores
-         * them in admin.system.external_validation_keys, and refreshes the keys cache.
+         * them in config.external_validation_keys, and refreshes the keys cache.
          */
         ExecutorFuture<void> _fetchAndStoreRecipientClusterTimeKeyDocs(
             std::shared_ptr<executor::ScopedTaskExecutor> executor,
@@ -227,7 +229,8 @@ public:
             return recipientCmdThreadPoolLimits;
         }
 
-        ServiceContext* _serviceContext;
+        ServiceContext* const _serviceContext;
+        const TenantMigrationDonorService* const _donorService;
 
         TenantMigrationDonorDocument _stateDoc;
         const std::string _instanceName;
@@ -270,6 +273,12 @@ public:
     };
 
 private:
+    ExecutorFuture<void> createStateDocumentTTLIndex(
+        std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancelationToken& token);
+
+    ExecutorFuture<void> createExternalKeysTTLIndex(
+        std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancelationToken& token);
+
     ExecutorFuture<void> _rebuildService(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                          const CancelationToken& token) override;
 

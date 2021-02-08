@@ -30,6 +30,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/jsobj.h"
+#include "mongo/db/keys_collection_client_direct.h"
 #include "mongo/db/keys_collection_client_sharded.h"
 #include "mongo/db/keys_collection_document_gen.h"
 #include "mongo/db/keys_collection_manager.h"
@@ -50,9 +51,6 @@ public:
     }
 
 protected:
-    const UUID kMigrationId1 = UUID::gen();
-    const UUID kMigrationId2 = UUID::gen();
-
     void setUp() override {
         ConfigServerTestFixture::setUp();
 
@@ -371,14 +369,50 @@ TEST_F(KeysManagerShardedTest, HasSeenKeysIsFalseUntilKeysAreFound) {
     ASSERT_EQ(true, keyManager()->hasSeenKeys());
 }
 
-TEST_F(KeysManagerShardedTest, CacheExternalKeyBasic) {
+class KeysManagerDirectTest : public ConfigServerTestFixture {
+protected:
+    const UUID kMigrationId1 = UUID::gen();
+    const UUID kMigrationId2 = UUID::gen();
+
+    KeysCollectionManager* keyManager() {
+        return _keyManager.get();
+    }
+
+    void setUp() override {
+        ConfigServerTestFixture::setUp();
+
+        auto clockSource = std::make_unique<ClockSourceMock>();
+        // Timestamps of "0 seconds" are not allowed, so we must advance our clock mock to the first
+        // real second.
+        clockSource->advance(Seconds(1));
+
+        operationContext()->getServiceContext()->setFastClockSource(std::move(clockSource));
+        _keyManager = std::make_unique<KeysCollectionManager>(
+            "dummy", std::make_unique<KeysCollectionClientDirect>(), Seconds(1));
+    }
+
+    void tearDown() override {
+        _keyManager->stopMonitoring();
+
+        ConfigServerTestFixture::tearDown();
+    }
+
+private:
+    std::unique_ptr<KeysCollectionManager> _keyManager;
+};
+
+TEST_F(KeysManagerDirectTest, CacheExternalKeyBasic) {
     keyManager()->startMonitoring(getServiceContext());
 
-    auto externalKeysTTLExpiresAt = getServiceContext()->getFastClockSource()->now() + Seconds(30);
-    ExternalKeysCollectionDocument externalKey1(
-        OID::gen(), 1, kMigrationId1, externalKeysTTLExpiresAt);
+    // Refresh immediately to prevent a refresh from discovering the inserted keys.
+    keyManager()->refreshNow(operationContext());
+
+    ExternalKeysCollectionDocument externalKey1(OID::gen(), 1, kMigrationId1);
     externalKey1.setKeysCollectionDocumentBase(
         {"dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(100, 0))});
+    ASSERT_OK(insertToConfigCollection(operationContext(),
+                                       NamespaceString::kExternalKeysCollectionNamespace,
+                                       externalKey1.toBSON()));
 
     keyManager()->cacheExternalKey(externalKey1);
 
@@ -393,12 +427,14 @@ TEST_F(KeysManagerShardedTest, CacheExternalKeyBasic) {
 
         ASSERT_EQ(externalKey1.getKeyId(), key.getKeyId());
         ASSERT_EQ(externalKey1.getPurpose(), key.getPurpose());
-        ASSERT_EQ(externalKey1.getExpiresAt().asTimestamp(), key.getExpiresAt().asTimestamp());
     }
 }
 
-TEST_F(KeysManagerShardedTest, WillNotCacheExternalKeyWhenMonitoringIsStopped) {
+TEST_F(KeysManagerDirectTest, WillNotCacheExternalKeyWhenMonitoringIsStopped) {
     keyManager()->startMonitoring(getServiceContext());
+
+    // Refresh immediately to prevent a refresh from discovering the inserted keys.
+    keyManager()->refreshNow(operationContext());
 
     // Insert an internal key so the key manager won't attempt to refresh after the refresher is
     // stopped.
@@ -408,11 +444,12 @@ TEST_F(KeysManagerShardedTest, WillNotCacheExternalKeyWhenMonitoringIsStopped) {
     ASSERT_OK(insertToConfigCollection(
         operationContext(), NamespaceString::kKeysCollectionNamespace, internalKey.toBSON()));
 
-    auto externalKeysTTLExpiresAt = getServiceContext()->getFastClockSource()->now() + Seconds(30);
-    ExternalKeysCollectionDocument externalKey1(
-        OID::gen(), 1, kMigrationId1, externalKeysTTLExpiresAt);
+    ExternalKeysCollectionDocument externalKey1(OID::gen(), 1, kMigrationId1);
     externalKey1.setKeysCollectionDocumentBase(
         {"dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(100, 0))});
+    ASSERT_OK(insertToConfigCollection(operationContext(),
+                                       NamespaceString::kExternalKeysCollectionNamespace,
+                                       externalKey1.toBSON()));
 
     keyManager()->cacheExternalKey(externalKey1);
 
@@ -425,8 +462,7 @@ TEST_F(KeysManagerShardedTest, WillNotCacheExternalKeyWhenMonitoringIsStopped) {
 
     keyManager()->stopMonitoring();
 
-    ExternalKeysCollectionDocument externalKey2(
-        OID::gen(), 1, kMigrationId2, externalKeysTTLExpiresAt);
+    ExternalKeysCollectionDocument externalKey2(OID::gen(), 1, kMigrationId2);
     externalKey2.setKeysCollectionDocumentBase(
         {"dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(100, 0))});
 

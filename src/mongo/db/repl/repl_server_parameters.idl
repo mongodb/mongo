@@ -382,15 +382,16 @@ server_parameters:
         default:
             expr: 15 * 60 * 1000
 
-    tenantMigrationExternalKeysRemovalDelaySecs:
+    tenantMigrationExternalKeysRemovalBufferSecs:
         description: >-
             The amount of time in seconds that the donor or recipient should wait before
-            removing the cluster time keys cloned from each other.
+            removing the cluster time keys cloned from each other after receiving
+            donorForgetMigration or recipientForgetMigration
         set_at: [ startup, runtime ]
         cpp_vartype: AtomicWord<int>
-        cpp_varname: tenantMigrationExternalKeysRemovalDelaySecs
+        cpp_varname: tenantMigrationExternalKeysRemovalBufferSecs
         default:
-            expr: 3 * 30 * 24 * 60 * 60   # ~3 months
+            expr: 60 * 60 * 24   # 24 hours
 
     tenantMigrationOplogBufferPeekCacheSize:
         description: >-

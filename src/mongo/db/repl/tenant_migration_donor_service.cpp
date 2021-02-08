@@ -63,8 +63,10 @@ MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationAfterPersistingInitialDonorStateDoc)
 MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationBeforeLeavingAbortingIndexBuildsState);
 MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationBeforeLeavingBlockingState);
 MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationBeforeLeavingDataSyncState);
+MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationDonorBeforeMarkingStateGarbageCollectable);
 
 const std::string kTTLIndexName = "TenantMigrationDonorTTLIndex";
+const std::string kExternalKeysTTLIndexName = "ExternalKeysTTLIndex";
 const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
 
 const ReadPreferenceSetting kPrimaryOnlyReadPreference(ReadPreference::PrimaryOnly);
@@ -98,7 +100,10 @@ void checkIfReceivedDonorAbortMigration(const CancelationToken& serviceToken,
 
 }  // namespace
 
-ExecutorFuture<void> TenantMigrationDonorService::_rebuildService(
+// Note this index is required on both the donor and recipient in a tenant migration, since each
+// will copy cluster time keys from the other. The donor service is set up on all mongods on stepup
+// to primary, so this index will be created on both donors and recipients.
+ExecutorFuture<void> TenantMigrationDonorService::createStateDocumentTTLIndex(
     std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancelationToken& token) {
     return AsyncTry([this] {
                auto nss = getStateDocumentsNS();
@@ -123,10 +128,45 @@ ExecutorFuture<void> TenantMigrationDonorService::_rebuildService(
         .on(**executor, CancelationToken::uncancelable());
 }
 
+ExecutorFuture<void> TenantMigrationDonorService::createExternalKeysTTLIndex(
+    std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancelationToken& token) {
+    return AsyncTry([this] {
+               const auto nss = NamespaceString::kExternalKeysCollectionNamespace;
+
+               AllowOpCtxWhenServiceRebuildingBlock allowOpCtxBlock(Client::getCurrent());
+               auto opCtxHolder = cc().makeOperationContext();
+               auto opCtx = opCtxHolder.get();
+               DBDirectClient client(opCtx);
+
+               BSONObj result;
+               client.runCommand(
+                   nss.db().toString(),
+                   BSON("createIndexes"
+                        << nss.coll().toString() << "indexes"
+                        << BSON_ARRAY(BSON("key" << BSON("ttlExpiresAt" << 1) << "name"
+                                                 << kExternalKeysTTLIndexName
+                                                 << "expireAfterSeconds" << 0))),
+                   result);
+               uassertStatusOK(getStatusFromCommandResult(result));
+           })
+        .until([token](Status status) { return shouldStopCreatingTTLIndex(status, token); })
+        .withBackoffBetweenIterations(kExponentialBackoff)
+        .on(**executor, CancelationToken::uncancelable());
+}
+
+ExecutorFuture<void> TenantMigrationDonorService::_rebuildService(
+    std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancelationToken& token) {
+    return createStateDocumentTTLIndex(executor, token).then([this, executor, token] {
+        return createExternalKeysTTLIndex(executor, token);
+    });
+}
+
 TenantMigrationDonorService::Instance::Instance(ServiceContext* const serviceContext,
+                                                const TenantMigrationDonorService* donorService,
                                                 const BSONObj& initialState)
     : repl::PrimaryOnlyService::TypedInstance<Instance>(),
       _serviceContext(serviceContext),
+      _donorService(donorService),
       _stateDoc(tenant_migration_access_blocker::parseDonorStateDocument(initialState)),
       _instanceName(kServiceName + "-" + _stateDoc.getTenantId()),
       _recipientUri(
@@ -355,7 +395,7 @@ TenantMigrationDonorService::Instance::_fetchAndStoreRecipientClusterTimeKeyDocs
                 const auto& data = dataStatus.getValue();
                 for (const BSONObj& doc : data.documents) {
                     keyDocs.push_back(tenant_migration_util::makeExternalClusterTimeKeyDoc(
-                        _serviceContext, _stateDoc.getId(), doc.getOwned()));
+                        _stateDoc.getId(), doc.getOwned()));
                 }
                 fetchStatus = Status::OK();
 
@@ -549,6 +589,8 @@ TenantMigrationDonorService::Instance::_markStateDocAsGarbageCollectable(
                auto opCtxHolder = cc().makeOperationContext();
                auto opCtx = opCtxHolder.get();
 
+               pauseTenantMigrationDonorBeforeMarkingStateGarbageCollectable.pauseWhileSet(opCtx);
+
                AutoGetCollection collection(opCtx, _stateDocumentsNS, MODE_IX);
 
                writeConflictRetry(
@@ -722,6 +764,10 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
                 });
         })
         .then([this, self = shared_from_this(), executor, recipientTargeterRS, serviceToken] {
+            if (_stateDoc.getState() > TenantMigrationDonorStateEnum::kAbortingIndexBuilds) {
+                return ExecutorFuture<void>(**executor, Status::OK());
+            }
+
             checkIfReceivedDonorAbortMigration(serviceToken, _abortMigrationSource.token());
 
             return _fetchAndStoreRecipientClusterTimeKeyDocs(
@@ -945,6 +991,18 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
                             executor, recipientTargeterRS, serviceToken);
                     })
                 .then([this, self = shared_from_this(), executor, serviceToken] {
+                    // Note marking the keys as garbage collectable is not atomic with marking the
+                    // state document garbage collectable, so an interleaved failover can lead the
+                    // keys to be deleted before the state document has an expiration date. This is
+                    // acceptable because the decision to forget a migration is not reversible.
+                    return tenant_migration_util::markExternalKeysAsGarbageCollectable(
+                        _serviceContext,
+                        executor,
+                        _donorService->getInstanceCleanupExecutor(),
+                        _stateDoc.getId(),
+                        serviceToken);
+                })
+                .then([this, self = shared_from_this(), executor, serviceToken] {
                     return _markStateDocAsGarbageCollectable(executor, serviceToken);
                 })
                 .then([this, self = shared_from_this(), executor](repl::OpTime opTime) {
@@ -955,7 +1013,8 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
             LOGV2(4920400,
                   "Marked migration state as garbage collectable",
                   "migrationId"_attr = _stateDoc.getId(),
-                  "expireAt"_attr = _stateDoc.getExpireAt());
+                  "expireAt"_attr = _stateDoc.getExpireAt(),
+                  "status"_attr = status);
 
             stdx::lock_guard<Latch> lg(_mutex);
             if (_completionPromise.getFuture().isReady()) {

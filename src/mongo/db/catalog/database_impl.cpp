@@ -353,7 +353,6 @@ Status DatabaseImpl::dropCollection(OperationContext* opCtx,
         } else if (!(nss.isSystemDotViews() || nss.isHealthlog() ||
                      nss == NamespaceString::kLogicalSessionsNamespace ||
                      nss == NamespaceString::kKeysCollectionNamespace ||
-                     nss == NamespaceString::kExternalKeysCollectionNamespace ||
                      nss.isTemporaryReshardingCollection())) {
             return Status(ErrorCodes::IllegalOperation,
                           str::stream() << "can't drop system collection " << nss);

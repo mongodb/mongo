@@ -29,6 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/keys_collection_cache.h"
@@ -36,8 +37,10 @@
 #include "mongo/db/keys_collection_client_sharded.h"
 #include "mongo/db/keys_collection_document_gen.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/ops/write_ops.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
 #include "mongo/db/time_proof_service.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/grid.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
@@ -71,6 +74,47 @@ protected:
         AutoGetCollection coll(opCtx, nss, MODE_IX);
         auto updateResult = Helpers::upsert(opCtx, nss.toString(), doc);
         ASSERT_EQ(0, updateResult.numDocsModified);
+    }
+
+    void deleteDocument(OperationContext* opCtx,
+                        const NamespaceString& nss,
+                        const BSONObj& filter) {
+        auto cmdObj = [&] {
+            write_ops::Delete deleteOp(nss);
+            deleteOp.setDeletes({[&] {
+                write_ops::DeleteOpEntry entry;
+                entry.setQ(filter);
+                entry.setMulti(false);
+                return entry;
+            }()});
+            return deleteOp.toBSON({});
+        }();
+
+        DBDirectClient client(opCtx);
+        BSONObj result;
+        client.runCommand(nss.db().toString(), cmdObj, result);
+        ASSERT_OK(getStatusFromWriteCommandReply(result));
+    }
+
+    void updateDocument(OperationContext* opCtx,
+                        const NamespaceString& nss,
+                        const BSONObj& filter,
+                        const BSONObj& update) {
+        auto cmdObj = [&] {
+            write_ops::Update updateOp(nss);
+            updateOp.setUpdates({[&] {
+                write_ops::UpdateOpEntry entry;
+                entry.setQ(filter);
+                entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(update));
+                return entry;
+            }()});
+            return updateOp.toBSON({});
+        }();
+
+        DBDirectClient client(opCtx);
+        BSONObj result;
+        client.runCommand(nss.db().toString(), cmdObj, result);
+        ASSERT_OK(getStatusFromWriteCommandReply(result));
     }
 
 private:
@@ -169,9 +213,6 @@ TEST_F(CacheTest, GetKeyShouldReturnCorrectKeyAfterRefreshSharded) {
 TEST_F(CacheTest, GetKeyShouldReturnCorrectKeysAfterRefreshDirectClient) {
     KeysCollectionCache cache("test", directClient());
 
-    const auto externalKeysTTLExpiresAt =
-        ServiceContext().getFastClockSource()->now() + Seconds(30);
-
     KeysCollectionDocument origKey0(1);
     origKey0.setKeysCollectionDocumentBase(
         {"test", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0))});
@@ -180,13 +221,14 @@ TEST_F(CacheTest, GetKeyShouldReturnCorrectKeysAfterRefreshDirectClient) {
 
     // Use external keys with the same keyId and expiresAt as the internal key to test that the
     // cache correctly tackles key collisions.
-    ExternalKeysCollectionDocument origKey1(OID::gen(), 1, kMigrationId1, externalKeysTTLExpiresAt);
+    ExternalKeysCollectionDocument origKey1(OID::gen(), 1, kMigrationId1);
     origKey1.setKeysCollectionDocumentBase(
         {"test", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0))});
+    origKey1.setTTLExpiresAt(ServiceContext().getFastClockSource()->now() + Seconds(30));
     insertDocument(
         operationContext(), NamespaceString::kExternalKeysCollectionNamespace, origKey1.toBSON());
 
-    ExternalKeysCollectionDocument origKey2(OID::gen(), 1, kMigrationId2, externalKeysTTLExpiresAt);
+    ExternalKeysCollectionDocument origKey2(OID::gen(), 1, kMigrationId2);
     origKey2.setKeysCollectionDocumentBase(
         {"test", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(205, 0))});
     insertDocument(
@@ -246,7 +288,12 @@ TEST_F(CacheTest, GetKeyShouldReturnCorrectKeysAfterRefreshDirectClient) {
             ASSERT_EQ(expectedKey.getId(), key.getId());
             ASSERT_EQ(expectedKey.getPurpose(), key.getPurpose());
             ASSERT_EQ(expectedKey.getExpiresAt().asTimestamp(), key.getExpiresAt().asTimestamp());
-            ASSERT_EQ(expectedKey.getTTLExpiresAt(), key.getTTLExpiresAt());
+            if (expectedKey.getTTLExpiresAt()) {
+                ASSERT_EQ(*expectedKey.getTTLExpiresAt(), *key.getTTLExpiresAt());
+            } else {
+                ASSERT(!expectedKey.getTTLExpiresAt()), key.getTTLExpiresAt();
+                ASSERT(!key.getTTLExpiresAt());
+            }
         }
     }
 
@@ -261,7 +308,7 @@ TEST_F(CacheTest, GetKeyShouldReturnCorrectKeysAfterRefreshDirectClient) {
         ASSERT_EQ(origKey2.getId(), key.getId());
         ASSERT_EQ(origKey2.getPurpose(), key.getPurpose());
         ASSERT_EQ(origKey2.getExpiresAt().asTimestamp(), key.getExpiresAt().asTimestamp());
-        ASSERT_EQ(origKey2.getTTLExpiresAt(), key.getTTLExpiresAt());
+        ASSERT(!key.getTTLExpiresAt());
     }
 
     swExternalKeys = cache.getExternalKeysById(1, LogicalTime(Timestamp(300, 0)));
@@ -391,10 +438,7 @@ TEST_F(CacheTest, RefreshShouldNotGetExternalKeysForOtherPurpose) {
     insertDocument(
         operationContext(), NamespaceString::kKeysCollectionNamespace, origKey0.toBSON());
 
-    const auto externalKeysTTLExpiresAt =
-        ServiceContext().getFastClockSource()->now() + Seconds(30);
-
-    ExternalKeysCollectionDocument origKey1(OID::gen(), 1, kMigrationId1, externalKeysTTLExpiresAt);
+    ExternalKeysCollectionDocument origKey1(OID::gen(), 1, kMigrationId1);
     origKey1.setKeysCollectionDocumentBase(
         {"dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0))});
     insertDocument(
@@ -408,7 +452,7 @@ TEST_F(CacheTest, RefreshShouldNotGetExternalKeysForOtherPurpose) {
         ASSERT_EQ(ErrorCodes::KeyNotFound, swKey.getStatus());
     }
 
-    ExternalKeysCollectionDocument origKey2(OID::gen(), 2, kMigrationId1, externalKeysTTLExpiresAt);
+    ExternalKeysCollectionDocument origKey2(OID::gen(), 2, kMigrationId1);
     origKey2.setKeysCollectionDocumentBase(
         {"test", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(110, 0))});
     insertDocument(
@@ -430,7 +474,6 @@ TEST_F(CacheTest, RefreshShouldNotGetExternalKeysForOtherPurpose) {
         ASSERT_EQ(origKey2.getKey(), key.getKey());
         ASSERT_EQ("test", key.getPurpose());
         ASSERT_EQ(Timestamp(110, 0), key.getExpiresAt().asTimestamp());
-        ASSERT_EQ(externalKeysTTLExpiresAt, key.getTTLExpiresAt());
     }
 }
 
@@ -494,15 +537,13 @@ TEST_F(CacheTest, RefreshCanIncrementallyGetNewKeys) {
 }
 
 TEST_F(CacheTest, CacheExternalKeyBasic) {
-    const auto externalKeysTTLExpiresAt =
-        ServiceContext().getFastClockSource()->now() + Seconds(30);
     KeysCollectionCache cache("test", catalogClient());
 
     auto swExternalKeys = cache.getExternalKeysById(5, LogicalTime(Timestamp(10, 1)));
     ASSERT_EQ(ErrorCodes::KeyNotFound, swExternalKeys.getStatus());
 
-    ExternalKeysCollectionDocument externalKey(
-        OID::gen(), 5, kMigrationId1, externalKeysTTLExpiresAt);
+    ExternalKeysCollectionDocument externalKey(OID::gen(), 5, kMigrationId1);
+    externalKey.setTTLExpiresAt(ServiceContext().getFastClockSource()->now() + Seconds(30));
     externalKey.setKeysCollectionDocumentBase(
         {"test", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(100, 0))});
 
@@ -516,7 +557,135 @@ TEST_F(CacheTest, CacheExternalKeyBasic) {
     ASSERT_EQ(externalKey.getId(), cachedKey.getId());
     ASSERT_EQ(externalKey.getPurpose(), cachedKey.getPurpose());
     ASSERT_EQ(externalKey.getExpiresAt().asTimestamp(), cachedKey.getExpiresAt().asTimestamp());
-    ASSERT_EQ(externalKey.getTTLExpiresAt(), cachedKey.getTTLExpiresAt());
+    ASSERT_EQ(*externalKey.getTTLExpiresAt(), *cachedKey.getTTLExpiresAt());
+}
+
+TEST_F(CacheTest, RefreshClearsRemovedExternalKeys) {
+    KeysCollectionCache cache("test", directClient());
+
+    KeysCollectionDocument origKey0(1);
+    origKey0.setKeysCollectionDocumentBase(
+        {"test", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0))});
+    insertDocument(
+        operationContext(), NamespaceString::kKeysCollectionNamespace, origKey0.toBSON());
+
+    ExternalKeysCollectionDocument origKey1(OID::gen(), 1, kMigrationId1);
+    origKey1.setKeysCollectionDocumentBase(
+        {"test", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0))});
+    origKey1.setTTLExpiresAt(ServiceContext().getFastClockSource()->now() + Seconds(30));
+    insertDocument(
+        operationContext(), NamespaceString::kExternalKeysCollectionNamespace, origKey1.toBSON());
+
+    ExternalKeysCollectionDocument origKey2(OID::gen(), 1, kMigrationId2);
+    origKey2.setKeysCollectionDocumentBase(
+        {"test", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(205, 0))});
+    insertDocument(
+        operationContext(), NamespaceString::kExternalKeysCollectionNamespace, origKey2.toBSON());
+
+    // After a refresh, both keys should be in the cache.
+    {
+        auto refreshStatus = cache.refresh(operationContext());
+        ASSERT_OK(refreshStatus.getStatus());
+
+        auto swExternalKeys = cache.getExternalKeysById(1, LogicalTime(Timestamp(1, 0)));
+        ASSERT_OK(swExternalKeys.getStatus());
+        ASSERT_EQ(2, swExternalKeys.getValue().size());
+    }
+
+    // After a key is deleted from the underlying collection, the next refresh should remove it from
+    // the cache.
+    deleteDocument(
+        operationContext(), NamespaceString::kExternalKeysCollectionNamespace, origKey1.toBSON());
+
+    // The key is still cached until refresh.
+    {
+        auto swExternalKeys = cache.getExternalKeysById(1, LogicalTime(Timestamp(1, 0)));
+        ASSERT_OK(swExternalKeys.getStatus());
+        ASSERT_EQ(2, swExternalKeys.getValue().size());
+    }
+
+    {
+        auto refreshStatus = cache.refresh(operationContext());
+        ASSERT_OK(refreshStatus.getStatus());
+
+        // Now the key is no longer cached.
+        auto swExternalKeys = cache.getExternalKeysById(1, LogicalTime(Timestamp(1, 0)));
+        ASSERT_OK(swExternalKeys.getStatus());
+        ASSERT_EQ(1, swExternalKeys.getValue().size());
+        auto key = swExternalKeys.getValue().front();
+
+        ASSERT_EQ(origKey2.getId(), key.getId());
+        ASSERT_EQ(origKey2.getPurpose(), key.getPurpose());
+        ASSERT_EQ(origKey2.getExpiresAt().asTimestamp(), key.getExpiresAt().asTimestamp());
+        ASSERT(!key.getTTLExpiresAt());
+    }
+
+    // Remove the final key and the external keys cache should be empty.
+    deleteDocument(
+        operationContext(), NamespaceString::kExternalKeysCollectionNamespace, origKey2.toBSON());
+
+    {
+        auto refreshStatus = cache.refresh(operationContext());
+        ASSERT_OK(refreshStatus.getStatus());
+
+        auto swExternalKeys = cache.getExternalKeysById(1, LogicalTime(Timestamp(1, 0)));
+        ASSERT_EQ(ErrorCodes::KeyNotFound, swExternalKeys.getStatus());
+    }
+}
+
+TEST_F(CacheTest, RefreshHandlesKeysReceivingTTLValue) {
+    KeysCollectionCache cache("test", directClient());
+
+    KeysCollectionDocument origKey0(1);
+    origKey0.setKeysCollectionDocumentBase(
+        {"test", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0))});
+    insertDocument(
+        operationContext(), NamespaceString::kKeysCollectionNamespace, origKey0.toBSON());
+
+    ExternalKeysCollectionDocument origKey1(OID::gen(), 1, kMigrationId1);
+    origKey1.setKeysCollectionDocumentBase(
+        {"test", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0))});
+    insertDocument(
+        operationContext(), NamespaceString::kExternalKeysCollectionNamespace, origKey1.toBSON());
+
+    // Refresh and the external key should be in the cache.
+    {
+        auto refreshStatus = cache.refresh(operationContext());
+        ASSERT_OK(refreshStatus.getStatus());
+
+        auto swExternalKeys = cache.getExternalKeysById(1, LogicalTime(Timestamp(1, 0)));
+        ASSERT_OK(swExternalKeys.getStatus());
+        ASSERT_EQ(1, swExternalKeys.getValue().size());
+        auto key = swExternalKeys.getValue().front();
+
+        ASSERT_EQ(origKey1.getId(), key.getId());
+        ASSERT_EQ(origKey1.getPurpose(), key.getPurpose());
+        ASSERT_EQ(origKey1.getExpiresAt().asTimestamp(), key.getExpiresAt().asTimestamp());
+        ASSERT(!key.getTTLExpiresAt());
+    }
+
+    origKey1.setTTLExpiresAt(ServiceContext().getFastClockSource()->now() + Seconds(30));
+    updateDocument(operationContext(),
+                   NamespaceString::kExternalKeysCollectionNamespace,
+                   BSON(ExternalKeysCollectionDocument::kIdFieldName << origKey1.getId()),
+                   origKey1.toBSON());
+
+    // Refresh and the external key should have been updated.
+    {
+        auto refreshStatus = cache.refresh(operationContext());
+        ASSERT_OK(refreshStatus.getStatus());
+
+        auto swExternalKeys = cache.getExternalKeysById(1, LogicalTime(Timestamp(1, 0)));
+        ASSERT_OK(swExternalKeys.getStatus());
+        ASSERT_EQ(1, swExternalKeys.getValue().size());
+        auto key = swExternalKeys.getValue().front();
+
+        ASSERT_EQ(origKey1.getId(), key.getId());
+        ASSERT_EQ(origKey1.getPurpose(), key.getPurpose());
+        ASSERT_EQ(origKey1.getExpiresAt().asTimestamp(), key.getExpiresAt().asTimestamp());
+        ASSERT(key.getTTLExpiresAt());
+        ASSERT_EQ(*origKey1.getTTLExpiresAt(), *key.getTTLExpiresAt());
+    }
 }
 
 }  // namespace

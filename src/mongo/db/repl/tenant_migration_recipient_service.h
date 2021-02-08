@@ -341,7 +341,7 @@ public:
 
         /**
          * Fetches all key documents from the donor's admin.system.keys collection, stores them in
-         * admin.system.external_validation_keys, and refreshes the keys cache.
+         * config.external_validation_keys, and refreshes the keys cache.
          */
         void _fetchAndStoreDonorClusterTimeKeyDocs(const CancelationToken& token);
 
