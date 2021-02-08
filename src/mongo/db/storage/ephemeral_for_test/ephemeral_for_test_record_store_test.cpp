@@ -86,6 +86,10 @@ public:
     std::unique_ptr<mongo::RecoveryUnit> newRecoveryUnit() final {
         return std::make_unique<RecoveryUnit>(&_kvEngine);
     }
+
+    KVEngine* getEngine() override final {
+        return &_kvEngine;
+    }
 };
 
 std::unique_ptr<mongo::RecordStoreHarnessHelper> makeRecordStoreHarnessHelper() {

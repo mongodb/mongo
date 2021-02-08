@@ -421,6 +421,12 @@ public:
     virtual void setJournalListener(JournalListener* jl) = 0;
 
     /**
+     * Returns true if the storage engine supports collections clustered on _id. That is,
+     * collections will use _id values as their RecordId and do not need a separate _id index.
+     */
+    virtual bool supportsClusteredIdIndex() const = 0;
+
+    /**
      * Returns whether the storage engine supports "recover to stable timestamp". Returns true
      * if the storage engine supports "recover to stable timestamp" but does not currently have
      * a stable timestamp. In that case StorageEngine::recoverToStableTimestamp() will return

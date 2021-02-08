@@ -191,6 +191,10 @@ public:
         return _engine.getConnection();
     }
 
+    KVEngine* getEngine() override final {
+        return &_engine;
+    }
+
 private:
     unittest::TempDir _dbpath;
     ClockSourceMock _cs;

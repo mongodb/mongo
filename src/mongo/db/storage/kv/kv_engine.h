@@ -235,6 +235,14 @@ public:
     }
 
     /**
+     * Returns true if the storage engine supports collections clustered on _id. That is,
+     * collections will use _id values as their RecordId and do not need a separate _id index.
+     */
+    virtual bool supportsClusteredIdIndex() const {
+        return false;
+    }
+
+    /**
      * Returns true if storage engine supports --directoryperdb.
      * See:
      *     http://docs.mongodb.org/manual/reference/program/mongod/#cmdoption--directoryperdb

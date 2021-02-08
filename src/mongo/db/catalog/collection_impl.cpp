@@ -330,6 +330,7 @@ void CollectionImpl::init(OperationContext* opCtx) {
     }
 
     if (collectionOptions.clusteredIndex) {
+        invariant(_shared->_recordStore->keyFormat() == KeyFormat::String);
         _clustered = true;
     }
 
@@ -634,7 +635,8 @@ Status CollectionImpl::insertDocumentForBulkLoader(
         uassert(ErrorCodes::BadValue,
                 str::stream() << "Document " << redact(doc) << " is missing the '_id' field",
                 foundId);
-        recordId = RecordId(oidElem.OID());
+        invariant(_shared->_recordStore->keyFormat() == KeyFormat::String);
+        recordId = RecordId(oidElem.OID().view().view(), OID::kOIDSize);
     }
 
     // Using timestamp 0 for these inserts, which are non-oplog so we don't have an appropriate
@@ -715,7 +717,8 @@ Status CollectionImpl::_insertDocuments(OperationContext* opCtx,
                     str::stream() << "Document " << redact(doc) << " is missing the '_id' field",
                     foundId);
 
-            recordId = RecordId(oidElem.OID());
+            invariant(_shared->_recordStore->keyFormat() == KeyFormat::String);
+            recordId = RecordId(oidElem.OID().view().view(), OID::kOIDSize);
         }
 
         if (MONGO_unlikely(corruptDocumentOnInsert.shouldFail())) {
@@ -737,12 +740,9 @@ Status CollectionImpl::_insertDocuments(OperationContext* opCtx,
     int recordIndex = 0;
     for (auto it = begin; it != end; it++) {
         RecordId loc = records[recordIndex++].id;
-        if (isClustered()) {
-            invariant(RecordId::min<OID>() < loc);
-            invariant(loc < RecordId::max<OID>());
-        } else {
-            invariant(RecordId::min<int64_t>() < loc);
-            invariant(loc < RecordId::max<int64_t>());
+        if (_shared->_recordStore->keyFormat() == KeyFormat::Long) {
+            invariant(RecordId::minLong() < loc);
+            invariant(loc < RecordId::maxLong());
         }
 
         BsonRecord bsonRecord = {loc, Timestamp(it->oplogSlot.getTimestamp()), &(it->doc)};

@@ -61,7 +61,7 @@ struct Record {
 };
 
 /**
- * The format of a RecordStore's RecordId keys.
+ * The data format of a RecordStore's RecordId keys.
  */
 enum class KeyFormat {
     /** Signed 64-bit integer */

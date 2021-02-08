@@ -126,7 +126,7 @@ int64_t RecordStore::storageSize(OperationContext* opCtx,
 
 bool RecordStore::findRecord(OperationContext* opCtx, const RecordId& loc, RecordData* rd) const {
     StringStore* workingCopy(RecoveryUnit::get(opCtx)->getHead());
-    auto it = workingCopy->find(createKey(_ident, loc.as<int64_t>()));
+    auto it = workingCopy->find(createKey(_ident, loc.asLong()));
     if (it == workingCopy->end()) {
         return false;
     }
@@ -139,7 +139,7 @@ void RecordStore::deleteRecord(OperationContext* opCtx, const RecordId& dl) {
     auto ru = RecoveryUnit::get(opCtx);
     StringStore* workingCopy(ru->getHead());
     SizeAdjuster adjuster(opCtx, this);
-    invariant(workingCopy->erase(createKey(_ident, dl.as<int64_t>())));
+    invariant(workingCopy->erase(createKey(_ident, dl.asLong())));
     ru->makeDirty();
 }
 
@@ -165,7 +165,7 @@ Status RecordStore::insertRecords(OperationContext* opCtx,
                     oploghack::extractKey(record.data.data(), record.data.size());
                 if (!status.isOK())
                     return status.getStatus();
-                thisRecordId = status.getValue().as<int64_t>();
+                thisRecordId = status.getValue().asLong();
                 _visibilityManager->addUncommittedRecord(opCtx, this, RecordId(thisRecordId));
             } else {
                 thisRecordId = _nextRecordId(opCtx);
@@ -188,7 +188,7 @@ Status RecordStore::updateRecord(OperationContext* opCtx,
     StringStore* workingCopy(RecoveryUnit::get(opCtx)->getHead());
     SizeAdjuster adjuster(opCtx, this);
     {
-        std::string key = createKey(_ident, oldLocation.as<int64_t>());
+        std::string key = createKey(_ident, oldLocation.asLong());
         StringStore::const_iterator it = workingCopy->find(key);
         invariant(it != workingCopy->end());
         workingCopy->update(StringStore::value_type{key, std::string(data, len)});
@@ -254,7 +254,7 @@ void RecordStore::cappedTruncateAfter(OperationContext* opCtx, RecordId end, boo
     auto ru = RecoveryUnit::get(opCtx);
     StringStore* workingCopy(ru->getHead());
     WriteUnitOfWork wuow(opCtx);
-    const auto recordKey = createKey(_ident, end.as<int64_t>());
+    const auto recordKey = createKey(_ident, end.asLong());
     auto recordIt =
         inclusive ? workingCopy->lower_bound(recordKey) : workingCopy->upper_bound(recordKey);
     auto endIt = workingCopy->upper_bound(_postfix);
@@ -316,7 +316,7 @@ boost::optional<RecordId> RecordStore::oplogStartHack(OperationContext* opCtx,
 
     StringStore* workingCopy{RecoveryUnit::get(opCtx)->getHead()};
 
-    std::string key = createKey(_ident, startingPosition.as<int64_t>());
+    std::string key = createKey(_ident, startingPosition.asLong());
     StringStore::const_reverse_iterator it(workingCopy->upper_bound(key));
 
     if (it == workingCopy->rend())
@@ -353,13 +353,13 @@ void RecordStore::_initHighestIdIfNeeded(OperationContext* opCtx) {
         return;
     }
 
-    // Need to start at 1 so we are always higher than RecordId::min<int64_t>()
+    // Need to start at 1 so we are always higher than RecordId::minLong()
     int64_t nextId = 1;
 
     // Find the largest RecordId currently in use.
     std::unique_ptr<SeekableRecordCursor> cursor = getCursor(opCtx, /*forward=*/false);
     if (auto record = cursor->next()) {
-        nextId = record->id.as<int64_t>() + 1;
+        nextId = record->id.asLong() + 1;
     }
 
     _highestRecordId.store(nextId);
@@ -457,7 +457,7 @@ boost::optional<Record> RecordStore::Cursor::seekExact(const RecordId& id) {
     _savedPosition = boost::none;
     _lastMoveWasRestore = false;
     StringStore* workingCopy(RecoveryUnit::get(opCtx)->getHead());
-    std::string key = createKey(_rs._ident, id.as<int64_t>());
+    std::string key = createKey(_rs._ident, id.asLong());
     it = workingCopy->find(key);
 
     if (it == workingCopy->end() || !inPrefix(it->first))
@@ -541,7 +541,7 @@ boost::optional<Record> RecordStore::ReverseCursor::seekExact(const RecordId& id
     _needFirstSeek = false;
     _savedPosition = boost::none;
     StringStore* workingCopy(RecoveryUnit::get(opCtx)->getHead());
-    std::string key = createKey(_rs._ident, id.as<int64_t>());
+    std::string key = createKey(_rs._ident, id.asLong());
     StringStore::const_iterator canFind = workingCopy->find(key);
     if (canFind == workingCopy->end() || !inPrefix(canFind->first)) {
         it = workingCopy->rend();

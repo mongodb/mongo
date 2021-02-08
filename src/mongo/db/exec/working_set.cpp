@@ -226,7 +226,7 @@ void WorkingSetMember::serialize(BufBuilder& buf) const {
     }
 
     if (hasRecordId()) {
-        buf.appendNum(recordId.as<int64_t>());
+        buf.appendNum(recordId.asLong());
     }
 
     _metadata.serializeForSorter(buf);

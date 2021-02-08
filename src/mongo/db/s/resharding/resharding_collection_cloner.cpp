@@ -223,7 +223,7 @@ Value ReshardingCollectionCloner::_findHighestInsertedId(OperationContext* opCtx
     qr->setSort(BSON("_id" << -1));
 
     auto recordId = Helpers::findOne(opCtx, *outputColl, std::move(qr), true /* requireIndex */);
-    if (!recordId.isNormal()) {
+    if (recordId.isNull()) {
         return Value{};
     }
 

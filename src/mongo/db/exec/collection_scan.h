@@ -80,7 +80,7 @@ public:
             return _lastSeenId.withFormat(
                 [](RecordId::Null n) { return BSON("$recordId" << NullLabeler{}); },
                 [](int64_t rid) { return BSON("$recordId" << rid); },
-                [](const OID& oid) { return BSON("$recordId" << oid); });
+                [](const char* str, int size) { return BSON("$recordId" << OID::from(str)); });
         }
         // Return a resume token compatible with resharding oplog sync.
         if (_params.shouldTrackLatestOplogTimestamp) {

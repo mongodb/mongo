@@ -1184,7 +1184,7 @@ public:
 
         // Insert documents.
         OpDebug* const nullOpDebug = nullptr;
-        RecordId rid = RecordId::min<int64_t>();
+        RecordId rid = RecordId::minLong();
         lockDb(MODE_X);
         {
             WriteUnitOfWork wunit(&_opCtx);
@@ -1280,7 +1280,7 @@ public:
 
         // Insert documents.
         OpDebug* const nullOpDebug = nullptr;
-        RecordId rid = RecordId::min<int64_t>();
+        RecordId rid = RecordId::minLong();
         lockDb(MODE_X);
         {
             WriteUnitOfWork wunit(&_opCtx);
@@ -1397,7 +1397,7 @@ public:
 
         // Insert documents.
         OpDebug* const nullOpDebug = nullptr;
-        RecordId rid = RecordId::min<int64_t>();
+        RecordId rid = RecordId::minLong();
         lockDb(MODE_X);
         {
             WriteUnitOfWork wunit(&_opCtx);
@@ -1665,7 +1665,7 @@ public:
 
         // Insert documents.
         OpDebug* const nullOpDebug = nullptr;
-        RecordId rid = RecordId::min<int64_t>();
+        RecordId rid = RecordId::minLong();
         lockDb(MODE_X);
         {
             WriteUnitOfWork wunit(&_opCtx);
@@ -1843,7 +1843,7 @@ public:
 
         // Insert documents.
         OpDebug* const nullOpDebug = nullptr;
-        RecordId rid = RecordId::min<int64_t>();
+        RecordId rid = RecordId::minLong();
         lockDb(MODE_X);
         {
             WriteUnitOfWork wunit(&_opCtx);
@@ -2407,7 +2407,7 @@ public:
 
         // Insert a document.
         OpDebug* const nullOpDebug = nullptr;
-        RecordId rid = RecordId::min<int64_t>();
+        RecordId rid = RecordId::minLong();
         lockDb(MODE_X);
         {
             WriteUnitOfWork wunit(&_opCtx);
@@ -3533,7 +3533,7 @@ public:
         BSONObj obj(buffer);
 
         RecordStore* rs = coll->getRecordStore();
-        RecordId rid(OID::gen());
+        RecordId rid(OID::gen().view().view(), OID::kOIDSize);
         {
             WriteUnitOfWork wunit(&_opCtx);
             ASSERT_OK(rs->insertRecord(&_opCtx, rid, obj.objdata(), obj.objsize(), Timestamp()));

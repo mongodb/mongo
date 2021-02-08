@@ -101,7 +101,7 @@ void VisibilityManager::addUncommittedRecord(OperationContext* opCtx,
 RecordId VisibilityManager::getAllCommittedRecord() {
     stdx::lock_guard<Latch> lock(_stateLock);
     return _uncommittedRecords.empty() ? _highestSeen
-                                       : RecordId(_uncommittedRecords.begin()->as<int64_t>() - 1);
+                                       : RecordId(_uncommittedRecords.begin()->asLong() - 1);
 }
 
 bool VisibilityManager::isFirstHidden(RecordId rid) {

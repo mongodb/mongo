@@ -241,12 +241,14 @@ Status _createTimeseries(OperationContext* opCtx,
                                                          timeField,
                                                          timeField));
 
-        // Time-series buckets collections are clustered by _id using the ObjectId type by default.
-        ClusteredIndexOptions clusteredOptions;
-        if (auto expireAfterSeconds = options.timeseries->getExpireAfterSeconds()) {
-            clusteredOptions.setExpireAfterSeconds(*expireAfterSeconds);
+        // If possible, cluster time-series buckets collections by _id.
+        if (opCtx->getServiceContext()->getStorageEngine()->supportsClusteredIdIndex()) {
+            ClusteredIndexOptions clusteredOptions;
+            if (auto expireAfterSeconds = options.timeseries->getExpireAfterSeconds()) {
+                clusteredOptions.setExpireAfterSeconds(*expireAfterSeconds);
+            }
+            bucketsOptions.clusteredIndex = clusteredOptions;
         }
-        bucketsOptions.clusteredIndex = clusteredOptions;
 
         // Create the buckets collection that will back the view. Do not create the _id index as the
         // buckets collection will have a clustered index on _id.

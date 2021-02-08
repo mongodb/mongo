@@ -1012,6 +1012,10 @@ boost::optional<Timestamp> StorageEngineImpl::getLastStableRecoveryTimestamp() c
     return _engine->getLastStableRecoveryTimestamp();
 }
 
+bool StorageEngineImpl::supportsClusteredIdIndex() const {
+    return _engine->supportsClusteredIdIndex();
+}
+
 bool StorageEngineImpl::supportsReadConcernSnapshot() const {
     return _engine->supportsReadConcernSnapshot();
 }

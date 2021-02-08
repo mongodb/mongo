@@ -444,7 +444,7 @@ TEST_F(KeyStringBuilderTest, Array1) {
     ROUNDTRIP(version, BSON("" << BSON_ARRAY(1 << 2 << 3)));
 
     {
-        KeyString::Builder a(version, emptyArray, ALL_ASCENDING, RecordId::min<int64_t>());
+        KeyString::Builder a(version, emptyArray, ALL_ASCENDING, RecordId::minLong());
         KeyString::Builder b(version, emptyArray, ALL_ASCENDING, RecordId(5));
         ASSERT_LESS_THAN(a, b);
     }
@@ -886,7 +886,7 @@ TEST_F(KeyStringBuilderTest, LotsOfNumbers3) {
 TEST_F(KeyStringBuilderTest, RecordIdOrder1) {
     Ordering ordering = Ordering::make(BSON("a" << 1));
 
-    KeyString::Builder a(version, BSON("" << 5), ordering, RecordId::min<int64_t>());
+    KeyString::Builder a(version, BSON("" << 5), ordering, RecordId::minLong());
     KeyString::Builder b(version, BSON("" << 5), ordering, RecordId(2));
     KeyString::Builder c(version, BSON("" << 5), ordering, RecordId(3));
     KeyString::Builder d(version, BSON("" << 6), ordering, RecordId());
@@ -901,7 +901,7 @@ TEST_F(KeyStringBuilderTest, RecordIdOrder1) {
 TEST_F(KeyStringBuilderTest, RecordIdOrder2) {
     Ordering ordering = Ordering::make(BSON("a" << -1 << "b" << -1));
 
-    KeyString::Builder a(version, BSON("" << 5 << "" << 6), ordering, RecordId::min<int64_t>());
+    KeyString::Builder a(version, BSON("" << 5 << "" << 6), ordering, RecordId::minLong());
     KeyString::Builder b(version, BSON("" << 5 << "" << 6), ordering, RecordId(5));
     KeyString::Builder c(version, BSON("" << 5 << "" << 5), ordering, RecordId(4));
     KeyString::Builder d(version, BSON("" << 3 << "" << 4), ordering, RecordId(3));
@@ -917,7 +917,7 @@ TEST_F(KeyStringBuilderTest, RecordIdOrder2) {
 TEST_F(KeyStringBuilderTest, RecordIdOrder2Double) {
     Ordering ordering = Ordering::make(BSON("a" << -1 << "b" << -1));
 
-    KeyString::Builder a(version, BSON("" << 5.0 << "" << 6.0), ordering, RecordId::min<int64_t>());
+    KeyString::Builder a(version, BSON("" << 5.0 << "" << 6.0), ordering, RecordId::minLong());
     KeyString::Builder b(version, BSON("" << 5.0 << "" << 6.0), ordering, RecordId(5));
     KeyString::Builder c(version, BSON("" << 3.0 << "" << 4.0), ordering, RecordId(3));
 
@@ -1555,11 +1555,11 @@ TEST_F(KeyStringBuilderTest, RecordIds) {
 
             if (rid.isValid()) {
                 ASSERT_GT(ks, KeyString::Builder(version, RecordId()));
-                ASSERT_GT(ks, KeyString::Builder(version, RecordId::min<int64_t>()));
-                ASSERT_LT(ks, KeyString::Builder(version, RecordId::max<int64_t>()));
+                ASSERT_GT(ks, KeyString::Builder(version, RecordId::minLong()));
+                ASSERT_LT(ks, KeyString::Builder(version, RecordId::maxLong()));
 
-                ASSERT_GT(ks, KeyString::Builder(version, RecordId(rid.as<int64_t>() - 1)));
-                ASSERT_LT(ks, KeyString::Builder(version, RecordId(rid.as<int64_t>() + 1)));
+                ASSERT_GT(ks, KeyString::Builder(version, RecordId(rid.asLong() - 1)));
+                ASSERT_LT(ks, KeyString::Builder(version, RecordId(rid.asLong() + 1)));
             }
         }
 
@@ -1579,7 +1579,7 @@ TEST_F(KeyStringBuilderTest, RecordIds) {
             {
                 // Test concatenating RecordIds like in a unique index.
                 KeyString::Builder ks(version);
-                ks.appendRecordId(RecordId::max<int64_t>());  // uses all bytes
+                ks.appendRecordId(RecordId::maxLong());  // uses all bytes
                 ks.appendRecordId(rid);
                 ks.appendRecordId(RecordId(0xDEADBEEF));  // uses some extra bytes
                 ks.appendRecordId(rid);
@@ -1591,7 +1591,7 @@ TEST_F(KeyStringBuilderTest, RecordIds) {
 
                 // forward scan
                 BufReader reader(ks.getBuffer(), ks.getSize());
-                ASSERT_EQ(KeyString::decodeRecordId(&reader), RecordId::max<int64_t>());
+                ASSERT_EQ(KeyString::decodeRecordId(&reader), RecordId::maxLong());
                 ASSERT_EQ(KeyString::decodeRecordId(&reader), rid);
                 ASSERT_EQ(KeyString::decodeRecordId(&reader), RecordId(0xDEADBEEF));
                 ASSERT_EQ(KeyString::decodeRecordId(&reader), rid);

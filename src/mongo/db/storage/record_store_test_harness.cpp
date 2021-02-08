@@ -406,15 +406,17 @@ TEST(RecordStoreTestHarness, Cursor1) {
 }
 
 TEST(RecordStoreTestHarness, ClusteredRecordStore) {
-    const std::string ns = "test.system.buckets.a";
     const auto harnessHelper = newRecordStoreHarnessHelper();
+    if (!harnessHelper->getEngine()->supportsClusteredIdIndex()) {
+        // Only WiredTiger supports clustered indexes on _id.
+        return;
+    }
+
+    const std::string ns = "test.system.buckets.a";
     CollectionOptions options;
     options.clusteredIndex = ClusteredIndexOptions{};
     std::unique_ptr<RecordStore> rs = harnessHelper->newNonCappedRecordStore(ns, options);
-    if (rs->keyFormat() == KeyFormat::Long) {
-        // ephemeralForTest does not support clustered indexes.
-        return;
-    }
+    invariant(rs->keyFormat() == KeyFormat::String);
 
     auto opCtx = harnessHelper->newOperationContext();
 
@@ -427,7 +429,7 @@ TEST(RecordStoreTestHarness, ClusteredRecordStore) {
         RecordData recordData = RecordData(doc.objdata(), doc.objsize());
         recordData.makeOwned();
 
-        records.push_back({RecordId(OID::gen()), recordData});
+        records.push_back({RecordId(OID::gen().view().view(), OID::kOIDSize), recordData});
     }
 
     {
@@ -474,8 +476,10 @@ TEST(RecordStoreTestHarness, ClusteredRecordStore) {
             ASSERT_EQ(0, strcmp(records.at(i).data.data(), rd.data()));
         }
 
-        ASSERT_FALSE(rs->findRecord(opCtx.get(), RecordId::min<OID>(), nullptr));
-        ASSERT_FALSE(rs->findRecord(opCtx.get(), RecordId::max<OID>(), nullptr));
+        RecordId minOid(OID().view().view(), OID::kOIDSize);
+        RecordId maxOid(OID::max().view().view(), OID::kOIDSize);
+        ASSERT_FALSE(rs->findRecord(opCtx.get(), minOid, nullptr));
+        ASSERT_FALSE(rs->findRecord(opCtx.get(), maxOid, nullptr));
     }
 
     {

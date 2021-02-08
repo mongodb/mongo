@@ -709,7 +709,7 @@ TEST(SortedDataInterface, InsertReservedRecordId) {
     WriteUnitOfWork uow(opCtx.get());
     RecordId reservedLoc(
         RecordId::reservedIdFor<int64_t>(RecordId::Reservation::kWildcardMultikeyMetadataId));
-    ASSERT(reservedLoc.isReserved());
+    invariant(RecordId::isReserved<int64_t>(reservedLoc));
     ASSERT_OK(sorted->insert(opCtx.get(),
                              makeKeyString(sorted.get(), key1, reservedLoc),
                              /*dupsAllowed*/ true));

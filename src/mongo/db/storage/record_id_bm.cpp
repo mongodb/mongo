@@ -37,13 +37,13 @@ namespace mongo {
 namespace {
 
 RecordId incInt(RecordId r) {
-    return RecordId(r.as<int64_t>() + 1);
+    return RecordId(r.asLong() + 1);
 }
 
 RecordId incOID(RecordId r) {
-    OID o = r.as<OID>();
+    OID o = OID::from(r.strData());
     o.setTimestamp(o.getTimestamp() + 1);
-    return RecordId(o);
+    return RecordId(o.view().view(), OID::kOIDSize);
 }
 
 void BM_RecordIdCopyLong(benchmark::State& state) {
@@ -55,7 +55,7 @@ void BM_RecordIdCopyLong(benchmark::State& state) {
 }
 
 void BM_RecordIdCopyOID(benchmark::State& state) {
-    RecordId rid(OID::gen());
+    RecordId rid(OID::gen().view().view(), OID::kOIDSize);
     for (auto _ : state) {
         benchmark::ClobberMemory();
         benchmark::DoNotOptimize(rid = incOID(rid));

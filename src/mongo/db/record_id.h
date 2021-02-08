@@ -37,96 +37,48 @@
 #include <ostream>
 
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/oid.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/util/bufreader.h"
+#include "mongo/util/hex.h"
 
 namespace mongo {
-
 
 /**
  * The key that uniquely identifies a Record in a Collection or RecordStore.
  */
 class RecordId {
 public:
-    // This set of constants define the boundaries of the 'normal' and 'reserved' id ranges for
-    // the kLong format.
+    // This set of constants define the boundaries of the 'normal' id ranges for the int64_t format.
     static constexpr int64_t kMinRepr = LLONG_MIN;
     static constexpr int64_t kMaxRepr = LLONG_MAX;
-    static constexpr int64_t kMinReservedRepr = kMaxRepr - (1024 * 1024);
 
-    // OID Constants
-    static constexpr unsigned char kMinOID[OID::kOIDSize] = {0x00};
-    static constexpr unsigned char kMaxOID[OID::kOIDSize] = {
-        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
-    // This reserved range leaves 2^20 possible reserved values.
-    static constexpr unsigned char kMinReservedOID[OID::kOIDSize] = {
-        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xf0, 0x00, 0x00};
+    // Fixed size of a RecordId that holds a char array
+    enum { kSmallStrSize = 12 };
 
     /**
-     * A RecordId that compares less than all ids for a given data format.
+     * A RecordId that compares less than all int64_t RecordIds that represent documents in a
+     * collection.
      */
-    template <typename T>
-    static RecordId min() {
-        if constexpr (std::is_same_v<T, int64_t>) {
-            return RecordId(kMinRepr);
-        } else {
-            static_assert(std::is_same_v<T, OID>, "Unsupported RecordID format");
-            return RecordId(OID(kMinOID));
-        }
+    static RecordId minLong() {
+        return RecordId(kMinRepr);
     }
 
     /**
-     * A RecordId that compares greater than all ids that represent documents in a collection.
+     * A RecordId that compares greater than all int64_t RecordIds that represent documents in a
+     * collection.
      */
-    template <typename T>
-    static RecordId max() {
-        if constexpr (std::is_same_v<T, int64_t>) {
-            return RecordId(kMaxRepr);
-        } else {
-            static_assert(std::is_same_v<T, OID>, "Unsupported RecordID format");
-            return RecordId(OID(kMaxOID));
-        }
-    }
-
-    /**
-     * Returns the first record in the reserved id range at the top of the RecordId space.
-     */
-    template <typename T>
-    static RecordId minReserved() {
-        if constexpr (std::is_same_v<T, int64_t>) {
-            return RecordId(kMinReservedRepr);
-        } else {
-            static_assert(std::is_same_v<T, OID>, "Unsupported RecordID format");
-            return RecordId(OID(kMinReservedOID));
-        }
-    }
-
-    /**
-     * Enumerates all reserved ids that have been allocated for a specific purpose.
-     * The underlying value of the reserved Record ID is data-format specific and must be retrieved
-     * by the getReservedId() helper.
-     */
-    enum class Reservation { kWildcardMultikeyMetadataId };
-
-    /**
-     * Returns the reserved RecordId value for a given Reservation.
-     */
-    template <typename T>
-    static RecordId reservedIdFor(Reservation res) {
-        // There is only one reservation at the moment.
-        invariant(res == Reservation::kWildcardMultikeyMetadataId);
-        if constexpr (std::is_same_v<T, int64_t>) {
-            return RecordId(kMinReservedRepr);
-        } else {
-            static_assert(std::is_same_v<T, OID>, "Unsupported RecordID format");
-            return RecordId(OID(kMinReservedOID));
-        }
+    static RecordId maxLong() {
+        return RecordId(kMaxRepr);
     }
 
     RecordId() : _format(Format::kNull) {}
+
+    /**
+     * RecordId supports holding either an int64_t or a 12 byte char array.
+     */
     explicit RecordId(int64_t repr) : _storage(repr), _format(Format::kLong) {}
-    explicit RecordId(const OID& oid) : _storage(oid), _format(Format::kOid) {}
+    explicit RecordId(const char* str, int32_t size)
+        : _storage(str, size), _format(Format::kSmallStr) {}
 
     /**
      * Construct a RecordId from two halves.
@@ -139,38 +91,32 @@ public:
     /**
      * Helpers to dispatch based on the underlying type.
      */
-    template <typename OnNull, typename OnLong, typename OnOid>
-    auto withFormat(OnNull&& onNull, OnLong&& onLong, OnOid&& onOid) const {
+    template <typename OnNull, typename OnLong, typename OnStr>
+    auto withFormat(OnNull&& onNull, OnLong&& onLong, OnStr&& onStr) const {
         switch (_format) {
             case Format::kNull:
                 return onNull(Null());
             case Format::kLong:
                 return onLong(_storage._long);
-            case Format::kOid:
-                return onOid(_storage._oid);
+            case Format::kSmallStr:
+                return onStr(_storage._str, kSmallStrSize);
             default:
                 MONGO_UNREACHABLE;
         }
     }
 
-    /**
-     * Returns the underlying data for a given format. Will invariant if the RecordId is not storing
-     * requested format.
-     */
-    template <typename T>
-    T as() const {
-        if constexpr (std::is_same_v<T, int64_t>) {
-            // In the the int64_t format, null can also be represented by '0'.
-            if (_format == Format::kNull) {
-                return 0;
-            }
-            invariant(_format == Format::kLong);
-            return _storage._long;
-        } else {
-            static_assert(std::is_same_v<T, OID>, "Unsupported RecordID format");
-            invariant(_format == Format::kOid);
-            return _storage._oid;
+    int64_t asLong() const {
+        // In the the int64_t format, null can also be represented by '0'.
+        if (_format == Format::kNull) {
+            return 0;
         }
+        invariant(_format == Format::kLong);
+        return _storage._long;
+    }
+
+    const char* strData() const {
+        invariant(_format == Format::kSmallStr);
+        return _storage._str;
     }
 
     bool isNull() const {
@@ -187,29 +133,9 @@ public:
      * used internally. All RecordIds outside of the valid range are sentinel values.
      */
     bool isValid() const {
-        return isNormal() || isReserved();
-    }
-
-    /**
-     * Normal RecordIds are those which fall within the range used to represent normal user data,
-     * excluding the reserved range at the top of the RecordId space.
-     */
-    bool isNormal() const {
         return withFormat([](Null n) { return false; },
-                          [](int64_t rid) { return rid > 0 && rid < kMinReservedRepr; },
-                          [](const OID& oid) { return oid.compare(OID(kMinReservedOID)) < 0; });
-    }
-
-    /**
-     * Returns true if this RecordId falls within the reserved range at the top of the record space.
-     */
-    bool isReserved() const {
-        return withFormat([](Null n) { return false; },
-                          [](int64_t rid) { return rid >= kMinReservedRepr && rid < kMaxRepr; },
-                          [](const OID& oid) {
-                              return oid.compare(OID(kMinReservedOID)) >= 0 &&
-                                  oid.compare(OID(kMaxOID)) < 0;
-                          });
+                          [&](int64_t rid) { return rid > 0; },
+                          [&](const char* str, int size) { return true; });
     }
 
     int compare(const RecordId& rhs) const {
@@ -222,28 +148,28 @@ public:
             return 1;
         }
         invariant(_format == rhs._format);
-        return withFormat([](Null n) { return 0; },
-                          [&](const int64_t rid) {
-                              return rid == rhs._storage._long ? 0
-                                                               : rid < rhs._storage._long ? -1 : 1;
-                          },
-                          [&](const OID& oid) { return oid.compare(rhs._storage._oid); });
+        return withFormat(
+            [](Null n) { return 0; },
+            [&](const int64_t rid) {
+                return rid == rhs._storage._long ? 0 : rid < rhs._storage._long ? -1 : 1;
+            },
+            [&](const char* str, int size) { return memcmp(str, rhs._storage._str, size); });
     }
 
     size_t hash() const {
         size_t hash = 0;
-        withFormat([](Null n) {},
-                   [&](int64_t rid) { boost::hash_combine(hash, rid); },
-                   [&](const OID& oid) {
-                       boost::hash_combine(hash, std::string(oid.view().view(), OID::kOIDSize));
-                   });
+        withFormat(
+            [](Null n) {},
+            [&](int64_t rid) { boost::hash_combine(hash, rid); },
+            [&](const char* str, int size) { boost::hash_combine(hash, std::string(str, size)); });
         return hash;
     }
 
     std::string toString() const {
-        return withFormat([](Null n) { return std::string("null"); },
-                          [](int64_t rid) { return std::to_string(rid); },
-                          [](const OID& oid) { return oid.toString(); });
+        return withFormat(
+            [](Null n) { return std::string("null"); },
+            [](int64_t rid) { return std::to_string(rid); },
+            [](const char* str, int size) { return hexblob::encodeLower(str, size); });
     }
 
     /**
@@ -259,13 +185,61 @@ public:
     void serialize(fmt::memory_buffer& buffer) const {
         withFormat([&](Null n) { fmt::format_to(buffer, "RecordId(null)"); },
                    [&](int64_t rid) { fmt::format_to(buffer, "RecordId({})", rid); },
-                   [&](const OID& oid) { fmt::format_to(buffer, "RecordId({})", oid.toString()); });
+                   [&](const char* str, int size) {
+                       fmt::format_to(buffer, "RecordId({})", hexblob::encodeLower(str, size));
+                   });
     }
 
     void serialize(BSONObjBuilder* builder) const {
         withFormat([&](Null n) { builder->append("RecordId", "null"); },
                    [&](int64_t rid) { builder->append("RecordId"_sd, rid); },
-                   [&](const OID& oid) { builder->append("RecordId"_sd, oid); });
+                   [&](const char* str, int size) {
+                       builder->appendBinData("RecordId"_sd, size, BinDataGeneral, str);
+                   });
+    }
+
+    /**
+     * Enumerates all reserved ids that have been allocated for a specific purpose.
+     * The underlying value of the reserved Record ID is data-type specific and must be
+     * retrieved by the reservedIdFor() helper.
+     */
+    enum class Reservation { kWildcardMultikeyMetadataId };
+
+    // These reserved ranges leave 2^20 possible reserved values.
+    static constexpr int64_t kMinReservedLong = RecordId::kMaxRepr - (1024 * 1024);
+    static constexpr unsigned char kMinReservedOID[OID::kOIDSize] = {
+        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xf0, 0x00, 0x00};
+
+    /**
+     * Returns the reserved RecordId value for a given Reservation.
+     */
+    template <typename T>
+    static RecordId reservedIdFor(Reservation res) {
+        // There is only one reservation at the moment.
+        invariant(res == Reservation::kWildcardMultikeyMetadataId);
+        if constexpr (std::is_same_v<T, int64_t>) {
+            return RecordId(kMinReservedLong);
+        } else {
+            static_assert(std::is_same_v<T, OID>, "Unsupported RecordId type");
+            OID minReserved(kMinReservedOID);
+            return RecordId(minReserved.view().view(), OID::kOIDSize);
+        }
+    }
+
+    /**
+     * Returns true if this RecordId falls within the reserved range for a given RecordId type.
+     */
+    template <typename T>
+    static bool isReserved(RecordId id) {
+        if (id.isNull()) {
+            return false;
+        }
+        if constexpr (std::is_same_v<T, int64_t>) {
+            return id.asLong() >= kMinReservedLong && id.asLong() < RecordId::kMaxRepr;
+        } else {
+            static_assert(std::is_same_v<T, OID>, "Unsupported RecordId type");
+            return memcmp(id.strData(), kMinReservedOID, OID::kOIDSize) >= 0;
+        }
     }
 
 private:
@@ -277,8 +251,8 @@ private:
         kNull,
         /** int64_t */
         kLong,
-        /** OID = char[12] */
-        kOid
+        /** char[12] */
+        kSmallStr
     };
 
 // Pack our union so that it only uses 12 bytes. The union will default to a 8 byte alignment,
@@ -287,20 +261,22 @@ private:
 // to use 16 bytes total.
 #pragma pack(push, 4)
     union Storage {
-        // Format::kLong
         int64_t _long;
-        // Format::kOid
-        OID _oid;
+        char _str[kSmallStrSize];
 
         Storage() {}
         Storage(int64_t s) : _long(s) {}
-        Storage(const OID& s) : _oid(s) {}
+        Storage(const char* str, int32_t size) {
+            invariant(size == kSmallStrSize);
+            memcpy(_str, str, size);
+        }
     };
 #pragma pack(pop)
 
     Storage _storage;
     Format _format;
 };
+
 
 inline bool operator==(RecordId lhs, RecordId rhs) {
     return lhs.compare(rhs) == 0;

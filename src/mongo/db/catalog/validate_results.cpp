@@ -45,9 +45,10 @@ void ValidateResults::appendToResultObj(BSONObjBuilder* resultObj, bool debuggin
     // Need to convert RecordId to the appropriate type.
     BSONArrayBuilder builder;
     for (const RecordId& corruptRecord : corruptRecords) {
-        corruptRecord.withFormat([&](RecordId::Null n) { builder.append("null"); },
-                                 [&](const int64_t rid) { builder.append(rid); },
-                                 [&](const OID& oid) { builder.append(oid); });
+        corruptRecord.withFormat(
+            [&](RecordId::Null n) { builder.append("null"); },
+            [&](const int64_t rid) { builder.append(rid); },
+            [&](const char* str, int size) { builder.append(OID::from(str)); });
     }
     resultObj->append("corruptRecords", builder.arr());
 

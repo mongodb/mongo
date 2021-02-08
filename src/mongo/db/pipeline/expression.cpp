@@ -2813,7 +2813,7 @@ Value ExpressionMeta::evaluate(const Document& root, Variables* variables) const
             return metadata.getRecordId().withFormat(
                 [](RecordId::Null n) { return Value(); },
                 [](const int64_t rid) { return Value{static_cast<long long>(rid)}; },
-                [](const OID& oid) { return Value(oid); });
+                [](const char* str, int len) { return Value(OID::from(str)); });
         case MetaType::kIndexKey:
             return metadata.hasIndexKey() ? Value(metadata.getIndexKey()) : Value();
         case MetaType::kSortKey:

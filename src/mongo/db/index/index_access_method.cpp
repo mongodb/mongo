@@ -69,10 +69,6 @@ MONGO_FAIL_POINT_DEFINE(hangIndexBuildDuringBulkLoadPhase);
 
 namespace {
 
-// Reserved RecordId against which multikey metadata keys are indexed.
-static const RecordId kMultikeyMetadataKeyId =
-    RecordId::reservedIdFor<int64_t>(RecordId::Reservation::kWildcardMultikeyMetadataId);
-
 /**
  * Returns true if at least one prefix of any of the indexed fields causes the index to be
  * multikey, and returns false otherwise. This function returns false if the 'multikeyPaths'

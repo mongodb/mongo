@@ -45,7 +45,8 @@ namespace {
 
 using namespace unittest;
 
-static const RecordId kMetadataId = RecordId::minReserved<int64_t>();
+static const RecordId kMetadataId =
+    RecordId::reservedIdFor<int64_t>(RecordId::Reservation::kWildcardMultikeyMetadataId);
 
 static const int kIndexVersion = static_cast<int>(IndexDescriptor::kLatestIndexVersion);
 static const NamespaceString kDefaultNSS{"wildcard_multikey_persistence.test"};

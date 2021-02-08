@@ -47,7 +47,7 @@ TEST(RecordId, HashEqual) {
 }
 
 TEST(RecordId, HashEqualOid) {
-    RecordId locA(OID::gen());
+    RecordId locA(OID::gen().view().view(), OID::kOIDSize);
     RecordId locB;
     locB = locA;
     ASSERT_EQUALS(locA, locB);
@@ -76,9 +76,9 @@ TEST(RecordId, HashNotEqual) {
 }
 
 TEST(RecordId, HashNotEqualOid) {
-    RecordId loc1(OID::gen());
-    RecordId loc2(OID::gen());
-    RecordId loc3(OID::gen());
+    RecordId loc1(OID::gen().view().view(), OID::kOIDSize);
+    RecordId loc2(OID::gen().view().view(), OID::kOIDSize);
+    RecordId loc3(OID::gen().view().view(), OID::kOIDSize);
     ASSERT_NOT_EQUALS(loc1, loc2);
     ASSERT_NOT_EQUALS(loc1, loc3);
     ASSERT_NOT_EQUALS(loc2, loc3);
@@ -94,19 +94,17 @@ TEST(RecordId, HashNotEqualOid) {
 TEST(RecordId, OidTest) {
     RecordId ridNull;
     ASSERT(ridNull.isNull());
-    ASSERT(!ridNull.isReserved());
+    ASSERT(!RecordId::isReserved<OID>(ridNull));
     ASSERT(!ridNull.isValid());
-    ASSERT(!ridNull.isNormal());
 
     RecordId null2;
     ASSERT(null2 == ridNull);
 
     OID oid1 = OID::gen();
-    RecordId rid1(oid1);
-    ASSERT(rid1.isNormal());
-    ASSERT(!rid1.isReserved());
+    RecordId rid1(oid1.view().view(), OID::kOIDSize);
+    ASSERT(!RecordId::isReserved<OID>(rid1));
     ASSERT(rid1.isValid());
-    ASSERT_EQ(rid1.as<OID>(), oid1);
+    ASSERT_EQ(OID::from(rid1.strData()), oid1);
     ASSERT_GT(rid1, ridNull);
     ASSERT_LT(ridNull, rid1);
 }
@@ -119,28 +117,30 @@ TEST(RecordId, NullTest) {
 
     RecordId rid0;
     ASSERT(rid0.isNull());
-    ASSERT_EQ(0, rid0.as<int64_t>());
+    ASSERT_EQ(0, rid0.asLong());
     ASSERT_EQ(nullRid, rid0);
 }
 
 TEST(RecordId, OidTestCompare) {
     RecordId ridNull;
-    RecordId rid0(OID::createFromString("000000000000000000000000"));
+    RecordId rid0(OID::createFromString("000000000000000000000000").view().view(), OID::kOIDSize);
     ASSERT_GT(rid0, ridNull);
 
-    RecordId rid1(OID::createFromString("000000000000000000000001"));
+    RecordId rid1(OID::createFromString("000000000000000000000001").view().view(), OID::kOIDSize);
     ASSERT_GT(rid1, rid0);
-    ASSERT_EQ(RecordId::min<OID>(), rid0);
-    ASSERT_GT(RecordId::min<OID>(), ridNull);
+    RecordId oidMin = RecordId(OID().view().view(), OID::kOIDSize);
+    ASSERT_EQ(oidMin, rid0);
+    ASSERT_GT(oidMin, ridNull);
 
-    RecordId rid2(OID::createFromString("000000000000000000000002"));
+    RecordId rid2(OID::createFromString("000000000000000000000002").view().view(), OID::kOIDSize);
     ASSERT_GT(rid2, rid1);
-    RecordId rid3(OID::createFromString("ffffffffffffffffffffffff"));
+    RecordId rid3(OID::createFromString("ffffffffffffffffffffffff").view().view(), OID::kOIDSize);
     ASSERT_GT(rid3, rid2);
     ASSERT_GT(rid3, rid0);
 
-    ASSERT_EQ(RecordId::max<OID>(), rid3);
-    ASSERT_GT(RecordId::max<OID>(), rid0);
+    RecordId oidMax = RecordId(OID::max().view().view(), OID::kOIDSize);
+    ASSERT_EQ(oidMax, rid3);
+    ASSERT_GT(oidMax, rid0);
 }
 
 TEST(RecordId, Reservations) {
@@ -148,22 +148,21 @@ TEST(RecordId, Reservations) {
     RecordId ridReserved(RecordId::kMaxRepr - (1024 * 1024));
     ASSERT_EQ(ridReserved,
               RecordId::reservedIdFor<int64_t>(RecordId::Reservation::kWildcardMultikeyMetadataId));
-    ASSERT(ridReserved.isReserved());
+    ASSERT(RecordId::isReserved<int64_t>(ridReserved));
     ASSERT(ridReserved.isValid());
-    ASSERT(!ridReserved.isNormal());
 
-    RecordId oidReserved(OID::createFromString("fffffffffffffffffff00000"));
+    RecordId oidReserved(OID::createFromString("fffffffffffffffffff00000").view().view(),
+                         OID::kOIDSize);
     ASSERT_EQ(oidReserved,
               RecordId::reservedIdFor<OID>(RecordId::Reservation::kWildcardMultikeyMetadataId));
-    ASSERT(oidReserved.isReserved());
+    ASSERT(RecordId::isReserved<OID>(oidReserved));
     ASSERT(oidReserved.isValid());
-    ASSERT(!oidReserved.isNormal());
 }
 
 // RecordIds of different formats may not be compared.
 DEATH_TEST(RecordId, UnsafeComparison, "Invariant failure") {
     RecordId rid1(1);
-    RecordId rid2(OID::createFromString("000000000000000000000001"));
+    RecordId rid2(OID::createFromString("000000000000000000000001").view().view(), OID::kOIDSize);
     ASSERT_NOT_EQUALS(rid1, rid2);
 }
 

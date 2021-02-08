@@ -563,7 +563,7 @@ int64_t EphemeralForTestRecordStore::storageSize(OperationContext* opCtx,
 
 RecordId EphemeralForTestRecordStore::allocateLoc(WithLock) {
     RecordId out = RecordId(_data->nextId++);
-    invariant(out.isNormal());
+    invariant(out.isValid());
     return out;
 }
 

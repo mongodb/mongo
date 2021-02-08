@@ -35,6 +35,7 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/test_harness_helper.h"
 
 namespace mongo {
@@ -60,6 +61,8 @@ public:
     virtual std::unique_ptr<RecordStore> newCappedRecordStore(const std::string& ns,
                                                               int64_t cappedSizeBytes,
                                                               int64_t cappedMaxDocs) = 0;
+
+    virtual KVEngine* getEngine() = 0;
 };
 
 void registerRecordStoreHarnessHelperFactory(

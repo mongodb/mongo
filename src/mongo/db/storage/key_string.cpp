@@ -463,11 +463,11 @@ void BuilderBase<BufferT>::appendRecordId(RecordId loc) {
     // big-endian order. This does not encode negative RecordIds to give maximum space to
     // positive RecordIds which are the only ones that are allowed to be stored in an index.
 
-    int64_t raw = loc.as<int64_t>();
+    int64_t raw = loc.asLong();
     if (raw < 0) {
-        // Note: we encode RecordId::min<int64_t>() and RecordId() the same which is ok, as they
+        // Note: we encode RecordId::minLong() and RecordId() the same which is ok, as they
         // are never stored so they will never be compared to each other.
-        invariant(raw == RecordId::min<int64_t>().as<int64_t>());
+        invariant(raw == RecordId::minLong().asLong());
         raw = 0;
     }
     const uint64_t value = static_cast<uint64_t>(raw);

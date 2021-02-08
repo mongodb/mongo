@@ -248,7 +248,8 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
                 csn->resumeAfterRecordId = RecordId();
                 break;
             case jstOID:
-                csn->resumeAfterRecordId = RecordId(recordIdElem.OID());
+                csn->resumeAfterRecordId =
+                    RecordId(recordIdElem.OID().view().view(), OID::kOIDSize);
                 break;
             case NumberLong:
             default:

@@ -106,6 +106,9 @@ public:
         return nullptr;
     }
     void setJournalListener(JournalListener* jl) final {}
+    bool supportsClusteredIdIndex() const final {
+        return false;
+    }
     bool supportsRecoverToStableTimestamp() const final {
         return false;
     }
