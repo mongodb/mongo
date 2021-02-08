@@ -34,11 +34,13 @@ const assertMetricsExist = (profilerEntry) => {
     assert.gte(metrics.docUnitsReturned, 0);
     assert.gte(metrics.cursorSeeks, 0);
 
-    // Every test should perform enough work to be measured as non-zero CPU activity in
-    // nanoseconds.
+    // Even though every test should perform enough work to be measured as non-zero CPU activity in
+    // nanoseconds, the OS is only required to return monotonically-increasing values. That means
+    // the OS may occasionally return the same CPU time between two different reads of the timer,
+    // resulting in the server calculating zero elapsed time.
     // The CPU time metrics are only collected on Linux.
     if (isLinux) {
-        assert.gt(metrics.cpuNanos, 0);
+        assert.gte(metrics.cpuNanos, 0);
     }
     assert.gte(metrics.docBytesWritten, 0);
     assert.gte(metrics.docUnitsWritten, 0);
