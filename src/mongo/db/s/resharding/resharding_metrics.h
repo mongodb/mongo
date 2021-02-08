@@ -100,6 +100,9 @@ public:
 
     void serialize(BSONObjBuilder*, ReporterOptions::Role role = ReporterOptions::Role::kAll) const;
 
+    // Reports the elapsed time for the active resharding operation, or `boost::none`.
+    boost::optional<Milliseconds> getOperationElapsedTime() const;
+
 private:
     ServiceContext* const _svcCtx;
 
