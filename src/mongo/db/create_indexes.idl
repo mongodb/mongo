@@ -61,9 +61,8 @@ structs:
                 type: string
                 optional: true
 
-    # A built index appears with these fields, which must be the same as ListIndexReplyItem's fields
-    # in list_indexes.idl.
-    # TODO (SERVER-52539): Write a test that asserts they're the same.
+    # A built index appears with these fields, which must be the same as ListIndexesReplyItem's
+    # fields in list_indexes.idl.
     NewIndexSpec:
         description: "A type representing a spec for a new index"
         strict: true
