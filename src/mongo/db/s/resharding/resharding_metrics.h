@@ -105,8 +105,9 @@ private:
 
     mutable Mutex _mutex = MONGO_MAKE_LATCH("ReshardingMetrics::_mutex");
 
-    // The following maintain the number of operations that succeeded, failed with an unrecoverable
-    // error, and canceled by the user, respectively.
+    // The following maintain the number of resharding operations that have started, succeeded,
+    // failed with an unrecoverable error, and canceled by the user, respectively.
+    int64_t _started = 0;
     int64_t _succeeded = 0;
     int64_t _failed = 0;
     int64_t _canceled = 0;

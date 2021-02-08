@@ -39,9 +39,10 @@ function verifyServerStatusOutput(reshardingTest, inputCollection) {
 
         const metrics = shardingStats.resharding;
         verifyMetrics(metrics, {
-            "successfulOperations": 0,
-            "failedOperations": 0,
-            "canceledOperations": 0,
+            "countReshardingOperations": 0,
+            "countReshardingSuccessful": 0,
+            "countReshardingFailures": 0,
+            "countReshardingCanceled": 0,
             "documentsCopied": 0,
             "bytesCopied": 0,
             "oplogEntriesApplied": 0,

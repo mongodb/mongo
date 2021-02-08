@@ -39,9 +39,10 @@ namespace {
 constexpr auto kAnotherOperationInProgress = "Another operation is in progress";
 constexpr auto kNoOperationInProgress = "No operation is in progress";
 
-constexpr auto kSuccessfulOps = "successfulOperations";
-constexpr auto kFailedOps = "failedOperations";
-constexpr auto kCanceledOps = "canceledOperations";
+constexpr auto kTotalOps = "countReshardingOperations";
+constexpr auto kSuccessfulOps = "countReshardingSuccessful";
+constexpr auto kFailedOps = "countReshardingFailures";
+constexpr auto kCanceledOps = "countReshardingCanceled";
 constexpr auto kOpTimeElapsed = "totalOperationTimeElapsed";
 constexpr auto kOpTimeRemaining = "remainingOperationTimeEstimated";
 constexpr auto kDocumentsToCopy = "approxDocumentsToCopy";
@@ -79,6 +80,7 @@ void ReshardingMetrics::onStart() noexcept {
     // Create a new operation and record the time it started.
     _currentOp.emplace(_svcCtx->getFastClockSource());
     _currentOp->runningOperation.start();
+    _started++;
 }
 
 void ReshardingMetrics::onCompletion(ReshardingMetrics::OperationStatus status) noexcept {
@@ -310,6 +312,7 @@ void ReshardingMetrics::serialize(BSONObjBuilder* bob, ReporterOptions::Role rol
     stdx::lock_guard<Latch> lk(_mutex);
 
     if (role == ReporterOptions::Role::kAll) {
+        bob->append(kTotalOps, _started);
         bob->append(kSuccessfulOps, _succeeded);
         bob->append(kFailedOps, _failed);
         bob->append(kCanceledOps, _canceled);

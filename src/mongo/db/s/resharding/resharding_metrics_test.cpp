@@ -129,9 +129,14 @@ TEST_F(ReshardingMetricsTest, TestOperationStatus) {
         getMetrics()->onCompletion(ReshardingMetrics::OperationStatus::kCanceled);
     }
 
-    checkMetrics("successfulOperations", kNumSuccessfulOps);
-    checkMetrics("failedOperations", kNumFailedOps);
-    checkMetrics("canceledOperations", kNumCanceledOps);
+    checkMetrics("countReshardingSuccessful", kNumSuccessfulOps);
+    checkMetrics("countReshardingFailures", kNumFailedOps);
+    checkMetrics("countReshardingCanceled", kNumCanceledOps);
+
+    const auto total = kNumSuccessfulOps + kNumFailedOps + kNumCanceledOps;
+    checkMetrics("countReshardingOperations", total);
+    getMetrics()->onStart();
+    checkMetrics("countReshardingOperations", total + 1);
 }
 
 TEST_F(ReshardingMetricsTest, TestElapsedTime) {
