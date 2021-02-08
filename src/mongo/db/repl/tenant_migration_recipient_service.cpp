@@ -356,7 +356,7 @@ OpTime TenantMigrationRecipientService::Instance::waitUntilTimestampIsMajorityCo
 
     BSONObj result;
     DBDirectClient client(opCtx);
-    client.runCommand("NamespaceString::kAdminDb",
+    client.runCommand(NamespaceString::kAdminDb.toString(),
                       BSON("appendOplogNote" << 1 << "data"
                                              << BSON("msg"
                                                      << "Noop write for recipientSyncData")),
