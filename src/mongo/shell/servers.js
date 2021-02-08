@@ -1229,6 +1229,18 @@ function appendSetParameterArgs(argArray) {
                 }
             }
 
+            // New mongod-specific option in 4.9.x.
+            if (programMajorMinorVersion >= 490) {
+                const parameters = jsTest.options().setParameters;
+                if ((parameters === undefined ||
+                     parameters['reshardingMinimumOperationDurationMillis'] === undefined) &&
+                    !argArrayContainsSetParameterValue(
+                        'reshardingMinimumOperationDurationMillis=')) {
+                    argArray.push(
+                        ...['--setParameter', "reshardingMinimumOperationDurationMillis=5000"]);
+                }
+            }
+
             // New mongod-specific option in 4.5.x.
             if (programMajorMinorVersion >= 450) {
                 // Allow the parameter to be overridden if set explicitly via TestData.

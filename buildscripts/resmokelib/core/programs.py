@@ -172,6 +172,13 @@ def mongod_program(  # pylint: disable=too-many-branches,too-many-statements
         "coordinateCommitReturnImmediatelyAfterPersistingDecision" in suite_set_parameters:
         del suite_set_parameters["coordinateCommitReturnImmediatelyAfterPersistingDecision"]
 
+    # TODO SERVER-54593 to remove the special-case handling when 5.0 becomes LAST_LTS.
+    if "reshardingMinimumOperationDurationMillis" in suite_set_parameters:
+        if executable == LAST_LTS_MONGOD_BINARY:
+            del suite_set_parameters["reshardingMinimumOperationDurationMillis"]
+    elif executable != LAST_LTS_MONGOD_BINARY:
+        suite_set_parameters["reshardingMinimumOperationDurationMillis"] = 5000
+
     # There's a periodic background thread that checks for and aborts expired transactions.
     # "transactionLifetimeLimitSeconds" specifies for how long a transaction can run before expiring
     # and being aborted by the background thread. It defaults to 60 seconds, which is too short to
@@ -386,6 +393,9 @@ def mongo_shell_program(  # pylint: disable=too-many-arguments,too-many-branches
     # to a default.
     if config.FLOW_CONTROL is not None:
         mongod_set_parameters.setdefault("enableFlowControl", config.FLOW_CONTROL == "on")
+
+    # Set the default value for minimum resharding operation duration to 5 seconds.
+    mongod_set_parameters.setdefault("reshardingMinimumOperationDurationMillis", 5000)
 
     # If the 'logComponentVerbosity' setParameter for mongos was not already specified, we set its
     # value to a default.

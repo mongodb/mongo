@@ -106,3 +106,16 @@ server_parameters:
         cpp_vartype: AtomicWord<int>
         cpp_varname: gReshardingOplogApplierMaxLockRequestTimeoutMillis
         default: 5
+
+    reshardingMinimumOperationDurationMillis:
+        description: >-
+            Controls the minimum duration of resharding operations, and allows transactions and 
+            retryable writes started after the current resharding operation to complete within the 
+            period defined by the parameter.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gReshardingMinimumOperationDurationMillis
+        default:
+            expr: 5 * 60 * 1000
+        validator:
+            gte: 0

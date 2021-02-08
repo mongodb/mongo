@@ -38,6 +38,7 @@
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
+#include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding_util.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/logv2/log.h"
@@ -873,6 +874,40 @@ void ReshardingCoordinatorService::ReshardingCoordinator::installCoordinatorDoc(
     _coordinatorDoc = doc;
 }
 
+ExecutorFuture<void> waitForMinimumOperationDuration(
+    std::shared_ptr<executor::TaskExecutor> executor, const CancelationToken& token) {
+    // Ensure to have at least `minDuration` elapsed after starting the operation and before
+    // engaging the critical section, unless the operation is already interrupted or canceled.
+    const auto minDuration =
+        Milliseconds(resharding::gReshardingMinimumOperationDurationMillis.load());
+    const auto elapsed =
+        ReshardingMetrics::get(cc().getServiceContext())->getOperationElapsedTime().get();
+
+    if (elapsed >= minDuration)
+        return ExecutorFuture<void>(executor);
+
+    // As `ReshardingMetrics` may use a different clock source, the following is to estimate the
+    // time on the executor clock source when the operation was started. This estimation also allows
+    // logging both `startedOn` and `resumedOn` using a single clock source.
+    const auto estimatedStart = executor->now() - elapsed;
+    return executor->sleepUntil(estimatedStart + minDuration, token)
+        .then([executor, estimatedStart] {
+            LOGV2_INFO(5391801,
+                       "Resuming operation after waiting for minimum resharding operation duration",
+                       "startedOn"_attr = estimatedStart,
+                       "resumedOn"_attr = executor->now());
+        });
+}
+
+void markCompleted(const Status& status) {
+    auto metrics = ReshardingMetrics::get(cc().getServiceContext());
+    // TODO SERVER-52770 to process the cancellation of resharding operations.
+    if (status.isOK())
+        metrics->onCompletion(ReshardingMetrics::OperationStatus::kSucceeded);
+    else
+        metrics->onCompletion(ReshardingMetrics::OperationStatus::kFailed);
+}
+
 SemiFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::run(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancelationToken& token) noexcept {
@@ -884,6 +919,11 @@ SemiFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::run(
         .then([this, executor] { _tellAllRecipientsToRefresh(executor); })
         .then([this, executor] { return _awaitAllRecipientsFinishedCloning(executor); })
         .then([this, executor] { _tellAllDonorsToRefresh(executor); })
+        .then([this, executor, token] {
+            // TODO SERVER-53916 to verify that the following runs only after the last recipient
+            // shard reports to the coordinator that it has entered "steady-state".
+            return waitForMinimumOperationDuration(**executor, token);
+        })
         .then([this, executor] { return _awaitAllRecipientsFinishedApplying(executor); })
         .then([this, executor] { _tellAllDonorsToRefresh(executor); })
         .then([this, executor] { return _awaitAllRecipientsInStrictConsistency(executor); })
@@ -920,6 +960,9 @@ SemiFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::run(
             return status;
         })
         .onCompletion([this, self = shared_from_this()](Status status) {
+            // Notify `ReshardingMetrics` as the operation is now complete for external observers.
+            markCompleted(status);
+
             stdx::lock_guard<Latch> lg(_mutex);
             if (_completionPromise.getFuture().isReady()) {
                 // interrupt() was called before we got here.
@@ -964,6 +1007,9 @@ ReshardingCoordinatorService::ReshardingCoordinator::getObserver() {
 }
 
 void ReshardingCoordinatorService::ReshardingCoordinator::_insertCoordDocAndChangeOrigCollEntry() {
+    // TODO SERVER-53914 to accommodate loading metrics for the coordinator.
+    ReshardingMetrics::get(cc().getServiceContext())->onStart();
+
     if (_coordinatorDoc.getState() > CoordinatorStateEnum::kUnused) {
         return;
     }

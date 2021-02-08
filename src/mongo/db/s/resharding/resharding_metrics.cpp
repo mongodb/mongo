@@ -379,4 +379,10 @@ BSONObj ReshardingMetrics::reportForCurrentOp(const ReporterOptions& options) co
     return bob.obj();
 }
 
+boost::optional<Milliseconds> ReshardingMetrics::getOperationElapsedTime() const {
+    if (!_currentOp)
+        return boost::none;
+    return _currentOp->runningOperation.duration();
+}
+
 }  // namespace mongo
