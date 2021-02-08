@@ -113,6 +113,8 @@ all:
     test_file: jstests/replsets/unconditional_step_down.js
   - ticket: SERVER-53932
     test_file: jstests/replsets/rollback_reconstructs_transactions_prepared_before_stable.js
+  - ticket: SERVER-54366
+    test_file: jstests/replsets/force_shutdown_primary.js
 
 suites:
 
