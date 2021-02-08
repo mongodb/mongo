@@ -38,6 +38,7 @@
 #include "mongo/db/s/dist_lock_manager.h"
 #include "mongo/db/s/drop_collection_coordinator.h"
 #include "mongo/db/s/sharding_ddl_util.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_chunk.h"
@@ -104,24 +105,16 @@ SemiFuture<void> DropCollectionCoordinator::runImpl(
 
             _stopMigrations(opCtx);
 
-            const auto routingInfo = uassertStatusOK(
-                Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(opCtx, _nss));
+            const auto catalogClient = Grid::get(opCtx)->catalogClient();
 
-            const boost::optional<UUID> collectionUUID = [&]() {
-                if (routingInfo.isSharded() && routingInfo.getVersion().getTimestamp()) {
-                    invariant(routingInfo.getUUID());
-                    return routingInfo.getUUID();
-                } else {
-                    return boost::optional<UUID>(boost::none);
-                }
-            }();
-
-            sharding_ddl_util::removeCollMetadataFromConfig(opCtx, _nss, collectionUUID);
-
-            if (routingInfo.isSharded()) {
+            try {
+                auto coll = catalogClient->getCollection(opCtx, _nss);
+                sharding_ddl_util::removeCollMetadataFromConfig(opCtx, coll);
                 _participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
-            } else {
-                _participants = {routingInfo.dbPrimary()};
+            } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+                // The collection is not sharded or doesn't exist, just remove tags
+                sharding_ddl_util::removeTagsMetadataFromConfig(opCtx, _nss);
+                _participants = {ShardingState::get(opCtx)->shardId()};
             }
 
             _sendDropCollToParticipants(opCtx);

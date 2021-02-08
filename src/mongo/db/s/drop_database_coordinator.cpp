@@ -124,15 +124,12 @@ SemiFuture<void> DropDatabaseCoordinator::runImpl(
                 }
 
                 const auto nss = coll.getNss();
-                const auto collectionUUID = coll.getTimestamp().has_value()
-                    ? boost::optional<UUID>(coll.getUuid())
-                    : boost::none;
 
                 // TODO SERVER-53905 to support failovers here we need to store the
                 // current namespace of this loop before to delete it from config server
                 // so that on step-up we will remmeber to resume the drop collection for that
                 // namespace.
-                sharding_ddl_util::removeCollMetadataFromConfig(opCtx, nss, collectionUUID);
+                sharding_ddl_util::removeCollMetadataFromConfig(opCtx, coll);
                 const auto dropCollParticipantCmd = ShardsvrDropCollectionParticipant(nss);
                 auto* const shardRegistry = Grid::get(opCtx)->shardRegistry();
                 sendCommandToAllShards(opCtx,
