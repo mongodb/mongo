@@ -337,6 +337,12 @@ public:
         void _fetchRetryableWritesOplogBeforeStartOpTime();
 
         /**
+         * Runs an aggregation that gets the donor's transactions entries in 'config.transactions'
+         * with 'lastWriteOpTime' < 'startFetchingOpTime' and 'state: committed'.
+         */
+        void _fetchCommittedTransactionsBeforeStartOpTime();
+
+        /**
          * Starts the tenant oplog fetcher.
          */
         void _startOplogFetcher();

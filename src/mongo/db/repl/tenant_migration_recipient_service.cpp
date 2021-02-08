@@ -736,6 +736,11 @@ void TenantMigrationRecipientService::Instance::_fetchRetryableWritesOplogBefore
     return;
 }
 
+void TenantMigrationRecipientService::Instance::_fetchCommittedTransactionsBeforeStartOpTime() {
+    // TODO (SERVER-53511): Run the aggregation.
+    return;
+}
+
 void TenantMigrationRecipientService::Instance::_startOplogFetcher() {
     auto opCtx = cc().makeOperationContext();
     OplogBufferCollection::Options options;
@@ -1503,6 +1508,7 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
             return clonerFuture;
         })
         .then([this, self = shared_from_this()] { return _onCloneSuccess(); })
+        .then([this, self = shared_from_this()] { _fetchCommittedTransactionsBeforeStartOpTime(); })
         .then([this, self = shared_from_this()] {
             _stopOrHangOnFailPoint(&fpAfterCollectionClonerDone);
             LOGV2_DEBUG(4881200,
