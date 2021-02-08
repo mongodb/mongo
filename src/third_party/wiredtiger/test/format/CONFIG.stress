@@ -1,8 +1,0 @@
-# A reasonable configuration for stress testing.
-btree.huffman_value=0
-cache.minimum=20
-runs.rows=1000000:5000000
-runs.threads=4:32
-runs.timer=6:30
-runs.type=row-store
-runs=100

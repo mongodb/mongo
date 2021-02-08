@@ -1,9 +1,0 @@
-/*! @arch_page arch-block Block Manager
-
-The Block Manager manages the reading and writing of disk blocks
-in WiredTiger.  It does compression and encryption when these
-are configured.
-
-The state of the block manager is represented by the \c WT_BM structure.
-Individual blocks being tracked are in \c WT_BLOCK structures.
-*/

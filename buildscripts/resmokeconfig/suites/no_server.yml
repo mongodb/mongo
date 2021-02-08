@@ -1,7 +1,0 @@
-test_kind: js_test
-
-executor:
-  config:
-    shell_options:
-      nodb: ''
-      readMode: commands

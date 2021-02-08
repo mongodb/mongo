@@ -1,9 +1,0 @@
-test_kind: cpp_unit_test
-
-selector:
-  root: build/unittests.txt
-  include_files:
-  - build/**/repl/*
-
-executor:
-  config: {}

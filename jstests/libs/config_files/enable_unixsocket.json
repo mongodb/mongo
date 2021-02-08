@@ -1,7 +1,0 @@
-{
-    "net" : {
-        "unixDomainSocket" : {
-            "enabled" : true
-        }
-    }
-}

@@ -1,3 +1,0 @@
-#define NSTACKS			1024
-#define STACK_SIZE_SHIFT	17
-#define STACK_SIZE		(1 << STACK_SIZE_SHIFT)

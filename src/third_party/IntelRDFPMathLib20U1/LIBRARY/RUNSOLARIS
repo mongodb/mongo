@@ -1,5 +1,0 @@
-echo "BEGIN BUILDING LIBRARY IN SOLARIS..."
-rm *.a
-./solarisbuild
-echo "END BUILDING LIBRARY IN SOLARIS..."
-

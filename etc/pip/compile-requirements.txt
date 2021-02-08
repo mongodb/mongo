@@ -1,4 +1,0 @@
--r components/platform.req
--r components/core.req
-
--r components/compile.req

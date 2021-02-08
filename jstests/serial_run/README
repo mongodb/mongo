@@ -1,2 +1,0 @@
-This suite contains tests that are unusually susceptible to availability of machine resources;
-therefore, this suite is always run with --jobs=1 via Evergreen config.

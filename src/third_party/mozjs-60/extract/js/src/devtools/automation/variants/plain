@@ -1,7 +1,0 @@
-{
-    "configure-args": "",
-    "optimize": true,
-    "env": {
-        "JSTESTS_EXTRA_ARGS": "--jitflags=all"
-    }
-}

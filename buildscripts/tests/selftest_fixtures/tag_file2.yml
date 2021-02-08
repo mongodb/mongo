@@ -1,4 +1,0 @@
-selector:
-  js_test:
-    buildscripts/tests/selftest_fixtures/two.js:
-    - tag4

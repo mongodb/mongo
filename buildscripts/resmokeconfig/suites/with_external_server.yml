@@ -1,8 +1,0 @@
-test_kind: js_test
-
-# Use this suite to connect to a running mongod and specify resmoke.py options
-# '--shellConnPort' or '--shellConnString'.
-executor:
-  config:
-    shell_options:
-      readMode: commands

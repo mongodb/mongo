@@ -1,9 +1,0 @@
-/*! @arch_page arch-snapshot Snapshot
-
-When the snapshot isolation level is used in WiredTiger, the transaction
-will see versions of records committed before the transaction started.
-
-Snapshots are implemented by storing the set of transaction ids committed
-before the transaction started in the \c WT_TXN structure.  Transaction
-ids older than a certain point need not be stored.
-*/

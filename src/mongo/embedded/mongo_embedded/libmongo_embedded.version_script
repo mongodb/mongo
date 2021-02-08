@@ -1,4 +1,0 @@
-MONGO_EMBEDDED_ABI_1.0 {
-    global: mongo_embedded_v1_*;
-    local: *;
-};
