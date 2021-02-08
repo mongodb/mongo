@@ -46,11 +46,15 @@
 namespace mongo {
 namespace aggregation_request_helper {
 
-StatusWith<AggregateCommand> parseFromBSON(
-    const std::string& dbName,
-    const BSONObj& cmdObj,
-    boost::optional<ExplainOptions::Verbosity> explainVerbosity,
-    bool apiStrict) {
+/**
+ * Validate the aggregate command object.
+ */
+void validate(const BSONObj& cmdObj, boost::optional<ExplainOptions::Verbosity> explainVerbosity);
+
+AggregateCommand parseFromBSON(const std::string& dbName,
+                               const BSONObj& cmdObj,
+                               boost::optional<ExplainOptions::Verbosity> explainVerbosity,
+                               bool apiStrict) {
     return parseFromBSON(parseNs(dbName, cmdObj), cmdObj, explainVerbosity, apiStrict);
 }
 
@@ -59,7 +63,11 @@ StatusWith<AggregateCommand> parseFromBSONForTests(
     const BSONObj& cmdObj,
     boost::optional<ExplainOptions::Verbosity> explainVerbosity,
     bool apiStrict) {
-    return parseFromBSON(nss, cmdObj, explainVerbosity, apiStrict);
+    try {
+        return parseFromBSON(nss, cmdObj, explainVerbosity, apiStrict);
+    } catch (const AssertionException&) {
+        return exceptionToStatus();
+    }
 }
 
 StatusWith<AggregateCommand> parseFromBSONForTests(
@@ -67,14 +75,17 @@ StatusWith<AggregateCommand> parseFromBSONForTests(
     const BSONObj& cmdObj,
     boost::optional<ExplainOptions::Verbosity> explainVerbosity,
     bool apiStrict) {
-    return parseFromBSON(dbName, cmdObj, explainVerbosity, apiStrict);
+    try {
+        return parseFromBSON(dbName, cmdObj, explainVerbosity, apiStrict);
+    } catch (const AssertionException&) {
+        return exceptionToStatus();
+    }
 }
 
-StatusWith<AggregateCommand> parseFromBSON(
-    NamespaceString nss,
-    const BSONObj& cmdObj,
-    boost::optional<ExplainOptions::Verbosity> explainVerbosity,
-    bool apiStrict) {
+AggregateCommand parseFromBSON(NamespaceString nss,
+                               const BSONObj& cmdObj,
+                               boost::optional<ExplainOptions::Verbosity> explainVerbosity,
+                               bool apiStrict) {
 
     // if the command object lacks field 'aggregate' or '$db', we will use the namespace in 'nss'.
     bool cmdObjChanged = false;
@@ -87,28 +98,18 @@ StatusWith<AggregateCommand> parseFromBSON(
     }
 
     AggregateCommand request(nss);
-    try {
-        request = AggregateCommand::parse(IDLParserErrorContext("aggregate", apiStrict),
-                                          cmdObjChanged ? cmdObjBob.obj() : cmdObj);
-    } catch (const AssertionException&) {
-        return exceptionToStatus();
-    }
+    request = AggregateCommand::parse(IDLParserErrorContext("aggregate", apiStrict),
+                                      cmdObjChanged ? cmdObjBob.obj() : cmdObj);
 
     if (explainVerbosity) {
-        if (cmdObj.hasField(AggregateCommand::kExplainFieldName)) {
-            return {
-                ErrorCodes::FailedToParse,
+        uassert(ErrorCodes::FailedToParse,
                 str::stream() << "The '" << AggregateCommand::kExplainFieldName
-                              << "' option is illegal when a explain verbosity is also provided"};
-        }
-
+                              << "' option is illegal when a explain verbosity is also provided",
+                !cmdObj.hasField(AggregateCommand::kExplainFieldName));
         request.setExplain(explainVerbosity);
     }
 
-    auto status = validate(cmdObj, explainVerbosity);
-    if (!status.isOK()) {
-        return status;
-    }
+    validate(cmdObj, explainVerbosity);
 
     return request;
 }
@@ -147,8 +148,7 @@ Document serializeToCommandDoc(const AggregateCommand& request) {
     return Document(request.toBSON(BSONObj()).getOwned());
 }
 
-Status validate(const BSONObj& cmdObj,
-                boost::optional<ExplainOptions::Verbosity> explainVerbosity) {
+void validate(const BSONObj& cmdObj, boost::optional<ExplainOptions::Verbosity> explainVerbosity) {
     bool hasAllowDiskUseElem = cmdObj.hasField(AggregateCommand::kAllowDiskUseFieldName);
     bool hasCursorElem = cmdObj.hasField(AggregateCommand::kCursorFieldName);
     bool hasExplainElem = cmdObj.hasField(AggregateCommand::kExplainFieldName);
@@ -159,32 +159,25 @@ Status validate(const BSONObj& cmdObj,
 
     // 'hasExplainElem' implies an aggregate command-level explain option, which does not require
     // a cursor argument.
-    if (!hasCursorElem && !hasExplainElem) {
-        return {ErrorCodes::FailedToParse,
-                str::stream()
-                    << "The '" << AggregateCommand::kCursorFieldName
-                    << "' option is required, except for aggregate with the explain argument"};
-    }
+    uassert(ErrorCodes::FailedToParse,
+            str::stream() << "The '" << AggregateCommand::kCursorFieldName
+                          << "' option is required, except for aggregate with the explain argument",
+            hasCursorElem || hasExplainElem);
 
-    if (hasExplain && cmdObj[WriteConcernOptions::kWriteConcernField]) {
-        return {ErrorCodes::FailedToParse,
-                str::stream() << "Aggregation explain does not support the'"
-                              << WriteConcernOptions::kWriteConcernField << "' option"};
-    }
+    uassert(ErrorCodes::FailedToParse,
+            str::stream() << "Aggregation explain does not support the'"
+                          << WriteConcernOptions::kWriteConcernField << "' option",
+            !hasExplain || !cmdObj[WriteConcernOptions::kWriteConcernField]);
 
-    if (hasNeedsMergeElem && !hasFromMongosElem) {
-        return {ErrorCodes::FailedToParse,
-                str::stream() << "Cannot specify '" << AggregateCommand::kNeedsMergeFieldName
-                              << "' without '" << AggregateCommand::kFromMongosFieldName << "'"};
-    }
+    uassert(ErrorCodes::FailedToParse,
+            str::stream() << "Cannot specify '" << AggregateCommand::kNeedsMergeFieldName
+                          << "' without '" << AggregateCommand::kFromMongosFieldName << "'",
+            (!hasNeedsMergeElem || hasFromMongosElem));
 
-    if (hasAllowDiskUseElem && storageGlobalParams.readOnly) {
-        return {ErrorCodes::IllegalOperation,
-                str::stream() << "The '" << AggregateCommand::kAllowDiskUseFieldName
-                              << "' option is not permitted in read-only mode."};
-    }
-
-    return Status::OK();
+    uassert(ErrorCodes::IllegalOperation,
+            str::stream() << "The '" << AggregateCommand::kAllowDiskUseFieldName
+                          << "' option is not permitted in read-only mode.",
+            (!hasAllowDiskUseElem || !storageGlobalParams.readOnly));
 }
 }  // namespace aggregation_request_helper
 
