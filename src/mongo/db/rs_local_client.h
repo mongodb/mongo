@@ -67,7 +67,8 @@ public:
                                                const NamespaceString& nss,
                                                const BSONObj& query,
                                                const BSONObj& sort,
-                                               boost::optional<long long> limit);
+                                               boost::optional<long long> limit,
+                                               const boost::optional<BSONObj>& hint = boost::none);
 
 private:
     /**

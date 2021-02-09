@@ -97,7 +97,8 @@ StatusWith<Shard::QueryResponse> RSLocalClient::queryOnce(
     const NamespaceString& nss,
     const BSONObj& query,
     const BSONObj& sort,
-    boost::optional<long long> limit) {
+    boost::optional<long long> limit,
+    const boost::optional<BSONObj>& hint) {
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
 
     if (readConcernLevel == repl::ReadConcernLevel::kMajorityReadConcern) {
@@ -126,6 +127,9 @@ StatusWith<Shard::QueryResponse> RSLocalClient::queryOnce(
     Query fullQuery(query);
     if (!sort.isEmpty()) {
         fullQuery.sort(sort);
+    }
+    if (hint) {
+        fullQuery.hint(*hint);
     }
     fullQuery.readPref(readPref.pref, BSONArray());
 

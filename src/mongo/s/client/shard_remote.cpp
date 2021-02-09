@@ -353,7 +353,8 @@ StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(
     const NamespaceString& nss,
     const BSONObj& query,
     const BSONObj& sort,
-    boost::optional<long long> limit) {
+    boost::optional<long long> limit,
+    const boost::optional<BSONObj>& hint) {
     invariant(isConfig());
     auto const grid = Grid::get(opCtx);
 
@@ -380,6 +381,9 @@ StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(
         qr.setSort(sort);
         qr.setReadConcern(readConcernObj);
         qr.setLimit(limit ? static_cast<boost::optional<std::int64_t>>(*limit) : boost::none);
+        if (hint) {
+            qr.setHint(*hint);
+        }
 
         if (maxTimeMS < Milliseconds::max()) {
             qr.setMaxTimeMS(durationCount<Milliseconds>(maxTimeMS));

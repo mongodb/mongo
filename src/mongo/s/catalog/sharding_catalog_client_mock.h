@@ -67,7 +67,8 @@ public:
                                                  const BSONObj& sort,
                                                  boost::optional<int> limit,
                                                  repl::OpTime* opTime,
-                                                 repl::ReadConcernLevel readConcern) override;
+                                                 repl::ReadConcernLevel readConcern,
+                                                 const boost::optional<BSONObj>& hint) override;
 
     StatusWith<std::vector<TagsType>> getTagsForCollection(OperationContext* opCtx,
                                                            const NamespaceString& nss) override;
@@ -139,7 +140,8 @@ private:
         const NamespaceString& nss,
         const BSONObj& query,
         const BSONObj& sort,
-        boost::optional<long long> limit) override;
+        boost::optional<long long> limit,
+        const boost::optional<BSONObj>& hint) override;
 };
 
 }  // namespace mongo

@@ -237,13 +237,14 @@ StatusWith<Shard::QueryResponse> Shard::exhaustiveFindOnConfig(
     const NamespaceString& nss,
     const BSONObj& query,
     const BSONObj& sort,
-    const boost::optional<long long> limit) {
+    const boost::optional<long long> limit,
+    const boost::optional<BSONObj>& hint) {
     // Do not allow exhaustive finds to be run against regular shards.
     invariant(isConfig());
 
     for (int retry = 1; retry <= kOnErrorNumRetries; retry++) {
-        auto result =
-            _exhaustiveFindOnConfig(opCtx, readPref, readConcernLevel, nss, query, sort, limit);
+        auto result = _exhaustiveFindOnConfig(
+            opCtx, readPref, readConcernLevel, nss, query, sort, limit, hint);
 
         if (retry < kOnErrorNumRetries &&
             isRetriableError(result.getStatus().code(), RetryPolicy::kIdempotent)) {

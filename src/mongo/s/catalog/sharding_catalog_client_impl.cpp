@@ -404,14 +404,15 @@ StatusWith<std::vector<ChunkType>> ShardingCatalogClientImpl::getChunks(
     const BSONObj& sort,
     boost::optional<int> limit,
     OpTime* opTime,
-    repl::ReadConcernLevel readConcern) {
+    repl::ReadConcernLevel readConcern,
+    const boost::optional<BSONObj>& hint) {
     invariant(serverGlobalParams.clusterRole == ClusterRole::ConfigServer ||
               readConcern == repl::ReadConcernLevel::kMajorityReadConcern);
 
     // Convert boost::optional<int> to boost::optional<long long>.
     auto longLimit = limit ? boost::optional<long long>(*limit) : boost::none;
     auto findStatus = _exhaustiveFindOnConfig(
-        opCtx, kConfigReadSelector, readConcern, ChunkType::ConfigNS, query, sort, longLimit);
+        opCtx, kConfigReadSelector, readConcern, ChunkType::ConfigNS, query, sort, longLimit, hint);
     if (!findStatus.isOK()) {
         return findStatus.getStatus().withContext("Failed to load chunks");
     }
@@ -877,9 +878,10 @@ StatusWith<repl::OpTimeWith<vector<BSONObj>>> ShardingCatalogClientImpl::_exhaus
     const NamespaceString& nss,
     const BSONObj& query,
     const BSONObj& sort,
-    boost::optional<long long> limit) {
+    boost::optional<long long> limit,
+    const boost::optional<BSONObj>& hint) {
     auto response = Grid::get(opCtx)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
-        opCtx, readPref, readConcern, nss, query, sort, limit);
+        opCtx, readPref, readConcern, nss, query, sort, limit, hint);
     if (!response.isOK()) {
         return response.getStatus();
     }

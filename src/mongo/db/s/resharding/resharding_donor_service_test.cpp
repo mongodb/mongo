@@ -90,12 +90,14 @@ protected:
             return chunks;
         }
 
-        StatusWith<std::vector<ChunkType>> getChunks(OperationContext* opCtx,
-                                                     const BSONObj& filter,
-                                                     const BSONObj& sort,
-                                                     boost::optional<int> limit,
-                                                     repl::OpTime* opTime,
-                                                     repl::ReadConcernLevel readConcern) override {
+        StatusWith<std::vector<ChunkType>> getChunks(
+            OperationContext* opCtx,
+            const BSONObj& filter,
+            const BSONObj& sort,
+            boost::optional<int> limit,
+            repl::OpTime* opTime,
+            repl::ReadConcernLevel readConcern,
+            const boost::optional<BSONObj>& hint) override {
             auto version = ChunkVersion(1, 0, OID::gen(), boost::none /* timestamp */);
             return makeChunks(reshardingTempNss(_existingUUID), _recipients, version);
         }

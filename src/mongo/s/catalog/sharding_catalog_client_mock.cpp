@@ -82,7 +82,8 @@ StatusWith<std::vector<ChunkType>> ShardingCatalogClientMock::getChunks(
     const BSONObj& sort,
     boost::optional<int> limit,
     repl::OpTime* opTime,
-    repl::ReadConcernLevel readConcern) {
+    repl::ReadConcernLevel readConcern,
+    const boost::optional<BSONObj>& hint) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
@@ -174,7 +175,8 @@ ShardingCatalogClientMock::_exhaustiveFindOnConfig(OperationContext* opCtx,
                                                    const NamespaceString& nss,
                                                    const BSONObj& query,
                                                    const BSONObj& sort,
-                                                   boost::optional<long long> limit) {
+                                                   boost::optional<long long> limit,
+                                                   const boost::optional<BSONObj>& hint) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 

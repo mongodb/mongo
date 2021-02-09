@@ -54,7 +54,7 @@ protected:
     ShardType shard0;
 
     void setUp() override {
-        ConfigServerTestFixture::setUp();
+        setUpAndInitializeConfigDb();
 
         // Create config.transactions collection
         auto opCtx = operationContext();
