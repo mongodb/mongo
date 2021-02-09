@@ -193,6 +193,43 @@ var TenantMigrationUtil = (function() {
         return rstArgs;
     }
 
+    /**
+     * Returns the TenantMigrationAccessBlocker serverStatus output for the migration for the given
+     * tenant if there one.
+     */
+    function getTenantMigrationAccessBlocker(node, tenantId) {
+        const mtabs =
+            assert.commandWorked(node.adminCommand({serverStatus: 1})).tenantMigrationAccessBlocker;
+        if (!mtabs) {
+            return null;
+        }
+        return mtabs[tenantId];
+    }
+
+    /**
+     * Returns the number of reads on the given donor node that were blocked due to tenant migration
+     * for the given tenant.
+     */
+    function getNumBlockedReads(donorNode, tenantId) {
+        const mtab = getTenantMigrationAccessBlocker(donorNode, tenantId);
+        if (!mtab) {
+            return 0;
+        }
+        return mtab.numBlockedReads;
+    }
+
+    /**
+     * Returns the number of writes on the given donor node that were blocked due to tenant
+     * migration for the given tenant.
+     */
+    function getNumBlockedWrites(donorNode, tenantId) {
+        const mtab = getTenantMigrationAccessBlocker(donorNode, tenantId);
+        if (!mtab) {
+            return 0;
+        }
+        return mtab.numBlockedWrites;
+    }
+
     return {
         runMigrationAsync,
         forgetMigrationAsync,
@@ -205,5 +242,8 @@ var TenantMigrationUtil = (function() {
         makeMigrationCertificatesForTest,
         makeX509OptionsForTest,
         isMigrationCompleted,
+        getTenantMigrationAccessBlocker,
+        getNumBlockedReads,
+        getNumBlockedWrites
     };
 })();

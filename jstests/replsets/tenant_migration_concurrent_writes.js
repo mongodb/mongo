@@ -17,6 +17,7 @@ load("jstests/libs/fail_point_util.js");
 load("jstests/libs/parallelTester.js");
 load("jstests/libs/uuid_util.js");
 load("jstests/replsets/libs/tenant_migration_test.js");
+load("jstests/replsets/libs/tenant_migration_util.js");
 
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 if (!tenantMigrationTest.isFeatureFlagEnabled()) {
@@ -49,18 +50,40 @@ const kTxnNumber = NumberLong(0);
 const kMaxTimeMS = 1 * 1000;
 
 /**
- * To be used to resume a migration that is paused after entering the blocking state. Waits for the
- * number of blocked reads to reach 'targetBlockedWrites' and unpauses the migration.
+ * Asserts that the TenantMigrationAccessBlocker for the given tenant on the given node has the
+ * expected statistics.
  */
-function resumeMigrationAfterBlockingWrite(host, targetBlockedWrites) {
+function checkTenantMigrationAccessBlocker(node, tenantId, {
+    numBlockedWrites = 0,
+    numTenantMigrationCommittedErrors = 0,
+    numTenantMigrationAbortedErrors = 0
+}) {
+    const mtab = TenantMigrationUtil.getTenantMigrationAccessBlocker(node, tenantId);
+    if (!mtab) {
+        assert.eq(0, numBlockedWrites);
+        assert.eq(0, numTenantMigrationCommittedErrors);
+        assert.eq(0, numTenantMigrationAbortedErrors);
+        return;
+    }
+
+    assert.eq(mtab.numBlockedReads, 0, tojson(mtab));
+    assert.eq(mtab.numBlockedWrites, numBlockedWrites, tojson(mtab));
+    assert.eq(
+        mtab.numTenantMigrationCommittedErrors, numTenantMigrationCommittedErrors, tojson(mtab));
+    assert.eq(mtab.numTenantMigrationAbortedErrors, numTenantMigrationAbortedErrors, tojson(mtab));
+}
+
+/**
+ * To be used to resume a migration that is paused after entering the blocking state. Waits for the
+ * number of blocked reads to reach 'targetNumBlockedWrites' and unpauses the migration.
+ */
+function resumeMigrationAfterBlockingWrite(host, tenantId, targetNumBlockedWrites) {
     load("jstests/libs/fail_point_util.js");
+    load("jstests/replsets/libs/tenant_migration_util.js");
     const primary = new Mongo(host);
 
-    assert.commandWorked(primary.adminCommand({
-        waitForFailPoint: "tenantMigrationBlockWrite",
-        timesEntered: targetBlockedWrites,
-        maxTimeMS: kDefaultWaitForFailPointTimeout
-    }));
+    assert.soon(() => TenantMigrationUtil.getNumBlockedWrites(primary, tenantId) ==
+                    targetNumBlockedWrites);
 
     assert.commandWorked(primary.adminCommand(
         {configureFailPoint: "pauseTenantMigrationBeforeLeavingBlockingState", mode: "off"}));
@@ -256,6 +279,9 @@ function testWriteIsRejectedIfSentAfterMigrationHasCommitted(testCase, testOpts)
 
     runCommand(testOpts, ErrorCodes.TenantMigrationCommitted);
     testCase.assertCommandFailed(testOpts.primaryDB, testOpts.dbName, testOpts.collName);
+    checkTenantMigrationAccessBlocker(
+        testOpts.primaryDB, tenantId, {numTenantMigrationCommittedErrors: 1});
+
     assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
 }
 
@@ -287,6 +313,9 @@ function testWriteIsAcceptedIfSentAfterMigrationHasAborted(testCase, testOpts) {
 
     runCommand(testOpts);
     testCase.assertCommandSucceeded(testOpts.primaryDB, testOpts.dbName, testOpts.collName);
+    checkTenantMigrationAccessBlocker(
+        testOpts.primaryDB, tenantId, {numTenantMigrationAbortedErrors: 0});
+
     assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
 }
 
@@ -317,6 +346,8 @@ function testWriteBlocksIfMigrationIsInBlocking(testCase, testOpts) {
     assert.eq(stateRes.state, TenantMigrationTest.State.kCommitted);
 
     testCase.assertCommandFailed(testOpts.primaryDB, testOpts.dbName, testOpts.collName);
+    checkTenantMigrationAccessBlocker(testOpts.primaryDB, tenantId, {numBlockedWrites: 1});
+
     assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
 }
 
@@ -333,15 +364,9 @@ function testBlockedWriteGetsUnblockedAndRejectedIfMigrationCommits(testCase, te
 
     let blockingFp =
         configureFailPoint(testOpts.primaryDB, "pauseTenantMigrationBeforeLeavingBlockingState");
-    const targetBlockedWrites =
-        assert
-            .commandWorked(testOpts.primaryDB.adminCommand(
-                {configureFailPoint: "tenantMigrationBlockWrite", mode: "alwaysOn"}))
-            .count +
-        1;
 
     let resumeMigrationThread =
-        new Thread(resumeMigrationAfterBlockingWrite, testOpts.primaryHost, targetBlockedWrites);
+        new Thread(resumeMigrationAfterBlockingWrite, testOpts.primaryHost, tenantId, 1);
 
     // Run the command after the migration enters the blocking state.
     resumeMigrationThread.start();
@@ -359,6 +384,9 @@ function testBlockedWriteGetsUnblockedAndRejectedIfMigrationCommits(testCase, te
     assert.eq(stateRes.state, TenantMigrationTest.State.kCommitted);
 
     testCase.assertCommandFailed(testOpts.primaryDB, testOpts.dbName, testOpts.collName);
+    checkTenantMigrationAccessBlocker(
+        testOpts.primaryDB, tenantId, {numBlockedWrites: 1, numTenantMigrationCommittedErrors: 1});
+
     assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
 }
 
@@ -377,15 +405,9 @@ function testBlockedWriteGetsUnblockedAndRejectedIfMigrationAborts(testCase, tes
         configureFailPoint(testOpts.primaryDB, "pauseTenantMigrationBeforeLeavingBlockingState");
     let abortFp =
         configureFailPoint(testOpts.primaryDB, "abortTenantMigrationBeforeLeavingBlockingState");
-    const targetBlockedWrites =
-        assert
-            .commandWorked(testOpts.primaryDB.adminCommand(
-                {configureFailPoint: "tenantMigrationBlockWrite", mode: "alwaysOn"}))
-            .count +
-        1;
 
     let resumeMigrationThread =
-        new Thread(resumeMigrationAfterBlockingWrite, testOpts.primaryHost, targetBlockedWrites);
+        new Thread(resumeMigrationAfterBlockingWrite, testOpts.primaryHost, tenantId, 1);
 
     // Run the command after the migration enters the blocking state.
     assert.commandWorked(tenantMigrationTest.startMigration(migrationOpts));
@@ -404,6 +426,9 @@ function testBlockedWriteGetsUnblockedAndRejectedIfMigrationAborts(testCase, tes
     assert.eq(stateRes.state, TenantMigrationTest.State.kAborted);
 
     testCase.assertCommandFailed(testOpts.primaryDB, testOpts.dbName, testOpts.collName);
+    checkTenantMigrationAccessBlocker(
+        testOpts.primaryDB, tenantId, {numBlockedWrites: 1, numTenantMigrationAbortedErrors: 1});
+
     assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
 }
 

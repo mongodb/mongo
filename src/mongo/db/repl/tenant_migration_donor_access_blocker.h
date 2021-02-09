@@ -113,7 +113,7 @@ inline RepeatableSharedPromise<void>::~RepeatableSharedPromise() {
  *     }
  * }
  *
- * Writes call checkIfCanWriteOrThrow after being assigned an OpTime but before committing. The
+ * Writes call checkIfCanWrite after being assigned an OpTime but before committing. The
  * method throws TenantMigrationConflict if writes are being blocked, which is caught in the loop.
  * The write then blocks until the migration either commits (in which case checkIfCanWriteOrBlock
  * throws an error that causes the write to be rejected) or aborts (in which case
@@ -140,10 +140,10 @@ inline RepeatableSharedPromise<void>::~RepeatableSharedPromise() {
  * Timestamp will be the "blockTimestamp".
  *
  * At this point:
- * - Writes that have already passed checkIfCanWriteOrThrow must have been assigned an OpTime before
+ * - Writes that have already passed checkIfCanWrite must have been assigned an OpTime before
  *   the blockTimestamp, since the blockTimestamp hasn't been assigned yet, and OpTimes are handed
  *   out in monotonically increasing order.
- * - Writes that have not yet passed checkIfCanWriteOrThrow will end up blocking. Some of these
+ * - Writes that have not yet passed checkIfCanWrite will end up blocking. Some of these
  *   writes may have already been assigned an OpTime, or may end up being assigned an OpTime that is
  *   before the blockTimestamp, and so will end up blocking unnecessarily, but not incorrectly.
  *
@@ -185,10 +185,10 @@ public:
     // Called by all writes and reads against the database.
     //
 
-    void checkIfCanWriteOrThrow() final;
+    Status checkIfCanWrite() final;
     Status waitUntilCommittedOrAborted(OperationContext* opCtx, OperationType operationType) final;
 
-    void checkIfLinearizableReadWasAllowedOrThrow(OperationContext* opCtx) final;
+    Status checkIfLinearizableReadWasAllowed(OperationContext* opCtx) final;
     SharedSemiFuture<void> getCanReadFuture(OperationContext* opCtx) final;
 
     //
@@ -210,8 +210,9 @@ public:
 
     void appendInfoForServerStatus(BSONObjBuilder* builder) const final;
 
-    // Returns structured info with current tenant ID and connection string.
     BSONObj getDebugInfo() const final;
+
+    void recordTenantMigrationError(Status status) final;
 
     //
     // Called while donating this database.
@@ -239,6 +240,23 @@ private:
      */
     enum class State { kAllow, kBlockWrites, kBlockWritesAndReads, kReject, kAborted };
     std::string _stateToString(State state) const;
+
+    /**
+     * Encapsulates runtime statistics on blocked reads and writes, and tenant migration errors
+     * thrown.
+     */
+    struct Stats {
+        AtomicWord<long long> numBlockedReads;
+        AtomicWord<long long> numBlockedWrites;
+        AtomicWord<long long> numTenantMigrationCommittedErrors;
+        AtomicWord<long long> numTenantMigrationAbortedErrors;
+
+        /**
+         * Reports the accumulated statistics for serverStatus.
+         */
+        void report(BSONObjBuilder* builder) const;
+
+    } _stats;
 
     SharedSemiFuture<void> _onCompletion() {
         return _completionPromise.getFuture();

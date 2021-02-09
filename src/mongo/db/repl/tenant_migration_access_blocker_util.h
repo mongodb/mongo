@@ -74,7 +74,7 @@ void checkIfLinearizableReadWasAllowedOrThrow(OperationContext* opCtx, StringDat
  * Throws TenantMigrationConflict if the database is being migrated and the migration is in the
  * blocking state. Throws TenantMigrationCommitted if it is in committed.
  */
-void onWriteToDatabase(OperationContext* opCtx, StringData dbName);
+void checkIfCanWriteOrThrow(OperationContext* opCtx, StringData dbName);
 
 /**
  * Returns TenantMigrationConflict if the database is being migrated (even if migration is not yet

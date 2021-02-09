@@ -1232,7 +1232,8 @@ void OpObserverImpl::onUnpreparedTransactionCommit(OperationContext* opCtx,
     // Throw TenantMigrationConflict error if the database for the transaction statements is being
     // migrated. We only need check the namespace of the first statement since a transaction's
     // statements must all be for the same tenant.
-    tenant_migration_access_blocker::onWriteToDatabase(opCtx, statements->begin()->getNss().db());
+    tenant_migration_access_blocker::checkIfCanWriteOrThrow(opCtx,
+                                                            statements->begin()->getNss().db());
 
     if (MONGO_unlikely(hangAndFailUnpreparedCommitAfterReservingOplogSlot.shouldFail())) {
         hangAndFailUnpreparedCommitAfterReservingOplogSlot.pauseWhileSet(opCtx);

@@ -55,11 +55,11 @@ public:
     // Called by all writes and reads against the database.
     //
 
-    virtual void checkIfCanWriteOrThrow() = 0;
+    virtual Status checkIfCanWrite() = 0;
     virtual Status waitUntilCommittedOrAborted(OperationContext* opCtx,
                                                OperationType operationType) = 0;
 
-    virtual void checkIfLinearizableReadWasAllowedOrThrow(OperationContext* opCtx) = 0;
+    virtual Status checkIfLinearizableReadWasAllowed(OperationContext* opCtx) = 0;
     virtual SharedSemiFuture<void> getCanReadFuture(OperationContext* opCtx) = 0;
 
     //
@@ -79,8 +79,16 @@ public:
 
     virtual void appendInfoForServerStatus(BSONObjBuilder* builder) const = 0;
 
-    // Returns structured info with current tenant ID and connection string.
+    /**
+     * Returns structured info with tenant id and connection string.
+     */
     virtual BSONObj getDebugInfo() const = 0;
+
+    /**
+     * Updates the runtime statistics for the number of tenant migration errors that have been
+     * thrown based on the given status.
+     */
+    virtual void recordTenantMigrationError(Status status) = 0;
 };
 
 }  // namespace mongo

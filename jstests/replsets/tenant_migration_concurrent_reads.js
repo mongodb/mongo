@@ -16,6 +16,7 @@ load("jstests/libs/fail_point_util.js");
 load("jstests/libs/parallelTester.js");
 load("jstests/libs/uuid_util.js");
 load("jstests/replsets/libs/tenant_migration_test.js");
+load("jstests/replsets/libs/tenant_migration_util.js");
 
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 if (!tenantMigrationTest.isFeatureFlagEnabled()) {
@@ -29,18 +30,40 @@ const kTenantDefinedDbName = "0";
 const kMaxTimeMS = 5 * 1000;
 
 /**
- * To be used to resume a migration that is paused after entering the blocking state. Waits for the
- * number of blocked reads to reach 'targetBlockedReads' and unpauses the migration.
+ * Asserts that the TenantMigrationAccessBlocker for the given tenant on the given node has the
+ * expected statistics.
  */
-function resumeMigrationAfterBlockingRead(host, targetBlockedReads) {
+function checkTenantMigrationAccessBlocker(node, tenantId, {
+    numBlockedReads = 0,
+    numTenantMigrationCommittedErrors = 0,
+    numTenantMigrationAbortedErrors = 0
+}) {
+    const mtab = TenantMigrationUtil.getTenantMigrationAccessBlocker(node, tenantId);
+    if (!mtab) {
+        assert.eq(0, numBlockedReads);
+        assert.eq(0, numTenantMigrationCommittedErrors);
+        assert.eq(0, numTenantMigrationAbortedErrors);
+        return;
+    }
+
+    assert.eq(mtab.numBlockedReads, numBlockedReads, tojson(mtab));
+    assert.eq(mtab.numBlockedWrites, 0, tojson(mtab));
+    assert.eq(
+        mtab.numTenantMigrationCommittedErrors, numTenantMigrationCommittedErrors, tojson(mtab));
+    assert.eq(mtab.numTenantMigrationAbortedErrors, numTenantMigrationAbortedErrors, tojson(mtab));
+}
+
+/**
+ * To be used to resume a migration that is paused after entering the blocking state. Waits for the
+ * number of blocked reads to reach 'targetNumBlockedReads' and unpauses the migration.
+ */
+function resumeMigrationAfterBlockingRead(host, tenantId, targetNumBlockedReads) {
     load("jstests/libs/fail_point_util.js");
+    load("jstests/replsets/libs/tenant_migration_util.js");
     const primary = new Mongo(host);
 
-    assert.commandWorked(primary.adminCommand({
-        waitForFailPoint: "tenantMigrationBlockRead",
-        timesEntered: targetBlockedReads,
-        maxTimeMS: kDefaultWaitForFailPointTimeout
-    }));
+    assert.soon(() => TenantMigrationUtil.getNumBlockedReads(primary, tenantId) ==
+                    targetNumBlockedReads);
 
     assert.commandWorked(primary.adminCommand(
         {configureFailPoint: "pauseTenantMigrationBeforeLeavingBlockingState", mode: "off"}));
@@ -109,11 +132,15 @@ function testReadIsRejectedIfSentAfterMigrationHasCommitted(testCase, dbName, co
                        testCase.command(collName, donorDoc.commitOrAbortOpTime.ts),
                        ErrorCodes.TenantMigrationCommitted,
                        testCase.isTransaction);
+            checkTenantMigrationAccessBlocker(
+                node, tenantId, {numTenantMigrationCommittedErrors: 2});
         } else {
             runCommand(db,
                        testCase.command(collName),
                        ErrorCodes.TenantMigrationCommitted,
                        testCase.isTransaction);
+            checkTenantMigrationAccessBlocker(
+                node, tenantId, {numTenantMigrationCommittedErrors: 1});
         }
     });
     assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
@@ -160,8 +187,10 @@ function testReadIsAcceptedIfSentAfterMigrationHasAborted(testCase, dbName, coll
                        testCase.command(collName, donorDoc.commitOrAbortOpTime.ts),
                        null,
                        testCase.isTransaction);
+            checkTenantMigrationAccessBlocker(node, tenantId, {numTenantMigrationAbortedErrors: 0});
         } else {
             runCommand(db, testCase.command(collName), null, testCase.isTransaction);
+            checkTenantMigrationAccessBlocker(node, tenantId, {numTenantMigrationAbortedErrors: 0});
         }
     });
     assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
@@ -204,10 +233,10 @@ function testReadBlocksIfMigrationIsInBlocking(testCase, dbName, collName) {
     const nodes = testCase.isSupportedOnSecondaries ? donorRst.nodes : [donorPrimary];
     nodes.forEach(node => {
         const db = node.getDB(dbName);
-        runCommand(db,
-                   command,
-                   testCase.isLinearizableRead ? null : ErrorCodes.MaxTimeMSExpired,
-                   testCase.isTransaction);
+        const shouldBlock = !testCase.isLinearizableRead;
+        runCommand(
+            db, command, shouldBlock ? ErrorCodes.MaxTimeMSExpired : null, testCase.isTransaction);
+        checkTenantMigrationAccessBlocker(node, tenantId, {numBlockedReads: shouldBlock ? 1 : 0});
     });
 
     blockingFp.off();
@@ -238,16 +267,10 @@ function testBlockedReadGetsUnblockedAndRejectedIfMigrationCommits(testCase, dbN
 
     let blockingFp =
         configureFailPoint(donorPrimary, "pauseTenantMigrationBeforeLeavingBlockingState");
-    const targetBlockedReads =
-        assert
-            .commandWorked(donorPrimary.adminCommand(
-                {configureFailPoint: "tenantMigrationBlockRead", mode: "alwaysOn"}))
-            .count +
-        1;
 
     assert.commandWorked(tenantMigrationTest.startMigration(migrationOpts));
     let resumeMigrationThread =
-        new Thread(resumeMigrationAfterBlockingRead, donorPrimary.host, targetBlockedReads);
+        new Thread(resumeMigrationAfterBlockingRead, donorPrimary.host, tenantId, 1);
 
     // Run the commands after the migration enters the blocking state.
     resumeMigrationThread.start();
@@ -272,6 +295,12 @@ function testBlockedReadGetsUnblockedAndRejectedIfMigrationCommits(testCase, dbN
         const db = node.getDB(dbName);
         runCommand(db, command, ErrorCodes.TenantMigrationCommitted, testCase.isTransaction);
     });
+
+    const shouldBlock = !testCase.isLinearizableRead;
+    checkTenantMigrationAccessBlocker(
+        donorPrimary,
+        tenantId,
+        {numBlockedReads: shouldBlock ? 1 : 0, numTenantMigrationCommittedErrors: 1});
 
     // Verify that the migration succeeded.
     resumeMigrationThread.join();
@@ -304,16 +333,10 @@ function testBlockedReadGetsUnblockedAndSucceedsIfMigrationAborts(testCase, dbNa
         configureFailPoint(donorPrimary, "pauseTenantMigrationBeforeLeavingBlockingState");
     let abortFp =
         configureFailPoint(donorPrimary, "abortTenantMigrationBeforeLeavingBlockingState");
-    const targetBlockedReads =
-        assert
-            .commandWorked(donorPrimary.adminCommand(
-                {configureFailPoint: "tenantMigrationBlockRead", mode: "alwaysOn"}))
-            .count +
-        1;
 
     assert.commandWorked(tenantMigrationTest.startMigration(migrationOpts));
     let resumeMigrationThread =
-        new Thread(resumeMigrationAfterBlockingRead, donorPrimary.host, targetBlockedReads);
+        new Thread(resumeMigrationAfterBlockingRead, donorPrimary.host, tenantId, 1);
 
     // Run the commands after the migration enters the blocking state.
     resumeMigrationThread.start();
@@ -337,6 +360,13 @@ function testBlockedReadGetsUnblockedAndSucceedsIfMigrationAborts(testCase, dbNa
     nodes.forEach(node => {
         const db = node.getDB(dbName);
         runCommand(db, command, null, testCase.isTransaction);
+    });
+
+    const shouldBlock = !testCase.isLinearizableRead;
+    checkTenantMigrationAccessBlocker(donorPrimary, tenantId, {
+        numBlockedReads: shouldBlock ? 1 : 0,
+        // Reads just get unblocked if the migration aborts.
+        numTenantMigrationAbortedErrors: 0
     });
 
     // Verify that the migration failed due to the simulated error.
@@ -453,6 +483,7 @@ const testFuncs = {
 
 for (const [testName, testFunc] of Object.entries(testFuncs)) {
     for (const [testCaseName, testCase] of Object.entries(testCases)) {
+        jsTest.log("Testing " + testName + " with testCase " + testCaseName);
         let dbName = testCaseName + "-" + testName + "_" + kTenantDefinedDbName;
         testFunc(testCase, dbName, kCollName);
     }

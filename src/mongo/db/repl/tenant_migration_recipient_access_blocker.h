@@ -77,10 +77,10 @@ public:
     // Called by all writes and reads against the database.
     //
 
-    void checkIfCanWriteOrThrow() final;
+    Status checkIfCanWrite() final;
     Status waitUntilCommittedOrAborted(OperationContext* opCtx, OperationType operationType) final;
 
-    void checkIfLinearizableReadWasAllowedOrThrow(OperationContext* opCtx) final;
+    Status checkIfLinearizableReadWasAllowed(OperationContext* opCtx) final;
     SharedSemiFuture<void> getCanReadFuture(OperationContext* opCtx) final;
 
     //
@@ -100,8 +100,9 @@ public:
 
     void appendInfoForServerStatus(BSONObjBuilder* builder) const final;
 
-    // Returns structured info with current tenant ID and connection string.
     BSONObj getDebugInfo() const final;
+
+    void recordTenantMigrationError(Status status) final{};
 
     //
     // Called as a recipient to reject reads before the `timestamp`.

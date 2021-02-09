@@ -137,7 +137,9 @@ void checkIfCanReadOrBlock(OperationContext* opCtx, StringData dbName) {
 
     // Optimisation: if the future is already ready, we are done.
     if (futures[0].isReady()) {
-        futures[0].get();  // Throw if error.
+        auto status = futures[0].getNoThrow();
+        mtab->recordTenantMigrationError(status);
+        uassertStatusOK(status);
         return;
     }
 
@@ -153,6 +155,7 @@ void checkIfCanReadOrBlock(OperationContext* opCtx, StringData dbName) {
     if (idx == 0) {
         // Read unblock condition finished first.
         cancelTimeoutSource.cancel();
+        mtab->recordTenantMigrationError(status);
         uassertStatusOK(status);
     } else if (idx == 1) {
         // Deadline finished first, throw error.
@@ -167,17 +170,21 @@ void checkIfLinearizableReadWasAllowedOrThrow(OperationContext* opCtx, StringDat
         repl::ReadConcernLevel::kLinearizableReadConcern) {
         if (auto mtab = TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
                             .getTenantMigrationAccessBlockerForDbName(dbName)) {
-            mtab->checkIfLinearizableReadWasAllowedOrThrow(opCtx);
+            auto status = mtab->checkIfLinearizableReadWasAllowed(opCtx);
+            mtab->recordTenantMigrationError(status);
+            uassertStatusOK(status);
         }
     }
 }
 
-void onWriteToDatabase(OperationContext* opCtx, StringData dbName) {
+void checkIfCanWriteOrThrow(OperationContext* opCtx, StringData dbName) {
     auto mtab = TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
                     .getTenantMigrationAccessBlockerForDbName(dbName);
 
     if (mtab) {
-        mtab->checkIfCanWriteOrThrow();
+        auto status = mtab->checkIfCanWrite();
+        mtab->recordTenantMigrationError(status);
+        uassertStatusOK(status);
     }
 }
 
@@ -188,6 +195,7 @@ Status checkIfCanBuildIndex(OperationContext* opCtx, StringData dbName) {
     if (mtab) {
         // This log is included for synchronization of the tenant migration buildindex jstests.
         auto status = mtab->checkIfCanBuildIndex();
+        mtab->recordTenantMigrationError(status);
         LOGV2_DEBUG(4886202,
                     1,
                     "Checked if tenant migration on database prevents index builds",
@@ -256,8 +264,10 @@ void handleTenantMigrationConflict(OperationContext* opCtx, Status status) {
     invariant(migrationConflictInfo);
     auto mtab = migrationConflictInfo->getTenantMigrationAccessBlocker();
     invariant(mtab);
-    uassertStatusOK(
-        mtab->waitUntilCommittedOrAborted(opCtx, migrationConflictInfo->getOperationType()));
+    auto migrationStatus =
+        mtab->waitUntilCommittedOrAborted(opCtx, migrationConflictInfo->getOperationType());
+    mtab->recordTenantMigrationError(migrationStatus);
+    uassertStatusOK(migrationStatus);
 }
 
 void performNoopWrite(OperationContext* opCtx, StringData msg) {

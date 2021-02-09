@@ -296,7 +296,7 @@ void _logOpsInner(OperationContext* opCtx,
         });
 
         if (!isAbortIndexBuild) {
-            tenant_migration_access_blocker::onWriteToDatabase(opCtx, nss.db());
+            tenant_migration_access_blocker::checkIfCanWriteOrThrow(opCtx, nss.db());
         } else if (records->size() > 1) {
             str::stream ss;
             ss << "abortIndexBuild cannot be logged with other oplog entries ";

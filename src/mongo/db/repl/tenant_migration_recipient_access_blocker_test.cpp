@@ -120,8 +120,8 @@ TEST_F(TenantMigrationRecipientAccessBlockerTest, NoopFunctions) {
         getServiceContext(), getTenantId(), getDonorConnectionString());
 
     // These functions are noop functions and should not throw even in reject state.
-    mtab.checkIfCanWriteOrThrow();
-    mtab.checkIfLinearizableReadWasAllowedOrThrow(opCtx());
+    ASSERT_OK(mtab.checkIfCanWrite());
+    ASSERT_OK(mtab.checkIfLinearizableReadWasAllowed(opCtx()));
     ASSERT_OK(mtab.checkIfCanBuildIndex());
 }
 

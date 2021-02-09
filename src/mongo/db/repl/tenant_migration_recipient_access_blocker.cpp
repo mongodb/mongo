@@ -54,10 +54,10 @@ TenantMigrationRecipientAccessBlocker::TenantMigrationRecipientAccessBlocker(
                                            .getOrCreateBlockedOperationsExecutor();
 }
 
-void TenantMigrationRecipientAccessBlocker::checkIfCanWriteOrThrow() {
+Status TenantMigrationRecipientAccessBlocker::checkIfCanWrite() {
     // This is guaranteed by the migration protocol. The recipient will not get any writes until the
     // migration is committed on the donor.
-    return;
+    return Status::OK();
 }
 
 Status TenantMigrationRecipientAccessBlocker::waitUntilCommittedOrAborted(
@@ -109,14 +109,14 @@ SharedSemiFuture<void> TenantMigrationRecipientAccessBlocker::getCanReadFuture(
     return SharedSemiFuture<void>();
 }
 
-void TenantMigrationRecipientAccessBlocker::checkIfLinearizableReadWasAllowedOrThrow(
+Status TenantMigrationRecipientAccessBlocker::checkIfLinearizableReadWasAllowed(
     OperationContext* opCtx) {
     // The donor will block all writes at the blockOpTime, and will not signal the proxy to allow
     // reading from the recipient until that blockOpTime is majority committed on the recipient.
     // This means any writes made on the donor set are available in the majority snapshot of the
     // recipient, so linearizable guarantees will hold using the existing linearizable read
     // mechanism of doing a no-op write and waiting for it to be majority committed.
-    return;
+    return Status::OK();
 }
 
 Status TenantMigrationRecipientAccessBlocker::checkIfCanBuildIndex() {
