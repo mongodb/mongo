@@ -380,7 +380,7 @@ server_parameters:
         cpp_vartype: AtomicWord<int>
         cpp_varname: tenantMigrationGarbageCollectionDelayMS
         default:
-            expr: 48 * 60 * 60 * 1000
+            expr: 15 * 60 * 1000
 
     tenantMigrationExternalKeysRemovalDelaySecs:
         description: >-
