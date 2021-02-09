@@ -23,19 +23,29 @@ const bucketsColl = testDB.getCollection('system.buckets.' + coll.getName());
 const timeFieldName = 'time';
 const metaFieldName = 'meta';
 
-coll.drop();
-assert.commandWorked(testDB.createCollection(
-    coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
-assert.contains(bucketsColl.getName(), testDB.getCollectionNames());
+const resetColl = function() {
+    coll.drop();
+    assert.commandWorked(testDB.createCollection(
+        coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
+    assert.contains(bucketsColl.getName(), testDB.getCollectionNames());
+};
+resetColl();
 
-const fp = configureFailPoint(conn, 'failTimeseriesInsert', {metadata: 'fail'});
+configureFailPoint(conn, 'failTimeseriesInsert', {metadata: 'fail'});
 
 const docs = [
     {_id: 0, [timeFieldName]: ISODate()},
-    {_id: 1, [timeFieldName]: ISODate(), [metaFieldName]: 'fail'},
-    {_id: 2, [timeFieldName]: ISODate()}
+    {_id: 1, [timeFieldName]: ISODate()},
+    {_id: 2, [timeFieldName]: ISODate()},
 ];
-const res = assert.commandFailed(coll.insert(docs, {ordered: true}));
+
+let res = assert.commandWorked(coll.insert(docs, {ordered: true}));
+assert.eq(res.nInserted, 3, 'Invalid insert result: ' + tojson(res));
+assert.docEq(coll.find().sort({_id: 1}).toArray(), docs);
+resetColl();
+
+docs[1][metaFieldName] = 'fail';
+res = assert.commandFailed(coll.insert(docs, {ordered: true}));
 jsTestLog('Checking insert result: ' + tojson(res));
 assert.eq(res.nInserted, 1);
 assert.eq(res.getWriteErrors().length, 1);

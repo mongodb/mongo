@@ -835,6 +835,7 @@ public:
             auto& baseReply = insertReply->getWriteReplyBase();
 
             if (_batch.getOrdered()) {
+                baseReply.setN(_batch.getDocuments().size());
                 for (size_t i = 0; i < _batch.getDocuments().size(); ++i) {
                     _performTimeseriesWritesSubset(opCtx, i, 1, &errors, &opTime, &electionId);
                     if (!errors.empty()) {
