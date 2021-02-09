@@ -296,6 +296,7 @@ env.Library(
 env.CppUnitTest(
     target='executor_test',
     source=[
+        'cancelable_executor_test.cpp',
         'connection_pool_test.cpp',
         'connection_pool_test_fixture.cpp',
         'mock_network_fixture_test.cpp',
