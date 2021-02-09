@@ -3091,7 +3091,7 @@ functions:
         if [[ ${task_name} == *"jepsen"* ]]; then
           hang_analyzer_option="-o file -o stdout -p dbtest,java,mongo,mongod,mongos,python,_test";
         else
-          hang_analyzer_option="-o file -o stdout -m contains -p python"
+          hang_analyzer_option="-o file -o stdout -m exact -p python"
         fi
 
         ${activate_virtualenv}
