@@ -34,10 +34,11 @@
 #include "mongo/db/pipeline/window_bounds.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 
-#define REGISTER_WINDOW_FUNCTION(name, parser)                                   \
-    MONGO_INITIALIZER_GENERAL(addToWindowFunctionMap_##name, ("default"), ())    \
-    (InitializerContext*) {                                                      \
-        ::mongo::window_function::Expression::registerParser("$" #name, parser); \
+#define REGISTER_WINDOW_FUNCTION(name, parser)                                       \
+    MONGO_INITIALIZER_GENERAL(                                                       \
+        addToWindowFunctionMap_##name, ("default"), ("windowFunctionExpressionMap")) \
+    (InitializerContext*) {                                                          \
+        ::mongo::window_function::Expression::registerParser("$" #name, parser);     \
     }
 
 namespace mongo::window_function {
@@ -85,6 +86,12 @@ public:
 
     virtual Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const = 0;
 
+    virtual std::string getOpName() const = 0;
+
+    virtual WindowBounds bounds() const = 0;
+
+    virtual boost::intrusive_ptr<::mongo::Expression> input() const = 0;
+
 private:
     static StringMap<Parser> parserMap;
 };
@@ -113,25 +120,38 @@ public:
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const final {
         MutableDocument args;
 
-        args["input"] = input->serialize(static_cast<bool>(explain));
-        bounds.serialize(args);
+        args["input"] = _input->serialize(static_cast<bool>(explain));
+        _bounds.serialize(args);
 
         return Value{Document{
-            {accumulatorName, args.freezeToValue()},
+            {_accumulatorName, args.freezeToValue()},
         }};
     }
 
     ExpressionFromAccumulator(std::string accumulatorName,
                               boost::intrusive_ptr<::mongo::Expression> input,
                               WindowBounds bounds)
-        : accumulatorName(std::move(accumulatorName)),
-          input(std::move(input)),
-          bounds(std::move(bounds)) {}
+        : _accumulatorName(std::move(accumulatorName)),
+          _input(std::move(input)),
+          _bounds(std::move(bounds)) {}
+
+    std::string getOpName() const final {
+        return _accumulatorName;
+    }
+
+    boost::intrusive_ptr<::mongo::Expression> input() const final {
+        return _input;
+    }
+
+    WindowBounds bounds() const final {
+        return _bounds;
+    }
+
 
 private:
-    std::string accumulatorName;
-    boost::intrusive_ptr<::mongo::Expression> input;
-    WindowBounds bounds;
+    std::string _accumulatorName;
+    boost::intrusive_ptr<::mongo::Expression> _input;
+    WindowBounds _bounds;
 };
 
 }  // namespace mongo::window_function

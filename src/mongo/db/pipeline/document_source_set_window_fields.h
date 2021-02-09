@@ -29,8 +29,11 @@
 
 #pragma once
 
+#include "mongo/db/pipeline/accumulation_statement.h"
+#include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_set_window_fields_gen.h"
+#include "mongo/db/pipeline/window_bounds.h"
 #include "mongo/db/pipeline/window_function_expression.h"
 
 namespace mongo {
@@ -50,6 +53,21 @@ struct WindowFunctionStatement {
                    boost::optional<ExplainOptions::Verbosity> explain) const;
 };
 
+struct ExecutableWindowFunction {
+    std::string fieldName;
+    boost::intrusive_ptr<AccumulatorState> accumulator;
+    WindowBounds bounds;
+    boost::intrusive_ptr<Expression> inputExpr;
+
+    ExecutableWindowFunction(std::string fieldName,
+                             boost::intrusive_ptr<AccumulatorState> accumulator,
+                             WindowBounds bounds,
+                             boost::intrusive_ptr<Expression> input)
+        : fieldName(std::move(fieldName)),
+          accumulator(std::move(accumulator)),
+          bounds(std::move(bounds)),
+          inputExpr(std::move(input)) {}
+};
 
 /**
  * $setWindowFields is an alias: it desugars to some combination of projection, sorting,
@@ -116,10 +134,13 @@ public:
 
 private:
     DocumentSource::GetNextResult getNextInput();
+    void initialize();
 
     boost::optional<boost::intrusive_ptr<Expression>> _partitionBy;
     boost::optional<SortPattern> _sortBy;
     std::vector<WindowFunctionStatement> _outputFields;
+    std::vector<ExecutableWindowFunction> _executableOutputs;
+    bool _init = false;
 };
 
 }  // namespace mongo

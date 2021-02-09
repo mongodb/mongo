@@ -36,6 +36,7 @@
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/util/visit_helper.h"
 
 using boost::intrusive_ptr;
 using boost::optional;
@@ -75,6 +76,7 @@ list<intrusive_ptr<DocumentSource>> document_source_set_window_fields::createFro
         else
             return boost::none;
     }();
+    uassert(5397906, "partitionBy field not yet supported", !partitionBy);
 
     optional<SortPattern> sortBy;
     if (auto sortSpec = spec.getSortBy()) {
@@ -259,9 +261,65 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalSetWindowFields::crea
         expCtx, partitionBy, sortBy, outputFields);
 }
 
+void DocumentSourceInternalSetWindowFields::initialize() {
+    for (auto& wfs : _outputFields) {
+        uassert(5397900, "Window function must be $sum", wfs.expr->getOpName() == "$sum");
+        // TODO: SERVER-54340 Remove this check.
+        uassert(5397905,
+                "Window functions cannot set to dotted paths",
+                wfs.fieldName.find('.') == std::string::npos);
+        auto windowBounds = wfs.expr->bounds();
+        stdx::visit(
+            visit_helper::Overloaded{
+                [](const WindowBounds::DocumentBased& docBase) {
+                    stdx::visit(
+                        visit_helper::Overloaded{
+                            [](const WindowBounds::Unbounded) { /* pass */ },
+                            [](auto&& other) {
+                                uasserted(5397904,
+                                          "Only 'unbounded' lower bound is currently supported");
+                            }},
+                        docBase.lower);
+                    stdx::visit(
+                        visit_helper::Overloaded{
+                            [](const WindowBounds::Current) { /* pass */ },
+                            [](auto&& other) {
+                                uasserted(5397903,
+                                          "Only 'current' upper bound is currently supported");
+                            }},
+                        docBase.upper);
+                },
+                [](const WindowBounds::RangeBased& rangeBase) {
+                    uasserted(5397901, "Ranged based windows not currently supported");
+                },
+                [](const WindowBounds::TimeBased& timeBase) {
+                    uasserted(5397902, "Time based windows are not currently supported");
+                }},
+            windowBounds.bounds);
+        _executableOutputs.push_back(ExecutableWindowFunction(
+            wfs.fieldName, AccumulatorSum::create(pExpCtx.get()), windowBounds, wfs.expr->input()));
+    }
+    _init = true;
+}
+
 DocumentSource::GetNextResult DocumentSourceInternalSetWindowFields::doGetNext() {
-    // This is a placeholder: it returns every input doc unchanged.
-    return pSource->getNext();
+    if (!_init) {
+        initialize();
+    }
+
+    auto curStat = pSource->getNext();
+    if (!curStat.isAdvanced()) {
+        return curStat;
+    }
+    auto curDoc = curStat.getDocument();
+    MutableDocument outDoc(curDoc);
+    for (auto& output : _executableOutputs) {
+        // Currently only support unbounded windows and run on the merging shard -- we don't need
+        // to reset accumulators, merge states, or partition into multiple groups.
+        output.accumulator->process(output.inputExpr->evaluate(curDoc, &pExpCtx->variables), false);
+        outDoc.setNestedField(output.fieldName, output.accumulator->getValue(false));
+    }
+    return outDoc.freeze();
 }
 
 }  // namespace mongo
