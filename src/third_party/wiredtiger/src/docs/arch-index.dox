@@ -132,6 +132,10 @@ The Block Manager manages the reading and writing of disk blocks.
 Cache is represented by the various shared data structures that
 make up in-memory Btrees and subordinate data structures.
 
+@subpage arch-checkpoint
+
+A checkpoint is created by WiredTiger to serve as a point from which it can recover.
+
 @subpage arch-column
 
 Column Stores are Btrees that have as their key a record id.

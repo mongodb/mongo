@@ -1,0 +1,1 @@
+value_format|lsm=(chunk_size=1MB,merge_min=2)

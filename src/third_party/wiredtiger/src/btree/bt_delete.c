@@ -109,12 +109,14 @@ __wt_delete_page(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
      * discarded. The way we figure that out is to check the page's cell type, cells for leaf pages
      * without overflow items are special.
      *
-     * Additionally, if the aggregated start time point on the page is not visible to us then we
-     * cannot truncate the page.
+     * Additionally, if the page has prepared updates or the aggregated start time point on the page
+     * is not visible to us then we cannot truncate the page.
      */
     if (!__wt_ref_addr_copy(session, ref, &addr))
         goto err;
     if (addr.type != WT_ADDR_LEAF_NO)
+        goto err;
+    if (addr.ta.prepare)
         goto err;
     if (!__wt_txn_visible(session, addr.ta.newest_txn, addr.ta.newest_start_durable_ts))
         goto err;

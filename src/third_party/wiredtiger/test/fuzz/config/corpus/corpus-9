@@ -1,0 +1,1 @@
+statistics_log.on_close|split_pct=90,statistics=(fast),statistics_log=(on_close=true)

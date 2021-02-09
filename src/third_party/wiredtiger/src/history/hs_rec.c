@@ -225,9 +225,16 @@ __hs_insert_record_with_btree(WT_SESSION_IMPL *session, WT_CURSOR *cursor, WT_BT
                 WT_ERR(cursor->get_value(cursor, &hs_stop_durable_ts_diag, &durable_timestamp_diag,
                   &upd_type_full_diag, existing_val));
                 WT_ERR(__wt_compare(session, NULL, existing_val, hs_value, &cmp));
+                /*
+                 * Check if the existing HS value is same as the new value we are about to insert.
+                 * We can skip this check if the existing value has a globally visible stop time,
+                 * i.e., the value has been deleted from the HS.
+                 */
                 if (cmp == 0)
                     WT_ASSERT(session,
-                      tw->start_txn == WT_TXN_NONE ||
+                      (WT_TIME_WINDOW_HAS_STOP(&hs_cbt->upd_value->tw) &&
+                        __wt_txn_tw_stop_visible_all(session, &hs_cbt->upd_value->tw)) ||
+                        tw->start_txn == WT_TXN_NONE ||
                         tw->start_txn != hs_cbt->upd_value->tw.start_txn ||
                         tw->start_ts != hs_cbt->upd_value->tw.start_ts);
                 counter = hs_counter + 1;
@@ -683,10 +690,18 @@ __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_PAGE *page, WT_MULTI *multi)
 
             /*
              * Calculate reverse modify and clear the history store records with timestamps when
-             * inserting the first update.
+             * inserting the first update. Always write on-disk data store updates to the history
+             * store as a full update because the on-disk update will be the base update for all the
+             * updates that are older than the on-disk update.
+             *
+             * Due to concurrent operation of checkpoint and eviction, it is possible that history
+             * store may have more recent versions of a key than the on-disk version. Without a
+             * proper base value in the history store, it can lead to wrong value being restored by
+             * the RTS.
              */
             nentries = MAX_REVERSE_MODIFY_NUM;
-            if (upd->type == WT_UPDATE_MODIFY && enable_reverse_modify &&
+            if (!F_ISSET(upd, WT_UPDATE_DS) && upd->type == WT_UPDATE_MODIFY &&
+              enable_reverse_modify &&
               __wt_calc_modify(session, prev_full_value, full_value, prev_full_value->size / 10,
                 entries, &nentries) == 0) {
                 WT_ERR(__wt_modify_pack(cursor, entries, nentries, &modify_value));

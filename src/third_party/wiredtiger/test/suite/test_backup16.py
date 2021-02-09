@@ -38,7 +38,6 @@ from wtscenario import make_scenarios
 class test_backup16(backup_base):
 
     conn_config='cache_size=1G,log=(enabled,file_max=100K)'
-    counter=1
     logmax='100K'
 
     # Define the table name and its on-disk file name together.
@@ -61,14 +60,14 @@ class test_backup16(backup_base):
     bigval = 'Value' * 10
 
     mult = 1
-    counter = 1
+    bkup_id = 1
     nops = 10
-
+    initial_backup = True
     def verify_incr_backup(self, expected_file_list):
-        bkup_config = ('incremental=(src_id="ID' +  str(self.counter - 1) +
-                       '",this_id="ID' + str(self.counter) + '")')
+        bkup_config = ('incremental=(src_id="ID' +  str(self.bkup_id - 1) +
+                       '",this_id="ID' + str(self.bkup_id) + '")')
         bkup_cur = self.session.open_cursor('backup:', None, bkup_config)
-        self.counter += 1
+        self.bkup_id += 1
         num_files = 0
 
         # Verify the files included in the incremental backup are the ones we expect.

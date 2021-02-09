@@ -64,10 +64,10 @@ class test_txn08(wttest.WiredTigerTestCase, suite_subprocess):
         #
         # Run printlog and make sure it exits with zero status.
         #
-        self.runWt(['printlog'], outfilename='printlog.out')
+        self.runWt(['printlog', '-u'], outfilename='printlog.out')
         self.check_file_contains('printlog.out',
             '\\u0001\\u0002abcd\\u0003\\u0004')
-        self.runWt(['printlog', '-x'], outfilename='printlog-hex.out')
+        self.runWt(['printlog', '-u','-x'], outfilename='printlog-hex.out')
         self.check_file_contains('printlog-hex.out',
             '\\u0001\\u0002abcd\\u0003\\u0004')
         self.check_file_contains('printlog-hex.out',

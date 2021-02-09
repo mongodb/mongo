@@ -34,8 +34,7 @@ from wtdataset import simple_key
 from wtscenario import make_scenarios
 
 # test_backup07.py
-# Test cursor backup with target URIs, logging and create during backup
-
+# Test cursor backup with target URIs, logging and create during backup.
 class test_backup07(backup_base):
     dir='backup.dir'                    # Backup directory name
     logmax="100K"
@@ -67,10 +66,8 @@ class test_backup07(backup_base):
         # when the backup metadata is created on cursor open and the newly
         # created file is not in the cursor list.
 
-        # Open up the backup cursor, create and add data to a new table
-        # and then copy the files.
+        # Create and add data to a new table and then copy the files with a full backup.
         os.mkdir(self.dir)
-        bkup_c = self.session.open_cursor('backup:', None, None)
 
         # Now create and populate the new table. Make sure the log records
         # are on disk and will be copied to the backup.
@@ -78,19 +75,9 @@ class test_backup07(backup_base):
         self.add_data(self.newuri, 'key', 'value')
         self.session.log_flush('sync=on')
 
-        # Now copy the files returned by the backup cursor. This should not
-        # include the newly created table.
-        while True:
-            ret = bkup_c.next()
-            if ret != 0:
-                break
-            newfile = bkup_c.get_key()
-            self.assertNotEqual(newfile, self.newuri)
-            sz = os.path.getsize(newfile)
-            self.pr('Copy from: ' + newfile + ' (' + str(sz) + ') to ' + self.dir)
-            shutil.copy(newfile, self.dir)
-        self.assertEqual(ret, wiredtiger.WT_NOTFOUND)
-        bkup_c.close()
+        # Now copy the files using full backup. This should not include the newly
+        # created table.
+        self.take_full_backup(self.dir)
 
         # After the full backup, open and recover the backup database.
         # Make sure we properly recover even though the log file will have

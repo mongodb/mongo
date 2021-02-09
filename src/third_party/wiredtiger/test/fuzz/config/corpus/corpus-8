@@ -1,0 +1,1 @@
+log.compressor|value_format=u,create,log=(enabled,compressor=zlib)

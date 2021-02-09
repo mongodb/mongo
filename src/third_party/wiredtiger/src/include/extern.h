@@ -47,6 +47,8 @@ extern char *__wt_timestamp_to_string(wt_timestamp_t ts, char *ts_string)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern const WT_CONFIG_ENTRY *__wt_conn_config_match(const char *method)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern const WT_CONFIG_ENTRY *__wt_test_config_match(const char *test_name)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern const char *__wt_addr_string(WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_size,
   WT_ITEM *buf) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern const char *__wt_buf_set_printable(WT_SESSION_IMPL *session, const void *p, size_t size,

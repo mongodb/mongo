@@ -1,0 +1,1 @@
+log.file_max|log=(enabled,file_max=512,compressor=snappy),create,statistics=(fast)

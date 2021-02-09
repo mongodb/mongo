@@ -52,60 +52,21 @@ class test_backup17(backup_base):
 
     nops = 1000
 
-    def take_incr_backup(self, id, consolidate):
-        # Open the backup data source for incremental backup.
-        buf = 'incremental=(src_id="ID' +  str(id - 1) + '",this_id="ID' + str(id) + '"'
-        if consolidate:
-            buf += ',consolidate=true'
-        buf += ')'
-        bkup_c = self.session.open_cursor('backup:', None, buf)
-        lens = []
+    #
+    # With a file length list, and the consolidate option is used, we expect the incremental
+    # backup to collapse adjacent blocks and return us lengths that exceed the granularity setting
+    # and verify that we see multiple blocks. If consolidate is not used, no block lengths should
+    # ever be greater than the granularity setting.
+    #
+    def check_consolidate_sizes(self, file_lens, consolidate):
         saw_multiple = False
-        while True:
-            ret = bkup_c.next()
-            if ret != 0:
-                break
-            newfile = bkup_c.get_key()
-            config = 'incremental=(file=' + newfile + ')'
-            self.pr('Open incremental cursor with ' + config)
-            dup_cnt = 0
-            dupc = self.session.open_cursor(None, bkup_c, config)
-            while True:
-                ret = dupc.next()
-                if ret != 0:
-                    break
-                incrlist = dupc.get_keys()
-                offset = incrlist[0]
-                size = incrlist[1]
-                curtype = incrlist[2]
-                # 1 is WT_BACKUP_FILE
-                # 2 is WT_BACKUP_RANGE
-                self.assertTrue(curtype == 1 or curtype == 2)
-                if curtype == 1:
-                    self.pr('Copy from: ' + newfile + ' (' + str(size) + ') to ' + self.dir)
-                    shutil.copy(newfile, self.dir)
-                else:
-                    self.pr('Range copy file ' + newfile + ' offset ' + str(offset) + ' len ' + str(size))
-                    lens.append(size)
-                    rfp = open(newfile, "r+b")
-                    wfp = open(self.dir + '/' + newfile, "w+b")
-                    rfp.seek(offset, 0)
-                    wfp.seek(offset, 0)
-                    if size > self.granval:
-                        saw_multiple = True
-                    buf = rfp.read(size)
-                    wfp.write(buf)
-                    rfp.close()
-                    wfp.close()
-                dup_cnt += 1
-            dupc.close()
-        self.assertEqual(ret, wiredtiger.WT_NOTFOUND)
-        bkup_c.close()
+        for size in file_lens:
+            if size > self.granval:
+                saw_multiple = True
         if consolidate:
             self.assertTrue(saw_multiple)
         else:
             self.assertFalse(saw_multiple)
-        return lens
 
     def test_backup17(self):
 
@@ -115,25 +76,15 @@ class test_backup17(backup_base):
         self.mult = 0
         self.add_data(self.uri2, self.bigkey, self.bigval, True)
 
+        os.mkdir(self.dir)
         # Open up the backup cursor. This causes a new log file to be created.
         # That log file is not part of the list returned. This is a full backup
         # primary cursor with incremental configured.
-        os.mkdir(self.dir)
         config = 'incremental=(enabled,granularity=%s,this_id="ID1")' % self.gran
         bkup_c = self.session.open_cursor('backup:', None, config)
 
-        # Now copy the files returned by the backup cursor.
-        all_files = []
-        while True:
-            ret = bkup_c.next()
-            if ret != 0:
-                break
-            newfile = bkup_c.get_key()
-            sz = os.path.getsize(newfile)
-            self.pr('Copy from: ' + newfile + ' (' + str(sz) + ') to ' + self.dir)
-            shutil.copy(newfile, self.dir)
-            all_files.append(newfile)
-        self.assertEqual(ret, wiredtiger.WT_NOTFOUND)
+        # Now make a full backup and track the log files.
+        self.take_full_backup(self.dir, bkup_c)
         bkup_c.close()
 
         # This is the main part of the test for consolidate. Add data to the first table.
@@ -143,12 +94,16 @@ class test_backup17(backup_base):
         self.mult = 1
         self.add_data(self.uri, self.bigkey, self.bigval, True)
 
-        uri1_lens = self.take_incr_backup(2, False)
+        # Do an incremental backup with id 2.
+        (_, uri1_lens) = self.take_incr_backup(self.dir, 2, False)
+        self.check_consolidate_sizes(uri1_lens, False)
 
         self.mult = 1
         self.add_data(self.uri2, self.bigkey, self.bigval, True)
 
-        uri2_lens = self.take_incr_backup(3, True)
+        # Now do an incremental backup with id 3.
+        (_, uri2_lens) = self.take_incr_backup(self.dir, 3, True)
+        self.check_consolidate_sizes(uri2_lens, True)
 
         # Assert that we recorded fewer lengths on the consolidated backup.
         self.assertLess(len(uri2_lens), len(uri1_lens))

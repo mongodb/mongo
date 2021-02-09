@@ -7,6 +7,7 @@ Atomicity
 BLOBs
 BLRrVv
 CFLAGS
+COV
 CPPFLAGS
 CPUs
 CRC
@@ -60,9 +61,12 @@ JavaScript
 KMS
 LD
 LDFLAGS
+LibFuzzer
 LIBS
+LINKFLAGS
 LLC
 LLVM
+LLVMFuzzerTestOneInput
 LOGREC
 LRU
 LRrVv
@@ -87,6 +91,7 @@ OPTYPE
 PMU
 PPC
 PRELOAD
+PROFDATA
 README
 RedHat
 RepMgr
@@ -96,6 +101,7 @@ Roelofs
 RrVv
 Rrx
 SCons
+Sanitizer
 Seward's
 SiH
 TSC
@@ -131,6 +137,7 @@ apiflags
 ar
 archiver
 arg
+args
 atomicity
 autoconf
 autogen
@@ -161,6 +168,7 @@ cd
 cdb
 cds
 changelog
+checkpointed
 checksum
 checksums
 ckp
@@ -178,6 +186,7 @@ conn
 const
 control's
 copydoc
+cov
 cp
 cpp
 cpu
@@ -250,6 +259,7 @@ extensibility
 fadvise
 failchk
 fallocate
+fcoverage
 fd's
 fdatasync
 fextend
@@ -271,11 +281,16 @@ flamegraph
 flamegraphs
 fnv
 forw
+fprofile
 fput
 freelist
 fs
+fsanitize
 fsync
 ftruncate
+fuzzer
+fuzzers
+fuzzutil
 fvisibility
 fxray
 gcc
@@ -334,6 +349,7 @@ len
 lgnd
 li
 libdir
+libfuzzer
 libhe
 libkvs
 libtool
@@ -447,6 +463,8 @@ printlog
 printvalue
 priv
 proc
+profdata
+profraw
 pthread
 pthreads
 putKey
@@ -471,6 +489,7 @@ recoverability
 recs
 rectype
 relinking
+req
 rerequests
 ret
 rf
@@ -493,6 +512,7 @@ scons
 screenshots
 secretkey
 selectable
+sep
 seqname
 seqno
 serializable
@@ -589,6 +609,13 @@ wrlock
 wtperf
 wtstats
 xa
+xaa
+xad
+xbe
+xde
+xdeadbeef
+xef
+xff
 xray
 yieldcpu
 zlib

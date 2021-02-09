@@ -76,41 +76,17 @@ class test_backup_target(backup_base):
             cursor[simple_key(cursor, i)] = str(i) + ':' + upd * dsize
         cursor.close()
 
-    def take_full_backup(self, dir):
-        # Open up the backup cursor, and copy the files.  Do a full backup.
-        cursor = self.session.open_cursor('backup:', None, None)
-        self.pr('Full backup to ' + dir + ': ')
-        os.mkdir(dir)
-        while True:
-            ret = cursor.next()
-            if ret != 0:
-                break
-            newfile = cursor.get_key()
-            sz = os.path.getsize(newfile)
-            self.pr('Copy from: ' + newfile + ' (' + str(sz) + ') to ' + dir)
-            shutil.copy(newfile, dir)
-        self.assertEqual(ret, wiredtiger.WT_NOTFOUND)
-        cursor.close()
-
     # Take an incremental backup and then truncate/archive the logs.
-    def take_incr_backup(self, dir):
-            config = 'target=("log:")'
-            cursor = self.session.open_cursor('backup:', None, config)
-            while True:
-                ret = cursor.next()
-                if ret != 0:
-                    break
-                newfile = cursor.get_key()
-                sz = os.path.getsize(newfile)
-                self.pr('Copy from: ' + newfile + ' (' + str(sz) + ') to ' + dir)
-                shutil.copy(newfile, dir)
-            self.assertEqual(ret, wiredtiger.WT_NOTFOUND)
-            self.session.truncate('log:', cursor, None, None)
-            cursor.close()
+    def take_log_incr_backup(self, dir):
+        config = 'target=("log:")'
+        cursor = self.session.open_cursor('backup:', None, config)
+        self.take_full_backup(dir, cursor)
+        self.session.truncate('log:', cursor, None, None)
+        cursor.close()
 
     # Run background inserts while running checkpoints and incremental backups
     # repeatedly.
-    def test_incremental_backup(self):
+    def test_log_incremental_backup(self):
         import sys
         # Create the backup directory.
         self.session.create(self.uri, "key_format=S,value_format=S")
@@ -118,8 +94,9 @@ class test_backup_target(backup_base):
         self.populate_with_string(self.uri, self.dsize, self.nops)
 
         # We need to start the directory for the incremental backup with
-        # a full backup.  The full backup function creates the directory.
+        # a full backup.
         dir = self.dir
+        os.mkdir(dir)
         self.take_full_backup(dir)
         self.session.checkpoint(None)
 
@@ -137,11 +114,12 @@ class test_backup_target(backup_base):
             self.session.checkpoint(None)
 
             self.pr('Iteration: ' + str(increment))
-            self.take_incr_backup(self.dir)
+            self.take_log_incr_backup(self.dir)
 
         # After running, take a full backup.  Compare the incremental
         # backup to the original database and the full backup database.
         full_dir = self.dir + ".full"
+        os.mkdir(full_dir)
         self.take_full_backup(full_dir)
         self.compare_backups(self.uri, self.dir, full_dir)
         self.compare_backups(self.uri, self.dir, './')
