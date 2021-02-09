@@ -36,7 +36,6 @@
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/db_raii.h"
-#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_build_interceptor.h"
 #include "mongo/db/index/index_descriptor.h"
@@ -66,25 +65,40 @@ static const char* const _ns = "unittests.validate_tests";
  */
 class ValidateBase {
 public:
-    explicit ValidateBase(bool full, bool background)
-        : _client(&_opCtx),
-          _full(full),
-          _background(background),
-          _nss(_ns),
-          _autoDb(nullptr),
-          _db(nullptr) {
-        _client.createCollection(_ns);
-        {
-            AutoGetCollection autoGetCollection(&_opCtx, _nss, MODE_X);
-            _isInRecordIdOrder =
-                autoGetCollection.getCollection()->getRecordStore()->isInRecordIdOrder();
+    explicit ValidateBase(bool full, bool background, bool clustered)
+        : _full(full), _background(background), _nss(_ns), _autoDb(nullptr), _db(nullptr) {
+
+        WriteUnitOfWork wuow(&_opCtx);
+        AutoGetOrCreateDb autoDb(&_opCtx, _nss.db(), MODE_X);
+        auto db = autoDb.getDb();
+        ASSERT_TRUE(db);
+
+        CollectionOptions options;
+        if (clustered) {
+            options.clusteredIndex = ClusteredIndexOptions{};
         }
+
+        auto coll = db->createCollection(&_opCtx, _nss, options);
+        ASSERT_TRUE(coll);
+        wuow.commit();
+
+        _isInRecordIdOrder = coll->getRecordStore()->isInRecordIdOrder();
         _engineSupportsCheckpoints =
             _opCtx.getServiceContext()->getStorageEngine()->supportsCheckpoints();
     }
 
+    explicit ValidateBase(bool full, bool background)
+        : ValidateBase(full, background, /*clustered=*/false) {}
+
     ~ValidateBase() {
-        _client.dropCollection(_ns);
+        AutoGetDb autoDb(&_opCtx, _nss.db(), MODE_X);
+        auto db = autoDb.getDb();
+        ASSERT_TRUE(db);
+
+        WriteUnitOfWork wuow(&_opCtx);
+        ASSERT_OK(db->dropCollection(&_opCtx, _nss));
+        wuow.commit();
+
         getGlobalServiceContext()->unsetKillAllOperations();
     }
 
@@ -169,7 +183,6 @@ protected:
 
     const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
     OperationContext& _opCtx = *_txnPtr;
-    DBDirectClient _client;
     bool _full;
     bool _background;
     const NamespaceString _nss;
@@ -3496,6 +3509,71 @@ public:
     }
 };
 
+template <bool background>
+class ValidateInvalidBSONOnClusteredCollection : public ValidateBase {
+public:
+    ValidateInvalidBSONOnClusteredCollection()
+        : ValidateBase(/*full=*/false, background, /*clustered=*/true) {}
+
+    void run() {
+        // Cannot run validate with {background:true} if either
+        //  - the RecordStore cursor does not retrieve documents in RecordId order
+        //  - or the storage engine does not support checkpoints.
+        if (_background && (!_isInRecordIdOrder || !_engineSupportsCheckpoints)) {
+            return;
+        }
+
+        lockDb(MODE_X);
+        CollectionPtr coll =
+            CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, _nss);
+        ASSERT(coll);
+
+        // Encode an invalid BSON Object with an invalid type, x90 and insert record
+        const char* buffer = "\x0c\x00\x00\x00\x90\x41\x00\x10\x00\x00\x00\x00";
+        BSONObj obj(buffer);
+
+        RecordStore* rs = coll->getRecordStore();
+        RecordId rid(OID::gen());
+        {
+            WriteUnitOfWork wunit(&_opCtx);
+            ASSERT_OK(rs->insertRecord(&_opCtx, rid, obj.objdata(), obj.objsize(), Timestamp()));
+            wunit.commit();
+        }
+        releaseDb();
+
+        {
+            auto mode = _background ? CollectionValidation::ValidateMode::kBackground
+                                    : CollectionValidation::ValidateMode::kForeground;
+
+            ValidateResults results;
+            BSONObjBuilder output;
+
+            ASSERT_OK(CollectionValidation::validate(&_opCtx,
+                                                     _nss,
+                                                     mode,
+                                                     CollectionValidation::RepairMode::kNone,
+                                                     &results,
+                                                     &output,
+                                                     kTurnOnExtraLoggingForTest));
+
+            auto dumpOnErrorGuard = makeGuard([&] {
+                StorageDebugUtil::printValidateResults(results);
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+            });
+
+            ASSERT_EQ(false, results.valid);
+            ASSERT_EQ(static_cast<size_t>(1), results.errors.size());
+            ASSERT_EQ(static_cast<size_t>(0), results.warnings.size());
+            ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
+            ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
+            ASSERT_EQ(static_cast<size_t>(1), results.corruptRecords.size());
+            ASSERT_EQ(rid, results.corruptRecords[0]);
+
+            dumpOnErrorGuard.dismiss();
+        }
+    }
+};
+
 class ValidateTests : public OldStyleSuiteSpecification {
 public:
     ValidateTests() : OldStyleSuiteSpecification("validate_tests") {}
@@ -3558,6 +3636,9 @@ public:
         add<ValidateMultikeyPathCoverageRepair>();
 
         add<ValidateAddNewMultikeyPaths>();
+
+        add<ValidateInvalidBSONOnClusteredCollection<false>>();
+        add<ValidateInvalidBSONOnClusteredCollection<true>>();
     }
 };
 

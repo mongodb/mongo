@@ -42,10 +42,12 @@ void ValidateResults::appendToResultObj(BSONObjBuilder* resultObj, bool debuggin
     resultObj->append("extraIndexEntries", extraIndexEntries);
     resultObj->append("missingIndexEntries", missingIndexEntries);
 
-    // Need to convert RecordId to int64_t to append to BSONObjBuilder
+    // Need to convert RecordId to the appropriate type.
     BSONArrayBuilder builder;
-    for (RecordId corruptRecord : corruptRecords) {
-        builder.append(corruptRecord.as<int64_t>());
+    for (const RecordId& corruptRecord : corruptRecords) {
+        corruptRecord.withFormat([&](RecordId::Null n) { builder.append("null"); },
+                                 [&](const int64_t rid) { builder.append(rid); },
+                                 [&](const OID& oid) { builder.append(oid); });
     }
     resultObj->append("corruptRecords", builder.arr());
 
