@@ -69,7 +69,7 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
             path.join(dir_path, "compatibility_test_fail/new"), ["src"])
 
         self.assertTrue(error_collection.has_errors())
-        self.assertTrue(error_collection.count() == 39)
+        self.assertTrue(error_collection.count() == 44)
 
         invalid_api_version_new_error = error_collection.get_error_by_command_name(
             "invalidAPIVersionNew")
@@ -98,6 +98,38 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
         removed_command_error = error_collection.get_error_by_error_id(
             idl_compatibility_errors.ERROR_ID_REMOVED_COMMAND)
         self.assertRegex(str(removed_command_error), "removedCommand")
+
+        removed_command_parameter_error = error_collection.get_error_by_command_name(
+            "removedCommandParameter")
+        self.assertTrue(removed_command_parameter_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_REMOVED_COMMAND_PARAMETER)
+        self.assertRegex(str(removed_command_parameter_error), "removedCommandParameter")
+
+        added_required_command_parameter_error = error_collection.get_error_by_command_name(
+            "addedNewCommandParameterRequired")
+        self.assertTrue(added_required_command_parameter_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_ADDED_REQUIRED_COMMAND_PARAMETER)
+        self.assertRegex(
+            str(added_required_command_parameter_error), "addedNewCommandParameterRequired")
+
+        command_parameter_unstable_error = error_collection.get_error_by_command_name(
+            "commandParameterUnstable")
+        self.assertTrue(command_parameter_unstable_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_COMMAND_PARAMETER_UNSTABLE)
+        self.assertRegex(str(command_parameter_unstable_error), "commandParameterUnstable")
+
+        command_parameter_stable_required_error = error_collection.get_error_by_command_name(
+            "commandParameterStableRequired")
+        self.assertTrue(command_parameter_stable_required_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_COMMAND_PARAMETER_STABLE_REQUIRED)
+        self.assertRegex(
+            str(command_parameter_stable_required_error), "commandParameterStableRequired")
+
+        command_parameter_required_error = error_collection.get_error_by_command_name(
+            "commandParameterRequired")
+        self.assertTrue(command_parameter_required_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_COMMAND_PARAMETER_REQUIRED)
+        self.assertRegex(str(command_parameter_required_error), "commandParameterRequired")
 
         new_reply_field_unstable_error = error_collection.get_error_by_command_name(
             "newReplyFieldUnstable")

@@ -267,6 +267,69 @@ commands:
         strict: true
         api_version: "1"
         reply_type: OkReply
+
+    removedCommandParameter:
+        description: "parameter will be removed from command in compatibility_test_fail/new which results
+                      in an error"
+        command_name: removedCommandParameter
+        namespace: ignored
+        cpp_name: removedCommandParameter
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        fields:
+            parameterToRemove:
+                type: string
+
+    addedNewCommandParameterRequired:
+        description: "new command parameter fails because it is required when it should be optional"
+        command_name: addedNewCommandParameterRequired
+        namespace: ignored
+        cpp_name: addedNewCommandParameterRequired
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    commandParameterUnstable:
+        description: "new unstable command parameter fails because it is stable
+                      in the corresponding old command"
+        command_name: commandParameterUnstable
+        namespace: ignored
+        cpp_name: commandParameterUnstable
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        fields:
+            newUnstableParameter:
+                type: string
+
+    commandParameterStableRequired:
+        description: "new required stable command parameter fails because it is unstable
+                      in the corresponding old command"
+        command_name: commandParameterStableRequired
+        namespace: ignored
+        cpp_name: commandParameterStableRequired
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        fields:
+            newRequiredStableParam:
+                type: string
+                unstable: true
+
+    commandParameterRequired:
+        description: "new required command parameter fails because it is optional
+                      in the corresponding old command"
+        command_name: commandParameterRequired
+        namespace: ignored
+        cpp_name: commandParameterRequired
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        fields:
+            newRequiredParam:
+                type: string
+                optional: true
     
     newReplyFieldUnstable:
         description: "new command fails because it contains an unstable reply field that is stable
