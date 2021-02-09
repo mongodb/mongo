@@ -170,7 +170,10 @@ public:
         : _opCtx(opCtx), _isOnLocalDb(ns.isLocal()) {}
 
     ~LastOpFixer() {
-        if (_needToFixLastOp && !_isOnLocalDb) {
+        // We don't need to do this if we are in a multi-document transaction as read-only/noop
+        // transactions will always write another noop entry at transaction commit time which we can
+        // use to wait for writeConcern.
+        if (!_opCtx->inMultiDocumentTransaction() && _needToFixLastOp && !_isOnLocalDb) {
             // If this operation has already generated a new lastOp, don't bother setting it
             // here. No-op updates will not generate a new lastOp, so we still need the
             // guard to fire in that case. Operations on the local DB aren't replicated, so they
@@ -190,7 +193,7 @@ public:
     }
 
     void finishedOpSuccessfully() {
-        // If the op was succesful and bumped LastOp, we don't need to do it again. However, we
+        // If the op was successful and bumped LastOp, we don't need to do it again. However, we
         // still need to for no-ops and all failing ops.
         _needToFixLastOp = (replClientInfo().getLastOp() == _opTimeAtLastOpStart);
     }
