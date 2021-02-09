@@ -129,8 +129,14 @@ void DeathTestBase::_doTest() {
         char* lineBuf = nullptr;
         size_t lineBufSize = 0;
         auto lineBufGuard = makeGuard([&] { free(lineBuf); });
-        ssize_t bytesRead;
-        while ((bytesRead = getline(&lineBuf, &lineBufSize, pf)) != -1) {
+        while (true) {
+            errno = 0;  // Needed as getline can return -1 without setting errno.
+            ssize_t bytesRead = getline(&lineBuf, &lineBufSize, pf);
+            if (bytesRead == -1) {
+                if (errno == EINTR)
+                    continue;
+                break;
+            }
             StringData line(lineBuf, bytesRead);
             if (line.empty())
                 continue;
