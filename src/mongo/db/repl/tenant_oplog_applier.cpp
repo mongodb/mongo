@@ -147,6 +147,12 @@ void TenantOplogApplier::_doShutdown_inlock() noexcept {
     }
 }
 
+void TenantOplogApplier::_preJoin() noexcept {
+    if (_oplogBatcher) {
+        _oplogBatcher->join();
+    }
+}
+
 void TenantOplogApplier::_applyLoop(TenantOplogBatch batch) {
     {
         stdx::lock_guard lk(_mutex);

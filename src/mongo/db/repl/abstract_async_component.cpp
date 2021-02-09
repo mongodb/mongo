@@ -116,6 +116,7 @@ void AbstractAsyncComponent::shutdown() noexcept {
 }
 
 void AbstractAsyncComponent::join() noexcept {
+    _preJoin();
     stdx::unique_lock<Latch> lk(*_getMutex());
     _stateCondition.wait(lk, [this]() { return !_isActive_inlock(); });
 }

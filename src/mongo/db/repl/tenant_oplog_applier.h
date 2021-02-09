@@ -98,6 +98,7 @@ public:
 private:
     Status _doStartup_inlock() noexcept final;
     void _doShutdown_inlock() noexcept final;
+    void _preJoin() noexcept final;
     void _finishShutdown(WithLock lk, Status status);
 
     void _applyLoop(TenantOplogBatch batch);

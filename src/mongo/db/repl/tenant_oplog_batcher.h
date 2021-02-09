@@ -99,6 +99,8 @@ private:
 
     void _doShutdown_inlock() noexcept final;
 
+    void _preJoin() noexcept final {}
+
     Mutex* _getMutex() noexcept final {
         return &_mutex;
     }

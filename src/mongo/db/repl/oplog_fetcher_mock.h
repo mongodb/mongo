@@ -80,6 +80,8 @@ private:
 
     void _doShutdown_inlock() noexcept override;
 
+    void _preJoin() noexcept override {}
+
     Mutex* _getMutex() noexcept override;
 
     // ============= End AbstractAsyncComponent overrides ==============

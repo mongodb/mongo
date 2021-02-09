@@ -95,6 +95,7 @@ public:
 private:
     Status _doStartup_inlock() noexcept override;
     void _doShutdown_inlock() noexcept override;
+    void _preJoin() noexcept override {}
     Mutex* _getMutex() noexcept override;
 
     // Used by AbstractAsyncComponent to guard start changes.

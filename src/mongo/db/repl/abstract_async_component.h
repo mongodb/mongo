@@ -205,6 +205,11 @@ private:
     virtual void _doShutdown_inlock() noexcept = 0;
 
     /**
+     * Function invoked before join() without holding the component's mutex.
+     */
+    virtual void _preJoin() noexcept = 0;
+
+    /**
      * Returns mutex to guard this component's state variable.
      */
     virtual Mutex* _getMutex() noexcept = 0;
