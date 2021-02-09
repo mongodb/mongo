@@ -117,6 +117,7 @@ selector:
   - jstests/sharding/ssv_config_check.js
   # Runs replSetGetStatus -- via awaitLastOpCommitted -- directly against the config server:
   # retries aren't supported.
+  - jstests/sharding/catalog_refresh_while_set_fcv.js
   - jstests/sharding/coll_epoch_test1.js
   - jstests/sharding/move_stale_mongos.js
   - jstests/sharding/shard4.js

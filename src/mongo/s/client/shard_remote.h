@@ -122,7 +122,8 @@ private:
         const NamespaceString& nss,
         const BSONObj& query,
         const BSONObj& sort,
-        boost::optional<long long> limit) final;
+        boost::optional<long long> limit,
+        const boost::optional<BSONObj>& hint = boost::none) final;
 
     StatusWith<AsyncCmdHandle> _scheduleCommand(
         OperationContext* opCtx,

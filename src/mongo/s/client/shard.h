@@ -238,13 +238,15 @@ public:
      * ShardRemote instances expect "readConcernLevel" to always be kMajorityReadConcern, whereas
      * ShardLocal instances expect either kLocalReadConcern or kMajorityReadConcern.
      */
-    StatusWith<QueryResponse> exhaustiveFindOnConfig(OperationContext* opCtx,
-                                                     const ReadPreferenceSetting& readPref,
-                                                     const repl::ReadConcernLevel& readConcernLevel,
-                                                     const NamespaceString& nss,
-                                                     const BSONObj& query,
-                                                     const BSONObj& sort,
-                                                     const boost::optional<long long> limit);
+    StatusWith<QueryResponse> exhaustiveFindOnConfig(
+        OperationContext* opCtx,
+        const ReadPreferenceSetting& readPref,
+        const repl::ReadConcernLevel& readConcernLevel,
+        const NamespaceString& nss,
+        const BSONObj& query,
+        const BSONObj& sort,
+        const boost::optional<long long> limit,
+        const boost::optional<BSONObj>& hint = boost::none);
 
     /**
      * Builds an index on a config server collection.
@@ -318,7 +320,8 @@ private:
         const NamespaceString& nss,
         const BSONObj& query,
         const BSONObj& sort,
-        boost::optional<long long> limit) = 0;
+        boost::optional<long long> limit,
+        const boost::optional<BSONObj>& hint = boost::none) = 0;
 
     /**
      * Identifier of the shard as obtained from the configuration data (i.e. shard0000).

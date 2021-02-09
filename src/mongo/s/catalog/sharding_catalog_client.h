@@ -173,12 +173,14 @@ public:
      *
      * Returns a vector of ChunkTypes, or a !OK status if an error occurs.
      */
-    virtual StatusWith<std::vector<ChunkType>> getChunks(OperationContext* opCtx,
-                                                         const BSONObj& filter,
-                                                         const BSONObj& sort,
-                                                         boost::optional<int> limit,
-                                                         repl::OpTime* opTime,
-                                                         repl::ReadConcernLevel readConcern) = 0;
+    virtual StatusWith<std::vector<ChunkType>> getChunks(
+        OperationContext* opCtx,
+        const BSONObj& filter,
+        const BSONObj& sort,
+        boost::optional<int> limit,
+        repl::OpTime* opTime,
+        repl::ReadConcernLevel readConcern,
+        const boost::optional<BSONObj>& hint = boost::none) = 0;
 
     /**
      * Retrieves all zones defined for the specified collection. The returned vector is sorted based
@@ -341,7 +343,8 @@ private:
         const NamespaceString& nss,
         const BSONObj& query,
         const BSONObj& sort,
-        boost::optional<long long> limit) = 0;
+        boost::optional<long long> limit,
+        const boost::optional<BSONObj>& hint = boost::none) = 0;
 };
 
 }  // namespace mongo
