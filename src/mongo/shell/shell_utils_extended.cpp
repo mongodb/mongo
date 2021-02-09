@@ -196,6 +196,59 @@ BSONObj cat(const BSONObj& args, void* data) {
     return BSON("" << ss.str());
 }
 
+BSONObj copyFileRange(const BSONObj& args, void* data) {
+    uassert(4793600,
+            "copyFileRange() requires 4 arguments: copyFileRange(src, dest, offset, length)",
+            args.nFields() == 4);
+
+    BSONObjIterator it(args);
+
+    const std::string src = it.next().str();
+    const std::string dest = it.next().str();
+    int64_t offset = it.next().Long();
+    int64_t length = it.next().Long();
+
+    std::ifstream in(src, std::ios::binary | std::ios::in);
+    uassert(CANT_OPEN_FILE, "Couldn't open file {} for reading"_format(src), in.is_open());
+
+    in.exceptions(std::ifstream::badbit);
+
+    // Set the position using the given offset.
+    in.seekg(offset, std::ios::beg);
+    if (in.rdstate() & std::ifstream::eofbit) {
+        // Offset is past EOF.
+        in.close();
+        return BSON("n" << 0 << "earlyEOF" << true);
+    }
+
+    bool earlyEOF = false;
+    std::vector<char> buffer(length);
+    if (!in.read(buffer.data(), length)) {
+        invariant(in.rdstate() & std::ifstream::eofbit);
+        earlyEOF = true;
+    }
+
+    int64_t bytesRead = in.gcount();
+    invariant(bytesRead <= length);
+    in.close();
+
+    // Before opening 'dest', check if we need to resize the file to fit in the contents.
+    if (static_cast<uint64_t>(offset + bytesRead) > boost::filesystem::file_size(dest)) {
+        boost::filesystem::resize_file(dest, offset + bytesRead);
+    }
+
+    std::ofstream out(dest, std::ios::binary | std::ios::out | std::ios::in);
+    uassert(CANT_OPEN_FILE, "Couldn't open file {} for writing"_format(dest), out.is_open());
+
+    out.exceptions(std::ofstream::eofbit | std::ofstream::failbit | std::ofstream::badbit);
+
+    out.seekp(offset, std::ios::beg);
+    out.write(buffer.data(), bytesRead);
+    out.close();
+
+    return BSON("n" << bytesRead << "earlyEOF" << earlyEOF);
+}
+
 BSONObj md5sumFile(const BSONObj& args, void* data) {
     BSONElement e = singleArg(args);
     stringstream ss;
@@ -478,6 +531,7 @@ void installShellUtilsExtended(Scope& scope) {
     scope.injectNative("passwordPrompt", passwordPrompt);
     scope.injectNative("umask", changeUmask);
     scope.injectNative("getFileMode", getFileMode);
+    scope.injectNative("_copyFileRange", copyFileRange);
     scope.injectNative("_readDumpFile", readDumpFile);
     scope.injectNative("_getEnv", shellGetEnv);
 }
