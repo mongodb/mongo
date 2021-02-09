@@ -384,7 +384,7 @@ EvalExprStagePair generatePathTraversal(EvalStage inputStage,
             frameIdGenerator);
     }
 
-    return {std::move(resultExpr), std::move(outputStage)};
+    return {std::move(resultExpr), std::move(outputStage)};  // NOLINT(bugprone-use-after-move)
 }
 
 /**
