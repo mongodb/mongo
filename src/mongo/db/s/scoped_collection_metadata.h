@@ -69,6 +69,10 @@ public:
         return _impl->get().getReshardingKeyIfShouldForwardOps();
     }
 
+    void throwIfReshardingInProgress(NamespaceString const& nss) const {
+        _impl->get().throwIfReshardingInProgress(nss);
+    }
+
     const BSONObj& getKeyPattern() const {
         return _impl->get().getKeyPattern();
     }

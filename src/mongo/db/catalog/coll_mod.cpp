@@ -83,8 +83,7 @@ void assertMovePrimaryInProgress(OperationContext* opCtx, NamespaceString const&
             auto mpsm = dss->getMovePrimarySourceManager(dssLock);
 
             if (mpsm) {
-                LOGV2(
-                    4945200, "assertMovePrimaryInProgress", "movePrimaryNss"_attr = nss.toString());
+                LOGV2(4945200, "assertMovePrimaryInProgress", "namespace"_attr = nss.toString());
 
                 uasserted(ErrorCodes::MovePrimaryInProgress,
                           "movePrimary is in progress for namespace " + nss.toString());
@@ -92,7 +91,7 @@ void assertMovePrimaryInProgress(OperationContext* opCtx, NamespaceString const&
         }
     } catch (const DBException& ex) {
         if (ex.toStatus() != ErrorCodes::MovePrimaryInProgress) {
-            LOGV2(4945201, "Error when getting colleciton description", "what"_attr = ex.what());
+            LOGV2(4945201, "Error when getting collection description", "what"_attr = ex.what());
             return;
         }
         throw;
@@ -401,6 +400,9 @@ Status _collModInternal(OperationContext* opCtx,
     if (coll) {
         assertMovePrimaryInProgress(opCtx, nss);
         IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(coll->uuid());
+        CollectionShardingState::get(opCtx, nss)
+            ->getCollectionDescription(opCtx)
+            .throwIfReshardingInProgress(nss);
     }
 
     // If db/collection/view does not exist, short circuit and return.

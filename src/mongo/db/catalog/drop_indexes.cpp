@@ -292,8 +292,7 @@ void assertMovePrimaryInProgress(OperationContext* opCtx, const NamespaceString&
             auto mpsm = dss->getMovePrimarySourceManager(dssLock);
 
             if (mpsm) {
-                LOGV2(
-                    4976500, "assertMovePrimaryInProgress", "movePrimaryNss"_attr = ns.toString());
+                LOGV2(4976500, "assertMovePrimaryInProgress", "namespace"_attr = ns.toString());
 
                 uasserted(ErrorCodes::MovePrimaryInProgress,
                           "movePrimary is in progress for namespace " + ns.toString());
@@ -301,7 +300,7 @@ void assertMovePrimaryInProgress(OperationContext* opCtx, const NamespaceString&
         }
     } catch (const DBException& ex) {
         if (ex.toStatus() != ErrorCodes::MovePrimaryInProgress) {
-            LOGV2(4976501, "Error when getting colleciton description", "what"_attr = ex.what());
+            LOGV2(4976501, "Error when getting collection description", "what"_attr = ex.what());
             return;
         }
         throw;
@@ -407,6 +406,9 @@ DropIndexesReply dropIndexes(OperationContext* opCtx,
 
         if (!abortAgain) {
             assertMovePrimaryInProgress(opCtx, nss);
+            CollectionShardingState::get(opCtx, nss)
+                ->getCollectionDescription(opCtx)
+                .throwIfReshardingInProgress(nss);
             break;
         }
     }

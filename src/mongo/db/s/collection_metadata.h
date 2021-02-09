@@ -78,6 +78,11 @@ public:
     boost::optional<ShardKeyPattern> getReshardingKeyIfShouldForwardOps() const;
 
     /**
+     * Throws an exception if resharding fields currently exist in the collection metadata.
+     */
+    void throwIfReshardingInProgress(NamespaceString const& nss) const;
+
+    /**
      * The caller should disallow writes when
      *      1. The coordinator is in the mirroring state, OR
      *      2. The coordinator is in the decision persisted state, but the UUID is still the

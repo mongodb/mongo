@@ -1700,23 +1700,26 @@ IndexBuildsCoordinator::_filterSpecsAndRegisterBuild(OperationContext* opCtx,
     AutoGetCollection autoColl(opCtx, nssOrUuid, MODE_X);
     CollectionWriter collection(autoColl);
 
+    const auto& ns = collection.get()->ns();
+    auto css = CollectionShardingState::get(opCtx, ns);
+
     // Disallow index builds on drop-pending namespaces (system.drop.*) if we are primary.
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     if (replCoord->getSettings().usingReplSets() &&
         replCoord->canAcceptWritesFor(opCtx, nssOrUuid)) {
         uassert(ErrorCodes::NamespaceNotFound,
-                str::stream() << "drop-pending collection: " << collection.get()->ns(),
-                !collection.get()->ns().isDropPendingNamespace());
+                str::stream() << "drop-pending collection: " << ns,
+                !ns.isDropPendingNamespace());
     }
 
     // This check is for optimization purposes only as since this lock is released after this,
     // and is acquired again when we build the index in _setUpIndexBuild.
-    CollectionShardingState::get(opCtx, collection.get()->ns())->checkShardVersionOrThrow(opCtx);
+    css->checkShardVersionOrThrow(opCtx);
+    css->getCollectionDescription(opCtx).throwIfReshardingInProgress(ns);
 
     std::vector<BSONObj> filteredSpecs;
     try {
-        filteredSpecs =
-            prepareSpecListForCreate(opCtx, collection.get(), collection.get()->ns(), specs);
+        filteredSpecs = prepareSpecListForCreate(opCtx, collection.get(), ns, specs);
     } catch (const DBException& ex) {
         return ex.toStatus();
     }
@@ -1742,15 +1745,12 @@ IndexBuildsCoordinator::_filterSpecsAndRegisterBuild(OperationContext* opCtx,
             // commitIndexBuild oplog entries, this optimization will fail to accurately timestamp
             // the catalog update when it uses the timestamp from the startIndexBuild, rather than
             // the commitIndexBuild, oplog entry.
-            writeConflictRetry(opCtx,
-                               "IndexBuildsCoordinator::_filterSpecsAndRegisterBuild",
-                               collection.get()->ns().ns(),
-                               [&] {
-                                   WriteUnitOfWork wuow(opCtx);
-                                   createIndexesOnEmptyCollection(
-                                       opCtx, collection, filteredSpecs, false);
-                                   wuow.commit();
-                               });
+            writeConflictRetry(
+                opCtx, "IndexBuildsCoordinator::_filterSpecsAndRegisterBuild", ns.ns(), [&] {
+                    WriteUnitOfWork wuow(opCtx);
+                    createIndexesOnEmptyCollection(opCtx, collection, filteredSpecs, false);
+                    wuow.commit();
+                });
         } catch (DBException& ex) {
             ex.addContext(str::stream() << "index build on empty collection failed: " << buildUUID);
             return ex.toStatus();

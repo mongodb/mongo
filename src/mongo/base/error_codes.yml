@@ -417,6 +417,8 @@ error_codes:
     - {code: 336, name: TimeseriesBucketCleared, categories: [InternalOnly]}
 
     - {code: 337, name: AuthenticationAbandoned, categories: [InternalOnly]}
+    
+    - {code: 338, name: ReshardCollectionInProgress}
 
     # Error codes 4000-8999 are reserved.
 
