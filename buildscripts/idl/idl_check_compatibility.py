@@ -354,6 +354,49 @@ def check_reply_fields(ctxt: IDLCompatibilityContext, old_reply: syntax.Struct,
             ctxt.add_new_reply_field_missing_error(cmd_name, old_field.name, old_idl_file_path)
 
 
+def check_command_parameters(ctxt: IDLCompatibilityContext, old_cmd: syntax.Command,
+                             new_cmd: syntax.Command, cmd_name: str, old_idl_file_path: str,
+                             new_idl_file_path: str):
+    """Check compatibility between old and new command parameters."""
+    # pylint: disable=too-many-arguments
+    for old_param in old_cmd.fields:
+        new_param_exists = False
+        for new_param in new_cmd.fields:
+            if new_param.name == old_param.name:
+                new_param_exists = True
+                check_command_parameter(ctxt, old_param, new_param, cmd_name, old_idl_file_path)
+                break
+
+        if not new_param_exists and not old_param.unstable:
+            ctxt.add_command_parameter_removed_error(old_cmd.command_name, old_param.name,
+                                                     old_idl_file_path)
+
+    # Check if a new parameter has been added to the command.
+    # If so, it must be optional.
+    for new_param in new_cmd.fields:
+        newly_added = True
+        for old_param in old_cmd.fields:
+            if new_param.name == old_param.name:
+                newly_added = False
+
+        if newly_added and not new_param.optional and not new_param.unstable:
+            ctxt.add_new_command_parameter_required_error(new_cmd.name, new_param.name,
+                                                          new_idl_file_path)
+
+
+def check_command_parameter(ctxt: IDLCompatibilityContext, old_param: syntax.Field,
+                            new_param: syntax.Field, cmd_name: str, old_idl_file_path: str):
+    """Check compatibility between the old and new command parameter."""
+    if not old_param.unstable and new_param.unstable:
+        ctxt.add_command_parameter_unstable_error(cmd_name, old_param.name, old_idl_file_path)
+    if old_param.unstable and not new_param.optional and not new_param.unstable:
+        ctxt.add_command_parameter_stable_required_error(cmd_name, old_param.name,
+                                                         old_idl_file_path)
+    if old_param.optional and not new_param.optional:
+        ctxt.add_command_parameter_required_error(cmd_name, old_param.name, old_idl_file_path)
+    #TODO (SERVER-53203): Type check command parameters.
+
+
 def check_namespace(ctxt: IDLCompatibilityContext, old_cmd: syntax.Command, new_cmd: syntax.Command,
                     old_idl_file: syntax.IDLParsedSpec, new_idl_file: syntax.IDLParsedSpec,
                     old_idl_file_path: str, new_idl_file_path: str):
@@ -482,6 +525,10 @@ def check_compatibility(old_idl_dir: str, new_idl_dir: str,
                     new_cmd = new_commands[old_cmd.command_name]
                     new_idl_file = new_command_file[old_cmd.command_name]
                     new_idl_file_path = new_command_file_path[old_cmd.command_name]
+
+                    # Check compatibility of command's parameters.
+                    check_command_parameters(ctxt, old_cmd, new_cmd, old_cmd.command_name,
+                                             old_idl_file_path, new_idl_file_path)
 
                     check_namespace(ctxt, old_cmd, new_cmd, old_idl_file, new_idl_file,
                                     old_idl_file_path, new_idl_file_path)

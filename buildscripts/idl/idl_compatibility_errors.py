@@ -68,6 +68,11 @@ ERROR_ID_NEW_COMMAND_TYPE_ENUM_OR_STRUCT = "ID0024"
 ERROR_ID_MISSING_ERROR_REPLY_STRUCT = "ID0025"
 ERROR_ID_NEW_REPLY_FIELD_VARIANT_TYPE = "ID0026"
 ERROR_ID_NEW_REPLY_FIELD_VARIANT_TYPE_NOT_SUBSET = "ID0027"
+ERROR_ID_REMOVED_COMMAND_PARAMETER = "ID0028"
+ERROR_ID_ADDED_REQUIRED_COMMAND_PARAMETER = "ID0029"
+ERROR_ID_COMMAND_PARAMETER_UNSTABLE = "ID0030"
+ERROR_ID_COMMAND_PARAMETER_STABLE_REQUIRED = "ID0031"
+ERROR_ID_COMMAND_PARAMETER_REQUIRED = "ID0032"
 
 
 class IDLCompatibilityCheckerError(Exception):
@@ -202,6 +207,66 @@ class IDLCompatibilityContext(object):
         """Add an error about a command that was removed."""
         self._add_error(ERROR_ID_REMOVED_COMMAND, command_name,
                         "Old command '%s' was removed from new commands." % (command_name), file)
+
+    def add_command_parameter_removed_error(self, command_name: str, parameter_name: str,
+                                            file: str) -> None:
+        """Add an error about a command parameter that was removed."""
+        self._add_error(
+            ERROR_ID_REMOVED_COMMAND_PARAMETER, command_name,
+            "Parameter '%s' for old command '%s' was removed from the corresponding new command." %
+            (parameter_name, command_name), file)
+
+    def add_new_command_parameter_required_error(self, command_name: str, parameter_name: str,
+                                                 file: str) -> None:
+        """
+        Add a new required parameter error.
+
+        Add an error about a new required command parameter that did not exist in the old command.
+        The new parameter should be optional.
+        """
+        self._add_error(
+            ERROR_ID_ADDED_REQUIRED_COMMAND_PARAMETER, command_name,
+            "New command parameter '%s' for command '%s' is required when it should be optional." %
+            (parameter_name, command_name), file)
+
+    def add_command_parameter_unstable_error(self, command_name: str, parameter_name: str,
+                                             file: str) -> None:
+        """
+        Add an unstable parameter error.
+
+        Add an error about the new command parameter being unstable
+        when the corresponding old command parameter is stable.
+        """
+        self._add_error(
+            ERROR_ID_COMMAND_PARAMETER_UNSTABLE, command_name,
+            "'%s' has an unstable command parameter '%s' that was stable in the old command." %
+            (command_name, parameter_name), file)
+
+    def add_command_parameter_stable_required_error(self, command_name: str, parameter_name: str,
+                                                    file: str) -> None:
+        """
+        Add a stable required parameter error.
+
+        Add an error about the new command parameter being stable and required
+        when the corresponding old command parameter is unstable.
+        """
+        self._add_error(
+            ERROR_ID_COMMAND_PARAMETER_STABLE_REQUIRED, command_name,
+            "'%s' has a stable required command parameter '%s' that was unstable in the old command."
+            "The new parameter should be optional." % (command_name, parameter_name), file)
+
+    def add_command_parameter_required_error(self, command_name: str, parameter_name: str,
+                                             file: str) -> None:
+        """
+        Add a required parameter error.
+
+        Add an error about the new command parameter being required when
+        the corresponding old command parameter is optional.
+        """
+        self._add_error(
+            ERROR_ID_COMMAND_PARAMETER_REQUIRED, command_name,
+            "'%s' has a required command parameter '%s' that was optional in the old command." %
+            (command_name, parameter_name), file)
 
     def add_duplicate_command_name_error(self, command_name: str, dir_name: str, file: str) -> None:
         """Add an error about a duplicate command name within a directory."""

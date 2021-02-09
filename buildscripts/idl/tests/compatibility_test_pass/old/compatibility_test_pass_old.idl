@@ -214,6 +214,81 @@ commands:
         api_version: ""
         reply_type: OkReply
     
+    addedCommandParameter:
+        description: "new optional command parameter is added and should pass"
+        command_name: addedCommandParameter
+        namespace: ignored
+        cpp_name: addedCommandParameter
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    addedCommandParameterStable:
+        description: "new command has an optional stable parameter that is unstable
+                      in the corresponding old command and still passes"
+        command_name: addedCommandParameterStable
+        namespace: ignored
+        cpp_name: addedCommandParameterStable
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        fields:
+            newOptionalStableParam:
+                type: string
+                unstable: true
+
+    removeCommandParameterUnstable:
+        description: "new command removes parameter that is unstable
+                      in the corresponding old command and still passes"
+        command_name: removeCommandParameterUnstable
+        namespace: ignored
+        cpp_name: removeCommandParameterUnstable
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        fields:
+            unstableParamToRemove:
+                type: string
+                unstable: true
+
+    addedCommandParameterOptional:
+        description: "new command has an optional parameter that is required
+                      in the corresponding old command and still passes"
+        command_name: addedCommandParameterOptional
+        namespace: ignored
+        cpp_name: addedCommandParameterOptional
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        fields:
+            newOptionalParam:
+                type: string
+                optional: false
+
+    addedUnstableCommandParameter:
+        description: "new command has a new unstable parameter that does not
+                      exist in the corresponding old command and still passes"
+        command_name: addedUnstableCommandParameter
+        namespace: ignored
+        cpp_name: addedUnstableCommandParameter
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    keptUnstableCommandParameter:
+        description: "new command has an unstable parameter that also
+                      exists in the corresponding old command and still passes"
+        command_name: keptUnstableCommandParameter
+        namespace: ignored
+        cpp_name: keptUnstableCommandParameter
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        fields:
+            unstableParam:
+                type: string
+                unstable: true
+
     newReplyFieldStable:
         description: "new command contains a stable reply field that is unstable
                       in the corresponding old command and still passes"
