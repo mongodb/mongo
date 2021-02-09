@@ -249,7 +249,7 @@ let viewsCommandTests = {
     dropAllUsersFromDatabase: {skip: isUnrelated},
     dropConnections: {skip: isUnrelated},
     dropDatabase: {command: {dropDatabase: 1}},
-    dropIndexes: {command: {dropIndexes: "view"}, expectFailure: true},
+    dropIndexes: {command: {dropIndexes: "view", index: "a_1"}, expectFailure: true},
     dropRole: {
         command: {dropRole: "testrole"},
         setup: function(conn) {

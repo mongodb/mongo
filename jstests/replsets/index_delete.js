@@ -99,7 +99,7 @@ assert.eq(3, secondDB[collName].getIndexes().length);
 
 jsTest.log("Dropping the rest of the indexes");
 
-primaryDB.runCommand({deleteIndexes: collName, index: "*"});
+assert.commandWorked(primaryDB.runCommand({deleteIndexes: collName, index: "*"}));
 assert.eq(1, primaryDB[collName].getIndexes().length);
 
 // Assert that we normalize 'dropIndexes' oplog entries properly.

@@ -910,34 +910,30 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
     // deleteIndex(es) is deprecated but still works as of April 10, 2015
     {"deleteIndex",
      {[](OperationContext* opCtx, const OplogEntry& entry, OplogApplication::Mode mode) -> Status {
-          BSONObjBuilder resultWeDontCareAbout;
           const auto& cmd = entry.getObject();
           return dropIndexesForApplyOps(
-              opCtx, extractNsFromUUID(opCtx, entry.getUuid().get()), cmd, &resultWeDontCareAbout);
+              opCtx, extractNsFromUUID(opCtx, entry.getUuid().get()), cmd);
       },
       {ErrorCodes::NamespaceNotFound, ErrorCodes::IndexNotFound}}},
     {"deleteIndexes",
      {[](OperationContext* opCtx, const OplogEntry& entry, OplogApplication::Mode mode) -> Status {
-          BSONObjBuilder resultWeDontCareAbout;
           const auto& cmd = entry.getObject();
           return dropIndexesForApplyOps(
-              opCtx, extractNsFromUUID(opCtx, entry.getUuid().get()), cmd, &resultWeDontCareAbout);
+              opCtx, extractNsFromUUID(opCtx, entry.getUuid().get()), cmd);
       },
       {ErrorCodes::NamespaceNotFound, ErrorCodes::IndexNotFound}}},
     {"dropIndex",
      {[](OperationContext* opCtx, const OplogEntry& entry, OplogApplication::Mode mode) -> Status {
-          BSONObjBuilder resultWeDontCareAbout;
           const auto& cmd = entry.getObject();
           return dropIndexesForApplyOps(
-              opCtx, extractNsFromUUID(opCtx, entry.getUuid().get()), cmd, &resultWeDontCareAbout);
+              opCtx, extractNsFromUUID(opCtx, entry.getUuid().get()), cmd);
       },
       {ErrorCodes::NamespaceNotFound, ErrorCodes::IndexNotFound}}},
     {"dropIndexes",
      {[](OperationContext* opCtx, const OplogEntry& entry, OplogApplication::Mode mode) -> Status {
-          BSONObjBuilder resultWeDontCareAbout;
           const auto& cmd = entry.getObject();
           return dropIndexesForApplyOps(
-              opCtx, extractNsFromUUID(opCtx, entry.getUuid().get()), cmd, &resultWeDontCareAbout);
+              opCtx, extractNsFromUUID(opCtx, entry.getUuid().get()), cmd);
       },
       {ErrorCodes::NamespaceNotFound, ErrorCodes::IndexNotFound}}},
     {"renameCollection",

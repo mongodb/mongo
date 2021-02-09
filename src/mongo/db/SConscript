@@ -577,6 +577,7 @@ env.Library(
         'commands.cpp',
         'drop.idl',
         'drop_database.idl',
+        'drop_indexes.idl',
         'list_collections.idl',
         'list_indexes.idl',
     ],

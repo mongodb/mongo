@@ -498,21 +498,11 @@ private:
                     continue;
                 }
 
-                // Construct a dropIndexes command to drop the indexes in 'haystackIndexes'.
-                BSONObjBuilder dropIndexesCmd;
-                dropIndexesCmd.append("dropIndexes", collName.nss()->coll());
-                BSONArrayBuilder indexNames;
+                std::vector<std::string> indexNames;
                 for (auto&& haystackIndex : haystackIndexes) {
-                    indexNames.append(haystackIndex->indexName());
+                    indexNames.emplace_back(haystackIndex->indexName());
                 }
-                dropIndexesCmd.append("index", indexNames.arr());
-
-                BSONObjBuilder response;  // This response is ignored.
-                uassertStatusOK(
-                    dropIndexes(opCtx,
-                                *collName.nss(),
-                                CommandHelpers::appendMajorityWriteConcern(dropIndexesCmd.obj()),
-                                &response));
+                dropIndexes(opCtx, *collName.nss(), indexNames);
             }
         }
     }

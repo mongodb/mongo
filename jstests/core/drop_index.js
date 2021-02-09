@@ -44,16 +44,25 @@ assertIndexes(['a_1', 'b_1', 'c_1', 'd_1', 'e_1'], 'creating indexes');
 
 // Drop single index by name.
 // Collection.dropIndex() throws if the dropIndexes command fails.
-t.dropIndex(t._genIndexName({a: 1}));
+assert.commandWorked(t.dropIndex(t._genIndexName({a: 1})));
 assertIndexes(['b_1', 'c_1', 'd_1', 'e_1'], 'dropping {a: 1} by name');
 
 // Drop single index by key pattern.
-t.dropIndex({b: 1});
+assert.commandWorked(t.dropIndex({b: 1}));
 assertIndexes(['c_1', 'd_1', 'e_1'], 'dropping {b: 1} by key pattern');
 
+const isMongos = assert.commandWorked(db.runCommand("hello")).msg === "isdbgrid";
+
 // Not allowed to drop _id index.
-assert.commandFailedWithCode(t.dropIndex('_id_'), ErrorCodes.InvalidOptions);
-assert.commandFailedWithCode(t.dropIndex({_id: 1}), ErrorCodes.InvalidOptions);
+for (const dropIndexArg of ['_id_', {_id: 1}]) {
+    const dropIdIndexReply = t.dropIndex(dropIndexArg);
+    jsTestLog(`Reply to dropIndexes with arg ${tojson(dropIndexArg)}: ${tojson(dropIdIndexReply)}`);
+    assert.commandFailedWithCode(dropIdIndexReply, ErrorCodes.InvalidOptions);
+    assert(dropIdIndexReply.hasOwnProperty('errmsg'));
+    if (isMongos) {
+        assert(dropIdIndexReply.hasOwnProperty('raw'));
+    }
+}
 
 // Ensure you can recreate indexes, even if you don't use dropIndex method.
 // Prior to SERVER-7168, the shell used to cache names of indexes created using
@@ -79,6 +88,11 @@ ex = assert.throws(() => {
 });
 assert.commandFailedWithCode(ex, ErrorCodes.TypeMismatch);
 assertIndexes(['a_1', 'e_1'], 'failed dropIndexes command with non-string index name');
+
+// Test "deleteIndexes" alias.
+assert.commandWorked(t.createIndex({f: 1}));
+assert.commandWorked(db.runCommand({deleteIndexes: t.getName(), index: 'f_1'}));
+assertIndexes(['a_1', 'e_1'], 'failed deleteIndexes command alias');
 
 // Drop all indexes.
 assert.commandWorked(t.dropIndexes());

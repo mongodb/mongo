@@ -32,12 +32,16 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/commands.h"
+#include "mongo/db/drop_indexes_gen.h"
 #include "mongo/logv2/log.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
 
 namespace mongo {
 namespace {
+
+constexpr auto kRawFieldName = "raw"_sd;
 
 struct StaleConfigRetryState {
     std::set<ShardId> shardsWithSuccessResponses;
@@ -69,13 +73,14 @@ void updateStateForStaleConfigRetry(OperationContext* opCtx,
     staleConfigRetryState(opCtx)->shardSuccessResponses = std::move(response.successResponses);
 }
 
-class DropIndexesCmd : public ErrmsgCommandDeprecated {
+class DropIndexesCmd : public BasicCommandWithRequestParser<DropIndexesCmd> {
 public:
+    using Request = DropIndexes;
+    using Reply = DropIndexesReply;
+
     const std::set<std::string>& apiVersions() const {
         return kApiVersions1;
     }
-
-    DropIndexesCmd() : ErrmsgCommandDeprecated("dropIndexes", "deleteIndexes") {}
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
@@ -93,16 +98,34 @@ public:
         out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
     }
 
+    void validateResult(const BSONObj& resultObj) final {
+        auto ctx = IDLParserErrorContext("DropIndexesReply");
+        if (!checkIsErrorStatus(resultObj, ctx)) {
+            Reply::parse(ctx, resultObj.removeField(kRawFieldName));
+            if (resultObj.hasField(kRawFieldName)) {
+                const auto& rawData = resultObj[kRawFieldName];
+                if (ctx.checkAndAssertType(rawData, Object)) {
+                    for (const auto& element : rawData.Obj()) {
+                        const auto& shardReply = element.Obj();
+                        if (!checkIsErrorStatus(shardReply, ctx)) {
+                            Reply::parse(ctx, shardReply);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     bool supportsWriteConcern(const BSONObj& cmd) const override {
         return true;
     }
 
-    bool errmsgRun(OperationContext* opCtx,
-                   const std::string& dbName,
-                   const BSONObj& cmdObj,
-                   std::string& errmsg,
-                   BSONObjBuilder& output) override {
-        const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
+    bool runWithRequestParser(OperationContext* opCtx,
+                              const std::string& dbName,
+                              const BSONObj& cmdObj,
+                              const RequestParser& requestParser,
+                              BSONObjBuilder& output) final {
+        auto nss = requestParser.request().getNamespace();
         LOGV2_DEBUG(22751,
                     1,
                     "dropIndexes: {namespace} cmd: {command}",
@@ -141,6 +164,7 @@ public:
                               retryState.shardSuccessResponses.begin(),
                               retryState.shardSuccessResponses.end());
 
+        std::string errmsg;
         const auto aggregateResponse =
             appendRawResponses(opCtx, &errmsg, &output, std::move(shardResponses));
 
@@ -150,6 +174,7 @@ public:
             uassertStatusOK(*aggregateResponse.firstStaleConfigError);
         }
 
+        CommandHelpers::appendSimpleCommandStatus(output, aggregateResponse.responseOK, errmsg);
         return aggregateResponse.responseOK;
     }
 

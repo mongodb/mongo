@@ -929,10 +929,9 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
         """Generate a template declaration for a command's base class."""
         self._writer.write_line('template <typename Derived>')
 
-    def gen_derived_class_declaration_block(self, command_name, api_version):
-        # type: (str, str) -> writer.IndentedScopedBlock
+    def gen_derived_class_declaration_block(self, class_name):
+        # type: (str) -> writer.IndentedScopedBlock
         """Generate a command's base class declaration block."""
-        class_name = common.title_case(command_name) + "CmdVersion" + api_version + "Gen"
         return writer.IndentedScopedBlock(
             self._writer, 'class %s : public TypedCommand<Derived> {' % class_name, '};')
 
@@ -984,11 +983,13 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
     def generate_versioned_command_base_class(self, command):
         # type: (ast.Command) -> None
         """Generate a command's C++ base class to a stream."""
+        class_name = "%sCmdVersion%sGen" % (common.title_case(command.command_name),
+                                            command.api_version)
+
         self.write_empty_line()
 
         self.gen_template_declaration()
-
-        with self.gen_derived_class_declaration_block(command.command_name, command.api_version):
+        with self.gen_derived_class_declaration_block(class_name):
             # Write type alias for InvocationBase.
             self.gen_type_alias_declaration('_TypedCommandInvocationBase',
                                             'typename TypedCommand<Derived>::InvocationBase')
@@ -1993,7 +1994,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             # This lambda is a template instantiated for each alternate type. Use "if constexpr"
             # to compile the appropriate serialization code for each.
             with self._block('stdx::visit([builder](auto&& arg) {', '}, ${access_member});'):
-                self._writer.write_template('idlSerialize(builder, ${field_name}, arg);')
+                self._writer.write_template('idl::idlSerialize(builder, ${field_name}, arg);')
 
     def _gen_serializer_method_common(self, field):
         # type: (ast.Field) -> None

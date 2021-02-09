@@ -34,6 +34,7 @@
 #include <string>
 #include <vector>
 
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/drop_indexes.h"
@@ -45,6 +46,7 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/drop_indexes_gen.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/op_observer.h"
@@ -65,46 +67,38 @@ using std::vector;
 
 MONGO_FAIL_POINT_DEFINE(reIndexCrashAfterDrop);
 
-/* "dropIndexes" is now the preferred form - "deleteIndexes" deprecated */
-class CmdDropIndexes : public BasicCommand {
+class CmdDropIndexes : public DropIndexesCmdVersion1Gen<CmdDropIndexes> {
 public:
-    const std::set<std::string>& apiVersions() const {
-        return kApiVersions1;
-    }
-
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
     }
-
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return true;
-    }
-
     bool collectsResourceConsumptionMetrics() const override {
         return true;
     }
-
     std::string help() const override {
         return "drop indexes for a collection";
     }
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) const {
-        ActionSet actions;
-        actions.addAction(ActionType::dropIndex);
-        out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
-    }
-
-    CmdDropIndexes() : BasicCommand("dropIndexes", "deleteIndexes") {}
-    bool run(OperationContext* opCtx,
-             const string& dbname,
-             const BSONObj& jsobj,
-             BSONObjBuilder& result) {
-        const NamespaceString nss = CommandHelpers::parseNsCollectionRequired(dbname, jsobj);
-        uassertStatusOK(dropIndexes(opCtx, nss, jsobj, &result));
-        return true;
-    }
-
+    class Invocation final : public InvocationBaseGen {
+    public:
+        using InvocationBaseGen::InvocationBaseGen;
+        bool supportsWriteConcern() const final {
+            return true;
+        }
+        NamespaceString ns() const final {
+            return request().getNamespace();
+        }
+        void doCheckAuthorization(OperationContext* opCtx) const final {
+            uassert(ErrorCodes::Unauthorized,
+                    str::stream() << "Not authorized to drop index(es) on collection"
+                                  << request().getNamespace(),
+                    AuthorizationSession::get(opCtx->getClient())
+                        ->isAuthorizedForActionsOnNamespace(request().getNamespace(),
+                                                            ActionType::dropIndex));
+        }
+        Reply typedRun(OperationContext* opCtx) final {
+            return dropIndexes(opCtx, request().getNamespace(), request().getIndex());
+        }
+    };
 } cmdDropIndexes;
 
 class CmdReIndex : public ErrmsgCommandDeprecated {
