@@ -339,6 +339,42 @@ def check_namespace(ctxt: IDLCompatibilityContext, old_cmd: syntax.Command, new_
         assert False, 'unrecognized namespace option'
 
 
+def check_error_reply(old_basic_types_path: str, new_basic_types_path: str,
+                      import_directories: List[str]) -> IDLCompatibilityErrorCollection:
+    """Check IDL compatibility between old and new ErrorReply."""
+    old_idl_dir = os.path.dirname(old_basic_types_path)
+    new_idl_dir = os.path.dirname(new_basic_types_path)
+    ctxt = IDLCompatibilityContext(old_idl_dir, new_idl_dir, IDLCompatibilityErrorCollection())
+    with open(old_basic_types_path) as old_file:
+        old_idl_file = parser.parse(old_file, old_basic_types_path,
+                                    CompilerImportResolver(import_directories))
+        if old_idl_file.errors:
+            old_idl_file.errors.dump_errors()
+            raise ValueError(f"Cannot parse {old_basic_types_path}")
+
+        old_error_reply_struct = old_idl_file.spec.symbols.get_struct("ErrorReply")
+
+        if old_error_reply_struct is None:
+            ctxt.add_missing_error_reply_error(old_basic_types_path)
+        else:
+            with open(new_basic_types_path) as new_file:
+                new_idl_file = parser.parse(new_file, new_basic_types_path,
+                                            CompilerImportResolver(import_directories))
+                if new_idl_file.errors:
+                    new_idl_file.errors.dump_errors()
+                    raise ValueError(f"Cannot parse {new_basic_types_path}")
+
+                new_error_reply_struct = new_idl_file.spec.symbols.get_struct("ErrorReply")
+                if new_error_reply_struct is None:
+                    ctxt.add_missing_error_reply_error(new_basic_types_path)
+                else:
+                    check_reply_fields(ctxt, old_error_reply_struct, new_error_reply_struct, "n/a",
+                                       old_idl_file, new_idl_file, old_basic_types_path,
+                                       new_basic_types_path)
+    ctxt.errors.dump_errors()
+    return ctxt.errors
+
+
 def check_compatibility(old_idl_dir: str, new_idl_dir: str,
                         import_directories: List[str]) -> IDLCompatibilityErrorCollection:
     """Check IDL compatibility between old and new IDL commands."""
@@ -417,6 +453,12 @@ def main():
 
     error_coll = check_compatibility(args.old_idl_dir, args.new_idl_dir, [])
     if error_coll.errors.has_errors():
+        sys.exit(1)
+
+    old_basic_types_path = os.path.join(args.old_idl_dir, "mongo/idl/basic_types.idl")
+    new_basic_types_path = os.path.join(args.new_idl_dir, "mongo/idl/basic_types.idl")
+    error_reply_coll = check_error_reply(old_basic_types_path, new_basic_types_path, [])
+    if error_reply_coll.has_errors():
         sys.exit(1)
 
 
