@@ -2615,10 +2615,10 @@ buildvariants:
     - name: ".unit_test"
     - name: fops
 
-- name: macos-1012
-  display_name: OS X 10.12
+- name: macos-1014
+  display_name: OS X 10.14
   run_on:
-  - macos-1012
+  - macos-1014
   expansions:
     configure_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH ADD_CFLAGS="-ggdb -fPIC"
     posix_configure_flags: --enable-silent-rules --enable-diagnostic --enable-python --enable-zlib --enable-strict --enable-static --prefix=$(pwd)/LOCAL_INSTALL

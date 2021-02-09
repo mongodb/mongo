@@ -405,8 +405,8 @@ multiversion
 mutex
 mutexes
 mutexing
+mux
 mvcc
-mx
 mygcc
 mytable
 namespace
