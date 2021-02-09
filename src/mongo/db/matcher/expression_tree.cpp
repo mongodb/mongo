@@ -255,12 +255,7 @@ bool OrMatchExpression::matches(const MatchableDocument* doc, MatchDetails* deta
 }
 
 bool OrMatchExpression::matchesSingleElement(const BSONElement& e, MatchDetails* details) const {
-    for (size_t i = 0; i < numChildren(); i++) {
-        if (getChild(i)->matchesSingleElement(e, details)) {
-            return true;
-        }
-    }
-    return false;
+    MONGO_UNREACHABLE_TASSERT(5429901);
 }
 
 
