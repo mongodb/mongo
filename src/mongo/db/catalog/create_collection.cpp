@@ -243,7 +243,6 @@ Status _createTimeseries(OperationContext* opCtx,
 
         // Time-series buckets collections are clustered by _id using the ObjectId type by default.
         ClusteredIndexOptions clusteredOptions;
-        clusteredOptions.setKeyFormat(KeyFormatEnum::OID);
         if (auto expireAfterSeconds = options.timeseries->getExpireAfterSeconds()) {
             clusteredOptions.setExpireAfterSeconds(*expireAfterSeconds);
         }

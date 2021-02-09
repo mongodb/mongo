@@ -90,18 +90,23 @@ public:
 
     ~WiredTigerHarnessHelper() {}
 
-    virtual std::unique_ptr<RecordStore> newNonCappedRecordStore() {
+    virtual std::unique_ptr<RecordStore> newNonCappedRecordStore() override {
         return newNonCappedRecordStore("a.b");
     }
 
     virtual std::unique_ptr<RecordStore> newNonCappedRecordStore(const std::string& ns) {
+        return newNonCappedRecordStore(ns, CollectionOptions());
+    }
+
+    virtual std::unique_ptr<RecordStore> newNonCappedRecordStore(
+        const std::string& ns, const CollectionOptions& collOptions) override {
         WiredTigerRecoveryUnit* ru =
             checked_cast<WiredTigerRecoveryUnit*>(_engine.newRecoveryUnit());
         OperationContextNoop opCtx(ru);
         string uri = WiredTigerKVEngine::kTableUriPrefix + ns;
 
-        StatusWith<std::string> result = WiredTigerRecordStore::generateCreateString(
-            kWiredTigerEngineName, ns, CollectionOptions(), "");
+        StatusWith<std::string> result =
+            WiredTigerRecordStore::generateCreateString(kWiredTigerEngineName, ns, collOptions, "");
         ASSERT_TRUE(result.isOK());
         std::string config = result.getValue();
 
@@ -117,7 +122,7 @@ public:
         params.ident = ns;
         params.engineName = kWiredTigerEngineName;
         params.isCapped = false;
-        params.isClustered = NamespaceString(ns).isTimeseriesBucketsCollection();
+        params.keyFormat = collOptions.clusteredIndex ? KeyFormat::String : KeyFormat::Long;
         params.isEphemeral = false;
         params.cappedMaxSize = -1;
         params.cappedMaxDocs = -1;
@@ -165,7 +170,7 @@ public:
         params.ident = ident;
         params.engineName = kWiredTigerEngineName;
         params.isCapped = true;
-        params.isClustered = NamespaceString(ns).isTimeseriesBucketsCollection();
+        params.keyFormat = KeyFormat::Long;
         params.isEphemeral = false;
         params.cappedMaxSize = cappedMaxSize;
         params.cappedMaxDocs = cappedMaxDocs;
@@ -254,7 +259,7 @@ TEST(WiredTigerRecordStoreTest, SizeStorer1) {
         params.ident = ident;
         params.engineName = kWiredTigerEngineName;
         params.isCapped = false;
-        params.isClustered = false;
+        params.keyFormat = KeyFormat::Long;
         params.isEphemeral = false;
         params.cappedMaxSize = -1;
         params.cappedMaxDocs = -1;

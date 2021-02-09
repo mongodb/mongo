@@ -58,8 +58,8 @@ public:
     ~RecordStore() = default;
 
     virtual const char* name() const;
-    virtual bool isClustered() const {
-        return false;
+    virtual KeyFormat keyFormat() const {
+        return KeyFormat::Long;
     }
     virtual long long dataSize(OperationContext* opCtx) const;
     virtual long long numRecords(OperationContext* opCtx) const;

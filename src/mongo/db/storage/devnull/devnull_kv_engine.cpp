@@ -81,8 +81,8 @@ public:
         return _options.capped;
     }
 
-    virtual bool isClustered() const {
-        return false;
+    virtual KeyFormat keyFormat() const {
+        return KeyFormat::Long;
     }
 
     virtual int64_t storageSize(OperationContext* opCtx,

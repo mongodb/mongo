@@ -97,7 +97,7 @@ public:
         params.ident = ident;
         params.engineName = kWiredTigerEngineName;
         params.isCapped = false;
-        params.isClustered = NamespaceString(ns).isTimeseriesBucketsCollection();
+        params.keyFormat = KeyFormat::Long;
         params.isEphemeral = false;
         params.cappedMaxSize = -1;
         params.cappedMaxDocs = -1;

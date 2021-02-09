@@ -408,8 +408,10 @@ TEST(RecordStoreTestHarness, Cursor1) {
 TEST(RecordStoreTestHarness, ClusteredRecordStore) {
     const std::string ns = "test.system.buckets.a";
     const auto harnessHelper = newRecordStoreHarnessHelper();
-    std::unique_ptr<RecordStore> rs = harnessHelper->newNonCappedRecordStore(ns);
-    if (!rs->isClustered()) {
+    CollectionOptions options;
+    options.clusteredIndex = ClusteredIndexOptions{};
+    std::unique_ptr<RecordStore> rs = harnessHelper->newNonCappedRecordStore(ns, options);
+    if (rs->keyFormat() == KeyFormat::Long) {
         // ephemeralForTest does not support clustered indexes.
         return;
     }

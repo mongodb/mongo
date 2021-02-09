@@ -77,15 +77,10 @@ public:
     BSONObj getPostBatchResumeToken() const {
         // Return a resume token compatible with resumable initial sync.
         if (_params.requestResumeToken) {
-            if (_lastSeenId.isNull()) {
-                return BSON("$recordId" << NullLabeler{});
-            }
-
-            if (_isClustered) {
-                return BSON("$recordId" << _lastSeenId.as<OID>());
-            } else {
-                return BSON("$recordId" << _lastSeenId.as<int64_t>());
-            }
+            return _lastSeenId.withFormat(
+                [](RecordId::Null n) { return BSON("$recordId" << NullLabeler{}); },
+                [](int64_t rid) { return BSON("$recordId" << rid); },
+                [](const OID& oid) { return BSON("$recordId" << oid); });
         }
         // Return a resume token compatible with resharding oplog sync.
         if (_params.shouldTrackLatestOplogTimestamp) {
@@ -138,9 +133,6 @@ private:
 
     CollectionScanParams _params;
 
-    // Collections with clustered indexes on _id use the ObjectId format for RecordId. All other
-    // collections use int64_t for RecordId.
-    const bool _isClustered;
     RecordId _lastSeenId;  // Null if nothing has been returned from _cursor yet.
 
     // If _params.shouldTrackLatestOplogTimestamp is set and the collection is the oplog, the latest

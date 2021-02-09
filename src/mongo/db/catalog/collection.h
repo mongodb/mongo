@@ -502,6 +502,12 @@ public:
      */
     virtual bool isTemporary(OperationContext* opCtx) const = 0;
 
+    /**
+     * Returns true if this collection is clustered on _id values. That is, its RecordIds are _id
+     * values and has no separate _id index.
+     */
+    virtual bool isClustered() const = 0;
+
     //
     // Stats
     //

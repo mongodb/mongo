@@ -52,10 +52,11 @@ public:
     RecordStoreHarnessHelper() {}
 
     virtual std::unique_ptr<mongo::RecordStore> newNonCappedRecordStore() {
-        return newNonCappedRecordStore("a.b");
+        return newNonCappedRecordStore("a.b", CollectionOptions());
     }
 
-    virtual std::unique_ptr<mongo::RecordStore> newNonCappedRecordStore(const std::string& ns) {
+    virtual std::unique_ptr<mongo::RecordStore> newNonCappedRecordStore(
+        const std::string& ns, const CollectionOptions& collOptions) {
         return std::make_unique<RecordStore>(ns,
                                              "ident"_sd /* ident */,
                                              false /* isCapped */,

@@ -205,7 +205,7 @@ WiredTigerRecordStore::OplogStones::OplogStones(OperationContext* opCtx, WiredTi
 
     invariant(rs->isCapped());
     invariant(rs->cappedMaxSize() > 0);
-    invariant(!rs->isClustered());
+    invariant(rs->keyFormat() == KeyFormat::Long);
     unsigned long long maxSize = rs->cappedMaxSize();
 
     // The minimum oplog stone size should be BSONObjMaxInternalSize.
@@ -685,7 +685,7 @@ public:
         invariantWTOK(advanceRet);
 
         RecordId id;
-        if (_rs->isClustered()) {
+        if (_rs->keyFormat() == KeyFormat::String) {
             const char* oidBytes;
             invariantWTOK(_cursor->get_key(_cursor, &oidBytes));
             id = RecordId(OID::from(oidBytes));
@@ -802,9 +802,8 @@ StatusWith<std::string> WiredTigerRecordStore::generateCreateString(
 
     // WARNING: No user-specified config can appear below this line. These options are required
     // for correct behavior of the server.
-    if (nss.isTimeseriesBucketsCollection()) {
-        // Time-series bucket collections use ObjectIds as their table keys. ObjectIds are
-        // described by a 12-byte string key format.
+    if (options.clusteredIndex) {
+        // If the RecordId format is a String, assume a 12-byte fix-length string key format.
         ss << "key_format=12s";
     } else {
         // All other collections use an int64_t as their table keys.
@@ -841,7 +840,7 @@ WiredTigerRecordStore::WiredTigerRecordStore(WiredTigerKVEngine* kvEngine,
       _tableId(WiredTigerSession::genTableId()),
       _engineName(params.engineName),
       _isCapped(params.isCapped),
-      _isClustered(params.isClustered),
+      _keyFormat(params.keyFormat),
       _isEphemeral(params.isEphemeral),
       _isLogged(!isTemp() &&
                 WiredTigerUtil::useTableLogging(
@@ -888,7 +887,7 @@ WiredTigerRecordStore::WiredTigerRecordStore(WiredTigerKVEngine* kvEngine,
     }
 
     if (_isOplog) {
-        invariant(!_isClustered);
+        invariant(_keyFormat == KeyFormat::Long);
         checkOplogFormatVersion(ctx, _uri);
         // The oplog always needs to be marked for size adjustment since it is journaled and also
         // may change during replication recovery (if truncated).
@@ -990,8 +989,8 @@ const char* WiredTigerRecordStore::name() const {
     return _engineName.c_str();
 }
 
-bool WiredTigerRecordStore::isClustered() const {
-    return _isClustered;
+KeyFormat WiredTigerRecordStore::keyFormat() const {
+    return _keyFormat;
 }
 
 bool WiredTigerRecordStore::inShutdown() const {
@@ -1089,7 +1088,7 @@ void WiredTigerRecordStore::deleteRecord(OperationContext* opCtx, const RecordId
     invariant(opCtx->lockState()->inAWriteUnitOfWork() || opCtx->lockState()->isNoop());
     // SERVER-48453: Initialize the next record id counter before deleting. This ensures we won't
     // reuse record ids, which can be problematic for the _mdb_catalog.
-    if (!_isClustered) {
+    if (_keyFormat == KeyFormat::Long) {
         _initNextIdIfNeeded(opCtx);
     }
 
@@ -1430,7 +1429,7 @@ void WiredTigerRecordStore::reclaimOplog(OperationContext* opCtx) {
 }
 
 void WiredTigerRecordStore::reclaimOplog(OperationContext* opCtx, Timestamp mayTruncateUpTo) {
-    invariant(!_isClustered);
+    invariant(_keyFormat == KeyFormat::Long);
 
     Timer timer;
     while (auto stone = _oplogStones->peekOldestStoneIfNeeded()) {
@@ -1558,7 +1557,7 @@ Status WiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
     Record highestIdRecord;
     invariant(nRecords != 0);
 
-    if (!_isClustered) {
+    if (_keyFormat == KeyFormat::Long) {
         // Non-clustered record stores will extract the RecordId key for the oplog and generate
         // unique int64_t RecordId's for everything else.
         for (size_t i = 0; i < nRecords; i++) {
@@ -1649,7 +1648,7 @@ void WiredTigerRecordStore::notifyCappedWaitersIfNeeded() {
 StatusWith<Timestamp> WiredTigerRecordStore::getLatestOplogTimestamp(
     OperationContext* opCtx) const {
     invariant(_isOplog);
-    invariant(!_isClustered);
+    invariant(_keyFormat == KeyFormat::Long);
     dassert(opCtx->lockState()->isReadLocked());
 
     WiredTigerSessionCache* cache = WiredTigerRecoveryUnit::get(opCtx)->getSessionCache();
@@ -1672,7 +1671,7 @@ StatusWith<Timestamp> WiredTigerRecordStore::getLatestOplogTimestamp(
 
 StatusWith<Timestamp> WiredTigerRecordStore::getEarliestOplogTimestamp(OperationContext* opCtx) {
     invariant(_isOplog);
-    invariant(!_isClustered);
+    invariant(_keyFormat == KeyFormat::Long);
     dassert(opCtx->lockState()->isReadLocked());
 
     stdx::lock_guard<stdx::timed_mutex> lk(_cappedDeleterMutex);
@@ -2036,7 +2035,7 @@ void WiredTigerRecordStore::updateStatsAfterRepair(OperationContext* opCtx,
 void WiredTigerRecordStore::_initNextIdIfNeeded(OperationContext* opCtx) {
     // Clustered record stores do not generate unique ObjectId's for RecordId's as the expectation
     // is for the caller to set the RecordId using the server generated ObjectId.
-    invariant(!_isClustered);
+    invariant(_keyFormat == KeyFormat::Long);
 
     // In the normal case, this will already be initialized, so use a weak load. Since this value
     // will only change from 0 to a positive integer, the only risk is reading an outdated value, 0,
@@ -2066,7 +2065,7 @@ void WiredTigerRecordStore::_initNextIdIfNeeded(OperationContext* opCtx) {
 RecordId WiredTigerRecordStore::_nextId(OperationContext* opCtx) {
     // Clustered record stores do not generate unique ObjectId's for RecordId's as the expectation
     // is for the caller to set the RecordId using the server generated ObjectId.
-    invariant(!_isClustered);
+    invariant(_keyFormat == KeyFormat::Long);
     invariant(!_isOplog);
     _initNextIdIfNeeded(opCtx);
     RecordId out = RecordId(_nextIdNum.fetchAndAdd(1));
@@ -2485,7 +2484,7 @@ StandardWiredTigerRecordStore::StandardWiredTigerRecordStore(WiredTigerKVEngine*
     : WiredTigerRecordStore(kvEngine, opCtx, params) {}
 
 RecordId StandardWiredTigerRecordStore::getKey(WT_CURSOR* cursor) const {
-    if (_isClustered) {
+    if (_keyFormat == KeyFormat::String) {
         const char* oidBytes;
         invariantWTOK(cursor->get_key(cursor, &oidBytes));
         return RecordId(OID::from(oidBytes));
@@ -2497,7 +2496,7 @@ RecordId StandardWiredTigerRecordStore::getKey(WT_CURSOR* cursor) const {
 }
 
 void StandardWiredTigerRecordStore::setKey(WT_CURSOR* cursor, RecordId id) const {
-    if (_isClustered) {
+    if (_keyFormat == KeyFormat::String) {
         cursor->set_key(cursor, id.as<OID>().view().view());
     } else {
         cursor->set_key(cursor, id.as<int64_t>());
@@ -2529,7 +2528,7 @@ WiredTigerRecordStoreStandardCursor::WiredTigerRecordStoreStandardCursor(
     : WiredTigerRecordStoreCursorBase(opCtx, rs, forward) {}
 
 void WiredTigerRecordStoreStandardCursor::setKey(WT_CURSOR* cursor, RecordId id) const {
-    if (_rs.isClustered()) {
+    if (_rs.keyFormat() == KeyFormat::String) {
         cursor->set_key(cursor, id.as<OID>().view().view());
     } else {
         cursor->set_key(cursor, id.as<int64_t>());
@@ -2537,7 +2536,7 @@ void WiredTigerRecordStoreStandardCursor::setKey(WT_CURSOR* cursor, RecordId id)
 }
 
 RecordId WiredTigerRecordStoreStandardCursor::getKey(WT_CURSOR* cursor) const {
-    if (_rs.isClustered()) {
+    if (_rs.keyFormat() == KeyFormat::String) {
         const char* oidBytes;
         invariantWTOK(cursor->get_key(cursor, &oidBytes));
         return RecordId(OID::from(oidBytes));

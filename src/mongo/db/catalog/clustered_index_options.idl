@@ -31,21 +31,11 @@ global:
 imports:
     - "mongo/idl/basic_types.idl"
 
-enums:
-    KeyFormat:
-        description: "The storage format of the RecordId keys for this collection"
-        type: string
-        values:
-            OID: OID
-
 structs:
     ClusteredIndexOptions:
         description: "The options that define a clustered _id index on a collection."
         strict: true
         fields:
-            keyFormat:
-                description: "The storage format of the RecordId keys for this collection"
-                type: KeyFormat
             expireAfterSeconds:
                 description: "The number of seconds after which old data should be deleted."
                 type: safeInt64

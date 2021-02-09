@@ -228,6 +228,10 @@ public:
         std::abort();
     }
 
+    bool isClustered() const {
+        std::abort();
+    }
+
     bool getRecordPreImages() const {
         std::abort();
     }

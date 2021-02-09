@@ -61,6 +61,16 @@ struct Record {
 };
 
 /**
+ * The format of a RecordStore's RecordId keys.
+ */
+enum class KeyFormat {
+    /** Signed 64-bit integer */
+    Long,
+    /** Variable-length binary comparable data */
+    String,
+};
+
+/**
  * Retrieves Records from a RecordStore.
  *
  * A cursor is constructed with a direction flag with the following effects:
@@ -228,12 +238,13 @@ public:
     }
 
     /**
-     * Collections with clustered indexes on _id use the ObjectId format for RecordId. All other
-     * RecordStores use int64_t for RecordId. Clustered RecordStores require callers to provide
-     * RecordIds and will not generate them automatically. The oplog is already clustered internally
-     * by timestamp, and cannot be clustered by ObjectId.
+     * The key format for this RecordStore's RecordIds.
+     *
+     * Collections with clustered indexes on _id may use the String format, however most
+     * RecordStores use Long. RecordStores with the String format require callers to provide
+     * RecordIds and will not generate them automatically.
      */
-    virtual bool isClustered() const = 0;
+    virtual KeyFormat keyFormat() const = 0;
 
     /**
      * The dataSize is an approximation of the sum of the sizes (in bytes) of the
@@ -329,11 +340,19 @@ public:
                                       const char* data,
                                       int len,
                                       Timestamp timestamp) {
-        // Clustered record stores do not generate unique ObjectIds for RecordIds. The expectation
-        // is for the caller to pass a non-null RecordId.
-        invariant(!isClustered());
+        // Record stores with the Long key format accept a null RecordId, as the storage engine will
+        // generate one.
+        invariant(keyFormat() == KeyFormat::Long);
+        return insertRecord(opCtx, RecordId(), data, len, timestamp);
+    }
 
-        std::vector<Record> inOutRecords{Record{RecordId(), RecordData(data, len)}};
+    /**
+     * A thin wrapper around insertRecords() to simplify handling of single document inserts.
+     * If RecordId is null, the storage engine will generate one and return it.
+     */
+    StatusWith<RecordId> insertRecord(
+        OperationContext* opCtx, RecordId rid, const char* data, int len, Timestamp timestamp) {
+        std::vector<Record> inOutRecords{Record{rid, RecordData(data, len)}};
         Status status = insertRecords(opCtx, &inOutRecords, std::vector<Timestamp>{timestamp});
         if (!status.isOK())
             return status;

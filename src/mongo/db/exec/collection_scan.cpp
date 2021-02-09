@@ -64,8 +64,7 @@ CollectionScan::CollectionScan(ExpressionContext* expCtx,
     : RequiresCollectionStage(kStageType, expCtx, collection),
       _workingSet(workingSet),
       _filter((filter && !filter->isTriviallyTrue()) ? filter : nullptr),
-      _params(params),
-      _isClustered(collection->getRecordStore()->isClustered()) {
+      _params(params) {
     // Explain reports the direction of the collection scan.
     _specificStats.direction = params.direction;
     _specificStats.minTs = params.minTs;

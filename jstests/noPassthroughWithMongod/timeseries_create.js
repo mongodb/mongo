@@ -51,7 +51,6 @@ const testOptions = function(allowed,
         assert(bucketsColl, collections);
         assert.eq(bucketsColl.type, "collection", bucketsColl);
         assert(bucketsColl.options.hasOwnProperty('clusteredIndex'), bucketsColl);
-        assert.eq(bucketsColl.options.clusteredIndex.keyFormat, 'OID', bucketsColl);
         if (timeseriesOptions.expireAfterSeconds) {
             assert.eq(bucketsColl.options.clusteredIndex.expireAfterSeconds,
                       timeseriesOptions.expireAfterSeconds,

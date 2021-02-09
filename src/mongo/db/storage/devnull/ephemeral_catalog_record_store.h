@@ -58,8 +58,8 @@ public:
 
     virtual const char* name() const;
 
-    virtual bool isClustered() const {
-        return false;
+    virtual KeyFormat keyFormat() const {
+        return KeyFormat::Long;
     }
 
     virtual RecordData dataFor(OperationContext* opCtx, const RecordId& loc) const;

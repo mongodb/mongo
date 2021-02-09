@@ -293,6 +293,8 @@ public:
 
     bool isTemporary(OperationContext* opCtx) const final;
 
+    bool isClustered() const final;
+
     //
     // Stats
     //
@@ -462,6 +464,9 @@ private:
     Validator _validator;
     boost::optional<ValidationActionEnum> _validationAction;
     boost::optional<ValidationLevelEnum> _validationLevel;
+
+    // Whether or not this collection is clustered on _id values.
+    bool _clustered = false;
 
     bool _recordPreImages = false;
 

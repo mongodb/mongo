@@ -32,6 +32,7 @@
 #include <cstdint>
 #include <memory>
 
+#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/test_harness_helper.h"
@@ -45,7 +46,12 @@ class RecordStoreHarnessHelper : public HarnessHelper {
 public:
     virtual std::unique_ptr<RecordStore> newNonCappedRecordStore() = 0;
 
-    virtual std::unique_ptr<RecordStore> newNonCappedRecordStore(const std::string& ns) = 0;
+    std::unique_ptr<RecordStore> newNonCappedRecordStore(const std::string& ns) {
+        return newNonCappedRecordStore(ns, CollectionOptions());
+    }
+
+    virtual std::unique_ptr<RecordStore> newNonCappedRecordStore(
+        const std::string& ns, const CollectionOptions& options) = 0;
 
     static const int64_t kDefaultCapedSizeBytes = 16 * 1024 * 1024;
     virtual std::unique_ptr<RecordStore> newCappedRecordStore(
