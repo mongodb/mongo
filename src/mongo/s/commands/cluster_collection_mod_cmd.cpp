@@ -117,9 +117,14 @@ public:
 
     void validateResult(const BSONObj& resultObj) final {
         auto ctx = IDLParserErrorContext("CollModReply");
-        StringDataSet ignorableFields(
-            {kWriteConcernErrorFieldName, ErrorReply::kOkFieldName, kTopologyVersionFieldName});
+        StringDataSet ignorableFields({kWriteConcernErrorFieldName,
+                                       ErrorReply::kOkFieldName,
+                                       kTopologyVersionFieldName,
+                                       kRawFieldName});
         if (!checkIsErrorStatus(resultObj, ctx)) {
+            auto reply = Reply::parse(ctx, resultObj.removeFields(ignorableFields));
+            coll_mod_reply_validation::validateReply(reply);
+
             if (resultObj.hasField(kRawFieldName)) {
                 const auto& rawData = resultObj[kRawFieldName];
                 if (ctx.checkAndAssertType(rawData, Object)) {
@@ -132,9 +137,6 @@ public:
                         }
                     }
                 }
-            } else {
-                auto reply = Reply::parse(ctx, resultObj.removeFields(ignorableFields));
-                coll_mod_reply_validation::validateReply(reply);
             }
         }
     }
