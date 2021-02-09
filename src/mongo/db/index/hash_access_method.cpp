@@ -43,7 +43,7 @@ HashAccessMethod::HashAccessMethod(IndexCatalogEntry* btreeState, SortedDataInte
 
     // We can change these if the single-field limitation is lifted later.
     uassert(16763,
-            "Currently only single field hashed index supported.",
+            "Hashed indices currently only support a single field.",
             1 == descriptor->getNumFields());
 
     uassert(16764,
