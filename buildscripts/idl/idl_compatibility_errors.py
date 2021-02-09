@@ -65,6 +65,7 @@ ERROR_ID_NEW_COMMAND_TYPE_FIELD_UNSTABLE = "ID0021"
 ERROR_ID_NEW_COMMAND_TYPE_NOT_STRUCT = "ID0022"
 ERROR_ID_NEW_COMMAND_TYPE_NOT_ENUM = "ID0023"
 ERROR_ID_NEW_COMMAND_TYPE_ENUM_OR_STRUCT = "ID0024"
+ERROR_ID_MISSING_ERROR_REPLY_STRUCT = "ID0025"
 
 
 class IDLCompatibilityCheckerError(Exception):
@@ -225,6 +226,11 @@ class IDLCompatibilityContext(object):
             ERROR_ID_COMMAND_TYPE_NOT_SUPERSET, command_name,
             "'%s' has type '%s' that is not a subset of the other version of this command." %
             (command_name, type_name), file)
+
+    def add_missing_error_reply_struct_error(self, file: str) -> None:
+        """Add an error about the file missing the ErrorReply struct."""
+        self._add_error(ERROR_ID_MISSING_ERROR_REPLY_STRUCT, "n/a",
+                        ("'%s' is missing the ErrorReply struct") % (file), file)
 
     def add_new_command_type_bson_any_error(self, command_name: str, new_type: str,
                                             file: str) -> None:

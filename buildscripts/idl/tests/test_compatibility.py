@@ -255,6 +255,27 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
             idl_compatibility_errors.ERROR_ID_NEW_COMMAND_TYPE_FIELD_MISSING)
         self.assertRegex(str(new_type_field_missing_error), "newTypeFieldMissing")
 
+    def test_error_reply(self):
+        """Tests the compatibility checker with the ErrorReply struct."""
+        dir_path = path.dirname(path.realpath(__file__))
+
+        self.assertFalse(
+            idl_check_compatibility.check_error_reply(
+                path.join(dir_path, "compatibility_test_pass/old/error_reply.idl"),
+                path.join(dir_path, "compatibility_test_pass/new/error_reply.idl"),
+                []).has_errors())
+
+        error_collection_fail = idl_check_compatibility.check_error_reply(
+            path.join(dir_path, "compatibility_test_fail/old/error_reply.idl"),
+            path.join(dir_path, "compatibility_test_fail/new/error_reply.idl"), [])
+
+        self.assertTrue(error_collection_fail.has_errors())
+        self.assertTrue(error_collection_fail.count() == 1)
+
+        new_error_reply_field_optional_error = error_collection_fail.get_error_by_error_id(
+            idl_compatibility_errors.ERROR_ID_NEW_REPLY_FIELD_OPTIONAL)
+        self.assertRegex(str(new_error_reply_field_optional_error), "n/a")
+
 
 if __name__ == '__main__':
     unittest.main()
