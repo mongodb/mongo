@@ -115,7 +115,7 @@ executor:
     n: 20
   fixture:
     class: TenantMigrationFixture
-    mongod_options:
+    common_mongod_options:
       set_parameters:
         enableTestCommands: 1
         failpoint.abortTenantMigrationBeforeLeavingBlockingState:
@@ -129,8 +129,11 @@ executor:
         ttlMonitorSleepSecs: 1
       tlsMode: allowTLS
       tlsCAFile: jstests/libs/ca.pem
-      tlsCertificateKeyFile: jstests/libs/rs0.pem
       tlsAllowInvalidHostnames: ''
+    per_mongod_options:
+      # Each entry is for a different replica set's extra mongod options.
+      - tlsCertificateKeyFile: jstests/libs/rs0.pem
+      - tlsCertificateKeyFile: jstests/libs/rs1.pem
     num_replica_sets: 2
     num_nodes_per_replica_set: 3
     use_replica_set_connection_string: true
