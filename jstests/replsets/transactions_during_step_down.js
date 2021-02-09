@@ -112,10 +112,6 @@ jsTestLog("Testing stepdown during commit transaction.");
 testAbortOrCommitTxnFailsWithCode(
     {failPoint: "hangBeforeCommitingTxn", op: "session.commitTransaction_forTesting()"});
 
-jsTestLog("Testing stepdown during abort transaction.");
-testAbortOrCommitTxnFailsWithCode(
-    {failPoint: "hangBeforeAbortingTxn", op: "session.abortTransaction_forTesting()"});
-
 jsTestLog("Testing stepdown during running transaction in inactive state.");
 // Do not start the transaction in parallel shell because when the parallel
 // shell work is done, implicit call to "endSessions" and "abortTransaction"
