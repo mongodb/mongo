@@ -31,16 +31,6 @@ describe command("#{service} mongod stop") do
   its('exit_status') { should eq 0 }
 end
 
-if (os[:name] == 'amazon' and os[:release] == '2.0')
-  describe systemd_service('mongod') do
-    it { should_not be_running }
-  end
-else
-  describe service('mongod') do
-    it { should_not be_running }
-  end
-end
-
 describe command("#{service} mongod restart") do
   its('exit_status') { should eq 0 }
 end

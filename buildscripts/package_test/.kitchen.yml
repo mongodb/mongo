@@ -20,10 +20,11 @@ verifier:
   sudo: true
 
 provisioner:
-  name: chef_solo
-  require_chef_omnibus: 15
-  chef_license: accept
+  name: chef_zero
   log_level: info
+  product_name: cinc
+  product_version: 16.7.61
+  download_url: https://omnitruck.cinc.sh/install.sh
 
 platforms:
   - name: amazon-x86-64
