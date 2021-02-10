@@ -72,6 +72,8 @@ class FreeMonWebServer {
             }
         }
 
+        clearRawMongoProgramOutput();
+
         this.pid = _startMongoProgram({args: args});
 
         assert(checkProgram(this.pid));
