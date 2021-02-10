@@ -259,8 +259,8 @@ enum class LeafTraversalMode {
  */
 EvalExprStagePair generatePathTraversal(EvalStage inputStage,
                                         sbe::value::SlotId inputSlot,
-                                        const FieldPath& fp,
-                                        size_t level,
+                                        const FieldRef& fp,
+                                        FieldIndex level,
                                         PlanNodeId planNodeId,
                                         sbe::value::SlotIdGenerator* slotIdGenerator,
                                         sbe::value::FrameIdGenerator* frameIdGenerator,
@@ -269,13 +269,13 @@ EvalExprStagePair generatePathTraversal(EvalStage inputStage,
                                         const FilterStateHelper& stateHelper) {
     using namespace std::literals;
 
-    invariant(level < fp.getPathLength());
+    invariant(level < fp.numParts());
 
-    const bool isLeafField = (level == fp.getPathLength() - 1u);
+    const bool isLeafField = (level == fp.numParts() - 1u);
 
     // Generate the projection stage to read a sub-field at the current nested level and bind it
     // to 'fieldSlot'.
-    std::string_view fieldName{fp.getFieldName(level).rawData(), fp.getFieldName(level).size()};
+    std::string_view fieldName{fp.getPart(level).rawData(), fp.getPart(level).size()};
     auto fieldSlot{slotIdGenerator->generate()};
     auto fromBranch =
         makeProject(std::move(inputStage),
@@ -405,7 +405,7 @@ void generatePredicate(MatchExpressionVisitorContext* context,
         if (!path.empty()) {
             return generatePathTraversal(frame.extractStage(),
                                          frame.data().inputSlot,
-                                         FieldPath{path},
+                                         FieldRef{path},
                                          0,
                                          context->planNodeId,
                                          context->slotIdGenerator,
