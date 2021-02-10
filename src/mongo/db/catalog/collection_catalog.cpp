@@ -1085,19 +1085,27 @@ void CollectionCatalog::addResource(const ResourceId& rid, const std::string& en
 
 CollectionCatalogStasher::CollectionCatalogStasher(OperationContext* opCtx)
     : _opCtx(opCtx), _stashed(false) {}
+
 CollectionCatalogStasher::CollectionCatalogStasher(OperationContext* opCtx,
                                                    std::shared_ptr<const CollectionCatalog> catalog)
     : _opCtx(opCtx), _stashed(true) {
     invariant(catalog);
     CollectionCatalog::stash(_opCtx, std::move(catalog));
 }
-CollectionCatalogStasher::~CollectionCatalogStasher() {
-    reset();
-}
 
 CollectionCatalogStasher::CollectionCatalogStasher(CollectionCatalogStasher&& other)
     : _opCtx(other._opCtx), _stashed(other._stashed) {
     other._stashed = false;
+}
+
+CollectionCatalogStasher::~CollectionCatalogStasher() {
+    if (_opCtx->isLockFreeReadsOp()) {
+        // Leave the catalog stashed on the opCtx because there is another Stasher instance still
+        // using it.
+        return;
+    }
+
+    reset();
 }
 
 void CollectionCatalogStasher::stash(std::shared_ptr<const CollectionCatalog> catalog) {

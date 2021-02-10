@@ -112,6 +112,10 @@ auto acquireCollectionAndConsistentSnapshot(
         // If this is a nested lock acquisition, then we already have a consistent stashed catalog
         // and snapshot from which to read and we can skip the below logic.
         if (isLockFreeReadSubOperation) {
+            // A consistent in-memory and on-disk state is already set up by a higher level AutoGet*
+            // instance. Save the catalog on this instance, to retain it against out-of-order
+            // AutoGet* destruction, and return early.
+            catalogStasher.stash(catalog);
             return collection;
         }
 
@@ -597,10 +601,10 @@ const NamespaceString& AutoGetCollectionForReadCommandMaybeLockFree::getNss() co
 AutoGetDbForReadLockFree::AutoGetDbForReadLockFree(OperationContext* opCtx,
                                                    StringData dbName,
                                                    Date_t deadline)
-    : _lockFreeReadsBlock(opCtx),
+    : _catalogStash(opCtx),
+      _lockFreeReadsBlock(opCtx),
       _globalLock(
-          opCtx, MODE_IS, deadline, Lock::InterruptBehavior::kThrow, true /* skipRSTLLock */),
-      _catalogStash(opCtx) {
+          opCtx, MODE_IS, deadline, Lock::InterruptBehavior::kThrow, true /* skipRSTLLock */) {
 
     // Type that pretends to be a Collection. It implements the minimal interface used by
     // acquireCollectionAndConsistentSnapshot(). We are tricking
