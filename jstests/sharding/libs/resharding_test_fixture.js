@@ -75,11 +75,6 @@ var ReshardingTest = class {
             config: 1,
             shards: this._numShards,
             rs: {nodes: 2},
-            rsOptions: {
-                setParameter: {
-                    "failpoint.WTPreserveSnapshotHistoryIndefinitely": tojson({mode: "alwaysOn"}),
-                }
-            },
             manualAddShard: true,
         });
 
