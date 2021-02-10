@@ -61,3 +61,10 @@ commands:
                 description: "The user attempting to authenticate"
                 type: string
                 optional: true
+
+    logout:
+        description: "Deauthenticate from the current database"
+        command_name: logout
+        namespace: ignored
+        cpp_name: LogoutCommand
+        api_version: ""
