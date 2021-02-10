@@ -64,6 +64,7 @@ MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationBeforeLeavingAbortingIndexBuildsStat
 MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationBeforeLeavingBlockingState);
 MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationBeforeLeavingDataSyncState);
 MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationDonorBeforeMarkingStateGarbageCollectable);
+MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationBeforeEnteringFutureChain);
 
 const std::string kTTLIndexName = "TenantMigrationDonorTTLIndex";
 const std::string kExternalKeysTTLIndexName = "ExternalKeysTTLIndex";
@@ -281,8 +282,11 @@ boost::optional<BSONObj> TenantMigrationDonorService::Instance::reportForCurrent
     bob.append("recipientConnectionString", _stateDoc.getRecipientConnectionString());
     bob.append("readPreference", _stateDoc.getReadPreference().toInnerBSON());
     bob.append("lastDurableState", _durableState.state);
+    if (_stateDoc.getMigrationStart()) {
+        bob.appendDate("migrationStart", *_stateDoc.getMigrationStart());
+    }
     if (_stateDoc.getExpireAt()) {
-        bob.append("expireAt", _stateDoc.getExpireAt()->toString());
+        bob.appendDate("expireAt", *_stateDoc.getExpireAt());
     }
     if (_stateDoc.getStartMigrationDonorTimestamp()) {
         bob.append("startMigrationDonorTimestamp",
@@ -739,6 +743,12 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendRecipientForget
 SemiFuture<void> TenantMigrationDonorService::Instance::run(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancelationToken& serviceToken) noexcept {
+    if (!_stateDoc.getMigrationStart()) {
+        _stateDoc.setMigrationStart(_serviceContext->getFastClockSource()->now());
+    }
+
+    pauseTenantMigrationBeforeEnteringFutureChain.pauseWhileSet();
+
     _abortMigrationSource = CancelationSource(serviceToken);
     auto recipientTargeterRS = std::make_shared<RemoteCommandTargeterRS>(
         _recipientUri.getSetName(), _recipientUri.getServers());

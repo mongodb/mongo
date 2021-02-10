@@ -132,6 +132,11 @@ structs:
                     timestamp is majority committed.
                 validator:
                     callback: "tenant_migration_util::validateTimestampNotNull"
+            migrationStart:
+                type: date
+                description: >-
+                    The wall-clock time at which the migration has started.
+                optional: true
 
     tenantMigrationRecipientDocument:
         description: "Represents an in-progress tenant migration on the migration recipient."

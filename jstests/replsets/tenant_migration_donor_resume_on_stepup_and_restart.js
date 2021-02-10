@@ -286,6 +286,103 @@ function testDonorAbortMigrationInterrupt(interruptFunc, fpName, isShutdown = fa
     recipientRst.stopSet();
 }
 
+/**
+ * Starts a migration and sets the passed in failpoint, then either waits for the failpoint or lets
+ * the migration run successfully and interrupts the donor using the 'interruptFunc'. After
+ * restarting, check the to see if the donorDoc data has persisted.
+ */
+function testStateDocPersistenceOnFailover(interruptFunc, fpName, isShutdown = false) {
+    const donorRst = new ReplSetTest({
+        nodes: 3,
+        name: "donorRst",
+        nodeOptions: Object.assign(migrationX509Options.donor, {
+            setParameter: {
+                tenantMigrationGarbageCollectionDelayMS: kGarbageCollectionDelayMS,
+                ttlMonitorSleepSecs: kTTLMonitorSleepSecs,
+            }
+        })
+    });
+    const recipientRst = new ReplSetTest({
+        nodes: 1,
+        name: "recipientRst",
+        nodeOptions: Object.assign(migrationX509Options.recipient, {
+            setParameter: {
+                // TODO SERVER-52719: Remove the failpoint
+                // 'returnResponseOkForRecipientSyncDataCmd'.
+                'failpoint.returnResponseOkForRecipientSyncDataCmd': tojson({mode: 'alwaysOn'}),
+                tenantMigrationGarbageCollectionDelayMS: kGarbageCollectionDelayMS,
+                ttlMonitorSleepSecs: kTTLMonitorSleepSecs,
+            }
+        })
+    });
+
+    donorRst.startSet();
+    donorRst.initiate();
+
+    recipientRst.startSet();
+    recipientRst.initiate();
+
+    const tenantMigrationTest =
+        new TenantMigrationTest({name: jsTestName(), donorRst, recipientRst});
+    if (!tenantMigrationTest.isFeatureFlagEnabled()) {
+        jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
+        donorRst.stopSet();
+        recipientRst.stopSet();
+        return;
+    }
+
+    const migrationId = UUID();
+    const migrationOpts = {
+        migrationIdString: extractUUIDFromObject(migrationId),
+        tenantId: kTenantId,
+        recipientConnString: tenantMigrationTest.getRecipientConnString(),
+    };
+    let donorPrimary = tenantMigrationTest.getDonorPrimary();
+
+    // If we passed in a valid failpoint we set it, otherwise we let the migration run normally.
+    let fp;
+    if (fpName) {
+        fp = configureFailPoint(donorPrimary, fpName);
+        assert.commandWorked(tenantMigrationTest.startMigration(migrationOpts));
+        fp.wait();
+    } else {
+        assert.commandWorked(tenantMigrationTest.runMigration(migrationOpts));
+    }
+
+    let configDonorsColl = donorPrimary.getCollection(TenantMigrationTest.kConfigDonorsNS);
+    let donorDocBeforeFailover = configDonorsColl.findOne({tenantId: kTenantId});
+
+    interruptFunc(tenantMigrationTest.getDonorRst());
+
+    if (fp && !isShutdown) {
+        // Turn off failpoint in order to allow the migration to resume after stepup.
+        fp.off();
+    }
+
+    donorPrimary = tenantMigrationTest.getDonorPrimary();
+    configDonorsColl = donorPrimary.getCollection(TenantMigrationTest.kConfigDonorsNS);
+    let donorDocAfterFailover = configDonorsColl.findOne({tenantId: kTenantId});
+
+    // Check persisted fields in the donor doc.
+    assert.eq(donorDocBeforeFailover._id, donorDocAfterFailover._id);
+    assert.eq(donorDocBeforeFailover.recipientConnString,
+              donorDocAfterFailover.recipientConnString);
+    assert.eq(donorDocBeforeFailover.readPreference, donorDocAfterFailover.readPreference);
+    assert.eq(donorDocBeforeFailover.startMigrationDonorTimestamp,
+              donorDocAfterFailover.startMigrationDonorTimestamp);
+    assert.eq(donorDocBeforeFailover.migration, donorDocAfterFailover.migration);
+    assert.eq(donorDocBeforeFailover.tenantId, donorDocAfterFailover.tenantId);
+    assert.eq(donorDocBeforeFailover.donorCertificateForRecipient,
+              donorDocAfterFailover.donorCertificateForRecipient);
+    assert.eq(donorDocBeforeFailover.recipientCertificateForDonor,
+              donorDocAfterFailover.recipientCertificateForDonor);
+    assert.eq(donorDocBeforeFailover.migrationStart, donorDocAfterFailover.migrationStart);
+
+    tenantMigrationTest.stop();
+    donorRst.stopSet();
+    recipientRst.stopSet();
+}
+
 (() => {
     jsTest.log("Test that the migration resumes on stepup");
     testDonorStartMigrationInterrupt((donorRst) => {
@@ -351,6 +448,41 @@ function testDonorAbortMigrationInterrupt(interruptFunc, fpName, isShutdown = fa
         }
 
         testDonorAbortMigrationInterrupt((donorRst) => {
+            // Force the primary to step down but make it likely to step back up.
+            const donorPrimary = donorRst.getPrimary();
+            assert.commandWorked(donorPrimary.adminCommand(
+                {replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
+            assert.commandWorked(donorPrimary.adminCommand({replSetFreeze: 0}));
+        }, fpName);
+    });
+})();
+
+(() => {
+    jsTest.log("Test stateDoc data persistence on restart.");
+    kMigrationFpNames.forEach(fpName => {
+        if (!fpName) {
+            jsTest.log("Testing without setting a failpoint.");
+        } else {
+            jsTest.log("Testing with failpoint: " + fpName);
+        }
+
+        testStateDocPersistenceOnFailover((donorRst) => {
+            donorRst.stopSet(null /* signal */, true /*forRestart */);
+            donorRst.startSet({restart: true});
+        }, fpName, true);
+    });
+})();
+
+(() => {
+    jsTest.log("Test stateDoc data persistence on stepup.");
+    kMigrationFpNames.forEach(fpName => {
+        if (!fpName) {
+            jsTest.log("Testing without setting a failpoint.");
+        } else {
+            jsTest.log("Testing with failpoint: " + fpName);
+        }
+
+        testStateDocPersistenceOnFailover((donorRst) => {
             // Force the primary to step down but make it likely to step back up.
             const donorPrimary = donorRst.getPrimary();
             assert.commandWorked(donorPrimary.adminCommand(

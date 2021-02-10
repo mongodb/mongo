@@ -60,6 +60,8 @@ const kReadPreference = {
     assert.eq(bsonWoCompare(res.inprog[0].readPreference, kReadPreference), 0);
     assert.eq(res.inprog[0].lastDurableState, migrationStates.kAbortingIndexBuilds);
     assert.eq(res.inprog[0].migrationCompleted, false);
+    assert(res.inprog[0].migrationStart);
+    assert(res.inprog[0].migrationStart instanceof Date);
 
     fp.off();
     assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
@@ -97,6 +99,8 @@ const kReadPreference = {
     assert.eq(res.inprog[0].lastDurableState, migrationStates.kDataSync);
     assert(res.inprog[0].startMigrationDonorTimestamp);
     assert.eq(res.inprog[0].migrationCompleted, false);
+    assert(res.inprog[0].migrationStart);
+    assert(res.inprog[0].migrationStart instanceof Date);
 
     fp.off();
     assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
@@ -134,6 +138,8 @@ const kReadPreference = {
     assert(res.inprog[0].startMigrationDonorTimestamp);
     assert(res.inprog[0].blockTimestamp);
     assert.eq(res.inprog[0].migrationCompleted, false);
+    assert(res.inprog[0].migrationStart);
+    assert(res.inprog[0].migrationStart instanceof Date);
 
     fp.off();
     assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
@@ -173,6 +179,9 @@ const kReadPreference = {
     assert(res.inprog[0].commitOrAbortOpTime);
     assert(res.inprog[0].abortReason);
     assert.eq(res.inprog[0].migrationCompleted, false);
+    assert(res.inprog[0].migrationStart);
+    assert(res.inprog[0].migrationStart instanceof Date);
+
     tenantMigrationTest.stop();
 })();
 
@@ -207,6 +216,8 @@ const kReadPreference = {
     assert(res.inprog[0].blockTimestamp);
     assert(res.inprog[0].commitOrAbortOpTime);
     assert.eq(res.inprog[0].migrationCompleted, false);
+    assert(res.inprog[0].migrationStart);
+    assert(res.inprog[0].migrationStart instanceof Date);
 
     jsTestLog("Testing currentOp output for a committed migration after donorForgetMigration");
 
@@ -225,6 +236,9 @@ const kReadPreference = {
     assert(res.inprog[0].commitOrAbortOpTime);
     assert(res.inprog[0].expireAt);
     assert.eq(res.inprog[0].migrationCompleted, true);
+    assert(res.inprog[0].migrationStart);
+    assert(res.inprog[0].migrationStart instanceof Date);
+
     tenantMigrationTest.stop();
 })();
 })();
