@@ -907,9 +907,6 @@ StatusWith<DurableCatalog::ImportResult> DurableCatalogImpl::importCollection(
     uassert(ErrorCodes::BadValue,
             "Attempted to import catalog entry without an ident",
             metadata.hasField("ident"));
-    uassert(ErrorCodes::BadValue,
-            "Attempted to import collection without idxIdent",
-            metadata.hasField("idxIdent"));
 
     const auto& catalogEntry = [&] {
         if (uuidOption == ImportCollectionUUIDOption::kGenerateNew) {
@@ -931,8 +928,10 @@ StatusWith<DurableCatalog::ImportResult> DurableCatalogImpl::importCollection(
     {
         const std::string collectionIdent = catalogEntry["ident"].String();
 
-        for (const auto& indexIdent : catalogEntry["idxIdent"].Obj()) {
-            indexIdents.insert(indexIdent.String());
+        if (!catalogEntry["idxIdent"].eoo()) {
+            for (const auto& indexIdent : catalogEntry["idxIdent"].Obj()) {
+                indexIdents.insert(indexIdent.String());
+            }
         }
 
         auto identsToImportConflict = [&](WithLock) -> bool {
