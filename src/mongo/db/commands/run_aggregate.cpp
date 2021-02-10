@@ -292,8 +292,9 @@ StatusWith<StringMap<ExpressionContext::ResolvedNamespace>> resolveInvolvedNames
         }
 
         // If 'ns' refers to a view namespace, then we resolve its definition.
-        auto resolveViewDefinition = [&](const NamespaceString& ns) -> Status {
-            auto resolvedView = viewCatalog->resolveView(opCtx, ns);
+        auto resolveViewDefinition = [&](const NamespaceString& ns,
+                                         std::shared_ptr<const ViewCatalog> vcp) -> Status {
+            auto resolvedView = vcp->resolveView(opCtx, ns);
             if (!resolvedView.isOK()) {
                 return resolvedView.getStatus().withContext(
                     str::stream() << "Failed to resolve view '" << involvedNs.ns());
@@ -316,22 +317,40 @@ StatusWith<StringMap<ExpressionContext::ResolvedNamespace>> resolveInvolvedNames
         };
 
         // If the involved namespace is not in the same database as the aggregation, it must be
-        // from an $out or a $merge to a collection in a different database.
+        // from a $lookup/$graphLookup into a tenant migration donor's oplog view or from an
+        // $out/$merge to a collection in a different database.
         if (involvedNs.db() != request.getNamespace().db()) {
-            // SERVER-51886: It is not correct to assume that we are reading from a collection
-            // because the collection targeted by $out/$merge on a given database can have the same
-            // name as a view on the source database. As such, we determine whether the collection
-            // name references a view on the aggregation request's database. Note that the inverse
-            // scenario (mistaking a view for a collection) is not an issue because $merge/$out
-            // cannot target a view.
-            auto nssToCheck = NamespaceString(request.getNamespace().db(), involvedNs.coll());
-            if (viewCatalog && viewCatalog->lookup(opCtx, nssToCheck.ns())) {
-                auto status = resolveViewDefinition(nssToCheck);
+            if (involvedNs == NamespaceString::kTenantMigrationOplogView) {
+                // For tenant migrations, we perform an aggregation on 'config.transactions' but
+                // require a lookup stage involving a view on the 'local' database.
+                // If the involved namespace is 'local.system.tenantMigration.oplogView', resolve
+                // its view definition.
+                auto involvedDbViewCatalog =
+                    DatabaseHolder::get(opCtx)->getViewCatalog(opCtx, involvedNs.db());
+
+                // It is safe to assume that the ViewCatalog for the `local` database always
+                // exists because replica sets forbid dropping the oplog and the `local` database.
+                invariant(involvedDbViewCatalog);
+                auto status = resolveViewDefinition(involvedNs, involvedDbViewCatalog);
                 if (!status.isOK()) {
                     return status;
                 }
             } else {
-                resolvedNamespaces[involvedNs.coll()] = {involvedNs, std::vector<BSONObj>{}};
+                // SERVER-51886: It is not correct to assume that we are reading from a collection
+                // because the collection targeted by $out/$merge on a given database can have the
+                // same name as a view on the source database. As such, we determine whether the
+                // collection name references a view on the aggregation request's database. Note
+                // that the inverse scenario (mistaking a view for a collection) is not an issue
+                // because $merge/$out cannot target a view.
+                auto nssToCheck = NamespaceString(request.getNamespace().db(), involvedNs.coll());
+                if (viewCatalog && viewCatalog->lookup(opCtx, nssToCheck.ns())) {
+                    auto status = resolveViewDefinition(nssToCheck, viewCatalog);
+                    if (!status.isOK()) {
+                        return status;
+                    }
+                } else {
+                    resolvedNamespaces[involvedNs.coll()] = {involvedNs, std::vector<BSONObj>{}};
+                }
             }
         } else if (!viewCatalog ||
                    CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, involvedNs)) {
@@ -342,7 +361,7 @@ StatusWith<StringMap<ExpressionContext::ResolvedNamespace>> resolveInvolvedNames
             // snapshot of the view catalog.
             resolvedNamespaces[involvedNs.coll()] = {involvedNs, std::vector<BSONObj>{}};
         } else if (viewCatalog->lookup(opCtx, involvedNs.ns())) {
-            auto status = resolveViewDefinition(involvedNs);
+            auto status = resolveViewDefinition(involvedNs, viewCatalog);
             if (!status.isOK()) {
                 return status;
             }

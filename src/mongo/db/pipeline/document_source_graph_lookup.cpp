@@ -53,12 +53,14 @@ bool foreignShardedLookupAllowed() {
     return getTestCommandsEnabled() && internalQueryAllowShardedLookup.load();
 }
 
-// Parses $graphLookup 'from' field. The 'from' field must be a string or
-// {from: {db: "local", coll: "oplog.rs"}, ...}.
+// Parses $graphLookup 'from' field. The 'from' field must be a string with the exception of
+// 'local.system.tenantMigration.oplogView'.
+//
+// {from: {db: "local", coll: "system.tenantMigration.oplogView"}, ...}.
 NamespaceString parseGraphLookupFromAndResolveNamespace(const BSONElement& elem,
                                                         StringData defaultDb) {
-    // The object syntax only works for local.oplog.rs which is not a user namespace so object type
-    // is omitted from the error message below.
+    // The object syntax only works for 'local.system.tenantMigration.oplogView' which is not a user
+    // namespace so object type is omitted from the error message below.
     uassert(ErrorCodes::FailedToParse,
             str::stream() << "$graphLookup 'from' field must be a string, but found "
                           << typeName(elem.type()),
@@ -79,7 +81,7 @@ NamespaceString parseGraphLookupFromAndResolveNamespace(const BSONElement& elem,
             str::stream()
                 << "$graphLookup with syntax {from: {db:<>, coll:<>},..} is not supported for db: "
                 << nss.db() << " and coll: " << nss.coll(),
-            nss == NamespaceString::kRsOplogNamespace);
+            nss == NamespaceString::kTenantMigrationOplogView);
     return nss;
 }
 
@@ -245,13 +247,11 @@ void DocumentSourceGraphLookUp::doBreadthFirstSearch() {
             _variables.copyToExpCtx(_variablesParseState, _fromExpCtx.get());
             auto pipeline = Pipeline::makePipeline(_fromPipeline, _fromExpCtx, pipelineOpts);
             while (auto next = pipeline->getNext()) {
-                // Make an exception for the oplog, since its docs are de-duplicated by the 'ts'
-                // field instead.
                 uassert(40271,
                         str::stream()
                             << "Documents in the '" << _from.ns()
                             << "' namespace must contain an _id for de-duplication in $graphLookup",
-                        (_from == NamespaceString::kRsOplogNamespace) || !(*next)["_id"].missing());
+                        !(*next)["_id"].missing());
 
                 shouldPerformAnotherQuery =
                     addToVisitedAndFrontier(*next, depth) || shouldPerformAnotherQuery;
@@ -269,9 +269,8 @@ void DocumentSourceGraphLookUp::doBreadthFirstSearch() {
 }
 
 bool DocumentSourceGraphLookUp::addToVisitedAndFrontier(Document result, long long depth) {
-    // The oplog does not have _id so visited oplog docs are cached by 'ts' instead.
-    auto id = _from == NamespaceString::kRsOplogNamespace ? result.getField("ts")
-                                                          : result.getField("_id");
+    auto id = result.getField("_id");
+
     if (_visited.find(id) != _visited.end()) {
         // We've already seen this object, don't repeat any work.
         return false;
@@ -603,7 +602,8 @@ intrusive_ptr<DocumentSource> DocumentSourceGraphLookUp::createFromBson(
         if (argName == "from" || argName == "as" || argName == "connectFromField" ||
             argName == "depthField" || argName == "connectToField") {
             // All remaining arguments to $graphLookup are expected to be strings or
-            // {db: "local", coll: "oplog.rs"}. local.oplog.rs is not a user namespace so object
+            // {db: "local", coll: "system.tenantMigration.oplogView"}.
+            // 'local.system.tenantMigration.oplogView' is not a user namespace so object
             // type is omitted from the error message below.
             uassert(40103,
                     str::stream() << "expected string as argument for " << argName

@@ -77,25 +77,26 @@ private:
 };
 
 // Tests that $graphLookup with special 'from' syntax from: {db: local, coll:
-// oplog.rs} can be round tripped.
+// system.tenantMigration.oplogView} can be round tripped.
 TEST_F(DocumentSourceGraphLookUpTest, LookupReParseSerializedStageWithFromDBAndColl) {
     auto expCtx = getExpCtx();
-    NamespaceString fromNs("local", "oplog.rs");
+    NamespaceString fromNs("local", "system.tenantMigration.oplogView");
     expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
         {fromNs.coll().toString(), {fromNs, std::vector<BSONObj>()}}});
 
-    auto originalBSON = BSON("$graphLookup" << BSON("from" << BSON("db"
-                                                                   << "local"
-                                                                   << "coll"
-                                                                   << "oplog.rs")
-                                                           << "startWith"
-                                                           << "$x"
-                                                           << "connectFromField"
-                                                           << "id"
-                                                           << "connectToField"
-                                                           << "id"
-                                                           << "as"
-                                                           << "connections"));
+    auto originalBSON =
+        BSON("$graphLookup" << BSON("from" << BSON("db"
+                                                   << "local"
+                                                   << "coll"
+                                                   << "system.tenantMigration.oplogView")
+                                           << "startWith"
+                                           << "$x"
+                                           << "connectFromField"
+                                           << "id"
+                                           << "connectToField"
+                                           << "id"
+                                           << "as"
+                                           << "connections"));
     auto graphLookupStage =
         DocumentSourceGraphLookUp::createFromBson(originalBSON.firstElement(), expCtx);
 
@@ -119,8 +120,8 @@ TEST_F(DocumentSourceGraphLookUpTest, LookupReParseSerializedStageWithFromDBAndC
 }
 
 // $graphLookup : {from : {db: <>, coll: <>}} syntax doesn't work for a namespace that isn't
-// local.oplog.rs.
-TEST_F(DocumentSourceGraphLookUpTest, RejectsPipelineFromDBAndCollNotLocalDBOrRsOplogColl) {
+// local.system.tenantMigration.oplogView.
+TEST_F(DocumentSourceGraphLookUpTest, RejectsPipelineFromDBAndCollNotLocalDBOrRsOplogView) {
     auto expCtx = getExpCtx();
     NamespaceString fromNs("test", "coll");
     expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
@@ -137,8 +138,8 @@ TEST_F(DocumentSourceGraphLookUpTest, RejectsPipelineFromDBAndCollNotLocalDBOrRs
 }
 
 // $graphLookup : {from : {db: <>, coll: <>}} syntax fails when "db" is local but "coll" is
-// not "oplog.rs".
-TEST_F(DocumentSourceGraphLookUpTest, RejectsPipelineFromDBAndCollNotRsOplogColl) {
+// not "system.tenantMigration.oplogView".
+TEST_F(DocumentSourceGraphLookUpTest, RejectsPipelineFromDBAndCollNotRsOplogView) {
     auto expCtx = getExpCtx();
     NamespaceString fromNs("local", "coll");
     expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
@@ -155,17 +156,17 @@ TEST_F(DocumentSourceGraphLookUpTest, RejectsPipelineFromDBAndCollNotRsOplogColl
 }
 
 // $lookup : {from : {db: <>, coll: <>}} syntax doesn't work for a namespace when "coll" is
-// "oplog.rs" but "db" is not "local".
+// "system.tenantMigration.oplogView" but "db" is not "local".
 TEST_F(DocumentSourceGraphLookUpTest, RejectsPipelineFromDBAndCollNotLocalDB) {
     auto expCtx = getExpCtx();
-    NamespaceString fromNs("test", "oplog.rs");
+    NamespaceString fromNs("test", "system.tenantMigration.oplogView");
     expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
         {fromNs.coll().toString(), {fromNs, std::vector<BSONObj>()}}});
 
     ASSERT_THROWS_CODE(
         DocumentSourceGraphLookUp::createFromBson(
             fromjson("{$graphLookup: {from: {db: 'test', coll: "
-                     "'oplog.rs'}, startWith: '$x', "
+                     "'system.tenantMigration.oplogView'}, startWith: '$x', "
                      "connectFromField: 'id', connectionToField: 'id', as: 'connections'}}")
                 .firstElement(),
             expCtx),

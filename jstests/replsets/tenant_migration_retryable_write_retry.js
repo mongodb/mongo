@@ -224,16 +224,15 @@ assert.commandWorked(donorPrimary.getDB(kDbName).runCommand({
 
 // The aggregation pipeline will return an array of oplog entries (pre-image/post-image oplog
 // entries included) for retryable writes that committed before 'startFetchingTimestamp' sorted
-// in ascending order of "ts". The pipeline doesn't currently support retryable write oplog chains
-// that exceed 100 MB since pipeline stages have a memory limit of 100 MB.
+// in ascending order of "ts".
 const aggRes = donorPrimary.getDB("config").runCommand({
     aggregate: "transactions",
     pipeline: [
         // Fetch the config.transactions entries.
         {$match: {"lastWriteOpTime.ts": {$lt: startFetchingTimestamp}}},
-        // Fetch latest oplog entry for each config.transactions entry.
+        // Fetch latest oplog entry for each config.transactions entry from the oplog view.
         {$lookup: {
-            from: {db: "local", coll: "oplog.rs"},
+            from: {db: "local", coll: "system.tenantMigration.oplogView"},
             localField: "lastWriteOpTime.ts",
             foreignField: "ts",
             // This array is expected to contain exactly one element.
@@ -242,39 +241,65 @@ const aggRes = donorPrimary.getDB("config").runCommand({
         // Replace the single-element 'lastOps' array field with a single 'lastOp' field.
         {$addFields: {lastOp: {$first: "$lastOps"}}},
         {$unset: "lastOps"},
-        // Fetch preImage oplog entry for findAndModify.
+        // Fetch preImage oplog entry for findAndModify from the oplog view.
         {$lookup: {
-            from: {db: "local", coll: "oplog.rs"},
+            from: {db: "local", coll: "system.tenantMigration.oplogView"},
             localField: "lastOp.preImageOpTime.ts",
             foreignField: "ts",
             // This array is expected to contain exactly one element if the 'preImageOpTime'
             // field is not null.
             as: "preImageOps"
         }},
-        // Fetch postImage oplog entry for findAndModify.
+        // Fetch postImage oplog entry for findAndModify from the oplog view.
         {$lookup: {
-            from: {db: "local", coll: "oplog.rs"},
+            from: {db: "local", coll: "system.tenantMigration.oplogView"},
             localField: "lastOp.postImageOpTime.ts",
             foreignField: "ts",
             // This array is expected to contain exactly one element if the 'postImageOpTime'
             // field is not null.
             as: "postImageOps"
         }},
-        // Fetch oplog entries in each chain for insert, update, or delete.
+        // Fetch oplog entries in each chain for insert, update, or delete from the oplog view.
         {$graphLookup: {
-            from: {db: "local", coll: "oplog.rs"},
+            from: {db: "local", coll: "system.tenantMigration.oplogView"},
             startWith: "$lastOp.ts",
             connectFromField: "prevOpTime.ts",
             connectToField: "ts",
             as: "history",
+            depthField: "depthForTenantMigration",
+        }},
+        // Sort the oplog entries in each oplog chain.
+        {$set: {
+            history: {$reverseArray: {$reduce: {
+                input: "$history",
+                initialValue: {$range: [0, {$size: "$history"}]},
+                in: {$concatArrays: [
+                    {$slice: ["$$value", "$$this.depthForTenantMigration"]},
+                    ["$$this"],
+                    {$slice: [
+                        "$$value",
+                        {$subtract: [
+                            {$add: ["$$this.depthForTenantMigration", 1]},
+                            {$size: "$history"},
+                        ]},
+                    ]},
+                ]},
+            }}},
         }},
         // Combine the oplog entries.
         {$set: {history: {$concatArrays: ["$preImageOps", "$history", "$postImageOps"]}}},
+        // Fetch the complete oplog entries and unwind oplog entries in each chain to the top-level
+        // array.
+        {$lookup: {
+            from: {db: "local", coll: "oplog.rs"},
+            localField: "history.ts",
+            foreignField: "ts",
+            // This array is expected to contain exactly one element.
+            as: "completeOplogEntry"
+        }},
         // Unwind oplog entries in each chain to the top-level array.
-        {$unwind: "$history"},
-        {$replaceRoot: {newRoot: "$history"}},
-        // Sort the oplog entries.
-        {$sort: {ts: 1}},
+        {$unwind: "$completeOplogEntry"},
+        {$replaceRoot: {newRoot: "$completeOplogEntry"}},
     ],
     readConcern: {level: "majority", afterClusterTime: startFetchingTimestamp},
     cursor: {},

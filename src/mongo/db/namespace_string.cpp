@@ -75,6 +75,9 @@ const NamespaceString NamespaceString::kTenantMigrationDonorsNamespace(Namespace
 const NamespaceString NamespaceString::kTenantMigrationRecipientsNamespace(
     NamespaceString::kConfigDb, "tenantMigrationRecipients");
 
+const NamespaceString NamespaceString::kTenantMigrationOplogView(
+    NamespaceString::kLocalDb, "system.tenantMigration.oplogView");
+
 const NamespaceString NamespaceString::kShardConfigCollectionsNamespace(NamespaceString::kConfigDb,
                                                                         "cache.collections");
 const NamespaceString NamespaceString::kShardConfigDatabasesNamespace(NamespaceString::kConfigDb,
