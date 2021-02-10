@@ -1199,20 +1199,6 @@ env.Library(
 )
 
 env.Library(
-    target="hello_command",
-    source=[
-        "hello.idl",
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/idl/idl_parser',
-        '$BUILD_DIR/mongo/rpc/metadata',
-    ],
-)
-
-env.Library(
     target="replication_info",
     source=[
         "replication_info.cpp",
@@ -1222,7 +1208,6 @@ env.Library(
         '$BUILD_DIR/mongo/client/clientdriver_network',
         '$BUILD_DIR/mongo/db/auth/auth',
         '$BUILD_DIR/mongo/db/auth/saslauth',
-        '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
         '$BUILD_DIR/mongo/db/dbhelpers',
         '$BUILD_DIR/mongo/db/query_exec',
         "$BUILD_DIR/mongo/util/fail_point",
@@ -1236,7 +1221,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/stats/counters',
         '$BUILD_DIR/mongo/transport/message_compressor',
         'hello_auth',
-        'hello_command',
         'primary_only_service',
         'replication_auth',
         'split_horizon',
@@ -1760,7 +1744,6 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/auth/authentication_session',
         '$BUILD_DIR/mongo/db/auth/authservercommon',
-        'hello_command',
     ],
 )
 

@@ -84,7 +84,7 @@ const auto getOperationState = OperationContext::declareDecoration<ClientMetadat
 
 }  // namespace
 
-StatusWith<boost::optional<ClientMetadata>> ClientMetadata::parse(const BSONElement& element) try {
+StatusWith<boost::optional<ClientMetadata>> ClientMetadata::parse(const BSONElement& element) {
     if (element.eoo()) {
         return {boost::none};
     }
@@ -93,50 +93,84 @@ StatusWith<boost::optional<ClientMetadata>> ClientMetadata::parse(const BSONElem
         return Status(ErrorCodes::TypeMismatch, "The client metadata document must be a document");
     }
 
-    return boost::make_optional(parseFromBSON(element.Obj()));
-} catch (const DBException& ex) {
-    return ex.toStatus();
+    ClientMetadata clientMetadata;
+    Status s = clientMetadata.parseClientMetadataDocument(element.Obj());
+    if (!s.isOK()) {
+        return s;
+    }
+
+    return {std::move(clientMetadata)};
 }
 
-ClientMetadata::ClientMetadata(BSONObj doc) {
+Status ClientMetadata::parseClientMetadataDocument(const BSONObj& doc) {
     uint32_t maxLength = kMaxMongoDMetadataDocumentByteLength;
     if (isMongos()) {
         maxLength = kMaxMongoSMetadataDocumentByteLength;
     }
 
-    uassert(ErrorCodes::ClientMetadataDocumentTooLarge,
-            str::stream() << "The client metadata document must be less then or equal to "
-                          << maxLength << "bytes",
-            static_cast<uint32_t>(doc.objsize()) <= maxLength);
-
-    const auto isobj = [](StringData name, const BSONElement& e) {
-        uassert(ErrorCodes::TypeMismatch,
-                str::stream()
-                    << "The '" << name
-                    << "' field is required to be a BSON document in the client metadata document",
-                e.isABSONObj());
-    };
+    if (static_cast<uint32_t>(doc.objsize()) > maxLength) {
+        return Status(ErrorCodes::ClientMetadataDocumentTooLarge,
+                      str::stream() << "The client metadata document must be less then or equal to "
+                                    << maxLength << "bytes");
+    }
 
     // Get a copy so that we can take a stable reference to the app name inside
-    _document = doc.getOwned();
+    BSONObj docOwned = doc.getOwned();
 
+    StringData appName;
     bool foundDriver = false;
     bool foundOperatingSystem = false;
-    for (const auto& e : _document) {
-        auto name = e.fieldNameStringData();
+
+    BSONObjIterator i(docOwned);
+    while (i.more()) {
+        BSONElement e = i.next();
+        StringData name = e.fieldNameStringData();
 
         if (name == kApplication) {
             // Application is an optional sub-document, but we require it to be a document if
             // specified.
-            isobj(kApplication, e);
-            _appName = uassertStatusOK(parseApplicationDocument(e.Obj()));
+            if (!e.isABSONObj()) {
+                return Status(ErrorCodes::TypeMismatch,
+                              str::stream() << "The '" << kApplication
+                                            << "' field is required to be a BSON document in the "
+                                               "client metadata document");
+            }
+
+            auto swAppName = parseApplicationDocument(e.Obj());
+            if (!swAppName.getStatus().isOK()) {
+                return swAppName.getStatus();
+            }
+
+            appName = swAppName.getValue();
+
         } else if (name == kDriver) {
-            isobj(kDriver, e);
-            uassertStatusOK(validateDriverDocument(e.Obj()));
+            if (!e.isABSONObj()) {
+                return Status(ErrorCodes::TypeMismatch,
+                              str::stream() << "The '" << kDriver
+                                            << "' field is required to be a "
+                                               "BSON document in the client "
+                                               "metadata document");
+            }
+
+            Status s = validateDriverDocument(e.Obj());
+            if (!s.isOK()) {
+                return s;
+            }
+
             foundDriver = true;
         } else if (name == kOperatingSystem) {
-            isobj(kOperatingSystem, e);
-            uassertStatusOK(validateOperatingSystemDocument(e.Obj()));
+            if (!e.isABSONObj()) {
+                return Status(ErrorCodes::TypeMismatch,
+                              str::stream() << "The '" << kOperatingSystem
+                                            << "' field is required to be a BSON document in the "
+                                               "client metadata document");
+            }
+
+            Status s = validateOperatingSystemDocument(e.Obj());
+            if (!s.isOK()) {
+                return s;
+            }
+
             foundOperatingSystem = true;
         }
 
@@ -144,16 +178,23 @@ ClientMetadata::ClientMetadata(BSONObj doc) {
     }
 
     // Driver is a required sub document.
-    uassert(ErrorCodes::ClientMetadataMissingField,
-            str::stream() << "Missing required sub-document '" << kDriver
-                          << "' in the client metadata document",
-            foundDriver);
+    if (!foundDriver) {
+        return Status(ErrorCodes::ClientMetadataMissingField,
+                      str::stream() << "Missing required sub-document '" << kDriver
+                                    << "' in the client metadata document");
+    }
 
     // OS is a required sub document.
-    uassert(ErrorCodes::ClientMetadataMissingField,
-            str::stream() << "Missing required sub-document '" << kOperatingSystem
-                          << "' in the client metadata document",
-            foundOperatingSystem);
+    if (!foundOperatingSystem) {
+        return Status(ErrorCodes::ClientMetadataMissingField,
+                      str::stream() << "Missing required sub-document '" << kOperatingSystem
+                                    << "' in the client metadata document");
+    }
+
+    _document = std::move(docOwned);
+    _appName = std::move(appName);
+
+    return Status::OK();
 }
 
 StatusWith<StringData> ClientMetadata::parseApplicationDocument(const BSONObj& doc) {

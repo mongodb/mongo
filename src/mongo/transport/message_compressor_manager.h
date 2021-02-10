@@ -81,11 +81,14 @@ public:
     /*
      * Called by a server that has received an isMaster request.
      *
+     * This looks for a BSON array called "compression" in input and appends the union of that
+     * array and the result of _registry->getCompressorNames(). The first name in the compression
+     * array in input will be used in subsequent calls to compressMessage
+     *
      * If no compressors are configured that match those requested by the client, then it will
      * not append anything to the BSONObjBuilder output.
      */
-    void serverNegotiate(const boost::optional<std::vector<StringData>>& clientCompressors,
-                         BSONObjBuilder*);
+    void serverNegotiate(const BSONObj& input, BSONObjBuilder* output);
 
     /*
      * Returns a new Message containing the compressed contentx of 'msg'. If compressorId is null,

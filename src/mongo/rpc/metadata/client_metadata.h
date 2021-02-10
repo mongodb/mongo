@@ -80,16 +80,10 @@ constexpr auto kMetadataDocumentName = "client"_sd;
  * See Driver Specification: "MongoDB Handshake" for more information.
  */
 class ClientMetadata {
+    ClientMetadata(const ClientMetadata&) = delete;
+    ClientMetadata& operator=(const ClientMetadata&) = delete;
+
 public:
-    explicit ClientMetadata(BSONObj obj);
-
-    ClientMetadata(const ClientMetadata& src) : ClientMetadata(src._document) {}
-    ClientMetadata& operator=(const ClientMetadata& src) {
-        ClientMetadata copy(src._document);
-        *this = std::move(copy);
-        return *this;
-    }
-
     ClientMetadata(ClientMetadata&&) = default;
     ClientMetadata& operator=(ClientMetadata&&) = default;
 
@@ -149,13 +143,6 @@ public:
      * Returns an empty optional if element is empty.
      */
     static StatusWith<boost::optional<ClientMetadata>> parse(const BSONElement& element);
-
-    /**
-     * Wrapper for BSONObj constructor used by IDL parsers.
-     */
-    static ClientMetadata parseFromBSON(BSONObj obj) {
-        return ClientMetadata(obj);
-    }
 
     /**
      * Create a new client metadata document with os information from the ProcessInfo class.
@@ -324,6 +311,7 @@ public:
 private:
     ClientMetadata() = default;
 
+    Status parseClientMetadataDocument(const BSONObj& doc);
     static Status validateDriverDocument(const BSONObj& doc);
     static Status validateOperatingSystemDocument(const BSONObj& doc);
     static StatusWith<StringData> parseApplicationDocument(const BSONObj& doc);
