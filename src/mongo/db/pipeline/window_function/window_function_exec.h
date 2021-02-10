@@ -32,12 +32,15 @@
 #include <queue>
 
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_source_set_window_fields.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/window_function/partition_iterator.h"
 #include "mongo/db/pipeline/window_function/window_bounds.h"
 #include "mongo/db/pipeline/window_function/window_function.h"
 
 namespace mongo {
+
+struct WindowFunctionStatement;
 
 /**
  * An interface for an executor class capable of evaluating a function over a given window
@@ -49,7 +52,12 @@ namespace mongo {
  */
 class WindowFunctionExec {
 public:
-    WindowFunctionExec(PartitionIterator* iter) : _iter(iter){};
+    /**
+     * Creates an appropriate WindowFunctionExec that is capable of evaluating the window function
+     * over the given bounds, both found within the WindowFunctionStatement.
+     */
+    static std::unique_ptr<WindowFunctionExec> create(PartitionIterator* iter,
+                                                      const WindowFunctionStatement& functionStmt);
 
     /**
      * Retrieve the next value computed by the window function.
@@ -62,6 +70,8 @@ public:
     virtual void reset() = 0;
 
 protected:
+    WindowFunctionExec(PartitionIterator* iter) : _iter(iter){};
+
     PartitionIterator* _iter;
 };
 

@@ -152,7 +152,8 @@ TEST_F(WindowFunctionExecNonRemovableTest, AccumulateOnlyWithMultiplePartitions)
     auto mock = DocumentSourceMock::createForTest(std::move(docs), getExpCtx());
     auto key = ExpressionFieldPath::createPathFromString(
         getExpCtx().get(), "key", getExpCtx()->variablesParseState);
-    auto iter = PartitionIterator{getExpCtx().get(), mock.get(), *key};
+    auto iter = PartitionIterator(
+        getExpCtx().get(), mock.get(), boost::optional<boost::intrusive_ptr<Expression>>(key));
     auto input =
         ExpressionFieldPath::parse(getExpCtx().get(), "$a", getExpCtx()->variablesParseState);
     auto mgr = WindowFunctionExecNonRemovable<AccumulatorState>(
@@ -328,7 +329,8 @@ TEST_F(WindowFunctionExecRemovableDocumentTest, CanResetFunction) {
     auto mock = DocumentSourceMock::createForTest(std::move(docs), getExpCtx());
     auto key = ExpressionFieldPath::createPathFromString(
         getExpCtx().get(), "key", getExpCtx()->variablesParseState);
-    auto iter = PartitionIterator{getExpCtx().get(), mock.get(), *key};
+    auto iter = PartitionIterator{
+        getExpCtx().get(), mock.get(), boost::optional<boost::intrusive_ptr<Expression>>(key)};
     auto input =
         ExpressionFieldPath::parse(getExpCtx().get(), "$a", getExpCtx()->variablesParseState);
     CollatorInterfaceMock collator = CollatorInterfaceMock::MockType::kToLowerString;
@@ -355,7 +357,8 @@ TEST_F(WindowFunctionExecRemovableDocumentTest, CanResetFunction) {
     auto mockTwo = DocumentSourceMock::createForTest(std::move(docsTwo), getExpCtx());
     auto keyTwo = ExpressionFieldPath::createPathFromString(
         getExpCtx().get(), "key", getExpCtx()->variablesParseState);
-    iter = PartitionIterator{getExpCtx().get(), mockTwo.get(), *key};
+    iter = PartitionIterator{
+        getExpCtx().get(), mockTwo.get(), boost::optional<boost::intrusive_ptr<Expression>>(key)};
     input = ExpressionFieldPath::parse(getExpCtx().get(), "$a", getExpCtx()->variablesParseState);
     maxFunc = std::make_unique<WindowFunctionMax>(cmp);
     mgr = WindowFunctionExecRemovableDocument(
