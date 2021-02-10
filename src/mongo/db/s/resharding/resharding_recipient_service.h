@@ -158,6 +158,11 @@ private:
     // Removes the local recipient document from disk and clears the in-memory state.
     void _removeRecipientDocument();
 
+    // Removes any docs from the oplog applier progress and txn applier progress collections that
+    // are associated with the in-progress operation. Also drops all oplog buffer collections and
+    // all conflict stash collections that are associated with the in-progress operation.
+    void _dropOplogCollections(OperationContext* opCtx);
+
     // The in-memory representation of the underlying document in
     // config.localReshardingOperations.recipient.
     ReshardingRecipientDocument _recipientDoc;

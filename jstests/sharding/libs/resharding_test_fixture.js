@@ -490,6 +490,42 @@ var ReshardingTest = class {
                 `collection exists on ${recipient.shardName} despite resharding having failed`);
         }
 
+        assert.eq(
+            [],
+            recipient.getCollection(`config.localReshardingOperations.recipient.progress_applier`)
+                .find()
+                .toArray(),
+            `config.localReshardingOperations.recipient.progress_applier wasn't cleaned up on ${
+                recipient.shardName}`);
+
+        assert.eq(
+            [],
+            recipient
+                .getCollection(`config.localReshardingOperations.recipient.progress_txn_cloner`)
+                .find()
+                .toArray(),
+            `config.localReshardingOperations.recipient.progress_txn_cloner wasn't cleaned up on ${
+                recipient.shardName}`);
+
+        const sourceCollectionUUIDString = extractUUIDFromObject(this._sourceCollectionUUID);
+        for (const donor of this._donorShards()) {
+            assert.eq(null,
+                      recipient
+                          .getCollection(`config.localReshardingOplogBuffer.${
+                              sourceCollectionUUIDString}.${donor.shardName}`)
+                          .exists(),
+                      `expected config.localReshardingOplogBuffer.${sourceCollectionUUIDString}.${
+                          donor.shardName} not to exist on ${recipient.shardName}, but it did.`);
+
+            assert.eq(null,
+                      recipient
+                          .getCollection(`config.localReshardingConflictStash.${
+                              sourceCollectionUUIDString}.${donor.shardName}`)
+                          .exists(),
+                      `expected config.localReshardingConflictStash.${sourceCollectionUUIDString}.${
+                          donor.shardName} not to exist on ${recipient.shardName}, but it did.`);
+        }
+
         const localRecipientOpsNs = "config.localReshardingOperations.recipient";
         let res;
         assert.soon(

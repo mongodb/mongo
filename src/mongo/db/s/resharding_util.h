@@ -262,6 +262,8 @@ boost::optional<ShardId> getDestinedRecipient(OperationContext* opCtx,
 bool isFinalOplog(const repl::OplogEntry& oplog);
 bool isFinalOplog(const repl::OplogEntry& oplog, UUID reshardingUUID);
 
-NamespaceString getLocalOplogBufferNamespace(UUID reshardingUUID, ShardId donorShardId);
+NamespaceString getLocalOplogBufferNamespace(UUID existingUUID, ShardId donorShardId);
+
+NamespaceString getLocalConflictStashNamespace(UUID existingUUID, ShardId donorShardId);
 
 }  // namespace mongo

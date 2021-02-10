@@ -563,9 +563,15 @@ bool isFinalOplog(const repl::OplogEntry& oplog, UUID reshardingUUID) {
 }
 
 
-NamespaceString getLocalOplogBufferNamespace(UUID reshardingUUID, ShardId donorShardId) {
+NamespaceString getLocalOplogBufferNamespace(UUID existingUUID, ShardId donorShardId) {
     return NamespaceString("config.localReshardingOplogBuffer.{}.{}"_format(
-        reshardingUUID.toString(), donorShardId.toString()));
+        existingUUID.toString(), donorShardId.toString()));
+}
+
+NamespaceString getLocalConflictStashNamespace(UUID existingUUID, ShardId donorShardId) {
+    return NamespaceString{NamespaceString::kConfigDb,
+                           "localReshardingConflictStash.{}.{}"_format(existingUUID.toString(),
+                                                                       donorShardId.toString())};
 }
 
 }  // namespace mongo
