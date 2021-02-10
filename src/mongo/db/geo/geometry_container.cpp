@@ -1288,7 +1288,15 @@ double GeometryContainer::minDistance(const PointWithCRS& otherPoint) const {
         double minDistance = -1;
 
         if (nullptr != _point) {
-            minDistance = S2Distance::distanceRad(otherPoint.point, _point->point);
+            // SERVER-52953: Calculating the distance between identical points can sometimes result
+            // in a small positive value due to a loss of floating point precision on certain
+            // platforms. As such, we perform a simple equality check to guarantee that equivalent
+            // points will always produce a distance of 0.
+            if (_point->point == otherPoint.point) {
+                minDistance = 0;
+            } else {
+                minDistance = S2Distance::distanceRad(otherPoint.point, _point->point);
+            }
         } else if (nullptr != _line) {
             minDistance = S2Distance::minDistanceRad(otherPoint.point, _line->line);
         } else if (nullptr != _polygon) {
