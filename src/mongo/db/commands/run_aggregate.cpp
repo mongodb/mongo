@@ -70,6 +70,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/speculative_majority_read_info.h"
+#include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context.h"
@@ -661,6 +662,10 @@ Status runAggregate(OperationContext* opCtx,
                                   << " is not supported against a view",
                     !request.getCollectionUUID());
 
+            uassert(ErrorCodes::CommandNotSupportedOnView,
+                    "mapReduce on a view is not supported",
+                    !request.getIsMapReduceCommand());
+
             // Check that the default collation of 'view' is compatible with the operation's
             // collation. The check is skipped if the request did not specify a collation.
             if (!request.getCollation().get_value_or(BSONObj()).isEmpty()) {
@@ -676,12 +681,32 @@ Status runAggregate(OperationContext* opCtx,
             auto resolvedView = uassertStatusOK(DatabaseHolder::get(opCtx)
                                                     ->getViewCatalog(opCtx, nss.db())
                                                     ->resolveView(opCtx, nss));
-            uassert(std::move(resolvedView),
-                    "On sharded systems, resolved views must be executed by mongos",
-                    !ShardingState::get(opCtx)->enabled());
 
             // With the view & collation resolved, we can relinquish locks.
             ctx.reset();
+
+            // Set this operation's shard version for the underlying collection to unsharded.
+            // This is prerequisite for future shard versioning checks.
+            OperationShardingState::get(opCtx).initializeClientRoutingVersions(
+                resolvedView.getNamespace(), ChunkVersion::UNSHARDED(), boost::none);
+
+            bool collectionIsSharded = [opCtx, &resolvedView]() {
+                AutoGetCollection autoColl(opCtx,
+                                           resolvedView.getNamespace(),
+                                           MODE_IS,
+                                           AutoGetCollectionViewMode::kViewsPermitted);
+                return CollectionShardingState::get(opCtx, resolvedView.getNamespace())
+                    ->getCollectionDescription(opCtx)
+                    .isSharded();
+            }();
+
+            uassert(std::move(resolvedView),
+                    "Resolved views on sharded collections must be executed by mongos",
+                    !collectionIsSharded);
+
+            uassert(std::move(resolvedView),
+                    "Explain of a resolved view must be executed by mongos",
+                    !ShardingState::get(opCtx)->enabled() || !request.getExplain());
 
             // Parse the resolved view into a new aggregation request.
             auto newRequest = resolvedView.asExpandedViewAggregation(request);
