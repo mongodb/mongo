@@ -32,6 +32,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/hello_gen.h"
 
 namespace mongo {
 
@@ -41,6 +42,6 @@ namespace mongo {
  * This will attach supported mechanisms or invoke the behavior of saslStart/authenticate commands
  * as appropriate.
  */
-void handleHelloAuth(OperationContext* opCtx, BSONObj cmdObj, BSONObjBuilder* result);
+void handleHelloAuth(OperationContext* opCtx, const HelloCommand& cmd, BSONObjBuilder* result);
 
 }  // namespace mongo

@@ -85,7 +85,8 @@ void checkNegotiationResult(const BSONObj& result, const std::vector<std::string
     }
 }
 
-void checkServerNegotiation(const BSONObj& input, const std::vector<std::string>& expected) {
+void checkServerNegotiation(const boost::optional<std::vector<StringData>>& input,
+                            const std::vector<std::string>& expected) {
     auto registry = buildRegistry();
     MessageCompressorManager manager(&registry);
 
@@ -105,8 +106,8 @@ void checkFidelity(const Message& msg, std::unique_ptr<MessageCompressorBase> co
     registry.finalizeSupportedCompressors().transitional_ignore();
 
     MessageCompressorManager mgr(&registry);
-    auto negotiator = BSON("isMaster" << 1 << "compression" << BSON_ARRAY(compressorName));
     BSONObjBuilder negotiatorOut;
+    std::vector<StringData> negotiator({compressorName});
     mgr.serverNegotiate(negotiator, &negotiatorOut);
     checkNegotiationResult(negotiatorOut.done(), {compressorName});
 
@@ -182,24 +183,44 @@ Message buildMessage() {
 
 TEST(MessageCompressorManager, NoCompressionRequested) {
     auto input = BSON("isMaster" << 1);
-    checkServerNegotiation(input, {});
+    checkServerNegotiation(boost::none, {});
 }
 
 TEST(MessageCompressorManager, NormalCompressionRequested) {
-    auto input = BSON("isMaster" << 1 << "compression" << BSON_ARRAY("noop"));
+    std::vector<StringData> input{"noop"_sd};
     checkServerNegotiation(input, {"noop"});
 }
 
 TEST(MessageCompressorManager, BadCompressionRequested) {
-    auto input = BSON("isMaster" << 1 << "compression" << BSON_ARRAY("fakecompressor"));
+    std::vector<StringData> input{"fakecompressor"_sd};
     checkServerNegotiation(input, {});
 }
 
 TEST(MessageCompressorManager, BadAndGoodCompressionRequested) {
-    auto input = BSON("isMaster" << 1 << "compression"
-                                 << BSON_ARRAY("fakecompressor"
-                                               << "noop"));
+    std::vector<StringData> input{"fakecompressor"_sd, "noop"_sd};
     checkServerNegotiation(input, {"noop"});
+}
+
+// Transitional: Parse BSON "isMaster"-like docs for compressor lists.
+boost::optional<std::vector<StringData>> parseBSON(BSONObj input) {
+    auto elem = input["compression"];
+    if (!elem) {
+        return boost::none;
+    }
+
+    uassert(ErrorCodes::BadValue,
+            str::stream() << "'compression' is not an array: " << elem,
+            elem.type() == Array);
+
+    std::vector<StringData> ret;
+    for (const auto& e : elem.Obj()) {
+        uassert(ErrorCodes::BadValue,
+                str::stream() << "'compression' element is not a string: " << e,
+                e.type() == String);
+        ret.push_back(e.valueStringData());
+    }
+
+    return ret;
 }
 
 TEST(MessageCompressorManager, FullNormalCompression) {
@@ -213,7 +234,7 @@ TEST(MessageCompressorManager, FullNormalCompression) {
     checkNegotiationResult(clientObj, {"noop"});
 
     BSONObjBuilder serverOutput;
-    serverManager.serverNegotiate(clientObj, &serverOutput);
+    serverManager.serverNegotiate(parseBSON(clientObj), &serverOutput);
     auto serverObj = serverOutput.done();
     checkNegotiationResult(serverObj, {"noop"});
 
@@ -285,7 +306,7 @@ TEST(MessageCompressorManager, SERVER_28008) {
     clientManager.clientBegin(&clientOutput);
     auto clientObj = clientOutput.done();
     BSONObjBuilder serverOutput;
-    serverManager.serverNegotiate(clientObj, &serverOutput);
+    serverManager.serverNegotiate(parseBSON(clientObj), &serverOutput);
     auto serverObj = serverOutput.done();
     clientManager.clientFinish(serverObj);
 
