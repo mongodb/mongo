@@ -136,7 +136,6 @@ selector:
   - jstests/sharding/mongos_no_replica_set_refresh.js
   - jstests/sharding/movechunk_interrupt_at_primary_stepdown.js
   - jstests/sharding/primary_config_server_blackholed_from_mongos.js
-  - jstests/sharding/refine_collection_shard_key_abort_on_stepup.js
   # Nothing is affected by config server step down
   - jstests/sharding/basic_sharding_params.js
   # ShardingTest is never used, so continuous step down thread never starts
