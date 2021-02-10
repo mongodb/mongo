@@ -94,7 +94,7 @@ void storeExternalClusterTimeKeyDocsAndRefreshCache(
 
 void createRetryableWritesView(OperationContext* opCtx, Database* db) {
     writeConflictRetry(
-        opCtx, "createDonorOplogView", "local.system.tenantMigration.oplogView", [&] {
+        opCtx, "createDonorOplogView", NamespaceString::kTenantMigrationOplogView.ns(), [&] {
             {
                 // Create 'system.views' in a separate WUOW if it does not exist.
                 WriteUnitOfWork wuow(opCtx);
@@ -121,8 +121,8 @@ void createRetryableWritesView(OperationContext* opCtx, Database* db) {
                                            << "preImageOpTime" << 1 << "postImageOpTime" << 1)));
 
             WriteUnitOfWork wuow(opCtx);
-            uassertStatusOK(db->createView(
-                opCtx, NamespaceString("local.system.tenantMigration.oplogView"), options));
+            uassertStatusOK(
+                db->createView(opCtx, NamespaceString::kTenantMigrationOplogView, options));
             wuow.commit();
         });
 }

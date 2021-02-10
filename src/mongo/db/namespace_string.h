@@ -122,6 +122,9 @@ public:
     // Namespace for storing the persisted state of tenant migration recipient service instances.
     static const NamespaceString kTenantMigrationRecipientsNamespace;
 
+    // Namespace for view on local.oplog.rs for tenant migrations.
+    static const NamespaceString kTenantMigrationOplogView;
+
     // Namespace for replica set configuration settings.
     static const NamespaceString kSystemReplSetNamespace;
 
