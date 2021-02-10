@@ -60,8 +60,11 @@ bool supportsLockFreeRead(OperationContext* opCtx) {
     // Lock-free reads are not supported in multi-document transactions.
     // Lock-free reads are not supported under an exclusive lock (nested reads under exclusive lock
     // holding operations).
+    // Lock-free reads are not supported if a storage txn is already open w/o the lock-free reads
+    // operation flag set.
     return !storageGlobalParams.disableLockFreeReads && !opCtx->inMultiDocumentTransaction() &&
-        !opCtx->lockState()->isWriteLocked();
+        !opCtx->lockState()->isWriteLocked() &&
+        !(opCtx->recoveryUnit()->isActive() && !opCtx->isLockFreeReadsOp());
 }
 
 /**
