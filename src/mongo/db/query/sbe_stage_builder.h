@@ -328,6 +328,21 @@ private:
     std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildShardFilter(
         const QuerySolutionNode* root, const PlanStageReqs& reqs);
 
+    /**
+     * Constructs an optimized SBE plan for 'filterNode' in the case that the fields of the
+     * 'shardKeyPattern' are provided by 'childIxscan'. In this case, the SBE plan for the child
+     * index scan node will fill out slots for the necessary components of the index key. These
+     * slots can be read directly in order to determine the shard key that should be passed to the
+     * 'shardFilterer'.
+     */
+    std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildShardFilterCovered(
+        const ShardingFilterNode* filterNode,
+        std::unique_ptr<ShardFilterer> shardFilterer,
+        BSONObj shardKeyPattern,
+        BSONObj indexKeyPattern,
+        const QuerySolutionNode* child,
+        PlanStageReqs childReqs);
+
     sbe::value::SlotIdGenerator _slotIdGenerator;
     sbe::value::FrameIdGenerator _frameIdGenerator;
     sbe::value::SpoolIdGenerator _spoolIdGenerator;

@@ -241,8 +241,14 @@ QuerySolutionNode* CollectionScanNode::clone() const {
 // VirtualScanNode
 //
 
-VirtualScanNode::VirtualScanNode(std::vector<BSONArray> docs, bool hasRecordId)
-    : docs(std::move(docs)), hasRecordId(hasRecordId) {}
+VirtualScanNode::VirtualScanNode(std::vector<BSONArray> docs,
+                                 ScanType scanType,
+                                 bool hasRecordId,
+                                 BSONObj indexKeyPattern)
+    : docs(std::move(docs)),
+      scanType(scanType),
+      hasRecordId(hasRecordId),
+      indexKeyPattern(std::move(indexKeyPattern)) {}
 
 void VirtualScanNode::appendToString(str::stream* ss, int indent) const {
     addIndent(ss, indent);
@@ -252,10 +258,14 @@ void VirtualScanNode::appendToString(str::stream* ss, int indent) const {
     addIndent(ss, indent + 1);
     *ss << "hasRecordId = " << hasRecordId;
     addCommon(ss, indent);
+    *ss << "scanType = " << static_cast<size_t>(scanType);
+    addCommon(ss, indent);
+    *ss << "indexKeyPattern = " << indexKeyPattern;
+    addCommon(ss, indent);
 }
 
 QuerySolutionNode* VirtualScanNode::clone() const {
-    auto copy = new VirtualScanNode(docs, this->hasRecordId);
+    auto copy = new VirtualScanNode(docs, scanType, hasRecordId, indexKeyPattern);
     cloneBaseData(copy);
     return copy;
 }

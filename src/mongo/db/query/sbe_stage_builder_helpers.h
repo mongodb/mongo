@@ -687,4 +687,32 @@ EvalExprStagePair generateShortCircuitingLogicalOp(sbe::EPrimBinary::Op logicOp,
                                                    sbe::value::SlotIdGenerator* slotIdGenerator,
                                                    const FilterStateHelper& stateHelper);
 
+/**
+ * Imagine that we have some parent QuerySolutionNode X and child QSN Y which both participate in a
+ * covered plan. Stage X requests some slots to be constructed out of the index keys using
+ * 'parentIndexKeyReqs'. Stage Y requests it's own slots, and adds those to the set requested by X,
+ * resulting in 'childIndexKeyReqs'. Note the invariant that 'childIndexKeyReqs' is a superset of
+ * 'parentIndexKeyReqs'. Let's notate the number of slots requested by 'childIndexKeyReqs' as |Y|
+ * and the set of slots requested by 'parentIndexKeyReqs' as |X|.
+ *
+ * The underlying SBE plan is constructed, and returns a vector of |Y| slots. However, the parent
+ * stage expects a vector of just |X| slots. The purpose of this function is to calculate and return
+ * the appropriate subset of the slot vector so that the parent stage X receives its expected |X|
+ * slots.
+ *
+ * As a concrete example, let's say the QSN tree is X => Y => IXSCAN and the index key pattern is
+ * {a: 1, b: 1, c: 1, d: 1}. X requests "a" and "d" using the bit vector 1001. Y additionally
+ * requires "c" so it requests three slots with the bit vector 1011. As a result, Y receives a
+ * 3-element slot vector, <s1, s2, s3>. Here, s1 will contain the value of "a", s2 contains "c", and
+ * s3 contain s"d".
+ *
+ * Parent QSN X expects just a two element slot vector where the first slot is for "a" and the
+ * second is for "d". This function would therefore return the slot vector <s1, s3>.
+ */
+sbe::value::SlotVector makeIndexKeyOutputSlotsMatchingParentReqs(
+    const BSONObj& indexKeyPattern,
+    sbe::IndexKeysInclusionSet parentIndexKeyReqs,
+    sbe::IndexKeysInclusionSet childIndexKeyReqs,
+    sbe::value::SlotVector childOutputSlots);
+
 }  // namespace mongo::stage_builder

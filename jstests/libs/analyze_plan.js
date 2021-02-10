@@ -59,11 +59,12 @@ function getPlanStages(root, stage) {
 
     if ("shards" in root) {
         if (Array.isArray(root.shards)) {
-            results = root.shards.reduce(
-                (res, shard) => res.concat(getPlanStages(
-                    shard.hasOwnProperty("winningPlan") ? shard.winningPlan : shard.executionStages,
-                    stage)),
-                results);
+            results =
+                root.shards.reduce((res, shard) => res.concat(getPlanStages(
+                                       shard.hasOwnProperty("winningPlan") ? getWinningPlan(shard)
+                                                                           : shard.executionStages,
+                                       stage)),
+                                   results);
         } else {
             const shards = Object.keys(root.shards);
             results = shards.reduce(

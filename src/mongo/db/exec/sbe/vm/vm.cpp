@@ -2640,7 +2640,7 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinShardFilter(Ari
     auto [ownedFilter, filterTag, filterValue] = getFromStack(0);
     auto [ownedShardKey, shardKeyTag, shardKeyValue] = getFromStack(1);
 
-    if (filterTag != value::TypeTags::shardFilterer || shardKeyTag != value::TypeTags::Object) {
+    if (filterTag != value::TypeTags::shardFilterer || shardKeyTag != value::TypeTags::bsonObject) {
         if (filterTag == value::TypeTags::shardFilterer &&
             shardKeyTag == value::TypeTags::Nothing) {
             LOGV2_WARNING(5071200,
@@ -2652,13 +2652,11 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinShardFilter(Ari
         return {false, value::TypeTags::Nothing, 0};
     }
 
-    BSONObjBuilder bob;
-    bson::convertToBsonObj(bob, value::getObjectView(shardKeyValue));
-
+    BSONObj keyAsUnownedBson{sbe::value::bitcastTo<const char*>(shardKeyValue)};
     return {false,
             value::TypeTags::Boolean,
             value::bitcastFrom<bool>(
-                value::getShardFiltererView(filterValue)->keyBelongsToMe(bob.done()))};
+                value::getShardFiltererView(filterValue)->keyBelongsToMe(keyAsUnownedBson))};
 }
 
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinExtractSubArray(ArityType arity) {

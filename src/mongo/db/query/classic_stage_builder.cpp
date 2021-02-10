@@ -357,7 +357,11 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
         }
         case STAGE_VIRTUAL_SCAN: {
             const auto* vsn = static_cast<const VirtualScanNode*>(root);
-            invariant(vsn->hasRecordId);
+
+            // The classic stage builder currently only supports VirtualScanNodes which represent
+            // collection scans that do not produce record ids.
+            invariant(!vsn->hasRecordId);
+            invariant(vsn->scanType == VirtualScanNode::ScanType::kCollScan);
 
             auto qds = std::make_unique<QueuedDataStage>(expCtx, _ws);
             for (auto&& arr : vsn->docs) {

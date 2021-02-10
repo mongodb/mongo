@@ -607,4 +607,30 @@ std::unique_ptr<FilterStateHelper> makeFilterStateHelper(bool trackIndex) {
     }
     return std::make_unique<BooleanStateHelper>();
 }
+
+sbe::value::SlotVector makeIndexKeyOutputSlotsMatchingParentReqs(
+    const BSONObj& indexKeyPattern,
+    sbe::IndexKeysInclusionSet parentIndexKeyReqs,
+    sbe::IndexKeysInclusionSet childIndexKeyReqs,
+    sbe::value::SlotVector childOutputSlots) {
+    tassert(5308000,
+            "'childIndexKeyReqs' had fewer bits set than 'parentIndexKeyReqs'",
+            parentIndexKeyReqs.count() <= childIndexKeyReqs.count());
+    sbe::value::SlotVector newIndexKeySlots;
+
+    size_t slotIdx = 0;
+    for (size_t indexFieldNumber = 0;
+         indexFieldNumber < static_cast<size_t>(indexKeyPattern.nFields());
+         ++indexFieldNumber) {
+        if (parentIndexKeyReqs.test(indexFieldNumber)) {
+            newIndexKeySlots.push_back(childOutputSlots[slotIdx]);
+        }
+
+        if (childIndexKeyReqs.test(indexFieldNumber)) {
+            ++slotIdx;
+        }
+    }
+
+    return newIndexKeySlots;
+}
 }  // namespace mongo::stage_builder
