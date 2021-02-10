@@ -29,10 +29,14 @@
 
 #include "mongo/db/repl/tenant_migration_util.h"
 
+#include "mongo/bson/json.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/logical_time_validator.h"
+#include "mongo/db/pipeline/document_source_lookup.h"
+#include "mongo/db/pipeline/document_source_match.h"
+#include "mongo/db/pipeline/document_source_project.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
@@ -83,7 +87,7 @@ void storeExternalClusterTimeKeyDocs(std::shared_ptr<executor::ScopedTaskExecuto
     }
 }
 
-void createRetryableWritesView(OperationContext* opCtx, Database* db) {
+void createOplogViewForTenantMigrations(OperationContext* opCtx, Database* db) {
     writeConflictRetry(
         opCtx, "createDonorOplogView", NamespaceString::kTenantMigrationOplogView.ns(), [&] {
             {
@@ -98,24 +102,97 @@ void createRetryableWritesView(OperationContext* opCtx, Database* db) {
                 wuow.commit();
             }
 
-            // First match entries with a `stmtId` so that we're filtering for retryable writes
-            // oplog entries. Pass the result into the next stage of the pipeline and only project
-            // the fields that a tenant migration recipient needs to refetch retryable writes oplog
-            // entries: `ts`, `prevOpTime`, `preImageOpTime`, and `postImageOpTime`.
+            // Project the fields that a tenant migration recipient needs to refetch retryable
+            // writes oplog entries: `ts`, `prevOpTime`, `preImageOpTime`, and `postImageOpTime`.
+            // Also projects the first 'ns' field of 'applyOps' for transactions.
+            //
+            // We use two stages in this pipeline because 'o.applyOps' is an array but '$project'
+            // does not recognize numeric paths as array indices. As a result, we use one '$project'
+            // stage to get the first element in 'o.applyOps', then a second stage to store the 'ns'
+            // field of the element into 'applyOpsNs'.
+            BSONArrayBuilder pipeline;
+            pipeline.append(BSON("$project" << BSON("_id"
+                                                    << "$ts"
+                                                    << "ns" << 1 << "ts" << 1 << "prevOpTime" << 1
+                                                    << "preImageOpTime" << 1 << "postImageOpTime"
+                                                    << 1 << "applyOpsNs"
+                                                    << BSON("$first"
+                                                            << "$o.applyOps"))));
+            pipeline.append(BSON("$project" << BSON("_id"
+                                                    << "$ts"
+                                                    << "ns" << 1 << "ts" << 1 << "prevOpTime" << 1
+                                                    << "preImageOpTime" << 1 << "postImageOpTime"
+                                                    << 1 << "applyOpsNs"
+                                                    << "$applyOpsNs.ns")));
+
             CollectionOptions options;
             options.viewOn = NamespaceString::kRsOplogNamespace.coll().toString();
-            options.pipeline = BSON_ARRAY(
-                BSON("$match" << BSON("stmtId" << BSON("$exists" << true)))
-                << BSON("$project" << BSON("_id"
-                                           << "$ts"
-                                           << "ns" << 1 << "ts" << 1 << "prevOpTime" << 1
-                                           << "preImageOpTime" << 1 << "postImageOpTime" << 1)));
+            options.pipeline = pipeline.arr();
 
             WriteUnitOfWork wuow(opCtx);
             uassertStatusOK(
                 db->createView(opCtx, NamespaceString::kTenantMigrationOplogView, options));
             wuow.commit();
         });
+}
+
+std::unique_ptr<Pipeline, PipelineDeleter> createCommittedTransactionsPipelineForTenantMigrations(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const Timestamp& startFetchingTimestamp,
+    const std::string& tenantId) {
+    Pipeline::SourceContainer stages;
+    using Doc = Document;
+
+    // 1. Match config.transactions entries that have a 'lastWriteOpTime.ts' before
+    //    'startFetchingTimestamp' and 'state: committed', which indicates that it is a committed
+    //    transaction. Retryable writes should not have the 'state' field.
+    stages.emplace_back(DocumentSourceMatch::createFromBson(
+        Doc{{"$match",
+             Doc{{"state", Value{"committed"_sd}},
+                 {"lastWriteOpTime.ts", Doc{{"$lt", startFetchingTimestamp}}}}}}
+            .toBson()
+            .firstElement(),
+        expCtx));
+
+    // 2. Get all oplog entries that have a timestamp equal to 'lastWriteOpTime.ts'. Store these
+    //    oplog entries in the 'oplogEntry' field.
+    stages.emplace_back(DocumentSourceLookUp::createFromBson(fromjson("{\
+        $lookup: {\
+            from: {db: 'local', coll: 'system.tenantMigration.oplogView'},\
+            localField: 'lastWriteOpTime.ts',\
+            foreignField: 'ts',\
+            as: 'oplogEntry'\
+        }}")
+                                                                 .firstElement(),
+                                                             expCtx));
+
+    // 3. Filter out the entries that do not belong to the tenant.
+    stages.emplace_back(DocumentSourceMatch::createFromBson(fromjson("{\
+        $match: {\
+            'oplogEntry.applyOpsNs': {$regex: '^" + tenantId + "_'}\
+        }}")
+                                                                .firstElement(),
+                                                            expCtx));
+
+    // 4. Unset the 'oplogEntry' field and return the committed transaction entries.
+    stages.emplace_back(DocumentSourceProject::createUnset(FieldPath("oplogEntry"), expCtx));
+
+    return Pipeline::create(std::move(stages), expCtx);
+}
+
+Status upsertCommittedTransactionEntry(OperationContext* opCtx, const BSONObj& entry) {
+    const auto nss = NamespaceString::kSessionTransactionsTableNamespace;
+    AutoGetCollection collection(opCtx, nss, MODE_IX);
+
+    // Sanity check.
+    uassert(ErrorCodes::PrimarySteppedDown,
+            str::stream() << "No longer primary while attempting to insert transactions entry",
+            repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss));
+
+    return writeConflictRetry(opCtx, "insertCommittedTransactionEntry", nss.ns(), [&]() -> Status {
+        Helpers::upsert(opCtx, nss.ns(), entry, false /* fromMigrate */);
+        return Status::OK();
+    });
 }
 
 }  // namespace tenant_migration_util

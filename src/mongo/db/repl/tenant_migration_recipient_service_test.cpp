@@ -232,6 +232,12 @@ public:
         auto compFp = globalFailPointRegistry().find("skipComparingRecipientAndDonorFCV");
         compFp->setMode(FailPoint::alwaysOn);
 
+        // Skip fetching committed transactions, as we will test this logic entirely in integration
+        // tests.
+        auto fetchCommittedTransactionsFp =
+            globalFailPointRegistry().find("skipFetchingCommittedTransactions");
+        fetchCommittedTransactionsFp->setMode(FailPoint::alwaysOn);
+
         // Timestamps of "0 seconds" are not allowed, so we must advance our clock mock to the first
         // real second.
         _clkSource->advance(Milliseconds(1000));

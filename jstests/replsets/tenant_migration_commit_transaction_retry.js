@@ -125,16 +125,6 @@ assert.eq(txnEntryOnDonor, aggRes.cursor.firstBatch[0]);
 // Test the client can retry commitTransaction for that transaction that committed prior to the
 // migration.
 
-// Insert the config.transactions entry on the recipient, but with a dummy lastWriteOpTime. The
-// recipient should not need a real lastWriteOpTime to support a commitTransaction retry.
-txnEntryOnDonor.lastWriteOpTime.ts = new Timestamp(0, 0);
-assert.commandWorked(
-    recipientPrimary.getCollection("config.transactions").insert([txnEntryOnDonor]));
-recipientRst.awaitLastOpCommitted();
-recipientRst.getSecondaries().forEach(node => {
-    assert.eq(1, node.getCollection("config.transactions").count(txnEntryOnDonor));
-});
-
 assert.commandWorked(recipientPrimary.adminCommand({
     commitTransaction: 1,
     lsid: txnEntryOnDonor._id,

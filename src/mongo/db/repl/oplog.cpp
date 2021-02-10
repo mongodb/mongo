@@ -661,7 +661,7 @@ void createOplog(OperationContext* opCtx,
     });
 
     createSlimOplogView(opCtx, ctx.db());
-    tenant_migration_util::createRetryableWritesView(opCtx, ctx.db());
+    tenant_migration_util::createOplogViewForTenantMigrations(opCtx, ctx.db());
 
     /* sync here so we don't get any surprising lag later when we try to sync */
     service->getStorageEngine()->flushAllFiles(opCtx, /*callerHoldsReadLock*/ false);
