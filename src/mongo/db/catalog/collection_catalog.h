@@ -412,25 +412,31 @@ private:
  * RAII style object to stash a versioned CollectionCatalog on the OperationContext.
  * Calls to CollectionCatalog::get(OperationContext*) will return this instance.
  *
- * Unstashes the CollectionCatalog at destruction.
- *
- * It is not safe to nest usages of this type.
+ * Unstashes the CollectionCatalog at destruction if the OperationContext::isLockFreeReadsOp()
+ * flag is no longer set. This is handling for the nested Stasher use case.
  */
 class CollectionCatalogStasher {
 public:
     CollectionCatalogStasher(OperationContext* opCtx);
     CollectionCatalogStasher(OperationContext* opCtx,
                              std::shared_ptr<const CollectionCatalog> catalog);
+
+    /**
+     * Unstashes the catalog if _opCtx->isLockFreeReadsOp() is no longer set.
+     */
     ~CollectionCatalogStasher();
 
-    CollectionCatalogStasher(const CollectionCatalogStasher&) = delete;
+    /**
+     * Moves ownership of the stash to the new instance, and marks the old one unstashed.
+     */
     CollectionCatalogStasher(CollectionCatalogStasher&& other);
 
+    CollectionCatalogStasher(const CollectionCatalogStasher&) = delete;
     CollectionCatalogStasher& operator=(const CollectionCatalogStasher&) = delete;
     CollectionCatalogStasher& operator=(CollectionCatalogStasher&&) = delete;
 
     /**
-     * Stashes a new catalog on OperationContext
+     * Stashes 'catalog' on the _opCtx.
      */
     void stash(std::shared_ptr<const CollectionCatalog> catalog);
 

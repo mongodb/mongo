@@ -244,9 +244,12 @@ private:
         bool _isLockFreeReadSubOperation;
     };
 
+    // The CollectionCatalogStasher must outlive the LockFreeReadsBlock in the AutoGet* below.
+    // ~LockFreeReadsBlock clears a flag that the ~CollectionCatalogStasher checks.
+    CollectionCatalogStasher _catalogStash;
+
     boost::optional<AutoGetCollectionForReadBase<AutoGetCollectionLockFree, EmplaceHelper>>
         _autoGetCollectionForReadBase;
-    CollectionCatalogStasher _catalogStash;
 };
 
 /**
@@ -412,11 +415,14 @@ public:
                              Date_t deadline = Date_t::max());
 
 private:
+    // The CollectionCatalogStasher must outlive the LockFreeReadsBlock below. ~LockFreeReadsBlock
+    // clears a flag that the ~CollectionCatalogStasher checks.
+    CollectionCatalogStasher _catalogStash;
+
     // Sets a flag on the opCtx to inform subsequent code that the operation is running lock-free.
     LockFreeReadsBlock _lockFreeReadsBlock;
 
     Lock::GlobalLock _globalLock;
-    CollectionCatalogStasher _catalogStash;
 };
 
 /**
