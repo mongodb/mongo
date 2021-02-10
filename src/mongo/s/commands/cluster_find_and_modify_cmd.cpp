@@ -31,9 +31,12 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/find_and_modify_common.h"
 #include "mongo/db/commands/update_metrics.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
@@ -198,7 +201,32 @@ public:
     void addRequiredPrivileges(const std::string& dbname,
                                const BSONObj& cmdObj,
                                std::vector<Privilege>* out) const override {
-        find_and_modify::addPrivilegesRequiredForFindAndModify(this, dbname, cmdObj, out);
+
+        bool update = cmdObj["update"].trueValue();
+        bool upsert = cmdObj["upsert"].trueValue();
+        bool remove = cmdObj["remove"].trueValue();
+
+        ActionSet actions;
+        actions.addAction(ActionType::find);
+        if (update) {
+            actions.addAction(ActionType::update);
+        }
+        if (upsert) {
+            actions.addAction(ActionType::insert);
+        }
+        if (remove) {
+            actions.addAction(ActionType::remove);
+        }
+        if (shouldBypassDocumentValidationForCommand(cmdObj)) {
+            actions.addAction(ActionType::bypassDocumentValidation);
+        }
+
+        const std::string ns = CommandHelpers::parseNsFromCommand(dbname, cmdObj);
+        ResourcePattern resource(CommandHelpers::resourcePatternForNamespace(ns));
+        uassert(17137,
+                "Invalid target namespace " + resource.toString(),
+                resource.isExactNamespacePattern());
+        out->push_back(Privilege(resource, actions));
     }
 
     Status explain(OperationContext* opCtx,

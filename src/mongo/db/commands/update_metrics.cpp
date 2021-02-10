@@ -57,4 +57,17 @@ void UpdateMetrics::collectMetrics(const BSONObj& cmdObj) {
         _commandsWithArrayFilters.increment();
     }
 }
+
+void UpdateMetrics::collectMetrics(const write_ops::FindAndModifyCommand& cmd) {
+    if (auto update = cmd.getUpdate()) {
+        if (update->type() == write_ops::UpdateModification::Type::kPipeline) {
+            _commandsWithAggregationPipeline.increment();
+        }
+    }
+
+    if (cmd.getArrayFilters()) {
+        _commandsWithArrayFilters.increment();
+    }
+}
+
 }  // namespace mongo

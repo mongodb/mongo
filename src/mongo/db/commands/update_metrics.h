@@ -33,6 +33,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/commands/server_status_metric.h"
+#include "mongo/db/ops/find_and_modify_command_gen.h"
 
 namespace mongo {
 /**
@@ -63,6 +64,11 @@ public:
      * support use cases when the command object is not fully parsed by the command.
      */
     void collectMetrics(const BSONObj& cmdObj);
+
+    /**
+     * Increments update metrics corresponding to the supplied parameters.
+     */
+    void collectMetrics(const write_ops::FindAndModifyCommand& cmd);
 
 private:
     // A counter for how many times this command has been executed with an aggregation

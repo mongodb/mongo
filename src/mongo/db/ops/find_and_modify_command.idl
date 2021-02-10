@@ -71,10 +71,11 @@ commands:
     findAndModify:
         description: "Parser for the 'findAndModify' command."
         command_name: findAndModify
+        command_alias: findandmodify
         cpp_name: FindAndModifyCommand
         strict: true
         namespace: concatenate_with_db
-        api_version: ""
+        api_version: "1"
         fields:
             query:
                 description: "The query that matches documents to update. Uses the same query
@@ -89,6 +90,14 @@ commands:
                 description: "Determines which document the operation modifies if the query selects
                               multiple documents."
                 type: object_owned
+                optional: true
+            batchSize:
+                description: "Determines the batch size."
+                type: int
+                optional: true
+            singleBatch:
+                description: "Determines if the batch is single."
+                type: bool
                 optional: true
             hint:
                 description: "Specifies the hint to use for the operation."
