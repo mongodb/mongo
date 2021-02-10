@@ -309,18 +309,18 @@ public:
             OperationContext* opCtx,
             const NamespaceString& nsString,
             const write_ops::FindAndModifyCommand& request,
-            const int stmtId,
-            CurOp* const curOp,
-            OpDebug* const opDebug,
-            const bool inTransaction);
+            int stmtId,
+            CurOp* curOp,
+            OpDebug* opDebug,
+            bool inTransaction);
 
         static write_ops::FindAndModifyReply writeConflictRetryUpsert(
             OperationContext* opCtx,
             const NamespaceString& nsString,
             const write_ops::FindAndModifyCommand& request,
-            CurOp* const curOp,
-            OpDebug* const opDebug,
-            const bool inTransaction,
+            CurOp* curOp,
+            OpDebug* opDebug,
+            bool inTransaction,
             ParsedUpdate* parsedUpdate);
     };
 
@@ -335,10 +335,10 @@ write_ops::FindAndModifyReply CmdFindAndModify::Invocation::writeConflictRetryRe
     OperationContext* opCtx,
     const NamespaceString& nsString,
     const write_ops::FindAndModifyCommand& request,
-    const int stmtId,
-    CurOp* const curOp,
+    int stmtId,
+    CurOp* curOp,
     OpDebug* const opDebug,
-    const bool inTransaction) {
+    bool inTransaction) {
 
     auto deleteRequest = DeleteRequest{};
     deleteRequest.setNsString(nsString);
@@ -411,9 +411,9 @@ write_ops::FindAndModifyReply CmdFindAndModify::Invocation::writeConflictRetryUp
     OperationContext* opCtx,
     const NamespaceString& nsString,
     const write_ops::FindAndModifyCommand& request,
-    CurOp* const curOp,
-    OpDebug* const opDebug,
-    const bool inTransaction,
+    CurOp* curOp,
+    OpDebug* opDebug,
+    bool inTransaction,
     ParsedUpdate* parsedUpdate) {
 
     AutoGetCollection autoColl(opCtx, nsString, MODE_IX);
