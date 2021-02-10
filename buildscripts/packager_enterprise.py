@@ -52,7 +52,10 @@ class EnterpriseSpec(packager.Spec):
 
     def suffix(self):
         """Suffix."""
-        return "-enterprise" if int(self.ver.split(".")[1]) % 2 == 0 else "-enterprise-unstable"
+        if int(self.ver.split(".")[0]) >= 5:
+            return "-enterprise" if int(self.ver.split(".")[1]) == 0 else "-enterprise-unstable"
+        else:
+            return "-enterprise" if int(self.ver.split(".")[1]) % 2 == 0 else "-enterprise-unstable"
 
 
 class EnterpriseDistro(packager.Distro):
