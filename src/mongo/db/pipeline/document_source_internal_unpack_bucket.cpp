@@ -39,6 +39,7 @@
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_project.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
+#include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 
@@ -141,6 +142,54 @@ Value constructObjectIdValue(const ComparisonMatchExpression* matchExpr) {
     // eliminate all buckets.
     return Value(oid);
 }
+
+/**
+ * Checks if a sort stage's pattern following our internal unpack bucket is suitable to be reordered
+ * before us. The sort stage must refer exclusively to the meta field or any subfields.
+ */
+bool checkMetadataSortReorder(const SortPattern& sortPattern, const StringData& metaFieldStr) {
+    for (const auto& sortKey : sortPattern) {
+        if (!sortKey.fieldPath.has_value()) {
+            return false;
+        }
+        if (sortKey.fieldPath->getPathLength() < 1) {
+            return false;
+        }
+        if (sortKey.fieldPath->getFieldName(0) != metaFieldStr) {
+            return false;
+        }
+    }
+    return true;
+}
+
+/**
+ * Returns a new DocumentSort to reorder before current unpack bucket document.
+ */
+boost::intrusive_ptr<DocumentSourceSort> createMetadataSortForReorder(
+    const DocumentSourceSort& sort) {
+    std::vector<SortPattern::SortPatternPart> updatedPattern;
+    for (const auto& entry : sort.getSortKeyPattern()) {
+        // Repoint sort to use metadata field before renaming.
+        auto updatedFieldPath = FieldPath(BucketUnpacker::kBucketMetaFieldName);
+        if (entry.fieldPath->getPathLength() > 1) {
+            updatedFieldPath = updatedFieldPath.concat(entry.fieldPath->tail());
+        }
+
+        updatedPattern.push_back(entry);
+        updatedPattern.back().fieldPath = updatedFieldPath;
+    }
+
+    boost::optional<uint64_t> maxMemoryUsageBytes;
+    if (auto sortStatsPtr = dynamic_cast<const SortStats*>(sort.getSpecificStats())) {
+        maxMemoryUsageBytes = sortStatsPtr->maxMemoryUsageBytes;
+    }
+
+    return DocumentSourceSort::create(sort.getContext(),
+                                      SortPattern{updatedPattern},
+                                      sort.getLimit().get_value_or(0),
+                                      maxMemoryUsageBytes);
+}
+
 }  // namespace
 
 void BucketUnpacker::reset(BSONObj&& bucket) {
@@ -517,6 +566,29 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
 
     if (std::next(itr) == container->end()) {
         return container->end();
+    }
+
+    // Before any other rewrites for the current stage, consider reordering with $sort.
+    if (auto sortPtr = dynamic_cast<DocumentSourceSort*>(std::next(itr)->get())) {
+        if (auto metaField = _bucketUnpacker.bucketSpec().metaField) {
+            if (checkMetadataSortReorder(sortPtr->getSortKeyPattern(), metaField.get())) {
+                // We have a sort on metadata field following this stage. Reorder the two stages
+                // and return a pointer to the preceding stage.
+                auto sortForReorder = createMetadataSortForReorder(*sortPtr);
+
+                // Reorder sort and current doc.
+                *std::next(itr) = std::move(*itr);
+                *itr = std::move(sortForReorder);
+
+                if (itr == container->begin()) {
+                    // Try to optimize the current stage again.
+                    return std::next(itr);
+                } else {
+                    // Try to optimize the previous stage against $sort.
+                    return std::prev(itr);
+                }
+            }
+        }
     }
 
     // Optimize the pipeline after the $unpackBucket.
