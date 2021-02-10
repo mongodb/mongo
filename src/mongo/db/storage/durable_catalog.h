@@ -190,6 +190,14 @@ public:
      */
     virtual void updateCappedSize(OperationContext* opCtx, RecordId catalogId, long long size) = 0;
 
+    /**
+     * Updates the expireAfterSeconds option on the clustered index. If no expireAfterSeconds value
+     * is passed in then TTL deletions will be stopped on the clustered index.
+     */
+    virtual void updateClusteredIndexTTLSetting(OperationContext* opCtx,
+                                                RecordId catalogId,
+                                                boost::optional<int64_t> expireAfterSeconds) = 0;
+
     /*
      * Updates the expireAfterSeconds field of the given index to the value in newExpireSecs.
      * The specified index must already contain an expireAfterSeconds field, and the value in

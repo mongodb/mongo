@@ -1027,6 +1027,15 @@ void DurableCatalogImpl::updateCappedSize(OperationContext* opCtx,
     putMetaData(opCtx, catalogId, md);
 }
 
+void DurableCatalogImpl::updateClusteredIndexTTLSetting(
+    OperationContext* opCtx, RecordId catalogId, boost::optional<int64_t> expireAfterSeconds) {
+    BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, catalogId);
+    uassert(5401000, "The collection doesn't have a clustered index", md.options.clusteredIndex);
+
+    md.options.clusteredIndex->setExpireAfterSeconds(expireAfterSeconds);
+    putMetaData(opCtx, catalogId, md);
+}
+
 void DurableCatalogImpl::updateTTLSetting(OperationContext* opCtx,
                                           RecordId catalogId,
                                           StringData idxName,

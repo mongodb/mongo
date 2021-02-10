@@ -136,6 +136,10 @@ public:
 
     void updateCappedSize(OperationContext* opCtx, RecordId catalogId, long long size);
 
+    void updateClusteredIndexTTLSetting(OperationContext* opCtx,
+                                        RecordId catalogId,
+                                        boost::optional<int64_t> expireAfterSeconds);
+
     void updateTTLSetting(OperationContext* opCtx,
                           RecordId catalogId,
                           StringData idxName,

@@ -68,6 +68,17 @@ structs:
             hidden_new:
                 optional: true
                 type: safeBool
+    
+    CollModClusteredIndex:
+        description: "A type representing the adjustable options on clustered indexes"
+        strict: true
+        fields:
+            expireAfterSeconds:
+                description: "The number of seconds after which old data should be deleted. This can
+                              be disabled by passing in 'off' as a value"
+                type: 
+                    variant: [string, safeInt64]
+
 commands:
     collMod:
         description: "Specify collMod Command."
@@ -115,4 +126,8 @@ commands:
                               document in the oplog"
                 optional: true
                 type: safeBool
+            clusteredIndex:
+                description: "Adjusts the options on clustered indexes"
+                optional: true
+                type: CollModClusteredIndex
         reply_type: CollModReply

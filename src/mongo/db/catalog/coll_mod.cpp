@@ -102,6 +102,7 @@ void assertMovePrimaryInProgress(OperationContext* opCtx, NamespaceString const&
 struct CollModRequest {
     const IndexDescriptor* idx = nullptr;
     BSONElement indexExpireAfterSeconds = {};
+    BSONElement clusteredIndexExpireAfterSeconds = {};
     BSONElement indexHidden = {};
     BSONElement viewPipeLine = {};
     std::string viewOn = {};
@@ -290,6 +291,35 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
             }
 
             cmr.recordPreImages = e.trueValue();
+        } else if (fieldName == "clusteredIndex") {
+            if (!nss.isTimeseriesBucketsCollection()) {
+                return Status(
+                    ErrorCodes::InvalidOptions,
+                    "'clusteredIndex' option is only supported on time-series bucket collections");
+            }
+
+            BSONElement elem = e.Obj()["expireAfterSeconds"];
+            if (elem.type() == mongo::String) {
+                const std::string elemStr = elem.String();
+                if (elemStr != "off") {
+                    return Status(
+                        ErrorCodes::InvalidOptions,
+                        str::stream()
+                            << "Invalid string value for the 'clusteredIndex::expireAfterSeconds' "
+                            << "option. Got: '" << elemStr << "'. Accepted value is 'off'");
+                }
+            } else {
+                invariant(elem.type() == mongo::NumberLong);
+                const int64_t elemNum = elem.safeNumberLong();
+                if (elemNum < 0) {
+                    return Status(ErrorCodes::InvalidOptions,
+                                  str::stream() << "Expected a number >= 0 for the "
+                                                << "'clusteredIndex::expireAfterSeconds' "
+                                                << "option. Got: " << elemNum);
+                }
+            }
+
+            cmr.clusteredIndexExpireAfterSeconds = e.Obj()["expireAfterSeconds"];
         } else {
             if (isView) {
                 return Status(ErrorCodes::InvalidOptions,
@@ -403,6 +433,7 @@ Status _collModInternal(OperationContext* opCtx,
     auto viewPipeline = cmrNew.viewPipeLine;
     auto viewOn = cmrNew.viewOn;
     auto indexExpireAfterSeconds = cmrNew.indexExpireAfterSeconds;
+    auto clusteredIndexExpireAfterSeconds = cmrNew.clusteredIndexExpireAfterSeconds;
     auto indexHidden = cmrNew.indexHidden;
     // WriteConflictExceptions thrown in the writeConflictRetry loop below can cause cmrNew.idx to
     // become invalid, so save a copy to use in the loop until we can refresh it.
@@ -452,6 +483,39 @@ Status _collModInternal(OperationContext* opCtx,
         boost::optional<IndexCollModInfo> indexCollModInfo;
 
         // Handle collMod operation type appropriately.
+        if (clusteredIndexExpireAfterSeconds) {
+            invariant(oldCollOptions.clusteredIndex.has_value());
+
+            [&]() -> void {
+                boost::optional<int64_t> oldExpireAfterSeconds =
+                    oldCollOptions.clusteredIndex->getExpireAfterSeconds();
+
+                if (clusteredIndexExpireAfterSeconds.type() == mongo::String) {
+                    const std::string newExpireAfterSeconds =
+                        clusteredIndexExpireAfterSeconds.String();
+                    invariant(newExpireAfterSeconds == "off");
+                    if (!oldExpireAfterSeconds) {
+                        // expireAfterSeconds is already disabled on the clustered index.
+                        return;
+                    }
+
+                    DurableCatalog::get(opCtx)->updateClusteredIndexTTLSetting(
+                        opCtx, coll->getCatalogId(), boost::none);
+                    return;
+                }
+
+                invariant(clusteredIndexExpireAfterSeconds.type() == mongo::NumberLong);
+                int64_t newExpireAfterSeconds = clusteredIndexExpireAfterSeconds.safeNumberLong();
+                if (oldExpireAfterSeconds && *oldExpireAfterSeconds == newExpireAfterSeconds) {
+                    // expireAfterSeconds is already the requested value on the clustered index.
+                    return;
+                }
+
+                invariant(newExpireAfterSeconds >= 0);
+                DurableCatalog::get(opCtx)->updateClusteredIndexTTLSetting(
+                    opCtx, coll->getCatalogId(), newExpireAfterSeconds);
+            }();
+        }
 
         if (indexExpireAfterSeconds || indexHidden) {
             BSONElement newExpireSecs = {};
