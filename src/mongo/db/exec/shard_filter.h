@@ -35,39 +35,17 @@
 namespace mongo {
 
 /**
- * This stage drops documents that didn't belong to the shard we're executing on at the time of
- * construction. This matches the contract for sharded cursorids which guarantees that a
- * StaleConfigException will be thrown early or the cursorid for its entire lifetime will return
- * documents matching the shard version set on the connection at the time of cursorid creation.
+ * This stage drops documents (called "orphans") that don't logically belong to this shard according
+ * to the the provided 'collectionFilter'. No data should be returned from a query in ranges of
+ * migrations that committed after the query started, or from ranges not owned when the query began.
  *
- * A related system will ensure that the data migrated away from a shard will not be deleted as
- * long as there are active queries from before the migration. Currently, "active queries" is
- * defined by cursorids so it is important that the metadata used in this stage uses the same
- * version as the cursorid. Therefore, you must wrap any Runner using this Stage in a
- * ClientCursor during the same lock grab as constructing the Runner.
+ * A related system will ensure that the data migrated away from a shard will not be deleted as long
+ * as there are active queries from before the migration. By holding onto a copy of the provided
+ * 'collectionFilter', this stage signals to the sharding subsystem that the data required at the
+ * associated shard version cannot yet be deleted. In other words, no migrated data should be
+ * removed from a shard while there are queries that were active before the migration.
  *
- * BEGIN NOTE FROM GREG
- *
- * There are three sharded query contracts:
- *
- * 0) Migration commit takes the db lock - i.e. is serialized with writes and reads.
- * 1) No data should be returned from a query in ranges of migrations that committed after the
- * query started, or from ranges not owned when the query began.
- * 2) No migrated data should be removed from a shard while there are queries that were active
- * before the migration.
- *
- * As implementation details, collection metadata is used to determine the ranges of all data
- * not actively migrated (or orphaned).  CursorIds are currently used to establish "active"
- * queries before migration commit.
- *
- * Combining all this: if a query is started in a db lock and acquires in that (same) lock the
- * collection metadata and a cursorId, the query will return results for exactly the ranges in
- * the metadata (though of arbitrary staleness).  This is the sharded collection query contract.
- *
- * END NOTE FROM GREG
- *
- * Preconditions: Child must be fetched.  TODO: when covering analysis is in just build doc
- * and check that against shard key.  See SERVER-5022.
+ * Preconditions: Child must be fetched.
  */
 class ShardFilterStage final : public PlanStage {
 public:
@@ -93,7 +71,6 @@ public:
 private:
     WorkingSet* _ws;
 
-    // Stats
     ShardingFilterStats _specificStats;
 
     // Note: it is important that this owns the ScopedCollectionFilter from the time this stage

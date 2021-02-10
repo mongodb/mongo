@@ -30,6 +30,8 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/exec/shard_filterer_mock.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/query/projection_parser.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/sbe_stage_builder_test_fixture.h"
 #include "mongo/db/query/shard_filterer_factory_mock.h"
@@ -74,7 +76,8 @@ protected:
      * Makes a new QuerySolutionNode consisting of a ShardingFilterNode and a child VirtualScanNode.
      */
     std::unique_ptr<QuerySolutionNode> makeFilterVirtualScanTree(std::vector<BSONArray> docs) {
-        auto virtScan = std::make_unique<VirtualScanNode>(docs, false);
+        auto virtScan =
+            std::make_unique<VirtualScanNode>(docs, VirtualScanNode::ScanType::kCollScan, false);
         auto shardFilter = std::make_unique<ShardingFilterNode>();
         shardFilter->children.push_back(virtScan.release());
         return std::move(shardFilter);
@@ -90,7 +93,17 @@ protected:
         // Construct a QuerySolutionNode consisting of a ShardingFilterNode with a single child
         // VirtualScanNode.
         auto shardFilter = makeFilterVirtualScanTree(docs);
-        auto querySolution = makeQuerySolution(std::move(shardFilter));
+        runTest(std::move(shardFilter), expected, std::move(shardFiltererFactory));
+    }
+
+    /**
+     * Similar to the above, but rather than hardcoding a SHARDING_FILTER => VIRTUAL_SCAN query
+     * solution, uses the query solution node tree provided by the caller.
+     */
+    void runTest(std::unique_ptr<QuerySolutionNode> qsn,
+                 const BSONArray& expected,
+                 std::unique_ptr<ShardFiltererFactoryInterface> shardFiltererFactory) {
+        auto querySolution = makeQuerySolution(std::move(qsn));
 
         // Translate the QuerySolution to an sbe::PlanStage.
         auto [resultSlots, stage, data] =
@@ -218,4 +231,33 @@ TEST_F(SbeShardFilterTest, MissingFieldsAtBottomDottedPathFilledCorrectly) {
     auto expected = BSON_ARRAY(BSON("a" << BSON("b" << BSON("c" << BSON("d" << 1)))));
     runTest(docs, expected, makeAllNullShardKeyFiltererFactory(BSON("a.b.c.d" << 1)));
 }
+
+TEST_F(SbeShardFilterTest, CoveredShardFilterPlan) {
+    auto indexKeyPattern = BSON("a" << 1 << "b" << 1 << "c" << 1 << "d" << 1);
+    auto projection = BSON("a" << 1 << "c" << 1);
+    auto mockedIndexKeys =
+        std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 2 << "b" << 2 << "c" << 2 << "d" << 2)),
+                               BSON_ARRAY(BSON("a" << 3 << "b" << 3 << "c" << 3 << "d" << 3))};
+    auto expected = BSON_ARRAY(BSON("a" << 2 << "c" << 2) << BSON("a" << 3 << "c" << 3));
+
+    auto nss = NamespaceString{"db", "coll"};
+    auto expCtx = make_intrusive<ExpressionContextForTest>(nss);
+    auto emptyMatchExpression =
+        unittest::assertGet(MatchExpressionParser::parse(BSONObj{}, expCtx));
+    auto projectionAst = projection_ast::parse(expCtx, projection, ProjectionPolicies{});
+
+    // Construct a PROJECTION_COVERED => SHARDING_FILTER => VIRTUAL_SCAN query solution node tree
+    // where the virtual scan mocks an index scan with 'indexKeyPattern'.
+    auto virtScan = std::make_unique<VirtualScanNode>(
+        mockedIndexKeys, VirtualScanNode::ScanType::kIxscan, false, indexKeyPattern);
+    auto shardFilter = std::make_unique<ShardingFilterNode>();
+    shardFilter->children.push_back(virtScan.release());
+    auto projectNode = std::make_unique<ProjectionNodeCovered>(
+        std::move(shardFilter), *emptyMatchExpression, projectionAst, indexKeyPattern);
+
+    runTest(std::move(projectNode),
+            expected,
+            makeAlwaysPassShardFiltererFactory(BSON("a" << 1 << "c" << 1 << "d" << 1)));
+}
+
 }  // namespace mongo

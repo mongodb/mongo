@@ -122,7 +122,8 @@ TEST_F(ClassicStageBuilderTest, VirtualScanTranslation) {
 
     // Construct a QuerySolution consisting of a single VirtualScanNode to test if a stream of
     // documents can be produced.
-    auto virtScan = std::make_unique<VirtualScanNode>(docs, true);
+    auto virtScan =
+        std::make_unique<VirtualScanNode>(docs, VirtualScanNode::ScanType::kCollScan, false);
 
     // Make a QuerySolution from the root virtual scan node.
     auto querySolution = makeQuerySolution(std::move(virtScan));

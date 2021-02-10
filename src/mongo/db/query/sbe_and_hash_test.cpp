@@ -49,7 +49,8 @@ protected:
         std::vector<std::vector<BSONArray>> docsVec) {
         auto andHashNode = std::make_unique<AndHashNode>();
         for (auto docs : docsVec) {
-            auto virtScan = std::make_unique<VirtualScanNode>(docs, true);
+            auto virtScan =
+                std::make_unique<VirtualScanNode>(docs, VirtualScanNode::ScanType::kCollScan, true);
             andHashNode->children.push_back(virtScan.release());
         }
         return std::move(andHashNode);

@@ -83,10 +83,10 @@ TEST_F(SbeShardFilterBuiltinTest, BasicFiltering) {
     value::ViewOfValueAccessor objAccessor;
     auto objSlot = bindAccessor(&objAccessor);
 
-    auto [tagEmptyObj, valEmptyObj] = value::makeNewObject();
-    value::ValueGuard objGuard{tagEmptyObj, valEmptyObj};
+    BSONObj emptyBson;
+    objAccessor.reset(value::TypeTags::bsonObject,
+                      value::bitcastFrom<const char*>(emptyBson.objdata()));
 
-    objAccessor.reset(tagEmptyObj, valEmptyObj);
     runAndAssertExpression(makeAlwaysPassShardFilter(), objSlot, true);
     runAndAssertExpression(makeAlwaysFailShardFilter(), objSlot, false);
     runAndAssertExpression(makeAlwaysPassShardFilter(), objSlot, true);
@@ -104,14 +104,26 @@ TEST_F(SbeShardFilterBuiltinTest, MissingShardKey) {
     runAndAssertExpression(makeAlwaysPassShardFilter(), inputSlot, false);
 };
 
+TEST_F(SbeShardFilterBuiltinTest, ShardKeyAsObjectNotBsonObjIsRejected) {
+    value::ViewOfValueAccessor inputSlotAccessor;
+    auto inputSlot = bindAccessor(&inputSlotAccessor);
+
+    auto [tagEmptyObj, valEmptyObj] = value::makeNewObject();
+    value::ValueGuard objGuard{tagEmptyObj, valEmptyObj};
+    inputSlotAccessor.reset(tagEmptyObj, valEmptyObj);
+
+    runAndAssertExpression(makeAlwaysPassShardFilter(), inputSlot, false);
+    runAndAssertExpression(makeAlwaysFailShardFilter(), inputSlot, false);
+};
+
 TEST_F(SbeShardFilterBuiltinTest, BadScopedCollFilterValue) {
     value::ViewOfValueAccessor objAccessor;
     auto objSlot = bindAccessor(&objAccessor);
 
-    auto [tagEmptyObj, valEmptyObj] = value::makeNewObject();
-    value::ValueGuard objGuard{tagEmptyObj, valEmptyObj};
+    BSONObj emptyBson;
+    objAccessor.reset(value::TypeTags::bsonObject,
+                      value::bitcastFrom<const char*>(emptyBson.objdata()));
 
-    objAccessor.reset(tagEmptyObj, valEmptyObj);
     runAndAssertExpression({value::TypeTags::Boolean, true}, objSlot, false);
     runAndAssertExpression({value::TypeTags::Boolean, true}, objSlot, false);
 };

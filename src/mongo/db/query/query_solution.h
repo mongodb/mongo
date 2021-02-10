@@ -515,8 +515,12 @@ struct CollectionScanNode : public QuerySolutionNodeWithSortSet {
  * collection or an index scan in memory by using a backing vector of BSONArray.
  */
 struct VirtualScanNode : public QuerySolutionNodeWithSortSet {
-    VirtualScanNode(std::vector<BSONArray> docs, bool hasRecordId);
-    virtual ~VirtualScanNode() {}
+    enum class ScanType { kCollScan, kIxscan };
+
+    VirtualScanNode(std::vector<BSONArray> docs,
+                    ScanType scanType,
+                    bool hasRecordId,
+                    BSONObj indexKeyPattern = {});
 
     virtual StageType getType() const {
         return STAGE_VIRTUAL_SCAN;
@@ -525,10 +529,15 @@ struct VirtualScanNode : public QuerySolutionNodeWithSortSet {
     virtual void appendToString(str::stream* ss, int indent) const;
 
     bool fetched() const {
-        return true;
+        return scanType == ScanType::kCollScan;
     }
     FieldAvailability getFieldAvailability(const std::string& field) const {
-        return FieldAvailability::kFullyProvided;
+        if (scanType == ScanType::kCollScan) {
+            return FieldAvailability::kFullyProvided;
+        } else {
+            return indexKeyPattern.hasField(field) ? FieldAvailability::kFullyProvided
+                                                   : FieldAvailability::kNotProvided;
+        }
     }
     bool sortedByDiskLoc() const {
         return false;
@@ -547,11 +556,17 @@ struct VirtualScanNode : public QuerySolutionNodeWithSortSet {
     // BSONObj in the first position of the array.
     std::vector<BSONArray> docs;
 
+    // Indicates whether the scan is mimicking a collection scan or index scan.
+    const ScanType scanType;
+
     // A flag to indicate the format of the BSONArray document payload in the above vector, docs. If
     // hasRecordId is set to true, then both a RecordId and a BSONObj document are stored in that
     // order for every BSONArray in docs. Otherwise, the RecordId is omitted and the BSONArray will
     // only carry a BSONObj document.
     bool hasRecordId;
+
+    // Set when 'scanType' is 'kIxscan'.
+    BSONObj indexKeyPattern;
 };
 
 struct AndHashNode : public QuerySolutionNode {
