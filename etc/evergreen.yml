@@ -8735,7 +8735,7 @@ buildvariants:
   - name: .stitch
   - name: test_packages
     distros:
-    - ubuntu2004-packer
+    - ubuntu2004-package
   - name: .publish
     distros:
     - ubuntu1804-small
@@ -8795,7 +8795,7 @@ buildvariants:
   - name: .watchdog
   - name: test_packages
     distros:
-    - ubuntu2004-packer
+    - ubuntu2004-package
   - name: .publish
     distros:
     - ubuntu1804-small
@@ -8870,7 +8870,7 @@ buildvariants:
   - name: .ssl
   - name: test_packages
     distros:
-    - ubuntu2004-packer
+    - ubuntu2004-package
   - name: .publish
     distros:
     - ubuntu1604-small
@@ -8964,7 +8964,7 @@ buildvariants:
   - name: .stitch
   - name: test_packages
     distros:
-    - ubuntu2004-packer
+    - ubuntu2004-package
   - name: .publish
     distros:
     - ubuntu1804-test
@@ -8998,7 +8998,7 @@ buildvariants:
   - name: replica_sets_jscore_passthrough
   - name: test_packages
     distros:
-    - ubuntu2004-packer
+    - ubuntu2004-package
   - name: .publish
     distros:
     - ubuntu1804-test
@@ -9204,7 +9204,7 @@ buildvariants:
   - name: .stitch
   - name: test_packages
     distros:
-    - ubuntu2004-packer
+    - ubuntu2004-package
   - name: .publish
     distros:
     - ubuntu2004-small
@@ -9259,7 +9259,7 @@ buildvariants:
   - name: snmp
   - name: test_packages
     distros:
-    - ubuntu2004-packer
+    - ubuntu2004-package
   - name: .publish
     distros:
     - ubuntu2004-small
@@ -9310,7 +9310,7 @@ buildvariants:
   - name: .stitch
   - name: test_packages
     distros:
-    - ubuntu2004-packer
+    - ubuntu2004-package
   - name: .publish
     distros:
     - ubuntu2004-test
@@ -9343,7 +9343,7 @@ buildvariants:
   - name: replica_sets_jscore_passthrough
   - name: test_packages
     distros:
-    - ubuntu2004-packer
+    - ubuntu2004-package
   - name: .publish
     distros:
     - ubuntu2004-test
@@ -9398,7 +9398,7 @@ buildvariants:
   - name: .stitch
   - name: test_packages
     distros:
-    - ubuntu2004-packer
+    - ubuntu2004-package
   - name: .publish
     distros:
     - amazon1-2018-small
@@ -9450,7 +9450,7 @@ buildvariants:
   - name: .stitch
   - name: test_packages
     distros:
-    - ubuntu2004-packer
+    - ubuntu2004-package
   - name: .publish
     distros:
     - amazon1-2018-small
@@ -9505,7 +9505,7 @@ buildvariants:
   - name: .stitch
   - name: test_packages
     distros:
-    - ubuntu2004-packer
+    - ubuntu2004-package
   - name: .publish
     distros:
     - amazon2-small
@@ -9558,7 +9558,7 @@ buildvariants:
   - name: .stitch
   - name: test_packages
     distros:
-    - ubuntu2004-packer
+    - ubuntu2004-package
   - name: .publish
     distros:
     - amazon2-small
@@ -9611,7 +9611,7 @@ buildvariants:
   - name: .stitch
   - name: test_packages
     distros:
-    - ubuntu2004-packer
+    - ubuntu2004-package
   - name: .publish
     distros:
     - rhel80-small
@@ -9658,7 +9658,7 @@ buildvariants:
   - name: .stitch
   - name: test_packages
     distros:
-    - ubuntu2004-packer
+    - ubuntu2004-package
   - name: .publish
     distros:
     - rhel80-small
@@ -10349,7 +10349,7 @@ buildvariants:
       - rhel62-large
   - name: test_packages
     distros:
-    - ubuntu2004-packer
+    - ubuntu2004-package
   - name: .publish
 
 - &enterprise-rhel-80-64-bit-dynamic-required-template
@@ -11137,7 +11137,7 @@ buildvariants:
   - name: unittest_shell_hang_analyzer_gen
   - name: test_packages
     distros:
-    - ubuntu2004-packer
+    - ubuntu2004-package
   - name: .publish
     distros:
     - rhel70-small
@@ -11216,7 +11216,7 @@ buildvariants:
   - name: .stitch
   - name: test_packages
     distros:
-    - ubuntu2004-packer
+    - ubuntu2004-package
   - name: .publish
     distros:
     - rhel80-small
@@ -11269,7 +11269,7 @@ buildvariants:
   - name: .stitch
   - name: test_packages
     distros:
-    - ubuntu2004-packer
+    - ubuntu2004-package
   - name: .publish
     distros:
     - rhel80-small
@@ -11446,7 +11446,7 @@ buildvariants:
   - name: .ssl
   - name: test_packages
     distros:
-    - ubuntu2004-packer
+    - ubuntu2004-package
   - name: .publish
     distros:
     - rhel62-small
@@ -11496,7 +11496,7 @@ buildvariants:
   - name: .stitch
   - name: test_packages
     distros:
-    - ubuntu2004-packer
+    - ubuntu2004-package
   - name: .publish
     distros:
     - rhel70-small
@@ -11546,7 +11546,7 @@ buildvariants:
   - name: .stitch
   - name: test_packages
     distros:
-    - ubuntu2004-packer
+    - ubuntu2004-package
   - name: .publish
     distros:
     - rhel80-small
@@ -11593,7 +11593,7 @@ buildvariants:
   - name: .stitch
   - name: test_packages
     distros:
-    - ubuntu2004-packer
+    - ubuntu2004-package
   - name: .publish
     distros:
     - rhel80-small
@@ -12013,7 +12013,7 @@ buildvariants:
   - name: .watchdog
   - name: test_packages
     distros:
-    - ubuntu2004-packer
+    - ubuntu2004-package
   - name: .publish
     distros:
     - ubuntu1604-small
@@ -12083,7 +12083,7 @@ buildvariants:
   - name: .stitch
   - name: test_packages
     distros:
-    - ubuntu2004-packer
+    - ubuntu2004-package
   - name: .publish
     distros:
     - suse12-small
@@ -12378,7 +12378,7 @@ buildvariants:
   - name: .stitch
   - name: test_packages
     distros:
-    - ubuntu2004-packer
+    - ubuntu2004-package
   - name: .publish
     distros:
     - debian92-small
@@ -12428,7 +12428,7 @@ buildvariants:
   - name: .stitch
   - name: test_packages
     distros:
-    - ubuntu2004-packer
+    - ubuntu2004-package
   - name: .publish
     distros:
     - debian92-small
@@ -12474,7 +12474,7 @@ buildvariants:
   - name: .stitch
   - name: test_packages
     distros:
-    - ubuntu2004-packer
+    - ubuntu2004-package
   - name: .publish
     distros:
     - debian10-small
@@ -12524,7 +12524,7 @@ buildvariants:
   - name: .stitch
   - name: test_packages
     distros:
-    - ubuntu2004-packer
+    - ubuntu2004-package
   - name: .publish
     distros:
     - debian10-small
