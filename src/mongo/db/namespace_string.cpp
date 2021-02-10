@@ -293,6 +293,14 @@ bool NamespaceString::isConfigDotCacheDotChunks() const {
     return db() == "config" && coll().startsWith("cache.chunks.");
 }
 
+bool NamespaceString::isReshardingLocalOplogBufferCollection() const {
+    return db() == "config" && coll().startsWith(kReshardingLocalOplogBufferPrefix);
+}
+
+bool NamespaceString::isReshardingConflictStashCollection() const {
+    return db() == "config" && coll().startsWith(kReshardingConflictStashPrefix);
+}
+
 bool NamespaceString::isTemporaryReshardingCollection() const {
     return coll().startsWith(kTemporaryReshardingCollectionPrefix);
 }

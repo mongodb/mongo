@@ -40,8 +40,10 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/s/migration_destination_manager.h"
 #include "mongo/db/s/resharding/resharding_collection_cloner.h"
+#include "mongo/db/s/resharding/resharding_data_copy_util.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
+#include "mongo/db/s/resharding/resharding_txn_cloner_progress_gen.h"
 #include "mongo/db/s/resharding_util.h"
 #include "mongo/db/s/shard_key_util.h"
 #include "mongo/db/s/sharding_state.h"
@@ -382,7 +384,7 @@ ReshardingRecipientService::RecipientStateMachine::_cloneThenTransitionToApplyin
                                    *_recipientDoc.getFetchTimestamp()},
             donor.getId(),
             recipientId,
-            getLocalOplogBufferNamespace(_recipientDoc.get_id(), donor.getId())));
+            getLocalOplogBufferNamespace(_recipientDoc.getExistingUUID(), donor.getId())));
 
         _oplogFetcherFutures.emplace_back(
             _oplogFetchers.back()
@@ -454,7 +456,7 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
         }
 
         const auto& oplogBufferNss =
-            getLocalOplogBufferNamespace(_recipientDoc.get_id(), donor.getId());
+            getLocalOplogBufferNamespace(_recipientDoc.getExistingUUID(), donor.getId());
         _oplogAppliers.emplace_back(std::make_unique<ReshardingOplogApplier>(
             serviceContext,
             ReshardingSourceId{_recipientDoc.get_id(), donor.getId()},
@@ -505,7 +507,6 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
 }
 
 void ReshardingRecipientService::RecipientStateMachine::_renameTemporaryReshardingCollection() {
-
     if (_recipientDoc.getState() > RecipientStateEnum::kRenaming) {
         return;
     }
@@ -520,6 +521,8 @@ void ReshardingRecipientService::RecipientStateMachine::_renameTemporaryReshardi
         options.dropTarget = true;
         uassertStatusOK(
             renameCollection(opCtx.get(), reshardingNss, _recipientDoc.getNss(), options));
+
+        _dropOplogCollections(opCtx.get());
     }
 
     _transitionStateAndUpdateCoordinator(RecipientStateEnum::kDone);
@@ -611,6 +614,40 @@ void ReshardingRecipientService::RecipientStateMachine::_removeRecipientDocument
                  BSON(ReshardingRecipientDocument::k_idFieldName << _id),
                  WriteConcerns::kMajorityWriteConcern);
     _recipientDoc = {};
+}
+
+void ReshardingRecipientService::RecipientStateMachine::_dropOplogCollections(
+    OperationContext* opCtx) {
+    for (const auto& donor : _recipientDoc.getDonorShardsMirroring()) {
+        auto reshardingSourceId = ReshardingSourceId{_recipientDoc.get_id(), donor.getId()};
+
+        // Remove the oplog applier progress doc for this donor.
+        PersistentTaskStore<ReshardingOplogApplierProgress> oplogApplierProgressStore(
+            NamespaceString::kReshardingApplierProgressNamespace);
+        oplogApplierProgressStore.remove(
+            opCtx,
+            QUERY(ReshardingOplogApplierProgress::kOplogSourceIdFieldName
+                  << reshardingSourceId.toBSON()),
+            WriteConcernOptions());
+
+        // Remove the txn cloner progress doc for this donor.
+        PersistentTaskStore<ReshardingTxnClonerProgress> txnClonerProgressStore(
+            NamespaceString::kReshardingTxnClonerProgressNamespace);
+        txnClonerProgressStore.remove(
+            opCtx,
+            QUERY(ReshardingTxnClonerProgress::kSourceIdFieldName << reshardingSourceId.toBSON()),
+            WriteConcernOptions());
+
+        // Drop the conflict stash collection for this donor.
+        auto stashNss =
+            getLocalConflictStashNamespace(_recipientDoc.getExistingUUID(), donor.getId());
+        resharding::data_copy::ensureCollectionDropped(opCtx, stashNss);
+
+        // Drop the oplog buffer collection for this donor.
+        auto oplogBufferNss =
+            getLocalOplogBufferNamespace(_recipientDoc.getExistingUUID(), donor.getId());
+        resharding::data_copy::ensureCollectionDropped(opCtx, oplogBufferNss);
+    }
 }
 
 }  // namespace mongo
