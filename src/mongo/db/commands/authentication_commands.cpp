@@ -139,37 +139,49 @@ private:
     SecureRandom _random;
 } cmdGetNonce;
 
-class CmdLogout : public BasicCommand {
+class CmdLogout : public TypedCommand<CmdLogout> {
 public:
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+    using Request = LogoutCommand;
+
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const final {
         return AllowedOnSecondary::kAlways;
     }
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) const {}  // No auth required
-    std::string help() const override {
+
+    std::string help() const final {
         return "de-authenticate";
     }
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return false;
-    }
-    CmdLogout() : BasicCommand("logout") {}
-    bool run(OperationContext* opCtx,
-             const std::string& dbname,
-             const BSONObj& cmdObj,
-             BSONObjBuilder& result) {
-        AuthorizationSession* authSession = AuthorizationSession::get(Client::getCurrent());
-        authSession->logoutDatabase(opCtx, dbname);
-        if (getTestCommandsEnabled() && dbname == "admin") {
-            // Allows logging out as the internal user against the admin database, however
-            // this actually logs out of the local database as well. This is to
-            // support the auth passthrough test framework on mongos (since you can't use the
-            // local database on a mongos, so you can't logout as the internal user
-            // without this).
-            authSession->logoutDatabase(opCtx, "local");
+
+    class Invocation final : public InvocationBase {
+    public:
+        using InvocationBase::InvocationBase;
+
+        bool supportsWriteConcern() const final {
+            return false;
         }
-        return true;
-    }
+
+        NamespaceString ns() const final {
+            return NamespaceString(request().getDbName());
+        }
+
+        void doCheckAuthorization(OperationContext*) const final {}
+
+        static constexpr auto kAdminDB = "admin"_sd;
+        static constexpr auto kLocalDB = "local"_sd;
+        void typedRun(OperationContext* opCtx) {
+            auto dbname = request().getDbName();
+            auto* as = AuthorizationSession::get(opCtx->getClient());
+
+            as->logoutDatabase(opCtx, dbname);
+            if (getTestCommandsEnabled() && (dbname == kAdminDB)) {
+                // Allows logging out as the internal user against the admin database, however
+                // this actually logs out of the local database as well. This is to
+                // support the auth passthrough test framework on mongos (since you can't use the
+                // local database on a mongos, so you can't logout as the internal user
+                // without this).
+                as->logoutDatabase(opCtx, kLocalDB);
+            }
+        }
+    };
 } cmdLogout;
 
 #ifdef MONGO_CONFIG_SSL
