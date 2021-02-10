@@ -37,6 +37,7 @@
 #include "mongo/config.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/keys_collection_document_gen.h"
+#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/executor/scoped_task_executor.h"
 #include "mongo/util/net/ssl_util.h"
@@ -146,9 +147,24 @@ void storeExternalClusterTimeKeyDocs(std::shared_ptr<executor::ScopedTaskExecuto
 
 /**
  * Creates a view on the oplog that allows a tenant migration recipient to fetch retryable writes
- * from a tenant migration donor.
+ * and transactions from a tenant migration donor.
  */
-void createRetryableWritesView(OperationContext* opCtx, Database* db);
+void createOplogViewForTenantMigrations(OperationContext* opCtx, Database* db);
+
+/**
+ * Creates a pipeline for fetching committed transactions on the donor before
+ * 'startFetchingTimestamp'. We use 'tenantId' to fetch transaction entries specific to a particular
+ * set of tenant databases.
+ */
+std::unique_ptr<Pipeline, PipelineDeleter> createCommittedTransactionsPipelineForTenantMigrations(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const Timestamp& startFetchingTimestamp,
+    const std::string& tenantId);
+
+/**
+ * Inserts a committed transactions entry into the 'config.transactions' collection.
+ */
+Status upsertCommittedTransactionEntry(OperationContext* opCtx, const BSONObj& entry);
 
 }  // namespace tenant_migration_util
 

@@ -45,12 +45,15 @@ if (!tenantMigrationTest.isFeatureFlagEnabled()) {
     return;
 }
 
+const dbName = "test";
+const collName = "collection";
+
 const donorPrimary = tenantMigrationTest.getDonorPrimary();
 const rsConn = new Mongo(donorRst.getURL());
 const oplog = donorPrimary.getDB("local")["oplog.rs"];
 const migrationOplogView = donorPrimary.getDB("local")["system.tenantMigration.oplogView"];
 const session = rsConn.startSession({retryWrites: true});
-const collection = session.getDatabase("test")["collection"];
+const collection = session.getDatabase(dbName)[collName];
 
 {
     // Assert an oplog entry representing a retryable write only projects fields defined in the
@@ -116,6 +119,42 @@ const collection = session.getDatabase("test")["collection"];
     assert(viewEntry.hasOwnProperty("postImageOpTime"));
     // `postImageOpTime` should point to the resulting oplog entry from the update.
     assert.eq(viewEntry["postImageOpTime"]["ts"], resultOplogEntry["ts"]);
+}
+
+{
+    // Assert that an oplog entry that belongs to a transaction will project its 'o.applyOps.ns'
+    // field. This is used to filter transactions that belong to the tenant.
+    const txnSession = rsConn.startSession();
+    const txnDb = txnSession.getDatabase(dbName);
+    const txnColl = txnDb.getCollection(collName);
+    assert.commandWorked(txnColl.insert({_id: 'insertDoc'}));
+
+    txnSession.startTransaction({writeConcern: {w: "majority"}});
+    assert.commandWorked(txnColl.insert({_id: 'transaction0'}));
+    assert.commandWorked(txnColl.insert({_id: 'transaction1'}));
+    assert.commandWorked(txnSession.commitTransaction_forTesting());
+
+    const txnEntryOnDonor =
+        donorPrimary.getCollection("config.transactions").find({state: "committed"}).toArray()[0];
+    jsTestLog(`Txn entry on donor: ${tojson(txnEntryOnDonor)}`);
+
+    const viewEntry = migrationOplogView.find({ts: txnEntryOnDonor.lastWriteOpTime.ts}).next();
+    jsTestLog(`Transaction view entry: ${tojson(viewEntry)}`);
+
+    // The following fields are filtered out of the view.
+    assert(!viewEntry.hasOwnProperty("txnNumber"));
+    assert(!viewEntry.hasOwnProperty("state"));
+    assert(!viewEntry.hasOwnProperty("preImageOpTime"));
+    assert(!viewEntry.hasOwnProperty("postImageOpTime"));
+    assert(!viewEntry.hasOwnProperty("stmtId"));
+
+    // Verify that the view entry has the following fields.
+    assert(viewEntry.hasOwnProperty("ns"));
+    assert(viewEntry.hasOwnProperty("ts"));
+    assert(viewEntry.hasOwnProperty("applyOpsNs"));
+
+    // Assert that 'applyOpsNs' contains the namespace of the inserts.
+    assert.eq(viewEntry.applyOpsNs, `${dbName}.${collName}`);
 }
 
 donorRst.stopSet();

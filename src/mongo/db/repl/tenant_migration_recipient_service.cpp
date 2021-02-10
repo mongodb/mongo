@@ -40,6 +40,7 @@
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/repl/cloner_utils.h"
 #include "mongo/db/repl/data_replicator_external_state.h"
 #include "mongo/db/repl/oplog_applier.h"
@@ -73,6 +74,36 @@ NamespaceString getOplogBufferNs(const UUID& migrationUUID) {
     return NamespaceString(NamespaceString::kConfigDb,
                            kOplogBufferPrefix + migrationUUID.toString());
 }
+
+boost::intrusive_ptr<ExpressionContext> makeExpressionContext(OperationContext* opCtx) {
+    StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
+
+    // Add kTenantMigrationOplogView, kSessionTransactionsTableNamespace, and kRsOplogNamespace
+    // to resolvedNamespaces since they are all used during different pipeline stages.
+    resolvedNamespaces[NamespaceString::kTenantMigrationOplogView.coll()] = {
+        NamespaceString::kTenantMigrationOplogView, std::vector<BSONObj>()};
+
+    resolvedNamespaces[NamespaceString::kSessionTransactionsTableNamespace.coll()] = {
+        NamespaceString::kSessionTransactionsTableNamespace, std::vector<BSONObj>()};
+
+    resolvedNamespaces[NamespaceString::kRsOplogNamespace.coll()] = {
+        NamespaceString::kRsOplogNamespace, std::vector<BSONObj>()};
+
+    return make_intrusive<ExpressionContext>(opCtx,
+                                             boost::none, /* explain */
+                                             false,       /* fromMongos */
+                                             false,       /* needsMerge */
+                                             true,        /* allowDiskUse */
+                                             true,        /* bypassDocumentValidation */
+                                             false,       /* isMapReduceCommand */
+                                             NamespaceString::kSessionTransactionsTableNamespace,
+                                             boost::none, /* runtimeConstants */
+                                             nullptr,     /* collator */
+                                             MongoProcessInterface::create(opCtx),
+                                             std::move(resolvedNamespaces),
+                                             boost::none); /* collUUID */
+}
+
 }  // namespace
 
 // A convenient place to set test-specific parameters.
@@ -82,6 +113,7 @@ MONGO_FAIL_POINT_DEFINE(skipTenantMigrationRecipientAuth);
 MONGO_FAIL_POINT_DEFINE(skipComparingRecipientAndDonorFCV);
 MONGO_FAIL_POINT_DEFINE(autoRecipientForgetMigration);
 MONGO_FAIL_POINT_DEFINE(pauseAfterCreatingOplogBuffer);
+MONGO_FAIL_POINT_DEFINE(skipFetchingCommittedTransactions);
 
 // Fails before waiting for the state doc to be majority replicated.
 MONGO_FAIL_POINT_DEFINE(failWhilePersistingTenantMigrationRecipientInstanceStateDoc);
@@ -770,9 +802,71 @@ void TenantMigrationRecipientService::Instance::_fetchRetryableWritesOplogBefore
     return;
 }
 
+AggregateCommand TenantMigrationRecipientService::Instance::_makeCommittedTransactionsAggregation()
+    const {
+
+    auto opCtx = cc().makeOperationContext();
+    auto expCtx = makeExpressionContext(opCtx.get());
+
+    Timestamp startFetchingTimestamp;
+    {
+        stdx::lock_guard lk(_mutex);
+        invariant(_stateDoc.getStartFetchingDonorOpTime());
+        startFetchingTimestamp = _stateDoc.getStartFetchingDonorOpTime().get().getTimestamp();
+    }
+
+    auto serializedPipeline =
+        tenant_migration_util::createCommittedTransactionsPipelineForTenantMigrations(
+            expCtx, startFetchingTimestamp, getTenantId())
+            ->serializeToBson();
+
+    AggregateCommand aggRequest(NamespaceString::kSessionTransactionsTableNamespace,
+                                std::move(serializedPipeline));
+
+    auto readConcern = repl::ReadConcernArgs(
+        boost::optional<LogicalTime>(startFetchingTimestamp),
+        boost::optional<repl::ReadConcernLevel>(repl::ReadConcernLevel::kMajorityReadConcern));
+    aggRequest.setReadConcern(readConcern.toBSONInner());
+
+    aggRequest.setHint(BSON(SessionTxnRecord::kSessionIdFieldName << 1));
+    aggRequest.setCursor(SimpleCursorOptions());
+    // We must set a writeConcern on internal commands.
+    aggRequest.setWriteConcern(WriteConcernOptions());
+
+    return aggRequest;
+}
+
 void TenantMigrationRecipientService::Instance::_fetchCommittedTransactionsBeforeStartOpTime() {
-    // TODO (SERVER-53511): Run the aggregation.
-    return;
+    if (MONGO_unlikely(skipFetchingCommittedTransactions.shouldFail())) {  // Test-only.
+        return;
+    }
+
+    auto aggRequest = _makeCommittedTransactionsAggregation();
+
+    auto statusWith = DBClientCursor::fromAggregationRequest(
+        _client.get(), std::move(aggRequest), true /* secondaryOk */, false /* useExhaust */);
+    if (!statusWith.isOK()) {
+        LOGV2_ERROR(5351100,
+                    "Fetch committed transactions aggregation failed",
+                    "error"_attr = statusWith.getStatus());
+        uassertStatusOK(statusWith.getStatus());
+    }
+
+    auto opCtx = cc().makeOperationContext();
+
+    auto cursor = statusWith.getValue().get();
+    while (cursor->more()) {
+        auto transactionEntry = cursor->next();
+        // TODO (SERVER-53513): Properly update 'config.transactions' and write a no-op entry
+        // instead of upserting the document.
+        uassertStatusOK(
+            tenant_migration_util::upsertCommittedTransactionEntry(opCtx.get(), transactionEntry));
+
+        stdx::lock_guard lk(_mutex);
+        if (_taskState.isInterrupted()) {
+            uassertStatusOK(_taskState.getInterruptStatus());
+        }
+    }
 }
 
 void TenantMigrationRecipientService::Instance::_startOplogFetcher() {

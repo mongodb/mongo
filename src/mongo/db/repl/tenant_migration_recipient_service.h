@@ -32,6 +32,7 @@
 #include <boost/optional.hpp>
 #include <memory>
 
+#include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/repl/oplog_fetcher.h"
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/repl/tenant_all_database_cloner.h"
@@ -361,10 +362,16 @@ public:
         void _fetchRetryableWritesOplogBeforeStartOpTime();
 
         /**
-         * Runs an aggregation that gets the donor's transactions entries in 'config.transactions'
-         * with 'lastWriteOpTime' < 'startFetchingOpTime' and 'state: committed'.
+         * Runs the aggregation from '_makeCommittedTransactionsAggregation()' and migrates the
+         * resulting committed transactions entries into 'config.transactions'.
          */
         void _fetchCommittedTransactionsBeforeStartOpTime();
+
+        /**
+         * Creates an aggregation pipeline to fetch transaction entries with 'lastWriteOpTime' <
+         * 'startFetchingDonorOpTime' and 'state: committed'.
+         */
+        AggregateCommand _makeCommittedTransactionsAggregation() const;
 
         /**
          * Starts the tenant oplog fetcher.
@@ -492,8 +499,10 @@ public:
         // Because the cloners and oplog fetcher use exhaust, we need a separate connection for
         // each.  The '_client' will be used for the cloners and other operations such as fetching
         // optimes while the '_oplogFetcherClient' will be reserved for the oplog fetcher only.
-        std::unique_ptr<DBClientConnection> _client;              // (M)
-        std::unique_ptr<DBClientConnection> _oplogFetcherClient;  // (M)
+        //
+        // Follow DBClientCursor synchonization rules.
+        std::unique_ptr<DBClientConnection> _client;              // (S)
+        std::unique_ptr<DBClientConnection> _oplogFetcherClient;  // (S)
 
         std::unique_ptr<OplogFetcherFactory> _createOplogFetcherFn =
             std::make_unique<CreateOplogFetcherFn>();                               // (M)
