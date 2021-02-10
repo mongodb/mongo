@@ -1738,8 +1738,12 @@ Future<SSLPeerInfo> SSLManagerApple::parseAndValidatePeerCertificate(
 int SSLManagerApple::SSL_read(SSLConnectionInterface* conn, void* buf, int num) {
     auto ssl = checked_cast<SSLConnectionApple*>(conn)->get();
     size_t read = 0;
-    uassertOSStatusOK(::SSLRead(ssl, static_cast<uint8_t*>(buf), num, &read),
-                      SocketErrorKind::RECV_ERROR);
+
+    const auto status = ::SSLRead(ssl, static_cast<uint8_t*>(buf), num, &read);
+    if (status != ::errSSLWouldBlock) {
+        uassertOSStatusOK(status, SocketErrorKind::RECV_ERROR);
+    }
+
     return read;
 }
 
