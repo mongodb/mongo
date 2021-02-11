@@ -205,6 +205,11 @@ shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getOrCreateMonitor(
 }
 
 shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getMonitorForHost(const HostAndPort& host) {
+    // Hold the shared_ptrs for each of the ReplicaSetMonitors to extend the lifetime of the
+    // ReplicaSetMonitor objects to ensure that we do not call their destructors while still holding
+    // the mutex.
+    vector<shared_ptr<ReplicaSetMonitor>> rsmPtrs;
+
     stdx::lock_guard<Latch> lk(_mutex);
 
     for (auto entry : _monitors) {
@@ -212,6 +217,7 @@ shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getMonitorForHost(const 
         if (monitor && monitor->contains(host)) {
             return monitor;
         }
+        rsmPtrs.push_back(std::move(monitor));
     }
 
     return shared_ptr<ReplicaSetMonitor>();
