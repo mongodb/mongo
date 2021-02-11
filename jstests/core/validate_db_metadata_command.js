@@ -123,4 +123,14 @@ validate({dbName: "new", coll: "view1", apiStrict: true});
 const testDB2 = db.getSiblingDB("testDB2");
 const collWithViewName = testDB2.view1;
 validate({coll: "view1", apiStrict: true, error: {code: ErrorCodes.APIStrictError}});
+
+//
+// Tests for validator.
+//
+assert.commandWorked(testDB.dropDatabase());
+
+assert.commandWorked(testDB.createCollection(
+    "validatorColl", {validator: {$expr: {$_testApiVersion: {unstable: true}}}}));
+
+validate({apiStrict: true, error: true});
 }());

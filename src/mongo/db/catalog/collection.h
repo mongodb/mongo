@@ -491,6 +491,8 @@ public:
                                    boost::optional<ValidationLevelEnum> newLevel,
                                    boost::optional<ValidationActionEnum> newAction) = 0;
 
+    virtual Status checkValidatorAPIVersionCompatability(OperationContext* opCtx) const = 0;
+
     virtual bool getRecordPreImages() const = 0;
     virtual void setRecordPreImages(OperationContext* opCtx, bool val) = 0;
 

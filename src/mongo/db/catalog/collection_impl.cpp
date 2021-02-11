@@ -395,6 +395,25 @@ bool CollectionImpl::findDoc(OperationContext* opCtx,
     return true;
 }
 
+Status CollectionImpl::checkValidatorAPIVersionCompatability(OperationContext* opCtx) const {
+    if (!_validator.expCtxForFilter) {
+        return Status::OK();
+    }
+    const auto& apiParams = APIParameters::get(opCtx);
+    const auto apiVersion = apiParams.getAPIVersion().value_or("");
+    if (apiParams.getAPIStrict().value_or(false) && apiVersion == "1" &&
+        _validator.expCtxForFilter->exprUnstableForApiV1) {
+        return {ErrorCodes::APIStrictError,
+                "The validator uses unstable expression(s) for API Version 1."};
+    }
+    if (apiParams.getAPIDeprecationErrors().value_or(false) && apiVersion == "1" &&
+        _validator.expCtxForFilter->exprDeprectedForApiV1) {
+        return {ErrorCodes::APIDeprecationError,
+                "The validator uses deprecated expression(s) for API Version 1."};
+    }
+    return Status::OK();
+}
+
 Status CollectionImpl::checkValidation(OperationContext* opCtx, const BSONObj& document) const {
     if (!_validator.isOK()) {
         return _validator.getStatus();
@@ -415,6 +434,11 @@ Status CollectionImpl::checkValidation(OperationContext* opCtx, const BSONObj& d
         // and the recipient should not perform validation on documents inserted into the temporary
         // resharding collection.
         return Status::OK();
+    }
+
+    auto status = checkValidatorAPIVersionCompatability(opCtx);
+    if (!status.isOK()) {
+        return status;
     }
 
     // TODO SERVER-50524: remove these FCV checks when 5.0 becomes last-lts in order to make sure
