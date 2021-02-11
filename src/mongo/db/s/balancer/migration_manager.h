@@ -37,7 +37,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/balancer/balancer_policy.h"
 #include "mongo/db/s/balancer/type_migration.h"
-#include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/dist_lock_manager.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/platform/mutex.h"

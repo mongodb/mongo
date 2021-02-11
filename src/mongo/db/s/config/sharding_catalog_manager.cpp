@@ -312,9 +312,9 @@ ShardingCatalogManager::ShardingCatalogManager(
     ServiceContext* serviceContext, std::unique_ptr<executor::TaskExecutor> addShardExecutor)
     : _serviceContext(serviceContext),
       _executorForAddShard(std::move(addShardExecutor)),
-      _kZoneOpLock("zoneOpLock"),
+      _kShardMembershipLock("shardMembershipLock"),
       _kChunkOpLock("chunkOpLock"),
-      _kShardMembershipLock("shardMembershipLock") {
+      _kZoneOpLock("zoneOpLock") {
     startup();
 }
 

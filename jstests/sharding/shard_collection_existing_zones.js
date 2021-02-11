@@ -5,7 +5,7 @@
 
 load("jstests/sharding/libs/find_chunks_util.js");
 
-var st = new ShardingTest({mongos: 1, shards: 3});
+var st = new ShardingTest({shards: 3});
 var kDbName = 'test';
 var kCollName = 'foo';
 var ns = kDbName + '.' + kCollName;

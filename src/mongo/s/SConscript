@@ -29,7 +29,9 @@ env.SConscript(
 env.Library(
     target='sharding_api',
     source=[
-        'write_ops/cluster_write.cpp',
+        'chunk_manager_targeter.cpp',
+        'cluster_ddl.cpp',
+        'cluster_write.cpp',
     ],
     LIBDEPS=[
         'query/cluster_query',
@@ -154,7 +156,6 @@ env.Library(
         'request_types/clone_catalog_data.idl',
         'request_types/clone_collection_options_from_primary_shard.idl',
         'request_types/commit_chunk_migration_request_type.cpp',
-        'request_types/create_database.idl',
         'request_types/ensure_chunk_version_is_greater_than.idl',
         'request_types/flush_database_cache_updates.idl',
         'request_types/flush_routing_table_cache_updates.idl',
@@ -584,6 +585,7 @@ env.CppUnitTest(
         'catalog/type_tags_test.cpp',
         'chunk_manager_index_bounds_test.cpp',
         'chunk_manager_query_test.cpp',
+        'chunk_manager_targeter_test.cpp',
         'chunk_map_test.cpp',
         'chunk_test.cpp',
         'chunk_version_test.cpp',
@@ -594,6 +596,7 @@ env.CppUnitTest(
         'comparable_chunk_version_test.cpp',
         'comparable_database_version_test.cpp',
         'hedge_options_util_test.cpp',
+        'mock_ns_targeter.cpp',
         'mongos_topology_coordinator_test.cpp',
         'request_types/add_shard_request_test.cpp',
         'request_types/add_shard_to_zone_request_test.cpp',
@@ -617,8 +620,6 @@ env.CppUnitTest(
         'write_ops/batch_write_op_test.cpp',
         'write_ops/batched_command_request_test.cpp',
         'write_ops/batched_command_response_test.cpp',
-        'write_ops/chunk_manager_targeter_test.cpp',
-        'write_ops/mock_ns_targeter.cpp',
         'write_ops/write_op_test.cpp',
     ],
     LIBDEPS=[
@@ -635,6 +636,7 @@ env.CppUnitTest(
         'coreshard',
         'mongos_topology_coordinator',
         'sessions_collection_sharded',
+        'sharding_api',
         'sharding_router_test_fixture',
         'sharding_task_executor',
         'vector_clock_mongos',

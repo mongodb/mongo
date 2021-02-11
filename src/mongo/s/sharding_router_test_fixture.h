@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/sharding_test_fixture_common.h"
 
 namespace mongo {
@@ -38,7 +39,6 @@ class ShardingCatalogClient;
 struct ChunkVersion;
 class CollectionType;
 class ShardRegistry;
-class ShardType;
 
 namespace transport {
 class TransportLayerMock;

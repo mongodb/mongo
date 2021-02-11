@@ -31,6 +31,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/s/chunk_manager_targeter.h"
+
 #include "mongo/base/counter.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/curop.h"
@@ -45,10 +47,10 @@
 #include "mongo/logv2/log.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_commands_helpers.h"
+#include "mongo/s/cluster_ddl.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_key_pattern.h"
-#include "mongo/s/write_ops/chunk_manager_targeter.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
 #include "signal.h"
@@ -336,7 +338,7 @@ ChunkManagerTargeter::ChunkManagerTargeter(OperationContext* opCtx,
 }
 
 void ChunkManagerTargeter::_init(OperationContext* opCtx) {
-    createShardDatabase(opCtx, _nss.db());
+    cluster::createDatabase(opCtx, _nss.db());
     _cm = uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, _nss));
 
     if (_targetEpoch) {

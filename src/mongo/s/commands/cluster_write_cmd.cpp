@@ -46,10 +46,12 @@
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/s/chunk_manager_targeter.h"
 #include "mongo/s/client/num_hosts_targeted_metrics.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/cluster_last_error_info.h"
+#include "mongo/s/cluster_write.h"
 #include "mongo/s/commands/cluster_explain.h"
 #include "mongo/s/commands/document_shard_key_update_util.h"
 #include "mongo/s/grid.h"
@@ -59,8 +61,6 @@
 #include "mongo/s/would_change_owning_shard_exception.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
-#include "mongo/s/write_ops/chunk_manager_targeter.h"
-#include "mongo/s/write_ops/cluster_write.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {
@@ -224,7 +224,7 @@ bool handleWouldChangeOwningShardError(OperationContext* opCtx,
             documentShardKeyUpdateUtil::startTransactionForShardKeyUpdate(opCtx);
             // Clear the error details from the response object before sending the write again
             response->unsetErrDetails();
-            ClusterWriter::write(opCtx, *request, &stats, response);
+            cluster::write(opCtx, *request, &stats, response);
             wouldChangeOwningShardErrorInfo =
                 getWouldChangeOwningShardErrorInfo(opCtx, *request, response, !isRetryableWrite);
             if (!wouldChangeOwningShardErrorInfo)
@@ -468,7 +468,7 @@ private:
             batchedRequest.unsetWriteConcern();
         }
 
-        ClusterWriter::write(opCtx, batchedRequest, &stats, &response);
+        cluster::write(opCtx, batchedRequest, &stats, &response);
 
         bool updatedShardKey = false;
         if (_batchedRequest.getBatchType() == BatchedCommandRequest::BatchType_Update) {

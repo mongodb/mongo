@@ -44,10 +44,10 @@
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/cluster_commands_helpers.h"
+#include "mongo/s/cluster_write.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/shard_collection_gen.h"
 #include "mongo/s/sharded_collections_ddl_parameters_gen.h"
-#include "mongo/s/write_ops/cluster_write.h"
 
 namespace mongo {
 namespace {
@@ -274,7 +274,7 @@ void upsertChunks(OperationContext* opCtx, std::vector<ChunkType>& chunks) {
 
     updateRequest.setWriteConcern(ShardingCatalogClient::kMajorityWriteConcern.toBSON());
 
-    ClusterWriter::write(opCtx, updateRequest, &stats, &response);
+    cluster::write(opCtx, updateRequest, &stats, &response);
     uassertStatusOK(response.toStatus());
 }
 
@@ -296,7 +296,7 @@ void updateCatalogEntry(OperationContext* opCtx, const NamespaceString& nss, Col
 
     updateRequest.setWriteConcern(ShardingCatalogClient::kMajorityWriteConcern.toBSON());
     try {
-        ClusterWriter::write(opCtx, updateRequest, &stats, &response);
+        cluster::write(opCtx, updateRequest, &stats, &response);
         uassertStatusOK(response.toStatus());
     } catch (const DBException&) {
         // If an error happens when contacting the config server, we don't know if the update

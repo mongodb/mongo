@@ -42,16 +42,15 @@
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/cluster_write.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_find.h"
 #include "mongo/s/write_ops/batch_write_exec.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
-#include "mongo/s/write_ops/cluster_write.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
-
 namespace {
 
 BSONObj lsidQuery(const LogicalSessionId& lsid) {
@@ -135,7 +134,7 @@ void SessionsCollectionSharded::refreshSessions(OperationContext* opCtx,
         BatchedCommandResponse response;
         BatchWriteExecStats stats;
 
-        ClusterWriter::write(opCtx, request, &stats, &response);
+        cluster::write(opCtx, request, &stats, &response);
         uassertStatusOK(response.toStatus());
     };
 
@@ -154,7 +153,7 @@ void SessionsCollectionSharded::removeRecords(OperationContext* opCtx,
         BatchedCommandResponse response;
         BatchWriteExecStats stats;
 
-        ClusterWriter::write(opCtx, request, &stats, &response);
+        cluster::write(opCtx, request, &stats, &response);
         uassertStatusOK(response.toStatus());
     };
 

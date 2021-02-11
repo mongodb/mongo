@@ -43,27 +43,15 @@ namespace mongo {
  * Once uuids are gone, relational operators should be implemented in this class.
  *
  */
-class DatabaseVersion : private DatabaseVersionBase {
+class DatabaseVersion : public DatabaseVersionBase {
 public:
-    // Make field names accessible
-    using DatabaseVersionBase::kTimestampFieldName;
-
-    // Make getters and setters accessible
-    using DatabaseVersionBase::getLastMod;
-    using DatabaseVersionBase::getTimestamp;
-    using DatabaseVersionBase::serialize;
-    using DatabaseVersionBase::toBSON;
-
-    // It returns a new DatabaseVersion marked as fixed. A fixed database version is used to
-    // distinguish databases that do not have entries in the sharding catalog, such as 'config' and
-    // 'admin'
-    static DatabaseVersion makeFixed();
-
     DatabaseVersion() = default;
 
     explicit DatabaseVersion(const BSONObj& obj) {
         DatabaseVersionBase::parseProtected(IDLParserErrorContext("DatabaseVersion"), obj);
     }
+
+    explicit DatabaseVersion(const DatabaseVersionBase& dbv) : DatabaseVersionBase(dbv) {}
 
     /**
      * Constructor of a DatabaseVersion based on epochs
@@ -80,6 +68,12 @@ public:
         setTimestamp(timestamp);
     }
 
+    // Returns a new hardcoded DatabaseVersion value, which is used to distinguish databases that do
+    // not have entries in the sharding catalog, namely 'config' and 'admin'.
+    static DatabaseVersion makeFixed();
+
+    // Returns a new DatabaseVersion with just the lastMod incremented. This indicates that the
+    // database changed primary, as opposed to being dropped and recreated.
     DatabaseVersion makeUpdated() const;
 
     /**
@@ -97,7 +91,7 @@ public:
         return getLastMod() == 0;
     }
 
-    mongo::UUID getUuid() const {
+    UUID getUuid() const {
         return *DatabaseVersionBase::getUuid();
     }
 };

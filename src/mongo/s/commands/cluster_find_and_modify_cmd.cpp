@@ -46,6 +46,7 @@
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_commands_helpers.h"
+#include "mongo/s/cluster_ddl.h"
 #include "mongo/s/commands/cluster_explain.h"
 #include "mongo/s/commands/document_shard_key_update_util.h"
 #include "mongo/s/commands/strategy.h"
@@ -307,9 +308,9 @@ public:
         // Collect metrics.
         _updateMetrics.collectMetrics(cmdObj);
 
-        // findAndModify should only be creating database if upsert is true, but this would require
-        // that the parsing be pulled into this function.
-        createShardDatabase(opCtx, nss.db());
+        // Technically, findAndModify should only be creating database if upsert is true, but this
+        // would require that the parsing be pulled into this function.
+        cluster::createDatabase(opCtx, nss.db());
 
         // Append mongoS' runtime constants to the command object before forwarding it to the shard.
         auto cmdObjForShard = appendLegacyRuntimeConstantsToCommandObject(opCtx, cmdObj);

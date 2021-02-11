@@ -34,10 +34,10 @@
 #include "mongo/base/status_with.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/cluster_write.h"
 #include "mongo/s/would_change_owning_shard_exception.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
-#include "mongo/s/write_ops/cluster_write.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
 
@@ -63,7 +63,7 @@ bool executeOperationsAsPartOfShardKeyUpdate(OperationContext* opCtx,
     BatchedCommandResponse deleteResponse;
     BatchWriteExecStats deleteStats;
 
-    ClusterWriter::write(opCtx, deleteRequest, &deleteStats, &deleteResponse);
+    cluster::write(opCtx, deleteRequest, &deleteStats, &deleteResponse);
     uassertStatusOK(deleteResponse.toStatus());
     // If shouldUpsert is true, this means the original command specified {upsert: true} and did not
     // match any docs, so we should not match any when doing this delete. If shouldUpsert is false
@@ -87,7 +87,7 @@ bool executeOperationsAsPartOfShardKeyUpdate(OperationContext* opCtx,
 
     BatchedCommandResponse insertResponse;
     BatchWriteExecStats insertStats;
-    ClusterWriter::write(opCtx, insertRequest, &insertStats, &insertResponse);
+    cluster::write(opCtx, insertRequest, &insertStats, &insertResponse);
     uassertStatusOK(insertResponse.toStatus());
     uassert(ErrorCodes::NamespaceNotFound,
             "Document not successfully inserted while changing shard key for namespace " +

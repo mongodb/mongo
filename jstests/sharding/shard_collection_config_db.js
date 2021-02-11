@@ -1,12 +1,12 @@
 (function() {
 'use strict';
 
-// Database-level tests
-{
-    var st = new ShardingTest({shards: 2});
-    var config = st.s.getDB('config');
-    var admin = st.s.getDB('admin');
+var st = new ShardingTest({shards: 2});
+var config = st.s.getDB('config');
+var admin = st.s.getDB('admin');
 
+jsTest.log('Cannot movePrimary on the config database');
+{
     // At first, there should not be an entry for config
     assert.eq(0, config.databases.count({"_id": "config"}));
 
@@ -19,23 +19,18 @@
     // Test that you cannot set the primary shard for config (not even to 'config')
     assert.commandFailed(admin.runCommand({movePrimary: 'config', to: st.shard0.shardName}));
     assert.commandFailed(admin.runCommand({movePrimary: 'config', to: 'config'}));
-
-    st.stop();
 }
 
-// Test that only system.sessions may be sharded.
+jsTest.log('Only system.sessions may be sharded');
 {
-    var st = new ShardingTest({shards: 2});
-    var admin = st.s.getDB('admin');
-
     assert.commandWorked(
         admin.runCommand({shardCollection: "config.system.sessions", key: {_id: 1}}));
     assert.eq(0, st.s.getDB('config').chunks.count({"shard": "config"}));
 
     assert.commandFailed(admin.runCommand({shardCollection: "config.anythingelse", key: {_id: 1}}));
-
-    st.stop();
 }
+
+st.stop();
 
 // Cannot shard things in config without shards.
 {

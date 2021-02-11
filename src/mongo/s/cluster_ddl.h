@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2021-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,36 +27,20 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
+#pragma once
 
-#include "mongo/logv2/log.h"
-
-#include "mongo/platform/basic.h"
-
-#include "mongo/s/write_ops/cluster_write.h"
-
-#include "mongo/db/lasterror.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/write_ops/chunk_manager_targeter.h"
+#include "mongo/s/catalog_cache.h"
 
 namespace mongo {
+namespace cluster {
 
-void ClusterWriter::write(OperationContext* opCtx,
-                          const BatchedCommandRequest& request,
-                          BatchWriteExecStats* stats,
-                          BatchedCommandResponse* response,
-                          boost::optional<OID> targetEpoch) {
-    LastError::Disabled disableLastError(&LastError::get(opCtx->getClient()));
+/**
+ * Creates (or ensures that it is created) a database `dbName`, with `suggestedPrimaryId` as the
+ * primary node and the `shardingEnabled` field set to true.
+ */
+CachedDatabaseInfo createDatabase(OperationContext* opCtx,
+                                  StringData dbName,
+                                  boost::optional<ShardId> suggestedPrimaryId = boost::none);
 
-    ChunkManagerTargeter targeter(opCtx, request.getNS(), targetEpoch);
-
-    LOGV2_DEBUG_OPTIONS(
-        4817400, 2, {logv2::LogComponent::kShardMigrationPerf}, "Starting batch write");
-
-    BatchWriteExec::executeBatch(opCtx, targeter, request, response, stats);
-
-    LOGV2_DEBUG_OPTIONS(
-        4817401, 2, {logv2::LogComponent::kShardMigrationPerf}, "Finished batch write");
-}
-
+}  // namespace cluster
 }  // namespace mongo

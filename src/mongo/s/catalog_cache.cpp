@@ -151,7 +151,6 @@ StatusWith<ChunkManager> CatalogCache::_getCollectionRoutingInfoAt(
 
     try {
         const auto swDbInfo = getDatabase(opCtx, nss.db(), allowLocks);
-
         if (!swDbInfo.isOK()) {
             if (swDbInfo == ErrorCodes::NamespaceNotFound) {
                 LOGV2_FOR_CATALOG_REFRESH(

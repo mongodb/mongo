@@ -5,7 +5,7 @@
 (function() {
 'use strict';
 
-let st = new ShardingTest({mongos: 1, shards: 2});
+let st = new ShardingTest({shards: 2});
 let mongos = st.s0;
 
 let config = mongos.getDB("config");
