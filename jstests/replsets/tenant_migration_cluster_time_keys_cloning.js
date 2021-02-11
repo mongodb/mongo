@@ -133,7 +133,7 @@ const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
 
     let donorPrimary = donorRst.getPrimary();
     const fp =
-        configureFailPoint(donorPrimary, "pauseTenantMigrationAfterPersitingInitialDonorStateDoc");
+        configureFailPoint(donorPrimary, "pauseTenantMigrationAfterPersistingInitialDonorStateDoc");
 
     const migrationId = UUID();
     const migrationOpts = {
