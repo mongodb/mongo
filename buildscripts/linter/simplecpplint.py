@@ -78,6 +78,36 @@ _RE_GENERIC_FCV_REF = re.compile(r'(' + '|'.join(GENERIC_FCV) + r')\b')
 class Linter:
     """Simple C++ Linter."""
 
+    _license_header = '''\
+/**
+ *    Copyright (C) {year}-present MongoDB, Inc.
+ *
+ *    This program is free software: you can redistribute it and/or modify
+ *    it under the terms of the Server Side Public License, version 1,
+ *    as published by MongoDB, Inc.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    Server Side Public License for more details.
+ *
+ *    You should have received a copy of the Server Side Public License
+ *    along with this program. If not, see
+ *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the Server Side Public License in all respects for
+ *    all of the code used other than as permitted herein. If you modify file(s)
+ *    with this exception, you may extend this exception to your version of the
+ *    file(s), but you are not obligated to do so. If you do not wish to do so,
+ *    delete this exception statement from your version. If you delete this
+ *    exception statement from all source files in the program, then also delete
+ *    it in the license file.
+ */'''.splitlines()
+
     def __init__(self, file_name, raw_lines):
         """Create new linter."""
         self.file_name = file_name
@@ -90,28 +120,13 @@ class Linter:
         self.found_config_header = False
 
     def lint(self):
-        """Run linter."""
+        """Run linter, returning error count."""
         # 3 steps:
-        # 1. Check for header
-        # 2. Check for NOLINT and Strip multi line comments
-        # 3. Run per line checks
+        #  1. Check for header
+        #  2. Check for NOLINT and Strip multi line comments
+        #  3. Run per-line checks
 
-        # The license header is 28 lines and we are 0 indexed unless the file does not have the
-        # correct header.
-        start_line = 0
-
-        # We expect the SSPL license in all files but it is not expected in the Enterprise code
-        expect_sspl_license = "enterprise" not in self.file_name
-        has_sspl_license = self._check_for_server_side_public_license(3)
-
-        if has_sspl_license:
-            start_line = 27
-
-            if not expect_sspl_license:
-                self._error(
-                    0, 'legal/enterprise_license', 'Incorrect license header found.  '
-                    'Expected Enterprise license.  '
-                    'See https://github.com/mongodb/mongo/wiki/Server-Code-Style')
+        start_line = self._check_for_server_side_public_license()
 
         self._check_and_strip_comments()
 
@@ -223,57 +238,36 @@ class Linter:
             self._error(linenum, 'mongodb/ctype',
                         'Use of prohibited <ctype.h> or <cctype> header, use "mongo/util/ctype.h"')
 
-    def _check_for_server_side_public_license(self, copyright_offset):
-        license_header = '''\
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the Server Side Public License, version 1,
- *    as published by MongoDB, Inc.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    Server Side Public License for more details.
- *
- *    You should have received a copy of the Server Side Public License
- *    along with this program. If not, see
- *    <http://www.mongodb.com/licensing/server-side-public-license>.
- *
- *    As a special exception, the copyright holders give permission to link the
- *    code of portions of this program with the OpenSSL library under certain
- *    conditions as described in each individual source file and distribute
- *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the Server Side Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
- */'''.splitlines()
+    def _license_error(self, linenum, msg, category='legal/license'):
+        style_url = 'https://github.com/mongodb/mongo/wiki/Server-Code-Style'
+        self._error(linenum, category, '{} See {}'.format(msg, style_url))
+        return (False, linenum)
 
-        # We expect the first line of the license header to follow shortly after the
-        # "Copyright" message.
-        if r'This program is free software' in self.raw_lines[copyright_offset]:
-            license_header_start_line = copyright_offset
-            for i in range(len(license_header)):  # pylint: disable=consider-using-enumerate
-                line = i + license_header_start_line
-                # We don't trim the lines so we check length and then do strncmp
-                if line >= len(self.raw_lines) or \
-                    len(self.raw_lines[line]) != len(license_header[i]) + 1 or \
-                     self.raw_lines[line][:len(license_header[i])] != license_header[i]:
-                    self._error(
-                        0, 'legal/license', 'Incorrect license header found.  '
-                        'Expected "' + license_header[i] + '".  '
-                        'See https://github.com/mongodb/mongo/wiki/Server-Code-Style')
-                    # We break here to stop reporting legal/license errors for this file.
-                    return False
-        else:
-            self._error(
-                0, 'legal/license', 'No license header found.  '
-                'See https://github.com/mongodb/mongo/wiki/Server-Code-Style')
-            return False
+    def _check_for_server_side_public_license(self):
+        """Return the number of the line at which the check ended."""
+        src_iter = (x.rstrip() for x in self.raw_lines)
+        linenum = 0
+        for linenum, lic_line in enumerate(self._license_header):
+            src_line = next(src_iter, None)
+            if src_line is None:
+                self._license_error(linenum, 'Missing or incomplete license header.')
+                return linenum
+            lic_re = re.escape(lic_line).replace(r'\{year\}', r'\d{4}')
+            if not re.fullmatch(lic_re, src_line):
+                self._license_error(
+                    linenum, 'Incorrect license header.\n'
+                    '  Expected: "{}"\n'
+                    '  Received: "{}"\n'.format(lic_line, src_line))
+                return linenum
 
-        return True
+        # Warn if SSPL appears in Enterprise code, which has a different license.
+        expect_sspl_license = "enterprise" not in self.file_name
+        if not expect_sspl_license:
+            self._license_error(linenum,
+                                'Incorrect license header found. Expected Enterprise license.',
+                                category='legal/enterprise_license')
+            return linenum
+        return linenum
 
     def _check_for_mongo_config_header(self, linenum):
         """Check for a config file."""
@@ -342,7 +336,7 @@ def lint_file(file_name):
 
 
 def main():
-    # type: () -> None
+    # type: () -> int
     """Execute Main Entry point."""
     parser = argparse.ArgumentParser(description='MongoDB Simple C++ Linter.')
 
@@ -355,9 +349,16 @@ def main():
     if args.verbose:
         logging.basicConfig(level=logging.DEBUG)
 
-    if not lint_file(args.file):
-        sys.exit(1)
+    try:
+        error_count = lint_file(args.file)
+        if error_count != 0:
+            print('File "{}" failed with {} errors.'.format(args.file, error_count))
+            return 1
+        return 0
+    except Exception as ex:  # pylint: disable=broad-except
+        print('Exception while checking file "{}": {}'.format(args.file, ex))
+        return 2
 
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())
