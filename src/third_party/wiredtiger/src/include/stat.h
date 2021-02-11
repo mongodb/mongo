@@ -478,6 +478,7 @@ struct __wt_connection_stats {
     int64_t dh_sweep_remove;
     int64_t dh_sweep_tod;
     int64_t dh_sweeps;
+    int64_t dh_sweep_skip_ckpt;
     int64_t dh_session_handles;
     int64_t dh_session_sweeps;
     int64_t lock_checkpoint_count;

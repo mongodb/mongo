@@ -624,6 +624,12 @@ __curfile_reopen(WT_CURSOR *cursor, bool check_only)
          * If the data handle can't be reopened, it is a candidate for sweep, and that should never
          * happen if any session (including ours) is actively using it.
          */
+        if (!can_reopen && dhandle == session->dhandle)
+            WT_RET(__wt_msg(session,
+              "%s: current dhandle may be swept: flags 0x%" PRIx32 " inuse 0x%" PRId32
+              " ref 0x%" PRIu32 " xref 0x%" PRIu32,
+              dhandle->name, dhandle->flags, dhandle->session_inuse, dhandle->session_ref,
+              dhandle->excl_ref));
         WT_ASSERT(session, can_reopen || dhandle != session->dhandle);
         return (can_reopen ? 0 : WT_NOTFOUND);
     }

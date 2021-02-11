@@ -334,6 +334,7 @@ connection_stats = [
     DhandleStat('dh_sweep_close', 'connection sweep dhandles closed'),
     DhandleStat('dh_sweep_ref', 'connection sweep candidate became referenced'),
     DhandleStat('dh_sweep_remove', 'connection sweep dhandles removed from hash list'),
+    DhandleStat('dh_sweep_skip_ckpt', 'connection sweeps skipped due to checkpoint gathering handles'),
     DhandleStat('dh_sweep_tod', 'connection sweep time-of-death sets'),
     DhandleStat('dh_sweeps', 'connection sweeps'),
 
