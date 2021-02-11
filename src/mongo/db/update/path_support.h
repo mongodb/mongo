@@ -38,6 +38,7 @@
 #include "mongo/db/field_ref_set.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
+#include "mongo/util/ctype.h"
 
 namespace mongo {
 
@@ -49,6 +50,46 @@ static const size_t kMaxPaddingAllowed = 1500000;
 
 // Convenience type to hold equality matches at particular paths from a MatchExpression
 typedef std::map<StringData, const EqualityMatchExpression*> EqualityMatches;
+
+struct cmpPathsAndArrayIndexes {
+    // While there is a string to number parser in the codebase, we use this for performance
+    // reasons. This code allows us to only look at the characters/digits that are relevant for our
+    // comparisons.
+    bool operator()(const std::string& a, const std::string& b) const {
+        auto aLength = a.size();
+        auto bLength = b.size();
+        // If these are not numbers, do a normal string comparison. Treat zero padded numbers as
+        // strings.
+        if (aLength == 0 || bLength == 0 || !ctype::isDigit(a[0]) || !ctype::isDigit(b[0]) ||
+            (a[0] == '0' && aLength > 1) || (b[0] == '0' && bLength > 1)) {
+            return a < b;
+        }
+
+        // At this point we are only seeing strings that are prefixed with at least one digit. If
+        // they are numbers, the longer one is bigger because it has a larger order of magnitude.
+        // If they are not numbers (ex: 123qyz) we would not be able to distinguish which is larger
+        // without inspecting every character. To avoid this work we choose to order by length
+        // because the actual order is not important but needs to be consistent.
+        if (aLength != bLength) {
+            return aLength < bLength;
+        }
+        // Find the larger number. Return immediately if a high order digit doesnt match, or we find
+        // a non-number.
+        size_t aIndex = 0;
+        size_t bIndex = 0;
+        while (ctype::isDigit(a[aIndex]) && ctype::isDigit(b[bIndex]) && aIndex < aLength &&
+               bIndex < bLength) {
+            if (a[aIndex] == b[bIndex]) {
+                ++aIndex;
+                ++bIndex;
+                continue;
+            }
+            return a[aIndex] < b[bIndex];
+        }
+        // We found a non-number, perform normal string comparison.
+        return a < b;
+    }
+};
 
 /**
  * Finds the longest portion of 'prefix' that exists in document rooted at 'root' and is
