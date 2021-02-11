@@ -63,6 +63,10 @@ public:
     // should be made to wait for it to become free.
     static const Milliseconds kSingleLockAttemptTimeout;
 
+    // DistLock to ensure DDL operations see an stable sharding routing info format.
+    static constexpr StringData kShardingRoutingInfoFormatStabilityLockName =
+        "ShardingRoutingInfoFormatStability"_sd;
+
     /**
      * RAII type for the local lock.
      */
