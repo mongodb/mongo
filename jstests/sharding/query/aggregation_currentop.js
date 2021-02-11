@@ -339,13 +339,15 @@ function runCommonTests(conn, curOpSpec) {
     // Test that {idleConnections: false} returns only active connections.
     const idleConn = new Mongo(conn.host);
 
-    assert.eq(adminDB
-                  .aggregate([
-                      {$currentOp: addToSpec({allUsers: true, idleConnections: false})},
-                      {$match: {active: false}}
-                  ])
-                  .itcount(),
-              0);
+    const activeConns = adminDB
+                            .aggregate([
+                                {$currentOp: addToSpec({allUsers: true, idleConnections: false})},
+                                {$match: {active: false}}
+                            ])
+                            .toArray();
+    assert.eq(activeConns.length,
+              0,
+              "$currentOp should report 0 active connections but found:\n" + tojson(activeConns));
 
     // Test that the currentOp command with {$all: false} returns only active connections.
     assert.eq(adminDB.currentOp({$ownOps: false, $all: false, active: false}).inprog.length, 0);
