@@ -270,7 +270,7 @@ private:
 
         // Promises for committers to fulfill in order to signal to waiters that their measurements
         // have been committed.
-        std::queue<Promise<CommitInfo>> promises;
+        std::queue<boost::optional<Promise<CommitInfo>>> promises;
 
         // Whether the bucket is full. This can be due to number of measurements, size, or time
         // range.

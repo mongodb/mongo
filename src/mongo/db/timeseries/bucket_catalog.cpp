@@ -187,6 +187,8 @@ StatusWith<BucketCatalog::InsertResult> BucketCatalog::insert(OperationContext* 
         auto [promise, future] = makePromiseFuture<CommitInfo>();
         bucket->promises.push(std::move(promise));
         commitInfoFuture = std::move(future);
+    } else {
+        bucket->promises.push(boost::none);
     }
 
     bucket->numWriters++;
@@ -243,8 +245,10 @@ BucketCatalog::CommitData BucketCatalog::commit(const BucketId& bucketId,
     stats.numMeasurementsCommitted += measurements.size();
 
     // Inform waiters that their measurements have been committed.
-    for (uint32_t i = 1; i < bucket.numPendingCommitMeasurements; i++) {
-        bucket.promises.front().emplaceValue(*previousCommitInfo);
+    for (uint32_t i = 0; i < bucket.numPendingCommitMeasurements; i++) {
+        if (auto& promise = bucket.promises.front()) {
+            promise->emplaceValue(*previousCommitInfo);
+        }
         bucket.promises.pop();
     }
     if (bucket.numPendingCommitMeasurements) {
@@ -302,9 +306,11 @@ void BucketCatalog::clear(const BucketId& bucketId) {
     auto& bucket = it->second;
 
     while (!bucket.promises.empty()) {
-        bucket.promises.front().setError({ErrorCodes::TimeseriesBucketCleared,
-                                          str::stream() << "Time-series bucket " << *bucketId
-                                                        << " for " << bucket.ns << " was cleared"});
+        if (auto& promise = bucket.promises.front()) {
+            promise->setError({ErrorCodes::TimeseriesBucketCleared,
+                               str::stream() << "Time-series bucket " << *bucketId << " for "
+                                             << bucket.ns << " was cleared"});
+        }
         bucket.promises.pop();
     }
 

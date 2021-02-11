@@ -195,6 +195,23 @@ TEST_F(BucketCatalogTest, ClearDatabaseBuckets) {
     _insertOneAndCommit(_ns3, 1);
 }
 
+TEST_F(BucketCatalogTest, InsertBetweenCommits) {
+    auto result1 = _bucketCatalog->insert(_opCtx, _ns1, BSON(_timeField << Date_t::now()));
+    ASSERT(!result1.getValue().commitInfo);
+
+    auto data = _bucketCatalog->commit(result1.getValue().bucketId);
+    ASSERT_EQ(data.docs.size(), 1);
+    ASSERT_EQ(data.numCommittedMeasurements, 0);
+
+    // Insert before the second commit so that the committer gets more documents to commit.
+    auto result2 = _bucketCatalog->insert(_opCtx, _ns1, BSON(_timeField << Date_t::now()));
+    ASSERT(result2.getValue().commitInfo);
+
+    _commit(result1.getValue().bucketId, 1);
+
+    ASSERT(result2.getValue().commitInfo->isReady());
+}
+
 DEATH_TEST_F(BucketCatalogTest, CannotProvideCommitInfoOnFirstCommit, "invariant") {
     auto result = _bucketCatalog->insert(_opCtx, _ns1, BSON(_timeField << Date_t::now()));
     auto& [bucketId, _] = result.getValue();
