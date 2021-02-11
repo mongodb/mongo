@@ -30,6 +30,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/rpc/write_concern_error_detail.h"
+#include "mongo/rpc/write_concern_error_gen.h"
 
 #include "mongo/db/field_parser.h"
 #include "mongo/util/str.h"
@@ -37,15 +38,6 @@
 namespace mongo {
 
 using std::string;
-
-namespace {
-
-const BSONField<int> errCode("code");
-const BSONField<string> errCodeName("codeName");
-const BSONField<BSONObj> errInfo("errInfo");
-const BSONField<string> errMessage("errmsg");
-
-}  // namespace
 
 WriteConcernErrorDetail::WriteConcernErrorDetail() {
     clear();
@@ -67,14 +59,16 @@ BSONObj WriteConcernErrorDetail::toBSON() const {
     BSONObjBuilder builder;
 
     invariant(!_status.isOK());
-    builder.append(errCode(), _status.code());
-    builder.append(errCodeName(), _status.codeString());
-    builder.append(errMessage(), _status.reason());
+
+    auto wce = WriteConcernError();
+    wce.setCode(_status.code());
+    wce.setCodeName(boost::optional<StringData>(_status.codeString()));
+    wce.setErrmsg(_status.reason());
+    wce.setErrInfo(_errInfo);
+    wce.serialize(&builder);
+
     if (auto extra = _status.extraInfo())
         extra->serialize(&builder);
-
-    if (_isErrInfoSet)
-        builder.append(errInfo(), _errInfo);
 
     return builder.obj();
 }
@@ -86,27 +80,16 @@ bool WriteConcernErrorDetail::parseBSON(const BSONObj& source, string* errMsg) {
     if (!errMsg)
         errMsg = &dummy;
 
-    FieldParser::FieldState fieldState;
-    int errCodeValue;
-    fieldState = FieldParser::extract(source, errCode, &errCodeValue, errMsg);
-    if (fieldState == FieldParser::FIELD_INVALID)
-        return false;
-    bool haveStatus = fieldState == FieldParser::FIELD_SET;
-    std::string errMsgValue;
-    fieldState = FieldParser::extract(source, errMessage, &errMsgValue, errMsg);
-    if (fieldState == FieldParser::FIELD_INVALID)
-        return false;
-    haveStatus = haveStatus && fieldState == FieldParser::FIELD_SET;
-    if (!haveStatus) {
-        *errMsg = "missing code or errmsg field";
+    try {
+        auto wce = WriteConcernError::parse({"writeConcernError"}, source);
+        _status = Status(ErrorCodes::Error(wce.getCode()), wce.getErrmsg(), source);
+        if ((_isErrInfoSet = wce.getErrInfo().is_initialized())) {
+            _errInfo = wce.getErrInfo().value().getOwned();
+        }
+    } catch (DBException& ex) {
+        *errMsg = str::stream() << ex.reason();
         return false;
     }
-    _status = Status(ErrorCodes::Error(errCodeValue), errMsgValue, source);
-
-    fieldState = FieldParser::extract(source, errInfo, &_errInfo, errMsg);
-    if (fieldState == FieldParser::FIELD_INVALID)
-        return false;
-    _isErrInfoSet = fieldState == FieldParser::FIELD_SET;
 
     return true;
 }
