@@ -154,6 +154,46 @@ structs:
         fields:
             fieldOne:
                 type: BsonSubsetReply
+    
+    OldVariantTypeReply:
+        description: "This reply contains an old field that has a variant type while the new field
+                      is not a variant type"
+        fields:
+            oldVariantTypeReplyField:
+                type: 
+                    variant: [int, string]
+
+    NewVariantSubsetReply:
+        description: "This reply contains a field whose new variant types are a subset
+                      of the old variant types"
+        fields:
+            variantSubsetReplyField:
+                type: 
+                    variant: [int, bool, string]
+    
+    VariantRecursiveReply:
+        description: "This reply contains a field that has a new variant type that is compatible
+                      with the old variant type"
+        fields:
+            variantRecursiveReplyField:
+                type: 
+                    variant: [int, intStringBoolToIntString]
+    
+    OldVariantStructReply:
+        description: "This reply contains a field whose new variant type does not have a variant
+                      struct type while the old one does"
+        fields:
+            variantStructReplyField:
+                type: 
+                    variant: [int, string, StructType]
+    
+    VariantStructRecursiveReply:
+        description: "This reply contains a field that has a new variant struct type that is compatible
+                      with the old variant struct type"
+        fields:
+            variantStructRecursiveReplyField:
+                type: 
+                    variant: [int, StructFieldTypeRecursiveReplyTwo]
 
 commands:
     testCommand:
@@ -357,3 +397,53 @@ commands:
         strict: true
         api_version: "1"
         reply_type: OkReply
+
+    oldReplyFieldVariantType:
+        description: "new command passes when its reply field type is not a variant type while
+                      the old reply field is a variant type"
+        command_name: oldReplyFieldVariantType
+        namespace: ignored
+        cpp_name: oldReplyFieldVariantType
+        strict: true
+        api_version: "1"
+        reply_type: OldVariantTypeReply
+    
+    newReplyFieldVariantSubset:
+        description: "new command when its reply field type is a variant type that is
+                      a subset of the old reply field variant types"
+        command_name: newReplyFieldVariantSubset
+        namespace: ignored
+        cpp_name: newReplyFieldVariantSubset
+        strict: true
+        api_version: "1"
+        reply_type: NewVariantSubsetReply
+
+    replyFieldVariantRecursive:
+        description: "new command passes when its reply field type is a variant type that is
+                      compatible with the old reply field variant type"
+        command_name: replyFieldVariantRecursive
+        namespace: ignored
+        cpp_name: replyFieldVariantRecursive
+        strict: true
+        api_version: "1"
+        reply_type: VariantRecursiveReply
+    
+    oldReplyFieldVariantStruct:
+        description: "new command passes if it doesn't have a variant struct type while the 
+                      old command does"
+        command_name: oldReplyFieldVariantStruct
+        namespace: ignored
+        cpp_name: oldReplyFieldVariantStruct
+        strict: true
+        api_version: "1"
+        reply_type: OldVariantStructReply
+
+    replyFieldVariantStructRecursive:
+        description: "new command passes when its reply field type has a variant struct type that is
+                      compatible with the old reply field variant struct type"
+        command_name: replyFieldVariantStructRecursive
+        namespace: ignored
+        cpp_name: replyFieldVariantStructRecursive
+        strict: true
+        api_version: "1"
+        reply_type: VariantStructRecursiveReply

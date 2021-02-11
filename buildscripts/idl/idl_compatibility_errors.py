@@ -66,6 +66,8 @@ ERROR_ID_NEW_COMMAND_TYPE_NOT_STRUCT = "ID0022"
 ERROR_ID_NEW_COMMAND_TYPE_NOT_ENUM = "ID0023"
 ERROR_ID_NEW_COMMAND_TYPE_ENUM_OR_STRUCT = "ID0024"
 ERROR_ID_MISSING_ERROR_REPLY_STRUCT = "ID0025"
+ERROR_ID_NEW_REPLY_FIELD_VARIANT_TYPE = "ID0026"
+ERROR_ID_NEW_REPLY_FIELD_VARIANT_TYPE_NOT_SUBSET = "ID0027"
 
 
 class IDLCompatibilityCheckerError(Exception):
@@ -360,6 +362,25 @@ class IDLCompatibilityContext(object):
             ERROR_ID_NEW_REPLY_FIELD_UNSTABLE, command_name,
             "'%s' has an unstable reply field '%s' that was stable in the old command." %
             (command_name, field_name), file)
+
+    def add_new_reply_field_variant_type_error(self, command_name: str, field_name: str,
+                                               new_field_type: str, old_field_type: str,
+                                               file: str) -> None:
+        # pylint: disable=too-many-arguments
+        """Add an error about the new reply field type being variant when the old one is not."""
+        self._add_error(
+            ERROR_ID_NEW_REPLY_FIELD_VARIANT_TYPE, command_name,
+            ("'%s' has a reply field '%s' of type '%s' that is variant while the corresponding "
+             "old reply field type '%s' is not.") % (command_name, field_name, new_field_type,
+                                                     old_field_type), file)
+
+    def add_new_reply_field_variant_type_not_subset_error(self, command_name: str, field_name: str,
+                                                          type_name: str, file: str) -> None:
+        # pylint: disable=too-many-arguments
+        """Add an error about the new reply field variant types not being a subset of the old variant types."""
+        self._add_error(ERROR_ID_NEW_REPLY_FIELD_VARIANT_TYPE_NOT_SUBSET, command_name, (
+            "'%s' has a reply field '%s' with variant alternative type '%s' that is not a subset of the corresponding "
+            "old reply field type") % (command_name, field_name, type_name), file)
 
     def add_old_command_type_bson_any_error(self, command_name: str, old_type: str,
                                             file: str) -> None:
