@@ -518,6 +518,11 @@ public:
         return Future<T>(std::move(this->_impl).tapAll(std::forward<Func>(func)));
     }
 
+    // Calling this on a Future is never strictly necessary, since this is already an inline
+    // Future, but making this public helps for writing generic utilities which need to use
+    // unsafeToInlineFuture for some future types but not others.
+    using SemiFuture<T>::unsafeToInlineFuture;
+
 private:
     template <typename>
     friend class ExecutorFuture;
@@ -528,7 +533,6 @@ private:
     friend class Promise<T>;
     friend class SharedPromise<T>;
 
-    using SemiFuture<T>::unsafeToInlineFuture;
 
     template <typename Func, typename Arg, typename U>
     static auto wrap(future_details::FutureImpl<U>&& impl) {

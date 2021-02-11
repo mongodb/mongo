@@ -648,6 +648,55 @@ SemiFuture<Result> whenAny(FuturePack&&... futures) {
 namespace future_util {
 
 /**
+ * Takes an input Future, ExecutorFuture, SemiFuture, or SharedSemiFuture and a CancelationToken,
+ * and returns a new SemiFuture that will be resolved when either the input future is resolved or
+ * when the input CancelationToken is canceled. If the token is canceled before the input future is
+ * resolved, the resulting SemiFuture will be resolved with a CallbackCanceled error. Otherwise, the
+ * resulting SemiFuture will be resolved with the same result as the input future.
+ */
+template <typename FutureT, typename Value = typename FutureT::value_type>
+SemiFuture<Value> withCancelation(FutureT&& inputFuture, const CancelationToken& token) {
+    /**
+     * A structure used to share state between the continuation we attach to the input future and
+     * the continuation we attach to the token's onCancel() future.
+     */
+    struct SharedBlock {
+        SharedBlock(Promise<Value> result) : resultPromise(std::move(result)) {}
+        // Tracks whether or not the resultPromise has been set.
+        AtomicWord<bool> done{false};
+        // The promise corresponding to the resulting SemiFuture returned by this function.
+        Promise<Value> resultPromise;
+    };
+
+    auto [promise, future] = makePromiseFuture<Value>();
+    auto sharedBlock = std::make_shared<SharedBlock>(std::move(promise));
+
+    std::move(inputFuture)
+        .unsafeToInlineFuture()
+        .getAsync([sharedBlock](StatusOrStatusWith<Value> result) {
+            // If the input future completes first, change done to true and set the
+            // value on the promise.
+            if (!sharedBlock->done.swap(true)) {
+                sharedBlock->resultPromise.setFrom(std::move(result));
+            }
+        });
+
+    token.onCancel().unsafeToInlineFuture().getAsync([sharedBlock](Status s) {
+        if (s.isOK()) {
+            // If the cancelation token is canceled first, change done to true and set the value on
+            // the promise.
+            if (!sharedBlock->done.swap(true)) {
+                sharedBlock->resultPromise.setError(
+                    {ErrorCodes::CallbackCanceled,
+                     "CancelationToken canceled while waiting for input future"});
+            }
+        }
+    });
+
+    return std::move(future).semi();
+}
+
+/**
  * This class is a helper for ensuring RAII-like behavior in async code.
  *
  * This class constructs a heap allocated State object in make(), and then uses that State object
