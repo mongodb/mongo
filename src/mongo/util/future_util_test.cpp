@@ -1229,6 +1229,94 @@ TEST_F(WhenAnyTest, WorksWithVariadicTemplateAndExecutorFutures) {
     ASSERT_EQ(idx, kWhichIdxWillBeFirst);
 }
 
+class WithCancelationTest : public FutureUtilTest {};
+
+TEST_F(FutureUtilTest,
+       WithCancelationReturnsSuccessIfInputFutureResolvedWithSuccessBeforeCancelation) {
+    const int kResult{5};
+    auto [promise, future] = makePromiseFuture<int>();
+
+    CancelationSource cancelSource;
+
+    auto cancelableFuture = future_util::withCancelation(std::move(future), cancelSource.token());
+
+    promise.emplaceValue(kResult);
+    ASSERT_EQ(cancelableFuture.get(), kResult);
+
+    // Canceling after the fact shouldn't hang or cause crashes.
+    cancelSource.cancel();
+}
+
+TEST_F(FutureUtilTest, WithCancelationReturnsErrorIfInputFutureResolvedWithErrorBeforeCancelation) {
+    auto [promise, future] = makePromiseFuture<int>();
+
+    CancelationSource cancelSource;
+
+    auto cancelableFuture = future_util::withCancelation(std::move(future), cancelSource.token());
+
+    const Status kErrorStatus{ErrorCodes::InternalError, ""};
+    promise.setError(kErrorStatus);
+    ASSERT_EQ(cancelableFuture.getNoThrow(), kErrorStatus);
+
+    // Canceling after the fact shouldn't hang or cause crashes.
+    cancelSource.cancel();
+}
+
+TEST_F(FutureUtilTest, WithCancelationReturnsErrorIfTokenCanceledFirst) {
+    auto [promise, future] = makePromiseFuture<int>();
+
+    CancelationSource cancelSource;
+    auto cancelableFuture = future_util::withCancelation(std::move(future), cancelSource.token());
+    cancelSource.cancel();
+    ASSERT_THROWS_CODE(cancelableFuture.get(), DBException, ErrorCodes::CallbackCanceled);
+
+    // Keep from getting a BrokenPromise assertion when the input promise is destroyed.
+    promise.setError(kCanceledStatus);
+}
+
+TEST_F(FutureUtilTest, WithCancelationWorksWithVoidInput) {
+    auto [promise, future] = makePromiseFuture<void>();
+
+    auto cancelableFuture =
+        future_util::withCancelation(std::move(future), CancelationToken::uncancelable());
+
+    promise.emplaceValue();
+    ASSERT(cancelableFuture.isReady());
+}
+
+TEST_F(FutureUtilTest, WithCancelationWorksWithSemiFutureInput) {
+    const int kResult{5};
+    auto [promise, future] = makePromiseFuture<int>();
+
+    auto cancelableFuture =
+        future_util::withCancelation(std::move(future).semi(), CancelationToken::uncancelable());
+
+    promise.emplaceValue(kResult);
+    ASSERT_EQ(cancelableFuture.get(), kResult);
+}
+
+TEST_F(FutureUtilTest, WithCancelationWorksWithSharedSemiFutureInput) {
+    const int kResult{5};
+    auto [promise, future] = makePromiseFuture<int>();
+
+    auto cancelableFuture = future_util::withCancelation(std::move(future).semi().share(),
+                                                         CancelationToken::uncancelable());
+
+    promise.emplaceValue(kResult);
+    ASSERT_EQ(cancelableFuture.get(), kResult);
+}
+
+TEST_F(FutureUtilTest, WithCancelationWorksWithExecutorFutureInput) {
+    const int kResult{5};
+    auto [promise, future] = makePromiseFuture<int>();
+
+    auto cancelableFuture = future_util::withCancelation(std::move(future).thenRunOn(executor()),
+                                                         CancelationToken::uncancelable());
+
+    promise.emplaceValue(kResult);
+    ASSERT_EQ(cancelableFuture.get(), kResult);
+}
+
 class AsyncStateTest : public FutureUtilTest {
 public:
     class SettingGuard {
