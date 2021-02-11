@@ -100,6 +100,7 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeTaskCompletion);
 MONGO_FAIL_POINT_DEFINE(fpAfterReceivingRecipientForgetMigration);
 MONGO_FAIL_POINT_DEFINE(hangAfterCreatingRSM);
 MONGO_FAIL_POINT_DEFINE(skipRetriesWhenConnectingToDonorHost);
+MONGO_FAIL_POINT_DEFINE(fpBeforeDroppingOplogBufferCollection);
 
 namespace {
 // We never restart just the oplog fetcher.  If a failure occurs, we restart the whole state machine
@@ -1377,15 +1378,14 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
 
             pauseAfterRunTenantMigrationRecipientInstance.pauseWhileSet();
 
-            uassert(ErrorCodes::TenantMigrationForgotten,
-                    str::stream() << "Migration " << getMigrationUUID()
-                                  << " already marked for garbage collect",
-                    !_stateDoc.getExpireAt());
-
             return _initializeStateDoc(lk);
         })
         .then([this, self = shared_from_this()] {
             _stateDocPersistedPromise.emplaceValue();
+            uassert(ErrorCodes::TenantMigrationForgotten,
+                    str::stream() << "Migration " << getMigrationUUID()
+                                  << " already marked for garbage collect",
+                    !_stateDoc.getExpireAt());
             _stopOrHangOnFailPoint(&fpAfterPersistingTenantMigrationRecipientInstanceStateDoc);
             return _createAndConnectClients();
         })
@@ -1604,6 +1604,7 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
         })
         .then([this, self = shared_from_this()] { return _markStateDocAsGarbageCollectable(); })
         .then([this, self = shared_from_this()] {
+            _stopOrHangOnFailPoint(&fpBeforeDroppingOplogBufferCollection);
             auto opCtx = cc().makeOperationContext();
             auto storageInterface = StorageInterface::get(opCtx.get());
 
