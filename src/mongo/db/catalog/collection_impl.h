@@ -288,6 +288,12 @@ public:
                            boost::optional<ValidationLevelEnum> newLevel,
                            boost::optional<ValidationActionEnum> newAction) final;
 
+    /**
+     * Returns non-OK status if the collection validator does not comply with stable API
+     * requirements.
+     */
+    Status checkValidatorAPIVersionCompatability(OperationContext* opCtx) const final;
+
     bool getRecordPreImages() const final;
     void setRecordPreImages(OperationContext* opCtx, bool val) final;
 

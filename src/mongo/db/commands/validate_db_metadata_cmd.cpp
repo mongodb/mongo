@@ -205,15 +205,25 @@ public:
                 return _validateView(opCtx, *viewDef);
             }
 
-            // TODO SERVER-53218: Add validation for collection validator.
-
-            const auto* collPtr = collection.getCollection().get();
-            if (!collPtr) {
+            if (!collection.getCollection()) {
                 return true;
+            }
+            const auto status = collection->checkValidatorAPIVersionCompatability(opCtx);
+            if (!status.isOK()) {
+                ErrorReplyElement error(coll.nss()->ns(),
+                                        ErrorCodes::APIStrictError,
+                                        ErrorCodes::errorString(ErrorCodes::APIStrictError),
+                                        status.reason());
+
+                if (!_sizeTracker.incrementAndCheckOverflow(error)) {
+                    _reply.setHasMoreErrors(true);
+                    return false;
+                }
+                apiVersionErrors.push_back(error);
             }
 
             // Ensure there are no unstable indexes.
-            const auto* indexCatalog = collPtr->getIndexCatalog();
+            const auto* indexCatalog = collection->getIndexCatalog();
             std::unique_ptr<IndexCatalog::IndexIterator> ii =
                 indexCatalog->getIndexIterator(opCtx, true /* includeUnfinishedIndexes */);
             while (ii->more()) {

@@ -166,19 +166,24 @@ assert.commandFailedWithCode(
 let validator = {$expr: {$_testApiVersion: {unstable: true}}};
 let validatedCollName = collName + "_validated";
 
-// Create the collection with the unstable validator, setting apiStrict: true does not have an
-// effect.
+// Creating a collection with the unstable validator is not allowed with apiStrict:true.
 db[validatedCollName].drop();
-assert.commandWorked(db.runCommand(
-    {create: validatedCollName, validator: validator, apiVersion: "1", apiStrict: true}));
+assert.commandFailedWithCode(
+    db.runCommand(
+        {create: validatedCollName, validator: validator, apiVersion: "1", apiStrict: true}),
+    ErrorCodes.APIStrictError);
 
-// Run an insert command without any API version and verify that it is successful.
+// Run create and insert commands without apiStrict:true and verify that it is successful.
+assert.commandWorked(db.runCommand(
+    {create: validatedCollName, validator: validator, apiVersion: "1", apiStrict: false}));
 assert.commandWorked(
     db[validatedCollName].runCommand({insert: validatedCollName, documents: [{num: 1}]}));
 
-// TODO SERVER-53218: Specifying apiStrict: true results in an error.
-assert.commandWorked(db[validatedCollName].runCommand(
-    {insert: validatedCollName, documents: [{num: 1}], apiVersion: "1", apiStrict: true}));
+// Specifying apiStrict: true results in an error.
+assert.commandFailedWithCode(
+    db[validatedCollName].runCommand(
+        {insert: validatedCollName, documents: [{num: 1}], apiVersion: "1", apiStrict: true}),
+    ErrorCodes.APIStrictError);
 
 // Recreate the validator containing a deprecated test expression.
 db[validatedCollName].drop();
@@ -186,26 +191,35 @@ validator = {
     $expr: {$_testApiVersion: {deprecated: true}}
 };
 
-// Create the collection with the unstable validator, setting apiDeprecationErrors : true does not
-// have an effect.
-assert.commandWorked(db.runCommand({
+// Creating a collection with the deprecated validator is not allowed with
+// apiDeprecationErrors:true.
+assert.commandFailedWithCode(db.runCommand({
     create: validatedCollName,
     validator: validator,
     apiVersion: "1",
     apiDeprecationErrors: true,
-}));
+}),
+                             ErrorCodes.APIDeprecationError);
 
-// Run an insert command without any API version and verify that it is successful.
+// Run create and insert commands without apiDeprecationErrors:true and verify that it is
+// successful.
+assert.commandWorked(db.runCommand({
+    create: validatedCollName,
+    validator: validator,
+    apiVersion: "1",
+    apiDeprecationErrors: false,
+}));
 assert.commandWorked(
     db[validatedCollName].runCommand({insert: validatedCollName, documents: [{num: 1}]}));
 
-// TODO SERVER-53218: Specifying apiDeprecationErrors: true results in an error.
-assert.commandWorked(db[validatedCollName].runCommand({
+// Specifying apiDeprecationErrors: true results in an error.
+assert.commandFailedWithCode(db[validatedCollName].runCommand({
     insert: validatedCollName,
     documents: [{num: 1}],
     apiVersion: "1",
     apiDeprecationErrors: true
-}));
+}),
+                             ErrorCodes.APIDeprecationError);
 
 // Test that API version parameters are inherited into the inner command of the explain command.
 function checkExplainInnerCommandGetsAPIVersionParameters(explainedCmd, errCode) {

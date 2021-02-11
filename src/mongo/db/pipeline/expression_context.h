@@ -37,7 +37,6 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/api_parameters.h"
 #include "mongo/db/exec/document_value/document_comparator.h"
 #include "mongo/db/exec/document_value/value_comparator.h"
 #include "mongo/db/namespace_string.h"
@@ -369,10 +368,11 @@ public:
     // SBE expressions.
     bool sbeCompatible = true;
 
-    // API Parameters pulled from OperationContext upon object creation.
-    // This may become stale if OperationContext changes after object creation.
-    // Expressions should reach APIParameters with this variable instead of using the decorator.
-    APIParameters apiParameters;
+    // These fields can be used in a context when API version validations were not enforced during
+    // parse time (Example creating a view or validator), but needs to be enforce while querying
+    // later.
+    bool exprUnstableForApiV1 = false;
+    bool exprDeprectedForApiV1 = false;
 
 protected:
     static const int kInterruptCheckPeriod = 128;

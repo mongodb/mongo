@@ -61,22 +61,28 @@ boost::intrusive_ptr<Expression> ExpressionTestApiVersion::parse(ExpressionConte
     if (field == kUnstableField) {
         uassert(5161702, "unstable must be a boolean", params.firstElement().isBoolean());
         unstableField = params.firstElement().boolean();
+        expCtx->exprUnstableForApiV1 = expCtx->exprUnstableForApiV1 || unstableField;
     } else if (field == kDeprecatedField) {
         uassert(5161703, "deprecated must be a boolean", params.firstElement().isBoolean());
         deprecatedField = params.firstElement().boolean();
+        expCtx->exprDeprectedForApiV1 = expCtx->exprDeprectedForApiV1 || deprecatedField;
     } else {
         uasserted(5161704,
                   str::stream() << field << " is not a valid argument for $_testApiVersion");
     }
 
-    const auto& apiParams = expCtx->apiParameters;
-    if (apiParams.getAPIStrict().value_or(false) && unstableField) {
+    const auto apiStrict =
+        expCtx->opCtx && APIParameters::get(expCtx->opCtx).getAPIStrict().value_or(false);
+    if (apiStrict && unstableField) {
         uasserted(ErrorCodes::APIStrictError,
-                  "Provided apiStrict is true with an unstable command.");
+                  "Provided apiStrict is true with an unstable parameter.");
     }
-    if (apiParams.getAPIDeprecationErrors().value_or(false) && deprecatedField) {
+
+    const auto apiDeprecated = expCtx->opCtx &&
+        APIParameters::get(expCtx->opCtx).getAPIDeprecationErrors().value_or(false);
+    if (apiDeprecated && deprecatedField) {
         uasserted(ErrorCodes::APIDeprecationError,
-                  "Provided apiDeprecatedErrors is true with a deprecated command.");
+                  "Provided apiDeprecatedErrors is true with a deprecated parameter.");
     }
 
     return new ExpressionTestApiVersion(expCtx, unstableField, deprecatedField);

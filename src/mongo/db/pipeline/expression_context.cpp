@@ -126,8 +126,6 @@ ExpressionContext::ExpressionContext(
     }
     if (letParameters)
         variables.seedVariablesWithLetParameters(this, *letParameters);
-    if (opCtx)
-        apiParameters = APIParameters::get(opCtx);
 }
 
 ExpressionContext::ExpressionContext(
@@ -215,6 +213,8 @@ intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
 
     expCtx->variables = variables;
     expCtx->variablesParseState = variablesParseState.copyWith(expCtx->variables.useIdGenerator());
+    expCtx->exprUnstableForApiV1 = exprUnstableForApiV1;
+    expCtx->exprDeprectedForApiV1 = exprDeprectedForApiV1;
 
     // Note that we intentionally skip copying the value of '_interruptCounter' because 'expCtx' is
     // intended to be used for executing a separate aggregation pipeline.
