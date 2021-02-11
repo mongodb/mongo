@@ -34,6 +34,7 @@
 
 #include "mongo/base/clonable_ptr.h"
 #include "mongo/db/field_ref.h"
+#include "mongo/db/update/path_support.h"
 #include "mongo/db/update/update_node.h"
 
 namespace mongo {
@@ -72,9 +73,12 @@ protected:
      * wrapFieldNameAsArrayFilterIdentifier is true, field names are wrapped as $[<field name>] for
      * error reporting.
      */
-    static std::map<std::string, clonable_ptr<UpdateNode>> createUpdateNodeMapByMerging(
-        const std::map<std::string, clonable_ptr<UpdateNode>>& leftMap,
-        const std::map<std::string, clonable_ptr<UpdateNode>>& rightMap,
+    static std::map<std::string, clonable_ptr<UpdateNode>, pathsupport::cmpPathsAndArrayIndexes>
+    createUpdateNodeMapByMerging(
+        const std::map<std::string, clonable_ptr<UpdateNode>, pathsupport::cmpPathsAndArrayIndexes>&
+            leftMap,
+        const std::map<std::string, clonable_ptr<UpdateNode>, pathsupport::cmpPathsAndArrayIndexes>&
+            rightMap,
         FieldRef* pathTaken,
         bool wrapFieldNameAsArrayFilterIdentifier = false);
 
