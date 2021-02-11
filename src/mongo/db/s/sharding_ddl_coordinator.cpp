@@ -40,10 +40,11 @@
 
 namespace mongo {
 
-ShardingDDLCoordinator::ShardingDDLCoordinator(OperationContext* opCtx, const NamespaceString& ns)
+ShardingDDLCoordinator_NORESILIENT::ShardingDDLCoordinator_NORESILIENT(OperationContext* opCtx,
+                                                                       const NamespaceString& ns)
     : _nss(ns), _forwardableOpMetadata(opCtx){};
 
-SemiFuture<void> ShardingDDLCoordinator::run(OperationContext* opCtx) {
+SemiFuture<void> ShardingDDLCoordinator_NORESILIENT::run(OperationContext* opCtx) {
     if (!_nss.isConfigDB()) {
         // Check that the operation context has a database version for this namespace
         const auto clientDbVersion = OperationShardingState::get(opCtx).getDbVersion(_nss.db());

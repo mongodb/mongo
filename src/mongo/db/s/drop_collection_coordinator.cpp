@@ -53,7 +53,7 @@ namespace mongo {
 
 DropCollectionCoordinator::DropCollectionCoordinator(OperationContext* opCtx,
                                                      const NamespaceString& nss)
-    : ShardingDDLCoordinator(opCtx, nss), _serviceContext(opCtx->getServiceContext()) {}
+    : ShardingDDLCoordinator_NORESILIENT(opCtx, nss), _serviceContext(opCtx->getServiceContext()) {}
 
 void DropCollectionCoordinator::_sendDropCollToParticipants(OperationContext* opCtx) {
     auto* const shardRegistry = Grid::get(opCtx)->shardRegistry();

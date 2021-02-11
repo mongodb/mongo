@@ -85,7 +85,7 @@ RenameCollectionCoordinator::RenameCollectionCoordinator(OperationContext* opCtx
                                                          const NamespaceString& toNss,
                                                          bool dropTarget,
                                                          bool stayTemp)
-    : ShardingDDLCoordinator(opCtx, _nss),
+    : ShardingDDLCoordinator_NORESILIENT(opCtx, _nss),
       _serviceContext(opCtx->getServiceContext()),
       _toNss(toNss),
       _dropTarget(dropTarget),

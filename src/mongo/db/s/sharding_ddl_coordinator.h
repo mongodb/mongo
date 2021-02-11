@@ -37,9 +37,9 @@
 
 namespace mongo {
 
-class ShardingDDLCoordinator {
+class ShardingDDLCoordinator_NORESILIENT {
 public:
-    ShardingDDLCoordinator(OperationContext* opCtx, const NamespaceString& nss);
+    ShardingDDLCoordinator_NORESILIENT(OperationContext* opCtx, const NamespaceString& nss);
     SemiFuture<void> run(OperationContext* opCtx);
 
 protected:

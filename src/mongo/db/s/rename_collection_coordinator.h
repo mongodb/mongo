@@ -35,7 +35,7 @@
 namespace mongo {
 
 class RenameCollectionCoordinator final
-    : public ShardingDDLCoordinator,
+    : public ShardingDDLCoordinator_NORESILIENT,
       public std::enable_shared_from_this<RenameCollectionCoordinator> {
 public:
     RenameCollectionCoordinator(OperationContext* opCtx,

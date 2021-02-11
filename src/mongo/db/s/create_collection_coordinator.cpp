@@ -313,7 +313,7 @@ void updateCatalogEntry(OperationContext* opCtx, const NamespaceString& nss, Col
 
 CreateCollectionCoordinator::CreateCollectionCoordinator(
     OperationContext* opCtx, const ShardsvrCreateCollection& createCollParams)
-    : ShardingDDLCoordinator(opCtx, createCollParams.getNamespace()),
+    : ShardingDDLCoordinator_NORESILIENT(opCtx, createCollParams.getNamespace()),
       _serviceContext(opCtx->getServiceContext()),
       _request(createCollParams),
       _nss(_request.getNamespace()) {

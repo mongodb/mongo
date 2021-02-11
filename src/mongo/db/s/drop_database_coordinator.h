@@ -33,7 +33,7 @@
 
 namespace mongo {
 
-class DropDatabaseCoordinator final : public ShardingDDLCoordinator,
+class DropDatabaseCoordinator final : public ShardingDDLCoordinator_NORESILIENT,
                                       public std::enable_shared_from_this<DropDatabaseCoordinator> {
 public:
     DropDatabaseCoordinator(OperationContext* opCtx, StringData dbName);

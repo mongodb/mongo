@@ -97,7 +97,8 @@ void removeDatabaseMetadataFromConfig(OperationContext* opCtx, StringData dbName
 }  // namespace
 
 DropDatabaseCoordinator::DropDatabaseCoordinator(OperationContext* opCtx, StringData dbName)
-    : ShardingDDLCoordinator(opCtx, {dbName, ""}), _serviceContext(opCtx->getServiceContext()) {}
+    : ShardingDDLCoordinator_NORESILIENT(opCtx, {dbName, ""}),
+      _serviceContext(opCtx->getServiceContext()) {}
 
 SemiFuture<void> DropDatabaseCoordinator::runImpl(
     std::shared_ptr<executor::TaskExecutor> executor) {

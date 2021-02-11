@@ -39,7 +39,7 @@
 namespace mongo {
 
 class CreateCollectionCoordinator final
-    : public ShardingDDLCoordinator,
+    : public ShardingDDLCoordinator_NORESILIENT,
       public std::enable_shared_from_this<CreateCollectionCoordinator> {
 public:
     CreateCollectionCoordinator(OperationContext* opCtx, const ShardsvrCreateCollection& request);

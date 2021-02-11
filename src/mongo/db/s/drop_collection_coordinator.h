@@ -35,7 +35,7 @@
 namespace mongo {
 
 class DropCollectionCoordinator final
-    : public ShardingDDLCoordinator,
+    : public ShardingDDLCoordinator_NORESILIENT,
       public std::enable_shared_from_this<DropCollectionCoordinator> {
 public:
     DropCollectionCoordinator(OperationContext* opCtx, const NamespaceString& nss);
