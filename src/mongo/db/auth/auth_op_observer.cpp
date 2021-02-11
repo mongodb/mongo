@@ -31,6 +31,7 @@
 
 #include "mongo/db/auth/auth_op_observer.h"
 
+#include "mongo/db/audit.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/op_observer_util.h"
@@ -56,6 +57,7 @@ void AuthOpObserver::onInserts(OperationContext* opCtx,
                                std::vector<InsertStatement>::const_iterator last,
                                bool fromMigrate) {
     for (auto it = first; it != last; it++) {
+        audit::logInsertOperation(opCtx->getClient(), nss, it->doc);
         AuthorizationManager::get(opCtx->getServiceContext())
             ->logOp(opCtx, "i", nss, it->doc, nullptr);
     }
@@ -65,6 +67,9 @@ void AuthOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
     if (args.updateArgs.update.isEmpty()) {
         return;
     }
+
+    audit::logUpdateOperation(opCtx->getClient(), args.nss, args.updateArgs.updatedDoc);
+
     AuthorizationManager::get(opCtx->getServiceContext())
         ->logOp(opCtx, "u", args.nss, args.updateArgs.update, &args.updateArgs.criteria);
 }
@@ -72,6 +77,8 @@ void AuthOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
 void AuthOpObserver::aboutToDelete(OperationContext* opCtx,
                                    NamespaceString const& nss,
                                    BSONObj const& doc) {
+    audit::logRemoveOperation(opCtx->getClient(), nss, doc);
+
     // Extract the _id field from the document. If it does not have an _id, use the
     // document itself as the _id.
     documentIdDecoration(opCtx) = doc["_id"] ? doc["_id"].wrap() : doc;
