@@ -195,6 +195,46 @@ structs:
         fields:
             fieldOne:
                 type: BsonNotSubsetReply
+    
+    NewVariantTypeReply:
+        description: "This reply contains a new field that has a variant type while the old field
+                      is not a variant type"
+        fields:
+            newVariantTypeReplyField:
+                type: 
+                    variant: [int, string]
+
+    NewVariantNotSubsetReply:
+        description: "This reply contains a field whose new variant types are not a subset
+                      of the old variant types"
+        fields:
+            variantNotSubsetReplyField:
+                type: 
+                    variant: [int, bool, string]
+    
+    VariantRecursiveReply:
+        description: "This reply contains a field that has a new variant type that is not compatible
+                      with the old variant type"
+        fields:
+            variantRecursiveReplyField:
+                type: 
+                    variant: [int, intStringToIntStringBool]
+    
+    NewVariantStructNotSubsetReply:
+        description: "This reply contains a field whose new variant types are not a subset
+                      of the old variant types"
+        fields:
+            variantStructNotSubsetReplyField:
+                type: 
+                    variant: [int, string, StructType]
+    
+    VariantStructRecursiveReply:
+        description: "This reply contains a field that has a new variant struct type that is not compatible
+                      with the old variant struct type"
+        fields:
+            variantStructRecursiveReplyField:
+                type: 
+                    variant: [int, StructFieldTypeRecursiveReplyTwo]
 
 commands:
     invalidAPIVersionNew:
@@ -536,3 +576,53 @@ commands:
         strict: true
         api_version: "1"
         reply_type: OkReply
+
+    newReplyFieldVariantType:
+        description: "new command fails because its reply field type is a variant type while
+                      the old reply field is not a variant type"
+        command_name: newReplyFieldVariantType
+        namespace: ignored
+        cpp_name: newReplyFieldVariantType
+        strict: true
+        api_version: "1"
+        reply_type: NewVariantTypeReply
+    
+    newReplyFieldVariantNotSubset:
+        description: "new command fails because its reply field type is a variant type that is not
+                      a subset of the old reply field variant types"
+        command_name: newReplyFieldVariantNotSubset
+        namespace: ignored
+        cpp_name: newReplyFieldVariantNotSubset
+        strict: true
+        api_version: "1"
+        reply_type: NewVariantNotSubsetReply
+
+    replyFieldVariantRecursive:
+        description: "new command fails because its reply field type is a variant type that is not
+                      compatible with the old reply field variant type"
+        command_name: replyFieldVariantRecursive
+        namespace: ignored
+        cpp_name: replyFieldVariantRecursive
+        strict: true
+        api_version: "1"
+        reply_type: VariantRecursiveReply
+
+    newReplyFieldVariantStructNotSubset:
+        description: "new command fails because its reply field type is a variant type that is not
+                      a subset of the old reply field variant types"
+        command_name: newReplyFieldVariantStructNotSubset
+        namespace: ignored
+        cpp_name: newReplyFieldVariantStructNotSubset
+        strict: true
+        api_version: "1"
+        reply_type: NewVariantStructNotSubsetReply
+    
+    replyFieldVariantStructRecursive:
+        description: "new command fails because its reply field type has a variant struct type that is not
+                      compatible with the old reply field variant struct type"
+        command_name: replyFieldVariantStructRecursive
+        namespace: ignored
+        cpp_name: replyFieldVariantStructRecursive
+        strict: true
+        api_version: "1"
+        reply_type: VariantStructRecursiveReply

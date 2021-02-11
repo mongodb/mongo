@@ -120,6 +120,71 @@ def check_type_superset(ctxt: IDLCompatibilityContext, cmd_name: str, type_name:
         ctxt.add_command_type_not_superset_error(cmd_name, type_name, file_path)
 
 
+def check_reply_field_type_recursive(
+        ctxt: IDLCompatibilityContext, old_field_type: syntax.Type,
+        new_field_type: Optional[Union[syntax.Enum, syntax.Struct, syntax.Type]], cmd_name: str,
+        field_name: str, old_idl_file: syntax.IDLParsedSpec, new_idl_file: syntax.IDLParsedSpec,
+        old_idl_file_path: str, new_idl_file_path: str) -> None:
+    # pylint: disable=too-many-arguments,too-many-branches
+    """Check compatibility between old and new reply field type if old field type is a syntax.Type instance."""
+    if not isinstance(new_field_type, syntax.Type):
+        ctxt.add_new_reply_field_type_enum_or_struct_error(
+            cmd_name, field_name, new_field_type.name, old_field_type.name, new_idl_file_path)
+        return
+
+    if "any" in old_field_type.bson_serialization_type:
+        ctxt.add_old_reply_field_bson_any_error(cmd_name, field_name, old_field_type.name,
+                                                old_idl_file_path)
+        return
+    if "any" in new_field_type.bson_serialization_type:
+        ctxt.add_new_reply_field_bson_any_error(cmd_name, field_name, new_field_type.name,
+                                                new_idl_file_path)
+        return
+
+    if isinstance(old_field_type, syntax.VariantType):
+        # If the new type is not variant just check the single type.
+        new_variant_types = new_field_type.variant_types if isinstance(
+            new_field_type, syntax.VariantType) else [new_field_type]
+        old_variant_types = old_field_type.variant_types
+
+        # Check that new variant types are a subset of old variant types.
+        for new_variant_type in new_variant_types:
+            old_variant_type_exists = False
+            for old_variant_type in old_variant_types:
+                if old_variant_type.name == new_variant_type.name:
+                    old_variant_type_exists = True
+                    # Check that the old and new version of each variant type is also compatible.
+                    check_reply_field_type_recursive(
+                        ctxt, old_variant_type, new_variant_type, cmd_name, field_name,
+                        old_idl_file, new_idl_file, old_idl_file_path, new_idl_file_path)
+
+            if not old_variant_type_exists:
+                ctxt.add_new_reply_field_variant_type_not_subset_error(
+                    cmd_name, field_name, new_field_type.name, new_idl_file_path)
+
+        # If new type is variant and has a struct as a variant type, compare old and new variant_struct_type.
+        # Since enums can't be part of variant types, we don't explicitly check for enums.
+        if isinstance(new_field_type,
+                      syntax.VariantType) and new_field_type.variant_struct_type is not None:
+            if old_field_type.variant_struct_type is None:
+                ctxt.add_new_reply_field_variant_type_not_subset_error(
+                    cmd_name, field_name, new_field_type.variant_struct_type.name,
+                    new_idl_file_path)
+            else:
+                check_reply_fields(ctxt, old_field_type.variant_struct_type,
+                                   new_field_type.variant_struct_type, cmd_name, old_idl_file,
+                                   new_idl_file, old_idl_file_path, new_idl_file_path)
+
+    else:
+        if isinstance(new_field_type, syntax.VariantType):
+            ctxt.add_new_reply_field_variant_type_error(cmd_name, field_name, old_field_type.name,
+                                                        new_field_type.name, new_idl_file_path)
+        else:
+            check_subset(ctxt, cmd_name, field_name, new_field_type.name,
+                         new_field_type.bson_serialization_type,
+                         old_field_type.bson_serialization_type, new_idl_file_path)
+
+
 def check_reply_field_type(ctxt: IDLCompatibilityContext,
                            old_field_type: Optional[Union[syntax.Enum, syntax.Struct, syntax.Type]],
                            new_field_type: Optional[Union[syntax.Enum, syntax.Struct, syntax.Type]],
@@ -138,20 +203,10 @@ def check_reply_field_type(ctxt: IDLCompatibilityContext,
         sys.exit(1)
 
     if isinstance(old_field_type, syntax.Type):
-        if isinstance(new_field_type, syntax.Type):
-            if "any" in old_field_type.bson_serialization_type:
-                ctxt.add_old_reply_field_bson_any_error(cmd_name, field_name, old_field_type.name,
-                                                        old_idl_file_path)
-            elif "any" in new_field_type.bson_serialization_type:
-                ctxt.add_new_reply_field_bson_any_error(cmd_name, field_name, new_field_type.name,
-                                                        new_idl_file_path)
-            else:
-                check_subset(ctxt, cmd_name, field_name, new_field_type.name,
-                             new_field_type.bson_serialization_type,
-                             old_field_type.bson_serialization_type, new_idl_file_path)
-        else:
-            ctxt.add_new_reply_field_type_enum_or_struct_error(
-                cmd_name, field_name, new_field_type.name, old_field_type.name, new_idl_file_path)
+        check_reply_field_type_recursive(ctxt, old_field_type, new_field_type, cmd_name, field_name,
+                                         old_idl_file, new_idl_file, old_idl_file_path,
+                                         new_idl_file_path)
+
     elif isinstance(old_field_type, syntax.Enum):
         if isinstance(new_field_type, syntax.Enum):
             check_subset(ctxt, cmd_name, field_name, new_field_type.name, new_field_type.values,
