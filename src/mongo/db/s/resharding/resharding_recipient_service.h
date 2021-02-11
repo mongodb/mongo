@@ -61,6 +61,10 @@ std::vector<NamespaceString> ensureStashCollectionsExist(
     const UUID& existingUUID,
     std::vector<DonorShardMirroringEntry> donorShards);
 
+ReshardingDonorOplogId getIdToResumeFrom(OperationContext* opCtx,
+                                         NamespaceString oplogBufferNss,
+                                         Timestamp fetchTimestamp);
+
 }  // namespace resharding
 
 class ReshardingRecipientService final : public repl::PrimaryOnlyService {

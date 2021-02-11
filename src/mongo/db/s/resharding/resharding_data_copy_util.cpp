@@ -33,6 +33,7 @@
 
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/write_unit_of_work.h"
@@ -76,6 +77,26 @@ void ensureCollectionDropped(OperationContext* opCtx,
             uassertStatusOK(coll.getDb()->dropCollectionEvenIfSystem(opCtx, nss));
             wuow.commit();
         });
+}
+
+Value findHighestInsertedId(OperationContext* opCtx, const CollectionPtr& collection) {
+    auto findCommand = std::make_unique<FindCommand>(collection->ns());
+    findCommand->setLimit(1);
+    findCommand->setSort(BSON("_id" << -1));
+
+    auto recordId =
+        Helpers::findOne(opCtx, collection, std::move(findCommand), true /* requireIndex */);
+    if (recordId.isNull()) {
+        return Value{};
+    }
+
+    auto doc = collection->docFor(opCtx, recordId).value();
+    auto value = Value{doc["_id"]};
+    uassert(4929300,
+            "Missing _id field for document in temporary resharding collection",
+            !value.missing());
+
+    return value;
 }
 
 }  // namespace mongo::resharding::data_copy
