@@ -29,26 +29,20 @@
 
 #pragma once
 
-#include <string>
-
 #include "mongo/s/write_ops/batch_write_exec.h"
 
 namespace mongo {
+namespace cluster {
 
-class BSONObj;
-class OperationContext;
+/**
+ * If 'targetEpoch' is set, throws a 'StaleEpoch' error if the targeted namespace is found to no
+ * longer have the epoch given by 'targetEpoch'.
+ */
+void write(OperationContext* opCtx,
+           const BatchedCommandRequest& request,
+           BatchWriteExecStats* stats,
+           BatchedCommandResponse* response,
+           boost::optional<OID> targetEpoch = boost::none);
 
-class ClusterWriter {
-public:
-    /**
-     * If 'targetEpoch' is set, throws a 'StaleEpoch' error if the targeted namespace is found to no
-     * longer have the epoch given by 'targetEpoch'.
-     */
-    static void write(OperationContext* opCtx,
-                      const BatchedCommandRequest& request,
-                      BatchWriteExecStats* stats,
-                      BatchedCommandResponse* response,
-                      boost::optional<OID> targetEpoch = boost::none);
-};
-
+}  // namespace cluster
 }  // namespace mongo

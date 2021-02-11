@@ -48,10 +48,10 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/cluster_commands_helpers.h"
+#include "mongo/s/cluster_write.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/document_source_merge_cursors.h"
 #include "mongo/s/stale_shard_version_helpers.h"
-#include "mongo/s/write_ops/cluster_write.h"
 
 namespace mongo {
 
@@ -119,7 +119,7 @@ Status ShardServerProcessInterface::insert(const boost::intrusive_ptr<Expression
 
     insertCommand.setWriteConcern(wc.toBSON());
 
-    ClusterWriter::write(expCtx->opCtx, insertCommand, &stats, &response, targetEpoch);
+    cluster::write(expCtx->opCtx, insertCommand, &stats, &response, targetEpoch);
 
     return response.toStatus();
 }
@@ -139,7 +139,7 @@ StatusWith<MongoProcessInterface::UpdateResult> ShardServerProcessInterface::upd
 
     updateCommand.setWriteConcern(wc.toBSON());
 
-    ClusterWriter::write(expCtx->opCtx, updateCommand, &stats, &response, targetEpoch);
+    cluster::write(expCtx->opCtx, updateCommand, &stats, &response, targetEpoch);
 
     if (auto status = response.toStatus(); status != Status::OK()) {
         return status;

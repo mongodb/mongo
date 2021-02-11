@@ -31,10 +31,10 @@
 
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/s/mock_ns_targeter.h"
 #include "mongo/s/session_catalog_router.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/s/write_ops/batched_command_request.h"
-#include "mongo/s/write_ops/mock_ns_targeter.h"
 #include "mongo/s/write_ops/write_error_detail.h"
 #include "mongo/s/write_ops/write_op.h"
 #include "mongo/unittest/unittest.h"

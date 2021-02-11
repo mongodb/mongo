@@ -1,15 +1,13 @@
-//
-// Basic tests for shardCollection.
-//
-
-load("jstests/sharding/libs/find_chunks_util.js");
-
 (function() {
 'use strict';
 
-var st = new ShardingTest({mongos: 1, shards: 2});
+load("jstests/sharding/libs/find_chunks_util.js");
+
+var st = new ShardingTest({shards: 2});
 var kDbName = 'db';
 var mongos = st.s0;
+var config = st.s0.getDB('config');
+var admin = st.s0.getDB('admin');
 
 function testAndClenaupWithKeyNoIndexFailed(keyDoc) {
     assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));

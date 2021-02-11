@@ -36,8 +36,8 @@
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/cluster_commands_helpers.h"
+#include "mongo/s/cluster_ddl.h"
 #include "mongo/s/grid.h"
-
 
 namespace mongo {
 namespace {
@@ -114,7 +114,7 @@ public:
         CreateCommandReply typedRun(OperationContext* opCtx) final {
             auto cmd = request();
             auto dbName = cmd.getDbName();
-            createShardDatabase(opCtx, dbName);
+            cluster::createDatabase(opCtx, dbName);
 
             uassert(ErrorCodes::InvalidOptions,
                     "specify size:<n> when capped is true",

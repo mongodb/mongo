@@ -37,8 +37,9 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/field_parser.h"
 #include "mongo/s/catalog_cache.h"
-#include "mongo/s/client/shard_registry.h"
+#include "mongo/s/cluster_ddl.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
@@ -59,7 +60,6 @@ public:
     bool supportsWriteConcern(const BSONObj& cmd) const override {
         return true;
     }
-    static constexpr StringData kShardNameField = "primaryShard"_sd;
 
     std::string help() const override {
         return "Enable sharding for a database. Optionally allows the caller to specify the shard "
@@ -89,35 +89,37 @@ public:
                    const BSONObj& cmdObj,
                    std::string& errmsg,
                    BSONObjBuilder& result) override {
+        const std::string dbName = parseNs("", cmdObj);
 
-        const std::string db = parseNs("", cmdObj);
+        auto catalogCache = Grid::get(opCtx)->catalogCache();
+        ON_BLOCK_EXIT([opCtx, dbName] { Grid::get(opCtx)->catalogCache()->purgeDatabase(dbName); });
 
+        constexpr StringData kShardNameField = "primaryShard"_sd;
         auto shardElem = cmdObj[kShardNameField];
-        std::string shardId = shardElem.ok() ? shardElem.String() : "";
 
-        // Invalidate the routing table cache entry for this database so that we reload the
-        // collection the next time it's accessed, even if we receive a failure, e.g. NetworkError.
-        auto guard =
-            makeGuard([opCtx, db] { Grid::get(opCtx)->catalogCache()->purgeDatabase(db); });
-
-
-        BSONObjBuilder remoteCmdObj;
-        remoteCmdObj.append("_configsvrEnableSharding", db);
-        if (shardElem.ok()) {
-            remoteCmdObj.append(kShardNameField, shardId);
-        }
+        ConfigsvrCreateDatabase request(dbName);
+        request.setDbName(NamespaceString::kAdminDb);
+        request.setEnableSharding(true);
+        if (shardElem.ok())
+            request.setPrimaryShardId(StringData(shardElem.String()));
 
         auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-        auto cmdResponse = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
+        auto response = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
             opCtx,
             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
             "admin",
-            CommandHelpers::appendMajorityWriteConcern(
-                CommandHelpers::appendGenericCommandArgs(cmdObj, remoteCmdObj.obj()),
-                opCtx->getWriteConcern()),
+            CommandHelpers::appendMajorityWriteConcern(request.toBSON({})),
             Shard::RetryPolicy::kIdempotent));
+        uassertStatusOKWithContext(response.commandStatus,
+                                   str::stream()
+                                       << "Database " << dbName << " could not be created");
+        uassertStatusOK(response.writeConcernStatus);
 
-        CommandHelpers::filterCommandReplyForPassthrough(cmdResponse.response, &result);
+        auto createDbResponse = ConfigsvrCreateDatabaseResponse::parse(
+            IDLParserErrorContext("configsvrCreateDatabaseResponse"), response.response);
+        catalogCache->onStaleDatabaseVersion(
+            dbName, DatabaseVersion(createDbResponse.getDatabaseVersion()));
+
         return true;
     }
 

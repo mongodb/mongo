@@ -31,6 +31,7 @@
 
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/s/sharding_mongod_test_fixture.h"
+#include "mongo/s/catalog/type_shard.h"
 
 namespace mongo {
 
@@ -40,9 +41,6 @@ struct ChunkVersion;
 class KeysCollectionDocument;
 class NamespaceString;
 class Shard;
-class ShardId;
-class ShardRegistry;
-class ShardType;
 
 /**
  * Provides config-specific functionality in addition to the mock storage engine and mock network

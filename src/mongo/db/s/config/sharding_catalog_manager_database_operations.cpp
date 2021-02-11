@@ -35,8 +35,11 @@
 
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/ops/write_ops.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/s/dist_lock_manager.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/db/write_concern.h"
@@ -44,16 +47,12 @@
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard.h"
-#include "mongo/s/database_version.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/shard_id.h"
 #include "mongo/s/shard_util.h"
 #include "mongo/s/sharded_collections_ddl_parameters_gen.h"
 
 namespace mongo {
 namespace {
-
-const ReadPreferenceSetting kConfigReadSelector(ReadPreference::Nearest, TagSet{});
 
 /**
  * Selects an optimal shard on which to place a newly created database from the set of available
@@ -92,40 +91,84 @@ ShardId selectShardForNewDatabase(OperationContext* opCtx, ShardRegistry* shardR
 
 DatabaseType ShardingCatalogManager::createDatabase(OperationContext* opCtx,
                                                     StringData dbName,
-                                                    const ShardId& primaryShard) {
-    invariant(nsIsDbOnly(dbName));
-
-    // The admin and config databases should never be explicitly created. They "just exist",
-    // i.e. getDatabase will always return an entry for them.
-    if (dbName == NamespaceString::kAdminDb || dbName == NamespaceString::kConfigDb) {
-        uasserted(ErrorCodes::InvalidOptions,
-                  str::stream() << "cannot manually create database '" << dbName << "'");
+                                                    const boost::optional<ShardId>& optPrimaryShard,
+                                                    bool enableSharding) {
+    if (dbName == NamespaceString::kConfigDb) {
+        return DatabaseType(
+            dbName.toString(), ShardId::kConfigServerId, true, DatabaseVersion::makeFixed());
     }
 
+    uassert(ErrorCodes::InvalidOptions,
+            str::stream() << "Cannot manually create or shard database '" << dbName << "'",
+            dbName != NamespaceString::kAdminDb && dbName != NamespaceString::kLocalDb);
+
+    uassert(ErrorCodes::InvalidNamespace,
+            str::stream() << "Invalid db name specified: " << dbName,
+            NamespaceString::validDBName(dbName, NamespaceString::DollarInDbNameBehavior::Allow));
+
+    // Make sure to force update of any stale metadata
+    ON_BLOCK_EXIT([&] { Grid::get(opCtx)->catalogCache()->purgeDatabase(dbName); });
+
+    DBDirectClient client(opCtx);
+
+    boost::optional<DistLockManager::ScopedDistLock> dbDistLock;
+
+    // First perform an optimistic attempt to write the 'sharded' field to the database entry, in
+    // case this is the only thing, which is missing. If that doesn't succeed, go through the
+    // expensive createDatabase flow.
+    while (true) {
+        auto response = client.findAndModify([&] {
+            write_ops::FindAndModifyCommand findAndModify(DatabaseType::ConfigNS);
+            findAndModify.setQuery([&] {
+                BSONObjBuilder queryFilterBuilder;
+                queryFilterBuilder.append(DatabaseType::name.name(), dbName);
+                if (optPrimaryShard) {
+                    uassert(ErrorCodes::BadValue,
+                            str::stream() << "invalid shard name: " << *optPrimaryShard,
+                            optPrimaryShard->isValid());
+                    queryFilterBuilder.append(DatabaseType::primary.name(),
+                                              optPrimaryShard->toString());
+                }
+                return queryFilterBuilder.obj();
+            }());
+            findAndModify.setUpdate(write_ops::UpdateModification::parseFromClassicUpdate(
+                BSON("$set" << BSON(DatabaseType::sharded(enableSharding)))));
+            findAndModify.setUpsert(false);
+            findAndModify.setNew(true);
+            return findAndModify;
+        }());
+
+        if (response.getLastErrorObject().getNumDocs()) {
+            uassert(528120, "Missing value in the response", response.getValue());
+            return uassertStatusOK(DatabaseType::fromBSON(*response.getValue()));
+        }
+
+        if (dbDistLock) {
+            break;
+        }
+
+        // Do another loop, with the dist lock held in order to avoid taking the expensive path on
+        // concurrent create database operations
+        dbDistLock.emplace(uassertStatusOK(DistLockManager::get(opCtx)->lock(
+            opCtx, dbName, "createDatabase", DistLockManager::kDefaultLockTimeout)));
+    }
+
+    // Expensive createDatabase code path
     const auto catalogClient = Grid::get(opCtx)->catalogClient();
     const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
+    auto& replClient = repl::ReplClientInfo::forClient(opCtx->getClient());
 
     // Check if a database already exists with the same name (case sensitive), and if so, return the
     // existing entry.
-
     BSONObjBuilder queryBuilder;
     queryBuilder.appendRegex(DatabaseType::name(),
                              (std::string) "^" + pcrecpp::RE::QuoteMeta(dbName.toString()) + "$",
                              "i");
 
-    auto docs = uassertStatusOK(catalogClient->_exhaustiveFindOnConfig(
-                                    opCtx,
-                                    ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                    repl::ReadConcernLevel::kLocalReadConcern,
-                                    DatabaseType::ConfigNS,
-                                    queryBuilder.obj(),
-                                    BSONObj(),
-                                    1))
-                    .value;
-
+    auto dbDoc = client.findOne(DatabaseType::ConfigNS.ns(), {queryBuilder.obj()});
     auto const [primaryShardPtr, database] = [&] {
-        if (!docs.empty()) {
-            auto actualDb = uassertStatusOK(DatabaseType::fromBSON(docs.front()));
+        if (!dbDoc.isEmpty()) {
+            auto actualDb = uassertStatusOK(DatabaseType::fromBSON(dbDoc));
 
             uassert(ErrorCodes::DatabaseDifferCase,
                     str::stream() << "can't have 2 databases that just differ on case "
@@ -135,23 +178,17 @@ DatabaseType ShardingCatalogManager::createDatabase(OperationContext* opCtx,
 
             uassert(
                 ErrorCodes::NamespaceExists,
-                str::stream() << "database already created on a primary which is different from: "
-                              << primaryShard,
-                !primaryShard.isValid() || actualDb.getPrimary() == primaryShard);
+                str::stream() << "database already created on a primary which is different from "
+                              << *optPrimaryShard,
+                !optPrimaryShard || *optPrimaryShard == actualDb.getPrimary());
 
             // We did a local read of the database entry above and found that the database already
             // exists. However, the data may not be majority committed (a previous createDatabase
             // attempt may have failed with a writeConcern error).
             // Since the current Client doesn't know the opTime of the last write to the database
             // entry, make it wait for the last opTime in the system when we wait for writeConcern.
-            auto& replClient = repl::ReplClientInfo::forClient(opCtx->getClient());
             replClient.setLastOpToSystemLastOpTime(opCtx);
 
-            WriteConcernResult unusedResult;
-            uassertStatusOK(waitForWriteConcern(opCtx,
-                                                replClient.getLastOp(),
-                                                ShardingCatalogClient::kMajorityWriteConcern,
-                                                &unusedResult));
             return std::make_pair(
                 uassertStatusOK(shardRegistry->getShard(opCtx, actualDb.getPrimary())), actualDb);
         } else {
@@ -159,8 +196,8 @@ DatabaseType ShardingCatalogManager::createDatabase(OperationContext* opCtx,
             // catalog.
             auto const shardPtr = uassertStatusOK(shardRegistry->getShard(
                 opCtx,
-                primaryShard.isValid() ? primaryShard
-                                       : selectShardForNewDatabase(opCtx, shardRegistry)));
+                optPrimaryShard ? *optPrimaryShard
+                                : selectShardForNewDatabase(opCtx, shardRegistry)));
 
             boost::optional<Timestamp> clusterTime;
             if (feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabled(
@@ -172,7 +209,7 @@ DatabaseType ShardingCatalogManager::createDatabase(OperationContext* opCtx,
             // Pick a primary shard for the new database.
             DatabaseType db(dbName.toString(),
                             shardPtr->getId(),
-                            false,
+                            enableSharding,
                             DatabaseVersion(UUID::gen(), clusterTime));
 
             LOGV2(21938,
@@ -191,6 +228,12 @@ DatabaseType ShardingCatalogManager::createDatabase(OperationContext* opCtx,
             return std::make_pair(shardPtr, db);
         }
     }();
+
+    WriteConcernResult unusedResult;
+    uassertStatusOK(waitForWriteConcern(opCtx,
+                                        replClient.getLastOp(),
+                                        ShardingCatalogClient::kMajorityWriteConcern,
+                                        &unusedResult));
 
     // Note, making the primary shard refresh its databaseVersion here is not required for
     // correctness, since either:
@@ -214,45 +257,6 @@ DatabaseType ShardingCatalogManager::createDatabase(OperationContext* opCtx,
     uassertStatusOK(cmdResponse.commandStatus);
 
     return database;
-}
-
-void ShardingCatalogManager::enableSharding(OperationContext* opCtx,
-                                            StringData dbName,
-                                            const ShardId& primaryShard) {
-    // Sharding is enabled automatically on the config db.
-    if (dbName == NamespaceString::kConfigDb) {
-        return;
-    }
-
-    // Creates the database if it doesn't exist and returns the new database entry, else returns the
-    // existing database entry.
-    auto dbType = createDatabase(opCtx, dbName, primaryShard);
-    dbType.setSharded(true);
-
-    // We must wait for the database entry to be majority committed, because it's possible that
-    // reading from the majority snapshot has been set on the RecoveryUnit due to an earlier read,
-    // such as overtaking a distlock or loading the ShardRegistry.
-    WriteConcernResult unusedResult;
-    uassertStatusOK(
-        waitForWriteConcern(opCtx,
-                            repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp(),
-                            WriteConcernOptions(WriteConcernOptions::kMajority,
-                                                WriteConcernOptions::SyncMode::UNSET,
-                                                Milliseconds{30000}),
-                            &unusedResult));
-
-    LOGV2(21939,
-          "Persisted sharding enabled for database {db}",
-          "Persisted sharding enabled for database",
-          "db"_attr = dbName);
-
-    uassertStatusOK(Grid::get(opCtx)->catalogClient()->updateConfigDocument(
-        opCtx,
-        DatabaseType::ConfigNS,
-        BSON(DatabaseType::name(dbName.toString())),
-        BSON("$set" << BSON(DatabaseType::sharded(true))),
-        false,
-        ShardingCatalogClient::kLocalWriteConcern));
 }
 
 Status ShardingCatalogManager::commitMovePrimary(OperationContext* opCtx,

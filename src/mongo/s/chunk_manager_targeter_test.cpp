@@ -33,10 +33,10 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/s/catalog_cache_test_fixture.h"
+#include "mongo/s/chunk_manager_targeter.h"
 #include "mongo/s/session_catalog_router.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/s/write_ops/batched_command_request.h"
-#include "mongo/s/write_ops/chunk_manager_targeter.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {

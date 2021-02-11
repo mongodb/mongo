@@ -29,7 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/write_ops/mock_ns_targeter.h"
+#include "mongo/s/mock_ns_targeter.h"
 
 namespace mongo {
 namespace {

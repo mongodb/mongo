@@ -306,24 +306,14 @@ public:
     //
 
     /**
-     * Checks if a database with the same name already exists, and if not, selects a primary shard
-     * for the database and creates a new entry for it in config.databases.
-     *
-     * Returns the database entry.
-     *
-     * Throws DatabaseDifferCase if the database already exists with a different case.
+     * Checks if a database with the same name, optPrimaryShard and enableSharding state already
+     * exists, and if not, creates a new one that matches these prerequisites. If a database already
+     * exists and matches all the prerequisites returns success, otherwise throws NamespaceNotFound.
      */
     DatabaseType createDatabase(OperationContext* opCtx,
                                 StringData dbName,
-                                const ShardId& primaryShard);
-
-    /**
-     * Creates the database if it does not exist, then marks its entry in config.databases as
-     * sharding-enabled.
-     *
-     * Throws DatabaseDifferCase if the database already exists with a different case.
-     */
-    void enableSharding(OperationContext* opCtx, StringData dbName, const ShardId& primaryShard);
+                                const boost::optional<ShardId>& optPrimaryShard,
+                                bool enableSharding);
 
     /**
      * Updates metadata in config.databases collection to show the given primary database on its
@@ -610,13 +600,10 @@ private:
     // _kZoneOpLock
 
     /**
-     * Lock for shard zoning operations. This should be acquired when doing any operations that
-     * can affect the config.tags collection or the tags field of the config.shards collection.
-     * No other locks should be held when locking this. If an operation needs to take database
-     * locks (for example to write to a local collection) those locks should be taken after
-     * taking this.
+     * Lock that guards changes to the set of shards in the cluster (ie addShard and removeShard
+     * requests).
      */
-    Lock::ResourceMutex _kZoneOpLock;
+    Lock::ResourceMutex _kShardMembershipLock;
 
     /**
      * Lock for chunk split/merge/move operations. This should be acquired when doing split/merge/
@@ -628,10 +615,13 @@ private:
     Lock::ResourceMutex _kChunkOpLock;
 
     /**
-     * Lock that guards changes to the set of shards in the cluster (ie addShard and removeShard
-     * requests).
+     * Lock for shard zoning operations. This should be acquired when doing any operations that
+     * can affect the config.tags collection or the tags field of the config.shards collection.
+     * No other locks should be held when locking this. If an operation needs to take database
+     * locks (for example to write to a local collection) those locks should be taken after
+     * taking this.
      */
-    Lock::ResourceMutex _kShardMembershipLock;
+    Lock::ResourceMutex _kZoneOpLock;
 };
 
 }  // namespace mongo

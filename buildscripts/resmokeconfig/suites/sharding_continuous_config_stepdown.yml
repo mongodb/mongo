@@ -157,7 +157,7 @@ selector:
   # listCollections is not retryable
   - jstests/sharding/sessions_collection_auto_healing.js
   # shardCollection is not retryable
-  - jstests/sharding/shard_config_db_collections.js
+  - jstests/sharding/shard_collection_config_db.js
   # creates collection, does movePrimary, then shards the collection and moves a chunk to the old
   # primary (SERVER-31909)
   - jstests/sharding/mongos_validate_writes.js

@@ -30,7 +30,6 @@ env.Library(
     source=[
         'batch_write_exec.cpp',
         'batch_write_op.cpp',
-        'chunk_manager_targeter.cpp',
         'write_op.cpp',
     ],
     LIBDEPS=[

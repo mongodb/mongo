@@ -30,14 +30,24 @@ global:
     cpp_namespace: "mongo"
 
 imports:
-    - "mongo/db/drop_database.idl"
     - "mongo/db/commands/rename_collection.idl"
+    - "mongo/db/drop_database.idl"
     - "mongo/db/keypattern.idl"
     - "mongo/idl/basic_types.idl"
     - "mongo/s/chunk_version.idl"
     - "mongo/s/database_version.idl"
 
 structs:
+
+    ConfigsvrCreateDatabaseResponse:
+        description: "Response for the create database command"
+        strict: false
+        fields:
+            databaseVersion:
+                type: DatabaseVersionBase
+                description: "The version of the newly-created or already existing database"
+                optional: false
+
     RenameCollectionResponse:
         description: "Response for the rename collection command"
         strict: false
@@ -94,7 +104,7 @@ commands:
                 type: object
                 description: "The collation to use for the shard key index."
                 optional: true
-    
+
     _shardsvrCreateCollectionParticipant:
         command_name: _shardsvrCreateCollectionParticipant
         cpp_name: ShardsvrCreateCollectionParticipant
@@ -116,7 +126,6 @@ commands:
             idIndex:
                 type: object
                 description: "Id index."
-            
 
     _shardsvrDropDatabase:
         description: "Internal command sent to the primary shard of a database to drop it."
@@ -124,7 +133,7 @@ commands:
         namespace: ignored
         api_version: ""
         cpp_name: ShardsvrDropDatabase
-        # The reply can completely removed once 5.0 became last lts
+        # The reply can completely removed once 5.0 becomes last lts
         reply_type: DropDatabaseReply
 
     _shardsvrDropDatabaseParticipant:
@@ -246,11 +255,34 @@ commands:
     _shardsvrRefineCollectionShardKey:
         description: "Parser for the _shardsvrRefineCollectionShardKey command"
         command_name: _shardsvrRefineCollectionShardKey
+        cpp_name: ShardsvrRefineCollectionShardKey
         namespace: concatenate_with_db
         api_version: ""
+        strict: false
         fields:
             newShardKey:
                 type: KeyPattern
                 description: "The index specification document to use as the new shard key."
                 optional: false
-        cpp_name: ShardsvrRefineCollectionShardKey
+
+    _configsvrCreateDatabase:
+        description: "The internal createDatabase command on the config server"
+        api_version: ""
+        command_name: _configsvrCreateDatabase
+        cpp_name : ConfigsvrCreateDatabase
+        namespace: type
+        type: string
+        reply_type: ConfigsvrCreateDatabaseResponse
+        strict: false
+        fields:
+            primaryShardId:
+                type: string
+                description: "If set, indicates to the system which shard should be used as the
+                              primary for the database (if not already created). Otherwise, the
+                              system will use the balancer in order to select a primary."
+                optional: true
+            enableSharding:
+                type: bool
+                description: "May only be set to 'true'. If set, indicates to the config server that
+                              it must turn on the 'enableSharding' bit for that database."
+                optional: true

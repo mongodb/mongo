@@ -37,6 +37,7 @@
 #include "mongo/db/keys_collection_document_gen.h"
 #include "mongo/db/repl/optime_with.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard.h"
 
 namespace mongo {
@@ -57,8 +58,6 @@ class NamespaceString;
 class OperationContext;
 class ShardingCatalogManager;
 class ShardKeyPattern;
-class ShardRegistry;
-class ShardType;
 class Status;
 template <typename T>
 class StatusWith;
@@ -83,9 +82,6 @@ struct ConnectionPoolStats;
 class ShardingCatalogClient {
     ShardingCatalogClient(const ShardingCatalogClient&) = delete;
     ShardingCatalogClient& operator=(const ShardingCatalogClient&) = delete;
-
-    // Allows ShardingCatalogManager to access _exhaustiveFindOnConfig
-    friend class ShardingCatalogManager;
 
 public:
     // Constant to use for configuration data majority writes
