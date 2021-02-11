@@ -399,12 +399,6 @@ std::shared_ptr<SSLManagerInterface> SSLManagerInterface::create(
     return std::make_shared<SSLManagerWindows>(params, isServer);
 }
 
-std::shared_ptr<SSLManagerInterface> SSLManagerInterface::create(const SSLParams& params,
-                                                                 bool isServer) {
-    return std::make_shared<SSLManagerOpenSSL>(
-        params, std::optional<TransientSSLParams>{}, isServer);
-}
-
 namespace {
 
 SSLManagerWindows::SSLManagerWindows(const SSLParams& params, bool isServer)

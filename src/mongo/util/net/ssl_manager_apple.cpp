@@ -1829,12 +1829,6 @@ std::shared_ptr<SSLManagerInterface> SSLManagerInterface::create(
     return std::make_shared<SSLManagerApple>(params, isServer);
 }
 
-std::shared_ptr<SSLManagerInterface> SSLManagerInterface::create(const SSLParams& params,
-                                                                 bool isServer) {
-    return std::make_shared<SSLManagerOpenSSL>(
-        params, std::optional<TransientSSLParams>{}, isServer);
-}
-
 MONGO_INITIALIZER_WITH_PREREQUISITES(SSLManager, ("EndStartupOptionHandling"))
 (InitializerContext*) {
     kMongoDBRolesOID = ::CFStringCreateWithCString(
