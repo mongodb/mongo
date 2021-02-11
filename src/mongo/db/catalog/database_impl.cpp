@@ -525,7 +525,7 @@ Status DatabaseImpl::renameCollection(OperationContext* opCtx,
                                       NamespaceString fromNss,
                                       NamespaceString toNss,
                                       bool stayTemp) const {
-    audit::logRenameCollection(&cc(), fromNss.ns(), toNss.ns());
+    audit::logRenameCollection(&cc(), fromNss, toNss);
 
     invariant(opCtx->lockState()->isCollectionLockedForMode(fromNss, MODE_X));
     invariant(opCtx->lockState()->isCollectionLockedForMode(toNss, MODE_X));
