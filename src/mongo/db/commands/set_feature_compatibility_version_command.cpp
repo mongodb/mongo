@@ -313,14 +313,7 @@ public:
                     ShardingCatalogManager::get(opCtx)->removePre49LegacyMetadata(opCtx);
                 }
 
-                // Upgrade shards before config finishes its upgrade.
-                uassertStatusOK(
-                    ShardingCatalogManager::get(opCtx)->setFeatureCompatibilityVersionOnShards(
-                        opCtx, CommandHelpers::appendMajorityWriteConcern(request.toBSON({}))));
-
-                // Amend metadata created before FCV 4.9. This must be done after all shards have
-                // been upgraded to 4.9 in order to guarantee that when the metadata is amended, no
-                // new databases or collections with the old version of the metadata will be added.
+                // Upgrade metadata created before FCV 4.9.
                 // TODO SERVER-53283: Remove once 5.0 has been released.
                 if (requestedVersion >= FeatureCompatibilityParams::Version::kVersion49) {
                     try {
@@ -332,6 +325,11 @@ public:
                         throw;
                     }
                 }
+
+                // Upgrade shards after config finishes its upgrade.
+                uassertStatusOK(
+                    ShardingCatalogManager::get(opCtx)->setFeatureCompatibilityVersionOnShards(
+                        opCtx, CommandHelpers::appendMajorityWriteConcern(request.toBSON({}))));
             }
 
             hangWhileUpgrading.pauseWhileSet(opCtx);
@@ -424,15 +422,7 @@ public:
                 return false;
 
             if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-                // Downgrade shards before config finishes its downgrade.
-                uassertStatusOK(
-                    ShardingCatalogManager::get(opCtx)->setFeatureCompatibilityVersionOnShards(
-                        opCtx, CommandHelpers::appendMajorityWriteConcern(request.toBSON({}))));
-
-                // Amend metadata created in FCV 4.9. This must be done after all shards have
-                // been downgraded to prior 4.9 in order to guarantee that when the metadata is
-                // amended, no new databases or collections with the new version of the metadata
-                // will be added.
+                // Downgrade metadata created in FCV 4.9.
                 // TODO SERVER-53283: Remove once 5.0 has been released.
                 if (requestedVersion < FeatureCompatibilityParams::Version::kVersion49) {
                     try {
@@ -444,6 +434,11 @@ public:
                         throw;
                     }
                 }
+
+                // Downgrade shards after config finishes its downgrade.
+                uassertStatusOK(
+                    ShardingCatalogManager::get(opCtx)->setFeatureCompatibilityVersionOnShards(
+                        opCtx, CommandHelpers::appendMajorityWriteConcern(request.toBSON({}))));
             }
 
             hangWhileDowngrading.pauseWhileSet(opCtx);

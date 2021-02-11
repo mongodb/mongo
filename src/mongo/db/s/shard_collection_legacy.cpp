@@ -548,7 +548,6 @@ CreateCollectionResponse shardCollection(OperationContext* opCtx,
         shouldUseUUIDForChunkIndexing =
             feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabled(
                 serverGlobalParams.featureCompatibility);
-        // TODO SERVER-53092: persist FCV placeholder
     }
 
     {
@@ -662,8 +661,6 @@ CreateCollectionResponse shardCollection(OperationContext* opCtx,
     if (!splitPolicy->isOptimized()) {
         writeChunkDocumentsAndRefreshShards(*targetState, initialChunks);
     }
-
-    // TODO SERVER-53092: delete FCV placeholder
 
     LOGV2(22101,
           "Created {numInitialChunks} chunk(s) for: {namespace}, producing collection version "

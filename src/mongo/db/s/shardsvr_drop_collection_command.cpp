@@ -34,6 +34,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/s/dist_lock_manager.h"
 #include "mongo/db/s/drop_collection_coordinator.h"
 #include "mongo/db/s/drop_collection_legacy.h"
 #include "mongo/db/s/sharding_state.h"
@@ -75,9 +76,13 @@ public:
                                   << opCtx->getWriteConcern().wMode,
                     opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
 
+            DistLockManager::ScopedDistLock dbDistLock(
+                uassertStatusOK(DistLockManager::get(opCtx)->lock(
+                    opCtx,
+                    DistLockManager::kShardingRoutingInfoFormatStabilityLockName,
+                    "dropCollection",
+                    DistLockManager::kDefaultLockTimeout)));
             bool useNewPath = [&] {
-                // TODO (SERVER-53092): Use the FCV lock in order to "reserve" operation as running
-                // in new or legacy mode
                 return feature_flags::gShardingFullDDLSupport.isEnabled(
                            serverGlobalParams.featureCompatibility) &&
                     !feature_flags::gDisableIncompleteShardingDDLSupport.isEnabled(

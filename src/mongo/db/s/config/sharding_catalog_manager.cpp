@@ -42,6 +42,7 @@
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/s/balancer/type_migration.h"
+#include "mongo/db/s/dist_lock_manager.h"
 #include "mongo/db/s/type_lockpings.h"
 #include "mongo/db/s/type_locks.h"
 #include "mongo/db/vector_clock.h"
@@ -687,6 +688,12 @@ void ShardingCatalogManager::_upgradeCollectionsAndChunksMetadataFor49(Operation
     auto const catalogCache = Grid::get(opCtx)->catalogCache();
     auto const configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
 
+    DistLockManager::ScopedDistLock dbDistLock(uassertStatusOK(DistLockManager::get(opCtx)->lock(
+        opCtx,
+        DistLockManager::kShardingRoutingInfoFormatStabilityLockName,
+        "fcvUpgrade",
+        DistLockManager::kDefaultLockTimeout)));
+
     auto collectionDocs =
         uassertStatusOK(
             configShard->exhaustiveFindOnConfig(
@@ -795,6 +802,13 @@ void ShardingCatalogManager::_downgradeCollectionsAndChunksMetadataToPre49(
 
     auto const catalogCache = Grid::get(opCtx)->catalogCache();
     auto const configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+
+    DistLockManager::ScopedDistLock dbDistLock(uassertStatusOK(DistLockManager::get(opCtx)->lock(
+        opCtx,
+        DistLockManager::kShardingRoutingInfoFormatStabilityLockName,
+        "fcvDowngrade",
+        DistLockManager::kDefaultLockTimeout)));
+
     auto collectionDocs =
         uassertStatusOK(
             configShard->exhaustiveFindOnConfig(
