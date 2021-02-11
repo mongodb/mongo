@@ -509,12 +509,6 @@ TEST_F(DurableCatalogTest, ImportCollection) {
         AssertionException,
         ErrorCodes::BadValue);
 
-    // Import should fail with missing "idxIdent" field.
-    ASSERT_THROWS_CODE(
-        importCollectionTest(nss, BSON("md" << mdObj << "ns" << nss.ns() << "ident" << ident)),
-        AssertionException,
-        ErrorCodes::BadValue);
-
     // Import should fail with missing "ident" field.
     ASSERT_THROWS_CODE(
         importCollectionTest(nss,
