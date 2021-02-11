@@ -59,7 +59,7 @@ namespace mongo {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(abortTenantMigrationBeforeLeavingBlockingState);
-MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationAfterPersitingInitialDonorStateDoc);
+MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationAfterPersistingInitialDonorStateDoc);
 MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationBeforeLeavingBlockingState);
 MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationBeforeLeavingDataSyncState);
 
@@ -710,7 +710,7 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
                 .then([this, self = shared_from_this()] {
                     auto opCtxHolder = cc().makeOperationContext();
                     auto opCtx = opCtxHolder.get();
-                    pauseTenantMigrationAfterPersitingInitialDonorStateDoc.pauseWhileSet(opCtx);
+                    pauseTenantMigrationAfterPersistingInitialDonorStateDoc.pauseWhileSet(opCtx);
                 });
         })
         .then([this, self = shared_from_this(), executor, recipientTargeterRS, serviceToken] {
