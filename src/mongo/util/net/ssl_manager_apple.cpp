@@ -1250,7 +1250,8 @@ public:
 
     Status initSSLContext(asio::ssl::apple::Context* context,
                           const SSLParams& params,
-                          ConnectionDirection direction) final;
+                          const TransientSSLParams& transientParams,
+                          ConnectionDirection direction) override final;
 
     SSLConnectionInterface* connect(Socket* socket) final;
     SSLConnectionInterface* accept(Socket* socket, const char* initialBytes, int len) final;
@@ -1309,14 +1310,16 @@ SSLManagerApple::SSLManagerApple(const SSLParams& params, bool isServer)
       _allowInvalidHostnames(params.sslAllowInvalidHostnames),
       _suppressNoCertificateWarning(params.suppressNoTLSPeerCertificateWarning) {
 
-    uassertStatusOK(initSSLContext(&_clientCtx, params, ConnectionDirection::kOutgoing));
+    uassertStatusOK(
+        initSSLContext(&_clientCtx, params, TransientSSLParams(), ConnectionDirection::kOutgoing));
     if (_clientCtx.certs) {
         _sslConfiguration.clientSubjectName =
             uassertStatusOK(certificateGetSubject(_clientCtx.certs.get()));
     }
 
     if (isServer) {
-        uassertStatusOK(initSSLContext(&_serverCtx, params, ConnectionDirection::kIncoming));
+        uassertStatusOK(initSSLContext(
+            &_serverCtx, params, TransientSSLParams(), ConnectionDirection::kIncoming));
         if (_serverCtx.certs) {
             uassertStatusOK(
                 _sslConfiguration.setServerSubjectName(uassertStatusOK(certificateGetSubject(
@@ -1390,6 +1393,7 @@ StatusWith<std::pair<::SSLProtocol, ::SSLProtocol>> parseProtocolRange(const SSL
 
 Status SSLManagerApple::initSSLContext(asio::ssl::apple::Context* context,
                                        const SSLParams& params,
+                                       const TransientSSLParams& transientParams,
                                        ConnectionDirection direction) {
     // Protocol Version.
     const auto swProto = parseProtocolRange(params);
@@ -1822,10 +1826,8 @@ bool isSSLServer = false;
 extern SSLManagerInterface* theSSLManager;
 extern SSLManagerCoordinator* theSSLManagerCoordinator;
 
-std::shared_ptr<SSLManagerInterface> SSLManagerInterface::create(
-    const SSLParams& params,
-    const std::optional<TransientSSLParams>& transientSSLParams,
-    bool isServer) {
+std::shared_ptr<SSLManagerInterface> SSLManagerInterface::create(const SSLParams& params,
+                                                                 bool isServer) {
     return std::make_shared<SSLManagerApple>(params, isServer);
 }
 

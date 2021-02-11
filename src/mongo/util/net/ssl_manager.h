@@ -208,16 +208,7 @@ class SSLManagerInterface : public Decorable<SSLManagerInterface> {
 public:
     /**
      * Creates an instance of SSLManagerInterface.
-     * Note: if 'transientSSLParams' is set, this will create a transient instance of the manager,
-     * otherwise, normally, this will be a global instance.
-     */
-    static std::shared_ptr<SSLManagerInterface> create(
-        const SSLParams& params,
-        const std::optional<TransientSSLParams>& transientSSLParams,
-        bool isServer);
-
-    /**
-     * Creates an instance of SSLManagerInterface without transient SSL params.
+     * Note: as we normally have one instance of the manager, it cannot take TransientSSLParams.
      */
     static std::shared_ptr<SSLManagerInterface> create(const SSLParams& params, bool isServer);
 
@@ -258,23 +249,6 @@ public:
      * @return the SSLConfiguration
      */
     virtual const SSLConfiguration& getSSLConfiguration() const = 0;
-
-    /**
-     * @return true if this manager was created with 'transientSSLParams' to authenticate with
-     * a particular remote cluster.
-     */
-    virtual bool isTransient() const {
-        return false;
-    }
-
-    /**
-     * @return Connection string for the remote cluster if this manager is transient (isTransient()
-     * == true), otherwise returns empty string.
-     */
-    virtual std::string getTargetedClusterConnectionString() const {
-        invariant(!isTransient());
-        return {};
-    }
 
 #if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
     /**
@@ -319,6 +293,7 @@ public:
      */
     virtual Status initSSLContext(SSLContextType context,
                                   const SSLParams& params,
+                                  const TransientSSLParams& transientParams,
                                   ConnectionDirection direction) = 0;
 
     /**
@@ -373,13 +348,6 @@ public:
      * Access the current SSLManager safely.
      */
     std::shared_ptr<SSLManagerInterface> getSSLManager();
-
-    /**
-     * Create a transient instance of SSL Manager.
-     * Ownership of the new manager is passed to the invoker.
-     */
-    std::shared_ptr<SSLManagerInterface> createTransientSSLManager(
-        const TransientSSLParams& transientSSLParams) const;
 
     /**
      * Perform certificate rotation safely.
