@@ -84,8 +84,8 @@ list<intrusive_ptr<DocumentSource>> document_source_set_window_fields::createFro
     }
 
     std::vector<WindowFunctionStatement> outputFields;
-    for (auto&& elem : spec.getOutput()) {
-        outputFields.push_back(WindowFunctionStatement::parse(elem, sortBy, expCtx.get()));
+    for (auto&& outputElem : spec.getOutput()) {
+        outputFields.push_back(WindowFunctionStatement::parse(outputElem, sortBy, expCtx.get()));
     }
 
     return create(
