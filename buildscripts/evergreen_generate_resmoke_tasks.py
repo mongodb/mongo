@@ -438,11 +438,13 @@ class EvergreenConfigGenerator(object):
 
     def _set_task_distro(self, task_spec):
         if self.options.use_large_distro:
-            if (self.options.variant not in self.gen_config.build_variant_large_distro_exceptions
-                    and not self.options.large_distro_name):
+            if self.options.large_distro_name:
+                task_spec.distro(self.options.large_distro_name)
+                return
+
+            if self.options.variant not in self.gen_config.build_variant_large_distro_exceptions:
                 print(NO_LARGE_DISTRO_ERR.format(build_variant=self.options.variant))
                 raise ValueError("Invalid Evergreen Configuration")
-            task_spec.distro(self.options.large_distro_name)
 
     def _generate_resmoke_args(self, suite_file):
         resmoke_args = "--suite={0}.yml --originSuite={1} {2}".format(
