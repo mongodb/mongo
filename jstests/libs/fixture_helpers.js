@@ -91,12 +91,11 @@ var FixtureHelpers = (function() {
     }
 
     /**
-     * Runs the command given by 'cmdObj' on the database given by 'db' on each replica set in
-     * the fixture (besides the config servers). Asserts that each command works, and returns an
-     * array with the responses from each shard, or with a single element if the fixture was a
-     * replica set. If the fixture is a standalone, will run the command directly.
+     * Runs the function given by 'func' passing the database given by 'db' from each replica set in
+     * the fixture (besides the config servers). Returns the array of return values from executed
+     * functions. If the fixture is a standalone, will run the function on the database directly.
      */
-    function runCommandOnEachPrimary({db, cmdObj}) {
+    function mapOnEachPrimary({db, func}) {
         function getConnToPrimaryOrStandalone(host) {
             const conn = new Mongo(host);
             const isMaster = conn.getDB("test").isMaster();
@@ -122,8 +121,18 @@ var FixtureHelpers = (function() {
             connList.push(getConnToPrimaryOrStandalone(db.getMongo().host));
         }
 
-        return connList.map((conn) =>
-                                assert.commandWorked(conn.getDB(db.getName()).runCommand(cmdObj)));
+        return connList.map((conn) => func(conn.getDB(db.getName())));
+    }
+
+    /**
+     * Runs the command given by 'cmdObj' on the database given by 'db' on each replica set in
+     * the fixture (besides the config servers). Asserts that each command works, and returns an
+     * array with the responses from each shard, or with a single element if the fixture was a
+     * replica set. If the fixture is a standalone, will run the command directly.
+     */
+    function runCommandOnEachPrimary({db, cmdObj}) {
+        return mapOnEachPrimary(
+            {db, func: (primaryDb) => assert.commandWorked(primaryDb.runCommand(cmdObj))});
     }
 
     /**
@@ -161,6 +170,7 @@ var FixtureHelpers = (function() {
         numberOfShardsForCollection: numberOfShardsForCollection,
         awaitReplication: awaitReplication,
         awaitLastOpCommitted: awaitLastOpCommitted,
+        mapOnEachPrimary: mapOnEachPrimary,
         runCommandOnEachPrimary: runCommandOnEachPrimary,
         getPrimaryForNodeHostingDatabase: getPrimaryForNodeHostingDatabase,
         isReplSet: isReplSet,
