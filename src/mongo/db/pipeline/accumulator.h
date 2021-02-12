@@ -252,8 +252,8 @@ private:
 class AccumulatorMinMax : public AccumulatorState {
 public:
     enum Sense : int {
-        kMin = 1,
-        kMax = -1,  // Used to "scale" comparison.
+        MIN = 1,
+        MAX = -1,  // Used to "scale" comparison.
     };
 
     AccumulatorMinMax(ExpressionContext* const expCtx, Sense sense);
@@ -278,15 +278,13 @@ private:
 
 class AccumulatorMax final : public AccumulatorMinMax {
 public:
-    explicit AccumulatorMax(ExpressionContext* const expCtx)
-        : AccumulatorMinMax(expCtx, Sense::kMax) {}
+    explicit AccumulatorMax(ExpressionContext* const expCtx) : AccumulatorMinMax(expCtx, MAX) {}
     static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* const expCtx);
 };
 
 class AccumulatorMin final : public AccumulatorMinMax {
 public:
-    explicit AccumulatorMin(ExpressionContext* const expCtx)
-        : AccumulatorMinMax(expCtx, Sense::kMin) {}
+    explicit AccumulatorMin(ExpressionContext* const expCtx) : AccumulatorMinMax(expCtx, MIN) {}
     static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* const expCtx);
 };
 

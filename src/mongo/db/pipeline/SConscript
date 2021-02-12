@@ -422,7 +422,6 @@ env.CppUnitTest(
         'tee_buffer_test.cpp',
         'window_function/partition_iterator_test.cpp',
         'window_function/window_function_exec_test.cpp',
-        'window_function/window_function_min_max_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
