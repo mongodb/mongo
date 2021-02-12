@@ -92,7 +92,7 @@ __wt_session_cursor_cache_sweep(WT_SESSION_IMPL *session)
         TAILQ_FOREACH_SAFE(cursor, cached_list, q, cursor_tmp)
         {
             /*
-             * First check to see if the cursor could be reopened.
+             * First check to see if the cursor could be reopened and should be swept.
              */
             ++nexamined;
             t_ret = cursor->reopen(cursor, true);

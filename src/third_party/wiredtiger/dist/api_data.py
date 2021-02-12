@@ -593,7 +593,7 @@ connection_runtime_config = [
         content in cache to this level. It is a percentage of the cache size if
         the value is within the range of 0 to 100 or an absolute size when
         greater than 100. The value is not allowed to exceed the \c cache_size.
-        Ignored if set to zero or \c in_memory is \c true''',
+        Ignored if set to zero.''',
         min=0, max='10TB'),
     Config('eviction_dirty_target', '5', r'''
         perform eviction in worker threads when the cache contains at least
@@ -895,7 +895,7 @@ statistics_log_configuration_common = [
     Config('timestamp', '"%b %d %H:%M:%S"', r'''
         a timestamp prepended to each log record, may contain strftime
         conversion specifications, when \c json is configured, defaults
-        to \c "%FT%Y.000Z"'''),
+        to \c "%Y-%m-%dT%H:%M:%S.000Z"'''),
     Config('wait', '0', r'''
         seconds to wait between each write of the log records; setting
         this value above 0 configures statistics logging''',
@@ -1154,8 +1154,8 @@ cursor_runtime_config = [
         configures whether the cursor's insert, update and remove
         methods check the existing state of the record.  If \c overwrite
         is \c false, WT_CURSOR::insert fails with ::WT_DUPLICATE_KEY
-        if the record exists, WT_CURSOR::update and WT_CURSOR::remove
-        fail with ::WT_NOTFOUND if the record does not exist''',
+        if the record exists, WT_CURSOR::update fails with ::WT_NOTFOUND
+        if the record does not exist''',
         type='boolean'),
 ]
 
@@ -1398,7 +1398,7 @@ methods = {
     Config('readonly', 'false', r'''
         only query operations are supported by this cursor. An error is
         returned if a modification is attempted using the cursor.  The
-        default is false for all cursor types except for log and metadata
+        default is false for all cursor types except for metadata
         cursors''',
         type='boolean'),
     Config('skip_sort_check', 'false', r'''

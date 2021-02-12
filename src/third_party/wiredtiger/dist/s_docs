@@ -90,6 +90,20 @@ structurechk()
 	}
 }
 
+asciichk()
+{
+    # Make sure there are only ASCII characters in the input files.
+    # Odd characters can cause our Python filter to fail.
+    (cd ../src/docs && LC_ALL=C grep -n '[^[:print:]	]' *.dox | cat -v) > $t
+    test -s $t && {
+	echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+	echo 'Non-ASCII content in src/docs/*.dox files is not allowed.'
+	sed -e 's/^/	/' < $t
+	echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+	e=1
+    }
+}
+
 spellchk()
 {
 	# If aspell has been installed, run a spell check.
@@ -236,12 +250,17 @@ changelog
 wtperf_config
 
 # Spell and structure check the documentation.
+asciichk
 spellchk
 structurechk
 
 # Check the docs data input file.
 check_docs_data
 
+# Do not build the doc if we get warnings.
+if [ $e != 0 ]; then
+    exit $e
+fi
 # Build the documentation.
 build $clean
 

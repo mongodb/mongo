@@ -27,6 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import time, wiredtiger, wttest
+from wtscenario import make_scenarios
 
 def timestamp_str(t):
     return '%x' % t
@@ -36,13 +37,23 @@ def timestamp_str(t):
 class test_hs19(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=5MB,eviction=(threads_max=1)'
     session_config = 'isolation=snapshot'
+    key_format_values = [
+        ('column', dict(key_format='r')),
+        ('string', dict(key_format='S'))
+    ]
+    scenarios = make_scenarios(key_format_values)
+
+    def create_key(self, i):
+        if self.key_format == 'S':
+            return str(i)
+        return i
 
     def test_hs19(self):
         uri = 'table:test_hs19'
         junk_uri = 'table:junk'
-        self.session.create(uri, 'key_format=S,value_format=S')
+        self.session.create(uri, 'key_format={},value_format=S'.format(self.key_format))
         session2 = self.conn.open_session()
-        session2.create(junk_uri, 'key_format=S,value_format=S')
+        session2.create(junk_uri, 'key_format={},value_format=S'.format(self.key_format))
         cursor2 = session2.open_cursor(junk_uri)
         cursor = self.session.open_cursor(uri)
         self.conn.set_timestamp(
@@ -54,39 +65,39 @@ class test_hs19(wttest.WiredTigerTestCase):
 
         # Insert an update without timestamp.
         self.session.begin_transaction()
-        cursor[str(0)] = value1
+        cursor[self.create_key(1)] = value1
         self.session.commit_transaction()
 
         # Do 2 modifies.
         self.session.begin_transaction()
-        cursor.set_key(str(0))
+        cursor.set_key(self.create_key(1))
         mods = [wiredtiger.Modify('B', 100, 1)]
         self.assertEqual(cursor.modify(mods), 0)
         self.session.commit_transaction('commit_timestamp=' + timestamp_str(1))
 
         self.session.begin_transaction()
-        cursor.set_key(str(0))
+        cursor.set_key(self.create_key(1))
         mods = [wiredtiger.Modify('C', 101, 1)]
         self.assertEqual(cursor.modify(mods), 0)
         self.session.commit_transaction('commit_timestamp=' + timestamp_str(2))
 
         # Start a transaction to pin back the reconciliation last running value.
         session2.begin_transaction()
-        cursor2[str(1)] = value3
+        cursor2[self.create_key(1)] = value3
 
         # Insert a modify ahead of our reconstructed modify, this one will be used unintentionally
         # to reconstruct the final value, corrupting the resulting value.
         # The 0 at the end of the modify call indicates how many bytes to replace, we keep
         # it as 0 here to not overwrite any of the existing value.
         self.session.begin_transaction()
-        cursor.set_key(str(0))
+        cursor.set_key(self.create_key(1))
         mods = [wiredtiger.Modify('AAAAAAAAAA', 102, 0)]
         self.assertEqual(cursor.modify(mods), 0)
         self.session.commit_transaction('commit_timestamp=' + timestamp_str(3))
 
         # Insert a modify to get written as the on disk value by checkpoint.
         self.session.begin_transaction()
-        cursor.set_key(str(0))
+        cursor.set_key(self.create_key(1))
         mods = [wiredtiger.Modify('D', 102, 1)]
         self.assertEqual(cursor.modify(mods), 0)
         self.session.commit_transaction('commit_timestamp=' + timestamp_str(4))
@@ -98,7 +109,7 @@ class test_hs19(wttest.WiredTigerTestCase):
         # Add an additional modify so that when eviction sees this page it will rewrite it as it's
         # dirty.
         self.session.begin_transaction()
-        cursor.set_key(str(0))
+        cursor.set_key(self.create_key(1))
         mods = [wiredtiger.Modify('E', 103, 1)]
         self.assertEqual(cursor.modify(mods), 0)
         self.session.commit_transaction('commit_timestamp=' + timestamp_str(5))
@@ -107,7 +118,7 @@ class test_hs19(wttest.WiredTigerTestCase):
         cursor.reset()
         evict_cursor = self.session.open_cursor(uri, None, "debug=(release_evict)")
         # Search for the key so we position our cursor on the page that we want to evict.
-        evict_cursor.set_key(str(0))
+        evict_cursor.set_key(self.create_key(1))
         evict_cursor.search()
         evict_cursor.reset()
         evict_cursor.close()
@@ -119,7 +130,7 @@ class test_hs19(wttest.WiredTigerTestCase):
 
         # Retrieve the value at timestamp 1.
         self.session.begin_transaction('read_timestamp=' + timestamp_str(1))
-        cursor.set_key(str(0))
+        cursor.set_key(self.create_key(1))
         cursor.search()
 
         # Assert that it matches our expected value.
@@ -133,7 +144,7 @@ class test_hs19(wttest.WiredTigerTestCase):
 
         # Retrieve the value at timestamp 1.
         self.session.begin_transaction('read_timestamp=' + timestamp_str(2))
-        cursor.set_key(str(0))
+        cursor.set_key(self.create_key(1))
         cursor.search()
 
         # Assert that it matches our expected value.
@@ -149,7 +160,7 @@ class test_hs19(wttest.WiredTigerTestCase):
 
         # Retrieve the value at timestamp 1.
         self.session.begin_transaction('read_timestamp=' + timestamp_str(3))
-        cursor.set_key(str(0))
+        cursor.set_key(self.create_key(1))
         cursor.search()
         # Assert that it matches our expected value.
         self.assertEqual(cursor.get_value(), expected)

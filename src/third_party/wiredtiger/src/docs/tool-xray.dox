@@ -35,7 +35,7 @@ $ cd bench/wtperf
 $ ../../../bench/wtperf/runners/wtperf_xray.sh  ../../../bench/wtperf/runners/small-btree.wtperf
 @endcode
 
-In general the usage is:  
+In general the usage is:
 
 @code
 wtperf_xray.sh <wtperf-config-file> [-h output-directory] [wtperf other arguments]
@@ -99,7 +99,7 @@ $ sudo apt install llvm
 LLVM needs to be version 8 or higher. Check the version like this:
 
 @code
-$ llvm-config –version
+$ llvm-config -version
 @endcode
 
 If your distribution's default \c llvm-config isn't from the 8 series, you'll

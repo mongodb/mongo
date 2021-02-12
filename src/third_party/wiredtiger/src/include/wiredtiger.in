@@ -571,15 +571,10 @@ struct __wt_cursor {
 	/*!
 	 * Remove a record.
 	 *
-	 * If the cursor was configured with "overwrite=true" (the default),
-	 * the key must be set; the key's record will be removed if it exists,
+	 * The key must be set; the key's record will be removed if it exists,
 	 * no error will be returned if the record does not exist.
 	 *
 	 * @snippet ex_all.c Remove a record
-	 *
-	 * If the cursor was configured with "overwrite=false" (not the
-	 * default), the key must be set and the key's record must exist; the
-	 * record will be removed.
 	 *
 	 * Any cursor position does not change: if the cursor was positioned
 	 * before the WT_CURSOR::remove call, the cursor remains positioned
@@ -598,8 +593,6 @@ struct __wt_cursor {
 	 *
 	 * @param cursor the cursor handle
 	 * @errors
-	 * In particular, if \c overwrite=false is configured and no record
-	 * with the specified key exists, ::WT_NOTFOUND is returned.
 	 */
 	int __F(remove)(WT_CURSOR *cursor);
 
@@ -656,9 +649,8 @@ struct __wt_cursor {
 	 * valid only for cursors with record number keys., a boolean flag; default \c false.}
 	 * @config{overwrite, configures whether the cursor's insert\, update and remove methods
 	 * check the existing state of the record.  If \c overwrite is \c false\, WT_CURSOR::insert
-	 * fails with ::WT_DUPLICATE_KEY if the record exists\, WT_CURSOR::update and
-	 * WT_CURSOR::remove fail with ::WT_NOTFOUND if the record does not exist., a boolean flag;
-	 * default \c true.}
+	 * fails with ::WT_DUPLICATE_KEY if the record exists\, WT_CURSOR::update fails with
+	 * ::WT_NOTFOUND if the record does not exist., a boolean flag; default \c true.}
 	 * @configend
 	 * @errors
 	 */
@@ -925,16 +917,15 @@ struct __wt_session {
 	 * \c 0.}
 	 * @config{overwrite, configures whether the cursor's insert\, update and remove methods
 	 * check the existing state of the record.  If \c overwrite is \c false\, WT_CURSOR::insert
-	 * fails with ::WT_DUPLICATE_KEY if the record exists\, WT_CURSOR::update and
-	 * WT_CURSOR::remove fail with ::WT_NOTFOUND if the record does not exist., a boolean flag;
-	 * default \c true.}
+	 * fails with ::WT_DUPLICATE_KEY if the record exists\, WT_CURSOR::update fails with
+	 * ::WT_NOTFOUND if the record does not exist., a boolean flag; default \c true.}
 	 * @config{raw, ignore the encodings for the key and value\, manage data as if the formats
 	 * were \c "u". See @ref cursor_raw for details., a boolean flag; default \c false.}
 	 * @config{read_once, results that are brought into cache from disk by this cursor will be
 	 * given less priority in the cache., a boolean flag; default \c false.}
 	 * @config{readonly, only query operations are supported by this cursor.  An error is
 	 * returned if a modification is attempted using the cursor.  The default is false for all
-	 * cursor types except for log and metadata cursors., a boolean flag; default \c false.}
+	 * cursor types except for metadata cursors., a boolean flag; default \c false.}
 	 * @config{statistics, Specify the statistics to be gathered.  Choosing "all" gathers
 	 * statistics regardless of cost and may include traversing on-disk files; "fast" gathers a
 	 * subset of relatively inexpensive statistics.  The selection must agree with the database
@@ -1388,6 +1379,8 @@ struct __wt_session {
 	/*!
 	 * Flush the log.
 	 *
+	 * WT_SESSION::log_flush will fail if logging is not enabled.
+	 *
 	 * @param session the session handle
 	 * @configstart{WT_SESSION.log_flush, see dist/api_data.py}
 	 * @config{sync, forcibly flush the log and wait for it to achieve the synchronization level
@@ -1433,10 +1426,11 @@ struct __wt_session {
 	/*!
 	 * Reset the session handle.
 	 *
-	 * This method resets all cursors associated with this session and
-	 * discards cached resources.  The session can be re-used immediately
-	 * after this call returns. If a transaction is running on this
-	 * session, then this call takes no action and return an error.
+	 * This method resets all cursors associated with this session,
+	 * discards cached resources and resets session statistics.
+	 * The session can be re-used immediately after this call returns.
+	 * If a transaction is running on this session, then this call takes
+	 * no action and return an error.
 	 *
 	 * @snippet ex_all.c Reset the session
 	 *
@@ -2054,8 +2048,8 @@ struct __wt_connection {
 	 * @config{eviction_checkpoint_target, perform eviction at the beginning of checkpoints to
 	 * bring the dirty content in cache to this level.  It is a percentage of the cache size if
 	 * the value is within the range of 0 to 100 or an absolute size when greater than 100. The
-	 * value is not allowed to exceed the \c cache_size.  Ignored if set to zero or \c in_memory
-	 * is \c true., an integer between 0 and 10TB; default \c 1.}
+	 * value is not allowed to exceed the \c cache_size.  Ignored if set to zero., an integer
+	 * between 0 and 10TB; default \c 1.}
 	 * @config{eviction_dirty_target, perform eviction in worker threads when the cache contains
 	 * at least this much dirty content.  It is a percentage of the cache size if the value is
 	 * within the range of 1 to 100 or an absolute size when greater than 100. The value is not
@@ -2198,12 +2192,11 @@ struct __wt_connection {
 	 * data sources of a particular type ("table:")., a list of strings; default empty.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;timestamp, a timestamp prepended to each log record\, may
 	 * contain strftime conversion specifications\, when \c json is configured\, defaults to \c
-	 * "%FT%Y.000Z"., a string; default \c "%b %d %H:%M:%S".}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;
-	 * wait, seconds to wait between each write of the log records; setting this value above 0
-	 * configures statistics logging., an integer between 0 and 100000; default \c 0.}
-	 * @config{
-	 * ),,}
+	 * "%Y-%m-%dT%H:%M:%S.000Z"., a string; default \c "%b %d %H:%M:%S".}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;wait, seconds to wait between each write of the log
+	 * records; setting this value above 0 configures statistics logging., an integer between 0
+	 * and 100000; default \c 0.}
+	 * @config{ ),,}
 	 * @config{verbose, enable messages for various events.  Options are given as a list\, such
 	 * as <code>"verbose=[evictserver\,read]"</code>., a list\, with values chosen from the
 	 * following options: \c "api"\, \c "backup"\, \c "block"\, \c "checkpoint"\, \c
@@ -2699,8 +2692,8 @@ struct __wt_connection {
  * @config{eviction_checkpoint_target, perform eviction at the beginning of checkpoints to bring the
  * dirty content in cache to this level.  It is a percentage of the cache size if the value is
  * within the range of 0 to 100 or an absolute size when greater than 100. The value is not allowed
- * to exceed the \c cache_size.  Ignored if set to zero or \c in_memory is \c true., an integer
- * between 0 and 10TB; default \c 1.}
+ * to exceed the \c cache_size.  Ignored if set to zero., an integer between 0 and 10TB; default \c
+ * 1.}
  * @config{eviction_dirty_target, perform eviction in worker threads when the cache contains at
  * least this much dirty content.  It is a percentage of the cache size if the value is within the
  * range of 1 to 100 or an absolute size when greater than 100. The value is not allowed to exceed
@@ -2901,11 +2894,11 @@ struct __wt_connection {
  * logging.  The list may include URIs matching a single data source ("table:mytable")\, or a URI
  * matching all data sources of a particular type ("table:")., a list of strings; default empty.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;timestamp, a timestamp prepended to each log record\, may contain
- * strftime conversion specifications\, when \c json is configured\, defaults to \c "%FT%Y.000Z"., a
- * string; default \c "%b %d %H:%M:%S".}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;wait, seconds to wait
- * between each write of the log records; setting this value above 0 configures statistics logging.,
- * an integer between 0 and 100000; default \c 0.}
+ * strftime conversion specifications\, when \c json is configured\, defaults to \c
+ * "%Y-%m-%dT%H:%M:%S.000Z"., a string; default \c "%b %d %H:%M:%S".}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;wait, seconds to wait between each write of the log records;
+ * setting this value above 0 configures statistics logging., an integer between 0 and 100000;
+ * default \c 0.}
  * @config{ ),,}
  * @config{transaction_sync = (, how to sync log records when the transaction commits., a set of
  * related configuration options defined below.}
