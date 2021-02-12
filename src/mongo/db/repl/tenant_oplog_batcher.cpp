@@ -194,7 +194,12 @@ SemiFuture<TenantOplogBatch> TenantOplogBatcher::_scheduleNextBatch(WithLock, Ba
 
     // If the batch fails to schedule, ensure we get a valid error code instead of a broken promise.
     if (!statusWithCbh.isOK()) {
+        stdx::lock_guard lk(_mutex);
+        _batchRequested = false;
         taskCompletionPromise->setError(statusWithCbh.getStatus());
+        if (_isShuttingDown_inlock()) {
+            _transitionToComplete_inlock();
+        }
     }
     return std::move(pf.future).semi();
 }
