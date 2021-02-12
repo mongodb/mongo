@@ -290,6 +290,8 @@ TEST_F(DestinedRecipientTest, TestGetDestinedRecipientThrowsOnBlockedRefresh) {
         AutoGetCollection coll(opCtx, kNss, MODE_IX);
         OperationShardingState::get(opCtx).initializeClientRoutingVersions(
             kNss, env.version, env.dbVersion);
+
+        FailPointEnableBlock failPoint("blockCollectionCacheLookup");
         ASSERT_THROWS(getDestinedRecipient(opCtx, kNss, BSON("x" << 2 << "y" << 10)),
                       ExceptionFor<ErrorCodes::ShardInvalidatedForTargeting>);
     }

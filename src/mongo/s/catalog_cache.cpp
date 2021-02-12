@@ -56,6 +56,8 @@
 namespace mongo {
 namespace {
 
+MONGO_FAIL_POINT_DEFINE(blockCollectionCacheLookup);
+
 // How many times to try refreshing the routing info if the set of chunks loaded from the config
 // server is found to be inconsistent.
 const int kMaxInconsistentRoutingInfoRefreshAttempts = 3;
@@ -619,6 +621,7 @@ CatalogCache::CollectionCache::LookupResult CatalogCache::CollectionCache::_look
     const ComparableChunkVersion& previousVersion) {
     const bool isIncremental(existingHistory && existingHistory->optRt);
     _updateRefreshesStats(isIncremental, true);
+    blockCollectionCacheLookup.pauseWhileSet(opCtx);
 
     Timer t{};
     try {
