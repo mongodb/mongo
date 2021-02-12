@@ -27,8 +27,8 @@ function setHeapSizeLimitMB({db, queryLimit, globalLimit}) {
 }
 
 function allocateLargeString() {
-    const arraySize = 10000000;
-    let str = new Array(arraySize).join("x");
+    const arraySize = 1000000;
+    let str = new Array(arraySize).fill(0);
     return true;
 }
 
