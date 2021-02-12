@@ -305,13 +305,14 @@ function toIndexSet(indexedDocs) {
 /**
  * Remove the indices for non-upsert writes that succeeded.
  */
-function removeSuccessfulOpIndexesExceptForUpserted(resObj, indexMap) {
+function removeSuccessfulOpIndexesExceptForUpserted(resObj, indexMap, ordered) {
     // Optimization to only look through the indices in a set rather than in an array.
     let indexSetForUpserted = toIndexSet(resObj.upserted);
     let indexSetForWriteErrors = toIndexSet(resObj.writeErrors);
 
     for (let index in Object.keys(indexMap)) {
         if ((!indexSetForUpserted.has(parseInt(index)) &&
+             !(ordered && resObj.writeErrors && (index > resObj.writeErrors[0].index)) &&
              !indexSetForWriteErrors.has(parseInt(index)))) {
             delete indexMap[index];
         }
@@ -423,7 +424,8 @@ Mongo.prototype.runCommandRetryOnTenantMigrationErrors = function(
         if (resObj.upserted || resObj.writeErrors) {
             // This is an optimization to make later lookups into 'indexMap' faster, since it
             // removes any key that is not pertinent in the current cmdObj execution.
-            indexMap = removeSuccessfulOpIndexesExceptForUpserted(resObj, indexMap);
+            indexMap = removeSuccessfulOpIndexesExceptForUpserted(
+                resObj, indexMap, cmdObjWithTenantId.ordered);
 
             if (resObj.upserted) {
                 for (let upsert of resObj.upserted) {
