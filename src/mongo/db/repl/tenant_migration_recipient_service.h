@@ -176,6 +176,10 @@ public:
             _excludeDonorHost(lk, host, until);
         }
 
+        const auto& getExcludedDonorHosts_forTest() {
+            return _excludedDonorHosts;
+        }
+
     private:
         friend class TenantMigrationRecipientServiceTest;
 

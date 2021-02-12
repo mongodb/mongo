@@ -76,6 +76,7 @@ namespace repl {
 
 namespace {
 constexpr std::int32_t stopFailPointErrorCode = 4880402;
+const Timestamp kDefaultStartMigrationTimestamp(1, 1);
 
 OplogEntry makeOplogEntry(OpTime opTime,
                           OpTypeEnum opType,
@@ -444,6 +445,7 @@ TEST_F(TenantMigrationRecipientServiceTest, BasicTenantMigrationRecipientService
         migrationUUID,
         "donor-rs/localhost:12345",
         "tenantA",
+        kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet::primaryOnly()));
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
@@ -469,6 +471,7 @@ TEST_F(TenantMigrationRecipientServiceTest, InstanceReportsErrorOnFailureWhilePe
         migrationUUID,
         "donor-rs/localhost:12345",
         "tenantA",
+        kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet::primaryOnly()));
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
@@ -497,10 +500,13 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientConnection_P
 
     MockReplicaSet replSet("donorSet", 3, true /* hasPrimary */, true /* dollarPrefixHosts */);
 
+    insertTopOfOplog(&replSet, OpTime(kDefaultStartMigrationTimestamp, 1));
+
     TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
+        kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
@@ -545,10 +551,13 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientConnection_S
 
     MockReplicaSet replSet("donorSet", 2, true /* hasPrimary */, true /* dollarPrefixHosts */);
 
+    insertTopOfOplog(&replSet, OpTime(kDefaultStartMigrationTimestamp, 1));
+
     TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
+        kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::SecondaryOnly));
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
@@ -594,10 +603,13 @@ TEST_F(TenantMigrationRecipientServiceTest,
 
     MockReplicaSet replSet("donorSet", 2);
 
+    insertTopOfOplog(&replSet, OpTime(kDefaultStartMigrationTimestamp, 1));
+
     TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
+        kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
@@ -666,10 +678,13 @@ TEST_F(TenantMigrationRecipientServiceTest,
 
     MockReplicaSet replSet("donorSet", 2);
 
+    insertTopOfOplog(&replSet, OpTime(kDefaultStartMigrationTimestamp, 1));
+
     TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
+        kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
@@ -735,10 +750,13 @@ TEST_F(TenantMigrationRecipientServiceTest,
 
     MockReplicaSet replSet("donorSet", 2);
 
+    insertTopOfOplog(&replSet, OpTime(kDefaultStartMigrationTimestamp, 1));
+
     TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
+        kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::Nearest));
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
@@ -810,10 +828,13 @@ TEST_F(TenantMigrationRecipientServiceTest,
 
     MockReplicaSet replSet("donorSet", 2);
 
+    insertTopOfOplog(&replSet, OpTime(kDefaultStartMigrationTimestamp, 1));
+
     TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
+        kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryPreferred));
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
@@ -876,10 +897,13 @@ TEST_F(TenantMigrationRecipientServiceTest,
 
     MockReplicaSet replSet("donorSet", 2);
 
+    insertTopOfOplog(&replSet, OpTime(kDefaultStartMigrationTimestamp, 1));
+
     TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
+        kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryPreferred));
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
@@ -957,6 +981,7 @@ TEST_F(TenantMigrationRecipientServiceTest,
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
+        kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryPreferred));
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
     initialStateDocument.setStartApplyingDonorOpTime(startApplyingOpTime);
@@ -989,6 +1014,70 @@ TEST_F(TenantMigrationRecipientServiceTest,
     taskFp->setMode(FailPoint::off, 0);
 }
 
+TEST_F(TenantMigrationRecipientServiceTest,
+       TenantMigrationRecipientConnection_RemoteMajorityOpTimeBehindStartMigrationDonorTimestamp) {
+    stopFailPointEnableBlock fp("fpAfterConnectingTenantMigrationRecipientInstance");
+
+    const UUID migrationUUID = UUID::gen();
+    const OpTime remoteMajorityOpTime(Timestamp(5, 1), 1);
+    const Timestamp startMigrationDonorTimestamp(6, 1);
+
+    auto taskFp = globalFailPointRegistry().find("hangBeforeTaskCompletion");
+    auto timesEntered = taskFp->setMode(FailPoint::alwaysOn, 0);
+
+    // Insert the remote majority optime into the oplogs of the first two hosts.
+    MockReplicaSet replSet("donorSet", 3, true /* hasPrimary */, true /* dollarPrefixHosts */);
+    const auto hosts = replSet.getHosts();
+    const std::vector<HostAndPort> advancedOpTimeHosts = {hosts[0], hosts[1]};
+
+    insertTopOfOplog(&replSet, remoteMajorityOpTime, advancedOpTimeHosts);
+    insertTopOfOplog(&replSet, OpTime(startMigrationDonorTimestamp, 1), {hosts.at(2)});
+
+    TenantMigrationRecipientDocument initialStateDocument(
+        migrationUUID,
+        replSet.getConnectionString(),
+        "tenantA",
+        startMigrationDonorTimestamp,
+        ReadPreferenceSetting(ReadPreference::PrimaryPreferred));
+    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
+
+    // Create and start the instance.
+    auto opCtx = makeOperationContext();
+    auto instance = TenantMigrationRecipientService::Instance::getOrCreate(
+        opCtx.get(), _service, initialStateDocument.toBSON());
+    ASSERT(instance.get());
+    ASSERT_EQ(migrationUUID, instance->getMigrationUUID());
+
+    taskFp->waitForTimesEntered(timesEntered + 1);
+
+    auto* client = getClient(instance.get());
+    auto* oplogFetcherClient = getOplogFetcherClient(instance.get());
+    // Both clients should be populated.
+    ASSERT(client);
+    ASSERT(oplogFetcherClient);
+
+    // Clients should be distinct.
+    ASSERT(client != oplogFetcherClient);
+
+    // Clients should be connected to donor node at index 2.
+    auto donorHost = hosts[2].toString();
+    ASSERT_EQ(donorHost, client->getServerAddress());
+    ASSERT(client->isStillConnected());
+    ASSERT_EQ(donorHost, oplogFetcherClient->getServerAddress());
+    ASSERT(oplogFetcherClient->isStillConnected());
+
+    // Since we were using primaryPreferred read preference, we should have tried hosts[0]
+    // and had it rejected.
+    const auto& excludedHosts = instance->getExcludedDonorHosts_forTest();
+    ASSERT_TRUE(std::find_if(excludedHosts.begin(),
+                             excludedHosts.end(),
+                             [hosts](const std::pair<HostAndPort, Date_t>& a) {
+                                 return a.first == hosts[0];
+                             }) != excludedHosts.end());
+
+    taskFp->setMode(FailPoint::off, 0);
+}
+
 TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientConnection_PrimaryFailsOver) {
     stopFailPointEnableBlock fp("fpAfterConnectingTenantMigrationRecipientInstance");
 
@@ -999,6 +1088,8 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientConnection_P
 
     MockReplicaSet replSet("donorSet", 2, true /* hasPrimary */, true /* dollarPrefixHosts */);
 
+    insertTopOfOplog(&replSet, OpTime(kDefaultStartMigrationTimestamp, 1));
+
     // Primary is unavailable.
     replSet.kill(replSet.getHosts()[0].toString());
 
@@ -1006,6 +1097,7 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientConnection_P
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
+        kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryPreferred));
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
@@ -1049,6 +1141,7 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientConnection_B
         migrationUUID,
         "broken,connect,string,no,set,name",
         "tenantA",
+        kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
@@ -1070,6 +1163,7 @@ TEST_F(TenantMigrationRecipientServiceTest,
         migrationUUID,
         "localhost:12345",
         "tenantA",
+        kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
@@ -1094,6 +1188,7 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientGetStartOpTi
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
+        kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
@@ -1131,6 +1226,7 @@ TEST_F(TenantMigrationRecipientServiceTest,
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
+        kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
@@ -1173,6 +1269,7 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientGetStartOpTi
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
+        kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
@@ -1217,6 +1314,7 @@ TEST_F(TenantMigrationRecipientServiceTest,
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
+        kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
@@ -1251,6 +1349,7 @@ TEST_F(TenantMigrationRecipientServiceTest,
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
+        kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
@@ -1284,6 +1383,7 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientStartOplogFe
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
+        kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
@@ -1337,6 +1437,7 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientStartsCloner
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
+        kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
@@ -1390,6 +1491,7 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogFetcherFailsDuringOplogApplicat
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
+        kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
@@ -1444,6 +1546,7 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogFetcherResumesFromTopOfOplogBuf
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
+        kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
@@ -1546,6 +1649,7 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogFetcherNoDocInBufferToResumeFro
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
+        kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
@@ -1650,6 +1754,7 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogApplierResumesFromLastNoOpOplog
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
+        kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
@@ -1768,6 +1873,7 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogApplierResumesFromStartDonorApp
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
+        kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
@@ -1924,6 +2030,7 @@ TEST_F(TenantMigrationRecipientServiceTest,
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
+        kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
@@ -2028,6 +2135,7 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogApplierFails) {
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
+        kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
@@ -2092,6 +2200,7 @@ TEST_F(TenantMigrationRecipientServiceTest, StoppingApplierAllowsCompletion) {
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
+        kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
@@ -2145,6 +2254,7 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientAddResumeTok
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
+        kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
@@ -2245,6 +2355,7 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientForgetMigration_BeforeRun) 
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
+        kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
@@ -2280,6 +2391,7 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientForgetMigration_FailToIniti
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
+        kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
@@ -2312,6 +2424,7 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientForgetMigration_WaitUntilSt
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
+        kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
@@ -2392,6 +2505,7 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientForgetMigration_AfterStartO
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
+        kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
@@ -2453,6 +2567,7 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientForgetMigration_AfterConsis
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
+        kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
@@ -2539,6 +2654,7 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientForgetMigration_AfterFail) 
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
+        kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
@@ -2618,6 +2734,7 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientForgetMigration_FailToMarkG
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
+        kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
@@ -2663,10 +2780,13 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientServiceRecor
     const UUID migrationUUID = UUID::gen();
     MockReplicaSet replSet("donorSet", 3, true /* hasPrimary */, true /* dollarPrefixHosts */);
 
+    insertTopOfOplog(&replSet, OpTime(kDefaultStartMigrationTimestamp, 1));
+
     TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
+        kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
@@ -2695,10 +2815,13 @@ TEST_F(TenantMigrationRecipientServiceTest,
     const UUID migrationUUID = UUID::gen();
     MockReplicaSet replSet("donorSet", 3, true /* hasPrimary */, true /* dollarPrefixHosts */);
 
+    insertTopOfOplog(&replSet, OpTime(kDefaultStartMigrationTimestamp, 1));
+
     TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
+        kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
@@ -2731,10 +2854,13 @@ TEST_F(TenantMigrationRecipientServiceTest,
     const UUID migrationUUID = UUID::gen();
     MockReplicaSet replSet("donorSet", 3, true /* hasPrimary */, true /* dollarPrefixHosts */);
 
+    insertTopOfOplog(&replSet, OpTime(kDefaultStartMigrationTimestamp, 1));
+
     TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
+        kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
@@ -2776,10 +2902,13 @@ TEST_F(TenantMigrationRecipientServiceTest,
     const UUID migrationUUID = UUID::gen();
     MockReplicaSet replSet("donorSet", 3, true /* hasPrimary */, true /* dollarPrefixHosts */);
 
+    insertTopOfOplog(&replSet, OpTime(kDefaultStartMigrationTimestamp, 1));
+
     TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
+        kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
@@ -2813,6 +2942,7 @@ TEST_F(TenantMigrationRecipientServiceTest, WaitUntilTimestampIsMajorityCommitte
         migrationUUID,
         replSet.getConnectionString(),
         "tenantA",
+        kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 

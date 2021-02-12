@@ -67,6 +67,7 @@ public:
             TenantMigrationRecipientDocument stateDoc(cmd.getMigrationId(),
                                                       cmd.getDonorConnectionString().toString(),
                                                       cmd.getTenantId().toString(),
+                                                      cmd.getStartMigrationDonorTimestamp(),
                                                       cmd.getReadPreference());
 
             if (!repl::tenantMigrationDisableX509Auth) {
@@ -176,9 +177,11 @@ public:
             // recipientSyncData. But even if that's the case, we still need to create an instance
             // and persist a state document that's marked garbage collectable (which is done by the
             // main chain).
+            const Timestamp kUnusedStartMigrationTimestamp(1, 1);
             TenantMigrationRecipientDocument stateDoc(cmd.getMigrationId(),
                                                       cmd.getDonorConnectionString().toString(),
                                                       cmd.getTenantId().toString(),
+                                                      kUnusedStartMigrationTimestamp,
                                                       cmd.getReadPreference());
             if (!repl::tenantMigrationDisableX509Auth) {
                 uassert(ErrorCodes::InvalidOptions,

@@ -515,31 +515,46 @@ TenantMigrationRecipientService::Instance::_createAndConnectClients() {
                        auto client = _connectAndAuth(serverAddress, applicationName);
 
                        boost::optional<repl::OpTime> startApplyingOpTime;
+                       Timestamp startMigrationDonorTimestamp;
                        {
                            stdx::lock_guard lk(_mutex);
                            startApplyingOpTime = _stateDoc.getStartApplyingDonorOpTime();
+                           startMigrationDonorTimestamp =
+                               _stateDoc.getStartMigrationDonorTimestamp();
                        }
 
-                       if (startApplyingOpTime) {
-                           auto majoritySnapshotOpTime = _getDonorMajorityOpTime(client);
-
-                           if (majoritySnapshotOpTime < *startApplyingOpTime) {
-                               stdx::lock_guard lk(_mutex);
-                               const auto now =
-                                   getGlobalServiceContext()->getFastClockSource()->now();
-                               _excludeDonorHost(
-                                   lk,
-                                   serverAddress,
-                                   now + Milliseconds(tenantMigrationExcludeDonorHostTimeoutMS));
-                               uasserted(
-                                   kDelayedMajorityOpTimeErrorCode,
-                                   str::stream()
-                                       << "majoritySnapshotOpTime on donor host must not be behind "
-                                          "startApplyingDonorOpTime, majoritySnapshotOpTime: "
-                                       << majoritySnapshotOpTime.toString()
-                                       << "; startApplyingDonorOpTime: "
-                                       << (*startApplyingOpTime).toString());
-                           }
+                       auto majoritySnapshotOpTime = _getDonorMajorityOpTime(client);
+                       if (majoritySnapshotOpTime.getTimestamp() < startMigrationDonorTimestamp) {
+                           stdx::lock_guard lk(_mutex);
+                           const auto now = getGlobalServiceContext()->getFastClockSource()->now();
+                           _excludeDonorHost(
+                               lk,
+                               serverAddress,
+                               now + Milliseconds(tenantMigrationExcludeDonorHostTimeoutMS));
+                           uasserted(
+                               kDelayedMajorityOpTimeErrorCode,
+                               str::stream()
+                                   << "majoritySnapshotOpTime on donor host must not be behind "
+                                      "startMigrationDonorTimestamp, majoritySnapshotOpTime: "
+                                   << majoritySnapshotOpTime.toString()
+                                   << "; startMigrationDonorTimestamp: "
+                                   << startMigrationDonorTimestamp.toString());
+                       }
+                       if (startApplyingOpTime && majoritySnapshotOpTime < *startApplyingOpTime) {
+                           stdx::lock_guard lk(_mutex);
+                           const auto now = getGlobalServiceContext()->getFastClockSource()->now();
+                           _excludeDonorHost(
+                               lk,
+                               serverAddress,
+                               now + Milliseconds(tenantMigrationExcludeDonorHostTimeoutMS));
+                           uasserted(
+                               kDelayedMajorityOpTimeErrorCode,
+                               str::stream()
+                                   << "majoritySnapshotOpTime on donor host must not be behind "
+                                      "startApplyingDonorOpTime, majoritySnapshotOpTime: "
+                                   << majoritySnapshotOpTime.toString()
+                                   << "; startApplyingDonorOpTime: "
+                                   << (*startApplyingOpTime).toString());
                        }
 
                        // Application name is constructed such that it doesn't exceed
