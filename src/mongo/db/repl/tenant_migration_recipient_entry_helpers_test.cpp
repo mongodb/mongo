@@ -46,6 +46,8 @@ namespace repl {
 
 using namespace tenantMigrationRecipientEntryHelpers;
 
+const Timestamp kDefaultStartMigrationTimestamp(1, 1);
+
 class TenantMigrationRecipientEntryHelpersTest : public ServiceContextMongoDTest {
 public:
     void setUp() override {
@@ -113,6 +115,7 @@ TEST_F(TenantMigrationRecipientEntryHelpersTest, AddTenantMigrationRecipientStat
         migrationUUID,
         "donor-rs0/localhost:12345",
         "tenantA",
+        kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     activeTenantAStateDoc.setRecipientCertificateForDonor(kRecipientPEMPayload);
     ASSERT_OK(insertStateDoc(opCtx.get(), activeTenantAStateDoc));
@@ -122,6 +125,7 @@ TEST_F(TenantMigrationRecipientEntryHelpersTest, AddTenantMigrationRecipientStat
     TenantMigrationRecipientDocument stateDoc1(migrationUUID,
                                                "donor-rs1/localhost:12345",
                                                "tenantA",
+                                               kDefaultStartMigrationTimestamp,
                                                ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     stateDoc1.setRecipientCertificateForDonor(kRecipientPEMPayload);
     auto status = insertStateDoc(opCtx.get(), stateDoc1);
@@ -132,6 +136,7 @@ TEST_F(TenantMigrationRecipientEntryHelpersTest, AddTenantMigrationRecipientStat
     TenantMigrationRecipientDocument stateDoc2(migrationUUID,
                                                "donor-rs0/localhost:12345",
                                                "tenantB",
+                                               kDefaultStartMigrationTimestamp,
                                                ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     stateDoc2.setRecipientCertificateForDonor(kRecipientPEMPayload);
     ASSERT_THROWS_CODE(
@@ -142,6 +147,7 @@ TEST_F(TenantMigrationRecipientEntryHelpersTest, AddTenantMigrationRecipientStat
     TenantMigrationRecipientDocument stateDoc3(UUID::gen(),
                                                "donor-rs0/localhost:12345",
                                                "tenantA",
+                                               kDefaultStartMigrationTimestamp,
                                                ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     stateDoc3.setRecipientCertificateForDonor(kRecipientPEMPayload);
     status = insertStateDoc(opCtx.get(), stateDoc3);
@@ -152,6 +158,7 @@ TEST_F(TenantMigrationRecipientEntryHelpersTest, AddTenantMigrationRecipientStat
     TenantMigrationRecipientDocument stateDoc4(UUID::gen(),
                                                "donor-rs0/localhost:12345",
                                                "tenantB",
+                                               kDefaultStartMigrationTimestamp,
                                                ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     stateDoc4.setRecipientCertificateForDonor(kRecipientPEMPayload);
     ASSERT_OK(insertStateDoc(opCtx.get(), stateDoc4));
@@ -167,6 +174,7 @@ TEST_F(TenantMigrationRecipientEntryHelpersTest,
         migrationUUID,
         "donor-rs0/localhost:12345",
         "tenantA",
+        kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     inactiveTenantAStateDoc.setRecipientCertificateForDonor(kRecipientPEMPayload);
     inactiveTenantAStateDoc.setExpireAt(Date_t::now());
@@ -177,6 +185,7 @@ TEST_F(TenantMigrationRecipientEntryHelpersTest,
     TenantMigrationRecipientDocument stateDoc1(migrationUUID,
                                                "donor-rs1/localhost:12345",
                                                "tenantA",
+                                               kDefaultStartMigrationTimestamp,
                                                ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     stateDoc1.setRecipientCertificateForDonor(kRecipientPEMPayload);
     ASSERT_THROWS_CODE(
@@ -187,6 +196,7 @@ TEST_F(TenantMigrationRecipientEntryHelpersTest,
     TenantMigrationRecipientDocument stateDoc2(migrationUUID,
                                                "donor-rs0/localhost:12345",
                                                "tenantB",
+                                               kDefaultStartMigrationTimestamp,
                                                ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     stateDoc2.setRecipientCertificateForDonor(kRecipientPEMPayload);
     ASSERT_THROWS_CODE(
@@ -197,6 +207,7 @@ TEST_F(TenantMigrationRecipientEntryHelpersTest,
     TenantMigrationRecipientDocument stateDoc3(UUID::gen(),
                                                "donor-rs0/localhost:12345",
                                                "tenantA",
+                                               kDefaultStartMigrationTimestamp,
                                                ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     stateDoc3.setRecipientCertificateForDonor(kRecipientPEMPayload);
     ASSERT_OK(insertStateDoc(opCtx.get(), stateDoc3));
@@ -206,6 +217,7 @@ TEST_F(TenantMigrationRecipientEntryHelpersTest,
     TenantMigrationRecipientDocument stateDoc4(UUID::gen(),
                                                "donor-rs0/localhost:12345",
                                                "tenantC",
+                                               kDefaultStartMigrationTimestamp,
                                                ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     stateDoc4.setRecipientCertificateForDonor(kRecipientPEMPayload);
     ASSERT_OK(insertStateDoc(opCtx.get(), stateDoc4));

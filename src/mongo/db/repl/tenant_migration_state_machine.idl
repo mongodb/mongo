@@ -153,6 +153,14 @@ structs:
                 description: "The tenantId for the migration."
                 validator:
                     callback: "tenant_migration_util::validateDatabasePrefix"
+            startMigrationDonorTimestamp:
+                type: timestamp
+                description: >-
+                    Timestamp after all index builds for tenant are complete or aborted.  Recipient
+                    must not start cloning/fetching oplog entries from the donor until this
+                    timestamp is majority committed.
+                validator:
+                    callback: "tenant_migration_util::validateTimestampNotNull"
             readPreference:
                 type: readPreference
                 description: >-
