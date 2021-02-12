@@ -62,6 +62,12 @@ public:
                     repl::feature_flags::gTenantMigrations.isEnabled(
                         serverGlobalParams.featureCompatibility));
 
+            // (Generic FCV reference): This FCV reference should exist across LTS binary versions.
+            uassert(
+                5356100,
+                "donorStartMigration not available while upgrading or downgrading the donor FCV",
+                !serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading());
+
             const auto& cmd = request();
 
             TenantMigrationDonorDocument stateDoc(cmd.getMigrationId(),
