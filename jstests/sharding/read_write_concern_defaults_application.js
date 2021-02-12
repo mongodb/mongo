@@ -125,6 +125,7 @@ let testCases = {
     _shardsvrRenameCollection: {skip: "internal command"},
     _shardsvrRenameCollectionParticipant: {skip: "internal command"},
     _shardsvrRenameCollectionUnblockParticipant: {skip: "internal command"},
+    _shardsvrReshardCollection: {skip: "internal command"},
     _shardsvrShardCollection: {skip: "internal command"},
     _transferMods: {skip: "internal command"},
     _vectorClockPersist: {skip: "internal command"},

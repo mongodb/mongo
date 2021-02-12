@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2020-present MongoDB, Inc.
+ *    Copyright (C) 2021-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -33,50 +33,52 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
-#include "mongo/logv2/log.h"
-#include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/s/catalog_cache.h"
-#include "mongo/s/cluster_commands_helpers.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/request_types/reshard_collection_gen.h"
+#include "mongo/db/s/reshard_collection_coordinator.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 
 namespace mongo {
 namespace {
 
-class ReshardCollectionCmd : public TypedCommand<ReshardCollectionCmd> {
+class ShardsvrReshardCollectionCommand final
+    : public TypedCommand<ShardsvrReshardCollectionCommand> {
 public:
-    using Request = ReshardCollection;
+    using Request = ShardsvrReshardCollection;
+
+    std::string help() const override {
+        return "Internal command. Do not call directly. Reshards a collection.";
+    }
+
+    bool adminOnly() const override {
+        return true;
+    }
+
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+        return AllowedOnSecondary::kNever;
+    }
 
     class Invocation final : public InvocationBase {
     public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
-            const auto& nss = ns();
-            ShardsvrReshardCollection shardsvrReshardCollection(nss, request().getKey());
-            shardsvrReshardCollection.setDbName(request().getDbName());
-            shardsvrReshardCollection.setUnique(request().getUnique());
-            shardsvrReshardCollection.setCollation(request().getCollation());
-            shardsvrReshardCollection.set_presetReshardedChunks(
-                request().get_presetReshardedChunks());
-            shardsvrReshardCollection.setZones(request().getZones());
-            shardsvrReshardCollection.setNumInitialChunks(request().getNumInitialChunks());
+            uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
 
-            auto catalogCache = Grid::get(opCtx)->catalogCache();
-            const auto dbInfo = uassertStatusOK(catalogCache->getDatabase(opCtx, nss.db()));
+            uassert(ErrorCodes::InvalidOptions,
+                    str::stream() << Request::kCommandName
+                                  << " must be called with majority writeConcern, got "
+                                  << opCtx->getWriteConcern().wMode,
+                    opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
+            // (Generic FCV reference): To run this command and ensure the consistency of the
+            // metadata we need to make sure we are on a stable state.
+            uassert(
+                ErrorCodes::CommandNotSupported,
+                "Resharding is not supported for this version, please update the FCV to latest.",
+                !serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading());
 
-            auto cmdResponse = executeCommandAgainstDatabasePrimary(
-                opCtx,
-                "admin",
-                dbInfo,
-                CommandHelpers::appendMajorityWriteConcern(shardsvrReshardCollection.toBSON({}),
-                                                           opCtx->getWriteConcern()),
-                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                Shard::RetryPolicy::kIdempotent);
-
-            const auto remoteResponse = uassertStatusOK(cmdResponse.swResponse);
-            uassertStatusOK(getStatusFromCommandResult(remoteResponse.data));
+            auto reshardCollectionCoordinator =
+                std::make_shared<ReshardCollectionCoordinator>(opCtx, request());
+            reshardCollectionCoordinator->run(opCtx).get(opCtx);
         }
 
     private:
@@ -92,25 +94,12 @@ public:
             uassert(ErrorCodes::Unauthorized,
                     "Unauthorized",
                     AuthorizationSession::get(opCtx->getClient())
-                        ->isAuthorizedForActionsOnResource(ResourcePattern::forExactNamespace(ns()),
-                                                           ActionType::reshardCollection));
+                        ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
+                                                           ActionType::internal));
         }
     };
 
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return AllowedOnSecondary::kNever;
-    }
-
-    bool adminOnly() const override {
-        return true;
-    }
-
-    std::string help() const override {
-        return "Reshard an already sharded collection on a new shard key.";
-    }
-};
-
-MONGO_REGISTER_TEST_COMMAND(ReshardCollectionCmd);
+} shardsvrReshardCollectionCommand;
 
 }  // namespace
 }  // namespace mongo
