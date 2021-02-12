@@ -2084,9 +2084,8 @@ void IndexBuildsCoordinator::_runIndexBuildInner(
     // This Status stays unchanged unless we catch an exception in the following try-catch block.
     auto status = Status::OK();
     try {
-        while (MONGO_unlikely(hangAfterInitializingIndexBuild.shouldFail())) {
-            hangAfterInitializingIndexBuild.pauseWhileSet(opCtx);
-        }
+
+        hangAfterInitializingIndexBuild.pauseWhileSet(opCtx);
 
         if (resumeInfo) {
             _resumeIndexBuildFromPhase(opCtx, replState, indexBuildOptions, resumeInfo.get());
