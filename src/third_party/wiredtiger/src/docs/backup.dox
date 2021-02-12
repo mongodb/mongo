@@ -121,7 +121,7 @@ The following is the procedure for incrementally backing up a database
 using block modifications:
 
 1. Perform a full backup of the database (as described above), with the
-additional configuration \c incremental=(enabled=true,this_id=”ID1”).
+additional configuration \c incremental=(enabled=true,this_id="ID1").
 The identifier specified in \c this_id starts block tracking and that
 identifier can be used in the future as the source of an incremental
 backup.
