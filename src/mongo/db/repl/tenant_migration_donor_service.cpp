@@ -68,7 +68,6 @@ const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
 
 const ReadPreferenceSetting kPrimaryOnlyReadPreference(ReadPreference::PrimaryOnly);
 
-const Seconds kRecipientSyncDataTimeout(30);
 const int kMaxRecipientKeyDocsFindAttempts = 10;
 
 bool shouldStopCreatingTTLIndex(Status status, const CancelationToken& token) {
@@ -610,8 +609,7 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendCommandToRecipi
                                NamespaceString::kAdminDb.toString(),
                                std::move(cmdObj),
                                rpc::makeEmptyMetadata(),
-                               nullptr,
-                               kRecipientSyncDataTimeout);
+                               nullptr);
                            request.sslMode = _sslMode;
 
                            return (_recipientCmdExecutor)
