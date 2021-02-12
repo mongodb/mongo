@@ -946,7 +946,7 @@ let MongosAPIParametersUtil = (function() {
             run: {
                 inAPIVersion1: false,
                 permittedInTxn: false,
-                configServerCommandName: "_configsvrReshardCollection",
+                shardCommandName: "_shardsvrReshardCollection",
                 requiresShardedCollection: true,
                 // reshardCollection internally does atClusterTime reads.
                 requiresCommittedReads: true,
