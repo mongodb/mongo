@@ -2,7 +2,6 @@
 // shard key since the document needs to be fetched in order to apply the SHARDING_FILTER stage.
 // @tags: [
 //   assumes_unsharded_collection,
-//   sbe_incompatible,
 // ]
 
 /**
@@ -14,6 +13,11 @@
 
 load("jstests/libs/analyze_plan.js");
 
+const isSBEEnabled = (() => {
+    const getParam = db.adminCommand({getParameter: 1, featureFlagSBE: 1});
+    return getParam.hasOwnProperty("featureFlagSBE") && getParam.featureFlagSBE.value;
+})();
+
 let coll = db["projection_dotted_paths"];
 coll.drop();
 assert.commandWorked(coll.createIndex({a: 1, "b.c": 1, "b.d": 1, c: 1}));
@@ -24,8 +28,8 @@ assert.commandWorked(coll.insert({_id: 1, a: 1, b: {c: 1, d: 1, e: 1}, c: 1, e: 
 let resultDoc = coll.findOne({a: 1}, {_id: 0, a: 1, "b.c": 1, "b.d": 1, c: 1});
 assert.eq(resultDoc, {a: 1, b: {c: 1, d: 1}, c: 1});
 let explain = coll.find({a: 1}, {_id: 0, a: 1, "b.c": 1, "b.d": 1, c: 1}).explain("queryPlanner");
-assert(isIxscan(db, explain.queryPlanner.winningPlan));
-assert(isIndexOnly(db, explain.queryPlanner.winningPlan));
+assert(isIxscan(db, explain.queryPlanner.winningPlan), explain);
+assert(isIndexOnly(db, explain.queryPlanner.winningPlan), explain);
 
 // Project a subset of the indexed fields. Verify that the projection is computed correctly and
 // that the plan is covered.
@@ -63,7 +67,11 @@ assert(!isIndexOnly(db, explain.queryPlanner.winningPlan));
 resultDoc = coll.findOne({_id: 1}, {_id: 0, "b.c": 1, "b.e": 1, c: 1});
 assert.eq(resultDoc, {b: {c: 1, e: 1}, c: 1});
 explain = coll.find({_id: 1}, {_id: 0, "b.c": 1, "b.e": 1, c: 1}).explain("queryPlanner");
-assert(isIdhack(db, explain.queryPlanner.winningPlan));
+if (isSBEEnabled) {
+    assert(isIxscan(db, explain.queryPlanner.winningPlan), explain);
+} else {
+    assert(isIdhack(db, explain.queryPlanner.winningPlan), explain);
+}
 
 // If we make a dotted path multikey, projections using that path cannot be covered. But
 // projections which do not include the multikey path can still be covered.
@@ -95,4 +103,27 @@ assert(isIndexOnly(db, explain.queryPlanner.winningPlan));
 // with nulls. This is a bug tracked by SERVER-23229.
 resultDoc = coll.findOne({a: 1}, {_id: 0, "x.y.y": 1, "x.y.z": 1, "x.z": 1});
 assert.eq(resultDoc, {x: {y: {y: null, z: null}, z: null}});
+
+// Test covered plans where an index contains overlapping dotted paths.
+{
+    assert.commandWorked(coll.createIndex({"a.b.c": 1, "a.b": 1}));
+    assert.commandWorked(coll.insert({a: {b: {c: 1, d: 1}}}));
+    explain = coll.find({"a.b.c": 1}, {_id: 0, "a.b": 1}).explain();
+    assert(isIxscan(db, explain.queryPlanner.winningPlan));
+    assert(isIndexOnly(db, explain.queryPlanner.winningPlan));
+    assert.eq(coll.findOne({"a.b.c": 1}, {_id: 0, "a.b": 1}), {a: {b: {c: 1, d: 1}}});
+}
+
+{
+    assert.commandWorked(coll.dropIndexes());
+
+    assert.commandWorked(coll.createIndex({"a.b": 1, "a.b.c": 1}));
+    assert.commandWorked(coll.insert({a: {b: {c: 1, d: 1}}}));
+
+    const filter = {"a.b": {c: 1, d: 1}};
+    explain = coll.find(filter, {_id: 0, "a.b": 1}).explain();
+    assert(isIxscan(db, explain.queryPlanner.winningPlan));
+    assert(isIndexOnly(db, explain.queryPlanner.winningPlan));
+    assert.eq(coll.findOne(filter, {_id: 0, "a.b": 1}), {a: {b: {c: 1, d: 1}}});
+}
 }());
