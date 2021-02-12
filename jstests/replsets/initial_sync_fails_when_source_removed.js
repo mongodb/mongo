@@ -76,7 +76,6 @@ beforeFinishFailPoint.wait();
 const res = assert.commandWorked(initialSyncNode.adminCommand({replSetGetStatus: 1}));
 // The initial sync should have failed.
 assert.eq(res.initialSyncStatus.failedInitialSyncAttempts, 1);
-beforeFinishFailPoint.off();
 
 // We skip validation and dbhashes because the initial sync failed so the initial sync node is
 // invalid and unreachable.
