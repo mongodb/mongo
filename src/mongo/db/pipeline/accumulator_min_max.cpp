@@ -48,7 +48,7 @@ REGISTER_WINDOW_FUNCTION(max, window_function::ExpressionFromAccumulator::parse)
 REGISTER_WINDOW_FUNCTION(min, window_function::ExpressionFromAccumulator::parse);
 
 const char* AccumulatorMinMax::getOpName() const {
-    if (_sense == Sense::kMin)
+    if (_sense == 1)
         return "$min";
     return "$max";
 }

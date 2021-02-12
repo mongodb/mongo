@@ -158,14 +158,6 @@ public:
     }
 
     /**
-     * Construct an empty ordered multiset of Values whose ordering and equivalence classes are
-     * given by this comparator. This comparator must outlive the returned set.
-     */
-    std::multiset<Value, LessThan> makeOrderedValueMultiset() const {
-        return std::multiset<Value, LessThan>(LessThan(this));
-    }
-
-    /**
      * Construct an empty unordered set of Values whose equivalence classes are given by this
      * comparator. This comparator must outlive the returned set.
      */
@@ -200,7 +192,6 @@ private:
 //
 
 using ValueSet = std::set<Value, ValueComparator::LessThan>;
-using ValueMultiset = std::multiset<Value, ValueComparator::LessThan>;
 
 using ValueUnorderedSet =
     stdx::unordered_set<Value, ValueComparator::Hasher, ValueComparator::EqualTo>;
