@@ -61,6 +61,128 @@
 #include "mongo/db/s/collection_sharding_state.h"
 
 namespace mongo::stage_builder {
+namespace {
+/**
+ * Tree representation of an index key pattern.
+ *
+ * For example, the key pattern {a.b: 1, x: 1, a.c: 1} would look like:
+ *
+ *         <root>
+ *         /   |
+ *        a    x
+ *       / \
+ *      b   c
+ *
+ * This tree is used for building SBE subtrees to re-hydrate index keys.
+ */
+struct IndexKeyPatternTreeNode {
+    IndexKeyPatternTreeNode* emplace(StringData fieldComponent) {
+        auto newNode = std::make_unique<IndexKeyPatternTreeNode>();
+        const auto newNodeRaw = newNode.get();
+        children.emplace(fieldComponent, std::move(newNode));
+        childrenOrder.push_back(fieldComponent.toString());
+
+        return newNodeRaw;
+    }
+
+    StringMap<std::unique_ptr<IndexKeyPatternTreeNode>> children;
+    std::vector<std::string> childrenOrder;
+
+    // Which slot the index key for this component is stored in. May be boost::none for non-leaf
+    // nodes.
+    boost::optional<sbe::value::SlotId> indexKeySlot;
+};
+
+/**
+ * Given a key pattern and an array of slots of equal size, builds an IndexKeyPatternTreeNode
+ * representing the mapping between key pattern component and slot.
+ *
+ * Note that this will "short circuit" in cases where the index key pattern contains two components
+ * where one is a subpath of the other. For example with the key pattern {a:1, a.b: 1}, the "a.b"
+ * component will not be represented in the output tree. For the purpose of rehydrating index keys,
+ * this is fine (and actually preferable).
+ */
+std::unique_ptr<IndexKeyPatternTreeNode> buildKeyPatternTree(const BSONObj& keyPattern,
+                                                             const sbe::value::SlotVector& slots) {
+    size_t i = 0;
+
+    auto root = std::make_unique<IndexKeyPatternTreeNode>();
+    for (auto&& elem : keyPattern) {
+        auto* node = root.get();
+        bool skipElem = false;
+
+        FieldRef fr(elem.fieldNameStringData());
+        for (FieldIndex j = 0; j < fr.numParts(); ++j) {
+            const auto part = fr.getPart(j);
+            if (auto it = node->children.find(part); it != node->children.end()) {
+                node = it->second.get();
+                if (node->indexKeySlot) {
+                    // We're processing the a sub-path of a path that's already indexed.  We can
+                    // bail out here since we won't use the sub-path when reconstructing the
+                    // object.
+                    skipElem = true;
+                    break;
+                }
+            } else {
+                node = node->emplace(part);
+            }
+        }
+
+        if (!skipElem) {
+            node->indexKeySlot = slots[i];
+        }
+
+        ++i;
+    }
+
+    return root;
+}
+
+/**
+ * Given a root IndexKeyPatternTreeNode, this function will construct an SBE expression for
+ * producing a partial object from an index key.
+ *
+ * For example, given the index key pattern {a.b: 1, x: 1, a.c: 1} and the index key
+ * {"": 1, "": 2, "": 3}, the SBE expression would produce the object {a: {b:1, c: 3}, x: 2}.
+ */
+std::unique_ptr<sbe::EExpression> buildNewObjExpr(const IndexKeyPatternTreeNode* kpTree) {
+
+    std::vector<std::unique_ptr<sbe::EExpression>> args;
+    for (auto&& fieldName : kpTree->childrenOrder) {
+        auto it = kpTree->children.find(fieldName);
+
+        args.emplace_back(makeConstant(fieldName));
+        if (it->second->indexKeySlot) {
+            args.emplace_back(makeVariable(*it->second->indexKeySlot));
+        } else {
+            // The reason this is in an else branch is that in the case where we have an index key
+            // like {a.b: ..., a: ...}, we've already made the logic for reconstructing the 'a'
+            // portion, so the 'a.b' subtree can be skipped.
+            args.push_back(buildNewObjExpr(it->second.get()));
+        }
+    }
+
+    return sbe::makeE<sbe::EFunction>("newObj", std::move(args));
+}
+
+/**
+ * Given a stage, and index key pattern a corresponding array of slot IDs, this function
+ * add a ProjectStage to the tree which rehydrates the index key and stores the result in
+ * 'resultSlot.'
+ */
+std::unique_ptr<sbe::PlanStage> rehydrateIndexKey(std::unique_ptr<sbe::PlanStage> stage,
+                                                  const BSONObj& indexKeyPattern,
+                                                  PlanNodeId nodeId,
+                                                  const sbe::value::SlotVector& indexKeySlots,
+                                                  sbe::value::SlotId resultSlot) {
+    auto kpTree = buildKeyPatternTree(indexKeyPattern, indexKeySlots);
+    auto keyExpr = buildNewObjExpr(kpTree.get());
+
+    return sbe::makeProjectStage(std::move(stage), nodeId, resultSlot, std::move(keyExpr));
+}
+}  // namespace
+
+
 std::unique_ptr<sbe::RuntimeEnvironment> makeRuntimeEnvironment(
     const CanonicalQuery& cq,
     OperationContext* opCtx,
@@ -310,16 +432,70 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     // Index scans cannot produce an oplogTsSlot, so assert that the caller doesn't need it.
     invariant(!reqs.has(kOplogTs));
 
-    return generateIndexScan(_opCtx,
-                             _collection,
-                             ixn,
-                             reqs,
-                             &_slotIdGenerator,
-                             &_frameIdGenerator,
-                             &_spoolIdGenerator,
-                             _yieldPolicy,
-                             _data.env,
-                             _lockAcquisitionCallback);
+    sbe::IndexKeysInclusionSet indexKeyBitset;
+
+    if (reqs.has(PlanStageSlots::kReturnKey) || reqs.has(PlanStageSlots::kResult)) {
+        // If either 'reqs.result' or 'reqs.returnKey' is true, we need to get all parts of the
+        // index key (regardless of what was requested by 'reqs.indexKeyBitset') so that we can
+        // create the inflated index key (keyExpr).
+        for (int i = 0; i < ixn->index.keyPattern.nFields(); ++i) {
+            indexKeyBitset.set(i);
+        }
+    } else if (reqs.getIndexKeyBitset()) {
+        indexKeyBitset = *reqs.getIndexKeyBitset();
+    }
+
+    auto [stage, outputs] = generateIndexScan(_opCtx,
+                                              _collection,
+                                              ixn,
+                                              indexKeyBitset,
+                                              &_slotIdGenerator,
+                                              &_frameIdGenerator,
+                                              &_spoolIdGenerator,
+                                              _yieldPolicy,
+                                              _data.env,
+                                              _lockAcquisitionCallback);
+
+    if (reqs.has(PlanStageSlots::kReturnKey)) {
+        std::vector<std::unique_ptr<sbe::EExpression>> mkObjArgs;
+
+        size_t i = 0;
+        for (auto&& elem : ixn->index.keyPattern) {
+            auto fieldName = elem.fieldNameStringData();
+
+            mkObjArgs.emplace_back(sbe::makeE<sbe::EConstant>(
+                std::string_view{fieldName.rawData(), fieldName.size()}));
+            mkObjArgs.emplace_back(sbe::makeE<sbe::EVariable>((*outputs.getIndexKeySlots())[i++]));
+        }
+
+        auto rawKeyExpr = sbe::makeE<sbe::EFunction>("newObj", std::move(mkObjArgs));
+        outputs.set(PlanStageSlots::kReturnKey, _slotIdGenerator.generate());
+        stage = sbe::makeProjectStage(std::move(stage),
+                                      ixn->nodeId(),
+                                      outputs.get(PlanStageSlots::kReturnKey),
+                                      std::move(rawKeyExpr));
+    }
+
+    if (reqs.has(PlanStageSlots::kResult)) {
+        outputs.set(PlanStageSlots::kResult, _slotIdGenerator.generate());
+        stage = rehydrateIndexKey(std::move(stage),
+                                  ixn->index.keyPattern,
+                                  ixn->nodeId(),
+                                  *outputs.getIndexKeySlots(),
+                                  outputs.get(PlanStageSlots::kResult));
+    }
+
+    if (reqs.getIndexKeyBitset()) {
+        outputs.setIndexKeySlots(
+            makeIndexKeyOutputSlotsMatchingParentReqs(ixn->index.keyPattern,
+                                                      *reqs.getIndexKeyBitset(),
+                                                      indexKeyBitset,
+                                                      *outputs.getIndexKeySlots()));
+    } else {
+        outputs.setIndexKeySlots(boost::none);
+    }
+
+    return {std::move(stage), std::move(outputs)};
 }
 
 std::tuple<sbe::value::SlotId, sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>>
