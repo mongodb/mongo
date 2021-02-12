@@ -1,14 +1,23 @@
 /**
  * Basic test to verify the output of $indexStats.
  *
- * @tags: [assumes_read_concern_unchanged, requires_wiredtiger, do_not_wrap_aggregations_in_facets,
- * uses_parallel_shell]
+ * @tags: [
+ *   assumes_read_concern_unchanged,
+ *   requires_wiredtiger,
+ *   # We are setting the failpoint only on primaries, so we need to disable reads from secondaries,
+ *   # where the failpoint is not enabled.
+ *   assumes_read_preference_unchanged,
+ *   # $indexStats aggregation stage cannot be used with $facet.
+ *   do_not_wrap_aggregations_in_facets,
+ *   uses_parallel_shell,
+ * ]
  */
 (function() {
 "use strict";
 load('jstests/noPassthrough/libs/index_build.js');  // for waitForIndexBuildToStart().
 load('jstests/libs/fixture_helpers.js');            // for runCommandOnEachPrimary.
 load("jstests/aggregation/extras/utils.js");        // for resultsEq.
+load("jstests/libs/fail_point_util.js");            // for configureFailPoint.
 
 const coll = db.index_stats_output;
 coll.drop();
@@ -28,9 +37,12 @@ const indexName = "testIndex";
 
 // Verify that in progress index builds report matching 'spec' and 'building: true' in the output of
 // $indexStats.
-FixtureHelpers.runCommandOnEachPrimary({
+
+// Enable 'hangAfterStartingIndexBuild' failpoint on each of the primaries. This will make index
+// building process infinite.
+const failPoints = FixtureHelpers.mapOnEachPrimary({
     db: db.getSiblingDB("admin"),
-    cmdObj: {configureFailPoint: "hangAfterStartingIndexBuild", mode: "alwaysOn"}
+    func: (db) => configureFailPoint(db, "hangAfterStartingIndexBuild")
 });
 
 const join = startParallelShell(() => {
@@ -39,7 +51,15 @@ const join = startParallelShell(() => {
     assert.commandWorked(db.index_stats_output.createIndex(indexKey, {unique: 1, name: indexName}));
 });
 
-IndexBuildTest.waitForIndexBuildToStart(db, coll.getName(), indexName);
+// Wait for the failpoint to be hit on each of the primaries.
+// This ensures that the index build started. We cannot use
+// 'IndexBuildTest.waitForIndexBuildToStart()' for it because it checks if any index build operation
+// exists. In the sharded cluster it may lead to the situation where only one shard has started
+// index build and triggered 'waitForIndexBuildToStart' to return. We want to wait for all shards
+// to start index building before proceeding with the test.
+// This also ensures that the index was added to the catalog, so that in can be seen by $indexStats
+// stage (see SERVER-54172 for details).
+failPoints.map((failPoint) => failPoint.wait());
 
 let pausedOutput = coll.aggregate([{$indexStats: {}}, {$match: {name: indexName}}]).toArray();
 
@@ -70,14 +90,16 @@ for (const shard of shardsFound) {
     assert.contains(shard, allShards);
 }
 
-FixtureHelpers.runCommandOnEachPrimary({
-    db: db.getSiblingDB("admin"),
-    cmdObj: {configureFailPoint: "hangAfterStartingIndexBuild", mode: "off"}
-});
-join();
+// Turn off failpoint on each of the primaries
+failPoints.map((failPoint) => failPoint.off());
 
-// Verify that index build has stopped before checking for the 'building' field.
+// Wait until all index building operations stop. It is safe to use
+// 'IndexBuildTest.waitForIndexBuildToStop()' here because it ensures that no index building
+// operation exists. So in the sharded cluster, this function will return only when all shards
+// stopped index building.
 IndexBuildTest.waitForIndexBuildToStop(db, coll.getName(), indexName);
+
+join();
 
 // Verify that there is no 'building' field in the $indexStats output for our created index once the
 // index build is complete.
