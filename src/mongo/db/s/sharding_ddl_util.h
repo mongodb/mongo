@@ -30,11 +30,21 @@
 #include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 
 namespace mongo {
 namespace sharding_ddl_util {
+
+/**
+ * Generic utility to send a command to a list of shards. Throws if one of the commands fails.
+ */
+void sendAuthenticatedCommandToShards(OperationContext* opCtx,
+                                      StringData dbName,
+                                      const BSONObj& command,
+                                      const std::vector<ShardId>& shardIds,
+                                      const std::shared_ptr<executor::TaskExecutor>& executor);
 
 /**
  * Erase tags metadata from config server for the given namespace.

@@ -58,7 +58,6 @@ public:
      */
     virtual void checkIfOptionsConflict(const BSONObj& coorDoc) const = 0;
 
-
     /*
      * Returns a future that will be completed when the construction of this coordinator instance
      * is completed.
@@ -90,6 +89,11 @@ private:
     virtual ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                           const CancelationToken& token) noexcept = 0;
 
+    void interrupt(Status status) override final;
+
+    virtual void _interruptImpl(Status status) = 0;
+
+    Mutex _mutex = MONGO_MAKE_LATCH("ShardingDDLCoordinator::_mutex");
     SharedPromise<void> _constructionCompletionPromise;
 };
 

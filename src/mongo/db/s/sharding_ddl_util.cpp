@@ -36,7 +36,9 @@
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
+#include "mongo/db/s/sharding_util.h"
 #include "mongo/logv2/log.h"
+#include "mongo/rpc/metadata/impersonated_user_metadata.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_tags.h"
@@ -105,6 +107,19 @@ void deleteCollection(OperationContext* opCtx, const NamespaceString& nss) {
 }
 
 }  // namespace
+
+void sendAuthenticatedCommandToShards(OperationContext* opCtx,
+                                      StringData dbName,
+                                      const BSONObj& command,
+                                      const std::vector<ShardId>& shardIds,
+                                      const std::shared_ptr<executor::TaskExecutor>& executor) {
+    // The AsyncRequestsSender ignore impersonation metadata so we need to manually attach them to
+    // the command
+    BSONObjBuilder bob(command);
+    rpc::writeAuthDataToImpersonatedUserMetadata(opCtx, &bob);
+    auto authenticatedCommand = bob.obj();
+    sharding_util::sendCommandToShards(opCtx, dbName, authenticatedCommand, shardIds, executor);
+}
 
 void removeTagsMetadataFromConfig(OperationContext* opCtx, const NamespaceString& nss) {
     const auto catalogClient = Grid::get(opCtx)->catalogClient();

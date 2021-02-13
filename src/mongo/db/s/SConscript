@@ -334,6 +334,7 @@ env.Library(
         'config/configsvr_update_zone_key_range_command.cpp',
         'create_collection_coordinator.cpp',
         'drop_collection_coordinator.cpp',
+        'drop_collection_coordinator_document.idl',
         'drop_database_coordinator.cpp',
         'flush_database_cache_updates_command.cpp',
         'flush_routing_table_cache_updates_command.cpp',

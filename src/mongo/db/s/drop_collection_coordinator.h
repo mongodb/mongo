@@ -29,24 +29,65 @@
 
 #pragma once
 
+#include "mongo/db/s/drop_collection_coordinator_document_gen.h"
 #include "mongo/db/s/sharding_ddl_coordinator.h"
-#include "mongo/s/shard_id.h"
 
 namespace mongo {
 
-class DropCollectionCoordinator final
-    : public ShardingDDLCoordinator_NORESILIENT,
-      public std::enable_shared_from_this<DropCollectionCoordinator> {
+class DropCollectionCoordinator final : public ShardingDDLCoordinator {
 public:
-    DropCollectionCoordinator(OperationContext* opCtx, const NamespaceString& nss);
+    using StateDoc = DropCollectionCoordinatorDocument;
+    using Phase = DropCollectionCoordinatorPhaseEnum;
+
+    DropCollectionCoordinator(const BSONObj& initialState);
+    ~DropCollectionCoordinator() override;
+
+    void checkIfOptionsConflict(const BSONObj& doc) const override {}
+
+    boost::optional<BSONObj> reportForCurrentOp(
+        MongoProcessInterface::CurrentOpConnectionsMode connMode,
+        MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept override;
+
+    /**
+     * Returns a Future that will be resolved when all work associated with this Instance has
+     * completed running.
+     */
+    SharedSemiFuture<void> getCompletionFuture() const {
+        return _completionPromise.getFuture();
+    }
 
 private:
-    SemiFuture<void> runImpl(std::shared_ptr<executor::TaskExecutor> executor) override;
+    ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                                  const CancelationToken& token) noexcept override;
 
-    void _sendDropCollToParticipants(OperationContext* opCtx);
+    void _interruptImpl(Status status) override;
 
-    ServiceContext* _serviceContext;
-    std::vector<ShardId> _participants;
+    template <typename Func>
+    auto _executePhase(const Phase& newPhase, Func&& func) {
+        return [=] {
+            const auto& currPhase = _doc.getPhase();
+
+            if (currPhase > newPhase) {
+                // Do not execute this phase if we already reached a subsequent one.
+                return;
+            }
+            if (currPhase < newPhase) {
+                // Persist the new phase if this is the first time we are executing it.
+                _enterPhase(newPhase);
+            }
+            return func();
+        };
+    }
+
+    void _insertStateDocument(StateDoc&& doc);
+    void _updateStateDocument(StateDoc&& newStateDoc);
+    void _removeStateDocument();
+    void _enterPhase(Phase newPhase);
+
+    DropCollectionCoordinatorDocument _doc;
+
+    Mutex _mutex = MONGO_MAKE_LATCH("DropCollectionCoordinator::_mutex");
+    SharedPromise<void> _completionPromise;
 };
 
 }  // namespace mongo

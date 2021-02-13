@@ -30,6 +30,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 #include "mongo/platform/basic.h"
+#include <fmt/format.h>
 
 #include "mongo/db/s/sharding_util.h"
 
@@ -40,8 +41,9 @@
 #include "mongo/s/request_types/flush_routing_table_cache_updates_gen.h"
 
 namespace mongo {
-
 namespace sharding_util {
+
+using namespace fmt::literals;
 
 void tellShardsToRefreshCollection(OperationContext* opCtx,
                                    const std::vector<ShardId>& shardIds,
@@ -51,7 +53,7 @@ void tellShardsToRefreshCollection(OperationContext* opCtx,
     cmd.setSyncFromConfig(true);
     cmd.setDbName(nss.db());
     auto cmdObj = CommandHelpers::appendMajorityWriteConcern(cmd.toBSON({}));
-    sendCommandToShards(opCtx, cmdObj, shardIds, executor);
+    sendCommandToShards(opCtx, NamespaceString::kAdminDb, cmdObj, shardIds, executor);
 }
 
 void tellShardsToRefreshDatabase(OperationContext* opCtx,
@@ -62,10 +64,11 @@ void tellShardsToRefreshDatabase(OperationContext* opCtx,
     cmd.setSyncFromConfig(true);
     cmd.setDbName(dbName);
     auto cmdObj = CommandHelpers::appendMajorityWriteConcern(cmd.toBSON({}));
-    sendCommandToShards(opCtx, cmdObj, shardIds, executor);
+    sendCommandToShards(opCtx, NamespaceString::kAdminDb, cmdObj, shardIds, executor);
 }
 
 void sendCommandToShards(OperationContext* opCtx,
+                         StringData dbName,
                          const BSONObj& command,
                          const std::vector<ShardId>& shardIds,
                          const std::shared_ptr<executor::TaskExecutor>& executor) {
@@ -82,7 +85,7 @@ void sendCommandToShards(OperationContext* opCtx,
         // the ARS automatically retries in that situation.
         AsyncRequestsSender ars(opCtx,
                                 executor,
-                                "admin",
+                                dbName,
                                 requests,
                                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                                 Shard::RetryPolicy::kIdempotentOrCursorInvalidated);
@@ -91,19 +94,17 @@ void sendCommandToShards(OperationContext* opCtx,
             // Retrieve the responses and throw at the first failure.
             auto response = ars.next();
 
-            auto generateErrorContext = [&]() -> std::string {
-                return str::stream()
-                    << "Failed command " << command.toString() << " on " << response.shardId;
-            };
+            const auto errorContext = "Failed command {} for database '{}' on shard '{}'"_format(
+                command.toString(), dbName, response.shardId);
 
             auto shardResponse =
-                uassertStatusOKWithContext(std::move(response.swResponse), generateErrorContext());
+                uassertStatusOKWithContext(std::move(response.swResponse), errorContext);
 
             auto status = getStatusFromCommandResult(shardResponse.data);
-            uassertStatusOKWithContext(status, generateErrorContext());
+            uassertStatusOKWithContext(status, errorContext);
 
             auto wcStatus = getWriteConcernStatusFromCommandResult(shardResponse.data);
-            uassertStatusOKWithContext(wcStatus, generateErrorContext());
+            uassertStatusOKWithContext(wcStatus, errorContext);
         }
     }
 }

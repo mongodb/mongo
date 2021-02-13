@@ -36,6 +36,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/s/drop_collection_coordinator.h"
 #include "mongo/db/s/drop_collection_legacy.h"
+#include "mongo/db/s/sharding_ddl_coordinator_service.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
@@ -75,12 +76,8 @@ public:
                                   << opCtx->getWriteConcern().wMode,
                     opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
 
-            bool useNewPath = [&] {
-                return feature_flags::gShardingFullDDLSupport.isEnabled(
-                           serverGlobalParams.featureCompatibility) &&
-                    !feature_flags::gDisableIncompleteShardingDDLSupport.isEnabled(
-                        serverGlobalParams.featureCompatibility);
-            }();
+            const auto useNewPath = feature_flags::gShardingFullDDLSupport.isEnabled(
+                serverGlobalParams.featureCompatibility);
 
             if (!useNewPath) {
                 LOGV2_DEBUG(5280951,
@@ -99,9 +96,13 @@ public:
             CurOp::get(opCtx)->raiseDbProfileLevel(
                 CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(ns().db()));
 
-            auto dropCollectionCoordinator =
-                std::make_shared<DropCollectionCoordinator>(opCtx, ns());
-            dropCollectionCoordinator->run(opCtx).get();
+            auto coordinatorDoc = DropCollectionCoordinatorDocument();
+            coordinatorDoc.setShardingDDLCoordinatorMetadata(
+                {{ns(), DDLCoordinatorTypeEnum::kDropCollection}});
+            auto service = ShardingDDLCoordinatorService::getService(opCtx);
+            auto dropCollCoordinator = checked_pointer_cast<DropCollectionCoordinator>(
+                service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON()));
+            dropCollCoordinator->getCompletionFuture().get(opCtx);
         }
 
     private:

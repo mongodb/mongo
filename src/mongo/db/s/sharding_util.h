@@ -58,9 +58,10 @@ void tellShardsToRefreshDatabase(OperationContext* opCtx,
                                  const std::shared_ptr<executor::TaskExecutor>& executor);
 
 /**
- * Generic utility to send a command to a list of shards. Throwfs if one of the commands fails.
+ * Generic utility to send a command to a list of shards. Throws if one of the commands fails.
  */
 void sendCommandToShards(OperationContext* opCtx,
+                         StringData dbName,
                          const BSONObj& command,
                          const std::vector<ShardId>& shardIds,
                          const std::shared_ptr<executor::TaskExecutor>& executor);
