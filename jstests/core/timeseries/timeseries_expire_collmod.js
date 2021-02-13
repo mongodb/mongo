@@ -18,72 +18,71 @@ if (!TimeseriesTest.timeseriesCollectionsEnabled(db.getMongo())) {
     return;
 }
 
-const testDB = db.getSiblingDB("timeseries_expire_collmod");
-assert.commandWorked(testDB.dropDatabase());
-
-const coll = testDB.getCollection('t');
+const coll = db.timeseries_expire_collmod;
 coll.drop();
 
 const timeFieldName = 'time';
 const expireAfterSeconds = NumberLong(5);
-assert.commandWorked(testDB.createCollection(
+assert.commandWorked(db.createCollection(
     coll.getName(),
     {timeseries: {timeField: timeFieldName, expireAfterSeconds: expireAfterSeconds}}));
 
-const bucketsColl = testDB.getCollection('system.buckets.' + coll.getName());
+const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
 
 // Cannot use the 'clusteredIndex' option on collections that aren't time-series bucket collections.
-assert.commandWorked(testDB.createCollection("other"));
+const collNotClustered = db.getCollection(coll.getName() + '_not_clustered');
+collNotClustered.drop();
+assert.commandWorked(db.createCollection(collNotClustered.getName()));
 assert.commandFailedWithCode(
-    testDB.runCommand({collMod: "other", clusteredIndex: {expireAfterSeconds: 10}}),
+    db.runCommand({collMod: collNotClustered.getName(), clusteredIndex: {expireAfterSeconds: 10}}),
     ErrorCodes.InvalidOptions);
 
 // Check for invalid input.
 assert.commandFailedWithCode(
-    testDB.runCommand({collMod: bucketsColl.getName(), clusteredIndex: {expireAfterSeconds: "10"}}),
+    db.runCommand({collMod: bucketsColl.getName(), clusteredIndex: {expireAfterSeconds: "10"}}),
     ErrorCodes.InvalidOptions);
 assert.commandFailedWithCode(
-    testDB.runCommand({collMod: bucketsColl.getName(), clusteredIndex: {expireAfterSeconds: {}}}),
+    db.runCommand({collMod: bucketsColl.getName(), clusteredIndex: {expireAfterSeconds: {}}}),
     ErrorCodes.TypeMismatch);
 assert.commandFailedWithCode(
-    testDB.runCommand({collMod: bucketsColl.getName(), clusteredIndex: {expireAfterSeconds: -10}}),
+    db.runCommand({collMod: bucketsColl.getName(), clusteredIndex: {expireAfterSeconds: -10}}),
     ErrorCodes.InvalidOptions);
-assert.commandFailedWithCode(
-    testDB.runCommand({collMod: bucketsColl.getName(), clusteredIndex: {}}), 40414);
+assert.commandFailedWithCode(db.runCommand({collMod: bucketsColl.getName(), clusteredIndex: {}}),
+                             40414);
 
 let res = assert.commandWorked(
-    testDB.runCommand({listCollections: 1, filter: {name: bucketsColl.getName()}}));
+    db.runCommand({listCollections: 1, filter: {name: bucketsColl.getName()}}));
 assert.eq(expireAfterSeconds, res.cursor.firstBatch[0].options.clusteredIndex.expireAfterSeconds);
 
 // Change expireAfterSeconds to 10.
 assert.commandWorked(
-    testDB.runCommand({collMod: bucketsColl.getName(), clusteredIndex: {expireAfterSeconds: 10}}));
+    db.runCommand({collMod: bucketsColl.getName(), clusteredIndex: {expireAfterSeconds: 10}}));
 
 res = assert.commandWorked(
-    testDB.runCommand({listCollections: 1, filter: {name: bucketsColl.getName()}}));
+    db.runCommand({listCollections: 1, filter: {name: bucketsColl.getName()}}));
 assert.eq(10, res.cursor.firstBatch[0].options.clusteredIndex.expireAfterSeconds);
 
 // Change expireAfterSeconds to 0.
 assert.commandWorked(
-    testDB.runCommand({collMod: bucketsColl.getName(), clusteredIndex: {expireAfterSeconds: 0}}));
+    db.runCommand({collMod: bucketsColl.getName(), clusteredIndex: {expireAfterSeconds: 0}}));
 
 res = assert.commandWorked(
-    testDB.runCommand({listCollections: 1, filter: {name: bucketsColl.getName()}}));
+    db.runCommand({listCollections: 1, filter: {name: bucketsColl.getName()}}));
 assert.eq(0, res.cursor.firstBatch[0].options.clusteredIndex.expireAfterSeconds);
 
 // Disable expireAfterSeconds.
-assert.commandWorked(testDB.runCommand(
-    {collMod: bucketsColl.getName(), clusteredIndex: {expireAfterSeconds: "off"}}));
+assert.commandWorked(
+    db.runCommand({collMod: bucketsColl.getName(), clusteredIndex: {expireAfterSeconds: "off"}}));
 
 res = assert.commandWorked(
-    testDB.runCommand({listCollections: 1, filter: {name: bucketsColl.getName()}}));
+    db.runCommand({listCollections: 1, filter: {name: bucketsColl.getName()}}));
 assert(!res.cursor.firstBatch[0].options.clusteredIndex.hasOwnProperty("expireAfterSeconds"));
 
 // Enable expireAfterSeconds again.
 assert.commandWorked(
-    testDB.runCommand({collMod: bucketsColl.getName(), clusteredIndex: {expireAfterSeconds: 100}}));
+    db.runCommand({collMod: bucketsColl.getName(), clusteredIndex: {expireAfterSeconds: 100}}));
 
 res = assert.commandWorked(
-    testDB.runCommand({listCollections: 1, filter: {name: bucketsColl.getName()}}));
+    db.runCommand({listCollections: 1, filter: {name: bucketsColl.getName()}}));
 assert.eq(100, res.cursor.firstBatch[0].options.clusteredIndex.expireAfterSeconds);
 })();
