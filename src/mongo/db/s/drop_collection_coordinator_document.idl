@@ -26,36 +26,48 @@
 # it in the license file.
 #
 
+# This file defines the format of documents stored in config.ddl.dropCollections on the coordinator
+# shard for a drop collection operation.
+
 global:
     cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/s/catalog/type_collection.h"
 
 imports:
-     - "mongo/idl/basic_types.idl"
-     - "mongo/rpc/metadata/impersonated_user_metadata.idl"
+    - "mongo/idl/basic_types.idl"
+    - "mongo/db/s/sharding_ddl_coordinator.idl"
+
+enums:
+    DropCollectionCoordinatorPhase:
+        description: "The current state of a drop collection operation on the coordinator."
+        type: string
+        values:
+            kUnset: "unset"
+            kFreezeCollection: "freezeCollection"
+            kDropCollection: "dropCollection"
+
+types:
+    CollectionInfo:
+        description: "Information of the collection to drop."
+        bson_serialization_type: object
+        cpp_type: CollectionType
+        serializer: "mongo::CollectionType::toBSON"
+        deserializer: "mongo::CollectionType"
 
 structs:
-    AuthenticationMetadata:
-        # Since we need to store this struct in collection,
-        # we need to redefine the ImpersonatedUserMetadata struct because
-        # it has fields prefixed with with '$' dollar sign that are not supported
-        # by our storage engine.
-        description: "A struct representing the impersonated users associated with a specific operation."
+    DropCollectionCoordinatorDocument:
+        description: "Represents a drop collection operation on the coordinator shard."
+        generate_comparison_operators: false
         strict: false
+        chained_structs:
+            ShardingDDLCoordinatorMetadata: ShardingDDLCoordinatorMetadata
         fields:
-            users:
-                type: array<UserName>
-            roles:
-                type: array<RoleName>
+            phase:
+                type: DropCollectionCoordinatorPhase
+                default: kUnset
+            collInfo:
+                description: "Information of the collection to drop, used only for sharded collection."
+                type: CollectionInfo
+                optional: true
 
-    ForwardableOperationMetadataBase:
-        description: "Used to store metadata of an operation context that can be safely passed among different threads."
-        strict: false
-        fields:
-            comment:
-                type: object_owned
-                description: "The comment assiociated with the operation."
-                optional: true
-            impersonatedUserMetadata:
-                type: AuthenticationMetadata
-                description: "The impersonated users associated with the operation."
-                optional: true

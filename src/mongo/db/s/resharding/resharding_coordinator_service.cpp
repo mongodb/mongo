@@ -1399,6 +1399,7 @@ void ReshardingCoordinatorService::ReshardingCoordinator::_tellAllParticipantsTo
     participantShardIds.insert(recipientShardIds.begin(), recipientShardIds.end());
 
     sharding_util::sendCommandToShards(opCtx.get(),
+                                       NamespaceString::kAdminDb,
                                        refreshCmd,
                                        {participantShardIds.begin(), participantShardIds.end()},
                                        **executor);

@@ -35,6 +35,7 @@
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/db/s/database_sharding_state.h"
+#include "mongo/db/s/drop_collection_coordinator.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharding_ddl_coordinator.h"
 #include "mongo/logv2/log.h"
@@ -56,8 +57,7 @@ ShardingDDLCoordinatorService::constructInstance(BSONObj initialState) const {
                 "coordinatorDoc"_attr = op.toBSON());
     switch (op.getId().getOperationType()) {
         case DDLCoordinatorTypeEnum::kDropCollection:
-            // Switch with only default case are not supported on windows compiler
-            return {};
+            return std::make_shared<DropCollectionCoordinator>(std::move(initialState));
             break;
         default:
             uasserted(ErrorCodes::BadValue,
@@ -106,7 +106,6 @@ ShardingDDLCoordinatorService::getOrCreateInstance(OperationContext* opCtx, BSON
         coordinator->checkIfOptionsConflict(coorDoc);
     }
 
-    coordinator->getConstructionCompletionFuture().get(opCtx);
     return coordinator;
 }
 

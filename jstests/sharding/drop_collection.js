@@ -61,7 +61,7 @@ function assertCollectionDropped(ns, uuid = null) {
     }
 }
 
-// Drop unsharded collection
+jsTest.log("Drop unsharded collection.");
 {
     const db = getNewDb();
     const coll = db['unshardedColl0'];
@@ -73,7 +73,7 @@ function assertCollectionDropped(ns, uuid = null) {
     assertCollectionDropped(coll.getFullName());
 }
 
-// Drop unsharded collection also remove tags
+jsTest.log("Drop unsharded collection also remove tags.");
 {
     const db = getNewDb();
     const coll = db['unshardedColl1'];
@@ -90,8 +90,24 @@ function assertCollectionDropped(ns, uuid = null) {
     assert.commandWorked(db.runCommand({drop: coll.getName()}));
     assertCollectionDropped(coll.getFullName());
 }
+jsTest.log("Drop sharded collection repeated.");
+{
+    const db = getNewDb();
+    const coll = db['unshardedColl0'];
+    // Create the database
+    assert.commandWorked(st.s.adminCommand({enableSharding: db.getName()}));
+    for (var i = 0; i < 3; i++) {
+        // Create the collection
+        assert.commandWorked(st.s.adminCommand({shardCollection: coll.getFullName(), key: {x: 1}}));
+        assert.commandWorked(coll.insert({x: 123}));
+        assert.eq(1, coll.countDocuments({x: 123}));
+        // Drop the collection
+        assert.commandWorked(db.runCommand({drop: coll.getName()}));
+        assertCollectionDropped(coll.getFullName());
+    }
+}
 
-// Drop unexistent collections also remove tags
+jsTest.log("Drop unexistent collections also remove tags.");
 {
     const db = getNewDb();
     const coll = db['unexistent'];
@@ -107,7 +123,7 @@ function assertCollectionDropped(ns, uuid = null) {
     assertCollectionDropped(coll.getFullName());
 }
 
-// Drop a sharded collection
+jsTest.log("Drop a sharded collection.");
 {
     const db = getNewDb();
     const coll = db['shardedColl1'];
@@ -133,10 +149,10 @@ function assertCollectionDropped(ns, uuid = null) {
     assertCollectionDropped(coll.getFullName(), uuid);
 
     // Call drop again to verify that the command is idempotent.
-    assert.commandWorked(db.runCommand({drop: 'user'}));
+    assert.commandWorked(db.runCommand({drop: coll.getName()}));
 }
 
-// Drop a sharded collection with zones
+jsTest.log("Drop a sharded collection with zones.");
 {
     const db = getNewDb();
     const coll = db['shardedColl2'];
@@ -172,6 +188,7 @@ function assertCollectionDropped(ns, uuid = null) {
     assert.commandWorked(db.runCommand({drop: coll.getName()}));
 }
 
+jsTest.log("Move primary with drop and recreate - new primary no chunks.");
 /*
  * Test that moving database primary works after dropping and recreating the same sharded
  * collection.
@@ -207,6 +224,7 @@ function assertCollectionDropped(ns, uuid = null) {
     assertCollectionDropped(coll.getFullName(), uuid);
 }
 
+jsTest.log("Move primary with drop and recreate - new primary own chunks.");
 /*
  * Test that moving database primary works after dropping and recreating the same sharded
  * collection.
