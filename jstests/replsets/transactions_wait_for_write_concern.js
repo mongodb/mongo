@@ -93,16 +93,6 @@ function runTest(readConcernLevel) {
     printjson(assert.commandWorked(sessionDB5.runCommand(fruitlessUpdate5)));
     let prepareTS5 = PrepareHelpers.prepareTransaction(session5);
 
-    jsTestLog("Unprepared Abort On Used Connection Setup");
-    const session6 = primary.getDB("admin").getMongo().startSession();
-    const sessionDB6 = session6.getDatabase(dbName);
-    session6.startTransaction({
-        writeConcern: {w: "majority", wtimeout: failTimeoutMS},
-        readConcern: {level: readConcernLevel}
-    });
-    const fruitlessUpdate6 = {update: collName, updates: [{q: {x: 6}, u: {$set: {x: 6}}}]};
-    printjson(assert.commandWorked(sessionDB6.runCommand(fruitlessUpdate6)));
-
     jsTestLog("Stop replication");
     stopReplicationOnSecondaries(rst);
 
@@ -140,10 +130,6 @@ function runTest(readConcernLevel) {
                                  ErrorCodes.WriteConcernFailed);
     // Send commit with the shell helper to reset the shell's state.
     assert.commandFailedWithCode(session5.commitTransaction_forTesting(),
-                                 ErrorCodes.WriteConcernFailed);
-
-    jsTestLog("Unprepared Abort On Used Connection Test");
-    assert.commandFailedWithCode(session6.abortTransaction_forTesting(),
                                  ErrorCodes.WriteConcernFailed);
 
     jsTestLog("Restart replication");
