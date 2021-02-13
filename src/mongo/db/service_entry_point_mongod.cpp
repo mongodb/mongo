@@ -127,22 +127,14 @@ public:
         }
 
         // Ensures that if we tried to do a write, we wait for write concern, even if that write was
-        // a noop.
-        //
-        // Transactions do not stash their lockers on commit and abort, so after commit and abort,
-        // wasGlobalLockTakenForWrite will return whether any statement in the transaction as a
-        // whole acquired the global write lock.
-        //
-        // Speculative majority semantics dictate that "abortTransaction" should not wait for write
-        // concern on operations the transaction observed. As a result, "abortTransaction" only ever
-        // waits on an oplog entry it wrote (and has already set lastOp to) or previous writes on
-        // the same client.
-        if (opCtx->lockState()->wasGlobalLockTakenForWrite()) {
-            if (invocation->definition()->getName() != "abortTransaction") {
-                repl::ReplClientInfo::forClient(opCtx->getClient())
-                    .setLastOpToSystemLastOpTime(opCtx);
-                lastOpAfterRun = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
-            }
+        // a noop. We do not need to update this for multi-document transactions as read-only/noop
+        // transactions will do a noop write at commit time, which should have incremented the
+        // lastOp. And speculative majority semantics dictate that "abortTransaction" should not
+        // wait for write concern on operations the transaction observed.
+        if (opCtx->lockState()->wasGlobalLockTakenForWrite() &&
+            !opCtx->inMultiDocumentTransaction()) {
+            repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
+            lastOpAfterRun = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
             waitForWriteConcernAndAppendStatus();
             return;
         }

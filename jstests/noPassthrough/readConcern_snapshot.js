@@ -106,8 +106,7 @@ rst = new ReplSetTest({nodes: 1});
 rst.startSet();
 rst.initiate();
 let testDB = rst.getPrimary().getDB(dbName);
-let coll = testDB.coll;
-assert.commandWorked(coll.createIndex({geo: "2d"}));
+assert.commandWorked(testDB.runCommand({create: collName, writeConcern: {w: "majority"}}));
 
 // Test snapshot in a transaction.
 session = testDB.getMongo().startSession({causalConsistency: false});
