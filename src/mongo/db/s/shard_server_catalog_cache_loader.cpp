@@ -368,20 +368,22 @@ ChunkVersion getLocalVersion(OperationContext* opCtx, const NamespaceString& nss
     return uassertStatusOK(std::move(swRefreshState)).lastRefreshedCollectionVersion;
 }
 
+/**
+ * if 'mustPatchUpMetadataResults' is true, it sets the current 'timestamp' to all 'changedChunks'.
+ * Does nothing otherwise.
+ */
 void patchUpChangedChunksIfNeeded(bool mustPatchUpMetadataResults,
-                                  CollectionAndChangedChunks& collAndChunks) {
+                                  const boost::optional<Timestamp>& timestamp,
+                                  std::vector<ChunkType>& changedChunks) {
+
     if (!mustPatchUpMetadataResults)
         return;
 
-    const boost::optional<Timestamp> newTimestamp = collAndChunks.creationTime;
-    std::for_each(
-        collAndChunks.changedChunks.begin(),
-        collAndChunks.changedChunks.end(),
-        [&newTimestamp](ChunkType& chunk) {
-            const ChunkVersion version = chunk.getVersion();
-            chunk.setVersion(ChunkVersion(
-                version.majorVersion(), version.minorVersion(), version.epoch(), newTimestamp));
-        });
+    std::for_each(changedChunks.begin(), changedChunks.end(), [&timestamp](ChunkType& chunk) {
+        const ChunkVersion version = chunk.getVersion();
+        chunk.setVersion(ChunkVersion(
+            version.majorVersion(), version.minorVersion(), version.epoch(), timestamp));
+    });
 }
 
 }  // namespace
@@ -884,35 +886,42 @@ StatusWith<CollectionAndChangedChunks> ShardServerCatalogCacheLoader::_getLoader
         // - the epoch changed in the enqueued metadata.
         // Whichever the cause, the persisted metadata is out-dated/non-existent. Return enqueued
         // results.
-        patchUpChangedChunksIfNeeded(enqueuedMetadata.mustPatchUpMetadataResults, enqueued);
+        patchUpChangedChunksIfNeeded(enqueuedMetadata.mustPatchUpMetadataResults,
+                                     enqueued.creationTime,
+                                     enqueued.changedChunks);
         return enqueued;
     } else {
 
         // There can be overlap between persisted and enqueued metadata because enqueued work can
         // be applied while persisted was read. We must remove this overlap.
+        // Note also that the enqueued changed Chunks set may be empty (e.g. there is only one
+        // update metadata format task)
 
-        const ChunkVersion minEnqueuedVersion = enqueued.changedChunks.front().getVersion();
+        if (!enqueued.changedChunks.empty()) {
+            const ChunkVersion minEnqueuedVersion = enqueued.changedChunks.front().getVersion();
 
-        // Remove chunks from 'persisted' that are GTE the minimum in 'enqueued' -- this is
-        // the overlap.
-        auto persistedChangedChunksIt = persisted.changedChunks.begin();
-        while (persistedChangedChunksIt != persisted.changedChunks.end() &&
-               persistedChangedChunksIt->getVersion().isOlderThan(minEnqueuedVersion)) {
-            ++persistedChangedChunksIt;
+            // Remove chunks from 'persisted' that are GTE the minimum in 'enqueued' -- this is
+            // the overlap.
+            auto persistedChangedChunksIt = persisted.changedChunks.begin();
+            while (persistedChangedChunksIt != persisted.changedChunks.end() &&
+                   persistedChangedChunksIt->getVersion().isOlderThan(minEnqueuedVersion)) {
+                ++persistedChangedChunksIt;
+            }
+            persisted.changedChunks.erase(persistedChangedChunksIt, persisted.changedChunks.end());
+
+            // Append 'enqueued's chunks to 'persisted', which no longer overlaps. Also add
+            // 'enqueued's reshardingFields and allowMigrations setting to 'persisted'.
+            persisted.changedChunks.insert(persisted.changedChunks.end(),
+                                           enqueued.changedChunks.begin(),
+                                           enqueued.changedChunks.end());
         }
-        persisted.changedChunks.erase(persistedChangedChunksIt, persisted.changedChunks.end());
-
-        // Append 'enqueued's chunks to 'persisted', which no longer overlaps. Also add 'enqueued's
-        // reshardingFields and allowMigrations setting to 'persisted'.
-        persisted.changedChunks.insert(persisted.changedChunks.end(),
-                                       enqueued.changedChunks.begin(),
-                                       enqueued.changedChunks.end());
 
         // We may need to patch up the changed chunks because there was a metadata format change
-        patchUpChangedChunksIfNeeded(enqueuedMetadata.mustPatchUpMetadataResults, persisted);
+        patchUpChangedChunksIfNeeded(enqueuedMetadata.mustPatchUpMetadataResults,
+                                     enqueued.creationTime,
+                                     persisted.changedChunks);
 
-
-        // The collection info in enqueued metadata may be more recent than the persited metadata
+        // The collection info in enqueued metadata may be more recent than the persisted metadata
         persisted.creationTime = enqueued.creationTime;
         persisted.reshardingFields = std::move(enqueued.reshardingFields);
         persisted.allowMigrations = enqueued.allowMigrations;
@@ -1451,11 +1460,10 @@ ShardServerCatalogCacheLoader::CollAndChunkTaskList::getEnqueuedMetadataForTerm(
             collAndChunks = CollectionAndChangedChunks();
             mustPatchUpMetadataResults = false;
         } else if (task.collectionAndChangedChunks->epoch != collAndChunks.epoch) {
-            // The current task has a new epoch (refine shard key or resharding op) -> the
-            // aggregated results aren't interesting so we overwrite them with the current
-            // CollAndChangedChunks and unset the flag
+            // The current task has a new epoch  -> the aggregated results aren't interesting so we
+            // overwrite them. The task may be an update metadata format task, so propagate the flag
             collAndChunks = *task.collectionAndChangedChunks;
-            mustPatchUpMetadataResults = false;
+            mustPatchUpMetadataResults = task.updateMetadataFormat;
         } else if (task.updateMetadataFormat) {
             // The current task is an update task -> we only update the Timestamp of the aggregated
             // results and set the flag
