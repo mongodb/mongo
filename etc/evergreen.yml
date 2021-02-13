@@ -7314,11 +7314,11 @@ buildvariants:
   - name: noPassthrough_WT
   - name: parallel_WT
   - name: parallel_compatibility_WT
-  - name: powercycle_WT
-  - name: powercycle_fcv3.4_WT
-  - name: powercycle_kill_mongod
-  - name: powercycle_replication_WT
-  - name: powercycle_syncdelay_WT
+  # - name: powercycle_WT
+  # - name: powercycle_fcv3.4_WT
+  # - name: powercycle_kill_mongod
+  # - name: powercycle_replication_WT
+  # - name: powercycle_syncdelay_WT
   - name: read_concern_linearizable_passthrough_WT
   - name: read_concern_majority_passthrough_WT
   - name: replica_sets_WT
