@@ -12868,9 +12868,9 @@ buildvariants:
   - name: .multi_shard .common
   - name: .query_fuzzer
   - name: .read_write_concern
-#  - name: replica_sets_large_txns_format_gen
-#  - name: replica_sets_large_txns_format_jscore_passthrough
-#  - name: .replica_sets !.multi_oplog
+  - name: replica_sets_large_txns_format_gen
+  - name: replica_sets_large_txns_format_jscore_passthrough
+  - name: .replica_sets !.multi_oplog
   - name: .resharding_fuzzer
   - name: .retry
   - name: .read_only
