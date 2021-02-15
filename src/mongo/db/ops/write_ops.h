@@ -46,13 +46,18 @@ public:
     static write_ops::Update parse(const OpMsgRequest& request);
     static write_ops::Update parseLegacy(const Message& msg);
 
-    static write_ops::UpdateResponse parseResponse(const BSONObj& obj);
+    static write_ops::UpdateReply parseResponse(const BSONObj& obj);
 };
 
 class DeleteOp {
 public:
     static write_ops::Delete parse(const OpMsgRequest& request);
     static write_ops::Delete parseLegacy(const Message& msg);
+};
+
+class FindAndModifyOp {
+public:
+    static write_ops::FindAndModifyReply parseResponse(const BSONObj& obj);
 };
 
 namespace write_ops {

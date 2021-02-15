@@ -36,19 +36,13 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/ops/write_ops_parsers.h"
+#include "mongo/db/ops/write_ops.h"
 #include "mongo/s/client/num_hosts_targeted_metrics.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/util/transitional_tools_do_not_use/vector_spooling.h"
 
 namespace mongo {
-
-using std::set;
-using std::stringstream;
-using std::unique_ptr;
-using std::vector;
-
 namespace {
 
 struct WriteErrorDetailComp {
@@ -235,7 +229,7 @@ int getWriteSizeBytes(const WriteOp& writeOp) {
  * into a TrackedErrorMap
  */
 void trackErrors(const ShardEndpoint& endpoint,
-                 const vector<WriteErrorDetail*> itemErrors,
+                 const std::vector<WriteErrorDetail*> itemErrors,
                  TrackedErrors* trackedErrors) {
     for (const auto error : itemErrors) {
         if (trackedErrors->isTracking(error->toStatus().code())) {
@@ -314,7 +308,7 @@ Status BatchWriteOp::targetBatch(const NSTargeter& targeter,
         // TargetedWrites need to be owned once returned
 
         OwnedPointerVector<TargetedWrite> writesOwned;
-        vector<TargetedWrite*>& writes = writesOwned.mutableVector();
+        std::vector<TargetedWrite*>& writes = writesOwned.mutableVector();
 
         Status targetStatus = Status::OK();
         try {
@@ -601,7 +595,7 @@ void BatchWriteOp::noteBatchResponse(const TargetedWriteBatch& targetedBatch,
         _wcErrors.emplace_back(targetedBatch.getEndpoint(), *response.getWriteConcernError());
     }
 
-    vector<WriteErrorDetail*> itemErrors;
+    std::vector<WriteErrorDetail*> itemErrors;
 
     // Handle batch and per-item errors
     if (response.isErrDetailsSet()) {
@@ -622,10 +616,10 @@ void BatchWriteOp::noteBatchResponse(const TargetedWriteBatch& targetedBatch,
 
     const bool ordered = _clientRequest.getWriteCommandBase().getOrdered();
 
-    vector<WriteErrorDetail*>::iterator itemErrorIt = itemErrors.begin();
+    std::vector<WriteErrorDetail*>::iterator itemErrorIt = itemErrors.begin();
     int index = 0;
     WriteErrorDetail* lastError = nullptr;
-    for (vector<TargetedWrite*>::const_iterator it = targetedBatch.getWrites().begin();
+    for (std::vector<TargetedWrite*>::const_iterator it = targetedBatch.getWrites().begin();
          it != targetedBatch.getWrites().end();
          ++it, ++index) {
         const TargetedWrite* write = *it;
@@ -664,8 +658,8 @@ void BatchWriteOp::noteBatchResponse(const TargetedWriteBatch& targetedBatch,
 
     // Track upserted ids if we need to
     if (response.isUpsertDetailsSet()) {
-        const vector<BatchedUpsertDetail*>& upsertedIds = response.getUpsertDetails();
-        for (vector<BatchedUpsertDetail*>::const_iterator it = upsertedIds.begin();
+        const std::vector<BatchedUpsertDetail*>& upsertedIds = response.getUpsertDetails();
+        for (std::vector<BatchedUpsertDetail*>::const_iterator it = upsertedIds.begin();
              it != upsertedIds.end();
              ++it) {
             // The child upserted details don't have the correct index for the full batch
@@ -764,7 +758,7 @@ void BatchWriteOp::buildClientResponse(BatchedCommandResponse* batchResp) {
     // Find all the errors in the batch
     //
 
-    vector<WriteOp*> errOps;
+    std::vector<WriteOp*> errOps;
 
     const size_t numWriteOps = _clientRequest.sizeWriteOps();
     for (size_t i = 0; i < numWriteOps; ++i) {
@@ -780,7 +774,7 @@ void BatchWriteOp::buildClientResponse(BatchedCommandResponse* batchResp) {
     //
 
     if (!errOps.empty()) {
-        for (vector<WriteOp*>::iterator it = errOps.begin(); it != errOps.end(); ++it) {
+        for (std::vector<WriteOp*>::iterator it = errOps.begin(); it != errOps.end(); ++it) {
             WriteOp& writeOp = **it;
             WriteErrorDetail* error = new WriteErrorDetail();
             writeOp.getOpError().cloneTo(error);
@@ -882,9 +876,9 @@ void BatchWriteOp::_cancelBatches(const WriteErrorDetail& why,
     // Collect all the writeOps that are currently targeted
     for (TargetedBatchMap::iterator it = batchMap.begin(); it != batchMap.end();) {
         TargetedWriteBatch* batch = it->second;
-        const vector<TargetedWrite*>& writes = batch->getWrites();
+        const std::vector<TargetedWrite*>& writes = batch->getWrites();
 
-        for (vector<TargetedWrite*>::const_iterator writeIt = writes.begin();
+        for (std::vector<TargetedWrite*>::const_iterator writeIt = writes.begin();
              writeIt != writes.end();
              ++writeIt) {
             TargetedWrite* write = *writeIt;

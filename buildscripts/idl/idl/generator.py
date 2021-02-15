@@ -243,7 +243,11 @@ class _SlowFieldUsageChecker(_FieldUsageCheckerBase):
                     (_get_field_constant_name(field))
                 with writer.IndentedScopedBlock(self._writer, pred, '}'):
                     if field.default:
-                        if field.type.is_enum:
+                        if field.chained_struct_field:
+                            self._writer.write_line('%s.%s(%s);' % (_get_field_member_name(
+                                field.chained_struct_field), _get_field_member_setter_name(field),
+                                                                    field.default))
+                        elif field.type.is_enum:
                             self._writer.write_line(
                                 '%s = %s::%s;' % (_get_field_member_name(field),
                                                   field.type.cpp_type, field.default))

@@ -33,7 +33,6 @@
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/ops/write_ops.h"
-#include "mongo/db/ops/write_ops_parsers.h"
 #include "mongo/db/ops/write_ops_parsers_test_helpers.h"
 #include "mongo/unittest/unittest.h"
 
