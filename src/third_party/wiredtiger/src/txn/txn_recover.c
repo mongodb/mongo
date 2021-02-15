@@ -506,9 +506,10 @@ __recovery_set_checkpoint_snapshot(WT_SESSION_IMPL *session)
          * snapshot max.
          */
         WT_ASSERT(session,
-          conn->recovery_ckpt_snapshot_count == counter &&
-            conn->recovery_ckpt_snapshot[0] == conn->recovery_ckpt_snap_min &&
-            conn->recovery_ckpt_snapshot[counter - 1] < conn->recovery_ckpt_snap_max);
+          conn->recovery_ckpt_snapshot == NULL ||
+            (conn->recovery_ckpt_snapshot_count == counter &&
+              conn->recovery_ckpt_snapshot[0] == conn->recovery_ckpt_snap_min &&
+              conn->recovery_ckpt_snapshot[counter - 1] < conn->recovery_ckpt_snap_max));
     }
 
 err:
