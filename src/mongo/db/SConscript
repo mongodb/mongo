@@ -2192,6 +2192,7 @@ env.Library(
         'repl/topology_coordinator',
         'repl/wait_for_majority_service',
         's/sessions_collection_config_server',
+        's/sharding_commands_d',
         's/sharding_runtime_d',
         'serverinit',
         'service_context_d',

@@ -150,6 +150,9 @@ public:
     // Namespace for the recipient shard's local resharding operation state.
     static const NamespaceString kRecipientReshardingOperationsNamespace;
 
+    // Namespace for persisting sharding DDL coordinators state documents
+    static const NamespaceString kShardingDDLCoordinatorsNamespace;
+
     // Namespace for balancer settings and default read and write concerns.
     static const NamespaceString kConfigSettingsNamespace;
 

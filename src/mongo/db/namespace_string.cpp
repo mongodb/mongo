@@ -102,6 +102,9 @@ const NamespaceString NamespaceString::kDonorReshardingOperationsNamespace(
 const NamespaceString NamespaceString::kRecipientReshardingOperationsNamespace(
     NamespaceString::kConfigDb, "localReshardingOperations.recipient");
 
+const NamespaceString NamespaceString::kShardingDDLCoordinatorsNamespace(
+    NamespaceString::kConfigDb, "system.sharding_ddl_coordinators");
+
 const NamespaceString NamespaceString::kConfigSettingsNamespace(NamespaceString::kConfigDb,
                                                                 "settings");
 const NamespaceString NamespaceString::kVectorClockNamespace(NamespaceString::kConfigDb,
@@ -139,6 +142,8 @@ bool NamespaceString::isLegalClientSystemNS() const {
         if (coll() == kIndexBuildEntryNamespace.coll())
             return true;
         if (coll().find(".system.resharding.") != std::string::npos)
+            return true;
+        if (coll() == kShardingDDLCoordinatorsNamespace.coll())
             return true;
     } else if (db() == kLocalDb) {
         if (coll() == kSystemReplSetNamespace.coll())

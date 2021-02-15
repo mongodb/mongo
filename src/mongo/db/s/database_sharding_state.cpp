@@ -35,6 +35,7 @@
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/stale_exception.h"
@@ -88,6 +89,29 @@ DatabaseShardingState* DatabaseShardingState::get(OperationContext* opCtx,
 
     auto& databasesMap = DatabaseShardingStateMap::get(opCtx->getServiceContext());
     return databasesMap.getOrCreate(dbName).get();
+}
+
+void DatabaseShardingState::checkIsPrimaryShardForDb(OperationContext* opCtx, StringData dbName) {
+    invariant(dbName != NamespaceString::kConfigDb);
+
+    uassert(ErrorCodes::IllegalOperation,
+            "Request sent without attaching database version",
+            OperationShardingState::get(opCtx).hasDbVersion());
+
+    const auto dbPrimaryShardId = [&]() {
+        Lock::DBLock dbWriteLock(opCtx, dbName, MODE_IS);
+        auto dss = DatabaseShardingState::get(opCtx, dbName);
+        auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, dss);
+        // The following call will also ensure that the database version matches
+        return dss->getDatabaseInfo(opCtx, dssLock).getPrimary();
+    }();
+
+    const auto thisShardId = ShardingState::get(opCtx)->shardId();
+
+    uassert(ErrorCodes::IllegalOperation,
+            str::stream() << "This is not the primary shard for db " << dbName
+                          << " expected: " << dbPrimaryShardId << " shardId: " << thisShardId,
+            dbPrimaryShardId == thisShardId);
 }
 
 std::shared_ptr<DatabaseShardingState> DatabaseShardingState::getSharedForLockFreeReads(
