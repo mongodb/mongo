@@ -179,9 +179,9 @@ explain = t.find().maxTimeMS(200).explain();
 assert.commandWorked(explain);
 
 // .readPref()
-explain = t.explain().find().readPref("secondary").finish();
+explain = t.explain().find().readPref("secondaryPreferred").finish();
 assert.commandWorked(explain);
-explain = t.find().readPref("secondary").explain();
+explain = t.find().readPref("secondaryPreferred").explain();
 assert.commandWorked(explain);
 
 // .comment()
