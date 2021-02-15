@@ -143,6 +143,7 @@
 #include "mongo/db/s/resharding/resharding_op_observer.h"
 #include "mongo/db/s/resharding/resharding_recipient_service.h"
 #include "mongo/db/s/shard_server_op_observer.h"
+#include "mongo/db/s/sharding_ddl_coordinator_service.h"
 #include "mongo/db/s/sharding_initialization_mongod.h"
 #include "mongo/db/s/sharding_state_recovery.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
@@ -317,6 +318,7 @@ void registerPrimaryOnlyServices(ServiceContext* serviceContext) {
     if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
         services.push_back(std::make_unique<ReshardingCoordinatorService>(serviceContext));
     } else if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
+        services.push_back(std::make_unique<ShardingDDLCoordinatorService>(serviceContext));
         services.push_back(std::make_unique<ReshardingDonorService>(serviceContext));
         services.push_back(std::make_unique<ReshardingRecipientService>(serviceContext));
     }

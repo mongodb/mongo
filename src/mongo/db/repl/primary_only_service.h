@@ -188,7 +188,7 @@ public:
         static std::shared_ptr<InstanceType> getOrCreate(OperationContext* opCtx,
                                                          PrimaryOnlyService* service,
                                                          BSONObj initialState) {
-            auto instance = service->getOrCreateInstance(opCtx, std::move(initialState));
+            auto [instance, _] = service->getOrCreateInstance(opCtx, std::move(initialState));
             return checked_pointer_cast<InstanceType>(instance);
         }
     };
@@ -326,13 +326,19 @@ protected:
 
     /**
      * Extracts an InstanceID from the _id field of the given 'initialState' object. If an Instance
-     * with the extracted InstanceID already exists in _instances, returns it.  If not, constructs a
-     * new Instance (by calling constructInstance()), registers it in _instances, and returns it.
-     * It is illegal to call this more than once with 'initialState' documents that have the same
-     * _id but are otherwise not completely identical.
+     * with the extracted InstanceID already exists in _instances, returns true and the instance
+     * itself.  If not, constructs a new Instance (by calling constructInstance()), registers it in
+     * _instances, and returns it with the boolean set to false. It is illegal to call this more
+     * than once with 'initialState' documents that have the same _id but are otherwise not
+     * completely identical.
+     *
+     * Returns a pair with an Instance and a boolean, the boolean indicates if the Instance have
+     * been created in this invocation (true) or already existed (false).
+     *
      * Throws NotWritablePrimary if the node is not currently primary.
      */
-    std::shared_ptr<Instance> getOrCreateInstance(OperationContext* opCtx, BSONObj initialState);
+    std::pair<std::shared_ptr<Instance>, bool> getOrCreateInstance(OperationContext* opCtx,
+                                                                   BSONObj initialState);
 
     /**
      * Since, scoped task executor shuts down on stepdown, we might need to run some instance work,

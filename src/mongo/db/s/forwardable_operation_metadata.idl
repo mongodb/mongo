@@ -45,3 +45,4 @@ structs:
             impersonatedUserMetadata:
                 type: ImpersonatedUserMetadata
                 description: "A struct representing the impersonated users from a mongos"
+                optional: true

@@ -27,42 +27,39 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
-#include "mongo/db/s/forwardable_operation_metadata.h"
-
-#include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/primary_only_service.h"
 
 namespace mongo {
 
-ForwardableOperationMetadata::ForwardableOperationMetadata(const BSONObj& obj) {
-    ForwardableOperationMetadataBase::parse(
-        IDLParserErrorContext("ForwardableOperationMetadataBase"), obj);
-}
+class ShardingDDLCoordinatorService final : public repl::PrimaryOnlyService {
+public:
+    static constexpr StringData kServiceName = "ShardingDDLCoordinator"_sd;
 
-ForwardableOperationMetadata::ForwardableOperationMetadata(OperationContext* opCtx) {
-    if (auto optComment = opCtx->getComment()) {
-        setComment(optComment->wrap());
-    }
-    auto authzSession = AuthorizationSession::get(opCtx->getClient());
-    setImpersonatedUserMetadata({{userNameIteratorToContainer<std::vector<UserName>>(
-                                      authzSession->getImpersonatedUserNames()),
-                                  roleNameIteratorToContainer<std::vector<RoleName>>(
-                                      authzSession->getImpersonatedRoleNames())}});
-}
+    explicit ShardingDDLCoordinatorService(ServiceContext* serviceContext)
+        : PrimaryOnlyService(serviceContext) {}
 
-void ForwardableOperationMetadata::setOn(OperationContext* opCtx) const {
-    if (const auto& comment = getComment()) {
-        opCtx->setComment(comment.get());
+    ~ShardingDDLCoordinatorService() = default;
+
+    static ShardingDDLCoordinatorService* getService(OperationContext* opCtx);
+
+    StringData getServiceName() const override {
+        return kServiceName;
     }
 
-    if (const auto& optAuthMetadata = getImpersonatedUserMetadata()) {
-        const auto& authMetadata = optAuthMetadata.get();
-        if (!authMetadata.getUsers().empty() || !authMetadata.getRoles().empty()) {
-            AuthorizationSession::get(opCtx->getClient())
-                ->setImpersonatedUserData(authMetadata.getUsers(), authMetadata.getRoles());
-        }
+    NamespaceString getStateDocumentsNS() const override {
+        return NamespaceString::kShardingDDLCoordinatorsNamespace;
     }
-}
+
+    ThreadPool::Limits getThreadPoolLimits() const override {
+        return ThreadPool::Limits();
+    }
+
+    std::shared_ptr<Instance> constructInstance(BSONObj initialState) const override;
+
+    std::shared_ptr<Instance> getOrCreateInstance(OperationContext* opCtx, BSONObj initialState);
+};
 
 }  // namespace mongo

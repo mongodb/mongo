@@ -73,6 +73,16 @@ public:
         OperationContext* opCtx, const StringData dbName);
 
     /**
+     * Checks if this shard is the primary shard for the given DB.
+     *
+     * Throws an IllegalOperation exception otherwise.
+     *
+     * Assumes the operation context has a DB version attached to it for the given @dbName.
+     */
+    static void checkIsPrimaryShardForDb(OperationContext* opCtx, StringData dbName);
+
+
+    /**
      * Methods to control the databases's critical section. Must be called with the database X lock
      * held.
      */

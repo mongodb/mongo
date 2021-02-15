@@ -102,6 +102,7 @@ public:
         ScopedDistLock(ScopedDistLock&& other);
 
         ScopedDistLock moveToAnotherThread();
+        void assignNewOpCtx(OperationContext* opCtx);
 
     private:
         OperationContext* _opCtx;

@@ -482,8 +482,8 @@ void PrimaryOnlyService::shutdown() {
     savedInstances.clear();
 }
 
-std::shared_ptr<PrimaryOnlyService::Instance> PrimaryOnlyService::getOrCreateInstance(
-    OperationContext* opCtx, BSONObj initialState) {
+std::pair<std::shared_ptr<PrimaryOnlyService::Instance>, bool>
+PrimaryOnlyService::getOrCreateInstance(OperationContext* opCtx, BSONObj initialState) {
     const auto idElem = initialState["_id"];
     uassert(4908702,
             str::stream() << "Missing _id element when adding new instance of PrimaryOnlyService \""
@@ -505,7 +505,7 @@ std::shared_ptr<PrimaryOnlyService::Instance> PrimaryOnlyService::getOrCreateIns
 
     auto it = _instances.find(instanceID);
     if (it != _instances.end()) {
-        return it->second;
+        return {it->second, false};
     }
     auto [it2, inserted] =
         _instances.emplace(instanceID, constructInstance(std::move(initialState)));
@@ -514,7 +514,7 @@ std::shared_ptr<PrimaryOnlyService::Instance> PrimaryOnlyService::getOrCreateIns
     // Kick off async work to run the instance
     _scheduleRun(lk, it2->second, instanceID);
 
-    return it2->second;
+    return {it2->second, true};
 }
 
 boost::optional<std::shared_ptr<PrimaryOnlyService::Instance>> PrimaryOnlyService::lookupInstance(

@@ -35,14 +35,83 @@
 
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
-#include "mongo/db/s/sharding_state.h"
+#include "mongo/db/s/sharding_ddl_coordinator_gen.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
 
 namespace mongo {
 
+ShardingDDLCoordinatorMetadata extractShardingDDLCoordinatorMetadata(const BSONObj& coorDoc) {
+    return ShardingDDLCoordinatorMetadata::parse(
+        IDLParserErrorContext("ShardingDDLCoordinatorMetadata"), coorDoc);
+}
+
+ShardingDDLCoordinator::ShardingDDLCoordinator(const BSONObj& coorDoc)
+    : _coorMetadata(extractShardingDDLCoordinatorMetadata(coorDoc)) {}
+
+ShardingDDLCoordinator::~ShardingDDLCoordinator() {
+    invariant(_constructionCompletionPromise.getFuture().isReady());
+}
+
+SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                                             const CancelationToken& token) noexcept {
+    return ExecutorFuture<void>(**executor)
+        .then([this, executor, token, anchor = shared_from_this()] {
+            auto opCtxHolder = cc().makeOperationContext();
+            auto* opCtx = opCtxHolder.get();
+            const auto coorName =
+                DDLCoordinatorType_serializer(_coorMetadata.getId().getOperationType());
+
+            auto distLockManager = DistLockManager::get(opCtx);
+            auto dbDistLock = uassertStatusOK(distLockManager->lock(
+                opCtx, nss().db(), coorName, DistLockManager::kDefaultLockTimeout));
+            _scopedLocks.emplace(dbDistLock.moveToAnotherThread());
+
+            if (!nss().isConfigDB() && !_coorMetadata.getRecoveredFromDisk()) {
+                invariant(_coorMetadata.getDatabaseVersion());
+
+                OperationShardingState::get(opCtx).initializeClientRoutingVersions(
+                    nss(), boost::none /* ChunkVersion */, _coorMetadata.getDatabaseVersion());
+                // Check under the dbLock if this is still the primary shard for the database
+                DatabaseShardingState::checkIsPrimaryShardForDb(opCtx, nss().db());
+            };
+
+            if (!nss().ns().empty()) {
+                auto collDistLock = uassertStatusOK(distLockManager->lock(
+                    opCtx, nss().ns(), coorName, DistLockManager::kDefaultLockTimeout));
+                _scopedLocks.emplace(collDistLock.moveToAnotherThread());
+            }
+
+            _constructionCompletionPromise.emplaceValue();
+        })
+        .onError([this, anchor = shared_from_this()](const Status& status) {
+            LOGV2_ERROR(5390530,
+                        "Failed to complete construction of sharding DDL coordinator",
+                        "coordinatorId"_attr = _coorMetadata.getId(),
+                        "reason"_attr = redact(status));
+            _constructionCompletionPromise.setError(
+                status.withContext("Failed to complete construction of sharding DDL coordinator"));
+            return status;
+        })
+        .then([this, executor, token, anchor = shared_from_this()] {
+            return _runImpl(executor, token);
+        })
+        .onCompletion([this, anchor = shared_from_this()](const Status& status) {
+            auto opCtxHolder = cc().makeOperationContext();
+            auto* opCtx = opCtxHolder.get();
+
+            while (!_scopedLocks.empty()) {
+                _scopedLocks.top().assignNewOpCtx(opCtx);
+                _scopedLocks.pop();
+            }
+            return status;
+        })
+        .semi();
+}
+
 ShardingDDLCoordinator_NORESILIENT::ShardingDDLCoordinator_NORESILIENT(OperationContext* opCtx,
                                                                        const NamespaceString& ns)
-    : _nss(ns), _forwardableOpMetadata(opCtx){};
+    : _nss(ns), _forwardableOpMetadata(opCtx) {}
 
 SemiFuture<void> ShardingDDLCoordinator_NORESILIENT::run(OperationContext* opCtx) {
     if (!_nss.isConfigDB()) {
@@ -53,20 +122,7 @@ SemiFuture<void> ShardingDDLCoordinator_NORESILIENT::run(OperationContext* opCtx
                 clientDbVersion);
 
         // Checks that this is the primary shard for the namespace's db
-        const auto dbPrimaryShardId = [&]() {
-            Lock::DBLock dbWriteLock(opCtx, _nss.db(), MODE_IS);
-            auto dss = DatabaseShardingState::get(opCtx, _nss.db());
-            auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, dss);
-            // The following call will also ensure that the database version matches
-            return dss->getDatabaseInfo(opCtx, dssLock).getPrimary();
-        }();
-
-        const auto thisShardId = ShardingState::get(opCtx)->shardId();
-
-        uassert(ErrorCodes::IllegalOperation,
-                str::stream() << "This is not the primary shard for db " << _nss.db()
-                              << " expected: " << dbPrimaryShardId << " shardId: " << thisShardId,
-                dbPrimaryShardId == thisShardId);
+        DatabaseShardingState::checkIsPrimaryShardForDb(opCtx, _nss.db());
     }
     return runImpl(Grid::get(opCtx)->getExecutorPool()->getFixedExecutor());
 }

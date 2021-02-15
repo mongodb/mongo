@@ -76,6 +76,11 @@ DistLockManager::ScopedDistLock DistLockManager::ScopedDistLock::moveToAnotherTh
     return unownedScopedDistLock;
 }
 
+void DistLockManager::ScopedDistLock::assignNewOpCtx(OperationContext* opCtx) {
+    invariant(!_opCtx);
+    _opCtx = opCtx;
+}
+
 DistLockManager::DistLockManager(OID lockSessionID) : _lockSessionID(std::move(lockSessionID)) {}
 
 DistLockManager* DistLockManager::get(ServiceContext* service) {

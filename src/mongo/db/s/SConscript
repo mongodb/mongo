@@ -349,6 +349,8 @@ env.Library(
         'reshard_collection_coordinator.cpp',
         'set_shard_version_command.cpp',
         'sharding_ddl_coordinator.cpp',
+        'sharding_ddl_coordinator.idl',
+        'sharding_ddl_coordinator_service.cpp',
         'sharding_server_status.cpp',
         'sharding_state_command.cpp',
         'shardsvr_create_collection_command.cpp',

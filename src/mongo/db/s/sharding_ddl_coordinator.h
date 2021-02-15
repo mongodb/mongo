@@ -31,11 +31,67 @@
 
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/primary_only_service.h"
+#include "mongo/db/s/dist_lock_manager.h"
 #include "mongo/db/s/forwardable_operation_metadata.h"
+#include "mongo/db/s/sharding_ddl_coordinator_gen.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/util/future.h"
 
 namespace mongo {
+
+ShardingDDLCoordinatorMetadata extractShardingDDLCoordinatorMetadata(const BSONObj& coorDoc);
+
+class ShardingDDLCoordinator
+    : public repl::PrimaryOnlyService::TypedInstance<ShardingDDLCoordinator> {
+public:
+    explicit ShardingDDLCoordinator(const BSONObj& coorDoc);
+
+    ~ShardingDDLCoordinator();
+
+    /*
+     * Check if the given coordinator document has the same options as this.
+     *
+     * This is used to decide if we can join a previously created coordinator.
+     * In the case the given coordinator document has incompatible options with this,
+     * this function must throw a ConflictingOprationInProgress exception with an adequate message.
+     */
+    virtual void checkIfOptionsConflict(const BSONObj& coorDoc) const = 0;
+
+
+    /*
+     * Returns a future that will be completed when the construction of this coordinator instance
+     * is completed.
+     *
+     * In particular the returned future will be ready only after this coordinator succesfully
+     * aquires the required locks.
+     */
+    SharedSemiFuture<void> getConstructionCompletionFuture() {
+        return _constructionCompletionPromise.getFuture();
+    }
+
+    const NamespaceString& nss() const {
+        return _coorMetadata.getId().getNss();
+    }
+
+    const ForwardableOperationMetadata& getForwardableOpMetadata() const {
+        invariant(_coorMetadata.getForwardableOpMetadata());
+        return _coorMetadata.getForwardableOpMetadata().get();
+    }
+
+protected:
+    ShardingDDLCoordinatorMetadata _coorMetadata;
+    std::stack<DistLockManager::ScopedDistLock> _scopedLocks;
+
+private:
+    SemiFuture<void> run(std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                         const CancelationToken& token) noexcept override final;
+
+    virtual ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                                          const CancelationToken& token) noexcept = 0;
+
+    SharedPromise<void> _constructionCompletionPromise;
+};
 
 class ShardingDDLCoordinator_NORESILIENT {
 public:
