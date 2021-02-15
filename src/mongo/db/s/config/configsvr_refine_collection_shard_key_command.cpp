@@ -72,18 +72,6 @@ public:
 
             const auto catalogClient = Grid::get(opCtx)->catalogClient();
 
-            // Acquire distlocks on the namespace's database and collection.
-            DistLockManager::ScopedDistLock dbDistLock(uassertStatusOK(
-                DistLockManager::get(opCtx)->lock(opCtx,
-                                                  nss.db(),
-                                                  "refineCollectionShardKey",
-                                                  DistLockManager::kDefaultLockTimeout)));
-            DistLockManager::ScopedDistLock collDistLock(uassertStatusOK(
-                DistLockManager::get(opCtx)->lock(opCtx,
-                                                  nss.ns(),
-                                                  "refineCollectionShardKey",
-                                                  DistLockManager::kDefaultLockTimeout)));
-
             // Validate the given namespace is (i) sharded, (ii) doesn't already have the proposed
             // key, and (iii) has the same epoch as the router that received
             // refineCollectionShardKey had in its routing table cache.

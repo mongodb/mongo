@@ -344,6 +344,7 @@ env.Library(
         'move_chunk_command.cpp',
         'move_primary_command.cpp',
         'rename_collection_coordinator.cpp',
+        'refine_collection_shard_key_coordinator.cpp',
         'set_shard_version_command.cpp',
         'sharding_ddl_coordinator.cpp',
         'sharding_server_status.cpp',
