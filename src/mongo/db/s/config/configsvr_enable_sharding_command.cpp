@@ -140,11 +140,14 @@ public:
         auto response = UpdateOp::parseResponse([&] {
             write_ops::Update updateOp(DatabaseType::ConfigNS);
             updateOp.setUpdates({[&] {
-                auto queryFilter = BSON(DatabaseType::name(dbname));
+                BSONObjBuilder queryFilterBuilder;
+                queryFilterBuilder.append(DatabaseType::name.name(), dbname);
+                if (shardId.isValid())
+                    queryFilterBuilder.append(DatabaseType::primary.name(), shardId.toString());
                 auto updateModification = write_ops::UpdateModification(
                     write_ops::UpdateModification::parseFromClassicUpdate(
                         BSON("$set" << BSON(DatabaseType::sharded(true)))));
-                write_ops::UpdateOpEntry updateEntry(queryFilter, updateModification);
+                write_ops::UpdateOpEntry updateEntry(queryFilterBuilder.obj(), updateModification);
                 updateEntry.setMulti(false);
                 updateEntry.setUpsert(false);
                 return updateEntry;

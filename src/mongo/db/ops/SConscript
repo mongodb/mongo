@@ -29,8 +29,7 @@ env.Library(
 env.Library(
     target='write_ops_parsers',
     source=[
-        'find_and_modify_command.idl',
-        'write_ops_parsers.cpp',
+        'write_ops.cpp',
         'write_ops.idl',
     ],
     LIBDEPS=[

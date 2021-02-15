@@ -33,7 +33,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/commands/server_status_metric.h"
-#include "mongo/db/ops/find_and_modify_command_gen.h"
+#include "mongo/db/ops/write_ops.h"
 
 namespace mongo {
 /**

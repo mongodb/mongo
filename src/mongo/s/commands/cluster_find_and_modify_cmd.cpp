@@ -55,7 +55,6 @@
 #include "mongo/s/stale_exception.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/s/would_change_owning_shard_exception.h"
-#include "mongo/s/write_ops/cluster_write.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {
@@ -174,7 +173,7 @@ public:
     FindAndModifyCmd()
         : BasicCommand("findAndModify", "findandmodify"), _updateMetrics{"findAndModify"} {}
 
-    const std::set<std::string>& apiVersions() const {
+    const std::set<std::string>& apiVersions() const override {
         return kApiVersions1;
     }
 
@@ -191,7 +190,7 @@ public:
     }
 
     ReadConcernSupportResult supportsReadConcern(const BSONObj& cmdObj,
-                                                 repl::ReadConcernLevel level) const final {
+                                                 repl::ReadConcernLevel level) const override {
         return {{level != repl::ReadConcernLevel::kLocalReadConcern &&
                      level != repl::ReadConcernLevel::kSnapshotReadConcern,
                  {ErrorCodes::InvalidOptions, "read concern not supported"}},
@@ -201,7 +200,6 @@ public:
     void addRequiredPrivileges(const std::string& dbname,
                                const BSONObj& cmdObj,
                                std::vector<Privilege>* out) const override {
-
         bool update = cmdObj["update"].trueValue();
         bool upsert = cmdObj["upsert"].trueValue();
         bool remove = cmdObj["remove"].trueValue();
@@ -221,7 +219,7 @@ public:
             actions.addAction(ActionType::bypassDocumentValidation);
         }
 
-        const std::string ns = CommandHelpers::parseNsFromCommand(dbname, cmdObj);
+        std::string ns = CommandHelpers::parseNsFromCommand(dbname, cmdObj);
         ResourcePattern resource(CommandHelpers::resourcePatternForNamespace(ns));
         uassert(17137,
                 "Invalid target namespace " + resource.toString(),
@@ -241,7 +239,6 @@ public:
             uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
 
         std::shared_ptr<Shard> shard;
-
         if (cm.isSharded()) {
             const BSONObj query = cmdObj.getObjectField("query");
             const BSONObj collation = getCollation(cmdObj);
@@ -318,7 +315,24 @@ public:
         auto cmdObjForShard = appendLegacyRuntimeConstantsToCommandObject(opCtx, cmdObj);
 
         const auto cm = uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, nss));
-        if (!cm.isSharded()) {
+        if (cm.isSharded()) {
+            const BSONObj query = cmdObjForShard.getObjectField("query");
+            const BSONObj collation = getCollation(cmdObjForShard);
+            const auto let = getLet(cmdObjForShard);
+            const auto rc = getLegacyRuntimeConstants(cmdObjForShard);
+            const BSONObj shardKey =
+                getShardKey(opCtx, cm, nss, query, collation, boost::none, let, rc);
+
+            auto chunk = cm.findIntersectingChunk(shardKey, collation);
+
+            _runCommand(opCtx,
+                        chunk.getShardId(),
+                        cm.getVersion(chunk.getShardId()),
+                        boost::none,
+                        nss,
+                        applyReadWriteConcern(opCtx, this, cmdObjForShard),
+                        &result);
+        } else {
             _runCommand(opCtx,
                         cm.dbPrimary(),
                         ChunkVersion::UNSHARDED(),
@@ -326,25 +340,7 @@ public:
                         nss,
                         applyReadWriteConcern(opCtx, this, cmdObjForShard),
                         &result);
-            return true;
         }
-
-        const BSONObj query = cmdObjForShard.getObjectField("query");
-        const BSONObj collation = getCollation(cmdObjForShard);
-        const auto let = getLet(cmdObjForShard);
-        const auto rc = getLegacyRuntimeConstants(cmdObjForShard);
-        const BSONObj shardKey =
-            getShardKey(opCtx, cm, nss, query, collation, boost::none, let, rc);
-
-        auto chunk = cm.findIntersectingChunk(shardKey, collation);
-
-        _runCommand(opCtx,
-                    chunk.getShardId(),
-                    cm.getVersion(chunk.getShardId()),
-                    boost::none,
-                    nss,
-                    applyReadWriteConcern(opCtx, this, cmdObjForShard),
-                    &result);
 
         return true;
     }

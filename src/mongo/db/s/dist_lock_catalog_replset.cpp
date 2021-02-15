@@ -33,11 +33,10 @@
 
 #include <string>
 
-#include "mongo/base/status.h"
-#include "mongo/base/status_with.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/lasterror.h"
+#include "mongo/db/ops/write_ops.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/s/type_lockpings.h"
 #include "mongo/db/s/type_locks.h"
@@ -52,10 +51,6 @@
 #include "mongo/util/time_support.h"
 
 namespace mongo {
-
-using std::string;
-using std::vector;
-
 namespace {
 
 const char kFindAndModifyResponseResultDocField[] = "value";
@@ -80,27 +75,15 @@ StatusWith<BSONObj> extractFindAndModifyNewObj(StatusWith<Shard::CommandResponse
         return response.getValue().writeConcernStatus;
     }
 
-    auto responseObj = std::move(response.getValue().response);
-
-    if (const auto& newDocElem = responseObj[kFindAndModifyResponseResultDocField]) {
-        if (newDocElem.isNull()) {
-            return {ErrorCodes::LockStateChangeFailed,
-                    "findAndModify query predicate didn't match any lock document"};
-        }
-
-        if (!newDocElem.isABSONObj()) {
-            return {ErrorCodes::UnsupportedFormat,
-                    str::stream() << "expected an object from the findAndModify response '"
-                                  << kFindAndModifyResponseResultDocField
-                                  << "'field, got: " << newDocElem};
-        }
-
-        return newDocElem.Obj().getOwned();
+    try {
+        auto reply = FindAndModifyOp::parseResponse(response.getValue().response);
+        uassert(ErrorCodes::LockStateChangeFailed,
+                "findAndModify query predicate didn't match any lock document",
+                reply.getValue());
+        return reply.getValue()->getOwned();
+    } catch (const DBException& ex) {
+        return ex.toStatus();
     }
-
-    return {ErrorCodes::UnsupportedFormat,
-            str::stream() << "no '" << kFindAndModifyResponseResultDocField
-                          << "' in findAndModify response"};
 }
 
 /**
@@ -130,7 +113,7 @@ StatusWith<OID> extractElectionId(const BSONObj& responseObj) {
             }
 
             if (isPrimary) {
-                string hostContacted;
+                std::string hostContacted;
                 auto hostContactedStatus = bsonExtractStringField(replSubObj, "me", &hostContacted);
 
                 if (!hostContactedStatus.isOK()) {
@@ -167,7 +150,23 @@ write_ops::FindAndModifyCommand makeFindAndModifyRequest(
     return request;
 }
 
-}  // unnamed namespace
+StatusWith<std::vector<BSONObj>> findOnConfig(OperationContext* opCtx,
+                                              const ReadPreferenceSetting& readPref,
+                                              const NamespaceString& nss,
+                                              const BSONObj& query,
+                                              const BSONObj& sort,
+                                              boost::optional<long long> limit) {
+    auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
+    auto result = shardRegistry->getConfigShard()->exhaustiveFindOnConfig(
+        opCtx, readPref, repl::ReadConcernLevel::kMajorityReadConcern, nss, query, sort, limit);
+    if (!result.isOK()) {
+        return result.getStatus();
+    }
+
+    return result.getValue().docs;
+}
+
+}  // namespace
 
 DistLockCatalogImpl::DistLockCatalogImpl()
     : _lockPingNS(LockpingsType::ConfigNS), _locksNS(LocksType::ConfigNS) {}
@@ -176,7 +175,7 @@ DistLockCatalogImpl::~DistLockCatalogImpl() = default;
 
 StatusWith<LockpingsType> DistLockCatalogImpl::getPing(OperationContext* opCtx,
                                                        StringData processID) {
-    auto findResult = _findOnConfig(
+    auto findResult = findOnConfig(
         opCtx, kReadPref, _lockPingNS, BSON(LockpingsType::process() << processID), {}, 1);
 
     if (!findResult.isOK()) {
@@ -333,11 +332,7 @@ Status DistLockCatalogImpl::unlock(OperationContext* opCtx,
         write_ops::UpdateModification::parseFromClassicUpdate(
             BSON("$set" << BSON(LocksType::state(LocksType::UNLOCKED)))));
     request.setWriteConcern(kMajorityWriteConcern.toBSON());
-    return _unlock(opCtx, request);
-}
 
-Status DistLockCatalogImpl::_unlock(OperationContext* opCtx,
-                                    const write_ops::FindAndModifyCommand& request) {
     auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
     auto resultStatus = shardRegistry->getConfigShard()->runCommandWithFixedRetryAttempts(
         opCtx,
@@ -447,8 +442,7 @@ StatusWith<DistLockCatalog::ServerInfo> DistLockCatalogImpl::getServerInfo(
 StatusWith<LocksType> DistLockCatalogImpl::getLockByTS(OperationContext* opCtx,
                                                        const OID& lockSessionID) {
     auto findResult =
-        _findOnConfig(opCtx, kReadPref, _locksNS, BSON(LocksType::lockID(lockSessionID)), {}, 1);
-
+        findOnConfig(opCtx, kReadPref, _locksNS, BSON(LocksType::lockID(lockSessionID)), {}, 1);
     if (!findResult.isOK()) {
         return findResult.getStatus();
     }
@@ -473,8 +467,7 @@ StatusWith<LocksType> DistLockCatalogImpl::getLockByTS(OperationContext* opCtx,
 
 StatusWith<LocksType> DistLockCatalogImpl::getLockByName(OperationContext* opCtx, StringData name) {
     auto findResult =
-        _findOnConfig(opCtx, kReadPref, _locksNS, BSON(LocksType::name() << name), {}, 1);
-
+        findOnConfig(opCtx, kReadPref, _locksNS, BSON(LocksType::name() << name), {}, 1);
     if (!findResult.isOK()) {
         return findResult.getStatus();
     }
@@ -513,23 +506,6 @@ Status DistLockCatalogImpl::stopPing(OperationContext* opCtx, StringData process
 
     auto findAndModifyStatus = extractFindAndModifyNewObj(std::move(resultStatus));
     return findAndModifyStatus.getStatus();
-}
-
-StatusWith<vector<BSONObj>> DistLockCatalogImpl::_findOnConfig(
-    OperationContext* opCtx,
-    const ReadPreferenceSetting& readPref,
-    const NamespaceString& nss,
-    const BSONObj& query,
-    const BSONObj& sort,
-    boost::optional<long long> limit) {
-    auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
-    auto result = shardRegistry->getConfigShard()->exhaustiveFindOnConfig(
-        opCtx, readPref, repl::ReadConcernLevel::kMajorityReadConcern, nss, query, sort, limit);
-    if (!result.isOK()) {
-        return result.getStatus();
-    }
-
-    return result.getValue().docs;
 }
 
 }  // namespace mongo

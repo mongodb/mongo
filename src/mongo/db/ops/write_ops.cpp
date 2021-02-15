@@ -29,10 +29,9 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/ops/write_ops_parsers.h"
+#include "mongo/db/ops/write_ops.h"
 
 #include "mongo/db/dbmessage.h"
-#include "mongo/db/ops/write_ops.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/db/update/update_oplog_entry_version.h"
@@ -206,12 +205,16 @@ write_ops::Update UpdateOp::parseLegacy(const Message& msgRaw) {
     return op;
 }
 
-write_ops::UpdateResponse UpdateOp::parseResponse(const BSONObj& obj) {
+write_ops::UpdateReply UpdateOp::parseResponse(const BSONObj& obj) {
     uassertStatusOK(getStatusFromCommandResult(obj));
 
-    write_ops::UpdateResponse response;
-    response.parse(IDLParserErrorContext("update"), obj);
-    return response;
+    return write_ops::UpdateReply::parse(IDLParserErrorContext("updateReply"), obj);
+}
+
+write_ops::FindAndModifyReply FindAndModifyOp::parseResponse(const BSONObj& obj) {
+    uassertStatusOK(getStatusFromCommandResult(obj));
+
+    return write_ops::FindAndModifyReply::parse(IDLParserErrorContext("findAndModifyReply"), obj);
 }
 
 write_ops::Delete DeleteOp::parse(const OpMsgRequest& request) {

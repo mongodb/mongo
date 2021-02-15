@@ -29,8 +29,8 @@
 
 #pragma once
 
-#include "mongo/db/ops/find_and_modify_command_gen.h"
 #include "mongo/db/ops/single_write_result_gen.h"
+#include "mongo/db/ops/write_ops.h"
 #include "mongo/db/repl/oplog_entry.h"
 
 namespace mongo {
