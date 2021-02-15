@@ -34,24 +34,33 @@
 namespace mongo {
 namespace sbe {
 namespace bson {
+
+/**
+ * Advance table specifies how to change the pointer to skip current BSON value (so that pointer
+ * points to the next byte after the BSON value):
+ *  - For values less than 128 (0x80), pointer is advanced by this value
+ *  - 255 (0xff) - pointer is advanced by the 32-bit integer stored in the buffer plus 4 bytes
+ *  - 254 (0xfe) - pointer is advanced by the 32-bit integer stored in the buffer
+ *  - 128 (0x80) - the type is either unsupported or handled explicitly
+ */
 // clang-format off
 static uint8_t advanceTable[] = {
-	0xff, // End
-	8,    // double
-	0xff, // string
-	0xfe, // document
-	0xfe, // document
-	0x80, // binary ??? +1 ?
-	0,    // Undefined(value) - Deprecated
+	0xff, // EOO
+	8,    // Double
+	0xff, // String
+	0xfe, // Object
+	0xfe, // Array
+	0x80, // BinData
+	0,    // Undefined - Deprecated
 	12,   // ObjectId
 	1,    // Boolean
 	8,    // UTC datetime
 	0,    // Null value
 	0x80, // Regular expression
-	0x80, // DBPointer
-	0x80, // JavaScript code
-	0x80, // Symbol
-	0x80, // JavaScript code w/ scope ????
+	0x80, // DBPointer - Deprecated
+	0xff, // JavaScript code
+	0x80, // Symbol - Deprecated
+	0x80, // JavaScript code with scope - Deprecated
 	4,    // 32-bit integer
 	8,    // Timestamp
 	8,    // 64-bit integer
@@ -227,13 +236,18 @@ std::pair<value::TypeTags, value::Value> convertFrom(bool view,
         case BSONType::Undefined:
             return {value::TypeTags::bsonUndefined, 0};
         case BSONType::RegEx: {
+            auto value = value::bitcastFrom<const char*>(be);
             if (view) {
-                return {value::TypeTags::bsonRegex, value::bitcastFrom<const char*>(be)};
+                return {value::TypeTags::bsonRegex, value};
             }
-
-            value::BsonRegex bsonRegex{be};
-            auto [_, strVal] = value::makeBigString(bsonRegex.dataView());
-            return {value::TypeTags::bsonRegex, strVal};
+            return value::makeCopyBsonRegex(value::getBsonRegexView(value));
+        }
+        case BSONType::Code: {
+            auto value = value::bitcastFrom<const char*>(be);
+            if (view) {
+                return {value::TypeTags::bsonJavascript, value};
+            }
+            return value::makeCopyBsonJavascript(value::getBsonJavascriptView(value));
         }
         default:
             return {value::TypeTags::Nothing, 0};
@@ -331,6 +345,9 @@ void convertToBsonObj(ArrayBuilder& builder, value::ArrayEnumerator arr) {
                 builder.appendRegex(regex.pattern, regex.flags);
                 break;
             }
+            case value::TypeTags::bsonJavascript:
+                builder.appendCode(value::getBsonJavascriptView(val));
+                break;
             default:
                 MONGO_UNREACHABLE;
         }
@@ -459,6 +476,9 @@ void appendValueToBsonObj(ObjBuilder& builder,
             builder.appendRegex(name, regex.pattern, regex.flags);
             break;
         }
+        case value::TypeTags::bsonJavascript:
+            builder.appendCode(name, value::getBsonJavascriptView(val));
+            break;
         default:
             MONGO_UNREACHABLE;
     }

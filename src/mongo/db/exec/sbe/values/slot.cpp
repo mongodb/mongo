@@ -72,13 +72,15 @@ static std::pair<TypeTags, Value> deserializeTagVal(BufReader& buf) {
         case TypeTags::bsonUndefined:
             val = 0;
             break;
-        case TypeTags::StringSmall:
+        case TypeTags::StringSmall: {
+            std::tie(tag, val) = makeNewString(buf.readCStr());
+            break;
+        }
         case TypeTags::StringBig:
         case TypeTags::bsonString: {
-            auto str = buf.readCStr();
-            auto [strTag, strVal] = makeNewString({str.rawData(), str.size()});
-            tag = strTag;
-            val = strVal;
+            auto stringLength = buf.read<LittleEndian<uint32_t>>();
+            auto stringStart = reinterpret_cast<const char*>(buf.skip(stringLength));
+            std::tie(tag, val) = makeNewString({stringStart, stringLength});
             break;
         }
         case TypeTags::Array: {
@@ -156,9 +158,13 @@ static std::pair<TypeTags, Value> deserializeTagVal(BufReader& buf) {
         case TypeTags::bsonRegex: {
             auto pattern = buf.readCStr();
             auto flags = buf.readCStr();
-            BsonRegex bsonRegex{pattern, flags};
-            auto [_, strVal] = makeBigString(bsonRegex.dataView());
-            val = strVal;
+            std::tie(tag, val) = value::makeCopyBsonRegex({pattern, flags});
+            break;
+        }
+        case TypeTags::bsonJavascript: {
+            auto codeLength = buf.read<LittleEndian<uint32_t>>();
+            auto codeStart = reinterpret_cast<const char*>(buf.skip(codeLength));
+            std::tie(tag, val) = makeCopyBsonJavascript({codeStart, codeLength});
             break;
         }
         default:
@@ -217,11 +223,17 @@ static void serializeTagValue(BufBuilder& buf, TypeTags tag, Value val) {
             break;
         case TypeTags::bsonUndefined:
             break;
-        case TypeTags::StringSmall:
+        case TypeTags::StringSmall: {
+            // Small strings cannot contain null bytes, so it is safe to serialize them as plain
+            // C-strings. Null byte is implicitly added at the end by 'buf.appendStr'.
+            buf.appendStr(getStringView(tag, val));
+            break;
+        }
         case TypeTags::StringBig:
         case TypeTags::bsonString: {
             auto sv = getStringView(tag, val);
-            buf.appendStr({sv.data(), sv.size()});
+            buf.appendNum(static_cast<uint32_t>(sv.size()));
+            buf.appendStr(sv, false /* includeEndingNull */);
             break;
         }
         case TypeTags::Array: {
@@ -290,6 +302,12 @@ static void serializeTagValue(BufBuilder& buf, TypeTags tag, Value val) {
             auto regex = getBsonRegexView(val);
             buf.appendStr(regex.pattern);
             buf.appendStr(regex.flags);
+            break;
+        }
+        case TypeTags::bsonJavascript: {
+            auto javascriptCode = getBsonJavascriptView(val);
+            buf.appendNum(static_cast<uint32_t>(javascriptCode.size()));
+            buf.appendStr(javascriptCode, false /* includeEndingNull */);
             break;
         }
         default:
@@ -383,6 +401,11 @@ int getApproximateSize(TypeTags tag, Value val) {
         case TypeTags::bsonRegex: {
             auto regex = getBsonRegexView(val);
             result += regex.byteSize();
+            break;
+        }
+        case TypeTags::bsonJavascript: {
+            auto code = getBsonJavascriptView(val);
+            result += sizeof(uint32_t) + code.size() + sizeof(char);
             break;
         }
         default:

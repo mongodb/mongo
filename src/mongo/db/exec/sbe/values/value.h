@@ -115,6 +115,7 @@ enum class TypeTags : uint8_t {
     // or from user over the wire). It is never created or manipulated by SBE.
     bsonUndefined,
     bsonRegex,
+    bsonJavascript,
 
     // KeyString::Value
     ksValue,
@@ -250,13 +251,13 @@ public:
     ValueGuard(TypeTags tag, Value val) : _tag(tag), _value(val) {}
     ValueGuard() = delete;
     ValueGuard(const ValueGuard&) = delete;
-    ValueGuard(ValueGuard&&) = delete;
+    ValueGuard(ValueGuard&& other) = delete;
     ~ValueGuard() {
         releaseValue(_tag, _value);
     }
 
     ValueGuard& operator=(const ValueGuard&) = delete;
-    ValueGuard& operator=(ValueGuard&&) = delete;
+    ValueGuard& operator=(ValueGuard&& other) = delete;
 
     void reset() {
         _tag = TypeTags::Nothing;
@@ -944,6 +945,14 @@ inline BsonRegex getBsonRegexView(Value val) noexcept {
     return BsonRegex(getRawPointerView(val));
 }
 
+std::pair<TypeTags, Value> makeCopyBsonRegex(const BsonRegex& regex);
+
+inline std::string_view getBsonJavascriptView(Value val) noexcept {
+    return getStringView(TypeTags::StringBig, val);
+}
+
+std::pair<TypeTags, Value> makeCopyBsonJavascript(std::string_view code);
+
 std::pair<TypeTags, Value> makeCopyKeyString(const KeyString::Value& inKey);
 
 std::pair<TypeTags, Value> makeCopyJsFunction(const JsFunction&);
@@ -1002,6 +1011,10 @@ inline std::pair<TypeTags, Value> copyValue(TypeTags tag, Value val) {
             return makeCopyJsFunction(*getJsFunctionView(val));
         case TypeTags::shardFilterer:
             return makeCopyShardFilterer(*getShardFiltererView(val));
+        case TypeTags::bsonRegex:
+            return makeCopyBsonRegex(getBsonRegexView(val));
+        case TypeTags::bsonJavascript:
+            return makeCopyBsonJavascript(getBsonJavascriptView(val));
         default:
             break;
     }
