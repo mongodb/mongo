@@ -36,32 +36,55 @@
 
 namespace mongo::sbe {
 TEST(ValueSerializeForSorter, Serialize) {
-    value::MaterializedRow originalRow(21);
+    auto [testDataTag, testDataVal] = sbe::value::makeNewArray();
+    sbe::value::ValueGuard testDataGuard{testDataTag, testDataVal};
+    auto testData = sbe::value::getArrayView(testDataVal);
 
-    originalRow.reset(0, true, value::TypeTags::Nothing, 0);
-    originalRow.reset(1, true, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(33550336));
-    originalRow.reset(2, true, value::TypeTags::RecordId, value::bitcastFrom<int64_t>(8589869056));
-    originalRow.reset(
-        3, true, value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(137438691328));
-    originalRow.reset(4, true, value::TypeTags::NumberDouble, value::bitcastFrom<double>(2.305e18));
+    testData->push_back(value::TypeTags::Nothing, 0);
+    testData->push_back(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(33550336));
+    testData->push_back(value::TypeTags::RecordId, value::bitcastFrom<int64_t>(8589869056));
+    testData->push_back(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(137438691328));
+    testData->push_back(value::TypeTags::NumberDouble, value::bitcastFrom<double>(2.305e18));
 
     auto [decimalTag, decimalVal] =
         value::makeCopyDecimal(Decimal128("2658455991569831744654692615953842176"));
-    originalRow.reset(5, true, decimalTag, decimalVal);
+    testData->push_back(decimalTag, decimalVal);
 
-    originalRow.reset(6, true, value::TypeTags::Date, value::bitcastFrom<int64_t>(1234));
-    originalRow.reset(7, true, value::TypeTags::Timestamp, value::bitcastFrom<uint64_t>(5678));
-    originalRow.reset(8, true, value::TypeTags::Boolean, value::bitcastFrom<bool>(true));
-    originalRow.reset(9, true, value::TypeTags::Null, 0);
-    originalRow.reset(10, true, value::TypeTags::MinKey, 0);
-    originalRow.reset(11, true, value::TypeTags::MaxKey, 0);
-    originalRow.reset(12, true, value::TypeTags::bsonUndefined, 0);
+    testData->push_back(value::TypeTags::Date, value::bitcastFrom<int64_t>(1234));
+    testData->push_back(value::TypeTags::Timestamp, value::bitcastFrom<uint64_t>(5678));
+    testData->push_back(value::TypeTags::Boolean, value::bitcastFrom<bool>(true));
+    testData->push_back(value::TypeTags::Null, 0);
+    testData->push_back(value::TypeTags::MinKey, 0);
+    testData->push_back(value::TypeTags::MaxKey, 0);
+    testData->push_back(value::TypeTags::bsonUndefined, 0);
 
-    auto [stringTag, stringVal] = value::makeNewString("perfect");
-    originalRow.reset(13, true, stringTag, stringVal);
+    std::string_view smallString = "perfect";
+    invariant(sbe::value::canUseSmallString(smallString));
+    std::string_view bigString = "too big string to fit into value";
+    invariant(!sbe::value::canUseSmallString(bigString));
+    std::string_view smallStringWithNull = "a\0b";
+    invariant(smallStringWithNull.size() <= sbe::value::kSmallStringMaxLength);
+    std::string_view bigStringWithNull = "too big string \0 to fit into value";
+    invariant(bigStringWithNull.size() > sbe::value::kSmallStringMaxLength);
+
+    std::vector<std::string_view> stringCases = {
+        smallString,
+        smallStringWithNull,
+        bigString,
+        bigStringWithNull,
+        "",
+        "a",
+        "a\0",
+        "\0",
+        "\0\0\0",
+    };
+    for (const auto& stringCase : stringCases) {
+        auto [stringTag, stringVal] = value::makeNewString(stringCase);
+        testData->push_back(stringTag, stringVal);
+    }
 
     auto [objectTag, objectVal] = value::makeNewObject();
-    originalRow.reset(14, true, objectTag, objectVal);
+    testData->push_back(objectTag, objectVal);
 
     auto object = value::getObjectView(objectVal);
     object->push_back("num", value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(1));
@@ -81,7 +104,7 @@ TEST(ValueSerializeForSorter, Serialize) {
     arraySet->push_back(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(5));
 
     auto [oidTag, oidVal] = value::makeCopyObjectId({1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12});
-    originalRow.reset(15, true, oidTag, oidVal);
+    testData->push_back(oidTag, oidVal);
 
     uint8_t byteArray[] = {8, 7, 6, 5, 4, 3, 2, 1};
     auto bson =
@@ -93,29 +116,54 @@ TEST(ValueSerializeForSorter, Serialize) {
 
     auto [bsonObjTag, bsonObjVal] = value::copyValue(
         value::TypeTags::bsonObject, value::bitcastFrom<const char*>(bson["obj"].value()));
-    originalRow.reset(16, true, bsonObjTag, bsonObjVal);
+    testData->push_back(bsonObjTag, bsonObjVal);
 
 
     auto [bsonArrayTag, bsonArrayVal] = value::copyValue(
         value::TypeTags::bsonArray, value::bitcastFrom<const char*>(bson["arr"].value()));
-    originalRow.reset(17, true, bsonArrayTag, bsonArrayVal);
+    testData->push_back(bsonArrayTag, bsonArrayVal);
 
     auto [bsonBinDataGeneralTag, bsonBinDataGeneralVal] =
         value::copyValue(value::TypeTags::bsonBinData,
                          value::bitcastFrom<const char*>(bson["binDataGeneral"].value()));
-    originalRow.reset(18, true, bsonBinDataGeneralTag, bsonBinDataGeneralVal);
+    testData->push_back(bsonBinDataGeneralTag, bsonBinDataGeneralVal);
 
     auto [bsonBinDataDeprecatedTag, bsonBinDataDeprecatedVal] =
         value::copyValue(value::TypeTags::bsonBinData,
                          value::bitcastFrom<const char*>(bson["binDataDeprecated"].value()));
-    originalRow.reset(19, true, bsonBinDataDeprecatedTag, bsonBinDataDeprecatedVal);
+    testData->push_back(bsonBinDataDeprecatedTag, bsonBinDataDeprecatedVal);
 
     KeyString::Builder keyStringBuilder(KeyString::Version::V1);
     keyStringBuilder.appendNumberLong(1);
     keyStringBuilder.appendNumberLong(2);
     keyStringBuilder.appendNumberLong(3);
     auto [keyStringTag, keyStringVal] = value::makeCopyKeyString(keyStringBuilder.getValueCopy());
-    originalRow.reset(20, true, keyStringTag, keyStringVal);
+    testData->push_back(keyStringTag, keyStringVal);
+
+    auto [plainCodeTag, plainCodeVal] =
+        value::makeCopyBsonJavascript("function test() { return 'Hello world!'; }");
+    testData->push_back(value::TypeTags::bsonJavascript, plainCodeVal);
+
+    auto [codeWithNullTag, codeWithNullVal] =
+        value::makeCopyBsonJavascript("function test() { return 'Danger\0us!'; }");
+    testData->push_back(value::TypeTags::bsonJavascript, codeWithNullVal);
+
+    auto regexBson =
+        BSON("noOptions" << BSONRegEx("[a-z]+") << "withOptions" << BSONRegEx(".*", "i")
+                         << "emptyPatternNoOptions" << BSONRegEx("") << "emptyPatternWithOptions"
+                         << BSONRegEx("", "s"));
+
+    for (const auto& element : regexBson) {
+        auto [copyTag, copyVal] = value::copyValue(
+            value::TypeTags::bsonRegex, value::bitcastFrom<const char*>(element.value()));
+        testData->push_back(copyTag, copyVal);
+    }
+
+    value::MaterializedRow originalRow{testData->size()};
+    for (size_t i = 0; i < testData->size(); i++) {
+        auto [tag, value] = testData->getAt(i);
+        originalRow.reset(i, false, tag, value);
+    }
 
     BufBuilder builder;
     originalRow.serializeForSorter(builder);

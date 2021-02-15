@@ -122,7 +122,10 @@ public:
     }
 
     void append(const BSONCode& in) {
-        unsupportedType("javascript");
+        appendValueBufferOffset(TypeTags::bsonJavascript);
+        // Add one to account null byte at the end.
+        _valueBufferBuilder->appendNum(static_cast<uint32_t>(in.code.size() + 1));
+        _valueBufferBuilder->appendStr(in.code);
     }
 
     void append(const BSONCodeWScope& in) {
@@ -137,7 +140,9 @@ public:
     }
 
     void append(const BSONRegEx& in) {
-        unsupportedType("regex");
+        appendValueBufferOffset(TypeTags::bsonRegex);
+        _valueBufferBuilder->appendStr(in.pattern);
+        _valueBufferBuilder->appendStr(in.flags);
     }
 
     void append(const BSONDBRef& in) {
@@ -206,7 +211,9 @@ public:
                 case TypeTags::NumberDecimal:
                 case TypeTags::bsonObject:
                 case TypeTags::bsonArray:
-                case TypeTags::bsonBinData: {
+                case TypeTags::bsonBinData:
+                case TypeTags::bsonRegex:
+                case TypeTags::bsonJavascript: {
                     auto offset = bitcastTo<decltype(bufferLen)>(val);
                     invariant(offset < bufferLen);
                     val = bitcastFrom<const char*>(_valueBufferBuilder->buf() + offset);
@@ -245,7 +252,7 @@ private:
     //
     // During the building process, pointers into that memory can become invalidated, so instead of
     // storing a pointer, we store an _offset_ into the under-construction buffer. Translation from
-    // offset to pointer occurs as part of the 'releaseValues()' function.
+    // offset to pointer occurs as part of the 'readValues()' function.
     void appendValueBufferOffset(TypeTags tag) {
         _tagList[_numValues] = tag;
         _valList[_numValues] = value::bitcastFrom<int32_t>(_valueBufferBuilder->len());
