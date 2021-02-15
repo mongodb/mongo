@@ -1676,6 +1676,21 @@ if (db.getMongo().writeMode() === "commands") {
     });
 }
 
+// updateOne with undefined/null collation.backwards parameter (SERVER-54482).
+if (db.getMongo().writeMode() === "commands") {
+    for (let backwards of [undefined, null]) {
+        assert.throws(function() {
+            coll.bulkWrite([{
+                updateOne: {
+                    filter: {str: 'foo'},
+                    update: {$set: {str: 'bar'}},
+                    collation: {locale: 'en_US', backwards: backwards}
+                }
+            }]);
+        });
+    }
+}
+
 // updateMany with bulkWrite().
 coll.drop();
 assert.commandWorked(coll.insert({_id: 1, str: "foo"}));

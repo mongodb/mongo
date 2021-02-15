@@ -384,10 +384,10 @@ structs:
                 type: bool
                 default: false
             # Causes accent differences to be considered in reverse order, as it is done in the
-            # French language.
+            # French language. Note: the optionalBool parser rejects null/undefined inputs, which
+            # preserves an invariant in updateCollationSpecFromICUCollator.
             backwards:
-                type: bool
-                optional: true
+                type: optionalBool
             # Indicates the version of the collator. It is used to ensure that we do not mix
             # versions by, for example, constructing an index with one version of ICU and then
             # attempting to use this index with a server that is built against a newer ICU version.
