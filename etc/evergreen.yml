@@ -4559,7 +4559,7 @@ tasks:
 ## jstestfuzz concurrent sharded cluster ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_concurrent_sharded_gen
-  tags: ["jstestfuzz", "common"]
+  tags: ["jstestfuzz", "common", "sharding"]
   commands:
   - func: "generate fuzzer tasks"
     vars:
@@ -4789,7 +4789,7 @@ tasks:
 ## jstestfuzz sharded cluster ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_sharded_gen
-  tags: ["jstestfuzz", "common"]
+  tags: ["jstestfuzz", "common", "sharding"]
   commands:
   - func: "generate fuzzer tasks"
     vars:
@@ -8594,9 +8594,8 @@ buildvariants:
   - name: concurrency_simultaneous
   - name: disk_wiredtiger
   - name: failpoints_auth
-  - name: .jscore .common !.decimal !.txns
-  - name: .jstestfuzz .common !.repl
-  - name: sharding_jscore_passthrough
+  - name: .jscore .common !.sharding !.decimal !.txns
+  - name: .jstestfuzz .common !.sharding !.repl
 
 - name: ubuntu1804
   display_name: Ubuntu 18.04

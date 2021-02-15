@@ -1,7 +1,7 @@
 // Test that attempting to read after optime fails if replication is not enabled.
 // @tags: [
 //   multiversion_incompatible,
-//   assumes_standalone_mongod
+//   assumes_standalone_mongod,
 // ]
 
 (function() {

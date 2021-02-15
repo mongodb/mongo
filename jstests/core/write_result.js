@@ -7,9 +7,6 @@
 //   assumes_write_concern_unchanged,
 //   requires_non_retryable_writes,
 //   requires_fastcount,
-//   # TODO (SERVER-43892): We can enable this test in the multiversion passthrough, which starts
-//   # shards as replica sets, once the test can be run against replica set shards.
-//   multiversion_incompatible,
 // ]
 
 //
@@ -186,7 +183,7 @@ coll.unsetWriteConcern();
 coll.remove({});
 var wRes = assert.writeError(coll.insert({foo: "bar"}, {writeConcern: {w: "invalid"}}));
 var res = assert.commandWorked(db.hello());
-var replSet = res.hasOwnProperty("setName");
+var replSet = res.hasOwnProperty("$clusterTime");
 if (!replSet && coll.getMongo().writeMode() == "commands")
     assert.eq(coll.count(), 0, "not-replset || command mode");
 else  // compatibility,

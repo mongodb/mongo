@@ -59,7 +59,14 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
         self.shard_options = utils.default_if_none(shard_options, {})
         self.mixed_bin_versions = utils.default_if_none(mixed_bin_versions,
                                                         config.MIXED_BIN_VERSIONS)
-        if self.mixed_bin_versions is not None and num_rs_nodes_per_shard is not None:
+
+        if self.num_rs_nodes_per_shard is None:
+            raise TypeError("num_rs_nodes_per_shard must be an integer but found None")
+        elif isinstance(self.num_rs_nodes_per_shard, int):
+            if self.num_rs_nodes_per_shard <= 0:
+                raise ValueError("num_rs_nodes_per_shard must be a positive integer")
+
+        if self.mixed_bin_versions is not None:
             num_mongods = self.num_shards * self.num_rs_nodes_per_shard
             if len(self.mixed_bin_versions) != num_mongods:
                 msg = (("The number of binary versions specified: {} do not match the number of"\
@@ -96,14 +103,7 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
 
         if not self.shards:
             for i in range(self.num_shards):
-                if self.num_rs_nodes_per_shard is None:
-                    shard = self._new_standalone_shard(i)
-                elif isinstance(self.num_rs_nodes_per_shard, int):
-                    if self.num_rs_nodes_per_shard <= 0:
-                        raise ValueError("num_rs_nodes_per_shard must be a positive integer")
-                    shard = self._new_rs_shard(i, self.num_rs_nodes_per_shard)
-                else:
-                    raise TypeError("num_rs_nodes_per_shard must be an integer or None")
+                shard = self._new_rs_shard(i, self.num_rs_nodes_per_shard)
                 self.shards.append(shard)
 
         # Start up each of the shards
@@ -169,8 +169,7 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
             primary.admin.command({"refreshLogicalSessionCacheNow": 1})
 
         for shard in self.shards:
-            primary = (shard.mongo_client() if self.num_rs_nodes_per_shard is None else
-                       shard.get_primary().mongo_client())
+            primary = shard.get_primary().mongo_client()
             primary.admin.command({"refreshLogicalSessionCacheNow": 1})
 
     def _auth_to_db(self, client):
@@ -316,25 +315,6 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
             num_nodes=num_rs_nodes_per_shard, auth_options=auth_options,
             replset_config_options=replset_config_options, mixed_bin_versions=mixed_bin_versions,
             shard_logging_prefix=shard_logging_prefix, **shard_options)
-
-    def _new_standalone_shard(self, index):
-        """Return a standalone.MongoDFixture configured as a shard in a sharded cluster."""
-
-        mongod_logger = logging.loggers.new_fixture_node_logger(
-            self.__class__.__name__, self.job_num, "shard{}".format(index))
-
-        shard_options = self.shard_options.copy()
-
-        preserve_dbpath = shard_options.pop("preserve_dbpath", self.preserve_dbpath)
-
-        mongod_options = self.mongod_options.copy()
-        mongod_options.update(shard_options.pop("mongod_options", {}))
-        mongod_options["shardsvr"] = ""
-        mongod_options["dbpath"] = os.path.join(self._dbpath_prefix, "shard{}".format(index))
-
-        return standalone.MongoDFixture(mongod_logger, self.job_num, mongod_options=mongod_options,
-                                        mongod_executable=self.mongod_executable,
-                                        preserve_dbpath=preserve_dbpath, **shard_options)
 
     def _new_mongos(self, index, total):
         """
