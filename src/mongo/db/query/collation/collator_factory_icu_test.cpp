@@ -418,7 +418,7 @@ TEST(CollatorFactoryICUTest, DefaultsSetSuccessfully) {
     ASSERT_EQ(static_cast<int>(CollationMaxVariableEnum::kPunct),
               static_cast<int>(collator.getValue()->getSpec().getMaxVariable()));
     ASSERT_FALSE(collator.getValue()->getSpec().getNormalization());
-    ASSERT_FALSE(*collator.getValue()->getSpec().getBackwards());
+    ASSERT_FALSE(collator.getValue()->getSpec().getBackwards());
 }
 
 TEST(CollatorFactoryICUTest, LanguageDependentDefaultsSetSuccessfully) {
@@ -426,7 +426,7 @@ TEST(CollatorFactoryICUTest, LanguageDependentDefaultsSetSuccessfully) {
     auto collator = factory.makeFromBSON(BSON("locale"
                                               << "fr_CA"));
     ASSERT_OK(collator.getStatus());
-    ASSERT_TRUE(*collator.getValue()->getSpec().getBackwards());
+    ASSERT_TRUE(collator.getValue()->getSpec().getBackwards());
 }
 
 TEST(CollatorFactoryICUTest, CaseLevelFalseParsesSuccessfully) {
@@ -616,7 +616,7 @@ TEST(CollatorFactoryICUTest, BackwardsFalseParsesSuccessfully) {
                                               << "en_US"
                                               << "backwards" << false));
     ASSERT_OK(collator.getStatus());
-    ASSERT_FALSE(*collator.getValue()->getSpec().getBackwards());
+    ASSERT_FALSE(collator.getValue()->getSpec().getBackwards());
 }
 
 TEST(CollatorFactoryICUTest, BackwardsTrueParsesSuccessfully) {
@@ -625,7 +625,7 @@ TEST(CollatorFactoryICUTest, BackwardsTrueParsesSuccessfully) {
                                               << "en_US"
                                               << "backwards" << true));
     ASSERT_OK(collator.getStatus());
-    ASSERT_TRUE(*collator.getValue()->getSpec().getBackwards());
+    ASSERT_TRUE(collator.getValue()->getSpec().getBackwards());
 }
 
 TEST(CollatorFactoryICUTest, LongStrengthFieldParsesSuccessfully) {

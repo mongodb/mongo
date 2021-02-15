@@ -367,7 +367,7 @@ void encodeCollation(const CollatorInterface* collation, StringBuilder* keyBuild
     *keyBuilder << encodeEnum(spec.getAlternate());
     *keyBuilder << encodeEnum(spec.getMaxVariable());
     *keyBuilder << spec.getNormalization();
-    *keyBuilder << spec.getBackwards().value_or(false);
+    *keyBuilder << spec.getBackwards();
 
     // We do not encode 'spec.version' because query shape strings are never persisted, and need
     // not be stable between versions.

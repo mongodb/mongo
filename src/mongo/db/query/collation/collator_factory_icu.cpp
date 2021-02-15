@@ -396,9 +396,9 @@ Status updateCollationSpecFromICUCollator(const BSONObj& spec,
     } else {
         UErrorCode status = U_ZERO_ERROR;
         // collation->getBackwards should be engaged if spec has a "backwards" field.
-        invariant(collation->getBackwards().is_initialized());
+        invariant(collation->getBackwards().has_value());
         icuCollator->setAttribute(
-            UCOL_FRENCH_COLLATION, boolToAttribute(*collation->getBackwards()), status);
+            UCOL_FRENCH_COLLATION, boolToAttribute(collation->getBackwards()), status);
         if (U_FAILURE(status)) {
             icu::ErrorCode icuError;
             icuError.set(status);
@@ -466,7 +466,7 @@ Status validateLocaleID(const BSONObj& spec, StringData originalID, const icu::C
 Status validateCollationSpec(const Collation& collation, const BSONObj& spec) {
     // The backwards option specifically means backwards secondary weighting, and therefore only
     // affects the secondary comparison level. It has no effect at strength 1.
-    if (collation.getBackwards().value_or(false) &&
+    if (collation.getBackwards() &&
         static_cast<CollationStrength>(collation.getStrength()) == CollationStrength::kPrimary) {
         return {ErrorCodes::BadValue,
                 str::stream() << "'" << Collation::kBackwardsFieldName << "' is invalid with '"
