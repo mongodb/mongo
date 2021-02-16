@@ -41,6 +41,7 @@
 #include "mongo/db/exec/fetch.h"
 #include "mongo/db/exec/idhack.h"
 #include "mongo/db/exec/index_scan.h"
+#include "mongo/db/exec/limit.h"
 #include "mongo/db/exec/update_stage.h"
 #include "mongo/db/exec/upsert_stage.h"
 #include "mongo/db/query/get_executor.h"
@@ -186,6 +187,12 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
                                                  boundInclusion,
                                                  direction,
                                                  InternalPlanner::IXSCAN_FETCH);
+    if (params && params->canonicalQuery) {
+        long long deleteLimit = *(params->canonicalQuery->getQueryRequest().getLimit());
+        if (deleteLimit > 0) {
+            root = std::make_unique<LimitStage>(opCtx, deleteLimit, ws.get(), std::move(root));
+        }
+    }
 
     root = std::make_unique<DeleteStage>(
         expCtx.get(), std::move(params), ws.get(), collection, root.release());
