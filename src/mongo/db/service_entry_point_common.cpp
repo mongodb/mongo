@@ -134,6 +134,21 @@ namespace {
 
 using namespace fmt::literals;
 
+Future<void> runCommandInvocation(std::shared_ptr<RequestExecutionContext> rec,
+                                  std::shared_ptr<CommandInvocation> invocation) {
+    auto threadingModel = [client = rec->getOpCtx()->getClient()] {
+        if (auto context = transport::ServiceExecutorContext::get(client); context) {
+            return context->getThreadingModel();
+        }
+        tassert(5453901,
+                "Threading model may only be absent for internal and direct clients",
+                !client->hasRemote() || client->isInDirectClient());
+        return transport::ServiceExecutor::ThreadingModel::kDedicated;
+    }();
+    return CommandHelpers::runCommandInvocation(
+        std::move(rec), std::move(invocation), threadingModel);
+}
+
 /*
  * Allows for the very complex handleRequest function to be decomposed into parts.
  * It also provides the infrastructure to futurize the process of executing commands.
@@ -796,8 +811,7 @@ Future<void> InvokeCommand::run() {
                tenant_migration_access_blocker::checkIfCanReadOrBlock(
                    execContext->getOpCtx(), execContext->getRequest().getDatabase())
                    .get();
-               return CommandHelpers::runCommandInvocationAsync(_ecd->getExecutionContext(),
-                                                                _ecd->getInvocation());
+               return runCommandInvocation(_ecd->getExecutionContext(), _ecd->getInvocation());
            })
         .onError<ErrorCodes::TenantMigrationConflict>([this](Status status) {
             tenant_migration_access_blocker::handleTenantMigrationConflict(
@@ -815,8 +829,7 @@ Future<void> CheckoutSessionAndInvokeCommand::run() {
                tenant_migration_access_blocker::checkIfCanReadOrBlock(
                    execContext->getOpCtx(), execContext->getRequest().getDatabase())
                    .get();
-               return CommandHelpers::runCommandInvocationAsync(_ecd->getExecutionContext(),
-                                                                _ecd->getInvocation());
+               return runCommandInvocation(_ecd->getExecutionContext(), _ecd->getInvocation());
            })
         .onError<ErrorCodes::TenantMigrationConflict>([this](Status status) {
             // Abort transaction and clean up transaction resources before blocking the
