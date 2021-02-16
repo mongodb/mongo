@@ -95,12 +95,14 @@ MONGO_FAIL_POINT_DEFINE(setTenantMigrationRecipientInstanceHostTimeout);
 MONGO_FAIL_POINT_DEFINE(pauseAfterRetrievingLastTxnMigrationRecipientInstance);
 MONGO_FAIL_POINT_DEFINE(fpAfterCollectionClonerDone);
 MONGO_FAIL_POINT_DEFINE(fpAfterStartingOplogApplierMigrationRecipientInstance);
+MONGO_FAIL_POINT_DEFINE(fpBeforeFulfillingDataConsistentPromise);
 MONGO_FAIL_POINT_DEFINE(fpAfterDataConsistentMigrationRecipientInstance);
 MONGO_FAIL_POINT_DEFINE(hangBeforeTaskCompletion);
 MONGO_FAIL_POINT_DEFINE(fpAfterReceivingRecipientForgetMigration);
 MONGO_FAIL_POINT_DEFINE(hangAfterCreatingRSM);
 MONGO_FAIL_POINT_DEFINE(skipRetriesWhenConnectingToDonorHost);
 MONGO_FAIL_POINT_DEFINE(fpBeforeDroppingOplogBufferCollection);
+MONGO_FAIL_POINT_DEFINE(fpWaitUntilTimestampMajorityCommitted);
 
 namespace {
 // We never restart just the oplog fetcher.  If a failure occurs, we restart the whole state machine
@@ -320,8 +322,10 @@ OpTime TenantMigrationRecipientService::Instance::waitUntilMigrationReachesConsi
 OpTime TenantMigrationRecipientService::Instance::waitUntilTimestampIsMajorityCommitted(
     OperationContext* opCtx, const Timestamp& donorTs) const {
 
-    // This gives assurance that _tenantOplogApplier pointer won't be empty.
-    _dataSyncStartedPromise.getFuture().get(opCtx);
+    // This gives assurance that _tenantOplogApplier pointer won't be empty, and that it has been
+    // started. Additionally, we must have finished processing the recipientSyncData command that
+    // waits on _dataConsistentPromise.
+    _dataConsistentPromise.getFuture().get(opCtx);
 
     auto getWaitOpTimeFuture = [&]() {
         stdx::lock_guard lk(_mutex);
@@ -350,7 +354,23 @@ OpTime TenantMigrationRecipientService::Instance::waitUntilTimestampIsMajorityCo
         return _tenantOplogApplier->getNotificationForOpTime(
             OpTime(donorTs, OpTime::kUninitializedTerm));
     };
-    auto donorRecipientOpTimePair = getWaitOpTimeFuture().get(opCtx);
+
+    auto waitOpTimeFuture = getWaitOpTimeFuture();
+    fpWaitUntilTimestampMajorityCommitted.pauseWhileSet();
+    auto swDonorRecipientOpTimePair = waitOpTimeFuture.getNoThrow();
+
+    auto status = swDonorRecipientOpTimePair.getStatus();
+
+    // A cancelation error may occur due to an interrupt. If that is the case, replace the error
+    // code with the interrupt code, the true reason for interruption.
+    if (ErrorCodes::isCancelationError(status)) {
+        stdx::lock_guard lk(_mutex);
+        if (!_taskState.getInterruptStatus().isOK()) {
+            status = _taskState.getInterruptStatus();
+        }
+    }
+
+    uassertStatusOK(status);
 
     // We want to guarantee that the recipient logical clock has advanced to at least the donor
     // timestamp before returning success for recipientSyncData by doing a majority committed noop
@@ -371,7 +391,7 @@ OpTime TenantMigrationRecipientService::Instance::waitUntilTimestampIsMajorityCo
     WaitForMajorityService::get(opCtx->getServiceContext())
         .waitUntilMajority(repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp())
         .get(opCtx);
-    return donorRecipientOpTimePair.donorOpTime;
+    return swDonorRecipientOpTimePair.getValue().donorOpTime;
 }
 
 std::unique_ptr<DBClientConnection> TenantMigrationRecipientService::Instance::_connectAndAuth(
@@ -1524,6 +1544,7 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
             return _getDataConsistentFuture();
         })
         .then([this, self = shared_from_this()] {
+            _stopOrHangOnFailPoint(&fpBeforeFulfillingDataConsistentPromise);
             stdx::lock_guard lk(_mutex);
             LOGV2_DEBUG(4881101,
                         1,
@@ -1553,16 +1574,15 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
             // normally stop by itself on success. It completes only on errors or on external
             // interruption (e.g. by shutDown/stepDown or by recipientForgetMigration command).
             Status status = applierStatus.getStatus();
-            {
-                // If we were interrupted during oplog application, replace oplog application
-                // status with error state.
+
+            // If we were interrupted during oplog application, replace oplog application
+            // status with error state.
+            // Network and cancellation errors can be caused due to interrupt() (which shuts
+            // down the cloner/fetcher dbClientConnection & oplog applier), so replace those
+            // error status with interrupt status, if set.
+            if (ErrorCodes::isCancelationError(status) || ErrorCodes::isNetworkError(status)) {
                 stdx::lock_guard lk(_mutex);
-                // Network and cancellation errors can be caused due to interrupt() (which shuts
-                // down the cloner/fetcher dbClientConnection & oplog applier), so replace those
-                // error status with interrupt status, if set.
-                if ((ErrorCodes::isCancelationError(status) ||
-                     ErrorCodes::isNetworkError(status)) &&
-                    _taskState.isInterrupted()) {
+                if (_taskState.isInterrupted()) {
                     LOGV2(4881207,
                           "Migration completed with both error and interrupt",
                           "tenantId"_attr = getTenantId(),

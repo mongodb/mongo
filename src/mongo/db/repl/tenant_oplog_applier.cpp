@@ -56,6 +56,7 @@ namespace mongo {
 namespace repl {
 
 MONGO_FAIL_POINT_DEFINE(hangInTenantOplogApplication);
+MONGO_FAIL_POINT_DEFINE(fpBeforeTenantOplogApplyingBatch);
 
 TenantOplogApplier::TenantOplogApplier(const UUID& migrationUuid,
                                        const std::string& tenantId,
@@ -277,6 +278,7 @@ void TenantOplogApplier::_applyOplogBatch(TenantOplogBatch* batch) {
         uassertStatusOK(status);
     }
 
+    fpBeforeTenantOplogApplyingBatch.pauseWhileSet();
 
     LOGV2_DEBUG(4886011,
                 1,
