@@ -27,7 +27,11 @@ BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root
 %define python_pkg python
 %else
 %define timezone_pkg tzdata
+%if 0%{?rhel} >= 8 || 0%{?fedora} >= 30
+%define python_pkg python3
+%else
 %define python_pkg python2
+%endif
 %endif
 
 %description
