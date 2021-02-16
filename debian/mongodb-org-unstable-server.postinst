@@ -39,9 +39,10 @@ case "$1" in
             chown mongodb:mongodb /var/log/mongodb
         fi
 
-        # Check for changes to the service file
+        # Check for changes to the service file, but ignore errors when
+        # systemd is not running.
         if $(command systemctl --help >/dev/null); then
-            systemctl daemon-reload
+            systemctl daemon-reload || true
         fi
     ;;
 
