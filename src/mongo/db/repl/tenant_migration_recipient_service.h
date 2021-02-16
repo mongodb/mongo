@@ -217,11 +217,15 @@ public:
                           str::stream() << "current state: " << toString(_state)
                                         << ", new state: " << toString(state));
 
+                // The interruptStatus can exist (and should be non-OK) if and only if the state is
+                // kInterrupted.
+                invariant((state == kInterrupted && interruptStatus && !interruptStatus->isOK()) ||
+                              (state != kInterrupted && !interruptStatus),
+                          str::stream() << "new state: " << toString(state)
+                                        << ", interruptStatus: " << interruptStatus);
+
                 _state = state;
-                if (interruptStatus) {
-                    invariant(_state == kInterrupted && !interruptStatus->isOK());
-                    _interruptStatus = interruptStatus.get();
-                }
+                _interruptStatus = (interruptStatus) ? interruptStatus.get() : _interruptStatus;
             }
 
             bool isNotStarted() const {
@@ -265,8 +269,9 @@ public:
         private:
             // task state.
             StateFlag _state = kNotStarted;
-            // task interrupt status.
-            Status _interruptStatus = Status{ErrorCodes::InternalError, "Uninitialized value"};
+            // task interrupt status. Set to Status::OK() only when the recipient service has not
+            // been interrupted so far, and is used to remember the initial interrupt error.
+            Status _interruptStatus = Status::OK();
         };
 
         /*
