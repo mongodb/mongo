@@ -216,7 +216,8 @@ class RecordStore : public Ident {
     RecordStore& operator=(const RecordStore&) = delete;
 
 public:
-    RecordStore(StringData ns, StringData identName) : Ident(identName), _ns(ns.toString()) {}
+    RecordStore(StringData ns, StringData identName)
+        : Ident(identName.toString()), _ns(ns.toString()) {}
 
     virtual ~RecordStore() {}
 

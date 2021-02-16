@@ -55,7 +55,7 @@ struct IndexValidateResults;
 class SortedDataInterface : public Ident {
 public:
     SortedDataInterface(StringData ident, KeyString::Version keyStringVersion, Ordering ordering)
-        : Ident(ident), _keyStringVersion(keyStringVersion), _ordering(ordering) {}
+        : Ident(ident.toString()), _keyStringVersion(keyStringVersion), _ordering(ordering) {}
 
     virtual ~SortedDataInterface() {}
 
