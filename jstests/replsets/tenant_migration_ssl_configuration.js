@@ -66,6 +66,7 @@ const kExpiredMigrationCertificates = {
         migrationId: UUID(),
         donorConnectionString: tenantMigrationTest.getDonorRst().getURL(),
         tenantId: kTenantId,
+        startMigrationDonorTimestamp: Timestamp(1, 1),
         readPreference: kReadPreference
     }),
                                  ErrorCodes.InvalidOptions);
@@ -137,6 +138,7 @@ const kExpiredMigrationCertificates = {
         donorConnectionString: tenantMigrationTest.getDonorRst().getURL(),
         tenantId: kTenantId,
         readPreference: kReadPreference,
+        startMigrationDonorTimestamp: Timestamp(1, 1),
         recipientCertificateForDonor: kValidMigrationCertificates.recipientCertificateForDonor,
     }),
                                  ErrorCodes.IllegalOperation);
@@ -213,6 +215,7 @@ const kExpiredMigrationCertificates = {
         migrationId: UUID(),
         donorConnectionString: tenantMigrationTest.getDonorRst().getURL(),
         tenantId: kTenantId,
+        startMigrationDonorTimestamp: Timestamp(1, 1),
         readPreference: kReadPreference
     }));
 

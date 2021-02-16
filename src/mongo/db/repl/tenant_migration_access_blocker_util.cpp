@@ -92,6 +92,13 @@ TenantMigrationDonorDocument parseDonorStateDocument(const BSONObj& doc) {
     switch (donorStateDoc.getState()) {
         case TenantMigrationDonorStateEnum::kUninitialized:
             break;
+        case TenantMigrationDonorStateEnum::kAbortingIndexBuilds:
+            uassert(ErrorCodes::BadValue,
+                    errmsg,
+                    !donorStateDoc.getBlockTimestamp() && !donorStateDoc.getCommitOrAbortOpTime() &&
+                        !donorStateDoc.getAbortReason() &&
+                        !donorStateDoc.getStartMigrationDonorTimestamp());
+            break;
         case TenantMigrationDonorStateEnum::kDataSync:
             uassert(ErrorCodes::BadValue,
                     errmsg,
@@ -232,6 +239,7 @@ void recoverTenantMigrationAccessBlockers(OperationContext* opCtx) {
             .add(doc.getTenantId(), mtab);
 
         switch (doc.getState()) {
+            case TenantMigrationDonorStateEnum::kAbortingIndexBuilds:
             case TenantMigrationDonorStateEnum::kDataSync:
                 break;
             case TenantMigrationDonorStateEnum::kBlocking:
@@ -252,7 +260,7 @@ void recoverTenantMigrationAccessBlockers(OperationContext* opCtx) {
                 }
                 mtab->setAbortOpTime(opCtx, doc.getCommitOrAbortOpTime().get());
                 break;
-            default:
+            case TenantMigrationDonorStateEnum::kUninitialized:
                 MONGO_UNREACHABLE;
         }
         return true;

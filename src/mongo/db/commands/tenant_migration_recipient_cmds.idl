@@ -101,6 +101,13 @@ commands:
         optional: true
         validator:
           callback: "tenant_migration_util::validateTimestampNotNull"
+      startMigrationDonorTimestamp:
+        type: timestamp
+        description: >-
+          Recipient must not start cloning/fetching oplog entries from the donor until this
+          timestamp is majority committed.
+        validator:
+          callback: "tenant_migration_util::validateTimestampNotNull"
 
   recipientForgetMigration:
     description: "Parser for the 'recipientForgetMigration' command."

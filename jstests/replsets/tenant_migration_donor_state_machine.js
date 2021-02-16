@@ -110,8 +110,13 @@ let configDonorsColl = donorPrimary.getCollection(TenantMigrationTest.kConfigDon
     assert(mtabs[kTenantId].blockTimestamp);
 
     let donorDoc = configDonorsColl.findOne({tenantId: kTenantId});
-    let blockOplogEntry = donorPrimary.getDB("local").oplog.rs.findOne(
-        {ns: TenantMigrationTest.kConfigDonorsNS, op: "u", "o.tenantId": kTenantId});
+    let blockOplogEntry =
+        donorPrimary.getDB("local")
+            .oplog.rs
+            .find({ns: TenantMigrationTest.kConfigDonorsNS, op: "u", "o.tenantId": kTenantId})
+            .sort({"$natural": -1})
+            .limit(1)
+            .next();
     assert.eq(donorDoc.state, "blocking");
     assert.eq(donorDoc.blockTimestamp, blockOplogEntry.ts);
 

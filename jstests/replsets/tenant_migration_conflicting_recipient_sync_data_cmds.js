@@ -60,6 +60,7 @@ function startRecipientSyncDataCmd(migrationUuid, tenantId, connectionString, re
             donorConnectionString: connectionString,
             tenantId: tenantId,
             readPreference: readPreference,
+            startMigrationDonorTimestamp: Timestamp(1, 1),
             recipientCertificateForDonor:
                 TenantMigrationUtil.makeMigrationCertificatesForTest().recipientCertificateForDonor
         }),
