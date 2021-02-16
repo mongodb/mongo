@@ -38,8 +38,34 @@
 #include "mongo/db/service_entry_point_common.h"
 #include "mongo/embedded/not_implemented.h"
 #include "mongo/embedded/periodic_runner_embedded.h"
+#include "mongo/transport/service_executor.h"
 
 namespace mongo {
+
+namespace {
+
+/**
+ * Use the dedicated threading model for embedded clients. The following ensures any request
+ * initiated by the embedded service entry point will always go through the synchronous command
+ * execution path, and will never get scheduled on a borrowed thread.
+ */
+class EmbeddedClientObserver final : public ServiceContext::ClientObserver {
+    void onCreateClient(Client* client) {
+        auto seCtx = transport::ServiceExecutorContext{};
+        seCtx.setThreadingModel(transport::ServiceExecutor::ThreadingModel::kDedicated);
+        transport::ServiceExecutorContext::set(client, std::move(seCtx));
+    }
+    void onDestroyClient(Client*) {}
+    void onCreateOperationContext(OperationContext*) {}
+    void onDestroyOperationContext(OperationContext*) {}
+};
+
+ServiceContext::ConstructorActionRegisterer registerClientObserverConstructor{
+    "EmbeddedClientObserverConstructor", [](ServiceContext* service) {
+        service->registerClientObserver(std::make_unique<EmbeddedClientObserver>());
+    }};
+
+}  // namespace
 
 class ServiceEntryPointEmbedded::Hooks final : public ServiceEntryPointCommon::Hooks {
 public:

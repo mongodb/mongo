@@ -111,6 +111,21 @@ const auto kOperationTime = "operationTime"_sd;
  */
 MONGO_FAIL_POINT_DEFINE(allowSkippingAppendRequiredFieldsToResponse);
 
+Future<void> runCommandInvocation(std::shared_ptr<RequestExecutionContext> rec,
+                                  std::shared_ptr<CommandInvocation> invocation) {
+    auto threadingModel = [client = rec->getOpCtx()->getClient()] {
+        if (auto context = transport::ServiceExecutorContext::get(client); context) {
+            return context->getThreadingModel();
+        }
+        tassert(5453902,
+                "Threading model may only be absent for internal and direct clients",
+                !client->hasRemote() || client->isInDirectClient());
+        return transport::ServiceExecutor::ThreadingModel::kDedicated;
+    }();
+    return CommandHelpers::runCommandInvocation(
+        std::move(rec), std::move(invocation), threadingModel);
+}
+
 /**
  * Append required fields to command response.
  */
@@ -168,7 +183,7 @@ Future<void> invokeInTransactionRouter(std::shared_ptr<RequestExecutionContext> 
     // No-op if the transaction is not running with snapshot read concern.
     txnRouter.setDefaultAtClusterTime(opCtx);
 
-    return CommandHelpers::runCommandInvocationAsync(rec, std::move(invocation))
+    return runCommandInvocation(rec, std::move(invocation))
         .tapError([rec = std::move(rec)](Status status) {
             if (auto code = status.code(); ErrorCodes::isSnapshotError(code) ||
                 ErrorCodes::isNeedRetargettingError(code) ||
@@ -277,7 +292,7 @@ Future<void> ExecCommandClient::_run() {
     if (auto txnRouter = TransactionRouter::get(opCtx); txnRouter) {
         return invokeInTransactionRouter(_rec, _invocation);
     } else {
-        return CommandHelpers::runCommandInvocationAsync(_rec, _invocation);
+        return runCommandInvocation(_rec, _invocation);
     }
 }
 
