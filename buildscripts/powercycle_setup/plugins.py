@@ -2,10 +2,10 @@
 import getpass
 import os
 import re
+import shlex
 import subprocess
 import sys
 
-import shlex
 import yaml
 
 from buildscripts.powercycle_setup.remote_operations import RemoteOperations, SSHOperation
@@ -107,7 +107,7 @@ class SetUpEC2Instance(PowercycleCommand):
 
         cmds = f"python_loc=$(which {python})"
         cmds = f"{cmds}; remote_dir={remote_dir}"
-        cmds = f"{cmds}; if [ 'Windows_NT' = '$OS' ]; then python_loc=$(cygpath -w $python_loc); remote_dir=$(cygpath -w $remote_dir); fi"
+        cmds = f"{cmds}; if [ \"Windows_NT\" = \"$OS\" ]; then python_loc=$(cygpath -w $python_loc); remote_dir=$(cygpath -w $remote_dir); fi"
         cmds = f"{cmds}; virtualenv --python $python_loc --system-site-packages {venv}"
         cmds = f"{cmds}; activate=$(find {venv} -name 'activate')"
         cmds = f"{cmds}; . $activate"
@@ -153,7 +153,7 @@ class SetUpEC2Instance(PowercycleCommand):
 
         # Sixth operation -
         # Set up curator to collect system & process stats on remote.
-        variant = "windows" if self.is_windows() else "ubuntu1604"
+        variant = "windows-64" if self.is_windows() else "ubuntu1604"
         curator_hash = "b0c3c0fc68bce26d9572796d6bed3af4a298e30e"
         curator_url = f"https://s3.amazonaws.com/boxes.10gen.com/build/curator/curator-dist-{variant}-{curator_hash}.tar.gz"
         cmds = f"curl -s {curator_url} | tar -xzv"
@@ -344,11 +344,8 @@ class RunHangAnalyzerOnRemoteInstance(PowercycleCommand):
         # Activate virtualenv on remote host. The virtualenv bin_dir is different for Linux and
         # Windows.
         venv = powercycle_constants.VIRTUALENV_DIR
-        virtual_env = os.environ["VIRTUAL_ENV"]
-        _, activate_loc = self._call(f"find {virtual_env} -name activate")
-        bin_dir_regex = re.compile(f"{re.escape(virtual_env)}/(.*)/activate")
-        bin_dir = bin_dir_regex.match(activate_loc)[1]
-        cmds = f". {venv}/{bin_dir}/activate"
+        cmds = f"activate=$(find {venv} -name 'activate')"
+        cmds = f"{cmds}; . $activate"
         # In the 'cmds' variable we pass to remote host, use 'python' instead of '$python' since
         # we don't want to evaluate the local python variable, but instead pass the python string
         # so the remote host will use the right python when the virtualenv is sourced.

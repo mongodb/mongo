@@ -128,7 +128,7 @@ variables:
 # Templates used by powercycle
 - &powercycle_remote_credentials
   private_key_file: $(${posix_workdir})/powercycle.pem
-  private_key_remote: ${powercycle_private_key}
+  private_key_remote: ${__project_aws_ssh_key_value}
   aws_key_remote: ${powercycle_aws_key}
   aws_secret_remote: ${powercycle_aws_secret}
 
@@ -2363,12 +2363,18 @@ functions:
           set -o verbose
           set -o errexit
 
+          if [ "Windows_NT" = "$OS" ]; then
+            user=Administrator
+          else
+            user=$USER
+          fi
+
           ${activate_virtualenv}
           # Set an exit trap so we can save the real exit status (see SERVER-34033).
           trap 'echo $? > error_exit.txt; exit 0' EXIT
           set +o errexit
           eval $python -u buildscripts/resmoke.py powercycle \
-            "--sshUserHost=${private_ip_address} \
+            "--sshUserHost=$(printf "%s@%s" "$user" "${private_ip_address}") \
             --sshConnection=\"-i ${private_key_file} ${ssh_connection_options}\" \
             --taskName=${task_name}"
 
@@ -2573,12 +2579,13 @@ functions:
 
     - command: shell.exec
       params:
+        shell: bash
         script: |
-          identity_file=${private_key_file}
-          echo "${__project_aws_ssh_key_value}" > "$identity_file"
-          chmod 0600 "$identity_file"
-
-          user=$USER
+          if [ "Windows_NT" = "$OS" ]; then
+            user=Administrator
+          else
+            user=$USER
+          fi
           hostname=$(tr -d '"[]{}' < src/hosts.yml | cut -d , -f 1 | awk -F : '{print $2}')
 
           # To add the hostname to expansions.
@@ -2586,14 +2593,13 @@ functions:
 
           echo $hostname
           echo $user
-          echo $identity_file
 
           attempts=0
           connection_attempts=${connection_attempts|25}
 
           # Check for remote connectivity
           while ! ssh \
-            -i "$identity_file" \
+            -i ${private_key_file} \
             -o ConnectTimeout=10 \
             -o ForwardAgent=yes \
             -o IdentitiesOnly=yes \
@@ -2607,7 +2613,6 @@ functions:
             # sleep for Permission denied (publickey) errors
             sleep 10
           done
-        shell: bash
 
     - command: expansions.update
       params:
@@ -7312,7 +7317,6 @@ tasks:
     timeout_secs: 1800 # 30 minute timeout for no output
 
 - name: powercycle_kill_mongod
-  tags: ["powercycle"]
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on:
   - name: archive_dist_test_debug
@@ -8855,6 +8859,9 @@ buildvariants:
   - name: .powercycle
     distros:
     - ubuntu1604-powercycle
+  - name: powercycle_kill_mongod
+    distros:
+    - ubuntu1604-powercycle
   - name: powercycle_replication_smalloplog
     distros:
     - ubuntu1604-powercycle
@@ -9642,6 +9649,7 @@ buildvariants:
   - name: burn_in_tests_gen
   - name: buildscripts_test
   - name: noPassthrough_gen
+  - name: powercycle_smoke
   - name: server_discovery_and_monitoring_json_test_TG
   - name: server_selection_json_test_TG
   - name: compile_run_and_archive_dbtest_TG
