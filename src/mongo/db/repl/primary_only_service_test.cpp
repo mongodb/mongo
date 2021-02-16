@@ -236,9 +236,9 @@ public:
                 auto opCtx = cc().makeOperationContext();
 
                 // Hang after creating OpCtx but before doing the document write so that we can test
-                // that the OpCtx gets interrupted at stepdown.
+                // that the OpCtx gets interrupted at stepdown or shutdown.
                 if (MONGO_unlikely(TestServiceHangAfterMakingOpCtx.shouldFail())) {
-                    TestServiceHangAfterMakingOpCtx.pauseWhileSet();
+                    TestServiceHangAfterMakingOpCtx.pauseWhileSet(opCtx.get());
                 }
 
                 DBDirectClient client(opCtx.get());
@@ -367,6 +367,11 @@ public:
             OpTimeAndWallTime(OpTime(Timestamp(1, 1), _term), Date_t()));
 
         _registry->onStepUpComplete(opCtx.get(), _term);
+    }
+
+
+    void shutdown() {
+        _registry->onShutdown();
     }
 
     std::shared_ptr<executor::TaskExecutor> makeTestExecutor() {
@@ -959,15 +964,27 @@ TEST_F(PrimaryOnlyServiceTest, OpCtxInterruptedByStepdown) {
     auto opCtx = makeOperationContext();
     auto instance =
         TestService::Instance::getOrCreate(opCtx.get(), _service, BSON("_id" << 0 << "state" << 0));
-    TestServiceHangAfterMakingOpCtx.waitForTimesEntered(++timesEntered);
+    TestServiceHangAfterMakingOpCtx.waitForTimesEntered(timesEntered + 1);
     stepDown();
-    ASSERT(!instance->getDocumentWriteException().isReady());
-    TestServiceHangAfterMakingOpCtx.setMode(FailPoint::off);
 
     ASSERT_EQ(ErrorCodes::Interrupted, instance->getCompletionFuture().getNoThrow());
-    // TODO(SERVER-51118): The error returned here should be InterruptedDueToReplStateChange, but
-    // due to SERVER-51118 it gets converted to NotWritablePrimary.
-    ASSERT_EQ(ErrorCodes::NotWritablePrimary, instance->getDocumentWriteException().getNoThrow());
+    ASSERT_EQ(ErrorCodes::InterruptedDueToReplStateChange,
+              instance->getDocumentWriteException().getNoThrow());
+}
+
+TEST_F(PrimaryOnlyServiceTest, OpCtxInterruptedByShutdown) {
+    // Ensure that OpCtxs for PrimaryOnlyService work get interrupted by shutdown.
+    auto timesEntered = TestServiceHangAfterMakingOpCtx.setMode(FailPoint::alwaysOn);
+
+    auto opCtx = makeOperationContext();
+    auto instance =
+        TestService::Instance::getOrCreate(opCtx.get(), _service, BSON("_id" << 0 << "state" << 0));
+    TestServiceHangAfterMakingOpCtx.waitForTimesEntered(timesEntered + 1);
+    shutdown();
+
+    ASSERT_EQ(ErrorCodes::Interrupted, instance->getCompletionFuture().getNoThrow());
+    ASSERT_EQ(ErrorCodes::InterruptedAtShutdown,
+              instance->getDocumentWriteException().getNoThrow());
 }
 
 TEST_F(PrimaryOnlyServiceTest, ReportCurOpInfo) {

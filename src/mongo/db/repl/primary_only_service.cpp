@@ -453,6 +453,11 @@ void PrimaryOnlyService::shutdown() {
             {ErrorCodes::InterruptedAtShutdown, "PrimaryOnlyService interrupted due to shutdown"});
     }
 
+    for (auto opCtx : _opCtxs) {
+        stdx::lock_guard<Client> clientLock(*opCtx->getClient());
+        _serviceContext->killOperation(clientLock, opCtx, ErrorCodes::InterruptedAtShutdown);
+    }
+
     if (savedScopedExecutor) {
         // Make sure to shut down the scoped executor before the parent executor to avoid
         // SERVER-50612.
