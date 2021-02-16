@@ -171,43 +171,6 @@ void shardedRenameMetadata(OperationContext* opCtx,
                                             collType.toBSON(),
                                             ShardingCatalogClient::kMajorityWriteConcern));
 
-    // Update source chunks to target collection
-    // Super-inefficient due to limitation of the catalogClient (no multi-document update), but just
-    // temporary: TODO on SERVER-53105 completion, throw out the following scope.
-    {
-        repl::OpTime opTime;
-        auto chunks = uassertStatusOK(Grid::get(opCtx)->catalogClient()->getChunks(
-            opCtx,
-            BSON(ChunkType::ns(fromNss.ns())),
-            BSON(ChunkType::lastmod() << 1),
-            boost::none,
-            &opTime,
-            repl::ReadConcernLevel::kMajorityReadConcern));
-
-        if (!chunks.empty()) {
-            // Wait for majority just for last chunk
-            auto lastChunk = chunks.back();
-            chunks.pop_back();
-            for (auto& chunk : chunks) {
-                uassertStatusOK(catalogClient->updateConfigDocument(
-                    opCtx,
-                    ChunkType::ConfigNS,
-                    BSON(ChunkType::name(chunk.getName())),
-                    BSON("$set" << BSON(ChunkType::ns(toNss.ns()))),
-                    false, /* upsert */
-                    ShardingCatalogClient::kLocalWriteConcern));
-            }
-
-            uassertStatusOK(
-                catalogClient->updateConfigDocument(opCtx,
-                                                    ChunkType::ConfigNS,
-                                                    BSON(ChunkType::name(lastChunk.getName())),
-                                                    BSON("$set" << BSON(ChunkType::ns(toNss.ns()))),
-                                                    false, /* upsert */
-                                                    ShardingCatalogClient::kMajorityWriteConcern));
-        }
-    }
-
     // Delete FROM tag/collection entries
     removeTagsMetadataFromConfig(opCtx, fromNss);
     deleteCollection(opCtx, fromNss);
