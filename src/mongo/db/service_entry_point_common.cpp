@@ -1958,7 +1958,7 @@ void receivedKillCursors(OperationContext* opCtx, const Message& m) {
     const char* cursorArray = dbmessage.getArray(n);
     int found = runOpKillCursors(opCtx, static_cast<size_t>(n), cursorArray);
 
-    if (shouldLog(logv2::LogSeverity::Debug(1)) || found != n) {
+    if (shouldLog(MONGO_LOGV2_DEFAULT_COMPONENT, logv2::LogSeverity::Debug(1)) || found != n) {
         LOGV2_DEBUG(21967,
                     found == n ? 1 : 0,
                     "killCursors: found {found} of {numCursors}",

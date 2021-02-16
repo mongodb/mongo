@@ -93,7 +93,7 @@ void MozJSScriptEngine::interrupt(unsigned opId) {
     OpIdToScopeMap::iterator iScope = _opToScopeMap.find(opId);
     if (iScope == _opToScopeMap.end()) {
         // got interrupt request for a scope that no longer exists
-        if (shouldLog(logv2::LogSeverity::Debug(3))) {
+        if (shouldLog(MONGO_LOGV2_DEFAULT_COMPONENT, logv2::LogSeverity::Debug(3))) {
             // This log record gets extra attributes when the log severity is at Debug(3)
             // but we still log the record at log severity Debug(2). Simplify this if SERVER-48671
             // gets done
@@ -107,7 +107,7 @@ void MozJSScriptEngine::interrupt(unsigned opId) {
         }
         return;
     }
-    if (shouldLog(logv2::LogSeverity::Debug(3))) {
+    if (shouldLog(MONGO_LOGV2_DEFAULT_COMPONENT, logv2::LogSeverity::Debug(3))) {
         // Like above, this log record gets extra attributes when the log severity is at Debug(3)
         LOGV2_DEBUG(22809, 2, "Interrupting op", "opId"_attr = opId, "knownOps"_attr = knownOps());
     } else {

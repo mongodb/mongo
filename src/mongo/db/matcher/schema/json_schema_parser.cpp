@@ -1870,7 +1870,8 @@ StatusWithMatchExpression JSONSchemaParser::parse(
                 "schema"_attr = schema.jsonString(JsonStringFormat::LegacyStrict));
     try {
         auto translation = _parse(expCtx, ""_sd, schema, allowedFeatures, ignoreUnknownKeywords);
-        if (shouldLog(logv2::LogSeverity::Debug(5)) && translation.isOK()) {
+        if (shouldLog(MONGO_LOGV2_DEFAULT_COMPONENT, logv2::LogSeverity::Debug(5)) &&
+            translation.isOK()) {
             LOGV2_DEBUG(20729,
                         5,
                         "Translated schema match expression: {expression}",

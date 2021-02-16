@@ -149,7 +149,7 @@ std::vector<std::string> getAddrsForHost(const std::string& iporhost,
         }
     }
 
-    if (shouldLog(logv2::LogSeverity::Debug(2))) {
+    if (shouldLog(MONGO_LOGV2_DEFAULT_COMPONENT, logv2::LogSeverity::Debug(2))) {
         LOGV2_DEBUG(21205,
                     2,
                     "getAddrsForHost()",
@@ -397,7 +397,7 @@ std::vector<std::string> getBoundAddrs(const bool ipv6enabled) {
 
 #endif  // defined(_WIN32)
 
-    if (shouldLog(logv2::LogSeverity::Debug(2))) {
+    if (shouldLog(MONGO_LOGV2_DEFAULT_COMPONENT, logv2::LogSeverity::Debug(2))) {
         LOGV2_DEBUG(21206, 2, "getBoundAddrs()", "result"_attr = out);
     }
     return out;
