@@ -1,5 +1,9 @@
 /**
  * Tests $or queries which can be answered with a SORT_MERGE stage.
+ *
+ * # The 4.4 query planner will produce default SORT plans for queries which the 4.7 query
+ * planner will produce SORT_MERGE plans.
+ * @tags: [requires_fcv_47]
  */
 (function() {
 "use strict";
