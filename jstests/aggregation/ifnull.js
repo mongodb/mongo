@@ -66,7 +66,7 @@ assertResult(6, ['$missingField', {$multiply: ['$two', '$three']}]);
 assertResult(2, [{$add: ['$one', '$one']}, '$three', '$zero']);
 
 // Divide/mod by 0.
-assertError([16608, 4848401], [{$divide: ['$one', '$zero']}, '$zero']);
+assertError([ErrorCodes.BadValue, 16608, 4848401], [{$divide: ['$one', '$zero']}, '$zero']);
 assertError([16610, 4848403], [{$mod: ['$one', '$zero']}, '$zero']);
 
 // Return undefined.

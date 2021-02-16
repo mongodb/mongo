@@ -28,13 +28,16 @@ db.s6240.save({date: new Date()});
 assertErrorCode(db.s6240, {$project: {add: {$add: ["$date", "$date"]}}}, 16612);
 
 // Divide
-assertErrorCode(db.s6240, {$project: {divide: {$divide: ["$date", 2]}}}, 16609);
+assertErrorCode(
+    db.s6240, {$project: {divide: {$divide: ["$date", 2]}}}, [16609, ErrorCodes.TypeMismatch]);
 
 // Mod
 assertErrorCode(db.s6240, {$project: {mod: {$mod: ["$date", 2]}}}, 16611);
 
 // Multiply
-assertErrorCode(db.s6240, {$project: {multiply: {$multiply: ["$date", 2]}}}, 16555);
+assertErrorCode(
+    db.s6240, {$project: {multiply: {$multiply: ["$date", 2]}}}, [16555, ErrorCodes.TypeMismatch]);
 
 // Subtract
-assertErrorCode(db.s6240, {$project: {subtract: {$subtract: [2, "$date"]}}}, 16556);
+assertErrorCode(
+    db.s6240, {$project: {subtract: {$subtract: [2, "$date"]}}}, [16556, ErrorCodes.TypeMismatch]);

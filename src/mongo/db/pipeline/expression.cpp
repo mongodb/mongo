@@ -2048,31 +2048,34 @@ void ExpressionDateDiff::_doAddDependencies(DepsTracker* deps) const {
 /* ----------------------- ExpressionDivide ---------------------------- */
 
 Value ExpressionDivide::evaluate(const Document& root, Variables* variables) const {
-    Value lhs = _children[0]->evaluate(root, variables);
-    Value rhs = _children[1]->evaluate(root, variables);
+    return uassertStatusOK(
+        apply(_children[0]->evaluate(root, variables), _children[1]->evaluate(root, variables)));
+}
 
-    auto assertNonZero = [](bool nonZero) { uassert(16608, "can't $divide by zero", nonZero); };
-
+StatusWith<Value> ExpressionDivide::apply(Value lhs, Value rhs) {
     if (lhs.numeric() && rhs.numeric()) {
         // If, and only if, either side is decimal, return decimal.
         if (lhs.getType() == NumberDecimal || rhs.getType() == NumberDecimal) {
             Decimal128 numer = lhs.coerceToDecimal();
             Decimal128 denom = rhs.coerceToDecimal();
-            assertNonZero(!denom.isZero());
+            if (denom.isZero())
+                return Status(ErrorCodes::BadValue, "can't $divide by zero");
             return Value(numer.divide(denom));
         }
 
         double numer = lhs.coerceToDouble();
         double denom = rhs.coerceToDouble();
-        assertNonZero(denom != 0.0);
+        if (denom == 0.0)
+            return Status(ErrorCodes::BadValue, "can't $divide by zero");
 
         return Value(numer / denom);
     } else if (lhs.nullish() || rhs.nullish()) {
         return Value(BSONNULL);
     } else {
-        uasserted(16609,
-                  str::stream() << "$divide only supports numeric types, not "
-                                << typeName(lhs.getType()) << " and " << typeName(rhs.getType()));
+        return Status(ErrorCodes::TypeMismatch,
+                      str::stream()
+                          << "$divide only supports numeric types, not " << typeName(lhs.getType())
+                          << " and " << typeName(rhs.getType()));
     }
 }
 
@@ -2972,63 +2975,94 @@ const char* ExpressionMod::getOpName() const {
 
 /* ------------------------- ExpressionMultiply ----------------------------- */
 
-Value ExpressionMultiply::evaluate(const Document& root, Variables* variables) const {
-    /*
-      We'll try to return the narrowest possible result value.  To do that
-      without creating intermediate Values, do the arithmetic for double
-      and integral types in parallel, tracking the current narrowest
-      type.
+namespace {
+class MultiplyState {
+    /**
+     * We'll try to return the narrowest possible result value.  To do that without creating
+     * intermediate Values, do the arithmetic for double and integral types in parallel, tracking
+     * the current narrowest type.
      */
     double doubleProduct = 1;
     long long longProduct = 1;
     Decimal128 decimalProduct;  // This will be initialized on encountering the first decimal.
-
     BSONType productType = NumberInt;
 
-    const size_t n = _children.size();
-    for (size_t i = 0; i < n; ++i) {
-        Value val = _children[i]->evaluate(root, variables);
+public:
+    void operator*=(const Value& val) {
+        tassert(5423304, "MultiplyState::operator*= only supports numbers", val.numeric());
 
-        if (val.numeric()) {
-            BSONType oldProductType = productType;
-            productType = Value::getWidestNumeric(productType, val.getType());
-            if (productType == NumberDecimal) {
-                // On finding the first decimal, convert the partial product to decimal.
-                if (oldProductType != NumberDecimal) {
-                    decimalProduct = oldProductType == NumberDouble
-                        ? Decimal128(doubleProduct, Decimal128::kRoundTo15Digits)
-                        : Decimal128(static_cast<int64_t>(longProduct));
-                }
-                decimalProduct = decimalProduct.multiply(val.coerceToDecimal());
-            } else {
-                doubleProduct *= val.coerceToDouble();
-
-                if (!std::isfinite(val.coerceToDouble()) ||
-                    overflow::mul(longProduct, val.coerceToLong(), &longProduct)) {
-                    // The number is either Infinity or NaN, or the 'longProduct' would have
-                    // overflowed, so we're abandoning it.
-                    productType = NumberDouble;
-                }
+        BSONType oldProductType = productType;
+        productType = Value::getWidestNumeric(productType, val.getType());
+        if (productType == NumberDecimal) {
+            // On finding the first decimal, convert the partial product to decimal.
+            if (oldProductType != NumberDecimal) {
+                decimalProduct = oldProductType == NumberDouble
+                    ? Decimal128(doubleProduct, Decimal128::kRoundTo15Digits)
+                    : Decimal128(static_cast<int64_t>(longProduct));
             }
-        } else if (val.nullish()) {
-            return Value(BSONNULL);
+            decimalProduct = decimalProduct.multiply(val.coerceToDecimal());
         } else {
-            uasserted(16555,
-                      str::stream() << "$multiply only supports numeric types, not "
-                                    << typeName(val.getType()));
+            doubleProduct *= val.coerceToDouble();
+
+            if (!std::isfinite(val.coerceToDouble()) ||
+                overflow::mul(longProduct, val.coerceToLong(), &longProduct)) {
+                // The number is either Infinity or NaN, or the 'longProduct' would have
+                // overflowed, so we're abandoning it.
+                productType = NumberDouble;
+            }
         }
     }
 
-    if (productType == NumberDouble)
-        return Value(doubleProduct);
-    else if (productType == NumberLong)
-        return Value(longProduct);
-    else if (productType == NumberInt)
-        return Value::createIntOrLong(longProduct);
-    else if (productType == NumberDecimal)
-        return Value(decimalProduct);
-    else
-        massert(16418, "$multiply resulted in a non-numeric type", false);
+    Value getValue() const {
+        if (productType == NumberDouble)
+            return Value(doubleProduct);
+        else if (productType == NumberLong)
+            return Value(longProduct);
+        else if (productType == NumberInt)
+            return Value::createIntOrLong(longProduct);
+        else if (productType == NumberDecimal)
+            return Value(decimalProduct);
+        else
+            massert(16418, "$multiply resulted in a non-numeric type", false);
+    }
+};
+
+Status checkMultiplyNumeric(Value val) {
+    if (!val.numeric())
+        return Status(ErrorCodes::TypeMismatch,
+                      str::stream() << "$multiply only supports numeric types, not "
+                                    << typeName(val.getType()));
+    return Status::OK();
+}
+}  // namespace
+
+StatusWith<Value> ExpressionMultiply::apply(Value lhs, Value rhs) {
+    // evaluate() checks arguments left-to-right, short circuiting on the first null or non-number.
+    // Imitate that behavior here.
+    if (lhs.nullish())
+        return Value(BSONNULL);
+    if (Status s = checkMultiplyNumeric(lhs); !s.isOK())
+        return s;
+    if (rhs.nullish())
+        return Value(BSONNULL);
+    if (Status s = checkMultiplyNumeric(rhs); !s.isOK())
+        return s;
+
+    MultiplyState state;
+    state *= lhs;
+    state *= rhs;
+    return state.getValue();
+}
+Value ExpressionMultiply::evaluate(const Document& root, Variables* variables) const {
+    MultiplyState state;
+    for (auto&& child : _children) {
+        Value val = child->evaluate(root, variables);
+        if (val.nullish())
+            return Value(BSONNULL);
+        uassertStatusOK(checkMultiplyNumeric(val));
+        state *= child->evaluate(root, variables);
+    }
+    return state.getValue();
 }
 
 REGISTER_EXPRESSION(multiply, ExpressionMultiply::parse);
@@ -4914,9 +4948,11 @@ const char* ExpressionStrLenCP::getOpName() const {
 /* ----------------------- ExpressionSubtract ---------------------------- */
 
 Value ExpressionSubtract::evaluate(const Document& root, Variables* variables) const {
-    Value lhs = _children[0]->evaluate(root, variables);
-    Value rhs = _children[1]->evaluate(root, variables);
+    return uassertStatusOK(
+        apply(_children[0]->evaluate(root, variables), _children[1]->evaluate(root, variables)));
+}
 
+StatusWith<Value> ExpressionSubtract::apply(Value lhs, Value rhs) {
     BSONType diffType = Value::getWidestNumeric(rhs.getType(), lhs.getType());
 
     if (diffType == NumberDecimal) {
@@ -4947,14 +4983,14 @@ Value ExpressionSubtract::evaluate(const Document& root, Variables* variables) c
         } else if (rhs.numeric()) {
             return Value(lhs.getDate() - Milliseconds(rhs.coerceToLong()));
         } else {
-            uasserted(16613,
-                      str::stream()
-                          << "cant $subtract a " << typeName(rhs.getType()) << " from a Date");
+            return Status(ErrorCodes::TypeMismatch,
+                          str::stream()
+                              << "cant $subtract a " << typeName(rhs.getType()) << " from a Date");
         }
     } else {
-        uasserted(16556,
-                  str::stream() << "cant $subtract a" << typeName(rhs.getType()) << " from a "
-                                << typeName(lhs.getType()));
+        return Status(ErrorCodes::TypeMismatch,
+                      str::stream() << "cant $subtract a" << typeName(rhs.getType()) << " from a "
+                                    << typeName(lhs.getType()));
     }
 }
 

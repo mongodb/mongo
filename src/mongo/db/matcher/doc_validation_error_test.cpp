@@ -953,8 +953,8 @@ TEST(MiscellaneousMatchExpression, ExprWhichThrowsGeneratesError) {
         "specifiedAs: {$expr: {$divide: [10, 0]}},"
         "reason: 'failed to evaluate aggregation expression',"
         "details: "
-        "   {code: 16608, "
-        "   codeName: 'Location16608', "
+        "   {code: 2, "
+        "   codeName: 'BadValue', "
         "   errmsg: \"can't $divide by zero\"}}");
     doc_validation_error::verifyGeneratedError(query, doc, expectedError, true /* shouldThrow */);
 }
@@ -978,8 +978,8 @@ TEST(MiscellaneousMatchExpression, MultipleExprsWhichThrow) {
         "   specifiedAs: {$expr: {$divide: [10, 0]}},"
         "   reason: 'failed to evaluate aggregation expression',"
         "   details: "
-        "       {code: 16608, "
-        "      codeName: 'Location16608', "
+        "       {code: 2, "
+        "      codeName: 'BadValue', "
         "       errmsg: \"can't $divide by zero\"}}}]}");
     doc_validation_error::verifyGeneratedError(query, doc, expectedError, true /* shouldThrow */);
 }
@@ -995,8 +995,8 @@ TEST(MiscellaneousMatchExpression, OneExprThrowsAmongMultiple) {
         "   specifiedAs: {$expr: {$divide: [10, 0]}},"
         "   reason: 'failed to evaluate aggregation expression',"
         "   details: "
-        "       {code: 16608, "
-        "      codeName: 'Location16608', "
+        "       {code: 2, "
+        "      codeName: 'BadValue', "
         "       errmsg: \"can't $divide by zero\"}}}]}");
     doc_validation_error::verifyGeneratedError(query, doc, expectedError, true /* shouldThrow */);
 }
@@ -1020,8 +1020,8 @@ TEST(MiscellaneousMatchExpression, ExprsWhichThrowUnderInversion) {
         "   specifiedAs: {$expr: {$divide: [10, 0]}},"
         "   reason: 'failed to evaluate aggregation expression',"
         "   details: "
-        "       {code: 16608, "
-        "      codeName: 'Location16608', "
+        "       {code: 2, "
+        "      codeName: 'BadValue', "
         "       errmsg: \"can't $divide by zero\"}}}]}");
     doc_validation_error::verifyGeneratedError(query, doc, expectedError, true /* shouldThrow */);
 }

@@ -26,9 +26,9 @@ assert.commandWorked(coll.insert({_id: 0}));
 // sent to the shard before failing (i.e. "$_id") so that mongos doesn't short-curcuit and
 // fail during optimization.
 const pipe = [{$project: {a: {$divide: ["$_id", 0]}}}];
-const divideByZeroErrorCode = 16608;
+const divideByZeroErrorCodes = [16608, ErrorCodes.BadValue];
 
-assertErrCodeAndErrMsgContains(coll, pipe, divideByZeroErrorCode, st.rs1.getPrimary().host);
+assertErrCodeAndErrMsgContains(coll, pipe, divideByZeroErrorCodes, st.rs1.getPrimary().host);
 
 st.stop();
 }());

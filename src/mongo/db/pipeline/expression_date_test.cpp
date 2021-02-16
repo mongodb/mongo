@@ -1382,7 +1382,8 @@ TEST_F(ExpressionDateFromStringTest, OnNullEvaluatedLazily) {
     ASSERT_EQ(
         "2018-02-14T00:00:00.000Z",
         dateExp->evaluate(Document{{"date", "2018-02-14"_sd}}, &expCtx->variables).toString());
-    ASSERT_THROWS_CODE(dateExp->evaluate({}, &expCtx->variables), AssertionException, 16608);
+    ASSERT_THROWS_CODE(
+        dateExp->evaluate({}, &expCtx->variables), AssertionException, ErrorCodes::BadValue);
 }
 
 TEST_F(ExpressionDateFromStringTest, OnErrorEvaluatedLazily) {
@@ -1396,8 +1397,9 @@ TEST_F(ExpressionDateFromStringTest, OnErrorEvaluatedLazily) {
     ASSERT_EQ(
         "2018-02-14T00:00:00.000Z",
         dateExp->evaluate(Document{{"date", "2018-02-14"_sd}}, &expCtx->variables).toString());
-    ASSERT_THROWS_CODE(
-        dateExp->evaluate(Document{{"date", 5}}, &expCtx->variables), AssertionException, 16608);
+    ASSERT_THROWS_CODE(dateExp->evaluate(Document{{"date", 5}}, &expCtx->variables),
+                       AssertionException,
+                       ErrorCodes::BadValue);
 }
 
 }  // namespace ExpressionDateFromStringTest

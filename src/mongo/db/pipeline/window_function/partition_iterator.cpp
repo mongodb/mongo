@@ -30,6 +30,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/pipeline/window_function/partition_iterator.h"
+#include "mongo/util/visit_helper.h"
 
 namespace mongo {
 
@@ -40,6 +41,8 @@ boost::optional<Document> PartitionIterator::operator[](int index) {
         return boost::none;
 
     // Case 0: Outside of lower bound of partition.
+    // TODO SERVER-53712: when we add expiry, this should tassert that the caller is not asking
+    // for a document that the caller promised it wouldn't need.
     if (desired < 0)
         return boost::none;
 
@@ -107,6 +110,69 @@ PartitionIterator::AdvanceResult PartitionIterator::advance() {
         default:
             MONGO_UNREACHABLE_TASSERT(5340102);
     }
+}
+
+namespace {
+boost::optional<int> numericBound(WindowBounds::Bound<int> bound) {
+    return stdx::visit(
+        visit_helper::Overloaded{
+            [](WindowBounds::Unbounded) -> boost::optional<int> { return boost::none; },
+            [](WindowBounds::Current) -> boost::optional<int> { return 0; },
+            [](int i) -> boost::optional<int> { return i; },
+        },
+        bound);
+}
+}  // namespace
+
+boost::optional<std::pair<int, int>> PartitionIterator::getEndpoints(const WindowBounds& bounds) {
+    // For range-based bounds, we will need to:
+    // 1. extract the sortBy for (*this)[0]
+    // 2. step backwards until we cross bounds.lower
+    // 3. step forwards until we cross bounds.upper
+    // This means we'll need to pass in sortBy somewhere.
+    tassert(5423300,
+            "TODO SERVER-54294: range-based and time-based bounds",
+            stdx::holds_alternative<WindowBounds::DocumentBased>(bounds.bounds));
+    tassert(5423301, "getEndpoints assumes there is a current document", (*this)[0] != boost::none);
+    auto docBounds = stdx::get<WindowBounds::DocumentBased>(bounds.bounds);
+    boost::optional<int> lowerBound = numericBound(docBounds.lower);
+    boost::optional<int> upperBound = numericBound(docBounds.upper);
+    tassert(5423302,
+            "Bounds should never be inverted",
+            !lowerBound || !upperBound || lowerBound <= upperBound);
+
+    // Pull documents into the cache until it contains the whole window.
+    if (upperBound) {
+        // For a right-bounded window we only need to pull in documents up to the bound.
+        (*this)[*upperBound];
+    } else {
+        // For a right-unbounded window we need to pull in the whole partition. operator[] reports
+        // end of partition by returning boost::none instead of a document.
+        for (int i = 0; (*this)[i]; ++i) {
+        }
+    }
+
+    // Valid offsets into the cache are any 'i' such that '_cache[_currentIndex + i]' is valid.
+    // We know the cache is nonempty because it contains the current document.
+    int cacheOffsetMin = -_currentIndex;
+    int cacheOffsetMax = cacheOffsetMin + _cache.size() - 1;
+
+    // The window can only be empty if the bounds are shifted completely out of the partition.
+    if (lowerBound && lowerBound > cacheOffsetMax)
+        return boost::none;
+    if (upperBound && upperBound < cacheOffsetMin)
+        return boost::none;
+
+    // Now we know that the window is nonempty, and the cache contains it.
+    // All we have to do is clamp the bounds to fall within the cache.
+    auto clamp = [&](int offset) {
+        // Return the closest offset from the interval '[cacheOffsetMin, cacheOffsetMax]'.
+        return std::max(cacheOffsetMin, std::min(offset, cacheOffsetMax));
+    };
+    int lowerOffset = lowerBound ? clamp(*lowerBound) : cacheOffsetMin;
+    int upperOffset = upperBound ? clamp(*upperBound) : cacheOffsetMax;
+
+    return {{lowerOffset, upperOffset}};
 }
 
 void PartitionIterator::getNextDocument() {

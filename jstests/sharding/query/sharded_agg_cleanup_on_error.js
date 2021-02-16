@@ -21,7 +21,7 @@ const kFailpointOptions = {
 
 const st = new ShardingTest({shards: 2});
 const kDBName = "test";
-const kDivideByZeroErrCode = 16608;
+const kDivideByZeroErrCodes = [16608, ErrorCodes.BadValue];
 const mongosDB = st.s.getDB(kDBName);
 const shard0DB = st.shard0.getDB(kDBName);
 const shard1DB = st.shard1.getDB(kDBName);
@@ -89,7 +89,7 @@ try {
             {$project: {out: {$divide: ["$_id", 0]}}},
             {$_internalSplitPipeline: {mergeType: "mongos"}}
         ],
-        errCode: kDivideByZeroErrCode
+        errCode: kDivideByZeroErrCodes
     });
 
     // Repeat the test above, but this time use $_internalSplitPipeline to force the merge to
@@ -99,7 +99,7 @@ try {
             {$project: {out: {$divide: ["$_id", 0]}}},
             {$_internalSplitPipeline: {mergeType: "primaryShard"}}
         ],
-        errCode: kDivideByZeroErrCode
+        errCode: kDivideByZeroErrCodes
     });
 } finally {
     assert.commandWorked(shard1DB.adminCommand({configureFailPoint: kFailPointName, mode: "off"}));

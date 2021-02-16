@@ -599,4 +599,17 @@ long long dateDiff(Date_t startDate,
  * timezone - the timezone in which the start date is interpreted
  */
 Date_t dateAdd(Date_t date, TimeUnit unit, long long amount, const TimeZone& timezone);
+
+/**
+ * Convert (approximately) a TimeUnit to a number of milliseconds.
+ *
+ * The answer is approximate because TimeUnit represents an amount of calendar time:
+ * for example, some calendar days are 23 or 25 hours long due to daylight savings time.
+ * This function assumes everything is "typical": days are 24 hours, minutes are 60 seconds.
+ *
+ * Large time units, 'month' or longer, are so variable that we don't try to pick a value: we
+ * return a non-OK Status.
+ */
+StatusWith<long long> timeUnitTypicalMilliseconds(TimeUnit unit);
+
 }  // namespace mongo

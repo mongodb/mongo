@@ -1453,6 +1453,16 @@ private:
 
 class ExpressionDivide final : public ExpressionFixedArity<ExpressionDivide, 2> {
 public:
+    /**
+     * Divides two values as if by {$divide: [{$const: numerator}, {$const: denominator]}.
+     *
+     * Returns BSONNULL if either argument is nullish.
+     *
+     * Returns ErrorCodes::TypeMismatch if either argument is non-nullish and non-numeric.
+     * Returns ErrorCodes::BadValue if the denominator is zero.
+     */
+    static StatusWith<Value> apply(Value numerator, Value denominator);
+
     explicit ExpressionDivide(ExpressionContext* const expCtx)
         : ExpressionFixedArity<ExpressionDivide, 2>(expCtx) {}
     explicit ExpressionDivide(ExpressionContext* const expCtx, ExpressionVector&& children)
@@ -1985,6 +1995,19 @@ public:
 
 class ExpressionMultiply final : public ExpressionVariadic<ExpressionMultiply> {
 public:
+    /**
+     * Multiplies two values together as if by evaluate() on
+     *     {$multiply: [{$const: lhs}, {$const: rhs}]}.
+     *
+     * Note that evaluate() does not use apply() directly, because when $muliply takes more than
+     * two arguments, it uses a wider intermediate state than Value.
+     *
+     * Returns BSONNULL if either argument is nullish.
+     *
+     * Returns ErrorCodes::TypeMismatch if any argument is non-nullish, non-numeric.
+     */
+    static StatusWith<Value> apply(Value lhs, Value rhs);
+
     explicit ExpressionMultiply(ExpressionContext* const expCtx)
         : ExpressionVariadic<ExpressionMultiply>(expCtx) {}
     ExpressionMultiply(ExpressionContext* const expCtx, ExpressionVector&& children)
@@ -2631,6 +2654,20 @@ public:
 
 class ExpressionSubtract final : public ExpressionFixedArity<ExpressionSubtract, 2> {
 public:
+    /**
+     * Subtracts two values as if by {$subtract: [{$const: lhs}, {$const: rhs}]}.
+     *
+     * If either argument is nullish, returns BSONNULL.
+     *
+     * Otherwise, the arguments can be either:
+     *     (numeric, numeric)
+     *     (Date, Date)       Returns the time difference in milliseconds.
+     *     (Date, numeric)    Returns the date shifted earlier by that many milliseconds.
+     *
+     * Otherwise, returns ErrorCodes::TypeMismatch.
+     */
+    static StatusWith<Value> apply(Value lhs, Value rhs);
+
     explicit ExpressionSubtract(ExpressionContext* const expCtx)
         : ExpressionFixedArity<ExpressionSubtract, 2>(expCtx) {
         expCtx->sbeCompatible = false;

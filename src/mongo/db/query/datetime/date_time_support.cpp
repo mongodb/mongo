@@ -590,6 +590,7 @@ auto const kDaysInNonLeapYear = 365LL;
 auto const kHoursPerDay = 24LL;
 auto const kMinutesPerHour = 60LL;
 auto const kSecondsPerMinute = 60LL;
+auto const kMillisecondsPerSecond = 1000LL;
 auto const kDaysPerWeek = 7;
 auto const kQuartersPerYear = 4LL;
 auto const kQuarterLengthInMonths = 3LL;
@@ -977,4 +978,35 @@ Date_t dateAdd(Date_t date, TimeUnit unit, long long amount, const TimeZone& tim
     timelib_time_dtor(newTime);
     return returnDate;
 }
+
+StatusWith<long long> timeUnitTypicalMilliseconds(TimeUnit unit) {
+    auto constexpr millisecond = 1;
+    auto constexpr second = millisecond * kMillisecondsPerSecond;
+    auto constexpr minute = second * kSecondsPerMinute;
+    auto constexpr hour = minute * kMinutesPerHour;
+    auto constexpr day = hour * kHoursPerDay;
+    auto constexpr week = day * kDaysPerWeek;
+
+    switch (unit) {
+        case TimeUnit::millisecond:
+            return millisecond;
+        case TimeUnit::second:
+            return second;
+        case TimeUnit::minute:
+            return minute;
+        case TimeUnit::hour:
+            return hour;
+        case TimeUnit::day:
+            return day;
+        case TimeUnit::week:
+            return week;
+        case TimeUnit::month:
+        case TimeUnit::quarter:
+        case TimeUnit::year:
+            return Status(ErrorCodes::BadValue,
+                          str::stream() << "TimeUnit is too big: " << serializeTimeUnit(unit));
+    }
+    MONGO_UNREACHABLE_TASSERT(5423303);
+}
+
 }  // namespace mongo
