@@ -184,10 +184,13 @@ function getExecutionStages(root) {
  * subdocuments whose stage is 'stage'. This can either be an agg stage name like "$cursor" or
  * "$sort", or a query stage name like "IXSCAN" or "SORT".
  *
+ * If 'useQueryPlannerSection' is set to 'true', the 'queryPlanner' section of the explain output
+ * will be used to lookup the given 'stage', even if 'executionStats' section is available.
+ *
  * Returns an empty array if the plan does not have the requested stage. Asserts that agg explain
  * structure matches expected format.
  */
-function getAggPlanStages(root, stage) {
+function getAggPlanStages(root, stage, useQueryPlannerSection = false) {
     let results = [];
 
     function getDocumentSources(docSourceArray) {
@@ -209,7 +212,7 @@ function getAggPlanStages(root, stage) {
 
         // If execution stats are available, then use the execution stats tree. Otherwise use the
         // plan info from the "queryPlanner" section.
-        if (queryLayerOutput.hasOwnProperty("executionStats")) {
+        if (queryLayerOutput.hasOwnProperty("executionStats") && !useQueryPlannerSection) {
             assert(queryLayerOutput.executionStats.hasOwnProperty("executionStages"));
             results = results.concat(
                 getPlanStages(queryLayerOutput.executionStats.executionStages, stage));

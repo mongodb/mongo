@@ -5,7 +5,6 @@
 // @tags: [
 //   do_not_wrap_aggregations_in_facets,
 //   requires_pipeline_optimization,
-//   sbe_incompatible,
 // ]
 (function() {
 "use strict";
@@ -17,14 +16,41 @@ let coll = db.explain_limit;
 const kCollSize = 105;
 const kLimit = 10;
 
+// Note that the "getParameter" command is expected to fail in versions of mongod that do not yet
+// include the slot-based execution engine. When that happens, however, 'isSBEEnabled' still
+// correctly evaluates to false.
+const isSBEEnabled = (() => {
+    const getParam = db.adminCommand({getParameter: 1, featureFlagSBE: 1});
+    return getParam.hasOwnProperty("featureFlagSBE") && getParam.featureFlagSBE.value;
+})();
+
 // Return whether or explain() was successful and contained the appropriate fields given the
 // requested verbosity. Checks that the number of documents examined and returned are correct given
 // the value of the limit.
 function checkResults({results, verbosity}) {
-    let cursorSubdocs = getAggPlanStages(results, "LIMIT");
-    assert.gt(cursorSubdocs.length, 0);
+    const [cursorSubdocs, limitAmount] = (() => {
+        if (verbosity != "queryPlanner" && isSBEEnabled) {
+            // We cannot use the "executionStats" section for SBE plans without some pre-processing,
+            // since it has different explain format. To find execution stats for the LIMIT stages
+            // from the "queryPlanner" section (there could be multiple of such stages if we're in a
+            // sharded environment, one for each shard) we first extract their 'planNodeIds' into a
+            // set. Then we filter out all "limit" stages from the "executionStats" section by
+            // keeping only correlated plan stages, and return the final array. Since the name of
+            // the field holding the limit amount also differs in SBE, we return a proper name as
+            // well.
+            const useQueryPlannerSection = true;
+            const queryPlannerStages = getAggPlanStages(results, "LIMIT", useQueryPlannerSection);
+            const execStatsStages = getAggPlanStages(results, "limit");
+            assert.gt(queryPlannerStages.length, 0, results);
+            assert.gt(execStatsStages.length, 0, results);
+            const planNodeIds = new Set(queryPlannerStages.map(stage => stage.planNodeId));
+            return [execStatsStages.filter(stage => planNodeIds.has(stage.planNodeId)), "limit"];
+        }
+        return [getAggPlanStages(results, "LIMIT"), "limitAmount"];
+    })();
+    assert.gt(cursorSubdocs.length, 0, results);
     for (let stageResult of cursorSubdocs) {
-        assert.eq(stageResult.limitAmount, NumberLong(kLimit), results);
+        assert.eq(stageResult[limitAmount], NumberLong(kLimit), cursorSubdocs);
         if (verbosity !== "queryPlanner") {
             assert.eq(stageResult.nReturned, NumberLong(kLimit), results);
         }
