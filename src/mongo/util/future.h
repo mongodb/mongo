@@ -1200,7 +1200,12 @@ auto coerceToFuture(T&& value) {
 TEMPLATE(typename Func)
 REQUIRES(future_details::isCallable<Func, void>)
 auto makeReadyFutureWith(Func&& func) -> Future<FutureContinuationResult<Func&&>> try {
-    return std::forward<Func>(func)();
+    if constexpr (std::is_void_v<std::invoke_result_t<Func>>) {
+        std::forward<Func>(func)();
+        return Future<void>::makeReady();
+    } else {
+        return std::forward<Func>(func)();
+    }
 } catch (const DBException& ex) {
     return ex.toStatus();
 }
