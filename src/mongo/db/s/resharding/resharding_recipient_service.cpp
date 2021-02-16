@@ -267,11 +267,13 @@ SemiFuture<void> ReshardingRecipientService::RecipientStateMachine::run(
             return status;
         })
         .onCompletion([this, self = shared_from_this()](Status status) {
-            stdx::lock_guard<Latch> lg(_mutex);
-            if (_completionPromise.getFuture().isReady()) {
-                // interrupt() was called before we got here.
-                _metrics()->onCompletion(ReshardingMetrics::OperationStatus::kCanceled);
-                return;
+            {
+                stdx::lock_guard<Latch> lg(_mutex);
+                if (_completionPromise.getFuture().isReady()) {
+                    // interrupt() was called before we got here.
+                    _metrics()->onCompletion(ReshardingMetrics::OperationStatus::kCanceled);
+                    return;
+                }
             }
 
             if (status.isOK()) {
@@ -287,12 +289,18 @@ SemiFuture<void> ReshardingRecipientService::RecipientStateMachine::run(
 
                 _removeRecipientDocument();
                 _metrics()->onCompletion(ReshardingMetrics::OperationStatus::kSucceeded);
-                _completionPromise.emplaceValue();
+                stdx::lock_guard<Latch> lg(_mutex);
+                if (!_completionPromise.getFuture().isReady()) {
+                    _completionPromise.emplaceValue();
+                }
             } else {
                 _metrics()->onCompletion(ErrorCodes::isCancelationError(status)
                                              ? ReshardingMetrics::OperationStatus::kCanceled
                                              : ReshardingMetrics::OperationStatus::kFailed);
-                _completionPromise.setError(status);
+                stdx::lock_guard<Latch> lg(_mutex);
+                if (!_completionPromise.getFuture().isReady()) {
+                    _completionPromise.setError(status);
+                }
             }
         })
         .semi();
