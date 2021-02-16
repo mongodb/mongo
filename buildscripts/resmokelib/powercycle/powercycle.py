@@ -31,7 +31,7 @@ import pymongo
 import requests
 import yaml
 
-from buildscripts.powercycle_setup import remote_operations
+from buildscripts.resmokelib.powercycle.lib import remote_operations
 from buildscripts.resmokelib.powercycle import powercycle_config, powercycle_constants
 
 # See https://docs.python.org/2/library/sys.html#sys.platform
@@ -1807,7 +1807,7 @@ def main(parser_actions, options):  # pylint: disable=too-many-branches,too-many
     verify_remote_access(local_ops)
 
     # Pass client_args to the remote script invocation.
-    client_args = "powercycle"
+    client_args = "powercycle run"
     options_dict = vars(options)
     for action in parser_actions:
         option_value = options_dict.get(action.dest, None)
