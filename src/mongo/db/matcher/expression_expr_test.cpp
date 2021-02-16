@@ -597,7 +597,7 @@ TEST_F(ExprMatchTest, FailGracefullyOnInvalidExpression) {
 
 TEST_F(ExprMatchTest, ReturnsFalseInsteadOfErrorWithFailpointSet) {
     createMatcher(fromjson("{$expr: {$divide: [10, '$divisor']}}"));
-    ASSERT_THROWS_CODE(matches(BSON("divisor" << 0)), AssertionException, 16608);
+    ASSERT_THROWS_CODE(matches(BSON("divisor" << 0)), AssertionException, ErrorCodes::BadValue);
 
     FailPointEnableBlock scopedFailpoint("ExprMatchExpressionMatchesReturnsFalseOnException");
     createMatcher(fromjson("{$expr: {$divide: [10, '$divisor']}}"));

@@ -76,20 +76,20 @@ testCases.forEach(function(testCase) {
 
 // Test error codes on incorrect use of $divide.
 const errorTestCases = [
-    {document: {left: 1, right: NumberInt(0)}, errorCode: 16608},
-    {document: {left: 1, right: 0.0}, errorCode: 16608},
-    {document: {left: 1, right: NumberLong("0")}, errorCode: 16608},
-    {document: {left: 1, right: NumberDecimal("0")}, errorCode: 16608},
+    {document: {left: 1, right: NumberInt(0)}, errorCodes: [16608, ErrorCodes.BadValue]},
+    {document: {left: 1, right: 0.0}, errorCodes: [16608, ErrorCodes.BadValue]},
+    {document: {left: 1, right: NumberLong("0")}, errorCodes: [16608, ErrorCodes.BadValue]},
+    {document: {left: 1, right: NumberDecimal("0")}, errorCodes: [16608, ErrorCodes.BadValue]},
 
-    {document: {left: 1, right: "not a number"}, errorCode: 16609},
-    {document: {left: "not a number", right: 1}, errorCode: 16609},
+    {document: {left: 1, right: "not a number"}, errorCodes: [16609, ErrorCodes.TypeMismatch]},
+    {document: {left: "not a number", right: 1}, errorCodes: [16609, ErrorCodes.TypeMismatch]},
 ];
 
 errorTestCases.forEach(function(testCase) {
     assert.commandWorked(coll.insert(testCase.document));
 
     assertErrorCode(
-        coll, {$project: {computed: {$divide: ["$left", "$right"]}}}, testCase.errorCode);
+        coll, {$project: {computed: {$divide: ["$left", "$right"]}}}, testCase.errorCodes);
 
     assert(coll.drop());
 });

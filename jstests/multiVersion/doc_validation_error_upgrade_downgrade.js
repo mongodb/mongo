@@ -130,7 +130,7 @@ const exprValidator = {
 };
 assert.commandWorked(targetDB.runCommand({collMod: collName, validator: exprValidator}));
 let exprResponse = targetDB[collName].insert({});
-assert.commandFailedWithCode(exprResponse, 16608, tojson(exprResponse));
+assert.commandFailedWithCode(exprResponse, [16608, ErrorCodes.BadValue], tojson(exprResponse));
 
 // Verify that the insert succeeds when the validator expression throws if the validationAction is
 // set to 'warn' and the FCV is 4.4.

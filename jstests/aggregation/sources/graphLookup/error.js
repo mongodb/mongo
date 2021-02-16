@@ -320,7 +320,7 @@ pipeline = {
             restrictSearchWithMatch: {$expr: {$divide: [1, "$x"]}}
         }
     };
-assertErrorCode(local, pipeline, 16608, "division by zero in $expr");
+assertErrorCode(local, pipeline, [16608, ErrorCodes.BadValue], "division by zero in $expr");
 
 // $graphLookup can only consume at most 100MB of memory.
 foreign.drop();

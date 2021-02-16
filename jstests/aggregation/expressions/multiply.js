@@ -145,15 +145,15 @@ nAryTestCases.forEach(function(testCase) {
 
 // Test error codes on incorrect use of $multiply.
 const errorTestCases = [
-    {document: {left: 1, right: "not a number"}, errorCode: 16555},
-    {document: {left: "not a number", right: 1}, errorCode: 16555},
+    {document: {left: 1, right: "not a number"}, errorCodes: [16555, ErrorCodes.TypeMismatch]},
+    {document: {left: "not a number", right: 1}, errorCodes: [16555, ErrorCodes.TypeMismatch]},
 ];
 
 errorTestCases.forEach(function(testCase) {
     assert.commandWorked(coll.insert(testCase.document));
 
     assertErrorCode(
-        coll, {$project: {computed: {$multiply: ["$left", "$right"]}}}, testCase.errorCode);
+        coll, {$project: {computed: {$multiply: ["$left", "$right"]}}}, testCase.errorCodes);
 
     assert(coll.drop());
 });

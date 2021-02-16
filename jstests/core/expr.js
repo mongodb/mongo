@@ -125,7 +125,7 @@ let explain = coll.find({$expr: {$divide: [1, "$a"]}}).explain("executionStats")
 if (!isMongos) {
     assert(explain.hasOwnProperty("executionStats"), explain);
     assert.eq(explain.executionStats.executionSuccess, false, explain);
-    assert.errorCodeEq(explain.executionStats.errorCode, 16609, explain);
+    assert.errorCodeEq(explain.executionStats.errorCode, [16609, ErrorCodes.TypeMismatch], explain);
 }
 
 // $expr is not allowed in $elemMatch projection.
