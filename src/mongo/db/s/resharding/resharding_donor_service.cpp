@@ -186,10 +186,12 @@ SemiFuture<void> ReshardingDonorService::DonorStateMachine::run(
             return status;
         })
         .onCompletion([this, self = shared_from_this()](Status status) {
-            stdx::lock_guard<Latch> lg(_mutex);
-            if (_completionPromise.getFuture().isReady()) {
-                // interrupt() was called before we got here.
-                return;
+            {
+                stdx::lock_guard<Latch> lg(_mutex);
+                if (_completionPromise.getFuture().isReady()) {
+                    // interrupt() was called before we got here.
+                    return;
+                }
             }
 
             if (status.isOK()) {
@@ -198,9 +200,15 @@ SemiFuture<void> ReshardingDonorService::DonorStateMachine::run(
                 // the instance is deleted. It is necessary to use shared_from_this() to extend the
                 // lifetime so the code can safely finish executing.
                 _removeDonorDocument();
-                _completionPromise.emplaceValue();
+                stdx::lock_guard<Latch> lg(_mutex);
+                if (!_completionPromise.getFuture().isReady()) {
+                    _completionPromise.emplaceValue();
+                }
             } else {
-                _completionPromise.setError(status);
+                stdx::lock_guard<Latch> lg(_mutex);
+                if (!_completionPromise.getFuture().isReady()) {
+                    _completionPromise.setError(status);
+                }
             }
         })
         .semi();

@@ -958,10 +958,12 @@ SemiFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::run(
             return _awaitAllParticipantShardsRenamedOrDroppedOriginalCollection(executor);
         })
         .onError([this, self = shared_from_this(), token, executor](Status status) {
-            stdx::lock_guard<Latch> lg(_mutex);
-            if (_completionPromise.getFuture().isReady()) {
-                // interrupt() was called before we got here.
-                return status;
+            {
+                stdx::lock_guard<Latch> lg(_mutex);
+                if (_completionPromise.getFuture().isReady()) {
+                    // interrupt() was called before we got here.
+                    return status;
+                }
             }
 
             auto nss = _coordinatorDoc.getNss();
@@ -1010,10 +1012,9 @@ SemiFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::run(
 
 void ReshardingCoordinatorService::ReshardingCoordinator::interrupt(Status status) {
     // Resolve any unresolved promises to avoid hanging.
-    stdx::lock_guard<Latch> lg(_mutex);
-
     _reshardingCoordinatorObserver->interrupt(status);
 
+    stdx::lock_guard<Latch> lg(_mutex);
     if (!_completionPromise.getFuture().isReady()) {
         _completionPromise.setError(status);
     }
