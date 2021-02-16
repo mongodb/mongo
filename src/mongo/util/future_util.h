@@ -56,25 +56,20 @@ inline Status asyncTryCanceledStatus() {
 }
 
 /**
- * Widget to get a default-constructible object that allows access to the type passed in at
- * compile time. Used for getReturnType below.
+ * Creates an ExecutorFuture from the result of the input callable.
  */
-template <typename T>
-struct DefaultConstructibleWrapper {
-    using type = T;
-};
+template <typename Callable>
+auto makeExecutorFutureWith(ExecutorPtr executor, Callable&& callable) {
+    using CallableResult = std::invoke_result_t<Callable>;
 
-/**
- * Helper to get the return type of the loop body in TryUntilLoop/TryUntilLoopWithDelay. This is
- * required because the loop body may return a future-like type, which wraps another result type
- * (specified in Future<T>::value_type), or some other kind of raw type which can be used directly.
- */
-template <typename T>
-auto getReturnType() {
-    if constexpr (future_details::isFutureLike<std::decay_t<T>>) {
-        return DefaultConstructibleWrapper<typename T::value_type>();
+    if constexpr (future_details::isFutureLike<CallableResult>) {
+        try {
+            return callable().thenRunOn(executor);
+        } catch (const DBException& e) {
+            return ExecutorFuture<FutureContinuationResult<Callable>>(executor, e.toStatus());
+        }
     } else {
-        return DefaultConstructibleWrapper<T>();
+        return makeReadyFutureWith(callable).thenRunOn(executor);
     }
 }
 
@@ -132,24 +127,60 @@ private:
          * Performs actual looping through recursion.
          */
         ExecutorFuture<FutureContinuationResult<BodyCallable>> run() {
-            using ReturnType =
-                typename decltype(getReturnType<decltype(executeLoopBody())>())::type;
-            // If the request to executeLoopBody has already been canceled, don't attempt to run it.
-            if (cancelToken.isCanceled()) {
+            using ReturnType = FutureContinuationResult<BodyCallable>;
+
+            // If the request is already canceled, don't run anything.
+            if (cancelToken.isCanceled())
                 return ExecutorFuture<ReturnType>(executor, asyncTryCanceledStatus());
-            }
-            auto future = ExecutorFuture<void>(executor).then(executeLoopBody);
 
-            return std::move(future).onCompletion(
-                [this, self = this->shared_from_this()](StatusOrStatusWith<ReturnType> s) {
-                    if (shouldStopIteration(s))
-                        return ExecutorFuture<ReturnType>(executor, std::move(s));
+            auto [promise, future] = makePromiseFuture<ReturnType>();
 
-                    // Retry after a delay.
-                    return executor->sleepFor(delay.getNext(), cancelToken).then([this, self] {
-                        return run();
+            // Kick off the asynchronous loop.
+            runImpl(std::move(promise));
+
+            return std::move(future).thenRunOn(executor);
+        }
+
+
+        /**
+         * Helper function that schedules an asynchronous task. This task executes the loop body and
+         * either terminates the loop by emplacing the resultPromise, or makes a recursive call to
+         * reschedule another iteration of the loop.
+         */
+        template <typename ReturnType>
+        void runImpl(Promise<ReturnType> resultPromise) {
+            executor->schedule([this,
+                                self = this->shared_from_this(),
+                                resultPromise =
+                                    std::move(resultPromise)](Status scheduleStatus) mutable {
+                if (!scheduleStatus.isOK()) {
+                    resultPromise.setError(std::move(scheduleStatus));
+                    return;
+                }
+
+                using BodyCallableResult = std::invoke_result_t<BodyCallable>;
+                // Convert the result of the loop body into an ExecutorFuture, even if the
+                // loop body is not future-returning. This isn't strictly necessary but it
+                // makes implementation easier.
+                makeExecutorFutureWith(executor, executeLoopBody)
+                    .getAsync([this, self, resultPromise = std::move(resultPromise)](
+                                  StatusOrStatusWith<ReturnType>&& swResult) mutable {
+                        if (cancelToken.isCanceled()) {
+                            resultPromise.setError(asyncTryCanceledStatus());
+                        } else if (shouldStopIteration(swResult)) {
+                            resultPromise.setFrom(std::move(swResult));
+                        } else {
+                            // Retry after a delay.
+                            executor->sleepFor(delay.getNext(), cancelToken)
+                                .getAsync([this, self, resultPromise = std::move(resultPromise)](
+                                              Status s) mutable {
+                                    if (s.isOK()) {
+                                        runImpl(std::move(resultPromise));
+                                    }
+                                });
+                        }
                     });
-                });
+            });
         }
 
         std::shared_ptr<executor::TaskExecutor> executor;
@@ -258,19 +289,49 @@ private:
          * Performs actual looping through recursion.
          */
         ExecutorFuture<FutureContinuationResult<BodyCallable>> run() {
-            using ReturnType =
-                typename decltype(getReturnType<decltype(executeLoopBody())>())::type;
+            using ReturnType = FutureContinuationResult<BodyCallable>;
+
             // If the request is already canceled, don't run anything.
             if (cancelToken.isCanceled())
                 return ExecutorFuture<ReturnType>(executor, asyncTryCanceledStatus());
-            auto future = ExecutorFuture<void>(executor).then(executeLoopBody);
 
-            return std::move(future).onCompletion(
-                [this, self = this->shared_from_this()](StatusOrStatusWith<ReturnType> s) {
-                    if (shouldStopIteration(s))
-                        return ExecutorFuture<ReturnType>(executor, std::move(s));
+            auto [promise, future] = makePromiseFuture<ReturnType>();
 
-                    return run();
+            // Kick off the asynchronous loop.
+            runImpl(std::move(promise));
+
+            return std::move(future).thenRunOn(executor);
+        }
+
+        /**
+         * Helper function that schedules an asynchronous task. This task executes the loop body and
+         * either terminates the loop by emplacing the resultPromise, or makes a recursive call to
+         * reschedule another iteration of the loop.
+         */
+        template <typename ReturnType>
+        void runImpl(Promise<ReturnType> resultPromise) {
+            executor->schedule(
+                [this, self = this->shared_from_this(), resultPromise = std::move(resultPromise)](
+                    Status scheduleStatus) mutable {
+                    if (!scheduleStatus.isOK()) {
+                        resultPromise.setError(std::move(scheduleStatus));
+                        return;
+                    }
+
+                    // Convert the result of the loop body into an ExecutorFuture, even if the
+                    // loop body is not Future-returning. This isn't strictly necessary but it
+                    // makes implementation easier.
+                    makeExecutorFutureWith(executor, executeLoopBody)
+                        .getAsync([this, self, resultPromise = std::move(resultPromise)](
+                                      StatusOrStatusWith<ReturnType>&& swResult) mutable {
+                            if (cancelToken.isCanceled()) {
+                                resultPromise.setError(asyncTryCanceledStatus());
+                            } else if (shouldStopIteration(swResult)) {
+                                resultPromise.setFrom(std::move(swResult));
+                            } else {
+                                runImpl(std::move(resultPromise));
+                            }
+                        });
                 });
         }
 
