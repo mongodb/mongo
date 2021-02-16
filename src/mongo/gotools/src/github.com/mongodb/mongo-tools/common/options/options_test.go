@@ -8,15 +8,22 @@ package options
 
 import (
 	"bytes"
+	"io/ioutil"
+	"os"
+
 	"github.com/mongodb/mongo-tools/common/connstring"
 	"github.com/mongodb/mongo-tools/common/log"
 	"github.com/mongodb/mongo-tools/common/testtype"
 	. "github.com/smartystreets/goconvey/convey"
-	"os"
 
 	"runtime"
 	"testing"
 	"time"
+)
+
+const (
+	ShouldSucceed = iota
+	ShouldFail
 )
 
 func TestVerbosityFlag(t *testing.T) {
@@ -466,6 +473,160 @@ func TestDeprecationWarning(t *testing.T) {
 			So(err, ShouldBeNil)
 			result := buffer.String()
 			So(result, ShouldNotContainSubstring, deprecationWarningSSLAllow)
+		})
+	})
+}
+
+type configTester struct {
+	description  string
+	yamlBytes    []byte
+	expectedOpts *ToolOptions
+	outcome      int
+}
+
+func runConfigFileTestCases(testCases []configTester) {
+	configFilePath := "./test-config.yaml"
+	args := []string{"--config", configFilePath}
+	defer os.Remove(configFilePath)
+
+	for _, testCase := range testCases {
+		if err := ioutil.WriteFile(configFilePath, testCase.yamlBytes, 0644); err != nil {
+			So(err, ShouldBeNil)
+		}
+		opts := New("test", "", EnabledOptions{true, true, true, true})
+		err := opts.ParseConfigFile(args)
+
+		var assertion func()
+		if testCase.outcome == ShouldSucceed {
+			assertion = func() {
+				So(err, ShouldBeNil)
+				So(opts.Auth.Password, ShouldEqual, testCase.expectedOpts.Auth.Password)
+				So(opts.URI.ConnectionString, ShouldEqual, testCase.expectedOpts.URI.ConnectionString)
+				So(opts.SSL.SSLPEMKeyPassword, ShouldEqual, testCase.expectedOpts.SSL.SSLPEMKeyPassword)
+			}
+		} else {
+			assertion = func() {
+				So(err, ShouldNotBeNil)
+			}
+		}
+
+		Convey(testCase.description, assertion)
+	}
+}
+
+func createExpectedOpts(pw string, uri string, ssl string) *ToolOptions {
+	opts := New("test", "", EnabledOptions{true, true, true, true})
+	opts.Auth.Password = pw
+	opts.URI.ConnectionString = uri
+	opts.SSL.SSLPEMKeyPassword = ssl
+	return opts
+}
+
+func TestParseConfigFile(t *testing.T) {
+	if !testtype.HasTestType(testtype.UnitTestType) {
+		t.SkipNow()
+	}
+
+	Convey("should error with no config file specified", t, func() {
+		opts := New("test", "", EnabledOptions{})
+
+		// --config at beginning of args list
+		args := []string{"--config", "--database", "myDB"}
+		So(opts.ParseConfigFile(args), ShouldNotBeNil)
+
+		// --config at end of args list
+		args = []string{"--database", "myDB", "--config"}
+		So(opts.ParseConfigFile(args), ShouldNotBeNil)
+
+		// --config= at beginning of args list
+		args = []string{"--config=", "--database", "myDB"}
+		So(opts.ParseConfigFile(args), ShouldNotBeNil)
+
+		// --config= at end of args list
+		args = []string{"--database", "myDB", "--config="}
+		So(opts.ParseConfigFile(args), ShouldNotBeNil)
+	})
+
+	Convey("should error with non-existent config file specified", t, func() {
+		opts := New("test", "", EnabledOptions{})
+
+		// --config with non-existent file
+		args := []string{"--config", "DoesNotExist.yaml", "--database", "myDB"}
+		So(opts.ParseConfigFile(args), ShouldNotBeNil)
+
+		// --config= with non-existent file
+		args = []string{"--config=DoesNotExist.yaml", "--database", "myDB"}
+		So(opts.ParseConfigFile(args), ShouldNotBeNil)
+	})
+
+	Convey("with an existing config file specified", t, func() {
+		runConfigFileTestCases([]configTester{
+			{
+				"containing nothing (empty file)",
+				[]byte(""),
+				createExpectedOpts("", "", ""),
+				ShouldSucceed,
+			},
+			{
+				"containing only password field",
+				[]byte("password: abc123"),
+				createExpectedOpts("abc123", "", ""),
+				ShouldSucceed,
+			},
+			{
+				"containing only uri field",
+				[]byte("uri: abc123"),
+				createExpectedOpts("", "abc123", ""),
+				ShouldSucceed,
+			},
+			{
+				"containing only sslPEMKeyPassword field",
+				[]byte("sslPEMKeyPassword: abc123"),
+				createExpectedOpts("", "", "abc123"),
+				ShouldSucceed,
+			},
+			{
+				"containing all of password, uri and sslPEMKeyPassword fields",
+				[]byte("password: abc123\nuri: def456\nsslPEMKeyPassword: ghi789"),
+				createExpectedOpts("abc123", "def456", "ghi789"),
+				ShouldSucceed,
+			},
+			{
+				"containing a duplicate field",
+				[]byte("password: abc123\npassword: def456"),
+				nil,
+				ShouldFail,
+			},
+			{
+				"containing an unsupported or misspelled field",
+				[]byte("pasword: abc123"),
+				nil,
+				ShouldFail,
+			},
+		})
+	})
+
+	Convey("with command line args that override config file values", t, func() {
+		configFilePath := "./test-config.yaml"
+		defer os.Remove(configFilePath)
+		if err := ioutil.WriteFile(configFilePath, []byte("password: abc123"), 0644); err != nil {
+			So(err, ShouldBeNil)
+		}
+
+		Convey("with --config followed by --password", func() {
+			args := []string{"--config=" + configFilePath, "--password=def456"}
+			opts := New("test", "", EnabledOptions{Auth: true})
+			_, err := opts.ParseArgs(args)
+			So(err, ShouldBeNil)
+			So(opts.Auth.Password, ShouldEqual, "def456")
+		})
+
+		Convey("with --password followed by --config", func() {
+			args := []string{"--password=ghi789", "--config=" + configFilePath}
+			opts := New("test", "", EnabledOptions{Auth: true})
+			_, err := opts.ParseArgs(args)
+			So(err, ShouldBeNil)
+			So(opts.Auth.Password, ShouldEqual, "ghi789")
 		})
 	})
 }
