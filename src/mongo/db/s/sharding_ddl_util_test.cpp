@@ -92,15 +92,18 @@ TEST_F(ShardingDDLUtilTest, ShardedRenameMetadata) {
 
     const auto toCollQuery = Query(BSON(CollectionType::kNssFieldName << kToNss.ns()));
 
+    const Timestamp collTimestamp(1);
+    const auto collUUID = UUID::gen();
+
     // Initialize FROM collection chunks
     const auto fromEpoch = OID::gen();
     const int nChunks = 10;
     std::vector<ChunkType> chunks;
     for (int i = 0; i < nChunks; i++) {
-        ChunkVersion chunkVersion(1, i, fromEpoch, boost::none);
+        ChunkVersion chunkVersion(1, i, fromEpoch, collTimestamp);
         ChunkType chunk;
         chunk.setName(OID::gen());
-        chunk.setNS(fromNss);
+        chunk.setCollectionUUID(collUUID);
         chunk.setVersion(chunkVersion);
         chunk.setShard(shard0.getName());
         chunk.setHistory({ChunkHistory(Timestamp(1, i), shard0.getName())});
@@ -111,13 +114,11 @@ TEST_F(ShardingDDLUtilTest, ShardedRenameMetadata) {
 
     setupCollection(fromNss, KeyPattern(BSON("x" << 1)), chunks);
 
-    // TODO SERVER-53105 remove all nss chunk references from this test
-    const auto nssChunkFieldName = "ns";
-
     // Get FROM collection document and chunks
     auto fromDoc = client.findOne(CollectionType::ConfigNS.ns(), fromCollQuery);
     CollectionType fromCollection(fromDoc);
-    auto fromChunksQuery = Query(BSON(nssChunkFieldName << fromNss.ns())).sort(BSON("_id" << 1));
+    auto fromChunksQuery =
+        Query(BSON(ChunkType::collectionUUID << collUUID)).sort(BSON("_id" << 1));
     std::vector<BSONObj> fromChunks;
     client.findN(fromChunks, ChunkType::ConfigNS.ns(), fromChunksQuery, nChunks);
 
@@ -127,12 +128,10 @@ TEST_F(ShardingDDLUtilTest, ShardedRenameMetadata) {
     // Check that the FROM config.collections entry has been deleted
     ASSERT(client.findOne(CollectionType::ConfigNS.ns(), fromCollQuery).isEmpty());
 
-    // Ensure no chunks are referring the FROM collection anymore
-    ASSERT(client.findOne(ChunkType::ConfigNS.ns(), fromChunksQuery).isEmpty());
-
     // Get TO collection document and chunks
     auto toDoc = client.findOne(CollectionType::ConfigNS.ns(), toCollQuery);
-    const auto toChunksQuery = Query(BSON(nssChunkFieldName << kToNss.ns())).sort(BSON("_id" << 1));
+    const auto toChunksQuery =
+        Query(BSON(ChunkType::collectionUUID << collUUID)).sort(BSON("_id" << 1));
     CollectionType toCollection(toDoc);
     std::vector<BSONObj> toChunks;
     client.findN(toChunks, ChunkType::ConfigNS.ns(), toChunksQuery, nChunks);
@@ -145,14 +144,12 @@ TEST_F(ShardingDDLUtilTest, ShardedRenameMetadata) {
     auto toUnchangedFields = toDoc.removeField(CollectionType::kNssFieldName);
     ASSERT_EQ(fromUnchangedFields.woCompare(toUnchangedFields), 0);
 
-    // Check that epoch and nss have been updated in chunk documents
+    // Check that chunk documents remain unchanged
     for (int i = 0; i < nChunks; i++) {
         auto fromChunkDoc = fromChunks[i];
         auto toChunkDoc = toChunks[i];
 
-        ASSERT_EQ(fromChunkDoc.removeField(nssChunkFieldName)
-                      .woCompare(toChunkDoc.removeField(nssChunkFieldName)),
-                  0);
+        ASSERT_EQ(fromChunkDoc.woCompare(toChunkDoc), 0);
     }
 }
 

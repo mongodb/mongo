@@ -322,7 +322,16 @@ void ConfigServerTestFixture::setupCollection(const NamespaceString& nss,
         setupDatabase(nss.db().toString(), ShardId(shard.getName()), true /* sharded */);
     }
 
-    CollectionType coll(nss, chunks[0].getVersion().epoch(), Date_t::now(), UUID::gen());
+    const auto collUUID = [&]() {
+        const auto& chunk = chunks.front();
+        if (chunk.getVersion().getTimestamp()) {
+            return chunk.getCollectionUUID();
+        } else {
+            return UUID::gen();
+        }
+    }();
+    CollectionType coll(nss, chunks[0].getVersion().epoch(), Date_t::now(), collUUID);
+    coll.setTimestamp(chunks.front().getVersion().getTimestamp());
     coll.setKeyPattern(shardKey);
     ASSERT_OK(
         insertToConfigCollection(operationContext(), CollectionType::ConfigNS, coll.toBSON()));
