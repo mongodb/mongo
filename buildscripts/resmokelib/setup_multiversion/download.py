@@ -1,17 +1,15 @@
 """Helper functions to download."""
 import contextlib
 import errno
+import glob
 import os
 import shutil
 import tarfile
 import tempfile
 import zipfile
 
-import boto3
+import requests
 import structlog
-from botocore import UNSIGNED
-from botocore.config import Config
-from botocore.exceptions import ClientError
 
 S3_BUCKET = "mciuploads"
 
@@ -24,30 +22,45 @@ class DownloadError(Exception):
     pass
 
 
-def download_mongodb(url):
+def download_from_s3(url):
     """Download file from S3 bucket by a given URL."""
 
     if not url:
         raise DownloadError("Download URL not found.")
 
     LOGGER.info("Downloading.", url=url)
-    s3_key = url.split('/', 3)[-1].replace(f"{S3_BUCKET}/", "")
-    filename = os.path.join(tempfile.gettempdir(), url.split('/')[-1])
+    filename = os.path.join(tempfile.gettempdir(), url.split('/')[-1].split('?')[0])
 
-    LOGGER.debug("Downloading from S3.", s3_bucket=S3_BUCKET, s3_key=s3_key, filename=filename)
-    s3_client = boto3.client("s3", config=Config(signature_version=UNSIGNED))
-    try:
-        s3_client.download_file(S3_BUCKET, s3_key, filename)
-    except ClientError as s3_client_error:
-        LOGGER.error("Download failed due to S3 client error.")
-        raise s3_client_error
-    except Exception as ex:  # pylint: disable=broad-except
-        LOGGER.error("Download failed.")
-        raise ex
-    else:
-        LOGGER.info("Download completed.", filename=filename)
+    with requests.get(url, stream=True) as reader:
+        with open(filename, 'wb') as file_handle:
+            shutil.copyfileobj(reader.raw, file_handle)
 
     return filename
+
+
+def _rsync_move_dir(source_dir, dest_dir):
+    """
+    Move dir.
+
+    Move the contents of `source_dir` into `dest_dir` as a subdir while merging with
+    all existing dirs.
+
+    This is similar to the behavior of `rsync` but different to `mv`.
+    """
+
+    for cur_src_dir, _, files in os.walk(source_dir):
+        cur_dest_dir = cur_src_dir.replace(source_dir, dest_dir, 1)
+        if not os.path.exists(cur_dest_dir):
+            os.makedirs(cur_dest_dir)
+        for cur_file in files:
+            src_file = os.path.join(cur_src_dir, cur_file)
+            dst_file = os.path.join(cur_dest_dir, cur_file)
+            if os.path.exists(dst_file):
+                # in case of the src and dst are the same file
+                if os.path.samefile(src_file, dst_file):
+                    continue
+                os.remove(dst_file)
+            shutil.move(src_file, cur_dest_dir)
 
 
 def extract_archive(archive_file, install_dir):
@@ -56,24 +69,25 @@ def extract_archive(archive_file, install_dir):
     LOGGER.info("Extracting archive data.", archive=archive_file, install_dir=install_dir)
     temp_dir = tempfile.mkdtemp()
     archive_name = os.path.basename(archive_file)
-    install_subdir, file_suffix = os.path.splitext(archive_name)
+    _, file_suffix = os.path.splitext(archive_name)
 
     if file_suffix == ".zip":
         # Support .zip downloads, used for Windows binaries.
         with zipfile.ZipFile(archive_file) as zip_handle:
-            first_file = zip_handle.namelist()[0]
             zip_handle.extractall(temp_dir)
     elif file_suffix == ".tgz":
         # Support .tgz downloads, used for Linux binaries.
         with contextlib.closing(tarfile.open(archive_file, "r:gz")) as tar_handle:
-            first_file = tar_handle.getnames()[0]
             tar_handle.extractall(path=temp_dir)
     else:
         raise DownloadError(f"Unsupported file extension {file_suffix}")
 
-    extracted_root_dir = os.path.join(temp_dir, os.path.dirname(first_file))
-    temp_install_dir = tempfile.mkdtemp()
-    shutil.move(extracted_root_dir, os.path.join(temp_install_dir, install_subdir))
+    # Pre-hygienic tarballs have a unique top-level dir when untarred. We ignore
+    # that dir to ensure the untarred dir structure is uniform. symbols and artifacts
+    # are rarely used on pre-hygienic versions so we ignore them for simplicity.
+    bin_archive_root = glob.glob(os.path.join(temp_dir, "mongodb-*", "bin"))
+    if not bin_archive_root:
+        temp_dir = bin_archive_root[0]
 
     try:
         os.makedirs(install_dir)
@@ -83,20 +97,15 @@ def extract_archive(archive_file, install_dir):
         else:
             raise
 
-    already_downloaded = os.path.isdir(os.path.join(install_dir, install_subdir))
-    if not already_downloaded:
-        shutil.move(os.path.join(temp_install_dir, install_subdir), install_dir)
-
+    _rsync_move_dir(temp_dir, install_dir)
     shutil.rmtree(temp_dir)
-    shutil.rmtree(temp_install_dir)
 
-    installed_dir = os.path.join(install_dir, install_subdir)
-    LOGGER.info("Extract archive completed.", installed_dir=installed_dir)
+    LOGGER.info("Extract archive completed.", installed_dir=install_dir)
 
-    return installed_dir
+    return install_dir
 
 
-def symlink_version(version, installed_dir, link_dir):
+def symlink_version(suffix, installed_dir, link_dir):
     """Symlink the binaries in the 'installed_dir' to the 'link_dir'."""
     try:
         os.makedirs(link_dir)
@@ -106,16 +115,18 @@ def symlink_version(version, installed_dir, link_dir):
         else:
             raise
 
-    if os.path.isdir(os.path.join(installed_dir, "bin")):
-        bin_dir = os.path.join(installed_dir, "bin")
+    hygienic_bin_dir = os.path.join(installed_dir, "dist-test", "bin")
+    if os.path.isdir(hygienic_bin_dir):
+        bin_dir = hygienic_bin_dir
     else:
         bin_dir = installed_dir
 
     for executable in os.listdir(bin_dir):
 
         executable_name, executable_extension = os.path.splitext(executable)
-        link_name = f"{executable_name}-{version}{executable_extension}"
-        if version == "master":
+        if suffix:
+            link_name = f"{executable_name}-{suffix}{executable_extension}"
+        else:
             link_name = executable
 
         try:
