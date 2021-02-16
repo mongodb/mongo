@@ -1,4 +1,4 @@
-// Ensures TEXT_OR stage is replaced with OR when possible.
+// Ensures TEXT_OR stage is elided or replaced with OR stage when possible.
 // @tags: [
 //   # We don't try to replace TEXT_OR with OR when the results are consumed by a merging node,
 //   # because the shard doesn't know whether the merger needs the textScore metadata.
@@ -10,11 +10,12 @@
 
 load("jstests/libs/analyze_plan.js");
 
-const coll = db.server47848;
+const coll = db.optimize_text;
 assert.commandWorked(coll.createIndex({"$**": "text"}));
 
-const findExplain = coll.find({$text: {$search: 'banana'}}).explain();
-const aggExplain = coll.explain().aggregate({$match: {$text: {$search: 'banana'}}});
+const findExplain = coll.find({$text: {$search: 'banana leaf'}}).explain();
+const findSingleTermExplain = coll.find({$text: {$search: 'banana'}}).explain();
+const aggExplain = coll.explain().aggregate({$match: {$text: {$search: 'banana leaf'}}});
 
 // The .find() plan doesn't have TEXT_OR, it has OR instead.
 // Both kinds of stages deduplicate record IDs, but OR is better because OR is streaming
@@ -33,4 +34,9 @@ assert(!planHasStage(db, findExplain, 'TEXT_OR'), findExplain);
 // be an implicit dependency on textScore.
 assert(planHasStage(db, aggExplain, 'OR'), aggExplain);
 assert(!planHasStage(db, aggExplain, 'TEXT_OR'), aggExplain);
+
+// Non-blocking $text plans with just one search term do not need an OR stage, as a further
+// optimization.
+assert(!planHasStage(db, findSingleTermExplain, 'OR'), findSingleTermExplain);
+assert(!planHasStage(db, findSingleTermExplain, 'TEXT_OR'), findSingleTermExplain);
 })();
