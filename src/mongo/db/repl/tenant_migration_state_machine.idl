@@ -44,6 +44,7 @@ enums:
         type: string
         values:
             kUninitialized: "uninitialized"
+            kAbortingIndexBuilds: "aborting index builds"
             kDataSync: "data sync"
             kBlocking: "blocking"
             kCommitted: "committed"
@@ -122,6 +123,15 @@ structs:
                 type: TenantMigrationPEMPayload
                 # TODO (SERVER-54085): Remove server parameter tenantMigrationDisableX509Auth.
                 optional: true
+            startMigrationDonorTimestamp:
+                type: timestamp
+                optional: true
+                description: >-
+                    Timestamp after all index builds for tenant are complete or aborted.  Recipient
+                    must not start cloning/fetching oplog entries from the donor until this
+                    timestamp is majority committed.
+                validator:
+                    callback: "tenant_migration_util::validateTimestampNotNull"
 
     tenantMigrationRecipientDocument:
         description: "Represents an in-progress tenant migration on the migration recipient."

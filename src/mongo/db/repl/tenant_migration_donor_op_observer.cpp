@@ -49,9 +49,9 @@ const auto tenantIdToDeleteDecoration =
  * Initializes the TenantMigrationDonorAccessBlocker for the tenant migration denoted by the given
  * state doc.
  */
-void onTransitionToDataSync(OperationContext* opCtx,
-                            const TenantMigrationDonorDocument& donorStateDoc) {
-    invariant(donorStateDoc.getState() == TenantMigrationDonorStateEnum::kDataSync);
+void onTransitionToAbortingIndexBuilds(OperationContext* opCtx,
+                                       const TenantMigrationDonorDocument& donorStateDoc) {
+    invariant(donorStateDoc.getState() == TenantMigrationDonorStateEnum::kAbortingIndexBuilds);
 
     auto mtab = std::make_shared<TenantMigrationDonorAccessBlocker>(
         opCtx->getServiceContext(),
@@ -213,15 +213,16 @@ void TenantMigrationDonorOpObserver::onInserts(OperationContext* opCtx,
         for (auto it = first; it != last; it++) {
             auto donorStateDoc = tenant_migration_access_blocker::parseDonorStateDocument(it->doc);
             switch (donorStateDoc.getState()) {
-                case TenantMigrationDonorStateEnum::kDataSync:
-                    onTransitionToDataSync(opCtx, donorStateDoc);
+                case TenantMigrationDonorStateEnum::kAbortingIndexBuilds:
+                    onTransitionToAbortingIndexBuilds(opCtx, donorStateDoc);
                     break;
+                case TenantMigrationDonorStateEnum::kDataSync:
                 case TenantMigrationDonorStateEnum::kBlocking:
                 case TenantMigrationDonorStateEnum::kCommitted:
                 case TenantMigrationDonorStateEnum::kAborted:
-                    uasserted(
-                        ErrorCodes::IllegalOperation,
-                        "cannot insert a donor's state doc with 'state' other than 'data sync'");
+                    uasserted(ErrorCodes::IllegalOperation,
+                              "cannot insert a donor's state doc with 'state' other than 'aborting "
+                              "index builds'");
                     break;
                 default:
                     MONGO_UNREACHABLE;
@@ -240,6 +241,8 @@ void TenantMigrationDonorOpObserver::onUpdate(OperationContext* opCtx,
         auto donorStateDoc =
             tenant_migration_access_blocker::parseDonorStateDocument(args.updateArgs.updatedDoc);
         switch (donorStateDoc.getState()) {
+            case TenantMigrationDonorStateEnum::kDataSync:
+                break;
             case TenantMigrationDonorStateEnum::kBlocking:
                 onTransitionToBlocking(opCtx, donorStateDoc);
                 break;
