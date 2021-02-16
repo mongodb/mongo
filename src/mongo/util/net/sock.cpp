@@ -116,7 +116,8 @@ void networkWarnWithDescription(const Socket& socket, StringData call, int error
 const double kMaxConnectTimeoutMS = 5000;
 
 void setSockTimeouts(int sock, double secs) {
-    bool report = shouldLog(logv2::LogSeverity::Debug(4)) || kDebugBuild;
+    bool report =
+        shouldLog(MONGO_LOGV2_DEFAULT_COMPONENT, logv2::LogSeverity::Debug(4)) || kDebugBuild;
 #if defined(_WIN32)
     DWORD timeout = secs * 1000;  // Windows timeout is a DWORD, in milliseconds.
     int status =

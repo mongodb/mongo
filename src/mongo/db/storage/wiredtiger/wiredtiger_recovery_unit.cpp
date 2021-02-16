@@ -565,7 +565,7 @@ void WiredTigerRecoveryUnit::_txnOpen() {
     _ensureSession();
 
     // Only start a timer for transaction's lifetime if we're going to log it.
-    if (shouldLog(kSlowTransactionSeverity)) {
+    if (shouldLog(MONGO_LOGV2_DEFAULT_COMPONENT, kSlowTransactionSeverity)) {
         _timer.reset(new Timer());
     }
     WT_SESSION* session = _session->getSession();
