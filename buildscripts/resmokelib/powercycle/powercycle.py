@@ -126,12 +126,14 @@ def exit_handler():
     LOGGER.debug("Exit handler: Killing processes")
     try:
         Processes.kill_all()
+        LOGGER.debug("Exit handler: Killing processes finished")
     except:  # pylint: disable=bare-except
         pass
 
     LOGGER.debug("Exit handler: Cleaning up temporary files")
     try:
         NamedTempFile.delete_all()
+        LOGGER.debug("Exit handler: Cleaning up temporary files finished")
     except:  # pylint: disable=bare-except
         pass
 
@@ -266,7 +268,7 @@ def abs_path(path):
         if ret:
             raise Exception("Command \"{}\" failed with code {} and output message: {}".format(
                 cmd, ret, output))
-        return output.rstrip()
+        return output.rstrip().replace("\\", "/")
     return os.path.abspath(os.path.normpath(path))
 
 
@@ -1164,7 +1166,7 @@ def remote_handler(options, task_config, root_dir):  # pylint: disable=too-many-
         mongod_options = f"{mongod_options} --replSet {task_config.repl_set}"
 
     # For MongodControl, the file references should be fully specified.
-    bin_dir = abs_path(os.path.join(powercycle_constants.REMOTE_DIR, "bin"))
+    bin_dir = os.path.join(abs_path(powercycle_constants.REMOTE_DIR), "bin")
     db_path = abs_path(powercycle_constants.DB_PATH)
     log_path = abs_path(powercycle_constants.LOG_PATH)
 
@@ -1198,7 +1200,8 @@ def remote_handler(options, task_config, root_dir):  # pylint: disable=too-many-
             # Ensure the mongod service is not in a running state. WT can take 10+ minutes to
             # cleanly shutdown. Prefer to hit the evergreen timeout which will run the hang
             # analyzer.
-            mongod.stop(timeout=2 * ONE_HOUR_SECS)
+            ret, output = mongod.stop(timeout=2 * ONE_HOUR_SECS)
+            LOGGER.info(output)
             status = mongod.status()
             if status != "stopped":
                 LOGGER.error("Unable to stop the mongod service, in state '%s'", status)
@@ -1265,7 +1268,7 @@ def remote_handler(options, task_config, root_dir):  # pylint: disable=too-many-
             # Rename the rsync_dir only if it has a different name than new_rsync_dir.
             if ret == 0 and rsync_dir != new_rsync_dir:
                 LOGGER.info("Renaming directory %s to %s", rsync_dir, new_rsync_dir)
-                os.rename(rsync_dir, new_rsync_dir)
+                os.rename(abs_path(rsync_dir), abs_path(new_rsync_dir))
 
         elif operation == "seed_docs":
             mongo = pymongo.MongoClient(**mongo_client_opts)
@@ -1643,10 +1646,11 @@ def setup_ssh_tunnel(  # pylint: disable=too-many-arguments
     """Establish ssh connection with tunnel options in the background."""
 
     ssh_tunnel_opts = f"-L {secret_port}:{mongod_host}:{secret_port} -L {standard_port}:{mongod_host}:{standard_port}"
-    ssh_tunnel_cmd = f"ssh {ssh_tunnel_opts} {ssh_connection_options} {ssh_options} {ssh_user_host}"
+    ssh_tunnel_cmd = f"ssh -N {ssh_tunnel_opts} {ssh_connection_options} {ssh_options} {ssh_user_host}"
     LOGGER.info("Tunneling mongod connections through ssh to get around firewall")
-    LOGGER.info("The connection is not terminated because the host can be shut down at anytime")
+    LOGGER.info(ssh_tunnel_cmd)
     Processes.create(ssh_tunnel_cmd)
+    LOGGER.info("The connection is not terminated because the host can be shut down at anytime")
 
 
 def get_remote_python():
@@ -1794,7 +1798,7 @@ def main(parser_actions, options):  # pylint: disable=too-many-branches,too-many
     # For remote operations requiring sudo, force pseudo-tty allocation,
     # see https://stackoverflow.com/questions/10310299/proper-way-to-sudo-over-ssh.
     # Note - the ssh option RequestTTY was added in OpenSSH 5.9, so we use '-tt'.
-    ssh_options = None if _IS_WINDOWS else "-tt"
+    ssh_options = "" if _IS_WINDOWS else "-tt"
 
     # Instantiate the local handler object.
     local_ops = LocalToRemoteOperations(user_host=ssh_user_host,
@@ -1822,6 +1826,7 @@ def main(parser_actions, options):  # pylint: disable=too-many-branches,too-many
             client_args = f"{client_args} {action.option_strings[-1]} {option_value}"
 
     script_name = f"{powercycle_constants.REMOTE_DIR}/{powercycle_constants.RESMOKE_PATH}"
+    script_name = abs_path(script_name)
     LOGGER.info("%s %s", script_name, client_args)
 
     remote_python = get_remote_python()
@@ -1996,7 +2001,8 @@ def main(parser_actions, options):  # pylint: disable=too-many-branches,too-many
                 ssh_failure_exit(ret, output)
             # Wait a bit after sending command to crash the server to avoid connecting to the
             # server before the actual crash occurs.
-            time.sleep(10)
+            sleep_secs = 120 if _IS_WINDOWS else 10
+            time.sleep(sleep_secs)
 
         # Kill any running clients and cleanup temporary files.
         Processes.kill_all()

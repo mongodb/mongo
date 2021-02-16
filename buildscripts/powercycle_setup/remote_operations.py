@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 """Remote access utilities, via ssh & scp."""
 
-import optparse
 import os
 import posixpath
 import re
 import shlex
+import subprocess
 import sys
 import time
-import subprocess
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 if __name__ == "__main__" and __package__ is None:
