@@ -54,7 +54,10 @@ class SetupMultiversion(Subcommand):
         self.architecture = options.architecture.lower() if options.architecture else None
         self.use_latest = options.use_latest
         self.versions = options.versions
-        self.debug_symbols = options.debug_symbols
+
+        self.download_binaries = options.download_binaries
+        self.download_symbols = options.download_symbols
+        self.download_artifacts = options.download_artifacts
 
         self.evg_api = evergreen_conn.get_evergreen_api(options.evergreen_config)
         # In evergreen github oauth token is stored as `token ******`, so we remove the leading part
@@ -64,6 +67,20 @@ class SetupMultiversion(Subcommand):
             raw_yaml = yaml.safe_load(file_handle)
         self.config = config.SetupMultiversionConfig(raw_yaml)
 
+    @staticmethod
+    def _get_bin_suffix(version, evg_project_id):
+        """Get the multiversion bin suffix from the evergreen project ID."""
+        if re.match(r"(\d+\.\d+)", version):
+            # If the cmdline version is already a semvar, just use that.
+            return version
+        elif evg_project_id == "mongodb-mongo-master":
+            # If the version is not a semvar and the project is the master waterfall,
+            # we can't add a suffix.
+            return ""
+        else:
+            # Use the Evergreen project ID as fallback.
+            return re.search(r"(\d+\.\d+$)", evg_project_id).group(0)
+
     def execute(self):
         """Execute setup multiversion mongodb."""
 
@@ -72,29 +89,30 @@ class SetupMultiversion(Subcommand):
             LOGGER.info("Fetching download URL from Evergreen.")
 
             try:
-                re.match(r"(\d+\.\d+|master)", version).group(0)
-            except AttributeError:
-                LOGGER.error(
-                    "Input version is not recognized. Some correct examples: 4.0, 4.0.1, 4.0.0-rc0")
-                exit(1)
-
-            try:
                 urls = {}
                 if self.use_latest:
                     urls = self.get_latest_urls(version)
                 if not urls:
                     LOGGER.warning("Latest URL is not available or not requested, "
-                                   "we fallback to getting the URL for the version.")
+                                   "we fallback to getting the URL for a specific "
+                                   "version.")
                     urls = self.get_urls(version)
 
-                binaries_url = urls.get("Binaries", "")
-                self.setup_mongodb(binaries_url, version)
+                artifacts_url = urls.get("Artifacts", "") if self.download_artifacts else None
+                binaries_url = urls.get("Binaries", "") if self.download_binaries else None
+                download_symbols_url = None
 
-                if self.debug_symbols:
-                    debug_symbols_url = urls.get(" mongo-debugsymbols.tgz", "")
-                    if not debug_symbols_url:
-                        debug_symbols_url = urls.get(" mongo-debugsymbols.zip", "")
-                    self.setup_mongodb(debug_symbols_url, version)
+                if self.download_symbols:
+                    download_symbols_url = urls.get(" mongo-debugsymbols.tgz", "")
+                    if not download_symbols_url:
+                        download_symbols_url = urls.get(" mongo-debugsymbols.zip", "")
+
+                bin_suffix = self._get_bin_suffix(version, urls["project_id"])
+                # Give each version a unique install dir
+                install_dir = os.path.join(self.install_dir, version)
+
+                self.setup_mongodb(artifacts_url, binaries_url, download_symbols_url, install_dir,
+                                   bin_suffix)
 
             except (github_conn.GithubConnError, evergreen_conn.EvergreenConnError,
                     download.DownloadError) as ex:
@@ -112,6 +130,7 @@ class SetupMultiversion(Subcommand):
         evg_project = f"mongodb-mongo-v{version}"
         if version == "master":
             evg_project = "mongodb-mongo-master"
+
         if evg_project not in self.config.evergreen_projects:
             return urls
 
@@ -159,13 +178,18 @@ class SetupMultiversion(Subcommand):
 
         return urls
 
-    def setup_mongodb(self, url, version):
+    def setup_mongodb(self, artifacts_url, binaries_url, symbols_url, install_dir, bin_suffix):
+        # pylint: disable=too-many-arguments
         """Download, extract and symlink."""
 
-        archive = download.download_mongodb(url)
-        installed_dir = download.extract_archive(archive, self.install_dir)
-        os.remove(archive)
-        download.symlink_version(version, installed_dir, self.link_dir)
+        for url in [artifacts_url, binaries_url, symbols_url]:
+            if url is not None:
+                tarball = download.download_from_s3(url)
+                download.extract_archive(tarball, install_dir)
+                os.remove(tarball)
+
+        if binaries_url is not None:
+            download.symlink_version(bin_suffix, install_dir, self.link_dir)
 
     def get_buildvariant_name(self, major_minor_version):
         """Return buildvariant name.
@@ -231,8 +255,16 @@ class SetupMultiversionPlugin(PluginInterface):
             "Examples: 4.0, 4.0.1, 4.0.0-rc0. If 'rc' is included in the version name, we'll use the exact rc, "
             "otherwise we'll pull the highest non-rc version compatible with the version specified."
         )
-        parser.add_argument("-ds", "--debugSymbols", dest="debug_symbols", action="store_true",
-                            default=False, help="Additionally download debug symbols.")
+
+        parser.add_argument("-db", "--downloadBinaries", dest="download_binaries",
+                            action="store_true", default=True,
+                            help="whether to download binaries, default to True.")
+        parser.add_argument("-ds", "--downloadSymbols", dest="download_symbols",
+                            action="store_true", default=False,
+                            help="whether to download debug symbols.")
+        parser.add_argument("-da", "--downloadArtifacts", dest="download_artifacts",
+                            action="store_true", default=False,
+                            help="whether to download artifacts.")
         parser.add_argument(
             "-ec", "--evergreenConfig", dest="evergreen_config",
             help="Location of evergreen configuration file. If not specified it will look "
