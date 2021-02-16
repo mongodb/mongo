@@ -2373,7 +2373,7 @@ functions:
           # Set an exit trap so we can save the real exit status (see SERVER-34033).
           trap 'echo $? > error_exit.txt; exit 0' EXIT
           set +o errexit
-          eval $python -u buildscripts/resmoke.py powercycle \
+          eval $python -u buildscripts/resmoke.py powercycle run \
             "--sshUserHost=$(printf "%s@%s" "$user" "${private_ip_address}") \
             --sshConnection=\"-i ${private_key_file} ${ssh_connection_options}\" \
             --taskName=${task_name}"
@@ -2631,10 +2631,10 @@ functions:
           set -o errexit
 
           ${activate_virtualenv}
-          $python buildscripts/powercycle_operations.py setUpEC2Instance
+          $python buildscripts/resmoke.py powercycle setup-host
 
   ### Process & archive remote EC2 artifacts ###
-  "tar EC2 artifacts": &tar_ec2_artifacts
+  "save powercycle artifacts": &save_powercycle_artifacts
     command: shell.exec
     params:
       shell: bash
@@ -2647,79 +2647,7 @@ functions:
         fi
 
         ${activate_virtualenv}
-        $python buildscripts/powercycle_operations.py tarEC2Artifacts
-
-  "copy EC2 artifacts": &copy_ec2_artifacts
-    command: shell.exec
-    params:
-      shell: bash
-      working_dir: src
-      script: |
-        if [ ! -f powercycle_ip_address.yml ]; then
-          exit 0
-        fi
-
-        ${activate_virtualenv}
-        $python buildscripts/powercycle_operations.py copyEC2Artifacts
-
-  "copy ec2 monitor files": &copy_ec2_monitor_files
-    command: shell.exec
-    params:
-      shell: bash
-      working_dir: src
-      script: |
-        set -o verbose
-
-        if [ ! -f powercycle_ip_address.yml ]; then
-          exit 0
-        fi
-
-        ${activate_virtualenv}
-        $python buildscripts/powercycle_operations.py copyEC2MonitorFiles
-
-  # The event logs on Windows are a useful diagnostic to have when determining if something bad
-  # happened to the remote machine after it was repeatedly crashed during powercycle testing. For
-  # example, the Application and System event logs have previously revealed that the mongod.exe
-  # process abruptly exited due to not being able to open a file despite the process successfully
-  # being restarted and responding to network requests.
-  "gather remote event logs": &gather_remote_event_logs
-    command: shell.exec
-    params:
-      shell: bash
-      working_dir: src
-      script: |
-        if [ ! -f powercycle_ip_address.yml ]; then
-          exit 0
-        fi
-
-        ${activate_virtualenv}
-        $python buildscripts/powercycle_operations.py gatherRemoteEventLogs
-
-  "gather remote mongo coredumps": &gather_remote_mongo_coredumps
-    command: shell.exec
-    params:
-      shell: bash
-      working_dir: "src"
-      script: |
-        if [ ! -f powercycle_ip_address.yml ]; then
-          exit 0
-        fi
-
-        ${activate_virtualenv}
-        $python buildscripts/powercycle_operations.py gatherRemoteMongoCoredumps
-
-  "copy remote mongo coredumps": &copy_remote_mongo_coredumps
-    command: shell.exec
-    params:
-      shell: bash
-      working_dir: "src"
-      script: |
-        if [ ! -f powercycle_ip_address.yml ]; then
-          exit 0
-        fi
-
-        ${activate_virtualenv}
-        $python buildscripts/powercycle_operations.py copyRemoteMongoCoredumps
+        $python buildscripts/resmoke.py powercycle save-diagnostics
 
   "archive remote EC2 artifacts": &archive_remote_ec2_artifacts
     command: s3.put
@@ -2748,12 +2676,7 @@ functions:
       optional: true
 
   "save ec2 task artifacts":
-    - *gather_remote_event_logs
-    - *tar_ec2_artifacts
-    - *copy_ec2_artifacts
-    - *copy_ec2_monitor_files
-    - *gather_remote_mongo_coredumps
-    - *copy_remote_mongo_coredumps
+    - *save_powercycle_artifacts
     - *archive_remote_ec2_artifacts
     - *archive_remote_ec2_monitor_files
 
@@ -3105,7 +3028,7 @@ functions:
 
         # Call hang analyzer for tasks that are running remote mongo processes
         if [ -n "${private_ip_address}" ]; then
-          $python buildscripts/powercycle_operations.py runHangAnalyzerOnRemoteInstance
+          $python buildscripts/resmoke.py powercycle remote-hang-analyzer
         fi
 
   "wait for resmoke to shutdown":
