@@ -267,11 +267,11 @@ class Archival(object):  # pylint: disable=too-many-instance-attributes
 
     def check_thread(self, thread, expected_alive):
         """Check if the thread is still active."""
-        if thread.isAlive() and not expected_alive:
+        if thread.is_alive() and not expected_alive:
             self.logger.warning(
                 "The %s thread did not complete, some files might not have been uploaded"
                 " to S3 or archived to %s.", thread.name, self.archival_json_file)
-        elif not thread.isAlive() and expected_alive:
+        elif not thread.is_alive() and expected_alive:
             self.logger.warning(
                 "The %s thread is no longer running, some files might not have been uploaded"
                 " to S3 or archived to %s.", thread.name, self.archival_json_file)
