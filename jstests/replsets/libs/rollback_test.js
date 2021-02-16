@@ -536,8 +536,13 @@ function RollbackTest(name = "RollbackTest", replSet) {
         log(`Reconnecting the secondary ${curSecondary.host} so it'll go into rollback`);
         // Reconnect the rollback node to the current primary, which is the node we want to sync
         // from. If we reconnect to both the current primary and the tiebreaker node, the rollback
-        // node may choose the tiebreaker.
+        // node may choose the tiebreaker. Send out a new round of heartbeats immediately so that
+        // the rollback node can find a sync source quickly. If there was a network error when
+        // trying to send out a new round of heartbeats, that indicates that rollback was already
+        // in progress and had closed connections, so there's no need to retry the command.
         curSecondary.reconnect([curPrimary]);
+        assert.adminCommandWorkedAllowingNetworkError(curSecondary,
+                                                      {replSetTest: 1, restartHeartbeats: 1});
 
         return curPrimary;
     };
