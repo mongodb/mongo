@@ -290,8 +290,6 @@ private:
     class NumRecordsChange;
     class DataSizeChange;
 
-    static WiredTigerRecoveryUnit* _getRecoveryUnit(OperationContext* opCtx);
-
     Status _insertRecords(OperationContext* opCtx,
                           Record* records,
                           const Timestamp* timestamps,

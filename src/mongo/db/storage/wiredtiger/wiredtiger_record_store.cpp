@@ -1976,7 +1976,14 @@ void WiredTigerRecordStore::appendCustomStats(OperationContext* opCtx,
 void WiredTigerRecordStore::waitForAllEarlierOplogWritesToBeVisible(OperationContext* opCtx) const {
     // Make sure that callers do not hold an active snapshot so it will be able to see the oplog
     // entries it waited for afterwards.
-    invariant(!_getRecoveryUnit(opCtx)->isActive());
+    if (opCtx->recoveryUnit()->isActive()) {
+        opCtx->lockState()->dump();
+        invariant(!opCtx->recoveryUnit()->isActive(),
+                  str::stream() << "Unexpected open storage txn. RecoveryUnit state: "
+                                << RecoveryUnit::toString(opCtx->recoveryUnit()->getState())
+                                << ", inMultiDocumentTransaction:"
+                                << (opCtx->inMultiDocumentTransaction() ? "true" : "false"));
+    }
 
     auto oplogManager = _kvEngine->getOplogManager();
     if (oplogManager->isRunning()) {
@@ -2071,10 +2078,6 @@ RecordId WiredTigerRecordStore::_nextId(OperationContext* opCtx) {
     RecordId out = RecordId(_nextIdNum.fetchAndAdd(1));
     invariant(out.isValid());
     return out;
-}
-
-WiredTigerRecoveryUnit* WiredTigerRecordStore::_getRecoveryUnit(OperationContext* opCtx) {
-    return checked_cast<WiredTigerRecoveryUnit*>(opCtx->recoveryUnit());
 }
 
 class WiredTigerRecordStore::NumRecordsChange : public RecoveryUnit::Change {

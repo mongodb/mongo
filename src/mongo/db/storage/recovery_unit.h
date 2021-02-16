@@ -647,7 +647,7 @@ public:
         kCommitting,
     };
 
-    std::string toString(State state) const {
+    static std::string toString(State state) {
         switch (state) {
             case State::kInactive:
                 return "Inactive";
@@ -663,6 +663,13 @@ public:
                 return "Aborting";
         }
         MONGO_UNREACHABLE;
+    }
+
+    /**
+     * Exposed for debugging purposes.
+     */
+    State getState() {
+        return _getState();
     }
 
     void setMustBeTimestamped() {
