@@ -164,10 +164,12 @@ list<intrusive_ptr<DocumentSource>> document_source_set_window_fields::create(
         } else {
             // In DocumentSource we don't have a mechanism for generating non-colliding field names,
             // so we have to choose the tmp name carefully to make a collision unlikely in practice.
-            auto tmp = "__internal_setWindowFields_partition_key";
-            simplePartitionBy = FieldPath{tmp};
+            std::array<unsigned char, 16> nonce = UUID::gen().data();
+            // We encode as a base64 string for a shorter, more performant field name (length 22).
+            std::string tmpField = base64::encode(nonce.data(), sizeof(nonce));
+            simplePartitionBy = FieldPath{tmpField};
             simplePartitionByExpr = ExpressionFieldPath::createPathFromString(
-                expCtx.get(), tmp, expCtx->variablesParseState);
+                expCtx.get(), tmpField, expCtx->variablesParseState);
             complexPartitionBy = partitionBy;
         }
     }
