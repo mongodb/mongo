@@ -47,6 +47,7 @@ const allCommands = {
     _configsvrRemoveShard: {skip: isPrimaryOnly},
     _configsvrRemoveShardFromZone: {skip: isPrimaryOnly},
     _configsvrReshardCollection: {skip: isPrimaryOnly},
+    _configsvrSetAllowMigrations: {skip: isPrimaryOnly},
     _configsvrShardCollection: {skip: isPrimaryOnly},
     _configsvrUpdateZoneKeyRange: {skip: isPrimaryOnly},
     _flushDatabaseCacheUpdates: {skip: isPrimaryOnly},

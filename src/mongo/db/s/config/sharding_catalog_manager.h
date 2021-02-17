@@ -301,6 +301,14 @@ public:
                           const NamespaceString& nss,
                           const BSONObj& minKey);
 
+    /**
+     * In a transaction, sets the 'allowMigrations' to the requested state and bumps the collection
+     * version.
+     */
+    void setAllowMigrationsAndBumpOneChunk(OperationContext* opCtx,
+                                           const NamespaceString& nss,
+                                           bool allowMigrations);
+
     //
     // Database Operations
     //

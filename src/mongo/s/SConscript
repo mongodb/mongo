@@ -168,6 +168,7 @@ env.Library(
         'request_types/refine_collection_shard_key.idl',
         'request_types/remove_shard_from_zone_request_type.cpp',
         'request_types/reshard_collection.idl',
+        'request_types/set_allow_migrations.idl',
         'request_types/set_shard_version_request.cpp',
         'request_types/shard_collection.idl',
         'request_types/sharded_ddl_commands.idl',

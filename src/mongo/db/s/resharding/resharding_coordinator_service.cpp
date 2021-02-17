@@ -40,6 +40,7 @@
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding_util.h"
+#include "mongo/db/s/sharding_util.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -1287,14 +1288,16 @@ void ReshardingCoordinatorService::ReshardingCoordinator::_tellAllRecipientsToRe
         nssToRefresh = _coordinatorDoc.getNss();
     }
 
-    tellShardsToRefresh(opCtx.get(), recipientIds, nssToRefresh, **executor);
+    sharding_util::tellShardsToRefreshCollection(
+        opCtx.get(), recipientIds, nssToRefresh, **executor);
 }
 
 void ReshardingCoordinatorService::ReshardingCoordinator::_tellAllDonorsToRefresh(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
     auto opCtx = cc().makeOperationContext();
     auto donorIds = extractShardIds(_coordinatorDoc.getDonorShards());
-    tellShardsToRefresh(opCtx.get(), donorIds, _coordinatorDoc.getNss(), **executor);
+    sharding_util::tellShardsToRefreshCollection(
+        opCtx.get(), donorIds, _coordinatorDoc.getNss(), **executor);
 }
 
 void ReshardingCoordinatorService::ReshardingCoordinator::_tellAllParticipantsToRefresh(
@@ -1306,11 +1309,11 @@ void ReshardingCoordinatorService::ReshardingCoordinator::_tellAllParticipantsTo
     std::set<ShardId> participantShardIds{donorShardIds.begin(), donorShardIds.end()};
     participantShardIds.insert(recipientShardIds.begin(), recipientShardIds.end());
 
-    sendCommandToShards(opCtx.get(),
-                        refreshCmd,
-                        {participantShardIds.begin(), participantShardIds.end()},
-                        _coordinatorDoc.getNss(),
-                        **executor);
+    sharding_util::sendCommandToShards(opCtx.get(),
+                                       refreshCmd,
+                                       {participantShardIds.begin(), participantShardIds.end()},
+                                       _coordinatorDoc.getNss(),
+                                       **executor);
 }
 
 }  // namespace mongo
