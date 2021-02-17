@@ -1016,7 +1016,7 @@ commands:
     
     CommandWithAnyTypeOwnedMember:
         description: "A mock command to test IDLAnyTypeOwned"
-        command_name: CommandWithValueTypeMember
+        command_name: CommandWithAnyTypeOwnedMember
         namespace: ignored
         api_version: ""
         reply_type: OkReply

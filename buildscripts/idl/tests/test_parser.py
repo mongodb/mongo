@@ -1460,6 +1460,82 @@ class TestParser(testcase.IDLTestcase):
                 reply_type: foo_reply_struct
             """), idl.errors.ERROR_ID_UNSTABLE_NO_API_VERSION)
 
+    def test_same_command_name_positive(self):
+        # type: () -> None
+        """Positive same command_name with different api_version test cases."""
+        self.assert_parse(
+            textwrap.dedent(f"""
+        commands:
+            foo:
+                description: foo
+                command_name: foo
+                namespace: ignored
+                api_version: "1"
+                reply_type: foo_reply_struct
+            fooV2:
+                description: foo
+                command_name: foo
+                namespace: ignored
+                api_version: "2"
+                reply_type: foo_reply_struct
+            """))
+
+        # No api_version
+        self.assert_parse(
+            textwrap.dedent("""
+        commands:
+            foo:
+                description: foo
+                command_name: foo
+                namespace: ignored
+                api_version: ""
+                reply_type: foo_reply_struct
+            fooV1:
+                description: foo
+                command_name: foo
+                namespace: ignored
+                api_version: "1"
+                reply_type: foo_reply_struct
+            """))
+
+    def test_same_command_name_negative(self):
+        # type: () -> None
+        """Negative same command_name with same api_version test cases."""
+        self.assert_parse_fail(
+            textwrap.dedent("""
+        commands:
+            foo:
+                description: foo
+                command_name: foo
+                namespace: ignored
+                api_version: "1"
+                reply_type: foo_reply_struct
+            fooV1:
+                description: foo
+                command_name: foo
+                namespace: ignored
+                api_version: "1"
+                reply_type: foo_reply_struct
+            """), idl.errors.ERROR_ID_DUPLICATE_SYMBOL)
+
+        # No api_version
+        self.assert_parse_fail(
+            textwrap.dedent("""
+        commands:
+            foo:
+                description: foo
+                command_name: foo
+                namespace: ignored
+                api_version: ""
+                reply_type: foo_reply_struct
+            foo2:
+                description: foo
+                command_name: foo
+                namespace: ignored
+                api_version: ""
+                reply_type: foo_reply_struct
+            """), idl.errors.ERROR_ID_DUPLICATE_SYMBOL)
+
     def test_scalar_or_mapping_negative(self):
         # type: () -> None
         """Negative test for scalar_or_mapping type."""
