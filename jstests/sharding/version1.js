@@ -80,8 +80,6 @@ assert.commandFailed(a.runCommand({
 // assert.eq( a.runCommand( { "setShardVersion" : "alleyinsider.foo" , configdb : s._configDB ,
 // version : 3 } ).oldVersion.i , 2 , "oldVersion" );
 
-// assert.eq( a.runCommand( { "getShardVersion" : "alleyinsider.foo" } ).mine.i , 3 , "my get
-// version A" );
 // assert.eq( a.runCommand( { "getShardVersion" : "alleyinsider.foo" } ).global.i , 3 , "my get
 // version B" );
 

@@ -92,11 +92,6 @@ public:
             "configServer",
             Grid::get(opCtx)->shardRegistry()->getConfigServerConnectionString().toString());
 
-        // TODO SERVER-50017: Legacy boolean related to sharded connections. To remove when 5.0
-        // becomes last-lts.
-        result.appendBool("inShardedMode", false);
-        result.appendTimestamp("mine", 0);
-
         AutoGetCollection autoColl(opCtx, nss, MODE_IS, AutoGetCollectionViewMode::kViewsPermitted);
         auto* const csr = CollectionShardingRuntime::get(opCtx, nss);
 
