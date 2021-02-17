@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/process_interface/common_mongod_process_interface.h"
 #include "mongo/s/catalog_cache.h"

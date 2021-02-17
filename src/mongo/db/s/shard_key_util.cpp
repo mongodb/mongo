@@ -32,7 +32,6 @@
 #include "mongo/db/s/shard_key_util.h"
 
 #include "mongo/bson/simple_bsonelement_comparator.h"
-#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/hasher.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"

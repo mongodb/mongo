@@ -84,7 +84,7 @@ structs:
                 optional: true
             writeErrors:
                 description: "Contains all the errors encoutered."
-                type: array<object>
+                type: array<object_owned>
                 optional: true
 
     InsertReply:
