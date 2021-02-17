@@ -45,6 +45,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/sharding_logging.h"
+#include "mongo/db/s/sharding_util.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/snapshot_window_options_gen.h"
 #include "mongo/db/transaction_participant_gen.h"
@@ -1451,6 +1452,57 @@ void ShardingCatalogManager::splitOrMarkJumbo(OperationContext* opCtx,
                                                   splitPoints));
     } catch (const DBException&) {
     }
+}
+
+void ShardingCatalogManager::setAllowMigrationsAndBumpOneChunk(OperationContext* opCtx,
+                                                               const NamespaceString& nss,
+                                                               bool allowMigrations) {
+    std::set<ShardId> shardsIds;
+    {
+        // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk splits, merges, and
+        // migrations
+        Lock::ExclusiveLock lk(opCtx->lockState(), _kChunkOpLock);
+
+        const auto cm = uassertStatusOK(
+            Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(opCtx,
+                                                                                         nss));
+        cm.getAllShardIds(&shardsIds);
+        withTransaction(
+            opCtx, CollectionType::ConfigNS, [&](OperationContext* opCtx, TxnNumber txnNumber) {
+                // Update the 'allowMigrations' field. An unset 'allowMigrations' field implies
+                // 'true'. To ease backwards compatibility we omit 'allowMigrations' instead of
+                // setting it explicitly to 'true'.
+                const auto update = allowMigrations
+                    ? BSON("$unset" << BSON(CollectionType::kAllowMigrationsFieldName << ""))
+                    : BSON("$set" << BSON(CollectionType::kAllowMigrationsFieldName << false));
+
+                writeToConfigDocumentInTxn(
+                    opCtx,
+                    CollectionType::ConfigNS,
+                    BatchedCommandRequest::buildUpdateOp(
+                        CollectionType::ConfigNS,
+                        BSON(CollectionType::kNssFieldName << nss.ns()) /* query */,
+                        update /* update */,
+                        false /* upsert */,
+                        false /* multi */),
+                    txnNumber);
+
+                // Bump the chunk version for one single chunk
+                invariant(!shardsIds.empty());
+                bumpMajorVersionOneChunkPerShard(opCtx, nss, txnNumber, {*shardsIds.begin()});
+            });
+
+        // From now on migrations are not allowed anymore, so it is not possible that new shards
+        // will own chunks for this collection.
+    }
+
+    // Trigger a refresh on each shard containing chunks for this collection.
+    const auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
+    sharding_util::tellShardsToRefreshCollection(
+        opCtx,
+        {std::make_move_iterator(shardsIds.begin()), std::make_move_iterator(shardsIds.end())},
+        nss,
+        executor);
 }
 
 }  // namespace mongo

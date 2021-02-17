@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2020-present MongoDB, Inc.
+ *    Copyright (C) 2021-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,24 +29,30 @@
 
 #pragma once
 
-#include "mongo/db/s/sharding_ddl_coordinator.h"
+#include <vector>
+
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/s/shard_id.h"
 
 namespace mongo {
+namespace sharding_util {
 
-class DropCollectionCoordinator final
-    : public ShardingDDLCoordinator_NORESILIENT,
-      public std::enable_shared_from_this<DropCollectionCoordinator> {
-public:
-    DropCollectionCoordinator(OperationContext* opCtx, const NamespaceString& nss);
+/**
+ * Sends _flushRoutingTableCacheUpdatesWithWriteConcern to a list of shards. Throws if one of the
+ * shards fails to refresh.
+ */
+void tellShardsToRefreshCollection(OperationContext* opCtx,
+                                   const std::vector<ShardId>& shardIds,
+                                   const NamespaceString& nss,
+                                   const std::shared_ptr<executor::TaskExecutor>& executor);
 
-private:
-    SemiFuture<void> runImpl(std::shared_ptr<executor::TaskExecutor> executor) override;
+void sendCommandToShards(OperationContext* opCtx,
+                         const BSONObj& command,
+                         const std::vector<ShardId>& shardIds,
+                         const NamespaceString& nss,
+                         const std::shared_ptr<executor::TaskExecutor>& executor);
 
-    void _sendDropCollToParticipants(OperationContext* opCtx);
-
-    ServiceContext* _serviceContext;
-    std::vector<ShardId> _participants;
-};
-
+}  // namespace sharding_util
 }  // namespace mongo

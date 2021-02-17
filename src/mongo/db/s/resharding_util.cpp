@@ -140,64 +140,6 @@ std::set<ShardId> getRecipientShards(OperationContext* opCtx,
     return recipients;
 }
 
-void tellShardsToRefresh(OperationContext* opCtx,
-                         const std::vector<ShardId>& shardIds,
-                         const NamespaceString& nss,
-                         const std::shared_ptr<executor::TaskExecutor>& executor) {
-    auto cmd = _flushRoutingTableCacheUpdatesWithWriteConcern(nss);
-    cmd.setSyncFromConfig(true);
-    cmd.setDbName(nss.db());
-    auto cmdObj =
-        cmd.toBSON(BSON(WriteConcernOptions::kWriteConcernField << WriteConcernOptions::Majority));
-
-    sendCommandToShards(opCtx, cmdObj, shardIds, nss, executor);
-}
-
-void sendCommandToShards(OperationContext* opCtx,
-                         const BSONObj& command,
-                         const std::vector<ShardId>& shardIds,
-                         const NamespaceString& nss,
-                         const std::shared_ptr<executor::TaskExecutor>& executor) {
-    std::vector<AsyncRequestsSender::Request> requests;
-    for (const auto& shardId : shardIds) {
-        requests.emplace_back(shardId, command);
-    }
-
-    if (!requests.empty()) {
-        // The _flushRoutingTableCacheUpdatesWithWriteConcern command will fail with a
-        // QueryPlanKilled error response if the config.cache.chunks collection is dropped
-        // concurrently. The config.cache.chunks collection is dropped by the shard when it detects
-        // the sharded collection's epoch having changed. We use kIdempotentOrCursorInvalidated so
-        // the ARS automatically retries in that situation.
-        AsyncRequestsSender ars(opCtx,
-                                executor,
-                                "admin",
-                                requests,
-                                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                                Shard::RetryPolicy::kIdempotentOrCursorInvalidated);
-
-        while (!ars.done()) {
-            // Retrieve the responses and throw at the first failure.
-            auto response = ars.next();
-
-            auto generateErrorContext = [&]() -> std::string {
-                return str::stream()
-                    << "Unable to _flushRoutingTableCacheUpdatesWithWriteConcern for namespace "
-                    << nss.ns() << " on " << response.shardId;
-            };
-
-            auto shardResponse =
-                uassertStatusOKWithContext(std::move(response.swResponse), generateErrorContext());
-
-            auto status = getStatusFromCommandResult(shardResponse.data);
-            uassertStatusOKWithContext(status, generateErrorContext());
-
-            auto wcStatus = getWriteConcernStatusFromCommandResult(shardResponse.data);
-            uassertStatusOKWithContext(wcStatus, generateErrorContext());
-        }
-    }
-}
-
 void checkForHolesAndOverlapsInChunks(std::vector<ReshardedChunk>& chunks,
                                       const KeyPattern& keyPattern) {
     std::sort(chunks.begin(), chunks.end(), [](const ReshardedChunk& a, const ReshardedChunk& b) {

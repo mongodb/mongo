@@ -77,17 +77,6 @@ void DropCollectionCoordinator::_sendDropCollToParticipants(OperationContext* op
     }
 }
 
-void DropCollectionCoordinator::_stopMigrations(OperationContext* opCtx) {
-    // TODO SERVER-53861 this will not stop current ongoing migrations
-    uassertStatusOK(Grid::get(opCtx)->catalogClient()->updateConfigDocument(
-        opCtx,
-        CollectionType::ConfigNS,
-        BSON(CollectionType::kNssFieldName << _nss.ns()),
-        BSON("$set" << BSON(CollectionType::kAllowMigrationsFieldName << false)),
-        false /* upsert */,
-        ShardingCatalogClient::kMajorityWriteConcern));
-}
-
 SemiFuture<void> DropCollectionCoordinator::runImpl(
     std::shared_ptr<executor::TaskExecutor> executor) {
     return ExecutorFuture<void>(executor, Status::OK())
@@ -103,7 +92,11 @@ SemiFuture<void> DropCollectionCoordinator::runImpl(
             const auto collDistLock = uassertStatusOK(distLockManager->lock(
                 opCtx, _nss.ns(), "DropCollection", DistLockManager::kDefaultLockTimeout));
 
-            _stopMigrations(opCtx);
+            try {
+                sharding_ddl_util::stopMigrations(opCtx, _nss);
+            } catch (ExceptionFor<ErrorCodes::NamespaceNotSharded>&) {
+                // The collection is not sharded or doesn't exist.
+            }
 
             const auto catalogClient = Grid::get(opCtx)->catalogClient();
 

@@ -33,7 +33,7 @@
 
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
-#include "mongo/db/s/resharding_util.h"
+#include "mongo/db/s/sharding_util.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_shard.h"
@@ -55,7 +55,7 @@ const BSONObj kMockResWithWriteConcernError =
 
 const Status kRetryableError{ErrorCodes::HostUnreachable, "RetryableError for test"};
 
-class ReshardingRefresherTest : public ConfigServerTestFixture {
+class ShardingRefresherTest : public ConfigServerTestFixture {
 protected:
     void setUp() {
         ConfigServerTestFixture::setUp();
@@ -74,10 +74,12 @@ protected:
     }
 };
 
-TEST_F(ReshardingRefresherTest, refresherTwoShardsSucceed) {
+TEST_F(ShardingRefresherTest, refresherTwoShardsSucceed) {
     auto opCtx = operationContext();
     auto nss = NamespaceString("mydb", "mycoll");
-    auto future = launchAsync([&] { tellShardsToRefresh(opCtx, kShardIdList, nss, executor()); });
+    auto future = launchAsync([&] {
+        sharding_util::tellShardsToRefreshCollection(opCtx, kShardIdList, nss, executor());
+    });
 
     onCommand([&](const executor::RemoteCommandRequest& request) { return BSON("ok" << 1); });
     onCommand([&](const executor::RemoteCommandRequest& request) { return BSON("ok" << 1); });
@@ -85,20 +87,24 @@ TEST_F(ReshardingRefresherTest, refresherTwoShardsSucceed) {
     future.default_timed_get();
 }
 
-TEST_F(ReshardingRefresherTest, refresherTwoShardsFirstErrors) {
+TEST_F(ShardingRefresherTest, refresherTwoShardsFirstErrors) {
     auto opCtx = operationContext();
     auto nss = NamespaceString("mydb", "mycoll");
-    auto future = launchAsync([&] { tellShardsToRefresh(opCtx, kShardIdList, nss, executor()); });
+    auto future = launchAsync([&] {
+        sharding_util::tellShardsToRefreshCollection(opCtx, kShardIdList, nss, executor());
+    });
 
     onCommand([&](const executor::RemoteCommandRequest& request) { return kMockErrorRes; });
 
     ASSERT_THROWS_CODE(future.default_timed_get(), DBException, kMockStatus.code());
 }
 
-TEST_F(ReshardingRefresherTest, refresherTwoShardsSecondErrors) {
+TEST_F(ShardingRefresherTest, refresherTwoShardsSecondErrors) {
     auto opCtx = operationContext();
     auto nss = NamespaceString("mydb", "mycoll");
-    auto future = launchAsync([&] { tellShardsToRefresh(opCtx, kShardIdList, nss, executor()); });
+    auto future = launchAsync([&] {
+        sharding_util::tellShardsToRefreshCollection(opCtx, kShardIdList, nss, executor());
+    });
 
     onCommand([&](const executor::RemoteCommandRequest& request) { return BSON("ok" << 1); });
     onCommand([&](const executor::RemoteCommandRequest& request) { return kMockErrorRes; });
@@ -106,10 +112,12 @@ TEST_F(ReshardingRefresherTest, refresherTwoShardsSecondErrors) {
     ASSERT_THROWS_CODE(future.default_timed_get(), DBException, kMockStatus.code());
 }
 
-TEST_F(ReshardingRefresherTest, refresherTwoShardsWriteConcernFailed) {
+TEST_F(ShardingRefresherTest, refresherTwoShardsWriteConcernFailed) {
     auto opCtx = operationContext();
     auto nss = NamespaceString("mydb", "mycoll");
-    auto future = launchAsync([&] { tellShardsToRefresh(opCtx, kShardIdList, nss, executor()); });
+    auto future = launchAsync([&] {
+        sharding_util::tellShardsToRefreshCollection(opCtx, kShardIdList, nss, executor());
+    });
 
     onCommand([&](const executor::RemoteCommandRequest& request) {
         return kMockResWithWriteConcernError;

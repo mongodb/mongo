@@ -41,6 +41,7 @@
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/request_types/set_allow_migrations_gen.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 
@@ -256,6 +257,26 @@ void releaseCriticalSection(OperationContext* opCtx, const NamespaceString& nss)
     auto* const csr = CollectionShardingRuntime::get(opCtx, nss);
     csr->exitCriticalSection(opCtx);
     csr->clearFilteringMetadata(opCtx);
+}
+
+void stopMigrations(OperationContext* opCtx, const NamespaceString& nss) {
+    const ConfigsvrSetAllowMigrations configsvrSetAllowMigrationsCmd(nss,
+                                                                     false /* allowMigrations */);
+    const auto swSetAllowMigrationsResult =
+        Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommandWithFixedRetryAttempts(
+            opCtx,
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            NamespaceString::kAdminDb.toString(),
+            CommandHelpers::appendMajorityWriteConcern(configsvrSetAllowMigrationsCmd.toBSON({})),
+            Shard::RetryPolicy::kIdempotent  // Although ConfigsvrSetAllowMigrations is not really
+                                             // idempotent (because it will cause the collection
+                                             // version to be bumped), it is safe to be retried.
+        );
+
+    uassertStatusOKWithContext(
+        Shard::CommandResponse::getEffectiveStatus(std::move(swSetAllowMigrationsResult)),
+        str::stream() << "Error setting allowMigrations to false for collection "
+                      << nss.toString());
 }
 
 }  // namespace sharding_ddl_util

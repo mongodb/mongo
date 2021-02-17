@@ -91,5 +91,10 @@ void acquireCriticalSection(OperationContext* opCtx, const NamespaceString& nss)
  */
 void releaseCriticalSection(OperationContext* opCtx, const NamespaceString& nss);
 
+/**
+ * Stops ongoing migrations and prevents future ones to start for the given nss.
+ */
+void stopMigrations(OperationContext* opCtx, const NamespaceString& nss);
+
 }  // namespace sharding_ddl_util
 }  // namespace mongo

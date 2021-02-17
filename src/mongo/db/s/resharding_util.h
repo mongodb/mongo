@@ -202,21 +202,6 @@ std::set<ShardId> getRecipientShards(OperationContext* opCtx,
                                      const UUID& reshardingUUID);
 
 /**
- * Sends _flushRoutingTableCacheUpdatesWithWriteConcern to a list of shards. Throws if one of the
- * shards fails to refresh.
- */
-void tellShardsToRefresh(OperationContext* opCtx,
-                         const std::vector<ShardId>& shardIds,
-                         const NamespaceString& nss,
-                         const std::shared_ptr<executor::TaskExecutor>& executor);
-
-void sendCommandToShards(OperationContext* opCtx,
-                         const BSONObj& command,
-                         const std::vector<ShardId>& shardIds,
-                         const NamespaceString& nss,
-                         const std::shared_ptr<executor::TaskExecutor>& executor);
-
-/**
  * Asserts that there is not a hole or overlap in the chunks.
  */
 void checkForHolesAndOverlapsInChunks(std::vector<ReshardedChunk>& chunks,

@@ -97,6 +97,7 @@ let testCases = {
     _configsvrRemoveShardFromZone: {skip: "internal command"},
     _configsvrRenameCollection: {skip: "internal command"},
     _configsvrReshardCollection: {skip: "internal command"},
+    _configsvrSetAllowMigrations: {skip: "internal command"},
     _configsvrShardCollection: {skip: "internal command"},
     _configsvrUpdateZoneKeyRange: {skip: "internal command"},
     _flushDatabaseCacheUpdates: {skip: "internal command"},
