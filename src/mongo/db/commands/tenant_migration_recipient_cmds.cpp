@@ -62,6 +62,12 @@ public:
                     repl::feature_flags::gTenantMigrations.isEnabled(
                         serverGlobalParams.featureCompatibility));
 
+            // (Generic FCV reference): This FCV reference should exist across LTS binary versions.
+            uassert(
+                5356101,
+                "recipientSyncData not available while upgrading or downgrading the recipient FCV",
+                !serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading());
+
             const auto& cmd = request();
 
             TenantMigrationRecipientDocument stateDoc(cmd.getMigrationId(),
