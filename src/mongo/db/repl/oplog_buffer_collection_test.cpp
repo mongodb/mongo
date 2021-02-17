@@ -149,11 +149,11 @@ TEST_F(OplogBufferCollectionTest, StartupWithUserProvidedNamespaceCreatesCollect
     testStartupCreatesCollection(_opCtx.get(), _storageInterface, makeNamespace(_agent));
 }
 
-DEATH_TEST_REGEX_F(
-    OplogBufferCollectionTest,
-    StartupWithOplogNamespaceTriggersFatalAssertion,
-    "Fatal assertion.*40154.*Location28838: cannot create a non-capped oplog collection") {
-    testStartupCreatesCollection(_opCtx.get(), _storageInterface, NamespaceString("local.oplog.Z"));
+TEST_F(OplogBufferCollectionTest, StartupWithOplogNamespaceTriggersUassert) {
+    ASSERT_THROWS_CODE(testStartupCreatesCollection(
+                           _opCtx.get(), _storageInterface, NamespaceString("local.oplog.Z")),
+                       DBException,
+                       28838);
 }
 
 TEST_F(OplogBufferCollectionTest, ShutdownDropsCollection) {

@@ -419,12 +419,12 @@ void OplogBufferCollection::_createCollection(OperationContext* opCtx) {
     auto status = _storageInterface->createCollection(opCtx, _nss, options);
     if (status.code() == ErrorCodes::NamespaceExists)
         return;
-    fassert(40154, status);
+    uassertStatusOK(status);
 }
 
 void OplogBufferCollection::_dropCollection(OperationContext* opCtx) {
     UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-    fassert(40155, _storageInterface->dropCollection(opCtx, _nss));
+    uassertStatusOK(_storageInterface->dropCollection(opCtx, _nss));
 }
 
 Timestamp OplogBufferCollection::getLastPushedTimestamp() const {
