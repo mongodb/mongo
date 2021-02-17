@@ -39,7 +39,6 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/authenticate.h"
 #include "mongo/client/sasl_client_authenticate.h"
-#include "mongo/db/audit.h"
 #include "mongo/db/auth/authentication_session.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
@@ -51,7 +50,6 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/authentication_commands.h"
 #include "mongo/db/server_options.h"
-#include "mongo/db/stats/counters.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/sequence_util.h"
@@ -135,9 +133,9 @@ public:
     }
 } cmdSaslContinue;
 
-StatusWith<SaslReply> doSaslStep(OperationContext* opCtx,
-                                 const SaslPayload& payload,
-                                 AuthenticationSession* session) try {
+SaslReply doSaslStep(OperationContext* opCtx,
+                     const SaslPayload& payload,
+                     AuthenticationSession* session) {
     auto mechanismPtr = session->getMechanism();
     invariant(mechanismPtr);
     auto& mechanism = *mechanismPtr;
@@ -166,7 +164,7 @@ StatusWith<SaslReply> doSaslStep(OperationContext* opCtx,
 
         sleepmillis(saslGlobalParams.authFailedDelay.load());
         // All the client needs to know is that authentication has failed.
-        return AuthorizationManager::authenticationFailedStatus;
+        uassertStatusOK(AuthorizationManager::authenticationFailedStatus);
     }
 
     if (mechanism.isSuccess()) {
@@ -197,14 +195,11 @@ StatusWith<SaslReply> doSaslStep(OperationContext* opCtx,
     reply.setPayload(std::move(replyPayload));
 
     return reply;
-} catch (const DBException& ex) {
-    return ex.toStatus();
 }
 
 SaslReply doSaslStart(OperationContext* opCtx,
                       AuthenticationSession* session,
-                      const SaslStartCommand& request,
-                      std::string* principalName) {
+                      const SaslStartCommand& request) {
     auto mechanism = uassertStatusOK(
         SASLServerMechanismRegistry::get(opCtx->getServiceContext())
             .getServerMechanism(request.getMechanism(), request.getDbName().toString()));
@@ -217,56 +212,19 @@ SaslReply doSaslStart(OperationContext* opCtx,
 
     session->setMechanism(std::move(mechanism), request.getOptions());
 
-    auto swReply = doSaslStep(opCtx, request.getPayload(), session);
-    if (!swReply.isOK() || session->getMechanism()->isSuccess()) {
-        // Only attempt to populate principal name if we're done (successfully or not).
-        *principalName = session->getMechanism()->getPrincipalName().toString();
-    }
-
-    auto reply = uassertStatusOK(swReply);
-    return reply;
+    return doSaslStep(opCtx, request.getPayload(), session);
 }
 
 SaslReply runSaslStart(OperationContext* opCtx,
                        AuthenticationSession* session,
                        const SaslStartCommand& request) {
     opCtx->markKillOnClientDisconnect();
-    auto client = opCtx->getClient();
 
-    auto db = request.getDbName();
-    auto mechanismName = request.getMechanism().toString();
+    // Note that while updateDatabase can throw, it should not be able to for saslStart.
+    session->updateDatabase(request.getDbName());
+    session->setMechanismName(request.getMechanism());
 
-    SaslReply reply;
-    std::string principalName;
-    try {
-        auto mechCounter = authCounter.getMechanismCounter(mechanismName);
-        mechCounter.incAuthenticateReceived();
-        if (session->isSpeculative()) {
-            mechCounter.incSpeculativeAuthenticateReceived();
-        }
-
-        reply = doSaslStart(opCtx, session, request, &principalName);
-
-        if (session->isClusterMember()) {
-            mechCounter.incClusterAuthenticateReceived();
-        }
-        if (session->getMechanism()->isSuccess()) {
-            mechCounter.incAuthenticateSuccessful();
-            if (session->isClusterMember()) {
-                mechCounter.incClusterAuthenticateSuccessful();
-            }
-            if (session->isSpeculative()) {
-                mechCounter.incSpeculativeAuthenticateSuccessful();
-            }
-            audit::logAuthentication(
-                client, mechanismName, UserName(principalName, db), ErrorCodes::OK);
-        }
-    } catch (const AssertionException& ex) {
-        audit::logAuthentication(client, mechanismName, UserName(principalName, db), ex.code());
-        throw;
-    }
-
-    return reply;
+    return doSaslStart(opCtx, session, request);
 }
 
 SaslReply runSaslContinue(OperationContext* opCtx,
@@ -291,45 +249,12 @@ SaslReply runSaslContinue(OperationContext* opCtx,
                           AuthenticationSession* session,
                           const SaslContinueCommand& cmd) {
     opCtx->markKillOnClientDisconnect();
-    auto* client = Client::getCurrent();
-
-    auto mechanismPtr = session->getMechanism();
-    invariant(mechanismPtr);
-    auto& mechanism = *mechanismPtr;
-
-    // Authenticating the __system@local user to the admin database on mongos is required
-    // by the auth passthrough test suite.
-    if (mechanism.getAuthenticationDatabase() != cmd.getDbName() && !getTestCommandsEnabled()) {
-        uasserted(ErrorCodes::ProtocolError,
-                  "Attempt to switch database target during SASL authentication.");
-    }
 
     uassert(ErrorCodes::ProtocolError,
             "sasl: Mismatched conversation id",
             cmd.getConversationId() == 1);
 
-    auto swReply = doSaslStep(opCtx, cmd.getPayload(), session);
-
-    if (mechanism.isSuccess() || !swReply.isOK()) {
-        audit::logAuthentication(
-            client,
-            mechanism.mechanismName(),
-            UserName(mechanism.getPrincipalName(), mechanism.getAuthenticationDatabase()),
-            swReply.getStatus().code());
-
-        auto mechCounter = authCounter.getMechanismCounter(mechanism.mechanismName());
-        if (mechanism.isSuccess()) {
-            mechCounter.incAuthenticateSuccessful();
-            if (mechanism.isClusterMember()) {
-                mechCounter.incClusterAuthenticateSuccessful();
-            }
-            if (session->isSpeculative()) {
-                mechCounter.incSpeculativeAuthenticateSuccessful();
-            }
-        }
-    }
-
-    return uassertStatusOK(swReply);
+    return doSaslStep(opCtx, cmd.getPayload(), session);
 }
 
 constexpr auto kDBFieldName = "db"_sd;

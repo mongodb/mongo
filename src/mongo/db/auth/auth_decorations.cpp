@@ -32,7 +32,6 @@
 #include <memory>
 #include <utility>
 
-#include "mongo/db/auth/authentication_session.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/sasl_options.h"
@@ -44,9 +43,6 @@
 
 namespace mongo {
 namespace {
-
-const auto getAuthenticationSession =
-    Client::declareDecoration<boost::optional<AuthenticationSession>>();
 
 const auto getAuthorizationManager =
     ServiceContext::declareDecoration<std::unique_ptr<AuthorizationManager>>();
@@ -95,10 +91,6 @@ ServiceContext::ConstructorActionRegisterer destroyAuthorizationManagerRegistere
     [](ServiceContext* service) { AuthorizationManager::set(service, nullptr); });
 
 }  // namespace
-
-boost::optional<AuthenticationSession>& AuthenticationSession::_get(Client* client) {
-    return getAuthenticationSession(client);
-}
 
 AuthorizationManager* AuthorizationManager::get(ServiceContext* service) {
     return getAuthorizationManager(service).get();

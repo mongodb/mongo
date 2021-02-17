@@ -49,7 +49,7 @@ function authAndTest(mongo, {clusterUserSeparationOveride = false} = {}) {
 
             return logJson.id === 20429 && logJson.attr.user === CLIENT_USER &&
                 logJson.attr.db === "$external" &&
-                /(?:\d{1,3}\.){3}\d{1,3}:\d+/.test(logJson.attr.remote);
+                /(?:\d{1,3}\.){3}\d{1,3}:\d+/.test(logJson.attr.client);
         }
         assert(log.some(checkAuthSuccess));
     } else {

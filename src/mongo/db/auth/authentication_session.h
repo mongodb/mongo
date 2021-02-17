@@ -30,8 +30,12 @@
 #pragma once
 
 #include <memory>
+#include <string>
+
+#include <boost/optional.hpp>
 
 #include "mongo/db/auth/sasl_mechanism_registry.h"
+#include "mongo/db/auth/user_name.h"
 #include "mongo/db/stats/counters.h"
 
 namespace mongo {
@@ -76,7 +80,7 @@ public:
         OperationContext* const _opCtx;
         const StepType _currentStep;
 
-        AuthenticationSession* _session;
+        AuthenticationSession* _session = nullptr;
     };
 
     /**
@@ -108,24 +112,56 @@ public:
     }
 
     /**
-     * This returns true if the session currently believes itself to be a cluster member.
+     * This returns the mechanism name for this session.
      */
-    bool isClusterMember() const {
-        if (_mech && _mech->isClusterMember()) {
-            // If we're doing sasl and we have a mechanism, then we know.
-            return true;
-        }
-
-        // Otherwise, rely on what the implementation has told us directly.
-        return _isClusterMember;
+    StringData getMechanismName() const {
+        return _mechName;
     }
 
     /**
-     * This returns true once either markFailed or markSuccessful is invoked.
+     * This returns the user portion of the UserName which may be an empty StringData.
      */
-    bool isFinished() const {
-        return _isFinished;
+    StringData getUserName() const {
+        return _userName.getUser();
     }
+
+    /**
+     * This returns the database portion of the UserName which may be an empty StringData.
+     */
+    StringData getDatabase() const {
+        return _userName.getDB();
+    }
+
+    /**
+     * Set the mechanism name for this session.
+     *
+     * If the mechanism name is not recognized, this will throw.
+     */
+    void setMechanismName(StringData mechanismName);
+
+    /**
+     * Update the database for this session.
+     *
+     * The database will be validated against the current database for this session.
+     */
+    void updateDatabase(StringData database) {
+        updateUserName(UserName("", database.toString()));
+    }
+
+    /**
+     * Update the user name for this session.
+     *
+     * The user name will be validated against the current user name for this session.
+     */
+    void updateUserName(UserName userName);
+
+    /**
+     * Set the last user name used with `saslSupportedMechs` for this session.
+     *
+     * This user name does no emit an exception when it conflicts, but it does create an audit
+     * entry.
+     */
+    void setUserNameForSaslSupportedMechanisms(UserName userName);
 
     /**
      * Mark the session as a cluster member.
@@ -143,15 +179,11 @@ public:
 
     /**
      * Mark the session as succssfully authenticated.
-     *
-     * TODO(SERVER-52862) This should increment counters and log.
      */
     void markSuccessful();
 
     /**
      * Mark the session as unable to authenticate.
-     *
-     * TODO(SERVER-52862) This should increment counters and log.
      */
     void markFailed(const Status& status);
 
@@ -202,12 +234,26 @@ public:
 private:
     static boost::optional<AuthenticationSession>& _get(Client* client);
 
+    void _finish();
+    void _verifyUserNameFromSaslSupportedMechanisms(const UserName& user);
+
     Client* const _client;
+
+    boost::optional<StepType> _lastStep;
 
     bool _isSpeculative = false;
     bool _isClusterMember = false;
     bool _isFinished = false;
 
+    // The user name can be provided in advance by saslSupportedMechs.
+    UserName _ssmUserName;
+
+    std::string _mechName;
+    boost::optional<AuthCounter::MechanismCounterHandle> _mechCounter;
+
+    // The user name can be provided partially by the command namespace or in full by a client
+    // certificate. If we have a authN mechanism, we use its principal name instead.
+    UserName _userName;
     std::unique_ptr<ServerMechanismBase> _mech;
 };
 
