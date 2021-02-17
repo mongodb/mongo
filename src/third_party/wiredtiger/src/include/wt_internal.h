@@ -317,6 +317,8 @@ struct __wt_thread_group;
 typedef struct __wt_thread_group WT_THREAD_GROUP;
 struct __wt_tiered;
 typedef struct __wt_tiered WT_TIERED;
+struct __wt_tiered_manager;
+typedef struct __wt_tiered_manager WT_TIERED_MANAGER;
 struct __wt_time_aggregate;
 typedef struct __wt_time_aggregate WT_TIME_AGGREGATE;
 struct __wt_time_window;

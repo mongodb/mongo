@@ -1,35 +1,79 @@
 #include <iostream>
 #include <cstdlib>
+
 #include "test_harness/test_harness.h"
+#include "test_harness/workload_generator.h"
 
 class poc_test : public test_harness::test {
     public:
-    int run() {
-        WT_CONNECTION *conn;
-        int ret = 0;
-        /* Setup basic test directory. */
-        const char *default_dir = "WT_TEST";
-
-        /*
-        * Csuite tests utilise a test_util.h command to make their directory, currently that doesn't
-        * compile under c++ and some extra work will be needed to make it work. Its unclear if the
-        * test framework will use test_util.h yet.
-        */
-        const char *mkdir_cmd = "mkdir WT_TEST";
-        ret = system(mkdir_cmd);
-        if (ret != 0)
-            return (ret);
-
-        ret = wiredtiger_open(default_dir, NULL, "create,cache_size=1G", &conn);
-        return (ret);
+    poc_test(const char *config, int64_t trace_level) : test(config)
+    {
+        test_harness::workload_generator::_trace_level = trace_level;
+        _wl = new test_harness::workload_generator(_configuration);
     }
 
-    poc_test(const char *config) : test(config) {}
+    ~poc_test()
+    {
+        delete _wl;
+        _wl = nullptr;
+    }
+
+    int
+    run()
+    {
+        int return_code = _wl->load();
+        if (return_code != 0)
+            throw std::runtime_error(
+              "Load stage failed with error code: " + std::to_string(return_code));
+        return_code = _wl->run();
+        if (return_code != 0)
+            throw std::runtime_error(
+              "Run stage failed with error code: " + std::to_string(return_code));
+        return return_code;
+    }
+
+    private:
+    test_harness::workload_generator *_wl = nullptr;
 };
 
 const char *poc_test::test::_name = "poc_test";
+const char *poc_test::test::_default_config = "collection_count=2,key_count=5,value_size=20";
+int64_t test_harness::workload_generator::_trace_level = 0;
 
-int main(int argc, char *argv[]) {
-    const char *cfg = "collection_count=1,key_size=5";
-    return poc_test(cfg).run();
+int
+main(int argc, char *argv[])
+{
+    std::string cfg = "";
+    int64_t trace_level = 0;
+
+    // Parse args
+    // -C   : Configuration
+    // -t   : Trace level
+    for (int i = 1; i < argc; ++i) {
+        if (strcmp(argv[i], "-C") == 0) {
+            if (i + 1 < argc) {
+                cfg = argv[++i];
+            } else {
+                throw std::invalid_argument("No value given for option " + std::string(argv[i]));
+                std::cout << "No value given for option " << argv[i] << std::endl;
+            }
+        } else if (strcmp(argv[i], "-t") == 0) {
+            if (i + 1 < argc) {
+                trace_level = std::stoi(argv[++i]);
+            } else {
+                throw std::invalid_argument("No value given for option " + std::string(argv[i]));
+            }
+        }
+    }
+
+    // Check if default configuration should be used
+    if (cfg.compare("") == 0) {
+        std::cout << "Using default configuration" << std::endl;
+        cfg = poc_test::test::_default_config;
+    }
+
+    std::cout << "Configuration\t:" << cfg << std::endl;
+    std::cout << "Tracel level\t:" << trace_level << std::endl;
+
+    return (poc_test(cfg.c_str(), trace_level).run());
 }

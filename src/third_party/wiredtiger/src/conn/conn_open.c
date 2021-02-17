@@ -93,6 +93,7 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
     WT_TRET(__wt_capacity_server_destroy(session));
     WT_TRET(__wt_checkpoint_server_destroy(session));
     WT_TRET(__wt_statlog_destroy(session, true));
+    WT_TRET(__wt_tiered_storage_destroy(session));
     WT_TRET(__wt_sweep_destroy(session));
 
     /* The eviction server is shut down last. */
@@ -204,6 +205,7 @@ __wt_connection_workers(WT_SESSION_IMPL *session, const char *cfg[])
      * can know if statistics are enabled or not.
      */
     WT_RET(__wt_statlog_create(session, cfg));
+    WT_RET(__wt_tiered_storage_create(session, cfg));
     WT_RET(__wt_logmgr_create(session));
 
     /*

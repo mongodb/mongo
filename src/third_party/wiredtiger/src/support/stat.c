@@ -205,6 +205,8 @@ static const char *const __stats_dsrc_desc[] = {
   "reconciliation: records written including a stop durable timestamp",
   "reconciliation: records written including a stop timestamp",
   "reconciliation: records written including a stop transaction ID",
+  "session: flush_tier operation calls",
+  "session: tiered storage local retention time (secs)",
   "transaction: race to read prepared update retry",
   "transaction: rollback to stable hs records with stop timestamps older than newer records",
   "transaction: rollback to stable keys removed",
@@ -453,6 +455,8 @@ __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats)
     stats->rec_time_window_durable_stop_ts = 0;
     stats->rec_time_window_stop_ts = 0;
     stats->rec_time_window_stop_txn = 0;
+    stats->flush_tier = 0;
+    /* not clearing tiered_retention */
     stats->txn_read_race_prepare_update = 0;
     stats->txn_rts_hs_stop_older_than_newer_start = 0;
     stats->txn_rts_keys_removed = 0;
@@ -688,6 +692,8 @@ __wt_stat_dsrc_aggregate_single(WT_DSRC_STATS *from, WT_DSRC_STATS *to)
     to->rec_time_window_durable_stop_ts += from->rec_time_window_durable_stop_ts;
     to->rec_time_window_stop_ts += from->rec_time_window_stop_ts;
     to->rec_time_window_stop_txn += from->rec_time_window_stop_txn;
+    to->flush_tier += from->flush_tier;
+    to->tiered_retention += from->tiered_retention;
     to->txn_read_race_prepare_update += from->txn_read_race_prepare_update;
     to->txn_rts_hs_stop_older_than_newer_start += from->txn_rts_hs_stop_older_than_newer_start;
     to->txn_rts_keys_removed += from->txn_rts_keys_removed;
@@ -928,6 +934,8 @@ __wt_stat_dsrc_aggregate(WT_DSRC_STATS **from, WT_DSRC_STATS *to)
     to->rec_time_window_durable_stop_ts += WT_STAT_READ(from, rec_time_window_durable_stop_ts);
     to->rec_time_window_stop_ts += WT_STAT_READ(from, rec_time_window_stop_ts);
     to->rec_time_window_stop_txn += WT_STAT_READ(from, rec_time_window_stop_txn);
+    to->flush_tier += WT_STAT_READ(from, flush_tier);
+    to->tiered_retention += WT_STAT_READ(from, tiered_retention);
     to->txn_read_race_prepare_update += WT_STAT_READ(from, txn_read_race_prepare_update);
     to->txn_rts_hs_stop_older_than_newer_start +=
       WT_STAT_READ(from, txn_rts_hs_stop_older_than_newer_start);
@@ -1215,6 +1223,8 @@ static const char *const __stats_connection_desc[] = {
   "perf: operation write latency histogram (bucket 3) - 500-999us",
   "perf: operation write latency histogram (bucket 4) - 1000-9999us",
   "perf: operation write latency histogram (bucket 5) - 10000us+",
+  "reconciliation: internal-page overflow keys",
+  "reconciliation: leaf-page overflow keys",
   "reconciliation: maximum seconds spent in a reconciliation call",
   "reconciliation: page reconciliation calls that resulted in values with prepared transaction "
   "metadata",
@@ -1420,6 +1430,8 @@ static const char *const __stats_connection_desc[] = {
   "reconciliation: records written including a stop durable timestamp",
   "reconciliation: records written including a stop timestamp",
   "reconciliation: records written including a stop transaction ID",
+  "session: flush_tier operation calls",
+  "session: tiered storage local retention time (secs)",
   "transaction: race to read prepared update retry",
   "transaction: rollback to stable hs records with stop timestamps older than newer records",
   "transaction: rollback to stable keys removed",
@@ -1735,6 +1747,8 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->perf_hist_opwrite_latency_lt1000 = 0;
     stats->perf_hist_opwrite_latency_lt10000 = 0;
     stats->perf_hist_opwrite_latency_gt10000 = 0;
+    stats->rec_overflow_key_internal = 0;
+    stats->rec_overflow_key_leaf = 0;
     /* not clearing rec_maximum_seconds */
     stats->rec_pages_with_prepare = 0;
     stats->rec_pages_with_ts = 0;
@@ -1936,6 +1950,8 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->rec_time_window_durable_stop_ts = 0;
     stats->rec_time_window_stop_ts = 0;
     stats->rec_time_window_stop_txn = 0;
+    stats->flush_tier = 0;
+    /* not clearing tiered_retention */
     stats->txn_read_race_prepare_update = 0;
     stats->txn_rts_hs_stop_older_than_newer_start = 0;
     stats->txn_rts_keys_removed = 0;
@@ -2248,6 +2264,8 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->perf_hist_opwrite_latency_lt1000 += WT_STAT_READ(from, perf_hist_opwrite_latency_lt1000);
     to->perf_hist_opwrite_latency_lt10000 += WT_STAT_READ(from, perf_hist_opwrite_latency_lt10000);
     to->perf_hist_opwrite_latency_gt10000 += WT_STAT_READ(from, perf_hist_opwrite_latency_gt10000);
+    to->rec_overflow_key_internal += WT_STAT_READ(from, rec_overflow_key_internal);
+    to->rec_overflow_key_leaf += WT_STAT_READ(from, rec_overflow_key_leaf);
     to->rec_maximum_seconds += WT_STAT_READ(from, rec_maximum_seconds);
     to->rec_pages_with_prepare += WT_STAT_READ(from, rec_pages_with_prepare);
     to->rec_pages_with_ts += WT_STAT_READ(from, rec_pages_with_ts);
@@ -2462,6 +2480,8 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->rec_time_window_durable_stop_ts += WT_STAT_READ(from, rec_time_window_durable_stop_ts);
     to->rec_time_window_stop_ts += WT_STAT_READ(from, rec_time_window_stop_ts);
     to->rec_time_window_stop_txn += WT_STAT_READ(from, rec_time_window_stop_txn);
+    to->flush_tier += WT_STAT_READ(from, flush_tier);
+    to->tiered_retention += WT_STAT_READ(from, tiered_retention);
     to->txn_read_race_prepare_update += WT_STAT_READ(from, txn_read_race_prepare_update);
     to->txn_rts_hs_stop_older_than_newer_start +=
       WT_STAT_READ(from, txn_rts_hs_stop_older_than_newer_start);
