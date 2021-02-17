@@ -853,6 +853,11 @@ void DBClientConnection::handleNotPrimaryResponse(const BSONObj& replyBody,
 const SSLConfiguration* DBClientConnection::getSSLConfiguration() {
     return _session->getSSLConfiguration();
 }
+
+bool DBClientConnection::isUsingTransientSSLParams() const {
+    return _transientSSLParams.has_value();
+}
+
 #endif
 
 AtomicWord<int> DBClientConnection::_numConnections;

@@ -304,6 +304,8 @@ public:
 
 #ifdef MONGO_CONFIG_SSL
     const SSLConfiguration* getSSLConfiguration() override;
+
+    bool isUsingTransientSSLParams() const override;
 #endif
 
 protected:
