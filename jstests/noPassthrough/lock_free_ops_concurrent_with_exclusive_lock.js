@@ -1,6 +1,6 @@
 /**
- * Tests that find, count, distinct and aggregation commands can run while a MODE_X collection lock
- * is held.
+ * Tests that find, count, distinct, (non-writing) aggregation, (non-writing) mapReduce,
+ * listCollection and listIndexes commands can run while a MODE_X collection lock is held.
  *
  * @tags: [
  *     # Cannot run against older binaries because they do not have lock-free ops.
@@ -82,6 +82,30 @@ const aggregationResult = coll.aggregate([
 const aggregationDocuments = aggregationResult.toArray();
 assert.eq(1, aggregationDocuments.length);
 assert.eq(15, aggregationDocuments[0].totalTopGroupCount);
+
+jsTestLog("Starting lock-free mapReduce command.");
+const mapReduceResult = coll.mapReduce(
+    function() {
+        emit(this.topGroupId, this.subGroupCount);
+    },
+    function(key, values) {
+        return Array.sum(values);
+    },
+    // Return the results to the user rather than taking a collection IX lock to write them to a
+    // collection.
+    {out: {inline: 1}});
+assert.commandWorked(mapReduceResult);
+assert.eq(2, mapReduceResult.results.length);
+
+jsTestLog("Starting lock-free listCollections command.");
+const listCollectionsResult = db.runCommand({listCollections: 1});
+assert.commandWorked(listCollectionsResult);
+assert.eq(1, listCollectionsResult.cursor.firstBatch.length);
+
+jsTestLog("Starting lock-free listIndexes command.");
+const listIndexesResult = db.runCommand({listIndexes: collName});
+assert.commandWorked(listIndexesResult);
+assert.eq(1, listIndexesResult.cursor.firstBatch.length);
 
 jsTestLog("Turning off failpoint.");
 collModFailPoint.off();
