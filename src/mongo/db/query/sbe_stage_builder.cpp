@@ -501,6 +501,11 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                             sbe::makeE<sbe::EVariable>(*collatorSlot));
         }
 
+        // According to MQL semantics, missing values are treated as nulls during sorting.
+        getSortFieldExpr = makeFunction("fillEmpty"sv,
+                                        std::move(getSortFieldExpr),
+                                        makeConstant(sbe::value::TypeTags::Null, 0));
+
         projectMap.emplace(sortFieldVar, std::move(getSortFieldExpr));
     }
 
