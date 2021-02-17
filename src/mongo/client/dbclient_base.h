@@ -772,6 +772,14 @@ public:
      * Get the SSL configuration of this client.
      */
     virtual const SSLConfiguration* getSSLConfiguration() = 0;
+
+    /**
+     * Returns true if this client was connected using transient SSL parameters. May return
+     * false if this client was never connected.
+     */
+    virtual bool isUsingTransientSSLParams() const {
+        return false;
+    }
 #endif
 
     const ClientAPIVersionParameters& getApiParameters() const {

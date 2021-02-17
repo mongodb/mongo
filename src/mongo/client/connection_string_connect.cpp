@@ -38,6 +38,7 @@
 
 #include "mongo/client/dbclient_rs.h"
 #include "mongo/client/mongo_uri.h"
+#include "mongo/config.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 
@@ -79,6 +80,10 @@ StatusWith<std::unique_ptr<DBClientBase>> ConnectionString::connect(
                 if (!lastError.isOK()) {
                     continue;
                 }
+
+#ifdef MONGO_CONFIG_SSL
+                invariant((transientSSLParams != nullptr) == c->isUsingTransientSSLParams());
+#endif
                 LOGV2_DEBUG(20110, 1, "Connected connection!");
                 return std::move(c);
             }
@@ -96,6 +101,10 @@ StatusWith<std::unique_ptr<DBClientBase>> ConnectionString::connect(
             if (!status.isOK()) {
                 return status.withReason(status.reason() + ", " + toString());
             }
+
+#ifdef MONGO_CONFIG_SSL
+            invariant(!set->isUsingTransientSSLParams());  // Not implemented.
+#endif
             return std::move(set);
         }
 
