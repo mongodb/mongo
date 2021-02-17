@@ -419,7 +419,10 @@ server_parameters:
         set_at: startup
         cpp_vartype: int
         cpp_varname: maxTenantMigrationRecipientThreadPoolSize
-        default: 8
+        # Each migration needs at least 2 dedicated threads for oplog fetching and data cloning plus
+        # 1 thread for other async jobs. To support 50 concurrent migrations on the recipient, we
+        # set the thread pool size to 128.
+        default: 128
         validator:
             gte: 1
 

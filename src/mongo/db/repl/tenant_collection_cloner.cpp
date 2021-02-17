@@ -59,6 +59,10 @@ const int kProgressMeterCheckInterval = 128;
 // listIndexes and recorded the results and the operationTime.
 MONGO_FAIL_POINT_DEFINE(tenantCollectionClonerHangAfterGettingOperationTime);
 
+// Failpoint which causes the tenant collection cloner to hang after createCollection. This
+// failpoint doesn't check for cloner exit so we can rely on its timesEntered in tests.
+MONGO_FAIL_POINT_DEFINE(tenantCollectionClonerHangAfterCreateCollection);
+
 // Failpoint which causes tenant migration to hang after handling the next batch of results from the
 // DBClientConnection, optionally limited to a specific collection.
 MONGO_FAIL_POINT_DEFINE(tenantMigrationHangCollectionClonerAfterHandlingBatchResponse);
@@ -332,6 +336,7 @@ BaseCloner::AfterStageBehavior TenantCollectionCloner::createCollectionStage() {
         uassertStatusOKWithContext(status, "Tenant collection cloner: create indexes");
     }
 
+    tenantCollectionClonerHangAfterCreateCollection.pauseWhileSet();
     return kContinueNormally;
 }
 
