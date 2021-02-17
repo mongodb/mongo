@@ -1204,6 +1204,60 @@ TEST(SplitMatchExpression, ShouldMoveIndependentPredicateWhenThereAreMultipleRen
     ASSERT_FALSE(splitExpr.second.get());
 }
 
+TEST(ApplyRenamesToExpression, ShouldApplyBasicRenamesForAMatchWithExpr) {
+    BSONObj matchPredicate = fromjson("{$expr: {$eq: ['$a.b', '$c']}}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto matcher = MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
+    ASSERT_OK(matcher.getStatus());
+
+    StringMap<std::string> renames{{"a", "d"}, {"c", "e"}, {"x", "y"}};
+    expression::applyRenamesToExpression(matcher.getValue().get(), renames);
+
+    ASSERT_BSONOBJ_EQ(matcher.getValue()->serialize(), fromjson("{$expr: {$eq: ['$d.b', '$e']}}"));
+}
+
+TEST(ApplyRenamesToExpression, ShouldApplyDottedRenamesForAMatchWithExpr) {
+    BSONObj matchPredicate = fromjson("{$expr: {$lt: ['$a.b.c', '$d.e.f']}}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto matcher = MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
+    ASSERT_OK(matcher.getStatus());
+
+    StringMap<std::string> renames{{"a.b.c", "x"}, {"d.e", "y"}};
+    expression::applyRenamesToExpression(matcher.getValue().get(), renames);
+
+    ASSERT_BSONOBJ_EQ(matcher.getValue()->serialize(), fromjson("{$expr: {$lt: ['$x', '$y.f']}}"));
+}
+
+TEST(ApplyRenamesToExpression, ShouldApplyDottedRenamesForAMatchWithNestedExpr) {
+    BSONObj matchPredicate =
+        fromjson("{$and: [{$expr: {$eq: ['$a.b.c', '$c']}}, {$expr: {$lt: ['$d.e.f', '$a']}}]}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto matcher = MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
+    ASSERT_OK(matcher.getStatus());
+
+    StringMap<std::string> renames{{"a", "x.y"}, {"d.e", "y"}, {"c", "q.r"}};
+    expression::applyRenamesToExpression(matcher.getValue().get(), renames);
+
+    ASSERT_BSONOBJ_EQ(
+        matcher.getValue()->serialize(),
+        fromjson(
+            "{$and: [{$expr: {$eq: ['$x.y.b.c', '$q.r']}}, {$expr: {$lt: ['$y.f', '$x.y']}}]}"));
+}
+
+TEST(ApplyRenamesToExpression, ShouldNotApplyRenamesForAMatchWithExprWithNoFieldPaths) {
+    BSONObj matchPredicate = fromjson("{$expr: {$concat: ['a', 'b', 'c']}}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto matcher = MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
+    ASSERT_OK(matcher.getStatus());
+
+    StringMap<std::string> renames{{"a", "x.y"}, {"d.e", "y"}, {"c", "q.r"}};
+    expression::applyRenamesToExpression(matcher.getValue().get(), renames);
+
+    ASSERT_BSONOBJ_EQ(
+        matcher.getValue()->serialize(),
+        fromjson("{$expr: {$concat: [{$const: 'a'}, {$const: 'b'}, {$const: 'c'}]}}"));
+}
+
 TEST(MapOverMatchExpression, DoesMapOverLogicalNodes) {
     BSONObj matchPredicate = fromjson("{a: {$not: {$eq: 1}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());

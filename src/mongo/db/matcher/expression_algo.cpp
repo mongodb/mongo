@@ -33,6 +33,7 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/matcher/expression_array.h"
+#include "mongo/db/matcher/expression_expr.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_xor.h"
@@ -274,22 +275,6 @@ unique_ptr<MatchExpression> createNorOfNodes(std::vector<unique_ptr<MatchExpress
     return splitNor;
 }
 
-void applyRenamesToExpression(MatchExpression* expr, const StringMap<std::string>& renames) {
-    if (expr->getCategory() == MatchExpression::MatchCategory::kArrayMatching ||
-        expr->getCategory() == MatchExpression::MatchCategory::kOther) {
-        return;
-    }
-
-    if (expr->getCategory() == MatchExpression::MatchCategory::kLeaf) {
-        LeafMatchExpression* leafExpr = checked_cast<LeafMatchExpression*>(expr);
-        leafExpr->applyRename(renames);
-    }
-
-    for (size_t i = 0; i < expr->numChildren(); ++i) {
-        applyRenamesToExpression(expr->getChild(i), renames);
-    }
-}
-
 std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>>
 splitMatchExpressionByWithoutRenames(unique_ptr<MatchExpression> expr,
                                      const std::set<std::string>& fields) {
@@ -453,6 +438,28 @@ std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> splitMatchEx
         applyRenamesToExpression(splitExpr.first.get(), renames);
     }
     return splitExpr;
+}
+
+void applyRenamesToExpression(MatchExpression* expr, const StringMap<std::string>& renames) {
+    if (expr->matchType() == MatchExpression::MatchType::EXPRESSION) {
+        ExprMatchExpression* exprExpr = checked_cast<ExprMatchExpression*>(expr);
+        exprExpr->applyRename(renames);
+        return;
+    }
+
+    if (expr->getCategory() == MatchExpression::MatchCategory::kArrayMatching ||
+        expr->getCategory() == MatchExpression::MatchCategory::kOther) {
+        return;
+    }
+
+    if (expr->getCategory() == MatchExpression::MatchCategory::kLeaf) {
+        LeafMatchExpression* leafExpr = checked_cast<LeafMatchExpression*>(expr);
+        leafExpr->applyRename(renames);
+    }
+
+    for (size_t i = 0; i < expr->numChildren(); ++i) {
+        applyRenamesToExpression(expr->getChild(i), renames);
+    }
 }
 
 void mapOver(MatchExpression* expr, NodeTraversalFunc func, std::string path) {
