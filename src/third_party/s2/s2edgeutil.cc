@@ -51,7 +51,7 @@ bool S2EdgeUtil::VertexCrossing(S2Point const& a, S2Point const& b,
   if (a == c) return S2::OrderedCCW(S2::Ortho(a), d, b, a);
   if (b == d) return S2::OrderedCCW(S2::Ortho(b), c, a, b);
 
-  // TODO Changing the following to a warning is a workaround fix for SERVER-19674.
+  // Changing the following to a warning is a workaround fix for SERVER-19674.
   //
   // Because ExpensiveCCW is subject to numerical errors there are some
   // edge cases where this function will be called with 4 distinct
