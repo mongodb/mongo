@@ -214,3 +214,8 @@ structs:
                     downgrade state.
                 type: fcv_string
                 optional: true
+            numRestartsDueToDonorConnectionFailure:
+                description: >-
+                    A counter that is incremented on each restart due to a donor connection failure.
+                type: long
+                default: 0

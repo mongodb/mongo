@@ -209,14 +209,16 @@ public:
                     case kRunning:
                         return newState == kInterrupted || newState == kDone;
                     case kInterrupted:
-                        return newState == kDone;
+                        return newState == kDone || newState == kRunning;
                     case kDone:
                         return false;
                 }
                 MONGO_UNREACHABLE;
             }
 
-            void setState(StateFlag state, boost::optional<Status> interruptStatus = boost::none) {
+            void setState(StateFlag state,
+                          boost::optional<Status> interruptStatus = boost::none,
+                          bool isExternalInterrupt = false) {
                 invariant(checkIfValidTransition(state),
                           str::stream() << "current state: " << toString(_state)
                                         << ", new state: " << toString(state));
@@ -230,6 +232,16 @@ public:
 
                 _state = state;
                 _interruptStatus = (interruptStatus) ? interruptStatus.get() : _interruptStatus;
+                _isExternalInterrupt = isExternalInterrupt;
+            }
+
+            void clearInterruptStatus() {
+                _interruptStatus = Status{ErrorCodes::InternalError, "Uninitialized value"};
+                _isExternalInterrupt = false;
+            }
+
+            bool isExternalInterrupt() const {
+                return (_state == kInterrupted) && _isExternalInterrupt;
             }
 
             bool isNotStarted() const {
@@ -276,6 +288,9 @@ public:
             // task interrupt status. Set to Status::OK() only when the recipient service has not
             // been interrupted so far, and is used to remember the initial interrupt error.
             Status _interruptStatus = Status::OK();
+            // Indicates if the task was interrupted externally due to a 'recipientForgetMigration'
+            // or stepdown/shutdown.
+            bool _isExternalInterrupt = false;
         };
 
         /*
@@ -495,6 +510,8 @@ public:
         std::unique_ptr<TenantMigrationSharedData> _sharedData;  // (S)
         // Indicates whether the main task future continuation chain state kicked off by run().
         TaskState _taskState;  // (M)
+        // Used to indicate whether the migration is able to be retried on fetcher error.
+        boost::optional<Status> _oplogFetcherStatus;  // (M)
 
         // Promise that is resolved when the state document is initialized and persisted.
         SharedPromise<void> _stateDocPersistedPromise;  // (W)
