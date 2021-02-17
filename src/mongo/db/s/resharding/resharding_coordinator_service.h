@@ -96,6 +96,7 @@ public:
     StringData getServiceName() const override {
         return kReshardingCoordinatorServiceName;
     }
+
     NamespaceString getStateDocumentsNS() const override {
         return NamespaceString::kConfigReshardingOperationsNamespace;
     }
@@ -104,8 +105,13 @@ public:
         // TODO Limit the size of ReshardingCoordinatorService thread pool.
         return ThreadPool::Limits();
     }
+
     std::shared_ptr<PrimaryOnlyService::Instance> constructInstance(
         BSONObj initialState) const override;
+
+private:
+    ExecutorFuture<void> _rebuildService(std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                                         const CancelationToken& token) override;
 };
 
 class ReshardingCoordinatorService::ReshardingCoordinator final

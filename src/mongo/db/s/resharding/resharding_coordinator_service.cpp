@@ -41,6 +41,7 @@
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding_util.h"
 #include "mongo/db/s/sharding_util.h"
+#include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -65,6 +66,13 @@ MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforeCloning);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorInSteadyState);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforeDecisionPersisted);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforeCompletion)
+
+const std::string kReshardingCoordinatorActiveIndexName = "ReshardingCoordinatorActiveIndex";
+const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
+
+bool shouldStopAttemptingToCreateIndex(Status status, const CancelationToken& token) {
+    return status.isOK() || token.isCanceled();
+}
 
 void assertNumDocsModifiedMatchesExpected(const BatchedCommandRequest& request,
                                           const BSONObj& response,
@@ -628,7 +636,21 @@ void insertCoordDocAndChangeOrigCollEntry(OperationContext* opCtx,
 
     executeMetadataChangesInTxn(opCtx, [&](OperationContext* opCtx, TxnNumber txnNumber) {
         // Insert the coordinator document to config.reshardingOperations.
-        writeToCoordinatorStateNss(opCtx, coordinatorDoc, txnNumber);
+        invariant(coordinatorDoc.getActive());
+        try {
+            writeToCoordinatorStateNss(opCtx, coordinatorDoc, txnNumber);
+        } catch (const ExceptionFor<ErrorCodes::DuplicateKey>& ex) {
+            auto extraInfo = ex.extraInfo<DuplicateKeyErrorInfo>();
+            if (extraInfo->getKeyPattern().woCompare(BSON("active" << 1)) == 0) {
+                uasserted(ErrorCodes::ReshardCollectionInProgress,
+                          str::stream()
+                              << "Only one resharding operation is allowed to be active at a "
+                                 "time, aborting resharding op for "
+                              << coordinatorDoc.getNss());
+            }
+
+            throw;
+        }
 
         // Update the config.collections entry for the original collection to include
         // 'reshardingFields'
@@ -848,6 +870,31 @@ std::shared_ptr<repl::PrimaryOnlyService::Instance> ReshardingCoordinatorService
     return std::make_shared<ReshardingCoordinator>(std::move(initialState));
 }
 
+ExecutorFuture<void> ReshardingCoordinatorService::_rebuildService(
+    std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancelationToken& token) {
+    return AsyncTry([this] {
+               auto nss = getStateDocumentsNS();
+
+               AllowOpCtxWhenServiceRebuildingBlock allowOpCtxBlock(Client::getCurrent());
+               auto opCtxHolder = cc().makeOperationContext();
+               auto opCtx = opCtxHolder.get();
+               DBDirectClient client(opCtx);
+               BSONObj result;
+               client.runCommand(
+                   nss.db().toString(),
+                   BSON("createIndexes"
+                        << nss.coll().toString() << "indexes"
+                        << BSON_ARRAY(BSON("key" << BSON("active" << 1) << "name"
+                                                 << kReshardingCoordinatorActiveIndexName
+                                                 << "unique" << true))),
+                   result);
+               uassertStatusOK(getStatusFromCommandResult(result));
+           })
+        .until([token](Status status) { return shouldStopAttemptingToCreateIndex(status, token); })
+        .withBackoffBetweenIterations(kExponentialBackoff)
+        .on(**executor, CancelationToken::uncancelable());
+}
+
 ReshardingCoordinatorService::ReshardingCoordinator::ReshardingCoordinator(const BSONObj& state)
     : PrimaryOnlyService::TypedInstance<ReshardingCoordinator>(),
       _id(state["_id"].wrap().getOwned()),
@@ -975,6 +1022,10 @@ SemiFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::run(
                   "newShardKeyPattern"_attr = _coordinatorDoc.getReshardingKey(),
                   "error"_attr = status);
 
+            if (_coordinatorDoc.getState() == CoordinatorStateEnum::kUnused) {
+                return status;
+            }
+
             _updateCoordinatorDocStateAndCatalogEntries(
                 CoordinatorStateEnum::kError, _coordinatorDoc, boost::none, boost::none, status);
 
@@ -990,8 +1041,13 @@ SemiFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::run(
             return status;
         })
         .onCompletion([this, self = shared_from_this()](Status status) {
-            // Notify `ReshardingMetrics` as the operation is now complete for external observers.
-            markCompleted(status);
+            // TODO SERVER-53914 depending on where we load metrics at the start of the operation,
+            // this may need to change
+            if (_coordinatorDoc.getState() != CoordinatorStateEnum::kUnused) {
+                // Notify `ReshardingMetrics` as the operation is now complete for external
+                // observers.
+                markCompleted(status);
+            }
 
             auto opCtx = cc().makeOperationContext();
             reshardingPauseCoordinatorBeforeCompletion.pauseWhileSet(opCtx.get());
@@ -1039,9 +1095,6 @@ ReshardingCoordinatorService::ReshardingCoordinator::getObserver() {
 }
 
 void ReshardingCoordinatorService::ReshardingCoordinator::_insertCoordDocAndChangeOrigCollEntry() {
-    // TODO SERVER-53914 to accommodate loading metrics for the coordinator.
-    ReshardingMetrics::get(cc().getServiceContext())->onStart();
-
     if (_coordinatorDoc.getState() > CoordinatorStateEnum::kUnused) {
         return;
     }
@@ -1052,6 +1105,9 @@ void ReshardingCoordinatorService::ReshardingCoordinator::_insertCoordDocAndChan
 
     resharding::insertCoordDocAndChangeOrigCollEntry(opCtx.get(), updatedCoordinatorDoc);
     installCoordinatorDoc(updatedCoordinatorDoc);
+
+    // TODO SERVER-53914 to accommodate loading metrics for the coordinator.
+    ReshardingMetrics::get(cc().getServiceContext())->onStart();
 }
 
 void ReshardingCoordinatorService::ReshardingCoordinator::

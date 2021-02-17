@@ -997,8 +997,7 @@ BSONObj ShardingCatalogManager::writeToConfigDocumentInTxn(OperationContext* opC
                         opCtx, nss.db(), false /* startTransaction */, txnNumber, request.toBSON())
                         .body;
 
-    uassertStatusOK(getStatusFromCommandResult(response));
-    uassertStatusOK(getWriteConcernStatusFromCommandResult(response));
+    uassertStatusOK(getStatusFromWriteCommandReply(response));
 
     return response;
 }
