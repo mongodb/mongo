@@ -37,6 +37,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/config.h"
+#include "mongo/db/auth/auth_options_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/options_parser/startup_option_init.h"
@@ -231,6 +232,12 @@ MONGO_STARTUP_OPTIONS_POST(SSLServerOptions)(InitializerContext*) {
         clusterAuthMode == ServerGlobalParams::ClusterAuthMode_x509) {
         if (sslGlobalParams.sslMode.load() == SSLParams::SSLMode_disabled) {
             uasserted(ErrorCodes::BadValue, "need to enable TLS via the tlsMode flag");
+        }
+
+        if (!gEnforceUserClusterSeparation) {
+            uasserted(ErrorCodes::BadValue,
+                      "cannot have have x.509 cluster authentication while not enforcing user "
+                      "cluster separation");
         }
     }
 

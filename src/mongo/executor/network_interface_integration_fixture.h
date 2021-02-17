@@ -75,6 +75,8 @@ public:
 
     void setRandomNumberGenerator(PseudoRandom* generator);
 
+    void resetIsInternalClient(bool isInternalClient);
+
     PseudoRandom* getRandomNumberGenerator();
 
     void startCommand(const TaskExecutor::CallbackHandle& cbHandle,

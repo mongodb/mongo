@@ -42,3 +42,9 @@ server_parameters:
     cpp_vartype: bool
     cpp_varname: roleGraphInvalidationIsFatal
     test_only: true
+  enforceUserClusterSeparation:
+    description: "Prevents creation of users whose names would be interpreted as cluster members"
+    set_at: startup
+    cpp_varname: "gEnforceUserClusterSeparation"
+    cpp_vartype: bool
+    default: true

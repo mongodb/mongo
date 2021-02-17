@@ -37,7 +37,6 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/client/connection_string.h"
-#include "mongo/db/wire_version.h"
 #include "mongo/executor/connection_pool_stats.h"
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface_integration_fixture.h"
@@ -150,12 +149,6 @@ class NetworkInterfaceTest : public NetworkInterfaceIntegrationFixture {
 public:
     constexpr static Milliseconds kNoTimeout = RemoteCommandRequest::kNoTimeout;
     constexpr static Milliseconds kMaxWait = Milliseconds(Minutes(1));
-
-    void resetIsInternalClient(bool isInternalClient) {
-        WireSpec::Specification newSpec = *WireSpec::instance().get();
-        newSpec.isInternalClient = isInternalClient;
-        WireSpec::instance().reset(std::move(newSpec));
-    }
 
     void assertNumOps(uint64_t canceled, uint64_t timedOut, uint64_t failed, uint64_t succeeded) {
         auto counters = net().getCounters();
