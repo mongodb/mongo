@@ -54,6 +54,8 @@ std::string loadFile(const std::string& name) {
 class NetworkInterfaceSSLFixture : public NetworkInterfaceIntegrationFixture {
 public:
     void setUp() final {
+        resetIsInternalClient(true);
+        NetworkInterfaceIntegrationFixture::setUp();
 
         // Setup an internal user so that we can use it for external auth
         UserHandle user(User(UserName("__system", "local")));
@@ -79,13 +81,17 @@ public:
         createNet(nullptr, std::move(options));
         net().startup();
     }
+
+    void tearDown() override {
+        NetworkInterfaceIntegrationFixture::tearDown();
+        resetIsInternalClient(false);
+    }
 };
 
 TEST_F(NetworkInterfaceSSLFixture, Ping) {
     assertCommandOK(
         "admin", BSON("ping" << 1), RemoteCommandRequest::kNoTimeout, transport::kEnableSSL);
 }
-
 
 }  // namespace
 }  // namespace executor
