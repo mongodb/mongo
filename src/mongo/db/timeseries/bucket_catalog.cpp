@@ -946,9 +946,11 @@ public:
         }
 
         BSONObjBuilder builder;
-        builder.appendNumber("numBuckets", bucketCatalog._buckets.size());
-        builder.appendNumber("numOpenBuckets", bucketCatalog._bucketIds.size());
-        builder.appendNumber("numIdleBuckets", bucketCatalog._numberOfIdleBuckets());
+        builder.appendNumber("numBuckets", static_cast<long long>(bucketCatalog._buckets.size()));
+        builder.appendNumber("numOpenBuckets",
+                             static_cast<long long>(bucketCatalog._bucketIds.size()));
+        builder.appendNumber("numIdleBuckets",
+                             static_cast<long long>(bucketCatalog._numberOfIdleBuckets()));
         builder.appendNumber("memoryUsage",
                              static_cast<long long>(bucketCatalog._memoryUsage.load()));
         return builder.obj();

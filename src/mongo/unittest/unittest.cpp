@@ -119,7 +119,7 @@ public:
         BSONObjBuilder bob;
         bob.append("name", _name);
         bob.append("tests", _tests);
-        bob.appendNumber("fails", _fails.size());
+        bob.appendNumber("fails", static_cast<long long>(_fails.size()));
         bob.append("asserts", _asserts);
         bob.append("time", Milliseconds(_millis).toBSON());
         {

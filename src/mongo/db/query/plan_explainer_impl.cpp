@@ -193,18 +193,18 @@ void statsToBSON(const PlanStageStats& stats,
 
     // Some top-level exec stats get pulled out of the root stage.
     if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
-        bob->appendNumber("nReturned", stats.common.advanced);
+        bob->appendNumber("nReturned", static_cast<long long>(stats.common.advanced));
         // Include executionTimeMillis if it was recorded.
         if (stats.common.executionTimeMillis) {
             bob->appendNumber("executionTimeMillisEstimate", *stats.common.executionTimeMillis);
         }
 
-        bob->appendNumber("works", stats.common.works);
-        bob->appendNumber("advanced", stats.common.advanced);
-        bob->appendNumber("needTime", stats.common.needTime);
-        bob->appendNumber("needYield", stats.common.needYield);
-        bob->appendNumber("saveState", stats.common.yields);
-        bob->appendNumber("restoreState", stats.common.unyields);
+        bob->appendNumber("works", static_cast<long long>(stats.common.works));
+        bob->appendNumber("advanced", static_cast<long long>(stats.common.advanced));
+        bob->appendNumber("needTime", static_cast<long long>(stats.common.needTime));
+        bob->appendNumber("needYield", static_cast<long long>(stats.common.needYield));
+        bob->appendNumber("saveState", static_cast<long long>(stats.common.yields));
+        bob->appendNumber("restoreState", static_cast<long long>(stats.common.unyields));
         if (stats.common.failed)
             bob->appendBool("failed", stats.common.failed);
         bob->appendNumber("isEOF", stats.common.isEOF);
@@ -215,12 +215,12 @@ void statsToBSON(const PlanStageStats& stats,
         AndHashStats* spec = static_cast<AndHashStats*>(stats.specific.get());
 
         if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
-            bob->appendNumber("memUsage", spec->memUsage);
-            bob->appendNumber("memLimit", spec->memLimit);
+            bob->appendNumber("memUsage", static_cast<long long>(spec->memUsage));
+            bob->appendNumber("memLimit", static_cast<long long>(spec->memLimit));
 
             for (size_t i = 0; i < spec->mapAfterChild.size(); ++i) {
                 bob->appendNumber(std::string(str::stream() << "mapAfterChild_" << i),
-                                  spec->mapAfterChild[i]);
+                                  static_cast<long long>(spec->mapAfterChild[i]));
             }
         }
     } else if (STAGE_AND_SORTED == stats.stageType) {
@@ -229,7 +229,7 @@ void statsToBSON(const PlanStageStats& stats,
         if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
             for (size_t i = 0; i < spec->failedAnd.size(); ++i) {
                 bob->appendNumber(std::string(str::stream() << "failedAnd_" << i),
-                                  spec->failedAnd[i]);
+                                  static_cast<long long>(spec->failedAnd[i]));
             }
         }
     } else if (STAGE_COLLSCAN == stats.stageType) {
@@ -242,7 +242,7 @@ void statsToBSON(const PlanStageStats& stats,
             bob->append("maxTs", *(spec->maxTs));
         }
         if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
-            bob->appendNumber("docsExamined", spec->docsTested);
+            bob->appendNumber("docsExamined", static_cast<long long>(spec->docsTested));
         }
     } else if (STAGE_COUNT == stats.stageType) {
         CountStats* spec = static_cast<CountStats*>(stats.specific.get());
@@ -255,7 +255,7 @@ void statsToBSON(const PlanStageStats& stats,
         CountScanStats* spec = static_cast<CountScanStats*>(stats.specific.get());
 
         if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
-            bob->appendNumber("keysExamined", spec->keysExamined);
+            bob->appendNumber("keysExamined", static_cast<long long>(spec->keysExamined));
         }
 
         bob->append("keyPattern", spec->keyPattern);
@@ -282,7 +282,7 @@ void statsToBSON(const PlanStageStats& stats,
         DeleteStats* spec = static_cast<DeleteStats*>(stats.specific.get());
 
         if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
-            bob->appendNumber("nWouldDelete", spec->docsDeleted);
+            bob->appendNumber("nWouldDelete", static_cast<long long>(spec->docsDeleted));
         }
     } else if (STAGE_DISTINCT_SCAN == stats.stageType) {
         DistinctScanStats* spec = static_cast<DistinctScanStats*>(stats.specific.get());
@@ -309,7 +309,7 @@ void statsToBSON(const PlanStageStats& stats,
         }
 
         if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
-            bob->appendNumber("keysExamined", spec->keysExamined);
+            bob->appendNumber("keysExamined", static_cast<long long>(spec->keysExamined));
         }
     } else if (STAGE_ENSURE_SORTED == stats.stageType) {
         EnsureSortedStats* spec = static_cast<EnsureSortedStats*>(stats.specific.get());
@@ -320,8 +320,8 @@ void statsToBSON(const PlanStageStats& stats,
     } else if (STAGE_FETCH == stats.stageType) {
         FetchStats* spec = static_cast<FetchStats*>(stats.specific.get());
         if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
-            bob->appendNumber("docsExamined", spec->docsExamined);
-            bob->appendNumber("alreadyHasObj", spec->alreadyHasObj);
+            bob->appendNumber("docsExamined", static_cast<long long>(spec->docsExamined));
+            bob->appendNumber("alreadyHasObj", static_cast<long long>(spec->alreadyHasObj));
         }
     } else if (STAGE_GEO_NEAR_2D == stats.stageType || STAGE_GEO_NEAR_2DSPHERE == stats.stageType) {
         NearStats* spec = static_cast<NearStats*>(stats.specific.get());
@@ -347,8 +347,8 @@ void statsToBSON(const PlanStageStats& stats,
     } else if (STAGE_IDHACK == stats.stageType) {
         IDHackStats* spec = static_cast<IDHackStats*>(stats.specific.get());
         if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
-            bob->appendNumber("keysExamined", spec->keysExamined);
-            bob->appendNumber("docsExamined", spec->docsExamined);
+            bob->appendNumber("keysExamined", static_cast<long long>(spec->keysExamined));
+            bob->appendNumber("docsExamined", static_cast<long long>(spec->docsExamined));
         }
     } else if (STAGE_IXSCAN == stats.stageType) {
         IndexScanStats* spec = static_cast<IndexScanStats*>(stats.specific.get());
@@ -375,21 +375,21 @@ void statsToBSON(const PlanStageStats& stats,
         }
 
         if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
-            bob->appendNumber("keysExamined", spec->keysExamined);
-            bob->appendNumber("seeks", spec->seeks);
-            bob->appendNumber("dupsTested", spec->dupsTested);
-            bob->appendNumber("dupsDropped", spec->dupsDropped);
+            bob->appendNumber("keysExamined", static_cast<long long>(spec->keysExamined));
+            bob->appendNumber("seeks", static_cast<long long>(spec->seeks));
+            bob->appendNumber("dupsTested", static_cast<long long>(spec->dupsTested));
+            bob->appendNumber("dupsDropped", static_cast<long long>(spec->dupsDropped));
         }
     } else if (STAGE_OR == stats.stageType) {
         OrStats* spec = static_cast<OrStats*>(stats.specific.get());
 
         if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
-            bob->appendNumber("dupsTested", spec->dupsTested);
-            bob->appendNumber("dupsDropped", spec->dupsDropped);
+            bob->appendNumber("dupsTested", static_cast<long long>(spec->dupsTested));
+            bob->appendNumber("dupsDropped", static_cast<long long>(spec->dupsDropped));
         }
     } else if (STAGE_LIMIT == stats.stageType) {
         LimitStats* spec = static_cast<LimitStats*>(stats.specific.get());
-        bob->appendNumber("limitAmount", spec->limit);
+        bob->appendNumber("limitAmount", static_cast<long long>(spec->limit));
     } else if (isProjectionStageType(stats.stageType)) {
         ProjectionStats* spec = static_cast<ProjectionStats*>(stats.specific.get());
         bob->append("transformBy", spec->projObj);
@@ -404,24 +404,25 @@ void statsToBSON(const PlanStageStats& stats,
         ShardingFilterStats* spec = static_cast<ShardingFilterStats*>(stats.specific.get());
 
         if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
-            bob->appendNumber("chunkSkips", spec->chunkSkips);
+            bob->appendNumber("chunkSkips", static_cast<long long>(spec->chunkSkips));
         }
     } else if (STAGE_SKIP == stats.stageType) {
         SkipStats* spec = static_cast<SkipStats*>(stats.specific.get());
-        bob->appendNumber("skipAmount", spec->skip);
+        bob->appendNumber("skipAmount", static_cast<long long>(spec->skip));
     } else if (isSortStageType(stats.stageType)) {
         SortStats* spec = static_cast<SortStats*>(stats.specific.get());
         bob->append("sortPattern", spec->sortPattern);
-        bob->appendIntOrLL("memLimit", spec->maxMemoryUsageBytes);
+        bob->appendNumber("memLimit", static_cast<long long>(spec->maxMemoryUsageBytes));
 
         if (spec->limit > 0) {
-            bob->appendIntOrLL("limitAmount", spec->limit);
+            bob->appendNumber("limitAmount", static_cast<long long>(spec->limit));
         }
 
         bob->append("type", stats.stageType == STAGE_SORT_SIMPLE ? "simple" : "default");
 
         if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
-            bob->appendIntOrLL("totalDataSizeSorted", spec->totalDataSizeBytes);
+            bob->appendNumber("totalDataSizeSorted",
+                              static_cast<long long>(spec->totalDataSizeBytes));
             bob->appendBool("usedDisk", (spec->spills > 0));
         }
     } else if (STAGE_SORT_MERGE == stats.stageType) {
@@ -429,8 +430,8 @@ void statsToBSON(const PlanStageStats& stats,
         bob->append("sortPattern", spec->sortPattern);
 
         if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
-            bob->appendNumber("dupsTested", spec->dupsTested);
-            bob->appendNumber("dupsDropped", spec->dupsDropped);
+            bob->appendNumber("dupsTested", static_cast<long long>(spec->dupsTested));
+            bob->appendNumber("dupsDropped", static_cast<long long>(spec->dupsDropped));
         }
     } else if (STAGE_TEXT == stats.stageType) {
         TextStats* spec = static_cast<TextStats*>(stats.specific.get());
@@ -443,21 +444,21 @@ void statsToBSON(const PlanStageStats& stats,
         TextMatchStats* spec = static_cast<TextMatchStats*>(stats.specific.get());
 
         if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
-            bob->appendNumber("docsRejected", spec->docsRejected);
+            bob->appendNumber("docsRejected", static_cast<long long>(spec->docsRejected));
         }
     } else if (STAGE_TEXT_OR == stats.stageType) {
         TextOrStats* spec = static_cast<TextOrStats*>(stats.specific.get());
 
         if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
-            bob->appendNumber("docsExamined", spec->fetches);
+            bob->appendNumber("docsExamined", static_cast<long long>(spec->fetches));
         }
     } else if (STAGE_UPDATE == stats.stageType) {
         UpdateStats* spec = static_cast<UpdateStats*>(stats.specific.get());
 
         if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
-            bob->appendNumber("nMatched", spec->nMatched);
-            bob->appendNumber("nWouldModify", spec->nModified);
-            bob->appendNumber("nWouldUpsert", spec->nUpserted);
+            bob->appendNumber("nMatched", static_cast<long long>(spec->nMatched));
+            bob->appendNumber("nWouldModify", static_cast<long long>(spec->nModified));
+            bob->appendNumber("nWouldUpsert", static_cast<long long>(spec->nUpserted));
         }
     }
 

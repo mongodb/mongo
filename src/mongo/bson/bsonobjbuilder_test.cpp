@@ -40,9 +40,6 @@ namespace {
 
 using std::string;
 
-const long long maxEncodableInt = (1 << 30) - 1;
-const long long minEncodableInt = -maxEncodableInt;
-
 const long long maxInt = (std::numeric_limits<int>::max)();
 const long long minInt = (std::numeric_limits<int>::min)();
 
@@ -87,93 +84,15 @@ TEST(BSONObjBuilderTest, AppendUnsignedIsForbidden) {
     MONGO_STATIC_ASSERT(!isUnsignedAppendable<unsigned long>::value);
     MONGO_STATIC_ASSERT(!isUnsignedAppendable<unsigned long long>::value);
     MONGO_STATIC_ASSERT(!isUnsignedAppendable<uint64_t>::value);
-}
-
-/**
- * current conversion ranges in appendIntOrLL(long long n)
- * dbl/int max/min in comments refer to max/min encodable constants
- *                       n <  dbl_min            -----> long long
- *            dbl_min <= n <  int_min            -----> double
- *            int_min <= n <= int_max            -----> int
- *            int_max <  n <= dbl_max            -----> double
- *            dbl_max <  n                       -----> long long
- */
-
-TEST(BSONObjBuilderTest, AppendIntOrLL) {
-    struct {
-        long long v;
-        BSONType t;
-    } data[] = {{0, mongo::NumberInt},
-                {-100, mongo::NumberInt},
-                {100, mongo::NumberInt},
-                {-(maxInt / 2 - 1), mongo::NumberInt},
-                {maxInt / 2 - 1, mongo::NumberInt},
-                {-(maxInt / 2), mongo::NumberLong},
-                {maxInt / 2, mongo::NumberLong},
-                {minEncodableInt, mongo::NumberLong},
-                {maxEncodableInt, mongo::NumberLong},
-                {minEncodableInt - 1, mongo::NumberLong},
-                {maxEncodableInt + 1, mongo::NumberLong},
-                {minInt, mongo::NumberLong},
-                {maxInt, mongo::NumberLong},
-                {minInt - 1, mongo::NumberLong},
-                {maxInt + 1, mongo::NumberLong},
-                {minLongLong, mongo::NumberLong},
-                {maxLongLong, mongo::NumberLong},
-                {0, mongo::Undefined}};
-    for (int i = 0; data[i].t != mongo::Undefined; i++) {
-        long long v = data[i].v;
-        BSONObjBuilder b;
-        b.appendIntOrLL("a", v);
-        BSONObj o = b.obj();
-        ASSERT_EQUALS(o.nFields(), 1);
-        BSONElement e = o.getField("a");
-        long long n = e.numberLong();
-        ASSERT_EQUALS(n, v);
-        assertBSONTypeEquals(e.type(), data[i].t, v, i);
-    }
-}
-
-/**
- * current conversion ranges in appendNumber(size_t n)
- * dbl/int max/min in comments refer to max/min encodable constants
- *                  0 <= n <= int_max            -----> int
- *            int_max <  n                       -----> long long
- */
-
-TEST(BSONObjBuilderTest, AppendNumberSizeT) {
-    struct {
-        size_t v;
-        BSONType t;
-    } data[] = {{0, mongo::NumberInt},
-                {100, mongo::NumberInt},
-                {maxEncodableInt, mongo::NumberInt},
-                {maxEncodableInt + 1, mongo::NumberLong},
-                {size_t(maxInt), mongo::NumberLong},
-                {size_t(maxInt) + 1U, mongo::NumberLong},
-                {(std::numeric_limits<size_t>::max)(), mongo::NumberLong},
-                {0, mongo::Undefined}};
-    for (int i = 0; data[i].t != mongo::Undefined; i++) {
-        size_t v = data[i].v;
-        BSONObjBuilder b;
-        b.appendNumber("a", v);
-        BSONObj o = b.obj();
-        ASSERT_EQUALS(o.nFields(), 1);
-        BSONElement e = o.getField("a");
-        size_t n = e.numberLong();
-        ASSERT_EQUALS(n, v);
-        assertBSONTypeEquals(e.type(), data[i].t, v, i);
-    }
+    MONGO_STATIC_ASSERT(!isUnsignedAppendable<size_t>::value);
 }
 
 /**
  * current conversion ranges in appendNumber(long long n)
- * dbl/int max/min in comments refer to max/min encodable constants
- *                       n <  dbl_min            -----> long long
- *            dbl_min <= n <  int_min            -----> double
+ * int max/min in comments refer to max/min encodable constants
+ *                       n <  int_min            -----> long long
  *            int_min <= n <= int_max            -----> int
- *            int_max <  n <= dbl_max            -----> double
- *            dbl_max <  n                       -----> long long
+ *            int_max <  n                       -----> long long
  */
 
 TEST(BSONObjBuilderTest, AppendNumberLongLong) {
@@ -183,16 +102,12 @@ TEST(BSONObjBuilderTest, AppendNumberLongLong) {
     } data[] = {{0, mongo::NumberInt},
                 {-100, mongo::NumberInt},
                 {100, mongo::NumberInt},
-                {minEncodableInt, mongo::NumberInt},
-                {maxEncodableInt, mongo::NumberInt},
-                {minEncodableInt - 1, mongo::NumberDouble},
-                {maxEncodableInt + 1, mongo::NumberDouble},
-                {minInt, mongo::NumberDouble},
-                {maxInt, mongo::NumberDouble},
-                {minInt - 1, mongo::NumberDouble},
-                {maxInt + 1, mongo::NumberDouble},
-                {minEncodableDouble, mongo::NumberDouble},
-                {maxEncodableDouble, mongo::NumberDouble},
+                {minInt, mongo::NumberInt},
+                {maxInt, mongo::NumberInt},
+                {minInt - 1, mongo::NumberLong},
+                {maxInt + 1, mongo::NumberLong},
+                {minEncodableDouble, mongo::NumberLong},
+                {maxEncodableDouble, mongo::NumberLong},
                 {minEncodableDouble - 1, mongo::NumberLong},
                 {maxEncodableDouble + 1, mongo::NumberLong},
                 {minDouble, mongo::NumberLong},

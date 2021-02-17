@@ -524,10 +524,10 @@ BSONObj CollectionCloner::Stats::toBSON() const {
 }
 
 void CollectionCloner::Stats::append(BSONObjBuilder* builder) const {
-    builder->appendNumber(kDocumentsToCopyFieldName, documentToCopy);
-    builder->appendNumber(kDocumentsCopiedFieldName, documentsCopied);
-    builder->appendNumber("indexes", indexes);
-    builder->appendNumber("fetchedBatches", fetchedBatches);
+    builder->appendNumber(kDocumentsToCopyFieldName, static_cast<long long>(documentToCopy));
+    builder->appendNumber(kDocumentsCopiedFieldName, static_cast<long long>(documentsCopied));
+    builder->appendNumber("indexes", static_cast<long long>(indexes));
+    builder->appendNumber("fetchedBatches", static_cast<long long>(fetchedBatches));
     builder->appendNumber("bytesToCopy", bytesToCopy);
     if (bytesToCopy) {
         builder->appendNumber("approxBytesCopied", approxBytesCopied);
@@ -541,7 +541,7 @@ void CollectionCloner::Stats::append(BSONObjBuilder* builder) const {
             builder->appendNumber("elapsedMillis", elapsedMillis);
         }
     }
-    builder->appendNumber("receivedBatches", receivedBatches);
+    builder->appendNumber("receivedBatches", static_cast<long long>(receivedBatches));
 }
 
 }  // namespace repl

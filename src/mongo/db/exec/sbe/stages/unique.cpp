@@ -99,8 +99,8 @@ std::unique_ptr<PlanStageStats> UniqueStage::getStats(bool includeDebugInfo) con
 
     if (includeDebugInfo) {
         BSONObjBuilder bob;
-        bob.appendNumber("dupsTested", _specificStats.dupsTested);
-        bob.appendNumber("dupsDropped", _specificStats.dupsDropped);
+        bob.appendNumber("dupsTested", static_cast<long long>(_specificStats.dupsTested));
+        bob.appendNumber("dupsDropped", static_cast<long long>(_specificStats.dupsDropped));
         bob.append("keySlots", _keySlots);
         ret->debugInfo = bob.obj();
     }

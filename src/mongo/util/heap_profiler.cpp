@@ -586,11 +586,12 @@ private:
 
         // Stats subsection.
         BSONObjBuilder statsBuilder(builder.subobjStart("stats"));
-        statsBuilder.appendNumber("totalActiveBytes", totalActiveBytes);
-        statsBuilder.appendNumber("bytesAllocated", bytesAllocated);
-        statsBuilder.appendNumber("numStacks", stackHashTable.size());
-        statsBuilder.appendNumber("currentObjEntries", objHashTable.size());
-        statsBuilder.appendNumber("maxObjEntriesUsed", objHashTable.maxSizeSeen());
+        statsBuilder.appendNumber("totalActiveBytes", static_cast<long long>(totalActiveBytes));
+        statsBuilder.appendNumber("bytesAllocated", static_cast<long long>(bytesAllocated));
+        statsBuilder.appendNumber("numStacks", static_cast<long long>(stackHashTable.size()));
+        statsBuilder.appendNumber("currentObjEntries", static_cast<long long>(objHashTable.size()));
+        statsBuilder.appendNumber("maxObjEntriesUsed",
+                                  static_cast<long long>(objHashTable.maxSizeSeen()));
         statsBuilder.doneFast();
 
         // Guard against races updating the StackInfo bson representation.
@@ -635,7 +636,8 @@ private:
             std::ostringstream shortName;
             shortName << "stack" << stackInfo->stackNum;
             BSONObjBuilder stackBuilder(stacksBuilder.subobjStart(shortName.str()));
-            stackBuilder.appendNumber("activeBytes", stackInfo->activeBytes);
+            stackBuilder.appendNumber("activeBytes",
+                                      static_cast<long long>(stackInfo->activeBytes));
         }
         stacksBuilder.doneFast();
 

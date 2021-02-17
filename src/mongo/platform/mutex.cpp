@@ -38,7 +38,7 @@ void Identity::serialize(BSONObjBuilder* bob) const {
     bob->append("name"_sd, name());
 
     size_t id = index();
-    bob->appendNumber("latchId"_sd, id);
+    bob->appendNumber("latchId"_sd, static_cast<long long>(id));
 
     auto& hal = level();
     invariant(hal);
@@ -48,7 +48,7 @@ void Identity::serialize(BSONObjBuilder* bob) const {
     invariant(loc);
     size_t line = loc->line();
     bob->append("file"_sd, loc->file_name());
-    bob->appendNumber("line"_sd, line);
+    bob->appendNumber("line"_sd, static_cast<long long>(line));
 }
 
 Mutex::Mutex(std::shared_ptr<Data> data) : _data{std::move(data)} {

@@ -145,7 +145,7 @@ std::unique_ptr<PlanStageStats> BSONScanStage::getStats(bool includeDebugInfo) c
     if (includeDebugInfo) {
         BSONObjBuilder bob;
         if (_recordSlot) {
-            bob.appendIntOrLL("recordSlot", *_recordSlot);
+            bob.appendNumber("recordSlot", static_cast<long long>(*_recordSlot));
         }
         bob.append("field", _fields);
         bob.append("outputSlots", _vars);

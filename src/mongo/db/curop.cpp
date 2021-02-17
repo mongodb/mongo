@@ -1269,7 +1269,7 @@ void OpDebug::append(OperationContext* opCtx,
         b.append("remoteOpWaitMillis", durationCount<Milliseconds>(*remoteOpWaitTime));
     }
 
-    b.appendIntOrLL("millis", durationCount<Milliseconds>(executionTime));
+    b.appendNumber("millis", durationCount<Milliseconds>(executionTime));
 
     if (!curop.getPlanSummary().empty()) {
         b.append("planSummary", curop.getPlanSummary());
@@ -1546,10 +1546,10 @@ std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(StringSet requ
     // the profiler (OpDebug::append) and the log file (OpDebug::report), so for the profile filter
     // we support both names.
     addIfNeeded("millis", [](auto field, auto args, auto& b) {
-        b.appendIntOrLL(field, durationCount<Milliseconds>(args.op.executionTime));
+        b.appendNumber(field, durationCount<Milliseconds>(args.op.executionTime));
     });
     addIfNeeded("durationMillis", [](auto field, auto args, auto& b) {
-        b.appendIntOrLL(field, durationCount<Milliseconds>(args.op.executionTime));
+        b.appendNumber(field, durationCount<Milliseconds>(args.op.executionTime));
     });
 
     addIfNeeded("planSummary", [](auto field, auto args, auto& b) {

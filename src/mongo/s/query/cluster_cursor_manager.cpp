@@ -818,12 +818,12 @@ BSONObj ClusterCursorManager::dumpNssToContainerMap() const {
         BSONObjBuilder nssToContainer(bob.subobjStart("nssToContainer"));
         for (auto&& [nss, cursorContainer] : _namespaceToContainerMap) {
             BSONObjBuilder nssBob(nssToContainer.subobjStart(nss.toString()));
-            nssBob.appendIntOrLL("containerPrefix",
-                                 static_cast<int64_t>(cursorContainer.containerPrefix));
+            nssBob.appendNumber("containerPrefix",
+                                static_cast<long long>(cursorContainer.containerPrefix));
             BSONArrayBuilder cursors(nssBob.subarrayStart("cursors"));
             for (auto&& [cursorId, cursorEntry] : cursorContainer.entryMap) {
                 BSONObjBuilder cursorBob(cursors.subobjStart());
-                cursorBob.appendIntOrLL("id", cursorId);
+                cursorBob.appendNumber("id", cursorId);
                 cursorBob.append("lastActive", cursorEntry.getLastActive());
             }
         }
@@ -839,7 +839,7 @@ BSONObj ClusterCursorManager::dumpCursorIdToNssMap() const {
         BSONArrayBuilder cursorIdPrefixToNss(bob.subarrayStart("cursorIdPrefixToNss"));
         for (auto&& [cursorIdPrefix, nss] : _cursorIdPrefixToNamespaceMap) {
             BSONObjBuilder bob(cursorIdPrefixToNss.subobjStart());
-            bob.appendIntOrLL("cursorIdPrefix", static_cast<int64_t>(cursorIdPrefix));
+            bob.appendNumber("cursorIdPrefix", static_cast<long long>(cursorIdPrefix));
             bob.append("nss", nss.toString());
         }
     }
@@ -857,7 +857,7 @@ BSONObj ClusterCursorManager::dumpInternalLog() const {
             BSONObjBuilder bob(logBuilder.subobjStart());
             const auto& logEntry = _log.events[i];
             if (logEntry.cursorId) {
-                bob.appendIntOrLL("cursorId", *logEntry.cursorId);
+                bob.appendNumber("cursorId", *logEntry.cursorId);
             }
             bob.append("type", LogEvent::typeToString(logEntry.type));
 

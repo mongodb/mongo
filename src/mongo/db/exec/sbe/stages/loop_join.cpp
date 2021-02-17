@@ -166,8 +166,8 @@ std::unique_ptr<PlanStageStats> LoopJoinStage::getStats(bool includeDebugInfo) c
 
     if (includeDebugInfo) {
         BSONObjBuilder bob;
-        bob.appendNumber("innerOpens", _specificStats.innerOpens);
-        bob.appendNumber("innerCloses", _specificStats.innerCloses);
+        bob.appendNumber("innerOpens", static_cast<long long>(_specificStats.innerOpens));
+        bob.appendNumber("innerCloses", static_cast<long long>(_specificStats.innerCloses));
         bob.append("outerProjects", _outerProjects);
         bob.append("outerCorrelated", _outerCorrelated);
         if (_predicate) {

@@ -230,7 +230,7 @@ TEST_F(MapReduceFixture, InternalJsReduceFailsIfExtraArgumentsAreSpecified) {
 
 TEST_F(MapReduceFixture, InternalJsReduceFailsIfEvalArgumentNotOfTypeStringOrCode) {
     BSONObjBuilder codeTypeInt;
-    codeTypeInt.appendIntOrLL("eval", 1);
+    codeTypeInt.appendNumber("eval", 1);
     codeTypeInt.append("data", BSON("k" << std::string("foo") << "v" << Value(2)));
     BSONObjBuilder wrapInt;
     wrapInt.append("$_internalJsReduce", codeTypeInt.obj());

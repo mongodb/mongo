@@ -169,14 +169,14 @@ void ReplSetHeartbeatArgsV1::addToBSON(BSONObjBuilder* builder) const {
     if (_checkEmpty) {
         builder->append(kCheckEmptyFieldName, _checkEmpty);
     }
-    builder->appendIntOrLL(kConfigVersionFieldName, _configVersion);
-    builder->appendIntOrLL(kConfigTermFieldName, _configTerm);
+    builder->appendNumber(kConfigVersionFieldName, _configVersion);
+    builder->appendNumber(kConfigTermFieldName, _configTerm);
     if (_hasHeartbeatVersion) {
-        builder->appendIntOrLL(kHeartbeatVersionFieldName, _hasHeartbeatVersion);
+        builder->appendNumber(kHeartbeatVersionFieldName, _hasHeartbeatVersion);
     }
     builder->append(kSenderHostFieldName, _hasSender ? _senderHost.toString() : "");
-    builder->appendIntOrLL(kSenderIdFieldName, _senderId);
-    builder->appendIntOrLL(kTermFieldName, _term);
+    builder->appendNumber(kSenderIdFieldName, _senderId);
+    builder->appendNumber(kTermFieldName, _term);
 
     // TODO SERVER-49382: Remove this FCV check when 5.0 becomes last-lts.
     if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&

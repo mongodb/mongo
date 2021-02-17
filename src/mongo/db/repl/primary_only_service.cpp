@@ -218,7 +218,8 @@ void PrimaryOnlyServiceRegistry::onStepDown() {
 void PrimaryOnlyServiceRegistry::reportServiceInfoForServerStatus(BSONObjBuilder* result) noexcept {
     BSONObjBuilder subBuilder(result->subobjStart("primaryOnlyServices"));
     for (auto& service : _servicesByName) {
-        subBuilder.appendNumber(service.first, service.second->getNumberOfInstances());
+        subBuilder.appendNumber(service.first,
+                                static_cast<long long>(service.second->getNumberOfInstances()));
     }
 }
 

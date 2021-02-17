@@ -130,7 +130,7 @@ Status getStatusFromApplyOpsResult(const BSONObj& result) {
     BSONObjBuilder builder;
     builder.appendElements(result);
     auto code = result.getIntField("code");
-    builder.appendIntOrLL("ok", code == 0);
+    builder.appendNumber("ok", code == 0);
     auto newResult = builder.obj();
     return getStatusFromCommandResult(newResult);
 }

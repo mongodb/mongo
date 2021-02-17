@@ -249,8 +249,8 @@ void MockReplicaSet::mockIsMasterCmd() {
             }
 
             if (member->getSecondaryDelay().count()) {
-                builder.appendIntOrLL("secondaryDelaySecs",
-                                      durationCount<Seconds>(member->getSecondaryDelay()));
+                builder.appendNumber("secondaryDelaySecs",
+                                     durationCount<Seconds>(member->getSecondaryDelay()));
             }
 
             if (member->isHidden()) {

@@ -1872,8 +1872,8 @@ void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatu
                 bb.appendDate("electionDate",
                               Date_t::fromDurationSinceEpoch(Seconds(_electionTime.getSecs())));
             }
-            bb.appendIntOrLL("configVersion", _rsConfig.getConfigVersion());
-            bb.appendIntOrLL("configTerm", _rsConfig.getConfigTerm());
+            bb.appendNumber("configVersion", static_cast<long long>(_rsConfig.getConfigVersion()));
+            bb.appendNumber("configTerm", static_cast<long long>(_rsConfig.getConfigTerm()));
             bb.append("self", true);
             bb.append("lastHeartbeatMessage", "");
             membersOut.push_back(bb.obj());
@@ -1935,8 +1935,8 @@ void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatu
                     "electionDate",
                     Date_t::fromDurationSinceEpoch(Seconds(it->getElectionTime().getSecs())));
             }
-            bb.appendIntOrLL("configVersion", it->getConfigVersion());
-            bb.appendIntOrLL("configTerm", it->getConfigTerm());
+            bb.appendNumber("configVersion", it->getConfigVersion());
+            bb.appendNumber("configTerm", it->getConfigTerm());
             membersOut.push_back(bb.obj());
         }
     }

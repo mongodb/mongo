@@ -114,7 +114,8 @@ public:
                     "tcmalloc.transfer_cache_free_bytes", &transfer) &&
                 MallocExtension::instance()->GetNumericProperty("tcmalloc.thread_cache_free_bytes",
                                                                 &thread)) {
-                sub.appendNumber("total_free_bytes", central + transfer + thread);
+                sub.appendNumber("total_free_bytes",
+                                 static_cast<long long>(central + transfer + thread));
             }
             appendNumericPropertyIfAvailable(
                 sub, "central_cache_free_bytes", "tcmalloc.central_cache_free_bytes");
@@ -177,7 +178,7 @@ private:
                                                  const char* property) {
         size_t value;
         if (MallocExtension::instance()->GetNumericProperty(property, &value))
-            builder.appendNumber(bsonName, value);
+            builder.appendNumber(bsonName, static_cast<long long>(value));
     }
 
 #if MONGO_HAVE_GPERFTOOLS_SIZE_CLASS_STATS
@@ -187,14 +188,14 @@ private:
                 ->first;
         BSONObjBuilder doc;
 
-        doc.appendNumber("bytes_per_object", stats->bytes_per_obj);
-        doc.appendNumber("pages_per_span", stats->pages_per_span);
-        doc.appendNumber("num_spans", stats->num_spans);
-        doc.appendNumber("num_thread_objs", stats->num_thread_objs);
-        doc.appendNumber("num_central_objs", stats->num_central_objs);
-        doc.appendNumber("num_transfer_objs", stats->num_transfer_objs);
-        doc.appendNumber("free_bytes", stats->free_bytes);
-        doc.appendNumber("allocated_bytes", stats->alloc_bytes);
+        doc.appendNumber("bytes_per_object", static_cast<long long>(stats->bytes_per_obj));
+        doc.appendNumber("pages_per_span", static_cast<long long>(stats->pages_per_span));
+        doc.appendNumber("num_spans", static_cast<long long>(stats->num_spans));
+        doc.appendNumber("num_thread_objs", static_cast<long long>(stats->num_thread_objs));
+        doc.appendNumber("num_central_objs", static_cast<long long>(stats->num_central_objs));
+        doc.appendNumber("num_transfer_objs", static_cast<long long>(stats->num_transfer_objs));
+        doc.appendNumber("free_bytes", static_cast<long long>(stats->free_bytes));
+        doc.appendNumber("allocated_bytes", static_cast<long long>(stats->alloc_bytes));
 
         builder.append(doc.obj());
     }
@@ -205,11 +206,11 @@ private:
                 ->second;
         BSONObjBuilder doc;
 
-        doc.appendNumber("pages", stats->pages);
-        doc.appendNumber("normal_spans", stats->normal_spans);
-        doc.appendNumber("unmapped_spans", stats->unmapped_spans);
-        doc.appendNumber("normal_bytes", stats->normal_bytes);
-        doc.appendNumber("unmapped_bytes", stats->unmapped_bytes);
+        doc.appendNumber("pages", static_cast<long long>(stats->pages));
+        doc.appendNumber("normal_spans", static_cast<long long>(stats->normal_spans));
+        doc.appendNumber("unmapped_spans", static_cast<long long>(stats->unmapped_spans));
+        doc.appendNumber("normal_bytes", static_cast<long long>(stats->normal_bytes));
+        doc.appendNumber("unmapped_bytes", static_cast<long long>(stats->unmapped_bytes));
 
         builder.append(doc.obj());
     }

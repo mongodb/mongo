@@ -279,7 +279,8 @@ public:
             }
             typename RamLogType::LineIterator rl(ramlog);
 
-            result.appendNumber("totalLinesWritten", rl.getTotalLinesWritten());
+            result.appendNumber("totalLinesWritten",
+                                static_cast<long long>(rl.getTotalLinesWritten()));
 
             BSONArrayBuilder arr(result.subarrayStart("log"));
             while (rl.more())

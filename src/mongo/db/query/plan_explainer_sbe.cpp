@@ -53,7 +53,7 @@ void statsToBSON(const QuerySolutionNode* node,
     }
 
     bob->append("stage", stageTypeToString(node->getType()));
-    bob->appendNumber("planNodeId", static_cast<size_t>(node->nodeId()));
+    bob->appendNumber("planNodeId", static_cast<long long>(node->nodeId()));
 
     // Display the BSON representation of the filter, if there is one.
     if (node->filter) {
@@ -117,7 +117,7 @@ void statsToBSON(const QuerySolutionNode* node,
         }
         case STAGE_LIMIT: {
             auto ln = static_cast<const LimitNode*>(node);
-            bob->appendIntOrLL("limitAmount", ln->limit);
+            bob->appendNumber("limitAmount", ln->limit);
             break;
         }
         case STAGE_PROJECTION_DEFAULT:
@@ -129,17 +129,17 @@ void statsToBSON(const QuerySolutionNode* node,
         }
         case STAGE_SKIP: {
             auto sn = static_cast<const SkipNode*>(node);
-            bob->appendIntOrLL("skipAmount", sn->skip);
+            bob->appendNumber("skipAmount", sn->skip);
             break;
         }
         case STAGE_SORT_SIMPLE:
         case STAGE_SORT_DEFAULT: {
             auto sn = static_cast<const SortNode*>(node);
             bob->append("sortPattern", sn->pattern);
-            bob->appendIntOrLL("memLimit", sn->maxMemoryUsageBytes);
+            bob->appendNumber("memLimit", static_cast<long long>(sn->maxMemoryUsageBytes));
 
             if (sn->limit > 0) {
-                bob->appendIntOrLL("limitAmount", sn->limit);
+                bob->appendNumber("limitAmount", static_cast<long long>(sn->limit));
             }
 
             bob->append("type", node->getType() == STAGE_SORT_SIMPLE ? "simple" : "default");
@@ -205,19 +205,19 @@ void statsToBSON(const sbe::PlanStageStats* stats,
 
     auto stageType = stats->common.stageType;
     bob->append("stage", stageType);
-    bob->appendNumber("planNodeId", static_cast<size_t>(stats->common.nodeId));
+    bob->appendNumber("planNodeId", static_cast<long long>(stats->common.nodeId));
 
     // Some top-level exec stats get pulled out of the root stage.
-    bob->appendNumber("nReturned", stats->common.advances);
+    bob->appendNumber("nReturned", static_cast<long long>(stats->common.advances));
     // Include executionTimeMillis if it was recorded.
     if (stats->common.executionTimeMillis) {
         bob->appendNumber("executionTimeMillisEstimate", *stats->common.executionTimeMillis);
     }
-    bob->appendNumber("advances", stats->common.advances);
-    bob->appendNumber("opens", stats->common.opens);
-    bob->appendNumber("closes", stats->common.closes);
-    bob->appendNumber("saveState", stats->common.yields);
-    bob->appendNumber("restoreState", stats->common.unyields);
+    bob->appendNumber("advances", static_cast<long long>(stats->common.advances));
+    bob->appendNumber("opens", static_cast<long long>(stats->common.opens));
+    bob->appendNumber("closes", static_cast<long long>(stats->common.closes));
+    bob->appendNumber("saveState", static_cast<long long>(stats->common.yields));
+    bob->appendNumber("restoreState", static_cast<long long>(stats->common.unyields));
     bob->appendNumber("isEOF", stats->common.isEOF);
 
     // Include any extra debug info if present.

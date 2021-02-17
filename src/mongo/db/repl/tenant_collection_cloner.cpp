@@ -505,10 +505,10 @@ BSONObj TenantCollectionCloner::Stats::toBSON() const {
 }
 
 void TenantCollectionCloner::Stats::append(BSONObjBuilder* builder) const {
-    builder->appendNumber(kDocumentsToCopyFieldName, documentToCopy);
-    builder->appendNumber(kDocumentsCopiedFieldName, documentsCopied);
-    builder->appendNumber("indexes", indexes);
-    builder->appendNumber("insertedBatches", insertedBatches);
+    builder->appendNumber(kDocumentsToCopyFieldName, static_cast<long long>(documentToCopy));
+    builder->appendNumber(kDocumentsCopiedFieldName, static_cast<long long>(documentsCopied));
+    builder->appendNumber("indexes", static_cast<long long>(indexes));
+    builder->appendNumber("insertedBatches", static_cast<long long>(insertedBatches));
     if (start != Date_t()) {
         builder->appendDate("start", start);
         if (end != Date_t()) {
@@ -518,7 +518,7 @@ void TenantCollectionCloner::Stats::append(BSONObjBuilder* builder) const {
             builder->appendNumber("elapsedMillis", elapsedMillis);
         }
     }
-    builder->appendNumber("receivedBatches", receivedBatches);
+    builder->appendNumber("receivedBatches", static_cast<long long>(receivedBatches));
 }
 
 Timestamp TenantCollectionCloner::getOperationTime_forTest() {

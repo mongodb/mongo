@@ -289,15 +289,15 @@ std::unique_ptr<PlanStageStats> ScanStage::getStats(bool includeDebugInfo) const
 
     if (includeDebugInfo) {
         BSONObjBuilder bob;
-        bob.appendNumber("numReads", _specificStats.numReads);
+        bob.appendNumber("numReads", static_cast<long long>(_specificStats.numReads));
         if (_recordSlot) {
-            bob.appendIntOrLL("recordSlot", *_recordSlot);
+            bob.appendNumber("recordSlot", static_cast<long long>(*_recordSlot));
         }
         if (_recordIdSlot) {
-            bob.appendIntOrLL("recordIdSlot", *_recordIdSlot);
+            bob.appendNumber("recordIdSlot", static_cast<long long>(*_recordIdSlot));
         }
         if (_seekKeySlot) {
-            bob.appendIntOrLL("seekKeySlot", *_seekKeySlot);
+            bob.appendNumber("seekKeySlot", static_cast<long long>(*_seekKeySlot));
         }
         bob.append("fields", _fields);
         bob.append("outputSlots", _vars);

@@ -252,16 +252,18 @@ void ThreadPoolTaskExecutor::appendDiagnosticBSON(BSONObjBuilder* b) const {
     // ThreadPool details
     // TODO: fill in
     BSONObjBuilder poolCounters(b->subobjStart("pool"));
-    poolCounters.appendIntOrLL("inProgressCount", _poolInProgressQueue.size());
+    poolCounters.appendNumber("inProgressCount",
+                              static_cast<long long>(_poolInProgressQueue.size()));
     poolCounters.done();
 
     // Queues
     BSONObjBuilder queues(b->subobjStart("queues"));
-    queues.appendIntOrLL("networkInProgress", _networkInProgressQueue.size());
-    queues.appendIntOrLL("sleepers", _sleepersQueue.size());
+    queues.appendNumber("networkInProgress",
+                        static_cast<long long>(_networkInProgressQueue.size()));
+    queues.appendNumber("sleepers", static_cast<long long>(_sleepersQueue.size()));
     queues.done();
 
-    b->appendIntOrLL("unsignaledEvents", _unsignaledEvents.size());
+    b->appendNumber("unsignaledEvents", static_cast<long long>(_unsignaledEvents.size()));
     b->append("shuttingDown", _inShutdown_inlock());
     b->append("networkInterface", _net->getDiagnosticString());
 }

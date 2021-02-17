@@ -116,8 +116,8 @@ std::unique_ptr<PlanStageStats> TextMatchStage::getStats(bool includeDebugInfo) 
 
     if (includeDebugInfo) {
         BSONObjBuilder bob;
-        bob.appendIntOrLL("inputSlot", _inputSlot);
-        bob.appendIntOrLL("outputSlot", _outputSlot);
+        bob.appendNumber("inputSlot", static_cast<long long>(_inputSlot));
+        bob.appendNumber("outputSlot", static_cast<long long>(_outputSlot));
         ret->debugInfo = bob.obj();
     }
 

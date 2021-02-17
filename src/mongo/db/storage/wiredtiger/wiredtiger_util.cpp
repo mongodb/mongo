@@ -303,7 +303,7 @@ Status WiredTigerUtil::getApplicationMetadata(OperationContext* opCtx,
                 bob->appendBool(key, valueItem.val);
                 break;
             case WT_CONFIG_ITEM::WT_CONFIG_ITEM_NUM:
-                bob->appendIntOrLL(key, valueItem.val);
+                bob->appendNumber(key, static_cast<long long>(valueItem.val));
                 break;
             default:
                 bob->append(key, StringData(valueItem.str, valueItem.len));
