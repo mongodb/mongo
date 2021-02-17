@@ -103,4 +103,11 @@ structs:
                 description: >-
                     Mapping of chunk ranges to be used as the initial split output. This is only
                     for testing purposes.
-                optional: true         
+                optional: true
+            active:
+                type: bool
+                description: >-
+                    Dummy field that always has the same value (true) to have a unique
+                    index on in order to prevent multiple resharding operations from being active at
+                    the same time.
+                default: true
