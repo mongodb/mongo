@@ -176,6 +176,7 @@ public:
         params.cappedMaxDocs = cappedMaxDocs;
         params.cappedCallback = nullptr;
         params.sizeStorer = nullptr;
+        params.isReadOnly = false;
         params.tracksSizeAdjustments = true;
 
         auto ret = std::make_unique<StandardWiredTigerRecordStore>(&_engine, &opCtx, params);
