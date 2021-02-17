@@ -453,7 +453,7 @@ EvalExprStagePair generatePathTraversal(EvalStage inputStage,
  * evaluating the predicate on a single value.
  */
 void generatePredicate(MatchExpressionVisitorContext* context,
-                       StringData path,
+                       const FieldRef* path,
                        MakePredicateFn makePredicate,
                        LeafTraversalMode mode = LeafTraversalMode::kArrayAndItsElements,
                        bool useCombinator = true) {
@@ -461,10 +461,10 @@ void generatePredicate(MatchExpressionVisitorContext* context,
 
     auto&& [expr, stage] = [&]() {
         if (frame.data().inputSlot) {
-            if (!path.empty()) {
+            if (path && !path->empty()) {
                 return generatePathTraversal(frame.extractStage(),
                                              *frame.data().inputSlot,
-                                             FieldRef{path},
+                                             *path,
                                              0,
                                              context->planNodeId,
                                              context->slotIdGenerator,
@@ -474,7 +474,7 @@ void generatePredicate(MatchExpressionVisitorContext* context,
                                              context->stateHelper);
             } else {
                 // If matchExpr's parent is a ElemMatchValueMatchExpression, then
-                // matchExpr()->path() will be empty. In this case, 'inputSlot' will be a
+                // matchExpr()->fieldRef() will be nullptr. In this case, 'inputSlot' will be a
                 // "correlated slot" that holds the value of the ElemMatchValueMatchExpression's
                 // field path, and we should apply the predicate directly on 'inputSlot' without
                 // array traversal.
@@ -491,11 +491,11 @@ void generatePredicate(MatchExpressionVisitorContext* context,
             // current field path - the index scan will extract the value for this field path and
             // will store it in a corresponding slot in the 'indexKeySlots' map.
 
-            tassert(5273402, "Field path cannot be empty for an index filter", !path.empty());
+            tassert(5273402, "Field path cannot be empty for an index filter", path);
 
-            auto it = context->indexKeySlots.find(path.toString());
+            auto it = context->indexKeySlots.find(path->dottedField());
             tassert(5273403,
-                    str::stream() << "Unknown field path in index filter: " << path,
+                    str::stream() << "Unknown field path in index filter: " << path->dottedField(),
                     it != context->indexKeySlots.end());
 
             auto result = makePredicate(it->second, frame.extractStage());
@@ -576,7 +576,7 @@ void generateArraySize(MatchExpressionVisitorContext* context,
     };
 
     generatePredicate(context,
-                      matchExpr->path(),
+                      matchExpr->fieldRef(),
                       std::move(makePredicate),
                       LeafTraversalMode::kDoNotTraverseLeaf);
 }
@@ -694,7 +694,7 @@ void generateComparison(MatchExpressionVisitorContext* context,
                 std::move(inputStage)};
     };
 
-    generatePredicate(context, expr->path(), std::move(makePredicate));
+    generatePredicate(context, expr->fieldRef(), std::move(makePredicate));
 }
 
 /**
@@ -782,7 +782,7 @@ void generateBitTest(MatchExpressionVisitorContext* context,
                 std::move(inputStage)};
     };
 
-    generatePredicate(context, expr->path(), std::move(makePredicate));
+    generatePredicate(context, expr->fieldRef(), std::move(makePredicate));
 }
 
 // Each logical expression child is evaluated in a separate EvalFrame. Set up a new EvalFrame with a
@@ -1170,7 +1170,7 @@ public:
         // 'makePredicate' defined above returns a state instead of plain boolean value, so there is
         // no need to use combinator for it.
         generatePredicate(_context,
-                          matchExpr->path(),
+                          matchExpr->fieldRef(),
                           std::move(makePredicate),
                           LeafTraversalMode::kDoNotTraverseLeaf,
                           false /* useCombinator */);
@@ -1222,7 +1222,7 @@ public:
         // 'makePredicate' defined above returns a state instead of plain boolean value, so there is
         // no need to use combinator for it.
         generatePredicate(_context,
-                          matchExpr->path(),
+                          matchExpr->fieldRef(),
                           std::move(makePredicate),
                           LeafTraversalMode::kDoNotTraverseLeaf,
                           false /* useCombinator */);
@@ -1240,7 +1240,7 @@ public:
                     std::move(inputStage)};
         };
 
-        generatePredicate(_context, expr->path(), std::move(makePredicate));
+        generatePredicate(_context, expr->fieldRef(), std::move(makePredicate));
     }
 
     void visit(const ExprMatchExpression* matchExpr) final {
@@ -1330,7 +1330,7 @@ public:
                         std::move(inputStage)};
             };
 
-            generatePredicate(_context, expr->path(), std::move(makePredicate));
+            generatePredicate(_context, expr->fieldRef(), std::move(makePredicate));
             return;
         } else {
             // If the InMatchExpression contains regex patterns, then we need to handle a regex-only
@@ -1427,7 +1427,7 @@ public:
                 return {regexOutputSlot, std::move(regexStage)};
             };
             generatePredicate(_context,
-                              expr->path(),
+                              expr->fieldRef(),
                               std::move(makePredicate),
                               LeafTraversalMode::kArrayAndItsElements);
         }
@@ -1506,7 +1506,7 @@ public:
                     std::move(inputStage)};
         };
 
-        generatePredicate(_context, expr->path(), std::move(makePredicate));
+        generatePredicate(_context, expr->fieldRef(), std::move(makePredicate));
     }
 
     void visit(const NorMatchExpression* expr) final {
@@ -1553,7 +1553,7 @@ public:
                     std::move(inputStage)};
         };
 
-        generatePredicate(_context, expr->path(), std::move(makePredicate));
+        generatePredicate(_context, expr->fieldRef(), std::move(makePredicate));
     }
 
     void visit(const SizeMatchExpression* expr) final {
@@ -1573,7 +1573,7 @@ public:
                     std::move(inputStage)};
         };
 
-        generatePredicate(_context, expr->path(), std::move(makePredicate));
+        generatePredicate(_context, expr->fieldRef(), std::move(makePredicate));
     }
 
     void visit(const WhereMatchExpression* expr) final {
@@ -1589,7 +1589,7 @@ public:
             return {std::move(whereExpr), std::move(inputStage)};
         };
 
-        generatePredicate(_context, expr->path(), std::move(makePredicate));
+        generatePredicate(_context, expr->fieldRef(), std::move(makePredicate));
     }
 
     void visit(const WhereNoOpMatchExpression* expr) final {}

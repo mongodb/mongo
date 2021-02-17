@@ -336,6 +336,12 @@ public:
     virtual const StringData path() const {
         return StringData();
     }
+    /**
+     * Similar to path(), but returns a FieldRef. Returns nullptr if there is no path.
+     */
+    virtual const FieldRef* fieldRef() const {
+        return nullptr;
+    }
 
     enum class MatchCategory {
         // Expressions that are leaves on the AST, these do not have any children.
