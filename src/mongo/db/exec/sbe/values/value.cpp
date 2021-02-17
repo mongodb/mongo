@@ -31,6 +31,7 @@
 
 #include "mongo/db/exec/sbe/values/value.h"
 
+#include "mongo/base/compare_numbers.h"
 #include "mongo/db/exec/js_function.h"
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/value_builder.h"
@@ -690,13 +691,13 @@ std::pair<TypeTags, Value> compareValue(TypeTags lhsTag,
                 return {TypeTags::NumberInt32, bitcastFrom<int32_t>(result)};
             }
             case TypeTags::NumberDouble: {
-                auto result = compareHelper(numericCast<double>(lhsTag, lhsValue),
-                                            numericCast<double>(rhsTag, rhsValue));
+                auto result = compareDoubles(numericCast<double>(lhsTag, lhsValue),
+                                             numericCast<double>(rhsTag, rhsValue));
                 return {TypeTags::NumberInt32, bitcastFrom<int32_t>(result)};
             }
             case TypeTags::NumberDecimal: {
-                auto result = compareHelper(numericCast<Decimal128>(lhsTag, lhsValue),
-                                            numericCast<Decimal128>(rhsTag, rhsValue));
+                auto result = compareDecimals(numericCast<Decimal128>(lhsTag, lhsValue),
+                                              numericCast<Decimal128>(rhsTag, rhsValue));
                 return {TypeTags::NumberInt32, bitcastFrom<int32_t>(result)};
             }
             default:
