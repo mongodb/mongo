@@ -90,6 +90,16 @@ bool hasNode(const MatchExpression* root, MatchExpression::MatchType type) {
     return false;
 }
 
+void addExpressionToRoot(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                         AndMatchExpression* root,
+                         std::unique_ptr<MatchExpression> newNode) {
+    if (newNode->fieldRef() && newNode->fieldRef()->hasNumericPathComponents()) {
+        // TODO SERVER-49852: Currently SBE cannot handle match expressions with numeric path
+        // components due to some of the complexity around how arrays are handled.
+        expCtx->sbeCompatible = false;
+    }
+    root->add(std::move(newNode));
+}
 }  // namespace
 
 namespace mongo {
@@ -306,7 +316,8 @@ StatusWithMatchExpression parse(const BSONObj& obj,
             auto result = parseRegexElement(e.fieldNameStringData(), e, expCtx);
             if (!result.isOK())
                 return result;
-            root->add(result.getValue().release());
+
+            addExpressionToRoot(expCtx, root.get(), std::move(result.getValue()));
             continue;
         }
 
@@ -322,7 +333,7 @@ StatusWithMatchExpression parse(const BSONObj& obj,
         if (!eq.isOK())
             return eq;
 
-        root->add(eq.getValue().release());
+        addExpressionToRoot(expCtx, root.get(), std::move(eq.getValue()));
     }
 
     if (root->numChildren() == 1) {
@@ -1954,7 +1965,7 @@ Status parseSub(StringData name,
                 auto s =
                     parseGeo(name, PathAcceptingKeyword::GEO_NEAR, sub, expCtx, allowedFeatures);
                 if (s.isOK()) {
-                    root->add(s.getValue().release());
+                    addExpressionToRoot(expCtx, root, std::move(s.getValue()));
                 }
 
                 // Propagate geo parsing result to caller.
@@ -1969,8 +1980,9 @@ Status parseSub(StringData name,
         if (!s.isOK())
             return s.getStatus();
 
-        if (s.getValue())
-            root->add(s.getValue().release());
+        if (s.getValue()) {
+            addExpressionToRoot(expCtx, root, std::move(s.getValue()));
+        }
     }
 
     return Status::OK();

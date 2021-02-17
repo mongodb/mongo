@@ -68,8 +68,12 @@ public:
         return false;
     }
 
-    const StringData path() const final {
+    const StringData path() const override final {
         return _elementPath.fieldRef().dottedField();
+    }
+
+    const FieldRef* fieldRef() const override final {
+        return &(_elementPath.fieldRef());
     }
 
     /**
