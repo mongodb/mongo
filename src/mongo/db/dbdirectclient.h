@@ -33,6 +33,7 @@
 #include "mongo/config.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/lasterror.h"
+#include "mongo/db/ops/write_ops.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
@@ -63,6 +64,9 @@ public:
         int queryOptions = 0,
         int batchSize = 0,
         boost::optional<BSONObj> readConcernObj = boost::none);
+
+    write_ops::FindAndModifyReply findAndModify(
+        const write_ops::FindAndModifyCommand& findAndModify);
 
     virtual bool isFailed() const;
 

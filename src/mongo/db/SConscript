@@ -719,9 +719,10 @@ env.Library(
         '$BUILD_DIR/mongo/client/clientdriver_minimal',
         'curop',
         'lasterror',
+        'ops/write_ops_parsers',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
+        'repl/repl_coordinator_interface',
     ],
 )
 
