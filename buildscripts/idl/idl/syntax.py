@@ -34,7 +34,7 @@ it follows the rules of the IDL, etc.
 """
 
 import itertools
-from typing import Any, Dict, Iterator, List, Optional, Tuple, Union, cast
+from typing import Any, Dict, Iterator, List, Optional, Set, Tuple, Union, cast
 
 from . import common
 from . import errors
@@ -110,6 +110,7 @@ class SymbolTable(object):
         # type: () -> None
         """Construct an empty symbol table."""
         self.commands = []  # type: List[Command]
+        self.api_to_command_names = {}  # type: Dict[str, Set[str]]
         self.enums = []  # type: List[Enum]
         self.structs = []  # type: List[Struct]
         self.types = []  # type: List[Type]
@@ -156,11 +157,32 @@ class SymbolTable(object):
         if not self._is_duplicate(ctxt, idltype, idltype.name, "type"):
             self.types.append(idltype)
 
+    def _add_command_name_per_api_version(self, ctxt, command):
+        # type: (errors.ParserContext, Command) -> bool
+        """
+        Make sure that the pair (command.command_name, command.same api_version) is distinct.
+
+        - Return false if the given command_name with the same api_version already exists.
+        - Return true otherwise and record them in api_to_command_names dictionary.
+        """
+        api_version = command.api_version if command.api_version else "None"
+        if api_version not in self.api_to_command_names:
+            self.api_to_command_names[api_version] = set()
+
+        if command.command_name in self.api_to_command_names[api_version]:
+            ctxt.add_duplicate_symbol_error(command, command.command_name, "command_name",
+                                            "command within api_version " + api_version)
+            return False
+
+        self.api_to_command_names[api_version].add(command.command_name)
+        return True
+
     def add_command(self, ctxt, command):
         # type: (errors.ParserContext, Command) -> None
         """Add an IDL command to the symbol table and check for duplicates."""
         if (not self._is_duplicate(ctxt, command, command.name, "command")
-                and not self._is_duplicate(ctxt, command, command.command_alias, "command")):
+                and not self._is_duplicate(ctxt, command, command.command_alias, "command")
+                and self._add_command_name_per_api_version(ctxt, command)):
             self.commands.append(command)
 
     def add_generic_argument_list(self, ctxt, field_list):
