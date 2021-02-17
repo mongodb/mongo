@@ -101,20 +101,25 @@ void QueryPlannerTest::addIndex(BSONObj keyPattern, bool multikey, bool sparse) 
 }
 
 void QueryPlannerTest::addIndex(BSONObj keyPattern, bool multikey, bool sparse, bool unique) {
-    params.indices.push_back(
-        {keyPattern,
-         IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
-         IndexDescriptor::kLatestIndexVersion,
-         multikey,
-         {},
-         {},
-         sparse,
-         unique,
-         IndexEntry::Identifier{"sql_query_walks_into_bar_and_says_can_i_join_you?"},
-         nullptr,  // filterExpr
-         BSONObj(),
-         nullptr,
-         nullptr});
+    addIndex(
+        keyPattern, multikey, sparse, unique, "sql_query_walks_into_bar_and_says_can_i_join_you?");
+}
+
+void QueryPlannerTest::addIndex(
+    BSONObj keyPattern, bool multikey, bool sparse, bool unique, const std::string& name) {
+    params.indices.push_back({keyPattern,
+                              IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
+                              IndexDescriptor::kLatestIndexVersion,
+                              multikey,
+                              {},
+                              {},
+                              sparse,
+                              unique,
+                              IndexEntry::Identifier{name},
+                              nullptr,  // filterExpr
+                              BSONObj(),
+                              nullptr,
+                              nullptr});
 }
 
 void QueryPlannerTest::addIndex(BSONObj keyPattern, BSONObj infoObj) {

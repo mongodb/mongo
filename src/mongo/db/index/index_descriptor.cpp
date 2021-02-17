@@ -45,30 +45,37 @@ namespace mongo {
 using IndexVersion = IndexDescriptor::IndexVersion;
 
 namespace {
-void populateOptionsMap(std::map<StringData, BSONElement>& theMap, const BSONObj& spec) {
+std::map<StringData, BSONElement> populateOptionsMapForEqualityCheck(const BSONObj& spec) {
+    std::map<StringData, BSONElement> optionsMap;
+
+    // These index options are not considered for equality.
+    static const StringDataSet kIndexOptionsNotConsideredForEqualityCheck{
+        IndexDescriptor::kKeyPatternFieldName,         // checked specially
+        IndexDescriptor::kNamespaceFieldName,          // removed in 4.4
+        IndexDescriptor::kIndexNameFieldName,          // checked separately
+        IndexDescriptor::kIndexVersionFieldName,       // not considered for equivalence
+        IndexDescriptor::kTextVersionFieldName,        // same as index version
+        IndexDescriptor::k2dsphereVersionFieldName,    // same as index version
+        IndexDescriptor::kBackgroundFieldName,         // this is a creation time option only
+        IndexDescriptor::kDropDuplicatesFieldName,     // this is now ignored
+        IndexDescriptor::kHiddenFieldName,             // not considered for equivalence
+        IndexDescriptor::kCollationFieldName,          // checked specially
+        IndexDescriptor::kPartialFilterExprFieldName,  // checked specially
+        IndexDescriptor::kUniqueFieldName,             // checked specially
+        IndexDescriptor::kSparseFieldName,             // checked specially
+    };
+
     BSONObjIterator it(spec);
     while (it.more()) {
         const BSONElement e = it.next();
 
         StringData fieldName = e.fieldNameStringData();
-        if (fieldName == IndexDescriptor::kKeyPatternFieldName ||  // checked specially
-            fieldName == IndexDescriptor::kNamespaceFieldName ||   // removed in 4.4
-            fieldName == IndexDescriptor::kIndexNameFieldName ||   // checked separately
-            fieldName ==
-                IndexDescriptor::kIndexVersionFieldName ||  // not considered for equivalence
-            fieldName == IndexDescriptor::kTextVersionFieldName ||      // same as index version
-            fieldName == IndexDescriptor::k2dsphereVersionFieldName ||  // same as index version
-            fieldName ==
-                IndexDescriptor::kBackgroundFieldName ||  // this is a creation time option only
-            fieldName == IndexDescriptor::kDropDuplicatesFieldName ||  // this is now ignored
-            fieldName == IndexDescriptor::kHiddenFieldName ||     // not considered for equivalence
-            fieldName == IndexDescriptor::kCollationFieldName ||  // checked specially
-            fieldName == IndexDescriptor::kPartialFilterExprFieldName  // checked specially
-        ) {
-            continue;
+        if (kIndexOptionsNotConsideredForEqualityCheck.count(fieldName) == 0) {
+            optionsMap[fieldName] = e;
         }
-        theMap[fieldName] = e;
     }
+
+    return optionsMap;
 }
 }  // namespace
 
@@ -165,6 +172,21 @@ IndexDescriptor::Comparison IndexDescriptor::compareIndexOptions(
         return Comparison::kDifferent;
     }
 
+    auto isFcvAtLeast49 = serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
+        ServerGlobalParams::FeatureCompatibility::Version::kVersion49);
+
+    // The 'unique' field is a part of index signature if FCV has been set to 4.9+.
+    // TODO SERVER-47766: remove these FCV checks when 5.0 becomes last-lts.
+    if (isFcvAtLeast49 && unique() != other->descriptor()->unique()) {
+        return Comparison::kDifferent;
+    }
+
+    // The 'sparse' field is a part of index signature if FCV has been set to 4.9+.
+    // TODO SERVER-47766: remove these FCV checks when 5.0 becomes last-lts.
+    if (isFcvAtLeast49 && isSparse() != other->descriptor()->isSparse()) {
+        return Comparison::kDifferent;
+    }
+
     // Check whether both indexes have the same collation. If not, then they are not equivalent.
     auto collator = collation().isEmpty()
         ? nullptr
@@ -176,8 +198,9 @@ IndexDescriptor::Comparison IndexDescriptor::compareIndexOptions(
 
     // The partialFilterExpression is only part of the index signature if FCV has been set to 4.7+.
     // TODO SERVER-47766: remove these FCV checks when 5.0 becomes last-lts.
-    auto isFCVAtLeast47 = serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
-        ServerGlobalParams::FeatureCompatibility::Version::kVersion47);
+    auto isFCVAtLeast47 = isFcvAtLeast49 ||
+        serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
+            ServerGlobalParams::FeatureCompatibility::Version::kVersion47);
 
     // If we have a partial filter expression and the other index doesn't, or vice-versa, then the
     // two indexes are not equivalent. We therefore return Comparison::kDifferent immediately.
@@ -202,26 +225,38 @@ IndexDescriptor::Comparison IndexDescriptor::compareIndexOptions(
     // an index, and so the return value will be at least Comparison::kEquivalent. We now proceed to
     // compare the rest of the options to see if we should return Comparison::kIdentical instead.
 
-    std::map<StringData, BSONElement> existingOptionsMap;
-    populateOptionsMap(existingOptionsMap, infoObj());
+    auto thisOptionsMap = populateOptionsMapForEqualityCheck(infoObj());
+    auto otherOptionsMap = populateOptionsMapForEqualityCheck(other->descriptor()->infoObj());
 
-    std::map<StringData, BSONElement> newOptionsMap;
-    populateOptionsMap(newOptionsMap, other->descriptor()->infoObj());
+    // If the FCV has not been upgraded to 4.9+, add unique/sparse to the options map. They do not
+    // contribute to the index signature, but can determine whether or not the candidate index is
+    // identical to the existing index.
+    if (!isFcvAtLeast49) {
+        thisOptionsMap[IndexDescriptor::kUniqueFieldName] =
+            infoObj()[IndexDescriptor::kUniqueFieldName];
+        otherOptionsMap[IndexDescriptor::kUniqueFieldName] =
+            other->descriptor()->infoObj()[IndexDescriptor::kUniqueFieldName];
+
+        thisOptionsMap[IndexDescriptor::kSparseFieldName] =
+            infoObj()[IndexDescriptor::kSparseFieldName];
+        otherOptionsMap[IndexDescriptor::kSparseFieldName] =
+            other->descriptor()->infoObj()[IndexDescriptor::kSparseFieldName];
+    }
 
     // If the FCV has not been upgraded to 4.7+, add partialFilterExpression to the options map. It
     // does not contribute to the index signature, but can determine whether or not the candidate
     // index is identical to the existing index.
     if (!isFCVAtLeast47) {
-        existingOptionsMap[IndexDescriptor::kPartialFilterExprFieldName] =
-            other->descriptor()->infoObj()[IndexDescriptor::kPartialFilterExprFieldName];
-        newOptionsMap[IndexDescriptor::kPartialFilterExprFieldName] =
+        thisOptionsMap[IndexDescriptor::kPartialFilterExprFieldName] =
             infoObj()[IndexDescriptor::kPartialFilterExprFieldName];
+        otherOptionsMap[IndexDescriptor::kPartialFilterExprFieldName] =
+            other->descriptor()->infoObj()[IndexDescriptor::kPartialFilterExprFieldName];
     }
 
-    const bool optsIdentical = existingOptionsMap.size() == newOptionsMap.size() &&
-        std::equal(existingOptionsMap.begin(),
-                   existingOptionsMap.end(),
-                   newOptionsMap.begin(),
+    const bool optsIdentical = thisOptionsMap.size() == otherOptionsMap.size() &&
+        std::equal(thisOptionsMap.begin(),
+                   thisOptionsMap.end(),
+                   otherOptionsMap.begin(),
                    [](const std::pair<StringData, BSONElement>& lhs,
                       const std::pair<StringData, BSONElement>& rhs) {
                        return lhs.first == rhs.first &&

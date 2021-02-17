@@ -3,10 +3,12 @@
  * which uniquely identify an index. Multiple indexes can be created on the same key pattern if
  * their signature parameters differ.
  *
- * @tags: [requires_fcv_47, requires_non_retryable_writes]
+ * @tags: [requires_fcv_49, requires_non_retryable_writes]
  */
 (function() {
 "use strict";
+
+load("jstests/libs/fixture_helpers.js");  // For 'isSharded'.
 
 const testDB = db.getSiblingDB(jsTestName());
 const coll = testDB.test;
@@ -19,6 +21,7 @@ const initialIndexSpec = {
     collation: {locale: "en_US", strength: 1},
     partialFilterExpression: {a: {$gt: 0, $lt: 10}, b: "blah"}
 };
+
 const keyPattern = {
     a: 1
 };
@@ -54,6 +57,28 @@ function assertIndexAlreadyExists(keyPattern, indexOptions) {
 function assertNewIndexBuilt(keyPattern, indexOptions) {
     buildIndexAndAssertChangeInIndexCount(keyPattern, indexOptions, 1);
 }
+
+// Create an index on {a: 1}.
+assertNewIndexBuilt(keyPattern, {name: "basic_index"});
+
+// Verify that we can create a second index on {a: 1} with sparse:true.
+assertNewIndexBuilt(keyPattern, {name: "sparse_index", sparse: true});
+
+// Verify that we can create two more indexex with 'unique': true. We do not run these tests on
+// sharded passthroughs, since unique indexes cannot be created on a hash-sharded collection.
+if (!FixtureHelpers.isSharded(coll)) {
+    // Verify that we can create an index on {a: 1} with unique:true.
+    assertNewIndexBuilt(keyPattern, {name: "unique_index", unique: true});
+
+    // Verify that we can create an index on {a: 1} with unique:true and sparse:true.
+    assertNewIndexBuilt(keyPattern, {name: "unique_sparse_index", unique: true, sparse: true});
+
+    assert.commandWorked(coll.dropIndex("unique_sparse_index"));
+    assert.commandWorked(coll.dropIndex("unique_index"));
+}
+
+assert.commandWorked(coll.dropIndex("basic_index"));
+assert.commandWorked(coll.dropIndex("sparse_index"));
 
 // Create an index on {a: 1} with an explicit collation and a partial filter expression.
 assertNewIndexBuilt(keyPattern, initialIndexSpec);
@@ -111,9 +136,7 @@ assert.commandFailedWithCode(coll.createIndex(keyPattern, partialFilterUnsortedL
                              ErrorCodes.IndexKeySpecsConflict);
 
 // Verify that non-signature options cannot distinguish a new index from an existing index.
-// TODO SERVER-47657: unique and sparse should be part of the signature.
-const nonSignatureOptions =
-    [{unique: true}, {sparse: true}, {expireAfterSeconds: 10}, {background: true}];
+const nonSignatureOptions = [{expireAfterSeconds: 10}, {background: true}];
 
 // Build a new, basic index on {a: 1}, since some of the options we intend to test are not
 // compatible with the partialFilterExpression on the existing {a: 1} indexes.
