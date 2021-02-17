@@ -2435,7 +2435,8 @@ public:
         visitConditionalExpression(expr);
     }
     void visit(ExpressionTestApiVersion* expr) final {
-        unsupportedExpression("$_testApiVersion");
+        _context->pushExpr(
+            makeConstant(sbe::value::TypeTags::NumberInt32, sbe::value::bitcastFrom<int32_t>(1)));
     }
     void visit(ExpressionToLower* expr) final {
         generateStringCaseConversionExpression(_context, "toLower");
