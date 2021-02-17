@@ -168,7 +168,7 @@ void generateSinglePlanExecutionInfo(const PlanExplainer::PlanStatsDetails& deta
     auto&& [stats, summary] = details;
     invariant(summary);
 
-    out->appendNumber("nReturned", summary->nReturned);
+    out->appendNumber("nReturned", static_cast<long long>(summary->nReturned));
 
     // Time elapsed could might be either precise or approximate.
     if (totalTimeMillis) {
@@ -177,8 +177,8 @@ void generateSinglePlanExecutionInfo(const PlanExplainer::PlanStatsDetails& deta
         out->appendNumber("executionTimeMillisEstimate", summary->executionTimeMillisEstimate);
     }
 
-    out->appendNumber("totalKeysExamined", summary->totalKeysExamined);
-    out->appendNumber("totalDocsExamined", summary->totalDocsExamined);
+    out->appendNumber("totalKeysExamined", static_cast<long long>(summary->totalKeysExamined));
+    out->appendNumber("totalDocsExamined", static_cast<long long>(summary->totalDocsExamined));
 
     if (summary->planFailed) {
         out->appendBool("failed", true);

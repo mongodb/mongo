@@ -105,7 +105,7 @@ ResumeToken::ResumeToken(const ResumeTokenData& data) {
     if (data.version >= 1) {
         builder.appendNumber("", data.tokenType);
     }
-    builder.appendNumber("", data.txnOpIndex);
+    builder.appendNumber("", static_cast<long long>(data.txnOpIndex));
     if (data.version >= 1) {
         builder.appendBool("", data.fromInvalidate);
     }

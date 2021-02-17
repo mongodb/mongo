@@ -140,10 +140,10 @@ std::unique_ptr<PlanStageStats> CheckBoundsStage::getStats(bool includeDebugInfo
 
     if (includeDebugInfo) {
         BSONObjBuilder bob;
-        bob.appendNumber("seeks", _specificStats.seeks);
-        bob.appendIntOrLL("inKeySlot", _inKeySlot);
-        bob.appendIntOrLL("inRecordIdSlot", _inRecordIdSlot);
-        bob.appendIntOrLL("outSlot", _outSlot);
+        bob.appendNumber("seeks", static_cast<long long>(_specificStats.seeks));
+        bob.appendNumber("inKeySlot", static_cast<long long>(_inKeySlot));
+        bob.appendNumber("inRecordIdSlot", static_cast<long long>(_inRecordIdSlot));
+        bob.appendNumber("outSlot", static_cast<long long>(_outSlot));
         ret->debugInfo = bob.obj();
     }
 

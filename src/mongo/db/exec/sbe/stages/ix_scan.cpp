@@ -327,19 +327,19 @@ std::unique_ptr<PlanStageStats> IndexScanStage::getStats(bool includeDebugInfo) 
 
     if (includeDebugInfo) {
         BSONObjBuilder bob;
-        bob.appendNumber("numReads", _specificStats.numReads);
-        bob.appendNumber("seeks", _specificStats.seeks);
+        bob.appendNumber("numReads", static_cast<long long>(_specificStats.numReads));
+        bob.appendNumber("seeks", static_cast<long long>(_specificStats.seeks));
         if (_recordSlot) {
-            bob.appendIntOrLL("recordSlot", *_recordSlot);
+            bob.appendNumber("recordSlot", static_cast<long long>(*_recordSlot));
         }
         if (_recordIdSlot) {
-            bob.appendIntOrLL("recordIdSlot", *_recordIdSlot);
+            bob.appendNumber("recordIdSlot", static_cast<long long>(*_recordIdSlot));
         }
         if (_seekKeySlotLow) {
-            bob.appendIntOrLL("seekKeySlotLow", *_seekKeySlotLow);
+            bob.appendNumber("seekKeySlotLow", static_cast<long long>(*_seekKeySlotLow));
         }
         if (_seekKeySlotHigh) {
-            bob.appendIntOrLL("seekKeySlotHigh", *_seekKeySlotHigh);
+            bob.appendNumber("seekKeySlotHigh", static_cast<long long>(*_seekKeySlotHigh));
         }
         bob.append("outputSlots", _vars);
         bob.append("indexKeysToInclude", _indexKeysToInclude.to_string());

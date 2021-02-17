@@ -125,9 +125,9 @@ void ReplSetRequestVotesArgs::addToBSON(BSONObjBuilder* builder) const {
     builder->append(kSetNameFieldName, _setName);
     builder->append(kDryRunFieldName, _dryRun);
     builder->append(kTermFieldName, _term);
-    builder->appendIntOrLL(kCandidateIndexFieldName, _candidateIndex);
-    builder->appendIntOrLL(kConfigVersionFieldName, _cfgVer);
-    builder->appendIntOrLL(kConfigTermFieldName, _cfgTerm);
+    builder->appendNumber(kCandidateIndexFieldName, _candidateIndex);
+    builder->appendNumber(kConfigVersionFieldName, _cfgVer);
+    builder->appendNumber(kConfigTermFieldName, _cfgTerm);
     _lastAppliedOpTime.append(builder, kLastAppliedOpTimeFieldName);
 }
 

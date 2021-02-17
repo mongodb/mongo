@@ -1946,10 +1946,10 @@ void WiredTigerRecordStore::appendCustomStats(OperationContext* opCtx,
                                               double scale) const {
     result->appendBool("capped", _isCapped);
     if (_isCapped) {
-        result->appendIntOrLL("max", _cappedMaxDocs);
-        result->appendIntOrLL("maxSize", static_cast<long long>(_cappedMaxSize / scale));
-        result->appendIntOrLL("sleepCount", _cappedSleep.load());
-        result->appendIntOrLL("sleepMS", _cappedSleepMS.load());
+        result->appendNumber("max", static_cast<long long>(_cappedMaxDocs));
+        result->appendNumber("maxSize", static_cast<long long>(_cappedMaxSize / scale));
+        result->appendNumber("sleepCount", _cappedSleep.load());
+        result->appendNumber("sleepMS", _cappedSleepMS.load());
     }
     WiredTigerSession* session = WiredTigerRecoveryUnit::get(opCtx)->getSessionNoTxn();
     WT_SESSION* s = session->getSession();

@@ -133,7 +133,7 @@ TEST(OpMsg, DocumentSequenceLargeDocumentMultiInsertWorks) {
     OpMsgBuilder::DocSequenceBuilder sequenceBuilder = msgBuilder.beginDocSequence("documents");
     for (size_t docID = 0; docID < 3; docID++) {
         BSONObjBuilder docBuilder = sequenceBuilder.appendBuilder();
-        docBuilder.appendNumber("_id", docID);
+        docBuilder.appendNumber("_id", static_cast<long long>(docID));
         std::string data(15000000, 'a');
         docBuilder.append("data", std::move(data));
     }

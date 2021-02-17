@@ -166,10 +166,10 @@ std::unique_ptr<PlanStageStats> UnwindStage::getStats(bool includeDebugInfo) con
 
     if (includeDebugInfo) {
         BSONObjBuilder bob;
-        bob.appendIntOrLL("inputSlot", _inField);
-        bob.appendIntOrLL("outSlot", _outField);
-        bob.appendIntOrLL("outIndexSlot", _outIndex);
-        bob.appendIntOrLL("preserveNullAndEmptyArrays", _preserveNullAndEmptyArrays);
+        bob.appendNumber("inputSlot", static_cast<long long>(_inField));
+        bob.appendNumber("outSlot", static_cast<long long>(_outField));
+        bob.appendNumber("outIndexSlot", static_cast<long long>(_outIndex));
+        bob.appendNumber("preserveNullAndEmptyArrays", _preserveNullAndEmptyArrays);
         ret->debugInfo = bob.obj();
     }
 

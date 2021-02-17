@@ -236,8 +236,9 @@ std::unique_ptr<PlanStageStats> SortStage::getStats(bool includeDebugInfo) const
 
     if (includeDebugInfo) {
         BSONObjBuilder bob;
-        bob.appendIntOrLL("memLimit", _specificStats.maxMemoryUsageBytes);
-        bob.appendIntOrLL("totalDataSizeSorted", _specificStats.totalDataSizeBytes);
+        bob.appendNumber("memLimit", static_cast<long long>(_specificStats.maxMemoryUsageBytes));
+        bob.appendNumber("totalDataSizeSorted",
+                         static_cast<long long>(_specificStats.totalDataSizeBytes));
         bob.appendBool("usedDisk", _specificStats.spills > 0);
 
         BSONObjBuilder childrenBob(bob.subobjStart("orderBySlots"));
