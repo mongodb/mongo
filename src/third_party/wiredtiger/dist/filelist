@@ -74,6 +74,7 @@ src/conn/conn_open.c
 src/conn/conn_reconfig.c
 src/conn/conn_stat.c
 src/conn/conn_sweep.c
+src/conn/conn_tiered.c
 src/cursor/cur_backup.c
 src/cursor/cur_backup_incr.c
 src/cursor/cur_bulk.c

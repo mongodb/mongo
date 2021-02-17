@@ -77,7 +77,7 @@ __rec_cell_build_int_key(
 
     /* Create an overflow object if the data won't fit. */
     if (size > btree->maxintlkey) {
-        WT_STAT_DATA_INCR(session, rec_overflow_key_internal);
+        WT_STAT_CONN_DATA_INCR(session, rec_overflow_key_internal);
 
         *is_ovflp = true;
         return (__wt_rec_cell_build_ovfl(session, r, key, WT_CELL_KEY_OVFL, NULL, 0));
@@ -163,7 +163,7 @@ __rec_cell_build_leaf_key(
          * compressed.
          */
         if (pfx == 0) {
-            WT_STAT_DATA_INCR(session, rec_overflow_key_leaf);
+            WT_STAT_CONN_DATA_INCR(session, rec_overflow_key_leaf);
 
             *is_ovflp = true;
             return (__wt_rec_cell_build_ovfl(session, r, key, WT_CELL_KEY_OVFL, NULL, 0));

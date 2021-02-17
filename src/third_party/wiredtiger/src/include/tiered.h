@@ -7,6 +7,26 @@
  */
 
 /*
+ * WT_TIERED_MANAGER --
+ *	A structure that holds resources used to manage any tiered storage
+ *	for the whole database.
+ */
+struct __wt_tiered_manager {
+    uint64_t wait_usecs; /* Wait time period */
+    uint32_t workers;    /* Current number of workers */
+    uint32_t workers_max;
+    uint32_t workers_min;
+
+#define WT_TIERED_MAX_WORKERS 20
+#define WT_TIERED_MIN_WORKERS 1
+
+/* AUTOMATIC FLAG VALUE GENERATION START */
+#define WT_TIERED_MANAGER_SHUTDOWN 0x1u /* Manager has shut down */
+                                        /* AUTOMATIC FLAG VALUE GENERATION STOP */
+    uint32_t flags;
+};
+
+/*
  * WT_CURSOR_TIERED --
  *	An tiered cursor.
  */
