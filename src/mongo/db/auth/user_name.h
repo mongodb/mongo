@@ -70,14 +70,20 @@ public:
      * Gets the user part of a UserName.
      */
     StringData getUser() const {
-        return StringData(_fullName).substr(0, _splitPoint);
+        return StringData(_fullName.data(), _splitPoint);
     }
 
     /**
      * Gets the database name part of a UserName.
      */
     StringData getDB() const {
-        return StringData(_fullName).substr(_splitPoint + 1);
+        if (_fullName.empty()) {
+            return _fullName;
+        }
+
+        const auto offset = _splitPoint + 1;
+        invariant(offset <= _fullName.size());
+        return StringData(_fullName.data() + offset, _fullName.size() - offset);
     }
 
     /**

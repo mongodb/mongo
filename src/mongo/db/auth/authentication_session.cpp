@@ -31,13 +31,67 @@
 
 #include "mongo/db/auth/authentication_session.h"
 
+#include "mongo/client/authenticate.h"
 #include "mongo/db/audit.h"
+#include "mongo/db/client.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo {
 namespace {
-constexpr auto kDiagnosticLogLevel = 0;
+constexpr auto kDiagnosticLogLevel = 3;
+
+Status crossVerifyUserNames(const UserName& oldUser, const UserName& newUser) noexcept {
+    if (oldUser.getFullName().empty()) {
+        return Status::OK();
+    }
+
+    if (!getTestCommandsEnabled()) {
+        // Authenticating the __system@local user to the admin database on mongos is required
+        // by the auth passthrough test suite, hence we forgive this set of errors in testing.
+
+        if (oldUser.getDB() != newUser.getDB()) {
+            return {ErrorCodes::ProtocolError,
+                    "Attempt to switch database target during SASL authentication."};
+        }
+    }
+
+    if (oldUser.getUser().empty() || newUser.getUser().empty()) {
+        // If we don't have a user and our databases match, no harm and nothing more to do.
+        return Status::OK();
+    }
+
+    if (oldUser.getUser() != newUser.getUser()) {
+        return {ErrorCodes::ProtocolError, "Attempt to switch user during SASL authentication."};
+    }
+
+    return Status::OK();
 }
+
+const auto getAuthenticationSession =
+    Client::declareDecoration<boost::optional<AuthenticationSession>>();
+
+class AuthenticationClientObserver final : public ServiceContext::ClientObserver {
+public:
+    void onCreateClient(Client* client) override {}
+
+    void onDestroyClient(Client* client) override {
+        auto& maybeSession = getAuthenticationSession(client);
+        if (maybeSession) {
+            maybeSession->markFailed(
+                {ErrorCodes::AuthenticationAbandoned,
+                 "Authentication session abandoned, client has likely disconnected"});
+        }
+    }
+
+    void onCreateOperationContext(OperationContext* opCtx) override {}
+    void onDestroyOperationContext(OperationContext* opCtx) override {}
+};
+
+auto registerer = ServiceContext::ConstructorActionRegisterer{
+    "AuthenticationClientObserver", [](ServiceContext* service) {
+        service->registerClientObserver(std::make_unique<AuthenticationClientObserver>());
+    }};
+}  // namespace
 
 AuthenticationSession::StepGuard::StepGuard(OperationContext* opCtx, StepType currentStep)
     : _opCtx(opCtx), _currentStep(currentStep) {
@@ -46,7 +100,7 @@ AuthenticationSession::StepGuard::StepGuard(OperationContext* opCtx, StepType cu
     LOGV2_DEBUG(
         5286300, kDiagnosticLogLevel, "Starting authentication step", "step"_attr = _currentStep);
 
-    auto& maybeSession = _get(client);
+    auto& maybeSession = getAuthenticationSession(client);
     ON_BLOCK_EXIT([&] {
         if (maybeSession) {
             // If we successfully made/kept a session, update it and track it.
@@ -63,6 +117,19 @@ AuthenticationSession::StepGuard::StepGuard(OperationContext* opCtx, StepType cu
         maybeSession.emplace(client);
     };
 
+    auto startActiveSession = [&] {
+        if (maybeSession) {
+            invariant(maybeSession->_lastStep);
+            auto lastStep = *maybeSession->_lastStep;
+            if (lastStep == StepType::kSaslSupportedMechanisms) {
+                // We can follow saslSupportedMechanisms with saslStart or authenticate.
+                return;
+            }
+        }
+
+        createSession();
+    };
+
     switch (_currentStep) {
         case StepType::kSaslSupportedMechanisms: {
             createSession();
@@ -70,37 +137,85 @@ AuthenticationSession::StepGuard::StepGuard(OperationContext* opCtx, StepType cu
         } break;
         case StepType::kSpeculativeAuthenticate:
         case StepType::kSpeculativeSaslStart: {
-            createSession();
+            startActiveSession();
             maybeSession->_isSpeculative = true;
         } break;
         case StepType::kAuthenticate:
         case StepType::kSaslStart: {
-            createSession();
+            startActiveSession();
         } break;
         case StepType::kSaslContinue: {
             uassert(ErrorCodes::ProtocolError, "No SASL session state found", maybeSession);
+
+            uassert(ErrorCodes::ProtocolError,
+                    "saslContinue must follow saslStart",
+                    maybeSession->_mech);
         } break;
     }
 }
 
 AuthenticationSession::StepGuard::~StepGuard() {
-    auto& maybeSession = _get(_opCtx->getClient());
+    auto& maybeSession = getAuthenticationSession(_opCtx->getClient());
     if (maybeSession) {
         LOGV2_DEBUG(5286301,
                     kDiagnosticLogLevel,
                     "Finished authentication step",
                     "step"_attr = _currentStep);
-        if (maybeSession->isFinished()) {
+        if (maybeSession->_isFinished) {
             // We're done with this session, reset it.
             maybeSession.reset();
+        } else {
+            maybeSession->_lastStep = _currentStep;
         }
     }
 }
 
 AuthenticationSession* AuthenticationSession::get(Client* client) {
-    auto& maybeSession = _get(client);
+    auto& maybeSession = getAuthenticationSession(client);
     tassert(5286302, "Unable to retrieve authentication session", static_cast<bool>(maybeSession));
     return &(*maybeSession);
+}
+
+void AuthenticationSession::setMechanismName(StringData mechanismName) {
+    LOGV2_DEBUG(
+        5286200, kDiagnosticLogLevel, "Setting mechanism name", "mechanism"_attr = mechanismName);
+    tassert(5286201, "Attempt to change the mechanism name", _mechName.empty());
+
+    _mechName = mechanismName.toString();
+    _mechCounter = authCounter.getMechanismCounter(_mechName);
+    _mechCounter->incAuthenticateReceived();
+    if (_isSpeculative) {
+        _mechCounter->incSpeculativeAuthenticateReceived();
+    }
+}
+
+void AuthenticationSession::_verifyUserNameFromSaslSupportedMechanisms(const UserName& userName) {
+    if (auto status = crossVerifyUserNames(_ssmUserName, userName); !status.isOK()) {
+        LOGV2(5286202,
+              "Different user name was supplied to saslSupportedMechs",
+              "error"_attr = status);
+
+        // Reset _ssmUserName since we have found a conflict.
+        auto ssmUserName = std::exchange(_ssmUserName, {});
+        audit::logAuthentication(_client,
+                                 auth::kSaslSupportedMechanisms,
+                                 std::move(ssmUserName),
+                                 ErrorCodes::AuthenticationAbandoned);
+    }
+}
+
+void AuthenticationSession::setUserNameForSaslSupportedMechanisms(UserName userName) {
+    _verifyUserNameFromSaslSupportedMechanisms(userName);
+
+    _ssmUserName = userName;
+}
+
+void AuthenticationSession::updateUserName(UserName userName) {
+    LOGV2_DEBUG(5286203, kDiagnosticLogLevel, "Updating user name", "userName"_attr = userName);
+
+    _verifyUserNameFromSaslSupportedMechanisms(userName);
+    uassertStatusOK(crossVerifyUserNames(_userName, userName));
+    _userName = userName;
 }
 
 void AuthenticationSession::setMechanism(std::unique_ptr<ServerMechanismBase> mech,
@@ -112,37 +227,69 @@ void AuthenticationSession::setMechanism(std::unique_ptr<ServerMechanismBase> me
         uassertStatusOK(_mech->setOptions(options->getOwned()));
     }
 
-    if (_mech && _mech->isClusterMember()) {
-        setAsClusterMember();
-    }
-
     LOGV2_DEBUG(5286304, kDiagnosticLogLevel, "Determined mechanism for authentication");
 }
 
 void AuthenticationSession::setAsClusterMember() {
-    _isClusterMember = true;
+    if (std::exchange(_isClusterMember, true)) {
+        return;
+    }
+
+    _mechCounter->incClusterAuthenticateReceived();
 
     LOGV2_DEBUG(5286305, kDiagnosticLogLevel, "Marking as cluster member");
 }
 
-void AuthenticationSession::markSuccessful() {
-    // Log success.
+void AuthenticationSession::_finish() {
     _isFinished = true;
+    if (_mech) {
+        // Since both isClusterMember() and getPrincipalName() can return differently over the
+        // course of authentication, only get the values when we finish.
+        if (_mech->isClusterMember()) {
+            setAsClusterMember();
+        }
+        updateUserName({_mech->getPrincipalName(), _mech->getAuthenticationDatabase()});
+    }
+}
+
+void AuthenticationSession::markSuccessful() {
+    _finish();
+
+    _mechCounter->incAuthenticateSuccessful();
+    if (_isClusterMember) {
+        _mechCounter->incClusterAuthenticateSuccessful();
+    }
+    if (_isSpeculative) {
+        _mechCounter->incSpeculativeAuthenticateSuccessful();
+    }
+
+    audit::logAuthentication(_client, _mechName, _userName, ErrorCodes::OK);
+
     LOGV2_DEBUG(5286306,
                 kDiagnosticLogLevel,
                 "Successfully authenticated",
-                "isSpeculative"_attr = isSpeculative(),
-                "isClusterMember"_attr = isClusterMember());
+                "client"_attr = _client->getRemote(),
+                "isSpeculative"_attr = _isSpeculative,
+                "isClusterMember"_attr = _isClusterMember,
+                "mechanism"_attr = _mechName,
+                "user"_attr = _userName.getUser(),
+                "db"_attr = _userName.getDB());
 }
 
 void AuthenticationSession::markFailed(const Status& status) {
-    // Log the error.
-    _isFinished = true;
+    _finish();
+
+    audit::logAuthentication(_client, _mechName, _userName, status.code());
+
     LOGV2_DEBUG(5286307,
                 kDiagnosticLogLevel,
                 "Failed to authenticate",
-                "isSpeculative"_attr = isSpeculative(),
-                "isClusterMember"_attr = isClusterMember(),
+                "client"_attr = _client->getRemote(),
+                "isSpeculative"_attr = _isSpeculative,
+                "isClusterMember"_attr = _isClusterMember,
+                "mechanism"_attr = _mechName,
+                "user"_attr = _userName.getUser(),
+                "db"_attr = _userName.getDB(),
                 "error"_attr = status);
 }
 

@@ -44,6 +44,8 @@ void handleHelloAuth(OperationContext* opCtx, const HelloCommand& cmd, BSONObjBu
     if (auto userName = cmd.getSaslSupportedMechs()) {
         AuthenticationSession::doStep(
             opCtx, AuthenticationSession::StepType::kSaslSupportedMechanisms, [&](auto session) {
+                session->setUserNameForSaslSupportedMechanisms(*userName);
+
                 auto& saslMechanismRegistry =
                     SASLServerMechanismRegistry::get(opCtx->getServiceContext());
                 saslMechanismRegistry.advertiseMechanismNamesForUser(opCtx, *userName, result);

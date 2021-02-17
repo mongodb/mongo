@@ -47,6 +47,7 @@ env.Library(
         'saslauth',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/audit',
         '$BUILD_DIR/mongo/db/stats/counters',
     ],
 )
@@ -270,10 +271,8 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/client/sasl_client',
-        '$BUILD_DIR/mongo/db/audit',
         '$BUILD_DIR/mongo/db/commands',
         '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
-        '$BUILD_DIR/mongo/db/stats/counters',
         'auth',
         'auth_impl_internal',
         'authentication_session',
