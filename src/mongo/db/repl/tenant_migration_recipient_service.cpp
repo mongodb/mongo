@@ -771,9 +771,21 @@ void TenantMigrationRecipientService::Instance::_startOplogFetcher() {
     options.useTemporaryCollection = false;
     stdx::unique_lock lk(_mutex);
     invariant(_stateDoc.getStartFetchingDonorOpTime());
+    auto oplogBufferNS = getOplogBufferNs(getMigrationUUID());
     _donorOplogBuffer = std::make_unique<OplogBufferCollection>(
-        StorageInterface::get(opCtx.get()), getOplogBufferNs(getMigrationUUID()), options);
-    _donorOplogBuffer->startup(opCtx.get());
+        StorageInterface::get(opCtx.get()), oplogBufferNS, options);
+
+    {
+        // Ensure we are primary when trying to startup and create the oplog buffer collection.
+        auto coordinator = repl::ReplicationCoordinator::get(opCtx.get());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_IX);
+        if (!coordinator->canAcceptWritesForDatabase(opCtx.get(), oplogBufferNS.db())) {
+            uassertStatusOK(
+                Status(ErrorCodes::NotWritablePrimary,
+                       "Recipient node is not primary, cannot create oplog buffer collection."));
+        }
+        _donorOplogBuffer->startup(opCtx.get());
+    }
 
     pauseAfterCreatingOplogBuffer.pauseWhileSet();
 
