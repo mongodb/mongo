@@ -377,8 +377,9 @@ public:
         ASSERT_EQUALS(ErrorCodes::IndexOptionsConflict,
                       createIndex(BSON("name"
                                        << "x"
-                                       << "unique" << true << "key" << BSON("x" << 1 << "y" << 1)
-                                       << "v" << static_cast<int>(kIndexVersion))));
+                                       << "key" << BSON("x" << 1 << "y" << 1) << "storageEngine"
+                                       << BSON("wiredTiger" << BSONObj()) << "v"
+                                       << static_cast<int>(kIndexVersion))));
     }
 };
 
@@ -458,28 +459,26 @@ public:
 class SameSpecDifferentUnique : public ComplexIndex {
 public:
     void run() {
-        ASSERT_EQUALS(ErrorCodes::IndexOptionsConflict,
-                      createIndex(BSON("name"
-                                       << "super2"
-                                       << "unique" << false << "sparse" << true
-                                       << "expireAfterSeconds" << 3600 << "key"
-                                       << BSON("superIdx"
-                                               << "2d")
-                                       << "v" << static_cast<int>(kIndexVersion))));
+        ASSERT_OK(createIndex(BSON("name"
+                                   << "super2"
+                                   << "unique" << false << "sparse" << true << "expireAfterSeconds"
+                                   << 3600 << "key"
+                                   << BSON("superIdx"
+                                           << "2d")
+                                   << "v" << static_cast<int>(kIndexVersion))));
     }
 };
 
 class SameSpecDifferentSparse : public ComplexIndex {
 public:
     void run() {
-        ASSERT_EQUALS(ErrorCodes::IndexOptionsConflict,
-                      createIndex(BSON("name"
-                                       << "super2"
-                                       << "unique" << 1 << "sparse" << false << "background" << true
-                                       << "expireAfterSeconds" << 3600 << "key"
-                                       << BSON("superIdx"
-                                               << "2d")
-                                       << "v" << static_cast<int>(kIndexVersion))));
+        ASSERT_OK(createIndex(BSON("name"
+                                   << "super3"
+                                   << "unique" << 1 << "sparse" << false << "background" << true
+                                   << "expireAfterSeconds" << 3600 << "key"
+                                   << BSON("superIdx"
+                                           << "2d")
+                                   << "v" << static_cast<int>(kIndexVersion))));
     }
 };
 
@@ -488,7 +487,7 @@ public:
     void run() {
         ASSERT_EQUALS(ErrorCodes::IndexOptionsConflict,
                       createIndex(BSON("name"
-                                       << "super2"
+                                       << "super4"
                                        << "unique" << 1 << "sparse" << true << "expireAfterSeconds"
                                        << 2400 << "key"
                                        << BSON("superIdx"

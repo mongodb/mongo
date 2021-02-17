@@ -267,9 +267,10 @@ TEST_F(ShardLocalTest, CreateIndex) {
     indexes = unittest::assertGet(getIndexes(nss));
     ASSERT_EQ(2U, indexes.size());
 
-    // Trying to make the same index as non-unique should fail.
+    // Trying to make the same index as non-unique should fail as the same index name exists
+    // though unique property is part of the index signature since 4.9.
     status = _shardLocal->createIndexOnConfig(_opCtx.get(), nss, BSON("a" << 1 << "b" << 1), false);
-    ASSERT_EQUALS(ErrorCodes::IndexOptionsConflict, status);
+    ASSERT_EQUALS(ErrorCodes::IndexKeySpecsConflict, status);
     indexes = unittest::assertGet(getIndexes(nss));
     ASSERT_EQ(2U, indexes.size());
 }

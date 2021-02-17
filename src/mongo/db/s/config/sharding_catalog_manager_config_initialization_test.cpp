@@ -339,7 +339,8 @@ TEST_F(ConfigInitializationTest, BuildsNecessaryIndexes) {
 
 TEST_F(ConfigInitializationTest, CompatibleIndexAlreadyExists) {
     getConfigShard()
-        ->createIndexOnConfig(operationContext(), ShardType::ConfigNS, BSON("host" << 1), true)
+        ->createIndexOnConfig(
+            operationContext(), ShardType::ConfigNS, BSON("host" << 1), /*unique*/ true)
         .transitional_ignore();
 
     ASSERT_OK(ShardingCatalogManager::get(operationContext())
@@ -360,10 +361,11 @@ TEST_F(ConfigInitializationTest, IncompatibleIndexAlreadyExists) {
     // Make the index non-unique even though its supposed to be unique, make sure initialization
     // fails
     getConfigShard()
-        ->createIndexOnConfig(operationContext(), ShardType::ConfigNS, BSON("host" << 1), false)
+        ->createIndexOnConfig(
+            operationContext(), ShardType::ConfigNS, BSON("host" << 1), /*unique*/ false)
         .transitional_ignore();
 
-    ASSERT_EQUALS(ErrorCodes::IndexOptionsConflict,
+    ASSERT_EQUALS(ErrorCodes::IndexKeySpecsConflict,
                   ShardingCatalogManager::get(operationContext())
                       ->initializeConfigDatabaseIfNeeded(operationContext()));
 }

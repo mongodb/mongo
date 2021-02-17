@@ -64,6 +64,9 @@ protected:
 
     void addIndex(BSONObj keyPattern, bool multikey, bool sparse, bool unique);
 
+    void addIndex(
+        BSONObj keyPattern, bool multikey, bool sparse, bool unique, const std::string& name);
+
     void addIndex(BSONObj keyPattern, BSONObj infoObj);
 
     void addIndex(BSONObj keyPattern, MatchExpression* filterExpr);
