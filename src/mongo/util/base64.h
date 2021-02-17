@@ -46,6 +46,10 @@ void decode(std::stringstream& ss, StringData in);
 void encode(fmt::memory_buffer& buffer, StringData in);
 void decode(fmt::memory_buffer& buffer, StringData in);
 
+inline std::string encode(const void* data, size_t len) {
+    return encode(StringData(reinterpret_cast<const char*>(data), len));
+}
+
 bool validate(StringData s);
 
 /**

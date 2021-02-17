@@ -153,6 +153,13 @@ public:
      */
     static bool isUUIDString(const std::string& s);
 
+    /*
+     * Return the underlying 128-bit array.
+     */
+    std::array<unsigned char, 16> data() const {
+        return _uuid;
+    }
+
     /**
      * Returns a ConstDataRange view of the UUID.
      */
