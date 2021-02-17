@@ -16,7 +16,6 @@ assert.commandWorked(s.s0.adminCommand({shardcollection: "alleyinsider.bar", key
 var a = s.shard0.getDB("admin");
 
 // Setup from one client
-assert.eq(a.runCommand({"getShardVersion": "alleyinsider.foo", configdb: s._configDB}).mine.i, 0);
 assert.eq(a.runCommand({"getShardVersion": "alleyinsider.foo", configdb: s._configDB}).global.i, 0);
 
 var fooEpoch = findChunksUtil.findOneChunkByNs(s.getDB('config'), 'alleyinsider.foo').lastmodEpoch;
@@ -32,7 +31,6 @@ assert.commandWorked(a.runCommand({
 
 printjson(s.config.chunks.findOne());
 
-assert.eq(a.runCommand({"getShardVersion": "alleyinsider.foo", configdb: s._configDB}).mine.t, 0);
 assert.eq(a.runCommand({"getShardVersion": "alleyinsider.foo", configdb: s._configDB}).global.t, 1);
 
 // From a different client
@@ -41,9 +39,6 @@ var a2 = connect(`mongodb://${s.rs0.getPrimary().name}/admin`);
 assert.eq(a2.runCommand({"getShardVersion": "alleyinsider.foo", configdb: s._configDB}).global.t,
           1,
           "a2 global 1");
-assert.eq(a2.runCommand({"getShardVersion": "alleyinsider.foo", configdb: s._configDB}).mine.i,
-          0,
-          "a2 mine 1");
 
 s.stop();
 })();
