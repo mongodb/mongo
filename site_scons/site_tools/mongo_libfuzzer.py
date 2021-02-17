@@ -44,7 +44,8 @@ def build_cpp_libfuzzer_test(env, target, source, **kwargs):
     libdeps = kwargs.get("LIBDEPS", myenv.get("LIBDEPS", [])).copy()
     kwargs["LIBDEPS"] = libdeps
     kwargs["INSTALL_ALIAS"] = ["tests"]
-    kwargs["FSAN_DO_LINK"] = True
+    sanitizer_option = "-fsanitize=fuzzer"
+    myenv.Prepend(LINKFLAGS=[sanitizer_option])
 
     libfuzzer_test_components = {"tests", "fuzzertests"}
     if "AIB_COMPONENT" in kwargs and not kwargs["AIB_COMPONENTS"].endswith(
