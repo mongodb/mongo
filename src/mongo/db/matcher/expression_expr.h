@@ -37,6 +37,7 @@
 #include "mongo/db/matcher/rewrite_expr.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/expression_walker.h"
 
 namespace mongo {
 
@@ -107,6 +108,17 @@ public:
 
     void acceptVisitor(MatchExpressionConstVisitor* visitor) const final {
         visitor->visit(this);
+    }
+
+    /**
+     * Finds an applicable rename from 'renameList' (if one exists) and applies it to the
+     * expression. Each pair in 'renameList' specifies a path prefix that should be renamed (as the
+     * first element) and the path components that should replace the renamed prefix (as the second
+     * element).
+     */
+    void applyRename(const StringMap<std::string>& renameList) {
+        SubstituteFieldPathWalker substituteWalker(renameList);
+        expression_walker::walk(&substituteWalker, _expression.get());
     }
 
 private:

@@ -2390,6 +2390,26 @@ Expression::ComputedPaths ExpressionFieldPath::getComputedPaths(const std::strin
     return outputPaths;
 }
 
+std::unique_ptr<Expression> ExpressionFieldPath::copyWithSubstitution(
+    const StringMap<std::string>& renameList) const {
+    if (_variable != Variables::kRootId || _fieldPath.getPathLength() == 1) {
+        return nullptr;
+    }
+
+    FieldRef path(getFieldPathWithoutCurrentPrefix().fullPath());
+    for (const auto& rename : renameList) {
+        if (FieldRef oldName(rename.first); oldName.isPrefixOfOrEqualTo(path)) {
+            // Remove the path components of 'oldName' from 'path'.
+            auto suffix = (path == oldName)
+                ? ""
+                : "." + path.dottedSubstring(oldName.numParts(), path.numParts());
+            return std::unique_ptr<Expression>(new ExpressionFieldPath(
+                getExpressionContext(), "CURRENT." + rename.second + suffix, getVariableId()));
+        }
+    }
+    return nullptr;
+}
+
 /* ------------------------- ExpressionFilter ----------------------------- */
 
 REGISTER_EXPRESSION(filter, ExpressionFilter::parse);

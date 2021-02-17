@@ -134,5 +134,13 @@ splitMatchExpressionBy(std::unique_ptr<MatchExpression> expr,
                        const std::set<std::string>& fields,
                        const StringMap<std::string>& renames);
 
+/**
+ * Applies the renames specified in 'renames' to 'expr'. 'renames' maps from path names in 'expr'
+ * to the new values of those paths. For example, suppose the original match expression is
+ * {old: {$gt: 3}} and 'renames' contains the mapping "old" => "new". At the end, 'expr' will be
+ * {new: {$gt: 3}}.
+ */
+void applyRenamesToExpression(MatchExpression* expr, const StringMap<std::string>& renames);
+
 }  // namespace expression
 }  // namespace mongo

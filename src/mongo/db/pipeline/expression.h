@@ -1541,6 +1541,15 @@ public:
     ComputedPaths getComputedPaths(const std::string& exprFieldPath,
                                    Variables::Id renamingVar) const final;
 
+    /**
+     * Finds an applicable rename from 'renameList' and creates a copy of ExpressionFieldPath in
+     * which the the rename is substituted. If there is no applicable rename, returns nullptr. Each
+     * pair in 'renameList' specifies a path prefix that should be renamed (as the first element)
+     * and the path components that should replace the renamed prefix (as the second element).
+     */
+    std::unique_ptr<Expression> copyWithSubstitution(
+        const StringMap<std::string>& renameList) const;
+
     void acceptVisitor(ExpressionVisitor* visitor) final {
         return visitor->visit(this);
     }
@@ -3316,6 +3325,19 @@ private:
                                           TimeUnit unit,
                                           long long amount,
                                           const TimeZone& timezone) const override;
+};
+
+struct SubstituteFieldPathWalker {
+    SubstituteFieldPathWalker(const StringMap<std::string>& renameList) : renameList(renameList) {}
+
+    auto postVisit(Expression* exp) {
+        if (auto fieldPathExpr = dynamic_cast<ExpressionFieldPath*>(exp)) {
+            return fieldPathExpr->copyWithSubstitution(renameList);
+        }
+        return std::unique_ptr<Expression>{};
+    }
+
+    const StringMap<std::string>& renameList;
 };
 
 }  // namespace mongo
