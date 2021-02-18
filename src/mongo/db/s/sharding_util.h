@@ -48,10 +48,21 @@ void tellShardsToRefreshCollection(OperationContext* opCtx,
                                    const NamespaceString& nss,
                                    const std::shared_ptr<executor::TaskExecutor>& executor);
 
+/**
+ * Sends _flushDatabaseCacheUpdatesWithWriteConcern to a list of shards. Throws if one of the
+ * shards fails to refresh.
+ */
+void tellShardsToRefreshDatabase(OperationContext* opCtx,
+                                 const std::vector<ShardId>& shardIds,
+                                 const std::string& dbName,
+                                 const std::shared_ptr<executor::TaskExecutor>& executor);
+
+/**
+ * Generic utility to send a command to a list of shards. Throwfs if one of the commands fails.
+ */
 void sendCommandToShards(OperationContext* opCtx,
                          const BSONObj& command,
                          const std::vector<ShardId>& shardIds,
-                         const NamespaceString& nss,
                          const std::shared_ptr<executor::TaskExecutor>& executor);
 
 }  // namespace sharding_util

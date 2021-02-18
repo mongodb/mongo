@@ -466,6 +466,7 @@ const testCases = {
     _configsvrShardCollection: {skip: isNotRunOnUserDatabase},
     _configsvrUpdateZoneKeyRange: {skip: isNotRunOnUserDatabase},
     _flushDatabaseCacheUpdates: {skip: isNotRunOnUserDatabase},
+    _flushDatabaseCacheUpdatesWithWriteConcern: {skip: isNotRunOnUserDatabase},
     _flushRoutingTableCacheUpdates: {skip: isNotRunOnUserDatabase},
     _flushRoutingTableCacheUpdatesWithWriteConcern: {skip: isNotRunOnUserDatabase},
     _getNextSessionMods: {skip: isNotRunOnUserDatabase},

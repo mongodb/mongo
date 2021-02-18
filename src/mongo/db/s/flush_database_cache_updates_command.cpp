@@ -55,10 +55,9 @@
 namespace mongo {
 namespace {
 
-class FlushDatabaseCacheUpdatesCmd final : public TypedCommand<FlushDatabaseCacheUpdatesCmd> {
+template <typename Derived>
+class FlushDatabaseCacheUpdatesCmdBase : public TypedCommand<Derived> {
 public:
-    using Request = _flushDatabaseCacheUpdates;
-
     std::string help() const override {
         return "Internal command which waits for any pending routing table cache updates for a "
                "particular database to be written locally. The operationTime returned in the "
@@ -72,13 +71,14 @@ public:
         return true;
     }
 
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return AllowedOnSecondary::kNever;
+    Command::AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+        return Command::AllowedOnSecondary::kNever;
     }
 
-    class Invocation final : public InvocationBase {
+    class Invocation final : public TypedCommand<Derived>::InvocationBase {
     public:
-        using InvocationBase::InvocationBase;
+        using Base = typename TypedCommand<Derived>::InvocationBase;
+        using Base::Base;
 
         /**
          * ns() is the database to flush, with no collection.
@@ -88,7 +88,7 @@ public:
         }
 
         bool supportsWriteConcern() const override {
-            return false;
+            return Derived::supportsWriteConcern();
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const override {
@@ -132,7 +132,7 @@ public:
 
             oss.waitForMigrationCriticalSectionSignal(opCtx);
 
-            if (request().getSyncFromConfig()) {
+            if (Base::request().getSyncFromConfig()) {
                 LOGV2_DEBUG(21981,
                             1,
                             "Forcing remote routing table refresh for {db}",
@@ -148,10 +148,30 @@ public:
 
     private:
         StringData _dbName() const {
-            return request().getCommandParameter();
+            return Base::request().getCommandParameter();
         }
     };
-} _flushDatabaseCacheUpdatesCmd;
+};
+
+class FlushDatabaseCacheUpdatesCmd final
+    : public FlushDatabaseCacheUpdatesCmdBase<FlushDatabaseCacheUpdatesCmd> {
+public:
+    using Request = _flushDatabaseCacheUpdates;
+
+    static bool supportsWriteConcern() {
+        return false;
+    }
+} _flushDatabaseCacheUpdates;
+
+class FlushDatabaseCacheUpdatesWithWriteConcernCmd final
+    : public FlushDatabaseCacheUpdatesCmdBase<FlushDatabaseCacheUpdatesWithWriteConcernCmd> {
+public:
+    using Request = _flushDatabaseCacheUpdatesWithWriteConcern;
+
+    static bool supportsWriteConcern() {
+        return true;
+    }
+} _flushDatabaseCacheUpdatesWithWriteConcern;
 
 }  // namespace
 }  // namespace mongo

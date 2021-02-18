@@ -1312,7 +1312,6 @@ void ReshardingCoordinatorService::ReshardingCoordinator::_tellAllParticipantsTo
     sharding_util::sendCommandToShards(opCtx.get(),
                                        refreshCmd,
                                        {participantShardIds.begin(), participantShardIds.end()},
-                                       _coordinatorDoc.getNss(),
                                        **executor);
 }
 
