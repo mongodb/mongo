@@ -15,6 +15,11 @@
 // version.
 TestData.skipCheckOrphans = true;
 
+// Because in this test we explicitly leave shard1 in 'downgradeFCV' version, but the rest or the
+// cluster has upgraded to 'latestFCV', shard1 won't be able to refresh its catalog cache from the
+// upgraded configsvr due to incompatible wire version. This makes the index consistency check fail.
+TestData.skipCheckingIndexesConsistentAcrossCluster = true;
+
 function runTest(downgradeVersion) {
     jsTestLog("Running test with downgradeVersion: " + downgradeVersion);
     const downgradeFCV = binVersionToFCV(downgradeVersion);

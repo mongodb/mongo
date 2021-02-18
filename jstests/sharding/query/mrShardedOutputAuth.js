@@ -65,6 +65,8 @@ function doMapReduce(connection, outputDb) {
 function assertSuccess(cmdResponse, configDb, outputDb) {
     assert.commandWorked(cmdResponse);
     assert.eq(outputDb.numbers_out.count(), nDocs, "map/reduce failed");
+    // TODO SERVER-51881: After 5.0 is released, change this assert to just check that a document is
+    // found in 'configDb.collections'
     assert(!configDb.collections.findOne().dropped, "no sharded collections");
 }
 

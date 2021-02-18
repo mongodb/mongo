@@ -1123,8 +1123,10 @@ DBCollection.autocomplete = function(obj) {
  * @return {boolean}
  */
 DBCollection.prototype._isSharded = function() {
+    // Checking for 'dropped: {$ne: true}' to ensure mongo shell compatibility with earlier versions
+    // of the server
     return !!this._db.getSiblingDB("config").collections.countDocuments(
-        {_id: this._fullName, dropped: false});
+        {_id: this._fullName, dropped: {$ne: true}});
 };
 
 /**
