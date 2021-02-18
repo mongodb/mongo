@@ -82,7 +82,10 @@ public:
                                                         const CollectionOptions& options) = 0;
 
     virtual std::unique_ptr<SortedDataInterface> getSortedDataInterface(
-        OperationContext* opCtx, StringData ident, const IndexDescriptor* desc) = 0;
+        OperationContext* opCtx,
+        const CollectionOptions& collOptions,
+        StringData ident,
+        const IndexDescriptor* desc) = 0;
 
     /**
      * The create and drop methods on KVEngine are not transactional. Transactional semantics

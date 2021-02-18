@@ -244,7 +244,10 @@ std::unique_ptr<RecordStore> DevNullKVEngine::makeTemporaryRecordStore(Operation
 }
 
 std::unique_ptr<SortedDataInterface> DevNullKVEngine::getSortedDataInterface(
-    OperationContext* opCtx, StringData ident, const IndexDescriptor* desc) {
+    OperationContext* opCtx,
+    const CollectionOptions& collOptions,
+    StringData ident,
+    const IndexDescriptor* desc) {
     return std::make_unique<DevNullSortedDataInterface>(ident);
 }
 

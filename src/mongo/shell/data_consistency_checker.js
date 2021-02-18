@@ -320,6 +320,8 @@ var {DataConsistencyChecker} = (function() {
                         // from index specs in 4.4.
                         if (sourceInfo.idIndex) {
                             delete sourceInfo.idIndex.ns;
+                        }
+                        if (syncingInfo.idIndex) {
                             delete syncingInfo.idIndex.ns;
                         }
 

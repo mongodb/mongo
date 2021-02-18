@@ -222,6 +222,8 @@ TEST_F(CollectionTest, CreateTimeseriesBucketCollection) {
                                      << "_id_"
                                      << "key" << BSON("_id" << 1));
 
+    CollectionOptions options;
+    options.clusteredIndex = ClusteredIndexOptions{};
     {
         WriteUnitOfWork wuow(operationContext());
 
@@ -229,7 +231,7 @@ TEST_F(CollectionTest, CreateTimeseriesBucketCollection) {
         // the collection.
         Collection* collection = db->createCollection(operationContext(),
                                                       nss,
-                                                      CollectionOptions(),
+                                                      options,
                                                       /*createIdIndex=*/true,
                                                       /*idIndex=*/
                                                       idxSpec);
@@ -248,8 +250,8 @@ TEST_F(CollectionTest, CreateTimeseriesBucketCollection) {
 
     {
         WriteUnitOfWork wuow(operationContext());
-        auto collection = db->createCollection(
-            operationContext(), nss, CollectionOptions(), /*createIdIndex=*/false);
+        auto collection =
+            db->createCollection(operationContext(), nss, options, /*createIdIndex=*/false);
         ASSERT(collection);
         ASSERT_EQ(0, collection->getIndexCatalog()->numIndexesTotal(operationContext()));
         wuow.commit();

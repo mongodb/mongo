@@ -76,7 +76,10 @@ public:
     }
 
     virtual std::unique_ptr<SortedDataInterface> getSortedDataInterface(
-        OperationContext* opCtx, StringData ident, const IndexDescriptor* desc);
+        OperationContext* opCtx,
+        const CollectionOptions& collOptions,
+        StringData ident,
+        const IndexDescriptor* desc);
 
     virtual Status dropIdent(RecoveryUnit* ru,
                              StringData ident,

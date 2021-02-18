@@ -451,8 +451,10 @@ IndexCatalogEntry* IndexCatalogImpl::createIndexEntry(OperationContext* opCtx,
         opCtx, _collection->getCatalogId(), ident, std::move(descriptor), frozen);
 
     IndexDescriptor* desc = entry->descriptor();
+    auto collOptions =
+        DurableCatalog::get(opCtx)->getCollectionOptions(opCtx, _collection->getCatalogId());
     std::unique_ptr<SortedDataInterface> sdi =
-        engine->getEngine()->getSortedDataInterface(opCtx, ident, desc);
+        engine->getEngine()->getSortedDataInterface(opCtx, collOptions, ident, desc);
 
     std::unique_ptr<IndexAccessMethod> accessMethod =
         IndexAccessMethodFactory::get(opCtx)->make(entry.get(), std::move(sdi));

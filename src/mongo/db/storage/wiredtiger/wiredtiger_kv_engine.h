@@ -152,7 +152,10 @@ public:
                                      const IndexDescriptor* desc) override;
 
     std::unique_ptr<SortedDataInterface> getSortedDataInterface(
-        OperationContext* opCtx, StringData ident, const IndexDescriptor* desc) override;
+        OperationContext* opCtx,
+        const CollectionOptions& collOptions,
+        StringData ident,
+        const IndexDescriptor* desc) override;
 
     Status importRecordStore(OperationContext* opCtx,
                              StringData ident,

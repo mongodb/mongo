@@ -241,7 +241,7 @@ TEST(KVEngineTestHarness, SimpleSorted1) {
     {
         MyOperationContext opCtx(engine);
         ASSERT_OK(engine->createSortedDataInterface(&opCtx, CollectionOptions(), ident, &desc));
-        sorted = engine->getSortedDataInterface(&opCtx, ident, &desc);
+        sorted = engine->getSortedDataInterface(&opCtx, CollectionOptions(), ident, &desc);
         ASSERT(sorted);
     }
 
@@ -1471,7 +1471,7 @@ DEATH_TEST_REGEX_F(DurableCatalogImplTest,
         auto clientAndCtx = makeClientAndCtx("opCtx");
         auto opCtx = clientAndCtx.opCtx();
         ASSERT_OK(engine->createSortedDataInterface(opCtx, CollectionOptions(), ident, &desc));
-        sorted = engine->getSortedDataInterface(opCtx, ident, &desc);
+        sorted = engine->getSortedDataInterface(opCtx, CollectionOptions(), ident, &desc);
         ASSERT(sorted);
     }
 }

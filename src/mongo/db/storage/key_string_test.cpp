@@ -306,7 +306,7 @@ TEST_F(KeyStringBuilderTest, ExceededBSONDepth) {
 
     // Construct a KeyString from the invalid BSON, and confirm that it fails to convert back to
     // BSON.
-    ks.resetToKey(nestedObj, ALL_ASCENDING, RecordId());
+    ks.resetToKey(nestedObj, ALL_ASCENDING, RecordId(1));
     ASSERT_THROWS_CODE(
         KeyString::toBsonSafe(ks.getBuffer(), ks.getSize(), ALL_ASCENDING, ks.getTypeBits()),
         AssertionException,
@@ -319,8 +319,8 @@ TEST_F(KeyStringBuilderTest, Simple1) {
 
     ASSERT_BSONOBJ_LT(a, b);
 
-    ASSERT_LESS_THAN(KeyString::Builder(version, a, ALL_ASCENDING, RecordId()),
-                     KeyString::Builder(version, b, ALL_ASCENDING, RecordId()));
+    ASSERT_LESS_THAN(KeyString::Builder(version, a, ALL_ASCENDING, RecordId(1)),
+                     KeyString::Builder(version, b, ALL_ASCENDING, RecordId(1)));
 }
 
 #define ROUNDTRIP_ORDER(version, x, order)                            \
@@ -839,63 +839,19 @@ TEST_F(KeyStringBuilderTest, LotsOfNumbers2) {
     }
 }
 
-TEST_F(KeyStringBuilderTest, LotsOfNumbers3) {
-    std::vector<stdx::future<void>> futures;
-
-    for (double k = 0; k < 8; k++) {
-        futures.push_back(stdx::async(stdx::launch::async, [k, this] {
-            for (double i = -1100; i < 1100; i++) {
-                for (double j = 0; j < 52; j++) {
-                    const auto V1 = KeyString::Version::V1;
-                    Decimal128::RoundingPrecision roundingPrecisions[]{
-                        Decimal128::kRoundTo15Digits, Decimal128::kRoundTo34Digits};
-                    Decimal128::RoundingMode roundingModes[]{Decimal128::kRoundTowardNegative,
-                                                             Decimal128::kRoundTowardPositive};
-                    double x = pow(2, i);
-                    double y = pow(2, i - j);
-                    double z = pow(2, i - 53 + k);
-                    double bin = x + y - z;
-
-                    // In general NaNs don't roundtrip as we only store a single NaN, see the NaNs
-                    // test.
-                    if (std::isnan(bin))
-                        continue;
-
-                    ROUNDTRIP(version, BSON("" << bin));
-                    ROUNDTRIP(version, BSON("" << -bin));
-
-                    if (version < V1)
-                        continue;
-
-                    for (auto precision : roundingPrecisions) {
-                        for (auto mode : roundingModes) {
-                            Decimal128 rounded = Decimal128(bin, precision, mode);
-                            ROUNDTRIP(V1, BSON("" << rounded));
-                            ROUNDTRIP(V1, BSON("" << rounded.negate()));
-                        }
-                    }
-                }
-            }
-        }));
-    }
-    for (auto&& future : futures) {
-        future.get();
-    }
-}
-
 TEST_F(KeyStringBuilderTest, RecordIdOrder1) {
     Ordering ordering = Ordering::make(BSON("a" << 1));
 
     KeyString::Builder a(version, BSON("" << 5), ordering, RecordId::minLong());
     KeyString::Builder b(version, BSON("" << 5), ordering, RecordId(2));
     KeyString::Builder c(version, BSON("" << 5), ordering, RecordId(3));
-    KeyString::Builder d(version, BSON("" << 6), ordering, RecordId());
+    KeyString::Builder d(version, BSON("" << 6), ordering, RecordId(4));
     KeyString::Builder e(version, BSON("" << 6), ordering, RecordId(1));
 
     ASSERT_LESS_THAN(a, b);
     ASSERT_LESS_THAN(b, c);
     ASSERT_LESS_THAN(c, d);
-    ASSERT_LESS_THAN(d, e);
+    ASSERT_LESS_THAN(e, d);
 }
 
 TEST_F(KeyStringBuilderTest, RecordIdOrder2) {
@@ -1456,85 +1412,6 @@ TEST_F(KeyStringBuilderTest, NaNs) {
     ASSERT(toBson(ks3d, ONE_DESCENDING)[""].Decimal().isNaN());
     ASSERT(toBson(ks4d, ONE_DESCENDING)[""].Decimal().isNaN());
 }
-TEST_F(KeyStringBuilderTest, NumberOrderLots) {
-    std::vector<BSONObj> numbers;
-    {
-        numbers.push_back(BSON("" << 0));
-        numbers.push_back(BSON("" << 0.0));
-        numbers.push_back(BSON("" << -0.0));
-
-        numbers.push_back(BSON("" << std::numeric_limits<long long>::min()));
-        numbers.push_back(BSON("" << std::numeric_limits<long long>::max()));
-        numbers.push_back(BSON("" << static_cast<double>(std::numeric_limits<long long>::min())));
-        numbers.push_back(BSON("" << static_cast<double>(std::numeric_limits<long long>::max())));
-        numbers.push_back(BSON("" << std::numeric_limits<double>::min()));
-        numbers.push_back(BSON("" << std::numeric_limits<double>::max()));
-        numbers.push_back(BSON("" << std::numeric_limits<int>::min()));
-        numbers.push_back(BSON("" << std::numeric_limits<int>::max()));
-        numbers.push_back(BSON("" << std::numeric_limits<short>::min()));
-        numbers.push_back(BSON("" << std::numeric_limits<short>::max()));
-
-        for (int i = 0; i < 64; i++) {
-            int64_t x = 1LL << i;
-            numbers.push_back(BSON("" << static_cast<long long>(x)));
-            numbers.push_back(BSON("" << static_cast<int>(x)));
-            numbers.push_back(BSON("" << static_cast<double>(x)));
-            numbers.push_back(BSON("" << (static_cast<double>(x) + .1)));
-
-            numbers.push_back(BSON("" << (static_cast<long long>(x) + 1)));
-            numbers.push_back(BSON("" << (static_cast<int>(x) + 1)));
-            numbers.push_back(BSON("" << (static_cast<double>(x) + 1)));
-            numbers.push_back(BSON("" << (static_cast<double>(x) + 1.1)));
-
-            // Avoid negating signed integral minima
-            if (i < 63)
-                numbers.push_back(BSON("" << -static_cast<long long>(x)));
-
-            if (i < 31)
-                numbers.push_back(BSON("" << -static_cast<int>(x)));
-
-            numbers.push_back(BSON("" << -static_cast<double>(x)));
-            numbers.push_back(BSON("" << -(static_cast<double>(x) + .1)));
-
-            numbers.push_back(BSON("" << -(static_cast<long long>(x) + 1)));
-            numbers.push_back(BSON("" << -(static_cast<int>(x) + 1)));
-            numbers.push_back(BSON("" << -(static_cast<double>(x) + 1)));
-            numbers.push_back(BSON("" << -(static_cast<double>(x) + 1.1)));
-        }
-
-        for (double i = 0; i < 1000; i++) {
-            double x = pow(2.1, i);
-            numbers.push_back(BSON("" << x));
-        }
-    }
-
-    Ordering ordering = Ordering::make(BSON("a" << 1));
-
-    std::vector<std::unique_ptr<KeyString::Builder>> KeyStringBuilders;
-    for (size_t i = 0; i < numbers.size(); i++) {
-        KeyStringBuilders.push_back(
-            std::make_unique<KeyString::Builder>(version, numbers[i], ordering));
-    }
-
-    for (size_t i = 0; i < numbers.size(); i++) {
-        for (size_t j = 0; j < numbers.size(); j++) {
-            const KeyString::Builder& a = *KeyStringBuilders[i];
-            const KeyString::Builder& b = *KeyStringBuilders[j];
-            ASSERT_EQUALS(a.compare(b), -b.compare(a));
-
-            if (a.compare(b) !=
-                compareNumbers(numbers[i].firstElement(), numbers[j].firstElement())) {
-                LOGV2(22235,
-                      "{numbers_i} {numbers_j}",
-                      "numbers_i"_attr = numbers[i],
-                      "numbers_j"_attr = numbers[j]);
-            }
-
-            ASSERT_EQUALS(a.compare(b),
-                          compareNumbers(numbers[i].firstElement(), numbers[j].firstElement()));
-        }
-    }
-}
 
 TEST_F(KeyStringBuilderTest, RecordIds) {
     for (int i = 0; i < 63; i++) {
@@ -1545,16 +1422,16 @@ TEST_F(KeyStringBuilderTest, RecordIds) {
             ASSERT_GTE(ks.getSize(), 2u);
             ASSERT_LTE(ks.getSize(), 10u);
 
-            ASSERT_EQ(KeyString::decodeRecordIdAtEnd(ks.getBuffer(), ks.getSize()), rid);
+            ASSERT_EQ(KeyString::decodeRecordIdLongAtEnd(ks.getBuffer(), ks.getSize()), rid);
 
             {
                 BufReader reader(ks.getBuffer(), ks.getSize());
-                ASSERT_EQ(KeyString::decodeRecordId(&reader), rid);
+                ASSERT_EQ(KeyString::decodeRecordIdLong(&reader), rid);
                 ASSERT(reader.atEof());
             }
 
             if (rid.isValid()) {
-                ASSERT_GT(ks, KeyString::Builder(version, RecordId()));
+                ASSERT_GTE(ks, KeyString::Builder(version, RecordId(1)));
                 ASSERT_GT(ks, KeyString::Builder(version, RecordId::minLong()));
                 ASSERT_LT(ks, KeyString::Builder(version, RecordId::maxLong()));
 
@@ -1587,18 +1464,76 @@ TEST_F(KeyStringBuilderTest, RecordIds) {
                 ks.appendRecordId(rid);
                 ks.appendRecordId(other);
 
-                ASSERT_EQ(KeyString::decodeRecordIdAtEnd(ks.getBuffer(), ks.getSize()), other);
+                ASSERT_EQ(KeyString::decodeRecordIdLongAtEnd(ks.getBuffer(), ks.getSize()), other);
 
                 // forward scan
                 BufReader reader(ks.getBuffer(), ks.getSize());
-                ASSERT_EQ(KeyString::decodeRecordId(&reader), RecordId::maxLong());
-                ASSERT_EQ(KeyString::decodeRecordId(&reader), rid);
-                ASSERT_EQ(KeyString::decodeRecordId(&reader), RecordId(0xDEADBEEF));
-                ASSERT_EQ(KeyString::decodeRecordId(&reader), rid);
-                ASSERT_EQ(KeyString::decodeRecordId(&reader), RecordId(1));
-                ASSERT_EQ(KeyString::decodeRecordId(&reader), rid);
-                ASSERT_EQ(KeyString::decodeRecordId(&reader), other);
+                ASSERT_EQ(KeyString::decodeRecordIdLong(&reader), RecordId::maxLong());
+                ASSERT_EQ(KeyString::decodeRecordIdLong(&reader), rid);
+                ASSERT_EQ(KeyString::decodeRecordIdLong(&reader), RecordId(0xDEADBEEF));
+                ASSERT_EQ(KeyString::decodeRecordIdLong(&reader), rid);
+                ASSERT_EQ(KeyString::decodeRecordIdLong(&reader), RecordId(1));
+                ASSERT_EQ(KeyString::decodeRecordIdLong(&reader), rid);
+                ASSERT_EQ(KeyString::decodeRecordIdLong(&reader), other);
                 ASSERT(reader.atEof());
+            }
+        }
+    }
+}
+
+TEST_F(KeyStringBuilderTest, RecordIdStr) {
+    const int kSize = 12;
+    for (int i = 0; i < kSize; i++) {
+        char buf[kSize];
+        memset(buf, 0x80, kSize);
+        buf[i] = 0xFE;
+        const RecordId rid = RecordId(buf, kSize);
+
+        {  // Test encoding / decoding of single RecordIds
+            const KeyString::Builder ks(version, rid);
+            ASSERT_EQ(ks.getSize(), 12u);
+
+            ASSERT_EQ(KeyString::decodeRecordIdStrAtEnd(ks.getBuffer(), ks.getSize()), rid);
+
+            {
+                BufReader reader(ks.getBuffer(), ks.getSize());
+                ASSERT_EQ(KeyString::decodeRecordIdStr(&reader), rid);
+                ASSERT(reader.atEof());
+            }
+
+            if (rid.isValid()) {
+                ASSERT_GT(ks, KeyString::Builder(version, RecordId(1)));
+                ASSERT_GT(
+                    ks, KeyString::Builder(version, RecordId(OID().view().view(), OID::kOIDSize)));
+                ASSERT_LT(
+                    ks,
+                    KeyString::Builder(version, RecordId(OID::max().view().view(), OID::kOIDSize)));
+
+                char bufLt[kSize];
+                memcpy(bufLt, buf, kSize);
+                bufLt[kSize - 1] -= 1;
+                ASSERT_GT(ks, KeyString::Builder(version, RecordId(bufLt, kSize)));
+
+                char bufGt[kSize];
+                memcpy(bufGt, buf, kSize);
+                bufGt[kSize - 1] += 1;
+                ASSERT_LT(ks, KeyString::Builder(version, RecordId(bufGt, kSize)));
+            }
+        }
+
+        for (int j = 0; j < kSize; j++) {
+            char otherBuf[kSize] = {0};
+            otherBuf[j] = 0xFE;
+            RecordId other = RecordId(otherBuf, kSize);
+
+            if (rid == other) {
+                ASSERT_EQ(KeyString::Builder(version, rid), KeyString::Builder(version, other));
+            }
+            if (rid < other) {
+                ASSERT_LT(KeyString::Builder(version, rid), KeyString::Builder(version, other));
+            }
+            if (rid > other) {
+                ASSERT_GT(KeyString::Builder(version, rid), KeyString::Builder(version, other));
             }
         }
     }
@@ -1974,4 +1909,130 @@ DEATH_TEST(KeyStringBuilderTest, ToBsonPromotesAssertionsToTerminate, "terminate
     };
     KeyString::TypeBits typeBits(KeyString::Version::V1);
     KeyString::toBson(invalidString, sizeof(invalidString), ALL_ASCENDING, typeBits);
+}
+
+// The following tests run last because they take a very long time.
+
+TEST_F(KeyStringBuilderTest, LotsOfNumbers3) {
+    std::vector<stdx::future<void>> futures;
+
+    for (double k = 0; k < 8; k++) {
+        futures.push_back(stdx::async(stdx::launch::async, [k, this] {
+            for (double i = -1100; i < 1100; i++) {
+                for (double j = 0; j < 52; j++) {
+                    const auto V1 = KeyString::Version::V1;
+                    Decimal128::RoundingPrecision roundingPrecisions[]{
+                        Decimal128::kRoundTo15Digits, Decimal128::kRoundTo34Digits};
+                    Decimal128::RoundingMode roundingModes[]{Decimal128::kRoundTowardNegative,
+                                                             Decimal128::kRoundTowardPositive};
+                    double x = pow(2, i);
+                    double y = pow(2, i - j);
+                    double z = pow(2, i - 53 + k);
+                    double bin = x + y - z;
+
+                    // In general NaNs don't roundtrip as we only store a single NaN, see the NaNs
+                    // test.
+                    if (std::isnan(bin))
+                        continue;
+
+                    ROUNDTRIP(version, BSON("" << bin));
+                    ROUNDTRIP(version, BSON("" << -bin));
+
+                    if (version < V1)
+                        continue;
+
+                    for (auto precision : roundingPrecisions) {
+                        for (auto mode : roundingModes) {
+                            Decimal128 rounded = Decimal128(bin, precision, mode);
+                            ROUNDTRIP(V1, BSON("" << rounded));
+                            ROUNDTRIP(V1, BSON("" << rounded.negate()));
+                        }
+                    }
+                }
+            }
+        }));
+    }
+    for (auto&& future : futures) {
+        future.get();
+    }
+}
+
+TEST_F(KeyStringBuilderTest, NumberOrderLots) {
+    std::vector<BSONObj> numbers;
+    {
+        numbers.push_back(BSON("" << 0));
+        numbers.push_back(BSON("" << 0.0));
+        numbers.push_back(BSON("" << -0.0));
+
+        numbers.push_back(BSON("" << std::numeric_limits<long long>::min()));
+        numbers.push_back(BSON("" << std::numeric_limits<long long>::max()));
+        numbers.push_back(BSON("" << static_cast<double>(std::numeric_limits<long long>::min())));
+        numbers.push_back(BSON("" << static_cast<double>(std::numeric_limits<long long>::max())));
+        numbers.push_back(BSON("" << std::numeric_limits<double>::min()));
+        numbers.push_back(BSON("" << std::numeric_limits<double>::max()));
+        numbers.push_back(BSON("" << std::numeric_limits<int>::min()));
+        numbers.push_back(BSON("" << std::numeric_limits<int>::max()));
+        numbers.push_back(BSON("" << std::numeric_limits<short>::min()));
+        numbers.push_back(BSON("" << std::numeric_limits<short>::max()));
+
+        for (int i = 0; i < 64; i++) {
+            int64_t x = 1LL << i;
+            numbers.push_back(BSON("" << static_cast<long long>(x)));
+            numbers.push_back(BSON("" << static_cast<int>(x)));
+            numbers.push_back(BSON("" << static_cast<double>(x)));
+            numbers.push_back(BSON("" << (static_cast<double>(x) + .1)));
+
+            numbers.push_back(BSON("" << (static_cast<long long>(x) + 1)));
+            numbers.push_back(BSON("" << (static_cast<int>(x) + 1)));
+            numbers.push_back(BSON("" << (static_cast<double>(x) + 1)));
+            numbers.push_back(BSON("" << (static_cast<double>(x) + 1.1)));
+
+            // Avoid negating signed integral minima
+            if (i < 63)
+                numbers.push_back(BSON("" << -static_cast<long long>(x)));
+
+            if (i < 31)
+                numbers.push_back(BSON("" << -static_cast<int>(x)));
+
+            numbers.push_back(BSON("" << -static_cast<double>(x)));
+            numbers.push_back(BSON("" << -(static_cast<double>(x) + .1)));
+
+            numbers.push_back(BSON("" << -(static_cast<long long>(x) + 1)));
+            numbers.push_back(BSON("" << -(static_cast<int>(x) + 1)));
+            numbers.push_back(BSON("" << -(static_cast<double>(x) + 1)));
+            numbers.push_back(BSON("" << -(static_cast<double>(x) + 1.1)));
+        }
+
+        for (double i = 0; i < 1000; i++) {
+            double x = pow(2.1, i);
+            numbers.push_back(BSON("" << x));
+        }
+    }
+
+    Ordering ordering = Ordering::make(BSON("a" << 1));
+
+    std::vector<std::unique_ptr<KeyString::Builder>> KeyStringBuilders;
+    for (size_t i = 0; i < numbers.size(); i++) {
+        KeyStringBuilders.push_back(
+            std::make_unique<KeyString::Builder>(version, numbers[i], ordering));
+    }
+
+    for (size_t i = 0; i < numbers.size(); i++) {
+        for (size_t j = 0; j < numbers.size(); j++) {
+            const KeyString::Builder& a = *KeyStringBuilders[i];
+            const KeyString::Builder& b = *KeyStringBuilders[j];
+            ASSERT_EQUALS(a.compare(b), -b.compare(a));
+
+            if (a.compare(b) !=
+                compareNumbers(numbers[i].firstElement(), numbers[j].firstElement())) {
+                LOGV2(22235,
+                      "{numbers_i} {numbers_j}",
+                      "numbers_i"_attr = numbers[i],
+                      "numbers_j"_attr = numbers[j]);
+            }
+
+            ASSERT_EQUALS(a.compare(b),
+                          compareNumbers(numbers[i].firstElement(), numbers[j].firstElement()));
+        }
+    }
 }

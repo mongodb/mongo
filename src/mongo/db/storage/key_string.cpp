@@ -452,10 +452,17 @@ template <class BufferT>
 void BuilderBase<BufferT>::appendRecordId(RecordId loc) {
     _doneAppending();
     _transition(BuildState::kAppendedRecordID);
+    loc.withFormat([](RecordId::Null n) { invariant(false); },
+                   [&](int64_t rid) { _appendRecordIdLong(rid); },
+                   [&](const char* str, int size) { _appendRecordIdStr(str, size); });
+}
+
+template <class BufferT>
+void BuilderBase<BufferT>::_appendRecordIdLong(int64_t val) {
     // The RecordId encoding must be able to determine the full length starting from the last
     // byte, without knowing where the first byte is since it is stored at the end of a
     // KeyString, and we need to be able to read the RecordId without decoding the whole thing.
-    //
+
     // This encoding places a number (N) between 0 and 7 in both the high 3 bits of the first
     // byte and the low 3 bits of the last byte. This is the number of bytes between the first
     // and last byte (ie total bytes is N + 2). The remaining bits of the first and last bytes
@@ -463,7 +470,7 @@ void BuilderBase<BufferT>::appendRecordId(RecordId loc) {
     // big-endian order. This does not encode negative RecordIds to give maximum space to
     // positive RecordIds which are the only ones that are allowed to be stored in an index.
 
-    int64_t raw = loc.asLong();
+    int64_t raw = val;
     if (raw < 0) {
         // Note: we encode RecordId::minLong() and RecordId() the same which is ok, as they
         // are never stored so they will never be compared to each other.
@@ -495,6 +502,14 @@ void BuilderBase<BufferT>::appendRecordId(RecordId loc) {
                      false);
     }
     _append(lastByte, false);
+}
+
+template <class BufferT>
+void BuilderBase<BufferT>::_appendRecordIdStr(const char* str, int size) {
+    // Only 12 byte strings can be encoded as RecordIds.
+    invariant(size == RecordId::kSmallStrSize);
+    const bool invert = false;
+    _appendBytes(str, size, invert);
 }
 
 template <class BufferT>
@@ -2438,15 +2453,15 @@ BSONObj toBson(StringData data, Ordering ord, const TypeBits& typeBits) {
     return toBson(data.rawData(), data.size(), ord, typeBits);
 }
 
-RecordId decodeRecordIdAtEnd(const void* bufferRaw, size_t bufSize) {
-    invariant(bufSize >= 2);  // smallest possible encoding of a RecordId.
+RecordId decodeRecordIdLongAtEnd(const void* bufferRaw, size_t bufSize) {
     const unsigned char* buffer = static_cast<const unsigned char*>(bufferRaw);
+    invariant(bufSize >= 2);  // smallest possible encoding of a RecordId.
     const unsigned char lastByte = *(buffer + bufSize - 1);
     const size_t ridSize = 2 + (lastByte & 0x7);  // stored in low 3 bits.
     invariant(bufSize >= ridSize);
     const unsigned char* firstBytePtr = buffer + bufSize - ridSize;
     BufReader reader(firstBytePtr, ridSize);
-    return decodeRecordId(&reader);
+    return decodeRecordIdLong(&reader);
 }
 
 size_t sizeWithoutRecordIdAtEnd(const void* bufferRaw, size_t bufSize) {
@@ -2458,7 +2473,7 @@ size_t sizeWithoutRecordIdAtEnd(const void* bufferRaw, size_t bufSize) {
     return bufSize - ridSize;
 }
 
-RecordId decodeRecordId(BufReader* reader) {
+RecordId decodeRecordIdLong(BufReader* reader) {
     const uint8_t firstByte = readType<uint8_t>(reader, false);
     const uint8_t numExtraBytes = firstByte >> 5;  // high 3 bits in firstByte
     uint64_t repr = firstByte & 0x1f;              // low 5 bits in firstByte
@@ -2470,6 +2485,22 @@ RecordId decodeRecordId(BufReader* reader) {
     invariant((lastByte & 0x7) == numExtraBytes);
     repr = (repr << 5) | (lastByte >> 3);  // fold in high 5 bits of last byte
     return RecordId(repr);
+}
+
+RecordId decodeRecordIdStrAtEnd(const void* bufferRaw, size_t bufSize) {
+    const uint8_t* buffer = static_cast<const uint8_t*>(bufferRaw);
+    // We currently require all RecordId strings to be 12 bytes.
+    const int ridSize = RecordId::kSmallStrSize;
+    invariant(bufSize >= ridSize);
+    const uint8_t* firstBytePtr = (buffer + bufSize - ridSize);
+    BufReader reader(firstBytePtr, ridSize);
+    return decodeRecordIdStr(&reader);
+}
+
+RecordId decodeRecordIdStr(BufReader* reader) {
+    // We currently require all RecordId strings to be 12 bytes.
+    const int size = RecordId::kSmallStrSize;
+    return RecordId(static_cast<const char*>(reader->skip(size)), size);
 }
 
 int compare(const char* leftBuf, const char* rightBuf, size_t leftSize, size_t rightSize) {
@@ -2521,7 +2552,7 @@ bool readSBEValue(BufReader* reader,
 }
 
 void Value::serializeWithoutRecordId(BufBuilder& buf) const {
-    dassert(decodeRecordIdAtEnd(_buffer.get(), _ksSize).isValid());
+    dassert(decodeRecordIdLongAtEnd(_buffer.get(), _ksSize).isValid());
 
     const int32_t sizeWithoutRecordId = sizeWithoutRecordIdAtEnd(_buffer.get(), _ksSize);
     buf.appendNum(sizeWithoutRecordId);                 // Serialize size of KeyString

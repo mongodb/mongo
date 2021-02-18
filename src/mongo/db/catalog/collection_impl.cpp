@@ -330,7 +330,6 @@ void CollectionImpl::init(OperationContext* opCtx) {
     }
 
     if (collectionOptions.clusteredIndex) {
-        invariant(_shared->_recordStore->keyFormat() == KeyFormat::String);
         _clustered = true;
     }
 
@@ -364,8 +363,8 @@ bool CollectionImpl::requiresIdIndex() const {
         return false;
     }
 
-    if (_ns.isTimeseriesBucketsCollection()) {
-        // Time-series bucket collections have a clustered _id index.
+    if (isClustered()) {
+        // Collections clustered by _id do not have a separate _id index.
         return false;
     }
 

@@ -90,7 +90,12 @@ class RecoveryUnit;
 class SortedDataInterfaceHarnessHelper : public virtual HarnessHelper {
 public:
     virtual std::unique_ptr<SortedDataInterface> newSortedDataInterface(bool unique,
-                                                                        bool partial) = 0;
+                                                                        bool partial,
+                                                                        KeyFormat keyFormat) = 0;
+
+    std::unique_ptr<SortedDataInterface> newSortedDataInterface(bool unique, bool partial) {
+        return newSortedDataInterface(unique, partial, KeyFormat::Long);
+    }
 
     virtual std::unique_ptr<SortedDataInterface> newIdIndexSortedDataInterface() = 0;
     /**
