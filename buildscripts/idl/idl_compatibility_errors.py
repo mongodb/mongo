@@ -73,6 +73,13 @@ ERROR_ID_ADDED_REQUIRED_COMMAND_PARAMETER = "ID0029"
 ERROR_ID_COMMAND_PARAMETER_UNSTABLE = "ID0030"
 ERROR_ID_COMMAND_PARAMETER_STABLE_REQUIRED = "ID0031"
 ERROR_ID_COMMAND_PARAMETER_REQUIRED = "ID0032"
+ERROR_ID_OLD_COMMAND_PARAMETER_TYPE_BSON_SERIALIZATION_TYPE_ANY = "ID0033"
+ERROR_ID_NEW_COMMAND_PARAMETER_TYPE_BSON_SERIALIZATION_TYPE_ANY = "ID0034"
+ERROR_ID_NEW_COMMAND_PARAMETER_TYPE_NOT_STRUCT = "ID0035"
+ERROR_ID_NEW_COMMAND_PARAMETER_TYPE_NOT_ENUM = "ID0036"
+ERROR_ID_NEW_COMMAND_PARAMETER_TYPE_ENUM_OR_STRUCT = "ID0037"
+ERROR_ID_COMMAND_PARAMETER_TYPE_INVALID = "ID0038"
+ERROR_ID_COMMAND_PARAMETER_TYPE_NOT_SUPERSET = "ID0039"
 
 
 class IDLCompatibilityCheckerError(Exception):
@@ -278,8 +285,8 @@ class IDLCompatibilityContext(object):
         """Add an error about the command not being a subset."""
         self._add_error(
             ERROR_ID_COMMAND_NOT_SUBSET, command_name,
-            "'%s' has field '%s' with type '%s' that is not a subset of the other version of this command."
-            % (command_name, field_name, type_name), file)
+            "'%s' has field '%s' with type '%s' that is not a subset of the other version "
+            "of this command." % (command_name, field_name, type_name), file)
 
     def add_command_type_invalid_error(self, command_name: str, file: str) -> None:
         """Add an error about the command type being invalid."""
@@ -293,6 +300,86 @@ class IDLCompatibilityContext(object):
             ERROR_ID_COMMAND_TYPE_NOT_SUPERSET, command_name,
             "'%s' has type '%s' that is not a subset of the other version of this command." %
             (command_name, type_name), file)
+
+    def add_old_parameter_type_bson_any_error(self, command_name: str, param_name: str,
+                                              old_type: str, file: str) -> None:
+        """
+        Add an error about BSON serialization type.
+
+        Add an error about the old command parameter type's
+        bson serialization type being of type "any".
+        """
+        self._add_error(
+            ERROR_ID_OLD_COMMAND_PARAMETER_TYPE_BSON_SERIALIZATION_TYPE_ANY, command_name,
+            ("The '%s'' command has parameter '%s' that has type '%s' "
+             "that has a bson serialization type 'any'") % (command_name, param_name, old_type),
+            file)
+
+    def add_new_parameter_type_bson_any_error(self, command_name: str, param_name: str,
+                                              new_type: str, file: str) -> None:
+        """
+        Add an error about BSON serialization type.
+
+        Add an error about the new command parameter type's
+        bson serialization type being of type "any".
+        """
+        self._add_error(
+            ERROR_ID_NEW_COMMAND_PARAMETER_TYPE_BSON_SERIALIZATION_TYPE_ANY, command_name,
+            ("The '%s'' command has parameter '%s' that has type '%s' "
+             "that has a bson serialization type 'any'") % (command_name, param_name, new_type),
+            file)
+
+    def add_new_command_parameter_type_not_enum_error(self, command_name: str, param_name: str,
+                                                      new_type: str, old_type: str,
+                                                      file: str) -> None:
+        # pylint: disable=too-many-arguments
+        """Add an error about the new command parameter type not being an enum when the old one is."""
+        self._add_error(
+            ERROR_ID_NEW_COMMAND_PARAMETER_TYPE_NOT_ENUM, command_name,
+            ("The '%s' command has parameter '%s' of type '%s' that is not an enum while the "
+             "corresponding old parameter type was an enum of type '%s'.") %
+            (command_name, param_name, new_type, old_type), file)
+
+    def add_new_command_parameter_type_not_struct_error(self, command_name: str, param_name: str,
+                                                        new_type: str, old_type: str,
+                                                        file: str) -> None:
+        # pylint: disable=too-many-arguments
+        """Add an error about the new command parameter type not being a struct when the old one is."""
+        self._add_error(ERROR_ID_NEW_COMMAND_PARAMETER_TYPE_NOT_STRUCT, command_name, (
+            "The '%s' command has parameter '%s' of type '%s' that is not a struct while the corresponding "
+            "old parameter type was a struct of type '%s'.") % (command_name, param_name, new_type,
+                                                                old_type), file)
+
+    def add_new_command_parameter_type_enum_or_struct_error(self, command_name: str,
+                                                            param_name: str, new_type: str,
+                                                            old_type: str, file: str) -> None:
+        # pylint: disable=too-many-arguments
+        """
+        Add an error about a non-enum or non-struct type.
+
+        Add an error when the new command parameter type is an enum or
+        struct and the old one is a non-enum or non-struct type.
+        """
+        self._add_error(
+            ERROR_ID_NEW_COMMAND_PARAMETER_TYPE_ENUM_OR_STRUCT, command_name,
+            ("The command '%s' has parameter '%s' of type '%s' that is an enum or struct "
+             "while the corresponding old parameter type is a non-enum or "
+             "non-struct of type '%s'.") % (command_name, param_name, new_type, old_type), file)
+
+    def add_command_parameter_type_invalid_error(self, command_name: str, param_name: str,
+                                                 file: str) -> None:
+        """Add an error about the command parameter type being invalid."""
+        self._add_error(ERROR_ID_COMMAND_PARAMETER_TYPE_INVALID, command_name,
+                        ("The '%s' command has a parameter '%s' that has an invalid type") %
+                        (command_name, param_name), file)
+
+    def add_command_parameter_type_not_superset_error(self, command_name: str, param_name: str,
+                                                      type_name: str, file: str) -> None:
+        """Add an error about the new command parameter not being a superset."""
+        self._add_error(
+            ERROR_ID_COMMAND_PARAMETER_TYPE_NOT_SUPERSET, command_name,
+            "The command '%s' has parameter '%s' with type '%s' that is not a superset of the older version "
+            "of this command parameter type." % (command_name, param_name, type_name), file)
 
     def add_missing_error_reply_struct_error(self, file: str) -> None:
         """Add an error about the file missing the ErrorReply struct."""

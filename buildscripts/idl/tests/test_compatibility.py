@@ -57,8 +57,24 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
         dir_path = path.dirname(path.realpath(__file__))
         with self.assertRaises(SystemExit):
             idl_check_compatibility.check_compatibility(
-                path.join(dir_path, "compatibility_test_fail/old_abort"),
-                path.join(dir_path, "compatibility_test_fail/new_abort"), ["src"])
+                path.join(dir_path, "compatibility_test_fail/abort/invalid_reply_field_type"),
+                path.join(dir_path, "compatibility_test_fail/abort/valid_reply_field_type"),
+                ["src"])
+        with self.assertRaises(SystemExit):
+            idl_check_compatibility.check_compatibility(
+                path.join(dir_path, "compatibility_test_fail/abort/valid_reply_field_type"),
+                path.join(dir_path, "compatibility_test_fail/abort/invalid_reply_field_type"),
+                ["src"])
+        with self.assertRaises(SystemExit):
+            idl_check_compatibility.check_compatibility(
+                path.join(dir_path, "compatibility_test_fail/abort/invalid_command_parameter_type"),
+                path.join(dir_path, "compatibility_test_fail/abort/valid_command_parameter_type"),
+                ["src"])
+        with self.assertRaises(SystemExit):
+            idl_check_compatibility.check_compatibility(
+                path.join(dir_path, "compatibility_test_fail/abort/valid_command_parameter_type"),
+                path.join(dir_path, "compatibility_test_fail/abort/invalid_command_parameter_type"),
+                ["src"])
 
     # pylint: disable=too-many-locals,too-many-statements
     def test_should_fail(self):
@@ -69,7 +85,7 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
             path.join(dir_path, "compatibility_test_fail/new"), ["src"])
 
         self.assertTrue(error_collection.has_errors())
-        self.assertTrue(error_collection.count() == 44)
+        self.assertTrue(error_collection.count() == 52)
 
         invalid_api_version_new_error = error_collection.get_error_by_command_name(
             "invalidAPIVersionNew")
@@ -130,6 +146,69 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
         self.assertTrue(command_parameter_required_error.error_id ==
                         idl_compatibility_errors.ERROR_ID_COMMAND_PARAMETER_REQUIRED)
         self.assertRegex(str(command_parameter_required_error), "commandParameterRequired")
+
+        old_command_parameter_type_bson_any_error = error_collection.get_error_by_command_name(
+            "oldCommandParameterTypeBsonSerializationAny")
+        self.assertTrue(
+            old_command_parameter_type_bson_any_error.error_id == idl_compatibility_errors.
+            ERROR_ID_OLD_COMMAND_PARAMETER_TYPE_BSON_SERIALIZATION_TYPE_ANY)
+        self.assertRegex(
+            str(old_command_parameter_type_bson_any_error),
+            "oldCommandParameterTypeBsonSerializationAny")
+
+        new_command_parameter_type_bson_any_error = error_collection.get_error_by_command_name(
+            "newCommandParameterTypeBsonSerializationAny")
+        self.assertTrue(
+            new_command_parameter_type_bson_any_error.error_id == idl_compatibility_errors.
+            ERROR_ID_NEW_COMMAND_PARAMETER_TYPE_BSON_SERIALIZATION_TYPE_ANY)
+        self.assertRegex(
+            str(new_command_parameter_type_bson_any_error),
+            "newCommandParameterTypeBsonSerializationAny")
+
+        new_command_parameter_type_enum_not_superset = error_collection.get_error_by_command_name(
+            "newCommandParameterTypeEnumNotSuperset")
+        self.assertTrue(new_command_parameter_type_enum_not_superset.error_id ==
+                        idl_compatibility_errors.ERROR_ID_COMMAND_PARAMETER_TYPE_NOT_SUPERSET)
+        self.assertRegex(
+            str(new_command_parameter_type_enum_not_superset),
+            "newCommandParameterTypeEnumNotSuperset")
+
+        new_command_parameter_type_not_enum = error_collection.get_error_by_command_name(
+            "newCommandParameterTypeNotEnum")
+        self.assertTrue(new_command_parameter_type_not_enum.error_id ==
+                        idl_compatibility_errors.ERROR_ID_NEW_COMMAND_PARAMETER_TYPE_NOT_ENUM)
+        self.assertRegex(str(new_command_parameter_type_not_enum), "newCommandParameterTypeNotEnum")
+
+        new_command_parameter_type_not_struct = error_collection.get_error_by_command_name(
+            "newCommandParameterTypeNotStruct")
+        self.assertTrue(new_command_parameter_type_not_struct.error_id ==
+                        idl_compatibility_errors.ERROR_ID_NEW_COMMAND_PARAMETER_TYPE_NOT_STRUCT)
+        self.assertRegex(
+            str(new_command_parameter_type_not_struct), "newCommandParameterTypeNotStruct")
+
+        new_command_parameter_type_enum_or_struct_one = error_collection.get_error_by_command_name(
+            "newCommandParameterTypeEnumOrStructOne")
+        self.assertTrue(new_command_parameter_type_enum_or_struct_one.error_id ==
+                        idl_compatibility_errors.ERROR_ID_NEW_COMMAND_PARAMETER_TYPE_ENUM_OR_STRUCT)
+        self.assertRegex(
+            str(new_command_parameter_type_enum_or_struct_one),
+            "newCommandParameterTypeEnumOrStructOne")
+
+        new_command_parameter_type_enum_or_struct_two = error_collection.get_error_by_command_name(
+            "newCommandParameterTypeEnumOrStructTwo")
+        self.assertTrue(new_command_parameter_type_enum_or_struct_two.error_id ==
+                        idl_compatibility_errors.ERROR_ID_NEW_COMMAND_PARAMETER_TYPE_ENUM_OR_STRUCT)
+        self.assertRegex(
+            str(new_command_parameter_type_enum_or_struct_two),
+            "newCommandParameterTypeEnumOrStructTwo")
+
+        new_command_parameter_type_bson_not_superset = error_collection.get_error_by_command_name(
+            "newCommandParameterTypeBsonNotSuperset")
+        self.assertTrue(new_command_parameter_type_bson_not_superset.error_id ==
+                        idl_compatibility_errors.ERROR_ID_COMMAND_PARAMETER_TYPE_NOT_SUPERSET)
+        self.assertRegex(
+            str(new_command_parameter_type_bson_not_superset),
+            "newCommandParameterTypeBsonNotSuperset")
 
         new_reply_field_unstable_error = error_collection.get_error_by_command_name(
             "newReplyFieldUnstable")

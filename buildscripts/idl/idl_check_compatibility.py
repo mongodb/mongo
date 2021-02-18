@@ -111,6 +111,16 @@ def check_subset(ctxt: IDLCompatibilityContext, cmd_name: str, field_name: str, 
         ctxt.add_command_not_subset_error(cmd_name, field_name, type_name, file_path)
 
 
+def check_superset(ctxt: IDLCompatibilityContext, cmd_name: str, param_name: str, type_name: str,
+                   super_list: List[Union[str, syntax.EnumValue]],
+                   sub_list: List[Union[str, syntax.EnumValue]], file_path: str):
+    # pylint: disable=too-many-arguments
+    """Check if super_list is a superset of the sub_list and log an error if not."""
+    if not set(super_list).issuperset(sub_list):
+        ctxt.add_command_parameter_type_not_superset_error(cmd_name, param_name, type_name,
+                                                           file_path)
+
+
 def check_type_superset(ctxt: IDLCompatibilityContext, cmd_name: str, type_name: str,
                         sub_list: List[Union[str, syntax.EnumValue]],
                         super_list: List[Union[str, syntax.EnumValue]], file_path: str):
@@ -221,6 +231,56 @@ def check_reply_field_type(ctxt: IDLCompatibilityContext,
         else:
             ctxt.add_new_reply_field_type_not_struct_error(
                 cmd_name, field_name, new_field_type.name, old_field_type.name, new_idl_file_path)
+
+
+def check_command_parameter_type(
+        ctxt: IDLCompatibilityContext,
+        old_parameter_type: Optional[Union[syntax.Enum, syntax.Struct, syntax.Type]],
+        new_parameter_type: Optional[Union[syntax.Enum, syntax.Struct, syntax.Type]], cmd_name: str,
+        param_name: str, old_idl_file_path: str, new_idl_file_path: str):
+    """Check compatibility between old and new command parameter type."""
+    # pylint: disable=too-many-arguments,too-many-branches
+    if old_parameter_type is None:
+        ctxt.add_command_parameter_type_invalid_error(cmd_name, param_name, old_idl_file_path)
+        ctxt.errors.dump_errors()
+        sys.exit(1)
+    if new_parameter_type is None:
+        ctxt.add_command_parameter_type_invalid_error(cmd_name, param_name, new_idl_file_path)
+        ctxt.errors.dump_errors()
+        sys.exit(1)
+
+    if isinstance(old_parameter_type, syntax.Type):
+        if isinstance(new_parameter_type, syntax.Type):
+            if "any" in old_parameter_type.bson_serialization_type:
+                ctxt.add_old_parameter_type_bson_any_error(
+                    cmd_name, param_name, old_parameter_type.name, old_idl_file_path)
+            elif "any" in new_parameter_type.bson_serialization_type:
+                ctxt.add_new_parameter_type_bson_any_error(
+                    cmd_name, param_name, new_parameter_type.name, new_idl_file_path)
+
+            else:
+                check_superset(ctxt, cmd_name, param_name, new_parameter_type.name,
+                               new_parameter_type.bson_serialization_type,
+                               old_parameter_type.bson_serialization_type, new_idl_file_path)
+        else:
+            ctxt.add_new_command_parameter_type_enum_or_struct_error(
+                cmd_name, param_name, new_parameter_type.name, old_parameter_type.name,
+                new_idl_file_path)
+
+    elif isinstance(old_parameter_type, syntax.Enum):
+        if isinstance(new_parameter_type, syntax.Enum):
+            check_superset(ctxt, cmd_name, param_name, new_parameter_type.name,
+                           new_parameter_type.values, old_parameter_type.values, new_idl_file_path)
+        else:
+            ctxt.add_new_command_parameter_type_not_enum_error(
+                cmd_name, param_name, new_parameter_type.name, old_parameter_type.name,
+                new_idl_file_path)
+
+    elif isinstance(old_parameter_type, syntax.Struct):
+        if not isinstance(new_parameter_type, syntax.Struct):
+            ctxt.add_new_command_parameter_type_not_struct_error(
+                cmd_name, param_name, new_parameter_type.name, old_parameter_type.name,
+                new_idl_file_path)
 
 
 def check_command_type(ctxt: IDLCompatibilityContext,
@@ -355,8 +415,9 @@ def check_reply_fields(ctxt: IDLCompatibilityContext, old_reply: syntax.Struct,
 
 
 def check_command_parameters(ctxt: IDLCompatibilityContext, old_cmd: syntax.Command,
-                             new_cmd: syntax.Command, cmd_name: str, old_idl_file_path: str,
-                             new_idl_file_path: str):
+                             new_cmd: syntax.Command, cmd_name: str,
+                             old_idl_file: syntax.IDLParsedSpec, new_idl_file: syntax.IDLParsedSpec,
+                             old_idl_file_path: str, new_idl_file_path: str):
     """Check compatibility between old and new command parameters."""
     # pylint: disable=too-many-arguments
     for old_param in old_cmd.fields:
@@ -364,7 +425,8 @@ def check_command_parameters(ctxt: IDLCompatibilityContext, old_cmd: syntax.Comm
         for new_param in new_cmd.fields:
             if new_param.name == old_param.name:
                 new_param_exists = True
-                check_command_parameter(ctxt, old_param, new_param, cmd_name, old_idl_file_path)
+                check_command_parameter(ctxt, old_param, new_param, cmd_name, old_idl_file,
+                                        new_idl_file, old_idl_file_path, new_idl_file_path)
                 break
 
         if not new_param_exists and not old_param.unstable:
@@ -385,8 +447,11 @@ def check_command_parameters(ctxt: IDLCompatibilityContext, old_cmd: syntax.Comm
 
 
 def check_command_parameter(ctxt: IDLCompatibilityContext, old_param: syntax.Field,
-                            new_param: syntax.Field, cmd_name: str, old_idl_file_path: str):
+                            new_param: syntax.Field, cmd_name: str,
+                            old_idl_file: syntax.IDLParsedSpec, new_idl_file: syntax.IDLParsedSpec,
+                            old_idl_file_path: str, new_idl_file_path: str):
     """Check compatibility between the old and new command parameter."""
+    # pylint: disable=too-many-arguments
     if not old_param.unstable and new_param.unstable:
         ctxt.add_command_parameter_unstable_error(cmd_name, old_param.name, old_idl_file_path)
     if old_param.unstable and not new_param.optional and not new_param.unstable:
@@ -394,7 +459,12 @@ def check_command_parameter(ctxt: IDLCompatibilityContext, old_param: syntax.Fie
                                                          old_idl_file_path)
     if old_param.optional and not new_param.optional:
         ctxt.add_command_parameter_required_error(cmd_name, old_param.name, old_idl_file_path)
-    #TODO (SERVER-53203): Type check command parameters.
+
+    old_parameter_type = get_field_type(old_param, old_idl_file, old_idl_file_path)
+    new_parameter_type = get_field_type(new_param, new_idl_file, new_idl_file_path)
+
+    check_command_parameter_type(ctxt, old_parameter_type, new_parameter_type, cmd_name,
+                                 old_param.name, old_idl_file_path, new_idl_file_path)
 
 
 def check_namespace(ctxt: IDLCompatibilityContext, old_cmd: syntax.Command, new_cmd: syntax.Command,
@@ -528,7 +598,8 @@ def check_compatibility(old_idl_dir: str, new_idl_dir: str,
 
                     # Check compatibility of command's parameters.
                     check_command_parameters(ctxt, old_cmd, new_cmd, old_cmd.command_name,
-                                             old_idl_file_path, new_idl_file_path)
+                                             old_idl_file, new_idl_file, old_idl_file_path,
+                                             new_idl_file_path)
 
                     check_namespace(ctxt, old_cmd, new_cmd, old_idl_file, new_idl_file,
                                     old_idl_file_path, new_idl_file_path)
