@@ -99,6 +99,18 @@ void OplogApplierImplOpObserver::onCreateCollection(OperationContext* opCtx,
     }
     onCreateCollectionFn(opCtx, coll, collectionName, options, idIndex);
 }
+
+void OplogApplierImplOpObserver::onCreateIndex(OperationContext* opCtx,
+                                               const NamespaceString& nss,
+                                               CollectionUUID uuid,
+                                               BSONObj indexDoc,
+                                               bool fromMigrate) {
+    if (!onCreateIndexFn) {
+        return;
+    }
+    onCreateIndexFn(opCtx, nss, uuid, indexDoc, fromMigrate);
+}
+
 void OplogApplierImplTest::setUp() {
     ServiceContextMongoDTest::setUp();
 

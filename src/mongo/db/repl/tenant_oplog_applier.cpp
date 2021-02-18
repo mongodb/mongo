@@ -587,15 +587,18 @@ Status TenantOplogApplier::_applyOplogEntryOrGroupedInserts(
     invariant(oplogApplicationMode == OplogApplication::Mode::kInitialSync);
 
     auto op = entryOrGroupedInserts.getOp();
-    if (op.isIndexCommandType()) {
-        // TODO(SERVER-48862): Handle index builds during oplog application.
+    if (op.isIndexCommandType() && op.getCommandType() != OplogEntry::CommandType::kCreateIndexes &&
+        op.getCommandType() != OplogEntry::CommandType::kDropIndexes) {
         LOGV2_ERROR(488610,
-                    "Index operations are not currently supported in tenant migration",
+                    "Index creation, except createIndex on empty collections, is not supported in "
+                    "tenant migration",
                     "tenant"_attr = _tenantId,
                     "migrationUuid"_attr = _migrationUuid,
                     "op"_attr = redact(op.toBSONForLogging()));
 
-        return Status::OK();
+        uasserted(5434700,
+                  "Index creation, except createIndex on empty collections, is not supported in "
+                  "tenant migration");
     }
     // We don't count tenant application in the ops applied stats.
     auto incrementOpsAppliedStats = [] {};

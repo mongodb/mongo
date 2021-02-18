@@ -105,6 +105,14 @@ public:
                             const BSONObj& idIndex,
                             const OplogSlot& createOpTime) override;
 
+    /**
+     * Called when OplogApplierImpl creates an index
+     */
+    void onCreateIndex(OperationContext* opCtx,
+                       const NamespaceString& nss,
+                       CollectionUUID uuid,
+                       BSONObj indexDoc,
+                       bool fromMigrate) override;
     // Hooks for OpObserver functions. Defaults to a no-op function but may be overridden to check
     // actual documents mutated.
     std::function<void(OperationContext*, const NamespaceString&, const std::vector<BSONObj>&)>
@@ -126,6 +134,8 @@ public:
                        const CollectionOptions&,
                        const BSONObj&)>
         onCreateCollectionFn;
+    std::function<void(OperationContext*, const NamespaceString&, CollectionUUID, BSONObj, bool)>
+        onCreateIndexFn;
 };
 
 class OplogApplierImplTest : public ServiceContextMongoDTest {

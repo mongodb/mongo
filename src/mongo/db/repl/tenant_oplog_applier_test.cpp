@@ -661,6 +661,69 @@ TEST_F(TenantOplogApplierTest, ApplyCommand_Success) {
     applier->join();
 }
 
+TEST_F(TenantOplogApplierTest, ApplyCreateIndexesCommand_Success) {
+    NamespaceString nss(dbName, "t");
+    auto uuid = createCollectionWithUuid(_opCtx.get(), nss);
+    auto op =
+        BSON("op"
+             << "c"
+             << "ns" << nss.getCommandNS().ns() << "wall" << Date_t() << "o"
+             << BSON("createIndexes" << nss.coll() << "v" << 2 << "key" << BSON("a" << 1) << "name"
+                                     << "a_1")
+             << "ts" << Timestamp(1, 1) << "ui" << uuid);
+    bool applyCmdCalled = false;
+    _opObserver->onCreateIndexFn = [&](OperationContext* opCtx,
+                                       const NamespaceString& collNss,
+                                       CollectionUUID collUuid,
+                                       BSONObj indexDoc,
+                                       bool fromMigrate) {
+        ASSERT_FALSE(applyCmdCalled);
+        applyCmdCalled = true;
+        ASSERT_TRUE(opCtx->lockState()->isDbLockedForMode(nss.db(), MODE_IX));
+        ASSERT_TRUE(opCtx->writesAreReplicated());
+        ASSERT_BSONOBJ_EQ(indexDoc,
+                          BSON("v" << 2 << "key" << BSON("a" << 1) << "name"
+                                   << "a_1"));
+        ASSERT_EQUALS(nss, collNss);
+        ASSERT_EQUALS(uuid, collUuid);
+    };
+    auto entry = OplogEntry(op);
+    pushOps({entry});
+    auto writerPool = makeTenantMigrationWriterPool();
+
+    auto applier = std::make_shared<TenantOplogApplier>(
+        _migrationUuid, _tenantId, OpTime(), &_oplogBuffer, _executor, writerPool.get());
+    ASSERT_OK(applier->startup());
+    auto opAppliedFuture = applier->getNotificationForOpTime(entry.getOpTime());
+    ASSERT_OK(opAppliedFuture.getNoThrow().getStatus());
+    ASSERT_TRUE(applyCmdCalled);
+    applier->shutdown();
+    applier->join();
+}
+
+TEST_F(TenantOplogApplierTest, ApplyStartIndexBuildCommand_Failure) {
+    NamespaceString nss(dbName, "t");
+    auto uuid = createCollectionWithUuid(_opCtx.get(), nss);
+    auto op = BSON("op"
+                   << "c"
+                   << "ns" << nss.getCommandNS().ns() << "wall" << Date_t() << "o"
+                   << BSON("startIndexBuild" << nss.coll() << "v" << 2 << "key" << BSON("a" << 1)
+                                             << "name"
+                                             << "a_1")
+                   << "ts" << Timestamp(1, 1) << "ui" << uuid);
+    auto entry = OplogEntry(op);
+    pushOps({entry});
+    auto writerPool = makeTenantMigrationWriterPool();
+
+    auto applier = std::make_shared<TenantOplogApplier>(
+        _migrationUuid, _tenantId, OpTime(), &_oplogBuffer, _executor, writerPool.get());
+    ASSERT_OK(applier->startup());
+    auto opAppliedFuture = applier->getNotificationForOpTime(entry.getOpTime());
+    ASSERT_EQUALS(opAppliedFuture.getNoThrow().getStatus().code(), 5434700);
+    applier->shutdown();
+    applier->join();
+}
+
 TEST_F(TenantOplogApplierTest, ApplyCommand_WrongNSS) {
     // Should not be able to apply a command in the wrong namespace.
     NamespaceString nss("notmytenant", "t");
