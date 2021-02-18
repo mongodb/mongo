@@ -124,6 +124,20 @@ void checkInitialSyncFinished(OperationContext* opCtx) {
     LOGV2(4637905, "The current replica set config has been propagated to all nodes.");
 }
 
+void waitForCurrentConfigCommitment(OperationContext* opCtx) {
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+
+    // Skip the waiting if the current config is from a force reconfig.
+    auto oplogWait = replCoord->getConfig().getConfigTerm() != repl::OpTime::kUninitializedTerm;
+    auto status = replCoord->awaitConfigCommitment(opCtx, oplogWait);
+    status.addContext("New feature compatibility version is rejected");
+    if (status == ErrorCodes::MaxTimeMSExpired) {
+        // Convert the error code to be more specific.
+        uasserted(ErrorCodes::CurrentConfigNotCommittedYet, status.reason());
+    }
+    uassertStatusOK(status);
+}
+
 /**
  * Sets the minimum allowed feature compatibility version for the cluster. The cluster should not
  * use any new features introduced in binary versions that are newer than the feature compatibility
@@ -259,6 +273,9 @@ public:
             // reconfig to change the 'slaveDelay' field to 'secondaryDelaySecs'.
             if (isReplSet && repl::feature_flags::gUseSecondaryDelaySecs.isEnabledAndIgnoreFCV() &&
                 requestedVersion == ServerGlobalParams::FeatureCompatibility::kLatest) {
+                // Wait for the current config to be committed before starting a new reconfig.
+                waitForCurrentConfigCommitment(opCtx);
+
                 auto getNewConfig = [&](const repl::ReplSetConfig& oldConfig, long long term) {
                     auto newConfig = oldConfig.getMutable();
                     newConfig.setConfigVersion(newConfig.getConfigVersion() + 1);
@@ -268,22 +285,12 @@ public:
                     }
                     return repl::ReplSetConfig(std::move(newConfig));
                 };
-                auto status = replCoord->doReplSetReconfig(opCtx, getNewConfig, true /* force */);
+                auto status = replCoord->doReplSetReconfig(opCtx, getNewConfig, false /* force */);
                 uassertStatusOKWithContext(status, "Failed to upgrade the replica set config");
 
-                LOGV2(5042301,
-                      "Waiting for the upgraded replica set config to propagate to a majority");
-                // If a write concern is given, we'll use its wTimeout. It's kNoTimeout by default.
-                WriteConcernOptions writeConcern(
-                    repl::ReplSetConfig::kConfigMajorityWriteConcernModeName,
-                    WriteConcernOptions::SyncMode::NONE,
-                    opCtx->getWriteConcern().wTimeout);
-                writeConcern.checkCondition = WriteConcernOptions::CheckCondition::Config;
-                repl::OpTime fakeOpTime(Timestamp(1, 1), replCoord->getTerm());
                 uassertStatusOKWithContext(
-                    replCoord->awaitReplication(opCtx, fakeOpTime, writeConcern).status,
-                    "Failed to wait for the upgraded replica set config to propagate to a "
-                    "majority");
+                    replCoord->awaitConfigCommitment(opCtx, true /* waitForOplogCommitment */),
+                    "The upgraded replica set config failed to propagate to a majority");
                 LOGV2(5042302, "The upgraded replica set config has been propagated to a majority");
             }
 
@@ -376,6 +383,9 @@ public:
             // a reconfig to change the 'secondaryDelaySecs' field to 'slaveDelay'.
             if (isReplSet && repl::feature_flags::gUseSecondaryDelaySecs.isEnabledAndIgnoreFCV() &&
                 requestedVersion < repl::feature_flags::gUseSecondaryDelaySecs.getVersion()) {
+                // Wait for the current config to be committed before starting a new reconfig.
+                waitForCurrentConfigCommitment(opCtx);
+
                 auto getNewConfig = [&](const repl::ReplSetConfig& oldConfig, long long term) {
                     auto newConfig = oldConfig.getMutable();
                     newConfig.setConfigVersion(newConfig.getConfigVersion() + 1);
@@ -387,22 +397,12 @@ public:
                     return repl::ReplSetConfig(std::move(newConfig));
                 };
 
-                auto status = replCoord->doReplSetReconfig(opCtx, getNewConfig, true /* force */);
+                auto status = replCoord->doReplSetReconfig(opCtx, getNewConfig, false /* force */);
                 uassertStatusOKWithContext(status, "Failed to downgrade the replica set config");
 
-                LOGV2(5042303,
-                      "Waiting for the downgraded replica set config to propagate to a majority");
-                // If a write concern is given, we'll use its wTimeout. It's kNoTimeout by default.
-                WriteConcernOptions writeConcern(
-                    repl::ReplSetConfig::kConfigMajorityWriteConcernModeName,
-                    WriteConcernOptions::SyncMode::NONE,
-                    opCtx->getWriteConcern().wTimeout);
-                writeConcern.checkCondition = WriteConcernOptions::CheckCondition::Config;
-                repl::OpTime fakeOpTime(Timestamp(1, 1), replCoord->getTerm());
                 uassertStatusOKWithContext(
-                    replCoord->awaitReplication(opCtx, fakeOpTime, writeConcern).status,
-                    "Failed to wait for the downgraded replica set config to propagate to a "
-                    "majority");
+                    replCoord->awaitConfigCommitment(opCtx, true /* waitForOplogCommitment */),
+                    "The downgraded replica set config failed to propagate to a majority");
                 LOGV2(5042304,
                       "The downgraded replica set config has been propagated to a majority");
             }
