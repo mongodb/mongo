@@ -94,6 +94,10 @@ structs:
                 type: array<object_owned>
                 description: "The zones associated with the new shard key."
                 optional: true
+            approxCopySize:
+                type: ReshardingApproxCopySize
+                description: "The approximate data that each recipient clones for this operation."
+                optional: true
             presetReshardedChunks:
                 type: array<object_owned>
                 description: >-

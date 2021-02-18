@@ -150,6 +150,16 @@ structs:
                 type: long
                 optional: true
 
+    ReshardingApproxCopySize:
+        description: "Not meant to be used directly. Only use internal fields."
+        fields:
+            approxDocumentsToCopy:
+                type: long
+                optional: true
+            approxBytesToCopy:
+                type: long
+                optional: true
+
     ReshardingSourceId:
         description: "Identifier for a shard involved in a particular resharding operation."
         fields:

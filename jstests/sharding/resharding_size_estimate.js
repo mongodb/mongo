@@ -107,6 +107,28 @@ reshardingTest.withReshardingInBackground(
         assert.eq(s0Estimate.documentsToClone, numDocumentsPerShard);
         assert.eq(s1Estimate.documentsToClone, numDocumentsPerShard);
 
+        const verifyApproximateCopySizeForRecipients = (doc, s0Estimate, s1Estimate) => {
+            const approxCopySize = doc.approxCopySize;
+            assert(approxCopySize !== undefined,
+                   "Unable to find 'approxCopySize' in the coordinator document");
+
+            const numRecipients = doc.recipientShards.length;
+            assert.neq(numRecipients, 0, "Unexpected number of recipients");
+
+            const expectedApproxDocumentsToCopy =
+                (s0Estimate.documentsToClone + s1Estimate.documentsToClone) / numRecipients;
+            assert.eq(approxCopySize.approxDocumentsToCopy,
+                      expectedApproxDocumentsToCopy,
+                      "Unexpected value for 'approxDocumentsToCopy' in the coordinator document");
+
+            const expectedApproxBytesToCopy =
+                (s0Estimate.bytesToClone + s1Estimate.bytesToClone) / numRecipients;
+            assert.eq(approxCopySize.approxBytesToCopy,
+                      expectedApproxBytesToCopy,
+                      "Unexpected value for 'approxBytesToCopy' in the coordinator document");
+        };
+        verifyApproximateCopySizeForRecipients(coordinatorDoc, s0Estimate, s1Estimate);
+
         return true;
     });
 

@@ -139,6 +139,12 @@ void writeToCoordinatorStateNss(OperationContext* opCtx,
                                           *abortReason);
                     }
 
+                    if (auto approxCopySize = coordinatorDoc.getApproxCopySize()) {
+                        // If the approxCopySize exists, include it in the update.
+                        setBuilder.append(ReshardingCoordinatorDocument::kApproxCopySizeFieldName,
+                                          approxCopySize->toBSON());
+                    }
+
                     if (nextState == CoordinatorStateEnum::kPreparingToDonate) {
                         appendShardEntriesToSetBuilder(coordinatorDoc, setBuilder);
                         setBuilder.doneFast();
@@ -967,7 +973,7 @@ SemiFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::run(
                   "error"_attr = status);
 
             _updateCoordinatorDocStateAndCatalogEntries(
-                CoordinatorStateEnum::kError, _coordinatorDoc, boost::none, status);
+                CoordinatorStateEnum::kError, _coordinatorDoc, boost::none, boost::none, status);
 
             _tellAllParticipantsToRefresh(createFlushRoutingTableCacheUpdatesCommand(nss),
                                           executor);
@@ -1078,6 +1084,43 @@ void ReshardingCoordinatorService::ReshardingCoordinator::
     installCoordinatorDoc(updatedCoordinatorDoc);
 };
 
+
+void emplaceApproxBytesToCopyIfExists(ReshardingCoordinatorDocument& coordinatorDoc,
+                                      boost::optional<ReshardingApproxCopySize> approxCopySize) {
+    if (!approxCopySize) {
+        return;
+    }
+
+    if (auto alreadyExistingApproxCopySize = coordinatorDoc.getApproxCopySize()) {
+        invariant(approxCopySize->toBSON().woCompare(alreadyExistingApproxCopySize->toBSON()) == 0,
+                  "Expected the existing and the new values for approxCopySize to be equal");
+    }
+
+    coordinatorDoc.setApproxCopySize(std::move(approxCopySize));
+}
+
+ReshardingApproxCopySize computeApproxCopySize(ReshardingCoordinatorDocument& coordinatorDoc) {
+    const auto numRecipients = coordinatorDoc.getRecipientShards().size();
+    iassert(ErrorCodes::BadValue,
+            "Expected to find at least one recipient in the coordinator document",
+            numRecipients > 0);
+
+    // Compute the aggregate for the number of documents and bytes to copy.
+    long aggBytesToCopy = 0, aggDocumentsToCopy = 0;
+    for (auto donor : coordinatorDoc.getDonorShards()) {
+        if (const auto cloneSizeInfo = donor.getCloneSizeInfo(); cloneSizeInfo) {
+            aggBytesToCopy += cloneSizeInfo->getBytesToClone().get_value_or(0);
+            aggDocumentsToCopy += cloneSizeInfo->getDocumentsToClone().get_value_or(0);
+        }
+    }
+
+    // Calculate the approximate number of documents and bytes that each recipient will clone.
+    ReshardingApproxCopySize approxCopySize;
+    approxCopySize.setApproxBytesToCopy(aggBytesToCopy / numRecipients);
+    approxCopySize.setApproxDocumentsToCopy(aggDocumentsToCopy / numRecipients);
+    return approxCopySize;
+}
+
 ExecutorFuture<void>
 ReshardingCoordinatorService::ReshardingCoordinator::_awaitAllDonorsReadyToDonate(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
@@ -1095,9 +1138,11 @@ ReshardingCoordinatorService::ReshardingCoordinator::_awaitAllDonorsReadyToDonat
 
             auto highestMinFetchTimestamp =
                 getHighestMinFetchTimestamp(coordinatorDocChangedOnDisk.getDonorShards());
-            _updateCoordinatorDocStateAndCatalogEntries(CoordinatorStateEnum::kCloning,
-                                                        coordinatorDocChangedOnDisk,
-                                                        highestMinFetchTimestamp);
+            _updateCoordinatorDocStateAndCatalogEntries(
+                CoordinatorStateEnum::kCloning,
+                coordinatorDocChangedOnDisk,
+                highestMinFetchTimestamp,
+                computeApproxCopySize(coordinatorDocChangedOnDisk));
         });
 }
 
@@ -1203,14 +1248,17 @@ ExecutorFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::
 }
 
 void ReshardingCoordinatorService::ReshardingCoordinator::
-    _updateCoordinatorDocStateAndCatalogEntries(CoordinatorStateEnum nextState,
-                                                ReshardingCoordinatorDocument coordinatorDoc,
-                                                boost::optional<Timestamp> fetchTimestamp,
-                                                boost::optional<Status> abortReason) {
+    _updateCoordinatorDocStateAndCatalogEntries(
+        CoordinatorStateEnum nextState,
+        ReshardingCoordinatorDocument coordinatorDoc,
+        boost::optional<Timestamp> fetchTimestamp,
+        boost::optional<ReshardingApproxCopySize> approxCopySize,
+        boost::optional<Status> abortReason) {
     // Build new state doc for coordinator state update
     ReshardingCoordinatorDocument updatedCoordinatorDoc = coordinatorDoc;
     updatedCoordinatorDoc.setState(nextState);
     emplaceFetchTimestampIfExists(updatedCoordinatorDoc, std::move(fetchTimestamp));
+    emplaceApproxBytesToCopyIfExists(updatedCoordinatorDoc, std::move(approxCopySize));
     emplaceAbortReasonIfExists(updatedCoordinatorDoc, abortReason);
 
     auto opCtx = cc().makeOperationContext();
