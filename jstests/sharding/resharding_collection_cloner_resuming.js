@@ -12,7 +12,17 @@
 load("jstests/libs/uuid_util.js");
 load("jstests/sharding/libs/create_sharded_collection_util.js");
 
-const st = new ShardingTest({mongos: 1, config: 1, shards: 2, rs: {nodes: 1}});
+const st = new ShardingTest({
+    mongos: 1,
+    config: 1,
+    shards: 2,
+    rs: {nodes: 1},
+    rsOptions: {
+        setParameter: {
+            "failpoint.WTPreserveSnapshotHistoryIndefinitely": tojson({mode: "alwaysOn"}),
+        }
+    },
+});
 
 const inputCollection = st.s.getCollection("reshardingDb.coll");
 
