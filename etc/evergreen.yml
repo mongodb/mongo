@@ -7240,6 +7240,7 @@ tasks:
     timeout_secs: 1800 # 30 minute timeout for no output
 
 - name: powercycle_kill_mongod
+  tags: ["powercycle"]
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on:
   - name: archive_dist_test_debug
@@ -8780,9 +8781,6 @@ buildvariants:
   - name: .logical_session_cache .one_sec
   - name: multiversion_gen
   - name: .powercycle
-    distros:
-    - ubuntu1604-powercycle
-  - name: powercycle_kill_mongod
     distros:
     - ubuntu1604-powercycle
   - name: powercycle_replication_smalloplog

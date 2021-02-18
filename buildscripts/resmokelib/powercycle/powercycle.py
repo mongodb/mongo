@@ -1649,8 +1649,10 @@ def setup_ssh_tunnel(  # pylint: disable=too-many-arguments
     ssh_tunnel_cmd = f"ssh -N {ssh_tunnel_opts} {ssh_connection_options} {ssh_options} {ssh_user_host}"
     LOGGER.info("Tunneling mongod connections through ssh to get around firewall")
     LOGGER.info(ssh_tunnel_cmd)
-    Processes.create(ssh_tunnel_cmd)
+    ssh_tunnel_proc = start_cmd(ssh_tunnel_cmd)
     LOGGER.info("The connection is not terminated because the host can be shut down at anytime")
+
+    return ssh_tunnel_proc
 
 
 def get_remote_python():
@@ -1891,8 +1893,8 @@ def main(parser_actions, options):  # pylint: disable=too-many-branches,too-many
         if ret:
             local_exit(ret)
 
-        setup_ssh_tunnel(mongod_host, secret_port, standard_port, ssh_connection_options,
-                         ssh_options, ssh_user_host)
+        ssh_tunnel_proc = setup_ssh_tunnel(mongod_host, secret_port, standard_port,
+                                           ssh_connection_options, ssh_options, ssh_user_host)
 
         # Optionally validate canary document locally.
         if validate_canary_local:
@@ -2008,6 +2010,7 @@ def main(parser_actions, options):  # pylint: disable=too-many-branches,too-many
         Processes.kill_all()
         for temp_file in temp_client_files:
             NamedTempFile.delete(temp_file)
+        kill_process(ssh_tunnel_proc)
 
         # Reestablish remote access after crash.
         local_ops = LocalToRemoteOperations(user_host=ssh_user_host,
