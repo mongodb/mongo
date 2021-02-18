@@ -32,19 +32,15 @@ global:
 imports:
     - "mongo/idl/basic_types.idl"
 
-structs:
-    InvalidFieldTypeReply:
-        description: "This reply contains a field where the old type is invalid"
-        fields:
-            invalidReplyField:
-                type: string
-
 commands:
-    replyFieldTypeInvalid:
-        description: "old command abort because its reply field type is invalid"
-        command_name: replyFieldTypeInvalid
+    commandParameterTypeInvalid:
+        description: "valid command parameter type"
+        command_name: commandParameterTypeInvalid
         namespace: ignored
-        cpp_name: replyFieldTypeInvalid
+        cpp_name: commandParameterTypeInvalid
         strict: true
         api_version: "1"
-        reply_type: InvalidFieldTypeReply
+        reply_type: OkReply
+        fields:
+            invalidParameter:
+                type: string

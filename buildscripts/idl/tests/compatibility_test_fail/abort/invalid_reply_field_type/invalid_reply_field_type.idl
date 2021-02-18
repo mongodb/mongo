@@ -34,14 +34,14 @@ imports:
 
 structs:
     InvalidFieldTypeReply:
-        description: "This reply contains a field where the old type is invalid"
+        description: "This reply contains a field where the type is invalid"
         fields:
             invalidReplyField:
                 type: None
 
 commands:
     replyFieldTypeInvalid:
-        description: "old command aborts because its reply field type is invalid"
+        description: "invalid reply field type"
         command_name: replyFieldTypeInvalid
         namespace: ignored
         cpp_name: replyFieldTypeInvalid

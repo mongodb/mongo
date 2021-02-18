@@ -72,6 +72,14 @@ types:
                       field type"
         cpp_type: "std::int32_t"
 
+    intStringToInt:
+        bson_serialization_type:
+                                - int
+                                - string
+        description: "The bson_serialization_type changes from [int, string] in the old command
+                      parameter's type to [int] in the new command parameter's type"
+        cpp_type: "std::int32_t"
+
 enums:
     NewReplyFieldEnumNotSubset:
         description: "The new reply type is an enum that is not a subset of the old reply type's 
@@ -90,6 +98,9 @@ enums:
             valueThree: "three"
 
 structs:
+    StructCommandParameterType:
+        description: "This is a struct command parameter type"
+
     UnstableNewFieldReply:
         description: "This reply contains a field that is stable in the old command but is
                       unstable in the new command."
@@ -215,8 +226,8 @@ structs:
                     variant: [int, string]
     
     VariantRecursiveReply:
-        description: "This reply contains a field that has a new variant type that is not compatible
-                      with the old variant type"
+        description: "This reply contains a field that has a new variant type that is not
+                      compatible with the old variant type"
         fields:
             variantRecursiveReplyField:
                 type: 
@@ -231,8 +242,8 @@ structs:
                     variant: [int, string]
 
     VariantStructRecursiveReply:
-        description: "This reply contains a field that has a new variant struct type that is not compatible
-                      with the old variant struct type"
+        description: "This reply contains a field that has a new variant struct type that is not
+                      compatible with the old variant struct type"
         fields:
             variantStructRecursiveReplyField:
                 type: 
@@ -269,8 +280,8 @@ commands:
         reply_type: OkReply
 
     removedCommandParameter:
-        description: "parameter will be removed from command in compatibility_test_fail/new which results
-                      in an error"
+        description: "parameter will be removed from command in compatibility_test_fail/new
+                      which results in an error"
         command_name: removedCommandParameter
         namespace: ignored
         cpp_name: removedCommandParameter
@@ -282,7 +293,8 @@ commands:
                 type: string
 
     addedNewCommandParameterRequired:
-        description: "new command parameter fails because it is required when it should be optional"
+        description: "new command parameter fails because it is required when
+                      it should be optional"
         command_name: addedNewCommandParameterRequired
         namespace: ignored
         cpp_name: addedNewCommandParameterRequired
@@ -330,7 +342,112 @@ commands:
             newRequiredParam:
                 type: string
                 optional: true
+
+    oldCommandParameterTypeBsonSerializationAny:
+        description: "old command fails because it has a parameter type that has a
+                      bson_serialization_type that contains 'any'"
+        command_name: oldCommandParameterTypeBsonSerializationAny
+        namespace: ignored
+        cpp_name: oldCommandParameterTypeBsonSerializationAny
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        fields:
+            bsonTypeAnyParam:
+                type: oldBsonSerializationTypeAny
+
+    newCommandParameterTypeBsonSerializationAny:
+        description: "new command fails because it has a parameter type that has a
+                      bson_serialization_type that contains 'any'"
+        command_name: newCommandParameterTypeBsonSerializationAny
+        namespace: ignored
+        cpp_name: newCommandParameterTypeBsonSerializationAny
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        fields:
+            bsonTypeAnyParam:
+                type: newBsonSerializationTypeAny
+
+    newCommandParameterTypeEnumNotSuperset:
+        description: "new command fails because its parameter type is an enum that is not
+                      a superset of the corresponding old parameter type's enum values"
+        command_name: newCommandParameterTypeEnumNotSuperset
+        namespace: ignored
+        cpp_name: newCommandParameterTypeEnumNotSuperset
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        fields:
+            enumNotSupersetParam:
+                type: EnumNotSuperset
+
+    newCommandParameterTypeNotEnum:
+        description: "new command fails because its parameter type is not an enum when the
+                      old command parameter type is an enum"
+        command_name: newCommandParameterTypeNotEnum
+        namespace: ignored
+        cpp_name: newCommandParameterTypeNotEnum
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        fields:
+            newParamNotEnum:
+                type: EnumNotSuperset
+
+    newCommandParameterTypeNotStruct:
+        description: "new command fails because its parameter type is not a struct when the
+                      old command parameter type is a struct"
+        command_name: newCommandParameterTypeNotStruct
+        namespace: ignored
+        cpp_name: newCommandParameterTypeNotStruct
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        fields:
+            newParamNotStruct:
+                type: StructCommandParameterType
     
+    newCommandParameterTypeEnumOrStructOne:
+        description: "new command fails because its parameter type is an enum while the
+                      parameter type in the old command is an non-enum or non-struct"
+        command_name: newCommandParameterTypeEnumOrStructOne
+        namespace: ignored
+        cpp_name: newCommandParameterTypeEnumOrStructOne
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        fields:
+            newParamEnum:
+                type: string
+
+    newCommandParameterTypeEnumOrStructTwo:
+        description: "new command fails because its parameter type is a struct while the
+                      parameter type in the old command is an non-enum or non-struct"
+        command_name: newCommandParameterTypeEnumOrStructTwo
+        namespace: ignored
+        cpp_name: newCommandParameterTypeEnumOrStructTwo
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        fields:
+            newParamStruct:
+                type: string
+
+    newCommandParameterTypeBsonNotSuperset:
+        description: "new command fails because its parameter type has a bson_serialization_type
+                      that is not a superset of the corresponding old command parameter type's
+                      bson_serialization_type"
+        command_name: newCommandParameterTypeBsonNotSuperset
+        namespace: ignored
+        cpp_name: newCommandParameterTypeBsonNotSuperset
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        fields:
+            newParamBsonNotSuperset:
+                type: intStringToInt
+
     newReplyFieldUnstable:
         description: "new command fails because it contains an unstable reply field that is stable
                       in the corresponding old command"
@@ -673,8 +790,9 @@ commands:
         reply_type: NewVariantStructNotSubsetReply
     
     replyFieldVariantStructRecursive:
-        description: "new command fails because its reply field type has a variant struct type that is not
-                      compatible with the old reply field variant struct type"
+        description: "new command fails because its reply field type has a variant
+                      struct type that is not compatible with the old reply field variant
+                      struct type"
         command_name: replyFieldVariantStructRecursive
         namespace: ignored
         cpp_name: replyFieldVariantStructRecursive
