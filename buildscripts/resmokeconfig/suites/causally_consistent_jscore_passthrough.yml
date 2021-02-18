@@ -6,10 +6,6 @@ selector:
   exclude_files:
   # These tests are run in causally_consistent_jscore_txns_passthrough.yml.
   - jstests/core/txns/**/*.js
-  # Cannot specify afterClusterTime and afterOpTime.
-  - jstests/core/read_after_optime.js
-  # Not expected to pass with replica-sets.
-  - jstests/core/opcounters_write_cmd.js
   # Has conditional logic for standalone servers and replica sets, but can't distinguish the two
   # when connected to mongos.
   - jstests/core/write_result.js
@@ -19,13 +15,11 @@ selector:
   - jstests/core/apply_ops*.js  # applyOps, SERVER-1439.
   - jstests/core/capped_convertToCapped1.js  # cloneCollectionAsCapped.
   - jstests/core/capped_empty.js  # emptycapped.
-  - jstests/core/capped_update.js # uses godinsert and can't run under replication.
   - jstests/core/check_shard_index.js  # checkShardingIndex.
   - jstests/core/collection_truncate.js  # emptycapped.
   - jstests/core/collmod_without_uuid.js # applyOps, SERVER-1439
   - jstests/core/compact_keeps_indexes.js  # compact.
   - jstests/core/currentop.js  # uses fsync.
-  - jstests/core/dbadmin.js  # "local" database.
   - jstests/core/dbhash.js  # dbhash.
   - jstests/core/dbhash2.js  # dbhash.
   - jstests/core/diagdata.js # Command not supported in mongos
@@ -98,6 +92,7 @@ selector:
   - jstests/core/txns/prepare_transaction_fails_on_temp_collections.js
 
   exclude_with_any_tags:
+  - assumes_standalone_mongod
   - assumes_against_mongod_not_mongos
   ##
   # The next tag corresponds to the special error thrown by the set_read_preference_secondary.js

@@ -19,7 +19,6 @@ selector:
   - jstests/core/collmod_without_uuid.js # applyOps, SERVER-1439
   - jstests/core/compact_keeps_indexes.js  # compact.
   - jstests/core/currentop.js  # uses fsync.
-  - jstests/core/dbadmin.js  # "local" database.
   - jstests/core/dbhash.js  # dbhash.
   - jstests/core/dbhash2.js  # dbhash.
   - jstests/core/diagdata.js # Command not supported in mongos
@@ -44,8 +43,6 @@ selector:
   - jstests/core/geo_s2explain.js  # inputStage in different spot in explain().
   - jstests/core/geo_s2sparse.js  # keysPerIndex in different spot in validate().
   - jstests/core/operation_latency_histogram.js  # Stats are counted differently on mongos, SERVER-24880.
-  # Test expects to run against a standalone, but shards in this passthrough are repl sets.
-  - jstests/core/read_after_optime.js
   # The following tests fail because they count indexes. These counts do not take into account the
   # additional hashed shard key indexes that are automatically added by this passthrough.
   - jstests/core/apitest_dbcollection.js
@@ -136,9 +133,6 @@ selector:
   - jstests/core/update_modifier_pop.js
   - jstests/core/updateh.js
   - jstests/core/updatej.js
-
-  # SERVER-38096 Mongos opCounter doesn't increase when last op causes the transaction to implicitly abort
-  - jstests/core/opcounters_write_cmd.js
 
   # TODO: SERVER-38207 Cannot insert document with MaxKey shard key.
   - jstests/core/type8.js
@@ -348,6 +342,7 @@ selector:
   - operations_longer_than_stepdown_interval_in_txns
 
   - assumes_against_mongod_not_mongos
+  - assumes_standalone_mongod
   # Tests tagged with the following will fail because they assume collections are not sharded.
   - assumes_no_implicit_collection_creation_after_drop
   - assumes_no_implicit_index_creation

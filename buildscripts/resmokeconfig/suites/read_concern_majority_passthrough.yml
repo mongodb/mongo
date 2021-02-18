@@ -6,11 +6,6 @@ selector:
   exclude_files:
   # Transactions only a readConcern argument on the first command.
   - jstests/core/txns/**/*.js
-  # These tests are not expected to pass with replica-sets:
-  - jstests/core/dbadmin.js
-  - jstests/core/opcounters_write_cmd.js
-  - jstests/core/read_after_optime.js
-  - jstests/core/capped_update.js
   # These tests use benchRun(), which isn't configured to use the overridden writeConcern.
   - jstests/core/bench_test*.js
   - jstests/core/benchrun_pipeline_updates.js # benchRun() used for writes
@@ -25,6 +20,7 @@ selector:
   - assumes_read_concern_unchanged
   # "Cowardly refusing to override write concern of command: ..."
   - assumes_write_concern_unchanged
+  - assumes_standalone_mongod
 
 executor:
   archive:

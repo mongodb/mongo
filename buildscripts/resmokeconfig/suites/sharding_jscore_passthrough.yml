@@ -14,13 +14,11 @@ selector:
   - jstests/core/capped6.js  # captrunc.
   - jstests/core/capped_convertToCapped1.js  # cloneCollectionAsCapped.
   - jstests/core/capped_empty.js  # emptycapped.
-  - jstests/core/capped_update.js # uses godinsert and can't run under replication.
   - jstests/core/check_shard_index.js  # checkShardingIndex.
   - jstests/core/collection_truncate.js  # emptycapped.
   - jstests/core/collmod_without_uuid.js # applyOps, SERVER-1439
   - jstests/core/compact_keeps_indexes.js  # compact.
   - jstests/core/currentop.js  # uses fsync.
-  - jstests/core/dbadmin.js  # "local" database.
   - jstests/core/dbhash.js  # dbhash.
   - jstests/core/dbhash2.js  # dbhash.
   - jstests/core/diagdata.js # Command not supported in mongos
@@ -55,6 +53,7 @@ selector:
   - jstests/core/txns/prepare_transaction_fails_on_temp_collections.js
 
   exclude_with_any_tags:
+  - assumes_standalone_mongod
   - assumes_against_mongod_not_mongos
   # system.profile collection doesn't exist on mongos.
   - requires_profiling

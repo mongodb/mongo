@@ -6,11 +6,6 @@ selector:
   exclude_files:
   # Operations within a transaction do not support write concern.
   - jstests/core/txns/**/*.js
-  # These tests are not expected to pass with replica-sets:
-  - jstests/core/dbadmin.js
-  - jstests/core/opcounters_write_cmd.js
-  - jstests/core/read_after_optime.js
-  - jstests/core/capped_update.js
 
   # Parallel shell is not causally consistent
   - jstests/core/benchrun_pipeline_updates.js
@@ -34,6 +29,7 @@ selector:
   - jstests/core/collation.js
 
   exclude_with_any_tags:
+  - assumes_standalone_mongod
   ##
   # The next tag corresponds to the special error thrown by the set_read_preference_secondary.js
   # override when it refuses to replace the readPreference of a particular command. Above each tag

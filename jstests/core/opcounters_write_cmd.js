@@ -1,8 +1,12 @@
 // Test that opcounters get incremented properly.
 // @tags: [
 //   uses_multiple_connections,
+//   assumes_standalone_mongod,
 // ]
 // Legacy write mode test also available at jstests/gle.
+
+(function() {
+'use strict';
 
 var mongo = new Mongo(db.getMongo().host);
 
@@ -158,9 +162,9 @@ t.insert({_id: 0});
 assert.commandWorked(newdb.runCommand({listCollections: 1}));
 
 // Command, recognized, no error.
-serverStatus = newdb.runCommand({serverStatus: 1});
+var serverStatus = newdb.runCommand({serverStatus: 1});
 opCounters = serverStatus.opcounters;
-metricsObj = serverStatus.metrics.commands;
+var metricsObj = serverStatus.metrics.commands;
 assert.eq(opCounters.command + 1,
           newdb.serverStatus().opcounters.command);  // "serverStatus" counted
 // Count this and the last run of "serverStatus"
@@ -172,10 +176,7 @@ assert.eq(metricsObj.serverStatus.failed,
           "failed ServerStatus command counter incremented!");  // "serverStatus" counted
 
 // Command, recognized, with error.
-countVal = {
-    "total": 0,
-    "failed": 0
-};
+var countVal = {"total": 0, "failed": 0};
 if (metricsObj.count != null) {
     countVal = metricsObj.count;
 }
@@ -198,3 +199,4 @@ assert.eq(opCounters.command + 8,
           newdb.serverStatus().opcounters.command);  // "serverStatus" counted
 assert.eq(null, newdb.serverStatus().metrics.commands.invalid);
 assert.eq(metricsObj['<UNKNOWN>'] + 1, newdb.serverStatus().metrics.commands['<UNKNOWN>']);
+})();

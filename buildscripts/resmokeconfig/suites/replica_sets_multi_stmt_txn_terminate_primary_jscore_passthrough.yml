@@ -7,12 +7,6 @@ selector:
   # These tests already run with transactions.
   - jstests/core/txns/*.js
 
-  # These tests are not expected to pass with replica-sets:
-  - jstests/core/capped_update.js
-  - jstests/core/dbadmin.js
-  - jstests/core/opcounters_write_cmd.js
-  - jstests/core/read_after_optime.js
-
   ##
   ## Limitations with the way the runner file injects transactions.
   ##
@@ -235,11 +229,6 @@ selector:
   - jstests/core/coveredIndex1.js
   - jstests/core/sortc.js
 
-  # Assert on the isWritablePrimary field of a hello response. If a primary steps down after
-  # accepting a hello command and returns before its connection is closed, the response can
-  # contain isWritablePrimary: false.
-  - jstests/core/hello_response_validation.js
-
   - jstests/core/bench_test*.js # benchRun() used for writes
   - jstests/core/benchrun_pipeline_updates.js # benchRun() used for writes
   - jstests/core/connection_string_validation.js # Does not expect a replica set connection string.
@@ -268,6 +257,7 @@ selector:
   - jstests/core/upsert_shell.js
 
   exclude_with_any_tags:
+  - assumes_standalone_mongod
   ##
   # The next four tags correspond to the special errors thrown by the auto_retry_on_network_error.js
   # override when it refuses to run a certain command. Above each tag are the message(s) that cause

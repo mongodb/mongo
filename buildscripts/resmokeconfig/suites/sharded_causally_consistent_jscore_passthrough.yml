@@ -8,8 +8,6 @@ selector:
   exclude_files:
   # These tests are run in sharded_causally_consistent_jscore_txns_passthrough.
   - jstests/core/txns/**/*.js
-  # Not expected to pass with replica-sets.
-  - jstests/core/opcounters_write_cmd.js
   # The following tests fail because a certain command or functionality is not supported by
   # mongos. This command or functionality is placed in a comment next to the failing test.
   - jstests/core/apitest_db.js  # serverStatus output doesn't have storageEngine.
@@ -21,7 +19,6 @@ selector:
   - jstests/core/compact_keeps_indexes.js  # compact.
   - jstests/core/currentop.js  # uses fsync.
   - jstests/core/collmod_without_uuid.js # applyOps, SERVER-1439
-  - jstests/core/dbadmin.js  # "local" database.
   - jstests/core/dbhash.js  # dbhash.
   - jstests/core/dbhash2.js  # dbhash.
   - jstests/core/diagdata.js # Command not supported in mongos
@@ -43,8 +40,6 @@ selector:
   - jstests/core/geo_2d_explain.js  # executionSuccess in different spot in explain().
   - jstests/core/geo_s2explain.js  # inputStage in different spot in explain().
   - jstests/core/geo_s2sparse.js  # keysPerIndex in different spot in validate().
-  # Can't specify both 'afterClusterTime' and 'afterOpTime'.
-  - jstests/core/read_after_optime.js
   # The following tests fail because they count indexes. These counts do not take into account the
   # additional hashed shard key indexes that are automatically added by this passthrough.
   - jstests/core/bad_index_plugin.js
@@ -98,6 +93,7 @@ selector:
   exclude_with_any_tags:
   # Tests tagged with the following will fail because they assume collections are not sharded.
   - assumes_against_mongod_not_mongos
+  - assumes_standalone_mongod
   - assumes_no_implicit_collection_creation_after_drop
   - assumes_no_implicit_index_creation
   - assumes_unsharded_collection

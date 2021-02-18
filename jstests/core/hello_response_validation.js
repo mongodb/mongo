@@ -1,7 +1,15 @@
-/**
- * This test ensures that the hello command and its aliases, ismaster and isMaster, are all
- * accepted.
- */
+//
+// This test ensures that the hello command and its aliases, ismaster and isMaster,
+// are all accepted.
+//
+// @tags: [
+//    # Assert on the isWritablePrimary field of a hello response. If a primary steps down after
+//    # accepting a hello command and returns before its connection is closed, the response can
+//    # contain isWritablePrimary: false.
+//    does_not_support_stepdowns,
+// ]
+
+(function() {
 "use strict";
 
 function checkResponseFields(commandString) {
@@ -88,3 +96,4 @@ assert.eq(cmdResponse1, cmdResponse2);
 cmdResponse1 = removeTimestamps(db.runCommand("isMaster"));
 cmdResponse2 = removeTimestamps(db.isMaster());
 assert.eq(cmdResponse1, cmdResponse2);
+})();

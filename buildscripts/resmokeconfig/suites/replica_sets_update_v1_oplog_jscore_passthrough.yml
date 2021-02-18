@@ -4,11 +4,6 @@ selector:
   roots:
   - jstests/core/**/*.js
   exclude_files:
-  # These tests are not expected to pass with replica-sets:
-  - jstests/core/dbadmin.js
-  - jstests/core/opcounters_write_cmd.js
-  - jstests/core/read_after_optime.js
-  - jstests/core/capped_update.js
   # These tests change the transactionLifetimeLimitSeconds server parameter which conflicts with how
   # the CheckReplDBHashInBackground hook doesn't want transactions to be reaped while it is running.
   - jstests/core/txns/abort_expired_transaction.js
@@ -18,6 +13,9 @@ selector:
   # command multiple times, which may observe the change to the "transactionLifetimeLimitSeconds"
   # server parameter.
   - jstests/core/set_param1.js
+
+  exclude_with_any_tags:
+  - assumes_standalone_mongod
 
 executor:
   archive:
