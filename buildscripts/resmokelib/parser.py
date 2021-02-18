@@ -19,31 +19,24 @@ _PLUGINS = [
 ]
 
 
-def _add_subcommands():
-    """Create and return the command line arguments parser."""
-    parser = argparse.ArgumentParser()
+def parse(sys_args, usage=None):
+    """Parse the CLI args."""
+
+    parser = argparse.ArgumentParser(usage=usage)
     subparsers = parser.add_subparsers(dest="command")
 
     # Add sub-commands.
     for plugin in _PLUGINS:
         plugin.add_subcommand(subparsers)
 
-    return parser
-
-
-def parse(sys_args):
-    """Parse the CLI args."""
-
-    # Split out this function for easier testing.
-    parser = _add_subcommands()
     parsed_args = parser.parse_args(sys_args)
 
     return parser, parsed_args
 
 
-def parse_command_line(sys_args, **kwargs):
+def parse_command_line(sys_args, usage=None, **kwargs):
     """Parse the command line arguments passed to resmoke.py and return the subcommand object to execute."""
-    parser, parsed_args = parse(sys_args)
+    parser, parsed_args = parse(sys_args, usage)
 
     subcommand = parsed_args.command
 
