@@ -65,9 +65,9 @@ DEFAULTS = {
     "logger_file": None,
     "mongo_executable": None,
     "mongod_executable": None,
-    "mongod_set_parameters": None,
+    "mongod_set_parameters": [],
     "mongos_executable": None,
-    "mongos_set_parameters": None,
+    "mongos_set_parameters": [],
     "no_journal": False,
     "num_clients_per_fixture": 1,
     "perf_report_file": None,
@@ -320,13 +320,13 @@ MONGO_EXECUTABLE = None
 MONGOD_EXECUTABLE = None
 
 # The --setParameter options passed to mongod.
-MONGOD_SET_PARAMETERS = None
+MONGOD_SET_PARAMETERS = []
 
 # The path to the mongos executable used by resmoke.py.
 MONGOS_EXECUTABLE = None
 
 # The --setParameter options passed to mongos.
-MONGOS_SET_PARAMETERS = None
+MONGOS_SET_PARAMETERS = []
 
 # If true, then all mongod's started by resmoke.py and by the mongo shell will not have journaling
 # enabled.

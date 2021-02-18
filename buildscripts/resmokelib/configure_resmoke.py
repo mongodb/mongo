@@ -1,5 +1,6 @@
 """Configure the command line input for the resmoke 'run' subcommand."""
 
+import collections
 import os
 import os.path
 import sys
@@ -26,7 +27,7 @@ def validate_and_update_config(parser, args):
 def _validate_options(parser, args):
     """Do preliminary validation on the options and error on any invalid options."""
 
-    if not 'shell_port' in args or not 'shell_conn_strin' in args:
+    if not 'shell_port' in args or not 'shell_conn_string' in args:
         return
 
     if args.shell_port is not None and args.shell_conn_string is not None:
@@ -37,8 +38,32 @@ def _validate_options(parser, args):
                      " test(s) under those suite configuration(s)".format(
                          args.executor_file, " ".join(args.test_files)))
 
+    def get_set_param_errors(process_params):
+        agg_set_params = collections.defaultdict(list)
+        for set_param in process_params:
+            for key, value in utils.load_yaml(set_param).items():
+                agg_set_params[key] += [value]
 
-def _validate_config(parser):
+        errors = []
+        for key, values in agg_set_params.items():
+            if len(values) > 1:
+                errors.append(f"setParameter has multiple values. Key: {key} Values: {values}")
+
+        return errors
+
+    config = vars(args)
+    mongod_set_param_errors = get_set_param_errors(config.get('mongod_set_parameters') or [])
+    mongos_set_param_errors = get_set_param_errors(config.get('mongos_set_parameters') or [])
+    error_msgs = {}
+    if mongod_set_param_errors:
+        error_msgs["mongodSetParameters"] = mongod_set_param_errors
+    if mongos_set_param_errors:
+        error_msgs["mongosSetParameters"] = mongos_set_param_errors
+    if error_msgs:
+        parser.error(str(error_msgs))
+
+
+def _validate_config(parser):  # pylint: disable=too-many-branches
     """Do validation on the config settings."""
 
     if _config.REPEAT_TESTS_MAX:
@@ -118,11 +143,18 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many
 
     _config.DBTEST_EXECUTABLE = _expand_user(config.pop("dbtest_executable"))
     _config.MONGO_EXECUTABLE = _expand_user(config.pop("mongo_executable"))
-    _config.MONGOD_EXECUTABLE = _expand_user(config.pop("mongod_executable"))
-    _config.MONGOD_SET_PARAMETERS = config.pop("mongod_set_parameters")
-    _config.MONGOS_EXECUTABLE = _expand_user(config.pop("mongos_executable"))
 
-    _config.MONGOS_SET_PARAMETERS = config.pop("mongos_set_parameters")
+    def _merge_set_params(param_list):
+        ret = {}
+        for set_param in param_list:
+            ret.update(utils.load_yaml(set_param))
+        return utils.dump_yaml(ret)
+
+    _config.MONGOD_EXECUTABLE = _expand_user(config.pop("mongod_executable"))
+    _config.MONGOD_SET_PARAMETERS = _merge_set_params(config.pop("mongod_set_parameters"))
+    _config.MONGOS_EXECUTABLE = _expand_user(config.pop("mongos_executable"))
+    _config.MONGOS_SET_PARAMETERS = _merge_set_params(config.pop("mongos_set_parameters"))
+
     _config.NO_JOURNAL = config.pop("no_journal")
     _config.NUM_CLIENTS_PER_FIXTURE = config.pop("num_clients_per_fixture")
     _config.NUM_REPLSET_NODES = config.pop("num_replset_nodes")
