@@ -368,8 +368,14 @@ void ThreadPool::Impl::schedule(Task task) {
 
 void ThreadPool::Impl::waitForIdle() {
     stdx::unique_lock<Latch> lk(_mutex);
-    // True when there are no `_pendingTasks` and all `_threads` are idle.
-    auto isIdle = [this] { return _pendingTasks.empty() && _numIdleThreads >= _threads.size(); };
+    // True when there are no `_pendingTasks` and all `_threads` are idle, or when the ThreadPool
+    // has been shutdown but not yet joined. As mentioned in the header, if waitForIdle() is called
+    // before shutdown(), there is no guarantee that there will still be no pending tasks when the
+    // function returns.
+    auto isIdle = [this] {
+        return (_pendingTasks.empty() && _numIdleThreads >= _threads.size()) ||
+            _state == joinRequired;
+    };
     _poolIsIdle.wait(lk, isIdle);
 }
 
