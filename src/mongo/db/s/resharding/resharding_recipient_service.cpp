@@ -174,9 +174,9 @@ std::vector<NamespaceString> ensureStashCollectionsExist(
     return stashCollections;
 }
 
-ReshardingDonorOplogId getIdToResumeFrom(OperationContext* opCtx,
-                                         NamespaceString oplogBufferNss,
-                                         Timestamp fetchTimestamp) {
+ReshardingDonorOplogId getFetcherIdToResumeFrom(OperationContext* opCtx,
+                                                NamespaceString oplogBufferNss,
+                                                Timestamp fetchTimestamp) {
     AutoGetCollection collection(opCtx, oplogBufferNss, MODE_IS);
     if (!collection) {
         return ReshardingDonorOplogId{fetchTimestamp, fetchTimestamp};
@@ -185,8 +185,16 @@ ReshardingDonorOplogId getIdToResumeFrom(OperationContext* opCtx,
     auto highestOplogBufferId = resharding::data_copy::findHighestInsertedId(opCtx, *collection);
     return highestOplogBufferId.missing()
         ? ReshardingDonorOplogId{fetchTimestamp, fetchTimestamp}
-        : ReshardingDonorOplogId::parse({"resharding::getIdToResumeFrom"},
+        : ReshardingDonorOplogId::parse({"resharding::getFetcherIdToResumeFrom"},
                                         highestOplogBufferId.getDocument().toBson());
+}
+
+ReshardingDonorOplogId getApplierIdToResumeFrom(OperationContext* opCtx,
+                                                ReshardingSourceId sourceId,
+                                                Timestamp fetchTimestamp) {
+    auto applierProgress = ReshardingOplogApplier::checkStoredProgress(opCtx, sourceId);
+    return !applierProgress ? ReshardingDonorOplogId{fetchTimestamp, fetchTimestamp}
+                            : applierProgress->getProgress();
 }
 
 }  // namespace resharding
@@ -430,7 +438,7 @@ ReshardingRecipientService::RecipientStateMachine::_cloneThenTransitionToApplyin
             getLocalOplogBufferNamespace(_recipientDoc.getExistingUUID(), donor.getId());
         auto opCtx = cc().makeOperationContext();
         auto idToResumeFrom =
-            resharding::getIdToResumeFrom(opCtx.get(), oplogBufferNss, fetchTimestamp);
+            resharding::getFetcherIdToResumeFrom(opCtx.get(), oplogBufferNss, fetchTimestamp);
         invariant((idToResumeFrom >= ReshardingDonorOplogId{fetchTimestamp, fetchTimestamp}));
 
         stdx::lock_guard<Latch> lk(_mutex);
@@ -441,10 +449,10 @@ ReshardingRecipientService::RecipientStateMachine::_cloneThenTransitionToApplyin
             // The recipient fetches oplog entries from the donor starting from the largest _id
             // value in the oplog buffer. Otherwise, it starts at fetchTimestamp, which corresponds
             // to {clusterTime: fetchTimestamp, ts: fetchTimestamp} as a resume token value.
-            idToResumeFrom,
+            std::move(idToResumeFrom),
             donor.getId(),
             recipientId,
-            oplogBufferNss));
+            std::move(oplogBufferNss)));
 
         _oplogFetcherFutures.emplace_back(
             _oplogFetchers.back()
@@ -531,27 +539,31 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
                                          true /* isKillableByStepdown */));
         }
 
+        auto sourceId = ReshardingSourceId{_recipientDoc.get_id(), donor.getId()};
         const auto& oplogBufferNss =
             getLocalOplogBufferNamespace(_recipientDoc.getExistingUUID(), donor.getId());
+        auto fetchTimestamp = *_recipientDoc.getFetchTimestamp();
+        auto idToResumeFrom = [&] {
+            auto opCtx = cc().makeOperationContext();
+            return resharding::getApplierIdToResumeFrom(opCtx.get(), sourceId, fetchTimestamp);
+        }();
+        invariant((idToResumeFrom >= ReshardingDonorOplogId{fetchTimestamp, fetchTimestamp}));
 
         _oplogAppliers.emplace_back(std::make_unique<ReshardingOplogApplier>(
             std::make_unique<ReshardingOplogApplier::Env>(Client::getCurrent()->getServiceContext(),
                                                           _metrics()),
-            ReshardingSourceId{_recipientDoc.get_id(), donor.getId()},
+            std::move(sourceId),
             oplogBufferNss,
             _recipientDoc.getNss(),
             _recipientDoc.getExistingUUID(),
             stashCollections,
             i,
-            *_recipientDoc.getFetchTimestamp(),
-            // The recipient applies oplog entries from the donor starting from the fetchTimestamp,
-            // which corresponds to {clusterTime: fetchTimestamp, ts: fetchTimestamp} as a resume
-            // token value.
+            fetchTimestamp,
+            // The recipient applies oplog entries from the donor starting from the progress value
+            // in progress_applier. Otherwise, it starts at fetchTimestamp, which corresponds to
+            // {clusterTime: fetchTimestamp, ts: fetchTimestamp} as a resume token value.
             std::make_unique<ReshardingDonorOplogIterator>(
-                oplogBufferNss,
-                ReshardingDonorOplogId{*_recipientDoc.getFetchTimestamp(),
-                                       *_recipientDoc.getFetchTimestamp()},
-                _oplogFetchers[i].get()),
+                oplogBufferNss, std::move(idToResumeFrom), _oplogFetchers[i].get()),
             sourceChunkMgr,
             **executor,
             _oplogApplierWorkers.back().get()));

@@ -556,7 +556,7 @@ TEST_F(ReshardingRecipientServiceTest, StashCollectionsHaveSameCollationAsReshar
                                         false /* unique */,
                                         {} /* splitPoints */);
 
-    // Create stash collections for both donor shards
+    // Create stash collections for both donor shards.
     auto stashCollections = resharding::ensureStashCollectionsExist(
         operationContext(),
         srcChunkMgr,
@@ -564,7 +564,7 @@ TEST_F(ReshardingRecipientServiceTest, StashCollectionsHaveSameCollationAsReshar
         {DonorShardMirroringEntry(ShardId("shard0"), true),
          DonorShardMirroringEntry(ShardId("shard1"), true)});
 
-    // Verify that each stash collation has the collation we passed in above
+    // Verify that each stash collation has the collation we passed in above.
     {
         auto opCtx = operationContext();
 
@@ -587,34 +587,107 @@ TEST_F(ReshardingRecipientServiceTest, StashCollectionsHaveSameCollationAsReshar
     }
 }
 
-TEST_F(ReshardingRecipientServiceTest, FindIdToResumeFrom) {
+TEST_F(ReshardingRecipientServiceTest, FindFetcherIdToResumeFrom) {
     auto opCtx = operationContext();
-    NamespaceString oplogBufferNs = getLocalOplogBufferNamespace(kReshardingUUID, ShardId("foo"));
+    NamespaceString oplogBufferNs =
+        getLocalOplogBufferNamespace(kReshardingUUID, ShardId("shard0"));
     auto timestamp0 = Timestamp(1, 0);
     auto timestamp1 = Timestamp(1, 1);
     auto timestamp2 = Timestamp(1, 2);
     auto timestamp3 = Timestamp(1, 3);
 
-    // Starts from FetchTimestamp since localOplogBuffer doesn't exist
-    ASSERT((resharding::getIdToResumeFrom(opCtx, oplogBufferNs, timestamp0) ==
+    // Start from FetchTimestamp since localOplogBuffer doesn't exist.
+    ASSERT((resharding::getFetcherIdToResumeFrom(opCtx, oplogBufferNs, timestamp0) ==
             ReshardingDonorOplogId{timestamp0, timestamp0}));
+
 
     DBDirectClient client(opCtx);
     client.insert(oplogBufferNs.toString(),
                   BSON("_id" << BSON("clusterTime" << timestamp3 << "ts" << timestamp1)));
 
-    // Makes sure to use the entry in localOplogBuffer
-    ASSERT((resharding::getIdToResumeFrom(opCtx, oplogBufferNs, timestamp0) ==
+    // Make sure to use the entry in localOplogBuffer.
+    ASSERT((resharding::getFetcherIdToResumeFrom(opCtx, oplogBufferNs, timestamp0) ==
             ReshardingDonorOplogId{timestamp3, timestamp1}));
+
 
     client.insert(oplogBufferNs.toString(),
                   BSON("_id" << BSON("clusterTime" << timestamp3 << "ts" << timestamp3)));
     client.insert(oplogBufferNs.toString(),
                   BSON("_id" << BSON("clusterTime" << timestamp3 << "ts" << timestamp2)));
 
-    // Makes sure to choose the largest timestamp
-    ASSERT((resharding::getIdToResumeFrom(opCtx, oplogBufferNs, timestamp0) ==
+    // Make sure to choose the largest timestamp.
+    ASSERT((resharding::getFetcherIdToResumeFrom(opCtx, oplogBufferNs, timestamp0) ==
             ReshardingDonorOplogId{timestamp3, timestamp3}));
+}
+
+TEST_F(ReshardingRecipientServiceTest, FindApplierIdToResumeFrom) {
+    auto opCtx = operationContext();
+    const ReshardingSourceId sourceId0{UUID::gen(), ShardId("shard0")};
+    const ReshardingSourceId sourceId1{UUID::gen(), ShardId("shard1")};
+
+    auto timestamp0 = Timestamp(1, 0);
+    auto timestamp1 = Timestamp(1, 1);
+    auto timestamp2 = Timestamp(1, 2);
+    auto timestamp3 = Timestamp(1, 3);
+
+    // Start from FetchTimestamp since reshardingApplierProgress doesn't exist.
+    ASSERT((resharding::getApplierIdToResumeFrom(opCtx, sourceId0, timestamp0) ==
+            ReshardingDonorOplogId{timestamp0, timestamp0}));
+    ASSERT((resharding::getApplierIdToResumeFrom(opCtx, sourceId1, timestamp0) ==
+            ReshardingDonorOplogId{timestamp0, timestamp0}));
+
+
+    DBDirectClient client(opCtx);
+    client.update(
+        NamespaceString::kReshardingApplierProgressNamespace.ns(),
+        QUERY(ReshardingOplogApplierProgress::kOplogSourceIdFieldName << sourceId0.toBSON()),
+        BSON("$set" << BSON(ReshardingOplogApplierProgress::kProgressFieldName
+                            << BSON("clusterTime" << timestamp3 << "ts" << timestamp1))),
+        true /* upsert */,
+        false /* multi */);
+
+    // SourceId0 resumes from the progress field but sourceId1 still uses FetchTimestamp.
+    ASSERT((resharding::getApplierIdToResumeFrom(opCtx, sourceId0, timestamp0) ==
+            ReshardingDonorOplogId{timestamp3, timestamp1}));
+    ASSERT((resharding::getApplierIdToResumeFrom(opCtx, sourceId1, timestamp0) ==
+            ReshardingDonorOplogId{timestamp0, timestamp0}));
+
+
+    client.update(
+        NamespaceString::kReshardingApplierProgressNamespace.ns(),
+        QUERY(ReshardingOplogApplierProgress::kOplogSourceIdFieldName << sourceId1.toBSON()),
+        BSON("$set" << BSON(ReshardingOplogApplierProgress::kProgressFieldName
+                            << BSON("clusterTime" << timestamp3 << "ts" << timestamp1))),
+        true /* upsert */,
+        false /* multi */);
+
+    // Both resume from the progress field.
+    ASSERT((resharding::getApplierIdToResumeFrom(opCtx, sourceId0, timestamp0) ==
+            ReshardingDonorOplogId{timestamp3, timestamp1}));
+    ASSERT((resharding::getApplierIdToResumeFrom(opCtx, sourceId1, timestamp0) ==
+            ReshardingDonorOplogId{timestamp3, timestamp1}));
+
+
+    client.update(
+        NamespaceString::kReshardingApplierProgressNamespace.ns(),
+        QUERY(ReshardingOplogApplierProgress::kOplogSourceIdFieldName << sourceId0.toBSON()),
+        BSON("$set" << BSON(ReshardingOplogApplierProgress::kProgressFieldName
+                            << BSON("clusterTime" << timestamp3 << "ts" << timestamp3))),
+        true /* upsert */,
+        false /* multi */);
+    client.update(
+        NamespaceString::kReshardingApplierProgressNamespace.ns(),
+        QUERY(ReshardingOplogApplierProgress::kOplogSourceIdFieldName << sourceId1.toBSON()),
+        BSON("$set" << BSON(ReshardingOplogApplierProgress::kProgressFieldName
+                            << BSON("clusterTime" << timestamp3 << "ts" << timestamp2))),
+        true /* upsert */,
+        false /* multi */);
+
+    // Resume from the updated progress value.
+    ASSERT((resharding::getApplierIdToResumeFrom(opCtx, sourceId0, timestamp0) ==
+            ReshardingDonorOplogId{timestamp3, timestamp3}));
+    ASSERT((resharding::getApplierIdToResumeFrom(opCtx, sourceId1, timestamp0) ==
+            ReshardingDonorOplogId{timestamp3, timestamp2}));
 }
 
 }  // namespace
