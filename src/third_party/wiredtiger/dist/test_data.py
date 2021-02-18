@@ -41,16 +41,40 @@ class Config:
 
     def __ge__(self, other):
         return self.name >= other.name
+
+key_config=[
+    Config('key_size', 0, r'''
+        The size of the keys to be created''', min=0, max=10000),
+]
+
+value_config = [
+    Config('value_size', 0, r'''
+        The size of the values to be created''', min=0, max=10000),
+]
+
+scale_config = [
+    Config('collection_count', 1, r'''
+        The number of colections the workload generator operates over''', min=0, max=200000),
+    Config('key_count', 0, r'''
+        The number of keys to be operated on per colection''', min=0, max=1000000),
+]
+
+load_config = key_config + value_config + scale_config
+
+workload_config = [
+    Config('read_threads', 0, r'''
+        The number of threads performing read operations''', min=0, max=100),
+    Config('insert_threads', 0, r'''
+        The number of threads performing insert operations''',min=0, max=20),
+    Config('insert_config',0, r'''
+        The definition of the record being inserted''',
+        subconfig=load_config),
+    Config('update_threads', 0, r'''
+        The number of threads performing update operations''',min=0, max=20),
+    Config('update_config',0,r''',
+        The definition of the record being updated''', subconfig=load_config)
+]
+
 methods = {
-'poc_test' : Method([
-    Config('collection_count', '1', r'''
-        the number of collections to create for testing''',
-        min='1', max='10'),
-    Config('key_size', '10', r'''
-        the size of the keys to be created in bytes''',
-        min='1', max='10000'),
-    Config('values', 'first', r'''
-        The value that each key will be populated with, used an example string configuration''',
-        choices=['first', 'second', 'third'])
-]),
+'poc_test' : Method(load_config + workload_config),
 }

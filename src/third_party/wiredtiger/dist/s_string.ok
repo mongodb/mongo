@@ -503,6 +503,7 @@ aspell
 assertfmt
 async
 atomicity
+auth
 autocommit
 autoconf
 automake

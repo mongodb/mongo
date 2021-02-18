@@ -57,6 +57,12 @@ static void config_reset(void);
 static void config_transaction(void);
 
 /*
+ * We currently disable random LSM testing, that is, it can be specified explicitly but we won't
+ * randomly choose LSM as a data_source configuration.
+ */
+#define DISABLE_RANDOM_LSM_TESTING 1
+
+/*
  * config_final --
  *     Final run initialization.
  */
@@ -126,6 +132,7 @@ config_run(void)
             config_single("runs.source=file", false);
             break;
         case 2: /* 20% */
+#if !defined(DISABLE_RANDOM_LSM_TESTING)
             /*
              * LSM requires a row-store and backing disk.
              *
@@ -141,6 +148,7 @@ config_run(void)
             if (config_is_perm("ops.truncate") && g.c_truncate)
                 break;
             config_single("runs.source=lsm", false);
+#endif
             break;
         case 3:
         case 4:

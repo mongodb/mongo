@@ -13,7 +13,7 @@ args="$args runs.threads=4 "
 
 # Temporarily disabled
 # $TEST_WRAPPER ./t $args runs.type=fix
-$TEST_WRAPPER ./t $args runs.type=row runs.source=lsm
+# $TEST_WRAPPER ./t $args runs.type=row runs.source=lsm
 # $TEST_WRAPPER ./t $args runs.type=var
 
 $TEST_WRAPPER ./t $args runs.type=row

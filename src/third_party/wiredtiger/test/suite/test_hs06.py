@@ -209,8 +209,8 @@ class test_hs06(wttest.WiredTigerTestCase):
         self.session.rollback_transaction()
 
     def test_hs_prepare_reads(self):
-        # Prepare reads currently not supported with columnar store.
-        # Remove this once prepare reads is supported in WT-6061.
+        # FIXME-WT-6061: Prepare reads currently not supported with columnar store.
+        # Remove this once prepare reads is supported.
         if self.key_format == 'r':
             return
 

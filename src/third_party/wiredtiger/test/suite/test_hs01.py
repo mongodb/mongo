@@ -143,20 +143,22 @@ class test_hs01(wttest.WiredTigerTestCase):
         session2.rollback_transaction()
         session2.close()
 
-        # Rollback to stable support for column store is not implemented, and it fails only when it is used with timestamps.
-        # Remove the above comment once WT-5545 is implemented.
-        if self.key_format != 'r':
-            # Scenario: 3
-            # Check to see if the history store is working with the old timestamp.
-            bigvalue4 = b"ddddd" * 100
-            self.conn.set_timestamp('stable_timestamp=' + timestamp_str(1))
-            self.large_updates(self.session, uri, bigvalue4, ds, nrows, timestamp=True)
-            # Check to see data can be see only till the stable_timestamp
-            self.durable_check(bigvalue3, uri, ds, nrows)
+        # FIXME-WT-7120: Rollback to stable support for column store is not implemented, and it
+        # fails only when it is used with timestamps.
+        if self.key_format == 'r':
+            return
 
-            self.conn.set_timestamp('stable_timestamp=' + timestamp_str(i + 1))
-            # Check that the latest data can be seen.
-            self.durable_check(bigvalue4, uri, ds, nrows)
+        # Scenario: 3
+        # Check to see if the history store is working with the old timestamp.
+        bigvalue4 = b"ddddd" * 100
+        self.conn.set_timestamp('stable_timestamp=' + timestamp_str(1))
+        self.large_updates(self.session, uri, bigvalue4, ds, nrows, timestamp=True)
+        # Check to see data can be see only till the stable_timestamp
+        self.durable_check(bigvalue3, uri, ds, nrows)
+
+        self.conn.set_timestamp('stable_timestamp=' + timestamp_str(i + 1))
+        # Check that the latest data can be seen.
+        self.durable_check(bigvalue4, uri, ds, nrows)
 
 if __name__ == '__main__':
     wttest.run()

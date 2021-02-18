@@ -569,7 +569,7 @@ __curfile_reopen_int(WT_CURSOR *cursor)
      * cache.
      */
     ret = __wt_session_lock_dhandle(session, 0, &is_dead);
-    if (!is_dead && ret == 0 && !F_ISSET(dhandle, WT_DHANDLE_OPEN)) {
+    if (!is_dead && ret == 0 && !WT_DHANDLE_CAN_REOPEN(dhandle)) {
         WT_RET(__wt_session_release_dhandle(session));
         ret = __wt_set_return(session, EBUSY);
     }
@@ -608,24 +608,28 @@ __curfile_reopen_int(WT_CURSOR *cursor)
  *     WT_CURSOR->reopen method for the btree cursor type.
  */
 static int
-__curfile_reopen(WT_CURSOR *cursor, bool check_only)
+__curfile_reopen(WT_CURSOR *cursor, bool sweep_check_only)
 {
     WT_DATA_HANDLE *dhandle;
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
-    bool can_reopen;
+    bool can_sweep;
 
     session = CUR2S(cursor);
     dhandle = ((WT_CURSOR_BTREE *)cursor)->dhandle;
 
-    if (check_only) {
-        can_reopen = WT_DHANDLE_CAN_REOPEN(dhandle);
+    if (sweep_check_only) {
         /*
-         * If the data handle can't be reopened, it is a candidate for sweep, and that should never
-         * happen if any session (including ours) is actively using it.
+         * The sweep check returns WT_NOTFOUND if the cursor should be swept. Generally if the
+         * associated data handle cannot be reopened it should be swept. But a handle being operated
+         * on by this thread should not be swept. The situation where a handle cannot be reopened
+         * but also cannot be swept can occur if this thread is in the middle of closing a cursor
+         * for a handle that is marked as dropped. During the close, a few iterations of the session
+         * cursor sweep are run. The sweep calls this function to see if a cursor should be swept,
+         * and it may thus be asking about the very cursor being closed.
          */
-        WT_ASSERT(session, can_reopen || dhandle != session->dhandle);
-        return (can_reopen ? 0 : WT_NOTFOUND);
+        can_sweep = !WT_DHANDLE_CAN_REOPEN(dhandle) && dhandle != session->dhandle;
+        return (can_sweep ? WT_NOTFOUND : 0);
     }
 
     /*

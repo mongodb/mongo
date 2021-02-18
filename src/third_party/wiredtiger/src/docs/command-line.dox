@@ -324,12 +324,13 @@ By default, the \c loadtext command reads from the standard input; the
 
 <hr>
 @section util_printlog wt printlog
-Display the database log.
+Display the database log. By default any operations in the log containing user
+data are redacted.
 
 The \c printlog command outputs the database log.
 
 @subsection util_printlog_synopsis Synopsis
-<code>wt [-RrVv] [-C config] [-E secretkey ] [-h directory] printlog [-mx] [-f output]</code>
+<code>wt [-RrVv] [-C config] [-E secretkey ] [-h directory] printlog [-mux] [-f output]</code>
 
 @subsection util_printlog_options Options
 The following are command-specific options for the \c printlog command:
@@ -340,6 +341,9 @@ output; the \c -f option re-directs the output to the specified file.
 
 @par <code>-m</code>
 Print only message-type log records.
+
+@par <code>-u</code>
+Display user data.
 
 @par <code>-x</code>
 Keys and value items in the log are printed in hex format in addition

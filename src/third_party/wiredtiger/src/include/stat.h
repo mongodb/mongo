@@ -478,6 +478,7 @@ struct __wt_connection_stats {
     int64_t dh_sweep_remove;
     int64_t dh_sweep_tod;
     int64_t dh_sweeps;
+    int64_t dh_sweep_skip_ckpt;
     int64_t dh_session_handles;
     int64_t dh_session_sweeps;
     int64_t lock_checkpoint_count;
@@ -577,6 +578,8 @@ struct __wt_connection_stats {
     int64_t perf_hist_opwrite_latency_lt1000;
     int64_t perf_hist_opwrite_latency_lt10000;
     int64_t perf_hist_opwrite_latency_gt10000;
+    int64_t rec_overflow_key_internal;
+    int64_t rec_overflow_key_leaf;
     int64_t rec_maximum_seconds;
     int64_t rec_pages_with_prepare;
     int64_t rec_pages_with_ts;
@@ -778,6 +781,8 @@ struct __wt_connection_stats {
     int64_t rec_time_window_durable_stop_ts;
     int64_t rec_time_window_stop_ts;
     int64_t rec_time_window_stop_txn;
+    int64_t flush_tier;
+    int64_t tiered_retention;
     int64_t txn_read_race_prepare_update;
     int64_t txn_rts_hs_stop_older_than_newer_start;
     int64_t txn_rts_keys_removed;
@@ -993,6 +998,8 @@ struct __wt_dsrc_stats {
     int64_t rec_time_window_durable_stop_ts;
     int64_t rec_time_window_stop_ts;
     int64_t rec_time_window_stop_txn;
+    int64_t flush_tier;
+    int64_t tiered_retention;
     int64_t txn_read_race_prepare_update;
     int64_t txn_rts_hs_stop_older_than_newer_start;
     int64_t txn_rts_keys_removed;

@@ -38,7 +38,8 @@ class test_hs13(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=2MB,statistics=(all),eviction=(threads_max=1)'
     session_config = 'isolation=snapshot'
     key_format_values = [
-        # The commented columnar tests needs to be enabled once columnar Modify type update is fixed in (WT-5550).
+        # FIXME-WT-5550: The commented columnar tests needs to be enabled once columnar modify type 
+        # update is fixed.
         # ('column', dict(key_format='r')),
         ('integer', dict(key_format='i'))
     ]

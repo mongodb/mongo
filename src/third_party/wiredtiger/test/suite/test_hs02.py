@@ -29,6 +29,7 @@
 from helper import copy_wiredtiger_home
 import wiredtiger, wttest
 from wtdataset import SimpleDataSet
+from wtscenario import make_scenarios
 
 def timestamp_str(t):
     return '%x' % t
@@ -39,6 +40,13 @@ class test_hs02(wttest.WiredTigerTestCase):
     # Force a small cache.
     conn_config = 'cache_size=50MB,log=(enabled)'
     session_config = 'isolation=snapshot'
+
+    key_format_values = [
+        ('string', dict(key_format='S')),
+        # FIXME-WT-7120: Uncomment the column store scenario when rollback to stable support is complete.
+        # ('column', dict(key_format='r'))
+    ]
+    scenarios = make_scenarios(key_format_values)
 
     def large_updates(self, uri, value, ds, nrows, commit_ts):
         # Update a large number of records, we'll hang if the history store table isn't working.
@@ -68,11 +76,11 @@ class test_hs02(wttest.WiredTigerTestCase):
         # behavior.
         uri = "table:las02_main"
         ds = SimpleDataSet(
-            self, uri, 0, key_format="S", value_format="S", config='log=(enabled=false)')
+            self, uri, 0, key_format=self.key_format, value_format="S", config='log=(enabled=false)')
         ds.populate()
 
         uri2 = "table:las02_extra"
-        ds2 = SimpleDataSet(self, uri2, 0, key_format="S", value_format="S")
+        ds2 = SimpleDataSet(self, uri2, 0, key_format=self.key_format, value_format="S")
         ds2.populate()
 
         # Pin oldest and stable to timestamp 1.

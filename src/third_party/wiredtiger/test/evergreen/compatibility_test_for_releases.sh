@@ -104,6 +104,7 @@ EXT+="]"
 #       arg1: branch name #1
 #       arg2: branch name #2
 #       arg3: access methods list
+#       arg4: backward compatibility
 #############################################################
 verify_branches()
 {
@@ -117,9 +118,11 @@ verify_branches()
             dir="$2/test/format/RUNDIR.$am"
             WIREDTIGER_CONFIG="$EXT" ./wt $(bflag $1) -h "../$dir" verify table:wt
 
-            echo "$1/wt dump and load $2 access method $am..."
-            WIREDTIGER_CONFIG="$EXT" ./wt $(bflag $1) -h "../$dir" dump table:wt > dump_wt.txt
-            WIREDTIGER_CONFIG="$EXT" ./wt $(bflag $1) -h "../$dir" load -f dump_wt.txt
+            if [ "$4" = true ]; then
+                echo "$1/wt dump and load $2 access method $am..."
+                WIREDTIGER_CONFIG="$EXT" ./wt $(bflag $1) -h "../$dir" dump table:wt > dump_wt.txt
+                WIREDTIGER_CONFIG="$EXT" ./wt $(bflag $1) -h "../$dir" load -f dump_wt.txt
+            fi
         done
 }
 
@@ -270,20 +273,20 @@ fi
 if [ "$newer" = true ]; then
     for i in ${!newer_release_branches[@]}; do
         [[ $((i+1)) < ${#newer_release_branches[@]} ]] && \
-        (verify_branches ${newer_release_branches[$i]} ${newer_release_branches[$((i+1))]} "row")
+        (verify_branches ${newer_release_branches[$i]} ${newer_release_branches[$((i+1))]} "row" true)
     done
 fi
 
 if [ "$older" = true ]; then
     for i in ${!older_release_branches[@]}; do
         [[ $((i+1)) < ${#older_release_branches[@]} ]] && \
-        (verify_branches ${older_release_branches[$i]} ${older_release_branches[$((i+1))]} "fix row var")
+        (verify_branches ${older_release_branches[$i]} ${older_release_branches[$((i+1))]} "fix row var" true)
     done
 fi
 
 if [ "${wt_standalone}" = true ]; then
-    (verify_branches develop "$wt1" "row")
-    (verify_branches "$wt1" "$wt2" "row")
+    (verify_branches develop "$wt1" "row" true)
+    (verify_branches "$wt1" "$wt2" "row" true)
 fi
 
 # Verify forward compatibility for supported access methods.
@@ -295,7 +298,7 @@ fi
 if [ "$newer" = true ]; then
     for i in ${!newer_release_branches[@]}; do
         [[ $((i+1)) < ${#newer_release_branches[@]} ]] && \
-        (verify_branches ${newer_release_branches[$((i+1))]} ${newer_release_branches[$i]} "row")
+        (verify_branches ${newer_release_branches[$((i+1))]} ${newer_release_branches[$i]} "row" false)
     done
 fi
 

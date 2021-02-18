@@ -104,6 +104,10 @@ class SessionOpStat(Stat):
     prefix = 'session'
     def __init__(self, name, desc, flags=''):
         Stat.__init__(self, name, SessionOpStat.prefix, desc, flags)
+class StorageStat(Stat):
+    prefix = 'session'
+    def __init__(self, name, desc, flags=''):
+        Stat.__init__(self, name, SessionOpStat.prefix, desc, flags)
 class ThreadStat(Stat):
     prefix = 'thread-state'
     def __init__(self, name, desc, flags=''):
@@ -334,6 +338,7 @@ connection_stats = [
     DhandleStat('dh_sweep_close', 'connection sweep dhandles closed'),
     DhandleStat('dh_sweep_ref', 'connection sweep candidate became referenced'),
     DhandleStat('dh_sweep_remove', 'connection sweep dhandles removed from hash list'),
+    DhandleStat('dh_sweep_skip_ckpt', 'connection sweeps skipped due to checkpoint gathering handles'),
     DhandleStat('dh_sweep_tod', 'connection sweep time-of-death sets'),
     DhandleStat('dh_sweeps', 'connection sweeps'),
 
@@ -462,6 +467,8 @@ connection_stats = [
     # Reconciliation statistics
     ##########################################
     RecStat('rec_maximum_seconds', 'maximum seconds spent in a reconciliation call', 'no_clear,no_scale,size'),
+    RecStat('rec_overflow_key_internal', 'internal-page overflow keys'),
+    RecStat('rec_overflow_key_leaf', 'leaf-page overflow keys'),
     RecStat('rec_pages_with_prepare', 'page reconciliation calls that resulted in values with prepared transaction metadata'),
     RecStat('rec_pages_with_ts', 'page reconciliation calls that resulted in values with timestamps'),
     RecStat('rec_pages_with_txn', 'page reconciliation calls that resulted in values with transaction ids'),
@@ -852,6 +859,12 @@ conn_dsrc_stats = [
     RecStat('rec_time_window_start_txn', 'records written including a start transaction ID'),
     RecStat('rec_time_window_stop_ts', 'records written including a stop timestamp'),
     RecStat('rec_time_window_stop_txn', 'records written including a stop transaction ID'),
+
+    ##########################################
+    # Tiered storage statistics
+    ##########################################
+    StorageStat('flush_tier', 'flush_tier operation calls'),
+    StorageStat('tiered_retention', 'tiered storage local retention time (secs)', 'no_clear,no_scale,size'),
 
     ##########################################
     # Transaction statistics

@@ -3,6 +3,7 @@ ACM
 APIs
 ActiveState
 Adler's
+ASAN
 Atomicity
 BLOBs
 BLRrVv
@@ -18,7 +19,10 @@ Christoph
 Collet's
 Coverity
 Coverity's
+CPPSuite
+CSuite
 CURSTD
+Cyclomatic
 DB's
 DBTs
 DHANDLE
@@ -83,6 +87,7 @@ Mewhort
 MongoDB
 MongoDB's
 Multithreaded
+MSAN
 NOTFOUND
 NSEC
 NUMA
@@ -106,8 +111,10 @@ Seward's
 SiH
 TSC
 TXT
+UBSAN
 UNC
 URIs
+Valgrind
 WILLNEED
 WiredTiger
 WiredTiger's
@@ -189,14 +196,17 @@ copydoc
 cov
 cp
 cpp
+cppsuite
 cpu
 crashless
 crc
+csuite
 curfile
 cursortype
 curtable
 customerABC
 cv
+cyclomatic
 dN
 dNLen
 dNOff
@@ -294,6 +304,7 @@ fuzzutil
 fvisibility
 fxray
 gcc
+gcov
 gdbm
 ge
 getKey
@@ -405,8 +416,8 @@ multiversion
 mutex
 mutexes
 mutexing
+mux
 mvcc
-mx
 mygcc
 mytable
 namespace

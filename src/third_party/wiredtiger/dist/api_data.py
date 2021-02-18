@@ -593,7 +593,7 @@ connection_runtime_config = [
         content in cache to this level. It is a percentage of the cache size if
         the value is within the range of 0 to 100 or an absolute size when
         greater than 100. The value is not allowed to exceed the \c cache_size.
-        Ignored if set to zero or \c in_memory is \c true''',
+        Ignored if set to zero.''',
         min=0, max='10TB'),
     Config('eviction_dirty_target', '5', r'''
         perform eviction in worker threads when the cache contains at least
@@ -721,6 +721,24 @@ connection_runtime_config = [
             this will update the value if one is already set''',
             min='1MB', max='10TB')
         ]),
+    Config('tiered_manager', '', r'''
+        tiered storage manager configuration options''',
+        type='category', undoc=True, subconfig=[
+            Config('threads_max', '8', r'''
+                maximum number of threads WiredTiger will start to help manage
+                tiered storage maintenance. Each worker thread uses a session
+                from the configured session_max''',
+                min=1, max=20),
+            Config('threads_min', '1', r'''
+                minimum number of threads WiredTiger will start to help manage
+                tiered storage maintenance.''',
+                min=1, max=20),
+            Config('wait', '0', r'''
+                seconds to wait between each periodic housekeeping of
+                tiered storage. Setting this value above 0 configures periodic
+                management inside WiredTiger''',
+                min='0', max='100000'),
+            ]),
     Config('statistics', 'none', r'''
         Maintain database statistics, which may impact performance.
         Choosing "all" maintains all statistics regardless of cost,
@@ -895,7 +913,7 @@ statistics_log_configuration_common = [
     Config('timestamp', '"%b %d %H:%M:%S"', r'''
         a timestamp prepended to each log record, may contain strftime
         conversion specifications, when \c json is configured, defaults
-        to \c "%FT%Y.000Z"'''),
+        to \c "%Y-%m-%dT%H:%M:%S.000Z"'''),
     Config('wait', '0', r'''
         seconds to wait between each write of the log records; setting
         this value above 0 configures statistics logging''',
@@ -910,6 +928,42 @@ connection_reconfigure_statistics_log_configuration = [
         type='category', subconfig=
         statistics_log_configuration_common)
 ]
+
+tiered_storage_configuration_common = [
+    Config('auth_token', '', r'''
+        authentication token string'''),
+    Config('local_retention', '300', r'''
+        time in seconds to retain data on tiered storage on the local tier for
+        faster read access''',
+        min='0', max='10000'),
+    Config('object_target_size', '10M', r'''
+        the approximate size of objects before creating them on the
+        tiered storage tier''',
+        min='100K', max='10TB'),
+]
+connection_reconfigure_tiered_storage_configuration = [
+    Config('tiered_storage', '', r'''
+        enable tiered storage. Enabling tiered storage may use one session from the
+        configured session_max''',
+        type='category', subconfig=
+        tiered_storage_configuration_common)
+]
+wiredtiger_open_tiered_storage_configuration = [
+    Config('tiered_storage', '', r'''
+        enable tiered storage. Enabling tiered storage may use one session from the
+        configured session_max''',
+        type='category', undoc=True, subconfig=
+        tiered_storage_configuration_common + [
+        Config('enabled', 'false', r'''
+            enable tiered storage subsystem''',
+            type='boolean'),
+        Config('name', 'none', r'''
+            Permitted values are \c "none"
+            or custom storage name created with
+            WT_CONNECTION::add_tiered_storage'''),
+    ]),
+]
+
 wiredtiger_open_statistics_log_configuration = [
     Config('statistics_log', '', r'''
         log any statistics the database is configured to maintain,
@@ -950,6 +1004,7 @@ wiredtiger_open_common =\
     connection_runtime_config +\
     wiredtiger_open_compatibility_configuration +\
     wiredtiger_open_log_configuration +\
+    wiredtiger_open_tiered_storage_configuration +\
     wiredtiger_open_statistics_log_configuration + [
     Config('buffer_alignment', '-1', r'''
         in-memory alignment (in bytes) for buffers used for I/O.  The
@@ -1154,8 +1209,8 @@ cursor_runtime_config = [
         configures whether the cursor's insert, update and remove
         methods check the existing state of the record.  If \c overwrite
         is \c false, WT_CURSOR::insert fails with ::WT_DUPLICATE_KEY
-        if the record exists, WT_CURSOR::update and WT_CURSOR::remove
-        fail with ::WT_NOTFOUND if the record does not exist''',
+        if the record exists, WT_CURSOR::update fails with ::WT_NOTFOUND
+        if the record does not exist''',
         type='boolean'),
 ]
 
@@ -1398,7 +1453,7 @@ methods = {
     Config('readonly', 'false', r'''
         only query operations are supported by this cursor. An error is
         returned if a modification is attempted using the cursor.  The
-        default is false for all cursor types except for log and metadata
+        default is false for all cursor types except for metadata
         cursors''',
         type='boolean'),
     Config('skip_sort_check', 'false', r'''
@@ -1448,6 +1503,13 @@ methods = {
         files''',
         type='boolean'),
 ]),
+
+'WT_SESSION.flush_tier' : Method([
+    Config('force', 'false', r'''
+        force sharing of all data''',
+        type='boolean'),
+]),
+
 'WT_SESSION.strerror' : Method([]),
 'WT_SESSION.transaction_sync' : Method([
     Config('timeout_ms', '1200000', # !!! Must match WT_SESSION_BG_SYNC_MSEC
@@ -1685,6 +1747,7 @@ methods = {
     connection_reconfigure_compatibility_configuration +\
     connection_reconfigure_log_configuration +\
     connection_reconfigure_statistics_log_configuration +\
+    connection_reconfigure_tiered_storage_configuration +\
     connection_runtime_config
 ),
 'WT_CONNECTION.set_file_system' : Method([]),

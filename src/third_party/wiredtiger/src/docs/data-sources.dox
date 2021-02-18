@@ -39,7 +39,7 @@ cursor types that give access to data managed by WiredTiger:
 	key=<code>string</code>\, value=<code>string</code>\,<br>
 	see @ref metadata for details}
 @row{<tt>statistics:[\<data source URI\>]</tt>,
-	database, data source, join or session statistics cursor,
+	database\, data source\, join or session statistics cursor,
 	key=<code>int id</code>\,<br>
 	value=<code>(string description\,
 	string value\, uint64_t value)</code>\,<br>

@@ -173,8 +173,10 @@ for tag in sorted_tags:
     test_type = test_type.replace("_", " ").title()
     testing_area = testing_area.replace("_", " ").title()
 
-    # Relative path to test file
+    # Relative path to test files
     link = ""
+    # Sort the filenames associated to the current tag
+    tagged_files[tag].sort()
     for name in tagged_files[tag]:
         link += "[" + name + "](" + name + "), "
     # Remove the extra ", " at the end
