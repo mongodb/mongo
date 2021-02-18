@@ -89,9 +89,13 @@ public:
      */
     static int Drop(OperationContext* opCtx, const std::string& uri);
 
+    /**
+     * Constructs an index. The rsKeyFormat is the RecordId key format of the related RecordStore.
+     */
     WiredTigerIndex(OperationContext* ctx,
                     const std::string& uri,
                     StringData ident,
+                    KeyFormat rsKeyFormat,
                     const IndexDescriptor* desc,
                     bool readOnly);
 
@@ -139,6 +143,10 @@ public:
 
     const BSONObj& keyPattern() const {
         return _keyPattern;
+    }
+
+    KeyFormat rsKeyFormat() const {
+        return _rsKeyFormat;
     }
 
     virtual bool isIdIndex() const {
@@ -190,6 +198,7 @@ protected:
     const std::string _indexName;
     const BSONObj _keyPattern;
     const BSONObj _collation;
+    const KeyFormat _rsKeyFormat;
 };
 
 class WiredTigerIndexUnique : public WiredTigerIndex {
@@ -282,6 +291,7 @@ public:
     WiredTigerIndexStandard(OperationContext* ctx,
                             const std::string& uri,
                             StringData ident,
+                            KeyFormat rsKeyFormat,
                             const IndexDescriptor* desc,
                             bool readOnly = false);
 

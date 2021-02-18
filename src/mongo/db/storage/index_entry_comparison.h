@@ -92,7 +92,17 @@ inline bool operator!=(const IndexKeyEntry& lhs, const IndexKeyEntry& rhs) {
  */
 struct KeyStringEntry {
     KeyStringEntry(KeyString::Value ks, RecordId loc) : keyString(ks), loc(loc) {
-        invariant(loc == KeyString::decodeRecordIdAtEnd(ks.getBuffer(), ks.getSize()));
+        if (!kDebugBuild) {
+            return;
+        }
+        loc.withFormat(
+            [](RecordId::Null n) { invariant(false); },
+            [&](int64_t rid) {
+                invariant(loc == KeyString::decodeRecordIdLongAtEnd(ks.getBuffer(), ks.getSize()));
+            },
+            [&](const char* str, int size) {
+                invariant(loc == KeyString::decodeRecordIdStrAtEnd(ks.getBuffer(), ks.getSize()));
+            });
     }
 
     KeyString::Value keyString;

@@ -85,7 +85,10 @@ public:
     }
 
     virtual std::unique_ptr<mongo::SortedDataInterface> getSortedDataInterface(
-        OperationContext* opCtx, StringData ident, const IndexDescriptor* desc);
+        OperationContext* opCtx,
+        const CollectionOptions& collOptions,
+        StringData ident,
+        const IndexDescriptor* desc);
 
     virtual Status beginBackup(OperationContext* opCtx) {
         return Status::OK();

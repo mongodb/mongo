@@ -299,8 +299,15 @@ Status IndexBuildInterceptor::_applyWrite(OperationContext* opCtx,
         (strcmp(operation.getStringField("op"), "i") == 0) ? Op::kInsert : Op::kDelete;
 
     const KeyStringSet keySet{keyString};
-    const RecordId opRecordId =
-        KeyString::decodeRecordIdAtEnd(keyString.getBuffer(), keyString.getSize());
+    const RecordId opRecordId = [&]() {
+        auto keyFormat = coll->getRecordStore()->keyFormat();
+        if (keyFormat == KeyFormat::Long) {
+            return KeyString::decodeRecordIdLongAtEnd(keyString.getBuffer(), keyString.getSize());
+        } else {
+            invariant(keyFormat == KeyFormat::String);
+            return KeyString::decodeRecordIdStrAtEnd(keyString.getBuffer(), keyString.getSize());
+        }
+    }();
 
     auto accessMethod = _indexCatalogEntry->accessMethod();
     if (opType == Op::kInsert) {

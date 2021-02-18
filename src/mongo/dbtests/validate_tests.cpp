@@ -78,7 +78,8 @@ public:
             options.clusteredIndex = ClusteredIndexOptions{};
         }
 
-        auto coll = db->createCollection(&_opCtx, _nss, options);
+        const bool createIdIndex = !clustered;
+        auto coll = db->createCollection(&_opCtx, _nss, options, createIdIndex);
         ASSERT_TRUE(coll);
         wuow.commit();
 

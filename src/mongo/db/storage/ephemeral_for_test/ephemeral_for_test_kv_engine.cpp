@@ -148,7 +148,11 @@ Status KVEngine::importSortedDataInterface(OperationContext* opCtx,
 }
 
 std::unique_ptr<mongo::SortedDataInterface> KVEngine::getSortedDataInterface(
-    OperationContext* opCtx, StringData ident, const IndexDescriptor* desc) {
+    OperationContext* opCtx,
+    const CollectionOptions& collOptions,
+    StringData ident,
+    const IndexDescriptor* desc) {
+    invariant(!collOptions.clusteredIndex);
     {
         stdx::lock_guard lock(_identsLock);
         _idents[ident.toString()] = false;

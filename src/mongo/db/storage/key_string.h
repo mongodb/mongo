@@ -639,6 +639,9 @@ protected:
     void _appendNumberInt(const int num, bool invert);
     void _appendNumberDecimal(const Decimal128 num, bool invert);
 
+    void _appendRecordIdLong(const int64_t val);
+    void _appendRecordIdStr(const char* val, int size);
+
     /**
      * @param name - optional, can be NULL
      *              if NULL, not included in encoding
@@ -940,9 +943,14 @@ BSONObj toBson(const T& keyString, Ordering ord) noexcept {
 }
 
 /**
- * Decodes a RecordId from the end of a buffer.
+ * Decodes a RecordId long from the end of a buffer.
  */
-RecordId decodeRecordIdAtEnd(const void* buf, size_t size);
+RecordId decodeRecordIdLongAtEnd(const void* buf, size_t size);
+
+/**
+ * Decodes a RecordId string from the end of a buffer.
+ */
+RecordId decodeRecordIdStrAtEnd(const void* buf, size_t size);
 
 /**
  * Given a KeyString with a RecordId, returns the length of the section without the RecordId.
@@ -952,7 +960,8 @@ size_t sizeWithoutRecordIdAtEnd(const void* bufferRaw, size_t bufSize);
 /**
  * Decodes a RecordId, consuming all bytes needed from reader.
  */
-RecordId decodeRecordId(BufReader* reader);
+RecordId decodeRecordIdLong(BufReader* reader);
+RecordId decodeRecordIdStr(BufReader* reader);
 
 int compare(const char* leftBuf, const char* rightBuf, size_t leftSize, size_t rightSize);
 

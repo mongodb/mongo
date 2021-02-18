@@ -1568,15 +1568,22 @@ Status WiredTigerKVEngine::dropSortedDataInterface(OperationContext* opCtx, Stri
 }
 
 std::unique_ptr<SortedDataInterface> WiredTigerKVEngine::getSortedDataInterface(
-    OperationContext* opCtx, StringData ident, const IndexDescriptor* desc) {
+    OperationContext* opCtx,
+    const CollectionOptions& collOptions,
+    StringData ident,
+    const IndexDescriptor* desc) {
     if (desc->isIdIndex()) {
+        invariant(!collOptions.clusteredIndex);
         return std::make_unique<WiredTigerIdIndex>(opCtx, _uri(ident), ident, desc, _readOnly);
     }
     if (desc->unique()) {
+        invariant(!collOptions.clusteredIndex);
         return std::make_unique<WiredTigerIndexUnique>(opCtx, _uri(ident), ident, desc, _readOnly);
     }
 
-    return std::make_unique<WiredTigerIndexStandard>(opCtx, _uri(ident), ident, desc, _readOnly);
+    auto keyFormat = (collOptions.clusteredIndex) ? KeyFormat::String : KeyFormat::Long;
+    return std::make_unique<WiredTigerIndexStandard>(
+        opCtx, _uri(ident), ident, keyFormat, desc, _readOnly);
 }
 
 std::unique_ptr<RecordStore> WiredTigerKVEngine::makeTemporaryRecordStore(OperationContext* opCtx,

@@ -1188,9 +1188,10 @@ SortedDataBuilderBase::SortedDataBuilderBase(OperationContext* opCtx,
       _collation(collation) {}
 
 Status SortedDataBuilderUnique::addKey(const KeyString::Value& keyString) {
-    dassert(KeyString::decodeRecordIdAtEnd(keyString.getBuffer(), keyString.getSize()).isValid());
+    dassert(
+        KeyString::decodeRecordIdLongAtEnd(keyString.getBuffer(), keyString.getSize()).isValid());
     StringStore* workingCopy(RecoveryUnit::get(_opCtx)->getHead());
-    RecordId loc = KeyString::decodeRecordIdAtEnd(keyString.getBuffer(), keyString.getSize());
+    RecordId loc = KeyString::decodeRecordIdLongAtEnd(keyString.getBuffer(), keyString.getSize());
 
     std::string key = createRadixKeyWithoutLocFromKS(keyString, _prefix);
     auto it = workingCopy->find(key);
@@ -1285,7 +1286,7 @@ Status SortedDataInterfaceUnique::insert(OperationContext* opCtx,
                                          const KeyString::Value& keyString,
                                          bool dupsAllowed) {
     StringStore* workingCopy(RecoveryUnit::get(opCtx)->getHead());
-    RecordId loc = KeyString::decodeRecordIdAtEnd(keyString.getBuffer(), keyString.getSize());
+    RecordId loc = KeyString::decodeRecordIdLongAtEnd(keyString.getBuffer(), keyString.getSize());
 
     std::string key = createRadixKeyWithoutLocFromKS(keyString, _prefix);
     auto it = workingCopy->find(key);
@@ -1316,7 +1317,7 @@ void SortedDataInterfaceUnique::unindex(OperationContext* opCtx,
                                         const KeyString::Value& keyString,
                                         bool dupsAllowed) {
     StringStore* workingCopy(RecoveryUnit::get(opCtx)->getHead());
-    RecordId loc = KeyString::decodeRecordIdAtEnd(keyString.getBuffer(), keyString.getSize());
+    RecordId loc = KeyString::decodeRecordIdLongAtEnd(keyString.getBuffer(), keyString.getSize());
 
     auto key = createRadixKeyWithoutLocFromKS(keyString, _prefix);
     auto it = workingCopy->find(key);
@@ -1428,9 +1429,10 @@ Status SortedDataInterfaceBase::initAsEmpty(OperationContext* opCtx) {
 }
 
 Status SortedDataBuilderStandard::addKey(const KeyString::Value& keyString) {
-    dassert(KeyString::decodeRecordIdAtEnd(keyString.getBuffer(), keyString.getSize()).isValid());
+    dassert(
+        KeyString::decodeRecordIdLongAtEnd(keyString.getBuffer(), keyString.getSize()).isValid());
     StringStore* workingCopy(RecoveryUnit::get(_opCtx)->getHead());
-    RecordId loc = KeyString::decodeRecordIdAtEnd(keyString.getBuffer(), keyString.getSize());
+    RecordId loc = KeyString::decodeRecordIdLongAtEnd(keyString.getBuffer(), keyString.getSize());
 
     std::string key = createRadixKeyWithLocFromKS(keyString, loc, _prefix);
     bool inserted =
@@ -1483,7 +1485,7 @@ Status SortedDataInterfaceStandard::insert(OperationContext* opCtx,
                                            const KeyString::Value& keyString,
                                            bool dupsAllowed) {
     StringStore* workingCopy(RecoveryUnit::get(opCtx)->getHead());
-    RecordId loc = KeyString::decodeRecordIdAtEnd(keyString.getBuffer(), keyString.getSize());
+    RecordId loc = KeyString::decodeRecordIdLongAtEnd(keyString.getBuffer(), keyString.getSize());
 
     std::string key = createRadixKeyWithLocFromKS(keyString, loc, _prefix);
     bool inserted =
@@ -1498,7 +1500,7 @@ void SortedDataInterfaceStandard::unindex(OperationContext* opCtx,
                                           const KeyString::Value& keyString,
                                           bool dupsAllowed) {
     StringStore* workingCopy(RecoveryUnit::get(opCtx)->getHead());
-    RecordId loc = KeyString::decodeRecordIdAtEnd(keyString.getBuffer(), keyString.getSize());
+    RecordId loc = KeyString::decodeRecordIdLongAtEnd(keyString.getBuffer(), keyString.getSize());
 
     auto key = createRadixKeyWithLocFromKS(keyString, loc, _prefix);
     if (workingCopy->erase(key))

@@ -92,7 +92,9 @@ public:
         return std::make_unique<WiredTigerIdIndex>(&opCtx, uri, "" /* ident */, &desc);
     }
 
-    std::unique_ptr<SortedDataInterface> newSortedDataInterface(bool unique, bool partial) final {
+    std::unique_ptr<mongo::SortedDataInterface> newSortedDataInterface(bool unique,
+                                                                       bool partial,
+                                                                       KeyFormat keyFormat) final {
         std::string ns = "test.wt";
         OperationContextNoop opCtx(newRecoveryUnit().release());
 
@@ -119,9 +121,12 @@ public:
         string uri = "table:" + ns;
         invariantWTOK(WiredTigerIndex::Create(&opCtx, uri, result.getValue()));
 
-        if (unique)
+        if (unique) {
+            invariant(keyFormat == KeyFormat::Long);
             return std::make_unique<WiredTigerIndexUnique>(&opCtx, uri, "" /* ident */, &desc);
-        return std::make_unique<WiredTigerIndexStandard>(&opCtx, uri, "" /* ident */, &desc);
+        }
+        return std::make_unique<WiredTigerIndexStandard>(
+            &opCtx, uri, "" /* ident */, keyFormat, &desc);
     }
 
     std::unique_ptr<RecoveryUnit> newRecoveryUnit() final {

@@ -134,7 +134,7 @@ void IndexConsistency::repairMissingIndexEntries(OperationContext* opCtx,
     for (auto it = _missingIndexEntries.begin(); it != _missingIndexEntries.end();) {
         const IndexKey& key = it->first;
         const KeyString::Value& ks = it->second.keyString;
-        const RecordId rid = KeyString::decodeRecordIdAtEnd(ks.getBuffer(), ks.getSize());
+        const RecordId rid = KeyString::decodeRecordIdLongAtEnd(ks.getBuffer(), ks.getSize());
 
         const std::string& indexName = key.first;
         if (indexName != index->descriptor()->indexName()) {
