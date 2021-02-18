@@ -41,7 +41,6 @@
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/s/migration_destination_manager.h"
 #include "mongo/db/s/resharding/resharding_recipient_service.h"
-#include "mongo/db/s/resharding_util.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/session_catalog_mongod.h"
 #include "mongo/logv2/log.h"
@@ -585,36 +584,6 @@ TEST_F(ReshardingRecipientServiceTest, StashCollectionsHaveSameCollationAsReshar
             ASSERT_BSONOBJ_EQ(collationSpec, collation);
         }
     }
-}
-
-TEST_F(ReshardingRecipientServiceTest, FindIdToResumeFrom) {
-    auto opCtx = operationContext();
-    NamespaceString oplogBufferNs = getLocalOplogBufferNamespace(kReshardingUUID, ShardId("foo"));
-    auto timestamp0 = Timestamp(1, 0);
-    auto timestamp1 = Timestamp(1, 1);
-    auto timestamp2 = Timestamp(1, 2);
-    auto timestamp3 = Timestamp(1, 3);
-
-    // Starts from FetchTimestamp since localOplogBuffer doesn't exist
-    ASSERT((resharding::getIdToResumeFrom(opCtx, oplogBufferNs, timestamp0) ==
-            ReshardingDonorOplogId{timestamp0, timestamp0}));
-
-    DBDirectClient client(opCtx);
-    client.insert(oplogBufferNs.toString(),
-                  BSON("_id" << BSON("clusterTime" << timestamp3 << "ts" << timestamp1)));
-
-    // Makes sure to use the entry in localOplogBuffer
-    ASSERT((resharding::getIdToResumeFrom(opCtx, oplogBufferNs, timestamp0) ==
-            ReshardingDonorOplogId{timestamp3, timestamp1}));
-
-    client.insert(oplogBufferNs.toString(),
-                  BSON("_id" << BSON("clusterTime" << timestamp3 << "ts" << timestamp3)));
-    client.insert(oplogBufferNs.toString(),
-                  BSON("_id" << BSON("clusterTime" << timestamp3 << "ts" << timestamp2)));
-
-    // Makes sure to choose the largest timestamp
-    ASSERT((resharding::getIdToResumeFrom(opCtx, oplogBufferNs, timestamp0) ==
-            ReshardingDonorOplogId{timestamp3, timestamp3}));
 }
 
 }  // namespace

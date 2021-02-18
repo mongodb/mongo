@@ -60,7 +60,5 @@ void ensureCollectionDropped(OperationContext* opCtx,
                              const NamespaceString& nss,
                              const boost::optional<CollectionUUID>& uuid = boost::none);
 
-Value findHighestInsertedId(OperationContext* opCtx, const CollectionPtr& collection);
-
 }  // namespace resharding::data_copy
 }  // namespace mongo
