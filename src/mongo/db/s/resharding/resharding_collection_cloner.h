@@ -75,6 +75,8 @@ public:
                              CancelationToken cancelToken);
 
 private:
+    Value _findHighestInsertedId(OperationContext* opCtx);
+
     std::unique_ptr<Pipeline, PipelineDeleter> _targetAggregationRequest(OperationContext* opCtx,
                                                                          const Pipeline& pipeline);
 
