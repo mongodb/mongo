@@ -89,6 +89,10 @@ structs:
                 type: array<object_owned>
                 description: "The zones associated with the new shard key."
                 optional: true
+            numInitialChunks:
+                type: long
+                description: "The number of chunks the new collection should have after resharding."
+                optional: true
             presetReshardedChunks:
                 type: array<object_owned>
                 description: >-

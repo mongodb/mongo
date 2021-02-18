@@ -61,9 +61,7 @@ const size_t kDefaultImbalanceThreshold = 1;
 }  // namespace
 
 DistributionStatus::DistributionStatus(NamespaceString nss, ShardToChunksMap shardToChunksMap)
-    : _nss(std::move(nss)),
-      _shardChunks(std::move(shardToChunksMap)),
-      _zoneRanges(SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<ZoneRange>()) {}
+    : _nss(std::move(nss)), _shardChunks(std::move(shardToChunksMap)) {}
 
 size_t DistributionStatus::totalChunks() const {
     size_t total = 0;
@@ -113,6 +111,17 @@ const vector<ChunkType>& DistributionStatus::getChunks(const ShardId& shardId) c
 }
 
 Status DistributionStatus::addRangeToZone(const ZoneRange& range) {
+    return _zoneInfo.addRangeToZone(range);
+}
+
+string DistributionStatus::getTagForChunk(const ChunkType& chunk) const {
+    return _zoneInfo.getZoneForChunk(chunk.getRange());
+}
+
+ZoneInfo::ZoneInfo()
+    : _zoneRanges(SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<ZoneRange>()) {}
+
+Status ZoneInfo::addRangeToZone(const ZoneRange& range) {
     const auto minIntersect = _zoneRanges.upper_bound(range.min);
     const auto maxIntersect = _zoneRanges.upper_bound(range.max);
 
@@ -148,11 +157,11 @@ Status DistributionStatus::addRangeToZone(const ZoneRange& range) {
 
     // This must be a new entry
     _zoneRanges.emplace(range.max.getOwned(), range);
-    _allTags.insert(range.zone);
+    _allZones.insert(range.zone);
     return Status::OK();
 }
 
-string DistributionStatus::getTagForChunk(const ChunkType& chunk) const {
+string ZoneInfo::getZoneForChunk(const ChunkRange& chunk) const {
     const auto minIntersect = _zoneRanges.upper_bound(chunk.getMin());
     const auto maxIntersect = _zoneRanges.lower_bound(chunk.getMax());
 
@@ -198,12 +207,12 @@ void DistributionStatus::report(BSONObjBuilder* builder) const {
 
     // Report all tags
     BSONArrayBuilder tagsArr(builder->subarrayStart("tags"));
-    tagsArr.append(_allTags);
+    tagsArr.append(_zoneInfo.allZones());
     tagsArr.doneFast();
 
     // Report all tag ranges
     BSONArrayBuilder tagRangesArr(builder->subarrayStart("tagRanges"));
-    for (const auto& tagRange : _zoneRanges) {
+    for (const auto& tagRange : _zoneInfo.zoneRanges()) {
         BSONObjBuilder tagRangeEntry(tagRangesArr.subobjStart());
         tagRangeEntry.append("tag", tagRange.second.zone);
         tagRangeEntry.append("mapKey", tagRange.first);

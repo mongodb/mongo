@@ -36,6 +36,7 @@
 #include "mongo/db/logical_session_cache.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/repl/primary_only_service.h"
+#include "mongo/db/s/config/initial_split_policy.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
@@ -388,8 +389,8 @@ void writeToConfigCollectionsForTempNss(OperationContext* opCtx,
                     BSON(CollectionType::kNssFieldName
                          << coordinatorDoc.getTempReshardingNss().ns()),
                     updateBuilder.obj(),
-                    false,  // upsert
-                    false   // multi
+                    true,  // upsert
+                    false  // multi
                 );
             }
         }
@@ -628,9 +629,9 @@ ParticipantShardsAndChunks calculateParticipantShardsAndChunks(
     std::set<ShardId> recipientShardIds;
     std::vector<ChunkType> initialChunks;
 
-    auto version = calculateChunkVersionForInitialChunks(opCtx);
-
     if (const auto& chunks = coordinatorDoc.getPresetReshardedChunks()) {
+        auto version = calculateChunkVersionForInitialChunks(opCtx);
+
         // Use the provided shardIds from presetReshardedChunks to construct the
         // recipient list.
         for (const BSONObj& obj : *chunks) {
@@ -655,26 +656,40 @@ ParticipantShardsAndChunks calculateParticipantShardsAndChunks(
             version.incMinor();
         }
     } else {
-        // No presetReshardedChunks were provided, make the recipients list be the same as
-        // the donors list by default.
-        recipientShardIds = donorShardIds;
+        int numInitialChunks = coordinatorDoc.getNumInitialChunks()
+            ? *coordinatorDoc.getNumInitialChunks()
+            : cm.numChunks();
 
-        cm.forEachChunk([&](const auto& chunk) {
-            // TODO SERVER-49526 Change the range to refer to the new shard key pattern.
-            if (version.getTimestamp()) {
-                initialChunks.emplace_back(coordinatorDoc.getReshardingUUID(),
-                                           ChunkRange{chunk.getMin(), chunk.getMax()},
-                                           version,
-                                           chunk.getShardId());
-            } else {
-                initialChunks.emplace_back(coordinatorDoc.getTempReshardingNss(),
-                                           ChunkRange{chunk.getMin(), chunk.getMax()},
-                                           version,
-                                           chunk.getShardId());
+        ShardKeyPattern shardKey(coordinatorDoc.getReshardingKey());
+        const auto tempNs = coordinatorDoc.getTempReshardingNss();
+
+        boost::optional<std::vector<mongo::TagsType>> parsedZones;
+        if (auto rawBSONZones = coordinatorDoc.getZones()) {
+            parsedZones.emplace();
+            parsedZones->reserve(rawBSONZones->size());
+
+            for (const auto& zone : *rawBSONZones) {
+                parsedZones->push_back(uassertStatusOK(TagsType::fromBSON(zone)));
             }
-            version.incMinor();
-            return true;
-        });
+        }
+
+        auto initialSplitter = ReshardingSplitPolicy::make(opCtx,
+                                                           coordinatorDoc.getSourceNss(),
+                                                           tempNs,
+                                                           shardKey,
+                                                           numInitialChunks,
+                                                           std::move(parsedZones));
+
+        // Note: The resharding initial split policy doesn't care about what is the real primary
+        // shard, so just pass in a random shard.
+        const SplitPolicyParams splitParams{
+            tempNs, coordinatorDoc.getReshardingUUID(), *donorShardIds.begin()};
+        auto splitResult = initialSplitter.createFirstChunks(opCtx, shardKey, splitParams);
+        initialChunks = std::move(splitResult.chunks);
+
+        for (const auto& chunk : initialChunks) {
+            recipientShardIds.insert(chunk.getShard());
+        }
     }
 
     return {constructDonorShardEntries(donorShardIds),

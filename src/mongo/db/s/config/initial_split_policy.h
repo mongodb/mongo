@@ -34,8 +34,10 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_tags.h"
+#include "mongo/s/resharded_chunk_gen.h"
 #include "mongo/s/shard_id.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/string_map.h"
@@ -278,30 +280,85 @@ private:
 };
 
 /**
- * Split point building strategy to be used for resharding when zones are not defined.
+ * Split point building strategy for resharding.
  */
 class ReshardingSplitPolicy : public InitialSplitPolicy {
 public:
-    ReshardingSplitPolicy(OperationContext* opCtx,
-                          const NamespaceString& nss,
-                          const ShardKeyPattern& shardKey,
+    using SampleDocumentPipeline = std::unique_ptr<Pipeline, PipelineDeleter>;
+
+    // Interface to faciliate testing
+    class SampleDocumentSource {
+    public:
+        virtual ~SampleDocumentSource(){};
+        virtual boost::optional<BSONObj> getNext() = 0;
+    };
+
+    // Provides documents from a real Pipeline
+    class PipelineDocumentSource : public SampleDocumentSource {
+    public:
+        PipelineDocumentSource() = delete;
+        PipelineDocumentSource(SampleDocumentPipeline pipeline, int skip);
+        boost::optional<BSONObj> getNext() override;
+
+    private:
+        SampleDocumentPipeline _pipeline;
+        const int _skip;
+    };
+
+    /**
+     * Creates a new ReshardingSplitPolicy. Note that it should not outlive the operation
+     * context used to create it.
+     */
+    static ReshardingSplitPolicy make(OperationContext* opCtx,
+                                      const NamespaceString& origNs,
+                                      const NamespaceString& reshardingTempNs,
+                                      const ShardKeyPattern& shardKey,
+                                      int numInitialChunks,
+                                      boost::optional<std::vector<TagsType>> zones,
+                                      int samplesPerChunk = kDefaultSamplesPerChunk);
+
+    ReshardingSplitPolicy(const NamespaceString& ns,
                           int numInitialChunks,
-                          const std::vector<ShardId>& recipientShardIds,
-                          const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                          int samplingRatio = 10);
+                          boost::optional<std::vector<TagsType>> zones,
+                          std::unique_ptr<SampleDocumentSource> samples);
+
     ShardCollectionConfig createFirstChunks(OperationContext* opCtx,
                                             const ShardKeyPattern& shardKeyPattern,
-                                            SplitPolicyParams params);
+                                            SplitPolicyParams params) override;
+
     /**
      * Creates the aggregation pipeline BSON to get documents for sampling from shards.
      */
     static std::vector<BSONObj> createRawPipeline(const ShardKeyPattern& shardKey,
-                                                  int samplingRatio,
-                                                  int numSplitPoints);
+                                                  int numSplitPoints,
+                                                  int samplesPerChunk);
+
+    static constexpr int kDefaultSamplesPerChunk = 10;
 
 private:
-    std::vector<BSONObj> _splitPoints;
-    std::vector<ShardId> _recipientShardIds;
-    int _numContiguousChunksPerShard;
+    static std::unique_ptr<SampleDocumentSource> _makePipelineDocumentSource(
+        OperationContext* opCtx,
+        const NamespaceString& ns,
+        const ShardKeyPattern& shardKey,
+        int numInitialChunks,
+        int samplesPerChunk);
+
+    /**
+     * Returns a set of split points to ensure that chunk boundaries will align with the zone
+     * ranges.
+     */
+    BSONObjSet _extractSplitPointsFromZones(const ShardKeyPattern& shardKey);
+
+    /**
+     * Append split points based from the samples taken from the collection.
+     */
+    void _appendSplitPointsFromSample(BSONObjSet* splitPoints,
+                                      const ShardKeyPattern& shardKey,
+                                      int nToAppend);
+
+    const NamespaceString _ns;
+    const int _numInitialChunks;
+    boost::optional<std::vector<TagsType>> _zones;
+    std::unique_ptr<SampleDocumentSource> _samples;
 };
 }  // namespace mongo

@@ -140,6 +140,7 @@ public:
             coordinatorDoc.setCommonReshardingMetadata(std::move(commonMetadata));
             coordinatorDoc.setZones(request().getZones());
             coordinatorDoc.setPresetReshardedChunks(request().get_presetReshardedChunks());
+            coordinatorDoc.setNumInitialChunks(request().getNumInitialChunks());
 
             auto registry = repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext());
             auto service = registry->lookupServiceByName(kReshardingCoordinatorServiceName);
