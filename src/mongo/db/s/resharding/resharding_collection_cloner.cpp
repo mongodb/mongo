@@ -41,7 +41,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
@@ -50,6 +49,7 @@
 #include "mongo/db/pipeline/document_source_replace_root.h"
 #include "mongo/db/pipeline/sharded_agg_helpers.h"
 #include "mongo/db/query/query_request_helper.h"
+#include "mongo/db/s/resharding/resharding_data_copy_util.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding_util.h"
 #include "mongo/db/service_context.h"
@@ -211,32 +211,6 @@ std::unique_ptr<Pipeline, PipelineDeleter> ReshardingCollectionCloner::makePipel
     return Pipeline::create(std::move(stages), std::move(expCtx));
 }
 
-Value ReshardingCollectionCloner::_findHighestInsertedId(OperationContext* opCtx) {
-    AutoGetCollection outputColl(opCtx, _outputNss, MODE_IS);
-    uassert(ErrorCodes::NamespaceNotFound,
-            str::stream() << "Resharding collection cloner's output collection '" << _outputNss
-                          << "' did not already exist",
-            outputColl);
-
-    auto findCommand = std::make_unique<FindCommand>(_outputNss);
-    findCommand->setLimit(1);
-    findCommand->setSort(BSON("_id" << -1));
-
-    auto recordId =
-        Helpers::findOne(opCtx, *outputColl, std::move(findCommand), true /* requireIndex */);
-    if (recordId.isNull()) {
-        return Value{};
-    }
-
-    auto doc = outputColl->docFor(opCtx, recordId).value();
-    auto value = Value{doc["_id"]};
-    uassert(4929300,
-            "Missing _id field for document in temporary resharding collection",
-            !value.missing());
-
-    return value;
-}
-
 std::unique_ptr<Pipeline, PipelineDeleter> ReshardingCollectionCloner::_targetAggregationRequest(
     OperationContext* opCtx, const Pipeline& pipeline) {
     AggregateCommand request(_sourceNss, pipeline.serializeToBson());
@@ -365,7 +339,15 @@ ExecutorFuture<void> ReshardingCollectionCloner::run(
     return AsyncTry([this, chainCtx] {
                if (!chainCtx->pipeline) {
                    chainCtx->pipeline = _withTemporaryOperationContext([&](auto* opCtx) {
-                       auto idToResumeFrom = _findHighestInsertedId(opCtx);
+                       auto idToResumeFrom = [&] {
+                           AutoGetCollection outputColl(opCtx, _outputNss, MODE_IS);
+                           uassert(ErrorCodes::NamespaceNotFound,
+                                   str::stream()
+                                       << "Resharding collection cloner's output collection '"
+                                       << _outputNss << "' did not already exist",
+                                   outputColl);
+                           return resharding::data_copy::findHighestInsertedId(opCtx, *outputColl);
+                       }();
                        auto pipeline = _targetAggregationRequest(
                            opCtx,
                            *makePipeline(
