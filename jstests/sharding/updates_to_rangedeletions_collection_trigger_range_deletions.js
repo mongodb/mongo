@@ -32,7 +32,7 @@ let testColl = testDB.foo;
     // Insert documents into each chunk
     jsTestLog("Inserting documents");
     for (let i = 0; i < 100; i++) {
-        testColl.insert({x: i});
+        assert.commandWorked(testColl.insert({x: i}));
     }
 
     const expectedNumDocsTotal = 100;
@@ -83,11 +83,11 @@ let testColl = testDB.foo;
 
     // Write range to deletion collection
     jsTestLog("Inserting deletion task");
-    deletionsColl.insert(deletionTask);
+    assert.commandWorked(deletionsColl.insert(deletionTask));
 
     // Update deletion task
     jsTestLog("Updating pending flag");
-    deletionsColl.update(deletionTask, {$unset: {pending: ""}});
+    assert.commandWorked(deletionsColl.update(deletionTask, {$unset: {pending: ""}}));
 
     // Verify that orphans are deleted.
     assert.soon(() => {
@@ -134,10 +134,10 @@ let testColl = testDB.foo;
     let deletionsColl = st.shard0.getCollection(rangeDeletionNs);
 
     // Write range to deletion collection
-    deletionsColl.insert(deletionTask);
+    assert.commandWorked(deletionsColl.insert(deletionTask));
 
     // Update deletion task
-    deletionsColl.update(deletionTask, {$unset: {pending: ""}});
+    assert.commandWorked(deletionsColl.update(deletionTask, {$unset: {pending: ""}}));
 
     // Verify that the deletion task gets deleted after being processed.
     assert.soon(function() {
