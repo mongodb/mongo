@@ -1,9 +1,6 @@
 /**
  * Test that a $project with a combination of expressions and field projections gets evaluted
  * correctly, and overwrites the data present in the input document when necessary.
- * @tags: [
- *   sbe_incompatible,
- * ]
  */
 (function() {
 const coll = db.project_with_expressions;
@@ -17,9 +14,19 @@ function assertProjectionResultForFindAndAgg(projection, expectedResults) {
         coll.aggregate([{$_internalInhibitOptimization: {}}, {$project: projection}]).toArray();
     const findResults = coll.find({}, projection).toArray();
 
-    assert.eq(aggResults, expectedResults);
-    assert.eq(aggNoPushdownResults, expectedResults);
-    assert.eq(findResults, expectedResults);
+    // SERVER-54314 The equality checks below don't make assertions about field ordering in order to
+    // account for differences between the classic engine and SBE. In particular, the classic engine
+    // will apply inclusions before applying computed projections, whereas SBE will apply the
+    // projections in the order in which the fields appear in the original document.
+    function assertResultsEqual(results, expected) {
+        assert.eq(results.length, expected.length);
+        for (let i = 0; i < results.length; ++i) {
+            assert.docEq(results[i], expected[i]);
+        }
+    }
+    assertResultsEqual(aggResults, expectedResults);
+    assertResultsEqual(aggNoPushdownResults, expectedResults);
+    assertResultsEqual(findResults, expectedResults);
 }
 
 // Case where a project with a valid sub-object, a project with missing sub-object and a project
