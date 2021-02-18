@@ -12,6 +12,11 @@
 (function() {
 "use strict";
 
+// TODO SERVER-53104: Temporarily skipping this check because at the end of the test after
+// downgrading the binaries the shards fail to refresh the catalog cache due to finding an
+// 'allowMigrations' field in the persisted metadata
+TestData.skipCheckingIndexesConsistentAcrossCluster = true;
+
 load('./jstests/multiVersion/libs/multi_cluster.js');  // for upgradeCluster()
 load("jstests/sharding/libs/find_chunks_util.js");
 

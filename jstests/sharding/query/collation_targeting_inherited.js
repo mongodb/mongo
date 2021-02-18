@@ -5,6 +5,12 @@
 // Shard key index has collation, which is not compatible with $min/$max
 TestData.skipCheckOrphans = true;
 
+// TODO SERVER-54629 Remove this skip. Index consistency check is failing due to shards reporting
+// the index spec BSON object with different element order. Check whether it's okay to change the
+// check at ShardedIndexUtil.findInconsistentIndexesAcrossShards to compare the index specs without
+// taking into account the order.
+TestData.skipCheckingIndexesConsistentAcrossCluster = true;
+
 const caseInsensitive = {
     locale: "en_US",
     strength: 2

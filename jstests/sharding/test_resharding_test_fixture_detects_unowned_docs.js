@@ -14,6 +14,9 @@
 load('jstests/libs/discover_topology.js');
 load("jstests/sharding/libs/resharding_test_fixture.js");
 
+// The test purposely emplaces documents on a shard that doesn't own them.
+TestData.skipCheckOrphans = true;
+
 const reshardingTest = new ReshardingTest({numDonors: 1, numRecipients: 2});
 reshardingTest.setup();
 

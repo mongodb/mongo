@@ -27,8 +27,9 @@ ShardingTest.prototype.checkIndexesConsistentAcrossCluster = function() {
      * Returns an array of config.collections docs for undropped collections.
      */
     function getCollDocs() {
+        // TODO SERVER-51881: Remove the checking for 'dropped: {$ne: true}' after 5.0 is released
         return mongos.getDB("config")
-            .collections.find({dropped: false})
+            .collections.find({dropped: {$ne: true}})
             .readConcern("local")
             .toArray();
     }

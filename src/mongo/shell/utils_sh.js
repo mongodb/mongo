@@ -744,6 +744,8 @@ function printShardingStatus(configDB, verbose) {
             configDB.collections.find({_id: new RegExp("^" + RegExp.escape(db._id) + "\\.")})
                 .sort({_id: 1})
                 .forEach(function(coll) {
+                    // Checking for '!dropped' to ensure mongo shell compatibility with earlier
+                    // versions of the server
                     if (!coll.dropped) {
                         output(3, coll._id);
                         output(4, "shard key: " + tojson(coll.key));
