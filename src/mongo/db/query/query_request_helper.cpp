@@ -263,39 +263,6 @@ Status validateFindCommand(const FindCommand& findCommand) {
                       "'limit' or 'batchSize' fields can not be set with 'ntoreturn' field.");
     }
 
-    // TODO SERVER-53060: When legacy query request is seperated, these validations can be moved to
-    // IDL.
-    if (findCommand.getSkip() && *findCommand.getSkip() < 0) {
-        return Status(ErrorCodes::BadValue,
-                      str::stream() << "Skip value must be non-negative, but received: "
-                                    << *findCommand.getSkip());
-    }
-
-    if (findCommand.getLimit() && *findCommand.getLimit() < 0) {
-        return Status(ErrorCodes::BadValue,
-                      str::stream() << "Limit value must be non-negative, but received: "
-                                    << *findCommand.getLimit());
-    }
-
-    if (findCommand.getBatchSize() && *findCommand.getBatchSize() < 0) {
-        return Status(ErrorCodes::BadValue,
-                      str::stream() << "BatchSize value must be non-negative, but received: "
-                                    << *findCommand.getBatchSize());
-    }
-
-    if (findCommand.getNtoreturn() && *findCommand.getNtoreturn() < 0) {
-        return Status(ErrorCodes::BadValue,
-                      str::stream() << "NToReturn value must be non-negative, but received: "
-                                    << *findCommand.getNtoreturn());
-    }
-
-    int maxTimeMS = findCommand.getMaxTimeMS() ? static_cast<int>(*findCommand.getMaxTimeMS()) : 0;
-    if (maxTimeMS < 0) {
-        return Status(ErrorCodes::BadValue,
-                      str::stream()
-                          << "MaxTimeMS value must be non-negative, but received: " << maxTimeMS);
-    }
-
     if (query_request_helper::getTailableMode(findCommand) != TailableModeEnum::kNormal) {
         // Tailable cursors cannot have any sort other than {$natural: 1}.
         const BSONObj expectedSort = BSON(query_request_helper::kNaturalSortField << 1);

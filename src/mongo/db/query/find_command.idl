@@ -97,18 +97,22 @@ commands:
         description: "Number of documents to skip."
         type: safeInt64
         optional: true
+        validator: { gte: 0 }
       limit:
         description: "The maximum number of documents to return."
         type: safeInt64
         optional: true
+        validator: { gte: 0 }
       batchSize:
         description: "The number of documents to return in the first batch."
         type: safeInt64
         optional: true
+        validator: { gte: 0 }
       ntoreturn:
         description: "Deprecated. Should use batchSize."
         type: safeInt64
         optional: true
+        validator: { gte: 0 }
         unstable: true
       singleBatch:
         description: "Determines whether to close the cursor after the first batch."
@@ -207,6 +211,7 @@ commands:
         cursor."
         type: maxTimeMS
         optional: true
+        validator: { gte: 0 }
       readConcern:
         description: "Specifies the read concern."
         type: object_owned
