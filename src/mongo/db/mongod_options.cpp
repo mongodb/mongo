@@ -688,6 +688,26 @@ Status storeMongodOptions(const moe::Environment& params) {
                                     << " and set skipShardingConfigurationChecks=true");
     }
 
+    if ((isClusterRoleShard || isClusterRoleConfig) && params.count("setParameter")) {
+        std::map<std::string, std::string> parameters =
+            params["setParameter"].as<std::map<std::string, std::string>>();
+        const bool requireApiVersionValue = ([&parameters] {
+            const auto requireApiVersionParam = parameters.find("requireApiVersion");
+            if (requireApiVersionParam == parameters.end()) {
+                return false;
+            }
+            const auto& val = requireApiVersionParam->second;
+            return (0 == val.compare("1")) || (0 == val.compare("true"));
+        })();
+
+        if (requireApiVersionValue) {
+            auto clusterRoleStr = isClusterRoleConfig ? "--configsvr" : "--shardsvr";
+            return Status(ErrorCodes::BadValue,
+                          str::stream() << "Can not specify " << clusterRoleStr
+                                        << " and set requireApiVersion=true");
+        }
+    }
+
     setGlobalReplSettings(replSettings);
     return Status::OK();
 }
