@@ -2386,7 +2386,7 @@ if env.TargetOSIs('posix'):
             env.Append( CCFLAGS=["-Werror"] )
 
     env.Append( CXXFLAGS=["-Woverloaded-virtual"] )
-    if env.ToolchainIs('clang'):
+    if env.ToolchainIs('clang') and not has_option('disable-warnings-as-errors'):
         env.Append( CXXFLAGS=['-Werror=unused-result'] )
 
     # On OS X, clang doesn't want the pthread flag at link time, or it
