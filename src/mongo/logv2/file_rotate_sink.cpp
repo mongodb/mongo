@@ -29,6 +29,7 @@
 
 #include "mongo/logv2/file_rotate_sink.h"
 
+#include <boost/exception/diagnostic_information.hpp>
 #include <boost/filesystem/operations.hpp>
 #include <boost/iterator/filter_iterator.hpp>
 #include <boost/iterator/transform_iterator.hpp>
@@ -39,8 +40,8 @@
 #include "mongo/logv2/json_formatter.h"
 #include "mongo/logv2/log_detail.h"
 #include "mongo/logv2/shared_access_fstream.h"
+#include "mongo/util/stacktrace.h"
 #include "mongo/util/string_map.h"
-
 
 namespace mongo::logv2 {
 namespace {
@@ -173,13 +174,19 @@ void FileRotateSink::consume(const boost::log::record_view& rec,
                         LogTruncation::Disabled);
             // Commented out log line below to get validation of the log id with the errorcodes
             // linter LOGV2(4522200, "Writing to log file failed, aborting application");
-            std::cout << StringData(buffer.data(), buffer.size()) << std::endl;
+            std::cerr << StringData(buffer.data(), buffer.size()) << std::endl;
+        } catch (const std::exception& ex) {
+            std::cerr << "Caught std::exception of type " << demangleName(typeid(ex)) << ": "
+                      << ex.what() << std::endl;
+        } catch (const boost::exception& ex) {
+            std::cerr << "Caught boost::exception of type " << demangleName(typeid(ex)) << ": "
+                      << boost::diagnostic_information(ex) << std::endl;
         } catch (...) {
-            // If the formatting code throws for any reason, ignore and proceed with aborting the
-            // application.
+            std::cerr << "Caught unidentified exception" << std::endl;
         }
 
-        std::abort();
+        printStackTrace(std::cerr);
+        std::quick_exit(EXIT_FAILURE);
     }
 }
 
