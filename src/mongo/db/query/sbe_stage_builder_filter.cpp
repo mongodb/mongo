@@ -582,7 +582,7 @@ void generateArraySize(MatchExpressionVisitorContext* context,
 }
 
 /**
- * Generates a path traversal SBE plan stage sub-tree which implments the comparison match
+ * Generates a path traversal SBE plan stage sub-tree which implements the comparison match
  * expression 'expr'. The comparison itself executes using the given 'binaryOp'.
  */
 void generateComparison(MatchExpressionVisitorContext* context,
@@ -662,11 +662,35 @@ void generateComparison(MatchExpressionVisitorContext* context,
                                                     sbe::makeE<sbe::EConstant>(tag, val),
                                                     context->env)),
                     std::move(inputStage)};
+        } else if (sbe::value::isNaN(tag, val)) {
+            // Construct an expression to perform a NaN check.
+            switch (binaryOp) {
+                case sbe::EPrimBinary::eq:
+                case sbe::EPrimBinary::greaterEq:
+                case sbe::EPrimBinary::lessEq:
+                    // If 'rhs' is NaN, then return whether the lhs is NaN.
+                    return {makeFillEmptyFalse(makeFunction("isNaN", makeVariable(inputSlot))),
+                            std::move(inputStage)};
+                case sbe::EPrimBinary::less:
+                case sbe::EPrimBinary::greater:
+                    // Always return false for non-equality operators.
+                    return {makeConstant(sbe::value::TypeTags::Boolean,
+                                         sbe::value::bitcastFrom<bool>(false)),
+                            std::move(inputStage)};
+                default:
+                    tasserted(5449400,
+                              str::stream() << "Could not construct expression for comparison op "
+                                            << expr->toString());
+            }
         }
-        return {makeFillEmptyFalse(makeBinaryOp(binaryOp,
-                                                makeVariable(inputSlot),
-                                                sbe::makeE<sbe::EConstant>(tag, val),
-                                                context->env)),
+
+        // When 'rhs' is not NaN, return false if lhs is NaN. Otherwise, use usual comparison
+        // semantics.
+        return {makeBinaryOp(
+                    sbe::EPrimBinary::logicAnd,
+                    makeNot(makeFillEmptyFalse(makeFunction("isNaN", makeVariable(inputSlot)))),
+                    makeFillEmptyFalse(makeBinaryOp(
+                        binaryOp, makeVariable(inputSlot), makeConstant(tag, val), context->env))),
                 std::move(inputStage)};
     };
 
