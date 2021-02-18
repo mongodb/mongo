@@ -209,6 +209,7 @@ wtEnv.Benchmark(
     target='storage_wiredtiger_begin_transaction_block_bm',
     source='wiredtiger_begin_transaction_block_bm.cpp',
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/storage/durable_catalog_impl',
         '$BUILD_DIR/mongo/unittest/unittest',
