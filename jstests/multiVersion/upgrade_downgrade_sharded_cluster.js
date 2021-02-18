@@ -103,12 +103,9 @@ function testAllowedMigrationsFieldChecksAfterFCVDowngrade() {
 //
 // This test must be removed once 5.0 is defined as the lastLTS.
 function testTimestampFieldSetup() {
-    assert.commandWorked(
-        st.s.adminCommand({shardCollection: 'sharded.test3_created_before_upgrade', key: {x: 1}}));
-    assert.commandWorked(
-        st.s.adminCommand({split: 'sharded.test3_created_before_upgrade', middle: {x: 10}}));
-    assert.commandWorked(
-        st.s.adminCommand({split: 'sharded.test3_created_before_upgrade', middle: {x: -10}}));
+    assert.commandWorked(st.s.adminCommand({shardCollection: 'sharded.test3', key: {x: 1}}));
+    assert.commandWorked(st.s.adminCommand({split: 'sharded.test3', middle: {x: 10}}));
+    assert.commandWorked(st.s.adminCommand({split: 'sharded.test3', middle: {x: -10}}));
 }
 
 function testTimestampFieldChecksAfterUpgrade() {
@@ -119,36 +116,29 @@ function testTimestampFieldChecksAfterUpgrade() {
         csrs_config_db.databases.findOne({_id: 'sharded'}).version.timestamp;
     assert.neq(null, dbTimestampInConfigSvr);
 
-    // Check that 'timestamp' propagates to the shardsvr config.cache.databases
     let primaryShard = st.getPrimaryShard('sharded');
-    primaryShard.adminCommand({
-        _flushDatabaseCacheUpdates: 'sharded',
-        syncFromConfig: true
-    });  // TODO: After SERVER-53104 it won't be necessary to issue this flush command from the
-         // test.
+
+    // Check that 'timestamp' propagates to the shardsvr config.cache.databases
     assert.eq(
         dbTimestampInConfigSvr,
         primaryShard.getDB('config').cache.databases.findOne({_id: 'sharded'}).version.timestamp);
 
     // Check that 'timestamp' has been created in configsvr config.collections
     let collTimestampInConfigSvr =
-        csrs_config_db.collections.findOne({_id: 'sharded.test3_created_before_upgrade'}).timestamp;
+        csrs_config_db.collections.findOne({_id: 'sharded.test3'}).timestamp;
     assert.neq(null, collTimestampInConfigSvr);
 
-    // TODO: After SERVER-52587, check that the timestamp in the shardsvr config.cache.collection
-    // exists and matches collTimestampInConfigSvr
+    // Check that 'timestamp' has been propagated to config.cache.collections
+    assert.eq(
+        collTimestampInConfigSvr,
+        primaryShard.getDB('config').cache.collections.findOne({_id: 'sharded.test3'}).timestamp);
 
     // Check that 'timestamp' has been created in config.chunks
-    var cursor = findChunksUtil.findChunksByNs(st.config, 'sharded.test3_created_before_upgrade');
+    var cursor = findChunksUtil.findChunksByNs(st.config, 'sharded.test3');
     assert(cursor.hasNext());
     do {
         assert.eq(collTimestampInConfigSvr, cursor.next().lastmodTimestamp);
     } while (cursor.hasNext());
-}
-
-function testTimestampFieldSetupBeforeDowngrade() {
-    assert.commandWorked(
-        st.s.adminCommand({shardCollection: 'sharded.test3_created_after_upgrade', key: {x: 1}}));
 }
 
 function testTimestampFieldChecksAfterFCVDowngrade() {
@@ -164,30 +154,20 @@ function testTimestampFieldChecksAfterFCVDowngrade() {
         primaryShard.getDB('config').cache.databases.findOne({_id: 'sharded'}).version.timestamp);
 
     // Check that the 'timestamp' has been removed from config.collections.
-    let collAfterUpgrade =
-        csrs_config_db.collections.findOne({_id: 'sharded.test3_created_before_upgrade'});
+    let collAfterUpgrade = csrs_config_db.collections.findOne({_id: 'sharded.test3'});
     assert.eq(null, collAfterUpgrade.timestamp);
 
     // Check that the 'timestamp' has been removed from config.cache.collections.
     let timestampInShard =
-        primaryShard.getDB('config')
-            .cache.collections.findOne({_id: 'sharded.test3_created_before_upgrade'})
-            .timestamp;
+        primaryShard.getDB('config').cache.collections.findOne({_id: 'sharded.test3'}).timestamp;
     assert.eq(null, timestampInShard);
 
     // Check that the 'timestamp' has been removed from config.chunks
-    var cursor = findChunksUtil.findChunksByNs(st.config, 'sharded.test3_created_before_upgrade');
+    var cursor = findChunksUtil.findChunksByNs(st.config, 'sharded.test3');
     assert(cursor.hasNext());
     do {
         assert.eq(null, cursor.next().lastmodTimestamp);
     } while (cursor.hasNext());
-
-    // TODO: After SERVER-52587, this is no longer needed as we can just check with
-    // test3_created_before_upgrade.
-    timestampInShard = primaryShard.getDB('config')
-                           .cache.collections.findOne({_id: 'sharded.test3_created_after_upgrade'})
-                           .timestamp;
-    assert.eq(null, timestampInShard);
 }
 
 // testChunkCollectionUuidField: ensures all config.chunks entries include a collection UUID after
@@ -254,7 +234,6 @@ function runChecksAfterUpgrade() {
 }
 
 function setupStateBeforeDowngrade() {
-    testTimestampFieldSetupBeforeDowngrade();
 }
 
 function runChecksAfterFCVDowngrade() {
@@ -299,20 +278,6 @@ for (let oldVersion of [lastLTSFCV, lastContinuousFCV]) {
     // Upgrade the entire cluster to the latest version.
     jsTest.log('upgrading cluster');
     st.upgradeCluster(latestFCV);
-
-    const isFeatureFlagEnabled =
-        assert
-            .commandWorked(st.configRS.getPrimary().adminCommand(
-                {getParameter: 1, featureFlagShardingFullDDLSupportTimestampedVersion: 1}))
-            .featureFlagShardingFullDDLSupportTimestampedVersion.value;
-
-    if (isFeatureFlagEnabled) {
-        // TODO SERVER-53104: do not skip this test once this ticket is completed
-        jsTest.log(
-            'Skipping test since it is not compatible with featureFlagShardingFullDDLSupportTimestampedVersion yet');
-        st.stop();
-        return;
-    }
 
     assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
 

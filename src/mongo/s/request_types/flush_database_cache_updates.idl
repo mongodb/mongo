@@ -47,3 +47,16 @@ commands:
                 type: bool
                 description: "If true, forces a refresh of the cache entry from the config server before waiting for updates to be persist"
                 default: true
+
+    _flushDatabaseCacheUpdatesWithWriteConcern:
+        description: "The same behavior as _flushDatabaseCacheUpdates but accepts writeConcern"
+        command_name: _flushDatabaseCacheUpdatesWithWriteConcern
+        strict: true
+        namespace: type
+        api_version: ""
+        type: string
+        fields:
+            syncFromConfig:
+                type: bool
+                description: "If true, forces a refresh of the cache entry from the config server before waiting for updates to be persist"
+                default: true

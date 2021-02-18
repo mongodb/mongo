@@ -53,11 +53,8 @@
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/s/active_migrations_registry.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/dist_lock_manager.h"
-#include "mongo/db/s/migration_util.h"
-#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/logv2/log.h"
@@ -322,11 +319,6 @@ public:
                         DistLockManager::kShardingRoutingInfoFormatStabilityLockName,
                         "fcvUpgrade",
                         DistLockManager::kDefaultLockTimeout)));
-
-                if (requestedVersion >= FeatureCompatibilityParams::Version::kVersion49) {
-                    // SERVER-52630: Remove once 5.0 becomes the LastLTS
-                    ShardingCatalogManager::get(opCtx)->removePre49LegacyMetadata(opCtx);
-                }
 
                 // Upgrade metadata created before FCV 4.9.
                 // TODO SERVER-53283: Remove once 5.0 has been released.

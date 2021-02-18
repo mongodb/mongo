@@ -36,6 +36,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/async_requests_sender.h"
+#include "mongo/s/request_types/flush_database_cache_updates_gen.h"
 #include "mongo/s/request_types/flush_routing_table_cache_updates_gen.h"
 
 namespace mongo {
@@ -50,14 +51,23 @@ void tellShardsToRefreshCollection(OperationContext* opCtx,
     cmd.setSyncFromConfig(true);
     cmd.setDbName(nss.db());
     auto cmdObj = CommandHelpers::appendMajorityWriteConcern(cmd.toBSON({}));
+    sendCommandToShards(opCtx, cmdObj, shardIds, executor);
+}
 
-    sendCommandToShards(opCtx, cmdObj, shardIds, nss, executor);
+void tellShardsToRefreshDatabase(OperationContext* opCtx,
+                                 const std::vector<ShardId>& shardIds,
+                                 const std::string& dbName,
+                                 const std::shared_ptr<executor::TaskExecutor>& executor) {
+    auto cmd = _flushDatabaseCacheUpdatesWithWriteConcern(dbName);
+    cmd.setSyncFromConfig(true);
+    cmd.setDbName(dbName);
+    auto cmdObj = CommandHelpers::appendMajorityWriteConcern(cmd.toBSON({}));
+    sendCommandToShards(opCtx, cmdObj, shardIds, executor);
 }
 
 void sendCommandToShards(OperationContext* opCtx,
                          const BSONObj& command,
                          const std::vector<ShardId>& shardIds,
-                         const NamespaceString& nss,
                          const std::shared_ptr<executor::TaskExecutor>& executor) {
     std::vector<AsyncRequestsSender::Request> requests;
     for (const auto& shardId : shardIds) {
@@ -83,8 +93,7 @@ void sendCommandToShards(OperationContext* opCtx,
 
             auto generateErrorContext = [&]() -> std::string {
                 return str::stream()
-                    << "Unable to _flushRoutingTableCacheUpdatesWithWriteConcern for namespace "
-                    << nss.ns() << " on " << response.shardId;
+                    << "Failed command " << command.toString() << " on " << response.shardId;
             };
 
             auto shardResponse =

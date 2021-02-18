@@ -398,17 +398,6 @@ public:
     Status setFeatureCompatibilityVersionOnShards(OperationContext* opCtx, const BSONObj& cmdObj);
 
     /**
-     * Removes all entries from the config server's config.collections where 'dropped' is true.
-     *
-     * Before v5.0, when a collection was dropped, its entry in config.collections remained, tagged
-     * as 'dropped: true'. As those are no longer needed, this method cleans up the leftover
-     * metadata.
-     *
-     * It shall be called when upgrading to 4.9 or newer versions.
-     */
-    void removePre49LegacyMetadata(OperationContext* opCtx);
-
-    /**
      * Patches-up persistent metadata for 4.9.
      *
      * It shall be called when upgrading to 4.9 or newer versions.
@@ -539,6 +528,19 @@ private:
                                                       const ReadPreferenceSetting& readPref,
                                                       const std::string& shardName,
                                                       const std::string& zoneName);
+
+    /**
+     * Removes all entries from the config server's config.collections where 'dropped' is true.
+     *
+     * Before v5.0, when a collection was dropped, its entry in config.collections remained, tagged
+     * as 'dropped: true'. As those are no longer needed, this method cleans up the leftover
+     * metadata.
+     *
+     * It shall be called when upgrading to 4.9 or newer versions.
+     *
+     * TODO SERVER-53283: Remove once 5.0 has been released.
+     */
+    void _removePre49LegacyMetadata(OperationContext* opCtx);
 
     /**
      * Creates a 'version.timestamp' for each one of the entries in the config server's

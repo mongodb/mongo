@@ -101,6 +101,7 @@ let testCases = {
     _configsvrShardCollection: {skip: "internal command"},
     _configsvrUpdateZoneKeyRange: {skip: "internal command"},
     _flushDatabaseCacheUpdates: {skip: "internal command"},
+    _flushDatabaseCacheUpdatesWithWriteConcern: {skip: "internal command"},
     _flushRoutingTableCacheUpdates: {skip: "internal command"},
     _flushRoutingTableCacheUpdatesWithWriteConcern: {skip: "internal command"},
     _getNextSessionMods: {skip: "internal command"},

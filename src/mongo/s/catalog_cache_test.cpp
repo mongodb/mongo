@@ -31,6 +31,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <boost/optional/optional_io.hpp>
+
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/catalog_cache_loader_mock.h"
@@ -351,6 +353,74 @@ TEST_F(CatalogCacheTest, CheckEpochWithMatch) {
 
     _catalogCache->checkEpochOrThrow(kNss, collVersion, kShards[0]);
 }
+
+
+TEST_F(CatalogCacheTest, GetDatabaseWithMetadataFormatChange) {
+    const auto dbName = "testDB";
+    const auto uuid = UUID::gen();
+    const DatabaseVersion versionWithoutTimestamp(uuid);
+    const DatabaseVersion versionWithTimestamp(uuid, Timestamp(42));
+
+    auto getDatabaseWithRefreshAndCheckResults = [&](const DatabaseVersion& version) {
+        _catalogCacheLoader->setDatabaseRefreshReturnValue(
+            DatabaseType(dbName, kShards[0], true, version));
+        const auto cachedDb =
+            _catalogCache->getDatabaseWithRefresh(operationContext(), dbName).getValue();
+        const auto cachedDbVersion = cachedDb.databaseVersion();
+        ASSERT_EQ(cachedDbVersion.getTimestamp(), version.getTimestamp());
+    };
+
+    // The CatalogCache is refreshed and it finds a DatabaseType using uuids.
+    getDatabaseWithRefreshAndCheckResults(versionWithoutTimestamp);
+    // The CatalogCache is forced to refresh and it finds a metadata format missmatch: we are using
+    // uuids locally but the loader returns a version with uuid and timestamp. The catalog cache
+    // returns a new DatabaseType with the new format.
+    getDatabaseWithRefreshAndCheckResults(versionWithTimestamp);
+    // The CatalogCache is forced to refresh and it finds a metadata format missmatch: we are using
+    // uuids and timestamps locally but the loader returns a version with only uuid. The catalog
+    // cache returns a new DatabaseType with the new format.
+    getDatabaseWithRefreshAndCheckResults(versionWithoutTimestamp);
+}
+
+
+TEST_F(CatalogCacheTest, GetCollectionWithMetadataFormatChange) {
+    const auto dbVersion = DatabaseVersion(UUID::gen());
+    const auto epoch = OID::gen();
+    const auto collVersionWithoutTimestamp = ChunkVersion(1, 0, epoch, boost::none /* timestamp */);
+    const auto collVersionWithTimestamp = ChunkVersion(1, 0, epoch, Timestamp(42));
+
+    loadDatabases({DatabaseType(kNss.db().toString(), kShards[0], true, dbVersion)});
+
+    auto getCollectionWithRefreshAndCheckResults = [this](const ChunkVersion& version) {
+        const auto coll = makeCollectionType(version);
+        const auto scopedCollProv = scopedCollectionProvider(coll);
+        const auto scopedChunksProv = scopedChunksProvider(makeChunks(version));
+
+        const auto swChunkManager =
+            _catalogCache->getCollectionRoutingInfoWithRefresh(operationContext(), coll.getNss());
+        ASSERT_OK(swChunkManager.getStatus());
+
+        const auto& chunkManager = swChunkManager.getValue();
+        const auto collectionVersion = chunkManager.getVersion();
+
+        ASSERT_EQ(collectionVersion.getTimestamp(), version.getTimestamp());
+        chunkManager.forEachChunk([&](const Chunk& chunk) {
+            ASSERT_EQ(chunk.getLastmod().getTimestamp(), version.getTimestamp());
+            return true;
+        });
+    };
+    // The CatalogCache is refreshed and it finds a Collection using epochs.
+    getCollectionWithRefreshAndCheckResults(collVersionWithoutTimestamp);
+    // The CatalogCache is forced to refresh and it finds a metadata format mismatch: we are using
+    // epochs locally but the loader returns a version with uuid and timestamp. The catalog cache
+    // returns a new ChunkManager with the new format.
+    getCollectionWithRefreshAndCheckResults(collVersionWithTimestamp);
+    // The CatalogCache is forced to refresh and it finds a metadata format mismatch: we are using
+    // epochs and timestamps locally but the loader returns a version with just epochs. The catalog
+    // cache returns a new ChunkManager with the new format.
+    getCollectionWithRefreshAndCheckResults(collVersionWithoutTimestamp);
+}
+
 
 }  // namespace
 }  // namespace mongo
