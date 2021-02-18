@@ -9,11 +9,6 @@ selector:
   exclude_files:
   # Operations within a transaction do not support write concern.
   - jstests/core/txns/**/*.js
-  # These tests are not expected to pass with replica-sets:
-  - jstests/core/dbadmin.js
-  - jstests/core/opcounters_write_cmd.js
-  - jstests/core/read_after_optime.js
-  - jstests/core/capped_update.js
   # The shellkillop.js test spawns a parallel shell without using startParallelShell() and therefore
   # doesn't inherit the w="majority" write concern when performing its writes.
   - jstests/core/shellkillop.js
@@ -40,6 +35,7 @@ selector:
   # These tests attempt to read from the "system.profile" collection, which may be missing entries
   # if a write was performed on the primary of the replica set instead.
   - requires_profiling
+  - assumes_standalone_mongod
 
 executor:
   archive:

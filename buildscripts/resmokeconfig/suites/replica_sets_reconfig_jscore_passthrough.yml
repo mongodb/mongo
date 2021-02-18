@@ -11,11 +11,6 @@ selector:
   # Transactions do not support retryability of individual operations.
   # TODO: Remove this once it is supported (SERVER-33952).
   - jstests/core/txns/**/*.js
-  # These tests are not expected to pass with replica-sets:
-  - jstests/core/dbadmin.js
-  - jstests/core/opcounters_write_cmd.js
-  - jstests/core/read_after_optime.js
-  - jstests/core/capped_update.js
   # The set_param1.js test attempts to compare the response from running the {getParameter: "*"}
   # command multiple times, which may observe the change to the "transactionLifetimeLimitSeconds"
   # server parameter.
@@ -34,6 +29,7 @@ selector:
   - jstests/core/connection_string_validation.js # Does not expect a replica set connection string.
 
   exclude_with_any_tags:
+  - assumes_standalone_mongod
   - assumes_read_preference_unchanged
   - requires_sharding
 

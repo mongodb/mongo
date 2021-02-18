@@ -1,4 +1,9 @@
-load('jstests/aggregation/extras/utils.js');
+// @tags: [
+//    # Assert on the isWritablePrimary field of a hello response. If a primary steps down after
+//    # accepting a hello command and returns before its connection is closed, the response can
+//    # contain isWritablePrimary: false.
+//    does_not_support_stepdowns,
+// ]
 
 (function() {
 'use strict';

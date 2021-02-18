@@ -16,7 +16,6 @@ selector:
   - jstests/core/collmod_without_uuid.js # applyOps, SERVER-1439
   - jstests/core/compact_keeps_indexes.js  # compact.
   - jstests/core/currentop.js  # uses fsync.
-  - jstests/core/dbadmin.js  # "local" database.
   - jstests/core/dbhash.js  # dbhash.
   - jstests/core/dbhash2.js  # dbhash.
   - jstests/core/diagdata.js # Command not supported in mongos
@@ -43,9 +42,6 @@ selector:
   # we expect a second drop to return status OK.
   - jstests/core/drop.js
   - jstests/core/explain_upsert.js
-
-  # Test is only for stand alone mongod.
-  - jstests/core/read_after_optime.js
 
   # Reads from system.views.
   - jstests/core/views/views_drop.js
@@ -108,9 +104,6 @@ selector:
   - jstests/core/update_modifier_pop.js
   - jstests/core/updateh.js
   - jstests/core/updatej.js
-
-  # SERVER-38096 Mongos opCounter doesn't increase when last op causes the transaction to implicitly abort
-  - jstests/core/opcounters_write_cmd.js
 
   ##
   ## Some aggregation stages don't support snapshot readconcern.
@@ -272,6 +265,7 @@ selector:
   # "writeConcern is not allowed within a multi-statement transaction"
   - assumes_write_concern_unchanged
   - assumes_against_mongod_not_mongos
+  - assumes_standalone_mongod
   # Transactions are not allowed to operate on capped collections.
   - requires_capped
   - requires_profiling

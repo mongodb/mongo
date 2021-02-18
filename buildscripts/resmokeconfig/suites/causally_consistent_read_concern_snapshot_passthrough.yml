@@ -7,16 +7,11 @@ selector:
   # Only the first command in a transaction allows readConcern and this suite only tests
   # non-transaction snapshot reads.
   - jstests/core/txns/**/*.js
-  # These tests are not expected to pass with replica-sets:
-  - jstests/core/dbadmin.js
-  - jstests/core/opcounters_write_cmd.js
-  - jstests/core/read_after_optime.js
-  - jstests/core/capped_update.js
   # These tests use benchRun(), which isn't configured to use the overridden writeConcern.
   - jstests/core/bench_test*.js
   - jstests/core/benchrun_pipeline_updates.js # benchRun() used for writes
   exclude_with_any_tags:
-  ##
+  - assumes_standalone_mongod
   # The next two tags correspond to the special errors thrown by the
   # set_read_and_write_concerns.js override when it refuses to replace the readConcern or
   # writeConcern of a particular command. Above each tag are the message(s) that cause the tag to be

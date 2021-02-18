@@ -5,6 +5,8 @@
  * @tags: [
  *   requires_capped,
  *   uses_testing_only_commands,
+ *   # godinsert and can't run under replication
+ *   assumes_standalone_mongod,
  * ]
  */
 (function() {

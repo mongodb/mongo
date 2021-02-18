@@ -21,9 +21,6 @@ selector:
   - jstests/core/profile_hide_index.js
   # The override cannot deep copy very large or small dates.
   - jstests/core/index_large_and_small_dates.js
-  # These tests are not expected to pass with replica-sets.
-  - jstests/core/opcounters_write_cmd.js
-  - jstests/core/read_after_optime.js
   # This test expects that the connection (i.e. 'threadName') does not change throughout each test
   # case. That is not always true when there is a background tenant migration.
   - jstests/core/failcommand_failpoint.js
@@ -110,6 +107,7 @@ selector:
   - jstests/core/batch_write_command_update.js
 
   exclude_with_any_tags:
+  - assumes_standalone_mongod
   # These tests run getMore commands which are not supported in the tenant migration passthrough.
   - requires_getmore
   # Due to background tenant migrations, operations in the main test shell are not guaranteed to
