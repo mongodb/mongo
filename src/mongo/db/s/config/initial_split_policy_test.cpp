@@ -1713,5 +1713,428 @@ TEST_F(PresplitHashedZonesChunksTest, RestrictionsDoNotApplyToUpperBound) {
         operationContext(), shardKeyPattern, {makeTag(zoneRange, zoneName("1"))}, 0, true);
 }
 
+class MockPipelineSource : public ReshardingSplitPolicy::SampleDocumentSource {
+public:
+    MockPipelineSource(std::list<BSONObj> toReturn) : _toReturn(std::move(toReturn)) {}
+
+    boost::optional<BSONObj> getNext() override {
+        if (_toReturn.empty()) {
+            return {};
+        }
+
+        auto next = _toReturn.front();
+        _toReturn.pop_front();
+        return next;
+    }
+
+private:
+    std::list<BSONObj> _toReturn;
+};
+
+class ReshardingInitSplitTest : public SingleChunkPerTagSplitPolicyTest {
+public:
+    /**
+     * Calls createFirstChunks() according to the given arguments and asserts that returned chunks
+     * match with the chunks created using expectedChunkRanges and expectedShardIds.
+     */
+    void checkGeneratedInitialZoneChunks(ReshardingSplitPolicy* splitPolicy,
+                                         const ShardKeyPattern& shardKeyPattern,
+                                         const std::vector<ChunkRange>& expectedChunkRanges,
+                                         const std::vector<ShardId>& expectedShardIds) {
+        const auto shardCollectionConfig = splitPolicy->createFirstChunks(
+            operationContext(), shardKeyPattern, {nss(), boost::none, expectedShardIds.front()});
+
+        const auto currentTime = VectorClock::get(operationContext())->getTime();
+        const std::vector<ChunkType> expectedChunks = makeChunks(
+            expectedChunkRanges, expectedShardIds, currentTime.clusterTime().asTimestamp());
+        assertChunkVectorsAreEqual(expectedChunks, shardCollectionConfig.chunks);
+    }
+};
+
+TEST_F(ReshardingInitSplitTest, NoZones) {
+    const NamespaceString ns("reshard", "foo");
+    const ShardKeyPattern shardKey(BSON("y" << 1));
+
+    std::vector<ShardType> shardList;
+    shardList.emplace_back(
+        ShardType(shardId("0").toString(), "rs0/fakeShard0:123", {std::string("zoneA")}));
+    shardList.emplace_back(
+        ShardType(shardId("1").toString(), "rs1/fakeShard1:123", {std::string("zoneB")}));
+
+    setupShards(shardList);
+    shardRegistry()->reload(operationContext());
+
+    std::list<BSONObj> mockSamples;
+    mockSamples.push_back(BSON("x" << 10 << "y" << 10));
+    mockSamples.push_back(BSON("x" << 10 << "y" << 20));
+    mockSamples.push_back(BSON("x" << 10 << "y" << 30));
+
+    auto mockSampleSource = std::make_unique<MockPipelineSource>(std::move(mockSamples));
+
+    ReshardingSplitPolicy initSplitPolicy(
+        nss(), 4 /* numInitialChunks */, boost::none /* zones */, std::move(mockSampleSource));
+
+    std::vector<ChunkRange> expectedChunkRanges = {
+        ChunkRange(BSON("y" << MINKEY), BSON("y" << 10)),
+        ChunkRange(BSON("y" << 10), BSON("y" << 20)),
+        ChunkRange(BSON("y" << 20), BSON("y" << 30)),
+        ChunkRange(BSON("y" << 30), BSON("y" << MAXKEY))};
+
+    std::vector<ShardId> expectedShardForEachChunk = {
+        shardId("0"), shardId("1"), shardId("0"), shardId("1")};
+
+    checkGeneratedInitialZoneChunks(
+        &initSplitPolicy, shardKey, expectedChunkRanges, expectedShardForEachChunk);
+}
+
+TEST_F(ReshardingInitSplitTest, HashedShardKey) {
+    const NamespaceString ns("reshard", "foo");
+    const ShardKeyPattern shardKey(BSON("y"
+                                        << "hashed"));
+
+    std::vector<ShardType> shardList;
+    shardList.emplace_back(
+        ShardType(shardId("0").toString(), "rs0/fakeShard0:123", {std::string("zoneA")}));
+    shardList.emplace_back(
+        ShardType(shardId("1").toString(), "rs1/fakeShard1:123", {std::string("zoneB")}));
+
+    setupShards(shardList);
+    shardRegistry()->reload(operationContext());
+
+    std::list<BSONObj> mockSamples;
+    mockSamples.push_back(BSON("x" << 10 << "y" << 10));
+    mockSamples.push_back(BSON("x" << 10 << "y" << 20));
+    mockSamples.push_back(BSON("x" << 10 << "y" << 30));
+
+    auto mockSampleSource = std::make_unique<MockPipelineSource>(std::move(mockSamples));
+
+    ReshardingSplitPolicy initSplitPolicy(
+        nss(), 4 /* numInitialChunks */, boost::none /* zones */, std::move(mockSampleSource));
+
+    std::vector<ChunkRange> expectedChunkRanges = {
+        ChunkRange(BSON("y" << MINKEY), BSON("y" << -9117533237618642180)),
+        ChunkRange(BSON("y" << -9117533237618642180), BSON("y" << -1196399207910989725)),
+        ChunkRange(BSON("y" << -1196399207910989725), BSON("y" << 7766103514953448109)),
+        ChunkRange(BSON("y" << 7766103514953448109), BSON("y" << MAXKEY))};
+
+    std::vector<ShardId> expectedShardForEachChunk = {
+        shardId("0"), shardId("1"), shardId("0"), shardId("1")};
+
+    checkGeneratedInitialZoneChunks(
+        &initSplitPolicy, shardKey, expectedChunkRanges, expectedShardForEachChunk);
+}
+
+TEST_F(ReshardingInitSplitTest, SingleInitialChunk) {
+    const NamespaceString ns("reshard", "foo");
+    const ShardKeyPattern shardKey(BSON("y" << 1));
+
+    std::vector<ShardType> shardList;
+    shardList.emplace_back(
+        ShardType(shardId("0").toString(), "rs0/fakeShard0:123", {std::string("zoneA")}));
+    shardList.emplace_back(
+        ShardType(shardId("1").toString(), "rs1/fakeShard1:123", {std::string("zoneB")}));
+
+    setupShards(shardList);
+    shardRegistry()->reload(operationContext());
+
+    std::list<BSONObj> mockSamples;
+
+    auto mockSampleSource = std::make_unique<MockPipelineSource>(std::move(mockSamples));
+
+    ReshardingSplitPolicy initSplitPolicy(
+        nss(), 1 /* numInitialChunks */, boost::none /* zones */, std::move(mockSampleSource));
+
+    std::vector<ChunkRange> expectedChunkRanges = {
+        ChunkRange(BSON("y" << MINKEY), BSON("y" << MAXKEY))};
+
+    std::vector<ShardId> expectedShardForEachChunk = {shardId("0")};
+
+    checkGeneratedInitialZoneChunks(
+        &initSplitPolicy, shardKey, expectedChunkRanges, expectedShardForEachChunk);
+}
+
+TEST_F(ReshardingInitSplitTest, ZonesCoversEntireDomainButInsufficient) {
+    const NamespaceString ns("reshard", "foo");
+    const ShardKeyPattern shardKey(BSON("y" << 1));
+
+    std::vector<ShardType> shardList;
+    shardList.emplace_back(
+        ShardType(shardId("0").toString(), "rs0/fakeShard0:123", {std::string("zoneA")}));
+    shardList.emplace_back(
+        ShardType(shardId("1").toString(), "rs1/fakeShard1:123", {std::string("zoneB")}));
+
+    setupShards(shardList);
+    shardRegistry()->reload(operationContext());
+
+    std::list<BSONObj> mockSamples;
+    mockSamples.push_back(BSON("x" << 10 << "y" << 10));
+    mockSamples.push_back(BSON("x" << 10 << "y" << 20));
+    mockSamples.push_back(BSON("x" << 10 << "y" << 30));
+
+    auto mockSampleSource = std::make_unique<MockPipelineSource>(std::move(mockSamples));
+
+    std::vector<TagsType> zones;
+    zones.emplace_back(nss(), "zoneB", ChunkRange(BSON("y" << MINKEY), BSON("y" << 0)));
+    zones.emplace_back(nss(), "zoneA", ChunkRange(BSON("y" << 0), BSON("y" << MAXKEY)));
+
+    ReshardingSplitPolicy initSplitPolicy(
+        nss(), 4 /* numInitialChunks */, zones, std::move(mockSampleSource));
+
+    std::vector<ChunkRange> expectedChunkRanges = {
+        ChunkRange(BSON("y" << MINKEY), BSON("y" << 0)),
+        ChunkRange(BSON("y" << 0), BSON("y" << 10)),
+        ChunkRange(BSON("y" << 10), BSON("y" << 20)),
+        ChunkRange(BSON("y" << 20), BSON("y" << MAXKEY))};
+
+    std::vector<ShardId> expectedShardForEachChunk = {
+        shardId("1"), shardId("0"), shardId("0"), shardId("0")};
+
+    checkGeneratedInitialZoneChunks(
+        &initSplitPolicy, shardKey, expectedChunkRanges, expectedShardForEachChunk);
+}
+
+TEST_F(ReshardingInitSplitTest, SamplesCoincidingWithZones) {
+    const NamespaceString ns("reshard", "foo");
+    const ShardKeyPattern shardKey(BSON("y" << 1));
+
+    std::vector<ShardType> shardList;
+    shardList.emplace_back(
+        ShardType(shardId("0").toString(), "rs0/fakeShard0:123", {std::string("zoneA")}));
+    shardList.emplace_back(
+        ShardType(shardId("1").toString(), "rs1/fakeShard1:123", {std::string("zoneB")}));
+
+    setupShards(shardList);
+    shardRegistry()->reload(operationContext());
+
+    std::list<BSONObj> mockSamples;
+    mockSamples.push_back(BSON("x" << 10 << "y" << 10));
+    mockSamples.push_back(BSON("x" << 10 << "y" << 20));
+    mockSamples.push_back(BSON("x" << 10 << "y" << 30));
+
+    auto mockSampleSource = std::make_unique<MockPipelineSource>(std::move(mockSamples));
+
+    std::vector<TagsType> zones;
+    zones.emplace_back(nss(), "zoneA", ChunkRange(BSON("y" << 10), BSON("y" << 20)));
+
+    ReshardingSplitPolicy initSplitPolicy(
+        nss(), 4 /* numInitialChunks */, zones, std::move(mockSampleSource));
+
+    std::vector<ChunkRange> expectedChunkRanges = {
+        ChunkRange(BSON("y" << MINKEY), BSON("y" << 10)),
+        ChunkRange(BSON("y" << 10), BSON("y" << 20)),
+        ChunkRange(BSON("y" << 20), BSON("y" << 30)),
+        ChunkRange(BSON("y" << 30), BSON("y" << MAXKEY))};
+
+    std::vector<ShardId> expectedShardForEachChunk = {
+        shardId("0"),  // hole
+        shardId("0"),  // zoneA
+        shardId("1"),  // hole
+        shardId("1"),  // hole
+    };
+
+    checkGeneratedInitialZoneChunks(
+        &initSplitPolicy, shardKey, expectedChunkRanges, expectedShardForEachChunk);
+}
+
+TEST_F(ReshardingInitSplitTest, ZoneWithHoles) {
+    const NamespaceString ns("reshard", "foo");
+    const ShardKeyPattern shardKey(BSON("y" << 1));
+
+    std::vector<ShardType> shardList;
+    shardList.emplace_back(
+        ShardType(shardId("0").toString(), "rs0/fakeShard0:123", {std::string("zoneA")}));
+    shardList.emplace_back(
+        ShardType(shardId("1").toString(), "rs1/fakeShard1:123", {std::string("zoneB")}));
+
+    setupShards(shardList);
+    shardRegistry()->reload(operationContext());
+
+    std::list<BSONObj> mockSamples;
+
+    auto mockSampleSource = std::make_unique<MockPipelineSource>(std::move(mockSamples));
+
+    std::vector<TagsType> zones;
+    zones.emplace_back(nss(), "zoneB", ChunkRange(BSON("y" << 0), BSON("y" << 20)));
+    zones.emplace_back(nss(), "zoneA", ChunkRange(BSON("y" << 30), BSON("y" << 40)));
+
+    ReshardingSplitPolicy initSplitPolicy(
+        nss(), 4 /* numInitialChunks */, zones, std::move(mockSampleSource));
+
+    std::vector<ChunkRange> expectedChunkRanges = {
+        ChunkRange(BSON("y" << MINKEY), BSON("y" << 0)),
+        ChunkRange(BSON("y" << 0), BSON("y" << 20)),
+        ChunkRange(BSON("y" << 20), BSON("y" << 30)),
+        ChunkRange(BSON("y" << 30), BSON("y" << 40)),
+        ChunkRange(BSON("y" << 40), BSON("y" << MAXKEY))};
+
+    std::vector<ShardId> expectedShardForEachChunk = {
+        shardId("0"),  // hole
+        shardId("1"),  // zoneB
+        shardId("0"),  // hole
+        shardId("0"),  // zoneA
+        shardId("1"),  // hole
+    };
+
+    checkGeneratedInitialZoneChunks(
+        &initSplitPolicy, shardKey, expectedChunkRanges, expectedShardForEachChunk);
+}
+
+TEST_F(ReshardingInitSplitTest, UnsortedZoneWithHoles) {
+    const NamespaceString ns("reshard", "foo");
+    const ShardKeyPattern shardKey(BSON("y" << 1));
+
+    std::vector<ShardType> shardList;
+    shardList.emplace_back(
+        ShardType(shardId("0").toString(), "rs0/fakeShard0:123", {std::string("zoneA")}));
+    shardList.emplace_back(
+        ShardType(shardId("1").toString(), "rs1/fakeShard1:123", {std::string("zoneB")}));
+
+    setupShards(shardList);
+    shardRegistry()->reload(operationContext());
+
+    std::list<BSONObj> mockSamples;
+
+    auto mockSampleSource = std::make_unique<MockPipelineSource>(std::move(mockSamples));
+
+    std::vector<TagsType> zones;
+    zones.emplace_back(nss(), "zoneA", ChunkRange(BSON("y" << 30), BSON("y" << 40)));
+    zones.emplace_back(nss(), "zoneB", ChunkRange(BSON("y" << 0), BSON("y" << 20)));
+
+    ReshardingSplitPolicy initSplitPolicy(
+        nss(), 4 /* numInitialChunks */, zones, std::move(mockSampleSource));
+
+    std::vector<ChunkRange> expectedChunkRanges = {
+        ChunkRange(BSON("y" << MINKEY), BSON("y" << 0)),
+        ChunkRange(BSON("y" << 0), BSON("y" << 20)),
+        ChunkRange(BSON("y" << 20), BSON("y" << 30)),
+        ChunkRange(BSON("y" << 30), BSON("y" << 40)),
+        ChunkRange(BSON("y" << 40), BSON("y" << MAXKEY))};
+
+    std::vector<ShardId> expectedShardForEachChunk = {
+        shardId("0"),  // hole
+        shardId("1"),  // zoneB
+        shardId("0"),  // hole
+        shardId("0"),  // zoneA
+        shardId("1"),  // hole
+    };
+
+    checkGeneratedInitialZoneChunks(
+        &initSplitPolicy, shardKey, expectedChunkRanges, expectedShardForEachChunk);
+}
+
+TEST_F(ReshardingInitSplitTest, ZonesIsPrefixOfReshardKey) {
+    const NamespaceString ns("reshard", "foo");
+    const ShardKeyPattern shardKey(BSON("y" << 1 << "z" << 1));
+
+    std::vector<ShardType> shardList;
+    shardList.emplace_back(
+        ShardType(shardId("0").toString(), "rs0/fakeShard0:123", {std::string("zoneA")}));
+    shardList.emplace_back(
+        ShardType(shardId("1").toString(), "rs1/fakeShard1:123", {std::string("zoneB")}));
+
+    setupShards(shardList);
+    shardRegistry()->reload(operationContext());
+
+    std::list<BSONObj> mockSamples;
+    auto mockSampleSource = std::make_unique<MockPipelineSource>(std::move(mockSamples));
+
+    std::vector<TagsType> zones;
+    zones.emplace_back(nss(), "zoneB", ChunkRange(BSON("y" << MINKEY), BSON("y" << 0)));
+    zones.emplace_back(nss(), "zoneA", ChunkRange(BSON("y" << 0), BSON("y" << MAXKEY)));
+
+    ReshardingSplitPolicy initSplitPolicy(
+        nss(), 2 /* numInitialChunks */, zones, std::move(mockSampleSource));
+
+    std::vector<ChunkRange> expectedChunkRanges = {
+        ChunkRange(BSON("y" << MINKEY << "z" << MINKEY), BSON("y" << 0 << "z" << MINKEY)),
+        ChunkRange(BSON("y" << 0 << "z" << MINKEY), BSON("y" << MAXKEY << "z" << MINKEY)),
+        ChunkRange(BSON("y" << MAXKEY << "z" << MINKEY), BSON("y" << MAXKEY << "z" << MAXKEY)),
+    };
+
+    std::vector<ShardId> expectedShardForEachChunk = {
+        shardId("1"),
+        shardId("0"),
+        shardId("0"),
+    };
+
+    checkGeneratedInitialZoneChunks(
+        &initSplitPolicy, shardKey, expectedChunkRanges, expectedShardForEachChunk);
+}
+
+TEST_F(ReshardingInitSplitTest, ZonesHasIncompatibleReshardKey) {
+    const NamespaceString ns("reshard", "foo");
+    const ShardKeyPattern shardKey(BSON("y" << 1 << "z" << 1));
+
+    std::vector<ShardType> shardList;
+    shardList.emplace_back(
+        ShardType(shardId("0").toString(), "rs0/fakeShard0:123", {std::string("zoneA")}));
+    shardList.emplace_back(
+        ShardType(shardId("1").toString(), "rs1/fakeShard1:123", {std::string("zoneB")}));
+
+    setupShards(shardList);
+    shardRegistry()->reload(operationContext());
+
+    std::list<BSONObj> mockSamples;
+    auto mockSampleSource = std::make_unique<MockPipelineSource>(std::move(mockSamples));
+
+    std::vector<TagsType> zones;
+    zones.emplace_back(nss(), "zoneB", ChunkRange(BSON("x" << MINKEY), BSON("x" << 0)));
+    zones.emplace_back(nss(), "zoneA", ChunkRange(BSON("x" << 0), BSON("x" << MAXKEY)));
+
+    ReshardingSplitPolicy initSplitPolicy(
+        nss(), 2 /* numInitialChunks */, zones, std::move(mockSampleSource));
+
+    SplitPolicyParams params{nss(), boost::none, shardId("0")};
+    ASSERT_THROWS(initSplitPolicy.createFirstChunks(operationContext(), shardKey, params),
+                  DBException);
+}
+
+TEST_F(ReshardingInitSplitTest, InsufficientSamples) {
+    const NamespaceString ns("reshard", "foo");
+    const ShardKeyPattern shardKey(BSON("y" << 1));
+
+    std::vector<ShardType> shardList;
+    shardList.emplace_back(
+        ShardType(shardId("0").toString(), "rs0/fakeShard0:123", {std::string("zoneA")}));
+    shardList.emplace_back(
+        ShardType(shardId("1").toString(), "rs1/fakeShard1:123", {std::string("zoneB")}));
+
+    setupShards(shardList);
+    shardRegistry()->reload(operationContext());
+
+    std::list<BSONObj> mockSamples;
+    mockSamples.push_back(BSON("x" << 10 << "y" << 10));
+    auto mockSampleSource = std::make_unique<MockPipelineSource>(std::move(mockSamples));
+
+    ReshardingSplitPolicy initSplitPolicy(
+        nss(), 10 /* numInitialChunks */, boost::none /* zones */, std::move(mockSampleSource));
+
+    SplitPolicyParams params{nss(), boost::none, shardId("0")};
+    ASSERT_THROWS(initSplitPolicy.createFirstChunks(operationContext(), shardKey, params),
+                  DBException);
+}
+
+TEST_F(ReshardingInitSplitTest, ZeroInitialChunks) {
+    const NamespaceString ns("reshard", "foo");
+    const ShardKeyPattern shardKey(BSON("y" << 1));
+
+    std::vector<ShardType> shardList;
+    shardList.emplace_back(
+        ShardType(shardId("0").toString(), "rs0/fakeShard0:123", {std::string("zoneA")}));
+    shardList.emplace_back(
+        ShardType(shardId("1").toString(), "rs1/fakeShard1:123", {std::string("zoneB")}));
+
+    setupShards(shardList);
+    shardRegistry()->reload(operationContext());
+
+    std::list<BSONObj> mockSamples;
+    auto mockSampleSource = std::make_unique<MockPipelineSource>(std::move(mockSamples));
+
+    ASSERT_THROWS(
+        ReshardingSplitPolicy(
+            nss(), 0 /* numInitialChunks */, boost::none /* zones */, std::move(mockSampleSource)),
+        DBException);
+}
+
 }  // namespace
 }  // namespace mongo

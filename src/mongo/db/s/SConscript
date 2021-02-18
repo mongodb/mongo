@@ -270,6 +270,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/catalog_raii',
+        '$BUILD_DIR/mongo/db/pipeline/process_interface/shardsvr_process_interface',
         '$BUILD_DIR/mongo/db/repl/read_concern_args',
         '$BUILD_DIR/mongo/db/rw_concern_d',
         '$BUILD_DIR/mongo/db/transaction',
@@ -277,6 +278,7 @@ env.Library(
         '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client',
         '$BUILD_DIR/mongo/s/client/sharding_client',
         '$BUILD_DIR/mongo/s/coreshard',
+	'$BUILD_DIR/mongo/s/query/cluster_aggregate',
         'type_shard_identity',
     ],
     LIBDEPS_PRIVATE=[

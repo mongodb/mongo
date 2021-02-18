@@ -695,10 +695,17 @@ TEST_F(ReshardingCoordinatorPersistenceTest, WriteInitialInfoSucceeds) {
         zonesBSON.push_back(zone.toBSON());
     }
 
+    std::vector<BSONObj> presetBSONChunks;
+    for (const auto& chunk : initialChunks) {
+        ReshardedChunk reshardChunk(chunk.getShard(), chunk.getMin(), chunk.getMax());
+        presetBSONChunks.push_back(reshardChunk.toBSON());
+    }
+
     // Persist the updates on disk
     auto expectedCoordinatorDoc = coordinatorDoc;
     expectedCoordinatorDoc.setState(CoordinatorStateEnum::kInitializing);
     expectedCoordinatorDoc.setZones(zonesBSON);
+    expectedCoordinatorDoc.setPresetReshardedChunks(presetBSONChunks);
 
     writeInitialStateAndCatalogUpdatesExpectSuccess(
         operationContext(), expectedCoordinatorDoc, initialChunks, newZones);

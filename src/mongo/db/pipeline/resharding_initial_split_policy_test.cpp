@@ -31,6 +31,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/sharded_agg_helpers.h"
 #include "mongo/db/s/config/initial_split_policy.h"
@@ -156,85 +157,47 @@ TEST_F(ReshardingSplitPolicyTest, CompoundShardKeyWithDottedHashedFieldSucceeds)
     ASSERT(!pipeline->getNext());
 }
 
+std::string dumpValues(const std::vector<int>& values) {
+    std::stringstream ss;
+    ss << "[";
+    for (const auto& val : values) {
+        ss << val << ", ";
+    }
+    ss << "]";
+    return ss.str();
+}
+
 TEST_F(ReshardingSplitPolicyTest, SamplingSuceeds) {
-    auto shards = setupNShards(2);
-    loadRoutingTableWithTwoChunksAndTwoShards(kTestAggregateNss);
-    // We add a $sortKey field since AsyncResultsMerger expects it in order to merge the batches
-    // from different shards.
-    std::vector<BSONObj> firstShardChunks{
-        BSON("a" << 0 << "$sortKey" << BSON_ARRAY(1)),
-        BSON("a" << 1 << "$sortKey" << BSON_ARRAY(1)),
-        BSON("a" << 2 << "$sortKey" << BSON_ARRAY(2)),
-        BSON("a" << 3 << "$sortKey" << BSON_ARRAY(3)),
-        BSON("a" << 4 << "$sortKey" << BSON_ARRAY(4)),
-        BSON("a" << 5 << "$sortKey" << BSON_ARRAY(5)),
-        BSON("a" << 6 << "$sortKey" << BSON_ARRAY(6)),
-        BSON("a" << 7 << "$sortKey" << BSON_ARRAY(7)),
-        BSON("a" << 8 << "$sortKey" << BSON_ARRAY(8)),
-        BSON("a" << 9 << "$sortKey" << BSON_ARRAY(9)),
-        BSON("a" << 10 << "$sortKey" << BSON_ARRAY(10)),
-    };
-
-    std::vector<BSONObj> secondShardChunks{
-        BSON("a" << 11 << "$sortKey" << BSON_ARRAY(11)),
-        BSON("a" << 12 << "$sortKey" << BSON_ARRAY(12)),
-        BSON("a" << 13 << "$sortKey" << BSON_ARRAY(13)),
-        BSON("a" << 14 << "$sortKey" << BSON_ARRAY(14)),
-        BSON("a" << 15 << "$sortKey" << BSON_ARRAY(15)),
-        BSON("a" << 16 << "$sortKey" << BSON_ARRAY(16)),
-        BSON("a" << 17 << "$sortKey" << BSON_ARRAY(17)),
-        BSON("a" << 18 << "$sortKey" << BSON_ARRAY(18)),
-        BSON("a" << 19 << "$sortKey" << BSON_ARRAY(19)),
-        BSON("a" << 20 << "$sortKey" << BSON_ARRAY(20)),
-        BSON("a" << 21 << "$sortKey" << BSON_ARRAY(21)),
-        BSON("a" << 22 << "$sortKey" << BSON_ARRAY(22)),
-    };
-
+    const int kNumSplitPoints = 4;
+    const int kNumSamplesPerChunk = 5;
     auto shardKeyPattern = ShardKeyPattern(BSON("a" << 1));
-    std::vector<ShardId> shardIds;
-    for (auto&& shard : shards) {
-        shardIds.push_back(ShardId(shard.getName()));
+
+    std::deque<DocumentSourceMock::GetNextResult> docs;
+    for (int a = 0; a < 30; a++) {
+        docs.emplace_back(Document(BSON("a" << a)));
     }
 
-    auto future = launchAsync([&] {
-        auto policy = ReshardingSplitPolicy(operationContext(),
-                                            kTestAggregateNss,
-                                            shardKeyPattern,
-                                            4 /* numInitialChunks */,
-                                            shardIds,
-                                            expCtx());
-        const auto chunks = policy
-                                .createFirstChunks(operationContext(),
-                                                   shardKeyPattern,
-                                                   {kTestAggregateNss, boost::none, primaryShardId})
-                                .chunks;
-        // We sample all of the documents since numSplitPoints(3) * samplingRatio (10) = 30 and the
-        // document source has 23 chunks. So we can assert on the split points.
-        ASSERT_EQ(chunks.size(), 4);
-        ASSERT_BSONOBJ_EQ(chunks.at(0).getMin(), shardKeyPattern.getKeyPattern().globalMin());
-        ASSERT_BSONOBJ_EQ(chunks.at(0).getMax(), firstShardChunks.at(0).removeField("$sortKey"));
+    auto pipeline = Pipeline::parse(ReshardingSplitPolicy::createRawPipeline(
+                                        shardKeyPattern, kNumSamplesPerChunk, kNumSplitPoints),
+                                    expCtx());
+    auto mockSource = DocumentSourceMock::createForTest(docs, expCtx());
+    pipeline->addInitialSource(mockSource.get());
 
-        ASSERT_BSONOBJ_EQ(chunks.at(1).getMin(), firstShardChunks.at(0).removeField("$sortKey"));
-        ASSERT_BSONOBJ_EQ(chunks.at(1).getMax(), firstShardChunks.at(10).removeField("$sortKey"));
+    ReshardingSplitPolicy::PipelineDocumentSource skippingSource(std::move(pipeline),
+                                                                 kNumSamplesPerChunk - 1);
 
-        ASSERT_BSONOBJ_EQ(chunks.at(2).getMin(), firstShardChunks.at(10).removeField("$sortKey"));
-        ASSERT_BSONOBJ_EQ(chunks.at(2).getMax(), secondShardChunks.at(9).removeField("$sortKey"));
+    std::vector<int> sampledValues;
+    while (auto nextDoc = skippingSource.getNext()) {
+        sampledValues.push_back((*nextDoc)["a"].numberInt());
+    }
 
-        ASSERT_BSONOBJ_EQ(chunks.at(3).getMin(), secondShardChunks.at(9).removeField("$sortKey"));
-        ASSERT_BSONOBJ_EQ(chunks.at(3).getMax(), shardKeyPattern.getKeyPattern().globalMax());
-    });
+    ASSERT_EQ(kNumSplitPoints, sampledValues.size()) << dumpValues(sampledValues);
 
-    onCommand([&](const executor::RemoteCommandRequest& request) {
-        return CursorResponse(kTestAggregateNss, CursorId{0}, firstShardChunks)
-            .toBSON(CursorResponse::ResponseType::InitialResponse);
-    });
-
-    onCommand([&](const executor::RemoteCommandRequest& request) {
-        return CursorResponse(kTestAggregateNss, CursorId{0}, secondShardChunks)
-            .toBSON(CursorResponse::ResponseType::InitialResponse);
-    });
-
-    future.default_timed_get();
+    int lastVal = -1 * kNumSamplesPerChunk;
+    for (const auto& val : sampledValues) {
+        ASSERT_GTE(val - lastVal, kNumSamplesPerChunk) << dumpValues(sampledValues);
+        lastVal = val;
+    }
 }
 
 }  // namespace
