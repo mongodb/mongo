@@ -343,6 +343,14 @@ public:
                 return false;
             }
 
+            if (parameterName == "requireApiVersion" && parameter.trueValue() &&
+                (serverGlobalParams.clusterRole == ClusterRole::ConfigServer ||
+                 serverGlobalParams.clusterRole == ClusterRole::ShardServer)) {
+                errmsg = str::stream()
+                    << "Cannot set parameter requireApiVersion=true on a shard or config server";
+                return false;
+            }
+
             auto oldValueObj = ([&] {
                 BSONObjBuilder bb;
                 if (numSet == 0) {
