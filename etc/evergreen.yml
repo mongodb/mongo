@@ -4688,6 +4688,15 @@ tasks:
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 4
 
+- name: sharding_opportunistic_secondary_targeting_gen
+  tags: ["sharding", "common"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      use_large_distro: "true"
+      resmoke_args: --storageEngine=wiredTiger
+      fallback_num_sub_suites: 32
+
 - <<: *task_template
   name: change_streams
   tags: ["change_streams"]
@@ -7434,6 +7443,7 @@ buildvariants:
   - name: sharded_multi_stmt_txn_jscore_passthrough
   - name: .sharding .jscore !.wo_snapshot
   - name: sharding_gen
+  - name: sharding_opportunistic_secondary_targeting_gen
   - name: .stitch
 
 - name: linux-64-duroff
@@ -8344,6 +8354,7 @@ buildvariants:
     - windows-64-vs2017-compile
   - name: session_jscore_passthrough
   - name: sharding_gen
+  - name: sharding_opportunistic_secondary_targeting_gen
   - name: .stitch
 
 - name: enterprise-windows-64-2k8
@@ -8395,6 +8406,7 @@ buildvariants:
   - name: sharding_auth_gen
   - name: sharding_auth_audit_gen
   - name: sharding_ese_gen
+  - name: sharding_opportunistic_secondary_targeting_gen
   - name: snmp
   - name: push
     distros:
@@ -8857,6 +8869,7 @@ buildvariants:
   - name: sharded_multi_stmt_txn_jscore_passthrough
     distros:
     - rhel62-large
+  - name: sharding_opportunistic_secondary_targeting_gen
   - name: snmp
   - name: .stitch
   - name: .updatefuzzer
@@ -10623,6 +10636,35 @@ buildvariants:
   - name: .watchdog
   - name: .stitch
   - name: .updatefuzzer
+
+- name: enterprise-ubuntu-sharding-opportunistic-secondary-targeting-1804-64-bit
+  display_name: "~ Enterprise Ubuntu 18.04 (with {opportunisticSecondaryTargeting: true})"
+  batchtime: 1440 # 1 day
+  run_on:
+  - ubuntu1804-test
+  modules:
+  - enterprise
+  expansions:
+    scons_cache_scope: shared
+    compile_flags: MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    multiversion_platform: ubuntu1804
+    multiversion_edition: enterprise
+    test_flags: >-
+        --mongosSetParameters="opportunisticSecondaryTargeting: true"
+    large_distro_name: ubuntu1804-build
+  tasks:
+  - name: compile_all_run_unittests_TG
+    distros:
+    - ubuntu1804-build
+  - name: .aggregation !.no_async
+  - name: .sharding .auth
+  - name: .sharding .causally_consistent !.wo_snapshot
+  - name: .concurrency .common !.kill_terminate
+  - name: .integration !.audit
+  - name: .jscore .common
+  - name: .logical_session_cache .one_sec
+  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
+  - name: .sharding .common !.csrs
 
 - name: ubuntu1804-asan
   display_name: ~ ASAN SSL Ubuntu 18.04

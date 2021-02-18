@@ -38,3 +38,12 @@ server_parameters:
     cpp_vartype: "AtomicWord<int>"
     cpp_varname: "taskExecutorPoolSize"
     default: 1
+
+  opportunisticSecondaryTargeting:
+    description: >-
+        Allows attempting to establish connections to multiple secondaries and directing the request 
+        to the first secondary that accepts the connection.
+    set_at: [ startup, runtime ]
+    cpp_vartype: 'AtomicWord<bool>'
+    cpp_varname: 'gOpportunisticSecondaryTargeting'
+    default: false

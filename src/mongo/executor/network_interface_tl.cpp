@@ -36,6 +36,7 @@
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/server_options.h"
 #include "mongo/executor/connection_pool_tl.h"
+#include "mongo/executor/executor_parameters_gen.h"
 #include "mongo/transport/transport_layer_manager.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/log.h"
@@ -269,6 +270,12 @@ Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHa
         }
 
         request.metadata = newMetadata.obj();
+    }
+
+    // If "Opportunistic Secondary Targeting" is disabled, then we target only the first host of the
+    // set we are given.
+    if (request.target.size() > 1 && !gOpportunisticSecondaryTargeting.loadRelaxed()) {
+        request.target.resize(1);
     }
 
     auto pf = makePromiseFuture<RemoteCommandOnAnyResponse>();
