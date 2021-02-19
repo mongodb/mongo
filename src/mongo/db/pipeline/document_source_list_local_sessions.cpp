@@ -39,7 +39,8 @@ namespace mongo {
 
 REGISTER_DOCUMENT_SOURCE(listLocalSessions,
                          DocumentSourceListLocalSessions::LiteParsed::parse,
-                         DocumentSourceListLocalSessions::createFromBson);
+                         DocumentSourceListLocalSessions::createFromBson,
+                         LiteParsedDocumentSource::AllowedWithApiStrict::kNeverInVersion1);
 
 DocumentSource::GetNextResult DocumentSourceListLocalSessions::doGetNext() {
     while (!_ids.empty()) {

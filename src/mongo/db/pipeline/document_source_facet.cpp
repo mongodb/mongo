@@ -123,7 +123,8 @@ std::unique_ptr<DocumentSourceFacet::LiteParsed> DocumentSourceFacet::LiteParsed
 
 REGISTER_DOCUMENT_SOURCE(facet,
                          DocumentSourceFacet::LiteParsed::parse,
-                         DocumentSourceFacet::createFromBson);
+                         DocumentSourceFacet::createFromBson,
+                         LiteParsedDocumentSource::AllowedWithApiStrict::kAlways);
 
 intrusive_ptr<DocumentSourceFacet> DocumentSourceFacet::create(
     std::vector<FacetPipeline> facetPipelines,

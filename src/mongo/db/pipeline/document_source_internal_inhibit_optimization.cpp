@@ -35,7 +35,8 @@ namespace mongo {
 
 REGISTER_DOCUMENT_SOURCE(_internalInhibitOptimization,
                          LiteParsedDocumentSourceDefault::parse,
-                         DocumentSourceInternalInhibitOptimization::createFromBson);
+                         DocumentSourceInternalInhibitOptimization::createFromBson,
+                         LiteParsedDocumentSource::AllowedWithApiStrict::kNeverInVersion1);
 
 constexpr StringData DocumentSourceInternalInhibitOptimization::kStageName;
 

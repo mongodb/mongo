@@ -44,7 +44,8 @@ namespace mongo {
 
 REGISTER_DOCUMENT_SOURCE(unionWith,
                          DocumentSourceUnionWith::LiteParsed::parse,
-                         DocumentSourceUnionWith::createFromBson);
+                         DocumentSourceUnionWith::createFromBson,
+                         LiteParsedDocumentSource::AllowedWithApiStrict::kAlways);
 
 namespace {
 std::unique_ptr<Pipeline, PipelineDeleter> buildPipelineFromViewDefinition(

@@ -53,6 +53,18 @@ class LiteParsedPipeline;
  */
 class LiteParsedDocumentSource {
 public:
+    /**
+     * Flags to mark stages with different allowance constrains when API versioning is enabled.
+     */
+    enum class AllowedWithApiStrict {
+        // The stage is always allowed in the pipeline regardless of API versions.
+        kAlways,
+        // The stage is allowed only for internal client when 'apiStrict' is set to true.
+        kInternal,
+        // The stage is never allowed in API version '1' when 'apiStrict' is set to true.
+        kNeverInVersion1
+    };
+
     LiteParsedDocumentSource(std::string parseTimeName)
         : _parseTimeName(std::move(parseTimeName)) {}
 
@@ -71,11 +83,20 @@ public:
     /**
      * Registers a DocumentSource with a spec parsing function, so that when a stage with the given
      * name is encountered, it will call 'parser' to construct that stage's specification object.
+     * The flag 'allowedWithApiStrict' is used to control the allowance of the stage when
+     * 'apiStrict' is set to true.
      *
      * DO NOT call this method directly. Instead, use the REGISTER_DOCUMENT_SOURCE macro defined in
      * document_source.h.
      */
-    static void registerParser(const std::string& name, Parser parser);
+    static void registerParser(const std::string& name,
+                               Parser parser,
+                               AllowedWithApiStrict allowedWithApiStrict);
+
+    /**
+     * Returns the 'ApiVersionAllowanceFlag' flag value for the specified stage name.
+     */
+    static AllowedWithApiStrict getApiVersionAllowanceFlag(std::string stageName);
 
     /**
      * Constructs a LiteParsedDocumentSource from the user-supplied BSON, or throws a

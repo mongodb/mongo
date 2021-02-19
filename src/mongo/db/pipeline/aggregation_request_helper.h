@@ -48,6 +48,7 @@ template <typename T>
 class StatusWith;
 class Document;
 class AggregateCommand;
+class OperationContext;
 
 namespace aggregation_request_helper {
 
@@ -111,6 +112,13 @@ NamespaceString parseNs(const std::string& dbname, const BSONObj& cmdObj);
 Document serializeToCommandDoc(const AggregateCommand& request);
 
 BSONObj serializeToCommandObj(const AggregateCommand& request);
+
+/**
+ * Validates if 'AggregateCommand' specs complies with API versioning. Throws uassert in case of
+ * any failure.
+ */
+void validateRequestForAPIVersion(const OperationContext* opCtx, const AggregateCommand& request);
+
 }  // namespace aggregation_request_helper
 
 /**

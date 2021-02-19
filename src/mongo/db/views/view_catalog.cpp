@@ -397,14 +397,8 @@ StatusWith<stdx::unordered_set<NamespaceString>> ViewCatalog::validatePipeline(
     const LiteParsedPipeline liteParsedPipeline(viewDef.viewOn(), viewDef.pipeline());
     const auto involvedNamespaces = liteParsedPipeline.getInvolvedNamespaces();
 
-    // If 'apiStrict: true', validates that the pipeline does not contain stages which are not in
-    // this API version.
-    auto apiParameters = APIParameters::get(opCtx);
-    if (apiParameters.getAPIStrict().value_or(false)) {
-        auto apiVersion = apiParameters.getAPIVersion();
-        invariant(apiVersion);
-        liteParsedPipeline.validatePipelineStagesIfAPIStrict(*apiVersion);
-    }
+    // Perform API versioning validation checks on stages of the pipeline.
+    liteParsedPipeline.validatePipelineStagesforAPIVersion(opCtx);
 
     // Verify that this is a legitimate pipeline specification by making sure it parses
     // correctly. In order to parse a pipeline we need to resolve any namespaces involved to a

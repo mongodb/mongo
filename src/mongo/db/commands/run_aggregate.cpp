@@ -516,6 +516,22 @@ std::vector<std::unique_ptr<Pipeline, PipelineDeleter>> createExchangePipelinesI
 
     return pipelines;
 }
+
+/**
+ * Performs validations related to API versioning before running the aggregation command.
+ * Throws uassert if any of the validations fails
+ *     - validation on each stage on the pipeline
+ *     - validation on 'AggregateCommand' request
+ */
+void performAPIVersionChecks(const OperationContext* opCtx,
+                             const AggregateCommand& request,
+                             const LiteParsedPipeline& liteParsedPipeline) {
+    invariant(opCtx);
+
+    liteParsedPipeline.validatePipelineStagesforAPIVersion(opCtx);
+    aggregation_request_helper::validateRequestForAPIVersion(opCtx, request);
+}
+
 }  // namespace
 
 Status runAggregate(OperationContext* opCtx,
@@ -534,14 +550,9 @@ Status runAggregate(OperationContext* opCtx,
                     const BSONObj& cmdObj,
                     const PrivilegeVector& privileges,
                     rpc::ReplyBuilderInterface* result) {
-    // If 'apiStrict: true', validates that the pipeline does not contain stages which are not in
-    // this API version.
-    auto apiParameters = APIParameters::get(opCtx);
-    if (apiParameters.getAPIStrict().value_or(false)) {
-        auto apiVersion = apiParameters.getAPIVersion();
-        invariant(apiVersion);
-        liteParsedPipeline.validatePipelineStagesIfAPIStrict(*apiVersion);
-    }
+
+    // Performs API versioning checks.
+    performAPIVersionChecks(opCtx, request, liteParsedPipeline);
 
     // For operations on views, this will be the underlying namespace.
     NamespaceString nss = request.getNamespace();

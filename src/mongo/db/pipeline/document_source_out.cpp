@@ -51,7 +51,8 @@ MONGO_FAIL_POINT_DEFINE(hangWhileBuildingDocumentSourceOutBatch);
 MONGO_FAIL_POINT_DEFINE(outWaitAfterTempCollectionCreation);
 REGISTER_DOCUMENT_SOURCE(out,
                          DocumentSourceOut::LiteParsed::parse,
-                         DocumentSourceOut::createFromBson);
+                         DocumentSourceOut::createFromBson,
+                         LiteParsedDocumentSource::AllowedWithApiStrict::kAlways);
 
 DocumentSourceOut::~DocumentSourceOut() {
     DESTRUCTOR_GUARD(

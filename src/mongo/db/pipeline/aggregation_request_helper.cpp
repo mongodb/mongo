@@ -179,6 +179,32 @@ void validate(const BSONObj& cmdObj, boost::optional<ExplainOptions::Verbosity> 
                           << "' option is not permitted in read-only mode.",
             (!hasAllowDiskUseElem || !storageGlobalParams.readOnly));
 }
+
+void validateRequestForAPIVersion(const OperationContext* opCtx, const AggregateCommand& request) {
+    invariant(opCtx);
+
+    auto apiParameters = APIParameters::get(opCtx);
+    bool apiStrict = apiParameters.getAPIStrict().value_or(false);
+    const auto apiVersion = apiParameters.getAPIVersion().value_or("");
+    auto client = opCtx->getClient();
+
+    // An internal client could be one of the following :
+    //     - Does not have any transport session
+    //     - The transport session tag is internal
+    bool isInternalClient =
+        !client->session() || (client->session()->getTags() & transport::Session::kInternalClient);
+
+    // Checks that the 'exchange' or 'fromMongos' option can only be specified by the internal
+    // client.
+    if ((request.getExchange() || request.getFromMongos()) && apiStrict && apiVersion == "1") {
+        uassert(ErrorCodes::APIStrictError,
+                str::stream() << "'exchange' and 'fromMongos' option cannot be specified with "
+                                 "'apiStrict: true' in API Version "
+                              << apiVersion,
+                isInternalClient);
+    }
+}
+
 }  // namespace aggregation_request_helper
 
 // Custom serializers/deserializers for AggregateCommand.

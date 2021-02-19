@@ -73,7 +73,8 @@ DocumentSourceSort::DocumentSourceSort(const boost::intrusive_ptr<ExpressionCont
 
 REGISTER_DOCUMENT_SOURCE(sort,
                          LiteParsedDocumentSourceDefault::parse,
-                         DocumentSourceSort::createFromBson);
+                         DocumentSourceSort::createFromBson,
+                         LiteParsedDocumentSource::AllowedWithApiStrict::kAlways);
 
 DocumentSource::GetNextResult DocumentSourceSort::doGetNext() {
     if (!_populated) {

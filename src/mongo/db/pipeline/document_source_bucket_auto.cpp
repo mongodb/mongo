@@ -44,7 +44,8 @@ using std::vector;
 
 REGISTER_DOCUMENT_SOURCE(bucketAuto,
                          LiteParsedDocumentSourceDefault::parse,
-                         DocumentSourceBucketAuto::createFromBson);
+                         DocumentSourceBucketAuto::createFromBson,
+                         LiteParsedDocumentSource::AllowedWithApiStrict::kAlways);
 
 namespace {
 
