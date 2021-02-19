@@ -134,7 +134,15 @@ void IndexConsistency::repairMissingIndexEntries(OperationContext* opCtx,
     for (auto it = _missingIndexEntries.begin(); it != _missingIndexEntries.end();) {
         const IndexKey& key = it->first;
         const KeyString::Value& ks = it->second.keyString;
-        const RecordId rid = KeyString::decodeRecordIdLongAtEnd(ks.getBuffer(), ks.getSize());
+        const KeyFormat keyFormat = _validateState->getCollection()->getRecordStore()->keyFormat();
+
+        RecordId rid;
+        if (keyFormat == KeyFormat::Long) {
+            rid = KeyString::decodeRecordIdLongAtEnd(ks.getBuffer(), ks.getSize());
+        } else {
+            invariant(keyFormat == KeyFormat::String);
+            rid = KeyString::decodeRecordIdStrAtEnd(ks.getBuffer(), ks.getSize());
+        }
 
         const std::string& indexName = key.first;
         if (indexName != index->descriptor()->indexName()) {
