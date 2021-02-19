@@ -223,10 +223,10 @@ function runCommand(testOpts, expectedError) {
             writeConcern: {w: "majority"}
         };
 
-        // 'testWriteBlocksIfMigrationIsInBlocking' runs each write command with maxTimeMS attached
-        // and asserts that the command blocks and fails with MaxTimeMSExpired. So in the case of
-        // transactions, we want to assert that commitTransaction blocks and fails MaxTimeMSExpired
-        // instead.
+        // 'testBlockWritesAfterMigrationEnteredBlocking' runs each write command with maxTimeMS
+        // attached and asserts that the command blocks and fails with MaxTimeMSExpired. So in the
+        // case of transactions, we want to assert that commitTransaction blocks and fails
+        // MaxTimeMSExpired instead.
         if (testOpts.command.maxTimeMS) {
             commitTxnCommand.maxTimeMS = testOpts.command.maxTimeMS;
         }
@@ -258,7 +258,7 @@ function runCommand(testOpts, expectedError) {
 /**
  * Tests that the write succeeds when there is no migration.
  */
-function testWriteNoMigration(testCase, testOpts) {
+function testWritesNoMigration(testCase, testOpts) {
     runCommand(testOpts);
     testCase.assertCommandSucceeded(testOpts.primaryDB, testOpts.dbName, testOpts.collName);
 }
@@ -266,7 +266,7 @@ function testWriteNoMigration(testCase, testOpts) {
 /**
  * Tests that the donor rejects writes after the migration commits.
  */
-function testWriteIsRejectedIfSentAfterMigrationHasCommitted(testCase, testOpts) {
+function testRejectWritesAfterMigrationCommitted(testCase, testOpts) {
     const tenantId = testOpts.dbName.split('_')[0];
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(UUID()),
@@ -288,7 +288,7 @@ function testWriteIsRejectedIfSentAfterMigrationHasCommitted(testCase, testOpts)
 /**
  * Tests that the donor does not reject writes after the migration aborts.
  */
-function testWriteIsAcceptedIfSentAfterMigrationHasAborted(testCase, testOpts) {
+function testDoNotRejectWritesAfterMigrationAborted(testCase, testOpts) {
     const tenantId = testOpts.dbName.split('_')[0];
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(UUID()),
@@ -322,7 +322,7 @@ function testWriteIsAcceptedIfSentAfterMigrationHasAborted(testCase, testOpts) {
 /**
  * Tests that the donor blocks writes that are executed in the blocking state.
  */
-function testWriteBlocksIfMigrationIsInBlocking(testCase, testOpts) {
+function testBlockWritesAfterMigrationEnteredBlocking(testCase, testOpts) {
     const tenantId = testOpts.dbName.split('_')[0];
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(UUID()),
@@ -355,7 +355,7 @@ function testWriteBlocksIfMigrationIsInBlocking(testCase, testOpts) {
  * Tests that the donor blocks writes that are executed in the blocking state and rejects them after
  * the migration commits.
  */
-function testBlockedWriteGetsUnblockedAndRejectedIfMigrationCommits(testCase, testOpts) {
+function testRejectBlockedWritesAfterMigrationCommitted(testCase, testOpts) {
     const tenantId = testOpts.dbName.split('_')[0];
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(UUID()),
@@ -394,7 +394,7 @@ function testBlockedWriteGetsUnblockedAndRejectedIfMigrationCommits(testCase, te
  * Tests that the donor blocks writes that are executed in the blocking state and rejects them after
  * the migration aborts.
  */
-function testBlockedWriteGetsUnblockedAndRejectedIfMigrationAborts(testCase, testOpts) {
+function testRejectBlockedWritesAfterMigrationAborted(testCase, testOpts) {
     const tenantId = testOpts.dbName.split('_')[0];
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(UUID()),
@@ -945,12 +945,12 @@ for (let command of Object.keys(testCases)) {
 
 // Run test cases.
 const testFuncs = {
-    noMigration: testWriteNoMigration,  // verify that the test cases are correct.
-    inCommitted: testWriteIsRejectedIfSentAfterMigrationHasCommitted,
-    inAborted: testWriteIsAcceptedIfSentAfterMigrationHasAborted,
-    inBlocking: testWriteBlocksIfMigrationIsInBlocking,
-    inBlockingThenCommitted: testBlockedWriteGetsUnblockedAndRejectedIfMigrationCommits,
-    inBlockingThenAborted: testBlockedWriteGetsUnblockedAndRejectedIfMigrationAborts
+    noMigration: testWritesNoMigration,  // verify that the test cases are correct.
+    inCommitted: testRejectWritesAfterMigrationCommitted,
+    inAborted: testDoNotRejectWritesAfterMigrationAborted,
+    inBlocking: testBlockWritesAfterMigrationEnteredBlocking,
+    inBlockingThenCommitted: testRejectBlockedWritesAfterMigrationCommitted,
+    inBlockingThenAborted: testRejectBlockedWritesAfterMigrationAborted
 };
 
 for (const [testName, testFunc] of Object.entries(testFuncs)) {

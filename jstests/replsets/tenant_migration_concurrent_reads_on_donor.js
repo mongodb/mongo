@@ -1,9 +1,11 @@
 /**
- * Tests that that the donor
- * - blocks clusterTime reads that are executed while the migration is in the blocking state but
- *   does not block linearizable reads.
- * - rejects (blocked) clusterTime reads and linearizable reads after the migration commits.
- * - does not reject (blocked) clusterTime reads and linearizable reads after the migration aborts.
+ * Tests that the donor
+ * - blocks reads with atClusterTime/afterClusterTime >= blockTimestamp that are executed while the
+ *   migration is in the blocking state but does not block linearizable reads.
+ * - rejects reads with atClusterTime/afterClusterTime >= blockTimestamp reads and linearizable
+ *   reads after the migration commits.
+ * - does not reject reads with atClusterTime/afterClusterTime >= blockTimestamp and linearizable
+ *   reads after the migration aborts.
  *
  * @tags: [requires_fcv_47, requires_majority_read_concern, incompatible_with_eft,
  * incompatible_with_windows_tls]
@@ -95,9 +97,10 @@ function runCommand(db, cmd, expectedError, isTransaction) {
 }
 
 /**
- * Tests that the donor rejects causal reads after the migration commits.
+ * Tests that after the migration commits, the donor rejects linearizable reads and reads with
+ * atClusterTime/afterClusterTime >= blockTimestamp.
  */
-function testReadIsRejectedIfSentAfterMigrationHasCommitted(testCase, dbName, collName) {
+function testRejectReadsAfterMigrationCommitted(testCase, dbName, collName) {
     const tenantId = dbName.split('_')[0];
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(UUID()),
@@ -112,9 +115,8 @@ function testReadIsRejectedIfSentAfterMigrationHasCommitted(testCase, dbName, co
     assert.eq(stateRes.state, TenantMigrationTest.State.kCommitted);
 
     // Wait for the last oplog entry on the primary to be visible in the committed snapshot view of
-    // the oplog on all the secondaries. This is to ensure that the write to put the migration into
-    // "committed" is majority-committed and that snapshot reads on the secondaries with unspecified
-    // atClusterTime have read timestamp >= commitTimestamp.
+    // the oplog on all the secondaries. This is to ensure that snapshot reads on secondaries with
+    // unspecified atClusterTime have read timestamp >= commitTimestamp.
     donorRst.awaitLastOpCommitted();
 
     const donorDoc = donorPrimary.getCollection(TenantMigrationTest.kConfigDonorsNS).findOne({
@@ -147,9 +149,10 @@ function testReadIsRejectedIfSentAfterMigrationHasCommitted(testCase, dbName, co
 }
 
 /**
- * Tests that the donor does not reject reads after the migration aborts.
+ * Tests that after the migration abort, the donor does not reject linearizable reads or reads with
+ * atClusterTime/afterClusterTime >= blockTimestamp.
  */
-function testReadIsAcceptedIfSentAfterMigrationHasAborted(testCase, dbName, collName) {
+function testDoNotRejectReadsAfterMigrationAborted(testCase, dbName, collName) {
     const tenantId = dbName.split('_')[0];
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(UUID()),
@@ -167,9 +170,8 @@ function testReadIsAcceptedIfSentAfterMigrationHasAborted(testCase, dbName, coll
     abortFp.off();
 
     // Wait for the last oplog entry on the primary to be visible in the committed snapshot view of
-    // the oplog on all the secondaries. This is to ensure that the write to put the migration into
-    // "aborted" is majority-committed and that snapshot reads on the secondaries with unspecified
-    // atClusterTime have read timestamp >= abortTimestamp.
+    // the oplog on all the secondaries. This is to ensure that snapshot reads on secondaries with
+    // unspecified atClusterTime have read timestamp >= abortTimestamp.
     donorRst.awaitLastOpCommitted();
 
     const donorDoc = donorPrimary.getCollection(TenantMigrationTest.kConfigDonorsNS).findOne({
@@ -197,10 +199,10 @@ function testReadIsAcceptedIfSentAfterMigrationHasAborted(testCase, dbName, coll
 }
 
 /**
- * Tests that the donor blocks clusterTime reads in the blocking state with readTimestamp >=
- * blockingTimestamp but does not block linearizable reads.
+ * Tests that in the blocking state, the donor blocks reads with atClusterTime/afterClusterTime >=
+ * blockTimestamp but does not block linearizable reads.
  */
-function testReadBlocksIfMigrationIsInBlocking(testCase, dbName, collName) {
+function testBlockReadsAfterMigrationEnteredBlocking(testCase, dbName, collName) {
     const tenantId = dbName.split('_')[0];
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(UUID()),
@@ -247,10 +249,10 @@ function testReadBlocksIfMigrationIsInBlocking(testCase, dbName, collName) {
 }
 
 /**
- * Tests that the donor blocks clusterTime reads in the blocking state with readTimestamp >=
- * blockingTimestamp, and unblocks the reads once the migration aborts.
+ * Tests that the donor rejects the blocked reads (reads with atClusterTime/afterClusterTime >=
+ * blockingTimestamp) once the migration commits.
  */
-function testBlockedReadGetsUnblockedAndRejectedIfMigrationCommits(testCase, dbName, collName) {
+function testRejectBlockedReadsAfterMigrationCommitted(testCase, dbName, collName) {
     if (testCase.isLinearizableRead) {
         // Linearizable reads are not blocked.
         return;
@@ -311,10 +313,10 @@ function testBlockedReadGetsUnblockedAndRejectedIfMigrationCommits(testCase, dbN
 }
 
 /**
- * Tests that the donor blocks clusterTime reads in the blocking state with readTimestamp >=
- * blockingTimestamp, and rejects the reads once the migration commits.
+ * Tests that the donor unblocks blocked reads (reads with atClusterTime/afterClusterTime >=
+ * blockingTimestamp) once the migration aborts.
  */
-function testBlockedReadGetsUnblockedAndSucceedsIfMigrationAborts(testCase, dbName, collName) {
+function testUnblockBlockedReadsAfterMigrationAborted(testCase, dbName, collName) {
     if (testCase.isLinearizableRead) {
         // Linearizable reads are not blocked.
         return;
@@ -474,11 +476,11 @@ const testCases = {
 };
 
 const testFuncs = {
-    inCommitted: testReadIsRejectedIfSentAfterMigrationHasCommitted,
-    inAborted: testReadIsAcceptedIfSentAfterMigrationHasAborted,
-    inBlocking: testReadBlocksIfMigrationIsInBlocking,
-    inBlockingThenCommitted: testBlockedReadGetsUnblockedAndRejectedIfMigrationCommits,
-    inBlockingThenAborted: testBlockedReadGetsUnblockedAndSucceedsIfMigrationAborts,
+    inCommitted: testRejectReadsAfterMigrationCommitted,
+    inAborted: testDoNotRejectReadsAfterMigrationAborted,
+    inBlocking: testBlockReadsAfterMigrationEnteredBlocking,
+    inBlockingThenCommitted: testRejectBlockedReadsAfterMigrationCommitted,
+    inBlockingThenAborted: testUnblockBlockedReadsAfterMigrationAborted,
 };
 
 for (const [testName, testFunc] of Object.entries(testFuncs)) {
