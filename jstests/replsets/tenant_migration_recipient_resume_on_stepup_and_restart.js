@@ -30,8 +30,9 @@ const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
  * Runs the donorStartMigration command to start a migration, and interrupts the migration on the
  * recipient using the 'interruptFunc' after the migration starts on the recipient side, and
  * asserts that migration eventually commits.
+ * @param {recipientRestarted} bool is needed to properly assert the tenant migrations stat count.
  */
-function testRecipientSyncDataInterrupt(interruptFunc) {
+function testRecipientSyncDataInterrupt(interruptFunc, recipientRestarted) {
     const recipientRst = new ReplSetTest(
         {nodes: 3, name: "recipientRst", nodeOptions: migrationX509Options.recipient});
     recipientRst.startSet();
@@ -44,7 +45,8 @@ function testRecipientSyncDataInterrupt(interruptFunc) {
         return;
     }
     const donorRst = tenantMigrationTest.getDonorRst();
-    const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
+    const donorPrimary = tenantMigrationTest.getDonorPrimary();
+    let recipientPrimary = tenantMigrationTest.getRecipientPrimary();
 
     const migrationId = UUID();
     const migrationOpts = {
@@ -75,6 +77,19 @@ function testRecipientSyncDataInterrupt(interruptFunc) {
                                                       migrationOpts.tenantId,
                                                       TenantMigrationTest.DonorState.kCommitted);
     assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
+
+    tenantMigrationTest.awaitTenantMigrationStatsCounts(donorPrimary,
+                                                        {totalSuccessfulMigrationsDonated: 1});
+    recipientPrimary = tenantMigrationTest.getRecipientPrimary();  // Could change after interrupt.
+    if (!recipientRestarted) {
+        tenantMigrationTest.awaitTenantMigrationStatsCounts(recipientPrimary,
+                                                            {totalSuccessfulMigrationsReceived: 1});
+    } else {
+        // In full restart the count could be lost completely.
+        const stats = tenantMigrationTest.getTenantMigrationStats(recipientPrimary);
+        assert(1 == stats.totalSuccessfulMigrationsReceived ||
+               0 == stats.totalSuccessfulMigrationsReceived);
+    }
 
     tenantMigrationTest.stop();
     recipientRst.stopSet();
@@ -169,7 +184,7 @@ function testRecipientForgetMigrationInterrupt(interruptFunc) {
         assert.commandWorked(recipientPrimary.adminCommand(
             {replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
         assert.commandWorked(recipientPrimary.adminCommand({replSetFreeze: 0}));
-    });
+    }, false);
 })();
 
 (() => {
@@ -177,7 +192,7 @@ function testRecipientForgetMigrationInterrupt(interruptFunc) {
     testRecipientSyncDataInterrupt((recipientRst) => {
         recipientRst.stopSet(null /* signal */, true /*forRestart */);
         recipientRst.startSet({restart: true});
-    });
+    }, true);
 })();
 
 (() => {

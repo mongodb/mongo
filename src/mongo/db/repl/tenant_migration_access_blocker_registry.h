@@ -80,7 +80,7 @@ public:
      * Iterates through each of the TenantMigrationAccessBlockers stored by the mapping
      * and appends the server status of each blocker to the BSONObjBuilder.
      */
-    void appendInfoForServerStatus(BSONObjBuilder* builder);
+    void appendInfoForServerStatus(BSONObjBuilder* builder) const;
 
     /**
      * Notifies all the TenantMigrationAccessBlockers that the given opTime has been majority
@@ -96,7 +96,7 @@ private:
     using TenantMigrationAccessBlockersMap =
         StringMap<std::shared_ptr<TenantMigrationAccessBlocker>>;
 
-    Mutex _mutex = MONGO_MAKE_LATCH("TenantMigrationAccessBlockerRegistry::_mutex");
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("TenantMigrationAccessBlockerRegistry::_mutex");
     TenantMigrationAccessBlockersMap _tenantMigrationAccessBlockers;
 };
 

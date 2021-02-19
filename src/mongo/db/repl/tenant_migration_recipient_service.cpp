@@ -59,6 +59,7 @@
 #include "mongo/db/repl/tenant_migration_recipient_entry_helpers.h"
 #include "mongo/db/repl/tenant_migration_recipient_service.h"
 #include "mongo/db/repl/tenant_migration_state_machine_gen.h"
+#include "mongo/db/repl/tenant_migration_statistics.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/session_txn_record_gen.h"
@@ -1747,6 +1748,8 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancelationToken& token) noexcept {
     _scopedExecutor = executor;
+    auto scopedOutstandingMigrationCounter =
+        TenantMigrationStatistics::get(_serviceContext)->getScopedOutstandingReceivingCount();
 
     LOGV2(4879607,
           "Starting tenant migration recipient instance: ",
@@ -2129,6 +2132,7 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
             }
 
             _cleanupOnDataSyncCompletion(status);
+            _setMigrationStatsOnCompletion(status);
 
             // Handle recipientForgetMigration.
             stdx::lock_guard lk(_mutex);
@@ -2169,7 +2173,9 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                                                     getOplogBufferNs(getMigrationUUID()));
         })
         .thenRunOn(_recipientService->getInstanceCleanupExecutor())
-        .onCompletion([this, self = shared_from_this()](Status status) {
+        .onCompletion([this,
+                       self = shared_from_this(),
+                       scopedCounter{std::move(scopedOutstandingMigrationCounter)}](Status status) {
             // Schedule on the parent executor to mark the completion of the whole chain so this
             // is safe even on shutDown/stepDown.
             stdx::lock_guard lk(_mutex);
@@ -2196,6 +2202,34 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
             _taskState.setState(TaskState::kDone);
         })
         .semi();
+}
+
+void TenantMigrationRecipientService::Instance::_setMigrationStatsOnCompletion(
+    Status completionStatus) const {
+    bool success = false;
+
+    if (completionStatus.code() == ErrorCodes::TenantMigrationForgotten) {
+        if (_stateDoc.getExpireAt()) {
+            // Avoid double counting tenant migration statistics after failover.
+            return;
+        }
+        // The migration committed if and only if it received recipientForgetMigration after it has
+        // applied data past the returnAfterReachingDonorTimestamp, saved in state doc as
+        // rejectReadsBeforeTimestamp.
+        if (_stateDoc.getRejectReadsBeforeTimestamp().has_value()) {
+            success = true;
+        }
+    } else if (ErrorCodes::isRetriableError(completionStatus)) {
+        // The migration was interrupted due to shutdown or stepdown, avoid incrementing the count
+        // for failed migrations since the migration will be resumed on stepup.
+        return;
+    }
+
+    if (success) {
+        TenantMigrationStatistics::get(_serviceContext)->incTotalSuccessfulMigrationsReceived();
+    } else {
+        TenantMigrationStatistics::get(_serviceContext)->incTotalFailedMigrationsReceived();
+    }
 }
 
 const UUID& TenantMigrationRecipientService::Instance::getMigrationUUID() const {

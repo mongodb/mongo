@@ -46,6 +46,7 @@
 #include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/db/repl/tenant_migration_donor_access_blocker.h"
 #include "mongo/db/repl/tenant_migration_state_machine_gen.h"
+#include "mongo/db/repl/tenant_migration_statistics.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/executor/connection_pool.h"
 #include "mongo/executor/network_interface_factory.h"
@@ -798,6 +799,8 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
     _abortMigrationSource = CancelationSource(serviceToken);
     auto recipientTargeterRS = std::make_shared<RemoteCommandTargeterRS>(
         _recipientUri.getSetName(), _recipientUri.getServers());
+    auto scopedOutstandingMigrationCounter =
+        TenantMigrationStatistics::get(_serviceContext)->getScopedOutstandingDonatingCount();
 
     return ExecutorFuture<void>(**executor)
         .then([this, self = shared_from_this(), executor, serviceToken] {
@@ -1024,6 +1027,18 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
                   "tenantId"_attr = _stateDoc.getTenantId(),
                   "status"_attr = status,
                   "abortReason"_attr = _abortReason);
+            if (!_stateDoc.getExpireAt()) {
+                // Avoid double counting tenant migration statistics after failover.
+                // Double counting may still happen if the failover to the same primary
+                // happens after this block and before the state doc GC is persisted.
+                if (_abortReason) {
+                    TenantMigrationStatistics::get(_serviceContext)
+                        ->incTotalFailedMigrationsDonated();
+                } else {
+                    TenantMigrationStatistics::get(_serviceContext)
+                        ->incTotalSuccessfulMigrationsDonated();
+                }
+            }
         })
         .then([this, self = shared_from_this(), executor, recipientTargeterRS, serviceToken] {
             if (_stateDoc.getExpireAt()) {
@@ -1065,7 +1080,9 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
                     return _waitForMajorityWriteConcern(executor, std::move(opTime));
                 });
         })
-        .onCompletion([this, self = shared_from_this()](Status status) {
+        .onCompletion([this,
+                       self = shared_from_this(),
+                       scopedCounter{std::move(scopedOutstandingMigrationCounter)}](Status status) {
             LOGV2(4920400,
                   "Marked migration state as garbage collectable",
                   "migrationId"_attr = _stateDoc.getId(),
