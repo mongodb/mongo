@@ -125,7 +125,10 @@ void PartitionIterator::getNextDocument() {
 
     auto doc = getNextRes.releaseDocument();
     if (_partitionExpr) {
-        auto curKey = _partitionExpr->evaluate(doc, nullptr);
+        auto curKey = _partitionExpr->evaluate(doc, &_expCtx->variables);
+        uassert(ErrorCodes::TypeMismatch,
+                "Cannot 'partitionBy' an expression of type array",
+                !curKey.isArray());
         if (_state == IteratorState::kNotInitialized) {
             _nextPartition = NextPartitionState{std::move(doc), std::move(curKey)};
             advanceToNextPartition();
