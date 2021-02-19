@@ -761,6 +761,11 @@ MongoRunner.mongodOptions = function(opts = {}) {
         opts.auditDestination = jsTestOptions().auditDestination;
     }
 
+    if (opts.hasOwnProperty("auditPath")) {
+        // We need to reformat the auditPath to include the proper port
+        opts.auditPath = MongoRunner.toRealPath(opts.auditPath, opts);
+    }
+
     if (opts.noReplSet)
         opts.replSet = null;
     if (opts.arbiter)
@@ -817,6 +822,11 @@ MongoRunner.mongosOptions = function(opts) {
 
     if (!opts.hasOwnProperty('binVersion') && testOptions.mongosBinVersion) {
         opts.binVersion = MongoRunner.getBinVersionFor(testOptions.mongosBinVersion);
+    }
+
+    if (opts.hasOwnProperty("auditPath")) {
+        // We need to reformat the auditPath to include the proper port
+        opts.auditPath = MongoRunner.toRealPath(opts.auditPath, opts);
     }
 
     _removeSetParameterIfBeforeVersion(
