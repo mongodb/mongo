@@ -2593,7 +2593,7 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinRegexFindAll(Ar
 
     int resultSize = 0;
     do {
-        auto [owned, matchTag, matchVal] = [&]() {
+        auto [_, matchTag, matchVal] = [&]() {
             if (isFirstMatch) {
                 isFirstMatch = false;
                 return pcreFirstMatch(
@@ -2601,6 +2601,7 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinRegexFindAll(Ar
             }
             return pcreNextMatch(pcre, inputString, capturesBuffer, startBytePos, codePointPos);
         }();
+        value::ValueGuard matchGuard{matchTag, matchVal};
 
         if (matchTag == value::TypeTags::Null) {
             break;
@@ -2614,6 +2615,7 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinRegexFindAll(Ar
                 "$regexFindAll: the size of buffer to store output exceeded the 64MB limit",
                 resultSize <= mongo::BufferMaxSize);
 
+        matchGuard.reset();
         arrayView->push_back(matchTag, matchVal);
 
         // Move indexes after the current matched string to prepare for the next search.
