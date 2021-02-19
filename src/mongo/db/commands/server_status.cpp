@@ -80,7 +80,7 @@ public:
              const string& dbname,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) {
-        _runCalled = true;
+        _runCalled.store(true);
 
         const auto service = opCtx->getServiceContext();
         const auto clock = service->getFastClockSource();
@@ -167,13 +167,13 @@ public:
     void addSection(ServerStatusSection* section) {
         // Disallow adding a section named "timing" as it is reserved for the server status command.
         dassert(section->getSectionName() != kTimingSection);
-        verify(!_runCalled);
+        verify(!_runCalled.load());
         _sections[section->getSectionName()] = section;
     }
 
 private:
     const Date_t _started;
-    bool _runCalled;
+    AtomicWord<bool> _runCalled;
 
     typedef map<string, ServerStatusSection*> SectionMap;
     SectionMap _sections;

@@ -98,7 +98,8 @@ void TenantMigrationAccessBlockerRegistry::shutDown() {
     _tenantMigrationAccessBlockers.clear();
 }
 
-void TenantMigrationAccessBlockerRegistry::appendInfoForServerStatus(BSONObjBuilder* builder) {
+void TenantMigrationAccessBlockerRegistry::appendInfoForServerStatus(
+    BSONObjBuilder* builder) const {
     stdx::lock_guard<Latch> lg(_mutex);
 
     std::for_each(

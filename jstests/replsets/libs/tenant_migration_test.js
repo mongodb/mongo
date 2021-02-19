@@ -564,12 +564,57 @@ function TenantMigrationTest({
     };
 
     /**
-     * Returns the TenantMigrationAccessBlocker associated with given the tenantId on the
+     * Returns the TenantMigrationAccessBlocker associated with the given tenantId on the
      * node.
      */
     this.getTenantMigrationAccessBlocker = function(node, tenantId) {
         return assert.commandWorked(node.adminCommand({serverStatus: 1}))
             .tenantMigrationAccessBlocker[tenantId];
+    };
+
+    /**
+     * Returns the TenantMigrationStats on the node.
+     */
+    this.getTenantMigrationStats = function(node) {
+        return assert.commandWorked(node.adminCommand({serverStatus: 1})).tenantMigrations;
+    };
+
+    /**
+     * Awaits the condition when every stats counter reaches the specified count.
+     */
+    this.awaitTenantMigrationStatsCounts = function(node, {
+        currentMigrationsDonating = 0,
+        currentMigrationsReceiving = 0,
+        totalSuccessfulMigrationsDonated = 0,
+        totalSuccessfulMigrationsReceived = 0,
+        totalFailedMigrationsDonated = 0,
+        totalFailedMigrationsReceived = 0
+    }) {
+        const check = function(expectedVal, stats, fieldName) {
+            if (expectedVal == stats[fieldName]) {
+                return true;  // Condition reached, true means the counter reached the target.
+            }
+            assert.gt(expectedVal,
+                      stats[fieldName],
+                      `Stat ${fieldName} value ${stats[fieldName]} exceeded the target`);
+            return false;
+        };
+        let stats;
+        assert.soon(() => {
+            stats = this.getTenantMigrationStats(node);
+            if (check(currentMigrationsDonating, stats, "currentMigrationsDonating") &&
+                check(currentMigrationsReceiving, stats, "currentMigrationsReceiving") &&
+                check(
+                    totalSuccessfulMigrationsDonated, stats, "totalSuccessfulMigrationsDonated") &&
+                check(totalSuccessfulMigrationsReceived,
+                      stats,
+                      "totalSuccessfulMigrationsReceived") &&
+                check(totalFailedMigrationsDonated, stats, "totalFailedMigrationsDonated") &&
+                check(totalFailedMigrationsReceived, stats, "totalFailedMigrationsReceived")) {
+                return true;  // Done.
+            }
+            return false;
+        }, `Awaiting for tenant migration stats to reach target, got ${tojson(stats)}`);
     };
 
     /**

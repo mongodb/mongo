@@ -1275,6 +1275,21 @@ env.Library(
 )
 
 env.Library(
+    target='tenant_migration_statistics',
+    source=[
+        "tenant_migration_statistics.cpp",
+        "tenant_migration_server_status_section.cpp",
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/commands/server_status',
+        "repl_server_parameters",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/base",
+    ],
+)
+
+env.Library(
     target='tenant_migration_utils',
     source=[
         "tenant_migration_util.cpp",
@@ -1306,6 +1321,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/vector_clock_mutable',
         'primary_only_service',
         'tenant_migration_access_blocker',
+        'tenant_migration_statistics',
         'tenant_migration_utils',
     ],
     LIBDEPS_PRIVATE=[
@@ -1367,6 +1383,7 @@ env.Library(
         '$BUILD_DIR/mongo/client/fetcher',
         'primary_only_service',
         'tenant_migration_access_blocker',
+        'tenant_migration_statistics',
         'tenant_migration_utils',
     ],
     LIBDEPS_PRIVATE=[

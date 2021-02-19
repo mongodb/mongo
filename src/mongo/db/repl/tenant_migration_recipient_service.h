@@ -483,6 +483,12 @@ public:
          */
         void _compareRecipientAndDonorFCV() const;
 
+        /**
+         * Increments either 'totalSuccessfulMigrationsReceived' or 'totalFailedMigrationsReceived'
+         * in TenantMigrationStatistics by examining status and promises.
+         */
+        void _setMigrationStatsOnCompletion(Status completionStatus) const;
+
         mutable Mutex _mutex = MONGO_MAKE_LATCH("TenantMigrationRecipientService::_mutex");
 
         // All member variables are labeled with one of the following codes indicating the
