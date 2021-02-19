@@ -21,6 +21,8 @@ version W.
 - Prohibit a formerly permitted StableCommand parameter value.
 - Remove a field from StableCommand's reply.
 - Change the type of a field in StableCommand's reply, or expand the set of types it may be.
+- Add a new value to a StableCommand reply field's enum-like fixed set of values, e.g. a new index
+  type (unless there's an opt-in mechanism besides API version).
 - Change semantics of StableCommand in a manner that may cause existing applications to misbehave.
 - Change an error code returned in a particular error scenario, if drivers rely on the code.
 - Remove a label L from an error returned in a particular error scenario which had returned an error
