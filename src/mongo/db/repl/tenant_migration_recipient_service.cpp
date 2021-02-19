@@ -309,6 +309,9 @@ boost::optional<BSONObj> TenantMigrationRecipientService::Instance::reportForCur
     bob.append("state", _stateDoc.getState());
     bob.append("dataSyncCompleted", _dataSyncCompletionPromise.getFuture().isReady());
     bob.append("migrationCompleted", _taskCompletionPromise.getFuture().isReady());
+    bob.append("numRestartsDueToDonorConnectionFailure",
+               _stateDoc.getNumRestartsDueToDonorConnectionFailure());
+    bob.append("numRestartsDueToRecipientFailure", _stateDoc.getNumRestartsDueToRecipientFailure());
 
     if (_stateDoc.getStartFetchingDonorOpTime())
         bob.append("startFetchingDonorOpTime", _stateDoc.getStartFetchingDonorOpTime()->toBSON());
@@ -697,12 +700,11 @@ std::vector<HostAndPort> TenantMigrationRecipientService::Instance::_getExcluded
 }
 
 SemiFuture<void> TenantMigrationRecipientService::Instance::_initializeStateDoc(WithLock) {
-    // If the instance state is not 'kUninitialized', then the instance is restarted by step
-    // up. So, skip persisting the state doc. And, PrimaryOnlyService::onStepUp() waits for
-    // majority commit of the primary no-op oplog entry written by the node in the newer
-    // term before scheduling the Instance::run(). So, it's also safe to assume that
-    // instance's state document written in an older term on disk won't get rolled back for
-    // step up case.
+    // If the instance state is not 'kUninitialized', then the instance is restarted by step up. So,
+    // skip persisting the state doc. And, PrimaryOnlyService::onStepUp() waits for majority commit
+    // of the primary no-op oplog entry written by the node in the newer term before scheduling the
+    // Instance::run(). So, it's also safe to assume that instance's state document written in an
+    // older term on disk won't get rolled back for step up case.
     if (_stateDoc.getState() != TenantMigrationRecipientStateEnum::kUninitialized) {
         return SemiFuture<void>::makeReady();
     }
@@ -1584,9 +1586,9 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
           "readPreference"_attr = _readPreference);
 
     pauseBeforeRunTenantMigrationRecipientInstance.pauseWhileSet();
-    // The 'AsyncTry' is run on the cleanup executor as we rely on the 'CancelationToken' to signal
-    // when work should be canceled rather than letting the scoped executor be destroyed on
-    // shutdown/stepdown.
+    // The 'AsyncTry' is run on the cleanup executor as opposed to the scoped executor  as we rely
+    // on the 'PrimaryService' to interrupt the operation contexts based on thread pool and not the
+    // executor.
     return AsyncTry([this, self = shared_from_this(), executor, token] {
                return ExecutorFuture(**executor)
                    .then([this, self = shared_from_this()] {
@@ -1612,7 +1614,7 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                        }
                    })
                    .then([this, self = shared_from_this()] {
-                       stdx::lock_guard lk(_mutex);
+                       stdx::unique_lock lk(_mutex);
                        // Instance task can be started only once for the current term on a primary.
                        invariant(!_taskState.isDone());
                        // If the task state is interrupted, then don't start the task.
@@ -1626,11 +1628,30 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                            _taskState.setState(TaskState::kRunning);
                        }
                        pauseAfterRunTenantMigrationRecipientInstance.pauseWhileSet();
+
+                       if (_stateDoc.getState() !=
+                               TenantMigrationRecipientStateEnum::kUninitialized &&
+                           !_stateDocPersistedPromise.getFuture().isReady() &&
+                           !_stateDoc.getExpireAt()) {
+                           // If our state is initialized and we haven't fulfilled the
+                           // '_stateDocPersistedPromise' yet, it means we are restarting the future
+                           // chain due to recipient failover.
+                           auto opCtx = cc().makeOperationContext();
+                           _stateDoc.setNumRestartsDueToRecipientFailure(
+                               _stateDoc.getNumRestartsDueToRecipientFailure() + 1);
+                           const auto stateDoc = _stateDoc;
+                           lk.unlock();
+                           // Update the state document outside the mutex to avoid a deadlock in the
+                           // case of a concurrent stepdown.
+                           uassertStatusOK(tenantMigrationRecipientEntryHelpers::updateStateDoc(
+                               opCtx.get(), stateDoc));
+                           return SemiFuture<void>::makeReady();
+                       }
                        return _initializeStateDoc(lk);
                    })
                    .then([this, self = shared_from_this()] {
                        if (_stateDocPersistedPromise.getFuture().isReady()) {
-                           // This is a retry of the future chain.
+                           // This is a retry of the future chain due to donor failure.
                            auto opCtx = cc().makeOperationContext();
                            TenantMigrationRecipientDocument stateDoc;
                            {
