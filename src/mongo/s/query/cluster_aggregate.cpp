@@ -197,8 +197,6 @@ void updateHostsTargetedMetrics(OperationContext* opCtx,
 void performAPIVersionChecks(const OperationContext* opCtx,
                              const AggregateCommand& request,
                              const LiteParsedPipeline& liteParsedPipeline) {
-    invariant(opCtx);
-
     liteParsedPipeline.validatePipelineStagesforAPIVersion(opCtx);
     aggregation_request_helper::validateRequestForAPIVersion(opCtx, request);
 }
