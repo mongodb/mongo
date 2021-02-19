@@ -9584,6 +9584,7 @@ buildvariants:
         --mongodSetParameters="{
             featureFlagToaster: true,
             featureFlagSpoon: true,
+            featureFlagAuthorizationContract: true,
             featureFlagImprovedAuditing: true,
             featureFlagTimeseriesCollection: true,
             featureFlagShardingFullDDLSupport: true,
@@ -9688,6 +9689,7 @@ buildvariants:
         --mongodSetParameters="{
             featureFlagToaster: true,
             featureFlagSpoon: true,
+            featureFlagAuthorizationContract: true,
             featureFlagImprovedAuditing: true,
             featureFlagTimeseriesCollection: true,
             featureFlagShardingFullDDLSupport: true,
@@ -10255,6 +10257,7 @@ buildvariants:
         --mongodSetParameters="{
             featureFlagToaster: true,
             featureFlagSpoon: true,
+            featureFlagAuthorizationContract: true,
             featureFlagTenantMigrations: true,
             featureFlagImprovedAuditing: true,
             featureFlagTimeseriesCollection: true,
@@ -11525,6 +11528,7 @@ buildvariants:
         --mongodSetParameters="{
             featureFlagToaster: true,
             featureFlagSpoon: true,
+            featureFlagAuthorizationContract: true,
             featureFlagTenantMigrations: true,
             featureFlagImprovedAuditing: true,
             featureFlagTimeseriesCollection: true,
@@ -12290,6 +12294,7 @@ buildvariants:
         --mongodSetParameters="{
             featureFlagToaster: true,
             featureFlagSpoon: true,
+            featureFlagAuthorizationContract: true,
             featureFlagTenantMigrations: true,
             featureFlagImprovedAuditing: true,
             featureFlagTimeseriesCollection: true,
@@ -12458,6 +12463,7 @@ buildvariants:
         --mongodSetParameters="{
             featureFlagToaster: true,
             featureFlagSpoon: true,
+            featureFlagAuthorizationContract: true,
             featureFlagTenantMigrations: true,
             featureFlagImprovedAuditing: true,
             featureFlagTimeseriesCollection: true,
@@ -12570,6 +12576,7 @@ buildvariants:
         --mongodSetParameters="{
             featureFlagToaster: true,
             featureFlagSpoon: true,
+            featureFlagAuthorizationContract: true,
             featureFlagTenantMigrations: true,
             featureFlagImprovedAuditing: true,
             featureFlagTimeseriesCollection: true,

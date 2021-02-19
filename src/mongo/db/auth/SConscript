@@ -141,6 +141,7 @@ env.Library(
 env.Library(
     target='auth_impl_internal',
     source=[
+        'authorization_contract.idl',
         'authorization_manager_impl.cpp',
         'authorization_session_impl.cpp',
         'authz_manager_external_state.cpp',
@@ -155,6 +156,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/db/global_settings',
         '$BUILD_DIR/mongo/db/namespace_string',
+        '$BUILD_DIR/mongo/idl/feature_flag',
         '$BUILD_DIR/mongo/util/concurrency/thread_pool',
         '$BUILD_DIR/mongo/util/icu',
         '$BUILD_DIR/mongo/util/net/ssl_manager',
