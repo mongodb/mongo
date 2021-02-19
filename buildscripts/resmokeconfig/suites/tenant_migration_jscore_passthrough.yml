@@ -175,11 +175,6 @@ executor:
       # Each entry is for a different replica set's extra mongod options.
       - tlsCertificateKeyFile: jstests/libs/rs0.pem
       - tlsCertificateKeyFile: jstests/libs/rs1.pem
-      - tlsCertificateKeyFile: jstests/libs/rs2.pem
-    # Tenant migration garbage collection is expected to take at least one second since
-    # ttlMonitorSleepSecs is set to 1 (lowest possible value). Using three replica sets allow us
-    # to run more migrations during tests that less than one second to complete since we don't need
-    # to wait for the garbage collection right way in the first round of migrations.
-    num_replica_sets: 3
+    num_replica_sets: 2
     num_nodes_per_replica_set: 3
     use_replica_set_connection_string: true

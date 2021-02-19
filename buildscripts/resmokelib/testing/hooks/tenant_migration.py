@@ -111,6 +111,11 @@ class TenantMigrationLifeCycle(object):
             self.__test_state = self._TEST_FINISHED_STATE
             self.__cond.notify_all()
 
+    def is_test_finished(self):
+        """Return true if the current test has finished."""
+        with self.__lock:
+            return self.__test_state == self._TEST_FINISHED_STATE
+
     def stop(self):
         """Signal to the tenant migration thread that it should exit.
 
@@ -216,11 +221,6 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
         self._is_idle_evt = threading.Event()
         self._is_idle_evt.set()
 
-        # Mapping from each ReplicaSetFixture in '_tenant_migration_fixture' to the
-        # _TenantMigrationOptions for the last outgoing (not garbage-collected) migration on
-        # that replica set if there is one.
-        self._active_outgoing_migrations = {}
-
     def run(self):
         """Execute the thread."""
         if not self._tenant_migration_fixture:
@@ -301,9 +301,6 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
 
     def resume(self):
         """Resume the thread before test."""
-        # Garbage collect migrations on all replica sets so that commands in the test don't get
-        # routed incorrectly.
-        self._garbage_collect_outgoing_migrations(self._tenant_migration_fixture.get_replsets())
         self.__lifecycle.mark_test_started()
 
     def _wait(self, timeout):
@@ -324,10 +321,8 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
         return _TenantMigrationOptions(donor_rs, recipient_rs, self._tenant_id, read_preference)
 
     def _run_migration(self, migration_opts):  # noqa: D205,D400
-        """Run donorStartMigration to start a tenant migration based on 'migration_opts',
-        wait for the migration decision, and then add the 'migration_opts' for the migration to the
-        '_active_outgoing_migrations' map. Returns true if the migration commits and false
-        otherwise.
+        """Run donorStartMigration to start a tenant migration based on 'migration_opts', wait for
+        the migration decision. Returns true if the migration commits and false otherwise.
         """
         donor_primary = migration_opts.get_donor_primary()
         donor_primary_client = donor_primary.mongo_client()
@@ -356,15 +351,6 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
 
         try:
             # Clean up any orphaned tenant databases on the recipient allow next migration to start.
-            # Since writes against migrated tenant databases are blocked until the migration is
-            # garbage collected, we need to garbage collect last outgoing migration on the recipient
-            # before doing dropDatabase. To avoid routing commands in each test incorrectly, wait
-            # for the recipient/proxy to reroute at least one command before doing garbage
-            # collection.
-            if migration_opts.recipient_rs in self._active_outgoing_migrations:
-                self._wait_for_reroute(
-                    self._active_outgoing_migrations[migration_opts.recipient_rs])
-                self._garbage_collect_outgoing_migrations([migration_opts.recipient_rs])
             self._drop_tenant_databases(migration_opts.recipient_rs)
 
             while True:
@@ -392,16 +378,14 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
 
                 time.sleep(_TenantMigrationThread.MIGRATION_STATE_POLL_INTERVAL_SECS)
 
-            self._active_outgoing_migrations[migration_opts.donor_rs] = migration_opts
-
-            # If the migration aborted, garbage collect it immediately. Otherwise, to avoid routing
-            # commands in each test incorrectly, do not garbage collect this migration until the
-            # donor/proxy has rerouted at least one command (or until the next test is about to
-            # start). To avoid waiting for that, do not garbage collect until we need to (i.e. when
-            # we are about to start an incoming migration on this donor in the next cycle, see
-            # above).
-            if not is_committed:
-                self._garbage_collect_outgoing_migrations([migration_opts.donor_rs])
+            # Garbage collect the migration.
+            if is_committed:
+                # If the migration committed, to avoid routing commands incorrectly, wait for the
+                # donor/proxy to reroute at least one command before doing garbage collection. Stop
+                # waiting when the test finishes.
+                self._wait_for_reroute_or_test_completion(migration_opts)
+            self._forget_migration(migration_opts)
+            self._wait_for_migration_garbage_collection(migration_opts)
 
             return is_committed
         except pymongo.errors.PyMongoError:
@@ -437,27 +421,6 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
                 migration_opts.get_donor_name())
             raise
 
-    def _garbage_collect_outgoing_migrations(self, replsets):  # noqa: D205,D400
-        """Run donorForgetMigration against every replica set in 'replsets' that has an active
-        outgoing migration as stored in the '_active_outgoing_migrations' map, and delete the entry
-        from the map after the migration has been garbage collected.
-        """
-        self.logger.info("Garbage collecting migrations on replica sets: " + ", ".join(
-            "'{}'".format(rs.replset_name) for rs in replsets))
-
-        # Wait for garbage collection after running donorForgetMigration on all replica sets to
-        # save time.
-        for rs in replsets:
-            if rs not in self._active_outgoing_migrations:
-                # Last active migration has already been garbage collected.
-                continue
-            self._forget_migration(self._active_outgoing_migrations[rs])
-        for rs in replsets:
-            if rs not in self._active_outgoing_migrations:
-                continue
-            self._wait_for_migration_garbage_collection(self._active_outgoing_migrations[rs])
-            del self._active_outgoing_migrations[rs]
-
     def _wait_for_migration_garbage_collection(self, migration_opts):  # noqa: D205,D400
         """Wait until the persisted state for migration denoted by 'migration_opts' has been
         garbage collected on both the donor and recipient.
@@ -490,12 +453,15 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
                 migration_opts.get_donor_name(), migration_opts.get_recipient_name())
             raise
 
-    def _wait_for_reroute(self, migration_opts):
+    def _wait_for_reroute_or_test_completion(self, migration_opts):
         self.logger.info(
             "Waiting for donor replica set '%s' for migration '%s' to reroute at least one " +
-            "conflicting command", migration_opts.get_donor_name(), migration_opts.migration_id)
+            "conflicting command. Stop waiting when the test finishes.",
+            migration_opts.get_donor_name(), migration_opts.migration_id)
 
-        while True:
+        start_time = time.time()
+
+        while not self.__lifecycle.is_test_finished():
             donor_primary = migration_opts.get_donor_primary()
             donor_primary_client = donor_primary.mongo_client()
 
@@ -505,9 +471,11 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
                 if doc is not None:
                     return
             except pymongo.errors.PyMongoError:
+                end_time = time.time()
                 self.logger.exception(
-                    "Error running find command on donor primary on port %d of replica set '%s'.",
-                    donor_primary.port, migration_opts.get_donor_name())
+                    "Error running find command on donor primary on port %d of replica set '%s' " +
+                    "after waiting for reroute for %0d ms", donor_primary.port,
+                    migration_opts.get_donor_name(), (end_time - start_time) * 1000)
                 raise
 
             time.sleep(_TenantMigrationThread.MIGRATION_STATE_POLL_INTERVAL_SECS)
