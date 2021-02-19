@@ -77,6 +77,10 @@ jsTest.log("Test dropping unsharded database");
     // Drop the database
     assert.commandWorked(db.dropDatabase());
     assertDatabaseDropped(db.getName());
+
+    // Test drop database idempotency
+    assert.commandWorked(db.dropDatabase());
+    assertDatabaseDropped(db.getName());
 }
 
 jsTest.log("Test dropping unsharded database with multiple collections");
@@ -100,6 +104,10 @@ jsTest.log("Test dropping sharded database");
     st.s.adminCommand({enableSharding: db.getName()});
     assertDatabaseExists(db.getName());
     // Drop the database
+    assert.commandWorked(db.dropDatabase());
+    assertDatabaseDropped(db.getName());
+
+    // Test drop database idempotency
     assert.commandWorked(db.dropDatabase());
     assertDatabaseDropped(db.getName());
 }

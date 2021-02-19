@@ -37,6 +37,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/s/drop_database_coordinator.h"
 #include "mongo/db/s/drop_database_legacy.h"
+#include "mongo/db/s/sharding_ddl_coordinator_service.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
@@ -78,30 +79,30 @@ public:
 
             const auto dbName = request().getDbName();
 
-            bool useNewPath = [&] {
-                return feature_flags::gShardingFullDDLSupport.isEnabled(
-                           serverGlobalParams.featureCompatibility) &&
-                    !feature_flags::gDisableIncompleteShardingDDLSupport.isEnabled(
-                        serverGlobalParams.featureCompatibility);
-            }();
+            const auto useNewPath = feature_flags::gShardingFullDDLSupport.isEnabled(
+                serverGlobalParams.featureCompatibility);
 
             if (!useNewPath) {
                 LOGV2_DEBUG(
-                    5281110, 1, "Running legacy drop database procedure", "database"_attr = dbName);
+                    5281110, 1, "Running legacy drop database procedure", "db"_attr = dbName);
                 dropDatabaseLegacy(opCtx, dbName);
                 return;
             }
 
-            LOGV2_DEBUG(
-                5281111, 1, "Running new drop database procedure", "database"_attr = dbName);
+            LOGV2_DEBUG(5281111, 1, "Running new drop database procedure", "db"_attr = dbName);
 
             // Since this operation is not directly writing locally we need to force its db
             // profile level increase in order to be logged in "<db>.system.profile"
             CurOp::get(opCtx)->raiseDbProfileLevel(
                 CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(dbName));
 
-            auto dropDatabaseCoordinator = std::make_shared<DropDatabaseCoordinator>(opCtx, dbName);
-            dropDatabaseCoordinator->run(opCtx).get();
+            auto coordinatorDoc = DropDatabaseCoordinatorDocument();
+            coordinatorDoc.setShardingDDLCoordinatorMetadata(
+                {{ns(), DDLCoordinatorTypeEnum::kDropDatabase}});
+            auto service = ShardingDDLCoordinatorService::getService(opCtx);
+            auto dropDatabaseCoordinator = checked_pointer_cast<DropDatabaseCoordinator>(
+                service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON()));
+            dropDatabaseCoordinator->getCompletionFuture().get(opCtx);
         }
 
     private:

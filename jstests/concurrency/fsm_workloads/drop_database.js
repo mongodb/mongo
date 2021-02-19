@@ -4,6 +4,11 @@
  * drop_database.js
  *
  * Repeatedly creates and drops a database.
+ *
+ * @tags: [
+ *   # SERVER-54587 create collection does not support stepdowns
+ *   does_not_support_stepdowns,
+ * ]
  */
 var $config = (function() {
     var states = {

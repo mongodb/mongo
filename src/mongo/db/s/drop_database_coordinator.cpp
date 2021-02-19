@@ -32,46 +32,41 @@
 #include "mongo/db/s/drop_database_coordinator.h"
 
 #include "mongo/db/api_parameters.h"
-#include "mongo/db/catalog_raii.h"
-#include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/s/database_sharding_state.h"
-#include "mongo/db/s/dist_lock_manager.h"
-#include "mongo/db/s/drop_collection_coordinator.h"
+#include "mongo/db/persistent_task_store.h"
 #include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
-#include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
-#include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace {
 
-void sendCommandToAllShards(OperationContext* opCtx,
-                            StringData dbName,
-                            StringData cmdName,
-                            BSONObj cmd,
-                            const std::vector<ShardId>& participants) {
-    auto* const shardRegistry = Grid::get(opCtx)->shardRegistry();
-    for (const auto& shardId : participants) {
-        const auto& shard = uassertStatusOK(shardRegistry->getShard(opCtx, shardId));
+void dropShardedCollection(OperationContext* opCtx,
+                           const CollectionType& coll,
+                           std::shared_ptr<executor::ScopedTaskExecutor> executor) {
+    sharding_ddl_util::removeCollMetadataFromConfig(opCtx, coll);
 
-        const auto swDropResult = shard->runCommandWithFixedRetryAttempts(
-            opCtx,
-            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            dbName.toString(),
-            CommandHelpers::appendMajorityWriteConcern(cmd),
-            Shard::RetryPolicy::kIdempotent);
+    const auto primaryShardId = ShardingState::get(opCtx)->shardId();
+    const ShardsvrDropCollectionParticipant dropCollectionParticipant(coll.getNss());
+    const auto cmdObj =
+        CommandHelpers::appendMajorityWriteConcern(dropCollectionParticipant.toBSON({}));
 
-        uassertStatusOKWithContext(
-            Shard::CommandResponse::getEffectiveStatus(std::move(swDropResult)),
-            str::stream() << "Error processing " << cmdName << " on shard " << shardId);
-    }
+    // The collection needs to be dropped first on the db primary shard
+    // because otherwise changestreams won't receive the drop event.
+    sharding_ddl_util::sendAuthenticatedCommandToShards(
+        opCtx, coll.getNss().db(), cmdObj, {primaryShardId}, **executor);
+
+    // We need to send the drop to all the shards because both movePrimary and
+    // moveChunk leave garbage behind for sharded collections.
+    auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
+    // Remove prumary shard from participants
+    participants.erase(std::remove(participants.begin(), participants.end(), primaryShardId),
+                       participants.end());
+    sharding_ddl_util::sendAuthenticatedCommandToShards(
+        opCtx, coll.getNss().db(), cmdObj, participants, **executor);
 }
 
 void removeDatabaseMetadataFromConfig(OperationContext* opCtx, StringData dbName) {
@@ -96,85 +91,184 @@ void removeDatabaseMetadataFromConfig(OperationContext* opCtx, StringData dbName
 
 }  // namespace
 
-DropDatabaseCoordinator::DropDatabaseCoordinator(OperationContext* opCtx, StringData dbName)
-    : ShardingDDLCoordinator_NORESILIENT(opCtx, {dbName, ""}),
-      _serviceContext(opCtx->getServiceContext()) {}
+DropDatabaseCoordinator::DropDatabaseCoordinator(const BSONObj& initialState)
+    : ShardingDDLCoordinator(initialState),
+      _doc(DropDatabaseCoordinatorDocument::parse(
+          IDLParserErrorContext("DropDatabaseCoordinatorDocument"), initialState)),
+      _dbName(nss().db()) {}
 
-SemiFuture<void> DropDatabaseCoordinator::runImpl(
-    std::shared_ptr<executor::TaskExecutor> executor) {
-    return ExecutorFuture<void>(executor, Status::OK())
-        .then([this, anchor = shared_from_this()]() {
-            ThreadClient tc{"DropDatabaseCoordinator", _serviceContext};
-            auto opCtxHolder = tc->makeOperationContext();
-            auto* opCtx = opCtxHolder.get();
-            _forwardableOpMetadata.setOn(opCtx);
+boost::optional<BSONObj> DropDatabaseCoordinator::reportForCurrentOp(
+    MongoProcessInterface::CurrentOpConnectionsMode connMode,
+    MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept {
+    BSONObjBuilder cmdBob;
+    if (const auto& optComment = getForwardableOpMetadata().getComment()) {
+        cmdBob.append(optComment.get().firstElement());
+    }
+    BSONObjBuilder bob;
+    bob.append("type", "op");
+    bob.append("desc", "DropDatabaseCoordinator");
+    bob.append("op", "command");
+    bob.append("ns", nss().toString());
+    bob.append("command", cmdBob.obj());
+    bob.append("currentPhase", _doc.getPhase());
+    bob.append("active", true);
+    return bob.obj();
+}
 
-            const auto dbName = _nss.db();
-            auto distLockManager = DistLockManager::get(_serviceContext);
-            const auto dbDistLock = uassertStatusOK(distLockManager->lock(
-                opCtx, dbName, "DropDatabase", DistLockManager::kDefaultLockTimeout));
+void DropDatabaseCoordinator::_insertStateDocument(OperationContext* opCtx, StateDoc&& doc) {
+    auto coorMetadata = doc.getShardingDDLCoordinatorMetadata();
+    coorMetadata.setRecoveredFromDisk(true);
+    doc.setShardingDDLCoordinatorMetadata(coorMetadata);
 
-            // Drop all collections under this DB
-            auto const catalogClient = Grid::get(opCtx)->catalogClient();
-            const auto allCollectionsForDb = catalogClient->getCollections(
-                opCtx, dbName, repl::ReadConcernLevel::kMajorityReadConcern);
+    PersistentTaskStore<StateDoc> store(NamespaceString::kShardingDDLCoordinatorsNamespace);
+    store.add(opCtx, doc, WriteConcerns::kMajorityWriteConcern);
+    _doc = std::move(doc);
+}
 
-            for (const auto& coll : allCollectionsForDb) {
-                if (coll.getDropped()) {
-                    continue;
+void DropDatabaseCoordinator::_updateStateDocument(OperationContext* opCtx, StateDoc&& newDoc) {
+    PersistentTaskStore<StateDoc> store(NamespaceString::kShardingDDLCoordinatorsNamespace);
+    store.update(opCtx,
+                 BSON(StateDoc::kIdFieldName << _doc.getId().toBSON()),
+                 newDoc.toBSON(),
+                 WriteConcerns::kMajorityWriteConcern);
+
+    _doc = std::move(newDoc);
+}
+
+void DropDatabaseCoordinator::_enterPhase(Phase newPhase) {
+    StateDoc newDoc(_doc);
+    newDoc.setPhase(newPhase);
+
+    LOGV2_DEBUG(5494501,
+                2,
+                "Drop database coordinator phase transition",
+                "namespace"_attr = nss(),
+                "newPhase"_attr = DropDatabaseCoordinatorPhase_serializer(newDoc.getPhase()),
+                "oldPhase"_attr = DropDatabaseCoordinatorPhase_serializer(_doc.getPhase()));
+
+    auto opCtx = cc().makeOperationContext();
+    if (_doc.getPhase() == Phase::kUnset) {
+        _insertStateDocument(opCtx.get(), std::move(newDoc));
+        return;
+    }
+    _updateStateDocument(opCtx.get(), std::move(newDoc));
+}
+
+void DropDatabaseCoordinator::_removeStateDocument() {
+    auto opCtx = cc().makeOperationContext();
+    PersistentTaskStore<StateDoc> store(NamespaceString::kShardingDDLCoordinatorsNamespace);
+    LOGV2_DEBUG(
+        5549402, 2, "Removing state document for drop database coordinator", "db"_attr = _dbName);
+    store.remove(opCtx.get(),
+                 BSON(StateDoc::kIdFieldName << _doc.getId().toBSON()),
+                 WriteConcerns::kMajorityWriteConcern);
+
+    _doc = {};
+}
+
+ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
+    std::shared_ptr<executor::ScopedTaskExecutor> executor,
+    const CancelationToken& token) noexcept {
+    return ExecutorFuture<void>(**executor)
+        .then(_executePhase(
+            Phase::kDrop,
+            [this, executor = executor, anchor = shared_from_this()] {
+                auto opCtxHolder = cc().makeOperationContext();
+                auto* opCtx = opCtxHolder.get();
+                getForwardableOpMetadata().setOn(opCtx);
+
+                if (_doc.getCollInfo()) {
+                    const auto& coll = _doc.getCollInfo().get();
+                    LOGV2_DEBUG(5494504,
+                                2,
+                                "Completing collection drop from previous primary",
+                                "namespace"_attr = coll.getNss());
+                    dropShardedCollection(opCtx, coll, executor);
                 }
 
-                const auto nss = coll.getNss();
+                // Drop all collections under this DB
+                auto const catalogClient = Grid::get(opCtx)->catalogClient();
+                const auto allCollectionsForDb = catalogClient->getCollections(
+                    opCtx, _dbName, repl::ReadConcernLevel::kMajorityReadConcern);
 
-                // TODO SERVER-53905 to support failovers here we need to store the
-                // current namespace of this loop before to delete it from config server
-                // so that on step-up we will remmeber to resume the drop collection for that
-                // namespace.
-                sharding_ddl_util::removeCollMetadataFromConfig(opCtx, coll);
-                const auto dropCollParticipantCmd = ShardsvrDropCollectionParticipant(nss);
-                auto* const shardRegistry = Grid::get(opCtx)->shardRegistry();
-                sendCommandToAllShards(opCtx,
-                                       dbName,
-                                       ShardsvrDropCollectionParticipant::kCommandName,
-                                       dropCollParticipantCmd.toBSON({}),
-                                       shardRegistry->getAllShardIds(opCtx));
+                for (const auto& coll : allCollectionsForDb) {
+                    const auto& nss = coll.getNss();
+                    LOGV2_DEBUG(5494505, 2, "Dropping collection", "namespace"_attr = nss);
+
+                    sharding_ddl_util::stopMigrations(opCtx, nss);
+
+                    auto newStateDoc = _doc;
+                    newStateDoc.setCollInfo(coll);
+                    _updateStateDocument(opCtx, std::move(newStateDoc));
+
+                    dropShardedCollection(opCtx, coll, executor);
+                }
+
+                const auto primaryShardId = ShardingState::get(opCtx)->shardId();
+                auto dropDatabaseParticipantCmd = ShardsvrDropDatabaseParticipant();
+                dropDatabaseParticipantCmd.setDbName(_dbName);
+                const auto cmdObj = CommandHelpers::appendMajorityWriteConcern(
+                    dropDatabaseParticipantCmd.toBSON({}));
+
+                // The database needs to be dropped first on the db primary shard
+                // because otherwise changestreams won't receive the drop event.
+                sharding_ddl_util::sendAuthenticatedCommandToShards(
+                    opCtx, _dbName, cmdObj, {primaryShardId}, **executor);
+
+                const auto allShardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
+                // Remove prumary shard from participants
+                auto participants = allShardIds;
+                participants.erase(
+                    std::remove(participants.begin(), participants.end(), primaryShardId),
+                    participants.end());
+                // Drop DB on all other shards
+                sharding_ddl_util::sendAuthenticatedCommandToShards(
+                    opCtx, _dbName, cmdObj, participants, **executor);
+
+                removeDatabaseMetadataFromConfig(opCtx, _dbName);
+
+                {
+                    // Send _flushDatabaseCacheUpdates to all shards
+                    IgnoreAPIParametersBlock ignoreApiParametersBlock{opCtx};
+                    sharding_ddl_util::sendAuthenticatedCommandToShards(
+                        opCtx,
+                        "admin",
+                        BSON("_flushDatabaseCacheUpdates" << _dbName),
+                        allShardIds,
+                        **executor);
+                }
+            }))
+        .onCompletion([this, anchor = shared_from_this()](const Status& status) {
+            if (!status.isOK() &&
+                (status.isA<ErrorCategory::NotPrimaryError>() ||
+                 status.isA<ErrorCategory::ShutdownError>())) {
+                LOGV2_DEBUG(5494506,
+                            1,
+                            "Drop database coordinator has been interrupted and "
+                            " will continue on the next elected replicaset primary",
+                            "db"_attr = _dbName,
+                            "error"_attr = status);
+                return;
             }
 
-            // Drop the DB itself.
-            // The DistLockManager will prevent to re-create the database before each shard
-            // have actually dropped it locally.
-            removeDatabaseMetadataFromConfig(opCtx, dbName);
+            if (status.isOK()) {
+                LOGV2_DEBUG(5494507, 1, "Database dropped", "db"_attr = _dbName);
+            } else {
+                LOGV2_ERROR(5494508,
+                            "Error running drop database",
+                            "db"_attr = _dbName,
+                            "error"_attr = redact(status));
+            }
 
-            auto dropDatabaseParticipantCmd = ShardsvrDropDatabaseParticipant();
-            dropDatabaseParticipantCmd.setDbName(dbName);
-            // Drop DB first on primary shard
-            const auto primaryShardId = ShardingState::get(opCtx)->shardId();
-            sendCommandToAllShards(opCtx,
-                                   dbName,
-                                   ShardsvrDropDatabaseParticipant::kCommandName,
-                                   dropDatabaseParticipantCmd.toBSON({}),
-                                   {primaryShardId});
+            try {
+                _removeStateDocument();
+            } catch (DBException& ex) {
+                ex.addContext("Failed to remove drop database coordinator state document");
+                throw;
+            }
 
-            auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
-            // Remove prumary shard from participants
-            participants.erase(
-                std::remove(participants.begin(), participants.end(), primaryShardId),
-                participants.end());
-            // Drop DB on all other shards
-            sendCommandToAllShards(opCtx,
-                                   dbName,
-                                   ShardsvrDropDatabaseParticipant::kCommandName,
-                                   dropDatabaseParticipantCmd.toBSON({}),
-                                   participants);
-        })
-        .onError([this, anchor = shared_from_this()](const Status& status) {
-            LOGV2_ERROR(5281131,
-                        "Error running drop database",
-                        "database"_attr = _nss.db(),
-                        "error"_attr = redact(status));
-            return status;
-        })
-        .semi();
+            uassertStatusOK(status);
+        });
 }
 
 }  // namespace mongo

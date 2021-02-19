@@ -20,7 +20,6 @@ selector:
 
   # SERVER-17397 Drops of sharded namespaces may not fully succeed
   - jstests/concurrency/fsm_workloads/create_database.js
-  - jstests/concurrency/fsm_workloads/drop_database.js
 
   # Disabled due to SERVER-33753, '.count() without a predicate can be wrong on sharded
   # collections'. This bug is problematic for these workloads because they assert on count()
