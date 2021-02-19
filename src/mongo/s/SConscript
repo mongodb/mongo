@@ -556,6 +556,7 @@ env.Program(
     AIB_COMPONENT="mongos",
     AIB_COMPONENTS_EXTRA=[
         "core",
+        "default",
         "dist",
         "dist-test",
         "servers",

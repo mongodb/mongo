@@ -331,6 +331,7 @@ if not has_option('noshell') and usemozjs:
         AIB_COMPONENT="mongo",
         AIB_COMPONENTS_EXTRA=[
             "core",
+            "default",
             "dist",
             "dist-test",
             "shell",
