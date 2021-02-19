@@ -34,6 +34,7 @@
 #include <fmt/format.h>
 
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
+#include "mongo/db/s/resharding_util.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_chunk.h"
@@ -59,85 +60,114 @@ const std::vector<RecipientShardEntry>& getParticipants(
 }
 
 /**
- * Generates error an response indicating which participant was found to be in state kError.
- */
-Status generateErrorStatus(WithLock, const DonorShardEntry& donor) {
-    return {ErrorCodes::InternalError,
-            "Donor shard {} is in an error state"_format(donor.getId().toString())};
-}
-Status generateErrorStatus(WithLock, const RecipientShardEntry& recipient) {
-    return {ErrorCodes::InternalError,
-            "Recipient shard {} is in an error state"_format(recipient.getId().toString())};
-}
-
-/**
- * Returns true if the participants all have a (non-error) state greater than or equal to
- * expectedState, false otherwise.
- *
- * If any participant is in state kError, returns an error status.
+ * Returns true if all participants are in a state greater than or equal to the expectedState.
  */
 template <class TState, class TParticipant>
-StatusWith<bool> allParticipantsInStateGTE(WithLock lk,
-                                           TState expectedState,
-                                           const std::vector<TParticipant>& participants) {
-    bool allInStateGTE = true;
+bool allParticipantsInStateGTE(WithLock lk,
+                               TState expectedState,
+                               const std::vector<TParticipant>& participants) {
     for (const auto& shard : participants) {
-        auto state = shard.getState();
-        if (state != expectedState) {
-            if (state == TState::kError) {
-                return generateErrorStatus(lk, shard);
-            }
-
-            if (allInStateGTE) {
-                // Ensure allInStateGTE never goes from false -> true. It's possible that while one
-                // participant has not yet reached the expectedState, another participant is in a
-                // state greater than the expectedState.
-                //
-                // Instead of early returning, continue loop in case another participant reported an
-                // error.
-                allInStateGTE = state > expectedState;
-            }
+        if (shard.getState() < expectedState) {
+            return false;
         }
     }
-    return allInStateGTE;
+    return true;
 }
 
 /**
- * Returns true if the state transition is incomplete and the promise cannot yet be fulfilled. This
- * includes if one or more of the participants report state kError. In the error case, an error is
- * set on the promise.
- *
- * Otherwise returns false and fulfills the promise if it is not already.
+ * Returns whether or not all relevant shards have completed their transitions into the
+ * expectedState. If they have, ensures the promise is fulfilled.
  */
-template <class T>
-bool stateTransitionIncomplete(WithLock lk,
+template <class TState>
+bool stateTransistionsComplete(WithLock lk,
                                SharedPromise<ReshardingCoordinatorDocument>& sp,
-                               T expectedState,
+                               TState expectedState,
                                const ReshardingCoordinatorDocument& updatedStateDoc) {
     if (sp.getFuture().isReady()) {
         // Ensure promise is not fulfilled twice.
-        return false;
-    }
-
-    auto participants = getParticipants(lk, expectedState, updatedStateDoc);
-    auto swAllParticipantsGTE = allParticipantsInStateGTE(lk, expectedState, participants);
-    if (!swAllParticipantsGTE.isOK()) {
-        // By returning true, onReshardingParticipantTransition will not try to fulfill any more of
-        // the promises.
-        // ReshardingCoordinator::run() waits on the promises from the ReshardingCoordinatorObserver
-        // in the same order they're fulfilled by onReshardingParticipantTransition(). If even one
-        // promise in the chain errors, ReshardingCoordinator::run() will jump to onError and not
-        // wait for the remaining promises to be fulfilled.
-        sp.setError(swAllParticipantsGTE.getStatus());
         return true;
     }
 
-    if (swAllParticipantsGTE.getValue()) {
-        // All participants are in a state greater than or equal to expected state.
+    auto participants = getParticipants(lk, expectedState, updatedStateDoc);
+    auto allShardsTransitioned = allParticipantsInStateGTE(lk, expectedState, participants);
+    if (allShardsTransitioned) {
         sp.emplaceValue(updatedStateDoc);
-        return false;
+        return true;
+    }
+    return false;
+}
+
+/**
+ * Appends context regarding the source of the abortReason.
+ */
+template <class TParticipant>
+Status getStatusFromAbortReasonWithShardInfo(const TParticipant& participant,
+                                             StringData participantType) {
+    return getStatusFromAbortReason(participant)
+        .withContext("{} shard {} reached an unrecoverable error"_format(
+            participantType, participant.getId().toString()));
+}
+
+/**
+ * If neither the coordinator nor participants have encountered an unrecoverable error, returns
+ * boost::none.
+ *
+ * Otherwise, returns the abortReason reported by either the coordinator or one of the participants.
+ */
+boost::optional<Status> getAbortReasonIfExists(
+    const ReshardingCoordinatorDocument& updatedStateDoc) {
+    if (updatedStateDoc.getAbortReason()) {
+        // Note: the absence of context specifying which shard the abortReason originates from
+        // implies the abortReason originates from the coordinator.
+        return getStatusFromAbortReason(updatedStateDoc);
+    }
+
+    for (const auto& donorShard : updatedStateDoc.getDonorShards()) {
+        if (donorShard.getState() == DonorStateEnum::kError) {
+            return getStatusFromAbortReasonWithShardInfo(donorShard, "Donor"_sd);
+        }
+    }
+
+    for (const auto& recipientShard : updatedStateDoc.getRecipientShards()) {
+        if (recipientShard.getState() == RecipientStateEnum::kError) {
+            return getStatusFromAbortReasonWithShardInfo(recipientShard, "Recipient"_sd);
+        }
+    }
+
+    return boost::none;
+}
+
+template <class TState, class TParticipant>
+bool allParticipantsDoneWithAbortReason(WithLock lk,
+                                        TState expectedState,
+                                        const std::vector<TParticipant>& participants) {
+    for (const auto& shard : participants) {
+        if (!(shard.getState() == expectedState && shard.getAbortReason().is_initialized())) {
+            return false;
+        }
     }
     return true;
+}
+
+/**
+ * Fulfills allParticipantsDoneAbortingSp if all participants have reported to the coordinator that
+ * they have finished aborting locally.
+ */
+void checkAllParticipantsAborted(WithLock lk,
+                                 SharedPromise<void>& allParticipantsDoneAbortingSp,
+                                 const ReshardingCoordinatorDocument& updatedStateDoc) {
+    if (allParticipantsDoneAbortingSp.getFuture().isReady()) {
+        return;
+    }
+
+    bool allDonorsAborted = allParticipantsDoneWithAbortReason(
+        lk, DonorStateEnum::kDone, updatedStateDoc.getDonorShards());
+    bool allRecipientsAborted = allParticipantsDoneWithAbortReason(
+        lk, RecipientStateEnum::kDone, updatedStateDoc.getRecipientShards());
+
+    if (allDonorsAborted && allRecipientsAborted) {
+        allParticipantsDoneAbortingSp.emplaceValue();
+    }
 }
 
 }  // namespace
@@ -156,41 +186,46 @@ ReshardingCoordinatorObserver::~ReshardingCoordinatorObserver() {
 
 void ReshardingCoordinatorObserver::onReshardingParticipantTransition(
     const ReshardingCoordinatorDocument& updatedStateDoc) {
-
     stdx::lock_guard<Latch> lk(_mutex);
 
-    if (stateTransitionIncomplete(lk,
-                                  _allDonorsReportedMinFetchTimestamp,
-                                  DonorStateEnum::kDonatingInitialData,
-                                  updatedStateDoc)) {
+    if (auto abortReason = getAbortReasonIfExists(updatedStateDoc)) {
+        _onAbortOrStepdown(lk, abortReason.get());
+        checkAllParticipantsAborted(lk, _allParticipantsDoneAborting, updatedStateDoc);
         return;
     }
 
-    if (stateTransitionIncomplete(
+    if (!stateTransistionsComplete(lk,
+                                   _allDonorsReportedMinFetchTimestamp,
+                                   DonorStateEnum::kDonatingInitialData,
+                                   updatedStateDoc)) {
+        return;
+    }
+
+    if (!stateTransistionsComplete(
             lk, _allRecipientsFinishedCloning, RecipientStateEnum::kApplying, updatedStateDoc)) {
         return;
     }
 
-    if (stateTransitionIncomplete(lk,
-                                  _allRecipientsFinishedApplying,
-                                  RecipientStateEnum::kSteadyState,
-                                  updatedStateDoc)) {
+    if (!stateTransistionsComplete(lk,
+                                   _allRecipientsFinishedApplying,
+                                   RecipientStateEnum::kSteadyState,
+                                   updatedStateDoc)) {
         return;
     }
 
-    if (stateTransitionIncomplete(lk,
-                                  _allRecipientsReportedStrictConsistencyTimestamp,
-                                  RecipientStateEnum::kStrictConsistency,
-                                  updatedStateDoc)) {
+    if (!stateTransistionsComplete(lk,
+                                   _allRecipientsReportedStrictConsistencyTimestamp,
+                                   RecipientStateEnum::kStrictConsistency,
+                                   updatedStateDoc)) {
         return;
     }
 
-    if (stateTransitionIncomplete(
+    if (!stateTransistionsComplete(
             lk, _allRecipientsRenamedCollection, RecipientStateEnum::kDone, updatedStateDoc)) {
         return;
     }
 
-    if (stateTransitionIncomplete(
+    if (!stateTransistionsComplete(
             lk, _allDonorsDroppedOriginalCollection, DonorStateEnum::kDone, updatedStateDoc)) {
         return;
     }
@@ -226,9 +261,20 @@ ReshardingCoordinatorObserver::awaitAllRecipientsRenamedCollection() {
     return _allRecipientsRenamedCollection.getFuture();
 }
 
-void ReshardingCoordinatorObserver::interrupt(Status status) {
-    stdx::lock_guard<Latch> lg(_mutex);
+SharedSemiFuture<void> ReshardingCoordinatorObserver::awaitAllParticipantsDoneAborting() {
+    return _allParticipantsDoneAborting.getFuture();
+}
 
+void ReshardingCoordinatorObserver::interrupt(Status status) {
+    stdx::lock_guard<Latch> lk(_mutex);
+    _onAbortOrStepdown(lk, status);
+
+    if (!_allParticipantsDoneAborting.getFuture().isReady()) {
+        _allParticipantsDoneAborting.setError(status);
+    }
+}
+
+void ReshardingCoordinatorObserver::_onAbortOrStepdown(WithLock, Status status) {
     if (!_allDonorsReportedMinFetchTimestamp.getFuture().isReady()) {
         _allDonorsReportedMinFetchTimestamp.setError(status);
     }

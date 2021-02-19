@@ -64,6 +64,8 @@ var ReshardingTest = class {
         /** @private */
         this._pauseCoordinatorBeforeDecisionPersistedFailpoint = undefined;
         /** @private */
+        this._pauseCoordinatorBeforeCompletionFailpoint = undefined;
+        /** @private */
         this._reshardingThread = undefined;
         /** @private */
         this._isReshardingActive = false;
@@ -184,6 +186,8 @@ var ReshardingTest = class {
             configureFailPoint(configPrimary, "reshardingPauseCoordinatorInSteadyState");
         this._pauseCoordinatorBeforeDecisionPersistedFailpoint =
             configureFailPoint(configPrimary, "reshardingPauseCoordinatorBeforeDecisionPersisted");
+        this._pauseCoordinatorBeforeCompletionFailpoint =
+            configureFailPoint(configPrimary, "reshardingPauseCoordinatorBeforeCompletion");
 
         const commandDoneSignal = new CountDownLatch(1);
 
@@ -234,10 +238,13 @@ var ReshardingTest = class {
      * Callers of interruptReshardingThread() will want to set this to ErrorCodes.Interrupted, for
      * example.
      */
-    withReshardingInBackground(
-        {newShardKeyPattern, newChunks},
-        duringReshardingFn = (tempNs) => {},
-        {expectedErrorCode = ErrorCodes.OK, postCheckConsistencyFn = (tempNs) => {}} = {}) {
+    withReshardingInBackground({newShardKeyPattern, newChunks},
+                               duringReshardingFn = (tempNs) => {},
+                               {
+                                   expectedErrorCode = ErrorCodes.OK,
+                                   postCheckConsistencyFn = (tempNs) => {},
+                                   postAbortDecisionPersistedFn = () => {}
+                               } = {}) {
         const commandDoneSignal = this._startReshardingInBackgroundAndAllowCommandFailure(
             {newShardKeyPattern, newChunks}, expectedErrorCode);
 
@@ -249,7 +256,8 @@ var ReshardingTest = class {
 
         this._callFunctionSafely(() => duringReshardingFn(this._tempNs));
         this._checkConsistencyAndPostState(expectedErrorCode,
-                                           () => postCheckConsistencyFn(this._tempNs));
+                                           () => postCheckConsistencyFn(this._tempNs),
+                                           () => postAbortDecisionPersistedFn());
     }
 
     /** @private */
@@ -279,7 +287,8 @@ var ReshardingTest = class {
             fn();
         } catch (duringReshardingError) {
             for (const fp of [this._pauseCoordinatorInSteadyStateFailpoint,
-                              this._pauseCoordinatorBeforeDecisionPersistedFailpoint]) {
+                              this._pauseCoordinatorBeforeDecisionPersistedFailpoint,
+                              this._pauseCoordinatorBeforeCompletionFailpoint]) {
                 try {
                     fp.off();
                 } catch (disableFailpointError) {
@@ -321,7 +330,9 @@ var ReshardingTest = class {
     }
 
     /** @private */
-    _checkConsistencyAndPostState(expectedErrorCode, postCheckConsistencyFn = () => {}) {
+    _checkConsistencyAndPostState(expectedErrorCode,
+                                  postCheckConsistencyFn = () => {},
+                                  postAbortDecisionPersistedFn = () => {}) {
         if (expectedErrorCode === ErrorCodes.OK) {
             this._callFunctionSafely(() => {
                 // We use the reshardingPauseCoordinatorInSteadyState failpoint so that any
@@ -340,11 +351,14 @@ var ReshardingTest = class {
                 postCheckConsistencyFn();
 
                 this._pauseCoordinatorBeforeDecisionPersistedFailpoint.off();
+                this._pauseCoordinatorBeforeCompletionFailpoint.off();
             });
         } else {
             this._callFunctionSafely(() => {
                 this._pauseCoordinatorInSteadyStateFailpoint.off();
                 this._pauseCoordinatorBeforeDecisionPersistedFailpoint.off();
+                postAbortDecisionPersistedFn();
+                this._pauseCoordinatorBeforeCompletionFailpoint.off();
             });
         }
 

@@ -62,6 +62,7 @@ using namespace fmt::literals;
 
 MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorInSteadyState);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforeDecisionPersisted);
+MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforeCompletion)
 
 void assertNumDocsModifiedMatchesExpected(const BatchedCommandRequest& request,
                                           const BSONObj& response,
@@ -502,7 +503,7 @@ stdx::unordered_map<CoordinatorStateEnum, ParticipantsToNotifyEnum> notifyForSta
     {CoordinatorStateEnum::kMirroring, ParticipantsToNotifyEnum::kDonors},
     {CoordinatorStateEnum::kDecisionPersisted, ParticipantsToNotifyEnum::kNone},
     {CoordinatorStateEnum::kDone, ParticipantsToNotifyEnum::kNone},
-    {CoordinatorStateEnum::kError, ParticipantsToNotifyEnum::kNone},
+    {CoordinatorStateEnum::kError, ParticipantsToNotifyEnum::kDonors},
 };
 
 /**
@@ -787,9 +788,7 @@ void writeStateTransitionAndCatalogUpdatesThenBumpShardVersions(
     // Run updates to config.reshardingOperations and config.collections in a transaction
     auto nextState = coordinatorDoc.getState();
     invariant(notifyForStateTransition.find(nextState) != notifyForStateTransition.end());
-    // TODO SERVER-51800 Remove special casing for kError.
-    invariant(nextState == CoordinatorStateEnum::kError ||
-                  notifyForStateTransition[nextState] != ParticipantsToNotifyEnum::kNone,
+    invariant(notifyForStateTransition[nextState] != ParticipantsToNotifyEnum::kNone,
               "failed to write state transition with nextState {}"_format(
                   CoordinatorState_serializer(nextState)));
 
@@ -812,13 +811,6 @@ void writeStateTransitionAndCatalogUpdatesThenBumpShardVersions(
                 opCtx, coordinatorDoc, boost::none, boost::none, txnNumber);
         }
     };
-
-    // TODO SERVER-51800 Remove special casing for kError.
-    if (nextState == CoordinatorStateEnum::kError) {
-        executeStateTransitionAndMetadataChangesInTxn(
-            opCtx, coordinatorDoc, std::move(changeMetadataFunc));
-        return;
-    }
 
     bumpShardVersionsThenExecuteStateTransitionAndMetadataChangesInTxn(
         opCtx, coordinatorDoc, std::move(changeMetadataFunc));
@@ -957,7 +949,7 @@ SemiFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::run(
             // keep 'this' pointer alive for the remaining callbacks.
             return _awaitAllParticipantShardsRenamedOrDroppedOriginalCollection(executor);
         })
-        .onError([this, self = shared_from_this(), executor](Status status) {
+        .onError([this, self = shared_from_this(), token, executor](Status status) {
             stdx::lock_guard<Latch> lg(_mutex);
             if (_completionPromise.getFuture().isReady()) {
                 // interrupt() was called before we got here.
@@ -975,16 +967,23 @@ SemiFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::run(
             _updateCoordinatorDocStateAndCatalogEntries(
                 CoordinatorStateEnum::kError, _coordinatorDoc, boost::none, status);
 
-            // TODO wait for donors and recipients to abort the operation and clean up state
-            _tellAllRecipientsToRefresh(executor);
             _tellAllParticipantsToRefresh(createFlushRoutingTableCacheUpdatesCommand(nss),
                                           executor);
+
+            // Wait for all participants to acknowledge the operation reached an unrecoverable
+            // error.
+            future_util::withCancelation(
+                _reshardingCoordinatorObserver->awaitAllParticipantsDoneAborting(), token)
+                .get();
 
             return status;
         })
         .onCompletion([this, self = shared_from_this()](Status status) {
             // Notify `ReshardingMetrics` as the operation is now complete for external observers.
             markCompleted(status);
+
+            auto opCtx = cc().makeOperationContext();
+            reshardingPauseCoordinatorBeforeCompletion.pauseWhileSet(opCtx.get());
 
             stdx::lock_guard<Latch> lg(_mutex);
             if (_completionPromise.getFuture().isReady()) {
