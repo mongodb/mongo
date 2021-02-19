@@ -173,13 +173,15 @@ TEST_F(ReplicaSetMonitorFixture, ReplicaSetMonitorCleanup) {
     auto sets = ReplicaSetMonitorManager::get()->getAllSetNames();
     ASSERT_TRUE(std::find(sets.begin(), sets.end(), setName) == sets.end());
 
-    Mutex mutex;
+    auto mutex = MONGO_MAKE_LATCH("ReplicaSetMonitorCleanup");
+    stdx::condition_variable cv;
     bool cleanupInvoked = false;
-    auto rsm =
-        ReplicaSetMonitorManager::get()->getOrCreateMonitor(replSetUri, [&cleanupInvoked, &mutex] {
-            stdx::lock_guard<Latch> lk(mutex);
-            cleanupInvoked = true;
-        });
+    auto rsm = ReplicaSetMonitorManager::get()->getOrCreateMonitor(replSetUri,
+                                                                   [&cleanupInvoked, &mutex, &cv] {
+                                                                       stdx::unique_lock lk(mutex);
+                                                                       cleanupInvoked = true;
+                                                                       cv.notify_one();
+                                                                   });
 
     sets = ReplicaSetMonitorManager::get()->getAllSetNames();
     ASSERT_TRUE(std::find(sets.begin(), sets.end(), setName) != sets.end());
@@ -187,7 +189,8 @@ TEST_F(ReplicaSetMonitorFixture, ReplicaSetMonitorCleanup) {
     shutdownExecutor();
     rsm.reset();
 
-    stdx::lock_guard<Latch> lk(mutex);
+    stdx::unique_lock lk(mutex);
+    cv.wait(lk, [&cleanupInvoked] { return cleanupInvoked; });
     ASSERT_TRUE(cleanupInvoked);
 }
 
