@@ -1484,10 +1484,10 @@ TEST_F(KeyStringBuilderTest, RecordIds) {
 TEST_F(KeyStringBuilderTest, RecordIdStr) {
     const int kSize = 12;
     for (int i = 0; i < kSize; i++) {
-        char buf[kSize];
+        unsigned char buf[kSize];
         memset(buf, 0x80, kSize);
         buf[i] = 0xFE;
-        const RecordId rid = RecordId(buf, kSize);
+        const RecordId rid = RecordId(reinterpret_cast<char*>(buf), kSize);
 
         {  // Test encoding / decoding of single RecordIds
             const KeyString::Builder ks(version, rid);
@@ -1522,9 +1522,9 @@ TEST_F(KeyStringBuilderTest, RecordIdStr) {
         }
 
         for (int j = 0; j < kSize; j++) {
-            char otherBuf[kSize] = {0};
+            unsigned char otherBuf[kSize] = {0};
             otherBuf[j] = 0xFE;
-            RecordId other = RecordId(otherBuf, kSize);
+            RecordId other = RecordId(reinterpret_cast<char*>(otherBuf), kSize);
 
             if (rid == other) {
                 ASSERT_EQ(KeyString::Builder(version, rid), KeyString::Builder(version, other));
