@@ -29,19 +29,53 @@
 
 #pragma once
 
+#include "mongo/db/s/drop_database_coordinator_document_gen.h"
 #include "mongo/db/s/sharding_ddl_coordinator.h"
 
 namespace mongo {
 
-class DropDatabaseCoordinator final : public ShardingDDLCoordinator_NORESILIENT,
-                                      public std::enable_shared_from_this<DropDatabaseCoordinator> {
+class DropDatabaseCoordinator final : public ShardingDDLCoordinator {
 public:
-    DropDatabaseCoordinator(OperationContext* opCtx, StringData dbName);
+    using StateDoc = DropDatabaseCoordinatorDocument;
+    using Phase = DropDatabaseCoordinatorPhaseEnum;
+
+    DropDatabaseCoordinator(const BSONObj& initialState);
+    ~DropDatabaseCoordinator() = default;
+
+    void checkIfOptionsConflict(const BSONObj& doc) const override {}
+
+    boost::optional<BSONObj> reportForCurrentOp(
+        MongoProcessInterface::CurrentOpConnectionsMode connMode,
+        MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept override;
 
 private:
-    SemiFuture<void> runImpl(std::shared_ptr<executor::TaskExecutor> executor) override;
+    ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                                  const CancelationToken& token) noexcept override;
 
-    ServiceContext* _serviceContext;
+    template <typename Func>
+    auto _executePhase(const Phase& newPhase, Func&& func) {
+        return [=] {
+            const auto& currPhase = _doc.getPhase();
+
+            if (currPhase > newPhase) {
+                // Do not execute this phase if we already reached a subsequent one.
+                return;
+            }
+            if (currPhase < newPhase) {
+                // Persist the new phase if this is the first time we are executing it.
+                _enterPhase(newPhase);
+            }
+            return func();
+        };
+    }
+
+    void _insertStateDocument(OperationContext* opCtx, StateDoc&& doc);
+    void _updateStateDocument(OperationContext* opCtx, StateDoc&& newStateDoc);
+    void _removeStateDocument();
+    void _enterPhase(Phase newPhase);
+
+    DropDatabaseCoordinatorDocument _doc;
+    StringData _dbName;
 };
 
 }  // namespace mongo

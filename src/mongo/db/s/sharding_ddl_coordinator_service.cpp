@@ -35,10 +35,12 @@
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/db/s/database_sharding_state.h"
-#include "mongo/db/s/drop_collection_coordinator.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharding_ddl_coordinator.h"
 #include "mongo/logv2/log.h"
+
+#include "mongo/db/s/drop_collection_coordinator.h"
+#include "mongo/db/s/drop_database_coordinator.h"
 
 namespace mongo {
 
@@ -56,6 +58,9 @@ ShardingDDLCoordinatorService::constructInstance(BSONObj initialState) const {
                 "Constructing new sharding DDL coordinator",
                 "coordinatorDoc"_attr = op.toBSON());
     switch (op.getId().getOperationType()) {
+        case DDLCoordinatorTypeEnum::kDropDatabase:
+            return std::make_shared<DropDatabaseCoordinator>(std::move(initialState));
+            break;
         case DDLCoordinatorTypeEnum::kDropCollection:
             return std::make_shared<DropCollectionCoordinator>(std::move(initialState));
             break;

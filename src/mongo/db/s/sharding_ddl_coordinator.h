@@ -79,6 +79,7 @@ public:
     SharedSemiFuture<void> getCompletionFuture() {
         return _completionPromise.getFuture();
     }
+
     const NamespaceString& nss() const {
         return _coorMetadata.getId().getNss();
     }

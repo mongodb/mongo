@@ -42,6 +42,7 @@ enums:
         description: "Type of the sharding DDL Operation."
         type: string
         values:
+            kDropDatabase: "dropDatabase"
             kDropCollection: "dropCollection"
 
 types:

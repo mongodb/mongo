@@ -335,6 +335,7 @@ env.Library(
         'drop_collection_coordinator.cpp',
         'drop_collection_coordinator_document.idl',
         'drop_database_coordinator.cpp',
+        'drop_database_coordinator_document.idl',
         'flush_database_cache_updates_command.cpp',
         'flush_routing_table_cache_updates_command.cpp',
         'get_database_version_command.cpp',
