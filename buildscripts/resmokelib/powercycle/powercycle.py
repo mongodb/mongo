@@ -1241,8 +1241,16 @@ def remote_handler(options, task_config, root_dir):  # pylint: disable=too-many-
                 return ret
             LOGGER.info("Started mongod running on port %d pid %s", options.port, mongod.get_pids())
             mongo = pymongo.MongoClient(**mongo_client_opts)
-            LOGGER.info("Server buildinfo: %s", mongo.admin.command("buildinfo"))
-            LOGGER.info("Server serverStatus: %s", mongo.admin.command("serverStatus"))
+            # Limit retries to a reasonable value
+            for _ in range(100):
+                try:
+                    build_info = mongo.admin.command("buildinfo")
+                    server_status = mongo.admin.command("serverStatus")
+                    break
+                except pymongo.errors.AutoReconnect:
+                    pass
+            LOGGER.info("Server buildinfo: %s", build_info)
+            LOGGER.info("Server serverStatus: %s", server_status)
             if task_config.repl_set:
                 ret = mongo_reconfig_replication(mongo, host_port, task_config.repl_set)
 
