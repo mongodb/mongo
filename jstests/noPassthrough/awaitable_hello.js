@@ -67,12 +67,14 @@ function runTest(db, cmd, logFailpoint) {
 
     // Use a skip of 1, since the parallel shell runs hello when it starts.
     const helloFailpoint = configureFailPoint(db, "waitInHello", {}, {skip: 1});
+    const logFailPoint = configureFailPoint(db, logFailpoint);
     const awaitHello = startParallelShell(funWithArgs(runHelloCommand, cmd, topologyVersionField),
                                           db.getMongo().port);
     helloFailpoint.wait();
     sleep(1000);  // Make the command hang for a second in the parallel shell.
     helloFailpoint.off();
-    const logFailPoint = configureFailPoint(db, logFailpoint);
+
+    // Wait for the parallel shell to finish.
     awaitHello();
 
     // Wait for the command to be logged.
