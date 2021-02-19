@@ -42,10 +42,12 @@ using boost::intrusive_ptr;
 
 REGISTER_DOCUMENT_SOURCE(addFields,
                          LiteParsedDocumentSourceDefault::parse,
-                         DocumentSourceAddFields::createFromBson);
+                         DocumentSourceAddFields::createFromBson,
+                         LiteParsedDocumentSource::AllowedWithApiStrict::kAlways);
 REGISTER_DOCUMENT_SOURCE(set,
                          LiteParsedDocumentSourceDefault::parse,
-                         DocumentSourceAddFields::createFromBson);
+                         DocumentSourceAddFields::createFromBson,
+                         LiteParsedDocumentSource::AllowedWithApiStrict::kAlways);
 
 intrusive_ptr<DocumentSource> DocumentSourceAddFields::create(
     BSONObj addFieldsSpec,

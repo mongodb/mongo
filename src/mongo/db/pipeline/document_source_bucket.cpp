@@ -42,7 +42,8 @@ using std::vector;
 
 REGISTER_DOCUMENT_SOURCE(bucket,
                          LiteParsedDocumentSourceDefault::parse,
-                         DocumentSourceBucket::createFromBson);
+                         DocumentSourceBucket::createFromBson,
+                         LiteParsedDocumentSource::AllowedWithApiStrict::kAlways);
 
 namespace {
 intrusive_ptr<ExpressionConstant> getExpressionConstant(ExpressionContext* const expCtx,

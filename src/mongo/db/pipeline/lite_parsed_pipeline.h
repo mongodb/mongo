@@ -170,27 +170,31 @@ public:
     void tickGlobalStageCounters() const;
 
     /**
-     * Returns true if 'stageName' is in API Version 1.
+     * Performs API versioning validations on the aggregate pipeline stages.
      */
-    static bool isStageInAPIVersion1(const std::string& stageName) {
-        // These stages are excluded from API Version1 with 'apiStrict: true'.
-        static const stdx::unordered_set<std::string> stagesExcluded = {"$collStats",
-                                                                        "$currentOp",
-                                                                        "$indexStats",
-                                                                        "$listLocalSessions",
-                                                                        "$listSessions",
-                                                                        "$planCacheStats",
-                                                                        "$search",
-                                                                        "$searchBeta"};
-
-        return (stagesExcluded.find(stageName) == stagesExcluded.end());
-    }
+    void validatePipelineStagesforAPIVersion(const OperationContext* opCtx) const;
 
     /**
-     * Throws 'APIStrictError' if the pipeline contains the stages which are not in API Version
-     * 'version'.
+     * Validates if 'AggregateCommand' specs complies with API versioning. Throws uassert in case of
+     * any failure.
      */
-    void validatePipelineStagesIfAPIStrict(const std::string& version) const;
+    void validateRequestForAPIVersion(const OperationContext* opCtx,
+                                      const AggregateCommand& request) const;
+
+    /**
+     * Performs validations related to API versioning before running the aggregation command.
+     * Throws uassert if any of the validations fails
+     *     - validation on each stage on the pipeline
+     *     - validation on 'AggregateCommand' request
+     */
+    void performAPIVersionChecks(const OperationContext* opCtx,
+                                 const AggregateCommand& request) const {
+
+        invariant(opCtx);
+
+        validatePipelineStagesforAPIVersion(opCtx);
+        validateRequestForAPIVersion(opCtx, request);
+    }
 
 private:
     std::vector<std::unique_ptr<LiteParsedDocumentSource>> _stageSpecs;

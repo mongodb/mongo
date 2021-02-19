@@ -134,7 +134,6 @@ commands:
                 description: "An optional exchange specification for this request. If set it means that the request represents a producer running as a part of the exchange machinery. This is an internal option; we do not expect it to be set on requests from users or drivers."
                 type: ExchangeSpec
                 optional: true
-                unstable: true
             runtimeConstants:
                 description: "A legacy way to specify constant variables available during execution. 'let' is now preferred."
                 type: LegacyRuntimeConstants

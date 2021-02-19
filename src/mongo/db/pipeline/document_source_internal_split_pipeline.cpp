@@ -35,7 +35,8 @@ namespace mongo {
 
 REGISTER_DOCUMENT_SOURCE(_internalSplitPipeline,
                          LiteParsedDocumentSourceDefault::parse,
-                         DocumentSourceInternalSplitPipeline::createFromBson);
+                         DocumentSourceInternalSplitPipeline::createFromBson,
+                         LiteParsedDocumentSource::AllowedWithApiStrict::kNeverInVersion1);
 
 constexpr StringData DocumentSourceInternalSplitPipeline::kStageName;
 

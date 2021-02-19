@@ -49,7 +49,8 @@ DocumentSourceSkip::DocumentSourceSkip(const intrusive_ptr<ExpressionContext>& p
 
 REGISTER_DOCUMENT_SOURCE(skip,
                          LiteParsedDocumentSourceDefault::parse,
-                         DocumentSourceSkip::createFromBson);
+                         DocumentSourceSkip::createFromBson,
+                         LiteParsedDocumentSource::AllowedWithApiStrict::kAlways);
 
 constexpr StringData DocumentSourceSkip::kStageName;
 

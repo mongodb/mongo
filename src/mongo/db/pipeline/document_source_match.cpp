@@ -57,7 +57,8 @@ using std::vector;
 
 REGISTER_DOCUMENT_SOURCE(match,
                          LiteParsedDocumentSourceDefault::parse,
-                         DocumentSourceMatch::createFromBson);
+                         DocumentSourceMatch::createFromBson,
+                         LiteParsedDocumentSource::AllowedWithApiStrict::kAlways);
 
 const char* DocumentSourceMatch::getSourceName() const {
     return kStageName.rawData();

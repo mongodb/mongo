@@ -48,7 +48,8 @@ DocumentSourceSample::DocumentSourceSample(const intrusive_ptr<ExpressionContext
 
 REGISTER_DOCUMENT_SOURCE(sample,
                          LiteParsedDocumentSourceDefault::parse,
-                         DocumentSourceSample::createFromBson);
+                         DocumentSourceSample::createFromBson,
+                         LiteParsedDocumentSource::AllowedWithApiStrict::kAlways);
 
 DocumentSource::GetNextResult DocumentSourceSample::doGetNext() {
     if (_size == 0)

@@ -46,7 +46,8 @@ constexpr StringData DocumentSourceGeoNear::kKeyFieldName;
 
 REGISTER_DOCUMENT_SOURCE(geoNear,
                          LiteParsedDocumentSourceDefault::parse,
-                         DocumentSourceGeoNear::createFromBson);
+                         DocumentSourceGeoNear::createFromBson,
+                         LiteParsedDocumentSource::AllowedWithApiStrict::kAlways);
 
 Value DocumentSourceGeoNear::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
     MutableDocument result;

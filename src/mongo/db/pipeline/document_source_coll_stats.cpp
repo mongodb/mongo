@@ -43,7 +43,8 @@ namespace mongo {
 
 REGISTER_DOCUMENT_SOURCE(collStats,
                          DocumentSourceCollStats::LiteParsed::parse,
-                         DocumentSourceCollStats::createFromBson);
+                         DocumentSourceCollStats::createFromBson,
+                         LiteParsedDocumentSource::AllowedWithApiStrict::kNeverInVersion1);
 
 const char* DocumentSourceCollStats::getSourceName() const {
     return kStageName.rawData();

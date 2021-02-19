@@ -49,6 +49,7 @@ REGISTER_DOCUMENT_SOURCE_CONDITIONALLY(
     setWindowFields,
     LiteParsedDocumentSourceDefault::parse,
     document_source_set_window_fields::createFromBson,
+    LiteParsedDocumentSource::AllowedWithApiStrict::kAlways,
     boost::none,
     ::mongo::feature_flags::gFeatureFlagWindowFunctions.isEnabledAndIgnoreFCV());
 
@@ -56,6 +57,7 @@ REGISTER_DOCUMENT_SOURCE_CONDITIONALLY(
     _internalSetWindowFields,
     LiteParsedDocumentSourceDefault::parse,
     DocumentSourceInternalSetWindowFields::createFromBson,
+    LiteParsedDocumentSource::AllowedWithApiStrict::kInternal,
     boost::none,
     ::mongo::feature_flags::gFeatureFlagWindowFunctions.isEnabledAndIgnoreFCV());
 

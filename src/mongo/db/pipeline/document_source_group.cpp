@@ -126,7 +126,8 @@ constexpr StringData DocumentSourceGroup::kStageName;
 
 REGISTER_DOCUMENT_SOURCE(group,
                          LiteParsedDocumentSourceDefault::parse,
-                         DocumentSourceGroup::createFromBson);
+                         DocumentSourceGroup::createFromBson,
+                         LiteParsedDocumentSource::AllowedWithApiStrict::kAlways);
 
 const char* DocumentSourceGroup::getSourceName() const {
     return kStageName.rawData();
