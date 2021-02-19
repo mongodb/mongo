@@ -50,6 +50,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/visit_helper.h"
 
 namespace mongo {
 namespace {
@@ -147,23 +148,19 @@ StatusWith<std::vector<std::string>> getIndexNames(OperationContext* opCtx,
     invariant(opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_IX));
 
     return stdx::visit(
-        [&](auto&& arg) -> StatusWith<std::vector<std::string>> {
-            using T = std::decay_t<decltype(arg)>;
-            if constexpr (std::is_same_v<T, std::string>) {
-                return {{arg}};
-            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+        visit_helper::Overloaded{
+            [](const std::string& arg) -> StatusWith<std::vector<std::string>> { return {{arg}}; },
+            [](const std::vector<std::string>& arg) -> StatusWith<std::vector<std::string>> {
                 return arg;
-            } else if constexpr (std::is_same_v<T, BSONObj>) {
+            },
+            [&](const BSONObj& arg) -> StatusWith<std::vector<std::string>> {
                 auto swDescriptor =
                     getDescriptorByKeyPattern(opCtx, collection->getIndexCatalog(), arg);
                 if (!swDescriptor.isOK()) {
                     return swDescriptor.getStatus();
                 }
                 return {{swDescriptor.getValue()->indexName()}};
-            } else {
-                MONGO_UNREACHABLE;
-            }
-        },
+            }},
         index);
 }
 
@@ -328,18 +325,11 @@ DropIndexesReply dropIndexes(OperationContext* opCtx,
               "namespace"_attr = nss,
               "uuid"_attr = collectionUUID,
               "indexes"_attr = stdx::visit(
-                  [](auto&& arg) -> std::string {
-                      using T = std::decay_t<decltype(arg)>;
-                      if constexpr (std::is_same_v<T, std::string>) {
-                          return arg;
-                      } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
-                          return boost::algorithm::join(arg, ",");
-                      } else if constexpr (std::is_same_v<T, BSONObj>) {
-                          return arg.toString();
-                      } else {
-                          MONGO_UNREACHABLE;
-                      }
-                  },
+                  visit_helper::Overloaded{[](const std::string& arg) { return arg; },
+                                           [](const std::vector<std::string>& arg) {
+                                               return boost::algorithm::join(arg, ",");
+                                           },
+                                           [](const BSONObj& arg) { return arg.toString(); }},
                   index));
     }
 
