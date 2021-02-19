@@ -125,13 +125,13 @@ class Document;
 /**
  * Like REGISTER_DOCUMENT_SOURCE, except the parser is only enabled when test-commands are enabled.
  */
-#define REGISTER_TEST_DOCUMENT_SOURCE(key, liteParser, fullParser) \
-    REGISTER_DOCUMENT_SOURCE_CONDITIONALLY(                        \
-        key,                                                       \
-        liteParser,                                                \
-        fullParser,                                                \
-        LiteParsedDocumentSource::AllowedWithApiStrict::kInternal, \
-        boost::none,                                               \
+#define REGISTER_TEST_DOCUMENT_SOURCE(key, liteParser, fullParser)        \
+    REGISTER_DOCUMENT_SOURCE_CONDITIONALLY(                               \
+        key,                                                              \
+        liteParser,                                                       \
+        fullParser,                                                       \
+        LiteParsedDocumentSource::AllowedWithApiStrict::kNeverInVersion1, \
+        boost::none,                                                      \
         ::mongo::getTestCommandsEnabled())
 
 class DocumentSource : public RefCountable {
