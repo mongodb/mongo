@@ -167,5 +167,15 @@ TEST_F(PartitionIteratorTest, EmptyCollectionReturnsEOF) {
     ASSERT_ADVANCE_RESULT(PartitionIterator::AdvanceResult::kEOF, partIter.advance());
 }
 
+TEST_F(PartitionIteratorTest, PartitionByArrayErrs) {
+    const auto docs = std::deque<DocumentSource::GetNextResult>{Document{{"key", 1}},
+                                                                Document{fromjson("{key: [1]}")}};
+    const auto mock = DocumentSourceMock::createForTest(docs, getExpCtx());
+    auto key = ExpressionFieldPath::createPathFromString(
+        getExpCtx().get(), "key", getExpCtx()->variablesParseState);
+    auto partIter = PartitionIterator(getExpCtx().get(), mock.get(), *key);
+    ASSERT_DOCUMENT_EQ(docs[0].getDocument(), *partIter[0]);
+    ASSERT_THROWS_CODE(*partIter[1], AssertionException, ErrorCodes::TypeMismatch);
+}
 }  // namespace
 }  // namespace mongo

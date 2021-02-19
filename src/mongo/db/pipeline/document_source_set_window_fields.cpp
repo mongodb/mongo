@@ -316,6 +316,11 @@ DocumentSource::GetNextResult DocumentSourceInternalSetWindowFields::doGetNext()
         return curStat;
     }
     auto curDoc = curStat.getDocument();
+    if (_partitionBy) {
+        uassert(ErrorCodes::TypeMismatch,
+                "Cannot 'partitionBy' an expression of type array",
+                !_partitionBy->get()->evaluate(curDoc, &pExpCtx->variables).isArray());
+    }
     MutableDocument outDoc(curDoc);
     for (auto& output : _executableOutputs) {
         // Currently only support unbounded windows and run on the merging shard -- we don't need
