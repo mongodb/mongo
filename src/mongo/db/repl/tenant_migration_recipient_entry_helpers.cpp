@@ -103,7 +103,7 @@ Status updateStateDoc(OperationContext* opCtx, const TenantMigrationRecipientDoc
             if (updateResult.numMatched == 0) {
                 return {ErrorCodes::NoSuchKey,
                         str::stream()
-                            << "Existing Tenant Migration State Document not found for id: "
+                            << "Existing tenant migration state document not found for id: "
                             << stateDoc.getId()};
             }
             return Status::OK();
