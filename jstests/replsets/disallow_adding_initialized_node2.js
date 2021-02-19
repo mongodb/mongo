@@ -18,7 +18,8 @@ var replSetA = new ReplSetTest({
     nodes: [
         {rsConfig: {_id: 10}},
         {rsConfig: {_id: 11, priority: 0}},
-    ]
+    ],
+    nodeOptions: {setParameter: {logComponentVerbosity: tojsononeline({replication: 2})}}
 });
 replSetA.startSet({dbpath: "$set-A-$node"});
 replSetA.initiate();
@@ -27,7 +28,8 @@ var replSetB = new ReplSetTest({
     name: name,
     nodes: [
         {rsConfig: {_id: 20}},
-    ]
+    ],
+    nodeOptions: {setParameter: {logComponentVerbosity: tojsononeline({replication: 2})}}
 });
 replSetB.startSet({dbpath: "$set-B-$node"});
 replSetB.initiate();
