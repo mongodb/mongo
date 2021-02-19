@@ -350,9 +350,7 @@ standaloneTest({shardsvr: ""}, 'last-lts');
 replicaSetTest({shardsvr: ""}, 'last-continuous');
 replicaSetTest({shardsvr: ""}, 'last-lts');
 
-// Do tests for standalones and replica sets started with --configsvr.
-standaloneTest({configsvr: ""}, 'last-continuous');
-standaloneTest({configsvr: ""}, 'last-lts');
+// Do tests for replica sets started with --configsvr.
 replicaSetTest({configsvr: ""}, 'last-continuous');
-standaloneTest({configsvr: ""}, 'last-lts');
+replicaSetTest({configsvr: ""}, 'last-lts');
 })();
