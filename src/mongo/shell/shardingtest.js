@@ -474,6 +474,18 @@ var ShardingTest = function(params) {
         });
     };
 
+    this.forEachMongos = function(fn) {
+        this._mongos.forEach(function(conn) {
+            fn(conn);
+        });
+    };
+
+    this.forEachConfigServer = function(fn) {
+        this._configServers.forEach(function(conn) {
+            fn(conn);
+        });
+    };
+
     this.printChangeLog = function() {
         this.config.changelog.find().forEach(function(z) {
             var msg = z.server + "\t" + z.time + "\t" + z.what;

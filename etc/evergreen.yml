@@ -9716,6 +9716,7 @@ buildvariants:
             featureFlagChangeStreamsOptimization: true,
         }"
         --mongosSetParameters="{
+            featureFlagImprovedAuditing: true,
             featureFlagTimeseriesCollection: true,
             featureFlagWindowFunctions: true,
             featureFlagChangeStreamsOptimization: true,
@@ -9821,6 +9822,7 @@ buildvariants:
             featureFlagChangeStreamsOptimization: true,
         }"
         --mongosSetParameters="{
+            featureFlagImprovedAuditing: true,
             featureFlagTimeseriesCollection: true,
             featureFlagWindowFunctions: true,
             featureFlagChangeStreamsOptimization: true,
@@ -10459,6 +10461,7 @@ buildvariants:
             featureFlagChangeStreamsOptimization: true,
         }"
         --mongosSetParameters="{
+            featureFlagImprovedAuditing: true,
             featureFlagTimeseriesCollection: true,
             featureFlagWindowFunctions: true,
             featureFlagChangeStreamsOptimization: true,
@@ -11737,6 +11740,7 @@ buildvariants:
             featureFlagChangeStreamsOptimization: true,
         }"
         --mongosSetParameters="{
+            featureFlagImprovedAuditing: true,
             featureFlagTimeseriesCollection: true,
             featureFlagWindowFunctions: true,
             featureFlagChangeStreamsOptimization: true,
@@ -12508,6 +12512,7 @@ buildvariants:
             featureFlagChangeStreamsOptimization: true,
         }"
         --mongosSetParameters="{
+            featureFlagImprovedAuditing: true,
             featureFlagTimeseriesCollection: true,
             featureFlagWindowFunctions: true,
             featureFlagChangeStreamsOptimization: true,
@@ -12679,6 +12684,7 @@ buildvariants:
             featureFlagChangeStreamsOptimization: true,
         }"
         --mongosSetParameters="{
+            featureFlagImprovedAuditing: true,
             featureFlagTimeseriesCollection: true,
             featureFlagWindowFunctions: true,
             featureFlagChangeStreamsOptimization: true,
@@ -12795,6 +12801,7 @@ buildvariants:
             featureFlagChangeStreamsOptimization: true,
         }"
         --mongosSetParameters="{
+            featureFlagImprovedAuditing: true,
             featureFlagTimeseriesCollection: true,
             featureFlagWindowFunctions: true,
             featureFlagChangeStreamsOptimization: true,
