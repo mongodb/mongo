@@ -104,11 +104,23 @@ public:
     SharedSemiFuture<ReshardingCoordinatorDocument> awaitAllDonorsDroppedOriginalCollection();
 
     /**
+     * Fulfills the '_allParticipantsDoneAborting' promise when the last recipient or donor writes
+     * that it is in 'kDone' with an abortReason.
+     */
+    SharedSemiFuture<void> awaitAllParticipantsDoneAborting();
+
+    /**
      * Sets errors on any promises that have not yet been fulfilled.
      */
     void interrupt(Status status);
 
 private:
+    /**
+     * Does work necessary for both recoverable errors (failover/stepdown) and unrecoverable errors
+     * (abort resharding).
+     */
+    void _onAbortOrStepdown(WithLock, Status status);
+
     // Protects the state below
     Mutex _mutex = MONGO_MAKE_LATCH("ReshardingCoordinatorObserver::_mutex");
 
@@ -126,6 +138,9 @@ private:
      *  {_allRecipientsReportedStrictConsistencyTimestamp, RecipientStateEnum::kStrictConsistency}
      *  {_allRecipientsRenamedCollection, RecipientStateEnum::kDone}
      *  {_allDonorsDroppedOriginalCollection, DonorStateEnum::kDone}
+     *  {_allParticipantsDoneAborting,
+     *                          DonorStateEnum::kDone with abortReason AND
+     *                          RecipientStateEnum::kDone with abortReason}
      */
 
     SharedPromise<ReshardingCoordinatorDocument> _allDonorsReportedMinFetchTimestamp;
@@ -139,6 +154,8 @@ private:
     SharedPromise<ReshardingCoordinatorDocument> _allRecipientsRenamedCollection;
 
     SharedPromise<ReshardingCoordinatorDocument> _allDonorsDroppedOriginalCollection;
+
+    SharedPromise<void> _allParticipantsDoneAborting;
 };
 
 }  // namespace mongo

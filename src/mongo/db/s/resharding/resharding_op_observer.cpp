@@ -49,7 +49,10 @@ std::shared_ptr<ReshardingCoordinatorObserver> getReshardingCoordinatorObserver(
     auto service = registry->lookupServiceByName(kReshardingCoordinatorServiceName);
     auto instance =
         ReshardingCoordinatorService::ReshardingCoordinator::lookup(opCtx, service, reshardingId);
-    invariant(instance);
+
+    iassert(
+        5400001, "ReshardingCoordinatorService instance does not exist", instance.is_initialized());
+
     return (*instance)->getObserver();
 }
 

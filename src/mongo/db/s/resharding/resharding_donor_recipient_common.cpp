@@ -27,11 +27,18 @@
  *    it in the license file.
  */
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
 
 #include <fmt/format.h>
+
+#include "mongo/db/s/sharding_state.h"
+#include "mongo/logv2/log.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
+#include "mongo/s/grid.h"
 
 namespace mongo {
 namespace resharding {
@@ -62,6 +69,76 @@ void createReshardingStateMachine(OperationContext* opCtx, const ReshardingDocum
     StateMachine::getOrCreate(opCtx, service, doc.toBSON());
 }
 
+/**
+ * Acknowledges to the coordinator that all abort work is done on the donor. Since the
+ * ReshardingDonorService doesn't exist, there isn't any work to do.
+ *
+ * TODO SERVER-54704: Remove this method, it should no longer be needed after SERVER-54513 is
+ * completed.
+ */
+void processAbortReasonNoDonorMachine(OperationContext* opCtx,
+                                      const ReshardingFields& reshardingFields,
+                                      const NamespaceString& nss) {
+    {
+        Lock::ResourceLock rstl(
+            opCtx->lockState(), resourceIdReplicationStateTransitionLock, MODE_IX);
+        auto* const replCoord = repl::ReplicationCoordinator::get(opCtx);
+        if (!replCoord->canAcceptWritesFor(opCtx, nss)) {
+            // no-op when node is not primary.
+            return;
+        }
+    }
+
+    auto abortReason = reshardingFields.getAbortReason();
+    auto shardId = ShardingState::get(opCtx)->shardId();
+    BSONObjBuilder updateBuilder;
+    updateBuilder.append("donorShards.$.state", DonorState_serializer(DonorStateEnum::kDone));
+    updateBuilder.append("donorShards.$.abortReason", *abortReason);
+    uassertStatusOK(Grid::get(opCtx)->catalogClient()->updateConfigDocument(
+        opCtx,
+        NamespaceString::kConfigReshardingOperationsNamespace,
+        BSON("_id" << reshardingFields.getUuid() << "donorShards.id" << shardId),
+        BSON("$set" << updateBuilder.done()),
+        false /* upsert */,
+        ShardingCatalogClient::kMajorityWriteConcern));
+}
+
+/**
+ * Acknowledges to the coordinator that all abort work is done on the recipient. Since the
+ * ReshardingRecipientService doesn't exist, there isn't any work to do.
+ *
+ * TODO SERVER-54704: Remove this method, it should no longer be needed after SERVER-54513 is
+ * completed.
+ */
+void processAbortReasonNoRecipientMachine(OperationContext* opCtx,
+                                          const ReshardingFields& reshardingFields,
+                                          const NamespaceString& nss) {
+
+    {
+        Lock::ResourceLock rstl(
+            opCtx->lockState(), resourceIdReplicationStateTransitionLock, MODE_IX);
+        auto* const replCoord = repl::ReplicationCoordinator::get(opCtx);
+        if (!replCoord->canAcceptWritesFor(opCtx, nss)) {
+            // no-op when node is not primary.
+            return;
+        }
+    }
+
+    auto abortReason = reshardingFields.getAbortReason();
+    auto shardId = ShardingState::get(opCtx)->shardId();
+    BSONObjBuilder updateBuilder;
+    updateBuilder.append("recipientShards.$.state",
+                         RecipientState_serializer(RecipientStateEnum::kDone));
+    updateBuilder.append("recipientShards.$.abortReason", *abortReason);
+    uassertStatusOK(Grid::get(opCtx)->catalogClient()->updateConfigDocument(
+        opCtx,
+        NamespaceString::kConfigReshardingOperationsNamespace,
+        BSON("_id" << reshardingFields.getUuid() << "recipientShards.id" << shardId),
+        BSON("$set" << updateBuilder.done()),
+        false /* upsert */,
+        ShardingCatalogClient::kMajorityWriteConcern));
+}
+
 /*
  * Either constructs a new ReshardingDonorStateMachine with 'reshardingFields' or passes
  * 'reshardingFields' to an already-existing ReshardingDonorStateMachine.
@@ -75,6 +152,11 @@ void processReshardingFieldsForDonorCollection(OperationContext* opCtx,
                                                               ReshardingDonorDocument>(
             opCtx, reshardingFields.getUuid())) {
         donorStateMachine->get()->onReshardingFieldsChanges(opCtx, reshardingFields);
+        return;
+    }
+
+    if (reshardingFields.getAbortReason()) {
+        processAbortReasonNoDonorMachine(opCtx, reshardingFields, nss);
         return;
     }
 
@@ -109,6 +191,7 @@ void processReshardingFieldsForDonorCollection(OperationContext* opCtx,
  * 'reshardingFields' to an already-existing ReshardingRecipientStateMachine.
  */
 void processReshardingFieldsForRecipientCollection(OperationContext* opCtx,
+                                                   const NamespaceString& nss,
                                                    const CollectionMetadata& metadata,
                                                    const ReshardingFields& reshardingFields) {
     if (auto recipientStateMachine = tryGetReshardingStateMachine<ReshardingRecipientService,
@@ -116,6 +199,11 @@ void processReshardingFieldsForRecipientCollection(OperationContext* opCtx,
                                                                   ReshardingRecipientDocument>(
             opCtx, reshardingFields.getUuid())) {
         recipientStateMachine->get()->onReshardingFieldsChanges(opCtx, reshardingFields);
+        return;
+    }
+
+    if (reshardingFields.getAbortReason()) {
+        processAbortReasonNoRecipientMachine(opCtx, reshardingFields, nss);
         return;
     }
 
@@ -144,6 +232,38 @@ void processReshardingFieldsForRecipientCollection(OperationContext* opCtx,
     createReshardingStateMachine<ReshardingRecipientService,
                                  RecipientStateMachine,
                                  ReshardingRecipientDocument>(opCtx, recipientDoc);
+}
+
+/**
+ * Checks that presence/absence of 'donorShards' and 'recipientShards' fields in the
+ * reshardingFields are consistent with the 'state' field.
+ */
+void verifyValidReshardingFields(const ReshardingFields& reshardingFields) {
+    auto coordinatorState = reshardingFields.getState();
+
+    if (coordinatorState < CoordinatorStateEnum::kDecisionPersisted) {
+        // Prior to the state CoordinatorStateEnum::kDecisionPersisted, only the source
+        // collection's config.collections entry should have donorFields, and only the
+        // temporary resharding collection's entry should have recipientFields.
+        uassert(5274201,
+                fmt::format("reshardingFields must contain either donorFields or recipientFields "
+                            "(and not both) when the "
+                            "coordinator is in state {}. Got reshardingFields {}",
+                            CoordinatorState_serializer(reshardingFields.getState()),
+                            reshardingFields.toBSON().toString()),
+                reshardingFields.getDonorFields().is_initialized() ^
+                    reshardingFields.getRecipientFields().is_initialized());
+    } else {
+        // At and after state CoordinatorStateEnum::kDecisionPersisted, the temporary
+        // resharding collection's config.collections entry has been removed, and so the
+        // source collection's entry should have both donorFields and recipientFields.
+        uassert(5274202,
+                fmt::format("reshardingFields must contain both donorFields and recipientFields "
+                            "when the coordinator's state is greater than or equal to "
+                            "CoordinatorStateEnum::kDecisionPersisted. Got reshardingFields {}",
+                            reshardingFields.toBSON().toString()),
+                reshardingFields.getDonorFields() && reshardingFields.getRecipientFields());
+    }
 }
 
 }  // namespace
@@ -192,41 +312,22 @@ void processReshardingFieldsForCollection(OperationContext* opCtx,
                                           const NamespaceString& nss,
                                           const CollectionMetadata& metadata,
                                           const ReshardingFields& reshardingFields) {
-    auto coordinatorState = reshardingFields.getState();
-    if (coordinatorState != CoordinatorStateEnum::kError) {
-        if (coordinatorState < CoordinatorStateEnum::kDecisionPersisted) {
-            // Prior to the state CoordinatorStateEnum::kDecisionPersisted, only the source
-            // collection's config.collections entry should have donorFields, and only the
-            // temporary resharding collection's entry should have recipientFields.
-            uassert(
-                5274201,
-                fmt::format("reshardingFields must contain either donorFields or recipientFields "
-                            "(and not both) when the "
-                            "coordinator is in state {}. Got reshardingFields {}",
-                            CoordinatorState_serializer(reshardingFields.getState()),
-                            reshardingFields.toBSON().toString()),
-                reshardingFields.getDonorFields().is_initialized() ^
-                    reshardingFields.getRecipientFields().is_initialized());
-        } else {
-            // At and after state CoordinatorStateEnum::kDecisionPersisted, the temporary
-            // resharding collection's config.collections entry has been removed, and so the
-            // source collection's entry should have both donorFields and recipientFields.
-            uassert(
-                5274202,
-                fmt::format("reshardingFields must contain both donorFields and recipientFields "
-                            "when the coordinator's state is greater than or equal to "
-                            "CoordinatorStateEnum::kDecisionPersisted. Got reshardingFields {}",
-                            reshardingFields.toBSON().toString()),
-                reshardingFields.getDonorFields() && reshardingFields.getRecipientFields());
-        }
+    if (reshardingFields.getAbortReason()) {
+        // The coordinator encountered an unrecoverable error, both donors and recipients should be
+        // made aware.
+        processReshardingFieldsForDonorCollection(opCtx, nss, metadata, reshardingFields);
+        processReshardingFieldsForRecipientCollection(opCtx, nss, metadata, reshardingFields);
+        return;
     }
+
+    verifyValidReshardingFields(reshardingFields);
 
     if (reshardingFields.getDonorFields()) {
         processReshardingFieldsForDonorCollection(opCtx, nss, metadata, reshardingFields);
     }
 
     if (reshardingFields.getRecipientFields()) {
-        processReshardingFieldsForRecipientCollection(opCtx, metadata, reshardingFields);
+        processReshardingFieldsForRecipientCollection(opCtx, nss, metadata, reshardingFields);
     }
 }
 

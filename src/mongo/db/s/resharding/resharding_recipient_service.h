@@ -145,7 +145,7 @@ private:
     ExecutorFuture<void> _awaitAllDonorsMirroringThenTransitionToStrictConsistency(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
-    ExecutorFuture<void> __awaitCoordinatorHasDecisionPersistedThenTransitionToRenaming(
+    ExecutorFuture<void> _awaitCoordinatorHasDecisionPersistedThenTransitionToRenaming(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
     void _renameTemporaryReshardingCollection();
@@ -175,6 +175,10 @@ private:
     void _initTxnCloner(OperationContext* opCtx, const Timestamp& fetchTimestamp);
 
     ReshardingMetrics* _metrics() const;
+
+    // Does work necessary for both recoverable errors (failover/stepdown) and unrecoverable errors
+    // (abort resharding).
+    void _onAbortOrStepdown(WithLock, Status status);
 
     // The in-memory representation of the underlying document in
     // config.localReshardingOperations.recipient.

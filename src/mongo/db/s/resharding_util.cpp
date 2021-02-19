@@ -88,19 +88,23 @@ bool documentBelongsToMe(OperationContext* opCtx,
 
 DonorShardEntry makeDonorShard(ShardId shardId,
                                DonorStateEnum donorState,
-                               boost::optional<Timestamp> minFetchTimestamp) {
+                               boost::optional<Timestamp> minFetchTimestamp,
+                               boost::optional<Status> abortReason) {
     DonorShardEntry entry(shardId);
     entry.setState(donorState);
     emplaceMinFetchTimestampIfExists(entry, minFetchTimestamp);
+    emplaceAbortReasonIfExists(entry, abortReason);
     return entry;
 }
 
 RecipientShardEntry makeRecipientShard(ShardId shardId,
                                        RecipientStateEnum recipientState,
-                                       boost::optional<Timestamp> strictConsistencyTimestamp) {
+                                       boost::optional<Timestamp> strictConsistencyTimestamp,
+                                       boost::optional<Status> abortReason) {
     RecipientShardEntry entry(shardId);
     entry.setState(recipientState);
     emplaceStrictConsistencyTimestampIfExists(entry, strictConsistencyTimestamp);
+    emplaceAbortReasonIfExists(entry, abortReason);
     return entry;
 }
 

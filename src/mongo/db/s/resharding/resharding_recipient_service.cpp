@@ -234,7 +234,7 @@ SemiFuture<void> ReshardingRecipientService::RecipientStateMachine::run(
             return _awaitAllDonorsMirroringThenTransitionToStrictConsistency(executor);
         })
         .then([this, executor] {
-            return __awaitCoordinatorHasDecisionPersistedThenTransitionToRenaming(executor);
+            return _awaitCoordinatorHasDecisionPersistedThenTransitionToRenaming(executor);
         })
         .then([this] { _renameTemporaryReshardingCollection(); })
         .onError([this](Status status) {
@@ -244,6 +244,12 @@ SemiFuture<void> ReshardingRecipientService::RecipientStateMachine::run(
                   "reshardingId"_attr = _id,
                   "error"_attr = status);
             _transitionState(RecipientStateEnum::kError, boost::none, status);
+            _updateCoordinator();
+
+            // TODO SERVER-52838: Ensure all local collections that may have been created for
+            // resharding are removed, with the exception of the ReshardingRecipientDocument, before
+            // transitioning to kDone.
+            _transitionState(RecipientStateEnum::kDone, boost::none, status);
             _updateCoordinator();
             return status;
         })
@@ -255,13 +261,17 @@ SemiFuture<void> ReshardingRecipientService::RecipientStateMachine::run(
                 return;
             }
 
-            removeRecipientDocFailpoint.pauseWhileSet();
-
             if (status.isOK()) {
                 // The shared_ptr stored in the PrimaryOnlyService's map for the
                 // ReshardingRecipientService Instance is removed when the recipient state document
                 // tied to the instance is deleted. It is necessary to use shared_from_this() to
                 // extend the lifetime so the code can safely finish executing.
+
+                {
+                    auto opCtx = cc().makeOperationContext();
+                    removeRecipientDocFailpoint.pauseWhileSet(opCtx.get());
+                }
+
                 _removeRecipientDocument();
                 _metrics()->onCompletion(ReshardingMetrics::OperationStatus::kSucceeded);
                 _completionPromise.emplaceValue();
@@ -269,7 +279,6 @@ SemiFuture<void> ReshardingRecipientService::RecipientStateMachine::run(
                 _metrics()->onCompletion(ErrorCodes::isCancelationError(status)
                                              ? ReshardingMetrics::OperationStatus::kCanceled
                                              : ReshardingMetrics::OperationStatus::kFailed);
-                // Set error on all promises
                 _completionPromise.setError(status);
             }
         })
@@ -278,23 +287,8 @@ SemiFuture<void> ReshardingRecipientService::RecipientStateMachine::run(
 
 void ReshardingRecipientService::RecipientStateMachine::interrupt(Status status) {
     // Resolve any unresolved promises to avoid hanging.
-    stdx::lock_guard<Latch> lg(_mutex);
-
-    if (_oplogFetcherExecutor) {
-        _oplogFetcherExecutor->shutdown();
-    }
-
-    for (auto&& fetcher : _oplogFetchers) {
-        fetcher->interrupt(status);
-    }
-
-    for (auto&& threadPool : _oplogApplierWorkers) {
-        threadPool->shutdown();
-    }
-
-    if (!_coordinatorHasDecisionPersisted.getFuture().isReady()) {
-        _coordinatorHasDecisionPersisted.setError(status);
-    }
+    stdx::lock_guard<Latch> lk(_mutex);
+    _onAbortOrStepdown(lk, status);
 
     if (!_completionPromise.getFuture().isReady()) {
         _completionPromise.setError(status);
@@ -314,17 +308,14 @@ boost::optional<BSONObj> ReshardingRecipientService::RecipientStateMachine::repo
 
 void ReshardingRecipientService::RecipientStateMachine::onReshardingFieldsChanges(
     OperationContext* opCtx, const TypeCollectionReshardingFields& reshardingFields) {
-    auto coordinatorState = reshardingFields.getState();
-    if (coordinatorState == CoordinatorStateEnum::kError) {
-        // TODO SERVER-52838: Investigate if we want to have a special error code so the recipient
-        // knows when it has recieved the error from the coordinator rather than needing to report
-        // an error to the coordinator.
-        interrupt({ErrorCodes::InternalError,
-                   "ReshardingDonorService observed CoordinatorStateEnum::kError"});
+    stdx::lock_guard<Latch> lk(_mutex);
+    if (reshardingFields.getAbortReason()) {
+        auto status = getStatusFromAbortReason(reshardingFields);
+        _onAbortOrStepdown(lk, status);
         return;
     }
 
-    stdx::lock_guard<Latch> lk(_mutex);
+    auto coordinatorState = reshardingFields.getState();
     if (coordinatorState >= CoordinatorStateEnum::kDecisionPersisted) {
         ensureFulfilledPromise(lk, _coordinatorHasDecisionPersisted);
     }
@@ -601,7 +592,7 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
 }
 
 ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
-    __awaitCoordinatorHasDecisionPersistedThenTransitionToRenaming(
+    _awaitCoordinatorHasDecisionPersistedThenTransitionToRenaming(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
     if (_recipientDoc.getState() > RecipientStateEnum::kStrictConsistency) {
         return ExecutorFuture<void>(**executor, Status::OK());
@@ -653,14 +644,17 @@ void ReshardingRecipientService::RecipientStateMachine::_transitionState(
     emplaceFetchTimestampIfExists(replacementDoc, std::move(fetchTimestamp));
     emplaceAbortReasonIfExists(replacementDoc, std::move(abortReason));
 
+    // For logging purposes.
+    auto oldState = _recipientDoc.getState();
     auto newState = replacementDoc.getState();
+
     _updateRecipientDocument(std::move(replacementDoc));
     _metrics()->setRecipientState(endState);
 
     LOGV2_INFO(5279506,
                "Transitioned resharding recipient state",
                "newState"_attr = RecipientState_serializer(newState),
-               "oldState"_attr = RecipientState_serializer(_recipientDoc.getState()),
+               "oldState"_attr = RecipientState_serializer(oldState),
                "ns"_attr = _recipientDoc.getNss(),
                "collectionUUID"_attr = _recipientDoc.getExistingUUID(),
                "reshardingUUID"_attr = _recipientDoc.get_id());
@@ -760,6 +754,25 @@ void ReshardingRecipientService::RecipientStateMachine::_dropOplogCollections(
 
 ReshardingMetrics* ReshardingRecipientService::RecipientStateMachine::_metrics() const {
     return ReshardingMetrics::get(cc().getServiceContext());
+}
+
+void ReshardingRecipientService::RecipientStateMachine::_onAbortOrStepdown(WithLock,
+                                                                           Status status) {
+    if (_oplogFetcherExecutor) {
+        _oplogFetcherExecutor->shutdown();
+    }
+
+    for (auto&& fetcher : _oplogFetchers) {
+        fetcher->interrupt(status);
+    }
+
+    for (auto&& threadPool : _oplogApplierWorkers) {
+        threadPool->shutdown();
+    }
+
+    if (!_coordinatorHasDecisionPersisted.getFuture().isReady()) {
+        _coordinatorHasDecisionPersisted.setError(status);
+    }
 }
 
 }  // namespace mongo

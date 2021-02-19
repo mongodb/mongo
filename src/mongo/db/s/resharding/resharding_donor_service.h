@@ -138,6 +138,10 @@ private:
     // Removes the local donor document from disk and clears the in-memory state.
     void _removeDonorDocument();
 
+    // Does work necessary for both recoverable errors (failover/stepdown) and unrecoverable errors
+    // (abort resharding).
+    void _onAbortOrStepdown(WithLock lk, Status status);
+
     // The in-memory representation of the underlying document in
     // config.localReshardingOperations.donor.
     ReshardingDonorDocument _donorDoc;

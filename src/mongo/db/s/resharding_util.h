@@ -144,11 +144,31 @@ void emplaceAbortReasonIfExists(ClassWithAbortReason& c, boost::optional<Status>
 }
 
 /**
+ * Extract the abortReason BSONObj into a status.
+ */
+template <class ClassWithAbortReason>
+Status getStatusFromAbortReason(ClassWithAbortReason& c) {
+    invariant(c.getAbortReason());
+    auto abortReasonObj = c.getAbortReason().get();
+    BSONElement codeElement = abortReasonObj["code"];
+    BSONElement errmsgElement = abortReasonObj["errmsg"];
+    int code = codeElement.numberInt();
+    std::string errmsg;
+    if (errmsgElement.type() == String) {
+        errmsg = errmsgElement.String();
+    } else if (!errmsgElement.eoo()) {
+        errmsg = errmsgElement.toString();
+    }
+    return Status(ErrorCodes::Error(code), errmsg, abortReasonObj);
+}
+
+/**
  * Helper method to construct a DonorShardEntry with the fields specified.
  */
 DonorShardEntry makeDonorShard(ShardId shardId,
                                DonorStateEnum donorState,
-                               boost::optional<Timestamp> minFetchTimestamp = boost::none);
+                               boost::optional<Timestamp> minFetchTimestamp = boost::none,
+                               boost::optional<Status> abortReason = boost::none);
 
 /**
  * Helper method to construct a RecipientShardEntry with the fields specified.
@@ -156,7 +176,8 @@ DonorShardEntry makeDonorShard(ShardId shardId,
 RecipientShardEntry makeRecipientShard(
     ShardId shardId,
     RecipientStateEnum recipientState,
-    boost::optional<Timestamp> strictConsistencyTimestamp = boost::none);
+    boost::optional<Timestamp> strictConsistencyTimestamp = boost::none,
+    boost::optional<Status> abortReason = boost::none);
 
 /**
  * Gets the UUID for 'nss' from the 'cm'

@@ -12,6 +12,7 @@
 
 load("jstests/libs/discover_topology.js");
 load("jstests/sharding/libs/resharding_test_fixture.js");
+load("jstests/sharding/libs/resharding_test_util.js");
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/parallelTester.js");
 
@@ -47,73 +48,27 @@ let createIndexFailpoint = configureFailPoint(donor0, "hangIndexBuildBeforeCommi
 createIndexThread.start();
 createIndexFailpoint.wait();
 
-/**
- * Confirms the shard's abortReason and state are written locally in
- * config.localReshardingOperations.donor, the shard's local ReshardingDonorDocument.
- */
-function assertEventuallyErrorsLocally(shardConn, shardName) {
-    const localDonorOpsCollection =
-        shardConn.getCollection("config.localReshardingOperations.donor");
-
-    assert.soon(
-        () => {
-            return localDonorOpsCollection.findOne({
-                state: "error",
-                "abortReason.code": ErrorCodes.BackgroundOperationInProgressForNamespace
-            }) !== null;
-        },
-        () => {
-            return "donor shard " + shardName + " never transitioned to the error state: " +
-                tojson(localDonorOpsCollection.findOne());
-        });
-}
-
-/**
- * Confirms the shard's abortReason and state are written in
- * config.reshardingOperations.donorShards[shardName], the main CoordinatorDocument on the
- * configsvr.
- */
-function assertEventuallyErrorsInDonorList(configsvrConn, shardName, nss) {
-    const reshardingOperationsCollection =
-        configsvrConn.getCollection("config.reshardingOperations");
-    assert.soon(
-        () => {
-            return reshardingOperationsCollection.findOne({
-                nss,
-                donorShards: {
-                    $elemMatch: {
-                        id: shardName,
-                        "abortReason.code": ErrorCodes.BackgroundOperationInProgressForNamespace
-                    }
-                }
-            }) !== null;
-        },
-        () => {
-            return "donor shard " + shardName + " never updated its entry in the coordinator" +
-                " document to state kError and abortReason BackgroundOperationInProgressForNamespace: " +
-                tojson(reshardingOperationsCollection.find().toArray());
-        });
-}
-
-// In the current implementation, the reshardCollection command won't propagate the error to the
-// caller if the recipient/donor shard encounters an unrecoverable error. To work around this
-// limitation, we verify the recipient shard transitioned itself into the "error" state as a result
-// of the duplicate key error during resharding's collection cloning.
-//
-// TODO SERVER-53792: Ensure the error propagated to the user indicates
-// ErrorCodes.BackgroundOperationInProgressForNamespace.
-reshardingTest.withReshardingInBackground(  //
+reshardingTest.withReshardingInBackground(
     {
         newShardKeyPattern: {newKey: 1},
         newChunks: [{min: {newKey: MinKey}, max: {newKey: MaxKey}, shard: recipientShardNames[0]}],
     },
     () => {
         // TODO SERVER-51696: Review if these checks can be made in a cpp unittest instead.
-        assertEventuallyErrorsLocally(donor0, donorShardNames[0]);
-        assertEventuallyErrorsInDonorList(
-            configsvr, donorShardNames[0], inputCollection.getFullName());
+        ReshardingTestUtil.assertDonorAbortsLocally(
+            donor0,
+            donorShardNames[0],
+            inputCollection.getFullName(),
+            ErrorCodes.BackgroundOperationInProgressForNamespace);
+
+        // Note: even though the recipient state machine does not exist by the time the donor
+        // errors, recipients should still acknowledge they saw the coordinator's abort.
+        ReshardingTestUtil.assertAllParticipantsReportAbortToCoordinator(
+            configsvr,
+            inputCollection.getFullName(),
+            ErrorCodes.BackgroundOperationInProgressForNamespace);
     },
-    {expectedErrorCode: ErrorCodes.InternalError});
+    {expectedErrorCode: ErrorCodes.BackgroundOperationInProgressForNamespace});
 
 // Resume index build.
 createIndexFailpoint.off();

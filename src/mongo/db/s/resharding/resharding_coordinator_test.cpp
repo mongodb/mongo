@@ -775,6 +775,10 @@ TEST_F(ReshardingCoordinatorPersistenceTest, StateTransitionToErrorSucceeds) {
     auto coordinatorDoc =
         insertStateAndCatalogEntries(CoordinatorStateEnum::kPreparingToDonate, _originalEpoch);
 
+    insertChunkAndZoneEntries(
+        makeChunks(_originalNss, OID::gen(), _oldShardKey, std::vector{OID::gen(), OID::gen()}),
+        makeZones(_originalNss, _oldShardKey));
+
     // Persist the updates on disk
     auto expectedCoordinatorDoc = coordinatorDoc;
     expectedCoordinatorDoc.setState(CoordinatorStateEnum::kError);
