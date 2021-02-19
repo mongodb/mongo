@@ -136,10 +136,6 @@ def get_compile_artifact_urls(evg_api, evg_version, buildvariant_name):
             evg_artifacts = compile_task.artifacts
             for artifact in evg_artifacts:
                 compile_artifact_urls[artifact.name] = artifact.url
-
-            # Tack on the project id for generating a friendly decompressed name for the artifacts.
-            compile_artifact_urls["project_id"] = compile_task.project_id
-
         elif compile_task and push_task:
             LOGGER.warning("Found evergreen tasks, but they are not both successful.",
                            compile_task=f"{EVERGREEN_HOST}/task/{compile_task.task_id}",
