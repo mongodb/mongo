@@ -227,3 +227,8 @@ structs:
                     A counter that is incremented on each restart due to a donor connection failure.
                 type: long
                 default: 0
+            numRestartsDueToRecipientFailure:
+                description: >-
+                    A counter that is incremented on each restart due to a recipient failure.
+                type: long
+                default: 0
