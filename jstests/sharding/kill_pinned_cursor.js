@@ -28,10 +28,9 @@ const shard1DB = st.shard1.getDB(kDBName);
 // fail. In versions 4.4 and later, this is solved by running the dummy operation with a 'comment'
 // and filtering $currentOp output based based on the comment. This behavior is unavailable in
 // earlier versions (see SERVER-29794), so we instead disable the background job.
-assert.commandWorked(
-    shard0DB.adminCommand({setParameter: 1, enableShardedIndexConsistencyCheck: false}));
-assert.commandWorked(
-    shard1DB.adminCommand({setParameter: 1, enableShardedIndexConsistencyCheck: false}));
+st._configServers.forEach(
+    config => config.adminCommand({setParameter: 1, enableShardedIndexConsistencyCheck: false}));
+
 let coll = mongosDB.jstest_kill_pinned_cursor;
 coll.drop();
 
