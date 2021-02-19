@@ -90,6 +90,14 @@ struct RecordIdAndWall {
     RecordIdAndWall(RecordId lastRecord, Date_t wallTime) : id(lastRecord), wall(wallTime) {}
 };
 
+WiredTigerRecordStore::CursorKey makeCursorKey(const RecordId& rid) {
+    WiredTigerRecordStore::CursorKey cursorKey;
+    rid.withFormat(
+        [](RecordId::Null n) { invariant(false); },
+        [&](int64_t rid) { cursorKey.emplace<int64_t>(rid); },
+        [&](const char* str, int size) { cursorKey.emplace<WiredTigerItem>(str, size); });
+    return cursorKey;
+}
 
 static const int kMinimumRecordStoreVersion = 1;
 static const int kCurrentRecordStoreVersion = 1;  // New record stores use this by default.
@@ -686,9 +694,9 @@ public:
 
         RecordId id;
         if (_rs->keyFormat() == KeyFormat::String) {
-            const char* data;
-            invariantWTOK(_cursor->get_key(_cursor, &data));
-            id = RecordId(data, RecordId::kSmallStrSize);
+            WT_ITEM item;
+            invariantWTOK(_cursor->get_key(_cursor, &item));
+            id = RecordId(static_cast<const char*>(item.data), item.size);
         } else {
             int64_t key;
             invariantWTOK(_cursor->get_key(_cursor, &key));
@@ -803,9 +811,8 @@ StatusWith<std::string> WiredTigerRecordStore::generateCreateString(
     // WARNING: No user-specified config can appear below this line. These options are required
     // for correct behavior of the server.
     if (options.clusteredIndex) {
-        // If the RecordId format is a String, assume a 12-byte fix-length string key format.
-        invariant(RecordId::kSmallStrSize == 12);
-        ss << "key_format=12s";
+        // If the RecordId format is a String, assume a byte array key format.
+        ss << "key_format=u";
     } else {
         // All other collections use an int64_t as their table keys.
         ss << "key_format=q";
@@ -1067,7 +1074,8 @@ bool WiredTigerRecordStore::findRecord(OperationContext* opCtx,
     WiredTigerCursor curwrap(_uri, _tableId, true, opCtx);
     WT_CURSOR* c = curwrap.get();
     invariant(c);
-    setKey(c, id);
+    CursorKey key = makeCursorKey(id);
+    setKey(c, key);
     int ret = wiredTigerPrepareConflictRetry(opCtx, [&] { return c->search(c); });
     if (ret == WT_NOTFOUND) {
         return false;
@@ -1100,7 +1108,8 @@ void WiredTigerRecordStore::deleteRecord(OperationContext* opCtx, const RecordId
     WiredTigerCursor cursor(_uri, _tableId, true, opCtx);
     cursor.assertInActiveTxn();
     WT_CURSOR* c = cursor.get();
-    setKey(c, id);
+    CursorKey key = makeCursorKey(id);
+    setKey(c, key);
     int ret = wiredTigerPrepareConflictRetry(opCtx, [&] { return c->search(c); });
     invariantWTOK(ret);
 
@@ -1215,7 +1224,8 @@ void WiredTigerRecordStore::_positionAtFirstRecordId(OperationContext* opCtx,
     // slow for capped collections since there may be many tombstones to traverse at the beginning
     // of the table.
     if (!firstRecordId.isNull()) {
-        setKey(cursor, firstRecordId);
+        CursorKey key = makeCursorKey(firstRecordId);
+        setKey(cursor, key);
         // Truncate does not require its cursor to be explicitly positioned.
         if (!forTruncate) {
             int cmp = 0;
@@ -1273,7 +1283,8 @@ int64_t WiredTigerRecordStore::_cappedDeleteAsNeeded_inlock(OperationContext* op
 
         // If we know where the first record is, go to it
         if (_cappedFirstRecord != RecordId()) {
-            setKey(truncateEnd, _cappedFirstRecord);
+            CursorKey key = makeCursorKey(_cappedFirstRecord);
+            setKey(truncateEnd, key);
             ret = wiredTigerPrepareConflictRetry(opCtx,
                                                  [&] { return truncateEnd->search(truncateEnd); });
             metricsCollector.incrementOneCursorSeek();
@@ -1476,7 +1487,8 @@ void WiredTigerRecordStore::reclaimOplog(OperationContext* opCtx, Timestamp mayT
             // It is necessary that there exists a record after the stone but before or including
             // the mayTruncateUpTo point.  Since the mayTruncateUpTo point may fall between
             // records, the stone check is not sufficient.
-            setKey(cursor, stone->lastRecord);
+            CursorKey key = makeCursorKey(stone->lastRecord);
+            setKey(cursor, key);
             ret = wiredTigerPrepareConflictRetry(opCtx, [&] { return cursor->search(cursor); });
             invariantWTOK(ret);
             ret = wiredTigerPrepareConflictRetry(opCtx, [&] { return cursor->next(cursor); });
@@ -1496,7 +1508,7 @@ void WiredTigerRecordStore::reclaimOplog(OperationContext* opCtx, Timestamp mayT
                 return;
             }
             invariantWTOK(cursor->reset(cursor));
-            setKey(cursor, stone->lastRecord);
+            setKey(cursor, key);
             invariantWTOK(session->truncate(session, nullptr, nullptr, cursor, nullptr));
             _changeNumRecords(opCtx, -stone->records);
             _increaseDataSize(opCtx, -stone->bytes);
@@ -1596,7 +1608,8 @@ Status WiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
             LOGV2_DEBUG(22403, 4, "inserting record with timestamp {ts}", "ts"_attr = ts);
             fassert(39001, opCtx->recoveryUnit()->setTimestamp(ts));
         }
-        setKey(c, record.id);
+        CursorKey key = makeCursorKey(record.id);
+        setKey(c, key);
         WiredTigerItem value(record.data.data(), record.data.size());
         c->set_value(c, value.Get());
         int ret = WT_OP_CHECK(wiredTigerCursorInsert(opCtx, c));
@@ -1708,7 +1721,8 @@ Status WiredTigerRecordStore::updateRecord(OperationContext* opCtx,
     curwrap.assertInActiveTxn();
     WT_CURSOR* c = curwrap.get();
     invariant(c);
-    setKey(c, id);
+    CursorKey key = makeCursorKey(id);
+    setKey(c, key);
     int ret = wiredTigerPrepareConflictRetry(opCtx, [&] { return c->search(c); });
     invariantWTOK(ret);
 
@@ -1814,7 +1828,8 @@ StatusWith<RecordData> WiredTigerRecordStore::updateWithDamages(
     curwrap.assertInActiveTxn();
     WT_CURSOR* c = curwrap.get();
     invariant(c);
-    setKey(c, id);
+    CursorKey key = makeCursorKey(id);
+    setKey(c, key);
 
     // The test harness calls us with empty damage vectors which WiredTiger doesn't allow.
     if (nentries == 0)
@@ -2011,7 +2026,8 @@ boost::optional<RecordId> WiredTigerRecordStore::oplogStartHack(
     WT_CURSOR* c = cursor.get();
 
     int cmp;
-    setKey(c, searchFor);
+    CursorKey key = makeCursorKey(searchFor);
+    setKey(c, key);
     int ret = c->search_near(c, &cmp);
     if (ret == 0 && cmp > 0)
         ret = c->prev(c);  // landed one higher than startingPosition
@@ -2218,7 +2234,8 @@ void WiredTigerRecordStore::cappedTruncateAfter(OperationContext* opCtx,
 
     WiredTigerCursor startwrap(_uri, _tableId, true, opCtx);
     WT_CURSOR* start = startwrap.get();
-    setKey(start, firstRemovedId);
+    CursorKey key = makeCursorKey(firstRemovedId);
+    setKey(start, key);
 
     WT_SESSION* session = WiredTigerRecoveryUnit::get(opCtx)->getSession()->getSession();
     invariantWTOK(session->truncate(session, nullptr, start, nullptr, nullptr));
@@ -2369,7 +2386,8 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::seekExact(const RecordI
 
     _skipNextAdvance = false;
     WT_CURSOR* c = _cursor->get();
-    setKey(c, id);
+    WiredTigerRecordStore::CursorKey key = makeCursorKey(id);
+    setKey(c, key);
     // Nothing after the next line can throw WCEs.
     int seekRet = wiredTigerPrepareConflictRetry(_opCtx, [&] { return c->search(c); });
     if (seekRet == WT_NOTFOUND) {
@@ -2434,7 +2452,8 @@ bool WiredTigerRecordStoreCursorBase::restore() {
     }
 
     WT_CURSOR* c = _cursor->get();
-    setKey(c, _lastReturnedId);
+    WiredTigerRecordStore::CursorKey key = makeCursorKey(_lastReturnedId);
+    setKey(c, key);
 
     int cmp;
     int ret = wiredTigerPrepareConflictRetry(_opCtx, [&] { return c->search_near(c, &cmp); });
@@ -2488,9 +2507,9 @@ StandardWiredTigerRecordStore::StandardWiredTigerRecordStore(WiredTigerKVEngine*
 
 RecordId StandardWiredTigerRecordStore::getKey(WT_CURSOR* cursor) const {
     if (_keyFormat == KeyFormat::String) {
-        const char* data;
-        invariantWTOK(cursor->get_key(cursor, &data));
-        return RecordId(data, RecordId::kSmallStrSize);
+        WT_ITEM item;
+        invariantWTOK(cursor->get_key(cursor, &item));
+        return RecordId(static_cast<const char*>(item.data), item.size);
     } else {
         std::int64_t recordId;
         invariantWTOK(cursor->get_key(cursor, &recordId));
@@ -2498,11 +2517,11 @@ RecordId StandardWiredTigerRecordStore::getKey(WT_CURSOR* cursor) const {
     }
 }
 
-void StandardWiredTigerRecordStore::setKey(WT_CURSOR* cursor, RecordId id) const {
-    if (_keyFormat == KeyFormat::String) {
-        cursor->set_key(cursor, id.strData());
-    } else {
-        cursor->set_key(cursor, id.asLong());
+void StandardWiredTigerRecordStore::setKey(WT_CURSOR* cursor, const CursorKey& key) const {
+    if (auto itemPtr = stdx::get_if<WiredTigerItem>(&key)) {
+        cursor->set_key(cursor, itemPtr->Get());
+    } else if (auto longPtr = stdx::get_if<int64_t>(&key)) {
+        cursor->set_key(cursor, *longPtr);
     }
 }
 
@@ -2530,19 +2549,20 @@ WiredTigerRecordStoreStandardCursor::WiredTigerRecordStoreStandardCursor(
     OperationContext* opCtx, const WiredTigerRecordStore& rs, bool forward)
     : WiredTigerRecordStoreCursorBase(opCtx, rs, forward) {}
 
-void WiredTigerRecordStoreStandardCursor::setKey(WT_CURSOR* cursor, RecordId id) const {
-    if (_rs.keyFormat() == KeyFormat::String) {
-        cursor->set_key(cursor, id.strData());
-    } else {
-        cursor->set_key(cursor, id.asLong());
+void WiredTigerRecordStoreStandardCursor::setKey(
+    WT_CURSOR* cursor, const WiredTigerRecordStore::CursorKey& key) const {
+    if (auto itemPtr = stdx::get_if<WiredTigerItem>(&key)) {
+        cursor->set_key(cursor, itemPtr->Get());
+    } else if (auto longPtr = stdx::get_if<int64_t>(&key)) {
+        cursor->set_key(cursor, *longPtr);
     }
 }
 
 RecordId WiredTigerRecordStoreStandardCursor::getKey(WT_CURSOR* cursor) const {
     if (_rs.keyFormat() == KeyFormat::String) {
-        const char* data;
-        invariantWTOK(cursor->get_key(cursor, &data));
-        return RecordId(data, RecordId::kSmallStrSize);
+        WT_ITEM item;
+        invariantWTOK(cursor->get_key(cursor, &item));
+        return RecordId(static_cast<const char*>(item.data), item.size);
     } else {
         std::int64_t recordId;
         invariantWTOK(cursor->get_key(cursor, &recordId));
