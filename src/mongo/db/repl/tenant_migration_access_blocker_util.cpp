@@ -35,20 +35,16 @@
 #include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 
 #include "mongo/db/catalog_raii.h"
-#include "mongo/db/commands/tenant_migration_recipient_cmds_gen.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/persistent_task_store.h"
-#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_registry.h"
+#include "mongo/db/repl/tenant_migration_conflict_info.h"
 #include "mongo/db/repl/tenant_migration_state_machine_gen.h"
 #include "mongo/executor/network_interface_factory.h"
-#include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/logv2/log.h"
 #include "mongo/transport/service_executor.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future_util.h"
 
@@ -292,6 +288,16 @@ void performNoopWrite(OperationContext* opCtx, StringData msg) {
                 opCtx, BSON("msg" << msg));
             wuow.commit();
         });
+}
+
+bool inRecoveryMode(OperationContext* opCtx) {
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    if (!replCoord->isReplEnabled()) {
+        return false;
+    }
+
+    return replCoord->getMemberState().startup() || replCoord->getMemberState().startup2() ||
+        replCoord->getMemberState().rollback();
 }
 
 }  // namespace tenant_migration_access_blocker

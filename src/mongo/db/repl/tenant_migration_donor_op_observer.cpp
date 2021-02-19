@@ -137,9 +137,9 @@ public:
 
     void commit(boost::optional<Timestamp>) override {
         if (_donorStateDoc.getExpireAt()) {
-            // The mtab entry needs to be removed for garbage collectable aborted migrations. This
-            // is to allow future migrations with the same tenantId, as this migration has been
-            // aborted and forgotten.
+            // The TenantMigrationDonorAccessBlocker entry needs to be removed to re-allow writes,
+            // reads and future migrations with the same tenantId as this migration has already
+            // been aborted and forgotten.
             if (_donorStateDoc.getState() == TenantMigrationDonorStateEnum::kAborted) {
                 TenantMigrationAccessBlockerRegistry::get(_opCtx->getServiceContext())
                     .remove(_donorStateDoc.getTenantId());
@@ -166,41 +166,6 @@ private:
     const TenantMigrationDonorDocument _donorStateDoc;
 };
 
-/**
- * Used to remove the TenantMigrationDonorAccessBlocker for the migration denoted by the donor's
- * state doc once the write for deleting the doc is committed.
- */
-class TenantMigrationDonorDeleteHandler final : public RecoveryUnit::Change {
-public:
-    TenantMigrationDonorDeleteHandler(OperationContext* opCtx, const std::string tenantId)
-        : _opCtx(opCtx), _tenantId(tenantId) {}
-
-    void commit(boost::optional<Timestamp>) override {
-        TenantMigrationAccessBlockerRegistry::get(_opCtx->getServiceContext()).remove(_tenantId);
-    }
-
-    void rollback() override {}
-
-private:
-    OperationContext* _opCtx;
-    const std::string _tenantId;
-};
-
-/**
- * Returns true if the node is in startup recovery, initial sync or rollback. If the node is any
- * of these mode, the TenantMigrationDonorAccessBlocker will be recovered outside of the OpObserver
- * by tenant_migration_access_blocker::recoverTenantMigrationAccessBlockers.
- */
-bool inRecoveryMode(OperationContext* opCtx) {
-    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    if (!replCoord->isReplEnabled()) {
-        return false;
-    }
-
-    return replCoord->getMemberState().startup() || replCoord->getMemberState().startup2() ||
-        replCoord->getMemberState().rollback();
-}
-
 }  // namespace
 
 void TenantMigrationDonorOpObserver::onInserts(OperationContext* opCtx,
@@ -209,7 +174,8 @@ void TenantMigrationDonorOpObserver::onInserts(OperationContext* opCtx,
                                                std::vector<InsertStatement>::const_iterator first,
                                                std::vector<InsertStatement>::const_iterator last,
                                                bool fromMigrate) {
-    if (nss == NamespaceString::kTenantMigrationDonorsNamespace && !inRecoveryMode(opCtx)) {
+    if (nss == NamespaceString::kTenantMigrationDonorsNamespace &&
+        !tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
         for (auto it = first; it != last; it++) {
             auto donorStateDoc = tenant_migration_access_blocker::parseDonorStateDocument(it->doc);
             switch (donorStateDoc.getState()) {
@@ -237,7 +203,8 @@ void TenantMigrationDonorOpObserver::onInserts(OperationContext* opCtx,
 
 void TenantMigrationDonorOpObserver::onUpdate(OperationContext* opCtx,
                                               const OplogUpdateEntryArgs& args) {
-    if (args.nss == NamespaceString::kTenantMigrationDonorsNamespace && !inRecoveryMode(opCtx)) {
+    if (args.nss == NamespaceString::kTenantMigrationDonorsNamespace &&
+        !tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
         auto donorStateDoc =
             tenant_migration_access_blocker::parseDonorStateDocument(args.updateArgs.updatedDoc);
         switch (donorStateDoc.getState()) {
@@ -265,21 +232,22 @@ void TenantMigrationDonorOpObserver::onUpdate(OperationContext* opCtx,
 void TenantMigrationDonorOpObserver::aboutToDelete(OperationContext* opCtx,
                                                    NamespaceString const& nss,
                                                    BSONObj const& doc) {
-    if (nss == NamespaceString::kTenantMigrationDonorsNamespace && !inRecoveryMode(opCtx)) {
+    if (nss == NamespaceString::kTenantMigrationDonorsNamespace &&
+        !tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
         auto donorStateDoc = tenant_migration_access_blocker::parseDonorStateDocument(doc);
         uassert(ErrorCodes::IllegalOperation,
                 str::stream() << "cannot delete a donor's state document " << doc
                               << " since it has not been marked as garbage collectable",
                 donorStateDoc.getExpireAt());
 
-        // Documents in the kAborted state have already had their tenantIds removed from the mtab,
-        // and therefore, TenantMigrationDonorOpObserver::onDelete doesn't have to delete the entry.
-        // Mark kAborted documents with boost::none so that onDelete skips them.
-        if (donorStateDoc.getState() == TenantMigrationDonorStateEnum::kAborted) {
-            tenantIdToDeleteDecoration(opCtx) = boost::none;
-        } else {
-            tenantIdToDeleteDecoration(opCtx) = donorStateDoc.getTenantId().toString();
-        }
+        // To support back-to-back migration retries, when a migration is aborted, we remove its
+        // TenantMigrationDonorAccessBlocker as soon as its donor state doc is marked as garbage
+        // collectable. So onDelete should skip removing the TenantMigrationDonorAccessBlocker for
+        // aborted migrations.
+        tenantIdToDeleteDecoration(opCtx) =
+            donorStateDoc.getState() == TenantMigrationDonorStateEnum::kAborted
+            ? boost::none
+            : boost::make_optional(donorStateDoc.getTenantId().toString());
     }
 }
 
@@ -290,9 +258,12 @@ void TenantMigrationDonorOpObserver::onDelete(OperationContext* opCtx,
                                               bool fromMigrate,
                                               const boost::optional<BSONObj>& deletedDoc) {
     if (nss == NamespaceString::kTenantMigrationDonorsNamespace &&
-        tenantIdToDeleteDecoration(opCtx) && !inRecoveryMode(opCtx)) {
-        opCtx->recoveryUnit()->registerChange(std::make_unique<TenantMigrationDonorDeleteHandler>(
-            opCtx, tenantIdToDeleteDecoration(opCtx).get()));
+        tenantIdToDeleteDecoration(opCtx) &&
+        !tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
+        opCtx->recoveryUnit()->onCommit([opCtx](boost::optional<Timestamp>) {
+            TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
+                .remove(tenantIdToDeleteDecoration(opCtx).get());
+        });
     }
 }
 
