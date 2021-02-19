@@ -232,8 +232,7 @@ if (db.getMongo().writeMode() === "commands") {
     assert.eq(arr[0], "foo");
     assert.eq(arr[1], "FOO");
 
-    // "foo" == "FOO" (case-insensitive) so no update occurs.
-    assert.commandWorked(coll.insert({a: ["foo", "FOO"]}));
+    // "foo" == "FOO" (case-insensitive) so an update occurs.
     assert.commandWorked(coll.update({a: "FOO"}, {$set: {"a.$": "FOO"}}, caseInsensitive));
     var arr = coll.findOne().a;
     assert.eq(arr.length, 2);
