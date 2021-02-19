@@ -10,6 +10,7 @@ package options
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"regexp"
 	"runtime"
@@ -22,6 +23,8 @@ import (
 	"github.com/mongodb/mongo-tools/common/failpoint"
 	"github.com/mongodb/mongo-tools/common/log"
 	"github.com/mongodb/mongo-tools/common/util"
+	"github.com/pkg/errors"
+	"gopkg.in/yaml.v2"
 )
 
 // Gitspec that the tool was built with. Needs to be set using -ldflags
@@ -47,6 +50,8 @@ var (
 
 const IncompatibleArgsErrorFormat = "illegal argument combination: cannot specify %s and --uri"
 const ConflictingArgsErrorFormat = "illegal argument combination: %s conflicts with --uri"
+
+const deprecationWarningSSLAllow = "WARNING: --sslAllowInvalidCertificates and --sslAllowInvalidHostnames are deprecated, please use --tlsInsecure instead"
 
 // Struct encompassing all of the options that are reused across tools: "help",
 // "version", verbosity settings, ssl settings, etc.
@@ -93,8 +98,9 @@ type Namespace struct {
 
 // Struct holding generic options
 type General struct {
-	Help    bool `long:"help" description:"print usage"`
-	Version bool `long:"version" description:"print the tool version and exit"`
+	Help       bool   `long:"help" description:"print usage"`
+	Version    bool   `long:"version" description:"print the tool version and exit"`
+	ConfigPath string `long:"config" value-name:"<filename>" description:"path to a configuration file"`
 
 	MaxProcs   int    `long:"numThreads" hidden:"true"`
 	Failpoints string `long:"failpoints" hidden:"true"`
@@ -139,9 +145,10 @@ type SSL struct {
 	SSLPEMKeyFile       string `long:"sslPEMKeyFile" value-name:"<filename>" description:"the .pem file containing the certificate and key"`
 	SSLPEMKeyPassword   string `long:"sslPEMKeyPassword" value-name:"<password>" description:"the password to decrypt the sslPEMKeyFile, if necessary"`
 	SSLCRLFile          string `long:"sslCRLFile" value-name:"<filename>" description:"the .pem file containing the certificate revocation list"`
-	SSLAllowInvalidCert bool   `long:"sslAllowInvalidCertificates" description:"bypass the validation for server certificates"`
-	SSLAllowInvalidHost bool   `long:"sslAllowInvalidHostnames" description:"bypass the validation for server name"`
+	SSLAllowInvalidCert bool   `long:"sslAllowInvalidCertificates" hidden:"true" description:"bypass the validation for server certificates"`
+	SSLAllowInvalidHost bool   `long:"sslAllowInvalidHostnames" hidden:"true" description:"bypass the validation for server name"`
 	SSLFipsMode         bool   `long:"sslFIPSMode" description:"use FIPS mode of the installed openssl library"`
+	TLSInsecure         bool   `long:"tlsInsecure" description:"bypass the validation for server's certificate chain and host name"`
 }
 
 // Struct holding auth-related options
@@ -418,12 +425,23 @@ func (o *ToolOptions) AddOptions(opts ExtraOptions) {
 	}
 }
 
-// Parse the command line args.  Returns any extra args not accounted for by
-// parsing, as well as an error if the parsing returns an error.
+// ParseArgs parses a potential config file followed by the command line args, overriding
+// any values in the config file. Returns any extra args not accounted for by parsing,
+// as well as an error if the parsing returns an error.
 func (o *ToolOptions) ParseArgs(args []string) ([]string, error) {
+	LogSensitiveOptionWarnings(args)
+
+	if err := o.ParseConfigFile(args); err != nil {
+		return []string{}, err
+	}
+
 	args, err := o.parser.ParseArgs(args)
 	if err != nil {
 		return []string{}, err
+	}
+
+	if o.SSLAllowInvalidCert || o.SSLAllowInvalidHost {
+		log.Logvf(log.Always, deprecationWarningSSLAllow)
 	}
 
 	// connect directly, unless a replica set name is explicitly specified
@@ -446,6 +464,91 @@ func (o *ToolOptions) ParseArgs(args []string) ([]string, error) {
 	}
 
 	return args, err
+}
+
+// LogSensitiveOptionWarnings logs a warning for any sensitive information (i.e. passwords)
+// that appear on the command line for the --password, --uri and --sslPEMKeyPassword options.
+// This also applies to a connection string that appears as a positional argument.
+func LogSensitiveOptionWarnings(args []string) {
+	passwordMsg := "WARNING: On some systems, a password provided directly using " +
+		"--password may be visible to system status programs such as `ps` that may be " +
+		"invoked by other users. Consider omitting the password to provide it via stdin, " +
+		"or using the --config option to specify a configuration file with the password."
+
+	uriMsg := "WARNING: On some systems, a password provided directly in a connection string " +
+		"or using --uri may be visible to system status programs such as `ps` that may be " +
+		"invoked by other users. Consider omitting the password to provide it via stdin, " +
+		"or using the --config option to specify a configuration file with the password."
+
+	sslMsg := "WARNING: On some systems, a password provided directly using --sslPEMKeyPassword " +
+		"may be visible to system status programs such as `ps` that may be invoked by other users. " +
+		"Consider using the --config option to specify a configuration file with the password."
+
+	// Create temporary options for parsing command line args.
+	tempOpts := New("", "", EnabledOptions{Auth: true, Connection: true, URI: true})
+	_, err := tempOpts.parser.ParseArgs(args)
+	if err != nil {
+		return
+	}
+
+	// Log a message for --password, if specified.
+	if tempOpts.Auth.Password != "" {
+		log.Logvf(log.Always, passwordMsg)
+	}
+
+	// Log a message for --uri or a positional connection string, if either is specified.
+	uri := tempOpts.URI.ConnectionString
+	if uri != "" {
+		if cs, err := connstring.ParseURIConnectionString(uri); err == nil && cs.Password != "" {
+			log.Logvf(log.Always, uriMsg)
+		}
+	}
+
+	// Log a message for --sslPEMKeyPassword, if specified.
+	if tempOpts.SSL.SSLPEMKeyPassword != "" {
+		log.Logvf(log.Always, sslMsg)
+	}
+}
+
+// ParseConfigFile iterates over args to find a --config option. If not found, we return.
+// If found, we read the contents of the specified config file in YAML format. We parse
+// any values corresponding to --password, --uri and --sslPEMKeyPassword, and store them
+// in the opts.
+func (opts *ToolOptions) ParseConfigFile(args []string) error {
+	// Get config file path from the arguments, if specified.
+	_, err := opts.parser.ParseArgs(args)
+	if err != nil {
+		return err
+	}
+
+	// No --config option was specified.
+	if opts.General.ConfigPath == "" {
+		return nil
+	}
+
+	// --config option specifies a file path.
+	configBytes, err := ioutil.ReadFile(opts.General.ConfigPath)
+	if err != nil {
+		return errors.Wrapf(err, "error opening file with --config")
+	}
+
+	// Unmarshal the config file as a top-level YAML file.
+	var config struct {
+		Password          string `yaml:"password"`
+		ConnectionString  string `yaml:"uri"`
+		SSLPEMKeyPassword string `yaml:"sslPEMKeyPassword"`
+	}
+	err = yaml.UnmarshalStrict(configBytes, &config)
+	if err != nil {
+		return errors.Wrapf(err, "error parsing config file %s", opts.General.ConfigPath)
+	}
+
+	// Assign each parsed value to its respective ToolOptions field.
+	opts.Auth.Password = config.Password
+	opts.URI.ConnectionString = config.ConnectionString
+	opts.SSL.SSLPEMKeyPassword = config.SSLPEMKeyPassword
+
+	return nil
 }
 
 func (opts *ToolOptions) handleUnknownOption(option string, arg flags.SplitArgument, args []string) ([]string, error) {
