@@ -784,11 +784,13 @@ void TenantMigrationRecipientService::Instance::_startOplogFetcher() {
     options.dropCollectionAtStartup = false;
     options.dropCollectionAtShutdown = false;
     options.useTemporaryCollection = false;
+    // Create the oplog buffer outside the mutex to avoid deadlock on a concurrent stepdown.
+    auto oplogBufferNS = getOplogBufferNs(getMigrationUUID());
+    auto bufferCollection = std::make_unique<OplogBufferCollection>(
+        StorageInterface::get(opCtx.get()), oplogBufferNS, options);
     stdx::unique_lock lk(_mutex);
     invariant(_stateDoc.getStartFetchingDonorOpTime());
-    auto oplogBufferNS = getOplogBufferNs(getMigrationUUID());
-    _donorOplogBuffer = std::make_unique<OplogBufferCollection>(
-        StorageInterface::get(opCtx.get()), oplogBufferNS, options);
+    _donorOplogBuffer = std::move(bufferCollection);
 
     {
         // Ensure we are primary when trying to startup and create the oplog buffer collection.
