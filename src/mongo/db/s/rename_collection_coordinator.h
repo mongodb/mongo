@@ -51,6 +51,9 @@ public:
 private:
     SemiFuture<void> runImpl(std::shared_ptr<executor::TaskExecutor> executor) override;
 
+    void _renameUnshardedCollection(OperationContext* opCtx);
+    void _renameShardedCollection(OperationContext* opCtx);
+
     ServiceContext* _serviceContext;
     NamespaceString _toNss;
     bool _dropTarget;

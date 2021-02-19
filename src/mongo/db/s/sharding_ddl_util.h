@@ -80,5 +80,16 @@ boost::optional<CreateCollectionResponse> checkIfCollectionAlreadySharded(
     const BSONObj& collation,
     bool unique);
 
+/**
+ * Acquires the critical section for the specified namespace.
+ * It works even if the namespace's current metadata are UNKNOWN.
+ */
+void acquireCriticalSection(OperationContext* opCtx, const NamespaceString& nss);
+
+/**
+ * Releases the critical section for the specified namespace.
+ */
+void releaseCriticalSection(OperationContext* opCtx, const NamespaceString& nss);
+
 }  // namespace sharding_ddl_util
 }  // namespace mongo

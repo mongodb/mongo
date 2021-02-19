@@ -32,11 +32,11 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/catalog/rename_collection.h"
-#include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/shard_metadata_util.h"
+#include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
@@ -44,6 +44,32 @@
 
 namespace mongo {
 namespace {
+
+void dropCollectionLocally(OperationContext* opCtx, const NamespaceString& nss) {
+    bool knownNss = [&]() {
+        try {
+            DropReply result;
+            uassertStatusOK(
+                dropCollection(opCtx,
+                               nss,
+                               &result,
+                               DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops));
+            return true;
+        } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+            return false;
+        }
+    }();
+
+    if (knownNss) {
+        uassertStatusOK(shardmetadatautil::dropChunksAndDeleteCollectionsEntry(opCtx, nss));
+    }
+
+    LOGV2_DEBUG(5448800,
+                1,
+                "Dropped target collection locally on renameCollection participant",
+                "namespace"_attr = nss,
+                "collectionExisted"_attr = knownNss);
+}
 
 class ShardsvrRenameCollectionParticipantCommand final
     : public TypedCommand<ShardsvrRenameCollectionParticipantCommand> {
@@ -76,47 +102,30 @@ public:
             auto const shardingState = ShardingState::get(opCtx);
             uassertStatusOK(shardingState->canAcceptShardedCommands());
 
-            auto req = request();
-            const auto fromNss = ns();
-            const auto toNss = req.getTo();
-            RenameCollectionOptions options;
-            options.dropTarget = req.getDropTarget();
-            options.stayTemp = req.getStayTemp();
+            const auto& req = request();
+            const auto& fromNss = ns();
+            const auto& toNss = req.getTo();
+            const RenameCollectionOptions options{req.getDropTarget(), req.getStayTemp()};
 
-            {
-                // Take the source collection critical section
-                AutoGetCollection sourceCollLock(opCtx, fromNss, MODE_X);
-                auto* const fromCsr = CollectionShardingRuntime::get(opCtx, fromNss);
-                auto fromCsrLock =
-                    CollectionShardingRuntime::CSRLock::lockExclusive(opCtx, fromCsr);
-                if (!fromCsr->getCurrentMetadataIfKnown()) {
-                    // Setting metadata to UNSHARDED (can't be UNKNOWN when taking the critical
-                    // section)
-                    fromCsr->setFilteringMetadata(opCtx, CollectionMetadata());
-                }
-                fromCsr->enterCriticalSectionCatchUpPhase(fromCsrLock);
-                fromCsr->enterCriticalSectionCommitPhase(fromCsrLock);
-                fromCsr->clearFilteringMetadata(opCtx);
+            // Acquire source/target critical sections
+            sharding_ddl_util::acquireCriticalSection(opCtx, fromNss);
+            sharding_ddl_util::acquireCriticalSection(opCtx, toNss);
+
+            dropCollectionLocally(opCtx, toNss);
+
+            try {
+                // Rename the collection locally and clear the cache
+                validateAndRunRenameCollection(opCtx, fromNss, toNss, options);
+                uassertStatusOK(
+                    shardmetadatautil::dropChunksAndDeleteCollectionsEntry(opCtx, fromNss));
+            } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+                // It's ok for a participant shard to have no knowledge about a collection
+                LOGV2_DEBUG(
+                    5448801,
+                    1,
+                    "Source namespace not found while trying to rename collection on participant",
+                    "namespace"_attr = fromNss);
             }
-
-            {
-                // Take the destination collection critical section
-                AutoGetCollection targetCollLock(opCtx, toNss, MODE_X);
-                auto* const toCsr = CollectionShardingRuntime::get(opCtx, toNss);
-                auto toCsrLock = CollectionShardingRuntime::CSRLock::lockExclusive(opCtx, toCsr);
-                if (!toCsr->getCurrentMetadataIfKnown()) {
-                    // Setting metadata to UNSHARDED (can't be UNKNOWN when taking the critical
-                    // section)
-                    toCsr->setFilteringMetadata(opCtx, CollectionMetadata());
-                }
-                toCsr->enterCriticalSectionCatchUpPhase(toCsrLock);
-                toCsr->enterCriticalSectionCommitPhase(toCsrLock);
-                toCsr->clearFilteringMetadata(opCtx);
-            }
-
-            // Rename the collection locally and clear the cache
-            validateAndRunRenameCollection(opCtx, fromNss, toNss, options);
-            uassertStatusOK(shardmetadatautil::dropChunksAndDeleteCollectionsEntry(opCtx, fromNss));
         }
 
     private:
@@ -171,22 +180,12 @@ public:
             auto const shardingState = ShardingState::get(opCtx);
             uassertStatusOK(shardingState->canAcceptShardedCommands());
 
-            const auto& req = request();
             const auto& fromNss = ns();
-            const auto& toNss = req.getTo();
+            const auto& toNss = request().getTo();
 
-            {
-                AutoGetCollection sourceCollLock(opCtx, fromNss, MODE_X);
-                auto* const fromCsr = CollectionShardingRuntime::get(opCtx, fromNss);
-                auto fromCsrLock =
-                    CollectionShardingRuntime::CSRLock::lockExclusive(opCtx, fromCsr);
-                fromCsr->exitCriticalSection(opCtx);
-
-                AutoGetCollection targetCollLock(opCtx, toNss, MODE_X);
-                auto* const toCsr = CollectionShardingRuntime::get(opCtx, toNss);
-                auto toCsrLock = CollectionShardingRuntime::CSRLock::lockExclusive(opCtx, toCsr);
-                toCsr->exitCriticalSection(opCtx);
-            }
+            // Release source/target critical sections
+            sharding_ddl_util::releaseCriticalSection(opCtx, fromNss);
+            sharding_ddl_util::releaseCriticalSection(opCtx, toNss);
 
             auto catalog = Grid::get(opCtx)->catalogCache();
             uassertStatusOK(catalog->getCollectionRoutingInfoWithRefresh(opCtx, toNss));
