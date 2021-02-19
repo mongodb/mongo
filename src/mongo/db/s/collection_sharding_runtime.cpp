@@ -167,12 +167,10 @@ void CollectionShardingRuntime::checkShardVersionOrThrow(OperationContext* opCtx
 }
 
 void CollectionShardingRuntime::enterCriticalSectionCatchUpPhase(const CSRLock&) {
-    invariant(_metadataType != MetadataType::kUnknown);
     _critSec.enterCriticalSectionCatchUpPhase();
 }
 
 void CollectionShardingRuntime::enterCriticalSectionCommitPhase(const CSRLock&) {
-    invariant(_metadataType != MetadataType::kUnknown);
     _critSec.enterCriticalSectionCommitPhase();
 }
 

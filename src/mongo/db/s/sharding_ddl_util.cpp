@@ -34,6 +34,8 @@
 #include "mongo/db/s/sharding_ddl_util.h"
 
 #include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/db_raii.h"
+#include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_chunk.h"
@@ -240,6 +242,21 @@ boost::optional<CreateCollectionResponse> checkIfCollectionAlreadySharded(
     CreateCollectionResponse response(cm.getVersion());
     response.setCollectionUUID(cm.getUUID());
     return response;
+}
+
+void acquireCriticalSection(OperationContext* opCtx, const NamespaceString& nss) {
+    AutoGetCollection cCollLock(opCtx, nss, MODE_X);
+    auto* const csr = CollectionShardingRuntime::get(opCtx, nss);
+    auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(opCtx, csr);
+    csr->enterCriticalSectionCatchUpPhase(csrLock);
+    csr->enterCriticalSectionCommitPhase(csrLock);
+}
+
+void releaseCriticalSection(OperationContext* opCtx, const NamespaceString& nss) {
+    AutoGetCollection collLock(opCtx, nss, MODE_X);
+    auto* const csr = CollectionShardingRuntime::get(opCtx, nss);
+    csr->exitCriticalSection(opCtx);
+    csr->clearFilteringMetadata(opCtx);
 }
 
 }  // namespace sharding_ddl_util

@@ -35,8 +35,6 @@
 #include "mongo/db/catalog/rename_collection.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/dist_lock_manager.h"
 #include "mongo/db/s/shard_metadata_util.h"
@@ -78,6 +76,40 @@ void sendCommandToParticipants(OperationContext* opCtx,
     }
 }
 
+void sendDropCollToParticipants(OperationContext* opCtx,
+                                const NamespaceString& nss,
+                                const std::vector<ShardId>& participants) {
+    auto* const shardRegistry = Grid::get(opCtx)->shardRegistry();
+
+    const ShardsvrDropCollectionParticipant dropCollectionParticipant(nss);
+
+    for (const auto& shardId : participants) {
+        const auto& shard = uassertStatusOK(shardRegistry->getShard(opCtx, shardId));
+
+        const auto swDropResult = shard->runCommandWithFixedRetryAttempts(
+            opCtx,
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            nss.db().toString(),
+            CommandHelpers::appendMajorityWriteConcern(dropCollectionParticipant.toBSON({})),
+            Shard::RetryPolicy::kIdempotent);
+
+        uassertStatusOKWithContext(
+            Shard::CommandResponse::getEffectiveStatus(std::move(swDropResult)),
+            str::stream() << "Error dropping collection " << nss.toString()
+                          << " on participant shard " << shardId << " during rename");
+    }
+}
+
+bool isSharded(OperationContext* opCtx, const NamespaceString& nss) {
+    try {
+        Grid::get(opCtx)->catalogClient()->getCollection(opCtx, nss);
+        return true;
+    } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+        // The collection is unsharded or doesn't exist
+        return false;
+    }
+}
+
 }  // namespace
 
 RenameCollectionCoordinator::RenameCollectionCoordinator(OperationContext* opCtx,
@@ -91,6 +123,67 @@ RenameCollectionCoordinator::RenameCollectionCoordinator(OperationContext* opCtx
       _dropTarget(dropTarget),
       _stayTemp(stayTemp){};
 
+void RenameCollectionCoordinator::_renameUnshardedCollection(OperationContext* opCtx) {
+    const auto fromDB =
+        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabaseWithRefresh(opCtx, _nss.db()));
+
+    const auto toDB = uassertStatusOK(
+        Grid::get(opCtx)->catalogCache()->getDatabaseWithRefresh(opCtx, _toNss.db()));
+
+    uassert(5448802,
+            "Source and destination collections must be on same shard",
+            fromDB.primaryId() == toDB.primaryId());
+
+    if (_dropTarget) {
+        const std::vector<mongo::ShardId> participants = [&]() {
+            const auto catalogClient = Grid::get(opCtx)->catalogClient();
+            try {
+                auto coll = catalogClient->getCollection(opCtx, _toNss);
+                sharding_ddl_util::removeCollMetadataFromConfig(opCtx, coll);
+                return Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
+            } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+                // The collection is not sharded or doesn't exist
+                return std::vector<mongo::ShardId>{ShardingState::get(opCtx)->shardId()};
+            }
+        }();
+    }
+
+    validateAndRunRenameCollection(opCtx, _nss, _toNss, {_dropTarget, _stayTemp});
+}
+
+void RenameCollectionCoordinator::_renameShardedCollection(OperationContext* opCtx) {
+    uassert(ErrorCodes::CommandFailed,
+            "Source and destination collections must be on the same database.",
+            _nss.db() == _toNss.db());
+
+    // Rename the collection locally and clear the cache
+    validateAndRunRenameCollection(opCtx, _nss, _toNss, {_dropTarget, _stayTemp});
+    shardmetadatautil::dropChunksAndDeleteCollectionsEntry(opCtx, _nss).ignore();
+
+    // Rename the collection locally on all other shards
+    ShardsvrRenameCollectionParticipant renameCollParticipantRequest(_nss);
+    renameCollParticipantRequest.setDbName(_nss.db());
+    renameCollParticipantRequest.setDropTarget(_dropTarget);
+    renameCollParticipantRequest.setStayTemp(_stayTemp);
+    renameCollParticipantRequest.setTo(_toNss);
+    sendCommandToParticipants(opCtx,
+                              _nss.db(),
+                              ShardsvrRenameCollectionParticipant::kCommandName,
+                              renameCollParticipantRequest.toBSON({}));
+
+    // Rename CSRS metadata
+    sharding_ddl_util::shardedRenameMetadata(opCtx, _nss, _toNss);
+
+    // Unblock participants for r/w on source and destination collections
+    ShardsvrRenameCollectionUnblockParticipant unblockParticipantRequest(_nss);
+    unblockParticipantRequest.setDbName(_nss.db());
+    unblockParticipantRequest.setTo(_toNss);
+    sendCommandToParticipants(opCtx,
+                              _nss.db(),
+                              ShardsvrRenameCollectionUnblockParticipant::kCommandName,
+                              unblockParticipantRequest.toBSON({}));
+}
+
 SemiFuture<void> RenameCollectionCoordinator::runImpl(
     std::shared_ptr<executor::TaskExecutor> executor) {
     return ExecutorFuture<void>(executor, Status::OK())
@@ -100,10 +193,6 @@ SemiFuture<void> RenameCollectionCoordinator::runImpl(
             auto* opCtx = opCtxHolder.get();
             _forwardableOpMetadata.setOn(opCtx);
 
-            uassert(ErrorCodes::CommandFailed,
-                    "Source and destination collections must be on the same database.",
-                    _nss.db() == _toNss.db());
-
             auto distLockManager = DistLockManager::get(opCtx->getServiceContext());
             const auto dbDistLock = uassertStatusOK(distLockManager->lock(
                 opCtx, _nss.db(), "RenameCollection", DistLockManager::kDefaultLockTimeout));
@@ -112,89 +201,51 @@ SemiFuture<void> RenameCollectionCoordinator::runImpl(
             const auto toCollDistLock = uassertStatusOK(distLockManager->lock(
                 opCtx, _toNss.ns(), "RenameCollection", DistLockManager::kDefaultLockTimeout));
 
-            RenameCollectionOptions options{_dropTarget, _stayTemp};
-
-            sharding_ddl_util::checkShardedRenamePreconditions(opCtx, _toNss, options.dropTarget);
-
-            {
-                // Take the source collection critical section
-                AutoGetCollection sourceCollLock(opCtx, _nss, MODE_X);
-                auto* const fromCsr = CollectionShardingRuntime::get(opCtx, _nss);
-                auto fromCsrLock =
-                    CollectionShardingRuntime::CSRLock::lockExclusive(opCtx, fromCsr);
-                fromCsr->enterCriticalSectionCatchUpPhase(fromCsrLock);
-                fromCsr->enterCriticalSectionCommitPhase(fromCsrLock);
+            // Make sure that the source collection exists
+            const auto sourceIsSharded = isSharded(opCtx, _nss);
+            if (!sourceIsSharded) {
+                const auto sourceCollPtr =
+                    CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, _nss);
+                uassert(ErrorCodes::CommandFailed,
+                        str::stream() << "Collection " << _nss << " doesn't exist.",
+                        sourceCollPtr);
             }
 
+            sharding_ddl_util::checkShardedRenamePreconditions(opCtx, _toNss, _dropTarget);
+
+            // Acquire source/target critical sections
+            sharding_ddl_util::acquireCriticalSection(opCtx, _nss);
+            sharding_ddl_util::acquireCriticalSection(opCtx, _toNss);
+
             {
-                // Take the destination collection critical section
-                AutoGetCollection targetCollLock(opCtx, _toNss, MODE_X);
-                auto* const toCsr = CollectionShardingRuntime::get(opCtx, _toNss);
-                auto toCsrLock = CollectionShardingRuntime::CSRLock::lockExclusive(opCtx, toCsr);
-                if (!toCsr->getCurrentMetadataIfKnown()) {
-                    // Setting metadata to UNSHARDED (can't be UNKNOWN when taking the critical
-                    // section)
-                    toCsr->setFilteringMetadata(opCtx, CollectionMetadata());
+                // Release critical sections both in case of rename success/failure
+                ON_BLOCK_EXIT([&] {
+                    sharding_ddl_util::releaseCriticalSection(opCtx, _nss);
+                    sharding_ddl_util::releaseCriticalSection(opCtx, _toNss);
+                });
+
+                if (sourceIsSharded) {
+                    _renameShardedCollection(opCtx);
+                } else {
+                    _renameUnshardedCollection(opCtx);
                 }
-                toCsr->enterCriticalSectionCatchUpPhase(toCsrLock);
-                toCsr->enterCriticalSectionCommitPhase(toCsrLock);
             }
 
-            // Rename the collection locally and clear the cache
-            validateAndRunRenameCollection(opCtx, _nss, _toNss, options);
-            uassertStatusOK(shardmetadatautil::dropChunksAndDeleteCollectionsEntry(opCtx, _nss));
-
-            // Rename the collection locally on all other shards
-            ShardsvrRenameCollectionParticipant renameCollParticipantRequest(_nss);
-            renameCollParticipantRequest.setDbName(_nss.db());
-            renameCollParticipantRequest.setDropTarget(_dropTarget);
-            renameCollParticipantRequest.setStayTemp(_stayTemp);
-            renameCollParticipantRequest.setTo(_toNss);
-            sendCommandToParticipants(opCtx,
-                                      _nss.db(),
-                                      ShardsvrRenameCollectionParticipant::kCommandName,
-                                      renameCollParticipantRequest.toBSON({}));
-
-            sharding_ddl_util::shardedRenameMetadata(opCtx, _nss, _toNss);
-
-            // Unblock participants for r/w on source and destination collections
-            ShardsvrRenameCollectionUnblockParticipant unblockParticipantRequest(_nss);
-            unblockParticipantRequest.setDbName(_nss.db());
-            unblockParticipantRequest.setTo(_toNss);
-            sendCommandToParticipants(opCtx,
-                                      _nss.db(),
-                                      ShardsvrRenameCollectionUnblockParticipant::kCommandName,
-                                      unblockParticipantRequest.toBSON({}));
-
-            {
-                // Clear source critical section
-                AutoGetCollection sourceCollLock(opCtx, _nss, MODE_X);
-                auto* const fromCsr = CollectionShardingRuntime::get(opCtx, _nss);
-                fromCsr->exitCriticalSection(opCtx);
-                fromCsr->clearFilteringMetadata(opCtx);
-            }
-
-            {
-                // Clear target critical section
-                AutoGetCollection targetCollLock(opCtx, _toNss, MODE_X);
-                auto* const toCsr = CollectionShardingRuntime::get(opCtx, _toNss);
-                toCsr->exitCriticalSection(opCtx);
-                toCsr->clearFilteringMetadata(opCtx);
-            }
-
-            auto catalog = Grid::get(opCtx)->catalogCache();
-            auto cm = uassertStatusOK(catalog->getCollectionRoutingInfoWithRefresh(opCtx, _toNss));
-            _response.emplaceValue(RenameCollectionResponse(cm.getVersion()));
+            const auto catalog = Grid::get(opCtx)->catalogCache();
+            const auto cm =
+                uassertStatusOK(catalog->getCollectionRoutingInfoWithRefresh(opCtx, _toNss));
+            const auto version = cm.isSharded() ? cm.getVersion() : ChunkVersion::UNSHARDED();
+            _response.emplaceValue(RenameCollectionResponse(version));
         })
         .onError([this, anchor = shared_from_this()](const Status& status) {
             LOGV2_ERROR(5438700,
                         "Error running rename collection",
                         "namespace"_attr = _nss,
                         "error"_attr = redact(status));
+            _response.setError(status);
             return status;
         })
         .semi();
 }
-
 
 }  // namespace mongo
