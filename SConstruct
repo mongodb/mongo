@@ -272,6 +272,21 @@ add_option('opt',
     type='choice',
 )
 
+experimental_optimizations = []
+experimental_optimization_choices = ['*']
+experimental_optimization_choices.extend("+" + opt for opt in experimental_optimizations)
+experimental_optimization_choices.extend("-" + opt for opt in experimental_optimizations)
+
+add_option('experimental-optimization',
+    action="append",
+    choices=experimental_optimization_choices,
+    const=experimental_optimization_choices[0],
+    default=[],
+    help='Enable experimental optimizations',
+    nargs='?',
+    type='choice'
+)
+
 add_option('debug-compress',
     action="append",
     choices=["off", "as", "ld"],
@@ -501,6 +516,21 @@ add_option('runtime-hardening',
     default="on",
     help="Enable runtime hardening features (e.g. stack smash protection)",
     type='choice',
+)
+
+experimental_runtime_hardenings = []
+experimental_runtime_hardening_choices = ['*']
+experimental_runtime_hardening_choices.extend("+" + opt for opt in experimental_runtime_hardenings)
+experimental_runtime_hardening_choices.extend("-" + opt for opt in experimental_runtime_hardenings)
+
+add_option('experimental-runtime-hardening',
+    action="append",
+    choices=experimental_runtime_hardening_choices,
+    const=experimental_runtime_hardening_choices[0],
+    default=[],
+    help='Enable experimental runtime hardenings',
+    nargs='?',
+    type='choice'
 )
 
 add_option('use-hardware-crc32',
@@ -2066,6 +2096,26 @@ if debugBuild:
     env.SetConfigHeaderDefine("MONGO_CONFIG_DEBUG_BUILD")
 else:
     env.AppendUnique( CPPDEFINES=[ 'NDEBUG' ] )
+
+
+# Normalize our experimental optimiation and hardening flags
+selected_experimental_optimizations = set()
+for suboption in get_option('experimental-optimization'):
+    if suboption == "*":
+        selected_experimental_optimizations.update(experimental_optimizations)
+    elif suboption.startswith('-'):
+        selected_experimental_optimizations.discard(suboption[1:])
+    elif suboption.startswith('+'):
+        selected_experimental_optimizations.add(suboption[1:])
+
+selected_experimental_runtime_hardenings = set()
+for suboption in get_option('experimental-runtime-hardening'):
+    if suboption == "*":
+        selected_experimental_runtime_hardenings.update(experimental_runtime_hardenings)
+    elif suboption.startswith('-'):
+        selected_experimental_runtime_hardenings.discard(suboption[1:])
+    elif suboption.startswith('+'):
+        selected_experimental_runtime_hardenings.add(suboption[1:])
 
 if env.TargetOSIs('linux'):
     env.Append( LIBS=["m"] )
