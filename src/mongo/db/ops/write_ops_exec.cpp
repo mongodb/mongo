@@ -240,7 +240,6 @@ bool handleError(OperationContext* opCtx,
                  const DBException& ex,
                  const NamespaceString& nss,
                  const write_ops::WriteCommandBase& wholeOp,
-                 bool isMultiUpdate,
                  WriteResult* out) {
     LastError::get(opCtx->getClient()).setLastError(ex.code(), ex.reason());
     auto& curOp = *CurOp::get(opCtx);
@@ -281,17 +280,6 @@ bool handleError(OperationContext* opCtx,
     }
 
     if (ErrorCodes::isTenantMigrationError(ex)) {
-        if (isMultiUpdate) {
-            BSONObjBuilder builder;
-            ex.serialize(&builder);
-            // Multiple not-idempotent updates are not safe to retry at the cloud level. To indicate
-            // this, we replace the original error.
-            out->results.emplace_back(
-                Status(ErrorCodes::Interrupted,
-                       str::stream() << "Multi update was interrupted by error: " << ex.reason(),
-                       builder.obj()));
-            return false;
-        }
         // If an op fails due to a TenantMigrationError then subsequent ops will also fail due to a
         // migration blocking, committing, or aborting.
         out->results.emplace_back(ex.toStatus());
@@ -433,12 +421,8 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
         if (inTxn) {
             // It is not safe to ignore errors from collection creation while inside a
             // multi-document transaction.
-            auto canContinue = handleError(opCtx,
-                                           ex,
-                                           wholeOp.getNamespace(),
-                                           wholeOp.getWriteCommandBase(),
-                                           false /* multiUpdate */,
-                                           out);
+            auto canContinue =
+                handleError(opCtx, ex, wholeOp.getNamespace(), wholeOp.getWriteCommandBase(), out);
             invariant(!canContinue);
             return false;
         }
@@ -505,12 +489,8 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
                 }
             });
         } catch (const DBException& ex) {
-            bool canContinue = handleError(opCtx,
-                                           ex,
-                                           wholeOp.getNamespace(),
-                                           wholeOp.getWriteCommandBase(),
-                                           false /* multiUpdate */,
-                                           out);
+            bool canContinue =
+                handleError(opCtx, ex, wholeOp.getNamespace(), wholeOp.getWriteCommandBase(), out);
 
             if (!canContinue) {
                 // Failed in ordered batch, or in a transaction, or from some unrecoverable error.
@@ -631,12 +611,8 @@ WriteResult performInserts(OperationContext* opCtx,
                 uassertStatusOK(fixedDoc.getStatus());
                 MONGO_UNREACHABLE;
             } catch (const DBException& ex) {
-                canContinue = handleError(opCtx,
-                                          ex,
-                                          wholeOp.getNamespace(),
-                                          wholeOp.getWriteCommandBase(),
-                                          false /* multiUpdate */,
-                                          &out);
+                canContinue = handleError(
+                    opCtx, ex, wholeOp.getNamespace(), wholeOp.getWriteCommandBase(), &out);
             }
 
             if (!canContinue) {
@@ -875,12 +851,8 @@ WriteResult performUpdates(OperationContext* opCtx, const write_ops::Update& who
                                                                           wholeOp.getLet()));
             lastOpFixer.finishedOpSuccessfully();
         } catch (const DBException& ex) {
-            const bool canContinue = handleError(opCtx,
-                                                 ex,
-                                                 wholeOp.getNamespace(),
-                                                 wholeOp.getWriteCommandBase(),
-                                                 singleOp.getMulti(),
-                                                 &out);
+            const bool canContinue =
+                handleError(opCtx, ex, wholeOp.getNamespace(), wholeOp.getWriteCommandBase(), &out);
             if (!canContinue)
                 break;
         }
@@ -1046,12 +1018,8 @@ WriteResult performDeletes(OperationContext* opCtx, const write_ops::Delete& who
                                                            wholeOp.getLet()));
             lastOpFixer.finishedOpSuccessfully();
         } catch (const DBException& ex) {
-            const bool canContinue = handleError(opCtx,
-                                                 ex,
-                                                 wholeOp.getNamespace(),
-                                                 wholeOp.getWriteCommandBase(),
-                                                 false /* multiUpdate */,
-                                                 &out);
+            const bool canContinue =
+                handleError(opCtx, ex, wholeOp.getNamespace(), wholeOp.getWriteCommandBase(), &out);
             if (!canContinue)
                 break;
         }
