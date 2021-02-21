@@ -149,3 +149,18 @@ assert.eq("missagain", cmdRes.value._id);
 
 // Two upserts should have happened.
 assert.eq(2, t.count());
+
+//
+// findAndModify must work against the admin and config collections
+//
+
+['admin', 'config'].forEach(function(dbName) {
+    var sysDb = db.getSiblingDB(dbName);
+    assert.commandWorked(sysDb.runCommand({
+        findAndModify: 'find_and_modify_js_test',
+        query: {_id: 0},
+        update: {'$set': {Value: dbName}},
+        upsert: true,
+        new: true,
+    }));
+});

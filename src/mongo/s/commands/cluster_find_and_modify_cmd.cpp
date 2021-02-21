@@ -216,13 +216,15 @@ public:
                         applyReadWriteConcern(opCtx, false, false, explainCmd),
                         &bob);
         } else {
-            _runCommand(opCtx,
-                        shard->getId(),
-                        ChunkVersion::UNSHARDED(),
-                        routingInfo.db().databaseVersion(),
-                        nss,
-                        applyReadWriteConcern(opCtx, false, false, explainCmd),
-                        &bob);
+            _runCommand(
+                opCtx,
+                shard->getId(),
+                boost::make_optional(!databaseVersion::isFixed(routingInfo.db().databaseVersion()),
+                                     ChunkVersion::UNSHARDED()),
+                routingInfo.db().databaseVersion(),
+                nss,
+                applyReadWriteConcern(opCtx, false, false, explainCmd),
+                &bob);
         }
 
         const auto millisElapsed = timer.millis();
@@ -258,13 +260,15 @@ public:
 
         const auto routingInfo = uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, nss));
         if (!routingInfo.cm()) {
-            _runCommand(opCtx,
-                        routingInfo.db().primaryId(),
-                        ChunkVersion::UNSHARDED(),
-                        routingInfo.db().databaseVersion(),
-                        nss,
-                        applyReadWriteConcern(opCtx, this, cmdObjForShard),
-                        &result);
+            _runCommand(
+                opCtx,
+                routingInfo.db().primaryId(),
+                boost::make_optional(!databaseVersion::isFixed(routingInfo.db().databaseVersion()),
+                                     ChunkVersion::UNSHARDED()),
+                routingInfo.db().databaseVersion(),
+                nss,
+                applyReadWriteConcern(opCtx, this, cmdObjForShard),
+                &result);
             return true;
         }
 
@@ -289,8 +293,8 @@ public:
 private:
     static void _runCommand(OperationContext* opCtx,
                             const ShardId& shardId,
-                            const ChunkVersion& shardVersion,
-                            boost::optional<DatabaseVersion> dbVersion,
+                            const boost::optional<ChunkVersion>& shardVersion,
+                            const boost::optional<DatabaseVersion>& dbVersion,
                             const NamespaceString& nss,
                             const BSONObj& cmdObj,
                             BSONObjBuilder* result) {
@@ -302,7 +306,10 @@ private:
             if (dbVersion) {
                 cmdObjWithVersions = appendDbVersionIfPresent(cmdObjWithVersions, *dbVersion);
             }
-            requests.emplace_back(shardId, appendShardVersion(cmdObjWithVersions, shardVersion));
+            if (shardVersion) {
+                cmdObjWithVersions = appendShardVersion(cmdObjWithVersions, *shardVersion);
+            }
+            requests.emplace_back(shardId, cmdObjWithVersions);
 
             MultiStatementTransactionRequestsSender ars(
                 opCtx,
