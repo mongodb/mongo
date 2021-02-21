@@ -131,7 +131,7 @@ public:
 
     void onCollMod(OperationContext* opCtx,
                    const NamespaceString& nss,
-                   OptionalCollectionUUID uuid,
+                   const UUID& uuid,
                    const BSONObj& collModCmd,
                    const CollectionOptions& oldCollOptions,
                    boost::optional<IndexCollModInfo> indexInfo) override {}

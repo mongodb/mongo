@@ -1185,6 +1185,7 @@ env.Library(
         'exec/upsert_stage.cpp',
         'exec/working_set_common.cpp',
         'exec/write_stage_common.cpp',
+        'ops/delete_request.idl',
         'ops/parsed_delete.cpp',
         'ops/update_result.cpp',
         'pipeline/document_source_cursor.cpp',
@@ -1916,7 +1917,6 @@ env.Library(
         'ops/update.cpp',
         'ops/write_ops_retryability.cpp',
         'ops/single_write_result.idl',
-        'ops/delete_request.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',

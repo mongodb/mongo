@@ -602,13 +602,13 @@ write_ops::Insert CommonMongodProcessInterface::buildInsertOp(const NamespaceStr
     return insertOp;
 }
 
-Update CommonMongodProcessInterface::buildUpdateOp(
+write_ops::Update CommonMongodProcessInterface::buildUpdateOp(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const NamespaceString& nss,
     BatchedObjects&& batch,
     UpsertType upsert,
     bool multi) {
-    Update updateOp(nss);
+    write_ops::Update updateOp(nss);
     updateOp.setUpdates([&] {
         std::vector<write_ops::UpdateOpEntry> updateEntries;
         for (auto&& obj : batch) {
