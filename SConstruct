@@ -273,6 +273,7 @@ add_option('opt',
 )
 
 experimental_optimizations = [
+    'fnsi',
     'sandybridge',
     'treevec',
 ]
@@ -3636,6 +3637,9 @@ def doConfigure(myenv):
                     myenv,
                     f"-Wl,--{compress_flag}=none")
 
+        if "fnsi" in selected_experimental_optimizations:
+            AddToCCFLAGSIfSupported(myenv, "-fno-semantic-interposition")
+
     # Avoid deduping symbols on OS X debug builds, as it takes a long time.
     if not optBuild and myenv.ToolchainIs('clang') and env.TargetOSIs('darwin'):
         AddToLINKFLAGSIfSupported(myenv, "-Wl,-no_deduplicate")
@@ -4351,7 +4355,10 @@ def doConfigure(myenv):
         elif usdt_provider:
             conf.env.SetConfigHeaderDefine("MONGO_CONFIG_USDT_ENABLED")
             conf.env.SetConfigHeaderDefine("MONGO_CONFIG_USDT_PROVIDER", usdt_provider)
-    return conf.Finish()
+    myenv = conf.Finish()
+
+    return myenv
+
 
 
 env = doConfigure( env )
