@@ -272,7 +272,9 @@ add_option('opt',
     type='choice',
 )
 
-experimental_optimizations = []
+experimental_optimizations = [
+    'sandybridge',
+]
 experimental_optimization_choices = ['*']
 experimental_optimization_choices.extend("+" + opt for opt in experimental_optimizations)
 experimental_optimization_choices.extend("-" + opt for opt in experimental_optimizations)
@@ -2536,6 +2538,12 @@ if not env.TargetOSIs('windows') and (env.ToolchainIs('GCC', 'clang')):
         "ppc64le"    : { "-mcpu="  : "power8",       "-mtune=" : "power8", "-mcmodel=" : "medium" },
         "s390x"      : { "-march=" : "z196",         "-mtune=" : "zEC12"                          },
     }
+
+    if "sandybridge" in selected_experimental_optimizations:
+        default_targeting_flags_for_architecture["x86_64"] = {
+            "-march=" : "sandybridge",
+            "-mtune=" : "generic",
+        }
 
     default_targeting_flags = default_targeting_flags_for_architecture.get(env['TARGET_ARCH'])
     if default_targeting_flags:
