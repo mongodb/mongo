@@ -1,5 +1,5 @@
 /**
- * Tests that migration certificates do not show up in the logs or system.profile collections.
+ * Tests that migration certificates do not show up in the logs.
  *
  * @tags: [requires_fcv_47, requires_majority_read_concern, incompatible_with_eft,
  * incompatible_with_windows_tls]
@@ -75,41 +75,6 @@ const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
     assert.commandWorked(donorPrimary.adminCommand({profile: 0, slowms: donorDefaultSlowMs}));
     assert.commandWorked(
         recipientPrimary.adminCommand({profile: 0, slowms: recipientDefaultSlowMs}));
-})();
-
-// Verify that migration certificates do not show up in system.profile collections.
-(() => {
-    const donorAdminDB = donorPrimary.getDB("config");
-    const recipientAdminDB = recipientPrimary.getDB("config");
-
-    donorAdminDB.setProfilingLevel(2);
-    recipientAdminDB.setProfilingLevel(2);
-
-    const migrationOpts = {
-        migrationIdString: extractUUIDFromObject(UUID()),
-        tenantId: "profiler",
-    };
-
-    const stateRes = assert.commandWorked(tenantMigrationTest.runMigration(migrationOpts));
-    assert.eq(stateRes.state, TenantMigrationTest.State.kCommitted);
-
-    donorAdminDB.system.profile.find({ns: TenantMigrationTest.kConfigDonorsNS}).forEach(doc => {
-        assertNoCertificateOrPrivateKeyFields(doc);
-    });
-    recipientAdminDB.system.profile.find({ns: TenantMigrationTest.kConfigRecipientsNS})
-        .forEach(doc => {
-            assertNoCertificateOrPrivateKeyFields(doc);
-        });
-
-    assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
-
-    donorAdminDB.system.profile.find({ns: TenantMigrationTest.kConfigDonorsNS}).forEach(doc => {
-        assertNoCertificateOrPrivateKeyFields(doc);
-    });
-    recipientAdminDB.system.profile.find({ns: TenantMigrationTest.kConfigRecipientsNS})
-        .forEach(doc => {
-            assertNoCertificateOrPrivateKeyFields(doc);
-        });
 })();
 
 tenantMigrationTest.stop();

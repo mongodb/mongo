@@ -69,7 +69,13 @@ class TenantMigrationRecipientAccessBlocker
     : public std::enable_shared_from_this<TenantMigrationRecipientAccessBlocker>,
       public TenantMigrationAccessBlocker {
 public:
+    /**
+     * The access states of an mtab.
+     */
+    enum class State { kReject, kRejectBefore };
+
     TenantMigrationRecipientAccessBlocker(ServiceContext* serviceContext,
+                                          UUID migrationId,
                                           std::string tenantId,
                                           std::string donorConnString);
 
@@ -100,6 +106,8 @@ public:
 
     void appendInfoForServerStatus(BSONObjBuilder* builder) const final;
 
+    UUID getMigrationId() const;
+
     BSONObj getDebugInfo() const final;
 
     void recordTenantMigrationError(Status status) final{};
@@ -109,14 +117,15 @@ public:
     //
     void startRejectingReadsBefore(const Timestamp& timestamp);
 
+    State getState() const {
+        return _state;
+    }
+
 private:
-    /**
-     * The access states of an mtab.
-     */
-    enum class State { kReject, kRejectBefore };
     std::string _stateToString(State state) const;
 
     ServiceContext* _serviceContext;
+    const UUID _migrationId;
     const std::string _tenantId;
     const std::string _donorConnString;
 

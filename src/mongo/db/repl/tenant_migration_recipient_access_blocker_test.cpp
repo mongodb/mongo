@@ -101,6 +101,10 @@ public:
         return _opCtx.get();
     }
 
+    UUID getMigrationId() const {
+        return _migrationId;
+    }
+
     std::string getTenantId() const {
         return _tenantId;
     }
@@ -110,6 +114,7 @@ public:
     }
 
 private:
+    const UUID _migrationId = UUID::gen();
     const std::string _tenantId = "tenant123";
     const std::string _donorConnectionString = "TestRS/HostA:12345,HostB:12345";
     ServiceContext::UniqueOperationContext _opCtx;
@@ -117,7 +122,7 @@ private:
 
 TEST_F(TenantMigrationRecipientAccessBlockerTest, NoopFunctions) {
     TenantMigrationRecipientAccessBlocker mtab(
-        getServiceContext(), getTenantId(), getDonorConnectionString());
+        getServiceContext(), getMigrationId(), getTenantId(), getDonorConnectionString());
 
     // These functions are noop functions and should not throw even in reject state.
     ASSERT_OK(mtab.checkIfCanWrite());
@@ -127,7 +132,7 @@ TEST_F(TenantMigrationRecipientAccessBlockerTest, NoopFunctions) {
 
 TEST_F(TenantMigrationRecipientAccessBlockerTest, StateReject) {
     TenantMigrationRecipientAccessBlocker mtab(
-        getServiceContext(), getTenantId(), getDonorConnectionString());
+        getServiceContext(), getMigrationId(), getTenantId(), getDonorConnectionString());
 
     {
         BSONObjBuilder builder;
@@ -162,7 +167,7 @@ TEST_F(TenantMigrationRecipientAccessBlockerTest, StateReject) {
 
 TEST_F(TenantMigrationRecipientAccessBlockerTest, StateRejectBefore) {
     TenantMigrationRecipientAccessBlocker mtab(
-        getServiceContext(), getTenantId(), getDonorConnectionString());
+        getServiceContext(), getMigrationId(), getTenantId(), getDonorConnectionString());
 
     mtab.startRejectingReadsBefore(Timestamp(1, 1));
     {

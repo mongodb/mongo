@@ -40,6 +40,7 @@ function testDonorForgetMigrationAfterMigrationCompletes(
     assert.eq(recipientForgetMigrationMetrics.failed, 0);
     assert.eq(recipientForgetMigrationMetrics.total, expectedNumRecipientForgetMigrationCmdSent);
 
+    // Wait for garbage collection on donor.
     donorRst.nodes.forEach((node) => {
         assert.soon(() =>
                         null == node.adminCommand({serverStatus: 1}).tenantMigrationAccessBlocker);
@@ -55,33 +56,60 @@ function testDonorForgetMigrationAfterMigrationCompletes(
     const donorRecipientMonitorPoolStats =
         donorPrimary.adminCommand({connPoolStats: 1}).replicaSets;
     assert.eq(Object.keys(donorRecipientMonitorPoolStats).length, 0);
+
+    // Wait for garbage collection on recipient.
+    recipientRst.nodes.forEach((node) => {
+        assert.soon(() =>
+                        null == node.adminCommand({serverStatus: 1}).tenantMigrationAccessBlocker);
+    });
+
+    assert.soon(() => 0 ===
+                    recipientPrimary.getCollection(TenantMigrationTest.kConfigRecipientsNS).count({
+                        tenantId: tenantId
+                    }));
+    assert.soon(() => 0 ===
+                    recipientPrimary.adminCommand({serverStatus: 1})
+                        .repl.primaryOnlyServices.TenantMigrationRecipientService);
+
+    const recipientRecipientMonitorPoolStats =
+        recipientPrimary.adminCommand({connPoolStats: 1}).replicaSets;
+    assert.eq(Object.keys(recipientRecipientMonitorPoolStats).length, 0);
 }
+
+const sharedOptions = {
+    setParameter: {
+        // Set the delay before a state doc is garbage collected to be short to speed up the test.
+        tenantMigrationGarbageCollectionDelayMS: 3 * 1000,
+        ttlMonitorSleepSecs: 1,
+    }
+};
+const x509Options = TenantMigrationUtil.makeX509OptionsForTest();
 
 const donorRst = new ReplSetTest({
     nodes: [{}, {rsConfig: {priority: 0}}, {rsConfig: {priority: 0}}],
     name: "donor",
-    nodeOptions: Object.assign(TenantMigrationUtil.makeX509OptionsForTest().donor, {
-        setParameter: {
-            // Set the delay before a donor state doc is garbage collected to be short to speed up
-            // the test.
-            tenantMigrationGarbageCollectionDelayMS: 3 * 1000,
+    nodeOptions: Object.assign(x509Options.donor, sharedOptions)
+});
 
-            // Set the TTL monitor to run at a smaller interval to speed up the test.
-            ttlMonitorSleepSecs: 1,
-        }
-    })
+const recipientRst = new ReplSetTest({
+    nodes: [{}, {rsConfig: {priority: 0}}, {rsConfig: {priority: 0}}],
+    name: "recipient",
+    nodeOptions: Object.assign(x509Options.recipient, sharedOptions)
 });
 
 donorRst.startSet();
 donorRst.initiate();
 
-const tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), donorRst});
+recipientRst.startSet();
+recipientRst.initiate();
+
+const tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), donorRst, recipientRst});
 if (!tenantMigrationTest.isFeatureFlagEnabled()) {
     jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
     donorRst.stopSet();
+    recipientRst.stopSet();
     return;
 }
-const recipientRst = tenantMigrationTest.getRecipientRst();
 
 const donorPrimary = tenantMigrationTest.getDonorPrimary();
 const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
@@ -220,4 +248,5 @@ configDonorsColl.dropIndex({expireAt: 1});
 
 tenantMigrationTest.stop();
 donorRst.stopSet();
+recipientRst.stopSet();
 })();

@@ -75,8 +75,13 @@ waitBeforeCloning.off();
 // Wait for the cloning phase to finish. Check that the recipient has only cloned documents that are
 // majority committed on the donor replica set.
 waitAfterCloning.wait();
+// Tenant migration recipient rejects all reads until it has applied data past the blockTimestamp
+// (returnAfterReachingTimestamp). Use this failpoint to allow the find command below to succeed.
+const notRejectReadsFp =
+    configureFailPoint(recipientPrimary, "tenantMigrationRecipientNotRejectReads");
 const recipientColl = recipientPrimary.getDB(dbName).getCollection(collName);
 assert.eq(2, recipientColl.find().itcount());
+notRejectReadsFp.off();
 
 // Restart secondary replication in the donor replica set and complete the migration.
 restartReplicationOnSecondaries(donorRst);

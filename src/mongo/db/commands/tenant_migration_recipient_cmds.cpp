@@ -108,9 +108,9 @@ public:
                         recipientInstance->waitUntilMigrationReachesConsistentState(opCtx));
                 }
 
-                return Response(recipientInstance->waitUntilTimestampIsMajorityCommitted(
-                    opCtx, *returnAfterReachingDonorTs));
-
+                return Response(
+                    recipientInstance->waitUntilMigrationReachesReturnAfterReachingTimestamp(
+                        opCtx, *returnAfterReachingDonorTs));
             } catch (ExceptionFor<ErrorCodes::ConflictingOperationInProgress>& ex) {
                 // A conflict may arise when inserting the recipientInstance's  state document.
                 // Since the conflict occurred at the insert stage, that means this instance's

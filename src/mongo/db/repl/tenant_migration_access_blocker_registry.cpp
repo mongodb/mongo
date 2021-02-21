@@ -45,9 +45,7 @@ void TenantMigrationAccessBlockerRegistry::add(StringData tenantId,
 
     if (it != _tenantMigrationAccessBlockers.end()) {
         uasserted(ErrorCodes::ConflictingOperationInProgress,
-                  str::stream() << "Found active migration for tenantId \"" << it->first
-                                << "\" which conflicts with the specified tenantId \"" << tenantId
-                                << "\"");
+                  str::stream() << "Found active migration for tenantId \"" << tenantId << "\"");
     }
 
     _tenantMigrationAccessBlockers.emplace(tenantId, mtab);

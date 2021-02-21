@@ -194,6 +194,14 @@ structs:
                     cloning finishes.
                 type: optime
                 optional: true
+            rejectReadsBeforeTimestamp:
+                description: >-
+                    Populated during data sync when the recipientSyncData with the
+                    returnAfterReachingTimestamp is received after data is consistent; the earliest
+                    timestamp at which reads are allowed on the recipient (corresponds to the
+                    donor's blockTimestamp).
+                type: timestamp
+                optional: true
             cloneFinishedRecipientOpTime:
                 description: >-
                     Populated during data sync; the recipient operation time when the data

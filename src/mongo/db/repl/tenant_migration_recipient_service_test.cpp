@@ -2942,7 +2942,7 @@ TEST_F(TenantMigrationRecipientServiceTest,
     ASSERT_OK(instance->getCompletionFuture().getNoThrow());
 }
 
-TEST_F(TenantMigrationRecipientServiceTest, WaitUntilTimestampIsMajorityCommitted) {
+TEST_F(TenantMigrationRecipientServiceTest, WaitUntilMigrationReachesReturnAfterReachingTimestamp) {
     const UUID migrationUUID = UUID::gen();
     const OpTime topOfOplogOpTime(Timestamp(5, 1), 1);
 
@@ -2978,25 +2978,19 @@ TEST_F(TenantMigrationRecipientServiceTest, WaitUntilTimestampIsMajorityCommitte
     checkStateDocPersisted(opCtx.get(), instance.get());
 
     // Simulate recipient receiving a donor timestamp.
-    auto newTimestamp =
+    auto returnAfterReachingTimestamp =
         ReplicationCoordinator::get(getServiceContext())->getMyLastAppliedOpTime().getTimestamp() +
         1;
     const OpTime newOpTime(
-        newTimestamp,
+        returnAfterReachingTimestamp,
         ReplicationCoordinator::get(getServiceContext())->getMyLastAppliedOpTime().getTerm());
 
-    instance->waitUntilTimestampIsMajorityCommitted(opCtx.get(), newTimestamp);
+    instance->waitUntilMigrationReachesReturnAfterReachingTimestamp(opCtx.get(),
+                                                                    returnAfterReachingTimestamp);
 
     auto lastAppliedOpTime =
         ReplicationCoordinator::get(getServiceContext())->getMyLastAppliedOpTime();
     ASSERT_GTE(lastAppliedOpTime, newOpTime);
-
-    DBDirectClient client(opCtx.get());
-    auto oplogBSON =
-        client.findOne(NamespaceString::kRsOplogNamespace.ns(), lastAppliedOpTime.asQuery());
-
-    ASSERT_FALSE(oplogBSON.isEmpty());
-    ASSERT_EQ(oplogBSON["o"]["msg"].String(), "Noop write for recipientSyncData");
 }
 
 TEST_F(TenantMigrationRecipientServiceTest, RecipientReceivesRetriableFetcherError) {

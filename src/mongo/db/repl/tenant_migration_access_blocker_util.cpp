@@ -72,6 +72,13 @@ std::shared_ptr<TenantMigrationDonorAccessBlocker> getTenantMigrationDonorAccess
             .getTenantMigrationAccessBlockerForTenantId(tenantId));
 }
 
+std::shared_ptr<TenantMigrationRecipientAccessBlocker> getTenantMigrationRecipientAccessBlocker(
+    ServiceContext* const serviceContext, StringData tenantId) {
+    return checked_pointer_cast<TenantMigrationRecipientAccessBlocker>(
+        TenantMigrationAccessBlockerRegistry::get(serviceContext)
+            .getTenantMigrationAccessBlockerForTenantId(tenantId));
+}
+
 TenantMigrationDonorDocument parseDonorStateDocument(const BSONObj& doc) {
     auto donorStateDoc =
         TenantMigrationDonorDocument::parse(IDLParserErrorContext("donorStateDoc"), doc);
