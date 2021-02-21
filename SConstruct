@@ -276,6 +276,7 @@ experimental_optimizations = [
     'O3',
     'builtin-memcmp',
     'fnsi',
+    'nofp',
     'sandybridge',
     'tbaa',
     'treevec',
@@ -2488,13 +2489,29 @@ if env.TargetOSIs('posix'):
             )
 
     # -Winvalid-pch Warn if a precompiled header (see Precompiled Headers) is found in the search path but can't be used.
-    env.Append( CCFLAGS=["-fno-omit-frame-pointer",
-                         "-fasynchronous-unwind-tables",
+    env.Append( CCFLAGS=["-fasynchronous-unwind-tables",
                          "-ggdb" if not env.TargetOSIs('emscripten') else "-g",
                          "-Wall",
                          "-Wsign-compare",
                          "-Wno-unknown-pragmas",
                          "-Winvalid-pch"] )
+
+    # TODO: At least on x86, glibc as of 2.3.4 will consult the
+    # .eh_frame info via _Unwind_Backtrace to do backtracing without
+    # needing the frame pointer, despite what the backtrace man page
+    # actually says. We should see if we can drop the requirement that
+    # we use libunwind here.
+    can_nofp = (env.TargetOSIs('darwin') or use_libunwind)
+
+    # For debug builds with tcmalloc, we need the frame pointer so it can
+    # record the stack of allocations.
+    can_nofp &= not (debugBuild and (env['MONGO_ALLOCATOR'] == 'tcmalloc'))
+
+    # Only disable frame pointers if requested
+    can_nofp &= ("nofp" in selected_experimental_optimizations)
+
+    if not can_nofp:
+        env.Append(CCFLAGS=["-fno-omit-frame-pointer"])
 
     if not "tbaa" in selected_experimental_optimizations:
         env.Append(CCFLAGS=["-fno-strict-aliasing"])
