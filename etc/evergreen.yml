@@ -8854,7 +8854,7 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: aarch64-enterprise-ubuntu1604
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) CCFLAGS="-march=armv8-a+crc -mtune=generic" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     resmoke_jobs_max: 8 # Avoid starting too many mongod's on ARM test servers
     has_packages: true
     packager_script: packager_enterprise.py
@@ -8896,7 +8896,7 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: aarch64-enterprise-ubuntu1804
-    compile_flags: --ssl --ocsp-stapling=off MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) CCFLAGS="-march=armv8-a+crc -mtune=generic" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl --ocsp-stapling=off MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     test_flags: --excludeWithAnyTags=requires_ocsp_stapling
     resmoke_jobs_max: 4 # Avoid starting too many mongod's on ARM test servers
     has_packages: true
@@ -8945,7 +8945,7 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: aarch64-ubuntu1804
-    compile_flags: --ssl --ocsp-stapling=off MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) CCFLAGS="-march=armv8-a+crc -mtune=generic" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl --ocsp-stapling=off MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     test_flags: --excludeWithAnyTags=requires_ocsp_stapling
     resmoke_jobs_max: 8 # Avoid starting too many mongod's on ARM test servers
     has_packages: true
@@ -9087,7 +9087,7 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: aarch64-enterprise-ubuntu2004
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu2004 -j$(grep -c ^processor /proc/cpuinfo) CCFLAGS="-march=armv8-a+crc -mtune=generic" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MONGO_DISTMOD=ubuntu2004 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     resmoke_jobs_max: 4 # Avoid starting too many mongod's on ARM test servers
     has_packages: true
     packager_script: packager_enterprise.py
@@ -9135,7 +9135,7 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: aarch64-ubuntu2004
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu2004 -j$(grep -c ^processor /proc/cpuinfo) CCFLAGS="-march=armv8-a+crc -mtune=generic" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MONGO_DISTMOD=ubuntu2004 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     resmoke_jobs_max: 8 # Avoid starting too many mongod's on ARM test servers
     has_packages: true
     packager_script: packager.py
@@ -9386,7 +9386,7 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: aarch64-enterprise-amazon2
-    compile_flags: --ssl MONGO_DISTMOD=amazon2 -j$(grep -c ^processor /proc/cpuinfo) CCFLAGS="-march=armv8-a+crc -mtune=generic" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MONGO_DISTMOD=amazon2 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     has_packages: true
     packager_script: packager_enterprise.py
     packager_arch: aarch64
@@ -9436,7 +9436,7 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: aarch64-amazon2
-    compile_flags: --ssl MONGO_DISTMOD=amazon2 -j$(grep -c ^processor /proc/cpuinfo) CCFLAGS="-march=armv8-a+crc -mtune=generic" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MONGO_DISTMOD=amazon2 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     has_packages: true
     packager_script: packager.py
     packager_arch: aarch64
@@ -11055,7 +11055,7 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: aarch64-enterprise-rhel82
-    compile_flags: --ssl MONGO_DISTMOD=rhel82 -j$(grep -c ^processor /proc/cpuinfo) CCFLAGS="-march=armv8-a+crc -mtune=generic" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MONGO_DISTMOD=rhel82 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     has_packages: true
     packager_script: packager_enterprise.py
     packager_arch: aarch64
@@ -11381,7 +11381,7 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: aarch64-rhel82
-    compile_flags: --ssl MONGO_DISTMOD=rhel82 -j$(grep -c ^processor /proc/cpuinfo) CCFLAGS="-march=armv8-a+crc -mtune=generic" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MONGO_DISTMOD=rhel82 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     has_packages: true
     packager_script: packager.py
     packager_arch: aarch64
@@ -11445,7 +11445,7 @@ buildvariants:
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     # We need to compensate for SMT8 setting the cpu count very high and lower the amount of parallelism down
-    compile_flags: --ssl MONGO_DISTMOD=rhel81 -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc) CCFLAGS="-mcpu=power8 -mtune=power8 -mcmodel=medium" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MONGO_DISTMOD=rhel81 -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     resmoke_jobs_factor: 0.25
     has_packages: true
     packager_script: packager_enterprise.py
@@ -11496,7 +11496,7 @@ buildvariants:
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     release_buid: true
-    compile_flags: --ssl MONGO_DISTMOD=rhel72 -j3 CCFLAGS="-march=z196 -mtune=zEC12" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MONGO_DISTMOD=rhel72 -j3 --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     resmoke_jobs_max: 2
     has_packages: true
     packager_script: packager_enterprise.py
@@ -11526,7 +11526,7 @@ buildvariants:
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     release_buid: true
-    compile_flags: --ssl MONGO_DISTMOD=rhel72 -j3 CCFLAGS="-march=z196 -mtune=zEC12" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MONGO_DISTMOD=rhel72 -j3 --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     resmoke_jobs_max: 2
     has_packages: true
     packager_script: packager_enterprise.py
@@ -11577,7 +11577,7 @@ buildvariants:
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     release_buid: true
-    compile_flags: --ssl MONGO_DISTMOD=rhel72 -j3 CCFLAGS="-march=z196 -mtune=zEC12" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MONGO_DISTMOD=rhel72 -j3 --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     resmoke_jobs_max: 2
     has_packages: true
     packager_script: packager_enterprise.py
@@ -11618,7 +11618,7 @@ buildvariants:
   run_on:
   - rhel72-zseries-test
   expansions:
-    compile_flags: --ssl MONGO_DISTMOD=rhel72 -j3 CCFLAGS="-march=z196 -mtune=zEC12" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MONGO_DISTMOD=rhel72 -j3 --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     has_packages: true
     packager_script: packager.py
     packager_arch: s390x
@@ -12229,7 +12229,7 @@ buildvariants:
   stepback: false
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
-    compile_flags: --dbg=on --opt=on --ssl MONGO_DISTMOD=rhel72 -j3 CCFLAGS="-march=z196 -mtune=zEC12" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --dbg=on --opt=on --ssl MONGO_DISTMOD=rhel72 -j3 --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     resmoke_jobs_max: 2
     test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_journaling
   tasks:

@@ -2461,20 +2461,38 @@ if get_option('ocsp-stapling') == 'on':
     # disable OCSP Stapling on Ubuntu 18.04 machines. See SERVER-51364 for more details.
     env.SetConfigHeaderDefine("MONGO_CONFIG_OCSP_STAPLING_ENABLED")
 
-if env['TARGET_ARCH'] == 'i386':
-    # If we are using GCC or clang to target 32 bit, set the ISA minimum to 'nocona',
-    # and the tuning to 'generic'. The choice of 'nocona' is selected because it
-    #  -- includes MMX extenions which we need for tcmalloc on 32-bit
-    #  -- can target 32 bit
-    #  -- is at the time of this writing a widely-deployed 10 year old microarchitecture
-    #  -- is available as a target architecture from GCC 4.0+
-    # However, we only want to select an ISA, not the nocona specific scheduling, so we
-    # select the generic tuning. For installations where hardware and system compiler rev are
-    # contemporaries, the generic scheduling should be appropriate for a wide range of
-    # deployed hardware.
 
-    if env.ToolchainIs('GCC', 'clang'):
-        env.Append( CCFLAGS=['-march=nocona', '-mtune=generic'] )
+if not env.TargetOSIs('windows') and (env.ToolchainIs('GCC', 'clang')):
+
+    # By default, apply our current microarchitecture minima. If the
+    # user has customized a flag of the same name in any of CCFLAGS,
+    # CFLAGS, or CXXFLAGS, we disable applying our default to
+    # CCFLAGS. We are assuming the user knows what they are doing,
+    # e.g. we don't try to be smart and notice that they applied it to
+    # CXXFLAGS and therefore still apply it to CFLAGS since they
+    # didn't customize that. Basically, don't send those flags in
+    # unless you a) mean it, and b) know what you are doing, and c)
+    # cover all your bases by either setting it via CCFLAGS, or
+    # setting it for both C and C++ by setting both of CFLAGS and
+    # CXXFLAGS.
+
+    arm_march_flag = "armv8-a"
+    if get_option('use-hardware-crc32') == "on":
+        arm_march_flag += "+crc"
+
+    default_targeting_flags_for_architecture = {
+        "aarch64"    : { "-march=" : arm_march_flag, "-mtune=" : "generic"                        },
+        "i386"       : { "-march=" : "nocona",       "-mtune=" : "generic"                        },
+        "ppc64le"    : { "-mcpu="  : "power8",       "-mtune=" : "power8", "-mcmodel=" : "medium" },
+        "s390x"      : { "-march=" : "z196",         "-mtune=" : "zEC12"                          },
+    }
+
+    default_targeting_flags = default_targeting_flags_for_architecture.get(env['TARGET_ARCH'])
+    if default_targeting_flags:
+        search_variables = ['CCFLAGS', 'CFLAGS', 'CXXFLAGS']
+        for targeting_flag, targeting_flag_value in default_targeting_flags.items():
+            if not any(flag_value.startswith(targeting_flag) for search_variable in search_variables for flag_value in env[search_variable]):
+                env.Append(CCFLAGS=[f'{targeting_flag}{targeting_flag_value}'])
 
 # Needed for auth tests since key files are stored in git with mode 644.
 if not env.TargetOSIs('windows'):
