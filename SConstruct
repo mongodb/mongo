@@ -279,6 +279,7 @@ experimental_optimizations = [
     'sandybridge',
     'tbaa',
     'treevec',
+    'vishidden',
 ]
 experimental_optimization_choices = ['*']
 experimental_optimization_choices.extend("+" + opt for opt in experimental_optimizations)
@@ -1649,13 +1650,6 @@ if link_model.startswith("dynamic"):
             SHCCFLAGS=[
                 '$MONGO_VISIBILITY_SHCCFLAGS_GENERATOR',
             ],
-            SHCXXFLAGS=[
-                # TODO: This has broader implications and seems not to
-                # work right now at least on macOS. We should
-                # investigate further in the future.
-                #
-                # '-fvisibility-inlines-hidden' if not env.TargetOSIs('windows') else [],
-            ],
         )
 
     def library(env, target, source, *args, **kwargs):
@@ -2505,6 +2499,26 @@ if env.TargetOSIs('posix'):
     if not "tbaa" in selected_experimental_optimizations:
         env.Append(CCFLAGS=["-fno-strict-aliasing"])
 
+    # The hidden visibility requires that we have libunwind in play.
+    if "vishidden" in selected_experimental_optimizations and use_libunwind:
+        if link_model.startswith('dynamic'):
+            # In dynamic mode, we can't make the default visibility
+            # hidden because not all libraries have export tags. But
+            # we can at least make inlines hidden.
+            env.Append(CXXFLAGS=["-fvisibility-inlines-hidden"])
+        else:
+            # In static mode, we need an escape hatch for a few
+            # libraries that don't work correctly when built with
+            # hidden visiblity.
+            def conditional_visibility_generator(target, source, env, for_signature):
+                if 'DISALLOW_VISHIDDEN' in env:
+                    return
+                return "-fvisibility=hidden"
+            env.Append(
+                CCFLAGS_VISIBILITY_HIDDEN_GENERATOR=conditional_visibility_generator,
+                CCFLAGS='$CCFLAGS_VISIBILITY_HIDDEN_GENERATOR',
+            )
+
     # env.Append( " -Wconversion" ) TODO: this doesn't really work yet
     env.Append( CXXFLAGS=["-Woverloaded-virtual"] )
 
@@ -2526,8 +2540,14 @@ if env.TargetOSIs('posix'):
         if env.TargetOSIs('macOS'):
             env.Append( LINKFLAGS=["-Wl,-bind_at_load"] )
     else:
-        env.Append( LINKFLAGS=["-Wl,-z,now"] )
-        env.Append( LINKFLAGS=["-rdynamic"] )
+        env.Append(
+            LINKFLAGS=[
+                "-Wl,-z,now",
+            ],
+            PROGLINKFLAGS=[
+                "-rdynamic",
+            ]
+        )
 
     env.Append( LIBS=[] )
 

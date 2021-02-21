@@ -5,7 +5,11 @@ Import("has_option")
 Import("use_libunwind")
 Import("debugBuild")
 
-env = env.Clone()
+env = env.Clone(
+    # Building with hidden visibility interferes with intercepting the
+    # libc allocation functions.
+    DISALLOW_VISHIDDEN=True,
+)
 
 if use_libunwind:
     env.Append(
