@@ -73,7 +73,7 @@ namespace mongo {
 
 namespace stack_trace_test_detail {
 /** Needs to have linkage so we can test metadata. */
-void testFunctionWithLinkage() {
+MONGO_COMPILER_NOINLINE MONGO_COMPILER_API_EXPORT void testFunctionWithLinkage() {
     printf("...");
 }
 
