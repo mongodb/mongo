@@ -104,7 +104,8 @@ struct CollectionOptions {
     bool matchesStorageOptions(const CollectionOptions& other,
                                CollatorFactoryInterface* collatorFactory) const;
 
-    // Collection UUID. Present for all CollectionOptions parsed for storage.
+    // Collection UUID. If not set, specifies that the storage engine should generate the UUID (for
+    // a new collection). For an existing collection parsed for storage, it will always be present.
     OptionalCollectionUUID uuid;
 
     bool capped = false;

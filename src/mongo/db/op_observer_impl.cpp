@@ -730,7 +730,7 @@ void OpObserverImpl::onCreateCollection(OperationContext* opCtx,
 
 void OpObserverImpl::onCollMod(OperationContext* opCtx,
                                const NamespaceString& nss,
-                               OptionalCollectionUUID uuid,
+                               const UUID& uuid,
                                const BSONObj& collModCmd,
                                const CollectionOptions& oldCollOptions,
                                boost::optional<IndexCollModInfo> indexInfo) {

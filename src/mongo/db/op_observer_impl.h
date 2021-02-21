@@ -32,12 +32,11 @@
 #include "mongo/db/op_observer.h"
 
 namespace mongo {
-
 namespace repl {
 
 class ReplOperation;
 
-}
+}  // namespace repl
 
 class OpObserverImpl : public OpObserver {
     OpObserverImpl(const OpObserverImpl&) = delete;
@@ -125,7 +124,7 @@ public:
                             const OplogSlot& createOpTime) final;
     void onCollMod(OperationContext* opCtx,
                    const NamespaceString& nss,
-                   OptionalCollectionUUID uuid,
+                   const UUID& uuid,
                    const BSONObj& collModCmd,
                    const CollectionOptions& oldCollOptions,
                    boost::optional<IndexCollModInfo> indexInfo) final;

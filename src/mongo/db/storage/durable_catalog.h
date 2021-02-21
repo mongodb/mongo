@@ -217,12 +217,13 @@ public:
                                      StringData idxName,
                                      bool hidden) = 0;
 
-    /** Compares the UUID argument to the UUID obtained from the metadata. Returns true if they are
+    /**
+     * Compares the UUID argument to the UUID obtained from the metadata. Returns true if they are
      * equal, false otherwise.
      */
     virtual bool isEqualToMetadataUUID(OperationContext* opCtx,
                                        RecordId catalogId,
-                                       OptionalCollectionUUID uuid) = 0;
+                                       const UUID& uuid) = 0;
 
     /**
      * Updates the 'temp' setting for this collection.

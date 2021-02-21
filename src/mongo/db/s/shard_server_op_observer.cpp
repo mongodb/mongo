@@ -510,7 +510,7 @@ void ShardServerOpObserver::onDropIndex(OperationContext* opCtx,
 
 void ShardServerOpObserver::onCollMod(OperationContext* opCtx,
                                       const NamespaceString& nss,
-                                      OptionalCollectionUUID uuid,
+                                      const UUID& uuid,
                                       const BSONObj& collModCmd,
                                       const CollectionOptions& oldCollOptions,
                                       boost::optional<IndexCollModInfo> indexInfo) {

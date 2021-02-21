@@ -1063,9 +1063,12 @@ void DurableCatalogImpl::updateHiddenSetting(OperationContext* opCtx,
 
 bool DurableCatalogImpl::isEqualToMetadataUUID(OperationContext* opCtx,
                                                RecordId catalogId,
-                                               OptionalCollectionUUID uuid) {
+                                               const UUID& uuid) {
     BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, catalogId);
-    return md.options.uuid && md.options.uuid == uuid;
+    invariant(md.options.uuid,
+              str::stream() << "UUID missing for catalog entry " << catalogId << " : "
+                            << md.toBSON());
+    return *md.options.uuid == uuid;
 }
 
 void DurableCatalogImpl::setIsTemp(OperationContext* opCtx, RecordId catalogId, bool isTemp) {

@@ -150,9 +150,7 @@ public:
                              StringData idxName,
                              bool hidden);
 
-    bool isEqualToMetadataUUID(OperationContext* opCtx,
-                               RecordId catalogId,
-                               OptionalCollectionUUID uuid);
+    bool isEqualToMetadataUUID(OperationContext* opCtx, RecordId catalogId, const UUID& uuid);
 
     void setIsTemp(OperationContext* opCtx, RecordId catalogId, bool isTemp);
 
