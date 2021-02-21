@@ -1305,6 +1305,7 @@ env.Library(
         '$BUILD_DIR/mongo/client/read_preference',
         '$BUILD_DIR/mongo/db/vector_clock_mutable',
         'primary_only_service',
+        'tenant_migration_access_blocker',
         'tenant_migration_utils',
     ],
     LIBDEPS_PRIVATE=[
@@ -1334,6 +1335,7 @@ env.Library(
         'tenant_migration_donor_access_blocker.cpp',
         'tenant_migration_donor_op_observer.cpp',
         'tenant_migration_recipient_access_blocker.cpp',
+        'tenant_migration_recipient_op_observer.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',

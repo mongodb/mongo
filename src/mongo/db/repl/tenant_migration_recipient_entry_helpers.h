@@ -67,6 +67,16 @@ Status insertStateDoc(OperationContext* opCtx, const TenantMigrationRecipientDoc
 Status updateStateDoc(OperationContext* opCtx, const TenantMigrationRecipientDocument& stateDoc);
 
 /**
+ * Deletes the state doc matching the given 'tenantId' if the doc has been marked as garbage
+ * collectable.
+ *
+ * Returns true if the state doc was deleted, otherwise false. Returns 'NamespaceNotFound' error
+ * code if the collection does not exist.
+ */
+StatusWith<bool> deleteStateDocIfMarkedAsGarbageCollectable(OperationContext* opCtx,
+                                                            StringData tenantId);
+
+/**
  * Returns the state doc matching the document with 'migrationUUID' from the disk if it
  * exists. Reads at "no" timestamp i.e, reading with the "latest" snapshot reflecting up to date
  * data.

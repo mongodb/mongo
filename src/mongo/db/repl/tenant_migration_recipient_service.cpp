@@ -51,6 +51,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/replication_auth.h"
+#include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/db/repl/tenant_migration_recipient_entry_helpers.h"
 #include "mongo/db/repl/tenant_migration_recipient_service.h"
 #include "mongo/db/repl/tenant_migration_state_machine_gen.h"
@@ -131,6 +132,7 @@ MONGO_FAIL_POINT_DEFINE(fpAfterCollectionClonerDone);
 MONGO_FAIL_POINT_DEFINE(fpAfterStartingOplogApplierMigrationRecipientInstance);
 MONGO_FAIL_POINT_DEFINE(fpBeforeFulfillingDataConsistentPromise);
 MONGO_FAIL_POINT_DEFINE(fpAfterDataConsistentMigrationRecipientInstance);
+MONGO_FAIL_POINT_DEFINE(fpAfterWaitForRejectReadsBeforeTimestamp);
 MONGO_FAIL_POINT_DEFINE(hangBeforeTaskCompletion);
 MONGO_FAIL_POINT_DEFINE(fpAfterReceivingRecipientForgetMigration);
 MONGO_FAIL_POINT_DEFINE(hangAfterCreatingRSM);
@@ -353,13 +355,25 @@ OpTime TenantMigrationRecipientService::Instance::waitUntilMigrationReachesConsi
     return _dataConsistentPromise.getFuture().get(opCtx);
 }
 
-OpTime TenantMigrationRecipientService::Instance::waitUntilTimestampIsMajorityCommitted(
-    OperationContext* opCtx, const Timestamp& donorTs) const {
-
+OpTime
+TenantMigrationRecipientService::Instance::waitUntilMigrationReachesReturnAfterReachingTimestamp(
+    OperationContext* opCtx, const Timestamp& returnAfterReachingTimestamp) {
     // This gives assurance that _tenantOplogApplier pointer won't be empty, and that it has been
     // started. Additionally, we must have finished processing the recipientSyncData command that
     // waits on _dataConsistentPromise.
     _dataConsistentPromise.getFuture().get(opCtx);
+
+    {
+        stdx::lock_guard lk(_mutex);
+        if (_stateDoc.getRejectReadsBeforeTimestamp()) {
+            uassert(
+                ErrorCodes::IllegalOperation,
+                str::stream() << "Received a conflicting returnAfterReachingTimestamp, received: "
+                              << returnAfterReachingTimestamp.toBSON() << " expected: "
+                              << _stateDoc.getRejectReadsBeforeTimestamp()->toBSON(),
+                returnAfterReachingTimestamp == *_stateDoc.getRejectReadsBeforeTimestamp());
+        }
+    }
 
     auto getWaitOpTimeFuture = [&]() {
         stdx::lock_guard lk(_mutex);
@@ -386,7 +400,7 @@ OpTime TenantMigrationRecipientService::Instance::waitUntilTimestampIsMajorityCo
                 state == TenantMigrationRecipientStateEnum::kConsistent);
 
         return _tenantOplogApplier->getNotificationForOpTime(
-            OpTime(donorTs, OpTime::kUninitializedTerm));
+            OpTime(returnAfterReachingTimestamp, OpTime::kUninitializedTerm));
     };
 
     auto waitOpTimeFuture = getWaitOpTimeFuture();
@@ -406,25 +420,26 @@ OpTime TenantMigrationRecipientService::Instance::waitUntilTimestampIsMajorityCo
 
     uassertStatusOK(status);
 
-    // We want to guarantee that the recipient logical clock has advanced to at least the donor
-    // timestamp before returning success for recipientSyncData by doing a majority committed noop
-    // write after ticking the recipient clock to the donor timestamp.
+    // Make sure that the recipient logical clock has advanced to at least the donor timestamp
+    // before returning success for recipientSyncData.
     // Note: tickClusterTimeTo() will not tick the recipient clock backwards in time.
-    VectorClockMutable::get(opCtx)->tickClusterTimeTo(LogicalTime(donorTs));
+    VectorClockMutable::get(opCtx)->tickClusterTimeTo(LogicalTime(returnAfterReachingTimestamp));
 
-    BSONObj result;
-    DBDirectClient client(opCtx);
-    client.runCommand(NamespaceString::kAdminDb.toString(),
-                      BSON("appendOplogNote" << 1 << "data"
-                                             << BSON("msg"
-                                                     << "Noop write for recipientSyncData")),
-                      result);
-    uassertStatusOK(getStatusFromCommandResult(result));
+    {
+        stdx::lock_guard lk(_mutex);
+        _stateDoc.setRejectReadsBeforeTimestamp(returnAfterReachingTimestamp);
+    }
+    uassertStatusOK(tenantMigrationRecipientEntryHelpers::updateStateDoc(opCtx, _stateDoc));
 
-    // Wait for the noop write optime to be majority committed.
-    WaitForMajorityService::get(opCtx->getServiceContext())
-        .waitUntilMajority(repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp())
-        .get(opCtx);
+    auto writeOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
+    auto replCoord = repl::ReplicationCoordinator::get(_serviceContext);
+    WriteConcernOptions writeConcern(repl::ReplSetConfig::kConfigAllWriteConcernName,
+                                     WriteConcernOptions::SyncMode::NONE,
+                                     opCtx->getWriteConcern().wTimeout);
+    replCoord->awaitReplication(opCtx, writeOpTime, writeConcern);
+
+    _stopOrHangOnFailPoint(&fpAfterWaitForRejectReadsBeforeTimestamp);
+
     return swDonorRecipientOpTimePair.getValue().donorOpTime;
 }
 
@@ -1574,6 +1589,28 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
     // shutdown/stepdown.
     return AsyncTry([this, self = shared_from_this(), executor, token] {
                return ExecutorFuture(**executor)
+                   .then([this, self = shared_from_this()] {
+                       auto mtab = tenant_migration_access_blocker::
+                           getTenantMigrationRecipientAccessBlocker(_serviceContext,
+                                                                    _stateDoc.getTenantId());
+                       if (mtab && mtab->getMigrationId() != _migrationUuid) {
+                           // There is a conflicting migration. If its state doc has already been
+                           // marked as garbage collectable, this instance must correspond to a
+                           // retry and we can delete immediately to allow the migration to restart.
+                           // Otherwise, there is a real conflict so we should throw
+                           // ConflictingInProgress.
+                           auto opCtx = cc().makeOperationContext();
+                           auto deleted =
+                               uassertStatusOK(tenantMigrationRecipientEntryHelpers::
+                                                   deleteStateDocIfMarkedAsGarbageCollectable(
+                                                       opCtx.get(), _tenantId));
+                           uassert(ErrorCodes::ConflictingOperationInProgress,
+                                   str::stream()
+                                       << "Found active migration for tenantId \"" << _tenantId
+                                       << "\" with migration id " << mtab->getMigrationId(),
+                                   deleted);
+                       }
+                   })
                    .then([this, self = shared_from_this()] {
                        stdx::lock_guard lk(_mutex);
                        // Instance task can be started only once for the current term on a primary.

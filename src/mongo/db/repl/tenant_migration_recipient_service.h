@@ -144,14 +144,20 @@ public:
         OpTime waitUntilMigrationReachesConsistentState(OperationContext* opCtx) const;
 
         /*
-         * Blocks the thread until the tenant oplog applier applied data past the given 'donorTs'
-         * in an interruptible mode. Returns the majority applied donor optime which may be greater
-         * or equal to given 'donorTs'. If the recipient's logical clock has not yet reached the
-         * 'donorTs', advance the recipient's logical clock to 'donorTs' and guarantee durability by
-         * applying a noop write. Throws exception on error.
+         * Blocks the thread until the tenant oplog applier applied data past the
+         * 'returnAfterReachingTimestamp' in an interruptible mode. If the recipient's logical clock
+         * has not yet reached the 'returnAfterReachingTimestamp', advances the recipient's logical
+         * clock to 'returnAfterReachingTimestamp'. Finally, stores the
+         * 'returnAfterReachingTimestamp' as 'rejectReadsBeforeTimestamp' in the state
+         * document and waits for the write to be replicated to every node (i.e. wait for
+         * 'rejectReadsBeforeTimestamp' to be set on the TenantMigrationRecipientAccessBlocker of
+         * every node) to guarantee that no reads will be incorrectly accepted.
+         *
+         * Throws IllegalOperation if the state document already has 'rejectReadsBeforeTimestamp'
+         * that is not equal to 'returnAfterReachingTimestamp', and on other error.
          */
-        OpTime waitUntilTimestampIsMajorityCommitted(OperationContext* opCtx,
-                                                     const Timestamp& donorTs) const;
+        OpTime waitUntilMigrationReachesReturnAfterReachingTimestamp(
+            OperationContext* opCtx, const Timestamp& returnAfterReachingTimestamp);
 
         /*
          *  Set the oplog creator functor, to allow use of a mock oplog fetcher.
