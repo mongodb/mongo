@@ -277,6 +277,7 @@ experimental_optimizations = [
     'builtin-memcmp',
     'fnsi',
     'sandybridge',
+    'tbaa',
     'treevec',
 ]
 experimental_optimization_choices = ['*']
@@ -2429,13 +2430,16 @@ if env.TargetOSIs('posix'):
 
     # -Winvalid-pch Warn if a precompiled header (see Precompiled Headers) is found in the search path but can't be used.
     env.Append( CCFLAGS=["-fno-omit-frame-pointer",
-                         "-fno-strict-aliasing",
                          "-fasynchronous-unwind-tables",
                          "-ggdb" if not env.TargetOSIs('emscripten') else "-g",
                          "-Wall",
                          "-Wsign-compare",
                          "-Wno-unknown-pragmas",
                          "-Winvalid-pch"] )
+
+    if not "tbaa" in selected_experimental_optimizations:
+        env.Append(CCFLAGS=["-fno-strict-aliasing"])
+
     # env.Append( " -Wconversion" ) TODO: this doesn't really work yet
     if env.TargetOSIs('linux', 'darwin', 'solaris'):
         if not has_option("disable-warnings-as-errors"):
