@@ -274,6 +274,7 @@ add_option('opt',
 
 experimental_optimizations = [
     'sandybridge',
+    'treevec',
 ]
 experimental_optimization_choices = ['*']
 experimental_optimization_choices.extend("+" + opt for opt in experimental_optimizations)
@@ -2485,6 +2486,9 @@ if env.TargetOSIs('posix'):
         env.Append( CCFLAGS=["-Os"] )
     else:
         env.Append( CCFLAGS=["-O0"] )
+
+    if optBuild and "treevec" in selected_experimental_optimizations:
+        env.Append(CCFLAGS=["-ftree-vectorize"])
 
     # Promote linker warnings into errors. We can't yet do this on OS X because its linker considers
     # noall_load obsolete and warns about it.
