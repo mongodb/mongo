@@ -234,9 +234,10 @@ var ReshardingTest = class {
      * Callers of interruptReshardingThread() will want to set this to ErrorCodes.Interrupted, for
      * example.
      */
-    withReshardingInBackground({newShardKeyPattern, newChunks},
-                               duringReshardingFn = (tempNs) => {},
-                               expectedErrorCode = ErrorCodes.OK) {
+    withReshardingInBackground(
+        {newShardKeyPattern, newChunks},
+        duringReshardingFn = (tempNs) => {},
+        {expectedErrorCode = ErrorCodes.OK, postCheckConsistencyFn = (tempNs) => {}} = {}) {
         const commandDoneSignal = this._startReshardingInBackgroundAndAllowCommandFailure(
             {newShardKeyPattern, newChunks}, expectedErrorCode);
 
@@ -247,7 +248,8 @@ var ReshardingTest = class {
         }, "failed to find reshardCollection in $currentOp output");
 
         this._callFunctionSafely(() => duringReshardingFn(this._tempNs));
-        this._checkConsistencyAndPostState(expectedErrorCode);
+        this._checkConsistencyAndPostState(expectedErrorCode,
+                                           () => postCheckConsistencyFn(this._tempNs));
     }
 
     /** @private */
@@ -319,7 +321,7 @@ var ReshardingTest = class {
     }
 
     /** @private */
-    _checkConsistencyAndPostState(expectedErrorCode) {
+    _checkConsistencyAndPostState(expectedErrorCode, postCheckConsistencyFn = () => {}) {
         if (expectedErrorCode === ErrorCodes.OK) {
             this._callFunctionSafely(() => {
                 // We use the reshardingPauseCoordinatorInSteadyState failpoint so that any
@@ -332,8 +334,10 @@ var ReshardingTest = class {
                 this._pauseCoordinatorInSteadyStateFailpoint.off();
                 this._pauseCoordinatorBeforeDecisionPersistedFailpoint.wait();
 
+                assert.commandWorked(this._st.s.adminCommand({flushRouterConfig: this._ns}));
                 this._checkConsistency();
                 this._checkDocumentOwnership();
+                postCheckConsistencyFn();
 
                 this._pauseCoordinatorBeforeDecisionPersistedFailpoint.off();
             });

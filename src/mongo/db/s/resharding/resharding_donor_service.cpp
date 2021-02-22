@@ -232,7 +232,7 @@ boost::optional<BSONObj> ReshardingDonorService::DonorStateMachine::reportForCur
 }
 
 void ReshardingDonorService::DonorStateMachine::onReshardingFieldsChanges(
-    const TypeCollectionReshardingFields& reshardingFields) {
+    OperationContext* opCtx, const TypeCollectionReshardingFields& reshardingFields) {
     auto coordinatorState = reshardingFields.getState();
     if (coordinatorState == CoordinatorStateEnum::kError) {
         // TODO SERVER-52838: Investigate if we want to have a special error code so the donor knows
@@ -249,11 +249,17 @@ void ReshardingDonorService::DonorStateMachine::onReshardingFieldsChanges(
     }
 
     if (coordinatorState >= CoordinatorStateEnum::kMirroring) {
+        _critSec.emplace(opCtx->getServiceContext(), _donorDoc.getNss());
+
         ensureFulfilledPromise(lk, _allRecipientsDoneApplying);
     }
 
     if (coordinatorState >= CoordinatorStateEnum::kDecisionPersisted) {
         ensureFulfilledPromise(lk, _coordinatorHasDecisionPersisted);
+    }
+
+    if (coordinatorState >= CoordinatorStateEnum::kDone) {
+        _critSec.reset();
     }
 }
 

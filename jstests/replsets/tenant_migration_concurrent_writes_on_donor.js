@@ -482,6 +482,7 @@ const testCases = {
     _shardsvrCloneCatalogData: {skip: isNotRunOnUserDatabase},
     _shardsvrCreateCollection: {skip: isOnlySupportedOnShardedCluster},
     _shardsvrCreateCollectionParticipant: {skip: isOnlySupportedOnShardedCluster},
+    _shardsvrFinishReshardCollection: {skip: isNotRunOnUserDatabase},
     _shardsvrMovePrimary: {skip: isNotRunOnUserDatabase},
     _shardsvrShardCollection: {skip: isNotRunOnUserDatabase},
     _shardsvrRenameCollection: {skip: isOnlySupportedOnShardedCluster},

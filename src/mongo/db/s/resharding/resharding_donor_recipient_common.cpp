@@ -74,7 +74,7 @@ void processReshardingFieldsForDonorCollection(OperationContext* opCtx,
                                                               DonorStateMachine,
                                                               ReshardingDonorDocument>(
             opCtx, reshardingFields.getUuid())) {
-        donorStateMachine->get()->onReshardingFieldsChanges(reshardingFields);
+        donorStateMachine->get()->onReshardingFieldsChanges(opCtx, reshardingFields);
         return;
     }
 
@@ -115,7 +115,7 @@ void processReshardingFieldsForRecipientCollection(OperationContext* opCtx,
                                                                   RecipientStateMachine,
                                                                   ReshardingRecipientDocument>(
             opCtx, reshardingFields.getUuid())) {
-        recipientStateMachine->get()->onReshardingFieldsChanges(reshardingFields);
+        recipientStateMachine->get()->onReshardingFieldsChanges(opCtx, reshardingFields);
         return;
     }
 

@@ -113,7 +113,7 @@ reshardingTest.withReshardingInBackground(  //
         assertEventuallyErrorsInDonorList(
             configsvr, donorShardNames[0], inputCollection.getFullName());
     },
-    ErrorCodes.InternalError);
+    {expectedErrorCode: ErrorCodes.InternalError});
 
 // Resume index build.
 createIndexFailpoint.off();

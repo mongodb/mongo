@@ -66,6 +66,7 @@ let testCases = {
     _killOperations: {skip: "does not return user data"},
     _mergeAuthzCollections: {skip: "primary only"},
     _migrateClone: {skip: "primary only"},
+    _shardsvrFinishReshardCollection: {skip: "does not return user data"},
     _shardsvrMovePrimary: {skip: "primary only"},
     _recvChunkAbort: {skip: "primary only"},
     _recvChunkCommit: {skip: "primary only"},

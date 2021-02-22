@@ -157,6 +157,7 @@ env.Library(
         'request_types/clone_collection_options_from_primary_shard.idl',
         'request_types/commit_chunk_migration_request_type.cpp',
         'request_types/ensure_chunk_version_is_greater_than.idl',
+        'request_types/finish_reshard_collection.idl',
         'request_types/flush_database_cache_updates.idl',
         'request_types/flush_routing_table_cache_updates.idl',
         'request_types/get_database_version.idl',

@@ -38,9 +38,12 @@
 #include "mongo/db/query/collation/collation_spec.h"
 #include "mongo/db/repl/oplog_applier.h"
 #include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/migration_destination_manager.h"
 #include "mongo/db/s/resharding/resharding_collection_cloner.h"
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
+#include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
+#include "mongo/db/s/resharding/resharding_donor_service.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding/resharding_txn_cloner.h"
@@ -88,6 +91,7 @@ void ensureFulfilledPromise(WithLock lk, SharedPromise<void>& sp) {
         sp.emplaceValue();
     }
 }
+
 }  // namespace
 
 namespace resharding {
@@ -228,7 +232,8 @@ SemiFuture<void> ReshardingRecipientService::RecipientStateMachine::run(
                   "namespace"_attr = _recipientDoc.getNss().ns(),
                   "reshardingId"_attr = _id,
                   "error"_attr = status);
-            _transitionStateAndUpdateCoordinator(RecipientStateEnum::kError, status);
+            _transitionState(RecipientStateEnum::kError, boost::none, status);
+            _updateCoordinator();
             return status;
         })
         .onCompletion([this, self = shared_from_this()](Status status) {
@@ -292,7 +297,7 @@ boost::optional<BSONObj> ReshardingRecipientService::RecipientStateMachine::repo
 }
 
 void ReshardingRecipientService::RecipientStateMachine::onReshardingFieldsChanges(
-    const TypeCollectionReshardingFields& reshardingFields) {
+    OperationContext* opCtx, const TypeCollectionReshardingFields& reshardingFields) {
     auto coordinatorState = reshardingFields.getState();
     if (coordinatorState == CoordinatorStateEnum::kError) {
         // TODO SERVER-52838: Investigate if we want to have a special error code so the recipient
@@ -456,7 +461,10 @@ ReshardingRecipientService::RecipientStateMachine::_cloneThenTransitionToApplyin
 
             return whenAllSucceed(std::move(txnClonerFutures));
         })
-        .then([this] { _transitionStateAndUpdateCoordinator(RecipientStateEnum::kApplying); });
+        .then([this] {
+            _transitionState(RecipientStateEnum::kApplying);
+            _updateCoordinator();
+        });
 }
 
 void ReshardingRecipientService::RecipientStateMachine::_applyThenTransitionToSteadyState() {
@@ -472,9 +480,10 @@ void ReshardingRecipientService::RecipientStateMachine::_applyThenTransitionToSt
     // _awaitAllDonorsMirroringThenTransitionToStrictConsistency() instead.
     //
     // TODO: Consider removing _applyThenTransitionToSteadyState() and changing
-    // _cloneThenTransitionToApplying() to call _transitionStateAndUpdateCoordinator(kSteadyState).
+    // _cloneThenTransitionToApplying() to call _transitionState/_updateCoordinator(kSteadyState).
 
-    _transitionStateAndUpdateCoordinator(RecipientStateEnum::kSteadyState);
+    _transitionState(RecipientStateEnum::kSteadyState);
+    _updateCoordinator();
 }
 
 ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
@@ -549,7 +558,23 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
     }
 
     return whenAllSucceed(std::move(futuresToWaitOn)).thenRunOn(**executor).then([this] {
-        _transitionStateAndUpdateCoordinator(RecipientStateEnum::kStrictConsistency);
+        _transitionState(RecipientStateEnum::kStrictConsistency);
+
+        bool isDonor = [& id = _recipientDoc.get_id()] {
+            auto opCtx = cc().makeOperationContext();
+            auto instance =
+                resharding::tryGetReshardingStateMachine<ReshardingDonorService,
+                                                         ReshardingDonorService::DonorStateMachine,
+                                                         ReshardingDonorDocument>(opCtx.get(), id);
+
+            return !!instance;
+        }();
+
+        if (!isDonor) {
+            _critSec.emplace(cc().getServiceContext(), _recipientDoc.getNss());
+        }
+
+        _updateCoordinator();
     });
 }
 
@@ -582,9 +607,12 @@ void ReshardingRecipientService::RecipientStateMachine::_renameTemporaryReshardi
             renameCollection(opCtx.get(), reshardingNss, _recipientDoc.getNss(), options));
 
         _dropOplogCollections(opCtx.get());
+
+        _critSec.reset();
     }
 
-    _transitionStateAndUpdateCoordinator(RecipientStateEnum::kDone);
+    _transitionState(RecipientStateEnum::kDone);
+    _updateCoordinator();
 }
 
 void ReshardingRecipientService::RecipientStateMachine::_transitionState(
@@ -614,20 +642,17 @@ void ReshardingRecipientService::RecipientStateMachine::_transitionState(
                "reshardingUUID"_attr = _recipientDoc.get_id());
 }
 
-void ReshardingRecipientService::RecipientStateMachine::_transitionStateAndUpdateCoordinator(
-    RecipientStateEnum endState, boost::optional<Status> abortReason) {
-    _transitionState(endState, boost::none, abortReason);
+void ReshardingRecipientService::RecipientStateMachine::_updateCoordinator() {
 
     auto opCtx = cc().makeOperationContext();
 
     auto shardId = ShardingState::get(opCtx.get())->shardId();
 
     BSONObjBuilder updateBuilder;
-    updateBuilder.append("recipientShards.$.state", RecipientState_serializer(endState));
-    if (abortReason) {
-        BSONObjBuilder abortReasonBuilder;
-        abortReason.get().serializeErrorToBSON(&abortReasonBuilder);
-        updateBuilder.append("recipientShards.$.abortReason", abortReasonBuilder.obj());
+    updateBuilder.append("recipientShards.$.state",
+                         RecipientState_serializer(_recipientDoc.getState()));
+    if (_recipientDoc.getAbortReason()) {
+        updateBuilder.append("recipientShards.$.abortReason", _recipientDoc.getAbortReason().get());
     }
 
     uassertStatusOK(
