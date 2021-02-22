@@ -16,7 +16,6 @@ import shutil
 import signal
 import stat
 import string
-import subprocess
 import sys
 import tarfile
 import tempfile
@@ -31,10 +30,13 @@ import pymongo
 import requests
 import yaml
 
-from buildscripts.resmokelib.powercycle.lib import remote_operations
+from buildscripts.resmokelib.powercycle.lib import remote_operations, execute_cmd, \
+    create_temp_executable_file, NamedTempFile
 from buildscripts.resmokelib.powercycle import powercycle_config, powercycle_constants
 
 # See https://docs.python.org/2/library/sys.html#sys.platform
+from buildscripts.resmokelib.powercycle.lib.services import WindowsService, PosixService
+
 _IS_WINDOWS = sys.platform == "win32" or sys.platform == "cygwin"
 _IS_LINUX = sys.platform.startswith("linux")
 _IS_DARWIN = sys.platform == "darwin"
@@ -289,16 +291,6 @@ def get_bin_dir(root_dir):
     return None
 
 
-def create_temp_executable_file(cmds):
-    """Create an executable temporary file containing 'cmds'. Returns file name."""
-    temp_file_name = NamedTempFile.create(newline="\n", suffix=".sh", directory="tmp")
-    with NamedTempFile.get(temp_file_name) as temp_file:
-        temp_file.write(cmds)
-    os_st = os.stat(temp_file_name)
-    os.chmod(temp_file_name, os_st.st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
-    return temp_file_name
-
-
 def start_cmd(cmd, use_file=False):
     """Start command and returns proc instance from Popen."""
 
@@ -328,41 +320,6 @@ def start_cmd(cmd, use_file=False):
     return proc
 
 
-def execute_cmd(cmd, use_file=False):
-    """Execute command and returns return_code, output from command."""
-
-    orig_cmd = ""
-    # Multi-commands need to be written to a temporary file to execute on Windows.
-    # This is due to complications with invoking Bash in Windows.
-    if use_file:
-        orig_cmd = cmd
-        temp_file = create_temp_executable_file(cmd)
-        # The temporary file name will have '\' on Windows and needs to be converted to '/'.
-        cmd = "bash -c {}".format(temp_file.replace("\\", "/"))
-
-    # If 'cmd' is specified as a string, convert it to a list of strings.
-    if isinstance(cmd, str):
-        cmd = shlex.split(cmd)
-
-    if use_file:
-        LOGGER.debug("Executing '%s', tempfile contains: %s", cmd, orig_cmd)
-    else:
-        LOGGER.debug("Executing '%s'", cmd)
-
-    try:
-        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        output, _ = proc.communicate()
-        output = output.decode("utf-8", "replace")
-        error_code = proc.returncode
-        if error_code:
-            output = "Error executing cmd {}: {}".format(cmd, output)
-    finally:
-        if use_file:
-            os.remove(temp_file)
-
-    return error_code, output
-
-
 def get_user_host(user_host):
     """Return a tuple (user, host) from the user_host string."""
     if "@" in user_host:
@@ -378,6 +335,8 @@ def parse_options(options):
     """
     options_map = collections.defaultdict(list)
     opts = shlex.split(options)
+    opt_name = None
+    opt_form = None
     for opt in opts:
         # Handle options which could start with "-" or "--".
         if opt.startswith("-"):
@@ -537,7 +496,7 @@ def set_windows_bootstatuspolicy():
     return ret, output
 
 
-def install_mongod(bin_dir=None, tarball_url="latest", root_dir=None):
+def _do_install_mongod(bin_dir=None, tarball_url="latest", root_dir=None):
     """Set up 'root_dir'/bin to contain MongoDB binaries.
 
     If 'bin_dir' is specified, then symlink it to 'root_dir'/bin.
@@ -634,351 +593,6 @@ class Processes(object):
             cls.kill(proc)
 
 
-class NamedTempFile(object):
-    """Class to control temporary files."""
-
-    _FILE_MAP = {}  # type: ignore
-    _DIR_LIST = []  # type: ignore
-
-    @classmethod
-    def create(cls, newline=None, suffix="", directory=None):
-        """Create a temporary file, and optional directory, and returns the file name."""
-        if directory and not os.path.isdir(directory):
-            LOGGER.debug("Creating temporary directory %s", directory)
-            os.makedirs(directory)
-            cls._DIR_LIST.append(directory)
-        temp_file = tempfile.NamedTemporaryFile(mode="w+", newline=newline, suffix=suffix,
-                                                dir=directory, delete=False)
-        cls._FILE_MAP[temp_file.name] = temp_file
-        return temp_file.name
-
-    @classmethod
-    def get(cls, name):
-        """Get temporary file object.  Raises an exception if the file is unknown."""
-        if name not in cls._FILE_MAP:
-            raise Exception("Unknown temporary file {}.".format(name))
-        return cls._FILE_MAP[name]
-
-    @classmethod
-    def delete(cls, name):
-        """Delete temporary file. Raises an exception if the file is unknown."""
-        if name not in cls._FILE_MAP:
-            raise Exception("Unknown temporary file {}.".format(name))
-        if not os.path.exists(name):
-            LOGGER.debug("Temporary file %s no longer exists", name)
-            del cls._FILE_MAP[name]
-            return
-        try:
-            os.remove(name)
-        except (IOError, OSError) as err:
-            LOGGER.warning("Unable to delete temporary file %s with error %s", name, err)
-        if not os.path.exists(name):
-            del cls._FILE_MAP[name]
-
-    @classmethod
-    def delete_dir(cls, directory):
-        """Delete temporary directory. Raises an exception if the directory is unknown."""
-        if directory not in cls._DIR_LIST:
-            raise Exception("Unknown temporary directory {}.".format(directory))
-        if not os.path.exists(directory):
-            LOGGER.debug("Temporary directory %s no longer exists", directory)
-            cls._DIR_LIST.remove(directory)
-            return
-        try:
-            shutil.rmtree(directory)
-        except (IOError, OSError) as err:
-            LOGGER.warning("Unable to delete temporary directory %s with error %s", directory, err)
-        if not os.path.exists(directory):
-            cls._DIR_LIST.remove(directory)
-
-    @classmethod
-    def delete_all(cls):
-        """Delete all temporary files and directories."""
-        for name in list(cls._FILE_MAP):
-            cls.delete(name)
-        for directory in cls._DIR_LIST:
-            cls.delete_dir(directory)
-
-
-class ProcessControl(object):
-    """Process control class.
-
-    Control processes either by name or a list of pids. If name is supplied, then
-    all matching pids are controlled.
-    """
-
-    def __init__(self, name=None, pids=None):
-        """Provide either 'name' or 'pids' to control the process."""
-        if not name and not pids:
-            raise Exception("Either 'process_name' or 'pids' must be specifed")
-        self.name = name
-        self.pids = []
-        if pids:
-            self.pids = pids
-        self.procs = []
-
-    def get_pids(self):
-        """Return list of process ids for process 'self.name'."""
-        if not self.name:
-            return self.pids
-        self.pids = []
-        for proc in psutil.process_iter():
-            try:
-                if proc.name() == self.name:
-                    self.pids.append(proc.pid)
-            except psutil.NoSuchProcess:
-                pass
-        return self.pids
-
-    def get_name(self):
-        """Return process name or name of first running process from pids."""
-        if not self.name:
-            for pid in self.get_pids():
-                proc = psutil.Process(pid)
-                if psutil.pid_exists(pid):
-                    self.name = proc.name()
-                    break
-        return self.name
-
-    def get_procs(self):
-        """Return a list of 'proc' for the associated pids."""
-        procs = []
-        for pid in self.get_pids():
-            try:
-                procs.append(psutil.Process(pid))
-            except psutil.NoSuchProcess:
-                pass
-        return procs
-
-    def is_running(self):
-        """Return true if any process is running that either matches on name or pids."""
-        for pid in self.get_pids():
-            if psutil.pid_exists(pid):
-                return True
-        return False
-
-    def kill(self):
-        """Kill all running processes that match the list of pids."""
-        if self.is_running():
-            for proc in self.get_procs():
-                try:
-                    proc.kill()
-                except psutil.NoSuchProcess:
-                    LOGGER.info("Could not kill process with pid %d, as it no longer exists",
-                                proc.pid)
-
-
-# pylint: disable=undefined-variable,unused-variable,too-many-instance-attributes
-class WindowsService(object):
-    """Windows service control class."""
-
-    def __init__(self, name, bin_path, bin_options, db_path):
-        """Initialize WindowsService."""
-
-        self.name = name
-        self.bin_name = os.path.basename(bin_path)
-        self.bin_path = bin_path
-        self.bin_options = bin_options
-        self.db_path = db_path
-        self.start_type = win32service.SERVICE_DEMAND_START
-        self.pids = []
-        self._states = {
-            win32service.SERVICE_CONTINUE_PENDING: "continue pending",
-            win32service.SERVICE_PAUSE_PENDING: "pause pending",
-            win32service.SERVICE_PAUSED: "paused",
-            win32service.SERVICE_RUNNING: "running",
-            win32service.SERVICE_START_PENDING: "start pending",
-            win32service.SERVICE_STOPPED: "stopped",
-            win32service.SERVICE_STOP_PENDING: "stop pending",
-        }
-
-    def create(self):
-        """Create service, if not installed. Return (code, output) tuple."""
-        if self.status() in list(self._states.values()):
-            return 1, "Service '{}' already installed, status: {}".format(self.name, self.status())
-        try:
-            win32serviceutil.InstallService(pythonClassString="Service.{}".format(
-                self.name), serviceName=self.name, displayName=self.name, startType=self.start_type,
-                                            exeName=self.bin_path, exeArgs=self.bin_options)
-            ret = 0
-            output = "Service '{}' created".format(self.name)
-        except pywintypes.error as err:
-            ret = err.winerror
-            output = f"{err.args[1]}: {err.args[2]}"
-
-        return ret, output
-
-    def update(self):
-        """Update installed service. Return (code, output) tuple."""
-        if self.status() not in self._states.values():
-            return 1, "Service update '{}' status: {}".format(self.name, self.status())
-        try:
-            win32serviceutil.ChangeServiceConfig(pythonClassString="Service.{}".format(
-                self.name), serviceName=self.name, displayName=self.name, startType=self.start_type,
-                                                 exeName=self.bin_path, exeArgs=self.bin_options)
-            ret = 0
-            output = "Service '{}' updated".format(self.name)
-        except pywintypes.error as err:
-            ret = err.winerror
-            output = f"{err.args[1]}: {err.args[2]}"
-
-        return ret, output
-
-    def delete(self):
-        """Delete service. Return (code, output) tuple."""
-        if self.status() not in self._states.values():
-            return 1, "Service delete '{}' status: {}".format(self.name, self.status())
-        try:
-            win32serviceutil.RemoveService(serviceName=self.name)
-            ret = 0
-            output = "Service '{}' deleted".format(self.name)
-        except pywintypes.error as err:
-            ret = err.winerror
-            output = f"{err.args[1]}: {err.args[2]}"
-
-        return ret, output
-
-    def start(self):
-        """Start service. Return (code, output) tuple."""
-        if self.status() not in self._states.values():
-            return 1, "Service start '{}' status: {}".format(self.name, self.status())
-        try:
-            win32serviceutil.StartService(serviceName=self.name)
-            ret = 0
-            output = "Service '{}' started".format(self.name)
-        except pywintypes.error as err:
-            ret = err.winerror
-            output = f"{err.args[1]}: {err.args[2]}"
-
-        proc = ProcessControl(name=self.bin_name)
-        self.pids = proc.get_pids()
-
-        return ret, output
-
-    def stop(self, timeout):
-        """Stop service, waiting for 'timeout' seconds. Return (code, output) tuple."""
-        self.pids = []
-        if self.status() not in self._states.values():
-            return 1, "Service '{}' status: {}".format(self.name, self.status())
-        try:
-            win32serviceutil.StopService(serviceName=self.name)
-            start = time.time()
-            status = self.status()
-            while status == "stop pending":
-                if time.time() - start >= timeout:
-                    ret = 1
-                    output = "Service '{}' status is '{}'".format(self.name, status)
-                    break
-                time.sleep(3)
-                status = self.status()
-            ret = 0
-            output = "Service '{}' stopped".format(self.name)
-        except pywintypes.error as err:
-            ret = err.winerror
-            output = f"{err.args[1]}: {err.args[2]}"
-
-            if ret == winerror.ERROR_BROKEN_PIPE:
-                # win32serviceutil.StopService() returns a "The pipe has been ended" error message
-                # (winerror=109) when stopping the "mongod-powercycle-test" service on
-                # Windows Server 2016 and the underlying mongod process has already exited.
-                ret = 0
-                output = f"Assuming service '{self.name}' stopped despite error: {output}"
-
-        return ret, output
-
-    def status(self):
-        """Return state of the service as a string."""
-        try:
-            # QueryServiceStatus returns a tuple:
-            #   (scvType, svcState, svcControls, err, svcErr, svcCP, svcWH)
-            # See https://msdn.microsoft.com/en-us/library/windows/desktop/ms685996(v=vs.85).aspx
-            scv_type, svc_state, svc_controls, err, svc_err, svc_cp, svc_wh = (
-                win32serviceutil.QueryServiceStatus(serviceName=self.name))
-            if svc_state in self._states:
-                return self._states[svc_state]
-            return "unknown"
-        except pywintypes.error:
-            return "not installed"
-
-    def get_pids(self):
-        """Return list of pids for service."""
-        return self.pids
-
-
-# pylint: enable=undefined-variable,unused-variable
-
-
-class PosixService(object):
-    """Service control on POSIX systems.
-
-    Simulates service control for background processes which fork themselves,
-    i.e., mongod with '--fork'.
-    """
-
-    def __init__(self, name, bin_path, bin_options, db_path):
-        """Initialize PosixService."""
-        self.name = name
-        self.bin_path = bin_path
-        self.bin_name = os.path.basename(bin_path)
-        self.bin_options = bin_options
-        self.db_path = db_path
-        self.pids = []
-
-    def create(self):  # pylint: disable=no-self-use
-        """Simulate create service. Returns (code, output) tuple."""
-        return 0, None
-
-    def update(self):  # pylint: disable=no-self-use
-        """Simulate update service. Returns (code, output) tuple."""
-        return 0, None
-
-    def delete(self):  # pylint: disable=no-self-use
-        """Simulate delete service. Returns (code, output) tuple."""
-        return 0, None
-
-    def start(self):
-        """Start process. Returns (code, output) tuple."""
-        cmd = "{} {}".format(self.bin_path, self.bin_options)
-        ret, output = execute_cmd(cmd)
-        if not ret:
-            proc = ProcessControl(name=self.bin_name)
-            self.pids = proc.get_pids()
-        return ret, output
-
-    def stop(self, timeout):  # pylint: disable=unused-argument
-        """Crash the posix process process. Empty "pids" to signal to `status` the process was terminated. Returns (code, output) tuple."""
-        proc = ProcessControl(name=self.bin_name)
-        proc.kill()
-        self.pids = []
-        return 0, None
-
-    def status(self):
-        """Return status of service. If "pids" is empty due to a `stop` call, return that the process is stopped. Otherwise only return `stopped` when the lock file is removed."""
-        if not self.get_pids():
-            return "stopped"
-
-        # Wait for the lock file to be deleted which concludes a clean shutdown.
-        lock_file = os.path.join(self.db_path, "mongod.lock")
-        if not os.path.exists(lock_file):
-            self.pids = []
-            return "stopped"
-
-        try:
-            if os.stat(lock_file).st_size == 0:
-                self.pids = []
-                return "stopped"
-        except OSError:
-            # The lock file was probably removed. Instead of being omnipotent with exception
-            # interpretation, have a follow-up call observe the file does not exist.
-            return "running"
-
-        return "running"
-
-    def get_pids(self):
-        """Return list of pids for process."""
-        return self.pids
-
-
 class MongodControl(object):  # pylint: disable=too-many-instance-attributes
     """Control mongod process."""
 
@@ -1043,7 +657,7 @@ class MongodControl(object):  # pylint: disable=too-many-instance-attributes
         if os.path.isdir(root_dir):
             LOGGER.warning("Root dir %s already exists", root_dir)
         else:
-            install_mongod(bin_dir=self.bin_dir, tarball_url=tarball_url, root_dir=root_dir)
+            _do_install_mongod(bin_dir=self.bin_dir, tarball_url=tarball_url, root_dir=root_dir)
         self.bin_dir = get_bin_dir(root_dir)
         if not self.bin_dir:
             ret, output = execute_cmd("ls -lR '{}'".format(root_dir), use_file=True)
@@ -1143,7 +757,8 @@ class LocalToRemoteOperations(object):
         return self.remote_op.access_info()
 
 
-def remote_handler(options, task_config, root_dir):  # pylint: disable=too-many-branches,too-many-locals,too-many-statements
+# pylint: disable=too-many-branches,too-many-locals,too-many-statements
+def remote_handler(options, task_config, root_dir):
     """Remote operations handler executes all remote operations on the remote host.
 
     These operations are invoked on the remote host's copy of this script.
@@ -1181,8 +796,8 @@ def remote_handler(options, task_config, root_dir):  # pylint: disable=too-many-
             pass
 
         # This is the internal "crash" mechanism, which is executed on the remote host.
-        elif operation == "crash_server":
-            ret, output = internal_crash()
+        def crash_server():
+            ret, _ = internal_crash()
             # An internal crash on Windows is not immediate
             try:
                 LOGGER.info("Waiting after issuing internal crash!")
@@ -1190,9 +805,11 @@ def remote_handler(options, task_config, root_dir):  # pylint: disable=too-many-
             except IOError:
                 pass
 
-        elif operation == "kill_mongod":
+            return ret
+
+        def kill_mongod():
             # Unconditional kill of mongod.
-            ret, output = kill_mongod()
+            ret, output = _do_kill_mongod()
             if ret:
                 LOGGER.error("kill_mongod failed %s", output)
                 return ret
@@ -1206,7 +823,9 @@ def remote_handler(options, task_config, root_dir):  # pylint: disable=too-many-
                 LOGGER.error("Unable to stop the mongod service, in state '%s'", status)
                 ret = 1
 
-        elif operation == "install_mongod":
+            return ret
+
+        def install_mongod():
             ret, output = mongod.install(root_dir, options.tarball_url)
             LOGGER.info(output)
 
@@ -1229,7 +848,9 @@ def remote_handler(options, task_config, root_dir):  # pylint: disable=too-many-
                 ret, output = set_windows_bootstatuspolicy()
                 LOGGER.info(output)
 
-        elif operation == "start_mongod":
+            return ret
+
+        def start_mongod():
             # Always update the service before starting, as options might have changed.
             ret, output = mongod.update()
             LOGGER.info(output)
@@ -1253,20 +874,22 @@ def remote_handler(options, task_config, root_dir):  # pylint: disable=too-many-
             if task_config.repl_set:
                 ret = mongo_reconfig_replication(mongo, host_port, task_config.repl_set)
 
-        elif operation == "stop_mongod":
-            ret, output = mongod.stop()
-            LOGGER.info(output)
-            ret = wait_for_mongod_shutdown(mongod)
+            return ret
 
-        elif operation == "shutdown_mongod":
+        def stop_mongod():
+            _, output = mongod.stop()
+            LOGGER.info(output)
+            return wait_for_mongod_shutdown(mongod)
+
+        def shutdown_mongod():
             mongo = pymongo.MongoClient(**mongo_client_opts)
             try:
                 mongo.admin.command("shutdown", force=True)
             except pymongo.errors.AutoReconnect:
                 pass
-            ret = wait_for_mongod_shutdown(mongod)
+            return wait_for_mongod_shutdown(mongod)
 
-        elif operation == "rsync_data":
+        def rsync_data():
             rsync_dir, new_rsync_dir = options.rsync_dest
             ret, output = rsync(powercycle_constants.DB_PATH, rsync_dir,
                                 powercycle_constants.RSYNC_EXCLUDE_FILES)
@@ -1277,12 +900,14 @@ def remote_handler(options, task_config, root_dir):  # pylint: disable=too-many-
                 LOGGER.info("Renaming directory %s to %s", rsync_dir, new_rsync_dir)
                 os.rename(abs_path(rsync_dir), abs_path(new_rsync_dir))
 
-        elif operation == "seed_docs":
-            mongo = pymongo.MongoClient(**mongo_client_opts)
-            ret = mongo_seed_docs(mongo, powercycle_constants.DB_NAME,
-                                  powercycle_constants.COLLECTION_NAME, task_config.seed_doc_num)
+            return ret
 
-        elif operation == "set_fcv":
+        def seed_docs():
+            mongo = pymongo.MongoClient(**mongo_client_opts)
+            return mongo_seed_docs(mongo, powercycle_constants.DB_NAME,
+                                   powercycle_constants.COLLECTION_NAME, task_config.seed_doc_num)
+
+        def set_fcv():
             mongo = pymongo.MongoClient(**mongo_client_opts)
             try:
                 ret = mongo.admin.command("setFeatureCompatibilityVersion", task_config.fcv)
@@ -1291,7 +916,10 @@ def remote_handler(options, task_config, root_dir):  # pylint: disable=too-many-
                 LOGGER.error("%s", err)
                 ret = err.code
 
-        elif operation == "check_disk":
+            return ret
+
+        def check_disk():
+            ret = 0
             if _IS_WINDOWS:
                 partitions = psutil.disk_partitions()
                 for part in partitions:
@@ -1314,10 +942,20 @@ def remote_handler(options, task_config, root_dir):  # pylint: disable=too-many-
 
                     if ret != 0:
                         return ret
+            return ret
 
-        else:
+        op_map = {
+            "crash_server": crash_server, "kill_mongod": kill_mongod, "install_mongod":
+                install_mongod, "start_mongod": start_mongod, "stop_mongod": stop_mongod,
+            "shutdown_mongod": shutdown_mongod, "rsync_data": rsync_data, "seed_docs": seed_docs,
+            "set_fcv": set_fcv, "check_disk": check_disk
+        }
+
+        if operation not in op_map:
             LOGGER.error("Unsupported remote option specified '%s'", operation)
             ret = 1
+        else:
+            ret = op_map[operation]()
 
         if ret:
             return ret
@@ -1349,6 +987,8 @@ def rsync(src_dir, dest_dir, exclude_files=None):
     # We retry running the rsync command up to 'max_attempts' times in order to work around how it
     # sporadically fails under cygwin on Windows Server 2016 with a "No medium found" error message.
     max_attempts = 5
+    rsync_output = None
+    ret = -1
     for attempt in range(1, max_attempts + 1):
         rsync_cmd = f"rsync -va --delete --quiet {exclude_options} {src_dir} {dest_dir}"
         ret, rsync_output = execute_cmd(rsync_cmd)
@@ -1368,7 +1008,7 @@ def rsync(src_dir, dest_dir, exclude_files=None):
     return ret, rsync_output
 
 
-def kill_mongod():
+def _do_kill_mongod():
     """Kill all mongod processes uncondtionally."""
     if _IS_WINDOWS:
         cmds = "taskkill /f /im mongod.exe"

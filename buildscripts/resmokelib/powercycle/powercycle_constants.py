@@ -1,11 +1,17 @@
 """Powercycle constants."""
 
 EXPANSIONS_FILE = "expansions.yml"
+
+# For ssh disable the options GSSAPIAuthentication, CheckHostIP, StrictHostKeyChecking
+# & UserKnownHostsFile, since these are local connections from one AWS instance to another.
 DEFAULT_SSH_CONNECTION_OPTIONS = ("-o ServerAliveCountMax=10"
                                   " -o ServerAliveInterval=6"
                                   " -o StrictHostKeyChecking=no"
                                   " -o ConnectTimeout=30"
-                                  " -o ConnectionAttempts=20")
+                                  " -o ConnectionAttempts=20"
+                                  " -o UserKnownHostsFile=/dev/null"
+                                  " -o GSSAPIAuthentication=no"
+                                  " -o CheckHostIP=no")
 
 MONITOR_PROC_FILE = "proc.json"
 MONITOR_SYSTEM_FILE = "system.json"
