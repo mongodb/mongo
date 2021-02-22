@@ -140,4 +140,29 @@ assert(arrayEq([{c: 6}, [5], [4, 5], 2, undefined, 3, null, 4, 5],
 assert(arrayEq([undefined, null, 2, 3, 4, 5, {c: 6}, [4, 5], [5]],
                [{c: 6}, [5], [4, 5], 2, undefined, 3, null, 4, 5],
                verbose));
+
+// Tests for the difference between arrayEq() and assert.sameMembers() : nested array order is not
+// significant in the first and significant in the latter.
+assert(arrayEq([1, [2, 3, 4]], [[4, 3, 2], 1]));
+assert.throws(() => assert.sameMembers([1, [2, 3, 4]], [[4, 3, 2], 1]));
+
+// Tests for the difference between orderedArrayEq() and assert.eq(): element order is significant
+// only at the top-level in orderedArrayEq() and always in assert.eq().
+assert(orderedArrayEq([1, [2, 3, 4]], [1, [2, 3, 4]], verbose));
+assert(orderedArrayEq([1, [2, 3, 4]], [1, [4, 3, 2]], verbose));
+assert.eq([1, [2, 3, 4]], [1, [2, 3, 4]]);
+assert.neq([1, [2, 3, 4]], [1, [4, 3, 2]]);
+
+// Tests for the difference between documentEq() and assert.docEq(): element order is not
+// significant in nested array values and property values can be skipped in documentEq().
+assert(documentEq({a: [1, 2, 3], b: 4, c: 5}, {a: [3, 2, 1], c: 5, b: 4}));
+
+assert.docEq({a: [1, 2, 3], b: 4, c: 5}, {a: [1, 2, 3], c: 5, b: 4});
+assert.throws(() => assert.docEq({a: [1, 2, 3], b: 4, c: 5}, {a: [3, 2, 1], c: 5, b: 4}));
+
+assert(documentEq({a: [1, 2, 3], b: 4, c: null},
+                  {a: [10, 20], c: 5, b: 4},
+                  false /* verbose */,
+                  null /* valueComparator */,
+                  ["a", "c"]));
 }());

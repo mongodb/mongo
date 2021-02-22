@@ -76,6 +76,10 @@ function customDocumentEq({left, right, verbose, valueComparator, fieldsToSkip =
  * Compare two documents for equality. Returns true or false. Only equal if they have the exact same
  * set of properties, and all the properties' values match except the values with names in the
  * fieldsToSkip array. The fields in fieldsToSkip will be skipped at all levels of the document.
+ * The value comparison with the recursive anyEq function allows for comparing nested array values
+ * ignoring the elements' order.
+ * If the order of the nested arrays elements is significant for the equivalence, the assert.docEq
+ * from assert.js should be used instead.
  */
 function documentEq(dl, dr, verbose = false, valueComparator, fieldsToSkip = []) {
     const debug = msg => verbose ? print(msg) : null;  // Helper to log 'msg' iff 'verbose' is true.
@@ -131,7 +135,12 @@ function documentEq(dl, dr, verbose = false, valueComparator, fieldsToSkip = [])
  * Returns true if both 'al' and 'ar' are arrays of the same length with the same elements according
  * to valueComparator.  Order of the elements within the arrays is not significant.
  *
- * This is a predicate, not an assertion; use assert.sameMembers() in assert.js for the
+ * Element comparison uses the anyEq function recursively, which allows for comparing of nested
+ * arrays with insignificant order.
+ *
+ * Use this function if the arguments have nested arrays and the element order is *not* significant
+ * when the equivalence is determined. Use assert.sameMembers() in assert.js instead if the
+ * arguments have no nested arrays, or the order of the nested arrays is significant for the
  * equivalent assertion.
  */
 function arrayEq(al, ar, verbose = false, valueComparator, fieldsToSkip = []) {
@@ -266,6 +275,16 @@ function resultsEq(rl, rr, verbose = false, fieldsToSkip = []) {
     return true;
 }
 
+/**
+ * Returns true if both 'al' and 'ar' are arrays of the same length with the same elements.
+ * Order of the elements is significant only in the top-level arrays.
+ *
+ * Element comparison uses the anyEq function recursively, which allows for comparing of nested
+ * arrays ignoring the elements' order.
+ *
+ * Use this function if the arguments have nested arrays and the elements' order is significant at
+ * the top-level and insignificant for the nested arrays.
+ */
 function orderedArrayEq(al, ar, verbose = false, fieldsToSkip = []) {
     if (al.length != ar.length) {
         if (verbose)
