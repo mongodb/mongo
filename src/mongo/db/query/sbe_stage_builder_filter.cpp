@@ -608,22 +608,19 @@ void generateComparison(MatchExpressionVisitorContext* context,
                 case sbe::EPrimBinary::neq:
                     break;
                 case sbe::EPrimBinary::greater: {
-                    return {makeFillEmptyFalse(makeNot(
-                                makeFunction("isMinKey", sbe::makeE<sbe::EVariable>(inputSlot)))),
+                    return {makeFillEmptyFalse(
+                                makeNot(makeFunction("isMinKey", makeVariable(inputSlot)))),
                             std::move(inputStage)};
                 }
                 case sbe::EPrimBinary::greaterEq: {
-                    return {makeFunction("exists", sbe::makeE<sbe::EVariable>(inputSlot)),
-                            std::move(inputStage)};
+                    return {makeFunction("exists", makeVariable(inputSlot)), std::move(inputStage)};
                 }
                 case sbe::EPrimBinary::less: {
-                    return {sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Boolean,
-                                                       sbe::value::bitcastFrom<bool>(false)),
+                    return {makeConstant(sbe::value::TypeTags::Boolean, false),
                             std::move(inputStage)};
                 }
                 case sbe::EPrimBinary::lessEq: {
-                    return {makeFillEmptyFalse(
-                                makeFunction("isMinKey", sbe::makeE<sbe::EVariable>(inputSlot))),
+                    return {makeFillEmptyFalse(makeFunction("isMinKey", makeVariable(inputSlot))),
                             std::move(inputStage)};
                 }
                 default:
@@ -635,30 +632,39 @@ void generateComparison(MatchExpressionVisitorContext* context,
                 case sbe::EPrimBinary::neq:
                     break;
                 case sbe::EPrimBinary::greater: {
-                    return {sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Boolean,
-                                                       sbe::value::bitcastFrom<bool>(false)),
+                    return {makeConstant(sbe::value::TypeTags::Boolean, false),
                             std::move(inputStage)};
                 }
                 case sbe::EPrimBinary::greaterEq: {
-                    return {makeFillEmptyFalse(
-                                makeFunction("isMaxKey", sbe::makeE<sbe::EVariable>(inputSlot))),
+                    return {makeFillEmptyFalse(makeFunction("isMaxKey", makeVariable(inputSlot))),
                             std::move(inputStage)};
                 }
                 case sbe::EPrimBinary::less: {
-                    return {makeFillEmptyFalse(makeNot(
-                                makeFunction("isMaxKey", sbe::makeE<sbe::EVariable>(inputSlot)))),
+                    return {makeFillEmptyFalse(
+                                makeNot(makeFunction("isMaxKey", makeVariable(inputSlot)))),
                             std::move(inputStage)};
                 }
                 case sbe::EPrimBinary::lessEq: {
-                    return {makeFunction("exists", sbe::makeE<sbe::EVariable>(inputSlot)),
-                            std::move(inputStage)};
+                    return {makeFunction("exists", makeVariable(inputSlot)), std::move(inputStage)};
                 }
                 default:
                     break;
             }
+        } else if (tag == sbe::value::TypeTags::Null) {
+            // When comparing to null we have to consider missing and undefined.
+            auto inputExpr = buildMultiBranchConditional(
+                CaseValuePair{generateNullOrMissing(sbe::EVariable(inputSlot)),
+                              makeConstant(sbe::value::TypeTags::Null, 0)},
+                makeVariable(inputSlot));
+
+            return {makeFillEmptyFalse(makeBinaryOp(binaryOp,
+                                                    std::move(inputExpr),
+                                                    sbe::makeE<sbe::EConstant>(tag, val),
+                                                    context->env)),
+                    std::move(inputStage)};
         }
         return {makeFillEmptyFalse(makeBinaryOp(binaryOp,
-                                                sbe::makeE<sbe::EVariable>(inputSlot),
+                                                makeVariable(inputSlot),
                                                 sbe::makeE<sbe::EConstant>(tag, val),
                                                 context->env)),
                 std::move(inputStage)};
