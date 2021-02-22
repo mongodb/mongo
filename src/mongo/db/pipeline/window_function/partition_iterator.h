@@ -68,6 +68,13 @@ public:
      */
     AdvanceResult advance();
 
+    /**
+     * Returns the offset of the iterator for the current partition.
+     */
+    auto getCurrentOffset() const {
+        return _currentIndex;
+    }
+
 private:
     /**
      * Retrieves the next document from the prior stage and updates the state accordingly.
