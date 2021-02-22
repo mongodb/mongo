@@ -29,11 +29,14 @@
 
 #include "mongo/platform/basic.h"
 
+#include <memory>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
@@ -52,9 +55,9 @@ protected:
         ASSERT_EQUALS(inputBson["pipeline"].type(), BSONType::Array);
         auto rawPipeline = parsePipelineFromBSON(inputBson["pipeline"]);
         NamespaceString testNss("test", "collection");
-        AggregateCommand request(testNss, rawPipeline);
+        auto command = AggregateCommand{testNss, rawPipeline};
 
-        return Pipeline::parse(request.getPipeline(), getExpCtx());
+        return Pipeline::parse(command.getPipeline(), getExpCtx());
     }
 
     auto parseExpression(std::string expressionString) {
@@ -66,13 +69,12 @@ protected:
 using namespace std::string_literals;
 using namespace expression_walker;
 
-TEST_F(ExpressionWalkerTest, NullTreeWalkSucceeds) {
+TEST_F(ExpressionWalkerTest, NothingTreeWalkSucceedsAndReturnsVoid) {
     struct {
-        void preVisit(Expression*) {}
-        void inVisit(unsigned long long, Expression*) {}
         void postVisit(Expression*) {}
     } nothingWalker;
-    auto expression = boost::intrusive_ptr<Expression>();
+    auto expression = std::unique_ptr<Expression>{};
+    static_assert(std::is_same_v<decltype(walk(&nothingWalker, expression.get())), void>);
     walk(&nothingWalker, expression.get());
 }
 
@@ -99,15 +101,47 @@ TEST_F(ExpressionWalkerTest, PrintWalkReflectsMutation) {
     auto expression = parseExpression(expressionString);
     walk(&stringWalker, expression.get());
     ASSERT_EQ(stringWalker.string, expressionString);
+
+    struct {
+        auto preVisit(Expression* expression) {
+            if (auto constant = dynamic_cast<ExpressionConstant*>(expression))
+                if (constant->getValue().getString() == "black")
+                    return std::make_unique<ExpressionConstant>(expCtx, Value{"white"s});
+            return std::unique_ptr<ExpressionConstant>{};
+        }
+        ExpressionContext* const expCtx;
+    } whiteWalker{getExpCtxRaw()};
+
+    ASSERT_FALSE(walk(&whiteWalker, expression.get()));
+    stringWalker.string.clear();
+    walk(&stringWalker, expression.get());
+    ASSERT_EQ(stringWalker.string, "{$concat: [\"white\", \"green\", \"yellow\"]}"s);
+}
+
+TEST_F(ExpressionWalkerTest, RootNodeReplacable) {
+    struct {
+        auto postVisit(Expression* expression) {
+            return std::make_unique<ExpressionConstant>(expCtx, Value{"soup"s});
+        }
+        ExpressionContext* const expCtx;
+    } replaceWithSoup{getExpCtxRaw()};
+
+    auto expressionString = "{$add: [2, 3, 4, {$atan2: [1, 0]}]}"s;
+    auto expression = parseExpression(expressionString);
+    auto resultExpression = walk(&replaceWithSoup, expression.get());
+    ASSERT_VALUE_EQ(dynamic_cast<ExpressionConstant*>(resultExpression.get())->getValue(),
+                    Value{"soup"s});
+    // The input Expression, as a side effect, will have all its branches changed to soup by this
+    // rewrite.
+    for (auto&& child : dynamic_cast<ExpressionAdd*>(expression.get())->getChildren())
+        ASSERT_VALUE_EQ(dynamic_cast<ExpressionConstant*>(child.get())->getValue(), Value{"soup"s});
 }
 
 TEST_F(ExpressionWalkerTest, InVisitCanCount) {
     struct {
-        void preVisit(Expression*) {}
         void inVisit(unsigned long long count, Expression*) {
             counter.push_back(count);
         }
-        void postVisit(Expression*) {}
         std::vector<unsigned long long> counter;
     } countWalker;
 
