@@ -1,6 +1,5 @@
 // @tags: [
-//   requires_getmore,
-//   sbe_incompatible,
+//   requires_getmore
 // ]
 
 // Tests that explicitly invoke the find and getMore commands.

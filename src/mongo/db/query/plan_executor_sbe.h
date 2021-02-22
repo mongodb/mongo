@@ -73,7 +73,7 @@ public:
     ExecState getNextDocument(Document* objOut, RecordId* dlOut) override;
 
     bool isEOF() override {
-        return _state == State::kClosed;
+        return isMarkedAsKilled() || (_stash.empty() && _root->getCommonStats()->isEOF);
     }
 
     long long executeCount() override {
