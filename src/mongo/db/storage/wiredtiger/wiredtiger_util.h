@@ -58,7 +58,7 @@ inline Status wtRCToStatus(int retCode, const char* prefix = nullptr) {
     return wtRCToStatus_slow(retCode, prefix);
 }
 
-#define invariantWTOK(expression)                                                       \
+#define MONGO_invariantWTOK_1(expression)                                               \
     do {                                                                                \
         int _invariantWTOK_retCode = expression;                                        \
         if (MONGO_unlikely(_invariantWTOK_retCode != 0)) {                              \
@@ -66,6 +66,21 @@ inline Status wtRCToStatus(int retCode, const char* prefix = nullptr) {
                 #expression, wtRCToStatus(_invariantWTOK_retCode), __FILE__, __LINE__); \
         }                                                                               \
     } while (false)
+
+#define MONGO_invariantWTOK_2(expression, contextExpr)                     \
+    do {                                                                   \
+        int _invariantWTOK_retCode = expression;                           \
+        if (MONGO_unlikely(_invariantWTOK_retCode != 0)) {                 \
+            invariantOKFailedWithMsg(#expression,                          \
+                                     wtRCToStatus(_invariantWTOK_retCode), \
+                                     contextExpr,                          \
+                                     __FILE__,                             \
+                                     __LINE__);                            \
+        }                                                                  \
+    } while (false)
+
+#define invariantWTOK(...) \
+    MONGO_expand(MONGO_expand(BOOST_PP_OVERLOAD(MONGO_invariantWTOK_, __VA_ARGS__))(__VA_ARGS__))
 
 struct WiredTigerItem : public WT_ITEM {
     WiredTigerItem(const void* d, size_t s) {

@@ -1724,7 +1724,14 @@ Status WiredTigerRecordStore::updateRecord(OperationContext* opCtx,
     CursorKey key = makeCursorKey(id);
     setKey(c, key);
     int ret = wiredTigerPrepareConflictRetry(opCtx, [&] { return c->search(c); });
-    invariantWTOK(ret);
+
+    invariantWTOK(ret,
+                  str::stream() << "Namespace: " << ns() << "; Key: " << getKey(c)
+                                << "; Read Timestamp: "
+                                << opCtx->recoveryUnit()
+                                       ->getPointInTimeReadTimestamp(opCtx)
+                                       .value_or(Timestamp{})
+                                       .toString());
 
     auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
     metricsCollector.incrementOneCursorSeek();
