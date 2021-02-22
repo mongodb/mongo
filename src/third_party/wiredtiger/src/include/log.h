@@ -50,8 +50,11 @@ union __wt_lsn {
 #define WT_LOG_ALIGN 128
 
 /*
- * Atomically set the two components of the LSN.
+ * Atomically set the LSN. There are two forms. We need WT_ASSIGN_LSN because some compilers (at
+ * least clang address sanitizer) does not do atomic 64-bit structure assignment so we need to
+ * explicitly assign the 64-bit field. And WT_SET_LSN atomically sets the LSN given a file/offset.
  */
+#define WT_ASSIGN_LSN(dstl, srcl) (dstl)->file_offset = (srcl)->file_offset
 #define WT_SET_LSN(l, f, o) (l)->file_offset = (((uint64_t)(f) << 32) + (o))
 
 #define WT_INIT_LSN(l) WT_SET_LSN((l), 1, 0)
@@ -395,8 +398,10 @@ struct __wt_txn_printlog_args {
     WT_FSTREAM *fs;
 
 /* AUTOMATIC FLAG VALUE GENERATION START */
-#define WT_TXN_PRINTLOG_HEX 0x1u /* Add hex output */
-                                 /* AUTOMATIC FLAG VALUE GENERATION STOP */
+#define WT_TXN_PRINTLOG_HEX 0x1u      /* Add hex output */
+#define WT_TXN_PRINTLOG_MSG 0x2u      /* Messages only */
+#define WT_TXN_PRINTLOG_UNREDACT 0x4u /* Don't redact user data from output */
+                                      /* AUTOMATIC FLAG VALUE GENERATION STOP */
     uint32_t flags;
 };
 

@@ -213,7 +213,7 @@ __wt_lsm_manager_start(WT_SESSION_IMPL *session)
         manager->lsm_worker_cookies[i].session = worker_session;
     }
 
-    F_SET(conn, WT_CONN_SERVER_LSM);
+    FLD_SET(conn->server_flags, WT_CONN_SERVER_LSM);
 
     /* Start the LSM manager thread. */
     WT_ERR(__wt_thread_create(session, &manager->lsm_worker_cookies[0].tid, __lsm_worker_manager,
@@ -270,7 +270,7 @@ __wt_lsm_manager_destroy(WT_SESSION_IMPL *session)
     removed = 0;
 
     /* Clear the LSM server flag. */
-    F_CLR(conn, WT_CONN_SERVER_LSM);
+    FLD_CLR(conn->server_flags, WT_CONN_SERVER_LSM);
 
     WT_ASSERT(session, !F_ISSET(conn, WT_CONN_READONLY) || manager->lsm_workers == 0);
     if (manager->lsm_workers > 0) {
@@ -354,7 +354,7 @@ __lsm_manager_run_server(WT_SESSION_IMPL *session)
     conn = S2C(session);
     dhandle_locked = false;
 
-    while (F_ISSET(conn, WT_CONN_SERVER_LSM)) {
+    while (FLD_ISSET(conn->server_flags, WT_CONN_SERVER_LSM)) {
         __wt_sleep(0, 10000);
         if (TAILQ_EMPTY(&conn->lsmqh))
             continue;

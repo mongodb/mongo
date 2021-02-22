@@ -595,15 +595,15 @@ __wt_txn_recover(WT_SESSION_IMPL *session)
                 WT_ERR_MSG(session, WT_RUN_RECOVERY, "Read-only database needs recovery");
         }
         if (WT_IS_INIT_LSN(&metafile->ckpt_lsn))
-            ret = __wt_log_scan(session, NULL, WT_LOGSCAN_FIRST, __txn_log_recover, &r);
+            ret = __wt_log_scan(session, NULL, NULL, WT_LOGSCAN_FIRST, __txn_log_recover, &r);
         else {
             /*
              * Start at the last checkpoint LSN referenced in the metadata. If we see the end of a
              * checkpoint while scanning, we will change the full scan to start from there.
              */
-            r.ckpt_lsn = metafile->ckpt_lsn;
-            ret = __wt_log_scan(
-              session, &metafile->ckpt_lsn, WT_LOGSCAN_RECOVER_METADATA, __txn_log_recover, &r);
+            WT_ASSIGN_LSN(&r.ckpt_lsn, &metafile->ckpt_lsn);
+            ret = __wt_log_scan(session, &metafile->ckpt_lsn, NULL, WT_LOGSCAN_RECOVER_METADATA,
+              __txn_log_recover, &r);
         }
         if (F_ISSET(conn, WT_CONN_SALVAGE))
             ret = 0;
@@ -674,9 +674,9 @@ __wt_txn_recover(WT_SESSION_IMPL *session)
         FLD_SET(conn->log_flags, WT_CONN_LOG_RECOVER_DIRTY);
     if (WT_IS_INIT_LSN(&r.ckpt_lsn))
         ret = __wt_log_scan(
-          session, NULL, WT_LOGSCAN_FIRST | WT_LOGSCAN_RECOVER, __txn_log_recover, &r);
+          session, NULL, NULL, WT_LOGSCAN_FIRST | WT_LOGSCAN_RECOVER, __txn_log_recover, &r);
     else
-        ret = __wt_log_scan(session, &r.ckpt_lsn, WT_LOGSCAN_RECOVER, __txn_log_recover, &r);
+        ret = __wt_log_scan(session, &r.ckpt_lsn, NULL, WT_LOGSCAN_RECOVER, __txn_log_recover, &r);
     if (F_ISSET(conn, WT_CONN_SALVAGE))
         ret = 0;
     WT_ERR(ret);

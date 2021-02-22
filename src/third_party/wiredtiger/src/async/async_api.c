@@ -238,7 +238,7 @@ __async_start(WT_SESSION_IMPL *session)
     /*
      * Start up the worker threads.
      */
-    F_SET(conn, WT_CONN_SERVER_ASYNC);
+    FLD_SET(conn->server_flags, WT_CONN_SERVER_ASYNC);
     for (i = 0; i < conn->async_workers; i++) {
         /*
          * Each worker has its own session. We set both a general server flag in the connection and
@@ -414,7 +414,7 @@ __wt_async_destroy(WT_SESSION_IMPL *session)
     if (!conn->async_cfg)
         return (0);
 
-    F_CLR(conn, WT_CONN_SERVER_ASYNC);
+    FLD_CLR(conn->server_flags, WT_CONN_SERVER_ASYNC);
     for (i = 0; i < conn->async_workers; i++)
         WT_TRET(__wt_thread_join(session, &async->worker_tids[i]));
     __wt_cond_destroy(session, &async->flush_cond);

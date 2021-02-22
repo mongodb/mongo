@@ -208,7 +208,7 @@ __curlog_next(WT_CURSOR *cursor)
      */
     if (cl->stepp == NULL || cl->stepp >= cl->stepp_end || !*cl->stepp) {
         cl->txnid = 0;
-        ret = __wt_log_scan(session, cl->next_lsn, WT_LOGSCAN_ONE, __curlog_logrec, cl);
+        ret = __wt_log_scan(session, cl->next_lsn, NULL, WT_LOGSCAN_ONE, __curlog_logrec, cl);
         if (ret == ENOENT)
             ret = WT_NOTFOUND;
         WT_ERR(ret);
@@ -247,7 +247,7 @@ __curlog_search(WT_CURSOR *cursor)
      */
     WT_ERR(__wt_cursor_get_key(cursor, &key_file, &key_offset, &counter));
     WT_SET_LSN(&key, key_file, key_offset);
-    ret = __wt_log_scan(session, &key, WT_LOGSCAN_ONE, __curlog_logrec, cl);
+    ret = __wt_log_scan(session, &key, NULL, WT_LOGSCAN_ONE, __curlog_logrec, cl);
     if (ret == ENOENT)
         ret = WT_NOTFOUND;
     WT_ERR(ret);

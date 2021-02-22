@@ -519,7 +519,7 @@ class test_txn19_meta(wttest.WiredTigerTestCase, suite_subprocess):
 
         if expect_fail:
             self.check_file_contains_one_of(errfile,
-                ['WT_TRY_SALVAGE: database corruption detected'])
+                ['WT_TRY_SALVAGE: database corruption detected'], True)
 
         for salvagedir in [ newdir, newdir2 ]:
             # Removing the 'WiredTiger.turtle' file has weird behavior:

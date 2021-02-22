@@ -78,7 +78,7 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
      * wiredtiger_open hits an error (as well as during normal shutdown). Assert they're not
      * running.
      */
-    WT_ASSERT(session, !F_ISSET(conn, WT_CONN_SERVER_ASYNC | WT_CONN_SERVER_LSM));
+    WT_ASSERT(session, !FLD_ISSET(conn->server_flags, WT_CONN_SERVER_ASYNC | WT_CONN_SERVER_LSM));
 
     /* Shut down the subsystems, ensuring workers see the state change. */
     F_SET(conn, WT_CONN_CLOSING);

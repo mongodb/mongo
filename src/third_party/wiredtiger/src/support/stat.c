@@ -899,6 +899,7 @@ static const char *const __stats_connection_desc[] = {
   "data-handle: connection sweep dhandles removed from hash list",
   "data-handle: connection sweep time-of-death sets",
   "data-handle: connection sweeps",
+  "data-handle: connection sweeps skipped due to checkpoint gathering handles",
   "data-handle: session dhandles swept",
   "data-handle: session sweep attempts",
   "lock: checkpoint lock acquisitions",
@@ -1357,6 +1358,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->dh_sweep_remove = 0;
     stats->dh_sweep_tod = 0;
     stats->dh_sweeps = 0;
+    stats->dh_sweep_skip_ckpt = 0;
     stats->dh_session_handles = 0;
     stats->dh_session_sweeps = 0;
     stats->lock_checkpoint_count = 0;
@@ -1811,6 +1813,7 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->dh_sweep_remove += WT_STAT_READ(from, dh_sweep_remove);
     to->dh_sweep_tod += WT_STAT_READ(from, dh_sweep_tod);
     to->dh_sweeps += WT_STAT_READ(from, dh_sweeps);
+    to->dh_sweep_skip_ckpt += WT_STAT_READ(from, dh_sweep_skip_ckpt);
     to->dh_session_handles += WT_STAT_READ(from, dh_session_handles);
     to->dh_session_sweeps += WT_STAT_READ(from, dh_session_sweeps);
     to->lock_checkpoint_count += WT_STAT_READ(from, lock_checkpoint_count);

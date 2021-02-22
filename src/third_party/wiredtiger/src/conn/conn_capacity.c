@@ -72,7 +72,7 @@ __capacity_config(WT_SESSION_IMPL *session, const char *cfg[])
 static bool
 __capacity_server_run_chk(WT_SESSION_IMPL *session)
 {
-    return (F_ISSET(S2C(session), WT_CONN_SERVER_CAPACITY));
+    return (FLD_ISSET(S2C(session)->server_flags, WT_CONN_SERVER_CAPACITY));
 }
 
 /*
@@ -129,7 +129,7 @@ __capacity_server_start(WT_CONNECTION_IMPL *conn)
 {
     WT_SESSION_IMPL *session;
 
-    F_SET(conn, WT_CONN_SERVER_CAPACITY);
+    FLD_SET(conn->server_flags, WT_CONN_SERVER_CAPACITY);
 
     /*
      * The capacity server gets its own session.
@@ -197,7 +197,7 @@ __wt_capacity_server_destroy(WT_SESSION_IMPL *session)
 
     conn = S2C(session);
 
-    F_CLR(conn, WT_CONN_SERVER_CAPACITY);
+    FLD_CLR(conn->server_flags, WT_CONN_SERVER_CAPACITY);
     if (conn->capacity_tid_set) {
         __wt_cond_signal(session, conn->capacity_cond);
         WT_TRET(__wt_thread_join(session, &conn->capacity_tid));

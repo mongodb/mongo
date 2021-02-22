@@ -252,7 +252,7 @@ __sweep_remove_handles(WT_SESSION_IMPL *session)
 static bool
 __sweep_server_run_chk(WT_SESSION_IMPL *session)
 {
-    return (F_ISSET(S2C(session), WT_CONN_SERVER_SWEEP));
+    return (FLD_ISSET(S2C(session)->server_flags, WT_CONN_SERVER_SWEEP));
 }
 
 /*
@@ -319,10 +319,18 @@ __sweep_server(void *arg)
 
         /*
          * See if it is time to sweep the data handles. Those are swept less frequently than the
-         * lookaside table by default and the frequency is controlled by a user setting.
+         * history store table by default and the frequency is controlled by a user setting. We want
+         * to avoid sweeping while checkpoint is gathering handles. Both need to lock the dhandle
+         * list and sweep acquiring that lock can interfere with checkpoint and cause it to take
+         * longer. Sweep is an operation that typically has long intervals so skipping some for
+         * checkpoint should have little impact.
          */
         if (!cv_signalled && (now - last < sweep_interval))
             continue;
+        if (F_ISSET(conn, WT_CONN_CKPT_GATHER)) {
+            WT_STAT_CONN_INCR(session, dh_sweep_skip_ckpt);
+            continue;
+        }
         WT_STAT_CONN_INCR(session, dh_sweeps);
         /*
          * Mark handles with a time of death, and report whether any handles are marked dead. If
@@ -399,7 +407,7 @@ __wt_sweep_create(WT_SESSION_IMPL *session)
     conn = S2C(session);
 
     /* Set first, the thread might run before we finish up. */
-    F_SET(conn, WT_CONN_SERVER_SWEEP);
+    FLD_SET(conn->server_flags, WT_CONN_SERVER_SWEEP);
 
     /*
      * Handle sweep does enough I/O it may be called upon to perform slow operations for the block
@@ -438,7 +446,7 @@ __wt_sweep_destroy(WT_SESSION_IMPL *session)
 
     conn = S2C(session);
 
-    F_CLR(conn, WT_CONN_SERVER_SWEEP);
+    FLD_CLR(conn->server_flags, WT_CONN_SERVER_SWEEP);
     if (conn->sweep_tid_set) {
         __wt_cond_signal(session, conn->sweep_cond);
         WT_TRET(__wt_thread_join(session, &conn->sweep_tid));

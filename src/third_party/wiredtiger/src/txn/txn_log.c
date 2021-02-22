@@ -717,8 +717,8 @@ __txn_printlog(WT_SESSION_IMPL *session, WT_ITEM *rawrec, WT_LSN *lsnp, WT_LSN *
  *     Print the log in a human-readable format.
  */
 int
-__wt_txn_printlog(WT_SESSION *wt_session, const char *ofile, uint32_t flags)
-  WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
+__wt_txn_printlog(WT_SESSION *wt_session, const char *ofile, uint32_t flags, WT_LSN *start_lsn,
+  WT_LSN *end_lsn) WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
 {
     WT_DECL_RET;
     WT_FSTREAM *fs;
@@ -735,8 +735,9 @@ __wt_txn_printlog(WT_SESSION *wt_session, const char *ofile, uint32_t flags)
     WT_ERR(__wt_fprintf(session, fs, "[\n"));
     args.fs = fs;
     args.flags = flags;
-    WT_ERR(__wt_log_scan(session, NULL, WT_LOGSCAN_FIRST, __txn_printlog, &args));
-    ret = __wt_fprintf(session, fs, "\n]\n");
+    WT_ERR(__wt_log_scan(session, start_lsn, end_lsn, 0x0, __txn_printlog, &args));
+    if (!LF_ISSET(WT_TXN_PRINTLOG_MSG))
+        ret = __wt_fprintf(session, fs, "\n]\n");
 
 err:
     if (ofile != NULL)

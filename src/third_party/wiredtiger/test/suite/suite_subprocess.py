@@ -93,7 +93,9 @@ class suite_subprocess:
             got = f.read(len(expect) + 100)
             self.assertEqual(got, expect, filename + ': does not contain expected:\n\'' + expect + '\', but contains:\n\'' + got + '\'.')
 
-    def check_file_contains_one_of(self, filename, expectlist):
+    # Check contents of the file against a provided checklist. Expected is used as a bool to either
+    # ensure checklist is included or ensure the checklist is not included in the file.
+    def check_file_contains_one_of(self, filename, checklist, expected):
         """
         Check that the file contains the expected string in the first 100K bytes
         """
@@ -101,21 +103,27 @@ class suite_subprocess:
         with open(filename, 'r') as f:
             got = f.read(maxbytes)
             found = False
-            for expect in expectlist:
+            for expect in checklist:
                 pat = self.convert_to_pattern(expect)
                 if pat == None:
                     if expect in got:
                         found = True
-                        break
+                        if expected:
+                            break
+                        else:
+                            self.fail("Did not expect: " + got)
                 else:
                     if re.search(pat, got):
                         found = True
-                        break
-            if not found:
-                if len(expectlist) == 1:
-                    expect = '\'' + expectlist[0] + '\''
+                        if expected:
+                            break
+                        else:
+                            self.fail("Did not expect: " + got)
+            if not found and expected:
+                if len(checklist) == 1:
+                    expect = '\'' + checklist[0] + '\''
                 else:
-                    expect = str(expectlist)
+                    expect = str(checklist)
                 gotstr = '\'' + \
                     (got if len(got) < 1000 else (got[0:1000] + '...')) + '\''
                 if len(got) >= maxbytes:
@@ -123,8 +131,11 @@ class suite_subprocess:
                 else:
                     self.fail(filename + ': does not contain expected ' + expect + ', got ' + gotstr)
 
-    def check_file_contains(self, filename, expect):
-        self.check_file_contains_one_of(filename, [expect])
+    def check_file_contains(self, filename, content):
+        self.check_file_contains_one_of(filename, [content], True)
+
+    def check_file_not_contains(self, filename, content):
+        self.check_file_contains_one_of(filename, [content], False)
 
     def check_empty_file(self, filename):
         """
