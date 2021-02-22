@@ -132,7 +132,7 @@ variables:
 
 # Templates used by powercycle
 - &powercycle_remote_credentials
-  private_key_file: $(${posix_workdir})/powercycle.pem
+  private_key_file: $(${posix_workdir})/src/powercycle.pem
   private_key_remote: ${__project_aws_ssh_key_value}
   aws_key_remote: ${powercycle_aws_key}
   aws_secret_remote: ${powercycle_aws_secret}
@@ -1103,12 +1103,6 @@ functions:
           fi
       - key: posix_workdir
         value: eval 'if [ "Windows_NT" = "$OS" ]; then echo $(cygpath -u "${workdir}"); else echo ${workdir}; fi'
-      # For ssh disable the options GSSAPIAuthentication, CheckHostIP, StrictHostKeyChecking
-      # & UserKnownHostsFile, since these are local connections from one AWS instance to another.
-      - key: ssh_connection_options
-        value: -o GSSAPIAuthentication=no -o CheckHostIP=no -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o ConnectionAttempts=20
-      - key: ssh_retries
-        value: "10"
       - key: set_sudo
         value: |
           set -o > /tmp/settings.log
@@ -2400,7 +2394,7 @@ functions:
           set +o errexit
           eval $python -u buildscripts/resmoke.py powercycle run \
             "--sshUserHost=$(printf "%s@%s" "$user" "${private_ip_address}") \
-            --sshConnection=\"-i ${private_key_file} ${ssh_connection_options}\" \
+            --sshConnection=\"-i ${private_key_file}\" \
             --taskName=${task_name}"
 
     - command: expansions.update

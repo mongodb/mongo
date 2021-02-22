@@ -78,19 +78,27 @@ class PowercyclePlugin(PluginInterface):
     @staticmethod
     def _add_powercycle_commands(parent_parser):
         """Add sub-subcommands for powercycle."""
-        sub_parsers = parent_parser.add_subparsers(help="powercycle commands")
+        sub_parsers = parent_parser.add_subparsers()
 
-        setup_parser = sub_parsers.add_parser("setup-host")
+        setup_parser = sub_parsers.add_parser("setup-host",
+                                              help="Step 1. Set up the host for powercycle")
         setup_parser.set_defaults(run_option=Powercycle.HOST_SETUP)
 
-        save_parser = sub_parsers.add_parser("save-diagnostics")
+        run_parser = sub_parsers.add_parser(
+            "run", help="Step 2. Run the Powercycle test of your choice;"
+            "search for 'powercycle invocation' in evg task logs")
+        run_parser.set_defaults(run_option=Powercycle.RUN)
+
+        save_parser = sub_parsers.add_parser(
+            "save-diagnostics",
+            help="Copy Powercycle diagnostics to local machine; mainly used by Evergreen. For"
+            "local invocation, consider instead ssh-ing into the Powercycle host directly")
         save_parser.set_defaults(run_option=Powercycle.SAVE_DIAG)
 
-        save_parser = sub_parsers.add_parser("remote-hang-analyzer")
+        save_parser = sub_parsers.add_parser(
+            "remote-hang-analyzer",
+            help="Run the hang analyzer on the remote machine; mainly used by Evergreen")
         save_parser.set_defaults(run_option=Powercycle.REMOTE_HANG_ANALYZER)
-
-        run_parser = sub_parsers.add_parser("run")
-        run_parser.set_defaults(run_option=Powercycle.RUN)
 
         # Only need to return run_parser for further processing; others don't need additional args.
         return run_parser
@@ -98,8 +106,31 @@ class PowercyclePlugin(PluginInterface):
     def add_subcommand(self, subparsers):  # pylint: disable=too-many-statements
         """Create and add the parser for the subcommand."""
         intermediate_parser = subparsers.add_parser(
-            SUBCOMMAND, help=__doc__,
-            usage="MongoDB Powercycle tests; type one of the subcommands for more information")
+            SUBCOMMAND, help=__doc__, usage="""
+MongoDB Powercycle Tests. To run a powercycle test locally, use the following steps:
+
+1. Spin up an Evergreen spawnhost or virtual workstation that supports running
+   Powercycle, e.g. by creating the host from an existing Powercycle task.
+
+2. Set up the mongo repo for development as you would locally, per Server Onboarding
+   instructions.
+
+3. Run the following command to create a new host for powercycle that is identical
+   to the one you're on:
+
+     `evergreen host create [options]`
+
+   See the command's help message for additional options, including a keyfile.
+
+4. Save the IP address of the newly created host from the previous step and store
+   it a file called `expansions.yml` in the current working directory with the key
+   `private_ip_address`. I.e.
+
+     `echo "private_ip_address: 123.45.67.89" > expansions.yml
+
+5. You're ready to run powercycle! See the help message for individual subcommands
+   for more detail.
+            """)
 
         parser = self._add_powercycle_commands(intermediate_parser)
 
