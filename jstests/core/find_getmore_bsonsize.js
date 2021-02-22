@@ -1,6 +1,5 @@
 // @tags: [
-//   requires_getmore,
-//   sbe_incompatible,
+//   requires_getmore
 // ]
 
 // Ensure that the find and getMore commands can handle documents nearing the 16 MB size limit for
