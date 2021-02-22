@@ -417,10 +417,12 @@ OpTime logOp(OperationContext* opCtx, MutableOplogEntry* oplogEntry) {
     return slot;
 }
 
-std::vector<OpTime> logInsertOps(OperationContext* opCtx,
-                                 MutableOplogEntry* oplogEntryTemplate,
-                                 std::vector<InsertStatement>::const_iterator begin,
-                                 std::vector<InsertStatement>::const_iterator end) {
+std::vector<OpTime> logInsertOps(
+    OperationContext* opCtx,
+    MutableOplogEntry* oplogEntryTemplate,
+    std::vector<InsertStatement>::const_iterator begin,
+    std::vector<InsertStatement>::const_iterator end,
+    std::function<boost::optional<ShardId>(const BSONObj& doc)> getDestinedRecipientFn) {
     invariant(begin != end);
     oplogEntryTemplate->setOpType(repl::OpTypeEnum::kInsert);
     // If this oplog entry is from a tenant migration, include the tenant migration
@@ -464,7 +466,7 @@ std::vector<OpTime> logInsertOps(OperationContext* opCtx,
         }
         oplogEntry.setObject(begin[i].doc);
         oplogEntry.setOpTime(insertStatementOplogSlot);
-        oplogEntry.setDestinedRecipient(getDestinedRecipient(opCtx, nss, begin[i].doc));
+        oplogEntry.setDestinedRecipient(getDestinedRecipientFn(begin[i].doc));
         addDestinedRecipient.execute([&](const BSONObj& data) {
             auto recipient = data["destinedRecipient"].String();
             oplogEntry.setDestinedRecipient(boost::make_optional<ShardId>({recipient}));

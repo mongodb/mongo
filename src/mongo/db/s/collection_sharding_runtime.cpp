@@ -90,6 +90,10 @@ CollectionShardingRuntime* CollectionShardingRuntime::get(OperationContext* opCt
     return checked_cast<CollectionShardingRuntime*>(css);
 }
 
+CollectionShardingRuntime* CollectionShardingRuntime::get(CollectionShardingState* css) {
+    return checked_cast<CollectionShardingRuntime*>(css);
+}
+
 CollectionShardingRuntime* CollectionShardingRuntime::get_UNSAFE(ServiceContext* svcCtx,
                                                                  const NamespaceString& nss) {
     auto* const css = CollectionShardingState::get_UNSAFE(svcCtx, nss);

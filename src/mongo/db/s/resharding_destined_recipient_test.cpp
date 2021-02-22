@@ -287,7 +287,11 @@ TEST_F(DestinedRecipientTest, TestGetDestinedRecipient) {
     AutoGetCollection coll(opCtx, kNss, MODE_IX);
     OperationShardingState::get(opCtx).initializeClientRoutingVersions(
         kNss, env.version, env.dbVersion);
-    auto destShardId = getDestinedRecipient(opCtx, kNss, BSON("x" << 2 << "y" << 10));
+    auto* const css = CollectionShardingState::get(opCtx, kNss);
+    auto collDesc = css->getCollectionDescription(opCtx);
+
+    auto destShardId =
+        getDestinedRecipient(opCtx, kNss, BSON("x" << 2 << "y" << 10), css, collDesc);
     ASSERT(destShardId);
     ASSERT_EQ(*destShardId, env.destShard);
 }
@@ -300,9 +304,11 @@ TEST_F(DestinedRecipientTest, TestGetDestinedRecipientThrowsOnBlockedRefresh) {
         AutoGetCollection coll(opCtx, kNss, MODE_IX);
         OperationShardingState::get(opCtx).initializeClientRoutingVersions(
             kNss, env.version, env.dbVersion);
+        auto* const css = CollectionShardingState::get(opCtx, kNss);
+        auto collDesc = css->getCollectionDescription(opCtx);
 
         FailPointEnableBlock failPoint("blockCollectionCacheLookup");
-        ASSERT_THROWS(getDestinedRecipient(opCtx, kNss, BSON("x" << 2 << "y" << 10)),
+        ASSERT_THROWS(getDestinedRecipient(opCtx, kNss, BSON("x" << 2 << "y" << 10), css, collDesc),
                       ExceptionFor<ErrorCodes::ShardInvalidatedForTargeting>);
     }
 

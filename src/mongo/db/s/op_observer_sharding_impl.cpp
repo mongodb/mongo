@@ -124,12 +124,13 @@ void OpObserverShardingImpl::shardObserveInsertOp(OperationContext* opCtx,
                                                   const NamespaceString nss,
                                                   const BSONObj& insertedDoc,
                                                   const repl::OpTime& opTime,
+                                                  CollectionShardingState* css,
                                                   const bool fromMigrate,
                                                   const bool inMultiDocumentTransaction) {
     if (nss == NamespaceString::kSessionTransactionsTableNamespace || fromMigrate)
         return;
 
-    auto* const csr = CollectionShardingRuntime::get(opCtx, nss);
+    auto* const csr = CollectionShardingRuntime::get(css);
     csr->checkShardVersionOrThrow(opCtx);
 
     auto metadata = csr->getCurrentMetadataIfKnown();
@@ -155,9 +156,10 @@ void OpObserverShardingImpl::shardObserveUpdateOp(OperationContext* opCtx,
                                                   boost::optional<BSONObj> preImageDoc,
                                                   const BSONObj& postImageDoc,
                                                   const repl::OpTime& opTime,
+                                                  CollectionShardingState* css,
                                                   const repl::OpTime& prePostImageOpTime,
                                                   const bool inMultiDocumentTransaction) {
-    auto* const csr = CollectionShardingRuntime::get(opCtx, nss);
+    auto* const csr = CollectionShardingRuntime::get(css);
     csr->checkShardVersionOrThrow(opCtx);
 
     auto metadata = csr->getCurrentMetadataIfKnown();
@@ -182,9 +184,10 @@ void OpObserverShardingImpl::shardObserveDeleteOp(OperationContext* opCtx,
                                                   const NamespaceString nss,
                                                   const BSONObj& documentKey,
                                                   const repl::OpTime& opTime,
+                                                  CollectionShardingState* css,
                                                   const repl::OpTime& preImageOpTime,
                                                   const bool inMultiDocumentTransaction) {
-    auto* const csr = CollectionShardingRuntime::get(opCtx, nss);
+    auto* const csr = CollectionShardingRuntime::get(css);
     csr->checkShardVersionOrThrow(opCtx);
 
     auto metadata = csr->getCurrentMetadataIfKnown();
@@ -219,8 +222,10 @@ void OpObserverShardingImpl::shardObserveTransactionPrepareOrUnpreparedCommit(
 void OpObserverShardingImpl::shardAnnotateOplogEntry(OperationContext* opCtx,
                                                      const NamespaceString nss,
                                                      const BSONObj& doc,
-                                                     repl::DurableReplOperation& op) {
-    op.setDestinedRecipient(getDestinedRecipient(opCtx, nss, doc));
+                                                     repl::DurableReplOperation& op,
+                                                     CollectionShardingState* css,
+                                                     const ScopedCollectionDescription& collDesc) {
+    op.setDestinedRecipient(getDestinedRecipient(opCtx, nss, doc, css, collDesc));
 }
 
 }  // namespace mongo

@@ -605,7 +605,8 @@ void UpdateStage::_checkRestrictionsOnUpdatingShardKeyAreNotViolated(
 }
 
 
-bool UpdateStage::wasReshardingKeyUpdated(const ScopedCollectionDescription& collDesc,
+bool UpdateStage::wasReshardingKeyUpdated(CollectionShardingState* css,
+                                          const ScopedCollectionDescription& collDesc,
                                           const BSONObj& newObj,
                                           const Snapshotted<BSONObj>& oldObj) {
     auto reshardingKeyPattern = collDesc.getReshardingKeyIfShouldForwardOps();
@@ -621,8 +622,9 @@ bool UpdateStage::wasReshardingKeyUpdated(const ScopedCollectionDescription& col
     FieldRefSet shardKeyPaths(collDesc.getKeyPatternFields());
     _checkRestrictionsOnUpdatingShardKeyAreNotViolated(collDesc, shardKeyPaths);
 
-    auto oldRecipShard = getDestinedRecipient(opCtx(), collection()->ns(), oldObj.value());
-    auto newRecipShard = getDestinedRecipient(opCtx(), collection()->ns(), newObj);
+    auto oldRecipShard =
+        getDestinedRecipient(opCtx(), collection()->ns(), oldObj.value(), css, collDesc);
+    auto newRecipShard = getDestinedRecipient(opCtx(), collection()->ns(), newObj, css, collDesc);
 
     uassert(WouldChangeOwningShardInfo(oldObj.value(), newObj, false /* upsert */),
             "This update would cause the doc to change owning shards under the new shard key",
@@ -648,7 +650,7 @@ bool UpdateStage::checkUpdateChangesShardKeyFields(const boost::optional<BSONObj
     // It is possible that both the existing and new shard keys are being updated, so we do not want
     // to short-circuit checking whether either is being modified.
     const auto existingShardKeyUpdated = wasExistingShardKeyUpdated(css, collDesc, newObj, oldObj);
-    const auto reshardingKeyUpdated = wasReshardingKeyUpdated(collDesc, newObj, oldObj);
+    const auto reshardingKeyUpdated = wasReshardingKeyUpdated(css, collDesc, newObj, oldObj);
 
     return existingShardKeyUpdated || reshardingKeyUpdated;
 }
