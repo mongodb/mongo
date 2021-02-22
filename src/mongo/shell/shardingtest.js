@@ -717,6 +717,70 @@ var ShardingTest = function(params) {
     };
 
     /**
+     * Wait for sharding to be initialized.
+     */
+    this.waitForShardingInitialized = function(timeoutMs = 60 * 1000) {
+        const getShardVersion = (client, timeout) => {
+            assert.soon(() => {
+                // The choice of namespace (local.fooCollection) does not affect the output.
+                var res = client.adminCommand({getShardVersion: "local.fooCollection"});
+                return res.ok == 1;
+            }, "timeout waiting for sharding to be initialized on mongod", timeout, 0.1);
+        };
+
+        var start = new Date();
+
+        for (var i = 0; i < this._rs.length; ++i) {
+            var replSet = this._rs[i];
+            if (!replSet)
+                continue;
+            nodes = replSet.test.nodes;
+            keyFileUsed = replSet.test.keyFile;
+
+            for (var j = 0; j < nodes.length; ++j) {
+                diff = (new Date()).getTime() - start.getTime();
+                var currNode = nodes[j];
+                // Skip arbiters
+                if (currNode.adminCommand({isMaster: 1}).arbiterOnly) {
+                    continue;
+                }
+
+                const x509AuthRequired = (conn.fullOptions && conn.fullOptions.clusterAuthMode &&
+                                          conn.fullOptions.clusterAuthMode === "x509" &&
+                                          currNode.fullOptions.sslMode === "requireSSL");
+
+                if (keyFileUsed) {
+                    authutil.asCluster(currNode, keyFileUsed, () => {
+                        getShardVersion(currNode, timeoutMs - diff);
+                    });
+                } else if (x509AuthRequired) {
+                    const exitCode = _runMongoProgram(
+                        ...["mongo",
+                            currNode.host,
+                            "--tls",
+                            "--tlsAllowInvalidHostnames",
+                            "--tlsCertificateKeyFile",
+                            currNode.fullOptions.tlsCertificateKeyFile
+                                ? currNode.fullOptions.tlsCertificateKeyFile
+                                : currNode.fullOptions.sslPEMKeyFile,
+                            "--tlsCAFile",
+                            currNode.fullOptions.tlsCAFile ? currNode.fullOptions.tlsCAFile
+                                                           : currNode.fullOptions.sslCAFile,
+                            "--authenticationDatabase=$external",
+                            "--authenticationMechanism=MONGODB-X509",
+                            "--eval",
+                            `(${getShardVersion.toString()})(db.getMongo(), ` +
+                                (timeoutMs - diff).toString() + `)`,
+                    ]);
+                    assert.eq(0, exitCode, "parallel shell for x509 auth failed");
+                } else {
+                    getShardVersion(currNode, timeoutMs - diff);
+                }
+            }
+        }
+    };
+
+    /**
      * Kills the mongos with index n.
      */
     this.stopMongos = function(n, opts) {
@@ -1760,6 +1824,8 @@ var ShardingTest = function(params) {
                 }
             }
         }
+
+        self.waitForShardingInitialized();
     }
 };
 
