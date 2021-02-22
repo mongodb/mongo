@@ -340,7 +340,9 @@ void logLogout(Client* client,
 void logCreateIndex(Client* client,
                     const BSONObj* indexSpec,
                     StringData indexname,
-                    const NamespaceString& nsname);
+                    const NamespaceString& nsname,
+                    StringData indexBuildState,
+                    ErrorCodes::Error result);
 
 /**
  * Logs the result of a createCollection command.

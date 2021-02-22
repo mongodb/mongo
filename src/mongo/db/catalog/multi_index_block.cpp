@@ -37,7 +37,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/simple_bsonelement_comparator.h"
-#include "mongo/db/audit.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/multi_index_block_gen.h"
@@ -302,12 +301,6 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
                       eachIndexBuildMaxMemoryUsageBytes / 1024 / 1024);
 
             index.filterExpression = indexCatalogEntry->getFilterExpression();
-
-            if (!resumeInfo) {
-                // TODO SERVER-14888 Suppress this in cases we don't want to audit.
-                audit::logCreateIndex(
-                    opCtx->getClient(), &info, descriptor->indexName(), collection->ns());
-            }
         }
 
         opCtx->recoveryUnit()->onCommit([ns = collection->ns(), this](auto commitTs) {

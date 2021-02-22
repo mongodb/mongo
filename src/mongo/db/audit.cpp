@@ -149,7 +149,9 @@ void logLogout(Client* client,
 void logCreateIndex(Client* client,
                     const BSONObj* indexSpec,
                     StringData indexname,
-                    const NamespaceString& nsname) {}
+                    const NamespaceString& nsname,
+                    StringData indexBuildState,
+                    ErrorCodes::Error result) {}
 
 void logCreateCollection(Client* client, const NamespaceString& nsname) {}
 
