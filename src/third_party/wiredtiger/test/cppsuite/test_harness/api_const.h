@@ -1,4 +1,3 @@
-/* Include guard. */
 #ifndef API_CONST_H
 #define API_CONST_H
 

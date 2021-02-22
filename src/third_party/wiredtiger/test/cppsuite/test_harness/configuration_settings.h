@@ -1,27 +1,32 @@
-/* Include guard. */
 #ifndef CONFIGURATION_SETTINGS_H
 #define CONFIGURATION_SETTINGS_H
 
-#include <string>
 #include <stdexcept>
+#include <string>
+
+extern "C" {
+#include "test_util.h"
+}
 
 #include "wt_internal.h"
 
 namespace test_harness {
 class configuration {
     public:
-    configuration(const char *test_config_name, const char *config) : _config(config)
+    configuration(const std::string &test_config_name, const std::string &config) : _config(config)
     {
-        int ret = wiredtiger_config_parser_open(nullptr, config, strlen(config), &_config_parser);
+        int ret = wiredtiger_test_config_validate(
+          nullptr, nullptr, test_config_name.c_str(), config.c_str());
         if (ret != 0)
             throw std::invalid_argument(
-              "failed to create configuration parser for provided config");
-        if (wiredtiger_test_config_validate(nullptr, nullptr, test_config_name, config) != 0)
-            throw std::invalid_argument(
               "failed to validate given config, ensure test config exists");
+        if (wiredtiger_config_parser_open(
+              nullptr, config.c_str(), config.size(), &_config_parser) != 0)
+            throw std::invalid_argument(
+              "failed to create configuration parser for provided config");
     }
 
-    configuration(const char *test_config_name, const WT_CONFIG_ITEM &nested)
+    configuration(const WT_CONFIG_ITEM &nested)
     {
         if (nested.type != WT_CONFIG_ITEM::WT_CONFIG_ITEM_STRUCT)
             throw std::invalid_argument("provided config item isn't a structure");
@@ -39,8 +44,8 @@ class configuration {
         }
     }
 
-    std::string
-    get_config()
+    const std::string &
+    get_config() const
     {
         return (_config);
     }
@@ -51,10 +56,10 @@ class configuration {
      * get and next functions can be used.
      */
     int
-    get_string(const char *key, std::string &value)
+    get_string(const std::string &key, std::string &value) const
     {
         WT_CONFIG_ITEM temp_value;
-        WT_RET(_config_parser->get(_config_parser, key, &temp_value));
+        testutil_check(_config_parser->get(_config_parser, key.c_str(), &temp_value));
         if (temp_value.type != WT_CONFIG_ITEM::WT_CONFIG_ITEM_STRING ||
           temp_value.type != WT_CONFIG_ITEM::WT_CONFIG_ITEM_ID)
             return (-1);
@@ -63,21 +68,21 @@ class configuration {
     }
 
     int
-    get_bool(const char *key, bool &value)
+    get_bool(const std::string &key, bool &value) const
     {
         WT_CONFIG_ITEM temp_value;
-        WT_RET(_config_parser->get(_config_parser, key, &temp_value));
+        testutil_check(_config_parser->get(_config_parser, key.c_str(), &temp_value));
         if (temp_value.type != WT_CONFIG_ITEM::WT_CONFIG_ITEM_BOOL)
             return (-1);
-        value = temp_value.val != 0;
+        value = (temp_value.val != 0);
         return (0);
     }
 
     int
-    get_int(const char *key, int64_t &value)
+    get_int(const std::string &key, int64_t &value) const
     {
         WT_CONFIG_ITEM temp_value;
-        WT_RET(_config_parser->get(_config_parser, key, &temp_value));
+        testutil_check(_config_parser->get(_config_parser, key.c_str(), &temp_value));
         if (temp_value.type != WT_CONFIG_ITEM::WT_CONFIG_ITEM_NUM)
             return (-1);
         value = temp_value.val;
@@ -88,15 +93,15 @@ class configuration {
      * Basic configuration parsing helper functions.
      */
     int
-    next(WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
+    next(WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value) const
     {
         return (_config_parser->next(_config_parser, key, value));
     }
 
     int
-    get(const char *key, WT_CONFIG_ITEM *value)
+    get(const std::string &key, WT_CONFIG_ITEM *value) const
     {
-        return (_config_parser->get(_config_parser, key, value));
+        return (_config_parser->get(_config_parser, key.c_str(), value));
     }
 
     private:
