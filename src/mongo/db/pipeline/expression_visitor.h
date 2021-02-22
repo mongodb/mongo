@@ -156,6 +156,7 @@ class ExpressionRadiansToDegrees;
 class ExpressionDateDiff;
 class ExpressionDateAdd;
 class ExpressionDateSubtract;
+class ExpressionDateTrunc;
 
 class AccumulatorAvg;
 class AccumulatorMax;
@@ -207,6 +208,7 @@ public:
     virtual void visit(ExpressionDateDiff*) = 0;
     virtual void visit(ExpressionDateToParts*) = 0;
     virtual void visit(ExpressionDateToString*) = 0;
+    virtual void visit(ExpressionDateTrunc*) = 0;
     virtual void visit(ExpressionDivide*) = 0;
     virtual void visit(ExpressionExp*) = 0;
     virtual void visit(ExpressionFieldPath*) = 0;

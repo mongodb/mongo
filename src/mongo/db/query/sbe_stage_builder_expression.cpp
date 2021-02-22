@@ -371,6 +371,7 @@ public:
     void visit(ExpressionDateFromParts* expr) final {}
     void visit(ExpressionDateToParts* expr) final {}
     void visit(ExpressionDateToString* expr) final {}
+    void visit(ExpressionDateTrunc* expr) final {}
     void visit(ExpressionDivide* expr) final {}
     void visit(ExpressionExp* expr) final {}
     void visit(ExpressionFieldPath* expr) final {}
@@ -534,6 +535,7 @@ public:
     void visit(ExpressionDateFromParts* expr) final {}
     void visit(ExpressionDateToParts* expr) final {}
     void visit(ExpressionDateToString* expr) final {}
+    void visit(ExpressionDateTrunc*) final {}
     void visit(ExpressionDivide* expr) final {}
     void visit(ExpressionExp* expr) final {}
     void visit(ExpressionFieldPath* expr) final {}
@@ -1728,6 +1730,9 @@ public:
     }
     void visit(ExpressionDateToString* expr) final {
         unsupportedExpression("$dateFromString");
+    }
+    void visit(ExpressionDateTrunc*) final {
+        unsupportedExpression("$dateTrunc");
     }
     void visit(ExpressionDivide* expr) final {
         _context->ensureArity(2);

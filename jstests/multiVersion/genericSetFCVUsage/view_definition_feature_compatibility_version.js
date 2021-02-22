@@ -40,6 +40,7 @@ const pipelinesWithNewFeatures = [
             }
         }
     }],
+    [{$project: {x: {$dateTrunc: {date: new Date("2020-02-02T02:02:02"), unit: "month"}}}}],
 ];
 
 // Tests Feature Compatibility Version behavior of view creation while using aggregation pipelines

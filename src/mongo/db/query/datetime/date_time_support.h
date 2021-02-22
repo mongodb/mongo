@@ -612,4 +612,23 @@ Date_t dateAdd(Date_t date, TimeUnit unit, long long amount, const TimeZone& tim
  */
 StatusWith<long long> timeUnitTypicalMilliseconds(TimeUnit unit);
 
+/**
+ * Returns the lower bound of a bin the 'date' falls into in the time axis, or, in other words,
+ * truncates the 'date' value. Bins are (1) uniformly spaced (in time unit sense); (2) do not
+ * overlap; (3) bin size is 'binSize' 'unit''s; (4) defined in a timezone specified by 'timezone';
+ * (5) one bin has a lower bound at 2000-01-01T00:00:00.000 (also called a reference point) in the
+ * specified timezone, except for "week" time unit when the given 'startOfWeek' does not coincide
+ * with the first of January, 2000. For weeks [exception to (5)] the bin is aligned to the earliest
+ * first day of the week after the first of January, 2000.
+ *
+ * binSize - must be larger than 0.
+ * timezone - determines boundaries of the bins as well as Daylight Saving Time rules.
+ * startOfWeek - the first day of a week used to determine week boundaries when 'unit' is
+ * TimeUnit::week. Otherwise, this parameter is ignored.
+ */
+Date_t truncateDate(Date_t date,
+                    TimeUnit unit,
+                    unsigned long long binSize,
+                    const TimeZone& timezone,
+                    DayOfWeek startOfWeek = kStartOfWeekDefault);
 }  // namespace mongo

@@ -1193,10 +1193,38 @@ TEST(DayOfWeek, DayNumber) {
     }
 }
 
-// Time zones for testing 'dateDiff()'.
+std::vector<const TimeZone*> setupTestTimezones() {
+    static const std::vector<TimeZone> kAllTimezones = [&]() {
+        std::vector<TimeZone> timezones{};
+        for (auto&& timeZoneId : kDefaultTimeZoneDatabase.getTimeZoneStrings()) {
+            timezones.push_back(kDefaultTimeZoneDatabase.getTimeZone(timeZoneId));
+        }
+        timezones.push_back(kDefaultTimeZoneDatabase.getTimeZone("-10:00"));
+        return timezones;
+    }();
+    std::vector<const TimeZone*> timezones{};
+    for (auto&& timezone : kAllTimezones) {
+        timezones.push_back(&timezone);
+    }
+    return timezones;
+}
+
+// Time zones for testing.
 const TimeZone kNewYorkTimeZone = kDefaultTimeZoneDatabase.getTimeZone("America/New_York");
 const TimeZone kAustraliaEuclaTimeZone =
-    kDefaultTimeZoneDatabase.getTimeZone("Australia/Eucla");  // UTC offset +08:45
+    kDefaultTimeZoneDatabase.getTimeZone("Australia/Eucla");  // UTC offset +08:45.
+const TimeZone kEuropeSofiaTimeZone = kDefaultTimeZoneDatabase.getTimeZone("Europe/Sofia");
+const TimeZone kAustraliaSydneyTimeZone =
+    kDefaultTimeZoneDatabase.getTimeZone("Australia/Sydney");  // UTC offset +11:00.
+const TimeZone kUTCMinus10TimeZone =
+    kDefaultTimeZoneDatabase.getTimeZone("-10:00");  // UTC offset -10:00.
+const std::vector<const TimeZone*> kTimezones{&kDefaultTimeZone,
+                                              &kNewYorkTimeZone,
+                                              &kAustraliaEuclaTimeZone,
+                                              &kEuropeSofiaTimeZone,
+                                              &kAustraliaSydneyTimeZone,
+                                              &kUTCMinus10TimeZone};
+const std::vector<const TimeZone*> kAllTimezones{setupTestTimezones()};
 
 // Verifies 'dateDiff()' with TimeUnit::year.
 TEST(DateDiff, Year) {
@@ -1546,6 +1574,536 @@ TEST(DateDiff, Millisecond) {
                                 kNewYorkTimeZone),
                        AssertionException,
                        5166308);
+}
+
+// Verifies 'truncateDate()' with TimeUnit::millisecond.
+TEST(TruncateDate, Millisecond) {
+    for (auto* timezone : kTimezones) {
+        // Value in the middle of a bin above default reference point.
+        ASSERT_EQ(timezone->createFromDateParts(2000, 1, 1, 0, 0, 1, 20),
+                  truncateDate(timezone->createFromDateParts(2000, 1, 1, 0, 0, 2, 0),
+                               TimeUnit::millisecond,
+                               1020,
+                               *timezone));
+
+        // Value at the lower boundary of a bin.
+        ASSERT_EQ(timezone->createFromDateParts(2000, 1, 1, 0, 0, 1, 20),
+                  truncateDate(timezone->createFromDateParts(2000, 1, 1, 0, 0, 1, 20),
+                               TimeUnit::millisecond,
+                               1020,
+                               *timezone));
+
+        // Value at the top of a bin.
+        ASSERT_EQ(timezone->createFromDateParts(2000, 1, 1, 0, 0, 1, 20),
+                  truncateDate(timezone->createFromDateParts(2000, 1, 1, 0, 0, 2, 39),
+                               TimeUnit::millisecond,
+                               1020,
+                               *timezone));
+
+        // Value at the bottom of the next bin.
+        ASSERT_EQ(timezone->createFromDateParts(2000, 1, 1, 0, 0, 2, 40),
+                  truncateDate(timezone->createFromDateParts(2000, 1, 1, 0, 0, 2, 40),
+                               TimeUnit::millisecond,
+                               1020,
+                               *timezone));
+
+        // Value at the top of a bin below default reference point.
+        ASSERT_EQ(timezone->createFromDateParts(1999, 12, 31, 23, 59, 58, 500),
+                  truncateDate(timezone->createFromDateParts(1999, 12, 31, 23, 59, 59, 999),
+                               TimeUnit::millisecond,
+                               1500,
+                               *timezone));
+    }
+}
+
+// Verifies 'truncateDate()' with TimeUnit::second.
+TEST(TruncateDate, Second) {
+    for (auto* timezone : kTimezones) {
+        // Value in the middle of a bin above default reference point.
+        ASSERT_EQ(timezone->createFromDateParts(2000, 1, 1, 0, 0, 5, 0),
+                  truncateDate(timezone->createFromDateParts(2000, 1, 1, 0, 0, 9, 0),
+                               TimeUnit::second,
+                               5,
+                               *timezone));
+
+        // Value at the lower boundary of a bin.
+        ASSERT_EQ(timezone->createFromDateParts(2000, 1, 1, 0, 0, 5, 0),
+                  truncateDate(timezone->createFromDateParts(2000, 1, 1, 0, 0, 5, 0),
+                               TimeUnit::second,
+                               5,
+                               *timezone));
+
+        // Value at the top of a bin.
+        ASSERT_EQ(timezone->createFromDateParts(2000, 1, 1, 0, 0, 5, 0),
+                  truncateDate(timezone->createFromDateParts(2000, 1, 1, 0, 0, 9, 999),
+                               TimeUnit::second,
+                               5,
+                               *timezone));
+
+        // Value at the bottom of the next bin.
+        ASSERT_EQ(timezone->createFromDateParts(2000, 1, 1, 0, 0, 10, 0),
+                  truncateDate(timezone->createFromDateParts(2000, 1, 1, 0, 0, 10, 0),
+                               TimeUnit::second,
+                               5,
+                               *timezone));
+
+        // Value at the top of a bin below default reference point.
+        ASSERT_EQ(timezone->createFromDateParts(1999, 12, 31, 23, 59, 50, 0),
+                  truncateDate(timezone->createFromDateParts(1999, 12, 31, 23, 59, 51, 0),
+                               TimeUnit::second,
+                               5,
+                               *timezone));
+    }
+}
+
+// Verifies 'truncateDate()' with TimeUnit::minute.
+TEST(TruncateDate, Minute) {
+    for (auto* timezone : kTimezones) {
+        // Value in the middle of a bin above default reference point.
+        ASSERT_EQ(timezone->createFromDateParts(2000, 1, 1, 0, 5, 0, 0),
+                  truncateDate(timezone->createFromDateParts(2000, 1, 1, 0, 9, 0, 0),
+                               TimeUnit::minute,
+                               5,
+                               *timezone));
+
+        // Value at the lower boundary of a bin.
+        ASSERT_EQ(timezone->createFromDateParts(2000, 1, 1, 0, 5, 0, 0),
+                  truncateDate(timezone->createFromDateParts(2000, 1, 1, 0, 5, 0, 0),
+                               TimeUnit::minute,
+                               5,
+                               *timezone));
+
+        // Value at the top of a bin.
+        ASSERT_EQ(timezone->createFromDateParts(2000, 1, 1, 0, 5, 0, 0),
+                  truncateDate(timezone->createFromDateParts(2000, 1, 1, 0, 9, 59, 999),
+                               TimeUnit::minute,
+                               5,
+                               *timezone));
+
+        // Value at the bottom of the next bin.
+        ASSERT_EQ(timezone->createFromDateParts(2000, 1, 1, 0, 10, 0, 0),
+                  truncateDate(timezone->createFromDateParts(2000, 1, 1, 0, 10, 10, 0),
+                               TimeUnit::minute,
+                               5,
+                               *timezone));
+
+        // Value at the top of a bin below default reference point.
+        ASSERT_EQ(timezone->createFromDateParts(1999, 12, 31, 23, 50, 0, 0),
+                  truncateDate(timezone->createFromDateParts(1999, 12, 31, 23, 54, 0, 0),
+                               TimeUnit::minute,
+                               5,
+                               *timezone));
+    }
+}
+
+// Verifies 'truncateDate()' with TimeUnit::hour.
+TEST(TruncateDate, Hour) {
+    for (auto* timezone : kTimezones) {
+        // Value in the middle of a bin above default reference point.
+        ASSERT_EQ(timezone->createFromDateParts(2020, 1, 1, 2, 0, 0, 0),
+                  truncateDate(timezone->createFromDateParts(2020, 1, 1, 3, 0, 0, 0),
+                               TimeUnit::hour,
+                               2,
+                               *timezone));
+
+        // Value at the lower boundary of a bin.
+        ASSERT_EQ(timezone->createFromDateParts(2020, 1, 1, 2, 0, 0, 0),
+                  truncateDate(timezone->createFromDateParts(2020, 1, 1, 2, 0, 0, 0),
+                               TimeUnit::hour,
+                               2,
+                               *timezone));
+
+        // Value at the top of a bin.
+        ASSERT_EQ(timezone->createFromDateParts(2020, 1, 1, 2, 0, 0, 0),
+                  truncateDate(timezone->createFromDateParts(2020, 1, 1, 3, 59, 59, 999),
+                               TimeUnit::hour,
+                               2,
+                               *timezone));
+
+        // Value at the bottom of the next bin.
+        ASSERT_EQ(timezone->createFromDateParts(2020, 1, 1, 4, 0, 0, 0),
+                  truncateDate(timezone->createFromDateParts(2020, 1, 1, 4, 0, 0, 0),
+                               TimeUnit::hour,
+                               2,
+                               *timezone));
+
+        // Value at the top of a bin below default reference point.
+        ASSERT_EQ(timezone->createFromDateParts(1999, 12, 31, 22, 0, 0, 0),
+                  truncateDate(timezone->createFromDateParts(1999, 12, 31, 23, 59, 51, 0),
+                               TimeUnit::hour,
+                               2,
+                               *timezone));
+    }
+}
+
+// Verifies 'truncateDate()' with TimeUnit::day.
+TEST(TruncateDate, Day) {
+    for (auto* timezone : kAllTimezones) {
+        // Value in the middle of a bin above default reference point.
+        ASSERT_EQ(timezone->createFromDateParts(2000, 1, 7, 0, 0, 0, 0),
+                  truncateDate(timezone->createFromDateParts(2000, 1, 8, 0, 0, 2, 0),
+                               TimeUnit::day,
+                               2,
+                               *timezone));
+
+        // Value at the lower boundary of a bin.
+        ASSERT_EQ(timezone->createFromDateParts(2000, 1, 9, 0, 0, 0, 0),
+                  truncateDate(timezone->createFromDateParts(2000, 1, 9, 0, 0, 0, 0),
+                               TimeUnit::day,
+                               2,
+                               *timezone));
+
+        // Value at the top of a bin.
+        ASSERT_EQ(timezone->createFromDateParts(2000, 1, 9, 0, 0, 0, 0),
+                  truncateDate(timezone->createFromDateParts(2000, 1, 10, 23, 59, 59, 999),
+                               TimeUnit::day,
+                               2,
+                               *timezone));
+
+        // Value at the top of a bin below default reference point.
+        ASSERT_EQ(timezone->createFromDateParts(1999, 12, 28, 0, 0, 0, 0),
+                  truncateDate(timezone->createFromDateParts(1999, 12, 29, 23, 59, 59, 999),
+                               TimeUnit::day,
+                               2,
+                               *timezone));
+    }
+
+    // Daylight Savings Time tests with America/New_York timezone.
+    // Day before DST is on.
+    ASSERT_EQ(kNewYorkTimeZone.createFromDateParts(2021, 3, 13, 0, 0, 0, 0),
+              truncateDate(kNewYorkTimeZone.createFromDateParts(2021, 3, 13, 4, 0, 0, 0),
+                           TimeUnit::day,
+                           1,
+                           kNewYorkTimeZone));
+
+    // Day when DST is on.
+    ASSERT_EQ(kNewYorkTimeZone.createFromDateParts(2021, 3, 14, 0, 0, 0, 0),
+              truncateDate(kNewYorkTimeZone.createFromDateParts(2021, 3, 14, 4, 0, 0, 0),
+                           TimeUnit::day,
+                           1,
+                           kNewYorkTimeZone));
+
+    // The next day when DST is on.
+    ASSERT_EQ(kNewYorkTimeZone.createFromDateParts(2021, 3, 15, 0, 0, 0, 0),
+              truncateDate(kNewYorkTimeZone.createFromDateParts(2021, 3, 15, 1, 0, 0, 0),
+                           TimeUnit::day,
+                           1,
+                           kNewYorkTimeZone));
+
+    // The last day when DST is on.
+    ASSERT_EQ(kNewYorkTimeZone.createFromDateParts(2021, 11, 7, 0, 0, 0, 0),
+              truncateDate(kNewYorkTimeZone.createFromDateParts(2021, 11, 7, 0, 30, 0, 0),
+                           TimeUnit::day,
+                           1,
+                           kNewYorkTimeZone));
+
+    // The DST is off.
+    ASSERT_EQ(kNewYorkTimeZone.createFromDateParts(2021, 11, 7, 0, 0, 0, 0),
+              truncateDate(kNewYorkTimeZone.createFromDateParts(2021, 11, 7, 2, 0, 0, 0),
+                           TimeUnit::day,
+                           1,
+                           kNewYorkTimeZone));
+
+    // The next day DST is off.
+    ASSERT_EQ(kNewYorkTimeZone.createFromDateParts(2021, 11, 8, 0, 0, 0, 0),
+              truncateDate(kNewYorkTimeZone.createFromDateParts(2021, 11, 8, 2, 0, 0, 0),
+                           TimeUnit::day,
+                           1,
+                           kNewYorkTimeZone));
+
+
+    // Daylight Savings Time tests with Europe/Sofia timezone.
+    // Day before DST is on.
+    ASSERT_EQ(kEuropeSofiaTimeZone.createFromDateParts(2021, 3, 27, 0, 0, 0, 0),
+              truncateDate(kEuropeSofiaTimeZone.createFromDateParts(2021, 3, 27, 22, 0, 0, 0),
+                           TimeUnit::day,
+                           1,
+                           kEuropeSofiaTimeZone));
+
+    // Day when DST is on.
+    ASSERT_EQ(kEuropeSofiaTimeZone.createFromDateParts(2021, 3, 28, 0, 0, 0, 0),
+              truncateDate(kEuropeSofiaTimeZone.createFromDateParts(2021, 3, 28, 4, 0, 0, 0),
+                           TimeUnit::day,
+                           1,
+                           kEuropeSofiaTimeZone));
+
+    // The next day when DST is on.
+    ASSERT_EQ(kEuropeSofiaTimeZone.createFromDateParts(2021, 3, 29, 0, 0, 0, 0),
+              truncateDate(kEuropeSofiaTimeZone.createFromDateParts(2021, 3, 29, 1, 0, 0, 0),
+                           TimeUnit::day,
+                           1,
+                           kEuropeSofiaTimeZone));
+
+    // The last day when DST is on.
+    ASSERT_EQ(kEuropeSofiaTimeZone.createFromDateParts(2021, 10, 31, 0, 0, 0, 0),
+              truncateDate(kEuropeSofiaTimeZone.createFromDateParts(2021, 10, 31, 0, 30, 0, 0),
+                           TimeUnit::day,
+                           1,
+                           kEuropeSofiaTimeZone));
+
+    // The DST is off.
+    ASSERT_EQ(kEuropeSofiaTimeZone.createFromDateParts(2021, 11, 1, 0, 0, 0, 0),
+              truncateDate(kEuropeSofiaTimeZone.createFromDateParts(2021, 11, 1, 0, 0, 0, 1),
+                           TimeUnit::day,
+                           1,
+                           kEuropeSofiaTimeZone));
+}
+
+// Verifies 'truncateDate()' with TimeUnit::week.
+TEST(TruncateDate, Week) {
+    for (auto* timezone : kAllTimezones) {
+        // Value in the middle of a bin above default reference point. The first day of a week is
+        // Wednesday.
+        ASSERT_EQ(timezone->createFromDateParts(2000, 1, 19, 0, 0, 0, 0),
+                  truncateDate(timezone->createFromDateParts(2000, 1, 26, 0, 0, 0, 0),
+                               TimeUnit::week,
+                               2,
+                               *timezone,
+                               DayOfWeek::wednesday));
+
+        // Reference point coincides with start of the week (Saturday).
+        ASSERT_EQ(timezone->createFromDateParts(2000, 1, 1, 0, 0, 0, 0),
+                  truncateDate(timezone->createFromDateParts(2000, 1, 2, 0, 0, 0, 0),
+                               TimeUnit::week,
+                               1,
+                               *timezone,
+                               DayOfWeek::saturday));
+
+        // Value at the lower boundary of a bin. The first day of a week is Monday.
+        ASSERT_EQ(timezone->createFromDateParts(2021, 7, 26, 0, 0, 0, 0),
+                  truncateDate(timezone->createFromDateParts(2021, 7, 26, 0, 0, 0, 0),
+                               TimeUnit::week,
+                               1,
+                               *timezone,
+                               DayOfWeek::monday));
+
+        // Value at the top of a bin. The first day of a week is Monday.
+        ASSERT_EQ(timezone->createFromDateParts(2021, 7, 26, 0, 0, 0, 0),
+                  truncateDate(timezone->createFromDateParts(2021, 8, 1, 23, 59, 59, 999),
+                               TimeUnit::week,
+                               1,
+                               *timezone,
+                               DayOfWeek::monday));
+
+        // Value at the top of a bin below default reference point. The first day of a week is
+        // Monday.
+        ASSERT_EQ(timezone->createFromDateParts(1999, 12, 6, 0, 0, 0, 0),
+                  truncateDate(timezone->createFromDateParts(1999, 12, 19, 23, 59, 59, 999),
+                               TimeUnit::week,
+                               2,
+                               *timezone,
+                               DayOfWeek::monday));
+    }
+}
+
+// Verifies 'truncateDate()' with TimeUnit::month.
+TEST(TruncateDate, Month) {
+    for (auto* timezone : kAllTimezones) {
+        // Value in the middle of a bin above default reference point.
+        ASSERT_EQ(timezone->createFromDateParts(2021, 3, 1, 0, 0, 0, 0),
+                  truncateDate(timezone->createFromDateParts(2021, 4, 1, 0, 0, 0, 0),
+                               TimeUnit::month,
+                               2,
+                               *timezone));
+
+        // Value at the lower boundary of a bin above default reference point.
+        ASSERT_EQ(timezone->createFromDateParts(2021, 3, 1, 0, 0, 0, 0),
+                  truncateDate(timezone->createFromDateParts(2021, 3, 1, 0, 0, 0, 0),
+                               TimeUnit::month,
+                               2,
+                               *timezone));
+
+        // Value at the upper boundary of a bin above default reference point.
+        ASSERT_EQ(timezone->createFromDateParts(2021, 3, 1, 0, 0, 0, 0),
+                  truncateDate(timezone->createFromDateParts(2021, 4, 30, 23, 59, 59, 999),
+                               TimeUnit::month,
+                               2,
+                               *timezone));
+
+        // Value at the lower boundary of the next bin.
+        ASSERT_EQ(timezone->createFromDateParts(2021, 5, 1, 0, 0, 0, 0),
+                  truncateDate(timezone->createFromDateParts(2021, 5, 1, 0, 0, 0, 0),
+                               TimeUnit::month,
+                               2,
+                               *timezone));
+
+        // Value at the lower boundary of a bin.
+        ASSERT_EQ(timezone->createFromDateParts(1900, 1, 1, 0, 0, 0, 0),
+                  truncateDate(timezone->createFromDateParts(1900, 1, 1, 0, 0, 0, 0),
+                               TimeUnit::month,
+                               1,
+                               *timezone));
+
+        // Value at the top of a bin.
+        ASSERT_EQ(timezone->createFromDateParts(1900, 1, 1, 0, 0, 0, 0),
+                  truncateDate(timezone->createFromDateParts(1900, 3, 31, 23, 59, 59, 999),
+                               TimeUnit::month,
+                               3,
+                               *timezone));
+
+        // February is atypical.
+        ASSERT_EQ(timezone->createFromDateParts(2005, 2, 1, 0, 0, 0, 0),
+                  truncateDate(timezone->createFromDateParts(2005, 2, 28, 23, 59, 59, 999),
+                               TimeUnit::month,
+                               1,
+                               *timezone));
+    }
+}
+
+// Verifies 'truncateDate()' with TimeUnit::quarter.
+TEST(TruncateDate, Quarter) {
+    for (auto* timezone : kAllTimezones) {
+        // Value in the middle of a bin above default reference point.
+        ASSERT_EQ(timezone->createFromDateParts(2021, 1, 1, 0, 0, 0, 0),
+                  truncateDate(timezone->createFromDateParts(2021, 5, 1, 0, 0, 0, 0),
+                               TimeUnit::quarter,
+                               2,
+                               *timezone));
+
+        // Value at the lower boundary of a bin above default reference point.
+        ASSERT_EQ(timezone->createFromDateParts(2021, 1, 1, 0, 0, 0, 0),
+                  truncateDate(timezone->createFromDateParts(2021, 1, 1, 0, 0, 0, 0),
+                               TimeUnit::quarter,
+                               2,
+                               *timezone));
+
+        // Value at the upper boundary of a bin above default reference point.
+        ASSERT_EQ(timezone->createFromDateParts(2021, 1, 1, 0, 0, 0, 0),
+                  truncateDate(timezone->createFromDateParts(2021, 6, 30, 23, 59, 59, 999),
+                               TimeUnit::quarter,
+                               2,
+                               *timezone));
+
+        // Value at the lower boundary of the next bin.
+        ASSERT_EQ(timezone->createFromDateParts(2021, 7, 1, 0, 0, 0, 0),
+                  truncateDate(timezone->createFromDateParts(2021, 7, 1, 0, 0, 0, 0),
+                               TimeUnit::quarter,
+                               2,
+                               *timezone));
+
+        // Value at the lower boundary of a bin.
+        ASSERT_EQ(timezone->createFromDateParts(1900, 1, 1, 0, 0, 0, 0),
+                  truncateDate(timezone->createFromDateParts(1900, 1, 1, 0, 0, 0, 0),
+                               TimeUnit::quarter,
+                               1,
+                               *timezone));
+
+        // Value at the top of a bin.
+        ASSERT_EQ(timezone->createFromDateParts(1900, 1, 1, 0, 0, 0, 0),
+                  truncateDate(timezone->createFromDateParts(1900, 3, 31, 23, 59, 59, 999),
+                               TimeUnit::quarter,
+                               1,
+                               *timezone));
+    }
+}
+
+// Verifies 'truncateDate()' with TimeUnit::year.
+TEST(TruncateDate, Year) {
+    for (auto* timezone : kAllTimezones) {
+        // Value in the middle of a bin above default reference point.
+        ASSERT_EQ(timezone->createFromDateParts(2020, 1, 1, 0, 0, 0, 0),
+                  truncateDate(timezone->createFromDateParts(2021, 5, 1, 0, 0, 0, 0),
+                               TimeUnit::year,
+                               2,
+                               *timezone));
+
+        // Value at the lower boundary of a bin above default reference point.
+        ASSERT_EQ(timezone->createFromDateParts(2020, 1, 1, 0, 0, 0, 0),
+                  truncateDate(timezone->createFromDateParts(2020, 1, 1, 0, 0, 0, 0),
+                               TimeUnit::year,
+                               2,
+                               *timezone));
+
+        // Value at the upper boundary of a bin above default reference point.
+        ASSERT_EQ(timezone->createFromDateParts(2020, 1, 1, 0, 0, 0, 0),
+                  truncateDate(timezone->createFromDateParts(2021, 12, 31, 23, 59, 59, 999),
+                               TimeUnit::year,
+                               2,
+                               *timezone));
+
+        // Value at the lower boundary of the next bin.
+        ASSERT_EQ(timezone->createFromDateParts(2022, 1, 1, 0, 0, 0, 0),
+                  truncateDate(timezone->createFromDateParts(2022, 1, 1, 0, 0, 0, 0),
+                               TimeUnit::year,
+                               2,
+                               *timezone));
+
+        // Value at the lower boundary of a bin.
+        ASSERT_EQ(timezone->createFromDateParts(1950, 1, 1, 0, 0, 0, 0),
+                  truncateDate(timezone->createFromDateParts(1950, 1, 1, 0, 0, 0, 0),
+                               TimeUnit::year,
+                               1,
+                               *timezone));
+
+        // Value at the top of a bin.
+        ASSERT_EQ(timezone->createFromDateParts(1950, 1, 1, 0, 0, 0, 0),
+                  truncateDate(timezone->createFromDateParts(1950, 12, 31, 23, 59, 59, 999),
+                               TimeUnit::year,
+                               1,
+                               *timezone));
+    }
+}
+
+// Verifies 'truncateDate()' error handling.
+TEST(TruncateDate, ErrorHandling) {
+    auto* timezone = &kDefaultTimeZone;
+    const auto anyDate = timezone->createFromDateParts(2000, 1, 1, 2, 0, 0, 0);
+    const auto dateBeforeReferencePoint = timezone->createFromDateParts(1980, 1, 1, 0, 0, 0, 0);
+
+    // Verify that binSize > 0 constraint is enforced.
+    ASSERT_THROWS_CODE(
+        truncateDate(anyDate, TimeUnit::day, 0, *timezone), AssertionException, 5439005);
+
+    // Verify millisecond overflow detection.
+    const Date_t dateInLongPast =
+        Date_t::fromMillisSinceEpoch(std::numeric_limits<long long>::min());
+    ASSERT_THROWS_CODE(truncateDate(dateInLongPast, TimeUnit::millisecond, 1, *timezone),
+                       AssertionException,
+                       5439000);
+    ASSERT_THROWS_CODE(
+        truncateDate(Date_t::fromMillisSinceEpoch(std::numeric_limits<long long>::min() / 4 * 3),
+                     TimeUnit::millisecond,
+                     std::numeric_limits<long long>::max() / 5 * 3,
+                     *timezone),
+        AssertionException,
+        5439001);
+
+    // Verify second/minute/hour overflow detection.
+    for (auto timeUnit : {TimeUnit::second, TimeUnit::minute, TimeUnit::hour}) {
+        ASSERT_THROWS_CODE(
+            truncateDate(anyDate, timeUnit, std::numeric_limits<long long>::max() / 64, *timezone),
+            AssertionException,
+            5439002);
+    }
+
+    // Verify day/week/month/quarter/year bin size limits.
+    for (auto timeUnit :
+         {TimeUnit::day, TimeUnit::week, TimeUnit::month, TimeUnit::quarter, TimeUnit::year}) {
+        ASSERT_THROWS_CODE(truncateDate(anyDate, timeUnit, 100'000'000'001ULL, *timezone),
+                           AssertionException,
+                           5439006);
+
+        // Verify computation with large bin size when the result is in the long past succeeds.
+        truncateDate(dateBeforeReferencePoint, timeUnit, 200'000'000ULL, *timezone);
+
+        // Verify computation with large bin size succeeds.
+        ASSERT_EQ(timezone->createFromDateParts(2000, 1, 1, 0, 0, 0, 0),
+                  truncateDate(timezone->createFromDateParts(2000, 1, 1, 12, 0, 0, 0),
+                               timeUnit,
+                               100'000'000'000ULL,
+                               *timezone,
+                               DayOfWeek::saturday));
+    }
+
+    // Verify that out-of-range results are detected.
+    ASSERT_THROWS_CODE(
+        truncateDate(dateBeforeReferencePoint, TimeUnit::year, 1'000'000'000ULL, *timezone),
+        AssertionException,
+        5166406);
+
+    // Verify computation with large bin size when the result is in the long past succeeds.
+    ASSERT_EQ(timezone->createFromDateParts(-200'000'000LL, 1, 1, 0, 0, 0, 0),
+              truncateDate(dateBeforeReferencePoint, TimeUnit::year, 200'002'000ULL, *timezone));
 }
 
 TEST(DateAdd, DateAddYear) {
