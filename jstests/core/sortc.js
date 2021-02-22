@@ -1,7 +1,4 @@
 // Test sorting with skipping and multiple candidate query plans.
-// @tags: [
-//   sbe_incompatible,
-// ]
 (function() {
 "use strict";
 

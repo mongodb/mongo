@@ -1,7 +1,4 @@
 // Tests for predicates which can use the trailing field of a text index.
-// @tags: [
-//   sbe_incompatible,
-// ]
 (function() {
 "use strict";
 
