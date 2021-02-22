@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2021-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,34 +27,35 @@
  *    it in the license file.
  */
 
-#include "mongo/base/status.h"
 #include "mongo/util/net/http_client.h"
+#include "mongo/base/status.h"
 
 namespace mongo {
 
 namespace {
+HttpClientProvider* _factory{nullptr};
+}
 
-class HttpClientProviderImpl : public HttpClientProvider {
-public:
-    HttpClientProviderImpl() {
-        registerHTTPClientProvider(this);
-    }
+HttpClientProvider::~HttpClientProvider() {}
 
-    std::unique_ptr<HttpClient> create() final {
-        return nullptr;
-    }
+void registerHTTPClientProvider(HttpClientProvider* factory) {
+    invariant(_factory == nullptr);
+    _factory = factory;
+}
 
-    std::unique_ptr<HttpClient> createWithoutConnectionPool() final {
-        return nullptr;
-    }
+std::unique_ptr<HttpClient> HttpClient::create() {
+    invariant(_factory != nullptr);
+    return _factory->create();
+}
 
-    /**
-     * Content for ServerStatus http_client section.
-     */
-    BSONObj getServerStatus() final {
-        return BSONObj();
-    }
-} provider;
+std::unique_ptr<HttpClient> HttpClient::createWithoutConnectionPool() {
+    invariant(_factory != nullptr);
+    return _factory->createWithoutConnectionPool();
+}
 
-}  // namespace
+BSONObj HttpClient::getServerStatus() {
+    invariant(_factory != nullptr);
+    return _factory->getServerStatus();
+}
+
 }  // namespace mongo

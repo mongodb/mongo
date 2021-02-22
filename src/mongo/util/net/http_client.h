@@ -124,6 +124,15 @@ public:
     static std::unique_ptr<HttpClient> create();
 
     /**
+     * Factory method provided by client implementation.
+     *
+     * The connection pool requires the ability to spawn threads which is not allowed through
+     * options parsing. Callers should default to create() unless they are calling into the
+     * HttpClient before thread spawning is allowed.
+     */
+    static std::unique_ptr<HttpClient> createWithoutConnectionPool();
+
+    /**
      * Content for ServerStatus http_client section.
      */
     static BSONObj getServerStatus();
@@ -137,5 +146,35 @@ private:
         return std::move(reply.body);
     }
 };
+
+/**
+ * HttpClientProvider is the factory behind the HttpClient
+ *
+ * This exists as a level-of-indirection to break link graph cycles.
+ */
+class HttpClientProvider {
+public:
+    virtual ~HttpClientProvider();
+
+    /**
+     * Factory method provided by client implementation.
+     */
+    virtual std::unique_ptr<HttpClient> create() = 0;
+
+    /**
+     * Factory method provided by client implementation.
+     */
+    virtual std::unique_ptr<HttpClient> createWithoutConnectionPool() = 0;
+
+    /**
+     * Content for ServerStatus http_client section.
+     */
+    virtual BSONObj getServerStatus() = 0;
+};
+
+/**
+ * Register HTTP Client provider
+ */
+void registerHTTPClientProvider(HttpClientProvider* factory);
 
 }  // namespace mongo

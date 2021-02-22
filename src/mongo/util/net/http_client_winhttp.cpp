@@ -322,15 +322,26 @@ private:
     Seconds _timeout = kTotalRequestTimeout;
 };
 
+class HttpClientProviderImpl : public HttpClientProvider {
+public:
+    HttpClientProviderImpl() {
+        registerHTTPClientProvider(this);
+    }
+
+    std::unique_ptr<HttpClient> create() final {
+        return std::make_unique<WinHttpClient>();
+    }
+
+    std::unique_ptr<HttpClient> createWithoutConnectionPool() final {
+        return std::make_unique<WinHttpClient>();
+    }
+
+    BSONObj getServerStatus() final {
+        return BSON("type"
+                    << "winhttp");
+    }
+
+} provider;
+
 }  // namespace
-
-std::unique_ptr<HttpClient> HttpClient::create() {
-    return std::make_unique<WinHttpClient>();
-}
-
-BSONObj HttpClient::getServerStatus() {
-    return BSON("type"
-                << "winhttp");
-}
-
 }  // namespace mongo
