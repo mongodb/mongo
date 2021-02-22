@@ -206,6 +206,27 @@ structs:
         description: "The new command parameter's type and the
                      old command parameter's type are both structs"
 
+    OldCommandTypeValidatorStruct:
+        description: "This struct contains a field where the old version contains a validator while
+                      the new version does not"
+        fields:
+            oldCommandTypeValidatorField:
+                type: int
+                validator:
+                    lt: 0
+
+    CommandTypeValidatorsEqualStruct:
+        description: "This struct contains a field where the new and old validator are exactly equal"
+        fields:
+            commandTypeValidatorsEqualField:
+                type: double
+                validator:
+                    lt: 0.0
+                    gt: -1.1
+                    lte: 2.0
+                    gte: -2.98
+                    callback: "callback"
+
 commands:
     testCommand:
         description: "old passing test command"
@@ -352,6 +373,62 @@ commands:
         fields:
             bsonSupersetParam:
                 type: intToIntString
+
+    oldCommandParameterValidator:
+        description: "new command passes when it contains a parameter that does not contain a validator
+                      that is present in the old parameter"
+        command_name: oldCommandParameterValidator
+        namespace: ignored
+        cpp_name: oldCommandParameterValidator
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        fields:
+            newParam:
+                type: int
+                validator:
+                    lt: 0
+
+    commandParameterValidatorsEqual:
+        description: "new command passes because it contains a parameter that contains a validator
+                      that is exactly equal to the old parameter validator"
+        command_name: commandParameterValidatorsEqual
+        namespace: ignored
+        cpp_name: commandParameterValidatorsEqual
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        fields:
+            newParam:
+                type: double
+                validator:
+                    lt: 0.0
+                    gt: -1.1
+                    lte: 2.0
+                    gte: -2.98
+                    callback: "callback"
+
+    oldCommandTypeValidator:
+        description: "new command passes because it contains a type that does not contain a validator
+                      that is present in the old type"
+        command_name: oldCommandTypeValidator
+        namespace: type
+        type: OldCommandTypeValidatorStruct
+        cpp_name: oldCommandTypeValidator
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    commandTypeValidatorsEqual:
+        description: "new command passes because it contains a type that contains a validator
+                      that is exactly equal to the old type validator"
+        command_name: commandTypeValidatorsEqual
+        namespace: type
+        type: CommandTypeValidatorsEqualStruct
+        cpp_name: commandTypeValidatorsEqual
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
 
     newReplyFieldStable:
         description: "new command contains a stable reply field that is unstable

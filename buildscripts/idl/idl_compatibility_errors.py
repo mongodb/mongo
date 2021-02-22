@@ -80,6 +80,11 @@ ERROR_ID_NEW_COMMAND_PARAMETER_TYPE_NOT_ENUM = "ID0036"
 ERROR_ID_NEW_COMMAND_PARAMETER_TYPE_ENUM_OR_STRUCT = "ID0037"
 ERROR_ID_COMMAND_PARAMETER_TYPE_INVALID = "ID0038"
 ERROR_ID_COMMAND_PARAMETER_TYPE_NOT_SUPERSET = "ID0039"
+ERROR_ID_REPLY_FIELD_CONTAINS_VALIDATOR = "ID0040"
+ERROR_ID_COMMAND_PARAMETER_CONTAINS_VALIDATOR = "ID0041"
+ERROR_ID_COMMAND_PARAMETER_VALIDATORS_NOT_EQUAL = "ID0042"
+ERROR_ID_COMMAND_TYPE_CONTAINS_VALIDATOR = "ID0043"
+ERROR_ID_COMMAND_TYPE_VALIDATORS_NOT_EQUAL = "ID0044"
 
 
 class IDLCompatibilityCheckerError(Exception):
@@ -214,6 +219,22 @@ class IDLCompatibilityContext(object):
         """Add an error about a command that was removed."""
         self._add_error(ERROR_ID_REMOVED_COMMAND, command_name,
                         "Old command '%s' was removed from new commands." % (command_name), file)
+
+    def add_command_parameter_contains_validator_error(self, command_name: str, parameter_name: str,
+                                                       file: str) -> None:
+        """Add an error about the new command parameter containing a validator while the old command parameter does not."""
+        self._add_error(
+            ERROR_ID_COMMAND_PARAMETER_CONTAINS_VALIDATOR, command_name,
+            "Parameter '%s' for new command '%s' contains a validator while old command parameter does not."
+            % (parameter_name, command_name), file)
+
+    def add_command_parameter_validators_not_equal_error(self, command_name: str,
+                                                         parameter_name: str, file: str) -> None:
+        """Add an error about the new and old command parameter validators not being equal."""
+        self._add_error(
+            ERROR_ID_COMMAND_PARAMETER_VALIDATORS_NOT_EQUAL, command_name,
+            "Validator for parameter '%s' in old command '%s' is not equal to the validator in"
+            "the new version of the command parameter" % (parameter_name, command_name), file)
 
     def add_command_parameter_removed_error(self, command_name: str, parameter_name: str,
                                             file: str) -> None:
@@ -380,6 +401,22 @@ class IDLCompatibilityContext(object):
             ERROR_ID_COMMAND_PARAMETER_TYPE_NOT_SUPERSET, command_name,
             "The command '%s' has parameter '%s' with type '%s' that is not a superset of the older version "
             "of this command parameter type." % (command_name, param_name, type_name), file)
+
+    def add_command_type_contains_validator_error(self, command_name: str, type_name: str,
+                                                  field_name: str, file: str) -> None:
+        """Add an error about the new command type containing a validator while the old command type does not."""
+        self._add_error(
+            ERROR_ID_COMMAND_TYPE_CONTAINS_VALIDATOR, command_name,
+            ("Type '%s' for new command '%s' has a field '%s' that contains a validator while the"
+             " old command type does not.") % (type_name, field_name, command_name), file)
+
+    def add_command_type_validators_not_equal_error(self, command_name: str, type_name: str,
+                                                    field_name: str, file: str) -> None:
+        """Add an error about the new and old command type validators not being equal."""
+        self._add_error(
+            ERROR_ID_COMMAND_TYPE_VALIDATORS_NOT_EQUAL, command_name,
+            ("Validator for field '%s' in type '%s' in old command '%s' is not equal to the"
+             "validator in the new command type.") % (field_name, type_name, command_name), file)
 
     def add_missing_error_reply_struct_error(self, file: str) -> None:
         """Add an error about the file missing the ErrorReply struct."""
@@ -548,6 +585,13 @@ class IDLCompatibilityContext(object):
             ERROR_ID_OLD_REPLY_FIELD_BSON_SERIALIZATION_TYPE_ANY, command_name,
             ("'%s' has a reply field '%s' of type '%s' that has a bson serialization type 'any'") %
             (command_name, field_name, old_field_type), file)
+
+    def add_reply_field_contains_validator_error(self, command_name: str, field_name: str,
+                                                 file: str) -> None:
+        """Add an error about the reply field containing a validator."""
+        self._add_error(ERROR_ID_REPLY_FIELD_CONTAINS_VALIDATOR, command_name, (
+            "'%s' has a reply field '%s' that contains a validator; compatibility checking for reply field "
+            "validators isn't implemented yet") % (command_name, field_name), file)
 
     def add_reply_field_type_invalid_error(self, command_name: str, field_name: str,
                                            file: str) -> None:

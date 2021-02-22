@@ -246,6 +246,27 @@ structs:
                 type: 
                     variant: [int, StructFieldTypeRecursiveReplyTwo]
 
+    NewCommandTypeValidatorStruct:
+        description: "This struct contains a field where the new version contains a validator while
+                      the old version does not"
+        fields:
+            newCommandTypeValidatorField:
+                type: int
+                validator:
+                    lt: 0
+
+    CommandTypeValidatorsNotEqualStruct:
+        description: "This struct contains a field where the new and old validators are not exactly equal"
+        fields:
+            commandTypeValidatorsNotEqualField:
+                type: double
+                validator:
+                    lt: 0.0
+                    gt: -1.1
+                    lte: 2.0
+                    gte: -2.98
+                    callback: "callback"
+
 commands:
     invalidAPIVersionNew:
         description: "new command fails because of invalid API version"
@@ -454,6 +475,62 @@ commands:
         fields:
             newParamBsonNotSuperset:
                 type: intStringToInt
+
+    newCommandParameterValidator:
+        description: "new command fails because it contains a parameter that contains a validator
+                      that is not present in the old parameter"
+        command_name: newCommandParameterValidator
+        namespace: ignored
+        cpp_name: newCommandParameterValidator
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        fields:
+            newParam:
+                type: int
+                validator:
+                    lt: 0
+
+    commandParameterValidatorsNotEqual:
+        description: "new command fails because it contains a parameter that contains a validator
+                      that is not exactly equal to the old parameter validator"
+        command_name: commandParameterValidatorsNotEqual
+        namespace: ignored
+        cpp_name: commandParameterValidatorsNotEqual
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        fields:
+            newParam:
+                type: double
+                validator:
+                    lt: 0.0
+                    gt: -1.1
+                    lte: 2.0
+                    gte: -2.98
+                    callback: "callback"
+
+    newCommandTypeValidator:
+        description: "new command fails because it contains a type that contains a validator
+                      that is not present in the old type"
+        command_name: newCommandTypeValidator
+        namespace: type
+        type: NewCommandTypeValidatorStruct
+        cpp_name: newCommandTypeValidator
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    commandTypeValidatorsNotEqual:
+        description: "new command fails because it contains a type that contains a validator
+                      that is not exactly equal to the old type validator"
+        command_name: commandTypeValidatorsNotEqual
+        namespace: type
+        type: CommandTypeValidatorsNotEqualStruct
+        cpp_name: commandTypeValidatorsNotEqual
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
 
     newReplyFieldUnstable:
         description: "new command fails because it contains an unstable reply field that is stable
