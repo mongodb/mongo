@@ -174,7 +174,8 @@ private:
                                     const BSONObj& newObj,
                                     const Snapshotted<BSONObj>& oldObj);
 
-    bool wasReshardingKeyUpdated(const ScopedCollectionDescription& collDesc,
+    bool wasReshardingKeyUpdated(CollectionShardingState* css,
+                                 const ScopedCollectionDescription& collDesc,
                                  const BSONObj& newObj,
                                  const Snapshotted<BSONObj>& oldObj);
 

@@ -77,8 +77,9 @@ UUID getCollectionUuid(OperationContext* opCtx, const NamespaceString& nss) {
 // are in a resharding operation so that we are guaranteed that migrations are suspended.
 bool documentBelongsToMe(OperationContext* opCtx,
                          CollectionShardingState* css,
+                         const ScopedCollectionDescription& collDesc,
                          const BSONObj& doc) {
-    auto currentKeyPattern = ShardKeyPattern(css->getCollectionDescription(opCtx).getKeyPattern());
+    auto currentKeyPattern = ShardKeyPattern(collDesc.getKeyPattern());
     auto ownershipFilter = css->getOwnershipFilter(
         opCtx, CollectionShardingState::OrphanCleanupPolicy::kAllowOrphanCleanup);
 
@@ -458,21 +459,20 @@ std::unique_ptr<Pipeline, PipelineDeleter> createOplogFetchingPipelineForReshard
 
 boost::optional<ShardId> getDestinedRecipient(OperationContext* opCtx,
                                               const NamespaceString& sourceNss,
-                                              const BSONObj& fullDocument) {
+                                              const BSONObj& fullDocument,
+                                              CollectionShardingState* css,
+                                              const ScopedCollectionDescription& collDesc) {
     if (!ShardingState::get(opCtx)->enabled()) {
         // Don't bother looking up the sharding state for the collection if the server isn't even
         // running with sharding enabled. We know there couldn't possibly be any resharding fields.
         return boost::none;
     }
 
-    auto css = CollectionShardingState::get(opCtx, sourceNss);
-
-    auto reshardingKeyPattern =
-        css->getCollectionDescription(opCtx).getReshardingKeyIfShouldForwardOps();
+    auto reshardingKeyPattern = collDesc.getReshardingKeyIfShouldForwardOps();
     if (!reshardingKeyPattern)
         return boost::none;
 
-    if (!documentBelongsToMe(opCtx, css, fullDocument))
+    if (!documentBelongsToMe(opCtx, css, collDesc, fullDocument))
         return boost::none;
 
     bool allowLocks = true;

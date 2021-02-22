@@ -131,10 +131,12 @@ void createOplog(OperationContext* opCtx);
  * defined by the begin-end range.
  *
  */
-std::vector<OpTime> logInsertOps(OperationContext* opCtx,
-                                 MutableOplogEntry* oplogEntryTemplate,
-                                 std::vector<InsertStatement>::const_iterator begin,
-                                 std::vector<InsertStatement>::const_iterator end);
+std::vector<OpTime> logInsertOps(
+    OperationContext* opCtx,
+    MutableOplogEntry* oplogEntryTemplate,
+    std::vector<InsertStatement>::const_iterator begin,
+    std::vector<InsertStatement>::const_iterator end,
+    std::function<boost::optional<ShardId>(const BSONObj& doc)> getDestinedRecipientFn);
 
 /**
  * Returns the optime of the oplog entry written to the oplog.

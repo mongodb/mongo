@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/op_observer.h"
+#include "mongo/db/s/collection_sharding_state.h"
 
 namespace mongo {
 namespace repl {
@@ -207,6 +208,7 @@ private:
                                       const NamespaceString nss,
                                       const BSONObj& insertedDoc,
                                       const repl::OpTime& opTime,
+                                      CollectionShardingState* css,
                                       const bool fromMigrate,
                                       const bool inMultiDocumentTransaction) {}
     virtual void shardObserveUpdateOp(OperationContext* opCtx,
@@ -214,12 +216,14 @@ private:
                                       boost::optional<BSONObj> preImageDoc,
                                       const BSONObj& postImageDoc,
                                       const repl::OpTime& opTime,
+                                      CollectionShardingState* css,
                                       const repl::OpTime& prePostImageOpTime,
                                       const bool inMultiDocumentTransaction) {}
     virtual void shardObserveDeleteOp(OperationContext* opCtx,
                                       const NamespaceString nss,
                                       const BSONObj& documentKey,
                                       const repl::OpTime& opTime,
+                                      CollectionShardingState* css,
                                       const repl::OpTime& preImageOpTime,
                                       const bool inMultiDocumentTransaction) {}
     virtual void shardObserveTransactionPrepareOrUnpreparedCommit(
@@ -230,7 +234,9 @@ private:
     virtual void shardAnnotateOplogEntry(OperationContext* opCtx,
                                          const NamespaceString nss,
                                          const BSONObj& doc,
-                                         repl::DurableReplOperation& op) {}
+                                         repl::DurableReplOperation& op,
+                                         CollectionShardingState* css,
+                                         const ScopedCollectionDescription& collDesc) {}
 };
 
 extern const OperationContext::Decoration<boost::optional<OpObserverImpl::DocumentKey>>

@@ -233,7 +233,9 @@ std::unique_ptr<Pipeline, PipelineDeleter> createOplogFetchingPipelineForReshard
  */
 boost::optional<ShardId> getDestinedRecipient(OperationContext* opCtx,
                                               const NamespaceString& sourceNss,
-                                              const BSONObj& fullDocument);
+                                              const BSONObj& fullDocument,
+                                              CollectionShardingState* css,
+                                              const ScopedCollectionDescription& collDesc);
 
 /**
  * Sentinel oplog format:

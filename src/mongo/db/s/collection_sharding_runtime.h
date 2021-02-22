@@ -66,6 +66,12 @@ public:
     static CollectionShardingRuntime* get(OperationContext* opCtx, const NamespaceString& nss);
 
     /**
+     * Obtains the sharding runtime state from the the specified sharding collection state. The
+     * returned pointer should never be stored.
+     */
+    static CollectionShardingRuntime* get(CollectionShardingState* css);
+
+    /**
      * It is the caller's responsibility to ensure that the collection locks for this namespace are
      * held when this is called. The returned pointer should never be stored.
      */
