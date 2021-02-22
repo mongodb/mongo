@@ -95,8 +95,8 @@ const topology = DiscoverTopology.findConnectedNodes(mongos);
 // Additionally, recipientShard[1] gets the 10 late inserts above, so expect 12
 // total fetches on that shard, and obviously the 10 corresponding
 // oplogEntry applies for those late inserts.
-[{shardName: recipientShardNames[0], fetched: 2, applied: 0},
- {shardName: recipientShardNames[1], fetched: 12, applied: 10},
+[{shardName: recipientShardNames[0], documents: 2, fetched: 2, applied: 0},
+ {shardName: recipientShardNames[1], documents: 2, fetched: 12, applied: 10},
 ].forEach(e => {
     const mongo = new Mongo(topology.shards[e.shardName].primary);
     const doc = mongo.getDB('admin').serverStatus({});
@@ -110,9 +110,12 @@ const topology = DiscoverTopology.findConnectedNodes(mongos);
     jsTest.log(`Resharding stats for ${mongo}: ${tojson(sub)}`);
 
     verifyDict(sub, {
+        "documentsCopied": e.documents,
         "oplogEntriesFetched": e.fetched,
         "oplogEntriesApplied": e.applied,
     });
+    // bytesCopied is harder to pin down but it should be >0.
+    assert.betweenIn(1, sub['bytesCopied'], 1024, 'bytesCopied');
 });
 
 reshardingTest.teardown();

@@ -38,6 +38,7 @@
 #include "mongo/db/commands/resharding_test_commands_gen.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/resharding/resharding_collection_cloner.h"
+#include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/vector_clock_metadata_hook.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/thread_pool_task_executor.h"
@@ -75,6 +76,10 @@ public:
                 }
             };
 
+            ReshardingMetrics metrics(opCtx->getServiceContext());
+            metrics.onStart();
+            metrics.setRecipientState(RecipientStateEnum::kCloning);
+
             auto hookList = std::make_unique<rpc::EgressMetadataHookList>();
             hookList->addHook(
                 std::make_unique<rpc::VectorClockMetadataHook>(opCtx->getServiceContext()));
@@ -85,12 +90,14 @@ public:
                     "TestReshardCloneCollectionNetwork", nullptr, std::move(hookList)));
             executor->startup();
 
-            ReshardingCollectionCloner cloner(ShardKeyPattern(request().getShardKey()),
-                                              ns(),
-                                              request().getUuid(),
-                                              request().getShardId(),
-                                              request().getAtClusterTime(),
-                                              request().getOutputNs());
+            ReshardingCollectionCloner cloner(
+                std::make_unique<ReshardingCollectionCloner::Env>(&metrics),
+                ShardKeyPattern(request().getShardKey()),
+                ns(),
+                request().getUuid(),
+                request().getShardId(),
+                request().getAtClusterTime(),
+                request().getOutputNs());
 
             cloner.run(std::move(executor), opCtx->getCancelationToken()).get(opCtx);
         }

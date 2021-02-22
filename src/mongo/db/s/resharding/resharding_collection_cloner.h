@@ -39,6 +39,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/future.h"
 
@@ -59,7 +60,19 @@ class ServiceContext;
  */
 class ReshardingCollectionCloner {
 public:
-    ReshardingCollectionCloner(ShardKeyPattern newShardKeyPattern,
+    class Env {
+    public:
+        explicit Env(ReshardingMetrics* metrics) : _metrics(metrics) {}
+        ReshardingMetrics* metrics() const {
+            return _metrics;
+        }
+
+    private:
+        ReshardingMetrics* _metrics;
+    };
+
+    ReshardingCollectionCloner(std::unique_ptr<Env> env,
+                               ShardKeyPattern newShardKeyPattern,
                                NamespaceString sourceNss,
                                CollectionUUID sourceUUID,
                                ShardId recipientShard,
@@ -84,6 +97,7 @@ private:
     template <typename Callable>
     auto _withTemporaryOperationContext(Callable&& callable);
 
+    std::unique_ptr<Env> _env;
     const ShardKeyPattern _newShardKeyPattern;
     const NamespaceString _sourceNss;
     const CollectionUUID _sourceUUID;

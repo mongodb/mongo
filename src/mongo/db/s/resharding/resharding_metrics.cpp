@@ -167,7 +167,6 @@ void ReshardingMetrics::setCoordinatorState(CoordinatorStateEnum state) noexcept
 void ReshardingMetrics::setDocumentsToCopy(int64_t documents, int64_t bytes) noexcept {
     stdx::lock_guard<Latch> lk(_mutex);
     invariant(_currentOp.has_value() && !_currentOp->isCompleted(), kNoOperationInProgress);
-    invariant(_currentOp->recipientState == RecipientStateEnum::kCloning);
 
     _currentOp->documentsToCopy = documents;
     _currentOp->bytesToCopy = bytes;
