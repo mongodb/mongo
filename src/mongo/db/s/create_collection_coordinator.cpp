@@ -145,12 +145,6 @@ std::vector<TagsType> getTagsAndValidate(OperationContext* opCtx,
     return tags;
 }
 
-boost::optional<UUID> getUUID(OperationContext* opCtx, const NamespaceString& nss) {
-    AutoGetCollection autoColl(opCtx, nss, MODE_IS, AutoGetCollectionViewMode::kViewsForbidden);
-    const auto& coll = autoColl.getCollection();
-    return coll->uuid();
-}
-
 boost::optional<UUID> getUUIDFromPrimaryShard(OperationContext* opCtx, const NamespaceString& nss) {
     // Obtain the collection's UUID from the primary shard's listCollections response.
     DBDirectClient localClient(opCtx);
