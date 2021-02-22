@@ -31,69 +31,40 @@
 
 #include "mongo/db/auth/action_type.h"
 
-#include <cstdint>
 #include <fmt/format.h>
 #include <iostream>
-#include <map>
-#include <set>
 #include <string>
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
-#include "mongo/util/static_immortal.h"
 
 namespace mongo {
-
 namespace {
 
-struct ActionEntry {
-    StringData name;
-    ActionType action;
-};
-
-constexpr std::array kTable{
-#define X_(a) ActionEntry{#a ""_sd, ActionType::a},
-    EXPAND_ACTION_TYPE(X_)
-#undef X_
-};
-
-constexpr bool isTableIndexedProperly() {
-    if (kTable.size() != kNumActionTypes)
-        return false;
-    for (size_t i = 0; i < kTable.size(); ++i)
-        if (kTable[i].action != static_cast<ActionType>(i))
-            return false;
-    return true;
+constexpr StringData kAction = "action"_sd;
 }
-static_assert(isTableIndexedProperly());
-
-}  // namespace
 
 StatusWith<ActionType> parseActionFromString(StringData action) {
-    static const StaticImmortal byName = [] {
-        std::map<StringData, ActionType> m;
-        for (auto&& e : kTable)
-            m.insert({e.name, e.action});
-        return m;
-    }();
-    if (auto iter = byName->find(action); iter != byName->end()) {
-        return iter->second;
+    try {
+        return {ActionType_parse(IDLParserErrorContext(kAction), action)};
+    } catch (DBException&) {
+        // ignore
     }
     return Status(ErrorCodes::FailedToParse,
                   fmt::format("Unrecognized action privilege string: {}", action));
 }
 
 StringData toStringData(ActionType a) {
-    return kTable[static_cast<size_t>(a)].name;
+    return ActionType_serializer(a);
 }
 
 std::string toString(ActionType a) {
-    return std::string{toStringData(a)};
+    return std::string{ActionType_serializer(a)};
 }
 
 std::ostream& operator<<(std::ostream& os, const ActionType& a) {
-    return os << toStringData(a);
+    return os << ActionType_serializer(a);
 }
 
 }  // namespace mongo

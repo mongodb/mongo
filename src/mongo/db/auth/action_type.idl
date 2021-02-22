@@ -1,0 +1,174 @@
+# Copyright (C) 2021-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/serversidepubliclicense>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+
+# List describing the ActionTypes that should be created.
+# Please note that the order of the elements is not guaranteed to be the same across versions.
+# This means that the integer value assigned to each ActionType and used internally in ActionSet
+# also may change between versions.
+#
+# Actions marked "ID only" are not used for permission checks, but to identify events in logs.
+
+
+enums:
+    ActionType:
+        description: "test"
+        type: string
+        values:
+           addShard :  "addShard"
+           advanceClusterTime :  "advanceClusterTime"
+           anyAction :  "anyAction"         # Special ActionType that represents *all* actions
+           appendOplogNote :  "appendOplogNote"
+           applicationMessage :  "applicationMessage"
+           auditLogRotate :  "auditLogRotate"  # ID only
+           authCheck :  "authCheck"       # ID only
+           authenticate :  "authenticate"    # ID only
+           authSchemaUpgrade :  "authSchemaUpgrade"
+           bypassDocumentValidation :  "bypassDocumentValidation"
+           changeCustomData :  "changeCustomData"
+           changePassword :  "changePassword"
+           changeOwnPassword :  "changeOwnPassword"
+           changeOwnCustomData :  "changeOwnCustomData"
+           changeStream :  "changeStream"
+           checkFreeMonitoringStatus :  "checkFreeMonitoringStatus"
+           cleanupOrphaned :  "cleanupOrphaned"
+           clearJumboFlag :  "clearJumboFlag"
+           closeAllDatabases :  "closeAllDatabases"  # Deprecated (backwards compatibility)
+           collMod :  "collMod"
+           collStats :  "collStats"
+           compact :  "compact"
+           connPoolStats :  "connPoolStats"
+           connPoolSync :  "connPoolSync"
+           convertToCapped :  "convertToCapped"
+           cpuProfiler :  "cpuProfiler"
+           createCollection :  "createCollection"
+           createDatabase :  "createDatabase"  # ID only
+           createIndex :  "createIndex"     # ID only
+           createRole :  "createRole"
+           createUser :  "createUser"
+           dbHash :  "dbHash"
+           dbStats :  "dbStats"
+           dropAllRolesFromDatabase :  "dropAllRolesFromDatabase"  # ID only
+           dropAllUsersFromDatabase :  "dropAllUsersFromDatabase"  # ID only
+           dropCollection :  "dropCollection"
+           dropConnections :  "dropConnections"
+           dropDatabase :  "dropDatabase"
+           dropIndex :  "dropIndex"
+           dropRole :  "dropRole"
+           dropUser :  "dropUser"
+           emptycapped :  "emptycapped"
+           enableProfiler :  "enableProfiler"
+           enableSharding :  "enableSharding"
+           exportCollection :  "exportCollection"
+           find :  "find"
+           flushRouterConfig :  "flushRouterConfig"
+           forceUUID :  "forceUUID"
+           fsync :  "fsync"
+           getDatabaseVersion :  "getDatabaseVersion"
+           getDefaultRWConcern :  "getDefaultRWConcern"
+           getCmdLineOpts :  "getCmdLineOpts"
+           getLog :  "getLog"
+           getParameter :  "getParameter"
+           getShardMap :  "getShardMap"
+           getShardVersion :  "getShardVersion"
+           grantRole :  "grantRole"
+           grantPrivilegesToRole :  "grantPrivilegesToRole"  # ID only
+           grantRolesToRole :  "grantRolesToRole"       # ID only
+           grantRolesToUser :  "grantRolesToUser"       # ID only
+           hostInfo :  "hostInfo"
+           impersonate :  "impersonate"
+           importCollection :  "importCollection"
+           indexStats :  "indexStats"
+           inprog :  "inprog"
+           insert :  "insert"
+           internal :  "internal"  # Special action type that represents internal actions
+           invalidateUserCache :  "invalidateUserCache"
+           killAnyCursor :  "killAnyCursor"
+           killAnySession :  "killAnySession"
+           killCursors :  "killCursors"  # Deprecated in favor of killAnyCursor
+           killop :  "killop"
+           listCachedAndActiveUsers :  "listCachedAndActiveUsers"
+           listCollections :  "listCollections"
+           listCursors :  "listCursors"
+           listDatabases :  "listDatabases"
+           listIndexes :  "listIndexes"
+           listSessions :  "listSessions"
+           listShards :  "listShards"
+           logRotate :  "logRotate"
+           moveChunk :  "moveChunk"
+           netstat :  "netstat"
+           operationMetrics :  "operationMetrics"
+           planCacheIndexFilter :  "planCacheIndexFilter"  # view/update index filters
+           planCacheRead :  "planCacheRead"         # view contents of plan cache
+           planCacheWrite :  "planCacheWrite"        # clear cache, drop cache entry, pin/unpin/shun plans
+           refineCollectionShardKey :  "refineCollectionShardKey"
+           reIndex :  "reIndex"
+           remove :  "remove"
+           removeShard :  "removeShard"
+           renameCollection :  "renameCollection"  # ID only
+           renameCollectionSameDB :  "renameCollectionSameDB"
+           repairDatabase :  "repairDatabase"  # Deprecated (backwards compatibility)
+           replSetConfigure :  "replSetConfigure"
+           replSetGetConfig :  "replSetGetConfig"
+           replSetGetStatus :  "replSetGetStatus"
+           replSetHeartbeat :  "replSetHeartbeat"
+           replSetReconfig :  "replSetReconfig"  # ID only
+           replSetResizeOplog :  "replSetResizeOplog"
+           replSetStateChange :  "replSetStateChange"
+           reshardCollection :  "reshardCollection"
+           resync :  "resync"
+           revokeRole :  "revokeRole"
+           revokePrivilegesFromRole :  "revokePrivilegesFromRole"  # ID only
+           revokeRolesFromRole :  "revokeRolesFromRole"       # ID only
+           revokeRolesFromUser :  "revokeRolesFromUser"       # ID only
+           rotateCertificates :  "rotateCertificates"
+           runAsLessPrivilegedUser :  "runAsLessPrivilegedUser"
+           runTenantMigration :  "runTenantMigration"
+           serverStatus :  "serverStatus"
+           setAuthenticationRestriction :  "setAuthenticationRestriction"
+           setDefaultRWConcern :  "setDefaultRWConcern"
+           setFeatureCompatibilityVersion :  "setFeatureCompatibilityVersion"
+           setFreeMonitoring :  "setFreeMonitoring"
+           setParameter :  "setParameter"
+           shardCollection :  "shardCollection"  # ID only
+           shardingState :  "shardingState"
+           shutdown :  "shutdown"
+           splitChunk :  "splitChunk"
+           splitVector :  "splitVector"
+           storageDetails :  "storageDetails"
+           top :  "top"
+           touch :  "touch"
+           trafficRecord :  "trafficRecord"
+           unlock :  "unlock"
+           useUUID :  "useUUID"
+           update :  "update"
+           updateRole :  "updateRole"  # ID only
+           updateUser :  "updateUser"  # ID only
+           validate :  "validate"
+           viewRole :  "viewRole"
+           viewUser :  "viewUser"
+
