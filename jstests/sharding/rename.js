@@ -56,13 +56,10 @@ if (!isDDLFeatureFlagEnabled) {
 
 // Renaming unsharded collection to a different db with different primary shard.
 db.unSharded.insert({x: 1});
-if (!isDDLFeatureFlagEnabled) {
-    assert.commandFailedWithCode(
-        db.adminCommand({renameCollection: 'test.unSharded', to: 'otherPrimary.foo'}), 13137);
-} else {
-    assert.commandFailedWithCode(
-        db.adminCommand({renameCollection: 'test.unSharded', to: 'otherPrimary.foo'}), 5448802);
-}
+assert.commandFailedWithCode(
+    db.adminCommand({renameCollection: 'test.unSharded', to: 'otherPrimary.foo'}),
+    [13137, 5448802],
+    "Source and destination collections must be on same shard");
 
 // Renaming unsharded collection to a different db with same primary shard.
 assert.commandWorked(db.adminCommand({renameCollection: 'test.unSharded', to: 'samePrimary.foo'}));
