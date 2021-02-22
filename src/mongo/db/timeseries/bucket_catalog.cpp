@@ -48,6 +48,38 @@ uint8_t numDigits(uint32_t num) {
     }
     return numDigits;
 }
+
+void normalizeObject(BSONObjBuilder* builder, const BSONObj& obj) {
+    BSONObjIteratorSorted iter(obj);
+    while (iter.more()) {
+        auto elem = iter.next();
+        if (elem.type() != BSONType::Object) {
+            builder->append(elem);
+        } else {
+            BSONObjBuilder subObject(builder->subobjStart(elem.fieldNameStringData()));
+            normalizeObject(&subObject, elem.Obj());
+        }
+    }
+}
+
+KeyString::Value toKeyString(const BSONObj& obj, const CollatorInterface* collator) {
+    // TODO SERVER-54736: Change KeyString API to allow building subobjects in place and avoid
+    // temporary BSONObjBuilder
+    BSONObjBuilder objBuilder;
+    normalizeObject(&objBuilder, obj);
+
+    KeyString::StringTransformFn getComparisonString = [&](StringData stringData) {
+        return collator->getComparisonString(stringData);
+    };
+    const KeyString::StringTransformFn& transform = collator ? getComparisonString : nullptr;
+
+    KeyString::HeapBuilder ksBuilder{KeyString::Version::kLatestVersion, KeyString::ALL_ASCENDING};
+    for (auto&& elem : objBuilder.obj()) {
+        ksBuilder.appendBSONElement(elem, transform);
+    }
+    ksBuilder.appendDiscriminator(KeyString::Discriminator::kInclusive);
+    return ksBuilder.release();
+}
 }  // namespace
 
 const std::shared_ptr<BucketCatalog::ExecutionStats> BucketCatalog::kEmptyStats{
@@ -75,7 +107,7 @@ BSONObj BucketCatalog::getMetadata(const BucketId& bucketId) const {
         return {};
     }
 
-    return bucket->metadata.metadata;
+    return bucket->metadata.toBSON();
 }
 
 StatusWith<BucketCatalog::InsertResult> BucketCatalog::insert(OperationContext* opCtx,
@@ -184,7 +216,7 @@ StatusWith<BucketCatalog::InsertResult> BucketCatalog::insert(OperationContext* 
         // The metadata is stored two times: the bucket itself and _bucketIds.
         // The bucketId is stored four times: _buckets, _bucketIds, _nsBuckets, and
         // _idleBuckets.
-        bucket->memoryUsage += (ns.size() * 3) + (bucket->metadata.metadata.objsize() * 2) +
+        bucket->memoryUsage += (ns.size() * 3) + (bucket->metadata.toBSON().objsize() * 2) +
             ((sizeof(BucketId) + sizeof(OID)) * 4);
     } else {
         _memoryUsage.fetchAndSubtract(bucket->memoryUsage);
@@ -436,17 +468,17 @@ const std::shared_ptr<BucketCatalog::ExecutionStats> BucketCatalog::_getExecutio
     return kEmptyStats;
 }
 
-bool BucketCatalog::BucketMetadata::operator<(const BucketMetadata& other) const {
-    auto size = metadata.objsize();
-    auto otherSize = other.metadata.objsize();
-    auto cmp = std::memcmp(metadata.objdata(), other.metadata.objdata(), std::min(size, otherSize));
-    return cmp == 0 && size != otherSize ? size < otherSize : cmp < 0;
-}
+BucketCatalog::BucketMetadata::BucketMetadata(BSONObj&& obj,
+                                              std::shared_ptr<const ViewDefinition>& v)
+    : _metadata(obj), _view(v), _keyString(toKeyString(_metadata, _view->defaultCollator())) {}
 
 bool BucketCatalog::BucketMetadata::operator==(const BucketMetadata& other) const {
-    return view->defaultCollator() == other.view->defaultCollator() &&
-        UnorderedFieldsBSONObjComparator(view->defaultCollator())
-            .compare(metadata, other.metadata) == 0;
+    return _view->defaultCollator() == other._view->defaultCollator() &&
+        _keyString == other._keyString;
+}
+
+const BSONObj& BucketCatalog::BucketMetadata::toBSON() const {
+    return _metadata;
 }
 
 void BucketCatalog::Bucket::calculateBucketFieldsAndSizeChange(
