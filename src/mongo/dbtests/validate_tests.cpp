@@ -73,8 +73,11 @@ public:
         auto db = autoDb.getDb();
         ASSERT_TRUE(db);
 
+        _supportsClusteredIdIndex =
+            _opCtx.getServiceContext()->getStorageEngine()->supportsClusteredIdIndex();
+
         CollectionOptions options;
-        if (clustered) {
+        if (clustered && _supportsClusteredIdIndex) {
             options.clusteredIndex = ClusteredIndexOptions{};
         }
 
@@ -191,6 +194,7 @@ protected:
     Database* _db;
     bool _isInRecordIdOrder;
     bool _engineSupportsCheckpoints;
+    bool _supportsClusteredIdIndex;
 };
 
 template <bool full, bool background>
@@ -3517,6 +3521,10 @@ public:
         : ValidateBase(/*full=*/false, background, /*clustered=*/true) {}
 
     void run() {
+        if (!_supportsClusteredIdIndex) {
+            return;
+        }
+
         // Cannot run validate with {background:true} if either
         //  - the RecordStore cursor does not retrieve documents in RecordId order
         //  - or the storage engine does not support checkpoints.
@@ -3582,6 +3590,10 @@ public:
         : ValidateBase(/*full=*/false, background, /*clustered=*/true) {}
 
     void run() {
+        if (!_supportsClusteredIdIndex) {
+            return;
+        }
+
         // Cannot run validate with {background:true} if either
         //  - the RecordStore cursor does not retrieve documents in RecordId order
         //  - or the storage engine does not support checkpoints.
@@ -3682,6 +3694,10 @@ public:
         : ValidateBase(/*full=*/false, /*background=*/false, /*clustered=*/true) {}
 
     void run() {
+        if (!_supportsClusteredIdIndex) {
+            return;
+        }
+
         // Cannot run validate with {background:true} if either
         //  - the RecordStore cursor does not retrieve documents in RecordId order
         //  - or the storage engine does not support checkpoints.
