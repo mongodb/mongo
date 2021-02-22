@@ -32,6 +32,7 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
 
     _CONFIGSVR_REPLSET_NAME = "config-rs"
     _SHARD_REPLSET_NAME_PREFIX = "shard-rs"
+    AWAIT_SHARDING_INITIALIZATION_TIMEOUT_SECS = 60
 
     def __init__(  # pylint: disable=too-many-arguments,too-many-locals
             self, logger, job_num, mongos_executable=None, mongos_options=None,
@@ -173,6 +174,9 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
             self.logger.info("Enabling sharding for '%s' database...", db_name)
             client.admin.command({"enablesharding": db_name})
 
+        # Wait for mongod's to be ready.
+        self._await_mongod_sharding_initialization()
+
         # Ensure that the sessions collection gets auto-sharded by the config server
         if self.configsvr is not None:
             primary = self.configsvr.get_primary().mongo_client()
@@ -181,6 +185,31 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
         for shard in self.shards:
             primary = shard.get_primary().mongo_client()
             primary.admin.command({"refreshLogicalSessionCacheNow": 1})
+
+    def _await_mongod_sharding_initialization(self):
+        if (self.enable_sharding) and (self.num_rs_nodes_per_shard is not None):
+            deadline = time.time(
+            ) + ShardedClusterFixture.AWAIT_SHARDING_INITIALIZATION_TIMEOUT_SECS
+            timeout_occurred = lambda: deadline - time.time() <= 0.0
+
+            mongod_clients = [(mongod.mongo_client(), mongod.port) for shard in self.shards
+                              for mongod in shard.nodes]
+
+            for client, port in mongod_clients:
+                self._auth_to_db(client)
+
+                while True:
+                    # The choice of namespace (local.fooCollection) does not affect the output.
+                    get_shard_version_result = client.admin.command(
+                        "getShardVersion", "local.fooCollection", check=False)
+                    if get_shard_version_result["ok"]:
+                        break
+
+                    if timeout_occurred():
+                        raise errors.ServerFailure(
+                            "mongod on port: {} failed waiting for getShardVersion success after {} seconds"
+                            .format(port, standalone.MongoDFixture.AWAIT_READY_TIMEOUT_SECS))
+                    time.sleep(0.1)
 
     def _auth_to_db(self, client):
         """Authenticate client for the 'authenticationDatabase'."""
