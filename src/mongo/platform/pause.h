@@ -58,7 +58,8 @@
 
 #elif defined(__aarch64__) || defined(__arm__)
 
-#define MONGO_YIELD_CORE_FOR_SMT() __asm__ volatile("yield" ::: "memory")
+/* See https://jira.mongodb.org/browse/WT-6872 for details on using `isb` instead of `yield`. */
+#define MONGO_YIELD_CORE_FOR_SMT() __asm__ volatile("isb" ::: "memory")
 
 #elif defined(__s390x__)
 
