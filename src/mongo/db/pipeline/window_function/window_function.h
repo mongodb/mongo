@@ -45,9 +45,11 @@ namespace mongo {
  */
 class WindowFunctionState {
 public:
+    virtual ~WindowFunctionState() = default;
     virtual void add(Value) = 0;
     virtual void remove(Value) = 0;
     virtual Value getValue() const = 0;
+    virtual void reset() = 0;
 };
 
 
@@ -75,6 +77,10 @@ public:
         auto iter = _values.find(std::move(value));
         tassert(5371400, "Can't remove from an empty WindowFunctionMinMax", iter != _values.end());
         _values.erase(iter);
+    }
+
+    void reset() final {
+        _values.clear();
     }
 
     Value getValue() const final {

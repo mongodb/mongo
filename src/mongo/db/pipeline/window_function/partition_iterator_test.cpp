@@ -177,5 +177,27 @@ TEST_F(PartitionIteratorTest, PartitionByArrayErrs) {
     ASSERT_DOCUMENT_EQ(docs[0].getDocument(), *partIter[0]);
     ASSERT_THROWS_CODE(*partIter[1], AssertionException, ErrorCodes::TypeMismatch);
 }
+
+TEST_F(PartitionIteratorTest, CurrentOffsetIsCorrectAfterDocumentsAreAccessed) {
+    const auto docs = std::deque<DocumentSource::GetNextResult>{
+        Document{{"key", 1}}, Document{{"key", 2}}, Document{{"key", 3}}, Document{{"key", 4}}};
+    const auto mock = DocumentSourceMock::createForTest(docs, getExpCtx());
+    auto key = ExpressionFieldPath::createPathFromString(
+        getExpCtx().get(), "a", getExpCtx()->variablesParseState);
+    auto partIter = PartitionIterator(getExpCtx().get(), mock.get(), *key);
+    ASSERT_EQ(0, partIter.getCurrentOffset());
+    auto doc = partIter[0];
+    partIter.advance();
+    ASSERT_EQ(1, partIter.getCurrentOffset());
+    doc = partIter[0];
+    partIter.advance();
+    ASSERT_EQ(2, partIter.getCurrentOffset());
+    doc = partIter[0];
+    partIter.advance();
+    ASSERT_EQ(3, partIter.getCurrentOffset());
+    doc = partIter[0];
+    ASSERT_EQ(3, partIter.getCurrentOffset());
+}
+
 }  // namespace
 }  // namespace mongo
