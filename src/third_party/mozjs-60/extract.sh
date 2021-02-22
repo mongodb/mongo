@@ -221,3 +221,4 @@ patch -p4 < patches/windows-Time.cpp-GetModuleHandle.patch
 patch -p4 < patches/JSGCConfig.patch
 patch -p4 < patches/struct-hasher.patch
 patch -p4 < patches/freebsd-powerpc64le-fix.patch
+patch -p4 < patches/moz-bug-1442583.patch
