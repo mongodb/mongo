@@ -9,30 +9,34 @@ var IndexBuildTest = class {
      * Starts an index build in a separate mongo shell process with given options.
      * Ensures the index build worked or failed with one of the expected failures.
      */
-    static startIndexBuild(conn, ns, keyPattern, options, expectedFailures, commitQuorum) {
+    static startIndexBuild(conn, ns, keyPattern, options, expectedFailures, commitQuorum, authDoc) {
         options = options || {};
         expectedFailures = expectedFailures || [];
-        // The default for the commit quorum parameter to Collection.createIndexes() should be
-        // left as undefined if 'commitQuorum' is omitted. This is because we need to differentiate
-        // between undefined (which uses the default in the server) and 0 which disables the commit
-        // quorum.
-        const commitQuorumStr = (commitQuorum === undefined ? '' : ', ' + tojson(commitQuorum));
 
-        if (Array.isArray(keyPattern)) {
-            return startParallelShell(
-                'const coll = db.getMongo().getCollection("' + ns + '");' +
-                    'assert.commandWorkedOrFailedWithCode(coll.createIndexes(' +
-                    JSON.stringify(keyPattern) + ', ' + tojson(options) + commitQuorumStr + '), ' +
-                    JSON.stringify(expectedFailures) + ');',
-                conn.port);
-        } else {
-            return startParallelShell('const coll = db.getMongo().getCollection("' + ns + '");' +
-                                          'assert.commandWorkedOrFailedWithCode(coll.createIndex(' +
-                                          tojson(keyPattern) + ', ' + tojson(options) +
-                                          commitQuorumStr + '), ' +
-                                          JSON.stringify(expectedFailures) + ');',
-                                      conn.port);
-        }
+        const args = [ns, keyPattern, options, expectedFailures, commitQuorum, authDoc];
+        let func = function(args) {
+            const [ns, keyPattern, options, expectedFailures, commitQuorum, authDoc] = args;
+            // If authDoc is specified, then the index build is being started on a server that has
+            // auth enabled. Be sure to authenticate the new shell client with the provided
+            // credentials.
+            if (authDoc) {
+                assert(db.getSiblingDB('admin').auth(authDoc.user, authDoc.pwd));
+            }
+            const keyPatterns = (Array.isArray(keyPattern) ? keyPattern : [keyPattern]);
+            const coll = db.getMongo().getCollection(ns);
+            // The default for the commit quorum parameter to Collection.createIndexes() should be
+            // left as undefined if 'commitQuorum' is omitted. This is because we need to
+            // differentiate between undefined (which uses the default in the server) and 0 which
+            // disables the commit quorum.
+            if (commitQuorum !== undefined) {
+                assert.commandWorkedOrFailedWithCode(
+                    coll.createIndexes(keyPatterns, options, commitQuorum), expectedFailures);
+            } else {
+                assert.commandWorkedOrFailedWithCode(coll.createIndexes(keyPatterns, options),
+                                                     expectedFailures);
+            }
+        };
+        return startParallelShell(funWithArgs(func, args), conn.port);
     }
 
     /**

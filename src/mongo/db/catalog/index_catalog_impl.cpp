@@ -521,7 +521,6 @@ StatusWith<BSONObj> IndexCatalogImpl::createIndexOnEmptyCollection(OperationCont
     invariant(DurableCatalog::get(opCtx)->isIndexReady(
         opCtx, _collection->getCatalogId(), descriptor->indexName()));
 
-    audit::logCreateIndex(opCtx->getClient(), &spec, descriptor->indexName(), _collection->ns());
 
     return spec;
 }

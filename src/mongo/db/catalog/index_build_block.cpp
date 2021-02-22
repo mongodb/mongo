@@ -35,6 +35,7 @@
 
 #include <vector>
 
+#include "mongo/db/audit.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/uncommitted_collections.h"
 #include "mongo/db/catalog_raii.h"
@@ -126,6 +127,15 @@ Status IndexBuildBlock::init(OperationContext* opCtx, Collection* collection) {
 
     _indexName = descriptor->indexName();
 
+    // Since the index build block is being initialized, the index build for _indexName is
+    // beginning. Accordingly, emit an audit event indicating this.
+    audit::logCreateIndex(opCtx->getClient(),
+                          &_spec,
+                          _indexName,
+                          collection->ns(),
+                          "IndexBuildStarted",
+                          ErrorCodes::OK);
+
     bool isBackgroundIndex = _method == IndexBuildMethod::kHybrid;
     bool isBackgroundSecondaryBuild = false;
     if (auto replCoord = repl::ReplicationCoordinator::get(opCtx)) {
@@ -176,6 +186,14 @@ void IndexBuildBlock::fail(OperationContext* opCtx, Collection* collection) {
 
     invariant(opCtx->lockState()->isCollectionLockedForMode(_nss, MODE_X));
 
+    // Audit that the index build is being aborted.
+    audit::logCreateIndex(opCtx->getClient(),
+                          &_spec,
+                          _indexName,
+                          collection->ns(),
+                          "IndexBuildAborted",
+                          ErrorCodes::IndexBuildAborted);
+
     auto indexCatalogEntry = getEntry(opCtx, collection);
     if (indexCatalogEntry) {
         invariant(collection->getIndexCatalog()->dropIndexEntry(opCtx, indexCatalogEntry).isOK());
@@ -209,6 +227,14 @@ void IndexBuildBlock::success(OperationContext* opCtx, Collection* collection) {
     auto indexCatalogEntry = getEntry(opCtx, collection);
     collection->indexBuildSuccess(opCtx, indexCatalogEntry);
     auto svcCtx = opCtx->getClient()->getServiceContext();
+
+    // Before committing the index build, optimistically audit that the index build has succeeded.
+    audit::logCreateIndex(opCtx->getClient(),
+                          &_spec,
+                          _indexName,
+                          collection->ns(),
+                          "IndexBuildSucceeded",
+                          ErrorCodes::OK);
 
     opCtx->recoveryUnit()->onCommit(
         [svcCtx,
