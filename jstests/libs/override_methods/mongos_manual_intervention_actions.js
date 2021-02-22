@@ -13,34 +13,36 @@ var ManualInterventionActions = (function() {
      * Remove all the chunk documents from the given namespace. Deletes are performed one at a
      * time to bypass auto_retry_on_network_error.js multi remove check.
      */
-    let removeChunks = function(mongosConn, ns) {
+    let removeChunks = function(mongosConn, ns, res) {
         let stillHasChunks = true;
+        let uuid = res.errmsg.split('uuid: ')[1];
+        let query = uuid ? {uuid: UUID(uuid)} : {ns: ns};
 
         while (stillHasChunks) {
             let writeRes = assert.commandWorked(mongosConn.getDB('config').chunks.remove(
-                {ns: ns}, {justOne: true, writeConcern: {w: 'majority'}}));
+                query, {justOne: true, writeConcern: {w: 'majority'}}));
             stillHasChunks = writeRes.nRemoved > 0;
         }
     };
 
-    this.removePartiallyWrittenChunks = function(mongosConn, ns, cmdObj, numAttempts) {
+    this.removePartiallyWrittenChunks = function(mongosConn, ns, cmdObj, numAttempts, res) {
         print("command " + tojson(cmdObj) + " failed after " + numAttempts +
               " attempts due to seeing partially written chunks for collection " + ns +
               ", probably due to a previous failed shardCollection attempt. Manually" +
               " deleting chunks for " + ns + " from config.chunks and retrying the command.");
 
-        removeChunks(mongosConn, ns);
+        removeChunks(mongosConn, ns, res);
     };
 
     this.removePartiallyWrittenChunksAndDropCollection = function(
-        mongosConn, ns, cmdObj, numAttempts) {
+        mongosConn, ns, cmdObj, numAttempts, res) {
         print("command " + tojson(cmdObj) + " failed after " + numAttempts +
               " attempts due to seeing partially written chunks for collection " + ns +
               ", probably due to a previous failed shardCollection attempt. Manually" +
               " deleting chunks for " + ns + " from config.chunks" +
               ", dropping the collection, and retrying the command.");
 
-        removeChunks(mongosConn, ns);
+        removeChunks(mongosConn, ns, res);
         const [dbName, collName] = ns.split(".");
         assert.commandWorked(
             mongosConn.getDB(dbName).runCommand({"drop": collName, writeConcern: {w: "majority"}}));
@@ -80,7 +82,8 @@ Mongo.prototype.runCommand = function runCommand(dbName, cmdObj, options) {
 
         if (cmdName === "shardCollection" || cmdName === "shardcollection") {
             const ns = cmdObj[cmdName];
-            ManualInterventionActions.removePartiallyWrittenChunks(this, ns, cmdObj, numAttempts);
+            ManualInterventionActions.removePartiallyWrittenChunks(
+                this, ns, cmdObj, numAttempts, res);
         } else if (cmdName === "mapReduce" || cmdName === "mapreduce") {
             const out = cmdObj.out;
 
@@ -105,7 +108,7 @@ Mongo.prototype.runCommand = function runCommand(dbName, cmdObj, options) {
 
             const ns = outDbName + "." + outCollName;
             ManualInterventionActions.removePartiallyWrittenChunksAndDropCollection(
-                this, ns, cmdObj, numAttempts);
+                this, ns, cmdObj, numAttempts, res);
         }
     }
     return res;

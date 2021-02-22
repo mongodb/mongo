@@ -44,6 +44,7 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/active_shard_collection_registry.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/config/initial_split_policy.h"
@@ -109,10 +110,29 @@ boost::optional<CreateCollectionResponse> checkIfCollectionAlreadyShardedWithSam
         opCtx, nss, request.getKey(), *request.getCollation(), request.getUnique());
 }
 
+// TODO SERVER-54587: Remove the code bellow after the new shard collection path is resilient.
+boost::optional<UUID> getUUID(OperationContext* opCtx, const NamespaceString& nss) {
+    AutoGetCollection autoColl(opCtx, nss, MODE_IS, AutoGetCollectionViewMode::kViewsForbidden);
+    const auto& coll = autoColl.getCollection();
+    return coll ? boost::make_optional(coll->uuid()) : boost::none;
+}
+
 void checkForExistingChunks(OperationContext* opCtx, const NamespaceString& nss) {
     BSONObjBuilder countBuilder;
-    countBuilder.append("count", ChunkType::ConfigNS.coll());
-    countBuilder.append("query", BSON(ChunkType::ns(nss.ns())));
+    boost::optional<UUID> optUUID;
+    // TODO SERVER-54587: Remove the code bellow the new shard collection path is resilient.
+    if (feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        optUUID = getUUID(opCtx, nss);
+        if (!optUUID) {
+            return;
+        }
+        countBuilder.append("count", ChunkType::ConfigNS.coll());
+        countBuilder.append("query", BSON(ChunkType::collectionUUID << *optUUID));
+    } else {
+        countBuilder.append("count", ChunkType::ConfigNS.coll());
+        countBuilder.append("query", BSON(ChunkType::ns(nss.ns())));
+    }
 
     // OK to use limit=1, since if any chunks exist, we will fail.
     countBuilder.append("limit", 1);
@@ -133,12 +153,14 @@ void checkForExistingChunks(OperationContext* opCtx, const NamespaceString& nss)
 
     long long numChunks;
     uassertStatusOK(bsonExtractIntegerField(cmdResponse.response, "n", &numChunks));
-    uassert(ErrorCodes::ManualInterventionRequired,
-            str::stream() << "A previous attempt to shard collection " << nss.ns()
-                          << " failed after writing some initial chunks to config.chunks. Please "
-                             "manually delete the partially written chunks for collection "
-                          << nss.ns() << " from config.chunks",
-            numChunks == 0);
+    uassert(
+        ErrorCodes::ManualInterventionRequired,
+        str::stream() << "A previous attempt to shard collection " << nss.ns()
+                      << " failed after writing some initial chunks to config.chunks. Please "
+                         "manually delete the partially written chunks for collection "
+                      << nss.ns() << " from config.chunks"
+                      << (optUUID ? str::stream() << " uuid: " << *optUUID : str::stream() << ""),
+        numChunks == 0);
 }
 
 void checkCollation(OperationContext* opCtx, const ShardsvrShardCollectionRequest& request) {
@@ -318,6 +340,16 @@ ShardCollectionTargetState calculateTargetState(OperationContext* opCtx,
         *request.getCollation(),
         request.getUnique(),
         shardkeyutil::ValidationBehaviorsShardCollection(opCtx));
+
+    // Wait until the index is majority written, to prevent having the collection commited to the
+    // config server, but the index creation rolled backed on stepdowns.
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx->getServiceContext());
+    if (replCoord->isReplEnabled() && opCtx->writesAreReplicated()) {
+        auto opTime = uassertStatusOK(replCoord->getLatestWriteOpTime(opCtx));
+        WaitForMajorityService::get(opCtx->getServiceContext())
+            .waitUntilMajority(opTime)
+            .get(opCtx);
+    }
 
     auto tags = getTagsAndValidate(opCtx, nss, proposedKey, shardKeyPattern);
     auto uuid = getOrGenerateUUID(opCtx, nss, request);
