@@ -328,6 +328,34 @@ def check_command_type(ctxt: IDLCompatibilityContext,
                                                        new_idl_file_path)
 
 
+def check_param_or_type_validator(ctxt: IDLCompatibilityContext, old_field: syntax.Field,
+                                  new_field: syntax.Field, cmd_name: str, new_idl_file_path: str,
+                                  type_name: Optional[str], is_command_parameter: bool):
+    """
+    Check compatibility between old and new validators.
+
+    Check compatibility between old and new validators in command parameters and command type
+    struct fields.
+    """
+    # pylint: disable=too-many-arguments
+    if new_field.validator:
+        if old_field.validator:
+            if new_field.validator != old_field.validator:
+                if is_command_parameter:
+                    ctxt.add_command_parameter_validators_not_equal_error(
+                        cmd_name, new_field.name, new_idl_file_path)
+                else:
+                    ctxt.add_command_type_validators_not_equal_error(
+                        cmd_name, type_name, new_field.name, new_idl_file_path)
+        else:
+            if is_command_parameter:
+                ctxt.add_command_parameter_contains_validator_error(cmd_name, new_field.name,
+                                                                    new_idl_file_path)
+            else:
+                ctxt.add_command_type_contains_validator_error(cmd_name, type_name, new_field.name,
+                                                               new_idl_file_path)
+
+
 def check_command_type_struct_field(
         ctxt: IDLCompatibilityContext, type_name: str, old_field: syntax.Field,
         new_field: syntax.Field, cmd_name: str, old_idl_file: syntax.IDLParsedSpec,
@@ -340,6 +368,9 @@ def check_command_type_struct_field(
     if old_field.optional and not new_field.optional:
         ctxt.add_new_command_type_field_required_error(cmd_name, type_name, new_field.name,
                                                        new_idl_file_path)
+
+    check_param_or_type_validator(ctxt, old_field, new_field, cmd_name, new_idl_file_path,
+                                  type_name, is_command_parameter=False)
 
     old_field_type = get_field_type(old_field, old_idl_file, old_idl_file_path)
     new_field_type = get_field_type(new_field, new_idl_file, new_idl_file_path)
@@ -383,6 +414,17 @@ def check_reply_field(ctxt: IDLCompatibilityContext, old_field: syntax.Field,
         ctxt.add_new_reply_field_unstable_error(cmd_name, new_field.name, new_idl_file_path)
     if new_field.optional and not old_field.optional:
         ctxt.add_new_reply_field_optional_error(cmd_name, new_field.name, new_idl_file_path)
+
+    if old_field.validator:
+        # Not implemented.
+        ctxt.add_reply_field_contains_validator_error(cmd_name, old_field.name, old_idl_file_path)
+        ctxt.errors.dump_errors()
+        sys.exit(1)
+    if new_field.validator:
+        # Not implemented.
+        ctxt.add_reply_field_contains_validator_error(cmd_name, new_field.name, new_idl_file_path)
+        ctxt.errors.dump_errors()
+        sys.exit(1)
 
     old_field_type = get_field_type(old_field, old_idl_file, old_idl_file_path)
     new_field_type = get_field_type(new_field, new_idl_file, new_idl_file_path)
@@ -459,6 +501,9 @@ def check_command_parameter(ctxt: IDLCompatibilityContext, old_param: syntax.Fie
                                                          old_idl_file_path)
     if old_param.optional and not new_param.optional:
         ctxt.add_command_parameter_required_error(cmd_name, old_param.name, old_idl_file_path)
+
+    check_param_or_type_validator(ctxt, old_param, new_param, cmd_name, new_idl_file_path,
+                                  type_name=None, is_command_parameter=True)
 
     old_parameter_type = get_field_type(old_param, old_idl_file, old_idl_file_path)
     new_parameter_type = get_field_type(new_param, new_idl_file, new_idl_file_path)

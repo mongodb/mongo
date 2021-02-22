@@ -41,7 +41,7 @@ structs:
 
 commands:
     replyFieldTypeInvalid:
-        description: "invalid reply field type"
+        description: "This command aborts because its reply field type is invalid"
         command_name: replyFieldTypeInvalid
         namespace: ignored
         cpp_name: replyFieldTypeInvalid

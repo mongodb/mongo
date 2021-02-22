@@ -933,6 +933,13 @@ commands:
         api_version: ""
         type: array<one_string>
 
+    CommandTypeStructValidatorCommand:
+        description: Command with a struct type that has a validator
+        command_name: CommandTypeStructValidatorCommand
+        namespace: type
+        api_version: ""
+        type: int_basic_ranges
+
     CommandTypeVariantCommand:
         description: Command with a variant parameter
         command_name: CommandTypeVariantCommand

@@ -433,6 +433,17 @@ class Validator(common.SourceLocation):
 
         super(Validator, self).__init__(file_name, line, column)
 
+    def __eq__(self, other):
+        return (isinstance(other, Validator) and self.gt == other.gt and self.lt == other.lt
+                and self.gte == other.gte and self.lte == other.lte
+                and self.callback == other.callback)
+
+    def __ne__(self, other):
+        return not self == other
+
+    def __hash__(self):
+        return hash((self.gt, self.lt, self.gte, self.lte, self.callback))
+
 
 class Field(common.SourceLocation):
     """
@@ -609,7 +620,8 @@ class EnumValue(common.SourceLocation):
         super(EnumValue, self).__init__(file_name, line, column)
 
     def __eq__(self, other):
-        return self.name == other.name and self.value == other.value
+        return (isinstance(other, EnumValue) and self.name == other.name
+                and self.value == other.value)
 
     def __ne__(self, other):
         return not self == other
@@ -722,6 +734,16 @@ class Expression(common.SourceLocation):
         self.is_constexpr = True  # type: bool
 
         super(Expression, self).__init__(file_name, line, column)
+
+    def __eq__(self, other):
+        return (isinstance(other, Expression) and self.literal == other.literal
+                and self.expr == other.expr and self.is_constexpr == other.is_constexpr)
+
+    def __ne__(self, other):
+        return not self == other
+
+    def __hash__(self):
+        return hash((self.literal, self.expr, self.is_constexpr))
 
 
 class ServerParameterClass(common.SourceLocation):

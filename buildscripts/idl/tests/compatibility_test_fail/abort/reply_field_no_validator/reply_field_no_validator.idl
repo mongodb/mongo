@@ -33,18 +33,18 @@ imports:
     - "mongo/idl/basic_types.idl"
 
 structs:
-    InvalidFieldTypeReply:
-        description: "This reply contains a field where the type is valid"
+    ValidatorReply:
+        description: "The other version of the reply field contains a validator which is invalid."
         fields:
-            invalidReplyField:
+            validatorReplyField:
                 type: string
 
 commands:
-    replyFieldTypeInvalid:
-        description: "the other version of this command aborts because its reply field type is invalid"
-        command_name: replyFieldTypeInvalid
+    replyFieldValidator:
+        description: "the other version of this command aborts because its reply field contains a validator"
+        command_name: replyFieldValidator
         namespace: ignored
-        cpp_name: replyFieldTypeInvalid
+        cpp_name: replyFieldValidator
         strict: true
         api_version: "1"
-        reply_type: InvalidFieldTypeReply
+        reply_type: ValidatorReply
