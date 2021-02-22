@@ -1,0 +1,29 @@
+# Fix https://jira.mongodb.org/browse/SERVER-54684 by applying upstream changes from ESR 69 
+# - https://bugzilla.mozilla.org/show_bug.cgi?id=1442583
+# - https://github.com/mozilla/gecko-dev/commit/7371a080accd8dfcaf0d24072b787e143846973a
+
+diff --git a/src/third_party/mozjs-60/extract/js/src/jit/ProcessExecutableMemory.cpp b/src/third_party/mozjs-60/extract/js/src/jit/ProcessExecutableMemory.cpp
+index e763a9d68d..8a6d50b6a7 100644
+--- a/src/third_party/mozjs-60/extract/js/src/jit/ProcessExecutableMemory.cpp
++++ b/src/third_party/mozjs-60/extract/js/src/jit/ProcessExecutableMemory.cpp
+@@ -20,6 +20,9 @@
+ #include "jsutil.h"
+ 
+ #include "gc/Memory.h"
++#ifdef JS_CODEGEN_ARM64
++# include "jit/arm64/vixl/Cpu-vixl.h"
++#endif
+ #include "threading/LockGuard.h"
+ #include "threading/Mutex.h"
+ #include "util/Windows.h"
+@@ -621,6 +624,10 @@ js::jit::DeallocateExecutableMemory(void* addr, size_t bytes)
+ bool
+ js::jit::InitProcessExecutableMemory()
+ {
++#ifdef JS_CODEGEN_ARM64
++    // Initialize instruction cache flushing.
++    vixl::CPU::SetUp();
++#endif
+     return execMemory.init();
+ }
+ 
