@@ -8821,7 +8821,7 @@ buildvariants:
 - &linux-64-debug-template
   name: linux-64-debug
   display_name: "! Linux DEBUG"
-  batchtime: 240 # 4 hours
+  batchtime: 480 # 8 hours
   run_on:
   - rhel62-large
   expansions:
@@ -9826,7 +9826,7 @@ buildvariants:
 
 - name: windows-debug
   display_name: "* Windows DEBUG"
-  batchtime: 240 # 4 hours
+  batchtime: 480 # 8 hours
   run_on:
   - windows-64-vs2019-small
   expansions:
@@ -9893,7 +9893,7 @@ buildvariants:
 
 - name: enterprise-windows-required
   display_name: "! Enterprise Windows"
-  batchtime: 240 # 4 hourss
+  batchtime: 480 # 8 hours
   modules:
   - enterprise
   run_on:
@@ -9936,7 +9936,7 @@ buildvariants:
 
 - name: enterprise-windows
   display_name: "* Enterprise Windows"
-  batchtime: 240 # 4 hours
+  batchtime: 480 # 8 hours
   modules:
     - enterprise
   run_on:
@@ -10196,7 +10196,7 @@ buildvariants:
 
 - name: macos-debug
   display_name: "* macOS DEBUG"
-  batchtime: 240 # 4 hours
+  batchtime: 480 # 8 hours
   run_on:
   - macos-1014
   expansions:
@@ -10311,7 +10311,7 @@ buildvariants:
 
 - name: enterprise-rhel-62-64-bit
   display_name: "! Enterprise RHEL 6.2"
-  batchtime: 240 # 4 hours
+  batchtime: 480 # 8 hours
   modules:
   - enterprise
   run_on:
@@ -10787,7 +10787,7 @@ buildvariants:
 - &enterprise-rhel-70-64-bit-template
   name: enterprise-rhel-70-64-bit
   display_name: "* Enterprise RHEL 7.0"
-  batchtime: 240 # 4 hours
+  batchtime: 480 # 8 hours
   modules:
   - enterprise
   run_on:
@@ -11077,7 +11077,7 @@ buildvariants:
 
 - name: ubuntu1604-debug
   display_name: "* Ubuntu 16.04 DEBUG"
-  batchtime: 240 # 4 hours
+  batchtime: 480 # 8 hours
   run_on:
   - ubuntu1604-test
   expansions:
@@ -11585,7 +11585,7 @@ buildvariants:
 
 - name: enterprise-ubuntu-dynamic-1604-clang
   display_name: "! Shared Library Enterprise Ubuntu 16.04 (Clang)"
-  batchtime: 240 # 4 hours
+  batchtime: 480 # 8 hours
   modules:
   - enterprise
   run_on:
@@ -11613,7 +11613,7 @@ buildvariants:
 
 - name: enterprise-ubuntu-dynamic-1604-clang-tidy
   display_name: "* Enterprise Clang Tidy"
-  batchtime: 240 # 4 hours
+  batchtime: 480 # 8 hours
   modules:
   - enterprise
   run_on:
@@ -11634,7 +11634,7 @@ buildvariants:
 
 - name: ubuntu-dynamic-1604-clang
   display_name: "* Shared Library Ubuntu 16.04 (Clang)"
-  batchtime: 240 # 4 hours
+  batchtime: 480 # 8 hours
   run_on:
    - ubuntu1604-test
   expansions:
@@ -12468,7 +12468,7 @@ buildvariants:
 
 - name: ubuntu1804-debug-aubsan-lite
   display_name: "! {A,UB}SAN Enterprise Ubuntu 18.04 DEBUG"
-  batchtime: 240 # 4 hours
+  batchtime: 480 # 8 hours
   modules:
   - enterprise
   run_on:
@@ -12516,7 +12516,7 @@ buildvariants:
 
 - name: enterprise-ubuntu-dynamic-1604-64-bit
   display_name: "* Shared Library Enterprise Ubuntu 16.04"
-  batchtime: 240 # 4 hours
+  batchtime: 480 # 8 hours
   modules:
   - enterprise
   expansions:
