@@ -1,14 +1,9 @@
-/* Include guard. */
 #ifndef WORKLOAD_GENERATOR_H
 #define WORKLOAD_GENERATOR_H
 
 #include <cstdint>
 #include <map>
 #include <vector>
-
-extern "C" {
-#include "test_util.h"
-}
 
 #include "api_const.h"
 #include "configuration_settings.h"
@@ -68,35 +63,37 @@ class workload_generator {
         testutil_make_work_dir(home);
 
         /* Open connection. */
-        WT_RET(wiredtiger_open(home, NULL, test_harness::CONNECTION_CREATE, &_conn));
+        testutil_check(wiredtiger_open(home, NULL, test_harness::CONNECTION_CREATE, &_conn));
 
         /* Open session. */
-        WT_RET(_conn->open_session(_conn, NULL, NULL, &_session));
+        testutil_check(_conn->open_session(_conn, NULL, NULL, &_session));
 
         /* Create n collections as per the configuration and store each collection name. */
-        WT_RET(_configuration->get_int(test_harness::COLLECTION_COUNT, collection_count));
+        testutil_check(_configuration->get_int(test_harness::COLLECTION_COUNT, collection_count));
         for (int i = 0; i < collection_count; ++i) {
             collection_name = "table:collection" + std::to_string(i);
-            WT_RET(_session->create(_session, collection_name.c_str(), DEFAULT_TABLE_SCHEMA));
+            testutil_check(
+              _session->create(_session, collection_name.c_str(), DEFAULT_TABLE_SCHEMA));
             _collection_names.push_back(collection_name);
         }
         debug_info(std::to_string(collection_count) + " collections created", DEBUG_INFO);
 
         /* Open a cursor on each collection and use the configuration to insert key/value pairs. */
-        WT_RET(_configuration->get_int(test_harness::KEY_COUNT, key_count));
-        WT_RET(_configuration->get_int(test_harness::VALUE_SIZE, value_size));
+        testutil_check(_configuration->get_int(test_harness::KEY_COUNT, key_count));
+        testutil_check(_configuration->get_int(test_harness::VALUE_SIZE, value_size));
         for (const auto &collection_name : _collection_names) {
             /* WiredTiger lets you open a cursor on a collection using the same pointer. When a
              * session is closed, WiredTiger APIs close the cursors too. */
-            WT_RET(_session->open_cursor(_session, collection_name.c_str(), NULL, NULL, &cursor));
+            testutil_check(
+              _session->open_cursor(_session, collection_name.c_str(), NULL, NULL, &cursor));
             for (size_t j = 0; j < key_count; ++j) {
                 cursor->set_key(cursor, j);
                 /* Generation of a random string value using the size defined in the test
                  * configuration. */
                 std::string generated_value =
-                  random_generator::random_generator::get_instance()->generate_string(value_size);
+                  random_generator::random_generator::get_instance().generate_string(value_size);
                 cursor->set_value(cursor, generated_value.c_str());
-                WT_RET(cursor->insert(cursor));
+                testutil_check(cursor->insert(cursor));
             }
         }
         debug_info(std::to_string(collection_count) + " key/value inserted", DEBUG_INFO);
