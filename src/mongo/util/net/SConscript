@@ -170,9 +170,20 @@ else:
         ],
     )
 
+env.Library(
+    target='http_client',
+    source=[
+        'http_client.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
+)
+
+
 if http_client == "off":
     env.Library(
-        target='http_client',
+        target='http_client_impl',
         source=[
             'http_client_none.cpp',
         ],
@@ -182,12 +193,19 @@ if http_client == "off":
     )
 else:
     env.Library(
-        target='http_client',
+        target='http_client_impl',
         source=[
             'http_client_winhttp.cpp' if env.TargetOSIs('windows') else 'http_client_curl.cpp',
         ],
         LIBDEPS=[
             '$BUILD_DIR/mongo/base',
+            'http_client',
+        ],
+        LIBDEPS_PRIVATE=[
+            '$BUILD_DIR/mongo/executor/connection_pool_executor',
+            '$BUILD_DIR/mongo/util/alarm',
+            '$BUILD_DIR/mongo/util/concurrency/thread_pool',
+            'network',
         ],
         SYSLIBDEPS=[
             'winhttp' if env.TargetOSIs('windows') else 'curl',
