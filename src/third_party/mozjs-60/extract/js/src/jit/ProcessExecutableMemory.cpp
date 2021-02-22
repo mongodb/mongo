@@ -20,6 +20,9 @@
 #include "jsutil.h"
 
 #include "gc/Memory.h"
+#ifdef JS_CODEGEN_ARM64
+# include "jit/arm64/vixl/Cpu-vixl.h"
+#endif
 #include "threading/LockGuard.h"
 #include "threading/Mutex.h"
 #include "util/Windows.h"
@@ -621,6 +624,10 @@ js::jit::DeallocateExecutableMemory(void* addr, size_t bytes)
 bool
 js::jit::InitProcessExecutableMemory()
 {
+#ifdef JS_CODEGEN_ARM64
+    // Initialize instruction cache flushing.
+    vixl::CPU::SetUp();
+#endif
     return execMemory.init();
 }
 
