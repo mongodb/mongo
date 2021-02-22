@@ -8,6 +8,7 @@ import shlex
 import subprocess
 import sys
 import time
+import textwrap
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 if __name__ == "__main__" and __package__ is None:
@@ -59,7 +60,6 @@ class RemoteOperations(object):  # pylint: disable=too-many-instance-attributes
         self.scp_options = scp_options if scp_options else ""
         self.retries = 5
         self.retry_sleep = 10
-        self.debug = True
         self.ignore_ret = ignore_ret
         self.shell_binary = shell_binary
         self.use_shell = use_shell
@@ -67,8 +67,7 @@ class RemoteOperations(object):  # pylint: disable=too-many-instance-attributes
         self._access_code, self._access_buff = self._remote_access()
 
     def _call(self, cmd):
-        if self.debug:
-            print(f"Executing command in subprocess: {cmd}")
+        print(f"Executing command in subprocess: {cmd}")
         # If use_shell is False we need to split the command up into a list.
         if not self.use_shell:
             cmd = shlex.split(cmd)
@@ -77,8 +76,8 @@ class RemoteOperations(object):  # pylint: disable=too-many-instance-attributes
                                    shell=self.use_shell)
         buff_stdout, _ = process.communicate()
         buff = buff_stdout.decode("utf-8", "replace")
-        if self.debug:
-            print(f"Result of command: {buff}")
+        print(f"Result of command:")
+        print(textwrap.indent(buff, "[result body] "))
         return process.poll(), buff
 
     def _call_retries(self, cmd):
@@ -90,10 +89,10 @@ class RemoteOperations(object):  # pylint: disable=too-many-instance-attributes
                 return ret, buff
             attempt_num += 1
             if attempt_num > self.retries:
+                print("Exhausted all retry attempts.")
                 break
-            if self.debug:
-                print("Failed remote attempt {}, retrying in {} seconds".format(
-                    attempt_num, self.retry_sleep))
+            print("Remote attempt {} unsuccessful, retrying in {} seconds".format(
+                attempt_num, self.retry_sleep))
             time.sleep(self.retry_sleep)
         return ret, buff
 
@@ -135,7 +134,6 @@ class RemoteOperations(object):  # pylint: disable=too-many-instance-attributes
         'operation_dir' is '.' if unspecified for 'copy_*'.
         """
 
-        print(f"Performing {operation_type} operation: {operation_param}")
         if not self.access_established():
             code, output = self.access_info()
             print(f"Exiting, unable to establish access. Code=${code}, output=${output}")
@@ -146,7 +144,6 @@ class RemoteOperations(object):  # pylint: disable=too-many-instance-attributes
         if operation_type.startswith("copy") and isinstance(operation_param, str):
             operation_param = shlex.split(operation_param, posix=not _IS_WINDOWS)
 
-        cmds = []
         if operation_type == "shell":
             if operation_dir is not None:
                 operation_param = "cd {}; {}".format(operation_dir, operation_param)
@@ -162,7 +159,6 @@ class RemoteOperations(object):  # pylint: disable=too-many-instance-attributes
             cmd = "ssh {} {} {} {} -c \"{}'{}'\"".format(self.ssh_connection_options,
                                                          self.ssh_options, self.user_host,
                                                          self.shell_binary, dollar, operation_param)
-            cmds.append(cmd)
 
         elif operation_type == "copy_to":
             cmd = "scp -r {} {} ".format(self.ssh_connection_options, self.scp_options)
@@ -173,7 +169,6 @@ class RemoteOperations(object):  # pylint: disable=too-many-instance-attributes
                 cmd += "{quote}{file}{quote} ".format(quote=quote, file=posix_path(copy_file))
             operation_dir = operation_dir if operation_dir else ""
             cmd += " {}:{}".format(self.user_host, posix_path(operation_dir))
-            cmds.append(cmd)
 
         elif operation_type == "copy_from":
             operation_dir = operation_dir if operation_dir else "."
@@ -194,26 +189,23 @@ class RemoteOperations(object):  # pylint: disable=too-many-instance-attributes
                     copy_file = re.escape("{quote}{file}{quote}".format(
                         quote=quote, file=copy_file))
                 cmd += "{} {}".format(copy_file, posix_path(operation_dir))
-                cmds.append(cmd)
 
         else:
             raise ValueError(f"Invalid operation '{operation_type}' specified.")
 
-        final_ret = 0
+        print(f"Created {operation_type} operation")
         buff = ""
-        for cmd in cmds:
-            ret, new_buff = self._perform_operation(cmd, retry)
-            buff += new_buff
-            final_ret = final_ret or ret
 
-        print(buff)
-        if final_ret != 0:
+        ret, new_buff = self._perform_operation(cmd, retry)
+        buff += new_buff
+
+        if ret != 0:
             if self.ignore_ret:
-                print(f"Ignoring return code {final_ret}.")
-                return final_ret, buff
+                print(f"Ignoring return code {ret}.")
+                return ret, buff
             raise Exception(buff)
 
-        return final_ret, buff
+        return ret, buff
 
     def shell(self, operation_param, operation_dir=None):
         """Provide helper for remote shell operations."""
