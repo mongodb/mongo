@@ -261,28 +261,32 @@ constexpr auto kDBFieldName = "db"_sd;
 }  // namespace
 }  // namespace auth
 
-void doSpeculativeSaslStart(OperationContext* opCtx, BSONObj cmdObj, BSONObjBuilder* result) try {
+void doSpeculativeSaslStart(OperationContext* opCtx,
+                            const BSONObj& sourceObj,
+                            BSONObjBuilder* result) try {
     // TypedCommands expect DB overrides in the "$db" field,
     // but saslStart coming from the Hello command has it in the "db" field.
     // Rewrite it for handling here.
-    BSONObjBuilder cmd;
+    BSONObjBuilder bob;
     bool hasDBField = false;
-    for (const auto& elem : cmdObj) {
+    for (const auto& elem : sourceObj) {
         if (elem.fieldName() == auth::kDBFieldName) {
-            cmd.appendAs(elem, auth::SaslStartCommand::kDbNameFieldName);
+            bob.appendAs(elem, auth::SaslStartCommand::kDbNameFieldName);
             hasDBField = true;
         } else {
-            cmd.append(elem);
+            bob.append(elem);
         }
     }
     if (!hasDBField) {
         return;
     }
 
+    const auto cmdObj = bob.obj();
+
     AuthenticationSession::doStep(
         opCtx, AuthenticationSession::StepType::kSpeculativeSaslStart, [&](auto session) {
             auto request = auth::SaslStartCommand::parse(
-                IDLParserErrorContext("speculative saslStart"), cmd.obj());
+                IDLParserErrorContext("speculative saslStart"), cmdObj);
             auto reply = auth::runSaslStart(opCtx, session, request);
             result->append(auth::kSpeculativeAuthenticate, reply.toBSON());
         });
