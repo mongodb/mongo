@@ -6,9 +6,6 @@
 (function() {
 "use strict";
 
-// TODO: SERVER-43881 Make migration_between_mixed_FCV_mixed_version_mongods.js start shards as
-// replica sets.
-
 // Test is not replSet so cannot clean up migration coordinator docs properly.
 // Making it replSet will also make the moveChunk get stuck forever because the migration
 // coordinator will retry forever and never succeeds because recipient shard has incompatible
@@ -20,36 +17,46 @@ TestData.skipCheckOrphans = true;
 // upgraded configsvr due to incompatible wire version. This makes the index consistency check fail.
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 
+// This test creates a sharded cluster with mixed binaries: one shard and all mongos are running an
+// old binary whereas the config server and the other shards are running the lastest binary. The
+// initial FCV of the sharded cluster is the older one. After some operations we explicitly advance
+// the FCV to 'latest' to one of the shards that was running the new binary. Finally, we verify that
+// we cannot move a chunk from a latestFCV + new binary shard to a downgraded binary version shard.
 function runTest(downgradeVersion) {
     jsTestLog("Running test with downgradeVersion: " + downgradeVersion);
-    const downgradeFCV = binVersionToFCV(downgradeVersion);
 
     let st = new ShardingTest({
-        shards: [{binVersion: "latest"}, {binVersion: downgradeFCV}],
-        mongos: {binVersion: "latest"},
-        other: {shardAsReplicaSet: false},
+        shards: [{binVersion: "latest"}, {binVersion: downgradeVersion}],
+        mongos: 1,
+        other: {
+            shardAsReplicaSet: true,
+            mongosOptions: {binVersion: downgradeVersion},
+            configOptions: {binVersion: "latest"},
+        }
     });
 
-    let testDB = st.s.getDB("test");
+    const downgradeFCV = binVersionToFCV(downgradeVersion);
+    checkFCV(st.configRS.getPrimary().getDB("admin"), downgradeFCV);
+    checkFCV(st.shard0.getDB("admin"), downgradeFCV);
+    checkFCV(st.shard1.getDB("admin"), downgradeFCV);
 
     // Create a sharded collection with primary shard 0.
+    let testDB = st.s.getDB("test");
     assert.commandWorked(st.s.adminCommand({enableSharding: testDB.getName()}));
     st.ensurePrimaryShard(testDB.getName(), st.shard0.shardName);
     assert.commandWorked(
         st.s.adminCommand({shardCollection: testDB.coll.getFullName(), key: {a: 1}}));
 
-    // Set the featureCompatibilityVersion to latestFCV. This will fail because the
-    // featureCompatibilityVersion cannot be set to latestFCV on shard 1, but it will set the
-    // featureCompatibilityVersion to latestFCV on shard 0.
-    assert.commandFailed(st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
-    checkFCV(st.configRS.getPrimary().getDB("admin"), downgradeFCV, latestFCV);
+    assert.commandWorked(st.shard0.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
+
+    checkFCV(st.configRS.getPrimary().getDB("admin"), downgradeFCV);
     checkFCV(st.shard0.getDB("admin"), latestFCV);
     checkFCV(st.shard1.getDB("admin"), downgradeFCV);
 
-    // It is not possible to move a chunk from a latestFCV shard to a downgraded binary version
-    // shard. Pass explicit writeConcern (which requires secondaryThrottle: true) to avoid problems
-    // if the downgraded version doesn't automatically include writeConcern when running
-    // _recvChunkStart on the newer shard.
+    // Invalid move chunk between shards with different binaries and FCVs. Pass explicit
+    // writeConcern (which requires secondaryThrottle: true) to avoid problems if the downgraded
+    // version doesn't automatically include writeConcern when running _recvChunkStart on the newer
+    // shard.
     assert.commandFailedWithCode(st.s.adminCommand({
         moveChunk: testDB.coll.getFullName(),
         find: {a: 1},
