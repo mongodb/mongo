@@ -77,13 +77,15 @@ bool collectionHasSimpleCollation(OperationContext* opCtx, const NamespaceString
 
 }  // namespace
 
-ReshardingCollectionCloner::ReshardingCollectionCloner(ShardKeyPattern newShardKeyPattern,
+ReshardingCollectionCloner::ReshardingCollectionCloner(std::unique_ptr<Env> env,
+                                                       ShardKeyPattern newShardKeyPattern,
                                                        NamespaceString sourceNss,
                                                        CollectionUUID sourceUUID,
                                                        ShardId recipientShard,
                                                        Timestamp atClusterTime,
                                                        NamespaceString outputNss)
-    : _newShardKeyPattern(std::move(newShardKeyPattern)),
+    : _env(std::move(env)),
+      _newShardKeyPattern(std::move(newShardKeyPattern)),
       _sourceNss(std::move(sourceNss)),
       _sourceUUID(std::move(sourceUUID)),
       _recipientShard(std::move(recipientShard)),
@@ -283,6 +285,11 @@ void ReshardingCollectionCloner::_insertBatch(OperationContext* opCtx,
 
         uassertStatusOK(outputColl->insertDocuments(opCtx, batch.begin(), batch.end(), nullptr));
         wuow.commit();
+        _env->metrics()->onDocumentsCopied(
+            batch.size(),
+            std::accumulate(batch.begin(), batch.end(), int64_t{0}, [](auto n, auto&& stmt) {
+                return n + stmt.doc.objsize();
+            }));
     });
 }
 

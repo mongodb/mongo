@@ -80,12 +80,15 @@ protected:
         std::deque<DocumentSource::GetNextResult> sourceCollectionData,
         std::deque<DocumentSource::GetNextResult> configCacheChunksData) {
         auto tempNss = constructTemporaryReshardingNss(_sourceNss.db(), _sourceUUID);
-        ReshardingCollectionCloner cloner(std::move(newShardKeyPattern),
-                                          _sourceNss,
-                                          _sourceUUID,
-                                          std::move(recipientShard),
-                                          Timestamp(1, 0), /* dummy value */
-                                          std::move(tempNss));
+
+        ReshardingCollectionCloner cloner(
+            std::make_unique<ReshardingCollectionCloner::Env>(&*_metrics),
+            std::move(newShardKeyPattern),
+            _sourceNss,
+            _sourceUUID,
+            std::move(recipientShard),
+            Timestamp(1, 0), /* dummy value */
+            std::move(tempNss));
 
         auto pipeline = cloner.makePipeline(
             _opCtx.get(), std::make_shared<MockMongoInterface>(std::move(configCacheChunksData)));
@@ -102,11 +105,24 @@ protected:
                                          BSONElementHasher::DEFAULT_HASH_SEED);
     }
 
+    void setUp() override {
+        ServiceContextTest::setUp();
+        _metrics = std::make_unique<ReshardingMetrics>(getServiceContext());
+        _metrics->onStart();
+        _metrics->setRecipientState(RecipientStateEnum::kCloning);
+    }
+
+    void tearDown() override {
+        _metrics = nullptr;
+        ServiceContextTest::tearDown();
+    }
+
 private:
     const NamespaceString _sourceNss = NamespaceString("test"_sd, "collection_being_resharded"_sd);
     const CollectionUUID _sourceUUID = UUID::gen();
 
     ServiceContext::UniqueOperationContext _opCtx = makeOperationContext();
+    std::unique_ptr<ReshardingMetrics> _metrics;
 };
 
 TEST_F(ReshardingCollectionClonerTest, MinKeyChunk) {

@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #include <boost/optional.hpp>
 
 #include "mongo/bson/bsonobj.h"
@@ -52,7 +54,7 @@ public:
     ReshardingMetrics(const ReshardingMetrics&) = delete;
     ReshardingMetrics(ReshardingMetrics&&) = delete;
 
-    ReshardingMetrics(ServiceContext* svcCtx) : _svcCtx(svcCtx) {}
+    explicit ReshardingMetrics(ServiceContext* svcCtx) : _svcCtx(svcCtx) {}
 
     static ReshardingMetrics* get(ServiceContext*) noexcept;
 
@@ -66,8 +68,9 @@ public:
     void setRecipientState(RecipientStateEnum) noexcept;
     void setCoordinatorState(CoordinatorStateEnum) noexcept;
 
-    // Allows updating metrics on "documents to copy" so long as the recipient is in cloning state.
+    // Set by donors.
     void setDocumentsToCopy(int64_t documents, int64_t bytes) noexcept;
+    // Allows updating metrics on "documents to copy" so long as the recipient is in cloning state.
     void onDocumentsCopied(int64_t documents, int64_t bytes) noexcept;
 
     // Allows updating "oplog entries to apply" metrics when the recipient is in applying state.

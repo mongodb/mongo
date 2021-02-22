@@ -433,6 +433,7 @@ ReshardingRecipientService::RecipientStateMachine::_cloneThenTransitionToApplyin
                                                    _recipientDoc.getExistingUUID());
 
     _collectionCloner = std::make_unique<ReshardingCollectionCloner>(
+        std::make_unique<ReshardingCollectionCloner::Env>(_metrics()),
         ShardKeyPattern(_recipientDoc.getReshardingKey()),
         _recipientDoc.getNss(),
         _recipientDoc.getExistingUUID(),
