@@ -1764,6 +1764,11 @@ void CmdUMCTyped<RevokeRolesFromRoleCommand, void>::Invocation::typedRun(Operati
  */
 using TxnOpsCallback = std::function<Status(UMCTransaction&)>;
 using TxnAuditCallback = std::function<void()>;
+
+bool shouldRetryTransaction(const Status& status) {
+    return (status == ErrorCodes::LockTimeout) || (status == ErrorCodes::SnapshotUnavailable);
+}
+
 Status retryTransactionOps(OperationContext* opCtx,
                            StringData forCommand,
                            TxnOpsCallback ops,
@@ -1787,8 +1792,10 @@ Status retryTransactionOps(OperationContext* opCtx,
         UMCTransaction txn(opCtx, forCommand);
         status = ops(txn);
         if (!status.isOK()) {
-            // A failure in the setup ops is just a failure, abort without retry.
-            return status;
+            if (!shouldRetryTransaction(status)) {
+                return status;
+            }
+            continue;
         }
 
         if (tries == kMaxAttempts) {
@@ -1805,8 +1812,7 @@ Status retryTransactionOps(OperationContext* opCtx,
         // Try to responsibly abort, but accept not being able to.
         txn.abort().ignore();
 
-        if ((status != ErrorCodes::LockTimeout) && (status != ErrorCodes::SnapshotUnavailable)) {
-            // Something moved underneath us. Try again.
+        if (!shouldRetryTransaction(status)) {
             return status;
         }
     }
