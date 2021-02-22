@@ -170,6 +170,11 @@ void ReplicationCoordinatorMock::setAwaitReplicationReturnValueFunction(
     _awaitReplicationReturnValueFunction = std::move(returnValueFunction);
 }
 
+SharedSemiFuture<void> ReplicationCoordinatorMock::awaitReplicationAsyncNoWTimeout(
+    const OpTime& opTime, const WriteConcernOptions& writeConcern) {
+    MONGO_UNREACHABLE;
+}
+
 void ReplicationCoordinatorMock::stepDown(OperationContext* opCtx,
                                           bool force,
                                           const Milliseconds& waitTime,

@@ -281,6 +281,11 @@ ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorEmbedded::awaitR
     UASSERT_NOT_IMPLEMENTED;
 }
 
+SharedSemiFuture<void> ReplicationCoordinatorEmbedded::awaitReplicationAsyncNoWTimeout(
+    const OpTime&, const WriteConcernOptions&) {
+    UASSERT_NOT_IMPLEMENTED;
+}
+
 void ReplicationCoordinatorEmbedded::stepDown(OperationContext*,
                                               const bool,
                                               const Milliseconds&,

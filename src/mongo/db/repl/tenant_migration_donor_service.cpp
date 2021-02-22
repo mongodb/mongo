@@ -42,6 +42,7 @@
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/query/find_command_gen.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
+#include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/db/repl/tenant_migration_donor_access_blocker.h"
 #include "mongo/db/repl/tenant_migration_state_machine_gen.h"
@@ -63,6 +64,7 @@ MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationAfterPersistingInitialDonorStateDoc)
 MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationBeforeLeavingAbortingIndexBuildsState);
 MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationBeforeLeavingBlockingState);
 MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationBeforeLeavingDataSyncState);
+MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationDonorBeforeWaitingForKeysToReplicate);
 MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationDonorBeforeMarkingStateGarbageCollectable);
 MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationBeforeEnteringFutureChain);
 
@@ -469,8 +471,24 @@ TenantMigrationDonorService::Instance::_fetchAndStoreRecipientClusterTimeKeyDocs
                              auto keyDocs) {
                        checkIfReceivedDonorAbortMigration(serviceToken, instanceToken);
 
-                       tenant_migration_util::storeExternalClusterTimeKeyDocs(executor,
-                                                                              std::move(keyDocs));
+                       return tenant_migration_util::storeExternalClusterTimeKeyDocs(
+                           executor, std::move(keyDocs));
+                   })
+                   .then([this, self = shared_from_this(), serviceToken, instanceToken](
+                             repl::OpTime lastKeyOpTime) {
+                       checkIfReceivedDonorAbortMigration(serviceToken, instanceToken);
+
+                       pauseTenantMigrationDonorBeforeWaitingForKeysToReplicate.pauseWhileSet();
+
+                       auto votingMembersWriteConcern =
+                           WriteConcernOptions(repl::ReplSetConfig::kConfigAllWriteConcernName,
+                                               WriteConcernOptions::SyncMode::NONE,
+                                               WriteConcernOptions::kNoTimeout);
+                       auto writeConcernFuture = repl::ReplicationCoordinator::get(_serviceContext)
+                                                     ->awaitReplicationAsyncNoWTimeout(
+                                                         lastKeyOpTime, votingMembersWriteConcern);
+                       return future_util::withCancelation(std::move(writeConcernFuture),
+                                                           instanceToken);
                    });
            })
         .until([instanceToken](Status status) {
