@@ -757,6 +757,9 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                     common.template_args('${name} ${value},', name=enum_value.name,
                                          value=enum_type_info.get_cpp_value_assignment(enum_value)))
 
+        self._writer.write_line("static constexpr uint32_t kNum%s = %d;" %
+                                (enum_type_info.get_cpp_type_name(), len(idl_enum.values)))
+
     def gen_op_msg_request_methods(self, command):
         # type: (ast.Command) -> None
         """Generate the methods for a command."""

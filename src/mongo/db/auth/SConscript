@@ -209,6 +209,7 @@ env.Library(
     source=[
         'action_set.cpp',
         'action_type.cpp',
+        'action_type.idl',
         'impersonation_session.cpp',
         'privilege.cpp',
         'privilege_parser.cpp',
