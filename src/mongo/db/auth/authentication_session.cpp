@@ -224,7 +224,8 @@ void AuthenticationSession::setMechanism(std::unique_ptr<ServerMechanismBase> me
 
     _mech = std::move(mech);
     if (options) {
-        uassertStatusOK(_mech->setOptions(options->getOwned()));
+        invariant(options->isOwned());
+        uassertStatusOK(_mech->setOptions(*options));
     }
 
     LOGV2_DEBUG(5286304, kDiagnosticLogLevel, "Determined mechanism for authentication");

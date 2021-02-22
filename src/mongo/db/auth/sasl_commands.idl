@@ -77,7 +77,7 @@ commands:
                 default: true
             options:
                 description: "SASL mechanism specific options"
-                type: object
+                type: object_owned
                 optional: true
             payload:
                 description: "Initial client message for SASL exchange"

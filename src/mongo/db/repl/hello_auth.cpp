@@ -53,7 +53,7 @@ void handleHelloAuth(OperationContext* opCtx, const HelloCommand& cmd, BSONObjBu
     }
 
     // speculativeAuthenticate: SaslStart -> SaslReply or Authenticate -> AuthenticateReply
-    auto specAuth = cmd.getSpeculativeAuthenticate();
+    auto& specAuth = cmd.getSpeculativeAuthenticate();
     if (!specAuth) {
         return;
     }
