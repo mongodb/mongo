@@ -665,7 +665,7 @@ TEST_F(RollbackImplTest, RollbackCallsRecoverToStableTimestamp) {
 
 DEATH_TEST_REGEX_F(RollbackImplTest,
                    RollbackFassertsIfRecoverToStableTimestampFails,
-                   "Fatal assertion.*45847000") {
+                   "Fatal assertion.*4584700") {
     auto op = makeOpAndRecordId(1);
     _remoteOplog->setOperations({op});
     ASSERT_OK(_insertOplogEntry(op.first));
