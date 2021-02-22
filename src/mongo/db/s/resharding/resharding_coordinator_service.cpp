@@ -45,6 +45,8 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/request_types/finish_reshard_collection_gen.h"
+#include "mongo/s/request_types/flush_routing_table_cache_updates_gen.h"
 #include "mongo/s/shard_id.h"
 #include "mongo/s/sharded_collections_ddl_parameters_gen.h"
 #include "mongo/s/write_ops/batched_command_response.h"
@@ -908,6 +910,21 @@ void markCompleted(const Status& status) {
         metrics->onCompletion(ReshardingMetrics::OperationStatus::kFailed);
 }
 
+BSONObj createFlushRoutingTableCacheUpdatesCommand(const NamespaceString& nss) {
+    _flushRoutingTableCacheUpdatesWithWriteConcern cmd(nss);
+    cmd.setSyncFromConfig(true);
+    cmd.setDbName(nss.db());
+    return cmd.toBSON(
+        BSON(WriteConcernOptions::kWriteConcernField << WriteConcernOptions::Majority));
+}
+
+BSONObj createFinishReshardCollectionCommand(const NamespaceString& nss) {
+    _shardsvrFinishReshardCollection cmd(nss);
+    cmd.setDbName(nss.db());
+    return cmd.toBSON(
+        BSON(WriteConcernOptions::kWriteConcernField << WriteConcernOptions::Majority));
+}
+
 SemiFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::run(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancelationToken& token) noexcept {
@@ -930,7 +947,10 @@ SemiFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::run(
         .then([this](const ReshardingCoordinatorDocument& updatedCoordinatorDoc) {
             return _persistDecision(updatedCoordinatorDoc);
         })
-        .then([this, executor] { _tellAllParticipantsToRefresh(executor); })
+        .then([this, executor] {
+            _tellAllParticipantsToRefresh(
+                createFinishReshardCollectionCommand(_coordinatorDoc.getNss()), executor);
+        })
         .then([this, self = shared_from_this(), executor] {
             // The shared_ptr maintaining the ReshardingCoordinatorService Instance object gets
             // deleted from the PrimaryOnlyService's map. Thus, shared_from_this() is necessary to
@@ -944,9 +964,11 @@ SemiFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::run(
                 return status;
             }
 
+            auto nss = _coordinatorDoc.getNss();
+
             LOGV2(4956902,
                   "Resharding failed",
-                  "namespace"_attr = _coordinatorDoc.getNss().ns(),
+                  "namespace"_attr = nss.ns(),
                   "newShardKeyPattern"_attr = _coordinatorDoc.getReshardingKey(),
                   "error"_attr = status);
 
@@ -955,7 +977,8 @@ SemiFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::run(
 
             // TODO wait for donors and recipients to abort the operation and clean up state
             _tellAllRecipientsToRefresh(executor);
-            _tellAllParticipantsToRefresh(executor);
+            _tellAllParticipantsToRefresh(createFlushRoutingTableCacheUpdatesCommand(nss),
+                                          executor);
 
             return status;
         })
@@ -1220,7 +1243,7 @@ void ReshardingCoordinatorService::ReshardingCoordinator::_tellAllDonorsToRefres
 }
 
 void ReshardingCoordinatorService::ReshardingCoordinator::_tellAllParticipantsToRefresh(
-    const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
+    const BSONObj& refreshCmd, const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
     auto opCtx = cc().makeOperationContext();
 
     auto donorShardIds = extractShardIds(_coordinatorDoc.getDonorShards());
@@ -1228,7 +1251,8 @@ void ReshardingCoordinatorService::ReshardingCoordinator::_tellAllParticipantsTo
     std::set<ShardId> participantShardIds{donorShardIds.begin(), donorShardIds.end()};
     participantShardIds.insert(recipientShardIds.begin(), recipientShardIds.end());
 
-    tellShardsToRefresh(opCtx.get(),
+    sendCommandToShards(opCtx.get(),
+                        refreshCmd,
                         {participantShardIds.begin(), participantShardIds.end()},
                         _coordinatorDoc.getNss(),
                         **executor);

@@ -139,16 +139,24 @@ std::set<ShardId> getRecipientShards(OperationContext* opCtx,
 void tellShardsToRefresh(OperationContext* opCtx,
                          const std::vector<ShardId>& shardIds,
                          const NamespaceString& nss,
-                         std::shared_ptr<executor::TaskExecutor> executor) {
+                         const std::shared_ptr<executor::TaskExecutor>& executor) {
     auto cmd = _flushRoutingTableCacheUpdatesWithWriteConcern(nss);
     cmd.setSyncFromConfig(true);
     cmd.setDbName(nss.db());
     auto cmdObj =
         cmd.toBSON(BSON(WriteConcernOptions::kWriteConcernField << WriteConcernOptions::Majority));
 
+    sendCommandToShards(opCtx, cmdObj, shardIds, nss, executor);
+}
+
+void sendCommandToShards(OperationContext* opCtx,
+                         const BSONObj& command,
+                         const std::vector<ShardId>& shardIds,
+                         const NamespaceString& nss,
+                         const std::shared_ptr<executor::TaskExecutor>& executor) {
     std::vector<AsyncRequestsSender::Request> requests;
     for (const auto& shardId : shardIds) {
-        requests.emplace_back(shardId, cmdObj);
+        requests.emplace_back(shardId, command);
     }
 
     if (!requests.empty()) {

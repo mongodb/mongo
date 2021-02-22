@@ -120,6 +120,7 @@ let testCases = {
     _shardsvrDropCollectionParticipant: {skip: "internal command"},
     _shardsvrDropDatabase: {skip: "internal command"},
     _shardsvrDropDatabaseParticipant: {skip: "internal command"},
+    _shardsvrFinishReshardCollection: {skip: "internal command"},
     _shardsvrMovePrimary: {skip: "internal command"},
     _shardsvrRefineCollectionShardKey: {skip: "internal command"},
     _shardsvrRenameCollection: {skip: "internal command"},

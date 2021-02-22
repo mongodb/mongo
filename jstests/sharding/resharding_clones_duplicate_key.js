@@ -118,7 +118,7 @@ reshardingTest.withReshardingInBackground(  //
             configsvr, recipientShardNames[0], inputCollection.getFullName());
         reshardingTest.interruptReshardingThread();
     },
-    ErrorCodes.Interrupted);
+    {expectedErrorCode: ErrorCodes.Interrupted});
 
 fp.off();
 

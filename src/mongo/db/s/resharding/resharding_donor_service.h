@@ -31,6 +31,8 @@
 
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/s/resharding/donor_document_gen.h"
+#include "mongo/db/s/resharding/resharding_critical_section.h"
+#include "mongo/db/s/resharding_util.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
 
 namespace mongo {
@@ -90,7 +92,8 @@ public:
         MongoProcessInterface::CurrentOpConnectionsMode connMode,
         MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept override;
 
-    void onReshardingFieldsChanges(const TypeCollectionReshardingFields& reshardingFields);
+    void onReshardingFieldsChanges(OperationContext* opCtx,
+                                   const TypeCollectionReshardingFields& reshardingFields);
 
     SharedSemiFuture<void> awaitFinalOplogEntriesWritten();
 
@@ -144,6 +147,8 @@ private:
 
     // Protects the promises below
     Mutex _mutex = MONGO_MAKE_LATCH("ReshardingDonor::_mutex");
+
+    boost::optional<ReshardingCriticalSection> _critSec;
 
     // Each promise below corresponds to a state on the donor state machine. They are listed in
     // ascending order, such that the first promise below will be the first promise fulfilled.

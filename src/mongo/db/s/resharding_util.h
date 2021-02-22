@@ -33,11 +33,14 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
 #include "mongo/db/s/resharding/donor_oplog_id_gen.h"
+#include "mongo/db/s/sharding_state_lock.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/chunk_manager.h"
@@ -184,7 +187,13 @@ std::set<ShardId> getRecipientShards(OperationContext* opCtx,
 void tellShardsToRefresh(OperationContext* opCtx,
                          const std::vector<ShardId>& shardIds,
                          const NamespaceString& nss,
-                         std::shared_ptr<executor::TaskExecutor> executor);
+                         const std::shared_ptr<executor::TaskExecutor>& executor);
+
+void sendCommandToShards(OperationContext* opCtx,
+                         const BSONObj& command,
+                         const std::vector<ShardId>& shardIds,
+                         const NamespaceString& nss,
+                         const std::shared_ptr<executor::TaskExecutor>& executor);
 
 /**
  * Asserts that there is not a hole or overlap in the chunks.

@@ -94,6 +94,41 @@ void onDbVersionMismatch(OperationContext* opCtx,
     forceDatabaseRefresh(opCtx, dbName);
 }
 
+// Return true if joins a shard version update/recover/refresh (in that case, all locks are dropped)
+bool joinShardVersionOperation(OperationContext* opCtx,
+                               CollectionShardingRuntime* csr,
+                               boost::optional<Lock::DBLock>* dbLock,
+                               boost::optional<Lock::CollectionLock>* collLock,
+                               boost::optional<CollectionShardingRuntime::CSRLock>* csrLock) {
+    invariant(collLock->has_value());
+    invariant(csrLock->has_value());
+
+    // If another thread is currently holding the critical section or the shard version future, it
+    // will be necessary to wait on one of the two variables to finish the update/recover/refresh.
+    auto inRecoverOrRefresh = csr->getShardVersionRecoverRefreshFuture(opCtx);
+    auto critSecSignal =
+        csr->getCriticalSectionSignal(opCtx, ShardingMigrationCriticalSection::kWrite);
+
+    if (inRecoverOrRefresh || critSecSignal) {
+        // Drop the locks and wait for an ongoing shard version's recovery/refresh/update
+        csrLock->reset();
+        collLock->reset();
+        dbLock->reset();
+
+        if (critSecSignal) {
+            critSecSignal->get(opCtx);
+        } else {
+            inRecoverOrRefresh->get(opCtx);
+        }
+
+        return true;
+    }
+
+    return false;
+}
+
+}  // namespace
+
 SharedSemiFuture<void> recoverRefreshShardVersion(ServiceContext* serviceContext,
                                                   const NamespaceString nss,
                                                   bool runRecover) {
@@ -160,41 +195,6 @@ SharedSemiFuture<void> recoverRefreshShardVersion(ServiceContext* serviceContext
         .semi()
         .share();
 }
-
-// Return true if joins a shard version update/recover/refresh (in that case, all locks are dropped)
-bool joinShardVersionOperation(OperationContext* opCtx,
-                               CollectionShardingRuntime* csr,
-                               boost::optional<Lock::DBLock>* dbLock,
-                               boost::optional<Lock::CollectionLock>* collLock,
-                               boost::optional<CollectionShardingRuntime::CSRLock>* csrLock) {
-    invariant(collLock->has_value());
-    invariant(csrLock->has_value());
-
-    // If another thread is currently holding the critical section or the shard version future, it
-    // will be necessary to wait on one of the two variables to finish the update/recover/refresh.
-    auto inRecoverOrRefresh = csr->getShardVersionRecoverRefreshFuture(opCtx);
-    auto critSecSignal =
-        csr->getCriticalSectionSignal(opCtx, ShardingMigrationCriticalSection::kWrite);
-
-    if (inRecoverOrRefresh || critSecSignal) {
-        // Drop the locks and wait for an ongoing shard version's recovery/refresh/update
-        csrLock->reset();
-        collLock->reset();
-        dbLock->reset();
-
-        if (critSecSignal) {
-            critSecSignal->get(opCtx);
-        } else {
-            inRecoverOrRefresh->get(opCtx);
-        }
-
-        return true;
-    }
-
-    return false;
-}
-
-}  // namespace
 
 void onShardVersionMismatch(OperationContext* opCtx,
                             const NamespaceString& nss,
