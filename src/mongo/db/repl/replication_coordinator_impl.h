@@ -138,6 +138,9 @@ public:
     virtual ReplicationCoordinator::StatusAndDuration awaitReplication(
         OperationContext* opCtx, const OpTime& opTime, const WriteConcernOptions& writeConcern);
 
+    virtual SharedSemiFuture<void> awaitReplicationAsyncNoWTimeout(
+        const OpTime& opTime, const WriteConcernOptions& writeConcern);
+
     void stepDown(OperationContext* opCtx,
                   bool force,
                   const Milliseconds& waitTime,

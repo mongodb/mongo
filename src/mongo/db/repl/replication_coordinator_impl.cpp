@@ -1957,6 +1957,19 @@ ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorImpl::awaitRepli
     return {std::move(status), duration_cast<Milliseconds>(timer.elapsed())};
 }
 
+SharedSemiFuture<void> ReplicationCoordinatorImpl::awaitReplicationAsyncNoWTimeout(
+    const OpTime& opTime, const WriteConcernOptions& writeConcern) {
+    WriteConcernOptions fixedWriteConcern = populateUnsetWriteConcernOptionsSyncMode(writeConcern);
+
+    // The returned future won't account for wTimeout or wDeadline, so reject any write concerns
+    // with either option to avoid misuse.
+    invariant(fixedWriteConcern.wDeadline == Date_t::max());
+    invariant(fixedWriteConcern.wTimeout == WriteConcernOptions::kNoTimeout);
+
+    stdx::lock_guard lg(_mutex);
+    return _startWaitingForReplication(lg, opTime, fixedWriteConcern);
+}
+
 BSONObj ReplicationCoordinatorImpl::_getReplicationProgress(WithLock wl) const {
     BSONObjBuilder progress;
 

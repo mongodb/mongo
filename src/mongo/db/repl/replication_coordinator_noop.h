@@ -112,6 +112,9 @@ public:
                                                                const OpTime&,
                                                                const WriteConcernOptions&) final;
 
+    SharedSemiFuture<void> awaitReplicationAsyncNoWTimeout(
+        const OpTime& opTime, const WriteConcernOptions& writeConcern) final;
+
     void stepDown(OperationContext*, bool, const Milliseconds&, const Milliseconds&) final;
 
     Status checkIfWriteConcernCanBeSatisfied(const WriteConcernOptions&) const final;

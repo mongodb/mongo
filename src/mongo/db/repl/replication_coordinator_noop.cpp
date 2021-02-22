@@ -257,6 +257,11 @@ ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorNoOp::awaitRepli
     MONGO_UNREACHABLE;
 }
 
+SharedSemiFuture<void> ReplicationCoordinatorNoOp::awaitReplicationAsyncNoWTimeout(
+    const OpTime& opTime, const WriteConcernOptions& writeConcern) {
+    MONGO_UNREACHABLE;
+}
+
 void ReplicationCoordinatorNoOp::stepDown(OperationContext*,
                                           const bool,
                                           const Milliseconds&,

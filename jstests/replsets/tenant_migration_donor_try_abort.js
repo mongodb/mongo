@@ -11,6 +11,7 @@
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/parallelTester.js");
 load("jstests/libs/uuid_util.js");
+load("jstests/libs/write_concern_util.js");
 load("jstests/replsets/libs/tenant_migration_test.js");
 load("jstests/replsets/libs/tenant_migration_util.js");
 
@@ -105,7 +106,7 @@ const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
 
 (() => {
     jsTestLog("Test sending donorAbortMigration during a tenant migration while waiting for the " +
-              "response  of recipientSyncData.");
+              "response of recipientSyncData.");
 
     const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
     if (!tenantMigrationTest.isFeatureFlagEnabled()) {
@@ -199,6 +200,69 @@ const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
         assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
     assert.eq(stateRes.state, TenantMigrationTest.DonorState.kAborted);
     tenantMigrationTest.stop();
+})();
+
+(() => {
+    jsTestLog("Test sending donorAbortMigration to interrupt waiting for keys to replicate.");
+
+    const donorRst = new ReplSetTest({
+        nodes: 3,
+        name: "donorRst",
+        settings: {chainingAllowed: false},
+        nodeOptions: migrationX509Options.donor
+    });
+
+    donorRst.startSet();
+    donorRst.initiate();
+
+    const tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), donorRst: donorRst});
+    if (!tenantMigrationTest.isFeatureFlagEnabled()) {
+        jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
+        donorRst.stopSet();
+        return;
+    }
+
+    const tenantId = kTenantId;
+    const migrationId = UUID();
+    const migrationOpts = {
+        migrationIdString: extractUUIDFromObject(migrationId),
+        tenantId: tenantId,
+    };
+
+    // Stop replicating on one of the secondaries so the donor cannot satisfy write concerns that
+    // require all nodes but can still commit majority writes.
+    const delayedSecondary = donorRst.getSecondaries()[1];
+    stopServerReplication(delayedSecondary);
+
+    const barrierBeforeWaitingForKeyWC = configureFailPoint(
+        donorRst.getPrimary(), "pauseTenantMigrationDonorBeforeWaitingForKeysToReplicate");
+
+    assert.commandWorked(
+        tenantMigrationTest.startMigration(migrationOpts, false /* retryOnRetryableErrors */));
+
+    // Wait for the donor to begin waiting for replication of the copied keys.
+    barrierBeforeWaitingForKeyWC.wait();
+    barrierBeforeWaitingForKeyWC.off();
+    sleep(500);
+
+    // The migration should be unable to progress past the aborting index builds state because
+    // it cannot replicate the copied keys to every donor node.
+    let res = assert.commandWorked(tenantMigrationTest.runDonorStartMigration(
+        migrationOpts, false /* waitForMigrationToComplete */, false /* retryOnRetryableErrors */));
+    assert.eq("aborting index builds", res.state, tojson(res));
+
+    // Abort the migration and the donor should stop waiting for key replication, despite the write
+    // concern still not being satisfied.
+    assert.commandWorked(tenantMigrationTest.tryAbortMigration(migrationOpts));
+
+    res = assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(
+        migrationOpts, false /* retryOnRetryableErrors */));
+    assert.eq(res.state, "aborted", tojson(res));
+
+    restartServerReplication(delayedSecondary);
+
+    tenantMigrationTest.stop();
+    donorRst.stopSet();
 })();
 
 (() => {

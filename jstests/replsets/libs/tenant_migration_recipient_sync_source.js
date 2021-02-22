@@ -48,10 +48,10 @@ const setUpMigrationSyncSourceTest = function() {
     const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
     const newRecipientPrimary = recipientRst.getSecondary();
 
-    // Stop replicating on one of the secondaries so that its majority OpTime will be behind the
-    // recipient's 'startApplyingDonorOpTime'.
-    stopServerReplication(delayedSecondary);
     tenantMigrationTest.insertDonorDB(tenantDB, collName);
+
+    const hangDonorBeforeEnteringDataSync = configureFailPoint(
+        donorPrimary, "pauseTenantMigrationBeforeLeavingAbortingIndexBuildsState");
 
     const hangRecipientPrimaryAfterCreatingRSM =
         configureFailPoint(recipientPrimary, 'hangAfterCreatingRSM');
@@ -69,6 +69,14 @@ const setUpMigrationSyncSourceTest = function() {
 
     jsTestLog("Starting the tenant migration");
     assert.commandWorked(tenantMigrationTest.startMigration(migrationOpts));
+
+    // Stop replicating on one of the secondaries so that its majority OpTime will be behind the
+    // recipient's 'startApplyingDonorOpTime'. Do this immediately before the write to enter the
+    // data sync state, so external keys will already have replicated to every donor node.
+    hangDonorBeforeEnteringDataSync.wait();
+    stopServerReplication(delayedSecondary);
+    hangDonorBeforeEnteringDataSync.off();
+
     hangRecipientPrimaryAfterCreatingRSM.wait();
 
     awaitRSClientHosts(recipientPrimary, donorSecondary, {ok: true, secondary: true});

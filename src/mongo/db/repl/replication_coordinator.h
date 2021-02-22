@@ -240,6 +240,14 @@ public:
                                                const WriteConcernOptions& writeConcern) = 0;
 
     /**
+     * Returns a future that will be set when the given writeConcern has been satisfied or the node
+     * is not a writable primary, is interrupted, or shuts down. Notably this will ignore the
+     * wTimeout in the given write concern.
+     */
+    virtual SharedSemiFuture<void> awaitReplicationAsyncNoWTimeout(
+        const OpTime& opTime, const WriteConcernOptions& writeConcern) = 0;
+
+    /**
      * Causes this node to relinquish being primary for at least 'stepdownTime'.  If 'force' is
      * false, before doing so it will wait for 'waitTime' for one other electable node to be caught
      * up before stepping down. Throws on error.

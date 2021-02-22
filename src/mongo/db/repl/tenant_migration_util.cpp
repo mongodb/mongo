@@ -66,8 +66,8 @@ ExternalKeysCollectionDocument makeExternalClusterTimeKeyDoc(UUID migrationId, B
     return externalKeyDoc;
 }
 
-void storeExternalClusterTimeKeyDocs(std::shared_ptr<executor::ScopedTaskExecutor> executor,
-                                     std::vector<ExternalKeysCollectionDocument> keyDocs) {
+repl::OpTime storeExternalClusterTimeKeyDocs(std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                                             std::vector<ExternalKeysCollectionDocument> keyDocs) {
     auto opCtxHolder = cc().makeOperationContext();
     auto opCtx = opCtxHolder.get();
     auto nss = NamespaceString::kExternalKeysCollectionNamespace;
@@ -89,6 +89,8 @@ void storeExternalClusterTimeKeyDocs(std::shared_ptr<executor::ScopedTaskExecuto
                             /*fromMigrate=*/false);
         });
     }
+
+    return repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
 }
 
 void createOplogViewForTenantMigrations(OperationContext* opCtx, Database* db) {
