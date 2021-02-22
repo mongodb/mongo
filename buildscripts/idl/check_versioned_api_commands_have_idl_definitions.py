@@ -75,6 +75,17 @@ def parse_idl(idl_path: str, import_directories: List[str]) -> syntax.IDLParsedS
     return parsed_doc
 
 
+def is_test_idl(idl_path: str) -> bool:
+    """Check if an IDL file is a test file."""
+    test_idls_subpaths = ["/idl/tests/", "unittest.idl"]
+
+    for file_name in test_idls_subpaths:
+        if idl_path.find(file_name) != -1:
+            return True
+
+    return False
+
+
 def get_command_definitions(api_version: str, directory: str,
                             import_directories: List[str]) -> Dict[str, syntax.Command]:
     """Get parsed IDL definitions of commands in a given API version."""
@@ -83,9 +94,10 @@ def get_command_definitions(api_version: str, directory: str,
 
     def gen():
         for idl_path in sorted(list_idls(directory)):
-            for command in parse_idl(idl_path, import_directories).spec.symbols.commands:
-                if command.api_version == api_version:
-                    yield command.name, command
+            if not is_test_idl(idl_path):
+                for command in parse_idl(idl_path, import_directories).spec.symbols.commands:
+                    if command.api_version == api_version:
+                        yield command.command_name, command
 
     idl_commands = dict(gen())
     LOGGER.debug("Found %s IDL commands in API Version %s", len(idl_commands), api_version)
@@ -147,9 +159,25 @@ def assert_command_sets_equal(api_version: str, command_sets: Dict[str, Set[str]
             if other_commands - commands:
                 LOGGER.error("%s has commands not in %s: %s", other_name, name,
                              other_commands - commands)
-            # TODO(SERVER-51878): Enable this assertion.
-            # raise AssertionError(
-            #     f"{name} and {other_name} have different commands in API Version {api_version}")
+            raise AssertionError(
+                f"{name} and {other_name} have different commands in API Version {api_version}")
+
+
+def remove_skipped_commands(command_sets: Dict[str, Set[str]]):
+    """Remove skipped commands from command_sets."""
+    skipped_commands = {
+        "testDeprecation",
+        "testVersions1And2",
+        "testRemoval",
+        "testDeprecationInVersion2",
+        # Idl specifies the command_name as hello.
+        "isMaster",
+        # TODO(SERVER-53149): remove getMore.
+        "getMore"
+    }
+
+    for key in command_sets.keys():
+        command_sets[key].difference_update(skipped_commands)
 
 
 def main():
@@ -177,6 +205,7 @@ def main():
     command_sets["mongod"] = list_commands_for_api(args.api_version, "mongod", args.install_dir)
     command_sets["mongos"] = list_commands_for_api(args.api_version, "mongos", args.install_dir)
     command_sets["idl"] = set(get_command_definitions(args.api_version, os.getcwd(), args.include))
+    remove_skipped_commands(command_sets)
     assert_command_sets_equal(args.api_version, command_sets)
 
 
