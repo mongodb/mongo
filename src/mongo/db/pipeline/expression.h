@@ -1413,24 +1413,13 @@ public:
         return static_cast<bool>(_startOfWeek);
     }
 
-protected:
-    void _doAddDependencies(DepsTracker* deps) const final;
-
 private:
     /**
      * Converts 'value' to Date_t type for $dateDiff expression for parameter 'parameterName'.
      */
     static Date_t convertToDate(const Value& value, StringData parameterName);
 
-    /**
-     * Converts 'value' to TimeUnit for $dateDiff expression parameter 'unit'.
-     */
-    static TimeUnit convertToTimeUnit(const Value& value);
-
-    /**
-     * Converts 'value' to DayOfWeek for $dateDiff expression parameter 'startOfWeek'.
-     */
-    static DayOfWeek parseStartOfWeek(const Value& value);
+    void _doAddDependencies(DepsTracker* deps) const final;
 
     // Starting time instant expression. Accepted types: Date_t, Timestamp, OID.
     boost::intrusive_ptr<Expression>& _startDate;
@@ -3377,4 +3366,91 @@ struct SubstituteFieldPathWalker {
     const StringMap<std::string>& renameList;
 };
 
+/**
+ * $dateTrunc expression that maps a date to a lower bound of a bin of a certain size that the date
+ * belongs to. It uses 2000-01-01T00:00:00.000 as a reference point.
+ */
+class ExpressionDateTrunc final : public Expression {
+public:
+    static boost::intrusive_ptr<Expression> parse(ExpressionContext* const expCtx,
+                                                  BSONElement expr,
+                                                  const VariablesParseState& vps);
+    /**
+     * date - an expression that resolves to a Value that is coercible to a Date.
+     * unit - an expression defining units of bin size that resolves to a string Value.
+     * binSize - an expression defining a size of bins in given units. Resolves to a Value coercible
+     * to a 64-bit integer. Can be nullptr.
+     * timezone - an expression defining a timezone to perform the operation in that resolves to a
+     * string Value. Can be nullptr.
+     * startOfWeek - an expression defining the week start day that resolves to a string Value. Can
+     * be nullptr.
+     */
+    ExpressionDateTrunc(ExpressionContext* const expCtx,
+                        boost::intrusive_ptr<Expression> date,
+                        boost::intrusive_ptr<Expression> unit,
+                        boost::intrusive_ptr<Expression> binSize,
+                        boost::intrusive_ptr<Expression> timezone,
+                        boost::intrusive_ptr<Expression> startOfWeek);
+    boost::intrusive_ptr<Expression> optimize() final;
+    Value serialize(bool explain) const final;
+    Value evaluate(const Document& root, Variables* variables) const final;
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
+    /**
+     * Returns true if this expression has parameter 'timezone' specified, otherwise false.
+     */
+    bool isTimezoneSpecified() const {
+        return static_cast<bool>(_timeZone);
+    }
+
+    /**
+     * Returns true if this expression has parameter 'startOfWeek' specified, otherwise false.
+     */
+    bool isStartOfWeekSpecified() const {
+        return static_cast<bool>(_startOfWeek);
+    }
+
+    /**
+     * Returns true if this expression has parameter 'binSize' specified, otherwise false.
+     */
+    bool isBinSizeSpecified() const {
+        return static_cast<bool>(_binSize);
+    }
+
+private:
+    /**
+     * Converts $dateTrunc expression parameter "date" 'value' to Date_t type.
+     */
+    static Date_t convertToDate(const Value& value);
+
+    /**
+     * Converts $dateTrunc expression parameter "binSize" 'value' to 64-bit integer.
+     */
+    static unsigned long long convertToBinSize(const Value& value);
+
+    void _doAddDependencies(DepsTracker* deps) const final;
+
+    // Expression that evaluates to a date to truncate. Accepted BSON types: Date, bsonTimestamp,
+    // jstOID.
+    boost::intrusive_ptr<Expression>& _date;
+
+    // Time units used to describe the size of bins. Accepted BSON type: String. Accepted values:
+    // enumerators from TimeUnit enumeration.
+    boost::intrusive_ptr<Expression>& _unit;
+
+    // Size of bins in time units '_unit'. Accepted BSON types: NumberInt, NumberLong, NumberDouble,
+    // NumberDecimal. Accepted are only values that can be coerced to a 64-bit integer without loss.
+    // If not specified, 1 is used.
+    boost::intrusive_ptr<Expression>& _binSize;
+
+    // Timezone to use for the truncation operation. Accepted BSON type: String. If not specified,
+    // UTC is used.
+    boost::intrusive_ptr<Expression>& _timeZone;
+
+    // First/start day of the week to use for date truncation when the time unit is the week.
+    // Accepted BSON type: String. If not specified, "sunday" is used.
+    boost::intrusive_ptr<Expression>& _startOfWeek;
+};
 }  // namespace mongo

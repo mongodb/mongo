@@ -111,6 +111,58 @@ struct ParserRegistration {
     boost::optional<ServerGlobalParams::FeatureCompatibility::Version> requiredMinVersion;
 };
 
+/**
+ * Converts 'value' to TimeUnit for an expression named 'expressionName'. It assumes that the
+ * parameter is named "unit". Throws an AssertionException if 'value' contains an invalid value.
+ */
+TimeUnit parseTimeUnit(const Value& value, StringData expressionName) {
+    uassert(5439013,
+            str::stream() << expressionName << " requires 'unit' to be a string, but got "
+                          << typeName(value.getType()),
+            BSONType::String == value.getType());
+    uassert(5439014,
+            str::stream() << expressionName
+                          << " parameter 'unit' value cannot be recognized as a time unit: "
+                          << value.getStringData(),
+            isValidTimeUnit(value.getStringData()));
+    return parseTimeUnit(value.getStringData());
+}
+
+/**
+ * Converts 'value' to DayOfWeek for an expression named 'expressionName' with parameter named as
+ * 'parameterName'. Throws an AssertionException if 'value' contains an invalid value.
+ */
+DayOfWeek parseDayOfWeek(const Value& value, StringData expressionName, StringData parameterName) {
+    uassert(5439015,
+            str::stream() << expressionName << " requires '" << parameterName
+                          << "' to be a string, but got " << typeName(value.getType()),
+            BSONType::String == value.getType());
+    uassert(5439016,
+            str::stream() << expressionName << " parameter '" << parameterName
+                          << "' value cannot be recognized as a day of a week: "
+                          << value.getStringData(),
+            isValidDayOfWeek(value.getStringData()));
+    return parseDayOfWeek(value.getStringData());
+}
+
+bool isTimeUnitWeek(const Value& unit) {
+    return BSONType::String == unit.getType() && unit.getStringData() == "week"_sd;
+}
+
+/**
+ * Calls function 'function' with zero parameters and returns the result. If AssertionException is
+ * raised during the call of 'function', adds a context 'errorContext' to the exception.
+ */
+template <typename F>
+auto addContextToAssertionException(F&& function, StringData errorContext) {
+    try {
+        return function();
+    } catch (AssertionException& exception) {
+        exception.addContext(str::stream() << errorContext);
+        throw;
+    }
+}
+
 StringMap<ParserRegistration> parserMap;
 }  // namespace
 
@@ -1885,7 +1937,7 @@ boost::intrusive_ptr<Expression> ExpressionDateDiff::parse(ExpressionContext* co
     uassert(5166301,
             "$dateDiff only supports an object as its argument",
             expr.type() == BSONType::Object);
-    BSONElement startDateElement, endDateElement, unitElement, timezoneElem, startOfWeekElem;
+    BSONElement startDateElement, endDateElement, unitElement, timezoneElement, startOfWeekElement;
     for (auto&& element : expr.embeddedObject()) {
         auto field = element.fieldNameStringData();
         if ("startDate"_sd == field) {
@@ -1895,9 +1947,9 @@ boost::intrusive_ptr<Expression> ExpressionDateDiff::parse(ExpressionContext* co
         } else if ("unit"_sd == field) {
             unitElement = element;
         } else if ("timezone"_sd == field) {
-            timezoneElem = element;
+            timezoneElement = element;
         } else if ("startOfWeek"_sd == field) {
-            startOfWeekElem = element;
+            startOfWeekElement = element;
         } else {
             uasserted(5166302,
                       str::stream()
@@ -1912,8 +1964,8 @@ boost::intrusive_ptr<Expression> ExpressionDateDiff::parse(ExpressionContext* co
         parseOperand(expCtx, startDateElement, vps),
         parseOperand(expCtx, endDateElement, vps),
         parseOperand(expCtx, unitElement, vps),
-        timezoneElem ? parseOperand(expCtx, timezoneElem, vps) : nullptr,
-        startOfWeekElem ? parseOperand(expCtx, startOfWeekElem, vps) : nullptr);
+        timezoneElement ? parseOperand(expCtx, timezoneElement, vps) : nullptr,
+        startOfWeekElement ? parseOperand(expCtx, startOfWeekElement, vps) : nullptr);
 }
 
 boost::intrusive_ptr<Expression> ExpressionDateDiff::optimize() {
@@ -1953,39 +2005,6 @@ Date_t ExpressionDateDiff::convertToDate(const Value& value, StringData paramete
     return value.coerceToDate();
 }
 
-/**
- * Calls function 'function' with zero parameters and returns the result. If AssertionException is
- * raised during the call of 'function', adds a context 'errorContext' to the exception.
- */
-template <typename F>
-auto addContextToAssertionException(F&& function, StringData errorContext) {
-    try {
-        return function();
-    } catch (AssertionException& exception) {
-        exception.addContext(str::stream() << errorContext);
-        throw;
-    }
-}
-
-TimeUnit ExpressionDateDiff::convertToTimeUnit(const Value& value) {
-    uassert(5166306,
-            str::stream() << "$dateDiff requires 'unit' to be a string, but got "
-                          << typeName(value.getType()),
-            BSONType::String == value.getType());
-    return addContextToAssertionException([&] { return parseTimeUnit(value.getStringData()); },
-                                          "$dateDiff parameter 'unit' value parsing failed"_sd);
-}
-
-DayOfWeek ExpressionDateDiff::parseStartOfWeek(const Value& value) {
-    uassert(5338800,
-            str::stream() << "$dateDiff requires 'startOfWeek' to be a string, but got "
-                          << typeName(value.getType()),
-            BSONType::String == value.getType());
-    return addContextToAssertionException(
-        [&] { return parseDayOfWeek(value.getStringData()); },
-        "$dateDiff parameter 'startOfWeek' value parsing failed"_sd);
-}
-
 Value ExpressionDateDiff::evaluate(const Document& root, Variables* variables) const {
     const Value startDateValue = _startDate->evaluate(root, variables);
     if (startDateValue.nullish()) {
@@ -1999,8 +2018,7 @@ Value ExpressionDateDiff::evaluate(const Document& root, Variables* variables) c
     if (unitValue.nullish()) {
         return Value(BSONNULL);
     }
-    const auto startOfWeekParameterActive = _startOfWeek &&
-        BSONType::String == unitValue.getType() && unitValue.getStringData() == "week"_sd;
+    const auto startOfWeekParameterActive = _startOfWeek && isTimeUnitWeek(unitValue);
     Value startOfWeekValue{};
     if (startOfWeekParameterActive) {
         startOfWeekValue = _startOfWeek->evaluate(root, variables);
@@ -2008,7 +2026,6 @@ Value ExpressionDateDiff::evaluate(const Document& root, Variables* variables) c
             return Value(BSONNULL);
         }
     }
-
     const auto timezone = addContextToAssertionException(
         [&]() {
             return makeTimeZone(
@@ -2020,9 +2037,10 @@ Value ExpressionDateDiff::evaluate(const Document& root, Variables* variables) c
     }
     const Date_t startDate = convertToDate(startDateValue, "startDate"_sd);
     const Date_t endDate = convertToDate(endDateValue, "endDate"_sd);
-    const TimeUnit unit = convertToTimeUnit(unitValue);
-    const DayOfWeek startOfWeek =
-        startOfWeekParameterActive ? parseStartOfWeek(startOfWeekValue) : kStartOfWeekDefault;
+    const TimeUnit unit = parseTimeUnit(unitValue, "$dateDiff"_sd);
+    const DayOfWeek startOfWeek = startOfWeekParameterActive
+        ? parseDayOfWeek(startOfWeekValue, "$dateDiff"_sd, "startOfWeek"_sd)
+        : kStartOfWeekDefault;
     return Value{dateDiff(startDate, endDate, unit, *timezone, startOfWeek)};
 }
 
@@ -6991,6 +7009,181 @@ Value ExpressionDateSubtract::evaluateDateArithmetics(Date_t date,
                                                       long long amount,
                                                       const TimeZone& timezone) const {
     return Value(dateAdd(date, unit, -amount, timezone));
+}
+
+/* ----------------------- ExpressionDateTrunc ---------------------------- */
+
+// TODO SERVER-53028: make the expression to be available for any FCV when 5.0 becomes last-lts.
+REGISTER_EXPRESSION_WITH_MIN_VERSION(dateTrunc,
+                                     ExpressionDateTrunc::parse,
+                                     ServerGlobalParams::FeatureCompatibility::Version::kVersion49);
+
+ExpressionDateTrunc::ExpressionDateTrunc(ExpressionContext* const expCtx,
+                                         boost::intrusive_ptr<Expression> date,
+                                         boost::intrusive_ptr<Expression> unit,
+                                         boost::intrusive_ptr<Expression> binSize,
+                                         boost::intrusive_ptr<Expression> timezone,
+                                         boost::intrusive_ptr<Expression> startOfWeek)
+    : Expression{expCtx,
+                 {std::move(date),
+                  std::move(unit),
+                  std::move(binSize),
+                  std::move(timezone),
+                  std::move(startOfWeek)}},
+      _date{_children[0]},
+      _unit{_children[1]},
+      _binSize{_children[2]},
+      _timeZone{_children[3]},
+      _startOfWeek{_children[4]} {
+    expCtx->sbeCompatible = false;
+}
+
+boost::intrusive_ptr<Expression> ExpressionDateTrunc::parse(ExpressionContext* const expCtx,
+                                                            BSONElement expr,
+                                                            const VariablesParseState& vps) {
+    tassert(5439011, "Invalid expression passed", expr.fieldNameStringData() == "$dateTrunc");
+    uassert(5439007,
+            "$dateTrunc only supports an object as its argument",
+            expr.type() == BSONType::Object);
+    BSONElement dateElement, unitElement, binSizeElement, timezoneElement, startOfWeekElement;
+    for (auto&& element : expr.embeddedObject()) {
+        auto field = element.fieldNameStringData();
+        if ("date"_sd == field) {
+            dateElement = element;
+        } else if ("binSize"_sd == field) {
+            binSizeElement = element;
+        } else if ("unit"_sd == field) {
+            unitElement = element;
+        } else if ("timezone"_sd == field) {
+            timezoneElement = element;
+        } else if ("startOfWeek"_sd == field) {
+            startOfWeekElement = element;
+        } else {
+            uasserted(5439008,
+                      str::stream()
+                          << "Unrecognized argument to $dateTrunc: " << element.fieldName()
+                          << ". Expected arguments are date, unit, and optionally, binSize, "
+                             "timezone, startOfWeek");
+        }
+    }
+    uassert(5439009, "Missing 'date' parameter to $dateTrunc", dateElement);
+    uassert(5439010, "Missing 'unit' parameter to $dateTrunc", unitElement);
+    return make_intrusive<ExpressionDateTrunc>(
+        expCtx,
+        parseOperand(expCtx, dateElement, vps),
+        parseOperand(expCtx, unitElement, vps),
+        binSizeElement ? parseOperand(expCtx, binSizeElement, vps) : nullptr,
+        timezoneElement ? parseOperand(expCtx, timezoneElement, vps) : nullptr,
+        startOfWeekElement ? parseOperand(expCtx, startOfWeekElement, vps) : nullptr);
+}
+
+boost::intrusive_ptr<Expression> ExpressionDateTrunc::optimize() {
+    _date = _date->optimize();
+    _unit = _unit->optimize();
+    if (_binSize) {
+        _binSize = _binSize->optimize();
+    }
+    if (_timeZone) {
+        _timeZone = _timeZone->optimize();
+    }
+    if (_startOfWeek) {
+        _startOfWeek = _startOfWeek->optimize();
+    }
+    if (ExpressionConstant::allNullOrConstant({_date, _unit, _binSize, _timeZone, _startOfWeek})) {
+        // Everything is a constant, so we can turn into a constant.
+        return ExpressionConstant::create(
+            getExpressionContext(), evaluate(Document{}, &(getExpressionContext()->variables)));
+    }
+    return this;
+};
+
+Value ExpressionDateTrunc::serialize(bool explain) const {
+    return Value{Document{
+        {"$dateTrunc"_sd,
+         Document{{"date"_sd, _date->serialize(explain)},
+                  {"unit"_sd, _unit->serialize(explain)},
+                  {"binSize"_sd, _binSize ? _binSize->serialize(explain) : Value{}},
+                  {"timezone"_sd, _timeZone ? _timeZone->serialize(explain) : Value{}},
+                  {"startOfWeek"_sd, _startOfWeek ? _startOfWeek->serialize(explain) : Value{}}}}}};
+};
+
+Date_t ExpressionDateTrunc::convertToDate(const Value& value) {
+    uassert(5439012,
+            str::stream() << "$dateTrunc requires 'date' to be a date, but got "
+                          << typeName(value.getType()),
+            value.coercibleToDate());
+    return value.coerceToDate();
+}
+
+unsigned long long ExpressionDateTrunc::convertToBinSize(const Value& value) {
+    uassert(5439017,
+            str::stream() << "$dateTrunc requires 'binSize' to be a 64-bit integer, but got value '"
+                          << value.toString() << "' of type " << typeName(value.getType()),
+            value.integral64Bit());
+    const long long binSize = value.coerceToLong();
+    uassert(5439018,
+            str::stream() << "$dateTrunc requires 'binSize' to be greater than 0, but got value "
+                          << binSize,
+            binSize > 0);
+    return static_cast<unsigned long long>(binSize);
+}
+
+Value ExpressionDateTrunc::evaluate(const Document& root, Variables* variables) const {
+    const Value dateValue = _date->evaluate(root, variables);
+    if (dateValue.nullish()) {
+        return Value(BSONNULL);
+    }
+    const Value unitValue = _unit->evaluate(root, variables);
+    if (unitValue.nullish()) {
+        return Value(BSONNULL);
+    }
+    Value binSizeValue;
+    if (_binSize) {
+        binSizeValue = _binSize->evaluate(root, variables);
+        if (binSizeValue.nullish()) {
+            return Value(BSONNULL);
+        }
+    }
+    const bool startOfWeekParameterActive = _startOfWeek && isTimeUnitWeek(unitValue);
+    Value startOfWeekValue{};
+    if (startOfWeekParameterActive) {
+        startOfWeekValue = _startOfWeek->evaluate(root, variables);
+        if (startOfWeekValue.nullish()) {
+            return Value(BSONNULL);
+        }
+    }
+    const auto timezone = addContextToAssertionException(
+        [&]() {
+            return makeTimeZone(
+                getExpressionContext()->timeZoneDatabase, root, _timeZone.get(), variables);
+        },
+        "$dateTrunc parameter 'timezone' value parsing failed"_sd);
+    if (!timezone) {
+        return Value(BSONNULL);
+    }
+
+    // Convert parameter values.
+    const Date_t date = convertToDate(dateValue);
+    const TimeUnit unit = parseTimeUnit(unitValue, "$dateTrunc"_sd);
+    const unsigned long long binSize = _binSize ? convertToBinSize(binSizeValue) : 1;
+    const DayOfWeek startOfWeek = startOfWeekParameterActive
+        ? parseDayOfWeek(startOfWeekValue, "$dateTrunc"_sd, "startOfWeek"_sd)
+        : kStartOfWeekDefault;
+    return Value{truncateDate(date, unit, binSize, *timezone, startOfWeek)};
+}
+
+void ExpressionDateTrunc::_doAddDependencies(DepsTracker* deps) const {
+    _date->addDependencies(deps);
+    _unit->addDependencies(deps);
+    if (_binSize) {
+        _binSize->addDependencies(deps);
+    }
+    if (_timeZone) {
+        _timeZone->addDependencies(deps);
+    }
+    if (_startOfWeek) {
+        _startOfWeek->addDependencies(deps);
+    }
 }
 
 MONGO_INITIALIZER(expressionParserMap)(InitializerContext*) {

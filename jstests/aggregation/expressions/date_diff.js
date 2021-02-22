@@ -7,6 +7,7 @@
 (function() {
 "use strict";
 load("jstests/libs/sbe_assert_error_override.js");
+load("jstests/libs/aggregation_pipeline_utils.js");  // For executeAggregationTestCase.
 
 const testDB = db.getSiblingDB(jsTestName());
 const coll = testDB.collection;
@@ -14,28 +15,6 @@ const coll = testDB.collection;
 // Drop the test database.
 assert.commandWorked(testDB.dropDatabase());
 
-// Executes a test case that inserts documents, issues an aggregate command on a collection and
-// compares the results with the expected.
-function executeTestCase(testCase) {
-    jsTestLog(tojson(testCase));
-    assert.commandWorked(coll.remove({}));
-
-    // Insert some documents into the collection.
-    assert.commandWorked(coll.insert(testCase.inputDocuments));
-
-    // Issue an aggregate command and verify the result.
-    try {
-        const actualResults = coll.aggregate(testCase.pipeline).toArray();
-        assert(testCase.expectedErrorCode === undefined,
-               `Expected an exception with code ${testCase.expectedErrorCode}`);
-        assert.docEq(actualResults, testCase.expectedResults);
-    } catch (error) {
-        if (testCase.expectedErrorCode === undefined) {
-            throw error;
-        }
-        assert.commandFailedWithCode(error, testCase.expectedErrorCode);
-    }
-}
 const someDate = new Date("2020-11-01T18:23:36Z");
 const aggregationPipelineWithDateDiff = [{
     $project: {
@@ -142,7 +121,7 @@ const testCases = [
         expectedErrorCode: 5166307,
     },
     {
-        // Missing 'startDate', invalid other fields.
+        // Missing 'startDate' value in the document, invalid other fields.
         pipeline: aggregationPipelineWithDateDiff,
         inputDocuments: [{endDate: 1, unit: "century", timeZone: "INVALID"}],
         expectedResults: [{date_diff: null}],
@@ -160,7 +139,7 @@ const testCases = [
         expectedErrorCode: 5166307,
     },
     {
-        // Missing 'endDate', invalid other fields.
+        // Missing 'endDate' value in the document, invalid other fields.
         pipeline: aggregationPipelineWithDateDiff,
         inputDocuments: [{startDate: "", unit: "epoch", timeZone: "INVALID"}],
         expectedResults: [{date_diff: null}],
@@ -172,7 +151,7 @@ const testCases = [
         expectedResults: [{date_diff: null}],
     },
     {
-        // Missing 'unit', invalid other fields.
+        // Missing 'unit' value in the document, invalid other fields.
         pipeline: aggregationPipelineWithDateDiff,
         inputDocuments: [{startDate: 1, endDate: 2, timeZone: "INVALID"}],
         expectedResults: [{date_diff: null}],
@@ -181,13 +160,13 @@ const testCases = [
         // Invalid 'unit' type.
         pipeline: aggregationPipelineWithDateDiff,
         inputDocuments: [{startDate: someDate, endDate: someDate, unit: 5, timeZone: "UTC"}],
-        expectedErrorCode: 5166306,
+        expectedErrorCode: 5439013,
     },
     {
         // Invalid 'unit' value.
         pipeline: aggregationPipelineWithDateDiff,
         inputDocuments: [{startDate: someDate, endDate: someDate, unit: "decade", timeZone: "UTC"}],
-        expectedErrorCode: 9,
+        expectedErrorCode: 5439014,
     },
     {
         // Null 'timezone'.
@@ -196,7 +175,7 @@ const testCases = [
         expectedResults: [{date_diff: null}],
     },
     {
-        // Missing 'timezone', invalid other fields.
+        // Missing 'timezone' value in the document, invalid other fields.
         pipeline: aggregationPipelineWithDateDiff,
         inputDocuments: [{startDate: 1, endDate: 2, unit: "century"}],
         expectedResults: [{date_diff: null}],
@@ -259,7 +238,7 @@ const testCases = [
         expectedResults: [{date_diff: null}],
     },
     {
-        // Missing 'startOfWeek' value, invalid other fields.
+        // Missing 'startOfWeek' value in the document, invalid other fields.
         pipeline: aggregationPipelineWithDateDiffAndStartOfWeek,
         inputDocuments: [{startDate: 1, endDate: 2, unit: "week", timeZone: 1}],
         expectedResults: [{date_diff: null}],
@@ -270,7 +249,7 @@ const testCases = [
         inputDocuments: [
             {startDate: someDate, endDate: someDate, unit: "week", timeZone: "GMT", startOfWeek: 1}
         ],
-        expectedErrorCode: 5338800,
+        expectedErrorCode: 5439015,
     },
     {
         // Invalid 'startOfWeek' type, unit is not the week.
@@ -290,8 +269,8 @@ const testCases = [
             timeZone: "GMT",
             startOfWeek: "FRIDIE"
         }],
-        expectedErrorCode: 9,
+        expectedErrorCode: 5439016,
     }
 ];
-testCases.forEach(executeTestCase);
+testCases.forEach(testCase => executeAggregationTestCase(coll, testCase));
 }());

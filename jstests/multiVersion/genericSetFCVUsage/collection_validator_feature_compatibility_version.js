@@ -72,6 +72,18 @@ const testCases = [
         nonMatchingDocument: {a: 1},
         lastStableErrCode: 168
     },
+    {
+        validator: {
+            $expr: {
+                $eq: [
+                    {$dateTrunc: {date: new Date("2020-02-02T02:02:02"), unit: "hour"}},
+                    new Date("2020-02-02T02:02:02")
+                ]
+            }
+        },
+        nonMatchingDocument: {a: 1},
+        lastStableErrCode: 168
+    },
 ];
 
 // Tests Feature Compatibility Version behavior of the validator of a collection by executing test
