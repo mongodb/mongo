@@ -525,7 +525,7 @@ private:
 
 std::string runYAMLRestExpansion(StringData url, Seconds timeout) {
 
-    auto client = HttpClient::create();
+    auto client = HttpClient::createWithoutConnectionPool();
     uassert(
         ErrorCodes::OperationFailed, "No HTTP Client available in this build of MongoDB", client);
 
