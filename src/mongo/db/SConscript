@@ -2263,6 +2263,9 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/transport/transport_layer_mock',
+    ],
+    LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/auth/auth',
         '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/catalog/catalog_impl',
@@ -2270,9 +2273,26 @@ env.Library(
         '$BUILD_DIR/mongo/db/repl/replmocks',
         '$BUILD_DIR/mongo/db/s/sharding_api_d',
         '$BUILD_DIR/mongo/db/service_context_d',
+        '$BUILD_DIR/mongo/db/storage/ephemeral_for_test/storage_ephemeral_for_test',
+        '$BUILD_DIR/mongo/db/storage/storage_control',
+        '$BUILD_DIR/mongo/db/storage/storage_options',
+        '$BUILD_DIR/mongo/rpc/rpc',
         '$BUILD_DIR/mongo/transport/service_entry_point',
-        '$BUILD_DIR/mongo/transport/transport_layer_mock',
         '$BUILD_DIR/mongo/unittest/unittest',
+    ],
+)
+
+# TODO(SERVER-45266) This could be part of db_unittest_test but it needs to mutate
+# storageGlobalParams.
+env.CppUnitTest(
+    target='op_msg_fuzzer_fixture_test',
+    source=[
+        'op_msg_fuzzer_fixture_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/op_msg_fuzzer_fixture',
+        '$BUILD_DIR/mongo/rpc/rpc',
     ],
 )
 
@@ -2306,7 +2326,6 @@ if wiredtiger:
             'mirroring_sampler_test.cpp',
             'multi_key_path_tracker_test.cpp',
             'namespace_string_test.cpp',
-            'op_msg_fuzzer_fixture_test.cpp',
             'op_observer_impl_test.cpp',
             'op_observer_registry_test.cpp',
             'operation_context_test.cpp',
@@ -2342,7 +2361,6 @@ if wiredtiger:
             '$BUILD_DIR/mongo/db/catalog/import_collection_oplog_entry',
             '$BUILD_DIR/mongo/db/catalog/index_build_entry_idl',
             '$BUILD_DIR/mongo/db/mongohasher',
-            '$BUILD_DIR/mongo/db/op_msg_fuzzer_fixture',
             '$BUILD_DIR/mongo/db/query/explain_options',
             '$BUILD_DIR/mongo/db/query/query_test_service_context',
             '$BUILD_DIR/mongo/db/storage/wiredtiger/storage_wiredtiger',
