@@ -40,6 +40,7 @@
 #include "mongo/logv2/json_formatter.h"
 #include "mongo/logv2/log_detail.h"
 #include "mongo/logv2/shared_access_fstream.h"
+#include "mongo/util/quick_exit.h"
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/string_map.h"
 
@@ -148,7 +149,7 @@ void FileRotateSink::consume(const boost::log::record_view& rec,
             auto failedBegin =
                 boost::make_filter_iterator(isFailed, _impl->files.begin(), _impl->files.end());
             auto failedEnd =
-                boost::make_filter_iterator(isFailed, _impl->files.begin(), _impl->files.end());
+                boost::make_filter_iterator(isFailed, _impl->files.end(), _impl->files.end());
 
             auto getFilename = [](const auto& file) -> const auto& {
                 return file.first;
@@ -186,7 +187,7 @@ void FileRotateSink::consume(const boost::log::record_view& rec,
         }
 
         printStackTrace(std::cerr);
-        std::quick_exit(EXIT_FAILURE);
+        quickExitWithoutLogging(EXIT_FAILURE);
     }
 }
 
