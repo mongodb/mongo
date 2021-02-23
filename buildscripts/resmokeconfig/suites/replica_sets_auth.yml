@@ -12,7 +12,14 @@ selector:
   # Skip any tests that run with auth explicitly.
   - jstests/replsets/*[aA]uth*.js
   - jstests/replsets/advance_cluster_time.js
+  - jstests/replsets/buildindexes_false_with_system_indexes.js
+  - jstests/replsets/db_reads_while_recovering_all_commands.js
+  - jstests/replsets/emptycapped.js
+  - jstests/replsets/localhostAuthBypass.js
+  - jstests/replsets/rollback_auth.js
+  - jstests/replsets/tenant_migration_concurrent_writes_on_donor.js
   - jstests/replsets/tenant_migration_external_cluster_validation.js
+  - jstests/replsets/user_management_wc.js
   # Also skip tests that require a Thread, because Threads don't inherit credentials.
   - jstests/replsets/interrupted_batch_insert.js
   - jstests/replsets/transactions_reaped_with_tickets_exhausted.js
