@@ -28,7 +28,7 @@
 
 import wiredtiger, wttest
 import os, shutil
-from helper import compare_files
+from helper import compare_files, simulate_crash_restart
 from wtbackup import backup_base
 from wtdataset import simple_key
 from wtscenario import make_scenarios
@@ -54,24 +54,6 @@ class test_backup13(backup_base):
     bigval = 'Value' * 100
 
     nops = 1000
-
-    def simulate_crash_restart(self, olddir, newdir):
-        ''' Simulate a crash from olddir and restart in newdir. '''
-        # with the connection still open, copy files to new directory.
-        shutil.rmtree(newdir, ignore_errors=True)
-        os.mkdir(newdir)
-        for fname in os.listdir(olddir):
-            fullname = os.path.join(olddir, fname)
-            # Skip lock file on Windows since it is locked.
-            if os.path.isfile(fullname) and \
-                "WiredTiger.lock" not in fullname and \
-                "Tmplog" not in fullname and \
-                "Preplog" not in fullname:
-                shutil.copy(fullname, newdir)
-        # close the original connection and open to new directory.
-        self.close_conn()
-        self.conn = self.setUpConnectionOpen(newdir)
-        self.session = self.setUpSessionOpen(self.conn)
 
     def session_config(self):
         return self.sess_cfg
@@ -129,7 +111,7 @@ class test_backup13(backup_base):
             lambda: self.session.open_cursor('backup:', None, config))
 
         # Make sure after a crash we cannot access old backup info.
-        self.simulate_crash_restart(".", "RESTART")
+        simulate_crash_restart(self, ".", "RESTART")
         self.assertRaises(wiredtiger.WiredTigerError,
             lambda: self.session.open_cursor('backup:', None, config))
 

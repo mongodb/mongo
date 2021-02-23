@@ -32,11 +32,11 @@ import wiredtiger
 
 from wtdataset import SimpleDataSet, SimpleIndexDataSet, ComplexDataSet
 
-# python has a filecmp.cmp function, but different versions of python approach
+# Python has a filecmp.cmp function, but different versions of python approach
 # file comparison differently.  To make sure we get byte for byte comparison,
 # we define it here.
-def compare_files(self, filename1, filename2):
-    self.pr('compare_files: ' + filename1 + ', ' + filename2)
+def compare_files(testcase, filename1, filename2):
+    testcase.pr('compare_files: ' + filename1 + ', ' + filename2)
     bufsize = 4096
     if os.path.getsize(filename1) != os.path.getsize(filename2):
         print('file comparison failed: ' + filename1 + ' size ' +\
@@ -50,12 +50,12 @@ def compare_files(self, filename1, filename2):
                 b2 = fp2.read(bufsize)
                 if b1 != b2:
                     return False
-                # files are identical size
+                # Files are identical size.
                 if not b1:
                     return True
 
 # Iterate over a set of tables, ensuring that they have identical contents
-def compare_tables(self, session, uris, config=None):
+def compare_tables(testcase, session, uris, config=None):
     cursors = list()
     for next_uri in uris:
         cursors.append(session.open_cursor(next_uri, None, config))
@@ -78,29 +78,29 @@ def compare_tables(self, session, uris, config=None):
         for c in cursors:
             c.close()
 
-# confirm a URI doesn't exist.
-def confirm_does_not_exist(self, uri):
-    self.pr('confirm_does_not_exist: ' + uri)
-    self.assertRaises(wiredtiger.WiredTigerError,
-        lambda: self.session.open_cursor(uri, None))
-    self.assertEqual(glob.glob('*' + uri.split(":")[-1] + '*'), [],
+# Confirm a URI doesn't exist.
+def confirm_does_not_exist(testcase, uri):
+    testcase.pr('confirm_does_not_exist: ' + uri)
+    testcase.assertRaises(wiredtiger.WiredTigerError,
+        lambda: testcase.session.open_cursor(uri, None))
+    testcase.assertEqual(glob.glob('*' + uri.split(":")[-1] + '*'), [],
         'confirm_does_not_exist: URI exists, file name matching \"' +
         uri.split(":")[1] + '\" found')
 
-# confirm a URI exists and is empty.
-def confirm_empty(self, uri):
-    self.pr('confirm_empty: ' + uri)
-    cursor = self.session.open_cursor(uri, None)
+# Confirm a URI exists and is empty.
+def confirm_empty(testcase, uri):
+    testcase.pr('confirm_empty: ' + uri)
+    cursor = testcase.session.open_cursor(uri, None)
     if cursor.value_format == '8t':
         for key,val in cursor:
-            self.assertEqual(val, 0)
+            testcase.assertEqual(val, 0)
     else:
-        self.assertEqual(cursor.next(), wiredtiger.WT_NOTFOUND)
+        testcase.assertEqual(cursor.next(), wiredtiger.WT_NOTFOUND)
     cursor.close()
 
-# copy a WT home directory
-def copy_wiredtiger_home(olddir, newdir, aligned=True):
-    # unaligned copy requires 'dd', which may not be available on Windows
+# Copy a WT home directory.
+def copy_wiredtiger_home(testcase, olddir, newdir, aligned=True):
+    # Unaligned copy requires 'dd', which may not be available on Windows.
     if not aligned and os.name == "nt":
         raise AssertionError(
             'copy_wiredtiger_home: unaligned copy impossible on Windows')
@@ -115,7 +115,19 @@ def copy_wiredtiger_home(olddir, newdir, aligned=True):
             "WiredTigerPreplog" not in fullname:
             # Use a dd command that does not align on a block boundary.
             if aligned:
-                shutil.copy(fullname, newdir)
+                try:
+                    shutil.copy(fullname, newdir)
+                except OSError as e:
+                    # If the copy failed it means the file was removed underneath us in the
+                    # short time after we verified the files existence. This can happen if we
+                    # are copying wiredtiger log files at the same time they are getting
+                    # archived by the background log server thread. To avoid failing in this case
+                    # we can log/print the removed file and continue.
+                    if "WiredTigerLog" not in fullname:
+                        raise e
+                    else:
+                        testcase.pr('Skipping logfile %s: No longer exists' % fname)
+                        continue
             else:
                 fullname = os.path.join(olddir, fname)
                 inpf = 'if=' + fullname
@@ -123,3 +135,15 @@ def copy_wiredtiger_home(olddir, newdir, aligned=True):
                 cmd_list = ['dd', inpf, outf, 'bs=300']
                 a = subprocess.Popen(cmd_list)
                 a.wait()
+
+# Simulate a crash from olddir and restart in newdir.
+def simulate_crash_restart(testcase, olddir, newdir):
+    # With the connection still open, copy files to new directory.
+    copy_wiredtiger_home(testcase, olddir, newdir)
+    # Close the original connection and open to new directory.
+    # NOTE:  This really cannot test the difference between the
+    # write-no-sync (off) version of log_flush and the sync
+    # version since we're not crashing the system itself.
+    testcase.close_conn()
+    testcase.conn = testcase.setUpConnectionOpen(newdir)
+    testcase.session = testcase.setUpSessionOpen(testcase.conn)

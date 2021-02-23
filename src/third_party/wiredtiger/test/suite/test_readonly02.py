@@ -86,7 +86,7 @@ class test_readonly02(wttest.WiredTigerTestCase, suite_subprocess):
 
     def check_unclean(self):
         backup = "WT_COPYDIR"
-        copy_wiredtiger_home(self.home, backup, True)
+        copy_wiredtiger_home(self, self.home, backup, True)
         msg = '/needs recovery/'
         #   2. an unclean shutdown and reopening readonly
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,

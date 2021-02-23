@@ -98,7 +98,7 @@ class test_timestamp03(wttest.WiredTigerTestCase, suite_subprocess):
         expected_nots_nolog):
 
         newdir = "BACKUP"
-        copy_wiredtiger_home('.', newdir, True)
+        copy_wiredtiger_home(self, '.', newdir, True)
 
         conn = self.setUpConnectionOpen(newdir)
         session = self.setUpSessionOpen(conn)

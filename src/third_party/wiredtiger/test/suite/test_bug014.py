@@ -59,7 +59,7 @@ class test_bug014(wttest.WiredTigerTestCase):
         ckpt_session.close()
 
         # Simulate a crash by copying to a new directory.
-        copy_wiredtiger_home(".", "RESTART")
+        copy_wiredtiger_home(self, ".", "RESTART")
 
         # Open the new directory.
         conn = self.setUpConnectionOpen("RESTART")
