@@ -80,6 +80,7 @@ let donorDoc = configDonorsColl.findOne({tenantId: kTenantId});
 if (donorDoc) {
     let state = donorDoc.state;
     switch (state) {
+        case TenantMigrationTest.State.kAbortingIndexBuilds:
         case TenantMigrationTest.State.kDataSync:
             assert.soon(
                 () => tenantMigrationTest.getTenantMigrationAccessBlocker(donorPrimary, kTenantId)
