@@ -32,12 +32,27 @@
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/service_context.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
 using std::string;
 
 namespace dps = ::mongo::dotted_path_support;
+
+namespace {
+
+/**
+ * The data format of a RecordId. Used for serializing and deserializing.
+ */
+enum class RecordIdFormat : char {
+    // Signed 64-bit integer
+    Long,
+    // 12-byte binary string
+    String,
+};
+
+}  // namespace
 
 WorkingSet::WorkingSet() : _freeList(INVALID_ID) {}
 
@@ -226,7 +241,16 @@ void WorkingSetMember::serialize(BufBuilder& buf) const {
     }
 
     if (hasRecordId()) {
-        buf.appendNum(recordId.asLong());
+        // Append the RecordId data format before appending the RecordId itself.
+        recordId.withFormat([&](RecordId::Null n) { MONGO_UNREACHABLE_TASSERT(5472100); },
+                            [&](int64_t rid) {
+                                buf.appendChar(static_cast<char>(RecordIdFormat::Long));
+                                buf.appendNum(recordId.asLong());
+                            },
+                            [&](const char* str, int size) {
+                                buf.appendChar(static_cast<char>(RecordIdFormat::String));
+                                buf.appendBuf(static_cast<const void*>(str), size);
+                            });
     }
 
     _metadata.serializeForSorter(buf);
@@ -263,7 +287,16 @@ WorkingSetMember WorkingSetMember::deserialize(BufReader& buf) {
     }
 
     if (wsm.hasRecordId()) {
-        wsm.recordId = RecordId{buf.read<LittleEndian<int64_t>>()};
+        // The RecordId data format informs us how to interpret the RecordId in the buffer.
+        RecordIdFormat recordIdFormat = static_cast<RecordIdFormat>(buf.read<char>());
+        if (recordIdFormat == RecordIdFormat::Long) {
+            wsm.recordId = RecordId{buf.read<LittleEndian<int64_t>>()};
+        } else {
+            invariant(recordIdFormat == RecordIdFormat::String);
+            invariant(static_cast<int>(RecordId::kSmallStrSize) == static_cast<int>(OID::kOIDSize));
+            const char* recordIdStr = static_cast<const char*>(buf.skip(RecordId::kSmallStrSize));
+            wsm.recordId = RecordId{recordIdStr, RecordId::kSmallStrSize};
+        }
     }
 
     DocumentMetadataFields::deserializeForSorter(buf, &wsm._metadata);

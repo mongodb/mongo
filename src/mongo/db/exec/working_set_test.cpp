@@ -208,7 +208,7 @@ WorkingSetMember roundtripWsmThroughSerialization(WorkingSetMember wsm) {
 }
 }  // namespace
 
-TEST_F(WorkingSetFixture, RecordIdAndObjStateCanRoundtripThroughSerialization) {
+TEST_F(WorkingSetFixture, RecordIdLongAndObjStateCanRoundtripThroughSerialization) {
     Document doc{{"foo", Value{"bar"_sd}}};
     member->doc.setValue(doc);
     member->doc.setSnapshotId(SnapshotId{42u});
@@ -219,6 +219,21 @@ TEST_F(WorkingSetFixture, RecordIdAndObjStateCanRoundtripThroughSerialization) {
     ASSERT_DOCUMENT_EQ(roundtripped.doc.value(), doc);
     ASSERT_EQ(roundtripped.doc.snapshotId().toNumber(), 42u);
     ASSERT_EQ(roundtripped.recordId.asLong(), 43);
+    ASSERT_FALSE(roundtripped.metadata());
+}
+
+TEST_F(WorkingSetFixture, RecordIdStrAndObjStateCanRoundtripThroughSerialization) {
+    Document doc{{"foo", Value{"bar"_sd}}};
+    member->doc.setValue(doc);
+    member->doc.setSnapshotId(SnapshotId{42u});
+    const OID oid = OID::gen();
+    member->recordId = RecordId{oid.view().view(), RecordId::kSmallStrSize};
+    ws->transitionToRecordIdAndObj(id);
+    auto roundtripped = roundtripWsmThroughSerialization(*member);
+    ASSERT_EQ(WorkingSetMember::RID_AND_OBJ, roundtripped.getState());
+    ASSERT_DOCUMENT_EQ(roundtripped.doc.value(), doc);
+    ASSERT_EQ(roundtripped.doc.snapshotId().toNumber(), 42u);
+    ASSERT_EQ(OID::from(roundtripped.recordId.strData()), oid);
     ASSERT_FALSE(roundtripped.metadata());
 }
 
@@ -265,10 +280,10 @@ TEST_F(WorkingSetFixture, WsmWithMetadataCanRoundtripThroughSerialization) {
     member->doc.setValue(doc);
     member->metadata().setTextScore(42.0);
     member->metadata().setSearchScore(43.0);
-    ws->transitionToRecordIdAndObj(id);
+    ws->transitionToOwnedObj(id);
     auto roundtripped = roundtripWsmThroughSerialization(*member);
 
-    ASSERT_EQ(WorkingSetMember::RID_AND_OBJ, roundtripped.getState());
+    ASSERT_EQ(WorkingSetMember::OWNED_OBJ, roundtripped.getState());
     ASSERT_DOCUMENT_EQ(roundtripped.doc.value(), doc);
     ASSERT_FALSE(roundtripped.doc.value().metadata());
     ASSERT_TRUE(roundtripped.doc.snapshotId().isNull());
