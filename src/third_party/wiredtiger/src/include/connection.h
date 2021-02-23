@@ -102,6 +102,17 @@ struct __wt_named_extractor {
 };
 
 /*
+ * WT_NAMED_STORAGE_SOURCE --
+ *	A storage source list entry
+ */
+struct __wt_named_storage_source {
+    const char *name;                  /* Name of storage source */
+    WT_STORAGE_SOURCE *storage_source; /* User supplied callbacks */
+    /* Linked list of compressors */
+    TAILQ_ENTRY(__wt_named_storage_source) q;
+};
+
+/*
  * WT_NAME_FLAG --
  *	Simple structure for name and flag configuration searches
  */
@@ -454,6 +465,9 @@ struct __wt_connection_impl {
 
     /* Locked: extractor list */
     TAILQ_HEAD(__wt_extractor_qh, __wt_named_extractor) extractorqh;
+
+    /* Locked: storage source list */
+    TAILQ_HEAD(__wt_storage_source_qh, __wt_named_storage_source) storagesrcqh;
 
     void *lang_private; /* Language specific private storage */
 
