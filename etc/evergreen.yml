@@ -1940,14 +1940,41 @@ functions:
 
         ${activate_virtualenv}
 
+
         rm -rf /data/install /data/multiversion
+        edition="${multiversion_edition|base}"
+        platform="${multiversion_platform|linux}"
+        architecture="${multiversion_architecture|x86_64}"
+
         $python buildscripts/setup_multiversion_mongodb.py   \
           --installDir /data/install                         \
           --linkDir /data/multiversion                       \
-          --edition ${multiversion_edition|base}             \
-          --platform ${multiversion_platform|linux}          \
-          --architecture ${multiversion_architecture|x86_64} \
-          --useLatest 3.2 3.4 3.6 4.0 4.0.1 4.0.5 4.2.1 4.2.3
+          --edition $edition                                 \
+          --platform $platform                               \
+          --architecture $architecture                       \
+          --useLatest 3.2 3.4 3.6 4.0 4.0.1 4.0.5
+
+        # The platform and architecture for how some of the binaries are reported in
+        # https://downloads.mongodb.org/full.json changed between MongoDB 4.0 and MongoDB 4.2.
+        # Certain build variants define additional multiversion_*_42_or_later expansions in order to
+        # be able to fetch a complete set of versions.
+        if [ ! -z "${multiversion_edition_42_or_later}" ]; then
+          edition="${multiversion_edition_42_or_later}"
+        fi
+        if [ ! -z "${multiversion_platform_42_or_later}" ]; then
+          platform="${multiversion_platform_42_or_later}"
+        fi
+        if [ ! -z "${multiversion_architecture_42_or_later}" ]; then
+          architecture="${multiversion_architecture_42_or_later}"
+        fi
+
+        $python buildscripts/setup_multiversion_mongodb.py   \
+          --installDir /data/install                         \
+          --linkDir /data/multiversion                       \
+          --edition $edition                                 \
+          --platform $platform                               \
+          --architecture $architecture                       \
+          --useLatest 4.2.1 4.2.3
 
   "do snmp setup":
     command: shell.exec
@@ -7678,6 +7705,7 @@ buildvariants:
     multiversion_platform: ubuntu1604
     multiversion_architecture: arm64
     multiversion_edition: enterprise
+    multiversion_architecture_42_or_later: aarch64
   tasks:
   - name: compile_all_run_unittests_TG
   - name: .aggfuzzer .common
