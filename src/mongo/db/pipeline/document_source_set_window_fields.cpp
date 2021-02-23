@@ -29,6 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/exec/add_fields_projection_executor.h"
 #include "mongo/db/pipeline/document_source_add_fields.h"
 #include "mongo/db/pipeline/document_source_project.h"
 #include "mongo/db/pipeline/document_source_set_window_fields.h"
@@ -282,9 +283,10 @@ DocumentSource::GetNextResult DocumentSourceInternalSetWindowFields::doGetNext()
         return DocumentSource::GetNextResult::makeEOF();
 
     // Populate the output document with the result from each window function.
-    MutableDocument outDoc(_iterator[0].get());
+    auto curDoc = _iterator[0].get();
+    MutableDocument addFieldsSpec;
     for (auto&& [fieldName, function] : _executableOutputs) {
-        outDoc.setNestedField(fieldName, function->getNext());
+        addFieldsSpec.addField(fieldName, function->getNext());
     }
 
     // Advance the iterator and handle partition/EOF edge cases.
@@ -301,7 +303,10 @@ DocumentSource::GetNextResult DocumentSourceInternalSetWindowFields::doGetNext()
             _eof = true;
             break;
     }
-    return outDoc.freeze();
+    auto projExec = projection_executor::AddFieldsProjectionExecutor::create(
+        pExpCtx, addFieldsSpec.freeze().toBson());
+
+    return projExec->applyProjection(curDoc);
 }
 
 }  // namespace mongo
