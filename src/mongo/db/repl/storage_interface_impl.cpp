@@ -1258,8 +1258,8 @@ Status StorageInterfaceImpl::setCollectionCount(OperationContext* opCtx,
     return Status::OK();
 }
 
-StatusWith<OptionalCollectionUUID> StorageInterfaceImpl::getCollectionUUID(
-    OperationContext* opCtx, const NamespaceString& nss) {
+StatusWith<UUID> StorageInterfaceImpl::getCollectionUUID(OperationContext* opCtx,
+                                                         const NamespaceString& nss) {
     AutoGetCollectionForRead autoColl(opCtx, nss);
 
     auto collectionResult = getCollection(

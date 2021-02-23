@@ -47,6 +47,7 @@
 
 namespace mongo {
 namespace catalog {
+
 MinVisibleTimestampMap closeCatalog(OperationContext* opCtx) {
     invariant(opCtx->lockState()->isW());
 
@@ -65,19 +66,17 @@ MinVisibleTimestampMap closeCatalog(OperationContext* opCtx) {
                 break;
             }
 
-            OptionalCollectionUUID uuid = coll->uuid();
             boost::optional<Timestamp> minVisible = coll->getMinimumVisibleSnapshot();
 
             // If there's a minimum visible, invariant there's also a UUID.
-            invariant(!minVisible || uuid);
-            if (uuid && minVisible) {
+            if (minVisible) {
                 LOGV2_DEBUG(20269,
                             1,
                             "closeCatalog: preserving min visible timestamp.",
                             "coll_ns"_attr = coll->ns(),
-                            "uuid"_attr = uuid,
+                            "uuid"_attr = coll->uuid(),
                             "minVisible"_attr = minVisible);
-                minVisibleTimestampMap[*uuid] = *minVisible;
+                minVisibleTimestampMap[coll->uuid()] = *minVisible;
             }
         }
     }
@@ -232,5 +231,6 @@ void openCatalog(OperationContext* opCtx,
     opCtx->getServiceContext()->incrementCatalogGeneration();
     LOGV2(20278, "openCatalog: finished reloading collection catalog");
 }
+
 }  // namespace catalog
 }  // namespace mongo

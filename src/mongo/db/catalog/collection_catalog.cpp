@@ -89,7 +89,7 @@ public:
 
         // External uuid when not accessible via collection
         // Set for actions kDropped, kRecreated. boost::none otherwise.
-        OptionalCollectionUUID externalUUID;
+        boost::optional<UUID> externalUUID;
 
         // New namespace this collection has been renamed to
         // Set for action kRenamed. Default constructed otherwise.

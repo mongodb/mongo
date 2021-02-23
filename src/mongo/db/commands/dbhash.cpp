@@ -227,7 +227,7 @@ public:
         md5_init(&globalState);
 
         std::map<std::string, std::string> collectionToHashMap;
-        std::map<std::string, OptionalCollectionUUID> collectionToUUIDMap;
+        std::map<std::string, UUID> collectionToUUIDMap;
         std::set<std::string> cappedCollectionSet;
 
         bool noError = true;
@@ -264,9 +264,7 @@ public:
                     cappedCollectionSet.insert(collNss.coll().toString());
                 }
 
-                if (OptionalCollectionUUID uuid = collection->uuid()) {
-                    collectionToUUIDMap[collNss.coll().toString()] = uuid;
-                }
+                collectionToUUIDMap.emplace(collNss.coll().toString(), collection->uuid());
 
                 // Compute the hash for this collection.
                 std::string hash = _hashCollection(opCtx, db, collNss);
@@ -289,7 +287,7 @@ public:
         for (auto entry : collectionToUUIDMap) {
             auto collName = entry.first;
             auto uuid = entry.second;
-            uuid->appendToBuilder(&collectionsByUUID, collName);
+            uuid.appendToBuilder(&collectionsByUUID, collName);
         }
 
         for (auto entry : collectionToHashMap) {

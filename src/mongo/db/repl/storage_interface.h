@@ -383,8 +383,8 @@ public:
     /**
      * Returns the UUID of the collection specified by nss, if such a UUID exists.
      */
-    virtual StatusWith<OptionalCollectionUUID> getCollectionUUID(OperationContext* opCtx,
-                                                                 const NamespaceString& nss) = 0;
+    virtual StatusWith<UUID> getCollectionUUID(OperationContext* opCtx,
+                                               const NamespaceString& nss) = 0;
 
     /**
      * Sets the highest timestamp at which the storage engine is allowed to take a checkpoint. This

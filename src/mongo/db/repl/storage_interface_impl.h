@@ -165,8 +165,8 @@ public:
                               const NamespaceStringOrUUID& nsOrUUID,
                               long long newCount) override;
 
-    StatusWith<OptionalCollectionUUID> getCollectionUUID(OperationContext* opCtx,
-                                                         const NamespaceString& nss) override;
+    StatusWith<UUID> getCollectionUUID(OperationContext* opCtx,
+                                       const NamespaceString& nss) override;
 
     void setStableTimestamp(ServiceContext* serviceCtx,
                             Timestamp snapshotName,

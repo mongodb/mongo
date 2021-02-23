@@ -309,5 +309,4 @@ void ValidateState::_relockDatabaseAndCollection(OperationContext* opCtx) {
 }
 
 }  // namespace CollectionValidation
-
 }  // namespace mongo
