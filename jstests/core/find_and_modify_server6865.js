@@ -2,8 +2,7 @@
 // update/delete on a sharded collection must contain an exact match on _id or contain the shard
 // key.
 // @tags: [
-//   assumes_unsharded_collection,
-//   sbe_incompatible,
+//   assumes_unsharded_collection
 // ]
 
 /**
@@ -29,14 +28,14 @@ t.drop();
  */
 function testFAMWorked(insert, cmdObj, expected) {
     t.drop();
-    t.insert(insert);
+    assert.commandWorked(t.insert(insert));
 
     var res;
 
     if (!cmdObj['new']) {
         // Test that the find operation returns the expected result.
         res = t.findOne(cmdObj['query'], cmdObj['fields']);
-        assert.eq(res, expected, 'positional projection failed for find');
+        assert.docEq(res, expected, 'positional projection failed for find');
     }
 
     // Test that the findAndModify command returns the expected result.
@@ -47,7 +46,7 @@ function testFAMWorked(insert, cmdObj, expected) {
     if (cmdObj['new']) {
         // Test that the find operation returns the expected result.
         res = t.findOne(cmdObj['query'], cmdObj['fields']);
-        assert.eq(res, expected, 'positional projection failed for find');
+        assert.docEq(res, expected, 'positional projection failed for find');
     }
 }
 
@@ -56,7 +55,7 @@ function testFAMWorked(insert, cmdObj, expected) {
  */
 function testFAMFailed(insert, cmdObj) {
     t.drop();
-    t.insert(insert);
+    assert.commandWorked(t.insert(insert));
 
     var res = t.runCommand('findAndModify', cmdObj);
     assert.commandFailed(res, 'findAndModify command unexpectedly succeeded');
