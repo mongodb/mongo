@@ -79,7 +79,6 @@ list<intrusive_ptr<DocumentSource>> document_source_set_window_fields::createFro
         else
             return boost::none;
     }();
-    uassert(5397906, "partitionBy field not yet supported", !partitionBy);
 
     optional<SortPattern> sortBy;
     if (auto sortSpec = spec.getSortBy()) {
@@ -268,7 +267,6 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalSetWindowFields::crea
 
 void DocumentSourceInternalSetWindowFields::initialize() {
     for (auto& wfs : _outputFields) {
-        uassert(5397900, "Window function must be $sum", wfs.expr->getOpName() == "$sum");
         _executableOutputs[wfs.fieldName] = WindowFunctionExec::create(&_iterator, wfs);
     }
     _init = true;
