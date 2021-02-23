@@ -55,14 +55,13 @@
 namespace mongo {
 namespace {
 
-class WiredTigerKVHarnessHelper : public KVHarnessHelper, public ScopedGlobalServiceContextForTest {
+class WiredTigerKVHarnessHelper : public KVHarnessHelper {
 public:
-    WiredTigerKVHarnessHelper(bool forRepair = false)
+    WiredTigerKVHarnessHelper(ServiceContext* svcCtx, bool forRepair = false)
         : _dbpath("wt-kv-harness"), _forRepair(forRepair), _engine(makeEngine()) {
-        auto context = getGlobalServiceContext();
         repl::ReplicationCoordinator::set(
-            context,
-            std::make_unique<repl::ReplicationCoordinatorMock>(context, repl::ReplSettings()));
+            svcCtx,
+            std::make_unique<repl::ReplicationCoordinatorMock>(svcCtx, repl::ReplSettings()));
         _engine->notifyStartupComplete();
     }
 
@@ -100,16 +99,21 @@ private:
     std::unique_ptr<WiredTigerKVEngine> _engine;
 };
 
-class WiredTigerKVEngineTest : public unittest::Test, public ScopedGlobalServiceContextForTest {
+class WiredTigerKVEngineTest : public ServiceContextTest {
 public:
     WiredTigerKVEngineTest(bool repair = false)
-        : _helper(repair), _engine(_helper.getWiredTigerKVEngine()) {}
-
-    std::unique_ptr<OperationContext> makeOperationContext() {
-        return std::make_unique<OperationContextNoop>(_engine->newRecoveryUnit());
-    }
+        : _helper(getServiceContext(), repair), _engine(_helper.getWiredTigerKVEngine()) {}
 
 protected:
+    ServiceContext::UniqueOperationContext _makeOperationContext() {
+        auto opCtx = makeOperationContext();
+        opCtx->setRecoveryUnit(
+            std::unique_ptr<RecoveryUnit>(_helper.getEngine()->newRecoveryUnit()),
+            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+        opCtx->swapLockState(std::make_unique<LockerNoop>(), WithLock::withoutLock());
+        return opCtx;
+    }
+
     WiredTigerKVHarnessHelper _helper;
     WiredTigerKVEngine* _engine;
 };
@@ -120,7 +124,7 @@ public:
 };
 
 TEST_F(WiredTigerKVEngineRepairTest, OrphanedDataFilesCanBeRecovered) {
-    auto opCtxPtr = makeOperationContext();
+    auto opCtxPtr = _makeOperationContext();
 
     NamespaceString nss("a.b");
     std::string ident = "collection-1234";
@@ -178,7 +182,7 @@ TEST_F(WiredTigerKVEngineRepairTest, OrphanedDataFilesCanBeRecovered) {
 }
 
 TEST_F(WiredTigerKVEngineRepairTest, UnrecoverableOrphanedDataFilesAreRebuilt) {
-    auto opCtxPtr = makeOperationContext();
+    auto opCtxPtr = _makeOperationContext();
 
     NamespaceString nss("a.b");
     std::string ident = "collection-1234";
@@ -246,7 +250,7 @@ TEST_F(WiredTigerKVEngineTest, TestOplogTruncation) {
     std::unique_ptr<Checkpointer> checkpointer = std::make_unique<Checkpointer>(_engine);
     checkpointer->go();
 
-    auto opCtxPtr = makeOperationContext();
+    auto opCtxPtr = _makeOperationContext();
     // The initial data timestamp has to be set to take stable checkpoints. The first stable
     // timestamp greater than this will also trigger a checkpoint. The following loop of the
     // CheckpointThread will observe the new `checkpointDelaySecs` value.
@@ -351,7 +355,7 @@ TEST_F(WiredTigerKVEngineTest, IdentDrop) {
     return;
 #endif
 
-    auto opCtxPtr = makeOperationContext();
+    auto opCtxPtr = _makeOperationContext();
 
     NamespaceString nss("a.b");
     std::string ident = "collection-1234";
@@ -392,7 +396,7 @@ TEST_F(WiredTigerKVEngineTest, IdentDrop) {
 }
 
 TEST_F(WiredTigerKVEngineTest, TestBasicPinOldestTimestamp) {
-    auto opCtxRaii = makeOperationContext();
+    auto opCtxRaii = _makeOperationContext();
     const Timestamp initTs = Timestamp(1, 0);
 
     // Initialize the oldest timestamp.
@@ -433,7 +437,7 @@ TEST_F(WiredTigerKVEngineTest, TestBasicPinOldestTimestamp) {
  * of all active requests will be obeyed.
  */
 TEST_F(WiredTigerKVEngineTest, TestMultiPinOldestTimestamp) {
-    auto opCtxRaii = makeOperationContext();
+    auto opCtxRaii = _makeOperationContext();
     const Timestamp initTs = Timestamp(1, 0);
 
     _engine->setOldestTimestamp(initTs, false);
@@ -474,7 +478,7 @@ TEST_F(WiredTigerKVEngineTest, TestMultiPinOldestTimestamp) {
  * relative to the current oldest timestamp.
  */
 TEST_F(WiredTigerKVEngineTest, TestPinOldestTimestampErrors) {
-    auto opCtxRaii = makeOperationContext();
+    auto opCtxRaii = _makeOperationContext();
     const Timestamp initTs = Timestamp(10, 0);
 
     _engine->setOldestTimestamp(initTs, false);
@@ -497,8 +501,8 @@ TEST_F(WiredTigerKVEngineTest, TestPinOldestTimestampErrors) {
 }
 
 
-std::unique_ptr<KVHarnessHelper> makeHelper() {
-    return std::make_unique<WiredTigerKVHarnessHelper>();
+std::unique_ptr<KVHarnessHelper> makeHelper(ServiceContext* svcCtx) {
+    return std::make_unique<WiredTigerKVHarnessHelper>(svcCtx);
 }
 
 MONGO_INITIALIZER(RegisterKVHarnessFactory)(InitializerContext*) {

@@ -44,13 +44,11 @@
 namespace mongo {
 namespace ephemeral_for_test {
 
-class KVHarnessHelper : public mongo::KVHarnessHelper, public ScopedGlobalServiceContextForTest {
+class KVHarnessHelper : public mongo::KVHarnessHelper {
 public:
-    KVHarnessHelper() {
-        invariant(hasGlobalServiceContext());
-        _engine = std::make_unique<KVEngine>();
+    KVHarnessHelper(ServiceContext* svcCtx) : _engine(std::make_unique<KVEngine>()) {
         repl::ReplicationCoordinator::set(
-            getGlobalServiceContext(),
+            svcCtx,
             std::unique_ptr<repl::ReplicationCoordinator>(new repl::ReplicationCoordinatorMock(
                 getGlobalServiceContext(), repl::ReplSettings())));
     }
@@ -67,17 +65,17 @@ private:
     std::unique_ptr<KVEngine> _engine;
 };
 
-std::unique_ptr<mongo::KVHarnessHelper> makeHelper() {
-    return std::make_unique<KVHarnessHelper>();
+std::unique_ptr<mongo::KVHarnessHelper> makeHelper(ServiceContext* svcCtx) {
+    return std::make_unique<KVHarnessHelper>(svcCtx);
 }
 
 MONGO_INITIALIZER(RegisterEphemeralForTestKVHarnessFactory)(InitializerContext*) {
     KVHarnessHelper::registerFactory(makeHelper);
 }
 
-class EphemeralForTestKVEngineTest : public unittest::Test {
+class EphemeralForTestKVEngineTest : public ServiceContextTest {
 public:
-    EphemeralForTestKVEngineTest() : _helper(), _engine(_helper.getEngine()) {}
+    EphemeralForTestKVEngineTest() : _helper(getServiceContext()), _engine(_helper.getEngine()) {}
 
 protected:
     std::unique_ptr<KVHarnessHelper> helper;
