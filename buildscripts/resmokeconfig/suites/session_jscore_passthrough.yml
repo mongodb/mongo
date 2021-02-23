@@ -12,6 +12,7 @@ selector:
   - jstests/core/exhaust.js
   - jstests/core/invalidated_legacy_cursors.js
   - jstests/core/validate_cmd_ns.js
+  - jstests/core/tailable_cursor_legacy_read_mode.js
 
   # Unacknowledged writes prohibited in an explicit session.
   - jstests/core/crud_api.js
