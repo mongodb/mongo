@@ -82,7 +82,7 @@ class test_hs01(wttest.WiredTigerTestCase):
         # Checkpoint and backup so as to simulate recovery
         self.session.checkpoint()
         newdir = "BACKUP"
-        copy_wiredtiger_home('.', newdir, True)
+        copy_wiredtiger_home(self, '.', newdir, True)
 
         conn = self.setUpConnectionOpen(newdir)
         session = self.setUpSessionOpen(conn)

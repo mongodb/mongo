@@ -156,7 +156,7 @@ class test_prepare_hs04(wttest.WiredTigerTestCase):
         self.session.checkpoint()
 
         # Simulate a crash by copying to a new directory(RESTART).
-        copy_wiredtiger_home(".", "RESTART")
+        copy_wiredtiger_home(self, ".", "RESTART")
 
         # Open the new directory.
         self.conn = self.setUpConnectionOpen("RESTART")

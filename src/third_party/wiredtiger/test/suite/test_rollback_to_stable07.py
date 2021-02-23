@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import fnmatch, os, shutil, time
-from helper import copy_wiredtiger_home
+from helper import simulate_crash_restart
 from test_rollback_to_stable01 import test_rollback_to_stable_base
 from wiredtiger import stat
 from wtdataset import SimpleDataSet
@@ -54,29 +54,6 @@ class test_rollback_to_stable07(test_rollback_to_stable_base):
     def conn_config(self):
         config = 'cache_size=5MB,statistics=(all),log=(enabled=true)'
         return config
-
-    def simulate_crash_restart(self, uri, olddir, newdir):
-        ''' Simulate a crash from olddir and restart in newdir. '''
-        # with the connection still open, copy files to new directory
-        shutil.rmtree(newdir, ignore_errors=True)
-        os.mkdir(newdir)
-        for fname in os.listdir(olddir):
-            fullname = os.path.join(olddir, fname)
-            # Skip lock file on Windows since it is locked
-            if os.path.isfile(fullname) and \
-                "WiredTiger.lock" not in fullname and \
-                "Tmplog" not in fullname and \
-                "Preplog" not in fullname:
-                shutil.copy(fullname, newdir)
-        #
-        # close the original connection and open to new directory
-        # NOTE:  This really cannot test the difference between the
-        # write-no-sync (off) version of log_flush and the sync
-        # version since we're not crashing the system itself.
-        #
-        self.close_conn()
-        self.conn = self.setUpConnectionOpen(newdir)
-        self.session = self.setUpSessionOpen(self.conn)
 
     def test_rollback_to_stable(self):
         nrows = 1000
@@ -128,7 +105,7 @@ class test_rollback_to_stable07(test_rollback_to_stable_base):
         self.check(value_d, uri, nrows, 80)
 
         # Simulate a server crash and restart.
-        self.simulate_crash_restart(uri, ".", "RESTART")
+        simulate_crash_restart(self, ".", "RESTART")
 
         # Check that the correct data is seen at and after the stable timestamp.
         self.check(value_b, uri, nrows, 40)
@@ -153,7 +130,7 @@ class test_rollback_to_stable07(test_rollback_to_stable_base):
         self.assertGreaterEqual(hs_removed, nrows * 4)
 
         # Simulate another server crash and restart.
-        self.simulate_crash_restart(uri, "RESTART", "RESTART2")
+        simulate_crash_restart(self, "RESTART", "RESTART2")
 
         # Check that the correct data is seen at and after the stable timestamp.
         self.check(value_b, uri, nrows, 40)

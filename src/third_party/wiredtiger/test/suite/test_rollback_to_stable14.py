@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import fnmatch, os, shutil, threading, time
-from helper import copy_wiredtiger_home
+from helper import simulate_crash_restart
 from test_rollback_to_stable01 import test_rollback_to_stable_base
 from wiredtiger import stat, wiredtiger_strerror, WiredTigerError, WT_ROLLBACK
 from wtdataset import SimpleDataSet
@@ -85,29 +85,6 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
     def conn_config(self):
         config = 'cache_size=8MB,statistics=(all),statistics_log=(json,on_close,wait=1),log=(enabled=true),timing_stress_for_test=[history_store_checkpoint_delay]'
         return config
-
-    def simulate_crash_restart(self, olddir, newdir):
-        ''' Simulate a crash from olddir and restart in newdir. '''
-        # with the connection still open, copy files to new directory
-        shutil.rmtree(newdir, ignore_errors=True)
-        os.mkdir(newdir)
-        for fname in os.listdir(olddir):
-            fullname = os.path.join(olddir, fname)
-            # Skip lock file on Windows since it is locked
-            if os.path.isfile(fullname) and \
-                "WiredTiger.lock" not in fullname and \
-                "Tmplog" not in fullname and \
-                "Preplog" not in fullname:
-                shutil.copy(fullname, newdir)
-        #
-        # close the original connection and open to new directory
-        # NOTE:  This really cannot test the difference between the
-        # write-no-sync (off) version of log_flush and the sync
-        # version since we're not crashing the system itself.
-        #
-        self.close_conn()
-        self.conn = self.setUpConnectionOpen(newdir)
-        self.session = self.setUpSessionOpen(self.conn)
 
     def test_rollback_to_stable(self):
         nrows = 1500
@@ -175,7 +152,7 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
 
         # Simulate a server crash and restart.
         self.pr("restart")
-        self.simulate_crash_restart(".", "RESTART")
+        simulate_crash_restart(self, ".", "RESTART")
         self.pr("restart complete")
 
         stat_cursor = self.session.open_cursor('statistics:', None, None)
@@ -273,7 +250,7 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
 
         # Simulate a server crash and restart.
         self.pr("restart")
-        self.simulate_crash_restart(".", "RESTART")
+        simulate_crash_restart(self, ".", "RESTART")
         self.pr("restart complete")
 
         stat_cursor = self.session.open_cursor('statistics:', None, None)
@@ -369,7 +346,7 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
 
         # Simulate a server crash and restart.
         self.pr("restart")
-        self.simulate_crash_restart(".", "RESTART")
+        simulate_crash_restart(self, ".", "RESTART")
         self.pr("restart complete")
 
         stat_cursor = self.session.open_cursor('statistics:', None, None)

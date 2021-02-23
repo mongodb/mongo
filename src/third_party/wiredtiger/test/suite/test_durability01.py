@@ -43,7 +43,7 @@ class test_durability01(wttest.WiredTigerTestCase, suite_subprocess):
     def check_crash_restart(self, olddir, newdir):
         ''' Simulate a crash from olddir and restart in newdir. '''
         # with the connection still open, copy files to new directory
-        copy_wiredtiger_home(olddir, newdir)
+        copy_wiredtiger_home(self, olddir, newdir)
 
         # Open the new directory
         conn = self.setUpConnectionOpen(newdir)

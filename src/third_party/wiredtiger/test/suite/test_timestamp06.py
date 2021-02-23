@@ -87,7 +87,7 @@ class test_timestamp06(wttest.WiredTigerTestCase, suite_subprocess):
     # check exists in the tables the expected number of times.
     def backup_check(self, check_value, expected_ts_log, expected_ts_nolog):
         newdir = "BACKUP"
-        copy_wiredtiger_home('.', newdir, True)
+        copy_wiredtiger_home(self, '.', newdir, True)
 
         conn = self.setUpConnectionOpen(newdir)
         session = self.setUpSessionOpen(conn)

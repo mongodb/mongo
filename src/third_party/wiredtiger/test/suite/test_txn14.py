@@ -31,6 +31,7 @@
 #
 
 import fnmatch, os, shutil, time
+from helper import simulate_crash_restart
 from suite_subprocess import suite_subprocess
 from wtscenario import make_scenarios
 import wttest
@@ -48,29 +49,6 @@ class test_txn14(wttest.WiredTigerTestCase, suite_subprocess):
         ('bg', dict(sync='background')),
     ]
     scenarios = make_scenarios(sync_list)
-
-    def simulate_crash_restart(self, olddir, newdir):
-        ''' Simulate a crash from olddir and restart in newdir. '''
-        # with the connection still open, copy files to new directory
-        shutil.rmtree(newdir, ignore_errors=True)
-        os.mkdir(newdir)
-        for fname in os.listdir(olddir):
-            fullname = os.path.join(olddir, fname)
-            # Skip lock file on Windows since it is locked
-            if os.path.isfile(fullname) and \
-                "WiredTiger.lock" not in fullname and \
-                "Tmplog" not in fullname and \
-                "Preplog" not in fullname:
-                shutil.copy(fullname, newdir)
-        #
-        # close the original connection and open to new directory
-        # NOTE:  This really cannot test the difference between the
-        # write-no-sync (off) version of log_flush and the sync
-        # version since we're not crashing the system itself.
-        #
-        self.close_conn()
-        self.conn = self.setUpConnectionOpen(newdir)
-        self.session = self.setUpSessionOpen(self.conn)
 
     def test_log_flush(self):
         # Here's the strategy:
@@ -98,7 +76,7 @@ class test_txn14(wttest.WiredTigerTestCase, suite_subprocess):
             # systems, and we've seen timeouts at 10 seconds on systems
             # with slow I/O. So give it time to flush perhaps a few files.
             self.session.transaction_sync('timeout_ms=30000')
-        self.simulate_crash_restart(".", "RESTART")
+        simulate_crash_restart(self, ".", "RESTART")
         c = self.session.open_cursor(self.t1, None, None)
         i = 0
         for key, value in c:

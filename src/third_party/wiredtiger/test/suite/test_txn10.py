@@ -31,6 +31,7 @@
 #
 
 import fnmatch, os, shutil, time
+from helper import simulate_crash_restart
 from suite_subprocess import suite_subprocess
 import wttest
 
@@ -40,24 +41,6 @@ class test_txn10(wttest.WiredTigerTestCase, suite_subprocess):
     create_params = 'key_format=i,value_format=i'
     conn_config = 'log=(archive=false,enabled,file_max=100K),' + \
                 'transaction_sync=(method=dsync,enabled)'
-
-    def simulate_crash_restart(self, olddir, newdir):
-        ''' Simulate a crash from olddir and restart in newdir. '''
-        # with the connection still open, copy files to new directory
-        shutil.rmtree(newdir, ignore_errors=True)
-        os.mkdir(newdir)
-        for fname in os.listdir(olddir):
-            fullname = os.path.join(olddir, fname)
-            # Skip lock file on Windows since it is locked
-            if os.path.isfile(fullname) and \
-                "WiredTiger.lock" not in fullname and \
-                "Tmplog" not in fullname and \
-                "Preplog" not in fullname:
-                shutil.copy(fullname, newdir)
-        # close the original connection and open to new directory
-        self.close_conn()
-        self.conn = self.setUpConnectionOpen(newdir)
-        self.session = self.setUpSessionOpen(self.conn)
 
     def test_recovery(self):
         ''' Check for bugs in file ID allocation. '''
@@ -78,7 +61,7 @@ class test_txn10(wttest.WiredTigerTestCase, suite_subprocess):
         for i in range(10000):
             c[i] = i + 1
         c.close()
-        self.simulate_crash_restart(".", "RESTART")
+        simulate_crash_restart(self, ".", "RESTART")
         c = self.session.open_cursor(self.t2, None, None)
         i = 0
         for key, value in c:

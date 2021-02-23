@@ -54,7 +54,7 @@ class test_backup05(wttest.WiredTigerTestCase, suite_subprocess):
         # Half the time use an unaligned copy.
         even = i % (self.freq * 2) == 0
         aligned = even or os.name == "nt"
-        copy_wiredtiger_home(olddir, newdir, aligned)
+        copy_wiredtiger_home(self, olddir, newdir, aligned)
 
         # Half the time try to rename a table and the other half try
         # to remove a table.  They should fail.

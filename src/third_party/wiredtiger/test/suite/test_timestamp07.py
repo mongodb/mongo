@@ -117,7 +117,7 @@ class test_timestamp07(wttest.WiredTigerTestCase, suite_subprocess):
     #
     def backup_check(self, check_value, valcnt, valcnt2, valcnt3):
         newdir = "BACKUP"
-        copy_wiredtiger_home('.', newdir, True)
+        copy_wiredtiger_home(self, '.', newdir, True)
 
         conn = self.setUpConnectionOpen(newdir)
         session = self.setUpSessionOpen(conn)

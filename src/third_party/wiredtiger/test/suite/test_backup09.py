@@ -88,7 +88,7 @@ class test_backup09(wttest.WiredTigerTestCase):
         log_files_to_copy = 0
         os.mkdir(self.backup_dir)
         if self.all_log_files:
-            helper.copy_wiredtiger_home('.', self.backup_dir)
+            helper.copy_wiredtiger_home(self, '.', self.backup_dir)
             log_files_copied = [x for x in os.listdir(self.backup_dir) if x.startswith('WiredTigerLog.')]
             self.assertEqual(len(log_files_copied), 2)
         else:
