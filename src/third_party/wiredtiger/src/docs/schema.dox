@@ -362,4 +362,19 @@ Here is another example program, @ex_ref{ex_call_center.c}.
 @snippet ex_call_center.c call-center decl
 @snippet ex_call_center.c call-center work
 
+@section logged_non_logged_tables Logged and Non-logged tables
+
+- WiredTiger writes records to the log for each transaction when logging is enabled
+  on the tables using the \c log=(enabled) configuration to \c wiredtiger_open.
+- WiredTiger supports checkpoint durability on non-logged tables and logging
+  is disabled by default. See @ref checkpoint for information on checkpoint durability.
+- WiredTiger supports commit-level durability on logged tables. See @ref durability for
+  information on commit-level durability.
+
+@section diff_logged_non_logged_tables Other differences between Logged and Non-logged tables
+
+- Rollback to stable does not operate on logged tables as the updates on these
+  tables are stable when the transaction gets committed.
+- Prepared updates can only be done on the non-logged tables.
+
  */
