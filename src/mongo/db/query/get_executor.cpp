@@ -1106,22 +1106,23 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
 }
 
 // Checks if the given query can be executed with the SBE engine.
-inline bool isQuerySbeCompatible(const CanonicalQuery* const cq, size_t plannerOptions) {
+inline bool isQuerySbeCompatible(OperationContext* opCtx,
+                                 const CanonicalQuery* const cq,
+                                 size_t plannerOptions) {
     invariant(cq);
     auto expCtx = cq->getExpCtxRaw();
     auto sortPattern = cq->getSortPattern();
     const bool allExpressionsSupported = expCtx && expCtx->sbeCompatible;
     const bool isNotCount = !(plannerOptions & QueryPlannerParams::IS_COUNT);
-    // Specifying 'ntoreturn' in an OP_QUERY style find may result in a QuerySolution with
-    // ENSURE_SORTED node, which is currently not supported by SBE.
-    const bool doesNotNeedEnsureSorted = !cq->getFindCommand().getNtoreturn();
     const bool doesNotContainMetadataRequirements = cq->metadataDeps().none();
     const bool doesNotSortOnDottedPath =
         !sortPattern || std::all_of(sortPattern->begin(), sortPattern->end(), [](auto&& part) {
             return part.fieldPath && part.fieldPath->getPathLength() == 1;
         });
-    return allExpressionsSupported && isNotCount && doesNotNeedEnsureSorted &&
-        doesNotContainMetadataRequirements && doesNotSortOnDottedPath;
+    // OP_QUERY style find commands are not currently supported by SBE.
+    const bool isNotLegacy = !CurOp::get(opCtx)->isLegacyQuery();
+    return allExpressionsSupported && isNotCount && doesNotContainMetadataRequirements &&
+        doesNotSortOnDottedPath && isNotLegacy;
 }
 }  // namespace
 
@@ -1132,7 +1133,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     size_t plannerOptions) {
     return feature_flags::gSBE.isEnabledAndIgnoreFCV() &&
-            isQuerySbeCompatible(canonicalQuery.get(), plannerOptions)
+            isQuerySbeCompatible(opCtx, canonicalQuery.get(), plannerOptions)
         ? getSlotBasedExecutor(
               opCtx, collection, std::move(canonicalQuery), yieldPolicy, plannerOptions)
         : getClassicExecutor(
