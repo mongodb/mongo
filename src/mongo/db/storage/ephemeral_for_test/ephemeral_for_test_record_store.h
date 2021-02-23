@@ -106,9 +106,6 @@ public:
                                    BSONObjBuilder* result,
                                    double scale) const;
 
-    virtual boost::optional<RecordId> oplogStartHack(OperationContext* opCtx,
-                                                     const RecordId& startingPosition) const;
-
     void waitForAllEarlierOplogWritesToBeVisible(OperationContext* opCtx) const override;
 
     virtual void updateStatsAfterRepair(OperationContext* opCtx,
@@ -191,6 +188,7 @@ private:
                VisibilityManager* visibilityManager);
         boost::optional<Record> next() final;
         boost::optional<Record> seekExact(const RecordId& id) final override;
+        boost::optional<Record> seekNear(const RecordId& id) final override;
         void save() final;
         void saveUnpositioned() final override;
         bool restore() final;
@@ -216,6 +214,7 @@ private:
                       VisibilityManager* visibilityManager);
         boost::optional<Record> next() final;
         boost::optional<Record> seekExact(const RecordId& id) final override;
+        boost::optional<Record> seekNear(const RecordId& id) final override;
         void save() final;
         void saveUnpositioned() final override;
         bool restore() final;

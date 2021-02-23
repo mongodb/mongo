@@ -42,11 +42,8 @@
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/db/storage/oplog_hack.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/fail_point.h"
-
-#include "mongo/db/client.h"  // XXX-ERH
 
 namespace mongo {
 
@@ -67,36 +64,35 @@ CollectionScan::CollectionScan(ExpressionContext* expCtx,
       _params(params) {
     // Explain reports the direction of the collection scan.
     _specificStats.direction = params.direction;
-    _specificStats.minTs = params.minTs;
-    _specificStats.maxTs = params.maxTs;
+    _specificStats.minRecord = params.minRecord;
+    _specificStats.maxRecord = params.maxRecord;
     _specificStats.tailable = params.tailable;
-    if (params.minTs || params.maxTs) {
-        // The 'minTs' and 'maxTs' parameters are used for a special optimization that
-        // applies only to forwards scans of the oplog.
-        invariant(params.direction == CollectionScanParams::FORWARD);
-        invariant(collection->ns().isOplog());
+    if (params.minRecord || params.maxRecord) {
+        // The 'minRecord' and 'maxRecord' parameters are used for a special optimization that
+        // applies only to forwards scans of the oplog and scans on collections clustered by _id.
         invariant(!params.resumeAfterRecordId);
+        if (collection->ns().isOplog()) {
+            invariant(params.direction == CollectionScanParams::FORWARD);
+        } else {
+            invariant(collection->isClustered());
+        }
     }
+    LOGV2_DEBUG(5400802,
+                5,
+                "collection scan bounds",
+                "min"_attr = (!_params.minRecord) ? "none" : _params.minRecord->toString(),
+                "max"_attr = (!_params.maxRecord) ? "none" : _params.maxRecord->toString());
     invariant(!_params.shouldTrackLatestOplogTimestamp || collection->ns().isOplog());
 
-    // We should never see 'assertMinTsHasNotFallenOffOplog' if 'minTS' is not present. This can be
-    // incorrectly requested by the user, but in that case we should already have uasserted by now.
-    if (params.assertMinTsHasNotFallenOffOplog) {
+    if (params.assertTsHasNotFallenOffOplog) {
         invariant(params.shouldTrackLatestOplogTimestamp);
-        invariant(params.minTs);
+        invariant(params.direction == CollectionScanParams::FORWARD);
     }
 
     if (params.resumeAfterRecordId) {
         // The 'resumeAfterRecordId' parameter is used for resumable collection scans, which we
         // only support in the forward direction.
         invariant(params.direction == CollectionScanParams::FORWARD);
-    }
-
-    // Set early stop condition.
-    if (params.maxTs) {
-        _endConditionBSON = BSON("$gte"_sd << *(params.maxTs));
-        _endCondition = std::make_unique<GTEMatchExpression>(repl::OpTime::kTimestampFieldName,
-                                                             _endConditionBSON.firstElement());
     }
 }
 
@@ -169,17 +165,16 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
             return PlanStage::NEED_TIME;
         }
 
-        if (_lastSeenId.isNull() && _params.minTs) {
-            // See if the RecordStore supports the oplogStartHack.
-            StatusWith<RecordId> goal = oploghack::keyForOptime(*_params.minTs);
-            if (goal.isOK()) {
-                boost::optional<RecordId> startLoc =
-                    collection()->getRecordStore()->oplogStartHack(opCtx(), goal.getValue());
-                if (startLoc && !startLoc->isNull()) {
-                    LOGV2_DEBUG(20584, 3, "Using direct oplog seek");
-                    record = _cursor->seekExact(*startLoc);
-                }
-            }
+        if (_lastSeenId.isNull() && _params.direction == CollectionScanParams::FORWARD &&
+            _params.minRecord) {
+            // Seek to the approximate start location.
+            record = _cursor->seekNear(*_params.minRecord);
+        }
+
+        if (_lastSeenId.isNull() && _params.direction == CollectionScanParams::BACKWARD &&
+            _params.maxRecord) {
+            // Seek to the approximate start location (at the end).
+            record = _cursor->seekNear(*_params.maxRecord);
         }
 
         if (!record) {
@@ -205,8 +200,8 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
     }
 
     _lastSeenId = record->id;
-    if (_params.assertMinTsHasNotFallenOffOplog) {
-        assertMinTsHasNotFallenOffOplog(*record);
+    if (_params.assertTsHasNotFallenOffOplog) {
+        assertTsHasNotFallenOffOplog(*record);
     }
     if (_params.shouldTrackLatestOplogTimestamp) {
         setLatestOplogEntryTimestamp(*record);
@@ -231,37 +226,54 @@ void CollectionScan::setLatestOplogEntryTimestamp(const Record& record) {
     _latestOplogEntryTimestamp = std::max(_latestOplogEntryTimestamp, tsElem.timestamp());
 }
 
-void CollectionScan::assertMinTsHasNotFallenOffOplog(const Record& record) {
+void CollectionScan::assertTsHasNotFallenOffOplog(const Record& record) {
     // If the first entry we see in the oplog is the replset initialization, then it doesn't matter
-    // if its timestamp is later than the specified minTs; no events earlier than the minTs can have
-    // fallen off this oplog. Otherwise, verify that the timestamp of the first observed oplog entry
-    // is earlier than or equal to the minTs time.
+    // if its timestamp is later than the timestamp that should not have fallen off the oplog; no
+    // events earlier can have fallen off this oplog. Otherwise, verify that the timestamp of the
+    // first observed oplog entry is earlier than or equal to timestamp that should not have fallen
+    // off the oplog.
     auto oplogEntry = invariantStatusOK(repl::OplogEntry::parse(record.data.toBson()));
     invariant(_specificStats.docsTested == 0);
     const bool isNewRS =
         oplogEntry.getObject().binaryEqual(BSON("msg" << repl::kInitiatingSetMsg)) &&
         oplogEntry.getOpType() == repl::OpTypeEnum::kNoop;
     uassert(ErrorCodes::OplogQueryMinTsMissing,
-            "Specified minTs has already fallen off the oplog",
-            isNewRS || oplogEntry.getTimestamp() <= *_params.minTs);
+            "Specified timestamp has already fallen off the oplog",
+            isNewRS || oplogEntry.getTimestamp() <= *_params.assertTsHasNotFallenOffOplog);
     // We don't need to check this assertion again after we've confirmed the first oplog event.
-    _params.assertMinTsHasNotFallenOffOplog = false;
+    _params.assertTsHasNotFallenOffOplog = boost::none;
 }
+
+namespace {
+bool atEndOfRangeInclusive(const CollectionScanParams& params, const WorkingSetMember& member) {
+    if (params.direction == CollectionScanParams::FORWARD) {
+        return params.maxRecord && member.recordId > *params.maxRecord;
+    } else {
+        return params.minRecord && member.recordId < *params.minRecord;
+    }
+}
+}  // namespace
 
 PlanStage::StageState CollectionScan::returnIfMatches(WorkingSetMember* member,
                                                       WorkingSetID memberID,
                                                       WorkingSetID* out) {
     ++_specificStats.docsTested;
+
+    // The 'minRecord' and 'maxRecord' bounds are always inclusive, even if the query predicate is
+    // an exclusive inequality like $gt or $lt. In such cases, we rely on '_filter' to either
+    // exclude or include the endpoints as required by the user's query.
+    if (atEndOfRangeInclusive(_params, *member)) {
+        _workingSet->free(memberID);
+        _commonStats.isEOF = true;
+        return PlanStage::IS_EOF;
+    }
+
     if (Filter::passes(member, _filter)) {
         if (_params.stopApplyingFilterAfterFirstMatch) {
             _filter = nullptr;
         }
         *out = memberID;
         return PlanStage::ADVANCED;
-    } else if (_endCondition && Filter::passes(member, _endCondition.get())) {
-        _workingSet->free(memberID);
-        _commonStats.isEOF = true;
-        return PlanStage::IS_EOF;
     } else {
         _workingSet->free(memberID);
         return PlanStage::NEED_TIME;

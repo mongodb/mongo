@@ -184,6 +184,20 @@ public:
     virtual boost::optional<Record> seekExact(const RecordId& id) = 0;
 
     /**
+     * Positions this cursor near 'start' or an adjacent record if 'start' does not exist. If there
+     * is not an exact match, the cursor is positioned on the directionally previous Record. If no
+     * earlier record exists, the cursor is positioned on the directionally following record.
+     * Returns boost::none if the RecordStore is empty.
+     *
+     * For forward cursors, returns the Record with the highest RecordId less than or equal to
+     * 'start'. If no such record exists, positions on the next highest RecordId after 'start'.
+     *
+     * For reverse cursors, returns the Record with the lowest RecordId greater than or equal to
+     * 'start'. If no such record exists, positions on the next lowest RecordId before 'start'.
+     */
+    virtual boost::optional<Record> seekNear(const RecordId& start) = 0;
+
+    /**
      * Prepares for state changes in underlying data without necessarily saving the current
      * state.
      *
@@ -489,18 +503,6 @@ public:
     virtual void appendCustomStats(OperationContext* opCtx,
                                    BSONObjBuilder* result,
                                    double scale) const = 0;
-
-    /**
-     * Return the RecordId of an oplog entry as close to startingPosition as possible without
-     * being higher. If there are no entries <= startingPosition, return RecordId().
-     *
-     * If you don't implement the oplogStartHack, just use the default implementation which
-     * returns boost::none.
-     */
-    virtual boost::optional<RecordId> oplogStartHack(OperationContext* opCtx,
-                                                     const RecordId& startingPosition) const {
-        return boost::none;
-    }
 
     /**
      * When we write to an oplog, we call this so that that the storage engine can manage the

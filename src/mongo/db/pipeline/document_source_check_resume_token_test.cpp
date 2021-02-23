@@ -77,6 +77,9 @@ public:
     boost::optional<Record> seekExact(const RecordId& id) override {
         return Record{};
     }
+    boost::optional<Record> seekNear(const RecordId& id) override {
+        return boost::none;
+    }
     void save() override {}
     bool restore() override {
         return true;
@@ -115,7 +118,7 @@ public:
         _data.push_back(mutableDoc.freeze().toBson());
         Record record;
         record.data = {_data.back().objdata(), _data.back().objsize()};
-        record.id = RecordId{static_cast<int64_t>(_data.size())};
+        record.id = RecordId{doc["ts"].getTimestamp().asLL()};
         _records.push_back(std::move(record));
     }
 
@@ -162,9 +165,9 @@ public:
         : DocumentSourceMock({}, expCtx), _collectionPtr(&_collection) {
         _filterExpr = BSON("ns" << kTestNs);
         _filter = MatchExpressionParser::parseAndNormalize(_filterExpr, pExpCtx);
-        _params.assertMinTsHasNotFallenOffOplog = true;
+        _params.assertTsHasNotFallenOffOplog = Timestamp(0);
         _params.shouldTrackLatestOplogTimestamp = true;
-        _params.minTs = Timestamp(0, 0);
+        _params.minRecord = RecordId(0);
         _params.tailable = true;
     }
 
@@ -172,7 +175,8 @@ public:
         invariant(!_collScan);
         _filterExpr = BSON("ns" << kTestNs << "ts" << BSON("$gte" << resumeToken.clusterTime));
         _filter = MatchExpressionParser::parseAndNormalize(_filterExpr, pExpCtx);
-        _params.minTs = resumeToken.clusterTime;
+        _params.minRecord = RecordId(resumeToken.clusterTime.asLL());
+        _params.assertTsHasNotFallenOffOplog = resumeToken.clusterTime;
     }
 
     void push_back(GetNextResult&& result) {

@@ -197,9 +197,6 @@ public:
 
     virtual void cappedTruncateAfter(OperationContext* opCtx, RecordId end, bool inclusive);
 
-    virtual boost::optional<RecordId> oplogStartHack(OperationContext* opCtx,
-                                                     const RecordId& startingPosition) const;
-
     virtual Status oplogDiskLocRegister(OperationContext* opCtx,
                                         const Timestamp& opTime,
                                         bool orderedCommit);
@@ -425,6 +422,8 @@ public:
     boost::optional<Record> next();
 
     boost::optional<Record> seekExact(const RecordId& id);
+
+    boost::optional<Record> seekNear(const RecordId& start);
 
     void save();
 

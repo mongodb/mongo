@@ -62,8 +62,8 @@
 #include "mongo/db/exec/text.h"
 #include "mongo/db/index/fts_access_method.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
+#include "mongo/db/record_id_helpers.h"
 #include "mongo/db/s/collection_sharding_state.h"
-#include "mongo/db/storage/oplog_hack.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo::stage_builder {
@@ -78,12 +78,12 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
             CollectionScanParams params;
             params.tailable = csn->tailable;
             params.shouldTrackLatestOplogTimestamp = csn->shouldTrackLatestOplogTimestamp;
-            params.assertMinTsHasNotFallenOffOplog = csn->assertMinTsHasNotFallenOffOplog;
+            params.assertTsHasNotFallenOffOplog = csn->assertTsHasNotFallenOffOplog;
             params.direction = (csn->direction == 1) ? CollectionScanParams::FORWARD
                                                      : CollectionScanParams::BACKWARD;
             params.shouldWaitForOplogVisibility = csn->shouldWaitForOplogVisibility;
-            params.minTs = csn->minTs;
-            params.maxTs = csn->maxTs;
+            params.minRecord = csn->minRecord;
+            params.maxRecord = csn->maxRecord;
             params.requestResumeToken = csn->requestResumeToken;
             params.resumeAfterRecordId = csn->resumeAfterRecordId;
             params.stopApplyingFilterAfterFirstMatch = csn->stopApplyingFilterAfterFirstMatch;

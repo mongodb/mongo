@@ -235,11 +235,17 @@ void statsToBSON(const PlanStageStats& stats,
     } else if (STAGE_COLLSCAN == stats.stageType) {
         CollectionScanStats* spec = static_cast<CollectionScanStats*>(stats.specific.get());
         bob->append("direction", spec->direction > 0 ? "forward" : "backward");
-        if (spec->minTs) {
-            bob->append("minTs", *(spec->minTs));
+        if (spec->minRecord) {
+            spec->minRecord->withFormat(
+                [&](RecordId::Null n) { bob->appendNull("minRecord"); },
+                [&](int64_t rid) { bob->append("minRecord", rid); },
+                [&](const char* str, int size) { bob->append("minRecord", OID::from(str)); });
         }
-        if (spec->maxTs) {
-            bob->append("maxTs", *(spec->maxTs));
+        if (spec->maxRecord) {
+            spec->maxRecord->withFormat(
+                [&](RecordId::Null n) { bob->appendNull("maxRecord"); },
+                [&](int64_t rid) { bob->append("maxRecord", rid); },
+                [&](const char* str, int size) { bob->append("maxRecord", OID::from(str)); });
         }
         if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
             bob->appendNumber("docsExamined", static_cast<long long>(spec->docsTested));

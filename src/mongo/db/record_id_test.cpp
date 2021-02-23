@@ -112,13 +112,13 @@ TEST(RecordId, OidTest) {
 TEST(RecordId, NullTest) {
     // The int64 format should be considered null if its value is 0. Likewise, the value should be
     // interpreted as int64_t(0) if it is null.
-    RecordId nullRid(0);
-    ASSERT(nullRid.isNull());
-
-    RecordId rid0;
+    RecordId rid0(0);
     ASSERT(rid0.isNull());
-    ASSERT_EQ(0, rid0.asLong());
-    ASSERT_EQ(nullRid, rid0);
+
+    RecordId nullRid;
+    ASSERT(nullRid.isNull());
+    ASSERT_EQ(0, nullRid.asLong());
+    ASSERT_NE(rid0, nullRid);
 }
 
 TEST(RecordId, OidTestCompare) {

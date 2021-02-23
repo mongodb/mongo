@@ -34,8 +34,8 @@
 #include <mutex>
 
 #include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/record_id_helpers.h"
 #include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_recovery_unit.h"
-#include "mongo/db/storage/oplog_hack.h"
 
 namespace mongo {
 namespace ephemeral_for_test {
@@ -146,7 +146,7 @@ bool RecoveryUnit::forkIfNeeded() {
 }
 
 Status RecoveryUnit::setTimestamp(Timestamp timestamp) {
-    auto key = oploghack::keyForOptime(timestamp);
+    auto key = record_id_helpers::keyForOptime(timestamp);
     if (!key.isOK())
         return key.getStatus();
 

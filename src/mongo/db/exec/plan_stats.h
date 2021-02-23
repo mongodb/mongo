@@ -38,6 +38,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/stage_types.h"
+#include "mongo/db/record_id.h"
 #include "mongo/util/container_size_helper.h"
 #include "mongo/util/time_support.h"
 
@@ -246,13 +247,11 @@ struct CollectionScanStats : public SpecificStats {
 
     bool tailable{false};
 
-    // The start location of the scan. Must only be set on forward oplog scans.
-    boost::optional<Timestamp> minTs;
+    // The start location of a forward scan and end location for a reverse scan.
+    boost::optional<RecordId> minRecord;
 
-    // Indicates that the collection scan will stop and return EOF the first time it sees a
-    // document that does not pass the filter and has a "ts" Timestamp field greater than 'maxTs'.
-    // Must only be set on forward oplog scans.
-    boost::optional<Timestamp> maxTs;
+    // The end location of a reverse scan and start location for a forward scan.
+    boost::optional<RecordId> maxRecord;
 };
 
 struct CountStats : public SpecificStats {

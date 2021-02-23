@@ -105,16 +105,6 @@ env.Library(
     )
 
 env.Library(
-    target='oplog_hack',
-    source=[
-        'oplog_hack.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-    ],
-)
-
-env.Library(
     target='storage_control',
     source=[
         'control/storage_control.cpp',

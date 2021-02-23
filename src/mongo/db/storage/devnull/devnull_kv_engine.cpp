@@ -47,6 +47,9 @@ public:
     boost::optional<Record> seekExact(const RecordId& id) final {
         return {};
     }
+    boost::optional<Record> seekNear(const RecordId& id) final {
+        return {};
+    }
     void save() final {}
     bool restore() final {
         return true;

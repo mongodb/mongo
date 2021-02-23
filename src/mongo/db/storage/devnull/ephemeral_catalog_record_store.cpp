@@ -36,7 +36,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/storage/oplog_hack.h"
+#include "mongo/db/record_id_helpers.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/str.h"
@@ -150,6 +150,11 @@ public:
         return {{_it->first, _it->second.toRecordData()}};
     }
 
+    boost::optional<Record> seekNear(const RecordId& id) final {
+        // not implemented
+        return boost::none;
+    }
+
     void save() final {
         if (!_needFirstSeek && !_lastMoveWasRestore)
             _savedId = _it == _records.end() ? RecordId() : _it->first;
@@ -221,6 +226,11 @@ public:
         dassert(_it != _records.rend());
         dassert(_it->first == id);
         return {{_it->first, _it->second.toRecordData()}};
+    }
+
+    boost::optional<Record> seekNear(const RecordId& id) final {
+        // not implemented
+        return boost::none;
     }
 
     void save() final {
@@ -386,7 +396,7 @@ void EphemeralForTestRecordStore::cappedDeleteAsNeeded(WithLock lk, OperationCon
 StatusWith<RecordId> EphemeralForTestRecordStore::extractAndCheckLocForOplog(WithLock,
                                                                              const char* data,
                                                                              int len) const {
-    StatusWith<RecordId> status = oploghack::extractKey(data, len);
+    StatusWith<RecordId> status = record_id_helpers::extractKey(data, len);
     if (!status.isOK())
         return status;
 
@@ -566,29 +576,4 @@ RecordId EphemeralForTestRecordStore::allocateLoc(WithLock) {
     invariant(out.isValid());
     return out;
 }
-
-boost::optional<RecordId> EphemeralForTestRecordStore::oplogStartHack(
-    OperationContext* opCtx, const RecordId& startingPosition) const {
-    if (!_data->isOplog)
-        return boost::none;
-
-    stdx::lock_guard<stdx::recursive_mutex> lock(_data->recordsMutex);
-    const Records& records = _data->records;
-
-    if (records.empty())
-        return RecordId();
-
-    Records::const_iterator it = records.lower_bound(startingPosition);
-    if (it == records.end() || it->first > startingPosition) {
-        // If the startingPosition is before the oldest oplog entry, this ensures that we return
-        // RecordId() as specified in record_store.h.
-        if (it == records.begin()) {
-            return RecordId();
-        }
-        --it;
-    }
-
-    return it->first;
-}
-
 }  // namespace mongo

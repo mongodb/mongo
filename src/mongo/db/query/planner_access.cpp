@@ -50,6 +50,7 @@
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_common.h"
+#include "mongo/db/record_id_helpers.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/transitional_tools_do_not_use/vector_spooling.h"
 
@@ -217,8 +218,6 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
     csn->tailable = tailable;
     csn->shouldTrackLatestOplogTimestamp =
         params.options & QueryPlannerParams::TRACK_LATEST_OPLOG_TS;
-    csn->assertMinTsHasNotFallenOffOplog =
-        params.options & QueryPlannerParams::ASSERT_MIN_TS_HAS_NOT_FALLEN_OFF_OPLOG;
     csn->shouldWaitForOplogVisibility =
         params.options & QueryPlannerParams::OPLOG_SCAN_WAIT_FOR_VISIBLE;
 
@@ -257,11 +256,29 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
         }
     }
 
+    const bool assertMinTsHasNotFallenOffOplog =
+        params.options & QueryPlannerParams::ASSERT_MIN_TS_HAS_NOT_FALLEN_OFF_OPLOG;
     if (query.nss().isOplog() && csn->direction == 1) {
         // Optimizes the start and end location parameters for a collection scan for an oplog
         // collection. Not compatible with $_resumeAfter so we do not optimize in that case.
         if (resumeAfterObj.isEmpty()) {
-            std::tie(csn->minTs, csn->maxTs) = extractTsRange(query.root());
+            auto [minTs, maxTs] = extractTsRange(query.root());
+            if (minTs) {
+                StatusWith<RecordId> goal = record_id_helpers::keyForOptime(*minTs);
+                if (goal.isOK()) {
+                    csn->minRecord = goal.getValue();
+                }
+
+                if (assertMinTsHasNotFallenOffOplog) {
+                    csn->assertTsHasNotFallenOffOplog = *minTs;
+                }
+            }
+            if (maxTs) {
+                StatusWith<RecordId> goal = record_id_helpers::keyForOptime(*maxTs);
+                if (goal.isOK()) {
+                    csn->maxRecord = goal.getValue();
+                }
+            }
         }
 
         // If the query is just a lower bound on "ts" on a forward scan, every document in the
@@ -275,11 +292,12 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
 
     // The user may have requested 'assertMinTsHasNotFallenOffOplog' for a query that does not
     // specify a minimum timestamp. This is not a valid request, so we throw InvalidOptions.
-    uassert(ErrorCodes::InvalidOptions,
-            str::stream() << "assertMinTsHasNotFallenOffOplog cannot be applied to a query "
-                             "which does not imply a minimum 'ts' value ",
-            !(csn->assertMinTsHasNotFallenOffOplog && !csn->minTs));
-
+    if (assertMinTsHasNotFallenOffOplog) {
+        uassert(ErrorCodes::InvalidOptions,
+                str::stream() << "assertTsHasNotFallenOffOplog cannot be applied to a query "
+                                 "which does not imply a minimum 'ts' value ",
+                csn->assertTsHasNotFallenOffOplog);
+    }
     return csn;
 }
 

@@ -33,6 +33,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include <fmt/printf.h>
 #include <memory>
 
 #include "mongo/client/dbclient_cursor.h"
@@ -143,6 +144,50 @@ public:
                 out->push_back(member->recordId);
             }
         }
+    }
+
+    class ScopedCollectionDeleter {
+    public:
+        ScopedCollectionDeleter(OperationContext* opCtx, NamespaceString nss)
+            : _opCtx(opCtx), _nss(nss) {}
+        ~ScopedCollectionDeleter() {
+            AutoGetDb autoDb(_opCtx, _nss.db(), MODE_IX);
+            if (!autoDb.getDb())
+                return;
+
+            AutoGetCollection autoColl(_opCtx, _nss, MODE_X);
+            if (!autoColl.getCollection())
+                return;
+
+            WriteUnitOfWork wuow(_opCtx);
+            ASSERT_OK(autoDb.getDb()->dropCollection(_opCtx, _nss));
+            wuow.commit();
+        }
+        ScopedCollectionDeleter(const ScopedCollectionDeleter&& other) = delete;
+
+    private:
+        OperationContext* _opCtx;
+        NamespaceString _nss;
+    };
+
+    ScopedCollectionDeleter makeCollectionClustered(const NamespaceString& ns) {
+        AutoGetOrCreateDb autoDb(&_opCtx, ns.db(), MODE_X);
+
+        {
+            WriteUnitOfWork wuow(&_opCtx);
+            CollectionOptions collOptions;
+            collOptions.clusteredIndex = ClusteredIndexOptions{};
+            const bool createIdIndex = false;
+            autoDb.getDb()->createCollection(&_opCtx, ns, collOptions, createIdIndex);
+            wuow.commit();
+        }
+
+
+        for (int i = 0; i < numObj(); ++i) {
+            _client.insert(ns.ns(), BSON("foo" << i));
+        }
+
+        return {&_opCtx, ns};
     }
 
     static int numObj() {
@@ -441,4 +486,320 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanResumeAfterRecordIdSeekFai
     ASSERT_THROWS_CODE(ps->work(&id), DBException, ErrorCodes::KeyNotFound);
 }
 
+TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredMinMax) {
+    if (!(&_opCtx)->getServiceContext()->getStorageEngine()->supportsClusteredIdIndex()) {
+        return;
+    }
+    auto ns = NamespaceString("a.b");
+    auto collDeleter = makeCollectionClustered(ns);
+    AutoGetCollectionForRead autoColl(&_opCtx, ns);
+    const CollectionPtr& coll = autoColl.getCollection();
+
+    ASSERT(coll->isClustered());
+
+    // Get the RecordIds that would be returned by an in-order scan.
+    vector<RecordId> recordIds;
+    getRecordIds(coll, CollectionScanParams::FORWARD, &recordIds);
+    ASSERT(recordIds.size());
+
+    // Configure the scan.
+    CollectionScanParams params;
+    params.direction = CollectionScanParams::FORWARD;
+    params.tailable = false;
+    params.minRecord = recordIds[0];
+    params.maxRecord = recordIds[recordIds.size() - 1];
+
+    WorkingSet ws;
+    auto scan = std::make_unique<CollectionScan>(_expCtx.get(), coll, params, &ws, nullptr);
+
+    // Expect to see all RecordIds.
+    int count = 0;
+    while (!scan->isEOF()) {
+        WorkingSetID id = WorkingSet::INVALID_ID;
+        PlanStage::StageState state = scan->work(&id);
+        if (PlanStage::ADVANCED == state) {
+            WorkingSetMember* member = ws.get(id);
+            ASSERT(member->hasRecordId());
+            ASSERT(member->hasObj());
+            ASSERT_EQ(member->recordId, recordIds[count]);
+            ASSERT_EQUALS(coll->docFor(&_opCtx, recordIds[count]).value()["foo"].numberInt(),
+                          member->doc.value()["foo"].getInt());
+            count++;
+        }
+    }
+
+    ASSERT_EQ(count, recordIds.size());
+}
+
+TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredReverse) {
+    if (!(&_opCtx)->getServiceContext()->getStorageEngine()->supportsClusteredIdIndex()) {
+        return;
+    }
+    auto ns = NamespaceString("a.b");
+    auto collDeleter = makeCollectionClustered(ns);
+    AutoGetCollectionForRead autoColl(&_opCtx, ns);
+    const CollectionPtr& coll = autoColl.getCollection();
+
+    ASSERT(coll->isClustered());
+
+    // Get the RecordIds that would be returned by a backwards scan.
+    vector<RecordId> recordIds;
+    getRecordIds(coll, CollectionScanParams::BACKWARD, &recordIds);
+    ASSERT(recordIds.size());
+
+    // Configure the scan.
+    CollectionScanParams params;
+    params.direction = CollectionScanParams::BACKWARD;
+    params.tailable = false;
+    // The last entry in recordIds is the lowest record in the collection and the first entry is the
+    // highest.
+    params.minRecord = recordIds[recordIds.size() - 1];
+    params.maxRecord = recordIds[0];
+
+    WorkingSet ws;
+    auto scan = std::make_unique<CollectionScan>(_expCtx.get(), coll, params, &ws, nullptr);
+
+    // Expect to see all RecordIds.
+    int count = 0;
+    while (!scan->isEOF()) {
+        WorkingSetID id = WorkingSet::INVALID_ID;
+        PlanStage::StageState state = scan->work(&id);
+        if (PlanStage::ADVANCED == state) {
+            WorkingSetMember* member = ws.get(id);
+            ASSERT(member->hasRecordId());
+            ASSERT(member->hasObj());
+            ASSERT_EQ(member->recordId, recordIds[count]);
+            ASSERT_EQUALS(coll->docFor(&_opCtx, recordIds[count]).value()["foo"].numberInt(),
+                          member->doc.value()["foo"].getInt());
+            count++;
+        }
+    }
+
+    ASSERT_EQ(count, recordIds.size());
+}
+
+TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredNonExistentRecordIds) {
+    if (!(&_opCtx)->getServiceContext()->getStorageEngine()->supportsClusteredIdIndex()) {
+        return;
+    }
+    auto ns = NamespaceString("a.b");
+    auto collDeleter = makeCollectionClustered(ns);
+    AutoGetCollectionForRead autoColl(&_opCtx, ns);
+    const CollectionPtr& coll = autoColl.getCollection();
+
+    ASSERT(coll->isClustered());
+
+    // Get the RecordIds that would be returned by an in-order scan.
+    vector<RecordId> recordIds;
+    getRecordIds(coll, CollectionScanParams::FORWARD, &recordIds);
+    ASSERT(recordIds.size());
+
+    // Configure the scan.
+    CollectionScanParams params;
+    params.direction = CollectionScanParams::FORWARD;
+    params.tailable = false;
+
+    // Use RecordIds that don't exist. Expect to see all records.
+    params.minRecord = RecordId(OID().view().view(), OID::kOIDSize);
+    params.maxRecord = RecordId(OID::max().view().view(), OID::kOIDSize);
+
+    WorkingSet ws;
+    auto scan = std::make_unique<CollectionScan>(_expCtx.get(), coll, params, &ws, nullptr);
+
+    // Expect to see all RecordIds.
+    int count = 0;
+    while (!scan->isEOF()) {
+        WorkingSetID id = WorkingSet::INVALID_ID;
+        PlanStage::StageState state = scan->work(&id);
+        if (PlanStage::ADVANCED == state) {
+            WorkingSetMember* member = ws.get(id);
+            ASSERT(member->hasRecordId());
+            ASSERT(member->hasObj());
+            ASSERT_EQ(member->recordId, recordIds[count]);
+            ASSERT_EQUALS(coll->docFor(&_opCtx, recordIds[count]).value()["foo"].numberInt(),
+                          member->doc.value()["foo"].getInt());
+            count++;
+        }
+    }
+
+    ASSERT_EQ(count, recordIds.size());
+}
+
+TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredInnerRange) {
+    if (!(&_opCtx)->getServiceContext()->getStorageEngine()->supportsClusteredIdIndex()) {
+        return;
+    }
+    auto ns = NamespaceString("a.b");
+    auto collDeleter = makeCollectionClustered(ns);
+    AutoGetCollectionForRead autoColl(&_opCtx, ns);
+    const CollectionPtr& coll = autoColl.getCollection();
+
+    ASSERT(coll->isClustered());
+
+    // Get the RecordIds that would be returned by an in-order scan.
+    vector<RecordId> recordIds;
+    getRecordIds(coll, CollectionScanParams::FORWARD, &recordIds);
+    ASSERT(recordIds.size());
+
+    // Configure the scan.
+    CollectionScanParams params;
+    params.direction = CollectionScanParams::FORWARD;
+    params.tailable = false;
+
+    const int startOffset = 10;
+    const int endOffset = 20;
+    ASSERT_LT(startOffset, recordIds.size());
+    ASSERT_LT(endOffset, recordIds.size());
+
+    params.minRecord = recordIds[startOffset];
+    params.maxRecord = recordIds[endOffset];
+
+    WorkingSet ws;
+    auto scan = std::make_unique<CollectionScan>(_expCtx.get(), coll, params, &ws, nullptr);
+
+    int count = 0;
+    while (!scan->isEOF()) {
+        WorkingSetID id = WorkingSet::INVALID_ID;
+        PlanStage::StageState state = scan->work(&id);
+        if (PlanStage::ADVANCED == state) {
+            WorkingSetMember* member = ws.get(id);
+            ASSERT(member->hasRecordId());
+            ASSERT(member->hasObj());
+            int i = startOffset + count;
+            ASSERT_EQ(member->recordId, recordIds[i]);
+            ASSERT_EQUALS(coll->docFor(&_opCtx, recordIds[i]).value()["foo"].numberInt(),
+                          member->doc.value()["foo"].getInt());
+            count++;
+        }
+    }
+
+    // There are 11 records between 10 and 20 inclusive
+    ASSERT_EQ(count, 1 + endOffset - startOffset);
+}
+
+TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredInnerRangeExclusive) {
+    if (!(&_opCtx)->getServiceContext()->getStorageEngine()->supportsClusteredIdIndex()) {
+        return;
+    }
+    auto ns = NamespaceString("a.b");
+    auto collDeleter = makeCollectionClustered(ns);
+    AutoGetCollectionForRead autoColl(&_opCtx, ns);
+    const CollectionPtr& coll = autoColl.getCollection();
+
+    ASSERT(coll->isClustered());
+
+    // Get the RecordIds that would be returned by an in-order scan.
+    vector<RecordId> recordIds;
+    getRecordIds(coll, CollectionScanParams::FORWARD, &recordIds);
+    ASSERT(recordIds.size());
+
+    // Configure the scan.
+    CollectionScanParams params;
+    params.direction = CollectionScanParams::FORWARD;
+    params.tailable = false;
+
+    const int startOffset = 10;
+    const int endOffset = 20;
+    ASSERT_LT(startOffset, recordIds.size());
+    ASSERT_LT(endOffset, recordIds.size());
+
+    params.minRecord = recordIds[startOffset];
+    params.maxRecord = recordIds[endOffset];
+
+    // Provide RecordId bounds with exclusive filters.
+    StatusWithMatchExpression swMatch = MatchExpressionParser::parse(
+        fromjson(fmt::sprintf("{_id: {$gt: ObjectId('%s'), $lt: ObjectId('%s')}}",
+                              params.minRecord->toString(),
+                              params.maxRecord->toString())),
+        _expCtx.get());
+    ASSERT_OK(swMatch.getStatus());
+    auto filter = std::move(swMatch.getValue());
+
+    WorkingSet ws;
+    auto scan = std::make_unique<CollectionScan>(_expCtx.get(), coll, params, &ws, filter.get());
+
+    // The expected range should not include the first or last records.
+    std::vector<RecordId> expectedIds{recordIds.begin() + startOffset + 1,
+                                      recordIds.begin() + endOffset};
+    int count = 0;
+    while (!scan->isEOF()) {
+        WorkingSetID id = WorkingSet::INVALID_ID;
+        PlanStage::StageState state = scan->work(&id);
+        if (PlanStage::ADVANCED == state) {
+            WorkingSetMember* member = ws.get(id);
+            ASSERT(member->hasRecordId());
+            ASSERT(member->hasObj());
+            ASSERT_EQ(member->recordId, expectedIds[count]);
+            ASSERT_EQUALS(coll->docFor(&_opCtx, expectedIds[count]).value()["foo"].numberInt(),
+                          member->doc.value()["foo"].getInt());
+            count++;
+        }
+    }
+
+    ASSERT_EQ(count, expectedIds.size());
+}
+
+TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredInnerRangeExclusiveReverse) {
+    if (!(&_opCtx)->getServiceContext()->getStorageEngine()->supportsClusteredIdIndex()) {
+        return;
+    }
+    auto ns = NamespaceString("a.b");
+    auto collDeleter = makeCollectionClustered(ns);
+    AutoGetCollectionForRead autoColl(&_opCtx, ns);
+    const CollectionPtr& coll = autoColl.getCollection();
+
+    ASSERT(coll->isClustered());
+
+    // Get the RecordIds that would be returned by a reverse scan.
+    vector<RecordId> recordIds;
+    getRecordIds(coll, CollectionScanParams::BACKWARD, &recordIds);
+    ASSERT(recordIds.size());
+
+    // Configure the scan.
+    CollectionScanParams params;
+    params.direction = CollectionScanParams::BACKWARD;
+    params.tailable = false;
+
+    const int startOffset = 10;
+    const int endOffset = 20;
+    ASSERT_LT(startOffset, recordIds.size());
+    ASSERT_LT(endOffset, recordIds.size());
+
+    // The last entry in recordIds is the lowest record in the collection and the first entry is the
+    // highest.
+    params.minRecord = recordIds[endOffset];
+    params.maxRecord = recordIds[startOffset];
+
+    // Provide RecordId bounds with exclusive filters.
+    StatusWithMatchExpression swMatch = MatchExpressionParser::parse(
+        fromjson(fmt::sprintf("{_id: {$gt: ObjectId('%s'), $lt: ObjectId('%s')}}",
+                              params.minRecord->toString(),
+                              params.maxRecord->toString())),
+        _expCtx.get());
+    ASSERT_OK(swMatch.getStatus());
+    auto filter = std::move(swMatch.getValue());
+
+    WorkingSet ws;
+    auto scan = std::make_unique<CollectionScan>(_expCtx.get(), coll, params, &ws, filter.get());
+
+    // The expected range should not include the first or last records.
+    std::vector<RecordId> expectedIds{recordIds.begin() + startOffset + 1,
+                                      recordIds.begin() + endOffset};
+    int count = 0;
+    while (!scan->isEOF()) {
+        WorkingSetID id = WorkingSet::INVALID_ID;
+        PlanStage::StageState state = scan->work(&id);
+        if (PlanStage::ADVANCED == state) {
+            WorkingSetMember* member = ws.get(id);
+            ASSERT(member->hasRecordId());
+            ASSERT(member->hasObj());
+            ASSERT_EQ(member->recordId, expectedIds[count]);
+            ASSERT_EQUALS(coll->docFor(&_opCtx, expectedIds[count]).value()["foo"].numberInt(),
+                          member->doc.value()["foo"].getInt());
+            count++;
+        }
+    }
+
+    ASSERT_EQ(count, expectedIds.size());
+}
 }  // namespace query_stage_collection_scan

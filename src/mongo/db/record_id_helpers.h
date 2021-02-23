@@ -36,7 +36,7 @@ namespace mongo {
 class RecordId;
 class Timestamp;
 
-namespace oploghack {
+namespace record_id_helpers {
 
 /**
  * Converts Timestamp to a RecordId in an unspecified manor that is safe to use as the key to
@@ -49,5 +49,5 @@ StatusWith<RecordId> keyForOptime(const Timestamp& opTime);
  */
 StatusWith<RecordId> extractKey(const char* data, int len);
 
-}  // namespace oploghack
+}  // namespace record_id_helpers
 }  // namespace mongo
