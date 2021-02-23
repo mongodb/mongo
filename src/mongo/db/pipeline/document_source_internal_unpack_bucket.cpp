@@ -108,6 +108,39 @@ void optimizeEndOfPipeline(Pipeline::SourceContainer::iterator itr,
     container->erase(std::next(itr), container->end());
     container->splice(std::next(itr), endOfPipeline);
 }
+
+/**
+ * Creates an ObjectId initialized with an appropriate timestamp corresponding to 'matchExpr' and
+ * returns it as a Value.
+ */
+Value constructObjectIdValue(const ComparisonMatchExpression* matchExpr) {
+    // An ObjectId consists of a 4-byte timestamp, as well as a unique value and a counter, thus
+    // two ObjectIds initialized with the same date will have different values. To ensure that we
+    // do not incorrectly include or exclude any buckets, depending on the operator we will
+    // construct either the largest or the smallest ObjectId possible with the corresponding date.
+    OID oid;
+    if (matchExpr->getData().type() == BSONType::Date) {
+        switch (matchExpr->matchType()) {
+            case MatchExpression::LT: {
+                oid.init(matchExpr->getData().date(), false /* min */);
+                break;
+            }
+            case MatchExpression::LTE:
+            case MatchExpression::EQ: {
+                oid.init(matchExpr->getData().date(), true /* max */);
+                break;
+            }
+            default:
+                // We will only perform this optimization with query operators $lt, $lte and $eq.
+                MONGO_UNREACHABLE_TASSERT(5375801);
+        }
+    }
+    // If the query operand is not of type Date, the original query will not match on any documents
+    // because documents in a time-series collection must have a timeField of type Date. We will
+    // make this case faster by keeping the ObjectId as the lowest possible value so as to
+    // eliminate all buckets.
+    return Value(oid);
+}
 }  // namespace
 
 void BucketUnpacker::reset(BSONObj&& bucket) {
@@ -365,7 +398,7 @@ std::pair<BSONObj, bool> DocumentSourceInternalUnpackBucket::extractOrBuildProje
 }
 
 std::unique_ptr<MatchExpression> createComparisonPredicate(
-    const ComparisonMatchExpression* matchExpr, const boost::optional<std::string>& metaField) {
+    const ComparisonMatchExpression* matchExpr, const BucketSpec& bucketSpec) {
     auto path = matchExpr->path();
     auto rhs = matchExpr->getData();
 
@@ -385,8 +418,9 @@ std::unique_ptr<MatchExpression> createComparisonPredicate(
     }
 
     // We must avoid mapping predicates on the meta field onto the control field.
-    if (metaField &&
-        (path == metaField.get() || expression::isPathPrefixOf(metaField.get(), path))) {
+    if (bucketSpec.metaField &&
+        (path == bucketSpec.metaField.get() ||
+         expression::isPathPrefixOf(bucketSpec.metaField.get(), path))) {
         return nullptr;
     }
 
@@ -400,6 +434,11 @@ std::unique_ptr<MatchExpression> createComparisonPredicate(
             andMatchExpr->add(std::make_unique<InternalExprGTEMatchExpression>(
                 str::stream() << DocumentSourceInternalUnpackBucket::kControlMaxFieldName << path,
                 rhs));
+
+            if (path == bucketSpec.timeField) {
+                andMatchExpr->add(std::make_unique<LTEMatchExpression>(
+                    BucketUnpacker::kBucketIdFieldName, constructObjectIdValue(matchExpr)));
+            }
             return andMatchExpr;
         }
         case MatchExpression::GT: {
@@ -413,14 +452,34 @@ std::unique_ptr<MatchExpression> createComparisonPredicate(
                 rhs);
         }
         case MatchExpression::LT: {
-            return std::make_unique<InternalExprLTMatchExpression>(
+            auto controlPred = std::make_unique<InternalExprLTMatchExpression>(
                 str::stream() << DocumentSourceInternalUnpackBucket::kControlMinFieldName << path,
                 rhs);
+            if (path == bucketSpec.timeField) {
+                auto andMatchExpr = std::make_unique<AndMatchExpression>();
+
+                andMatchExpr->add(std::make_unique<LTMatchExpression>(
+                    BucketUnpacker::kBucketIdFieldName, constructObjectIdValue(matchExpr)));
+                andMatchExpr->add(controlPred.release());
+
+                return andMatchExpr;
+            }
+            return controlPred;
         }
         case MatchExpression::LTE: {
-            return std::make_unique<InternalExprLTEMatchExpression>(
+            auto controlPred = std::make_unique<InternalExprLTEMatchExpression>(
                 str::stream() << DocumentSourceInternalUnpackBucket::kControlMinFieldName << path,
                 rhs);
+            if (path == bucketSpec.timeField) {
+                auto andMatchExpr = std::make_unique<AndMatchExpression>();
+
+                andMatchExpr->add(std::make_unique<LTEMatchExpression>(
+                    BucketUnpacker::kBucketIdFieldName, constructObjectIdValue(matchExpr)));
+                andMatchExpr->add(controlPred.release());
+
+                return andMatchExpr;
+            }
+            return controlPred;
         }
         default:
             MONGO_UNREACHABLE_TASSERT(5348302);
@@ -429,14 +488,15 @@ std::unique_ptr<MatchExpression> createComparisonPredicate(
     MONGO_UNREACHABLE_TASSERT(5348303);
 }
 
-std::unique_ptr<MatchExpression> DocumentSourceInternalUnpackBucket::createPredicatesOnControlField(
+std::unique_ptr<MatchExpression>
+DocumentSourceInternalUnpackBucket::createPredicatesOnBucketLevelField(
     const MatchExpression* matchExpr) const {
     if (matchExpr->matchType() == MatchExpression::AND) {
         auto nextAnd = static_cast<const AndMatchExpression*>(matchExpr);
         auto andMatchExpr = std::make_unique<AndMatchExpression>();
 
         for (size_t i = 0; i < nextAnd->numChildren(); i++) {
-            if (auto child = createPredicatesOnControlField(nextAnd->getChild(i))) {
+            if (auto child = createPredicatesOnBucketLevelField(nextAnd->getChild(i))) {
                 andMatchExpr->add(std::move(child));
             }
         }
@@ -445,7 +505,7 @@ std::unique_ptr<MatchExpression> DocumentSourceInternalUnpackBucket::createPredi
         }
     } else if (ComparisonMatchExpression::isComparisonMatchExpression(matchExpr)) {
         return createComparisonPredicate(static_cast<const ComparisonMatchExpression*>(matchExpr),
-                                         _bucketUnpacker.bucketSpec().metaField);
+                                         _bucketUnpacker.bucketSpec());
     }
 
     return nullptr;
@@ -464,7 +524,7 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
 
     // Attempt to map predicates on bucketed fields to predicates on the control field.
     if (auto nextMatch = dynamic_cast<DocumentSourceMatch*>((*std::next(itr)).get())) {
-        if (auto match = createPredicatesOnControlField(nextMatch->getMatchExpression())) {
+        if (auto match = createPredicatesOnBucketLevelField(nextMatch->getMatchExpression())) {
             // Optimize the newly created MatchExpression.
             auto optimized = MatchExpression::optimize(std::move(match));
             BSONObjBuilder bob;
