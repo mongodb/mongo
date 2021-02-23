@@ -16,8 +16,10 @@ t.save({
 });
 
 // default weight is 1
-// specify weights if you want a field to be more meaningull
+// specify weights if you want a field to be more meaningful
 t.createIndex({dummy: "text"}, {weights: "$**"});
+// ensure listIndexes can handle a string-valued "weights"
+assert.eq(2, t.getIndexes().length);
 
 res = t.find({"$text": {"$search": "blog"}});
 assert.eq(3, res.length(), "A1");

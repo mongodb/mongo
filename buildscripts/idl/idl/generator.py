@@ -1369,11 +1369,10 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         for scalar_type in scalar_types:
             for bson_type in scalar_type.bson_serialization_type:
                 self._writer.write_line('case %s:' % (bson.cpp_bson_type_name(bson_type), ))
-            self._writer.indent()
-            self.gen_field_deserializer(field, scalar_type, "bsonObject", bson_element, None,
-                                        check_type=False)
-            self._writer.write_line('break;')
-            self._writer.unindent()
+                with self._block('{', '}'):
+                    self.gen_field_deserializer(field, scalar_type, "bsonObject", bson_element,
+                                                None, check_type=False)
+                    self._writer.write_line('break;')
 
         if field.type.variant_struct_type:
             self._writer.write_line('case Object:')

@@ -204,4 +204,19 @@ coll.dropIndexes();
 assert.commandFailed(coll.createIndex({a: 1, _fts: "text", _ftsx: 1, c: 1}, {weights: {}}));
 assert.commandFailed(coll.createIndex({a: 1, _fts: "text", _ftsx: 1, c: 1}));
 
+// These are permitted for now, make sure they don't interfere with listIndexes.
+// TODO (SERVER-54712): Remove
+coll.drop();
+assert.commandWorked(coll.createIndex({a: 1, c: 1}, {weights: {d: 1}}));
+coll.getIndexes();
+coll.drop();
+assert.commandWorked(coll.createIndex({a: 1, c: 1}, {weights: "$**"}));
+coll.getIndexes();
+coll.drop();
+assert.commandWorked(coll.createIndex({a: 1, c: 1}, {weights: {}}));
+coll.getIndexes();
+coll.drop();
+assert.commandWorked(coll.createIndex({a: 1, c: 1}, {weights: "$foo"}));
+coll.getIndexes();
+
 coll.drop();
