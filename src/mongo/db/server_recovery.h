@@ -81,7 +81,7 @@ public:
 
 private:
     mutable Mutex _mutex = MONGO_MAKE_LATCH("SizeRecoveryState::_mutex");
-    std::set<std::string> _collectionsAlwaysNeedingSizeAdjustment;
+    StringSet _collectionsAlwaysNeedingSizeAdjustment;
 };
 
 /**
