@@ -33,27 +33,27 @@ assert.commandFailedWithCode(run({$setWindowFields: "invalid"}), ErrorCodes.Fail
 assert.commandFailedWithCode(run({$setWindowFields: {sortBy: "invalid"}}), ErrorCodes.TypeMismatch);
 assert.commandFailedWithCode(run({$setWindowFields: {output: "invalid"}}), ErrorCodes.TypeMismatch);
 
-// TODO SERVER-53402 Enable partitionBy tests.
 // Test that parsing fails for an invalid partitionBy expression.
-// assert.commandFailedWithCode(
-// run({$setWindowFields: {partitionBy: {$notAnOperator: 1}, output: {}}}),
-// ErrorCodes.InvalidPipelineOperator);
+assert.commandFailedWithCode(
+    run({$setWindowFields: {partitionBy: {$notAnOperator: 1}, output: {}}}),
+    ErrorCodes.InvalidPipelineOperator);
 
 // Since partitionBy can be any expression, it can be a variable.
-// assert.commandWorked(run({$setWindowFields: {partitionBy: "$$NOW", output: {}}}));
-// assert.commandWorked(
-// run({$setWindowFields: {partitionBy: "$$myobj.a", output: {}}}, {let : {myobj: {a: 456}}}));
+assert.commandWorked(run({$setWindowFields: {partitionBy: "$$NOW", output: {}}}));
+assert.commandWorked(
+    run({$setWindowFields: {partitionBy: "$$myobj.a", output: {}}}, {let : {myobj: {a: 456}}}));
 
 // Test that parsing fails for unrecognized parameters.
 assert.commandFailedWithCode(run({$setWindowFields: {what_is_this: 1}}), 40415);
 
 // Test for a successful parse, ignoring the response documents.
-// assert.commandFailedWithCode(
-// run({
-// $setWindowFields:
-// {partitionBy: "$state", sortBy: {city: 1}, output: {a: {$sum: {input: 1}}}}
-// }),
-// 5374100);
+assert.commandWorked(run({
+    $setWindowFields: {
+        partitionBy: "$state",
+        sortBy: {city: 1},
+        output: {a: {$sum: {input: 1, documents: ["unbounded", "current"]}}}
+    }
+}));
 
 function runSum(spec) {
     // Include a single-field sortBy in this helper to allow all kinds of bounds.
@@ -194,14 +194,26 @@ assert.commandFailedWithCode(
     'Range-based bounds require sortBy a single field');
 
 // Variety of accumulators:
-assert.commandFailedWithCode(run({$setWindowFields: {output: {v: {$sum: {input: "$a"}}}}}),
-                             5374100);
-assert.commandFailedWithCode(run({$setWindowFields: {output: {v: {$avg: {input: "$a"}}}}}),
-                             5397900);
-assert.commandFailedWithCode(run({$setWindowFields: {output: {v: {$max: {input: "$a"}}}}}),
-                             5397900);
-assert.commandFailedWithCode(run({$setWindowFields: {output: {v: {$min: {input: "$a"}}}}}),
-                             5397900);
+assert.commandWorked(run({
+    $setWindowFields:
+        {sortBy: {ts: 1},
+         output: {v: {$sum: {input: "$a", documents: ['unbounded', 'current']}}}}
+}));
+assert.commandWorked(run({
+    $setWindowFields:
+        {sortBy: {ts: 1},
+         output: {v: {$avg: {input: "$a", documents: ['unbounded', 'current']}}}}
+}));
+assert.commandWorked(run({
+    $setWindowFields:
+        {sortBy: {ts: 1},
+         output: {v: {$max: {input: "$a", documents: ['unbounded', 'current']}}}}
+}));
+assert.commandWorked(run({
+    $setWindowFields:
+        {sortBy: {ts: 1},
+         output: {v: {$min: {input: "$a", documents: ['unbounded', 'current']}}}}
+}));
 
 // Not every accumulator is automatically a window function.
 assert.commandFailedWithCode(run({$setWindowFields: {output: {v: {$mergeObjects: {input: "$a"}}}}}),

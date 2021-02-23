@@ -1,4 +1,4 @@
-/*
+/**
  * Test that $sum works as a window function.
  */
 (function() {
@@ -16,13 +16,15 @@ if (!featureEnabled) {
 const coll = db[jsTestName()];
 coll.drop();
 
-for (let i = 0; i < 10; i++) {
+const nDocs = 10;
+for (let i = 0; i < nDocs; i++) {
     assert.commandWorked(coll.insert({
         one: i,
         two: i * 2,
         simpleArr: [1, 2, 3],
         docArr: [{first: i}, {second: 0}],
-        nestedDoc: {1: {2: {3: 1}}}
+        nestedDoc: {1: {2: {3: 1}}},
+        mixed: (i % 2) ? null : i,
     }));
 }
 
@@ -208,6 +210,66 @@ verifyResults(result, function(num, baseObj) {
     baseObj.newField = {a: secondSum(num)};
     baseObj.simpleArr = Array.apply(null, Array(baseObj.simpleArr.length)).map(_ => newObj);
     baseObj.nestedDoc = {1: {2: {3: 1, a: firstSum(num)}}};
+    return baseObj;
+});
+
+// Test $sum over a non-removable lookahead window.
+result = coll.aggregate([
+                 sortStage,
+                 {
+                     $setWindowFields: {
+                         sortBy: {one: 1},
+                         output: {one: {$sum: {input: "$one", documents: ["unbounded", 1]}}}
+                     }
+                 }
+             ])
+             .toArray();
+verifyResults(result, function(num, baseObj) {
+    baseObj.one = firstSum(num);
+    if (num < (nDocs - 1))
+        baseObj.one += (num + 1);
+    return baseObj;
+});
+
+// Test $sum over a non-removable window whose upper bound is behind the current.
+result = coll.aggregate([
+                 sortStage,
+                 {
+                     $setWindowFields: {
+                         sortBy: {one: 1},
+                         output: {one: {$sum: {input: "$one", documents: ["unbounded", -1]}}}
+                     }
+                 }
+             ])
+             .toArray();
+verifyResults(result, function(num, baseObj) {
+    baseObj.one = firstSum(num);
+    // Subtract the "current" value from the accumulation.
+    baseObj.one -= num;
+    return baseObj;
+});
+
+// Test that non-numeric types do not contribute to the sum.
+result = coll.aggregate([
+                 sortStage,
+                 {
+                     $setWindowFields: {
+                         sortBy: {one: 1},
+                         output: {
+                             mixedTypeSum:
+                                 {$sum: {input: "$mixed", documents: ["unbounded", "current"]}}
+                         }
+                     }
+                 }
+             ])
+             .toArray();
+verifyResults(result, function(num, baseObj) {
+    // The 'mixed' field contains alternating null and integers, manually calculate the running sum
+    // for each document.
+    baseObj.mixedTypeSum = 0;
+    for (let i = 0; i <= num; i++) {
+        baseObj.mixedTypeSum += (i % 2) ? 0 : i;
+    }
     return baseObj;
 });
 })();
