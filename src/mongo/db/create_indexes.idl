@@ -106,7 +106,8 @@ structs:
                 optional: true
                 unstable: true
             weights:
-                type: object_owned
+                type:
+                    variant: [string, object_owned]
                 optional: true
             default_language:
                 type: string
