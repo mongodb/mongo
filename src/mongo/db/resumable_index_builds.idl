@@ -116,7 +116,8 @@ structs:
                 type: uuid
             collectionScanPosition:
                 description: "The last record id inserted into the sorter before shutdown"
-                type: long
+                type:
+                    variant: [objectid, long]
                 optional: true
             indexes:
                 description: "The information needed to resume each specific index in this build"

@@ -2178,12 +2178,17 @@ void IndexBuildsCoordinator::_resumeIndexBuildFromPhase(
 
     if (resumeInfo.getPhase() == IndexBuildPhaseEnum::kInitialized ||
         resumeInfo.getPhase() == IndexBuildPhaseEnum::kCollectionScan) {
-        _scanCollectionAndInsertSortedKeysIntoIndex(
-            opCtx,
-            replState,
-            resumeInfo.getCollectionScanPosition()
-                ? boost::make_optional<RecordId>(RecordId(*resumeInfo.getCollectionScanPosition()))
-                : boost::none);
+        boost::optional<RecordId> resumeAfterRecordId;
+        if (resumeInfo.getCollectionScanPosition()) {
+            auto scanPosition = *resumeInfo.getCollectionScanPosition();
+            if (auto recordIdOIDPtr = stdx::get_if<OID>(&scanPosition)) {
+                resumeAfterRecordId.emplace(recordIdOIDPtr->view().view(), OID::kOIDSize);
+            } else if (auto recordIdLongPtr = stdx::get_if<int64_t>(&scanPosition)) {
+                resumeAfterRecordId.emplace(RecordId(*recordIdLongPtr));
+            }
+        }
+
+        _scanCollectionAndInsertSortedKeysIntoIndex(opCtx, replState, resumeAfterRecordId);
     } else if (resumeInfo.getPhase() == IndexBuildPhaseEnum::kBulkLoad) {
         _insertSortedKeysIntoIndexForResume(opCtx, replState);
     }
