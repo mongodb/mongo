@@ -137,6 +137,28 @@ var IndexBuildTest = class {
     }
 
     /**
+     * Returns true if the passed in collection is clustered.
+     */
+    static isCollectionClustered(coll) {
+        const res = assert.commandWorked(
+            coll.getDB().runCommand({listCollections: 1, filter: {name: coll.getName()}}));
+        assert.eq(1, res.cursor.firstBatch.length);
+
+        const collInfo = res.cursor.firstBatch[0];
+        return collInfo.options.hasOwnProperty("clusteredIndex");
+    }
+
+    static assertIndexesIdHelper(coll, numIndexes, readyIndexes, notReadyIndexes, options) {
+        if (!IndexBuildTest.isCollectionClustered(coll)) {
+            numIndexes++;
+            readyIndexes.concat("_id_");
+        }
+
+        return IndexBuildTest.assertIndexes(
+            coll, numIndexes, readyIndexes, notReadyIndexes, options);
+    }
+
+    /**
      * Runs listIndexes command on collection.
      * If 'options' is provided, these will be sent along with the command request.
      * Asserts that all the indexes on this collection fit within the first batch of results.
@@ -253,7 +275,7 @@ const ResumableIndexBuildTest = class {
             indexNamesFlatSinglePerBuild[i] = indexNames[i][0];
             buildUUIDs[i] = extractUUIDFromObject(
                 IndexBuildTest
-                    .assertIndexes(coll, indexNamesFlat.length + 1, ["_id_"], indexNamesFlat, {
+                    .assertIndexesIdHelper(coll, indexNamesFlat.length, [], indexNamesFlat, {
                         includeBuildUUIDs: true
                     })[indexNames[i][0]]
                     .buildUUID);
@@ -371,11 +393,9 @@ const ResumableIndexBuildTest = class {
         const indexNamesFlat = ResumableIndexBuildTest.flatten(indexNames);
         let indexes;
         assert.soonNoExcept(function() {
-            indexes = IndexBuildTest.assertIndexes(coll,
-                                                   indexNamesFlat.length + 1,
-                                                   ["_id_"],
-                                                   indexNamesFlat,
-                                                   {includeBuildUUIDs: true});
+            indexes = IndexBuildTest.assertIndexesIdHelper(
+                coll, indexNamesFlat.length, [], indexNamesFlat, {includeBuildUUIDs: true});
+
             return true;
         });
 
@@ -430,8 +450,7 @@ const ResumableIndexBuildTest = class {
                 namespace: coll.getFullName()
             });
         }
-
-        IndexBuildTest.assertIndexes(coll, indexNames.length + 1, indexNames.concat("_id_"));
+        IndexBuildTest.assertIndexesIdHelper(coll, indexNames.length, indexNames);
     }
 
     /**
@@ -712,7 +731,8 @@ const ResumableIndexBuildTest = class {
 
         const buildUUID = extractUUIDFromObject(
             IndexBuildTest
-                .assertIndexes(coll, 2, ["_id_"], [indexName], {includeBuildUUIDs: true})[indexName]
+                .assertIndexesIdHelper(
+                    coll, 1, [], [indexName], {includeBuildUUIDs: true})[indexName]
                 .buildUUID);
 
         clearRawMongoProgramOutput();
