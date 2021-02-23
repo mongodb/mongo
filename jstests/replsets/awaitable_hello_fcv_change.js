@@ -10,15 +10,6 @@
 load("jstests/libs/parallel_shell_helpers.js");
 load("jstests/libs/fail_point_util.js");
 
-const rst = new ReplSetTest({nodes: [{}, {rsConfig: {priority: 0, votes: 0}}]});
-rst.startSet();
-rst.initiate();
-
-const primary = rst.getPrimary();
-const secondary = rst.getSecondary();
-const primaryAdminDB = primary.getDB("admin");
-const secondaryAdminDB = secondary.getDB("admin");
-
 function runAwaitableHelloBeforeFCVChange(
     topologyVersionField, targetFCV, isPrimary, prevMinWireVersion, serverMaxWireVersion) {
     const isUseSecondaryDelaySecsEnabled = db.adminCommand({
@@ -76,6 +67,15 @@ function runAwaitableHelloBeforeFCVChange(
 
 function runTest(downgradeFCV) {
     jsTestLog("Running test with downgradeFCV: " + downgradeFCV);
+
+    const rst = new ReplSetTest({nodes: [{}, {rsConfig: {priority: 0, votes: 0}}]});
+    rst.startSet();
+    rst.initiate();
+
+    const primary = rst.getPrimary();
+    const secondary = rst.getSecondary();
+    const primaryAdminDB = primary.getDB("admin");
+    const secondaryAdminDB = secondary.getDB("admin");
 
     // This test manually runs hello with the 'internalClient' field, which means that to the
     // mongod, the connection appears to be from another server. This makes mongod to return an
@@ -334,10 +334,9 @@ function runTest(downgradeFCV) {
         secondaryAdminDB.serverStatus().connections.awaitingTopologyChanges;
     assert.eq(0, numAwaitingTopologyChangeOnPrimary);
     assert.eq(0, numAwaitingTopologyChangeOnSecondary);
+    rst.stopSet();
 }
 
 runTest(lastLTSFCV);
 runTest(lastContinuousFCV);
-
-rst.stopSet();
 })();
