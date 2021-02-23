@@ -107,9 +107,42 @@ boost::optional<repl::OplogEntry> createMatchingTransactionTableUpdate(
 }
 
 /**
+ * A tenant migrations transaction entry will:
+ *
+ * 1) Have the 'fromTenantMigration' field set
+ * 2) Be a no-op entry
+ * 3) Store session info inside the 'o2' field
+ */
+bool isTransactionEntryFromTenantMigrations(OplogEntry& entry) {
+    if (!entry.getFromTenantMigration()) {
+        return false;
+    }
+
+    if (entry.getOpType() != repl::OpTypeEnum::kNoop) {
+        return false;
+    }
+
+    if (!entry.getObject2()) {
+        return false;
+    }
+    auto entryObject2 = *entry.getObject2();
+
+    if (!entryObject2.hasField(OperationSessionInfo::kSessionIdFieldName) ||
+        !entryObject2.hasField(OperationSessionInfo::kTxnNumberFieldName)) {
+        return false;
+    }
+
+    return true;
+}
+
+/**
  * Returns true if the oplog entry represents an operation in a transaction and false otherwise.
  */
 bool isTransactionEntry(OplogEntry entry) {
+    if (isTransactionEntryFromTenantMigrations(entry)) {
+        return true;
+    }
+
     auto sessionInfo = entry.getOperationSessionInfo();
     if (!sessionInfo.getTxnNumber()) {
         return false;
@@ -151,7 +184,15 @@ boost::optional<std::vector<OplogEntry>> SessionUpdateTracker::updateSession(
     // each entry originating from a multi-statement transaction. For this reason, we cannot defer
     // entries originating from multi-statement transactions.
     if (auto txnTableUpdate = _createTransactionTableUpdateFromTransactionOp(entry)) {
-        _sessionsToUpdate.erase(*entry.getOperationSessionInfo().getSessionId());
+        if (entry.getFromTenantMigration()) {
+            // If the entry is from tenant migrations, the session info will be stored as a field
+            // inside of the 'o2' field.
+            auto sessionInfo = OperationSessionInfo::parse(
+                IDLParserErrorContext("OperationSessionInfo"), *entry.getObject2());
+            _sessionsToUpdate.erase(*sessionInfo.getSessionId());
+        } else {
+            _sessionsToUpdate.erase(*entry.getOperationSessionInfo().getSessionId());
+        }
         return boost::optional<std::vector<OplogEntry>>({*txnTableUpdate});
     }
 
@@ -257,61 +298,97 @@ std::vector<OplogEntry> SessionUpdateTracker::_flushForQueryPredicate(
     return opList;
 }
 
+std::pair<BSONObj, LogicalSessionId> SessionUpdateTracker::_createSessionTxnRecordTenantMigration(
+    const repl::OplogEntry& entry) {
+    SessionTxnRecord newTxnRecord;
+
+    // For a tenant migrations transactions entry, all information is stored in the 'o2' field of
+    // the oplog entry.
+    auto entryObject2 = entry.getObject2();
+    invariant(entryObject2);
+    auto sessionInfo =
+        OperationSessionInfo::parse(IDLParserErrorContext("OperationSessionInfo"), *entryObject2);
+
+    invariant(sessionInfo.getSessionId());
+    auto sessionId = *sessionInfo.getSessionId();
+    invariant(sessionInfo.getTxnNumber());
+    auto txnNumber = *sessionInfo.getTxnNumber();
+
+    newTxnRecord.setSessionId(sessionId);
+    newTxnRecord.setTxnNum(txnNumber);
+    newTxnRecord.setLastWriteOpTime(OpTime());
+    newTxnRecord.setLastWriteDate(entry.getWallClockTime());
+    newTxnRecord.setState(DurableTxnStateEnum::kCommitted);
+
+    return std::pair(newTxnRecord.toBSON(), sessionId);
+}
+
+std::pair<BSONObj, LogicalSessionId> SessionUpdateTracker::_createSessionTxnRecordGeneral(
+    const repl::OplogEntry& entry) {
+    SessionTxnRecord newTxnRecord;
+
+    auto sessionInfo = entry.getOperationSessionInfo();
+    invariant(sessionInfo.getSessionId());
+
+    auto sessionId = *sessionInfo.getSessionId();
+    newTxnRecord.setSessionId(sessionId);
+    newTxnRecord.setTxnNum(*sessionInfo.getTxnNumber());
+    newTxnRecord.setLastWriteOpTime(entry.getOpTime());
+    newTxnRecord.setLastWriteDate(entry.getWallClockTime());
+
+    if (entry.isPartialTransaction()) {
+        invariant(entry.getPrevWriteOpTimeInTransaction()->isNull());
+        newTxnRecord.setState(DurableTxnStateEnum::kInProgress);
+        newTxnRecord.setStartOpTime(entry.getOpTime());
+        return std::pair(newTxnRecord.toBSON(), sessionId);
+    }
+    switch (entry.getCommandType()) {
+        case repl::OplogEntry::CommandType::kApplyOps:
+            if (entry.shouldPrepare()) {
+                newTxnRecord.setState(DurableTxnStateEnum::kPrepared);
+                if (entry.getPrevWriteOpTimeInTransaction()->isNull()) {
+                    // The prepare oplog entry is the first operation of the transaction.
+                    newTxnRecord.setStartOpTime(entry.getOpTime());
+                } else {
+                    // Update the transaction record using $set to avoid overwriting the
+                    // startOpTime.
+                    return std::pair(BSON("$set" << newTxnRecord.toBSON()), sessionId);
+                }
+            } else {
+                newTxnRecord.setState(DurableTxnStateEnum::kCommitted);
+            }
+            break;
+        case repl::OplogEntry::CommandType::kCommitTransaction:
+            newTxnRecord.setState(DurableTxnStateEnum::kCommitted);
+            break;
+        case repl::OplogEntry::CommandType::kAbortTransaction:
+            newTxnRecord.setState(DurableTxnStateEnum::kAborted);
+            break;
+        default:
+            break;
+    }
+    return std::pair(newTxnRecord.toBSON(), sessionId);
+}
+
 boost::optional<OplogEntry> SessionUpdateTracker::_createTransactionTableUpdateFromTransactionOp(
     const repl::OplogEntry& entry) {
-    auto sessionInfo = entry.getOperationSessionInfo();
-
     // We only update the transaction table on the first partialTxn operation.
     if (entry.isPartialTransaction() && !entry.getPrevWriteOpTimeInTransaction()->isNull()) {
         return boost::none;
     }
-    invariant(sessionInfo.getSessionId());
 
-    const auto updateBSON = [&] {
-        SessionTxnRecord newTxnRecord;
-        newTxnRecord.setSessionId(*sessionInfo.getSessionId());
-        newTxnRecord.setTxnNum(*sessionInfo.getTxnNumber());
-        newTxnRecord.setLastWriteOpTime(entry.getOpTime());
-        newTxnRecord.setLastWriteDate(entry.getWallClockTime());
-
-        if (entry.isPartialTransaction()) {
-            invariant(entry.getPrevWriteOpTimeInTransaction()->isNull());
-            newTxnRecord.setState(DurableTxnStateEnum::kInProgress);
-            newTxnRecord.setStartOpTime(entry.getOpTime());
-            return newTxnRecord.toBSON();
-        }
-        switch (entry.getCommandType()) {
-            case repl::OplogEntry::CommandType::kApplyOps:
-                if (entry.shouldPrepare()) {
-                    newTxnRecord.setState(DurableTxnStateEnum::kPrepared);
-                    if (entry.getPrevWriteOpTimeInTransaction()->isNull()) {
-                        // The prepare oplog entry is the first operation of the transaction.
-                        newTxnRecord.setStartOpTime(entry.getOpTime());
-                    } else {
-                        // Update the transaction record using $set to avoid overwriting the
-                        // startOpTime.
-                        return BSON("$set" << newTxnRecord.toBSON());
-                    }
-                } else {
-                    newTxnRecord.setState(DurableTxnStateEnum::kCommitted);
-                }
-                break;
-            case repl::OplogEntry::CommandType::kCommitTransaction:
-                newTxnRecord.setState(DurableTxnStateEnum::kCommitted);
-                break;
-            case repl::OplogEntry::CommandType::kAbortTransaction:
-                newTxnRecord.setState(DurableTxnStateEnum::kAborted);
-                break;
-            default:
-                break;
-        }
-        return newTxnRecord.toBSON();
-    }();
+    std::pair<BSONObj, LogicalSessionId> updatePair;
+    if (entry.getOpType() == OpTypeEnum::kNoop) {
+        // If the oplog entry is a no-op, we must have received it from tenant migrations.
+        updatePair = _createSessionTxnRecordTenantMigration(entry);
+    } else {
+        updatePair = _createSessionTxnRecordGeneral(entry);
+    }
 
     return createOplogEntryForTransactionTableUpdate(
         entry.getOpTime(),
-        updateBSON,
-        BSON(SessionTxnRecord::kSessionIdFieldName << sessionInfo.getSessionId()->toBSON()),
+        updatePair.first,
+        BSON(SessionTxnRecord::kSessionIdFieldName << updatePair.second.toBSON()),
         entry.getWallClockTime());
 }
 
