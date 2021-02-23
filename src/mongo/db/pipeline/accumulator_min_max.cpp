@@ -44,8 +44,8 @@ REGISTER_ACCUMULATOR(max, genericParseSingleExpressionAccumulator<AccumulatorMax
 REGISTER_ACCUMULATOR(min, genericParseSingleExpressionAccumulator<AccumulatorMin>);
 REGISTER_EXPRESSION(max, ExpressionFromAccumulator<AccumulatorMax>::parse);
 REGISTER_EXPRESSION(min, ExpressionFromAccumulator<AccumulatorMin>::parse);
-REGISTER_WINDOW_FUNCTION(max, window_function::ExpressionFromAccumulator<AccumulatorMax>::parse);
-REGISTER_WINDOW_FUNCTION(min, window_function::ExpressionFromAccumulator<AccumulatorMin>::parse);
+REGISTER_WINDOW_FUNCTION(max, window_function::ExpressionFromAccumulator::parse);
+REGISTER_WINDOW_FUNCTION(min, window_function::ExpressionFromAccumulator::parse);
 
 const char* AccumulatorMinMax::getOpName() const {
     if (_sense == Sense::kMin)
