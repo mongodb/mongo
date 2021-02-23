@@ -125,7 +125,8 @@ public:
             return response;
         }
 
-        void doCheckAuthorization(OperationContext* opCtx) const {
+    private:
+        void doCheckAuthorization(OperationContext* opCtx) const final {
             uassert(ErrorCodes::Unauthorized,
                     "Unauthorized",
                     AuthorizationSession::get(opCtx->getClient())
@@ -133,7 +134,6 @@ public:
                                                            ActionType::runTenantMigration));
         }
 
-    private:
         bool supportsWriteConcern() const override {
             return false;
         }
@@ -195,7 +195,7 @@ public:
         }
 
     private:
-        void doCheckAuthorization(OperationContext* opCtx) const {
+        void doCheckAuthorization(OperationContext* opCtx) const final {
             uassert(ErrorCodes::Unauthorized,
                     "Unauthorized",
                     AuthorizationSession::get(opCtx->getClient())
@@ -283,7 +283,7 @@ public:
         }
 
     private:
-        void doCheckAuthorization(OperationContext* opCtx) const {
+        void doCheckAuthorization(OperationContext* opCtx) const final {
             uassert(ErrorCodes::Unauthorized,
                     "Unauthorized",
                     AuthorizationSession::get(opCtx->getClient())
