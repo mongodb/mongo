@@ -1,6 +1,11 @@
 command_type: system
 stepback: false
 
+## Parameters for parameterized builds (see https://github.com/evergreen-ci/evergreen/wiki/Parameterized-Builds)
+parameters:
+  - key: patch_compile_flags
+    description: "Additional SCons flags to be applied during scons compile invocations in this patch"
+
 variables:
   ###
   # Leave this section uncommented to enable compile.
@@ -342,7 +347,7 @@ functions:
           set -o errexit
           set -o verbose
           source "${workdir}/compile_venv/bin/activate"
-          python ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} install-core MONGO_VERSION=${version} DESTDIR=$(pwd)/mongodb
+          python ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} install-core MONGO_VERSION=${version} DESTDIR=$(pwd)/mongodb ${patch_compile_flags|}
           mkdir -p mongodb/jstests/hooks
           if [ -d jstests/hooks ]
           then

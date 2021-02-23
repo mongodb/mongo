@@ -40,6 +40,11 @@ ignore:
   - "!/etc/evergreen.yml"
   - "README"
 
+## Parameters for parameterized builds (see https://github.com/evergreen-ci/evergreen/wiki/Parameterized-Builds)
+parameters:
+  - key: patch_compile_flags
+    description: "Additional SCons flags to be applied during scons compile invocations in this patch"
+
 ## Some variables for convenience:
 variables:
 
@@ -1893,7 +1898,7 @@ functions:
         ${compile_env|} $python ./buildscripts/scons.py                                     \
             ${compile_flags|} ${task_compile_flags|} ${task_compile_flags_extra|}           \
             ${scons_cache_args|} $extra_args                                                \
-            ${targets} MONGO_VERSION=${version} || exit_status=$?
+            ${targets} MONGO_VERSION=${version} ${patch_compile_flags|} || exit_status=$?
 
         chmod -R ugo+w ./src
         ls -la src/mongo/stdx/sigaltstack_location_test.cpp || true
