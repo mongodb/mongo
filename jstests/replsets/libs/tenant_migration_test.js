@@ -628,6 +628,7 @@ TenantMigrationTest.State = {
     kAborted: "aborted",
     kDataSync: "data sync",
     kBlocking: "blocking",
+    kAbortingIndexBuilds: "aborting index builds",
 };
 
 TenantMigrationTest.AccessState = {
