@@ -262,6 +262,7 @@ pipelineEnv.Library(
         'skip_and_limit.cpp',
         'tee_buffer.cpp',
         'window_function/partition_iterator.cpp',
+        'window_function/window_function_exec.cpp',
         'window_function/window_function_exec_removable_document.cpp',
     ],
     LIBDEPS=[

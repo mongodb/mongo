@@ -268,40 +268,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalSetWindowFields::crea
 void DocumentSourceInternalSetWindowFields::initialize() {
     for (auto& wfs : _outputFields) {
         uassert(5397900, "Window function must be $sum", wfs.expr->getOpName() == "$sum");
-        // TODO: SERVER-54340 Remove this check.
-        uassert(5397905,
-                "Window functions cannot set to dotted paths",
-                wfs.fieldName.find('.') == std::string::npos);
-        auto windowBounds = wfs.expr->bounds();
-        stdx::visit(
-            visit_helper::Overloaded{
-                [](const WindowBounds::DocumentBased& docBase) {
-                    stdx::visit(
-                        visit_helper::Overloaded{
-                            [](const WindowBounds::Unbounded) { /* pass */ },
-                            [](auto&& other) {
-                                uasserted(5397904,
-                                          "Only 'unbounded' lower bound is currently supported");
-                            }},
-                        docBase.lower);
-                    stdx::visit(
-                        visit_helper::Overloaded{
-                            [](const WindowBounds::Current) { /* pass */ },
-                            [](auto&& other) {
-                                uasserted(5397903,
-                                          "Only 'current' upper bound is currently supported");
-                            }},
-                        docBase.upper);
-                },
-                [](const WindowBounds::RangeBased& rangeBase) {
-                    uasserted(5397901, "Ranged based windows not currently supported");
-                },
-                [](const WindowBounds::TimeBased& timeBase) {
-                    uasserted(5397902, "Time based windows are not currently supported");
-                }},
-            windowBounds.bounds);
-        _executableOutputs.push_back(ExecutableWindowFunction(
-            wfs.fieldName, AccumulatorSum::create(pExpCtx.get()), windowBounds, wfs.expr->input()));
+        _executableOutputs[wfs.fieldName] = WindowFunctionExec::create(&_iterator, wfs);
     }
     _init = true;
 }
@@ -311,22 +278,28 @@ DocumentSource::GetNextResult DocumentSourceInternalSetWindowFields::doGetNext()
         initialize();
     }
 
-    auto curStat = pSource->getNext();
-    if (!curStat.isAdvanced()) {
-        return curStat;
+    if (_eof)
+        return DocumentSource::GetNextResult::makeEOF();
+
+    // Populate the output document with the result from each window function.
+    MutableDocument outDoc(_iterator[0].get());
+    for (auto&& [fieldName, function] : _executableOutputs) {
+        outDoc.setNestedField(fieldName, function->getNext());
     }
-    auto curDoc = curStat.getDocument();
-    if (_partitionBy) {
-        uassert(ErrorCodes::TypeMismatch,
-                "Cannot 'partitionBy' an expression of type array",
-                !_partitionBy->get()->evaluate(curDoc, &pExpCtx->variables).isArray());
-    }
-    MutableDocument outDoc(curDoc);
-    for (auto& output : _executableOutputs) {
-        // Currently only support unbounded windows and run on the merging shard -- we don't need
-        // to reset accumulators, merge states, or partition into multiple groups.
-        output.accumulator->process(output.inputExpr->evaluate(curDoc, &pExpCtx->variables), false);
-        outDoc.setNestedField(output.fieldName, output.accumulator->getValue(false));
+
+    // Advance the iterator and handle partition/EOF edge cases.
+    switch (_iterator.advance()) {
+        case PartitionIterator::AdvanceResult::kAdvanced:
+            break;
+        case PartitionIterator::AdvanceResult::kNewPartition:
+            // We've advanced to a new partition, reset the state of every function.
+            for (auto&& [_, function] : _executableOutputs) {
+                function->reset();
+            }
+            break;
+        case PartitionIterator::AdvanceResult::kEOF:
+            _eof = true;
+            break;
     }
     return outDoc.freeze();
 }

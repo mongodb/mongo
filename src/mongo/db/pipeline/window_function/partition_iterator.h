@@ -42,7 +42,7 @@ class PartitionIterator {
 public:
     PartitionIterator(ExpressionContext* expCtx,
                       DocumentSource* source,
-                      boost::optional<const ExpressionFieldPath&> partitionExpr)
+                      boost::optional<boost::intrusive_ptr<Expression>> partitionExpr)
         : _expCtx(expCtx),
           _source(source),
           _partitionExpr(partitionExpr),
@@ -75,6 +75,13 @@ public:
         return _currentIndex;
     }
 
+    /**
+     * Sets the input DocumentSource for this iterator to 'source'.
+     */
+    void setSource(DocumentSource* source) {
+        _source = source;
+    }
+
 private:
     /**
      * Retrieves the next document from the prior stage and updates the state accordingly.
@@ -98,7 +105,7 @@ private:
 
     ExpressionContext* _expCtx;
     DocumentSource* _source;
-    boost::optional<const ExpressionFieldPath&> _partitionExpr;
+    boost::optional<boost::intrusive_ptr<Expression>> _partitionExpr;
     std::vector<Document> _cache;
     int _currentIndex = 0;
     Value _partitionKey;
