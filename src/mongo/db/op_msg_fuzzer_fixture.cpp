@@ -40,13 +40,16 @@
 #include "mongo/db/client.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_access_method_factory_impl.h"
+#include "mongo/db/op_observer_registry.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/s/collection_sharding_state_factory_standalone.h"
 #include "mongo/db/service_entry_point_common.h"
 #include "mongo/db/service_entry_point_mongod.h"
-#include "mongo/db/storage/storage_engine_mock.h"
+#include "mongo/db/storage/control/storage_control.h"
+#include "mongo/db/storage/storage_engine_init.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/transport/service_entry_point_impl.h"
 
@@ -65,9 +68,22 @@ OpMsgFuzzerFixture::OpMsgFuzzerFixture(bool skipGlobalInitializers) {
     _serviceContext->setServiceEntryPoint(
         std::make_unique<ServiceEntryPointMongod>(_serviceContext));
 
-    _clientStrand = ClientStrand::make(_serviceContext->makeClient("test", _session));
+    auto observerRegistry = std::make_unique<OpObserverRegistry>();
+    _serviceContext->setOpObserver(std::move(observerRegistry));
 
-    _serviceContext->setStorageEngine(std::make_unique<StorageEngineMock>());
+    _clientStrand = ClientStrand::make(_serviceContext->makeClient("test", _session));
+    auto clientGuard = _clientStrand->bind();
+    auto opCtx = _serviceContext->makeOperationContext(clientGuard.get());
+
+    storageGlobalParams.engine = "ephemeralForTest";
+    storageGlobalParams.engineSetByUser = true;
+    storageGlobalParams.repair = false;
+    serverGlobalParams.enableMajorityReadConcern = false;
+
+    initializeStorageEngine(opCtx.get(),
+                            StorageEngineInitFlags::kAllowNoLockFile |
+                                StorageEngineInitFlags::kSkipMetadataFile);
+    StorageControl::startStorageControls(_serviceContext, true /*forTestOnly*/);
 
     CollectionShardingStateFactory::set(
         _serviceContext,
@@ -92,6 +108,8 @@ OpMsgFuzzerFixture::OpMsgFuzzerFixture(bool skipGlobalInitializers) {
     repl::ReplicationCoordinator::set(
         _serviceContext,
         std::make_unique<repl::ReplicationCoordinatorMock>(_serviceContext, repl::ReplSettings()));
+
+    _serviceContext->getStorageEngine()->notifyStartupComplete();
 }
 
 int OpMsgFuzzerFixture::testOneInput(const char* Data, size_t Size) {
