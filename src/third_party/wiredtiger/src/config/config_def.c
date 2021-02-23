@@ -934,6 +934,7 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open_usercfg[] = {
 static const WT_CONFIG_ENTRY config_entries[] = {{"WT_CONNECTION.add_collator", "", NULL, 0},
   {"WT_CONNECTION.add_compressor", "", NULL, 0}, {"WT_CONNECTION.add_data_source", "", NULL, 0},
   {"WT_CONNECTION.add_encryptor", "", NULL, 0}, {"WT_CONNECTION.add_extractor", "", NULL, 0},
+  {"WT_CONNECTION.add_storage_source", "", NULL, 0},
   {"WT_CONNECTION.close", "leak_memory=false,use_timestamp=true", confchk_WT_CONNECTION_close, 2},
   {"WT_CONNECTION.debug_info",
     "cache=false,cursors=false,handles=false,log=false,sessions=false"

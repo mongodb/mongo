@@ -78,6 +78,11 @@ struct __wt_file_system;    typedef struct __wt_file_system WT_FILE_SYSTEM;
 struct __wt_item;	    typedef struct __wt_item WT_ITEM;
 struct __wt_modify;	    typedef struct __wt_modify WT_MODIFY;
 struct __wt_session;	    typedef struct __wt_session WT_SESSION;
+#if !defined(SWIG)
+#if !defined(DOXYGEN)
+struct __wt_storage_source; typedef struct __wt_storage_source WT_STORAGE_SOURCE;
+#endif
+#endif
 
 #if defined(SWIGJAVA)
 #define	WT_HANDLE_NULLABLE(typename)	typename##_NULLABLE
@@ -2560,6 +2565,27 @@ struct __wt_connection {
 	int __F(set_file_system)(
 	    WT_CONNECTION *connection, WT_FILE_SYSTEM *fs, const char *config);
 
+#if !defined(SWIG)
+#if !defined(DOXYGEN)
+	/*!
+	 * Add a storage source implementation.
+	 *
+	 * The application must first implement the WT_STORAGE_SOURCE
+	 * interface and then register the implementation with WiredTiger:
+	 *
+	 * @snippet ex_storage_source.c WT_STORAGE_SOURCE register
+	 *
+	 * @param connection the connection handle
+	 * @param name the name of the storage source implementation
+	 * @param storage_source the populated storage source structure
+	 * @configempty{WT_CONNECTION.add_storage_source, see dist/api_data.py}
+	 * @errors
+	 */
+	int __F(add_storage_source)(WT_CONNECTION *connection, const char *name,
+            WT_STORAGE_SOURCE *storage_source, const char *config);
+#endif
+#endif
+
 	/*!
 	 * Return a reference to the WiredTiger extension functions.
 	 *
@@ -4230,7 +4256,7 @@ typedef enum {
  * the implementation to protect any shared data.
  *
  * Applications register implementations with WiredTiger by calling
- * WT_CONNECTION::add_file_system.  See @ref custom_file_systems for more
+ * WT_CONNECTION::set_file_system.  See @ref custom_file_systems for more
  * information.
  *
  * @snippet ex_file_system.c WT_FILE_SYSTEM register
@@ -4336,7 +4362,6 @@ struct __wt_file_system {
 	 * @param file_system the WT_FILE_SYSTEM
 	 * @param session the current WiredTiger session
 	 * @param name the name of the file system object
-	 * @param durable if the operation requires durability
 	 * @param flags 0 or ::WT_FS_DURABLE
 	 */
 	int (*fs_remove)(WT_FILE_SYSTEM *file_system,
@@ -4670,6 +4695,184 @@ struct __wt_file_handle {
 	int (*fh_write)(WT_FILE_HANDLE *file_handle, WT_SESSION *session,
 	    wt_off_t offset, size_t length, const void *buf);
 };
+#endif /* !defined(SWIG) */
+
+#if !defined(SWIG)
+#if !defined(DOXYGEN)
+/* This interface is not yet public. */
+
+/* AUTOMATIC FLAG VALUE GENERATION START */
+#define	WT_SS_OPEN_CREATE	0x1u
+#define	WT_SS_OPEN_READONLY	0x2u
+/* AUTOMATIC FLAG VALUE GENERATION STOP */
+
+/*!
+ * A location handle, and its encoding is defined by each implementation
+ * of the WT_STORAGE_SOURCE interface.
+ */
+typedef struct __wt_location_handle WT_LOCATION_HANDLE;
+
+/*!
+ * The interface implemented by applications to provide a storage source
+ * implementation. This documentation refers to "object" and "bucket"
+ * to mean a "file-like object" and a "container of objects", respectively.
+ *
+ * <b>Thread safety:</b> WiredTiger may invoke methods on the WT_STORAGE_SOURCE
+ * interface from multiple threads concurrently. It is the responsibility of
+ * the implementation to protect any shared data.
+ *
+ * Applications register implementations with WiredTiger by calling
+ * WT_CONNECTION::add_storage_source.
+ *
+ * @snippet ex_storage_source.c WT_STORAGE_SOURCE register
+ */
+struct __wt_storage_source {
+	/*!
+	 * Return a location handle from a location string.
+	 * A location string may encode a bucket name, or the equivalent for this
+	 * storage source, authorization information for that bucket,
+	 * naming prefixes to be used for objects in that bucket, etc.
+	 *
+	 * @errors
+	 *
+	 * @param storage_source the WT_STORAGE_SOURCE
+	 * @param session the current WiredTiger session
+	 * @param location the location string
+	 * @param[out] location_handle the allocated handle
+	 */
+	int (*ss_location_handle)(WT_STORAGE_SOURCE *storage_source,
+	    WT_SESSION *session, const char *location, WT_LOCATION_HANDLE **location_handle);
+
+	/*!
+	 * Free a location handle created by WT_STORAGE_SOURCE::ss_location_handle.
+	 *
+	 * @errors
+	 *
+	 * @param storage_source the WT_STORAGE_SOURCE
+	 * @param session the current WiredTiger session
+	 * @param location_handle the handle to be freed.
+	 */
+	int (*ss_location_handle_free)(WT_STORAGE_SOURCE *storage_source,
+	    WT_SESSION *session, WT_LOCATION_HANDLE *location_handle);
+
+	/*!
+	 * Return a list of object names for the given location.
+	 *
+	 * @errors
+	 *
+	 * @param storage_source the WT_STORAGE_SOURCE
+	 * @param session the current WiredTiger session
+	 * @param location_handle the location to list
+	 * @param prefix if not NULL, only files with names matching the prefix
+	 *    are returned
+	 * @param limit if not 0, limits the number of objects listed to this number.
+	 * @param[out] object_list the method returns an allocated array of
+	 *    individually allocated strings, one for each object in the location.
+	 * @param[out] countp the number of entries returned
+	 */
+	int (*ss_location_list)(WT_STORAGE_SOURCE *storage_source,
+	    WT_SESSION *session, WT_LOCATION_HANDLE *location_handle, const char *prefix,
+            uint32_t limit, char ***object_list, uint32_t *countp);
+
+	/*!
+	 * Free memory allocated by WT_STORAGE_SOURCE::location_list.
+	 *
+	 * @errors
+	 *
+	 * @param storage_source the WT_STORAGE_SOURCE
+	 * @param session the current WiredTiger session
+	 * @param object_list array returned by WT_STORAGE_SOURCE::location_list
+	 * @param count count returned by WT_STORAGE_SOURCE::location_list
+	 */
+	int (*ss_location_list_free)(WT_STORAGE_SOURCE *storage_source,
+	    WT_SESSION *session, char **object_list, uint32_t count);
+
+	/*!
+	 * Return if the named object exists in the location.
+	 *
+	 * @errors
+	 *
+	 * @param storage_source the WT_STORAGE_SOURCE
+	 * @param session the current WiredTiger session
+	 * @param location_handle the location to search
+	 * @param name the name of the object
+	 * @param[out] existp If the named storage source object exists
+	 */
+	int (*ss_exist)(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session,
+	    WT_LOCATION_HANDLE *location_handle, const char *name, bool *existp);
+
+	/*!
+	 * Open a handle for a named storage source object
+	 *
+	 * The method should return ENOENT if the object is not being created and
+	 * does not exist.
+	 *
+	 * The method should return EACCES if the object cannot be opened given
+	 * permissions by the location.
+	 *
+	 * @errors
+	 *
+	 * @param storage_source the WT_STORAGE_SOURCE
+	 * @param session the current WiredTiger session
+	 * @param location_handle the location where the object will be stored.
+	 * @param name the name of the object within the location.
+	 * @param flags flags indicating how to open the object, exactly one of
+	 *    ::WT_SS_OPEN_CREATE, ::WT_SS_OPEN_READONLY.
+	 * @param[out] file_handlep the handle to the newly opened object. Storage
+	 *    source implementations must allocate memory for the handle and
+	 *    the WT_FILE_HANDLE::name field, and fill in the WT_FILE_HANDLE::
+	 *    fields. Applications wanting to associate private information
+	 *    with the WT_FILE_HANDLE:: structure should declare and allocate
+	 *    their own structure as a superset of a WT_FILE_HANDLE:: structure.
+	 */
+	int (*ss_open_object)(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session,
+	    WT_LOCATION_HANDLE *location_handle, const char *name, uint32_t flags,
+	    WT_FILE_HANDLE **file_handlep);
+
+	/*!
+	 * Remove a named storage source object
+	 *
+	 * This method is not required if storage source is configured readonly
+	 * and should be set to NULL when not required by the storage source implementation.
+	 *
+	 * @errors
+	 *
+	 * @param storage_source the WT_STORAGE_SOURCE
+	 * @param session the current WiredTiger session
+	 * @param location_handle the location containing the object
+	 * @param name the name of the storage source object
+	 * @param flags must be 0
+	 */
+	int (*ss_remove)(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session,
+	    WT_LOCATION_HANDLE *location_handle, const char *name, uint32_t flags);
+
+	/*!
+	 * Return the size of a named storage source object
+	 *
+	 * @errors
+	 *
+	 * @param storage_source the WT_STORAGE_SOURCE
+	 * @param session the current WiredTiger session
+	 * @param location_handle the location containing the object
+	 * @param name the name of the storage source object
+	 * @param[out] sizep the size of the storage source object
+	 */
+	int (*ss_size)(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session,
+	    WT_LOCATION_HANDLE *location_handle, const char *name, wt_off_t *sizep);
+
+	/*!
+	 * A callback performed when the storage source is closed and will no
+	 * longer be accessed by the WiredTiger database.
+	 *
+	 * This method is not required and should be set to NULL when not
+	 * required by the storage source implementation.
+	 *
+	 * The WT_STORAGE_SOURCE::terminate callback is intended to allow cleanup,
+	 * the handle will not be subsequently accessed by WiredTiger.
+	 */
+	int (*terminate)(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session);
+};
+#endif
 #endif /* !defined(SWIG) */
 
 /*!

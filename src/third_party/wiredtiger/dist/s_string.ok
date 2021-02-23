@@ -1268,6 +1268,7 @@ spinlocks
 sprintf
 src
 srch
+ss
 ssize
 startup
 statlog
