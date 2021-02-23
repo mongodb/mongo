@@ -92,7 +92,7 @@ public:
         return _repairMode == RepairMode::kFixErrors || _repairMode == RepairMode::kAdjustMultikey;
     }
 
-    const UUID uuid() const {
+    UUID uuid() const {
         invariant(_uuid);
         return *_uuid;
     }
@@ -198,7 +198,6 @@ private:
     NamespaceString _nss;
     ValidateMode _mode;
     RepairMode _repairMode;
-    OptionalCollectionUUID _uuid;
 
     boost::optional<ShouldNotConflictWithSecondaryBatchApplicationBlock> _noPBWM;
     boost::optional<Lock::GlobalLock> _globalLock;
@@ -207,6 +206,10 @@ private:
 
     Database* _database;
     CollectionPtr _collection;
+
+    // Always present after construction, but needs to be boost::optional due to the lack of default
+    // constructor
+    boost::optional<UUID> _uuid;
 
     // Stores the indexes that are going to be validated. When validate yields periodically we'll
     // use this list to determine if validation should abort when an existing index that was
@@ -233,5 +236,4 @@ private:
 };
 
 }  // namespace CollectionValidation
-
 }  // namespace mongo

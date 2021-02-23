@@ -40,6 +40,8 @@
 namespace mongo {
 namespace repl {
 
+StorageInterfaceMock::StorageInterfaceMock() = default;
+
 StatusWith<int> StorageInterfaceMock::getRollbackID(OperationContext* opCtx) {
     stdx::lock_guard<Latch> lock(_mutex);
     if (!_rbidInitialized) {
@@ -100,7 +102,7 @@ Status CollectionBulkLoaderMock::init(const std::vector<BSONObj>& secondaryIndex
     LOGV2_DEBUG(21757, 1, "CollectionBulkLoaderMock::init called");
     stats->initCalled = true;
     return Status::OK();
-};
+}
 
 Status CollectionBulkLoaderMock::insertDocuments(const std::vector<BSONObj>::const_iterator begin,
                                                  const std::vector<BSONObj>::const_iterator end) {
@@ -112,13 +114,13 @@ Status CollectionBulkLoaderMock::insertDocuments(const std::vector<BSONObj>::con
         stats->insertCount += std::distance(begin, end);
     }
     return status;
-};
+}
 
 Status CollectionBulkLoaderMock::commit() {
     LOGV2_DEBUG(21759, 1, "CollectionBulkLoaderMock::commit called");
     stats->commitCalled = true;
     return commitFn();
-};
+}
 
 }  // namespace repl
 }  // namespace mongo

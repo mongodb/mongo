@@ -681,7 +681,10 @@ private:
     // These members needs to be mutable so the yield/restore interface can be const. We don't want
     // yield/restore to require a non-const instance when it otherwise could be const.
     mutable const Collection* _collection;
-    mutable OptionalCollectionUUID _yieldedUUID;
+
+    // If the collection is currently in the 'yielded' state (i.e. yield() has been called), this
+    // field will contain what was the UUID of the collection at the time of yield.
+    mutable boost::optional<UUID> _yieldedUUID;
 
     OperationContext* _opCtx;
     RestoreFn _restoreFn;

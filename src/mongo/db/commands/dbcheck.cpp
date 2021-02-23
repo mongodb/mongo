@@ -461,7 +461,7 @@ private:
 
     repl::OpTime _logOp(OperationContext* opCtx,
                         const NamespaceString& nss,
-                        OptionalCollectionUUID uuid,
+                        const UUID& uuid,
                         const BSONObj& obj) {
         repl::MutableOplogEntry oplogEntry;
         oplogEntry.setOpType(repl::OpTypeEnum::kCommand);

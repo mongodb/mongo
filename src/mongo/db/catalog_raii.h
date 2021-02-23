@@ -37,7 +37,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/local_oplog_info.h"
 #include "mongo/db/views/view.h"
-#include "mongo/db/yieldable.h"
 
 namespace mongo {
 

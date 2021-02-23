@@ -126,10 +126,10 @@ public:
                                                        BoundInclusion,
                                                        std::size_t)>;
     using IsAdminDbValidFn = std::function<Status(OperationContext*)>;
-    using GetCollectionUUIDFn = std::function<StatusWith<OptionalCollectionUUID>(
-        OperationContext*, const NamespaceString&)>;
+    using GetCollectionUUIDFn =
+        std::function<StatusWith<UUID>(OperationContext*, const NamespaceString&)>;
 
-    StorageInterfaceMock() = default;
+    StorageInterfaceMock();
 
     StatusWith<int> getRollbackID(OperationContext* opCtx) override;
     StatusWith<int> initializeRollbackID(OperationContext* opCtx) override;
@@ -302,8 +302,8 @@ public:
         return Status{ErrorCodes::IllegalOperation, "setCollectionCount not implemented."};
     }
 
-    StatusWith<OptionalCollectionUUID> getCollectionUUID(OperationContext* opCtx,
-                                                         const NamespaceString& nss) override {
+    StatusWith<UUID> getCollectionUUID(OperationContext* opCtx,
+                                       const NamespaceString& nss) override {
         return getCollectionUUIDFn(opCtx, nss);
     }
 
@@ -424,9 +424,8 @@ public:
     IsAdminDbValidFn isAdminDbValidFn = [](OperationContext*) {
         return Status{ErrorCodes::IllegalOperation, "IsAdminDbValidFn not implemented."};
     };
-    GetCollectionUUIDFn getCollectionUUIDFn =
-        [](OperationContext* opCtx,
-           const NamespaceString& nss) -> StatusWith<OptionalCollectionUUID> {
+    GetCollectionUUIDFn getCollectionUUIDFn = [](OperationContext* opCtx,
+                                                 const NamespaceString& nss) -> StatusWith<UUID> {
         return Status{ErrorCodes::IllegalOperation, "GetCollectionUUIDFn not implemented."};
     };
 
@@ -439,7 +438,6 @@ private:
     bool _rbidInitialized = false;
     Timestamp _stableTimestamp = Timestamp::min();
     Timestamp _initialDataTimestamp = Timestamp::min();
-    OptionalCollectionUUID _uuid;
     bool _schemaUpgraded;
 };
 

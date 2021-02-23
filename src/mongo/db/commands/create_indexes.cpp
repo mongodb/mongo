@@ -397,7 +397,7 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
     // 1) We are in a replication mode that allows for index creation.
     // 2) Check sharding state.
     // 3) Check if we can create the index without handing control to the IndexBuildsCoordinator.
-    OptionalCollectionUUID collectionUUID;
+    boost::optional<UUID> collectionUUID;
     CreateIndexesReply reply;
     {
         Lock::DBLock dbLock(opCtx, ns.db(), MODE_IS);
