@@ -189,7 +189,7 @@ TEST_F(WindowFunctionExecNonRemovableTest, UnboundedNotYetSupported) {
 TEST_F(WindowFunctionExecRemovableDocumentTest, AccumulateCurrentToInteger) {
     const auto docs = std::deque<DocumentSource::GetNextResult>{
         Document{{"a", 3}}, Document{{"a", 2}}, Document{{"a", 1}}};
-    auto mgr = createForFieldPath(std::move(docs), "$a", WindowBounds::DocumentBased{0, 2});
+    auto mgr = createForFieldPath(docs, "$a", WindowBounds::DocumentBased{0, 2});
     ASSERT_VALUE_EQ(Value(3), mgr.getNext());
     advanceIterator();
     ASSERT_VALUE_EQ(Value(2), mgr.getNext());
@@ -245,7 +245,7 @@ TEST_F(WindowFunctionExecRemovableDocumentTest, AccumulateIntegerToInteger) {
 
     const auto docsTwo = std::deque<DocumentSource::GetNextResult>{
         Document{{"a", 3}}, Document{{"a", 4}}, Document{{"a", 2}}, Document{{"a", 1}}};
-    mgr = createForFieldPath(std::move(docsTwo), "$a", WindowBounds::DocumentBased{-3, -1});
+    mgr = createForFieldPath(docsTwo, "$a", WindowBounds::DocumentBased{-3, -1});
     ASSERT(mgr.getNext().nullish());  // Default value
     advanceIterator();
     ASSERT_VALUE_EQ(Value(3), mgr.getNext());
@@ -269,7 +269,7 @@ TEST_F(WindowFunctionExecRemovableDocumentTest, AccumulateIntegerToInteger) {
 TEST_F(WindowFunctionExecRemovableDocumentTest, DefaultValueWorksAsExpected) {
     const auto docsOne =
         std::deque<DocumentSource::GetNextResult>{Document{{"a", 3}}, Document{{"a", 4}}};
-    auto mgr = createForFieldPath(std::move(docsOne), "$a", WindowBounds::DocumentBased{-3, -2});
+    auto mgr = createForFieldPath(docsOne, "$a", WindowBounds::DocumentBased{-3, -2});
     ASSERT(mgr.getNext().nullish());  // Default value
     advanceIterator();
     ASSERT(mgr.getNext().nullish());  // Default value
