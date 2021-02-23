@@ -33,14 +33,10 @@
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_set_window_fields_gen.h"
-#include "mongo/db/pipeline/window_function/partition_iterator.h"
 #include "mongo/db/pipeline/window_function/window_bounds.h"
-#include "mongo/db/pipeline/window_function/window_function_exec.h"
 #include "mongo/db/pipeline/window_function/window_function_expression.h"
 
 namespace mongo {
-
-class WindowFunctionExec;
 
 struct WindowFunctionStatement {
     std::string fieldName;  // top-level fieldname, not a path
@@ -55,6 +51,22 @@ struct WindowFunctionStatement {
                                          ExpressionContext* expCtx);
     void serialize(MutableDocument& outputFields,
                    boost::optional<ExplainOptions::Verbosity> explain) const;
+};
+
+struct ExecutableWindowFunction {
+    std::string fieldName;
+    boost::intrusive_ptr<AccumulatorState> accumulator;
+    WindowBounds bounds;
+    boost::intrusive_ptr<Expression> inputExpr;
+
+    ExecutableWindowFunction(std::string fieldName,
+                             boost::intrusive_ptr<AccumulatorState> accumulator,
+                             WindowBounds bounds,
+                             boost::intrusive_ptr<Expression> input)
+        : fieldName(std::move(fieldName)),
+          accumulator(std::move(accumulator)),
+          bounds(std::move(bounds)),
+          inputExpr(std::move(input)) {}
 };
 
 /**
@@ -94,8 +106,7 @@ public:
         : DocumentSource(kStageName, expCtx),
           _partitionBy(partitionBy),
           _sortBy(std::move(sortBy)),
-          _outputFields(std::move(outputFields)),
-          _iterator(expCtx.get(), pSource, std::move(partitionBy)) {}
+          _outputFields(std::move(outputFields)) {}
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
         return StageConstraints(StreamType::kBlocking,
@@ -121,11 +132,6 @@ public:
 
     DocumentSource::GetNextResult doGetNext();
 
-    void setSource(DocumentSource* source) final {
-        pSource = source;
-        _iterator.setSource(source);
-    }
-
 private:
     DocumentSource::GetNextResult getNextInput();
     void initialize();
@@ -133,10 +139,8 @@ private:
     boost::optional<boost::intrusive_ptr<Expression>> _partitionBy;
     boost::optional<SortPattern> _sortBy;
     std::vector<WindowFunctionStatement> _outputFields;
-    PartitionIterator _iterator;
-    StringMap<std::unique_ptr<WindowFunctionExec>> _executableOutputs;
+    std::vector<ExecutableWindowFunction> _executableOutputs;
     bool _init = false;
-    bool _eof = false;
 };
 
 }  // namespace mongo

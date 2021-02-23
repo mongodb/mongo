@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_set_window_fields_gen.h"
 #include "mongo/db/pipeline/window_function/window_bounds.h"
@@ -93,13 +92,10 @@ public:
 
     virtual boost::intrusive_ptr<::mongo::Expression> input() const = 0;
 
-    virtual boost::intrusive_ptr<AccumulatorState> buildAccumulatorOnly() const = 0;
-
 private:
     static StringMap<Parser> parserMap;
 };
 
-template <typename NonRemovableType>
 class ExpressionFromAccumulator : public Expression {
 public:
     static boost::intrusive_ptr<Expression> parse(BSONElement elem,
@@ -118,8 +114,8 @@ public:
                                   << " found an unknown argument: " << arg.fieldNameStringData(),
                     allowedFields.find(arg.fieldNameStringData()) != allowedFields.end());
         }
-        return make_intrusive<ExpressionFromAccumulator<NonRemovableType>>(
-            expCtx, std::move(accumulatorName), std::move(input), std::move(bounds));
+        return make_intrusive<ExpressionFromAccumulator>(
+            std::move(accumulatorName), std::move(input), std::move(bounds));
     }
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const final {
         MutableDocument args;
@@ -132,12 +128,10 @@ public:
         }};
     }
 
-    ExpressionFromAccumulator(ExpressionContext* expCtx,
-                              std::string accumulatorName,
+    ExpressionFromAccumulator(std::string accumulatorName,
                               boost::intrusive_ptr<::mongo::Expression> input,
                               WindowBounds bounds)
-        : _expCtx(expCtx),
-          _accumulatorName(std::move(accumulatorName)),
+        : _accumulatorName(std::move(accumulatorName)),
           _input(std::move(input)),
           _bounds(std::move(bounds)) {}
 
@@ -153,12 +147,8 @@ public:
         return _bounds;
     }
 
-    boost::intrusive_ptr<AccumulatorState> buildAccumulatorOnly() const {
-        return NonRemovableType::create(_expCtx);
-    }
 
 private:
-    ExpressionContext* _expCtx;
     std::string _accumulatorName;
     boost::intrusive_ptr<::mongo::Expression> _input;
     WindowBounds _bounds;

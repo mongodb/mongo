@@ -43,7 +43,7 @@ using boost::intrusive_ptr;
 using std::vector;
 
 REGISTER_ACCUMULATOR(push, genericParseSingleExpressionAccumulator<AccumulatorPush>);
-REGISTER_WINDOW_FUNCTION(push, window_function::ExpressionFromAccumulator<AccumulatorPush>::parse);
+REGISTER_WINDOW_FUNCTION(push, window_function::ExpressionFromAccumulator::parse);
 
 const char* AccumulatorPush::getOpName() const {
     return "$push";

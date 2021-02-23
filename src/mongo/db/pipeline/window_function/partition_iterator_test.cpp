@@ -84,8 +84,7 @@ TEST_F(PartitionIteratorTest, LookaheadOutOfRangeAccessNewPartition) {
     const auto mock = DocumentSourceMock::createForTest(docs, getExpCtx());
     auto key = ExpressionFieldPath::createPathFromString(
         getExpCtx().get(), "key", getExpCtx()->variablesParseState);
-    auto partIter = PartitionIterator(
-        getExpCtx().get(), mock.get(), boost::optional<boost::intrusive_ptr<Expression>>(key));
+    auto partIter = PartitionIterator(getExpCtx().get(), mock.get(), *key);
     ASSERT_DOCUMENT_EQ(docs[0].getDocument(), *partIter[0]);
     ASSERT_DOCUMENT_EQ(docs[1].getDocument(), *partIter[1]);
     ASSERT_FALSE(partIter[2]);
@@ -99,8 +98,7 @@ TEST_F(PartitionIteratorTest, AdvanceMovesCurrent) {
     const auto mock = DocumentSourceMock::createForTest(docs, getExpCtx());
     auto key = ExpressionFieldPath::createPathFromString(
         getExpCtx().get(), "key", getExpCtx()->variablesParseState);
-    auto partIter = PartitionIterator(
-        getExpCtx().get(), mock.get(), boost::optional<boost::intrusive_ptr<Expression>>(key));
+    auto partIter = PartitionIterator(getExpCtx().get(), mock.get(), *key);
     ASSERT_DOCUMENT_EQ(docs[0].getDocument(), *partIter[0]);
     ASSERT_DOCUMENT_EQ(docs[1].getDocument(), *partIter[1]);
     ASSERT_FALSE(partIter[2]);
@@ -118,8 +116,7 @@ TEST_F(PartitionIteratorTest, AdvanceOverPartitionBoundary) {
     const auto mock = DocumentSourceMock::createForTest(docs, getExpCtx());
     auto key = ExpressionFieldPath::createPathFromString(
         getExpCtx().get(), "key", getExpCtx()->variablesParseState);
-    auto partIter = PartitionIterator(
-        getExpCtx().get(), mock.get(), boost::optional<boost::intrusive_ptr<Expression>>(key));
+    auto partIter = PartitionIterator(getExpCtx().get(), mock.get(), *key);
     ASSERT_DOCUMENT_EQ(docs[0].getDocument(), *partIter[0]);
     // First advance to the final document in partition with key "1".
     ASSERT_ADVANCE_RESULT(PartitionIterator::AdvanceResult::kAdvanced, partIter.advance());
@@ -136,8 +133,7 @@ TEST_F(PartitionIteratorTest, AdvanceResultsInEof) {
     const auto mock = DocumentSourceMock::createForTest(docs, getExpCtx());
     auto key = ExpressionFieldPath::createPathFromString(
         getExpCtx().get(), "key", getExpCtx()->variablesParseState);
-    auto partIter = PartitionIterator(
-        getExpCtx().get(), mock.get(), boost::optional<boost::intrusive_ptr<Expression>>(key));
+    auto partIter = PartitionIterator(getExpCtx().get(), mock.get(), *key);
     ASSERT_DOCUMENT_EQ(docs[0].getDocument(), *partIter[0]);
     ASSERT_ADVANCE_RESULT(PartitionIterator::AdvanceResult::kEOF, partIter.advance());
 
@@ -153,8 +149,7 @@ TEST_F(PartitionIteratorTest, CurrentReturnsCorrectDocumentAsIteratorAdvances) {
     const auto mock = DocumentSourceMock::createForTest(docs, getExpCtx());
     auto key = ExpressionFieldPath::createPathFromString(
         getExpCtx().get(), "key", getExpCtx()->variablesParseState);
-    auto partIter = PartitionIterator(
-        getExpCtx().get(), mock.get(), boost::optional<boost::intrusive_ptr<Expression>>(key));
+    auto partIter = PartitionIterator(getExpCtx().get(), mock.get(), *key);
     ASSERT_DOCUMENT_EQ(docs[0].getDocument(), *partIter[0]);
     partIter.advance();
     ASSERT_DOCUMENT_EQ(docs[1].getDocument(), *partIter[0]);
@@ -167,8 +162,7 @@ TEST_F(PartitionIteratorTest, EmptyCollectionReturnsEOF) {
     const auto mock = DocumentSourceMock::createForTest(docs, getExpCtx());
     auto key = ExpressionFieldPath::createPathFromString(
         getExpCtx().get(), "key", getExpCtx()->variablesParseState);
-    auto partIter = PartitionIterator(
-        getExpCtx().get(), mock.get(), boost::optional<boost::intrusive_ptr<Expression>>(key));
+    auto partIter = PartitionIterator(getExpCtx().get(), mock.get(), *key);
     ASSERT_FALSE(partIter[0]);
     ASSERT_ADVANCE_RESULT(PartitionIterator::AdvanceResult::kEOF, partIter.advance());
 }
@@ -179,8 +173,7 @@ TEST_F(PartitionIteratorTest, PartitionByArrayErrs) {
     const auto mock = DocumentSourceMock::createForTest(docs, getExpCtx());
     auto key = ExpressionFieldPath::createPathFromString(
         getExpCtx().get(), "key", getExpCtx()->variablesParseState);
-    auto partIter = PartitionIterator(
-        getExpCtx().get(), mock.get(), boost::optional<boost::intrusive_ptr<Expression>>(key));
+    auto partIter = PartitionIterator(getExpCtx().get(), mock.get(), *key);
     ASSERT_DOCUMENT_EQ(docs[0].getDocument(), *partIter[0]);
     ASSERT_THROWS_CODE(*partIter[1], AssertionException, ErrorCodes::TypeMismatch);
 }
@@ -191,8 +184,7 @@ TEST_F(PartitionIteratorTest, CurrentOffsetIsCorrectAfterDocumentsAreAccessed) {
     const auto mock = DocumentSourceMock::createForTest(docs, getExpCtx());
     auto key = ExpressionFieldPath::createPathFromString(
         getExpCtx().get(), "a", getExpCtx()->variablesParseState);
-    auto partIter = PartitionIterator(
-        getExpCtx().get(), mock.get(), boost::optional<boost::intrusive_ptr<Expression>>(key));
+    auto partIter = PartitionIterator(getExpCtx().get(), mock.get(), *key);
     ASSERT_EQ(0, partIter.getCurrentOffset());
     auto doc = partIter[0];
     partIter.advance();

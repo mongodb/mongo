@@ -125,7 +125,7 @@ void PartitionIterator::getNextDocument() {
 
     auto doc = getNextRes.releaseDocument();
     if (_partitionExpr) {
-        auto curKey = (*_partitionExpr)->evaluate(doc, &_expCtx->variables);
+        auto curKey = _partitionExpr->evaluate(doc, &_expCtx->variables);
         uassert(ErrorCodes::TypeMismatch,
                 "Cannot 'partitionBy' an expression of type array",
                 !curKey.isArray());
