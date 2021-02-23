@@ -94,7 +94,7 @@ uint64_t Hex::fromHex(StringData s) {
 
 void logBacktraceObject(const BSONObj& bt, StackTraceSink* sink, bool withHumanReadable) {
     if (sink) {
-        *sink << fmt::format(FMT_STRING("BACKTRACE: {}"), tojson(bt, ExtendedRelaxedV2_0_0));
+        *sink << fmt::format(FMT_STRING("BACKTRACE: {}\n"), tojson(bt, ExtendedRelaxedV2_0_0));
     } else {
         LOGV2_OPTIONS(31380, {logv2::LogTruncation::Disabled}, "BACKTRACE", "bt"_attr = bt);
     }
@@ -103,7 +103,7 @@ void logBacktraceObject(const BSONObj& bt, StackTraceSink* sink, bool withHumanR
             for (const auto& fe : elem.Obj()) {
                 BSONObj frame = fe.Obj();
                 if (sink) {
-                    *sink << fmt::format("\n  Frame: {}", tojson(frame, ExtendedRelaxedV2_0_0));
+                    *sink << fmt::format("  Frame: {}\n", tojson(frame, ExtendedRelaxedV2_0_0));
                 } else {
                     LOGV2(31445, "Frame", "frame"_attr = frame);
                 }
