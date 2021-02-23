@@ -29,7 +29,7 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
-#include "mongo/db/storage/oplog_hack.h"
+#include "mongo/db/record_id_helpers.h"
 
 #include <limits>
 
@@ -40,7 +40,7 @@
 #include "mongo/util/debug_util.h"
 
 namespace mongo {
-namespace oploghack {
+namespace record_id_helpers {
 
 StatusWith<RecordId> keyForOptime(const Timestamp& opTime) {
     // Make sure secs and inc wouldn't be negative if treated as signed. This ensures that they
@@ -80,5 +80,5 @@ StatusWith<RecordId> extractKey(const char* data, int len) {
     return keyForOptime(elem.timestamp());
 }
 
-}  // namespace oploghack
+}  // namespace record_id_helpers
 }  // namespace mongo

@@ -65,11 +65,17 @@ void statsToBSON(const QuerySolutionNode* node,
         case STAGE_COLLSCAN: {
             auto csn = static_cast<const CollectionScanNode*>(node);
             bob->append("direction", csn->direction > 0 ? "forward" : "backward");
-            if (csn->minTs) {
-                bob->append("minTs", *csn->minTs);
+            if (csn->minRecord) {
+                csn->minRecord->withFormat(
+                    [&](RecordId::Null n) { bob->appendNull("minRecord"); },
+                    [&](int64_t rid) { bob->append("minRecord", rid); },
+                    [&](const char* str, int size) { bob->append("minRecord", OID::from(str)); });
             }
-            if (csn->maxTs) {
-                bob->append("maxTs", *csn->maxTs);
+            if (csn->maxRecord) {
+                csn->maxRecord->withFormat(
+                    [&](RecordId::Null n) { bob->appendNull("maxRecord"); },
+                    [&](int64_t rid) { bob->append("maxRecord", rid); },
+                    [&](const char* str, int size) { bob->append("maxRecord", OID::from(str)); });
             }
             break;
         }

@@ -49,12 +49,12 @@
 #include "mongo/db/global_settings.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/record_id_helpers.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_recovery.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
-#include "mongo/db/storage/oplog_hack.h"
 #include "mongo/db/storage/wiredtiger/oplog_stone_parameters_gen.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_cursor_helpers.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
@@ -1576,7 +1576,7 @@ Status WiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
             auto& record = records[i];
             if (_isOplog) {
                 StatusWith<RecordId> status =
-                    oploghack::extractKey(record.data.data(), record.data.size());
+                    record_id_helpers::extractKey(record.data.data(), record.data.size());
                 if (!status.isOK())
                     return status.getStatus();
                 record.id = status.getValue();
@@ -2006,40 +2006,6 @@ void WiredTigerRecordStore::waitForAllEarlierOplogWritesToBeVisible(OperationCon
     }
 }
 
-boost::optional<RecordId> WiredTigerRecordStore::oplogStartHack(
-    OperationContext* opCtx, const RecordId& startingPosition) const {
-    dassert(opCtx->lockState()->isReadLocked());
-
-    if (!_isOplog)
-        return boost::none;
-
-    auto wtRu = WiredTigerRecoveryUnit::get(opCtx);
-    wtRu->setIsOplogReader();
-
-    RecordId searchFor = startingPosition;
-    auto visibilityTs = wtRu->getOplogVisibilityTs();
-    if (visibilityTs && searchFor.asLong() > *visibilityTs) {
-        searchFor = RecordId(*visibilityTs);
-    }
-
-    WiredTigerCursor cursor(_uri, _tableId, true, opCtx);
-    WT_CURSOR* c = cursor.get();
-
-    int cmp;
-    CursorKey key = makeCursorKey(searchFor);
-    setKey(c, key);
-    int ret = c->search_near(c, &cmp);
-    if (ret == 0 && cmp > 0)
-        ret = c->prev(c);  // landed one higher than startingPosition
-    if (ret == WT_NOTFOUND)
-        return RecordId();  // nothing <= startingPosition
-    // It's illegal for oplog documents to be in a prepare state.
-    invariant(ret != WT_PREPARE_CONFLICT);
-    invariantWTOK(ret);
-
-    return getKey(c);
-}
-
 void WiredTigerRecordStore::updateStatsAfterRepair(OperationContext* opCtx,
                                                    long long numRecords,
                                                    long long dataSize) {
@@ -2418,6 +2384,74 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::seekExact(const RecordI
     return {{id, {static_cast<const char*>(value.data), static_cast<int>(value.size)}}};
 }
 
+boost::optional<Record> WiredTigerRecordStoreCursorBase::seekNear(const RecordId& id) {
+    dassert(_opCtx->lockState()->isReadLocked());
+
+    // Forward scans on the oplog must round down to the oplog visibility timestamp.
+    RecordId start = id;
+    if (_forward && _oplogVisibleTs && start.asLong() > *_oplogVisibleTs) {
+        start = RecordId(*_oplogVisibleTs);
+    }
+
+    _skipNextAdvance = false;
+    WiredTigerRecoveryUnit::get(_opCtx)->getSession();
+    WT_CURSOR* c = _cursor->get();
+
+    WiredTigerRecordStore::CursorKey key = makeCursorKey(start);
+    setKey(c, key);
+
+    int cmp;
+    int ret = wiredTigerPrepareConflictRetry(_opCtx, [&] { return c->search_near(c, &cmp); });
+    if (ret == WT_NOTFOUND) {
+        _eof = true;
+        return boost::none;
+    }
+    invariantWTOK(ret);
+
+    auto& metricsCollector = ResourceConsumption::MetricsCollector::get(_opCtx);
+    metricsCollector.incrementOneCursorSeek();
+
+    RecordId curId = getKey(c);
+
+    // Per the requirement of the API, return the lower (for forward) or higher (for reverse)
+    // record.
+    if (_forward && cmp > 0) {
+        ret = wiredTigerPrepareConflictRetry(_opCtx, [&] { return c->prev(c); });
+    } else if (!_forward && cmp < 0) {
+        ret = wiredTigerPrepareConflictRetry(_opCtx, [&] { return c->next(c); });
+    }
+
+    // If we tried to return an earlier record but we found the end (for forward) or beginning (for
+    // reverse), go back to our original location so that we have something to return.
+    if (ret == WT_NOTFOUND) {
+        if (_forward) {
+            invariant(cmp > 0);
+            ret = wiredTigerPrepareConflictRetry(_opCtx, [&] { return c->next(c); });
+        } else if (!_forward) {
+            invariant(cmp < 0);
+            ret = wiredTigerPrepareConflictRetry(_opCtx, [&] { return c->prev(c); });
+        }
+    }
+    invariantWTOK(ret);
+
+    curId = getKey(c);
+
+    // For forward cursors on the oplog, the oplog visible timestamp is treated as the end of the
+    // record store. So if we are positioned past this point, then there are no visible records.
+    if (_forward && _oplogVisibleTs && curId.asLong() > *_oplogVisibleTs) {
+        _eof = true;
+        return boost::none;
+    }
+
+    WT_ITEM value;
+    invariantWTOK(c->get_value(c, &value));
+
+    metricsCollector.incrementOneDocRead(value.size);
+
+    _lastReturnedId = curId;
+    _eof = false;
+    return {{curId, {static_cast<const char*>(value.data), static_cast<int>(value.size)}}};
+}
 
 void WiredTigerRecordStoreCursorBase::save() {
     try {

@@ -46,7 +46,7 @@
 #include "mongo/db/query/sbe_stage_builder_filter.h"
 #include "mongo/db/query/sbe_stage_builder_helpers.h"
 #include "mongo/db/query/util/make_data_structure.h"
-#include "mongo/db/storage/oplog_hack.h"
+#include "mongo/db/record_id_helpers.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/str.h"
 
@@ -126,16 +126,15 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateOptimizedOplo
     bool isTailableResumeBranch,
     sbe::LockAcquisitionCallback lockAcquisitionCallback) {
     invariant(collection->ns().isOplog());
-    // The minTs and maxTs optimizations are not compatible with resumeAfterRecordId and can only
-    // be done for a forward scan.
+    // The minRecord and maxRecord optimizations are not compatible with resumeAfterRecordId and can
+    // only be done for a forward scan.
     invariant(!csn->resumeAfterRecordId);
     invariant(csn->direction == CollectionScanParams::FORWARD);
 
     auto resultSlot = slotIdGenerator->generate();
     auto recordIdSlot = slotIdGenerator->generate();
 
-    // See if the RecordStore supports the oplogStartHack. If so, the scan will start from the
-    // RecordId stored in seekRecordId.
+    // Start the scan from the RecordId stored in seekRecordId.
     // Otherwise, if we're building a collection scan for a resume branch of a special union
     // sub-tree implementing a tailable cursor scan, we can use the seekRecordIdSlot directly
     // to access the recordId to resume the scan from.
@@ -144,25 +143,22 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateOptimizedOplo
         if (isTailableResumeBranch) {
             auto resumeRecordIdSlot = env->getSlot("resumeRecordId"_sd);
             return {{}, resumeRecordIdSlot};
-        } else if (csn->minTs) {
-            auto goal = oploghack::keyForOptime(*csn->minTs);
-            if (goal.isOK()) {
-                auto startLoc =
-                    collection->getRecordStore()->oplogStartHack(opCtx, goal.getValue());
-                if (startLoc && !startLoc->isNull()) {
-                    LOGV2_DEBUG(205841, 3, "Using direct oplog seek");
-                    return {startLoc, slotIdGenerator->generate()};
-                }
+        } else if (csn->minRecord) {
+            auto cursor = collection->getRecordStore()->getCursor(opCtx);
+            auto startRec = cursor->seekNear(*csn->minRecord);
+            if (startRec) {
+                LOGV2_DEBUG(205841, 3, "Using direct oplog seek");
+                return {startRec->id, slotIdGenerator->generate()};
             }
         }
         return {};
     }();
 
     // Check if we need to project out an oplog 'ts' field as part of the collection scan. We will
-    // need it either when 'maxTs' bound has been provided, so that we can apply an EOF filter, of
-    // if we need to track the latest oplog timestamp.
+    // need it either when 'maxRecord' bound has been provided, so that we can apply an EOF filter,
+    // of if we need to track the latest oplog timestamp.
     const auto shouldTrackLatestOplogTimestamp = !csn->stopApplyingFilterAfterFirstMatch &&
-        (csn->maxTs || csn->shouldTrackLatestOplogTimestamp);
+        (csn->maxRecord || csn->shouldTrackLatestOplogTimestamp);
     auto&& [fields, slots, tsSlot] = makeOplogTimestampSlotsIfNeeded(
         collection, slotIdGenerator, shouldTrackLatestOplogTimestamp);
 
@@ -179,7 +175,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateOptimizedOplo
                                             lockAcquisitionCallback,
                                             makeOpenCallbackIfNeeded(collection, csn));
 
-    // Start the scan from the seekRecordId if we can use the oplogStartHack.
+    // Start the scan from the seekRecordId.
     if (seekRecordId) {
         invariant(seekRecordIdSlot);
 
@@ -199,14 +195,12 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateOptimizedOplo
     }
 
     // Create a filter which checks the first document to ensure either that its 'ts' is less than
-    // or equal to minTs, or that it is a replica set initialization message. If this fails, then we
-    // throw ErrorCodes::OplogQueryMinTsMissing. We avoid doing this check on the resumable branch
-    // of a tailable scan; it only needs to be done once, when the initial branch is run.
-    if (csn->assertMinTsHasNotFallenOffOplog && !isTailableResumeBranch) {
-        // We should never see 'assertMinTsHasNotFallenOffOplog' if 'minTS' is not present. This can
-        // be incorrectly requested by the user, but in that case we should already have uasserted.
+    // or equal the minimum timestamp that should not have rolled off the oplog, or that it is a
+    // replica set initialization message. If this fails, then we throw
+    // ErrorCodes::OplogQueryMinTsMissing. We avoid doing this check on the resumable branch of a
+    // tailable scan; it only needs to be done once, when the initial branch is run.
+    if (csn->assertTsHasNotFallenOffOplog && !isTailableResumeBranch) {
         invariant(csn->shouldTrackLatestOplogTimestamp);
-        invariant(csn->minTs);
 
         // We will be constructing a filter that needs to see the 'ts' field. We name it 'minTsSlot'
         // here so that it does not shadow the 'tsSlot' which we allocated earlier.
@@ -261,10 +255,10 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateOptimizedOplo
             sbe::makeE<sbe::EIf>(
                 makeBinaryOp(
                     sbe::EPrimBinary::logicOr,
-                    makeBinaryOp(
-                        sbe::EPrimBinary::lessEq,
-                        makeVariable(*minTsSlot),
-                        makeConstant(sbe::value::TypeTags::Timestamp, csn->minTs->asULL())),
+                    makeBinaryOp(sbe::EPrimBinary::lessEq,
+                                 makeVariable(*minTsSlot),
+                                 makeConstant(sbe::value::TypeTags::Timestamp,
+                                              csn->assertTsHasNotFallenOffOplog->asULL())),
                     makeBinaryOp(
                         sbe::EPrimBinary::logicAnd,
                         makeBinaryOp(
@@ -306,8 +300,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateOptimizedOplo
 
     // Add an EOF filter to stop the scan after we fetch the first document that has 'ts' greater
     // than the upper bound.
-    if (csn->maxTs) {
-        // The 'maxTs' optimization is not compatible with 'stopApplyingFilterAfterFirstMatch'.
+    if (csn->maxRecord) {
+        // The 'maxRecord' optimization is not compatible with 'stopApplyingFilterAfterFirstMatch'.
         invariant(!csn->stopApplyingFilterAfterFirstMatch);
         invariant(tsSlot);
 
@@ -315,7 +309,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateOptimizedOplo
             std::move(stage),
             makeBinaryOp(sbe::EPrimBinary::lessEq,
                          makeVariable(*tsSlot),
-                         makeConstant(sbe::value::TypeTags::Timestamp, csn->maxTs->asULL())),
+                         makeConstant(sbe::value::TypeTags::Timestamp, csn->maxRecord->asLong())),
             csn->nodeId());
     }
 
@@ -361,7 +355,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateOptimizedOplo
         // inner branch, and the execution will continue from this point further on, without
         // applying the filter.
         if (csn->stopApplyingFilterAfterFirstMatch) {
-            invariant(csn->minTs);
+            invariant(csn->minRecord);
             invariant(csn->direction == CollectionScanParams::FORWARD);
 
             std::tie(fields, slots, tsSlot) = makeOplogTimestampSlotsIfNeeded(
@@ -569,7 +563,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateCollScan(
     sbe::RuntimeEnvironment* env,
     bool isTailableResumeBranch,
     sbe::LockAcquisitionCallback lockAcquisitionCallback) {
-    if (csn->minTs || csn->maxTs) {
+    if (csn->minRecord || csn->maxRecord) {
         return generateOptimizedOplogScan(opCtx,
                                           collection,
                                           csn,

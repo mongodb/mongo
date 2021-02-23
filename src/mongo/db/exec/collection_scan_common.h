@@ -40,23 +40,30 @@ struct CollectionScanParams {
         BACKWARD = -1,
     };
 
-    // If present, the collection scan will seek directly to the RecordId of an oplog entry as
-    // close to 'minTs' as possible without going higher. Must only be set on forward oplog scans.
-    // This field cannot be used in conjunction with 'resumeAfterRecordId'.
-    boost::optional<Timestamp> minTs;
+    // If present, this parameter sets the start point of a forward scan or the end point of a
+    // reverse scan. A forward scan will start scanning at the document with the lowest RecordId
+    // greater than or equal to minRecord. A reverse scan will stop and return EOF on the first
+    // document with a RecordId less than minRecord, or a higher record if none exists. May only
+    // be used for scans on collections clustered by _id and forward oplog scans. If exclusive
+    // bounds are required, a MatchExpression must be passed to the CollectionScan stage. This field
+    // cannot be used in conjunction with 'resumeAfterRecordId'
+    boost::optional<RecordId> minRecord;
 
-    // If present, the collection scan will stop and return EOF the first time it sees a document
-    // that does not pass the filter and has 'ts' greater than 'maxTs'. Must only be set on forward
-    // oplog scans.
-    // This field cannot be used in conjunction with 'resumeAfterRecordId'.
-    boost::optional<Timestamp> maxTs;
+    // If present, this parameter sets the start point of a reverse scan or the end point of a
+    // forward scan. A forward scan will stop and return EOF on the first document with a RecordId
+    // greater than maxRecord. A reverse scan will start scanning at the document with the
+    // highest RecordId less than or equal to maxRecord, or a lower record if none exists. May
+    // only be used for scans on collections clustered by _id and forward oplog scans. If exclusive
+    // bounds are required, a MatchExpression must be passed to the CollectionScan stage. This field
+    // cannot be used in conjunction with 'resumeAfterRecordId'.
+    boost::optional<RecordId> maxRecord;
 
     // If true, the collection scan will return a token that can be used to resume the scan.
     bool requestResumeToken = false;
 
     // If present, the collection scan will seek to the exact RecordId, or return KeyNotFound if it
     // does not exist. Must only be set on forward collection scans.
-    // This field cannot be used in conjunction with 'minTs' or 'maxTs'.
+    // This field cannot be used in conjunction with 'minRecord' or 'maxRecord'.
     boost::optional<RecordId> resumeAfterRecordId;
 
     Direction direction = FORWARD;
@@ -64,8 +71,8 @@ struct CollectionScanParams {
     // Do we want the scan to be 'tailable'?  Only meaningful if the collection is capped.
     bool tailable = false;
 
-    // Should we assert that the specified minTS has not fallen off the oplog?
-    bool assertMinTsHasNotFallenOffOplog = false;
+    // Assert that the specified timestamp has not fallen off the oplog on a forward scan.
+    boost::optional<Timestamp> assertTsHasNotFallenOffOplog = boost::none;
 
     // Should we keep track of the timestamp of the latest oplog entry we've seen? This information
     // is needed to merge cursors from the oplog in order of operation time when reading the oplog

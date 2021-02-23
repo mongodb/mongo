@@ -108,9 +108,6 @@ public:
         return _data->records.size();
     }
 
-    virtual boost::optional<RecordId> oplogStartHack(OperationContext* opCtx,
-                                                     const RecordId& startingPosition) const;
-
     void waitForAllEarlierOplogWritesToBeVisible(OperationContext* opCtx) const override {}
 
     virtual void updateStatsAfterRepair(OperationContext* opCtx,

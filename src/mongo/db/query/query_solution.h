@@ -470,23 +470,20 @@ struct CollectionScanNode : public QuerySolutionNodeWithSortSet {
     // Name of the namespace.
     std::string name;
 
-    // If present, the collection scan will seek directly to the RecordId of an oplog entry as
-    // close to 'minTs' as possible without going higher. Should only be set on forward oplog scans.
-    // This field cannot be used in conjunction with 'resumeAfterRecordId'.
-    boost::optional<Timestamp> minTs;
+    // If present, this parameter sets the start point of a forward scan or the end point of a
+    // reverse scan.
+    boost::optional<RecordId> minRecord;
 
-    // If present the collection scan will stop and return EOF the first time it sees a document
-    // that does not pass the filter and has 'ts' greater than 'maxTs'. Should only be set on
-    // forward oplog scans.
-    // This field cannot be used in conjunction with 'resumeAfterRecordId'.
-    boost::optional<Timestamp> maxTs;
+    // If present, this parameter sets the start point of a reverse scan or the end point of a
+    // forward scan.
+    boost::optional<RecordId> maxRecord;
 
     // If true, the collection scan will return a token that can be used to resume the scan.
     bool requestResumeToken = false;
 
     // If present, the collection scan will seek to the exact RecordId, or return KeyNotFound if it
     // does not exist. Must only be set on forward collection scans.
-    // This field cannot be used in conjunction with 'minTs' or 'maxTs'.
+    // This field cannot be used in conjunction with 'minRecord' or 'maxRecord'.
     boost::optional<RecordId> resumeAfterRecordId;
 
     // Should we make a tailable cursor?
@@ -497,8 +494,8 @@ struct CollectionScanNode : public QuerySolutionNodeWithSortSet {
     // across a sharded cluster.
     bool shouldTrackLatestOplogTimestamp = false;
 
-    // Should we assert that the specified minTS has not fallen off the oplog?
-    bool assertMinTsHasNotFallenOffOplog = false;
+    // Assert that the specified timestamp has not fallen off the oplog.
+    boost::optional<Timestamp> assertTsHasNotFallenOffOplog = boost::none;
 
     int direction{1};
 

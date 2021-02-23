@@ -513,5 +513,70 @@ TEST(RecordStoreTestHarness, ClusteredRecordStore) {
     }
 }
 
+TEST(RecordStoreTestHarness, ClusteredRecordStoreSeekNear) {
+    const auto harnessHelper = newRecordStoreHarnessHelper();
+    if (!harnessHelper->getEngine()->supportsClusteredIdIndex()) {
+        // Only WiredTiger supports clustered indexes on _id.
+        return;
+    }
+
+    const std::string ns = "test.system.buckets.a";
+    CollectionOptions options;
+    options.clusteredIndex = ClusteredIndexOptions{};
+    std::unique_ptr<RecordStore> rs = harnessHelper->newNonCappedRecordStore(ns, options);
+    invariant(rs->keyFormat() == KeyFormat::String);
+
+    auto opCtx = harnessHelper->newOperationContext();
+
+    const int numRecords = 100;
+    std::vector<Record> records;
+    std::vector<Timestamp> timestamps;
+    for (int i = 0; i < numRecords; i++) {
+        timestamps.push_back(Timestamp(i, 1));
+    }
+
+    // Insert RecordIds where the timestamp part of the OID correlates directly with the seconds in
+    // the Timestamp.
+    for (int i = 0; i < numRecords; i++) {
+        BSONObj doc = BSON("i" << i);
+        RecordData recordData = RecordData(doc.objdata(), doc.objsize());
+        recordData.makeOwned();
+
+        auto oid = OID::gen();
+        oid.setTimestamp(timestamps[i].getSecs());
+        auto record = Record{RecordId(oid.view().view(), OID::kOIDSize), recordData};
+        std::vector<Record> recVec = {record};
+
+        WriteUnitOfWork wuow(opCtx.get());
+        ASSERT_OK(rs->insertRecords(opCtx.get(), &recVec, {timestamps[i]}));
+        wuow.commit();
+
+        records.push_back(record);
+    }
+
+    for (int i = 0; i < numRecords; i++) {
+        // Generate an OID RecordId with a timestamp part and high bits elsewhere such that it
+        // always compares greater than or equal to the OIDs we inserted.
+        auto oid = OID::max();
+        oid.setTimestamp(i);
+        auto rid = RecordId(oid.view().view(), OID::kOIDSize);
+        auto cur = rs->getCursor(opCtx.get());
+        auto rec = cur->seekNear(rid);
+        ASSERT(rec);
+        ASSERT_EQ(records[i].id, rec->id);
+    }
+
+    for (int i = 0; i < numRecords; i++) {
+        // Generate an OID RecordId with only a timestamp part and zeroes elsewhere such that it
+        // always compares less than or equal to the OIDs we inserted.
+        auto oid = OID();
+        oid.setTimestamp(i);
+        auto rid = RecordId(oid.view().view(), OID::kOIDSize);
+        auto cur = rs->getCursor(opCtx.get(), false /* forward */);
+        auto rec = cur->seekNear(rid);
+        ASSERT(rec);
+        ASSERT_EQ(records[i].id, rec->id);
+    }
+}
 }  // namespace
 }  // namespace mongo

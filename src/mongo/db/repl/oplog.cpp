@@ -407,7 +407,7 @@ OpTime logOp(OperationContext* opCtx, MutableOplogEntry* oplogEntry) {
 
     auto bsonOplogEntry = oplogEntry->toBSON();
     // The storage engine will assign the RecordId based on the "ts" field of the oplog entry, see
-    // oploghack::extractKey.
+    // record_id_helpers::extractKey.
     std::vector<Record> records{
         {RecordId(), RecordData(bsonOplogEntry.objdata(), bsonOplogEntry.objsize())}};
     std::vector<Timestamp> timestamps{slot.getTimestamp()};
@@ -477,7 +477,7 @@ std::vector<OpTime> logInsertOps(OperationContext* opCtx,
         timestamps[i] = insertStatementOplogSlot.getTimestamp();
         bsonOplogEntries[i] = oplogEntry.toBSON();
         // The storage engine will assign the RecordId based on the "ts" field of the oplog entry,
-        // see oploghack::extractKey.
+        // see record_id_helpers::extractKey.
         records[i] = Record{
             RecordId(), RecordData(bsonOplogEntries[i].objdata(), bsonOplogEntries[i].objsize())};
     }

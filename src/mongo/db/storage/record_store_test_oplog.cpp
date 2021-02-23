@@ -63,7 +63,7 @@ RecordId _oplogOrderInsertOplog(OperationContext* opCtx,
     return res.getValue();
 }
 
-TEST(RecordStoreTestHarness, OplogHack) {
+TEST(RecordStoreTestHarness, SeekNearOplog) {
     std::unique_ptr<RecordStoreHarnessHelper> harnessHelper = newRecordStoreHarnessHelper();
 
     // Use a large enough cappedMaxSize so that the limit is not reached by doing the inserts within
@@ -104,14 +104,78 @@ TEST(RecordStoreTestHarness, OplogHack) {
     // Make sure all are visible.
     rs->waitForAllEarlierOplogWritesToBeVisible(harnessHelper->newOperationContext().get());
 
+    // Forward cursor seeks
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         WriteUnitOfWork wuow(opCtx.get());
-        // find start
-        ASSERT_EQ(rs->oplogStartHack(opCtx.get(), RecordId(0, 1)), RecordId());      // nothing <=
-        ASSERT_EQ(rs->oplogStartHack(opCtx.get(), RecordId(2, 1)), RecordId(1, 2));  // between
-        ASSERT_EQ(rs->oplogStartHack(opCtx.get(), RecordId(2, 2)), RecordId(2, 2));  // ==
-        ASSERT_EQ(rs->oplogStartHack(opCtx.get(), RecordId(2, 3)), RecordId(2, 2));  // > highest
+        auto cur = rs->getCursor(opCtx.get());
+        auto rec = cur->seekNear(RecordId(0, 1));
+        ASSERT(rec);
+        ASSERT_EQ(rec->id, RecordId(1, 1));
+    }
+
+    {
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        WriteUnitOfWork wuow(opCtx.get());
+        auto cur = rs->getCursor(opCtx.get());
+        auto rec = cur->seekNear(RecordId(2, 1));
+        ASSERT(rec);
+        ASSERT_EQ(rec->id, RecordId(1, 2));
+    }
+
+    {
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        WriteUnitOfWork wuow(opCtx.get());
+        auto cur = rs->getCursor(opCtx.get());
+        auto rec = cur->seekNear(RecordId(2, 2));
+        ASSERT(rec);
+        ASSERT_EQ(rec->id, RecordId(2, 2));
+    }
+
+    {
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        WriteUnitOfWork wuow(opCtx.get());
+        auto cur = rs->getCursor(opCtx.get());
+        auto rec = cur->seekNear(RecordId(2, 3));
+        ASSERT(rec);
+        ASSERT_EQ(rec->id, RecordId(2, 2));
+    }
+
+    // Reverse cursor seeks
+    {
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        WriteUnitOfWork wuow(opCtx.get());
+        auto cur = rs->getCursor(opCtx.get(), false /* forward */);
+        auto rec = cur->seekNear(RecordId(0, 1));
+        ASSERT(rec);
+        ASSERT_EQ(rec->id, RecordId(1, 1));
+    }
+
+    {
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        WriteUnitOfWork wuow(opCtx.get());
+        auto cur = rs->getCursor(opCtx.get(), false /* forward */);
+        auto rec = cur->seekNear(RecordId(2, 1));
+        ASSERT(rec);
+        ASSERT_EQ(rec->id, RecordId(2, 2));
+    }
+
+    {
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        WriteUnitOfWork wuow(opCtx.get());
+        auto cur = rs->getCursor(opCtx.get(), false /* forward */);
+        auto rec = cur->seekNear(RecordId(2, 2));
+        ASSERT(rec);
+        ASSERT_EQ(rec->id, RecordId(2, 2));
+    }
+
+    {
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        WriteUnitOfWork wuow(opCtx.get());
+        auto cur = rs->getCursor(opCtx.get(), false /* forward */);
+        auto rec = cur->seekNear(RecordId(2, 3));
+        ASSERT(rec);
+        ASSERT_EQ(rec->id, RecordId(2, 2));
     }
 
     {
@@ -121,7 +185,10 @@ TEST(RecordStoreTestHarness, OplogHack) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT_EQ(rs->oplogStartHack(opCtx.get(), RecordId(2, 3)), RecordId(2, 2));
+        auto cur = rs->getCursor(opCtx.get());
+        auto rec = cur->seekNear(RecordId(2, 3));
+        ASSERT(rec);
+        ASSERT_EQ(rec->id, RecordId(2, 2));
     }
 
     {
@@ -131,7 +198,10 @@ TEST(RecordStoreTestHarness, OplogHack) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT_EQ(rs->oplogStartHack(opCtx.get(), RecordId(2, 3)), RecordId(1, 2));
+        auto cur = rs->getCursor(opCtx.get());
+        auto rec = cur->seekNear(RecordId(2, 3));
+        ASSERT(rec);
+        ASSERT_EQ(rec->id, RecordId(1, 2));
     }
 
     {
@@ -141,7 +211,10 @@ TEST(RecordStoreTestHarness, OplogHack) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT_EQ(rs->oplogStartHack(opCtx.get(), RecordId(2, 3)), RecordId(1, 1));
+        auto cur = rs->getCursor(opCtx.get());
+        auto rec = cur->seekNear(RecordId(2, 3));
+        ASSERT(rec);
+        ASSERT_EQ(rec->id, RecordId(1, 1));
     }
 
     {
@@ -153,7 +226,9 @@ TEST(RecordStoreTestHarness, OplogHack) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT_EQ(rs->oplogStartHack(opCtx.get(), RecordId(2, 3)), RecordId());
+        auto cur = rs->getCursor(opCtx.get());
+        auto rec = cur->seekNear(RecordId(2, 3));
+        ASSERT_FALSE(rec);
     }
 }
 
@@ -182,7 +257,7 @@ TEST(RecordStoreTestHarness, OplogInsertOutOfOrder) {
     }
 }
 
-TEST(RecordStoreTestHarness, OplogHackOnNonOplog) {
+TEST(RecordStoreTestHarness, SeekNearOnNonOplog) {
     std::unique_ptr<RecordStoreHarnessHelper> harnessHelper = newRecordStoreHarnessHelper();
     std::unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore("local.NOT_oplog.foo"));
 
@@ -195,7 +270,12 @@ TEST(RecordStoreTestHarness, OplogHackOnNonOplog) {
                       .getStatus());
         wuow.commit();
     }
-    ASSERT_EQ(rs->oplogStartHack(opCtx.get(), RecordId(0, 1)), boost::none);
+    auto cur = rs->getCursor(opCtx.get());
+    auto rec = cur->seekNear(RecordId(0, 1));
+    ASSERT(rec);
+    // Regular record stores don't use timestamps for their RecordId, so expect the first
+    // auto-incrementing RecordId to be 1.
+    ASSERT_EQ(rec->id, RecordId(1));
 }
 
 
@@ -228,6 +308,15 @@ TEST(RecordStoreTestHarness, OplogOrder) {
     }
 
     {
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        auto cursor = rs->getCursor(opCtx.get());
+        auto record = cursor->seekNear(RecordId(id1.asLong() + 1));
+        ASSERT(record);
+        ASSERT_EQ(id1, record->id);
+        ASSERT(!cursor->next());
+    }
+
+    {
         // now we insert 2 docs, but commit the 2nd one first.
         // we make sure we can't find the 2nd until the first is committed.
         ServiceContext::UniqueOperationContext earlyReader(harnessHelper->newOperationContext());
@@ -240,15 +329,16 @@ TEST(RecordStoreTestHarness, OplogOrder) {
         auto client1 = harnessHelper->serviceContext()->makeClient("c1");
         auto t1 = harnessHelper->newOperationContext(client1.get());
         WriteUnitOfWork w1(t1.get());
-        _oplogOrderInsertOplog(t1.get(), rs, 20);
+        RecordId id2 = _oplogOrderInsertOplog(t1.get(), rs, 20);
         // do not commit yet
 
+        RecordId id3;
         {  // create 2nd doc
             auto client2 = harnessHelper->serviceContext()->makeClient("c2");
             auto t2 = harnessHelper->newOperationContext(client2.get());
             {
                 WriteUnitOfWork w2(t2.get());
-                _oplogOrderInsertOplog(t2.get(), rs, 30);
+                id3 = _oplogOrderInsertOplog(t2.get(), rs, 30);
                 w2.commit();
             }
         }
@@ -261,6 +351,27 @@ TEST(RecordStoreTestHarness, OplogOrder) {
             auto opCtx = harnessHelper->newOperationContext(client2.get());
             auto cursor = rs->getCursor(opCtx.get());
             auto record = cursor->seekExact(id1);
+            ASSERT(record);
+            ASSERT_EQ(id1, record->id);
+            ASSERT(!cursor->next());
+        }
+
+        {
+            auto client2 = harnessHelper->serviceContext()->makeClient("c2");
+            auto opCtx = harnessHelper->newOperationContext(client2.get());
+            auto cursor = rs->getCursor(opCtx.get());
+            auto record = cursor->seekNear(id2);
+            ASSERT(record);
+            ASSERT_EQ(id1, record->id);
+            ASSERT(!cursor->next());
+        }
+
+        {
+            auto client2 = harnessHelper->serviceContext()->makeClient("c2");
+            auto opCtx = harnessHelper->newOperationContext(client2.get());
+            auto cursor = rs->getCursor(opCtx.get());
+            auto record = cursor->seekNear(id3);
+            ASSERT(record);
             ASSERT_EQ(id1, record->id);
             ASSERT(!cursor->next());
         }
@@ -303,15 +414,17 @@ TEST(RecordStoreTestHarness, OplogOrder) {
         auto client1 = harnessHelper->serviceContext()->makeClient("c1");
         auto t1 = harnessHelper->newOperationContext(client1.get());
         WriteUnitOfWork w1(t1.get());
-        _oplogOrderInsertOplog(t1.get(), rs, 2);
+        RecordId id2 = _oplogOrderInsertOplog(t1.get(), rs, 2);
+
         // do not commit yet
 
+        RecordId id3;
         {  // create 2nd doc
             auto client2 = harnessHelper->serviceContext()->makeClient("c2");
             auto t2 = harnessHelper->newOperationContext(client2.get());
             {
                 WriteUnitOfWork w2(t2.get());
-                _oplogOrderInsertOplog(t2.get(), rs, 3);
+                id3 = _oplogOrderInsertOplog(t2.get(), rs, 3);
                 w2.commit();
             }
         }
@@ -324,6 +437,27 @@ TEST(RecordStoreTestHarness, OplogOrder) {
             auto opCtx = harnessHelper->newOperationContext(client2.get());
             auto cursor = rs->getCursor(opCtx.get());
             auto record = cursor->seekExact(id1);
+            ASSERT(record);
+            ASSERT_EQ(id1, record->id);
+            ASSERT(!cursor->next());
+        }
+
+        {
+            auto client2 = harnessHelper->serviceContext()->makeClient("c2");
+            auto opCtx = harnessHelper->newOperationContext(client2.get());
+            auto cursor = rs->getCursor(opCtx.get());
+            auto record = cursor->seekNear(id2);
+            ASSERT(record);
+            ASSERT_EQ(id1, record->id);
+            ASSERT(!cursor->next());
+        }
+
+        {
+            auto client2 = harnessHelper->serviceContext()->makeClient("c2");
+            auto opCtx = harnessHelper->newOperationContext(client2.get());
+            auto cursor = rs->getCursor(opCtx.get());
+            auto record = cursor->seekNear(id3);
+            ASSERT(record);
             ASSERT_EQ(id1, record->id);
             ASSERT(!cursor->next());
         }

@@ -139,12 +139,12 @@ public:
     }
 
     int compare(const RecordId& rhs) const {
-        // Null always compares less than every other RecordId.
-        if (isNull() && rhs.isNull()) {
+        // Null always compares less than every other RecordId format.
+        if (_format == Format::kNull && rhs._format == Format::kNull) {
             return 0;
-        } else if (isNull()) {
+        } else if (_format == Format::kNull) {
             return -1;
-        } else if (rhs.isNull()) {
+        } else if (rhs._format == Format::kNull) {
             return 1;
         }
         invariant(_format == rhs._format);

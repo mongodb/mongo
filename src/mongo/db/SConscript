@@ -1136,6 +1136,16 @@ env.Library(
 )
 
 env.Library(
+    target='record_id_helpers',
+    source=[
+        'record_id_helpers.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
+)
+
+env.Library(
     target='query_exec',
     source=[
         'clientcursor.cpp',
@@ -1268,7 +1278,6 @@ env.Library(
         's/sharding_api_d',
         'shared_request_handling',
         'stats/serveronly_stats',
-        'storage/oplog_hack',
         'storage/remove_saver',
         'storage/storage_options',
         'update/update_driver',
