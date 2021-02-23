@@ -55,9 +55,6 @@ std::unique_ptr<WindowFunctionExec> translateDocumentWindow(
 
 std::unique_ptr<WindowFunctionExec> WindowFunctionExec::create(
     PartitionIterator* iter, const WindowFunctionStatement& functionStmt) {
-    uassert(5397905,
-            "Window functions cannot set to dotted paths",
-            functionStmt.fieldName.find('.') == std::string::npos);
 
     // Use a sentinel variable to avoid a compilation error when some cases of std::visit don't
     // return a value.
