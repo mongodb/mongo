@@ -52,7 +52,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
 
     auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
     auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
-                         ->createPredicatesOnControlField(original->getMatchExpression());
+                         ->createPredicatesOnBucketLevelField(original->getMatchExpression());
 
     ASSERT_BSONOBJ_EQ(predicate->serialize(true),
                       fromjson("{'control.max.a': {$_internalExprGt: 1}}"));
@@ -70,7 +70,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
 
     auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
     auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
-                         ->createPredicatesOnControlField(original->getMatchExpression());
+                         ->createPredicatesOnBucketLevelField(original->getMatchExpression());
 
     ASSERT_BSONOBJ_EQ(predicate->serialize(true),
                       fromjson("{'control.max.a': {$_internalExprGte: 1}}"));
@@ -88,7 +88,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
 
     auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
     auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
-                         ->createPredicatesOnControlField(original->getMatchExpression());
+                         ->createPredicatesOnBucketLevelField(original->getMatchExpression());
 
     ASSERT_BSONOBJ_EQ(predicate->serialize(true),
                       fromjson("{'control.min.a': {$_internalExprLt: 1}}"));
@@ -106,7 +106,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
 
     auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
     auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
-                         ->createPredicatesOnControlField(original->getMatchExpression());
+                         ->createPredicatesOnBucketLevelField(original->getMatchExpression());
 
     ASSERT_BSONOBJ_EQ(predicate->serialize(true),
                       fromjson("{'control.min.a': {$_internalExprLte: 1}}"));
@@ -124,7 +124,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
 
     auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
     auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
-                         ->createPredicatesOnControlField(original->getMatchExpression());
+                         ->createPredicatesOnBucketLevelField(original->getMatchExpression());
 
     ASSERT_BSONOBJ_EQ(predicate->serialize(true),
                       fromjson("{$and: [{'control.min.a': {$_internalExprLte: 1}}, "
@@ -135,7 +135,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
        OptimizeMapsAndWithPushableChildrenOnControlField) {
     auto pipeline = Pipeline::parse(
         makeVector(fromjson("{$_internalUnpackBucket: {exclude: [], timeField: 'time'}}"),
-                   fromjson("{$match: {$and: [{time: {$gt: 1}}, {a: {$lt: 5}}]}}")),
+                   fromjson("{$match: {$and: [{b: {$gt: 1}}, {a: {$lt: 5}}]}}")),
         getExpCtx());
     auto& container = pipeline->getSources();
 
@@ -143,10 +143,10 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
 
     auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
     auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
-                         ->createPredicatesOnControlField(original->getMatchExpression());
+                         ->createPredicatesOnBucketLevelField(original->getMatchExpression());
 
     ASSERT_BSONOBJ_EQ(predicate->serialize(true),
-                      fromjson("{$and: [{'control.max.time': {$_internalExprGt: 1}}, "
+                      fromjson("{$and: [{'control.max.b': {$_internalExprGt: 1}}, "
                                "{'control.min.a': {$_internalExprLt: 5}}]}"));
 }
 
@@ -154,7 +154,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
        OptimizeDoesNotMapAndWithUnpushableChildrenOnControlField) {
     auto pipeline = Pipeline::parse(
         makeVector(fromjson("{$_internalUnpackBucket: {exclude: [], timeField: 'time'}}"),
-                   fromjson("{$match: {$and: [{time: {$ne: 1}}, {a: {$ne: 5}}]}}")),
+                   fromjson("{$match: {$and: [{b: {$ne: 1}}, {a: {$ne: 5}}]}}")),
         getExpCtx());
     auto& container = pipeline->getSources();
 
@@ -162,7 +162,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
 
     auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
     auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
-                         ->createPredicatesOnControlField(original->getMatchExpression());
+                         ->createPredicatesOnBucketLevelField(original->getMatchExpression());
 
     ASSERT(predicate == nullptr);
 }
@@ -171,7 +171,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
        OptimizeMapsAndWithPushableAndUnpushableChildrenOnControlField) {
     auto pipeline = Pipeline::parse(
         makeVector(fromjson("{$_internalUnpackBucket: {exclude: [], timeField: 'time'}}"),
-                   fromjson("{$match: {$and: [{time: {$gt: 1}}, {a: {$ne: 5}}]}}")),
+                   fromjson("{$match: {$and: [{b: {$gt: 1}}, {a: {$ne: 5}}]}}")),
         getExpCtx());
     auto& container = pipeline->getSources();
 
@@ -179,10 +179,10 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
 
     auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
     auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
-                         ->createPredicatesOnControlField(original->getMatchExpression());
+                         ->createPredicatesOnBucketLevelField(original->getMatchExpression());
 
     ASSERT_BSONOBJ_EQ(predicate->serialize(true),
-                      fromjson("{$and: [{'control.max.time': {$_internalExprGt: 1}}]}"));
+                      fromjson("{$and: [{'control.max.b': {$_internalExprGt: 1}}]}"));
 }
 
 TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
@@ -190,8 +190,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
     auto pipeline = Pipeline::parse(
         makeVector(
             fromjson("{$_internalUnpackBucket: {exclude: [], timeField: 'time'}}"),
-            fromjson(
-                "{$match: {$and: [{b: {$gte: 2}}, {$and: [{time: {$gt: 1}}, {a: {$lt: 5}}]}]}}")),
+            fromjson("{$match: {$and: [{b: {$gte: 2}}, {$and: [{b: {$gt: 1}}, {a: {$lt: 5}}]}]}}")),
         getExpCtx());
     auto& container = pipeline->getSources();
 
@@ -199,18 +198,18 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
 
     auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
     auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
-                         ->createPredicatesOnControlField(original->getMatchExpression());
+                         ->createPredicatesOnBucketLevelField(original->getMatchExpression());
 
     ASSERT_BSONOBJ_EQ(predicate->serialize(true),
                       fromjson("{$and: [{'control.max.b': {$_internalExprGte: 2}}, {$and: "
-                               "[{'control.max.time': {$_internalExprGt: 1}}, "
+                               "[{'control.max.b': {$_internalExprGt: 1}}, "
                                "{'control.min.a': {$_internalExprLt: 5}}]}]}"));
 }
 
 TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
        OptimizeFurtherOptimizesNewlyAddedMatchWithSingletonAndNode) {
     auto unpackBucketObj = fromjson("{$_internalUnpackBucket: {exclude: [], timeField: 'time'}}");
-    auto matchObj = fromjson("{$match: {$and: [{time: {$gt: 1}}, {a: {$ne: 5}}]}}");
+    auto matchObj = fromjson("{$match: {$and: [{b: {$gt: 1}}, {a: {$ne: 5}}]}}");
     auto pipeline = Pipeline::parse(makeVector(unpackBucketObj, matchObj), getExpCtx());
     ASSERT_EQ(pipeline->getSources().size(), 2U);
 
@@ -220,7 +219,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
     auto stages = pipeline->serializeToBson();
     ASSERT_EQ(stages.size(), 3U);
 
-    ASSERT_BSONOBJ_EQ(stages[0], fromjson("{$match: {'control.max.time': {$_internalExprGt: 1}}}"));
+    ASSERT_BSONOBJ_EQ(stages[0], fromjson("{$match: {'control.max.b': {$_internalExprGt: 1}}}"));
     ASSERT_BSONOBJ_EQ(stages[1], unpackBucketObj);
     ASSERT_BSONOBJ_EQ(stages[2], matchObj);
 }
@@ -229,7 +228,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
        OptimizeFurtherOptimizesNewlyAddedMatchWithNestedAndNodes) {
     auto unpackBucketObj = fromjson("{$_internalUnpackBucket: {exclude: [], timeField: 'time'}}");
     auto matchObj =
-        fromjson("{$match: {$and: [{b: {$gte: 2}}, {$and: [{time: {$gt: 1}}, {a: {$lt: 5}}]}]}}");
+        fromjson("{$match: {$and: [{b: {$gte: 2}}, {$and: [{c: {$gt: 1}}, {a: {$lt: 5}}]}]}}");
     auto pipeline = Pipeline::parse(makeVector(unpackBucketObj, matchObj), getExpCtx());
     ASSERT_EQ(pipeline->getSources().size(), 2U);
 
@@ -241,7 +240,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
 
     ASSERT_BSONOBJ_EQ(
         stages[0],
-        fromjson("{$match: {$and: [{'control.max.b': {$_internalExprGte: 2}}, {'control.max.time': "
+        fromjson("{$match: {$and: [{'control.max.b': {$_internalExprGte: 2}}, {'control.max.c': "
                  "{$_internalExprGt: 1}}, {'control.min.a': {$_internalExprLt: 5}}]}}"));
     ASSERT_BSONOBJ_EQ(stages[1], unpackBucketObj);
     ASSERT_BSONOBJ_EQ(stages[2], matchObj);
@@ -259,7 +258,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
 
     auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
     auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
-                         ->createPredicatesOnControlField(original->getMatchExpression());
+                         ->createPredicatesOnBucketLevelField(original->getMatchExpression());
 
     ASSERT(predicate == nullptr);
 }
@@ -276,7 +275,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
 
     auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
     auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
-                         ->createPredicatesOnControlField(original->getMatchExpression());
+                         ->createPredicatesOnBucketLevelField(original->getMatchExpression());
 
     ASSERT(predicate == nullptr);
 }
@@ -293,7 +292,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
 
     auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
     auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
-                         ->createPredicatesOnControlField(original->getMatchExpression());
+                         ->createPredicatesOnBucketLevelField(original->getMatchExpression());
 
     ASSERT(predicate == nullptr);
 }
@@ -312,7 +311,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
 
     auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
     auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
-                         ->createPredicatesOnControlField(original->getMatchExpression());
+                         ->createPredicatesOnBucketLevelField(original->getMatchExpression());
 
     ASSERT(predicate == nullptr);
 }
@@ -331,7 +330,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
 
     auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
     auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
-                         ->createPredicatesOnControlField(original->getMatchExpression());
+                         ->createPredicatesOnBucketLevelField(original->getMatchExpression());
 
     ASSERT(predicate == nullptr);
 }
@@ -342,7 +341,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
         makeVector(
             fromjson(
                 "{$_internalUnpackBucket: {exclude: [], timeField: 'time', metaField: 'myMeta'}}"),
-            fromjson("{$match: {$and: [{time: {$gt: 1}}, {myMeta: {$eq: 5}}]}}")),
+            fromjson("{$match: {$and: [{a: {$gt: 1}}, {myMeta: {$eq: 5}}]}}")),
         getExpCtx());
     auto& container = pipeline->getSources();
 
@@ -350,10 +349,190 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
 
     auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
     auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
-                         ->createPredicatesOnControlField(original->getMatchExpression());
+                         ->createPredicatesOnBucketLevelField(original->getMatchExpression());
 
     ASSERT_BSONOBJ_EQ(predicate->serialize(true),
-                      fromjson("{$and: [{'control.max.time': {$_internalExprGt: 1}}]}"));
+                      fromjson("{$and: [{'control.max.a': {$_internalExprGt: 1}}]}"));
+}
+
+TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest, OptimizeMapsTimePredicatesOnId) {
+    auto date = Date_t::now();
+    {
+        auto timePred = BSON("$match" << BSON("time" << BSON("$lt" << date)));
+        auto pipeline = Pipeline::parse(
+            makeVector(fromjson("{$_internalUnpackBucket: {exclude: [], timeField: 'time'}}"),
+                       timePred),
+            getExpCtx());
+        auto& container = pipeline->getSources();
+
+        ASSERT_EQ(pipeline->getSources().size(), 2U);
+
+        auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
+        auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
+                             ->createPredicatesOnBucketLevelField(original->getMatchExpression());
+
+        auto andExpr = dynamic_cast<AndMatchExpression*>(predicate.get());
+        auto children = andExpr->getChildVector();
+        auto idPred = dynamic_cast<ComparisonMatchExpressionBase*>(children.get()[0]);
+
+        ASSERT_EQ(idPred->path(), "_id"_sd);
+        ASSERT_EQ(idPred->getData().type(), BSONType::jstOID);
+
+        OID oid;
+        oid.init(date);
+        ASSERT_TRUE(oid.compare(idPred->getData().OID()) == 0);
+
+        ASSERT_BSONOBJ_EQ(children.get()[1]->serialize(true),
+                          BSON("control.min.time" << BSON("$_internalExprLt" << date)));
+    }
+    {
+        auto timePred = BSON("$match" << BSON("time" << BSON("$lte" << date)));
+        auto pipeline = Pipeline::parse(
+            makeVector(fromjson("{$_internalUnpackBucket: {exclude: [], timeField: 'time'}}"),
+                       timePred),
+            getExpCtx());
+        auto& container = pipeline->getSources();
+
+        ASSERT_EQ(pipeline->getSources().size(), 2U);
+
+        auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
+        auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
+                             ->createPredicatesOnBucketLevelField(original->getMatchExpression());
+        auto andExpr = dynamic_cast<AndMatchExpression*>(predicate.get());
+        auto children = andExpr->getChildVector();
+        auto idPred = dynamic_cast<ComparisonMatchExpressionBase*>(children.get()[0]);
+
+        ASSERT_EQ(idPred->path(), "_id"_sd);
+        ASSERT_EQ(idPred->getData().type(), BSONType::jstOID);
+
+        OID oid;
+        oid.init(date);
+        ASSERT_TRUE(oid.compare(idPred->getData().OID()) < 0);
+
+        ASSERT_BSONOBJ_EQ(children.get()[1]->serialize(true),
+                          BSON("control.min.time" << BSON("$_internalExprLte" << date)));
+    }
+    {
+        auto timePred = BSON("$match" << BSON("time" << BSON("$eq" << date)));
+        auto pipeline = Pipeline::parse(
+            makeVector(fromjson("{$_internalUnpackBucket: {exclude: [], timeField: 'time'}}"),
+                       timePred),
+            getExpCtx());
+        auto& container = pipeline->getSources();
+
+        ASSERT_EQ(pipeline->getSources().size(), 2U);
+
+        auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
+        auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
+                             ->createPredicatesOnBucketLevelField(original->getMatchExpression());
+        auto andExpr = dynamic_cast<AndMatchExpression*>(predicate.get());
+        auto children = andExpr->getChildVector();
+
+        ASSERT_BSONOBJ_EQ(children.get()[0]->serialize(true),
+                          BSON("control.min.time" << BSON("$_internalExprLte" << date)));
+
+        ASSERT_BSONOBJ_EQ(children.get()[1]->serialize(true),
+                          BSON("control.max.time" << BSON("$_internalExprGte" << date)));
+
+        auto idPred = dynamic_cast<ComparisonMatchExpressionBase*>(children.get()[2]);
+
+        ASSERT_EQ(idPred->path(), "_id"_sd);
+        ASSERT_EQ(idPred->getData().type(), BSONType::jstOID);
+
+        OID oid;
+        oid.init(date);
+        ASSERT_TRUE(oid.compare(idPred->getData().OID()) < 0);
+    }
+}
+
+TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
+       OptimizeMapsTimePredicatesWithNonDateTypeOnId) {
+    {
+        auto timePred = BSON("$match" << BSON("time" << BSON("$lt" << 1)));
+        auto pipeline = Pipeline::parse(
+            makeVector(fromjson("{$_internalUnpackBucket: {exclude: [], timeField: 'time'}}"),
+                       timePred),
+            getExpCtx());
+        auto& container = pipeline->getSources();
+
+        ASSERT_EQ(pipeline->getSources().size(), 2U);
+
+        auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
+        auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
+                             ->createPredicatesOnBucketLevelField(original->getMatchExpression());
+
+        auto andExpr = dynamic_cast<AndMatchExpression*>(predicate.get());
+        auto children = andExpr->getChildVector();
+        auto idPred = dynamic_cast<ComparisonMatchExpressionBase*>(children.get()[0]);
+
+        ASSERT_EQ(idPred->path(), "_id"_sd);
+        ASSERT_EQ(idPred->getData().type(), BSONType::jstOID);
+
+        OID oid;
+        oid.init(Date_t::min());
+        ASSERT_TRUE(oid.compare(idPred->getData().OID()) > 0);
+
+        ASSERT_BSONOBJ_EQ(children.get()[1]->serialize(true),
+                          fromjson("{'control.min.time': {$_internalExprLt: 1}}"));
+    }
+    {
+        auto timePred = BSON("$match" << BSON("time" << BSON("$lte" << 1)));
+        auto pipeline = Pipeline::parse(
+            makeVector(fromjson("{$_internalUnpackBucket: {exclude: [], timeField: 'time'}}"),
+                       timePred),
+            getExpCtx());
+        auto& container = pipeline->getSources();
+
+        ASSERT_EQ(pipeline->getSources().size(), 2U);
+
+        auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
+        auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
+                             ->createPredicatesOnBucketLevelField(original->getMatchExpression());
+        auto andExpr = dynamic_cast<AndMatchExpression*>(predicate.get());
+        auto children = andExpr->getChildVector();
+        auto idPred = dynamic_cast<ComparisonMatchExpressionBase*>(children.get()[0]);
+
+        ASSERT_EQ(idPred->path(), "_id"_sd);
+        ASSERT_EQ(idPred->getData().type(), BSONType::jstOID);
+
+        OID oid;
+        oid.init(Date_t::min());
+        ASSERT_TRUE(oid.compare(idPred->getData().OID()) > 0);
+
+        ASSERT_BSONOBJ_EQ(children.get()[1]->serialize(true),
+                          fromjson("{'control.min.time': {$_internalExprLte: 1}}"));
+    }
+    {
+        auto timePred = BSON("$match" << BSON("time" << BSON("$eq" << 1)));
+        auto pipeline = Pipeline::parse(
+            makeVector(fromjson("{$_internalUnpackBucket: {exclude: [], timeField: 'time'}}"),
+                       timePred),
+            getExpCtx());
+        auto& container = pipeline->getSources();
+
+        ASSERT_EQ(pipeline->getSources().size(), 2U);
+
+        auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
+        auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
+                             ->createPredicatesOnBucketLevelField(original->getMatchExpression());
+        auto andExpr = dynamic_cast<AndMatchExpression*>(predicate.get());
+        auto children = andExpr->getChildVector();
+
+        ASSERT_BSONOBJ_EQ(children.get()[0]->serialize(true),
+                          fromjson("{'control.min.time': {$_internalExprLte: 1}}"));
+
+        ASSERT_BSONOBJ_EQ(children.get()[1]->serialize(true),
+                          fromjson("{'control.max.time': {$_internalExprGte: 1}}"));
+
+        auto idPred = dynamic_cast<ComparisonMatchExpressionBase*>(children.get()[2]);
+
+        ASSERT_EQ(idPred->path(), "_id"_sd);
+        ASSERT_EQ(idPred->getData().type(), BSONType::jstOID);
+
+        OID oid;
+        oid.init(Date_t::min());
+        ASSERT_TRUE(oid.compare(idPred->getData().OID()) > 0);
+    }
 }
 
 }  // namespace
