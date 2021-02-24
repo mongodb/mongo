@@ -49,6 +49,10 @@ protected:
     const Timestamp _operationTime = Timestamp(12345, 67);
     const std::string _tenantId = "tenant42";
     const UUID _migrationId = UUID::gen();
+
+private:
+    unittest::MinimumLoggedSeverityGuard _verboseGuard{logv2::LogComponent::kTenantMigration,
+                                                       logv2::LogSeverity::Debug(1)};
 };
 
 }  // namespace repl
