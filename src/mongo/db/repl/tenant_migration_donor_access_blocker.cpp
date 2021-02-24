@@ -36,7 +36,6 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_executor.h"
-#include "mongo/db/repl/tenant_migration_committed_info.h"
 #include "mongo/db/repl/tenant_migration_conflict_info.h"
 #include "mongo/db/repl/tenant_migration_donor_access_blocker.h"
 #include "mongo/logv2/log.h"
@@ -73,7 +72,7 @@ Status TenantMigrationDonorAccessBlocker::checkIfCanWrite() {
             return {TenantMigrationConflictInfo(_tenantId, shared_from_this()),
                     "Write must block until this tenant migration commits or aborts"};
         case State::kReject:
-            return {TenantMigrationCommittedInfo(_tenantId, _recipientConnString),
+            return {ErrorCodes::TenantMigrationCommitted,
                     "Write must be re-routed to the new owner of this tenant"};
         default:
             MONGO_UNREACHABLE;
@@ -150,8 +149,7 @@ SharedSemiFuture<void> TenantMigrationDonorAccessBlocker::_getCanDoClusterTimeRe
     if (_state == State::kReject) {
         return SharedSemiFuture<void>(
             Status(ErrorCodes::TenantMigrationCommitted,
-                   "Read must be re-routed to the new owner of this tenant",
-                   TenantMigrationCommittedInfo(_tenantId, _recipientConnString).toBSON()));
+                   "Read must be re-routed to the new owner of this tenant"));
     }
 
     _stats.numBlockedReads.addAndFetch(1);
@@ -162,7 +160,7 @@ Status TenantMigrationDonorAccessBlocker::checkIfLinearizableReadWasAllowed(
     OperationContext* opCtx) {
     stdx::lock_guard<Latch> lg(_mutex);
     if (_state == State::kReject) {
-        return {TenantMigrationCommittedInfo(_tenantId, _recipientConnString),
+        return {ErrorCodes::TenantMigrationCommitted,
                 "Read must be re-routed to the new owner of this tenant"};
     }
     return Status::OK();
@@ -177,7 +175,7 @@ Status TenantMigrationDonorAccessBlocker::checkIfCanBuildIndex() {
             return {TenantMigrationConflictInfo(_tenantId, shared_from_this(), kIndexBuild),
                     "Index build must block until tenant migration is committed or aborted."};
         case State::kReject:
-            return {TenantMigrationCommittedInfo(_tenantId, _recipientConnString),
+            return {ErrorCodes::TenantMigrationCommitted,
                     "Index build must be re-routed to the new owner of this tenant"};
         case State::kAborted:
             return Status::OK();
@@ -311,8 +309,7 @@ void TenantMigrationDonorAccessBlocker::_onMajorityCommitCommitOpTime(
 
     _state = State::kReject;
     Status error{ErrorCodes::TenantMigrationCommitted,
-                 "Write or read must be re-routed to the new owner of this tenant",
-                 TenantMigrationCommittedInfo(_tenantId, _recipientConnString).toBSON()};
+                 "Write or read must be re-routed to the new owner of this tenant"};
     _completionPromise.setError(error);
     _transitionOutOfBlockingPromise.setFrom(error);
 

@@ -58,7 +58,6 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_registry.h"
-#include "mongo/db/repl/tenant_migration_committed_info.h"
 #include "mongo/db/repl/tenant_migration_conflict_info.h"
 #include "mongo/db/retryable_writes_stats.h"
 #include "mongo/db/stats/counters.h"
@@ -315,17 +314,8 @@ boost::optional<BSONObj> generateError(OperationContext* opCtx,
             if (status.reason() != "") {
                 error.append("errmsg", errorMessage(migrationStatus.reason()));
             }
-            if (migrationStatus.extraInfo()) {
-                error.append(
-                    "errInfo",
-                    migrationStatus.template extraInfo<TenantMigrationCommittedInfo>()->toBSON());
-            }
         } else {
             error.append("code", int(status.code()));
-            if (status.extraInfo()) {
-                error.append("errInfo",
-                             status.template extraInfo<TenantMigrationCommittedInfo>()->toBSON());
-            }
         }
     } else {
         error.append("code", int(status.code()));

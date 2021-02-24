@@ -87,11 +87,6 @@ selector:
   - jstests/core/notablescan_capped.js
   # captrunc command is not blocked during tenant migration.
   - jstests/core/capped6.js
-  # TODO (SERVER-51774): Ensure the donor's TenantMigrationCommitted/TenantMigrationAborted write
-  # errors don't exceed the max BSON size.
-  - jstests/core/batch_write_command_delete.js
-  - jstests/core/batch_write_command_insert.js
-  - jstests/core/batch_write_command_update.js
   # Multi-updates that conflict with tenant migration are not retried by inject_tenant_prefix.js.
   - jstests/core/batch_write_collation_estsize.js
   - jstests/core/bulk_api_ordered.js

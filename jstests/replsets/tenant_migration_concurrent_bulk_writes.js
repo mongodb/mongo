@@ -171,10 +171,6 @@ function retryFailedWrites(primaryDB, collName, writeErrors, ops) {
         } else {
             assert(!err.errmsg);
         }
-
-        assert.eq(err.errInfo.recipientConnectionString,
-                  tenantMigrationTest.getRecipientConnString());
-        assert.eq(err.errInfo.tenantId, tenantId);
     });
 
     tenantMigrationTest.stop();
@@ -255,10 +251,6 @@ function retryFailedWrites(primaryDB, collName, writeErrors, ops) {
         } else {
             assert.eq(err.errmsg, "");
         }
-
-        assert.eq(err.errInfo.recipientConnectionString,
-                  tenantMigrationTest.getRecipientConnString());
-        assert.eq(err.errInfo.tenantId, tenantId);
     });
 
     tenantMigrationTest.stop();
@@ -406,9 +398,6 @@ function retryFailedWrites(primaryDB, collName, writeErrors, ops) {
     // blocking writes.
     assert.eq(writeErrors[0].index, kNumWriteBatchesWithoutMigrationConflict * kMaxBatchSize);
     assert.eq(writeErrors[0].code, ErrorCodes.TenantMigrationCommitted);
-    assert.eq(writeErrors[0].errInfo.recipientConnectionString,
-              tenantMigrationTest.getRecipientConnString());
-    assert.eq(writeErrors[0].errInfo.tenantId, tenantId);
 
     tenantMigrationTest.stop();
     donorRst.stopSet();
@@ -484,9 +473,6 @@ function retryFailedWrites(primaryDB, collName, writeErrors, ops) {
     // blocking writes.
     assert.eq(writeErrors[0].index, kNumWriteBatchesWithoutMigrationConflict * kMaxBatchSize);
     assert.eq(writeErrors[0].code, ErrorCodes.TenantMigrationCommitted);
-    assert.eq(writeErrors[0].errInfo.recipientConnectionString,
-              tenantMigrationTest.getRecipientConnString());
-    assert.eq(writeErrors[0].errInfo.tenantId, tenantId);
 
     tenantMigrationTest.stop();
     donorRst.stopSet();
