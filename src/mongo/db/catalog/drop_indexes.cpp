@@ -436,6 +436,9 @@ Status dropIndexes(OperationContext* opCtx,
     // Drop any ready indexes that were created while we yielded our locks while aborting using
     // similar index specs.
     if (!isWildcard && !abortedIndexBuilders.empty()) {
+        // The index catalog requires that no active index builders are running when dropping ready
+        // indexes.
+        IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(collectionUUID);
         return writeConflictRetry(opCtx, "dropIndexes", dbAndUUID.toString(), [&] {
             WriteUnitOfWork wuow(opCtx);
 
@@ -472,13 +475,12 @@ Status dropIndexes(OperationContext* opCtx,
         invariant(indexNames.size() == 1);
         invariant(indexNames.front() == "*");
         invariant(collection->getIndexCatalog()->numIndexesInProgress(opCtx) == 0);
-    } else {
-        // The index catalog requires that no active index builders are running when dropping
-        // indexes.
-        BackgroundOperation::assertNoBgOpInProgForNs(collection->ns());
-        IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(collectionUUID);
     }
 
+    // The index catalog requires that no active index builders are running when dropping ready
+    // indexes.
+    BackgroundOperation::assertNoBgOpInProgForNs(collection->ns());
+    IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(collectionUUID);
     return writeConflictRetry(
         opCtx, "dropIndexes", dbAndUUID.toString(), [opCtx, &collection, &indexNames, result] {
             WriteUnitOfWork wunit(opCtx);
