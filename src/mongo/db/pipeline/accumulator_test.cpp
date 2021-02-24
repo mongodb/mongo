@@ -56,7 +56,8 @@ using std::string;
 template <typename AccName>
 static void assertExpectedResults(
     ExpressionContext* const expCtx,
-    std::initializer_list<std::pair<std::vector<Value>, Value>> operations) {
+    std::initializer_list<std::pair<std::vector<Value>, Value>> operations,
+    bool skipMerging = false) {
     for (auto&& op : operations) {
         try {
             // Asserts that result equals expected result when not sharded.
@@ -71,7 +72,7 @@ static void assertExpectedResults(
             }
 
             // Asserts that result equals expected result when all input is on one shard.
-            {
+            if (!skipMerging) {
                 auto accum = AccName::create(expCtx);
                 auto shard = AccName::create(expCtx);
                 for (auto&& val : op.first) {
@@ -84,7 +85,7 @@ static void assertExpectedResults(
             }
 
             // Asserts that result equals expected result when each input is on a separate shard.
-            {
+            if (!skipMerging) {
                 auto accum = AccName::create(expCtx);
                 for (auto&& val : op.first) {
                     auto shard = AccName::create(expCtx);
@@ -334,6 +335,68 @@ TEST(Accumulators, Sum) {
          {{Value(5), Value(BSONNULL)}, Value(5)},
          // Missing values are ignored.
          {{Value(9), Value()}, Value(9)}});
+}
+
+TEST(Accumulators, Rank) {
+    auto expCtx = ExpressionContextForTest{};
+    assertExpectedResults<AccumulatorRank>(
+        &expCtx,
+        {
+            // Document number is correct.
+            {{Value(0)}, Value(1)},
+            {{Value(0), Value(2)}, Value(2)},
+            {{Value(0), Value(2), Value(4)}, Value(3)},
+            // Ties don't increment
+            {{Value(1), Value(1)}, Value(1)},
+            // Ties skip next value correctly.
+            {{Value(1), Value(1), Value(3)}, Value(3)},
+            {{Value(1), Value(1), Value(1), Value(3)}, Value(4)},
+            {{Value(1), Value(1), Value(1), Value(3), Value(3), Value(7)}, Value(6)},
+            // Expected results with empty values.
+            {{Value{}}, Value(1)},
+            {{Value{}, Value{}}, Value(1)},
+
+        },
+        true /* rank can't be merged */);
+}
+
+TEST(Accumulators, DenseRank) {
+    auto expCtx = ExpressionContextForTest{};
+    assertExpectedResults<AccumulatorDenseRank>(
+        &expCtx,
+        {
+            // Document number is correct.
+            {{Value(0)}, Value(1)},
+            {{Value(0), Value(2)}, Value(2)},
+            {{Value(0), Value(2), Value(4)}, Value(3)},
+            // Ties don't increment
+            {{Value(1), Value(1)}, Value(1)},
+            // Ties don't skip values.
+            {{Value(1), Value(1), Value(3)}, Value(2)},
+            {{Value(1), Value(1), Value(1), Value(3)}, Value(2)},
+            {{Value(1), Value(1), Value(1), Value(3), Value(3), Value(7)}, Value(3)},
+
+        },
+        true /* denseRank can't be merged */);
+}
+
+TEST(Accumulators, DocumentNumberRank) {
+    auto expCtx = ExpressionContextForTest{};
+    assertExpectedResults<AccumulatorDocumentNumber>(
+        &expCtx,
+        {
+            // Document number is correct.
+            {{Value(0)}, Value(1)},
+            {{Value(0), Value(2)}, Value(2)},
+            {{Value(0), Value(2), Value(4)}, Value(3)},
+            // Ties increment
+            {{Value(1), Value(1)}, Value(2)},
+            {{Value(1), Value(1), Value(3)}, Value(3)},
+            {{Value(1), Value(1), Value(1), Value(3)}, Value(4)},
+            {{Value(1), Value(1), Value(1), Value(3), Value(3), Value(7)}, Value(6)},
+
+        },
+        true /* denseRank can't be merged */);
 }
 
 TEST(Accumulators, AddToSetRespectsCollation) {
