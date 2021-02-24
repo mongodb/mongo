@@ -307,7 +307,7 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
             if (!resumeInfo) {
                 // TODO SERVER-14888 Suppress this in cases we don't want to audit.
                 audit::logCreateIndex(
-                    opCtx->getClient(), &info, descriptor->indexName(), collection->ns().ns());
+                    opCtx->getClient(), &info, descriptor->indexName(), collection->ns());
             }
         }
 

@@ -152,27 +152,29 @@ void mongo::audit::logLogout(Client* client,
 void mongo::audit::logCreateIndex(Client* client,
                                   const BSONObj* indexSpec,
                                   StringData indexname,
-                                  StringData nsname) {}
+                                  const NamespaceString& nsname) {}
 
-void mongo::audit::logCreateCollection(Client* client, StringData nsname) {}
+void mongo::audit::logCreateCollection(Client* client, const NamespaceString& nsname) {}
 
 void mongo::audit::logCreateView(Client* client,
-                                 StringData nsname,
+                                 const NamespaceString& nsname,
                                  StringData viewOn,
                                  BSONArray pipeline,
                                  ErrorCodes::Error code) {}
 
-void mongo::audit::logImportCollection(Client* client, StringData nsname) {}
+void mongo::audit::logImportCollection(Client* client, const NamespaceString& nsname) {}
 
 void mongo::audit::logCreateDatabase(Client* client, StringData dbname) {}
 
 
-void mongo::audit::logDropIndex(Client* client, StringData indexname, StringData nsname) {}
+void mongo::audit::logDropIndex(Client* client,
+                                StringData indexname,
+                                const NamespaceString& nsname) {}
 
-void mongo::audit::logDropCollection(Client* client, StringData nsname) {}
+void mongo::audit::logDropCollection(Client* client, const NamespaceString& nsname) {}
 
 void mongo::audit::logDropView(Client* client,
-                               StringData nsname,
+                               const NamespaceString& nsname,
                                StringData viewOn,
                                const std::vector<BSONObj>& pipeline,
                                ErrorCodes::Error code) {}

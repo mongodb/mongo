@@ -291,18 +291,18 @@ void logLogout(Client* client,
 void logCreateIndex(Client* client,
                     const BSONObj* indexSpec,
                     StringData indexname,
-                    StringData nsname);
+                    const NamespaceString& nsname);
 
 /**
  * Logs the result of a createCollection command.
  */
-void logCreateCollection(Client* client, StringData nsname);
+void logCreateCollection(Client* client, const NamespaceString& nsname);
 
 /**
  * Logs the result of a createView command.
  */
 void logCreateView(Client* client,
-                   StringData nsname,
+                   const NamespaceString& nsname,
                    StringData viewOn,
                    BSONArray pipeline,
                    ErrorCodes::Error code);
@@ -310,7 +310,7 @@ void logCreateView(Client* client,
 /**
  * Logs the result of an importCollection command.
  */
-void logImportCollection(Client* client, StringData nsname);
+void logImportCollection(Client* client, const NamespaceString& nsname);
 
 /**
  * Logs the result of a createDatabase command.
@@ -321,18 +321,18 @@ void logCreateDatabase(Client* client, StringData dbname);
 /**
  * Logs the result of a dropIndex command.
  */
-void logDropIndex(Client* client, StringData indexname, StringData nsname);
+void logDropIndex(Client* client, StringData indexname, const NamespaceString& nsname);
 
 /**
  * Logs the result of a dropCollection command on a collection.
  */
-void logDropCollection(Client* client, StringData nsname);
+void logDropCollection(Client* client, const NamespaceString& nsname);
 
 /**
  * Logs the result of a dropCollection command on a view.
  */
 void logDropView(Client* client,
-                 StringData nsname,
+                 const NamespaceString& nsname,
                  StringData viewOn,
                  const std::vector<BSONObj>& pipeline,
                  ErrorCodes::Error code);

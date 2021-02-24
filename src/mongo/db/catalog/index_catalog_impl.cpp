@@ -521,8 +521,7 @@ StatusWith<BSONObj> IndexCatalogImpl::createIndexOnEmptyCollection(OperationCont
     invariant(DurableCatalog::get(opCtx)->isIndexReady(
         opCtx, _collection->getCatalogId(), descriptor->indexName()));
 
-    audit::logCreateIndex(
-        opCtx->getClient(), &spec, descriptor->indexName(), _collection->ns().ns());
+    audit::logCreateIndex(opCtx->getClient(), &spec, descriptor->indexName(), _collection->ns());
 
     return spec;
 }
@@ -1071,7 +1070,7 @@ Status IndexCatalogImpl::dropIndexEntry(OperationContext* opCtx, IndexCatalogEnt
     // Pulling indexName out as it is needed post descriptor release.
     string indexName = entry->descriptor()->indexName();
 
-    audit::logDropIndex(&cc(), indexName, _collection->ns().ns());
+    audit::logDropIndex(&cc(), indexName, _collection->ns());
 
     auto released = _readyIndexes.release(entry->descriptor());
     if (released) {
