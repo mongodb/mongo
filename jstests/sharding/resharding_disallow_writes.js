@@ -82,14 +82,6 @@ reshardingTest.withReshardingInBackground(
                     {dropIndexes: collName, index: {oldKey: 1}, maxTimeMS: 5000}),
                 ErrorCodes.ReshardCollectionInProgress);
 
-            // TODO(SERVER-54635): This currently succeeds when the
-            // featureFlagShardingFullDDLSupport parameter is enabled. Uncomment the code below when
-            // this is fixed.
-            // jsTestLog("Attempting drop collection");
-            // assert.commandFailedWithCode(
-            //    sourceCollection.runCommand({drop: collName, maxTimeMS: 5000}),
-            //    ErrorCodes.MaxTimeMSExpired);
-
             jsTestLog("Completed operations");
         }
     });
