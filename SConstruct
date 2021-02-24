@@ -273,6 +273,7 @@ add_option('opt',
 )
 
 experimental_optimizations = [
+    'builtin-memcmp',
     'fnsi',
     'sandybridge',
     'treevec',
@@ -3708,7 +3709,7 @@ def doConfigure(myenv):
         myenv = conf.Finish()
 
     # We set this to work around https://gcc.gnu.org/bugzilla/show_bug.cgi?id=43052
-    if not myenv.ToolchainIs('msvc'):
+    if not myenv.ToolchainIs('msvc') and not 'builtin-memcmp' in selected_experimental_optimizations:
         AddToCCFLAGSIfSupported(myenv, "-fno-builtin-memcmp")
 
     # pthread_setname_np was added in GLIBC 2.12, and Solaris 11.3
