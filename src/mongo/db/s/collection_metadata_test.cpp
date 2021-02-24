@@ -119,7 +119,7 @@ protected:
             TypeCollectionRecipientFields recipientFields{
                 {kThisShard, kOtherShard}, existingUuid, kNss};
             reshardingFields.setRecipientFields(std::move(recipientFields));
-        } else if (state == CoordinatorStateEnum::kMirroring) {
+        } else if (state == CoordinatorStateEnum::kBlockingWrites) {
             TypeCollectionDonorFields donorFields{KeyPattern{BSON("newKey" << 1)}};
             reshardingFields.setDonorFields(std::move(donorFields));
         }
@@ -251,14 +251,14 @@ TEST_F(NoChunkFixture, DisallowWritesInApplyingWithOrigUUID) {
     ASSERT(!metadata.disallowWritesForResharding(originalUUID));
 }
 
-TEST_F(NoChunkFixture, DisallowWritesInMirroringWithOrigUUID) {
+TEST_F(NoChunkFixture, DisallowWritesInBlockingWritesWithOrigUUID) {
     UUID originalUUID = UUID::gen();
     UUID reshardingUUID = UUID::gen();
 
     auto metadata =
-        makeCollectionMetadata(originalUUID, reshardingUUID, CoordinatorStateEnum::kMirroring);
+        makeCollectionMetadata(originalUUID, reshardingUUID, CoordinatorStateEnum::kBlockingWrites);
 
-    // Writes should be disallowed if the coordinator state is mirroring.
+    // Writes should be disallowed if the coordinator state is blocking-writes.
     ASSERT(metadata.disallowWritesForResharding(originalUUID));
 }
 

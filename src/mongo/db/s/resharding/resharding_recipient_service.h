@@ -57,11 +57,10 @@ void createTemporaryReshardingCollectionLocally(OperationContext* opCtx,
                                                 const UUID& existingUUID,
                                                 Timestamp fetchTimestamp);
 
-std::vector<NamespaceString> ensureStashCollectionsExist(
-    OperationContext* opCtx,
-    const ChunkManager& cm,
-    const UUID& existingUUID,
-    std::vector<DonorShardMirroringEntry> donorShards);
+std::vector<NamespaceString> ensureStashCollectionsExist(OperationContext* opCtx,
+                                                         const ChunkManager& cm,
+                                                         const UUID& existingUUID,
+                                                         std::vector<ShardId> donorShards);
 
 ReshardingDonorOplogId getFetcherIdToResumeFrom(OperationContext* opCtx,
                                                 NamespaceString oplogBufferNss,
@@ -146,7 +145,7 @@ private:
 
     void _applyThenTransitionToSteadyState();
 
-    ExecutorFuture<void> _awaitAllDonorsMirroringThenTransitionToStrictConsistency(
+    ExecutorFuture<void> _awaitAllDonorsBlockingWritesThenTransitionToStrictConsistency(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
     ExecutorFuture<void> _awaitCoordinatorHasDecisionPersistedThenTransitionToRenaming(

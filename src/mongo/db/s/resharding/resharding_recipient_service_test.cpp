@@ -558,11 +558,7 @@ TEST_F(ReshardingRecipientServiceTest, StashCollectionsHaveSameCollationAsReshar
 
     // Create stash collections for both donor shards.
     auto stashCollections = resharding::ensureStashCollectionsExist(
-        operationContext(),
-        srcChunkMgr,
-        kOrigUUID,
-        {DonorShardMirroringEntry(ShardId("shard0"), true),
-         DonorShardMirroringEntry(ShardId("shard1"), true)});
+        operationContext(), srcChunkMgr, kOrigUUID, {ShardId("shard0"), ShardId("shard1")});
 
     // Verify that each stash collation has the collation we passed in above.
     {

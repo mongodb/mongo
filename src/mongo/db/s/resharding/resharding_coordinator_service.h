@@ -182,7 +182,7 @@ private:
 
     /**
      * Waits on _reshardingCoordinatorObserver to notify that all recipients have finished
-     * applying oplog entries. Transitions to 'kMirroring'.
+     * applying oplog entries. Transitions to 'kBlockingWrites'.
      */
     ExecutorFuture<void> _awaitAllRecipientsFinishedApplying(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor);

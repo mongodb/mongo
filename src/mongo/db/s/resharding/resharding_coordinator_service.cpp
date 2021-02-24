@@ -507,7 +507,7 @@ stdx::unordered_map<CoordinatorStateEnum, ParticipantsToNotifyEnum> notifyForSta
     {CoordinatorStateEnum::kPreparingToDonate, ParticipantsToNotifyEnum::kDonors},
     {CoordinatorStateEnum::kCloning, ParticipantsToNotifyEnum::kRecipients},
     {CoordinatorStateEnum::kApplying, ParticipantsToNotifyEnum::kDonors},
-    {CoordinatorStateEnum::kMirroring, ParticipantsToNotifyEnum::kDonors},
+    {CoordinatorStateEnum::kBlockingWrites, ParticipantsToNotifyEnum::kDonors},
     {CoordinatorStateEnum::kDecisionPersisted, ParticipantsToNotifyEnum::kNone},
     {CoordinatorStateEnum::kDone, ParticipantsToNotifyEnum::kNone},
     {CoordinatorStateEnum::kError, ParticipantsToNotifyEnum::kDonors},
@@ -1177,7 +1177,7 @@ ReshardingCoordinatorService::ReshardingCoordinator::_awaitAllRecipientsFinished
                 reshardingPauseCoordinatorInSteadyState.pauseWhileSet(opCtx.get());
             }
 
-            this->_updateCoordinatorDocStateAndCatalogEntries(CoordinatorStateEnum::kMirroring,
+            this->_updateCoordinatorDocStateAndCatalogEntries(CoordinatorStateEnum::kBlockingWrites,
                                                               coordinatorDocChangedOnDisk);
         });
 }
@@ -1185,7 +1185,7 @@ ReshardingCoordinatorService::ReshardingCoordinator::_awaitAllRecipientsFinished
 SharedSemiFuture<ReshardingCoordinatorDocument>
 ReshardingCoordinatorService::ReshardingCoordinator::_awaitAllRecipientsInStrictConsistency(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
-    if (_coordinatorDoc.getState() > CoordinatorStateEnum::kMirroring) {
+    if (_coordinatorDoc.getState() > CoordinatorStateEnum::kBlockingWrites) {
         // If in recovery, just return the existing _stateDoc.
         return _coordinatorDoc;
     }
@@ -1195,7 +1195,7 @@ ReshardingCoordinatorService::ReshardingCoordinator::_awaitAllRecipientsInStrict
 
 Future<void> ReshardingCoordinatorService::ReshardingCoordinator::_persistDecision(
     const ReshardingCoordinatorDocument& coordinatorDoc) {
-    if (_coordinatorDoc.getState() > CoordinatorStateEnum::kMirroring) {
+    if (_coordinatorDoc.getState() > CoordinatorStateEnum::kBlockingWrites) {
         return Status::OK();
     }
 

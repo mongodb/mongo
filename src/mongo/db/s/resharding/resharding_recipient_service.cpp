@@ -162,11 +162,10 @@ void createTemporaryReshardingCollectionLocally(OperationContext* opCtx,
         opCtx, reshardingNss, optionsAndIndexes);
 }
 
-std::vector<NamespaceString> ensureStashCollectionsExist(
-    OperationContext* opCtx,
-    const ChunkManager& cm,
-    const UUID& existingUUID,
-    std::vector<DonorShardMirroringEntry> donorShards) {
+std::vector<NamespaceString> ensureStashCollectionsExist(OperationContext* opCtx,
+                                                         const ChunkManager& cm,
+                                                         const UUID& existingUUID,
+                                                         std::vector<ShardId> donorShards) {
     // Use the same collation for the stash collections as the temporary resharding collection
     auto collator = cm.getDefaultCollator();
     BSONObj collationSpec = collator ? collator->getSpec().toBSON() : BSONObj();
@@ -179,7 +178,7 @@ std::vector<NamespaceString> ensureStashCollectionsExist(
         options.collation = std::move(collationSpec);
         for (const auto& donor : donorShards) {
             stashCollections.emplace_back(ReshardingOplogApplier::ensureStashCollectionExists(
-                opCtx, existingUUID, donor.getId(), options));
+                opCtx, existingUUID, donor, options));
         }
     }
 
@@ -244,7 +243,7 @@ SemiFuture<void> ReshardingRecipientService::RecipientStateMachine::run(
         })
         .then([this] { return _applyThenTransitionToSteadyState(); })
         .then([this, executor] {
-            return _awaitAllDonorsMirroringThenTransitionToStrictConsistency(executor);
+            return _awaitAllDonorsBlockingWritesThenTransitionToStrictConsistency(executor);
         })
         .then([this, executor] {
             return _awaitCoordinatorHasDecisionPersistedThenTransitionToRenaming(executor);
@@ -448,7 +447,7 @@ ReshardingRecipientService::RecipientStateMachine::_cloneThenTransitionToApplyin
         _initTxnCloner(opCtx, *_recipientDoc.getFetchTimestamp());
     }
 
-    auto numDonors = _recipientDoc.getDonorShardsMirroring().size();
+    auto numDonors = _recipientDoc.getDonorShards().size();
     _oplogFetchers.reserve(numDonors);
     _oplogFetcherFutures.reserve(numDonors);
 
@@ -458,9 +457,8 @@ ReshardingRecipientService::RecipientStateMachine::_cloneThenTransitionToApplyin
     }
 
     const auto& recipientId = ShardingState::get(serviceContext)->shardId();
-    for (const auto& donor : _recipientDoc.getDonorShardsMirroring()) {
-        auto oplogBufferNss =
-            getLocalOplogBufferNamespace(_recipientDoc.getExistingUUID(), donor.getId());
+    for (const auto& donor : _recipientDoc.getDonorShards()) {
+        auto oplogBufferNss = getLocalOplogBufferNamespace(_recipientDoc.getExistingUUID(), donor);
         auto opCtx = cc().makeOperationContext();
         auto idToResumeFrom =
             resharding::getFetcherIdToResumeFrom(opCtx.get(), oplogBufferNss, fetchTimestamp);
@@ -475,7 +473,7 @@ ReshardingRecipientService::RecipientStateMachine::_cloneThenTransitionToApplyin
             // value in the oplog buffer. Otherwise, it starts at fetchTimestamp, which corresponds
             // to {clusterTime: fetchTimestamp, ts: fetchTimestamp} as a resume token value.
             std::move(idToResumeFrom),
-            donor.getId(),
+            donor,
             recipientId,
             std::move(oplogBufferNss)));
 
@@ -519,7 +517,7 @@ void ReshardingRecipientService::RecipientStateMachine::_applyThenTransitionToSt
     // resharding has immediately finished the "apply phase" as soon as the
     // ReshardingCollectionCloner has finished. This is why it is acceptable to not call
     // applyUntilCloneFinishedTs() here and to only do so in
-    // _awaitAllDonorsMirroringThenTransitionToStrictConsistency() instead.
+    // _awaitAllDonorsBlockingWritesThenTransitionToStrictConsistency() instead.
     //
     // TODO: Consider removing _applyThenTransitionToSteadyState() and changing
     // _cloneThenTransitionToApplying() to call _transitionState/_updateCoordinator(kSteadyState).
@@ -529,13 +527,13 @@ void ReshardingRecipientService::RecipientStateMachine::_applyThenTransitionToSt
 }
 
 ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
-    _awaitAllDonorsMirroringThenTransitionToStrictConsistency(
+    _awaitAllDonorsBlockingWritesThenTransitionToStrictConsistency(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
     if (_recipientDoc.getState() > RecipientStateEnum::kSteadyState) {
         return ExecutorFuture<void>(**executor, Status::OK());
     }
 
-    auto numDonors = _recipientDoc.getDonorShardsMirroring().size();
+    auto numDonors = _recipientDoc.getDonorShards().size();
     _oplogAppliers.reserve(numDonors);
     _oplogApplierWorkers.reserve(numDonors);
 
@@ -550,12 +548,12 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
         return resharding::ensureStashCollectionsExist(opCtx.get(),
                                                        sourceChunkMgr,
                                                        _recipientDoc.getExistingUUID(),
-                                                       _recipientDoc.getDonorShardsMirroring());
+                                                       _recipientDoc.getDonorShards());
     }();
 
     size_t i = 0;
     auto futuresToWaitOn = std::move(_oplogFetcherFutures);
-    for (const auto& donor : _recipientDoc.getDonorShardsMirroring()) {
+    for (const auto& donor : _recipientDoc.getDonorShards()) {
         {
             stdx::lock_guard<Latch> lk(_mutex);
             _oplogApplierWorkers.emplace_back(
@@ -564,9 +562,9 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
                                          true /* isKillableByStepdown */));
         }
 
-        auto sourceId = ReshardingSourceId{_recipientDoc.get_id(), donor.getId()};
+        auto sourceId = ReshardingSourceId{_recipientDoc.get_id(), donor};
         const auto& oplogBufferNss =
-            getLocalOplogBufferNamespace(_recipientDoc.getExistingUUID(), donor.getId());
+            getLocalOplogBufferNamespace(_recipientDoc.getExistingUUID(), donor);
         auto fetchTimestamp = *_recipientDoc.getFetchTimestamp();
         auto idToResumeFrom = [&] {
             auto opCtx = cc().makeOperationContext();
@@ -746,8 +744,8 @@ void ReshardingRecipientService::RecipientStateMachine::_removeRecipientDocument
 
 void ReshardingRecipientService::RecipientStateMachine::_dropOplogCollections(
     OperationContext* opCtx) {
-    for (const auto& donor : _recipientDoc.getDonorShardsMirroring()) {
-        auto reshardingSourceId = ReshardingSourceId{_recipientDoc.get_id(), donor.getId()};
+    for (const auto& donor : _recipientDoc.getDonorShards()) {
+        auto reshardingSourceId = ReshardingSourceId{_recipientDoc.get_id(), donor};
 
         // Remove the oplog applier progress doc for this donor.
         PersistentTaskStore<ReshardingOplogApplierProgress> oplogApplierProgressStore(
@@ -767,13 +765,11 @@ void ReshardingRecipientService::RecipientStateMachine::_dropOplogCollections(
             WriteConcernOptions());
 
         // Drop the conflict stash collection for this donor.
-        auto stashNss =
-            getLocalConflictStashNamespace(_recipientDoc.getExistingUUID(), donor.getId());
+        auto stashNss = getLocalConflictStashNamespace(_recipientDoc.getExistingUUID(), donor);
         resharding::data_copy::ensureCollectionDropped(opCtx, stashNss);
 
         // Drop the oplog buffer collection for this donor.
-        auto oplogBufferNss =
-            getLocalOplogBufferNamespace(_recipientDoc.getExistingUUID(), donor.getId());
+        auto oplogBufferNss = getLocalOplogBufferNamespace(_recipientDoc.getExistingUUID(), donor);
         resharding::data_copy::ensureCollectionDropped(opCtx, oplogBufferNss);
     }
 }

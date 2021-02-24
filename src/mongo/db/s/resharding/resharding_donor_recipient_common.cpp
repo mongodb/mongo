@@ -50,15 +50,6 @@ using RecipientStateMachine = ReshardingRecipientService::RecipientStateMachine;
 namespace {
 using namespace fmt::literals;
 
-std::vector<DonorShardMirroringEntry> createDonorShardMirroringEntriesFromDonorShardIds(
-    const std::vector<ShardId>& shardIds) {
-    std::vector<DonorShardMirroringEntry> donorShards(shardIds.size());
-    for (size_t i = 0; i < shardIds.size(); ++i) {
-        donorShards[i] = {shardIds[i], false /* mirroring */};
-    }
-    return donorShards;
-}
-
 /*
  * Creates a ReshardingStateMachine if this node is primary and the ReshardingStateMachine doesn't
  * already exist.
@@ -320,12 +311,9 @@ ReshardingRecipientDocument constructRecipientDocumentFromReshardingFields(
     // will remain idle until the donor shards are prepared to donate.
     invariant(!reshardingFields.getRecipientFields()->getFetchTimestamp());
 
-    std::vector<DonorShardMirroringEntry> donorShards =
-        createDonorShardMirroringEntriesFromDonorShardIds(
-            reshardingFields.getRecipientFields()->getDonorShardIds());
-
-    auto recipientDoc = ReshardingRecipientDocument(RecipientStateEnum::kAwaitingFetchTimestamp,
-                                                    std::move(donorShards));
+    auto recipientDoc =
+        ReshardingRecipientDocument(RecipientStateEnum::kAwaitingFetchTimestamp,
+                                    reshardingFields.getRecipientFields()->getDonorShardIds());
 
     auto commonMetadata =
         CommonReshardingMetadata(reshardingFields.getUuid(),

@@ -164,9 +164,9 @@ SemiFuture<void> ReshardingDonorService::DonorStateMachine::run(
             return _awaitAllRecipientsDoneCloningThenTransitionToDonatingOplogEntries(executor);
         })
         .then([this, executor] {
-            return _awaitAllRecipientsDoneApplyingThenTransitionToPreparingToMirror(executor);
+            return _awaitAllRecipientsDoneApplyingThenTransitionToPreparingToBlockWrites(executor);
         })
-        .then([this] { _writeTransactionOplogEntryThenTransitionToMirroring(); })
+        .then([this] { _writeTransactionOplogEntryThenTransitionToBlockingWrites(); })
         .then([this, executor] {
             return _awaitCoordinatorHasDecisionPersistedThenTransitionToDropping(executor);
         })
@@ -248,7 +248,7 @@ void ReshardingDonorService::DonorStateMachine::onReshardingFieldsChanges(
         ensureFulfilledPromise(lk, _allRecipientsDoneCloning);
     }
 
-    if (coordinatorState >= CoordinatorStateEnum::kMirroring) {
+    if (coordinatorState >= CoordinatorStateEnum::kBlockingWrites) {
         _critSec.emplace(opCtx->getServiceContext(), _donorDoc.getNss());
 
         ensureFulfilledPromise(lk, _allRecipientsDoneApplying);
@@ -331,20 +331,20 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::
 }
 
 ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::
-    _awaitAllRecipientsDoneApplyingThenTransitionToPreparingToMirror(
+    _awaitAllRecipientsDoneApplyingThenTransitionToPreparingToBlockWrites(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
     if (_donorDoc.getState() > DonorStateEnum::kDonatingOplogEntries) {
         return ExecutorFuture<void>(**executor, Status::OK());
     }
 
     return _allRecipientsDoneApplying.getFuture().thenRunOn(**executor).then([this]() {
-        _transitionState(DonorStateEnum::kPreparingToMirror);
+        _transitionState(DonorStateEnum::kPreparingToBlockWrites);
     });
 }
 
 void ReshardingDonorService::DonorStateMachine::
-    _writeTransactionOplogEntryThenTransitionToMirroring() {
-    if (_donorDoc.getState() > DonorStateEnum::kPreparingToMirror) {
+    _writeTransactionOplogEntryThenTransitionToBlockingWrites() {
+    if (_donorDoc.getState() > DonorStateEnum::kPreparingToBlockWrites) {
         return;
     }
 
@@ -419,7 +419,7 @@ void ReshardingDonorService::DonorStateMachine::
         }
     }
 
-    _transitionState(DonorStateEnum::kMirroring);
+    _transitionState(DonorStateEnum::kBlockingWrites);
 }
 
 SharedSemiFuture<void> ReshardingDonorService::DonorStateMachine::awaitFinalOplogEntriesWritten() {
@@ -429,7 +429,7 @@ SharedSemiFuture<void> ReshardingDonorService::DonorStateMachine::awaitFinalOplo
 ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::
     _awaitCoordinatorHasDecisionPersistedThenTransitionToDropping(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
-    if (_donorDoc.getState() > DonorStateEnum::kMirroring) {
+    if (_donorDoc.getState() > DonorStateEnum::kBlockingWrites) {
         return ExecutorFuture<void>(**executor, Status::OK());
     }
 
