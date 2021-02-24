@@ -179,6 +179,17 @@ public:
         const boost::optional<BSONObj>& hint = boost::none) = 0;
 
     /**
+     * Retrieves the collection metadata and its chunks metadata. If the collection epoch matches
+     * the one specified in sinceVersion, then it only returns chunks with 'lastmod' gte than
+     * sinceVersion; otherwise it returns all of its chunks.
+     */
+    virtual std::pair<CollectionType, std::vector<ChunkType>> getCollectionAndChunks(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const ChunkVersion& sinceVersion,
+        const repl::ReadConcernArgs& readConcern) = 0;
+
+    /**
      * Retrieves all zones defined for the specified collection. The returned vector is sorted based
      * on the min key of the zones.
      *

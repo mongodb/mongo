@@ -129,6 +129,11 @@ protected:
                              OID epoch,
                              UUID uuid,
                              const ShardKeyPattern& shardKeyPattern);
+    void expectCollectionAndChunksAggregation(NamespaceString nss,
+                                              OID epoch,
+                                              UUID uuid,
+                                              const ShardKeyPattern& shardKeyPattern,
+                                              const std::vector<ChunkType>& chunks);
 
     const HostAndPort kConfigHostAndPort{"DummyConfig", 1234};
 };

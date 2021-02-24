@@ -165,26 +165,25 @@ TEST_F(ShardedUnionTest, RetriesSubPipelineOnStaleConfigError) {
     const OID epoch = OID::gen();
     const UUID uuid = UUID::gen();
     const ShardKeyPattern shardKeyPattern(BSON("_id" << 1));
-    expectGetCollection(kTestAggregateNss, epoch, uuid, shardKeyPattern);
-    expectFindSendBSONObjVector(kConfigHostAndPort, [&]() {
-        ChunkVersion version(1, 0, epoch, boost::none /* timestamp */);
 
-        ChunkType chunk1(kTestAggregateNss,
-                         {shardKeyPattern.getKeyPattern().globalMin(), BSON("_id" << 0)},
-                         version,
-                         {"0"});
-        chunk1.setName(OID::gen());
-        version.incMinor();
+    ChunkVersion version(1, 0, epoch, boost::none /* timestamp */);
 
-        ChunkType chunk2(kTestAggregateNss,
-                         {BSON("_id" << 0), shardKeyPattern.getKeyPattern().globalMax()},
-                         version,
-                         {"1"});
-        chunk2.setName(OID::gen());
-        version.incMinor();
+    ChunkType chunk1(kTestAggregateNss,
+                     {shardKeyPattern.getKeyPattern().globalMin(), BSON("_id" << 0)},
+                     version,
+                     {"0"});
+    chunk1.setName(OID::gen());
+    version.incMinor();
 
-        return std::vector<BSONObj>{chunk1.toConfigBSON(), chunk2.toConfigBSON()};
-    }());
+    ChunkType chunk2(kTestAggregateNss,
+                     {BSON("_id" << 0), shardKeyPattern.getKeyPattern().globalMax()},
+                     version,
+                     {"1"});
+    chunk2.setName(OID::gen());
+    version.incMinor();
+
+    expectCollectionAndChunksAggregation(
+        kTestAggregateNss, epoch, uuid, shardKeyPattern, {chunk1, chunk2});
 
     // That error should be retried, but only the one on that shard.
     onCommand([&](const executor::RemoteCommandRequest& request) {
@@ -242,33 +241,29 @@ TEST_F(ShardedUnionTest, CorrectlySplitsSubPipelineIfRefreshedDistributionRequir
     const OID epoch = OID::gen();
     const UUID uuid = UUID::gen();
     const ShardKeyPattern shardKeyPattern(BSON("_id" << 1));
-    expectGetCollection(kTestAggregateNss, epoch, uuid, shardKeyPattern);
-    expectFindSendBSONObjVector(kConfigHostAndPort, [&]() {
-        ChunkVersion version(1, 0, epoch, boost::none /* timestamp */);
 
-        ChunkType chunk1(kTestAggregateNss,
-                         {shardKeyPattern.getKeyPattern().globalMin(), BSON("_id" << 0)},
-                         version,
-                         {shards[0].getName()});
-        chunk1.setName(OID::gen());
-        version.incMinor();
+    ChunkVersion version(1, 0, epoch, boost::none /* timestamp */);
 
-        ChunkType chunk2(kTestAggregateNss,
-                         {BSON("_id" << 0), BSON("_id" << 10)},
-                         version,
-                         {shards[1].getName()});
-        chunk2.setName(OID::gen());
-        version.incMinor();
+    ChunkType chunk1(kTestAggregateNss,
+                     {shardKeyPattern.getKeyPattern().globalMin(), BSON("_id" << 0)},
+                     version,
+                     {shards[0].getName()});
+    chunk1.setName(OID::gen());
+    version.incMinor();
 
-        ChunkType chunk3(kTestAggregateNss,
-                         {BSON("_id" << 10), shardKeyPattern.getKeyPattern().globalMax()},
-                         version,
-                         {shards[0].getName()});
-        chunk3.setName(OID::gen());
+    ChunkType chunk2(
+        kTestAggregateNss, {BSON("_id" << 0), BSON("_id" << 10)}, version, {shards[1].getName()});
+    chunk2.setName(OID::gen());
+    version.incMinor();
 
-        return std::vector<BSONObj>{
-            chunk1.toConfigBSON(), chunk2.toConfigBSON(), chunk3.toConfigBSON()};
-    }());
+    ChunkType chunk3(kTestAggregateNss,
+                     {BSON("_id" << 10), shardKeyPattern.getKeyPattern().globalMax()},
+                     version,
+                     {shards[0].getName()});
+    chunk3.setName(OID::gen());
+
+    expectCollectionAndChunksAggregation(
+        kTestAggregateNss, epoch, uuid, shardKeyPattern, {chunk1, chunk2, chunk3});
 
     // That error should be retried, this time two shards.
     onCommand([&](const executor::RemoteCommandRequest& request) {
@@ -333,19 +328,15 @@ TEST_F(ShardedUnionTest, AvoidsSplittingSubPipelineIfRefreshedDistributionDoesNo
     const OID epoch = OID::gen();
     const UUID uuid = UUID::gen();
     const ShardKeyPattern shardKeyPattern(BSON("_id" << 1));
-    expectGetCollection(kTestAggregateNss, epoch, uuid, shardKeyPattern);
-    expectFindSendBSONObjVector(kConfigHostAndPort, [&]() {
-        ChunkVersion version(1, 0, epoch, boost::none /* timestamp */);
+    ChunkVersion version(1, 0, epoch, boost::none /* timestamp */);
+    ChunkType chunk1(
+        kTestAggregateNss,
+        {shardKeyPattern.getKeyPattern().globalMin(), shardKeyPattern.getKeyPattern().globalMax()},
+        version,
+        {shards[0].getName()});
+    chunk1.setName(OID::gen());
 
-        ChunkType chunk1(kTestAggregateNss,
-                         {shardKeyPattern.getKeyPattern().globalMin(),
-                          shardKeyPattern.getKeyPattern().globalMax()},
-                         version,
-                         {shards[0].getName()});
-        chunk1.setName(OID::gen());
-
-        return std::vector<BSONObj>{chunk1.toConfigBSON()};
-    }());
+    expectCollectionAndChunksAggregation(kTestAggregateNss, epoch, uuid, shardKeyPattern, {chunk1});
 
     // That error should be retried, this time targetting only one shard.
     onCommand([&](const executor::RemoteCommandRequest& request) {
