@@ -323,6 +323,7 @@ certs:
     mongoRoles:
     - {role: backup, db: admin}
     - {role: findInternalClusterTimeKeysRole, db: admin}
+    - {role: findAggregateNamespacesRole, db: admin}
 
 - name: 'rs0_tenant_migration_expired.pem'
   description:
@@ -378,6 +379,7 @@ certs:
     mongoRoles:
     - {role: backup, db: admin}
     - {role: findInternalClusterTimeKeysRole, db: admin}
+    - {role: findAggregateNamespacesRole, db: admin}
 
 - name: 'rs1_tenant_migration_expired.pem'
   description:
@@ -446,6 +448,7 @@ certs:
     mongoRoles:
     - {role: backup, db: admin}
     - {role: findInternalClusterTimeKeysRole, db: admin}
+    - {role: findAggregateNamespacesRole, db: admin}
 
 ###
 # Certificates not based on the primary root ca.pem
