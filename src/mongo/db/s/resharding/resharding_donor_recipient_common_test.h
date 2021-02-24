@@ -193,10 +193,8 @@ protected:
         auto donorShardIds = reshardingFields.getRecipientFields()->getDonorShardIds();
         auto donorShardIdsSet = std::set<ShardId>(donorShardIds.begin(), donorShardIds.end());
 
-        for (const auto& donorShardMirroringEntry : recipientDoc.getDonorShardsMirroring()) {
-            ASSERT_EQ(donorShardMirroringEntry.getMirroring(), false);
-            auto reshardingFieldsDonorShardId =
-                donorShardIdsSet.find(donorShardMirroringEntry.getId());
+        for (const auto& donorShardId : recipientDoc.getDonorShards()) {
+            auto reshardingFieldsDonorShardId = donorShardIdsSet.find(donorShardId);
             ASSERT(reshardingFieldsDonorShardId != donorShardIdsSet.end());
             donorShardIdsSet.erase(reshardingFieldsDonorShardId);
         }

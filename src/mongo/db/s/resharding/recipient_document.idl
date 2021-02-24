@@ -36,16 +36,6 @@ imports:
     - "mongo/s/resharding/common_types.idl"
 
 structs:
-    DonorShardMirroringEntry:
-        description: "Represents a particular donor shard and whether that shard has reported to
-                      this recipient that the shard is now mirroring writes as distributed
-                      transactions."
-        generate_comparison_operators: false
-        strict: true
-        fields:
-            id: shard_id
-            mirroring: bool
-
     ReshardingRecipientDocument:
         description: "Represents a resharding operation on the recipient shard."
         inline_chained_structs: true
@@ -58,7 +48,6 @@ structs:
         strict: true
         fields:
             state: RecipientState
-            donorShardsMirroring:
-                type: array<DonorShardMirroringEntry>
-                description: "The list of donor shards that have reported to this recipient that
-                              the donor shard is now mirroring writes as distributed transactions."
+            donorShards:
+                type: array<shard_id>
+                description: "The list of donor shards that report to this recipient."

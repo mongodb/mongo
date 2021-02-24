@@ -75,7 +75,7 @@ public:
     void onOplogEntriesApplied(int64_t entries) noexcept;
 
     // Allows tracking writes during a critical section when the donor's state is either of
-    // "preparing-to-mirror" or "mirroring".
+    // "preparing-to-block-writes" or "blocking-writes".
     void onWriteDuringCriticalSection(int64_t writes) noexcept;
 
     // Marks the completion of the current (active) resharding operation. Aborts the process if no

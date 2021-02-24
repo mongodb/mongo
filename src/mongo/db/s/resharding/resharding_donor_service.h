@@ -109,10 +109,10 @@ private:
     ExecutorFuture<void> _awaitAllRecipientsDoneCloningThenTransitionToDonatingOplogEntries(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
-    ExecutorFuture<void> _awaitAllRecipientsDoneApplyingThenTransitionToPreparingToMirror(
+    ExecutorFuture<void> _awaitAllRecipientsDoneApplyingThenTransitionToPreparingToBlockWrites(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
-    void _writeTransactionOplogEntryThenTransitionToMirroring();
+    void _writeTransactionOplogEntryThenTransitionToBlockingWrites();
 
     ExecutorFuture<void> _awaitCoordinatorHasDecisionPersistedThenTransitionToDropping(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor);

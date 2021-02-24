@@ -72,7 +72,7 @@ boost::optional<ShardKeyPattern> CollectionMetadata::getReshardingKeyIfShouldFor
     switch (reshardingFields.get().getState()) {
         case CoordinatorStateEnum::kUnused:
         case CoordinatorStateEnum::kInitializing:
-        case CoordinatorStateEnum::kMirroring:
+        case CoordinatorStateEnum::kBlockingWrites:
         case CoordinatorStateEnum::kDecisionPersisted:
         case CoordinatorStateEnum::kDone:
         case CoordinatorStateEnum::kError:
@@ -118,7 +118,7 @@ bool CollectionMetadata::disallowWritesForResharding(const UUID& currentCollecti
         case CoordinatorStateEnum::kCloning:
         case CoordinatorStateEnum::kApplying:
             return false;
-        case CoordinatorStateEnum::kMirroring:
+        case CoordinatorStateEnum::kBlockingWrites:
             // Only return true if this is also the donor shard.
             return reshardingFields->getDonorFields() != boost::none;
         case CoordinatorStateEnum::kDecisionPersisted:

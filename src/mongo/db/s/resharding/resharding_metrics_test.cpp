@@ -161,7 +161,7 @@ TEST_F(ReshardingMetricsTest, TestDonorAndRecipientMetrics) {
 
     // Update metrics for donor
     const auto kWritesDuringCriticalSection = 7;
-    getMetrics()->setDonorState(DonorStateEnum::kPreparingToMirror);
+    getMetrics()->setDonorState(DonorStateEnum::kPreparingToBlockWrites);
     getMetrics()->onWriteDuringCriticalSection(kWritesDuringCriticalSection);
     advanceTime();
 
@@ -231,7 +231,7 @@ TEST_F(ReshardingMetricsTest, EstimatedRemainingOperationTime) {
 }
 
 TEST_F(ReshardingMetricsTest, CurrentOpReportForDonor) {
-    const auto kDonorState = DonorStateEnum::kPreparingToMirror;
+    const auto kDonorState = DonorStateEnum::kPreparingToBlockWrites;
     getMetrics()->onStart();
     advanceTime(Seconds(2));
     getMetrics()->setDonorState(kDonorState);

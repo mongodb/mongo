@@ -189,8 +189,9 @@ protected:
     static constexpr auto kReshardNs = "db.foo"_sd;
 };
 
-TEST_F(ReshardingDonorServiceTest, ShouldWriteFinalOpLogEntryAfterTransitionToPreparingToMirror) {
-    ReshardingDonorDocument doc(DonorStateEnum::kPreparingToMirror);
+TEST_F(ReshardingDonorServiceTest,
+       ShouldWriteFinalOpLogEntryAfterTransitionToPreparingToBlockWrites) {
+    ReshardingDonorDocument doc(DonorStateEnum::kPreparingToBlockWrites);
     CommonReshardingMetadata metadata(kReshardingUUID,
                                       mongo::NamespaceString(kReshardNs),
                                       kExistingUUID,
