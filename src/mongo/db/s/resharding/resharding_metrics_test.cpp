@@ -185,8 +185,9 @@ TEST_F(ReshardingMetricsTest, TestDonorAndRecipientMetrics) {
     const auto kDocumentsToCopy = 50;
     const auto kBytesToCopy = 740;
     const auto kCopyProgress = 50;
-    getMetrics()->setRecipientState(RecipientStateEnum::kCloning);
+    getMetrics()->setRecipientState(RecipientStateEnum::kCreatingCollection);
     getMetrics()->setDocumentsToCopy(kDocumentsToCopy, kBytesToCopy);
+    getMetrics()->setRecipientState(RecipientStateEnum::kCloning);
     getMetrics()->onDocumentsCopied(kDocumentsToCopy * kCopyProgress / 100,
                                     kBytesToCopy * kCopyProgress / 100);
     advanceTime(Seconds(elapsedTime));
@@ -286,8 +287,9 @@ TEST_F(ReshardingMetricsTest, EstimatedRemainingOperationTime) {
 
     const auto kDocumentsToCopy = 2;
     const auto kBytesToCopy = 200;
-    getMetrics()->setRecipientState(RecipientStateEnum::kCloning);
+    getMetrics()->setRecipientState(RecipientStateEnum::kCreatingCollection);
     getMetrics()->setDocumentsToCopy(kDocumentsToCopy, kBytesToCopy);
+    getMetrics()->setRecipientState(RecipientStateEnum::kCloning);
     getMetrics()->onDocumentsCopied(kDocumentsToCopy / 2, kBytesToCopy / 2);
     advanceTime(Seconds(elapsedTime));
     // Since 50% of the data is copied, the remaining copy time equals the elapsed copy time, which
@@ -361,8 +363,9 @@ TEST_F(ReshardingMetricsTest, CurrentOpReportForRecipient) {
     advanceTime(kDelayBeforeCloning);
 
     constexpr auto kTimeSpentCloning = Seconds(3);
-    getMetrics()->setRecipientState(kRecipientState);
+    getMetrics()->setRecipientState(RecipientStateEnum::kCreatingCollection);
     getMetrics()->setDocumentsToCopy(kDocumentsToCopy, kBytesToCopy);
+    getMetrics()->setRecipientState(kRecipientState);
     advanceTime(kTimeSpentCloning);
     getMetrics()->onDocumentsCopied(kDocumentsCopied, kBytesCopied);
 
@@ -459,12 +462,13 @@ TEST_F(ReshardingMetricsTest, EstimatedRemainingOperationTimeCloning) {
     // Copy N docs @ timePerDoc. Check the progression of the estimated time remaining.
     auto m = getMetrics();
     m->onStart();
-    m->setRecipientState(RecipientStateEnum::kCloning);
     auto timePerDocument = Seconds(2);
     int64_t bytesPerDocument = 1024;
     int64_t documentsToCopy = 409;
     int64_t bytesToCopy = bytesPerDocument * documentsToCopy;
+    m->setRecipientState(RecipientStateEnum::kCreatingCollection);
     m->setDocumentsToCopy(documentsToCopy, bytesToCopy);
+    m->setRecipientState(RecipientStateEnum::kCloning);
     auto remainingTime = 2 * timePerDocument * documentsToCopy;
     double maxAbsRelErr = 0;
     for (int64_t copied = 0; copied < documentsToCopy; ++copied) {

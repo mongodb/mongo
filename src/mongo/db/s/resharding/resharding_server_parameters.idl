@@ -130,3 +130,16 @@ server_parameters:
             expr: 5 * 1000
         validator:
             gte: 0
+
+    remainingReshardingOperationTimeThresholdMillis:
+        description: >-
+            Controls the threshold for engaging the critical section of resharding operations. 
+            Once the remaining operation time on all recipients falls below this threshold, the 
+            resharding coordinator will engage the critical section and block incoming writes.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gRemainingReshardingOperationTimeThresholdMillis
+        default:
+            expr: 2 * 1000
+        validator:
+            gte: 0

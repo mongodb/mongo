@@ -90,7 +90,21 @@ class ReshardingRecipientService::RecipientStateMachine final
 public:
     struct CloneDetails {
         Timestamp cloneTimestamp;
+        int64_t approxDocumentsToCopy;
+        int64_t approxBytesToCopy;
         std::vector<DonorShardFetchTimestamp> donorShards;
+
+        auto lens() const {
+            return std::tie(cloneTimestamp, approxDocumentsToCopy, approxBytesToCopy);
+        }
+
+        friend bool operator==(const CloneDetails& a, const CloneDetails& b) {
+            return a.lens() == b.lens();
+        }
+
+        friend bool operator!=(const CloneDetails& a, const CloneDetails& b) {
+            return a.lens() != b.lens();
+        }
     };
 
     explicit RecipientStateMachine(const ReshardingRecipientService* recipientService,

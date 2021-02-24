@@ -134,6 +134,7 @@ let viewsCommandTests = {
     _shardsvrRenameCollectionParticipant: {skip: isAnInternalCommand},
     _shardsvrRenameCollectionUnblockParticipant: {skip: isAnInternalCommand},
     _shardsvrReshardCollection: {skip: isAnInternalCommand},
+    _shardsvrReshardingOperationTime: {skip: isAnInternalCommand},
     _shardsvrShardCollection: {skip: isAnInternalCommand},
     _transferMods: {skip: isAnInternalCommand},
     _vectorClockPersist: {skip: isAnInternalCommand},

@@ -80,16 +80,14 @@ void ensureFulfilledPromise(WithLock lk, SharedPromise<void>& sp) {
     }
 }
 
-void ensureFulfilledPromise(
-    WithLock lk,
-    SharedPromise<ReshardingRecipientService::RecipientStateMachine::CloneDetails>& sp,
-    ReshardingRecipientService::RecipientStateMachine::CloneDetails details) {
+template <class T>
+void ensureFulfilledPromise(WithLock lk, SharedPromise<T>& sp, T value) {
     auto future = sp.getFuture();
     if (!future.isReady()) {
-        sp.emplaceValue(details);
+        sp.emplaceValue(std::move(value));
     } else {
-        // Ensure that we would only attempt to fulfill the promise with the same Timestamp value.
-        invariant(future.get().cloneTimestamp == details.cloneTimestamp);
+        // Ensure that we would only attempt to fulfill the promise with the same value.
+        invariant(future.get() == value);
     }
 }
 
@@ -349,10 +347,14 @@ void ReshardingRecipientService::RecipientStateMachine::onReshardingFieldsChange
     if (coordinatorState >= CoordinatorStateEnum::kCloning) {
         auto recipientFields = *reshardingFields.getRecipientFields();
         invariant(recipientFields.getCloneTimestamp());
-        ensureFulfilledPromise(
-            lk,
-            _allDonorsPreparedToDonate,
-            {*recipientFields.getCloneTimestamp(), recipientFields.getDonorShards()});
+        invariant(recipientFields.getApproxDocumentsToCopy());
+        invariant(recipientFields.getApproxBytesToCopy());
+        ensureFulfilledPromise(lk,
+                               _allDonorsPreparedToDonate,
+                               {*recipientFields.getCloneTimestamp(),
+                                *recipientFields.getApproxDocumentsToCopy(),
+                                *recipientFields.getApproxBytesToCopy(),
+                                recipientFields.getDonorShards()});
     }
 
     if (coordinatorState >= CoordinatorStateEnum::kDecisionPersisted) {
@@ -371,7 +373,9 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
     return _allDonorsPreparedToDonate.getFuture()
         .thenRunOn(**executor)
         .then([this](ReshardingRecipientService::RecipientStateMachine::CloneDetails cloneDetails) {
-            _transitionToCreatingCollection(std::move(cloneDetails));
+            _transitionToCreatingCollection(cloneDetails);
+            _metrics()->setDocumentsToCopy(cloneDetails.approxDocumentsToCopy,
+                                           cloneDetails.approxBytesToCopy);
         });
 }
 

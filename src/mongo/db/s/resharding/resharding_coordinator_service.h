@@ -276,6 +276,13 @@ private:
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
     /**
+     * Starts a new coordinator commit monitor to periodically query recipient shards for the
+     * remaining operation time, and engage the critical section as soon as the remaining time falls
+     * below a configurable threshold (i.e., `remainingReshardingOperationTimeThresholdMillis`).
+     */
+    void _startCommitMonitor(const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
+
+    /**
      * Waits on _reshardingCoordinatorObserver to notify that all recipients have finished
      * cloning. Transitions to 'kApplying'.
      */
@@ -393,6 +400,9 @@ private:
 
     // Callback handle for scheduled work to handle critical section timeout.
     boost::optional<executor::TaskExecutor::CallbackHandle> _criticalSectionTimeoutCbHandle;
+
+    // Provides the means to cancel the commit monitor (e.g., due to receiving the commit command).
+    CancellationSource _commitMonitorCancellationSource;
 };
 
 }  // namespace mongo

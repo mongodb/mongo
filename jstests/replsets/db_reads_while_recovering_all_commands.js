@@ -83,6 +83,7 @@ const allCommands = {
     _shardsvrDropDatabaseParticipant: {skip: isPrimaryOnly},
     _shardsvrShardCollection: {skip: isPrimaryOnly},
     _shardsvrReshardCollection: {skip: isPrimaryOnly},
+    _shardsvrReshardingOperationTime: {skip: isPrimaryOnly},
     _shardsvrRefineCollectionShardKey: {skip: isPrimaryOnly},
     _transferMods: {skip: isPrimaryOnly},
     _vectorClockPersist: {skip: isPrimaryOnly},

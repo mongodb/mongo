@@ -110,6 +110,9 @@ public:
     // Reports the elapsed time for the active resharding operation, or `boost::none`.
     boost::optional<Milliseconds> getOperationElapsedTime() const;
 
+    // Reports the estimated remaining time for the active resharding operation, or `boost::none`.
+    boost::optional<Milliseconds> getOperationRemainingTime() const;
+
 private:
     ServiceContext* const _svcCtx;
 
@@ -152,6 +155,8 @@ private:
         void appendCurrentOpMetrics(BSONObjBuilder*, Role) const;
 
         void appendCumulativeOpMetrics(BSONObjBuilder*) const;
+
+        boost::optional<Milliseconds> remainingOperationTime() const;
 
         TimeInterval runningOperation;
         ReshardingOperationStatusEnum opStatus = ReshardingOperationStatusEnum::kInactive;

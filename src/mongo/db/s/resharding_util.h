@@ -72,6 +72,31 @@ void emplaceCloneTimestampIfExists(ClassWithCloneTimestamp& c,
     c.setCloneTimestamp(*cloneTimestamp);
 }
 
+template <class ReshardingDocumentWithApproxCopySize>
+void emplaceApproxBytesToCopyIfExists(ReshardingDocumentWithApproxCopySize& document,
+                                      boost::optional<ReshardingApproxCopySize> approxCopySize) {
+    if (!approxCopySize) {
+        return;
+    }
+
+    invariant(bool(document.getApproxBytesToCopy()) == bool(document.getApproxDocumentsToCopy()),
+              "Expected approxBytesToCopy and approxDocumentsToCopy to either both be set or to"
+              " both be unset");
+
+    if (auto alreadyExistingApproxBytesToCopy = document.getApproxBytesToCopy()) {
+        invariant(approxCopySize->getApproxBytesToCopy() == *alreadyExistingApproxBytesToCopy,
+                  "Expected the existing and the new values for approxBytesToCopy to be equal");
+    }
+
+    if (auto alreadyExistingApproxDocumentsToCopy = document.getApproxDocumentsToCopy()) {
+        invariant(approxCopySize->getApproxDocumentsToCopy() ==
+                      *alreadyExistingApproxDocumentsToCopy,
+                  "Expected the existing and the new values for approxDocumentsToCopy to be equal");
+    }
+
+    document.setReshardingApproxCopySizeStruct(std::move(*approxCopySize));
+}
+
 /**
  * Emplaces the 'minFetchTimestamp' onto the ClassWithFetchTimestamp if the timestamp has been
  * emplaced inside the boost::optional.

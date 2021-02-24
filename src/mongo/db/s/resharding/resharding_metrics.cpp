@@ -193,6 +193,7 @@ static bool checkState(T state, std::initializer_list<T> validStates) {
 void ReshardingMetrics::setDocumentsToCopy(int64_t documents, int64_t bytes) noexcept {
     stdx::lock_guard<Latch> lk(_mutex);
     invariant(_currentOp.has_value(), kNoOperationInProgress);
+    invariant(_currentOp->recipientState == RecipientStateEnum::kCreatingCollection);
 
     _currentOp->documentsToCopy = documents;
     _currentOp->bytesToCopy = bytes;
@@ -279,19 +280,8 @@ void ReshardingMetrics::OperationMetrics::appendCurrentOpMetrics(BSONObjBuilder*
         return durationCount<Seconds>(interval.duration());
     };
 
-    auto remainingMsec = [&]() -> boost::optional<Milliseconds> {
-        if (oplogEntriesApplied > 0 && oplogEntriesFetched > 0) {
-            // All fetched oplogEntries must be applied. Some of them already have been.
-            return remainingTime(
-                applyingOplogEntries.duration(), oplogEntriesApplied, oplogEntriesFetched);
-        }
-        if (bytesCopied > 0 && bytesToCopy > 0) {
-            // Until the time to apply batches of oplog entries is measured, we assume that applying
-            // all of them will take as long as copying did.
-            return remainingTime(copyingDocuments.duration(), bytesCopied, 2 * bytesToCopy);
-        }
-        return {};
-    }();
+
+    const auto remainingMsec = remainingOperationTime();
 
     bob->append(kOpTimeElapsed, getElapsedTime(runningOperation));
 
@@ -380,12 +370,32 @@ boost::optional<Milliseconds> ReshardingMetrics::getOperationElapsedTime() const
     return _currentOp->runningOperation.duration();
 }
 
+boost::optional<Milliseconds> ReshardingMetrics::getOperationRemainingTime() const {
+    if (_currentOp)
+        return _currentOp->remainingOperationTime();
+    return boost::none;
+}
+
 void ReshardingMetrics::OperationMetrics::appendCumulativeOpMetrics(BSONObjBuilder* bob) const {
     bob->append(kDocumentsCopied, documentsCopied);
     bob->append(kBytesCopied, bytesCopied);
     bob->append(kOplogsApplied, oplogEntriesApplied);
     bob->append(kWritesDuringCritialSection, writesDuringCriticalSection);
     bob->append(kOplogsFetched, oplogEntriesFetched);
+}
+
+boost::optional<Milliseconds> ReshardingMetrics::OperationMetrics::remainingOperationTime() const {
+    if (oplogEntriesApplied > 0 && oplogEntriesFetched > 0) {
+        // All fetched oplogEntries must be applied. Some of them already have been.
+        return remainingTime(
+            applyingOplogEntries.duration(), oplogEntriesApplied, oplogEntriesFetched);
+    }
+    if (bytesCopied > 0 && bytesToCopy > 0) {
+        // Until the time to apply batches of oplog entries is measured, we assume that applying all
+        // of them will take as long as copying did.
+        return remainingTime(copyingDocuments.duration(), bytesCopied, 2 * bytesToCopy);
+    }
+    return {};
 }
 
 void ReshardingMetrics::serializeCumulativeOpMetrics(BSONObjBuilder* bob) const {

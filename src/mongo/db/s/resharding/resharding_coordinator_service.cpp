@@ -40,6 +40,7 @@
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/s/config/initial_split_policy.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "mongo/db/s/resharding/resharding_coordinator_commit_monitor.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding_util.h"
@@ -217,6 +218,8 @@ TypeCollectionRecipientFields constructRecipientFields(
         resharding::gReshardingMinimumOperationDurationMillis.load());
 
     emplaceCloneTimestampIfExists(recipientFields, coordinatorDoc.getCloneTimestamp());
+    emplaceApproxBytesToCopyIfExists(recipientFields,
+                                     coordinatorDoc.getReshardingApproxCopySizeStruct());
 
     return recipientFields;
 }
@@ -356,8 +359,8 @@ void writeToConfigCollectionsForTempNss(OperationContext* opCtx,
                     CollectionType::ConfigNS, std::vector<BSONObj>{collType.toBSON()});
             }
             case CoordinatorStateEnum::kCloning: {
-                // Update the 'state', 'donorShards' and 'cloneTimestamp' fields in the
-                // 'reshardingFields.recipient' section
+                // Update the 'state', 'donorShards', 'approxCopySize', and 'cloneTimestamp' fields
+                // in the 'reshardingFields.recipient' section
 
                 BSONArrayBuilder donorShardsBuilder;
                 for (const auto& donor : coordinatorDoc.getDonorShards()) {
@@ -374,6 +377,10 @@ void writeToConfigCollectionsForTempNss(OperationContext* opCtx,
                     BSON("$set" << BSON(
                              "reshardingFields.state"
                              << CoordinatorState_serializer(nextState).toString()
+                             << "reshardingFields.recipientFields.approxDocumentsToCopy"
+                             << coordinatorDoc.getApproxDocumentsToCopy().get()
+                             << "reshardingFields.recipientFields.approxBytesToCopy"
+                             << coordinatorDoc.getApproxBytesToCopy().get()
                              << "reshardingFields.recipientFields.cloneTimestamp"
                              << coordinatorDoc.getCloneTimestamp().get()
                              << "reshardingFields.recipientFields.donorShards"
@@ -1192,31 +1199,6 @@ void ReshardingCoordinatorService::ReshardingCoordinator::
     installCoordinatorDoc(opCtx.get(), updatedCoordinatorDoc);
 }
 
-void emplaceApproxBytesToCopyIfExists(ReshardingCoordinatorDocument& coordinatorDoc,
-                                      boost::optional<ReshardingApproxCopySize> approxCopySize) {
-    if (!approxCopySize) {
-        return;
-    }
-
-    invariant(bool(coordinatorDoc.getApproxBytesToCopy()) ==
-                  bool(coordinatorDoc.getApproxDocumentsToCopy()),
-              "Expected approxBytesToCopy and approxDocumentsToCopy to either both be set or to"
-              " both be unset");
-
-    if (auto alreadyExistingApproxBytesToCopy = coordinatorDoc.getApproxBytesToCopy()) {
-        invariant(approxCopySize->getApproxBytesToCopy() == *alreadyExistingApproxBytesToCopy,
-                  "Expected the existing and the new values for approxBytesToCopy to be equal");
-    }
-
-    if (auto alreadyExistingApproxDocumentsToCopy = coordinatorDoc.getApproxDocumentsToCopy()) {
-        invariant(approxCopySize->getApproxDocumentsToCopy() ==
-                      *alreadyExistingApproxDocumentsToCopy,
-                  "Expected the existing and the new values for approxDocumentsToCopy to be equal");
-    }
-
-    coordinatorDoc.setReshardingApproxCopySizeStruct(std::move(*approxCopySize));
-}
-
 ReshardingApproxCopySize computeApproxCopySize(ReshardingCoordinatorDocument& coordinatorDoc) {
     const auto numRecipients = coordinatorDoc.getRecipientShards().size();
     iassert(ErrorCodes::BadValue,
@@ -1287,6 +1269,24 @@ ReshardingCoordinatorService::ReshardingCoordinator::_awaitAllRecipientsFinished
         });
 }
 
+void ReshardingCoordinatorService::ReshardingCoordinator::_startCommitMonitor(
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
+    _ctHolder->getAbortToken().onCancel().thenRunOn(**executor).getAsync([this](Status status) {
+        if (status.isOK())
+            _commitMonitorCancellationSource.cancel();
+    });
+
+    auto commitMonitor = std::make_shared<resharding::CoordinatorCommitMonitor>(
+        _coordinatorDoc.getSourceNss(),
+        extractShardIdsFromParticipantEntries(_coordinatorDoc.getRecipientShards()),
+        **executor,
+        _commitMonitorCancellationSource.token());
+
+    commitMonitor->waitUntilRecipientsAreWithinCommitThreshold()
+        .thenRunOn(**executor)
+        .getAsync([this](Status) { onOkayToEnterCritical(); });
+}
+
 ExecutorFuture<void>
 ReshardingCoordinatorService::ReshardingCoordinator::_awaitAllRecipientsFinishedApplying(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
@@ -1305,13 +1305,16 @@ ReshardingCoordinatorService::ReshardingCoordinator::_awaitAllRecipientsFinished
                     opCtx.get(), _ctHolder->getAbortToken());
             }
 
+            _startCommitMonitor(executor);
+
             LOGV2(5391602, "Resharding operation waiting for an okay to enter critical section");
             if (reshardingCoordinatorCanEnterCriticalImplicitly.shouldFail()) {
                 onOkayToEnterCritical();
             }
             return _canEnterCritical.getFuture()
                 .thenRunOn(**executor)
-                .then([doc = std::move(coordinatorDocChangedOnDisk)] {
+                .then([this, doc = std::move(coordinatorDocChangedOnDisk)] {
+                    _commitMonitorCancellationSource.cancel();
                     LOGV2(5391603, "Resharding operation is okay to enter critical section");
                     return doc;
                 });
@@ -1423,8 +1426,8 @@ void ReshardingCoordinatorService::ReshardingCoordinator::
     // Build new state doc for coordinator state update
     ReshardingCoordinatorDocument updatedCoordinatorDoc = coordinatorDoc;
     updatedCoordinatorDoc.setState(nextState);
-    emplaceCloneTimestampIfExists(updatedCoordinatorDoc, std::move(cloneTimestamp));
     emplaceApproxBytesToCopyIfExists(updatedCoordinatorDoc, std::move(approxCopySize));
+    emplaceCloneTimestampIfExists(updatedCoordinatorDoc, std::move(cloneTimestamp));
     emplaceAbortReasonIfExists(updatedCoordinatorDoc, abortReason);
 
     auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());

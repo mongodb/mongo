@@ -762,6 +762,12 @@ TEST_F(ReshardingCoordinatorPersistenceTest, StateTransitionWithFetchTimestampSu
     auto expectedCoordinatorDoc = coordinatorDoc;
     expectedCoordinatorDoc.setState(CoordinatorStateEnum::kCloning);
     emplaceCloneTimestampIfExists(expectedCoordinatorDoc, Timestamp(1, 1));
+    emplaceApproxBytesToCopyIfExists(expectedCoordinatorDoc, [] {
+        ReshardingApproxCopySize approxCopySize;
+        approxCopySize.setApproxBytesToCopy(0);
+        approxCopySize.setApproxDocumentsToCopy(0);
+        return approxCopySize;
+    }());
 
     writeStateTransitionUpdateExpectSuccess(operationContext(), expectedCoordinatorDoc);
     assertChunkVersionIncreasedAfterStateTransition(donorChunk, donorCollectionVersion);
