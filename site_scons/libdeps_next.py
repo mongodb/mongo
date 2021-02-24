@@ -1150,14 +1150,17 @@ def generate_libdeps_graph(env):
                         str(libdep.abspath),
                         visibility=int(deptype.Public),
                         direct=False)
-
-            ld_path = ":".join([os.path.dirname(str(libdep)) for libdep in _get_libdeps(source)])
+            if env['PLATFORM'] == 'darwin':
+                sep = ' '
+            else:
+                sep = ':'
+            ld_path = sep.join([os.path.dirname(str(libdep)) for libdep in _get_libdeps(source)])
             symbol_deps.append(env.Command(
                 target=target,
                 source=source,
                 action=SCons.Action.Action(
                     f'{find_symbols} $SOURCE "{ld_path}" $TARGET',
-                    "Generating $SOURCE symbol dependencies")))
+                    "Generating $SOURCE symbol dependencies" if not env['VERBOSE'] else "")))
 
         def write_graph_hash(env, target, source):
             import networkx
@@ -1249,13 +1252,16 @@ def generate_graph(env, target, source):
     for symbol_deps_file in source:
         with open(str(symbol_deps_file)) as f:
             symbols = {}
-            for symbol, lib in json.load(f).items():
-                # ignore symbols from external libraries,
-                # they will just clutter the graph
-                if lib.startswith(env.Dir("$BUILD_DIR").path):
-                    if lib not in symbols:
-                        symbols[lib] = []
-                    symbols[lib].append(symbol)
+            try:
+                for symbol, lib in json.load(f).items():
+                    # ignore symbols from external libraries,
+                    # they will just clutter the graph
+                    if lib.startswith(env.Dir("$BUILD_DIR").path):
+                        if lib not in symbols:
+                            symbols[lib] = []
+                        symbols[lib].append(symbol)
+            except json.JSONDecodeError:
+                env.FatalError(f"Failed processing json file: {str(symbol_deps_file)}")
 
             for lib in symbols:
 
@@ -1335,7 +1341,12 @@ def setup_environment(env, emitting_shared=False, debug='off', linting='on', san
             env.FatalError("Libdeps graph generation is not supported with ninja builds.")
         if not emitting_shared:
             env.FatalError("Libdeps graph generation currently only supports dynamic builds.")
-        for bin in ['awk', 'grep', 'ldd', 'nm']:
+
+        if env['PLATFORM'] == 'darwin':
+            required_bins = ['awk', 'sed', 'otool', 'nm']
+        else:
+            required_bins = ['awk', 'grep', 'ldd', 'nm']
+        for bin in required_bins:
             if not env.WhereIs(bin):
                 env.FatalError(f"'{bin}' not found, Libdeps graph generation requires {bin}.")
 
