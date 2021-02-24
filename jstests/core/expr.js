@@ -5,12 +5,13 @@
 //   requires_fcv_47,
 //   requires_getmore,
 //   requires_non_retryable_writes,
-//   sbe_incompatible,
 // ]
 
 // Tests for $expr in the CRUD commands.
 (function() {
 "use strict";
+
+load("jstests/libs/sbe_assert_error_override.js");  // For 'assert.errorCodeEq'.
 
 const coll = db.expr;
 
@@ -124,7 +125,7 @@ let explain = coll.find({$expr: {$divide: [1, "$a"]}}).explain("executionStats")
 if (!isMongos) {
     assert(explain.hasOwnProperty("executionStats"), explain);
     assert.eq(explain.executionStats.executionSuccess, false, explain);
-    assert.eq(explain.executionStats.errorCode, 16609, explain);
+    assert.errorCodeEq(explain.executionStats.errorCode, 16609, explain);
 }
 
 // $expr is not allowed in $elemMatch projection.

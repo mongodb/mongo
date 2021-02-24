@@ -1,6 +1,5 @@
 // Test profiling for commands in multi-document transactions.
 // @tags: [
-//   sbe_incompatible,
 //   uses_transactions,
 // ]
 (function() {
