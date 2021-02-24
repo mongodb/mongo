@@ -36,6 +36,7 @@ import networkx
 import graph_analyzer
 from libdeps_graph_enums import CountTypes, LinterTypes
 
+
 class LinterSplitArgs(argparse.Action):
     """Custom argument action for checking multiple choice comma separated list."""
 

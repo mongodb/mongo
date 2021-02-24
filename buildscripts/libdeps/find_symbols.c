@@ -78,7 +78,7 @@ void clean_up() {
     free(libs);
     libs = NULL;
 
-    if (popen_fptr != NULL){
+    if (popen_fptr != NULL) {
         pclose(popen_fptr);
         popen_fptr = NULL;
     }
@@ -94,10 +94,10 @@ void clean_up() {
  * @param char* output - input arg, the string array to clean up
  * @param int lines - input arg, how many strings are in the output
  */
-void clean_up_str_array(char** output, int lines){
+void clean_up_str_array(char** output, int lines) {
     if (output != NULL) {
         for (int i = 0; i < lines; i++) {
-            if (output[i] != NULL){
+            if (output[i] != NULL) {
                 free(output[i]);
                 output[i] = NULL;
             }
@@ -115,7 +115,7 @@ void clean_up_str_array(char** output, int lines){
  * @param int* status - ouput arg, after the command is run, the exit status of the command
  * @return char** - a pointer to an array of strings that is each line of the output
  */
-char** get_command_output(char* command, int* num_lines, int* status){
+char** get_command_output(char* command, int* num_lines, int* status) {
 
     char buffer[1024];
     popen_fptr = popen(command, "r");
@@ -130,14 +130,13 @@ char** get_command_output(char* command, int* num_lines, int* status){
     int line_len = 0;
 
     while (fgets(buffer, sizeof(buffer), popen_fptr) != NULL) {
-        if (output == NULL){
+        if (output == NULL) {
             output = (char**)malloc(sizeof(char*));
             if (output == NULL) {
                 clean_up();
                 printf("Failed to allocate memory for command array: %d\n", index);
                 exit(1);
-            }
-            else{
+            } else {
                 output[index] = NULL;
             }
         }
@@ -158,7 +157,7 @@ char** get_command_output(char* command, int* num_lines, int* status){
             line_len = 0;
 
             index++;
-            char** tmp = (char**)realloc(output, (index+1) * sizeof(char*));
+            char** tmp = (char**)realloc(output, (index + 1) * sizeof(char*));
             if (tmp == NULL) {
                 clean_up();
                 printf("Failed to allocate memory for command array: %d\n", index);
@@ -167,8 +166,7 @@ char** get_command_output(char* command, int* num_lines, int* status){
                 output = tmp;
                 output[index] = NULL;
             }
-        }
-        else {
+        } else {
             memcpy(output[index] + line_len, buffer, buffer_len);
             line_len += buffer_len;
         }
@@ -189,14 +187,28 @@ char** get_command_output(char* command, int* num_lines, int* status){
  */
 char** get_ldd(char* target, char* ld_libpath, int* return_size) {
 
-    const char* target_ldd_format = "LD_LIBRARY_PATH=%s ldd %s | awk 'NF == 4 {print $3}; NF == 2 {print $1}'";
-    char* target_ldd = (char*)malloc((strlen(ld_libpath) + strlen(target) + strlen(target_ldd_format)) * sizeof(char));
-    if (target_ldd == NULL){
+#if __linux__
+    const char* target_ldd_format =
+        "LD_LIBRARY_PATH=%s ldd %s | awk 'NF == 4 {print $3}; NF == 2 {print $1}'";
+#elif __APPLE__
+    const char* target_ldd_format =
+        "for LIB in $(otool -L %s | awk '{gsub(/@rpath\\//, \"\", $1); print $1;}'); "
+        "do for PATHLIB in %s; do if [ -e "
+        "$PATHLIB/$LIB ]; then echo $PATHLIB/$LIB; break; fi; done; done;";
+#endif
+
+    char* target_ldd = (char*)malloc(
+        (strlen(ld_libpath) + strlen(target) + strlen(target_ldd_format)) * sizeof(char));
+    if (target_ldd == NULL) {
         printf("Failed to allocate memory for target ldd: %s %s\n", target, ld_libpath);
         clean_up();
         exit(1);
     }
+#if __linux__
     sprintf(target_ldd, target_ldd_format, ld_libpath, target);
+#elif __APPLE__
+    sprintf(target_ldd, target_ldd_format, target, ld_libpath);
+#endif
 
     int status = -1;
     char** output = get_command_output(target_ldd, return_size, &status);
@@ -204,8 +216,7 @@ char** get_ldd(char* target, char* ld_libpath, int* return_size) {
     target_ldd = NULL;
     if (status == 0) {
         return output;
-    }
-    else{
+    } else {
         clean_up_str_array(output, *return_size);
         return NULL;
     }
@@ -219,8 +230,16 @@ char** get_ldd(char* target, char* ld_libpath, int* return_size) {
  * @return char** - the array of strings for each line of output
  */
 char** get_target_symbols(char* target, int* return_size) {
+
+#if __linux__
     const char* target_symbols_format = "nm -D -u %s 2>/dev/null | awk '{print $NF}'";
-    char* target_symbols_command = (char*)malloc((strlen(target) + strlen(target_symbols_format)) * sizeof(char));
+#elif __APPLE__
+    const char* target_symbols_format =
+        "nm --dyldinfo-only --undefined-only %s 2>/dev/null | awk '{print $NF}'";
+#endif
+
+    char* target_symbols_command =
+        (char*)malloc((strlen(target) + strlen(target_symbols_format)) * sizeof(char));
     if (target_symbols_command == NULL) {
         printf("Failed to allocate memory for target_symbols: %s\n", target);
         clean_up();
@@ -234,8 +253,7 @@ char** get_target_symbols(char* target, int* return_size) {
     target_symbols_command = NULL;
     if (status == 0) {
         return output;
-    }
-    else {
+    } else {
         clean_up_str_array(output, *return_size);
         return NULL;
     }
@@ -249,7 +267,14 @@ char** get_target_symbols(char* target, int* return_size) {
  * @return char** - the array of strings for each line of output
  */
 char** get_lib_symbols(char* lib, int* return_size) {
+
+#if __linux__
     const char* lib_symbols_format = "nm -D --defined-only %s 2>/dev/null | awk '{print $NF}'";
+#elif __APPLE__
+    const char* lib_symbols_format =
+        "nm --dyldinfo-only --defined-only %s 2>/dev/null | awk '{print $NF}'";
+#endif
+
     char* lib_symbols = (char*)malloc((strlen(lib) + strlen(lib_symbols_format)) * sizeof(char));
     if (lib_symbols == NULL) {
         printf("Failed to allocate memory for lib_symbols: %s\n", lib);
@@ -264,18 +289,19 @@ char** get_lib_symbols(char* lib, int* return_size) {
     lib_symbols = NULL;
     if (status == 0) {
         return output;
-    }
-    else {
+    } else {
         clean_up_str_array(output, *return_size);
         return NULL;
     }
 }
 
-int main(int argc, char** argv){
+int main(int argc, char** argv) {
 
     if (argc < 4) {
-        printf("%s: A small tool to resolve undefined symbols in linked dynamic libraries.\n", argv[0]);
-        printf("USAGE : %s <target_shared_library> <LD_LIBRARY_PATH> <output_file.json>\n", argv[0]);
+        printf("%s: A small tool to resolve undefined symbols in linked dynamic libraries.\n",
+               argv[0]);
+        printf("USAGE : %s <target_shared_library> <LD_LIBRARY_PATH> <output_file.json>\n",
+               argv[0]);
         exit(1);
     }
 
@@ -290,7 +316,7 @@ int main(int argc, char** argv){
     libs = get_ldd(argv[1], argv[2], &num_libs);
     target_symbols = get_target_symbols(argv[1], &num_symbols);
 
-    if (num_libs == 0 || num_symbols == 0){
+    if (num_libs == 0 || num_symbols == 0) {
         FILE* fptr;
         fptr = fopen(argv[3], "w");
         fprintf(fptr, "{}\n");
@@ -317,10 +343,12 @@ int main(int argc, char** argv){
     FILE* fptr;
     fptr = fopen(argv[3], "w");
     fprintf(fptr, "{");
+    int found_symbol_dep = 0;
     for (int symbol = 0; symbol < num_symbols; symbol++) {
         for (int lib = 0; lib < num_libs; lib++) {
             for (int i = 0; i < symbol_tables[lib].lines; i++) {
                 if (strcmp(target_symbols[symbol], symbol_tables[lib].symbols[i]) == 0) {
+                    found_symbol_dep = 1;
                     fprintf(fptr, "\n\t\"%s\":\"%s\",", target_symbols[symbol], libs[lib]);
                     goto found_symbol;
                 }
@@ -328,9 +356,10 @@ int main(int argc, char** argv){
         }
         found_symbol:;
     }
-
-    // delete the last comma
-    fseek(fptr, -1, SEEK_CUR);
+    if (found_symbol_dep == 1) {
+        // delete the last comma
+        fseek(fptr, -1, SEEK_CUR);
+    }
     fprintf(fptr, "\n}\n");
     fclose(fptr);
     fptr = NULL;

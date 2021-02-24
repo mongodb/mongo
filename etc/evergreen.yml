@@ -3436,7 +3436,7 @@ tasks:
         shell: bash
         script: |
           ${activate_virtualenv}
-          python -m pip install networkx
+          python -m pip install -r etc/pip/libdeps-requirements.txt
 
     - func: "scons compile"
       vars:
@@ -3458,7 +3458,7 @@ tasks:
 
           ${activate_virtualenv}
           GRAPH_FILE=$(find build -name "libdeps.graphml")
-          python buildscripts/libdeps/gacli.py --graph-file $GRAPH_FILE | gzip > results.txt.gz
+          python buildscripts/libdeps/gacli.py --graph-file $GRAPH_FILE > results.txt
           gzip $GRAPH_FILE
           mv $GRAPH_FILE.gz .
 
@@ -3466,23 +3466,23 @@ tasks:
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        local_file: src/results.txt.gz
-        remote_file: ${project}/${build_variant}/${revision}/sources/libdeps-${build_id}-results.txt.gz
+        local_file: src/results.txt
+        remote_file: ${project}/${build_variant}/${revision}/artifacts/libdeps-results.txt.${build_id}-${task_name}.${execution}
         bucket: mciuploads
         permissions: public-read
-        content_type: ${content_type|application/gzip}
-        display_name: libdeps results tarball
+        content_type: text/plain
+        display_name: Libdeps Linter Results
 
     - command: s3.put
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: src/libdeps.graphml.gz
-        remote_file: ${project}/${build_variant}/${revision}/sources/libdeps-${build_id}-graph.graphml.gz
+        remote_file: ${project}/${build_variant}/${revision}/artifacts/libdeps.graphml.${build_id}-${task_name}.${execution}.gz
         bucket: mciuploads
         permissions: public-read
         content_type: ${content_type|application/gzip}
-        display_name: libdeps graph tarball
+        display_name: Libdeps Graph Data
 
 ## compile_all - build all scons targets ##
 - name: compile_all
@@ -3495,17 +3495,6 @@ tasks:
         compiling_for_test: true
         task_compile_flags: >-
           --separate-debug
-    - command: s3.put
-      params:
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
-        local_file: src/library_dependency_graph.json
-        remote_file: ${project}/${build_variant}/${revision}/library_dependency_graph.${build_id}.json
-        bucket: mciuploads
-        permissions: public-read
-        content_type: application/json
-        display_name: Library Dependency Graph (library_dependency_graph.json)
-        build_variants: [enterprise-rhel-70-64-bit-kitchen-sink] # This must be the Dagger variant
 
 ## clang_tidy - run clang_tidy
 - name: clang_tidy
@@ -10001,6 +9990,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
   - name: compile_ninja_next_TG
+  - name: libdeps_graph_linting_TG
   - name: audit
   - name: auth_audit_gen
   - name: causally_consistent_jscore_txns_passthrough
@@ -10351,6 +10341,9 @@ buildvariants:
   - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
     - rhel80-medium
+  - name: libdeps_graph_linting_TG
+    distros:
+      - rhel80-large
   - name: burn_in_tests_gen
   - name: .aggfuzzer
   - name: .aggregation
@@ -11106,12 +11099,11 @@ buildvariants:
 # This variant is to intentionally test uncommon features nightly
 - <<: *enterprise-rhel-70-64-bit-template
   name: enterprise-rhel-70-64-bit-kitchen-sink
-  display_name: "~ Enterprise RHEL 7.0 (Dagger)"
+  display_name: "~ Enterprise RHEL 7.0"
   batchtime: 1440 # 1 day
   expansions:
     <<: *enterprise-rhel-70-64-bit-expansions-template
     compile_flags: --ssl MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    additional_compile_targets: dagger # If this moves to another variant, update the compile_all task
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
