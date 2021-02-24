@@ -51,13 +51,14 @@ using PreVisit = decltype(std::declval<Walker>().preVisit(std::declval<Arg>()));
  * exists for a given Walker type when called on a pointer to our Expression type.
  */
 template <typename Walker>
-constexpr auto hasVoidPreVisit = stdx::is_detected_exact_v<void, PreVisit, Walker, Expression*>;
+inline constexpr auto hasVoidPreVisit =
+    stdx::is_detected_exact_v<void, PreVisit, Walker, Expression*>;
 /**
  * hasVoidPreVisit is a template variable indicating whether such a pointer-returning member
  * function exists for a given Walker type when called on a pointer to our Expression type.
  */
 template <typename Walker>
-constexpr auto hasPtrPreVisit =
+inline constexpr auto hasPtrPreVisit =
     stdx::is_detected_convertible_v<std::unique_ptr<Expression>, PreVisit, Walker, Expression*>;
 
 /**
@@ -70,13 +71,13 @@ using InVisit = decltype(std::declval<Walker>().inVisit(std::declval<Args>()...)
  * given Walker type when called on a pointer to our Expression type.
  */
 template <typename Walker>
-constexpr auto hasBasicInVisit = stdx::is_detected_v<InVisit, Walker, Expression*>;
+inline constexpr auto hasBasicInVisit = stdx::is_detected_v<InVisit, Walker, Expression*>;
 /**
  * hasCountingInVisit is a template variable indicating whether such a member function exists for a
  * given Walker type when called on a pointer to our Expression type.
  */
 template <typename Walker>
-constexpr auto hasCountingInVisit =
+inline constexpr auto hasCountingInVisit =
     stdx::is_detected_v<InVisit, Walker, unsigned long long, Expression*>;
 
 /**
@@ -89,13 +90,14 @@ using PostVisit = decltype(std::declval<Walker>().postVisit(std::declval<Arg>())
  * exists for a given Walker type when called on a pointer to our Expression type.
  */
 template <typename Walker>
-constexpr auto hasVoidPostVisit = stdx::is_detected_exact_v<void, PostVisit, Walker, Expression*>;
+inline constexpr auto hasVoidPostVisit =
+    stdx::is_detected_exact_v<void, PostVisit, Walker, Expression*>;
 /**
  * hasVoidPostVisit is a template variable indicating whether such a pointer-returning member
  * function exists for a given Walker type when called on a pointer to our Expression type.
  */
 template <typename Walker>
-constexpr auto hasPtrPostVisit =
+inline constexpr auto hasPtrPostVisit =
     stdx::is_detected_convertible_v<std::unique_ptr<Expression>, PostVisit, Walker, Expression*>;
 
 /**
@@ -104,7 +106,7 @@ constexpr auto hasPtrPostVisit =
  * Expression type.
  */
 template <typename Walker>
-constexpr auto hasReturningVisit = hasPtrPreVisit<Walker> || hasPtrPostVisit<Walker>;
+inline constexpr auto hasReturningVisit = hasPtrPreVisit<Walker> || hasPtrPostVisit<Walker>;
 
 /**
  * Provided with a Walker and an Expression, walk() calls each of the following if they exist:
