@@ -97,6 +97,9 @@ public:
 
     SharedSemiFuture<void> awaitFinalOplogEntriesWritten();
 
+    static void insertStateDocument(OperationContext* opCtx,
+                                    const ReshardingDonorDocument& donorDoc);
+
 private:
     // The following functions correspond to the actions to take at a particular donor state.
     void _transitionToPreparingToDonate();
@@ -128,9 +131,6 @@ private:
         boost::optional<Timestamp> minFetchTimestamp = boost::none,
         boost::optional<Status> abortReason = boost::none,
         boost::optional<ReshardingCloneSize> cloneSizeEstimate = boost::none);
-
-    // Inserts 'doc' on-disk and sets '_donorDoc' in-memory.
-    void _insertDonorDocument(const ReshardingDonorDocument& doc);
 
     // Updates the donor document on-disk and in-memory with the 'replacementDoc.'
     void _updateDonorDocument(ReshardingDonorDocument&& replacementDoc);

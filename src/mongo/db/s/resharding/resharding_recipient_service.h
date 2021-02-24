@@ -130,9 +130,13 @@ public:
     void onReshardingFieldsChanges(OperationContext* opCtx,
                                    const TypeCollectionReshardingFields& reshardingFields);
 
+    static void insertStateDocument(OperationContext* opCtx,
+                                    const ReshardingRecipientDocument& recipientDoc);
+
 private:
     // The following functions correspond to the actions to take at a particular recipient state.
-    void _transitionToCreatingTemporaryReshardingCollection();
+    ExecutorFuture<void> _awaitAllDonorsPreparedToDonateThenTransitionToCreatingCollection(
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
     void _createTemporaryReshardingCollectionThenTransitionToCloning();
 
@@ -156,9 +160,6 @@ private:
                           boost::optional<Status> abortReason = boost::none);
 
     void _updateCoordinator();
-
-    // Inserts 'doc' on-disk and sets '_replacementDoc' in-memory.
-    void _insertRecipientDocument(const ReshardingRecipientDocument& doc);
 
     // Updates the recipient document on-disk and in-memory with the 'replacementDoc.'
     void _updateRecipientDocument(ReshardingRecipientDocument&& replacementDoc);
@@ -206,6 +207,8 @@ private:
 
     // Each promise below corresponds to a state on the recipient state machine. They are listed in
     // ascending order, such that the first promise below will be the first promise fulfilled.
+    SharedPromise<Timestamp> _allDonorsPreparedToDonate;
+
     SharedPromise<void> _coordinatorHasDecisionPersisted;
 
     SharedPromise<void> _completionPromise;
