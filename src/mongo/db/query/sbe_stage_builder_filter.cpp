@@ -1804,7 +1804,7 @@ std::unique_ptr<sbe::PlanStage> generateIndexFilter(OperationContext* opCtx,
     tree_walker::walk<true, MatchExpression>(root, &walker);
 
     auto [resultSlot, resultStage] = context.done();
-    tassert(5273409, "Index filter must not track a matching element index", !resultSlot);
+    tassert(5273411, "Index filter must not track a matching element index", !resultSlot);
     return std::move(resultStage.stage);
 }
 }  // namespace mongo::stage_builder

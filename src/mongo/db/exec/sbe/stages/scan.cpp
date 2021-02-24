@@ -476,7 +476,7 @@ void ParallelScanStage::open(bool reOpen) {
     if (!_coll) {
         // we're being opened after 'close()'. we need to re-acquire '_coll' in this case and
         // make some validity checks (the collection has not been dropped, renamed, etc.).
-        tassert(5071008, "ParallelScanStage is not open but have _cursor", !_cursor);
+        tassert(5071013, "ParallelScanStage is not open but have _cursor", !_cursor);
         restoreCollection(_opCtx, _collName, _collUuid, nullptr, _coll);
     }
 
