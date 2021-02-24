@@ -914,4 +914,24 @@ let g7 = testDB.runCommand({
     cursor: {}
 });
 assert.eq(g7.cursor.firstBatch[0].count, 7);
+
+// $count accumulator
+let g8 = testDB.runCommand({
+    aggregate: "article",
+    pipeline: [
+        {$unwind: "$tags"},
+        {$group: {_id: "$tags", docCount1: {$sum: 1}, docCount2: {$count: {}}}},
+        {$sort: {'_id': 1}}
+    ],
+    cursor: {}
+});
+
+let g8result = [
+    {"_id": "filthy", "docCount1": 1, "docCount2": 1},
+    {"_id": "fun", "docCount1": 3, "docCount2": 3},
+    {"_id": "good", "docCount1": 1, "docCount2": 1},
+    {"_id": "nasty", "docCount1": 2, "docCount2": 2},
+];
+
+assert.docEq(g8.cursor.firstBatch, g8result, 'g8 failed');
 }());
