@@ -3,19 +3,23 @@
 
 #include "test_harness/test_harness.h"
 #include "test_harness/workload_generator.h"
+#include "test_harness/runtime_monitor.h"
 
 class poc_test : public test_harness::test {
     public:
     poc_test(const std::string &config, int64_t trace_level) : test(config)
     {
-        test_harness::workload_generator::_trace_level = trace_level;
+        test_harness::_trace_level = trace_level;
         _wl = new test_harness::workload_generator(_configuration);
+        _rm = new test_harness::runtime_monitor();
     }
 
     ~poc_test()
     {
         delete _wl;
         _wl = nullptr;
+        delete _rm;
+        _rm = nullptr;
     }
 
     int
@@ -30,12 +34,13 @@ class poc_test : public test_harness::test {
     }
 
     private:
+    test_harness::runtime_monitor *_rm = nullptr;
     test_harness::workload_generator *_wl = nullptr;
 };
 
 const std::string poc_test::test::_name = "poc_test";
-const std::string poc_test::test::_default_config = "collection_count=2,key_count=5,value_size=20";
-int64_t test_harness::workload_generator::_trace_level = 0;
+const std::string poc_test::test::_default_config = "collection_count=2,key_count=5,value_size=20,"
+                "read_threads=1,duration_seconds=1";
 
 int
 main(int argc, char *argv[])
