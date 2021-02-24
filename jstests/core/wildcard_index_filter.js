@@ -5,13 +5,13 @@
  * that may return different values after a failover; in this case, 'planCacheClearFilters'.
  * @tags: [
  *   does_not_support_stepdowns,
- *   sbe_incompatible,
  * ]
  */
 (function() {
 "use strict";
 
 load("jstests/libs/analyze_plan.js");
+load("jstests/libs/fixture_helpers.js");  // For 'isMongos()'.
 
 const coll = db.wildcard_index_filter;
 
@@ -38,17 +38,26 @@ function assertExpectedIndexAnswersQueryWithFilter(
 
     // Check that expectedIndex index was used over another index.
     let explain;
-    if (hint == undefined) {
-        explain = assert.commandWorked(coll.explain("executionStats").find(query).finish());
+    if (hint === undefined) {
+        explain = assert.commandWorked(coll.find(query).explain('executionStats'));
     } else {
-        explain =
-            assert.commandWorked(coll.explain("executionStats").find(query).hint(hint).finish());
+        explain = assert.commandWorked(coll.find(query).hint(hint).explain('executionStats'));
     }
 
-    const executionStages = getExecutionStages(explain).shift();
-    let planStage = getPlanStage(executionStages, 'IXSCAN');
-    assert.neq(null, planStage);
-    assert.eq(planStage.indexName, expectedIndexName, tojson(planStage));
+    const winningPlan = getWinningPlan(explain.queryPlanner);
+    const planStages = getPlanStages(winningPlan, 'IXSCAN');
+
+    if (FixtureHelpers.isMongos(db)) {
+        assert.gte(planStages.length, 1, explain);
+    } else {
+        // If we're not running on a sharded cluster, there should be exactly one IXSCAN stage.
+        assert.eq(planStages.length, 1, explain);
+    }
+
+    for (const stage of planStages) {
+        assert(stage.hasOwnProperty('indexName'), stage);
+        assert.eq(stage.indexName, expectedIndexName, stage);
+    }
 }
 
 const indexWildcard = {
