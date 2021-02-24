@@ -135,6 +135,7 @@ selector:
   - jstests/core/explain_find_and_modify.js
   - jstests/core/explain_large_bounds.js
   - jstests/core/explain_multi_plan.js
+  - jstests/core/explain_server_params.js
   - jstests/core/explain_shell_helpers.js
   - jstests/core/explain_sort_type.js
   - jstests/core/explain_winning_plan.js

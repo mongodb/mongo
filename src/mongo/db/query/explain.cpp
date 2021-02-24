@@ -324,6 +324,7 @@ void Explain::explainPipeline(PlanExecutor* exec,
     *out << "stages" << Value(pipelineExec->writeExplainOps(verbosity));
 
     explain_common::generateServerInfo(out);
+    explain_common::generateServerParameters(out);
 
     explain_common::appendIfRoom(command, "command", out);
 }
@@ -365,6 +366,7 @@ void Explain::explainStages(PlanExecutor* exec,
                   out);
 
     explain_common::generateServerInfo(out);
+    explain_common::generateServerParameters(out);
 }
 
 

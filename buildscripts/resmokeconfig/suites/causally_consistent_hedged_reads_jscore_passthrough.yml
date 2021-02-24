@@ -70,6 +70,7 @@ selector:
   - jstests/core/explain_shell_helpers.js
   - jstests/core/index_partial_read_ops.js
   - jstests/core/update_arrayFilters.js
+  - jstests/core/explain_server_params.js
   # TODO: SERVER-30488
   - jstests/core/apitest_dbcollection.js
   - jstests/core/getmore_invalidated_cursors.js

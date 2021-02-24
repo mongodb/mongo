@@ -31,6 +31,7 @@
 
 #include "mongo/db/query/explain_common.h"
 
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/version.h"
@@ -45,6 +46,23 @@ void generateServerInfo(BSONObjBuilder* out) {
     out->append("version", vii.version());
     out->append("gitVersion", vii.gitVersion());
     serverBob.doneFast();
+}
+
+void generateServerParameters(BSONObjBuilder* out) {
+    BSONObjBuilder serverBob(out->subobjStart("serverParameters"));
+    out->appendNumber("internalQueryFacetBufferSizeBytes",
+                      internalQueryFacetBufferSizeBytes.load());
+    out->appendNumber("internalQueryFacetMaxOutputDocSizeBytes",
+                      internalQueryFacetMaxOutputDocSizeBytes.load());
+    out->appendNumber("internalLookupStageIntermediateDocumentMaxSizeBytes",
+                      internalLookupStageIntermediateDocumentMaxSizeBytes.load());
+    out->appendNumber("internalDocumentSourceGroupMaxMemoryBytes",
+                      internalDocumentSourceGroupMaxMemoryBytes.load());
+    out->appendNumber("internalQueryMaxBlockingSortMemoryUsageBytes",
+                      internalQueryMaxBlockingSortMemoryUsageBytes.load());
+    out->appendNumber("internalQueryProhibitBlockingMergeOnMongoS",
+                      internalQueryProhibitBlockingMergeOnMongoS.load());
+    out->appendNumber("internalQueryMaxAddToSetBytes", internalQueryMaxAddToSetBytes.load());
 }
 
 bool appendIfRoom(const BSONObj& toAppend, StringData fieldName, BSONObjBuilder* out) {
