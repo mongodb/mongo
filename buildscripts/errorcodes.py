@@ -11,12 +11,11 @@ import sys
 from collections import defaultdict, namedtuple
 from optparse import OptionParser
 from functools import reduce
+from pathlib import Path
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from buildscripts import utils  # pylint: disable=wrong-import-position
 
 try:
     import regex as re
@@ -37,45 +36,82 @@ AssertLocation = namedtuple("AssertLocation", ['sourceFile', 'byteOffset', 'line
 
 list_files = False  # pylint: disable=invalid-name
 
-
-def parse_source_files(callback):
-    """Walk MongoDB sourcefiles and invoke a callback for each AssertLocation found."""
-
-    quick = [r"assert", r"Exception", r"ErrorCodes::Error", r"LOGV2", r"logAndBackoff"]
-
-    patterns = [
-        re.compile(r"(?:u|m(?:sg)?)asser(?:t|ted)(?:NoTrace)?\s*\(\s*(\d+)", re.MULTILINE),
-        re.compile(r"(?:DB|Assertion)Exception\s*[({]\s*(\d+)", re.MULTILINE),
-        re.compile(r"fassert(?:Failed)?(?:WithStatus)?(?:NoTrace)?(?:StatusOK)?\s*\(\s*(\d+)",
-                   re.MULTILINE),
-        re.compile(r"LOGV2(?:\w*)?\s*\(\s*(\d+)", re.MULTILINE),
-        re.compile(r"logAndBackoff\(\s*(\d+)", re.MULTILINE),
-        re.compile(r"ErrorCodes::Error\s*[({]\s*(\d+)", re.MULTILINE)
+_CODE_PATTERNS = [
+    re.compile(p + r'\s*(?P<code>\d+)', re.MULTILINE) for p in [
+        # All the asserts and their optional variant suffixes
+        r"(?:f|i|m|msg|t|u)(?:assert)"
+        r"(?:ed)?"
+        r"(?:Failed)?"
+        r"(?:WithStatus)?"
+        r"(?:NoTrace)?"
+        r"(?:StatusOK)?"
+        r"(?:WithContext)?"
+        r"\s*\(",
+        # DBException and AssertionException constructors
+        r"(?:DB|Assertion)Exception\s*[({]",
+        # Calls to all LOGV2* variants
+        r"LOGV2(?:\w*)?\s*\(",
+        # Forwards a dynamic code to LOGV2
+        r"logAndBackoff\(",
+        # Error coersions
+        r"ErrorCodes::Error\s*[({]",
     ]
+]
 
-    for source_file in utils.get_all_source_files(prefix='src/mongo/'):
-        if list_files:
-            print('scanning file: ' + source_file)
+_DIR_EXCLUDE_RE = re.compile(r'(\..*'
+                             r'|pcre-.*'
+                             r'|32bit.*'
+                             r'|mongodb-.*'
+                             r'|debian.*'
+                             r'|mongo-cxx-driver.*'
+                             r'|.*gotools.*'
+                             r'|.*mozjs.*'
+                             r')')
 
+_FILE_INCLUDE_RE = re.compile(r'.*\.(cpp|c|h|py|idl)')
+
+
+def get_all_source_files(prefix='.'):
+    """Return source files."""
+
+    def walk(path):
+        for fx in path.iterdir():
+            if fx.is_dir():
+                if fx.is_symlink() and fx.parent.name != "modules":
+                    continue
+                if _DIR_EXCLUDE_RE.fullmatch(fx.name):
+                    continue
+                for child in walk(fx):
+                    yield child
+            elif fx.is_file() and _FILE_INCLUDE_RE.fullmatch(fx.name):
+                yield fx
+
+    for child in walk(Path(prefix)):
+        yield str(child)
+
+
+def foreach_source_file(callback, src_root):
+    """Invoke a callback on the text of each source file."""
+    for source_file in get_all_source_files(prefix=src_root):
         with open(source_file, 'r', encoding='utf-8') as fh:
             text = fh.read()
+        callback(source_file, text)
 
-            if not any([zz in text for zz in quick]):
-                continue
 
-            matchiters = [p.finditer(text) for p in patterns]
-            for matchiter in matchiters:
-                for match in matchiter:
-                    code = match.group(1)
-                    code_offset = match.start(1)
+def parse_source_files(callback, src_root):
+    """Walk MongoDB sourcefiles and invoke a callback for each AssertLocation found."""
 
-                    # Note that this will include the text of the full match but will report the
-                    # position of the beginning of the code portion rather than the beginning of the
-                    # match. This is to position editors on the spot that needs to change.
-                    this_loc = AssertLocation(source_file, code_offset,
-                                              text[match.start():match.end()], code)
+    def scan_for_codes(source_file, text):
+        for pat in _CODE_PATTERNS:
+            for match in pat.finditer(text):
+                # Note that this will include the text of the full match but will report the
+                # position of the beginning of the code portion rather than the beginning of the
+                # match. This is to position editors on the spot that needs to change.
+                loc = AssertLocation(source_file, match.start('code'), match.group(0),
+                                     match.group('code'))
+                callback(loc)
 
-                    callback(this_loc)
+    foreach_source_file(scan_for_codes, src_root)
 
 
 def get_line_and_column_for_position(loc, _file_cache=None):
@@ -157,7 +193,7 @@ def read_error_codes():
         validate_code(assert_loc)
         check_dups(assert_loc)
 
-    parse_source_files(callback)
+    parse_source_files(callback, 'src/mongo')
 
     if "0" in seen:
         code = "0"

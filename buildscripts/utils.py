@@ -8,46 +8,6 @@ import subprocess
 import sys
 
 
-def get_all_source_files(arr=None, prefix="."):
-    """Return source files."""
-    if arr is None:
-        arr = []
-
-    if not os.path.isdir(prefix):
-        # assume a file
-        arr.append(prefix)
-        return arr
-
-    for fx in os.listdir(prefix):
-        # pylint: disable=too-many-boolean-expressions
-        if (fx.startswith(".") or fx.startswith("pcre-") or fx.startswith("32bit")
-                or fx.startswith("mongodb-") or fx.startswith("debian")
-                or fx.startswith("mongo-cxx-driver") or "gotools" in fx or fx.find("mozjs") != -1):
-            continue
-        # pylint: enable=too-many-boolean-expressions
-
-        def is_followable_dir(prefix, full):
-            """Return True if 'full' is a followable directory."""
-            if not os.path.isdir(full):
-                return False
-            if not os.path.islink(full):
-                return True
-            # Follow softlinks in the modules directory (e.g: enterprise).
-            if os.path.split(prefix)[1] == "modules":
-                return True
-            return False
-
-        full = prefix + "/" + fx
-        if is_followable_dir(prefix, full):
-            get_all_source_files(arr, full)
-        else:
-            if full.endswith(".cpp") or full.endswith(".h") or full.endswith(".c"):
-                full = full.replace("//", "/")
-                arr.append(full)
-
-    return arr
-
-
 def get_git_branch():
     """Return the git branch version."""
     if not os.path.exists(".git") or not os.path.isdir(".git"):

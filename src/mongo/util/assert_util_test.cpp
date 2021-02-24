@@ -249,7 +249,7 @@ TEST(AssertUtils, InternalAssertWithExpression) {
         ASSERT_EQ(ex.reason(), "Test");
     }
 
-    internalAssert(48922, "Another test", true);
+    internalAssert(48923, "Another test", true);
 
     ASSERT_EQ(userAssertions, assertionCount.user.load());
 }
