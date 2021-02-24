@@ -305,10 +305,6 @@ TEST_F(TenantOplogApplierTest, NoOpsForLargeTransaction) {
     for (size_t i = 0; i < srcOps.size(); i++) {
         assertNoOpMatches(srcOps[i], entries[i]);
     }
-    // Make sure the no-ops got linked properly.
-    ASSERT_EQ(OpTime(), entries[0].getPrevWriteOpTimeInTransaction());
-    ASSERT_EQ(entries[0].getOpTime(), entries[1].getPrevWriteOpTimeInTransaction());
-    ASSERT_EQ(entries[1].getOpTime(), entries[2].getPrevWriteOpTimeInTransaction());
     applier->shutdown();
     applier->join();
 }

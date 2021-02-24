@@ -408,7 +408,6 @@ TenantOplogApplier::OpTimePair TenantOplogApplier::_writeNoOpEntries(
             continue;
         }
         greatestOplogSlotUsed = *slotIter;
-        _setRecipientOpTime(op.entry.getOpTime(), *slotIter++);
     }
     const size_t numOplogThreads = _writerPool->getStats().numThreads;
     const size_t numOpsPerThread = std::max(std::size_t(minOplogEntriesPerThread.load()),
@@ -464,43 +463,6 @@ TenantOplogApplier::OpTimePair TenantOplogApplier::_writeNoOpEntries(
     return {batch.ops.back().entry.getOpTime(), greatestOplogSlotUsed};
 }
 
-
-// These two routines can't be the ultimate solution.  It's not necessarily practical to keep a list
-// of every op we've written, and it doesn't work for failover.  But as far as I can tell, it's
-// possible to refer to oplog entries arbitarily far back.  We probably don't want to search the
-// oplog each time because it requires a collection scan to do so.
-// TODO(SERVER-50263): Come up with the right way to do this.
-OpTime TenantOplogApplier::_getRecipientOpTime(const OpTime& donorOpTime) {
-    stdx::lock_guard lk(_mutex);
-    auto times = std::upper_bound(
-        _opTimeMapping.begin(), _opTimeMapping.end(), OpTimePair(donorOpTime, OpTime()));
-    uassert(4886000,
-            str::stream() << "Recipient optime not found for donor optime "
-                          << donorOpTime.toString(),
-            times->donorOpTime == donorOpTime);
-    return times->recipientOpTime;
-}
-
-void TenantOplogApplier::_setRecipientOpTime(const OpTime& donorOpTime,
-                                             const OpTime& recipientOpTime) {
-    stdx::lock_guard lk(_mutex);
-    // The _opTimeMapping is an array strictly ordered by donorOpTime; this uassert assures the
-    // order remains intact.
-    uassert(4886001,
-            str::stream() << "Donor optimes inserted out of order "
-                          << _opTimeMapping.back().donorOpTime.toString()
-                          << " >= " << donorOpTime.toString(),
-            _opTimeMapping.empty() || _opTimeMapping.back().donorOpTime < donorOpTime);
-    _opTimeMapping.emplace_back(donorOpTime, recipientOpTime);
-}
-
-boost::optional<OpTime> TenantOplogApplier::_maybeGetRecipientOpTime(
-    const boost::optional<OpTime> donorOpTime) {
-    if (!donorOpTime || donorOpTime->isNull())
-        return donorOpTime;
-    return _getRecipientOpTime(*donorOpTime);
-}
-
 void TenantOplogApplier::_writeNoOpsForRange(OpObserver* opObserver,
                                              std::vector<TenantOplogEntry>::const_iterator begin,
                                              std::vector<TenantOplogEntry>::const_iterator end,
@@ -520,6 +482,11 @@ void TenantOplogApplier::_writeNoOpsForRange(OpObserver* opObserver,
                     // not be applied in a change stream anyways.
                     continue;
                 }
+                // TODO(SERVER-53510) Correctly fill in pre-image and post-image op times.
+                const boost::optional<OpTime> preImageOpTime = boost::none;
+                const boost::optional<OpTime> postImageOpTime = boost::none;
+                // TODO(SERVER-53509) Correctly fill in prevWriteOpTime for retryable writes.
+                const boost::optional<OpTime> prevWriteOpTimeInTransaction = boost::none;
                 opObserver->onInternalOpMessage(
                     opCtx.get(),
                     entry.getNss(),
@@ -529,9 +496,9 @@ void TenantOplogApplier::_writeNoOpsForRange(OpObserver* opObserver,
                     // We link the no-ops together by recipient op time the same way the actual ops
                     // were linked together by donor op time.  This is to allow retryable writes
                     // and changestreams to find the ops they need.
-                    _maybeGetRecipientOpTime(entry.getPreImageOpTime()),
-                    _maybeGetRecipientOpTime(entry.getPostImageOpTime()),
-                    _maybeGetRecipientOpTime(entry.getPrevWriteOpTimeInTransaction()),
+                    preImageOpTime,
+                    postImageOpTime,
+                    prevWriteOpTimeInTransaction,
                     *slot);
             }
             wuow.commit();
