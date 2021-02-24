@@ -147,7 +147,7 @@ SharedSemiFuture<void> recoverRefreshShardVersion(ServiceContext* serviceContext
             auto opCtxHolder = tc->makeOperationContext();
             auto const opCtx = opCtxHolder.get();
 
-            boost::optional<CollectionMetadata> currentMetadata;
+            boost::optional<CollectionMetadata> currentMetadataToInstall;
 
             ON_BLOCK_EXIT([&] {
                 UninterruptibleLockGuard noInterrupt(opCtx->lockState());
@@ -161,11 +161,12 @@ SharedSemiFuture<void> recoverRefreshShardVersion(ServiceContext* serviceContext
 
                 auto* const csr = CollectionShardingRuntime::get(opCtx, nss);
 
-                if (currentMetadata) {
-                    csr->setFilteringMetadata(opCtx, *currentMetadata);
+                if (currentMetadataToInstall) {
+                    csr->setFilteringMetadata(opCtx, *currentMetadataToInstall);
                 } else {
-                    // If currentMetadata is uninitialized, an error occurred in the current spawned
-                    // thread. Filtering metadata is cleared to force a new recover/refresh.
+                    // If currentMetadataToInstall is uninitialized, an error occurred in the
+                    // current spawned thread. Filtering metadata is cleared to force a new
+                    // recover/refresh.
                     csr->clearFilteringMetadata(opCtx);
                 }
 
@@ -180,17 +181,21 @@ SharedSemiFuture<void> recoverRefreshShardVersion(ServiceContext* serviceContext
                 }
             }
 
-            currentMetadata = forceGetCurrentMetadata(opCtx, nss);
+            auto currentMetadata = forceGetCurrentMetadata(opCtx, nss);
 
-            if (currentMetadata && currentMetadata->isSharded()) {
+            if (currentMetadata.isSharded()) {
                 // If the collection metadata after a refresh has 'reshardingFields', then pass it
                 // to the resharding subsystem to process.
-                const auto& reshardingFields = currentMetadata->getReshardingFields();
+                const auto& reshardingFields = currentMetadata.getReshardingFields();
                 if (reshardingFields) {
                     resharding::processReshardingFieldsForCollection(
-                        opCtx, nss, *currentMetadata, *reshardingFields);
+                        opCtx, nss, currentMetadata, *reshardingFields);
                 }
             }
+
+            // Only if all actions taken as part of refreshing the shard version completed
+            // successfully do we want to install the current metadata.
+            currentMetadataToInstall = std::move(currentMetadata);
         })
         .semi()
         .share();

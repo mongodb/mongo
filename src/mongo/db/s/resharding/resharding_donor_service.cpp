@@ -58,6 +58,9 @@ MONGO_FAIL_POINT_DEFINE(reshardingDonorFailsBeforePreparingToMirror);
 using namespace fmt::literals;
 
 namespace {
+
+const WriteConcernOptions kNoWaitWriteConcern{1, WriteConcernOptions::SyncMode::UNSET, Seconds(0)};
+
 ChunkManager getShardedCollectionRoutingInfoWithRefreshAndFlush(const NamespaceString& nss) {
     auto opCtx = cc().makeOperationContext();
 
@@ -258,8 +261,6 @@ void ReshardingDonorService::DonorStateMachine::
         invariant(_donorDoc.getMinFetchTimestamp());
         return;
     }
-
-    _insertDonorDocument(_donorDoc);
 
     ReshardingCloneSize cloneSizeEstimate;
     {
@@ -506,14 +507,11 @@ void ReshardingDonorService::DonorStateMachine::_transitionStateAndUpdateCoordin
                                    ShardingCatalogClient::kMajorityWriteConcern));
 }
 
-void ReshardingDonorService::DonorStateMachine::_insertDonorDocument(
-    const ReshardingDonorDocument& doc) {
-    auto opCtx = cc().makeOperationContext();
+void ReshardingDonorService::DonorStateMachine::insertStateDocument(
+    OperationContext* opCtx, const ReshardingDonorDocument& donorDoc) {
     PersistentTaskStore<ReshardingDonorDocument> store(
         NamespaceString::kDonorReshardingOperationsNamespace);
-    store.add(opCtx.get(), doc, WriteConcerns::kMajorityWriteConcern);
-
-    _donorDoc = doc;
+    store.add(opCtx, donorDoc, kNoWaitWriteConcern);
 }
 
 void ReshardingDonorService::DonorStateMachine::_updateDonorDocument(

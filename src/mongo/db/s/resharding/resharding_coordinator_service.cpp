@@ -60,6 +60,7 @@ namespace {
 
 using namespace fmt::literals;
 
+MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforeCloning);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorInSteadyState);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforeDecisionPersisted);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforeCompletion)
@@ -924,6 +925,7 @@ SemiFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::run(
         .then([this, executor] { _insertCoordDocAndChangeOrigCollEntry(); })
         .then([this, executor] { _calculateParticipantsAndChunksThenWriteToDisk(); })
         .then([this, executor] { _tellAllDonorsToRefresh(executor); })
+        .then([this, executor] { _tellAllRecipientsToRefresh(executor); })
         .then([this, executor] { return _awaitAllDonorsReadyToDonate(executor); })
         .then([this, executor] { _tellAllRecipientsToRefresh(executor); })
         .then([this, executor] { return _awaitAllRecipientsFinishedCloning(executor); })
@@ -1086,6 +1088,11 @@ ReshardingCoordinatorService::ReshardingCoordinator::_awaitAllDonorsReadyToDonat
     return _reshardingCoordinatorObserver->awaitAllDonorsReadyToDonate()
         .thenRunOn(**executor)
         .then([this](ReshardingCoordinatorDocument coordinatorDocChangedOnDisk) {
+            {
+                auto opCtx = cc().makeOperationContext();
+                reshardingPauseCoordinatorBeforeCloning.pauseWhileSet(opCtx.get());
+            }
+
             auto highestMinFetchTimestamp =
                 getHighestMinFetchTimestamp(coordinatorDocChangedOnDisk.getDonorShards());
             _updateCoordinatorDocStateAndCatalogEntries(CoordinatorStateEnum::kCloning,

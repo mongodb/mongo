@@ -66,6 +66,8 @@ MONGO_FAIL_POINT_DEFINE(removeRecipientDocFailpoint);
 
 namespace {
 
+const WriteConcernOptions kNoWaitWriteConcern{1, WriteConcernOptions::SyncMode::UNSET, Seconds(0)};
+
 std::shared_ptr<executor::ThreadPoolTaskExecutor> makeTaskExecutor(StringData name,
                                                                    size_t maxThreads) {
     ThreadPool::Limits threadPoolLimits;
@@ -89,6 +91,16 @@ std::shared_ptr<executor::ThreadPoolTaskExecutor> makeTaskExecutor(StringData na
 void ensureFulfilledPromise(WithLock lk, SharedPromise<void>& sp) {
     if (!sp.getFuture().isReady()) {
         sp.emplaceValue();
+    }
+}
+
+void ensureFulfilledPromise(WithLock lk, SharedPromise<Timestamp>& sp, Timestamp ts) {
+    auto future = sp.getFuture();
+    if (!future.isReady()) {
+        sp.emplaceValue(ts);
+    } else {
+        // Ensure that we would only attempt to fulfill the promise with the same Timestamp value.
+        invariant(future.get() == ts);
     }
 }
 
@@ -213,6 +225,7 @@ ReshardingRecipientService::RecipientStateMachine::RecipientStateMachine(
 
 ReshardingRecipientService::RecipientStateMachine::~RecipientStateMachine() {
     stdx::lock_guard<Latch> lg(_mutex);
+    invariant(_allDonorsPreparedToDonate.getFuture().isReady());
     invariant(_coordinatorHasDecisionPersisted.getFuture().isReady());
     invariant(_completionPromise.getFuture().isReady());
 }
@@ -221,9 +234,9 @@ SemiFuture<void> ReshardingRecipientService::RecipientStateMachine::run(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancelationToken& cancelToken) noexcept {
     return ExecutorFuture<void>(**executor)
-        .then([this] {
+        .then([this, executor] {
             _metrics()->onStart();
-            _transitionToCreatingTemporaryReshardingCollection();
+            return _awaitAllDonorsPreparedToDonateThenTransitionToCreatingCollection(executor);
         })
         .then([this] { _createTemporaryReshardingCollectionThenTransitionToCloning(); })
         .then([this, executor, cancelToken] {
@@ -316,18 +329,31 @@ void ReshardingRecipientService::RecipientStateMachine::onReshardingFieldsChange
     }
 
     auto coordinatorState = reshardingFields.getState();
+
+    if (coordinatorState >= CoordinatorStateEnum::kCloning) {
+        auto fetchTimestamp = reshardingFields.getRecipientFields()->getFetchTimestamp();
+        invariant(fetchTimestamp);
+        ensureFulfilledPromise(lk, _allDonorsPreparedToDonate, *fetchTimestamp);
+    }
+
     if (coordinatorState >= CoordinatorStateEnum::kDecisionPersisted) {
         ensureFulfilledPromise(lk, _coordinatorHasDecisionPersisted);
     }
 }
 
-void ReshardingRecipientService::RecipientStateMachine::
-    _transitionToCreatingTemporaryReshardingCollection() {
-    if (_recipientDoc.getState() > RecipientStateEnum::kCreatingCollection) {
-        return;
+ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
+    _awaitAllDonorsPreparedToDonateThenTransitionToCreatingCollection(
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
+    if (_recipientDoc.getState() > RecipientStateEnum::kAwaitingFetchTimestamp) {
+        invariant(_recipientDoc.getFetchTimestamp());
+        return ExecutorFuture(**executor);
     }
 
-    _transitionState(RecipientStateEnum::kCreatingCollection);
+    return _allDonorsPreparedToDonate.getFuture()
+        .thenRunOn(**executor)
+        .then([this](Timestamp fetchTimestamp) {
+            _transitionState(RecipientStateEnum::kCreatingCollection, fetchTimestamp);
+        });
 }
 
 void ReshardingRecipientService::RecipientStateMachine::
@@ -632,14 +658,9 @@ void ReshardingRecipientService::RecipientStateMachine::_transitionState(
     RecipientStateEnum endState,
     boost::optional<Timestamp> fetchTimestamp,
     boost::optional<Status> abortReason) {
+    invariant(endState != RecipientStateEnum::kAwaitingFetchTimestamp);
     ReshardingRecipientDocument replacementDoc(_recipientDoc);
     replacementDoc.setState(endState);
-
-    if (endState == RecipientStateEnum::kCreatingCollection) {
-        _insertRecipientDocument(replacementDoc);
-        _metrics()->setRecipientState(endState);
-        return;
-    }
 
     emplaceFetchTimestampIfExists(replacementDoc, std::move(fetchTimestamp));
     emplaceAbortReasonIfExists(replacementDoc, std::move(abortReason));
@@ -685,14 +706,11 @@ void ReshardingRecipientService::RecipientStateMachine::_updateCoordinator() {
                 ShardingCatalogClient::kMajorityWriteConcern));
 }
 
-void ReshardingRecipientService::RecipientStateMachine::_insertRecipientDocument(
-    const ReshardingRecipientDocument& doc) {
-    auto opCtx = cc().makeOperationContext();
+void ReshardingRecipientService::RecipientStateMachine::insertStateDocument(
+    OperationContext* opCtx, const ReshardingRecipientDocument& recipientDoc) {
     PersistentTaskStore<ReshardingRecipientDocument> store(
         NamespaceString::kRecipientReshardingOperationsNamespace);
-    store.add(opCtx.get(), doc, WriteConcerns::kMajorityWriteConcern);
-
-    _recipientDoc = doc;
+    store.add(opCtx, recipientDoc, kNoWaitWriteConcern);
 }
 
 void ReshardingRecipientService::RecipientStateMachine::_updateRecipientDocument(
@@ -768,6 +786,10 @@ void ReshardingRecipientService::RecipientStateMachine::_onAbortOrStepdown(WithL
 
     for (auto&& threadPool : _oplogApplierWorkers) {
         threadPool->shutdown();
+    }
+
+    if (!_allDonorsPreparedToDonate.getFuture().isReady()) {
+        _allDonorsPreparedToDonate.setError(status);
     }
 
     if (!_coordinatorHasDecisionPersisted.getFuture().isReady()) {
