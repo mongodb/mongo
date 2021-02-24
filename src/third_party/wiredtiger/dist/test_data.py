@@ -62,6 +62,8 @@ scale_config = [
 load_config = key_config + value_config + scale_config
 
 workload_config = [
+    Config('duration_seconds', 0, r'''
+        The duration that the workload run phase will last''',min=0, max=1000000),
     Config('read_threads', 0, r'''
         The number of threads performing read operations''', min=0, max=100),
     Config('insert_threads', 0, r'''
