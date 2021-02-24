@@ -205,10 +205,6 @@ commands:
         reply_type: HelloCommandReply
         strict: true
         fields:
-            awaitable:
-                type: safeBool
-                optional: true
-                unstable: true
             forShell:
                 type: safeBool
                 default: false

@@ -242,7 +242,6 @@ StatusWith<TaskExecutor::CallbackHandle> SingleServerDiscoveryMonitor::_schedule
 
     BSONObjBuilder bob;
     bob.append("isMaster", 1);
-    bob.append("awaitable", 1);
     bob.append("maxAwaitTimeMS", maxAwaitTimeMS);
     bob.append("topologyVersion", _topologyVersion->toBSON());
 

@@ -359,14 +359,6 @@ public:
             curOp->pauseTimer();
             timerGuard.emplace([curOp]() { curOp->resumeTimer(); });
         } else {
-            // The awaitable field is optional, but if it exists, it requires both other fields.
-            // Note that the awaitable field only exists to make filtering out these operations
-            // via currentOp queries easier and is not otherwise explicitly used.
-            uassert(5135800,
-                    "A request marked awaitable must contain both 'topologyVersion' and "
-                    "'maxAwaitTimeMS'",
-                    !cmd.getAwaitable() || !cmd.getAwaitable());
-
             uassert(31368,
                     (clientTopologyVersion
                          ? "A request with a 'topologyVersion' must include 'maxAwaitTimeMS'"
