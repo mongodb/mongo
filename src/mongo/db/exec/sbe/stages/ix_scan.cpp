@@ -106,6 +106,19 @@ void IndexScanStage::prepare(CompileCtx& ctx) {
     }
 
     _collName = acquireCollection(_opCtx, _collUuid, _lockAcquisitionCallback, _coll);
+
+    auto indexCatalog = _coll->getCollection()->getIndexCatalog();
+    auto indexDesc = indexCatalog->findIndexByName(_opCtx, _indexName);
+    tassert(4938500,
+            str::stream() << "could not find index named '" << _indexName << "' in collection '"
+                          << _collName << "'",
+            indexDesc);
+    _weakIndexCatalogEntry = indexCatalog->getEntryShared(indexDesc);
+    auto entry = _weakIndexCatalogEntry.lock();
+    tassert(4938503,
+            str::stream() << "expected IndexCatalogEntry for index named: " << _indexName,
+            static_cast<bool>(entry));
+    _ordering = entry->ordering();
 }
 
 value::SlotAccessor* IndexScanStage::getAccessor(CompileCtx& ctx, value::SlotId slot) {
@@ -132,6 +145,14 @@ void IndexScanStage::doSaveState() {
     _coll.reset();
 }
 
+void IndexScanStage::restoreCollectionAndIndex() {
+    restoreCollection(_opCtx, _collName, _collUuid, _lockAcquisitionCallback, _coll);
+    auto indexCatalogEntry = _weakIndexCatalogEntry.lock();
+    uassert(ErrorCodes::QueryPlanKilled,
+            str::stream() << "query plan killed :: index '" << _indexName << "' dropped",
+            indexCatalogEntry && !indexCatalogEntry->isDropped());
+}
+
 void IndexScanStage::doRestoreState() {
     invariant(_opCtx);
     invariant(!_coll);
@@ -141,7 +162,7 @@ void IndexScanStage::doRestoreState() {
         return;
     }
 
-    restoreCollection(_opCtx, _collName, _collUuid, _lockAcquisitionCallback, _coll);
+    restoreCollectionAndIndex();
 
     if (_cursor) {
         _cursor->restore();
@@ -185,71 +206,55 @@ void IndexScanStage::open(bool reOpen) {
             // We're being opened after 'close()'. We need to re-acquire '_coll' in this case and
             // make some validity checks (the collection has not been dropped, renamed, etc.).
             tassert(5071010, "IndexScanStage is not open but have _cursor", !_cursor);
-            restoreCollection(_opCtx, _collName, _collUuid, _lockAcquisitionCallback, _coll);
+            restoreCollectionAndIndex();
         }
     }
 
     _open = true;
     _firstGetNext = true;
 
-    if (const auto& collection = _coll->getCollection()) {
-        auto indexCatalog = collection->getIndexCatalog();
-        auto indexDesc = indexCatalog->findIndexByName(_opCtx, _indexName);
-        if (indexDesc) {
-            _weakIndexCatalogEntry = indexCatalog->getEntryShared(indexDesc);
-        }
-
-        if (auto entry = _weakIndexCatalogEntry.lock()) {
-            if (!_cursor) {
-                _cursor =
-                    entry->accessMethod()->getSortedDataInterface()->newCursor(_opCtx, _forward);
-            }
-
-            if (_seekKeyLowAccessor && _seekKeyHiAccessor) {
-                auto [tagLow, valLow] = _seekKeyLowAccessor->getViewOfValue();
-                const auto msgTagLow = tagLow;
-                uassert(4822851,
-                        str::stream() << "seek key is wrong type: " << msgTagLow,
-                        tagLow == value::TypeTags::ksValue);
-                _seekKeyLow = value::getKeyStringView(valLow);
-
-                auto [tagHi, valHi] = _seekKeyHiAccessor->getViewOfValue();
-                const auto msgTagHi = tagHi;
-                uassert(4822852,
-                        str::stream() << "seek key is wrong type: " << msgTagHi,
-                        tagHi == value::TypeTags::ksValue);
-                _seekKeyHi = value::getKeyStringView(valHi);
-            } else if (_seekKeyLowAccessor) {
-                auto [tagLow, valLow] = _seekKeyLowAccessor->getViewOfValue();
-                const auto msgTagLow = tagLow;
-                uassert(4822853,
-                        str::stream() << "seek key is wrong type: " << msgTagLow,
-                        tagLow == value::TypeTags::ksValue);
-                _seekKeyLow = value::getKeyStringView(valLow);
-                _seekKeyHi = nullptr;
-            } else {
-                auto sdi = entry->accessMethod()->getSortedDataInterface();
-                KeyString::Builder kb(sdi->getKeyStringVersion(),
-                                      sdi->getOrdering(),
-                                      KeyString::Discriminator::kExclusiveBefore);
-                kb.appendDiscriminator(KeyString::Discriminator::kExclusiveBefore);
-                _startPoint = kb.getValueCopy();
-
-                _seekKeyLow = &_startPoint;
-                _seekKeyHi = nullptr;
-            }
-
-            // TODO SERVER-49385: When the 'prepare()' phase takes the collection lock, it will be
-            // possible to intialize '_ordering' there instead of here.
-            _ordering = entry->ordering();
-
-            ++_specificStats.seeks;
-        } else {
-            _cursor.reset();
-        }
-    } else {
-        _cursor.reset();
+    auto entry = _weakIndexCatalogEntry.lock();
+    tassert(4938502,
+            str::stream() << "expected IndexCatalogEntry for index named: " << _indexName,
+            static_cast<bool>(entry));
+    if (!_cursor) {
+        _cursor = entry->accessMethod()->getSortedDataInterface()->newCursor(_opCtx, _forward);
     }
+
+    if (_seekKeyLowAccessor && _seekKeyHiAccessor) {
+        auto [tagLow, valLow] = _seekKeyLowAccessor->getViewOfValue();
+        const auto msgTagLow = tagLow;
+        uassert(4822851,
+                str::stream() << "seek key is wrong type: " << msgTagLow,
+                tagLow == value::TypeTags::ksValue);
+        _seekKeyLow = value::getKeyStringView(valLow);
+
+        auto [tagHi, valHi] = _seekKeyHiAccessor->getViewOfValue();
+        const auto msgTagHi = tagHi;
+        uassert(4822852,
+                str::stream() << "seek key is wrong type: " << msgTagHi,
+                tagHi == value::TypeTags::ksValue);
+        _seekKeyHi = value::getKeyStringView(valHi);
+    } else if (_seekKeyLowAccessor) {
+        auto [tagLow, valLow] = _seekKeyLowAccessor->getViewOfValue();
+        const auto msgTagLow = tagLow;
+        uassert(4822853,
+                str::stream() << "seek key is wrong type: " << msgTagLow,
+                tagLow == value::TypeTags::ksValue);
+        _seekKeyLow = value::getKeyStringView(valLow);
+        _seekKeyHi = nullptr;
+    } else {
+        auto sdi = entry->accessMethod()->getSortedDataInterface();
+        KeyString::Builder kb(sdi->getKeyStringVersion(),
+                              sdi->getOrdering(),
+                              KeyString::Discriminator::kExclusiveBefore);
+        kb.appendDiscriminator(KeyString::Discriminator::kExclusiveBefore);
+        _startPoint = kb.getValueCopy();
+
+        _seekKeyLow = &_startPoint;
+        _seekKeyHi = nullptr;
+    }
+    ++_specificStats.seeks;
 }
 
 PlanState IndexScanStage::getNext() {

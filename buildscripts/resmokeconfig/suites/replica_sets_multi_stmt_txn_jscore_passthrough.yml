@@ -47,6 +47,7 @@ selector:
   - jstests/core/or1.js
   - jstests/core/or2.js
   - jstests/core/or3.js
+  - jstests/core/ord.js
   - jstests/core/orj.js
   - jstests/core/projection_expr_mod.js
   - jstests/core/ref.js

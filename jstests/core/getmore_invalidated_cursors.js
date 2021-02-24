@@ -3,7 +3,6 @@
 //   requires_collstats,
 //   requires_getmore,
 //   requires_non_retryable_commands,
-//   sbe_incompatible,
 // ]
 
 // Tests that running a getMore on a cursor that has been invalidated by something like a collection
@@ -17,6 +16,9 @@ const testDB = db.getSiblingDB("getmore_invalidated_cursors");
 const coll = testDB.test;
 
 const nDocs = 100;
+
+// Possible error codes that a query can return when killed due to a collection drop.
+const kKilledByDropErrorCodes = [ErrorCodes.QueryPlanKilled, ErrorCodes.NamespaceNotFound];
 
 function setupCollection() {
     coll.drop();
@@ -50,7 +52,7 @@ if (testDB.runCommand({isdbgrid: 1}).isdbgrid && shellReadMode == 'legacy') {
     // The cursor will be invalidated on mongos, and we won't be able to find it.
     assert.neq(-1, error.message.indexOf('didn\'t exist on server'), error.message);
 } else {
-    assert.eq(error.code, ErrorCodes.QueryPlanKilled, tojson(error));
+    assert(kKilledByDropErrorCodes.includes(error.code), tojson(error));
     assert.neq(-1, error.message.indexOf('collection dropped'), error.message);
 }
 
@@ -62,7 +64,7 @@ cursor.next();  // Send the query to the server.
 
 coll.drop();
 error = assert.throws(() => cursor.itcount());
-assert.eq(error.code, ErrorCodes.QueryPlanKilled, tojson(error));
+assert(kKilledByDropErrorCodes.includes(error.code), tojson(error));
 // In replica sets, collection drops are done in two phases, first renaming the collection to a
 // "drop pending" namespace, and then later reaping the collection. Therefore, we expect to
 // either see an error message related to a collection drop, or one related to a collection
@@ -87,7 +89,7 @@ cursor = coll.find().hint({x: 1}).batchSize(batchSize);
 cursor.next();  // Send the query to the server.
 assert.commandWorked(testDB.runCommand({dropIndexes: coll.getName(), index: {x: 1}}));
 error = assert.throws(() => cursor.itcount());
-assert.eq(error.code, ErrorCodes.QueryPlanKilled, tojson(error));
+assert(kKilledByDropErrorCodes.includes(error.code), tojson(error));
 assert.neq(-1, error.message.indexOf('index \'x_1\' dropped'), error.message);
 
 // Test that killing a cursor between a find and a getMore will return an appropriate error

@@ -8,12 +8,6 @@
  * is dropped.
  *
  * This workload was designed to reproduce SERVER-24761.
- *
- * TODO SERVER-49385: Re-enable once SBE fails cleanly if an index required by the execution plan is
- * dropped.
- * @tags: [
- *   sbe_incompatible,
- * ]
  */
 load("jstests/concurrency/fsm_workload_helpers/assert_handle_fail_in_transaction.js");
 var $config = (function() {
@@ -43,7 +37,9 @@ var $config = (function() {
             } catch (e) {
                 // We expect to see errors caused by the plan executor being killed, because of the
                 // collection getting dropped on another thread.
-                if (ErrorCodes.QueryPlanKilled != e.code) {
+                const kAllowedErrorCodes =
+                    [ErrorCodes.QueryPlanKilled, ErrorCodes.NamespaceNotFound];
+                if (!kAllowedErrorCodes.includes(e.code)) {
                     throw e;
                 }
             }

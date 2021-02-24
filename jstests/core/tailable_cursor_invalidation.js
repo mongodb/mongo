@@ -1,7 +1,6 @@
 // @tags: [
 //   requires_capped,
 //   requires_getmore,
-//   sbe_incompatible,
 // ]
 
 // Tests for the behavior of tailable cursors when a collection is dropped or the cursor is
@@ -67,9 +66,9 @@ function openCursor({tailable, awaitData}) {
 let cursorId = openCursor({tailable: true, awaitData: false});
 dropAndRecreateColl();
 assert.commandFailedWithCode(db.runCommand({getMore: cursorId, collection: collName}),
-                             ErrorCodes.QueryPlanKilled);
+                             [ErrorCodes.QueryPlanKilled, ErrorCodes.NamespaceNotFound]);
 cursorId = openCursor({tailable: true, awaitData: true});
 dropAndRecreateColl();
 assert.commandFailedWithCode(db.runCommand({getMore: cursorId, collection: collName}),
-                             ErrorCodes.QueryPlanKilled);
+                             [ErrorCodes.QueryPlanKilled, ErrorCodes.NamespaceNotFound]);
 }());

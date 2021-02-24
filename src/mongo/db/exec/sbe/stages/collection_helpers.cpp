@@ -50,6 +50,10 @@ NamespaceString acquireCollection(OperationContext* opCtx,
         lockAcquisitionCallback(opCtx, *coll);
     }
 
+    tassert(4938501,
+            str::stream() << "expected CollectionPtr for: " << *collName,
+            static_cast<bool>(coll->getCollection()));
+
     return *collName;
 }
 

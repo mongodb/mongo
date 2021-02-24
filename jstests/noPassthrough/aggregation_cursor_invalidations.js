@@ -10,7 +10,6 @@
  * @tags: [
  *   do_not_wrap_aggregations_in_facets,
  *   requires_capped,
- *   sbe_incompatible,
  * ]
  */
 (function() {
@@ -96,7 +95,7 @@ sourceCollection.drop();
 let getMoreCollName = res.cursor.ns.substr(res.cursor.ns.indexOf('.') + 1);
 assert.commandFailedWithCode(
     testDB.runCommand({getMore: res.cursor.id, collection: getMoreCollName}),
-    ErrorCodes.QueryPlanKilled,
+    [ErrorCodes.QueryPlanKilled, ErrorCodes.NamespaceNotFound],
     'expected getMore to fail because the source collection was dropped');
 
 // Make sure the cursors were cleaned up.
@@ -186,7 +185,7 @@ foreignCollection.drop();
 getMoreCollName = res.cursor.ns.substr(res.cursor.ns.indexOf('.') + 1);
 assert.commandFailedWithCode(
     testDB.runCommand({getMore: res.cursor.id, collection: getMoreCollName}),
-    ErrorCodes.QueryPlanKilled,
+    [ErrorCodes.QueryPlanKilled, ErrorCodes.NamespaceNotFound],
     'expected getMore to fail because the foreign collection was dropped');
 
 // Make sure the cursors were cleaned up.
@@ -265,7 +264,7 @@ getMoreCollName = res.cursor.ns.substr(res.cursor.ns.indexOf('.') + 1);
 
 assert.commandFailedWithCode(
     testDB.runCommand({getMore: res.cursor.id, collection: getMoreCollName}),
-    ErrorCodes.QueryPlanKilled,
+    [ErrorCodes.QueryPlanKilled, ErrorCodes.NamespaceNotFound],
     'expected getMore to fail because the database was dropped');
 
 assertNoOpenCursorsOnSourceCollection();
