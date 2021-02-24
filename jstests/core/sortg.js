@@ -3,7 +3,6 @@
 // @tags: [
 //   assumes_no_implicit_index_creation,
 //   requires_getmore,
-//   sbe_incompatible,
 // ]
 
 // Test that a memory exception is triggered for in memory sorts, but not for indexed sorts.
