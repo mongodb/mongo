@@ -180,6 +180,12 @@ private:
     AfterStageBehavior countStage();
 
     /**
+     * Stage function that checks to see if the donor collection is empty (and therefore we may
+     * race with createIndexes on empty collections) before running listIndexes.
+     */
+    AfterStageBehavior checkIfDonorCollectionIsEmptyStage();
+
+    /**
      * Stage function that gets the index information of the collection on the source to re-create
      * it.
      */
@@ -237,10 +243,11 @@ private:
     // The size of the batches of documents returned in collection cloning.
     int _collectionClonerBatchSize;  // (R)
 
-    TenantCollectionClonerStage _countStage;             // (R)
-    TenantCollectionClonerStage _listIndexesStage;       // (R)
-    TenantCollectionClonerStage _createCollectionStage;  // (R)
-    TenantCollectionClonerQueryStage _queryStage;        // (R)
+    TenantCollectionClonerStage _countStage;                          // (R)
+    TenantCollectionClonerStage _checkIfDonorCollectionIsEmptyStage;  // (R)
+    TenantCollectionClonerStage _listIndexesStage;                    // (R)
+    TenantCollectionClonerStage _createCollectionStage;               // (R)
+    TenantCollectionClonerQueryStage _queryStage;                     // (R)
 
     ProgressMeter _progressMeter;           // (X) progress meter for this instance.
     std::vector<BSONObj> _readyIndexSpecs;  // (X) Except for _id_
@@ -261,6 +268,9 @@ private:
 
     // The operationTime returned with the listIndexes result.
     Timestamp _operationTime;  // (X)
+
+    // Was the collection empty the first time we checked?
+    bool _donorCollectionWasEmptyBeforeListIndexes = false;  // (X)
 };
 
 }  // namespace repl

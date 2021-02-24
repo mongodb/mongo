@@ -1003,5 +1003,44 @@ TEST_F(TenantCollectionClonerTest, ResumeFromRenamedCollection) {
     ASSERT_EQ(2, cloner->getStats().documentsCopied);
 }
 
+// This test checks the condition where documents are inserted on the donor after the listIndexes
+// call is made on the recipient, but before the query is done.  In that case we should skip the
+// the query and never see the documents.
+TEST_F(TenantCollectionClonerTest, NoDocumentsIfInsertedAfterListIndexes) {
+    // Set up data for preliminary stages
+    _mockServer->setCommandReply("count", createCountResponse(0));
+    _mockServer->setCommandReply("listIndexes",
+                                 createCursorResponse(_nss.ns(), BSON_ARRAY(_idIndexSpec)));
+    _mockServer->setCommandReply("find", createFindResponse());
+
+    auto collClonerAfterFailPoint = globalFailPointRegistry().find("hangAfterClonerStage");
+    auto timesEntered = collClonerAfterFailPoint->setMode(
+        FailPoint::alwaysOn,
+        0,
+        fromjson("{cloner: 'TenantCollectionCloner', stage: 'listIndexes', nss: '" + _nss.ns() +
+                 "'}"));
+    auto cloner = makeCollectionCloner();
+    stdx::thread clonerThread([&] {
+        Client::initThread("ClonerRunner");
+        ASSERT_OK(cloner->run());
+        ASSERT_EQ(0, cloner->getStats().documentsCopied);
+    });
+
+    collClonerAfterFailPoint->waitForTimesEntered(timesEntered + 1);
+    // Set up documents to be returned from upstream node.
+    _mockServer->insert(_nss.ns(), BSON("_id" << 1));
+    _mockServer->insert(_nss.ns(), BSON("_id" << 2));
+
+    // Continue and finish. Final status is checked in the thread.
+    collClonerAfterFailPoint->setMode(FailPoint::off, 0);
+    clonerThread.join();
+
+    ASSERT_EQUALS(0, _opObserver->numDocsInserted);
+
+    auto stats = cloner->getStats();
+    ASSERT_EQUALS(0u, stats.documentsCopied);
+    ASSERT_EQUALS(0u, stats.receivedBatches);
+}
+
 }  // namespace repl
 }  // namespace mongo
