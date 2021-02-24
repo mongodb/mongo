@@ -67,5 +67,6 @@ private:
     TenantMigrationAccessBlocker::OperationType _operationType;
 };
 using TenantMigrationConflictException = ExceptionFor<ErrorCodes::TenantMigrationConflict>;
+using TenantMigrationCommittedException = ExceptionFor<ErrorCodes::TenantMigrationCommitted>;
 
 }  // namespace mongo
