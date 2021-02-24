@@ -440,7 +440,7 @@ void InitialSyncer::_appendInitialSyncProgressMinimal_inlock(BSONObjBuilder* bob
                               (long long)remainingInitialSyncEstimatedMillis);
         }
     }
-    bob->appendNumber("appliedOps", static_cast<long long>(_initialSyncState->appliedOps));
+    bob->appendNumber("appliedOps", _initialSyncState->appliedOps);
     if (!_initialSyncState->beginApplyingTimestamp.isNull()) {
         bob->append("initialSyncOplogStart", _initialSyncState->beginApplyingTimestamp);
     }

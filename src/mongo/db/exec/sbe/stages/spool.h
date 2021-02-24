@@ -225,7 +225,7 @@ public:
 
         if (includeDebugInfo) {
             BSONObjBuilder bob;
-            bob.appendNumber("spoolId", static_cast<long long>(_spoolId));
+            bob.appendIntOrLL("spoolId", _spoolId);
             bob.append("outputSlots", _vals);
             ret->debugInfo = bob.obj();
         }

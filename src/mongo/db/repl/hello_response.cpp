@@ -177,11 +177,11 @@ void HelloResponse::addToBSON(BSONObjBuilder* builder, bool useLegacyResponseFie
         builder->append(kBuildIndexesFieldName, _buildIndexes);
     if (_secondaryDelaySecsSet) {
         if (useLegacyResponseFields) {
-            builder->appendNumber(kSlaveDelayFieldName,
-                                  durationCount<Seconds>(_secondaryDelaySecs));
+            builder->appendIntOrLL(kSlaveDelayFieldName,
+                                   durationCount<Seconds>(_secondaryDelaySecs));
         } else {
-            builder->appendNumber(kSecondaryDelaySecsFieldName,
-                                  durationCount<Seconds>(_secondaryDelaySecs));
+            builder->appendIntOrLL(kSecondaryDelaySecsFieldName,
+                                   durationCount<Seconds>(_secondaryDelaySecs));
         }
     }
     if (_tagsSet) {

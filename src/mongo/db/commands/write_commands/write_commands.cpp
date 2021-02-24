@@ -902,8 +902,7 @@ public:
     std::string help() const final {
         return "insert documents";
     }
-}  // namespace
-cmdInsert;
+} cmdInsert;
 
 class CmdUpdate final : public WriteCommand<write_ops::UpdateReply> {
 public:

@@ -71,7 +71,7 @@ Status validateReplicaSetIdNotNull(OID replicaSetId);
  * For serialization and deserialization of certain values in the IDL.
  */
 inline void smallExactInt64Append(std::int64_t value, StringData fieldName, BSONObjBuilder* bob) {
-    bob->appendNumber(fieldName, static_cast<long long>(value));
+    bob->appendIntOrLL(fieldName, value);
 }
 
 inline std::int64_t parseSmallExactInt64(const BSONElement& element) {

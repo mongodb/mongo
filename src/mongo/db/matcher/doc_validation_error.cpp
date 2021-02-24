@@ -465,8 +465,7 @@ void finishLogicalOperatorChildError(const ListOfMatchExpression* expr,
         if (ctx->haveLatestCompleteError()) {
             if (operatorsWithOrderedClauses.find(tag) != operatorsWithOrderedClauses.end()) {
                 BSONObjBuilder subBuilder = ctx->getCurrentArrayBuilder().subobjStart();
-                subBuilder.appendNumber("index",
-                                        static_cast<long long>(ctx->getCurrentChildIndex()));
+                subBuilder.appendNumber("index", ctx->getCurrentChildIndex());
                 ctx->appendLatestCompleteError(&subBuilder);
                 subBuilder.done();
             } else {
