@@ -385,10 +385,6 @@ bool IndexCatalogEntryImpl::_catalogIsPresent(OperationContext* opCtx) const {
 
 bool IndexCatalogEntryImpl::_catalogIsMultikey(OperationContext* opCtx,
                                                MultikeyPaths* multikeyPaths) const {
-    if (_isMultikeyForRead.load()) {
-        return true;
-    }
-
     return DurableCatalog::get(opCtx)->isIndexMultikey(
         opCtx, _ns, _descriptor->indexName(), multikeyPaths);
 }
