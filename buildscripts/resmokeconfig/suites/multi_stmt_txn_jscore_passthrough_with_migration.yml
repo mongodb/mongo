@@ -70,6 +70,7 @@ selector:
   # TODO: Remove after fixing SERVER-32563. The implementation of explain for the count command is
   # incorrect on sharded collections.
   - jstests/core/explain_count.js
+  - jstests/core/explain_server_params.js
   # TODO SERVER-32311: These tests use plan stage helpers which can't handle sharded explain output.
   - jstests/core/expr_index_use.js
   - jstests/core/index_multikey.js
@@ -163,6 +164,7 @@ selector:
   - jstests/core/sort_array.js
   - jstests/core/views/views_collation.js
   - jstests/core/wildcard_index_count.js
+  - jstests/core/explain_server_params.js
 
   # $listSessions
   - jstests/core/list_all_local_sessions.js

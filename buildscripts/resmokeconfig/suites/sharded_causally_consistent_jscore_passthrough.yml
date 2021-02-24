@@ -76,6 +76,7 @@ selector:
   - jstests/core/explain_multi_plan.js
   - jstests/core/explain_shell_helpers.js
   - jstests/core/index_partial_read_ops.js
+  - jstests/core/explain_server_params.js
   - jstests/core/update_arrayFilters.js
   # The in memory structures are not causally consistent. Details are in DOCS-10626
   - jstests/core/apitest_dbcollection.js

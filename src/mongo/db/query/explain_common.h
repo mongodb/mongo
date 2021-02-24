@@ -44,6 +44,13 @@ namespace mongo::explain_common {
 void generateServerInfo(BSONObjBuilder* out);
 
 /**
+ * Adds the 'serverParameters' explain section to the BSON object being built by 'out'.
+ *
+ * This section includes various server-wide internal limits/knobs.
+ */
+void generateServerParameters(BSONObjBuilder* out);
+
+/**
  * Conditionally appends a BSONObj to 'bob' depending on whether or not the maximum user size for a
  * BSON object will be exceeded.
  */
