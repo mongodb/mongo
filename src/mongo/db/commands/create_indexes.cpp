@@ -52,6 +52,7 @@
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/ops/insert.h"
+#include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -63,6 +64,7 @@
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/idl/command_generic_argument.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/redaction.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/scopeguard.h"
@@ -613,6 +615,99 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
 }
 
 /**
+ * Returns time-series options if 'ns' refers to a time-series collection.
+ */
+boost::optional<TimeseriesOptions> getTimeseriesOptions(OperationContext* opCtx,
+                                                        const NamespaceString& ns) {
+    auto viewCatalog = DatabaseHolder::get(opCtx)->getViewCatalog(opCtx, ns.db());
+    if (!viewCatalog) {
+        return {};
+    }
+
+    auto view = viewCatalog->lookupWithoutValidatingDurableViews(opCtx, ns.ns());
+    if (!view) {
+        return {};
+    }
+
+    // Return a copy of the time-series options so that we don't refer to the internal state of
+    // 'viewCatalog' once it goes out of scope.
+    return view->timeseries();
+}
+
+/**
+ * Returns an index key with field names mapped to the bucket collection schema.
+ */
+BSONObj makeTimeseriesIndexSpecKey(const TimeseriesOptions& timeseriesOptions,
+                                   const CreateIndexesCommand& origCmd,
+                                   const BSONObj& origKey) {
+    auto metaField = timeseriesOptions.getMetaField();
+
+    BSONObjBuilder builder;
+    for (const auto& elem : origKey) {
+        if (metaField) {
+            if (elem.fieldNameStringData() == *metaField) {
+                builder.appendAs(elem, BucketUnpacker::kBucketMetaFieldName);
+                continue;
+            }
+
+            if (elem.fieldNameStringData().startsWith(*metaField + ".")) {
+                builder.appendAs(elem,
+                                 str::stream()
+                                     << BucketUnpacker::kBucketMetaFieldName << "."
+                                     << elem.fieldNameStringData().substr(metaField->size() + 1));
+                continue;
+            }
+        }
+
+        uasserted(ErrorCodes::CannotCreateIndex,
+                  str::stream() << "Failed to convert index spec for time-series collection: "
+                                << redact(origCmd.toBSON({}))  // 'origKey' is included in 'origCmd'
+                                << ". Unable to convert field: " << elem);
+    }
+    return builder.obj();
+}
+
+/**
+ * Returns a CreateIndexesCommand for creating indexes on the bucket collection.
+ * Returns null if 'origCmd' is not for a time-series collection.
+ */
+std::unique_ptr<CreateIndexesCommand> makeTimeseriesCreateIndexesCommand(
+    OperationContext* opCtx, const CreateIndexesCommand& origCmd) {
+    const auto& origNs = origCmd.getNamespace();
+
+    auto timeseriesOptions = getTimeseriesOptions(opCtx, origNs);
+
+    // Return early with null if we are not working with a time-series collection.
+    if (!timeseriesOptions) {
+        return {};
+    }
+
+    // TODO(SERVER-54639): Map index specs to bucket collection using helper function.
+    const auto& origIndexes = origCmd.getIndexes();
+    std::vector<mongo::BSONObj> indexes;
+    for (const auto& origIndex : origIndexes) {
+        BSONObjBuilder builder;
+        for (const auto& elem : origIndex) {
+            if (elem.fieldNameStringData() == NewIndexSpec::kKeyFieldName) {
+                builder.append(NewIndexSpec::kKeyFieldName,
+                               makeTimeseriesIndexSpecKey(*timeseriesOptions, origCmd, elem.Obj()));
+                continue;
+            }
+            builder.append(elem);
+        }
+        indexes.push_back(builder.obj());
+    }
+
+    auto ns = origNs.makeTimeseriesBucketsNamespace();
+    auto cmd = std::make_unique<CreateIndexesCommand>(ns, std::move(indexes));
+    cmd->setV(origCmd.getV());
+    cmd->setIgnoreUnknownIndexOptions(origCmd.getIgnoreUnknownIndexOptions());
+    cmd->setCommitQuorum(origCmd.getCommitQuorum());
+
+    return cmd;
+}
+
+/**
  * { createIndexes : "bar",
  *   indexes : [ { ns : "test.bar", key : { x : 1 }, name: "x_1" } ],
  *   commitQuorum: "majority" }
@@ -640,13 +735,24 @@ public:
         }
 
         CreateIndexesReply typedRun(OperationContext* opCtx) {
+            const auto& origCmd = request();
+            const auto* cmd = &origCmd;
+
+            // 'timeseriesCmd' is null if the request namespace does not refer to a time-series
+            // collection. Otherwise, transforms the user time-series index request to one on the
+            // underlying bucket.
+            auto timeseriesCmd = makeTimeseriesCreateIndexesCommand(opCtx, origCmd);
+            if (timeseriesCmd) {
+                cmd = timeseriesCmd.get();
+            }
+
             // If we encounter an IndexBuildAlreadyInProgress error for any of the requested index
             // specs, then we will wait for the build(s) to finish before trying again unless we are
             // in a multi-document transaction.
             bool shouldLogMessageOnAlreadyBuildingError = true;
             while (true) {
                 try {
-                    return runCreateIndexesWithCoordinator(opCtx, request());
+                    return runCreateIndexesWithCoordinator(opCtx, *cmd);
                 } catch (const DBException& ex) {
                     hangAfterIndexBuildAbort.pauseWhileSet();
                     // We can only wait for an existing index build to finish if we are able to
@@ -668,7 +774,7 @@ public:
                             "but found that at least one of the indexes is already being built."
                             "This request will wait for the pre-existing index build to finish "
                             "before proceeding",
-                            "indexesFieldName"_attr = request().getIndexes(),
+                            "indexesFieldName"_attr = cmd->getIndexes(),
                             "error"_attr = ex);
                         shouldLogMessageOnAlreadyBuildingError = false;
                     }
