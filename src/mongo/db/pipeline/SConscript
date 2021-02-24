@@ -124,6 +124,7 @@ env.Library(
         'accumulator_merge_objects.cpp',
         'accumulator_min_max.cpp',
         'accumulator_push.cpp',
+        'accumulator_rank.cpp',
         'accumulator_std_dev.cpp',
         'accumulator_sum.cpp',
         'window_function/window_bounds.cpp',
