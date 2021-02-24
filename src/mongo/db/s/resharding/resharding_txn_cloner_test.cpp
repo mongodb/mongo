@@ -357,6 +357,20 @@ protected:
             Grid::get(getServiceContext())->getExecutorPool()->getFixedExecutor());
     }
 
+    ExecutorFuture<void> runCloner(ReshardingTxnCloner& cloner,
+                                   std::shared_ptr<executor::ThreadPoolTaskExecutor> executor) {
+        // There isn't a guarantee that the reference count to `executor` has been decremented after
+        // .run() returns. We schedule a trivial task on the task executor to ensure the callback's
+        // destructor has run. Otherwise `executor` could end up outliving the ServiceContext and
+        // triggering an invariant due to the task executor's thread having a Client still.
+        return cloner
+            .run(getServiceContext(),
+                 std::move(executor),
+                 operationContext()->getCancelationToken(),
+                 makeMongoProcessInterface())
+            .onCompletion([](auto x) { return x; });
+    }
+
 private:
     static HostAndPort makeHostAndPort(const ShardId& shardId) {
         return HostAndPort(str::stream() << shardId << ":123");
@@ -370,7 +384,7 @@ TEST_F(ReshardingTxnClonerTest, MergeTxnNotOnRecipient) {
     for (auto state : getDurableTxnStatesAndBoostNone()) {
         auto executor = makeTaskExecutorForCloner();
         ReshardingTxnCloner cloner(kTwoSourceIdList[1], Timestamp::max());
-        auto future = cloner.run(getServiceContext(), executor, makeMongoProcessInterface());
+        auto future = runCloner(cloner, executor);
 
         const auto sessionId = makeLogicalSessionIdForTest();
         TxnNumber txnNum = 3;
@@ -389,7 +403,7 @@ TEST_F(ReshardingTxnClonerTest, MergeTxnNotOnRecipient) {
 TEST_F(ReshardingTxnClonerTest, MergeUnParsableTxn) {
     auto executor = makeTaskExecutorForCloner();
     ReshardingTxnCloner cloner(kTwoSourceIdList[1], Timestamp::max());
-    auto future = cloner.run(getServiceContext(), executor, makeMongoProcessInterface());
+    auto future = runCloner(cloner, executor);
 
     const auto sessionId = makeLogicalSessionIdForTest();
     TxnNumber txnNum = 3;
@@ -412,7 +426,7 @@ TEST_F(ReshardingTxnClonerTest, MergeNewTxnOverMultiDocTxn) {
 
         auto executor = makeTaskExecutorForCloner();
         ReshardingTxnCloner cloner(kTwoSourceIdList[1], Timestamp::max());
-        auto future = cloner.run(getServiceContext(), executor, makeMongoProcessInterface());
+        auto future = runCloner(cloner, executor);
 
         auto txn = SessionTxnRecord(sessionId, donorTxnNum, repl::OpTime(), Date_t::now());
         txn.setState(state);
@@ -435,7 +449,7 @@ TEST_F(ReshardingTxnClonerTest, MergeNewTxnOverRetryableWriteTxn) {
 
         auto executor = makeTaskExecutorForCloner();
         ReshardingTxnCloner cloner(kTwoSourceIdList[1], Timestamp::max());
-        auto future = cloner.run(getServiceContext(), executor, makeMongoProcessInterface());
+        auto future = runCloner(cloner, executor);
 
         auto txn = SessionTxnRecord(sessionId, donorTxnNum, repl::OpTime(), Date_t::now());
         txn.setState(state);
@@ -457,7 +471,7 @@ TEST_F(ReshardingTxnClonerTest, MergeCurrentTxnOverRetryableWriteTxn) {
 
         auto executor = makeTaskExecutorForCloner();
         ReshardingTxnCloner cloner(kTwoSourceIdList[1], Timestamp::max());
-        auto future = cloner.run(getServiceContext(), executor, makeMongoProcessInterface());
+        auto future = runCloner(cloner, executor);
 
         auto txn = SessionTxnRecord(sessionId, txnNum, repl::OpTime(), Date_t::now());
         txn.setState(state);
@@ -479,7 +493,7 @@ TEST_F(ReshardingTxnClonerTest, MergeCurrentTxnOverMultiDocTxn) {
 
         auto executor = makeTaskExecutorForCloner();
         ReshardingTxnCloner cloner(kTwoSourceIdList[1], Timestamp::max());
-        auto future = cloner.run(getServiceContext(), executor, makeMongoProcessInterface());
+        auto future = runCloner(cloner, executor);
 
         auto txn = SessionTxnRecord(sessionId, txnNum, repl::OpTime(), Date_t::now());
         txn.setState(state);
@@ -503,7 +517,7 @@ TEST_F(ReshardingTxnClonerTest, MergeOldTxnOverTxn) {
 
         auto executor = makeTaskExecutorForCloner();
         ReshardingTxnCloner cloner(kTwoSourceIdList[1], Timestamp::max());
-        auto future = cloner.run(getServiceContext(), executor, makeMongoProcessInterface());
+        auto future = runCloner(cloner, executor);
 
         auto txn = SessionTxnRecord(sessionId, donorTxnNum, repl::OpTime(), Date_t::now());
         txn.setState(state);
@@ -523,7 +537,7 @@ TEST_F(ReshardingTxnClonerTest, MergeMultiDocTransactionAndRetryableWrite) {
 
     auto executor = makeTaskExecutorForCloner();
     ReshardingTxnCloner cloner(kTwoSourceIdList[1], Timestamp::max());
-    auto future = cloner.run(getServiceContext(), executor, makeMongoProcessInterface());
+    auto future = runCloner(cloner, executor);
 
     auto sessionRecordRetryableWrite =
         SessionTxnRecord(sessionIdRetryableWrite, txnNum, repl::OpTime(), Date_t::now());
@@ -551,7 +565,7 @@ TEST_F(ReshardingTxnClonerTest, ClonerStoresProgressSingleBatch) {
 
         auto executor = makeTaskExecutorForCloner();
         ReshardingTxnCloner cloner(kTwoSourceIdList[1], Timestamp::max());
-        auto future = cloner.run(getServiceContext(), executor, makeMongoProcessInterface());
+        auto future = runCloner(cloner, executor);
 
         onCommandReturnTxnBatch(txns, CursorId{0}, true /* isFirstBatch */);
 
@@ -570,7 +584,7 @@ TEST_F(ReshardingTxnClonerTest, ClonerStoresProgressSingleBatch) {
 
         auto executor = makeTaskExecutorForCloner();
         ReshardingTxnCloner cloner(kTwoSourceIdList[0], Timestamp::max());
-        auto future = cloner.run(getServiceContext(), executor, makeMongoProcessInterface());
+        auto future = runCloner(cloner, executor);
 
         onCommandReturnTxnBatch(txns, CursorId{0}, true /* isFirstBatch */);
 
@@ -596,21 +610,21 @@ TEST_F(ReshardingTxnClonerTest, ClonerStoresProgressMultipleBatches) {
 
     auto executor = makeTaskExecutorForCloner();
     ReshardingTxnCloner cloner(kTwoSourceIdList[1], Timestamp::max());
-    auto future = cloner.run(getServiceContext(), executor, makeMongoProcessInterface());
+    auto future = runCloner(cloner, executor);
 
     // The progress document is updated asynchronously after the session record is updated. We fake
-    // the cursor having been killed to inspect the progress document after the first batch has been
-    // processed.
+    // the cloning operation being canceled to inspect the progress document after the first batch
+    // has been processed.
     onCommandReturnTxnBatch(std::vector<BSONObj>(txns.begin(), txns.begin() + 2),
                             CursorId{123},
                             true /* isFirstBatch */);
 
     onCommand([&](const executor::RemoteCommandRequest& request) {
-        return Status{ErrorCodes::CursorNotFound, "Simulate cursor not found error"};
+        return Status{ErrorCodes::CallbackCanceled, "Simulate cancellation"};
     });
 
     auto status = future.getNoThrow();
-    ASSERT_EQ(status, ErrorCodes::CursorNotFound);
+    ASSERT_EQ(status, ErrorCodes::CallbackCanceled);
 
     // After the first batch, the progress document should contain the lsid of the last document in
     // that batch.
@@ -618,7 +632,7 @@ TEST_F(ReshardingTxnClonerTest, ClonerStoresProgressMultipleBatches) {
     ASSERT_EQ(*getProgressLsid(kTwoSourceIdList[1]), firstLsid);
 
     // Now we run the cloner again and give it the remaining documents.
-    future = cloner.run(getServiceContext(), executor, makeMongoProcessInterface());
+    future = runCloner(cloner, executor);
 
     onCommandReturnTxnBatch(
         std::vector<BSONObj>(txns.begin() + 1, txns.end()), CursorId{0}, false /* isFirstBatch */);
@@ -642,24 +656,22 @@ TEST_F(ReshardingTxnClonerTest, ClonerStoresProgressResume) {
 
     auto executor = makeTaskExecutorForCloner();
     ReshardingTxnCloner cloner(kTwoSourceIdList[1], Timestamp::max());
-    auto future = cloner.run(getServiceContext(), executor, makeMongoProcessInterface());
+    auto future = runCloner(cloner, executor);
 
     onCommandReturnTxnBatch({txns.front()}, CursorId{123}, true /* isFirstBatch */);
 
-    // Simulate the cursor being killed as the batch was being filled and interrupting the cloner.
-    // The ARS automatically retries on ErrorCodes::isRetriableError() codes, so we intentionally
-    // use a non-retryable error code.
+    // Simulate the cloning operation being canceled as the batch was being filled.
     onCommand([&](const executor::RemoteCommandRequest& request) {
         // The progress document is updated asynchronously after the session record is updated but
         // is guaranteed to have been updated before the next getMore request is sent.
         ASSERT_FALSE(getTxnCloningProgress(kTwoSourceIdList[0]));
         ASSERT_EQ(*getProgressLsid(kTwoSourceIdList[1]), firstLsid);
 
-        return Status{ErrorCodes::CursorKilled, "Simulate cursor killed error"};
+        return Status{ErrorCodes::CallbackCanceled, "Simulate cancellation"};
     });
 
     auto status = future.getNoThrow();
-    ASSERT_EQ(status, ErrorCodes::CursorKilled);
+    ASSERT_EQ(status, ErrorCodes::CallbackCanceled);
 
     // The stored progress should be unchanged.
     ASSERT_FALSE(getTxnCloningProgress(kTwoSourceIdList[0]));
@@ -667,7 +679,7 @@ TEST_F(ReshardingTxnClonerTest, ClonerStoresProgressResume) {
 
     // Simulate a resume on the new primary by creating a new fetcher that resumes after the lsid in
     // the progress document.
-    future = cloner.run(getServiceContext(), executor, makeMongoProcessInterface());
+    future = runCloner(cloner, executor);
 
     BSONObj cmdObj;
     onCommand([&](const executor::RemoteCommandRequest& request) {
@@ -696,7 +708,7 @@ TEST_F(ReshardingTxnClonerTest, ClonerStoresProgressResume) {
     // fetcher that resumes at the lsid from the first progress document. This verifies cloning is
     // idempotent on the cloning shard.
     cloner.updateProgressDocument_forTest(operationContext(), firstLsid);
-    future = cloner.run(getServiceContext(), executor, makeMongoProcessInterface());
+    future = runCloner(cloner, executor);
 
     onCommand([&](const executor::RemoteCommandRequest& request) {
         cmdObj = request.cmdObj.getOwned();
@@ -726,7 +738,7 @@ TEST_F(ReshardingTxnClonerTest, ClonerDoesNotUpdateProgressOnEmptyBatch) {
 
     auto executor = makeTaskExecutorForCloner();
     ReshardingTxnCloner cloner(kTwoSourceIdList[0], Timestamp::max());
-    auto future = cloner.run(getServiceContext(), executor, makeMongoProcessInterface());
+    auto future = runCloner(cloner, executor);
 
     onCommandReturnTxnBatch({}, CursorId{0}, true /* isFirstBatch */);
 

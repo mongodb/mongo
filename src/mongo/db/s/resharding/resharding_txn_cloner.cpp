@@ -61,6 +61,7 @@
 #include "mongo/db/transaction_participant.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/redaction.h"
+#include "mongo/util/future_util.h"
 
 namespace mongo {
 
@@ -140,78 +141,35 @@ std::unique_ptr<Pipeline, PipelineDeleter> ReshardingTxnCloner::_targetAggregati
         pipeline.getContext(), std::move(request), _sourceId.getShardId());
 }
 
-/**
- * Returns a fresh OperationContext.
- *
- * The OperationContext is configured so the RstlKillOpThread would always interrupt the operation
- * on step-up or stepdown, regardless of whether the operation has acquired any locks. This
- * interruption is best-effort to stop doing wasteful work on stepdown as quickly as possible. It
- * isn't required for the ReshardingTxnCloner's correctness. In particular, it is possible for an
- * OperationContext to be constructed after stepdown has finished, for the ReshardingTxnCloner to
- * run a getMore on the aggregation against the donor shards, and for the ReshardingTxnCloner to
- * only discover afterwards the recipient had already stepped down from a NotPrimary error when
- * updating a session record locally.
- *
- * Note that the recipient's primary-only service is responsible for managing the
- * ReshardingTxnCloner and would shut down the ReshardingTxnCloner's task executor following the
- * recipient stepping down.
- *
- * Also note that the ReshardingTxnCloner is only created after step-up as part of the recipient's
- * primary-only service and therefore would never be interrupted by step-up.
- */
-ServiceContext::UniqueOperationContext ReshardingTxnCloner::_makeOperationContext(
-    ServiceContext* serviceContext) {
-    auto* client = Client::getCurrent();
-    {
-        stdx::lock_guard<Client> lk(*client);
-        invariant(client->canKillSystemOperationInStepdown(lk));
-    }
-
-    auto opCtx = client->makeOperationContext();
-    opCtx->setAlwaysInterruptAtStepDownOrUp();
-
-    return opCtx;
-}
-
-ExecutorFuture<LogicalSessionId> ReshardingTxnCloner::_checkOutAndUpdateSession(
-    ServiceContext* serviceContext,
-    std::shared_ptr<executor::TaskExecutor> executor,
-    SessionTxnRecord donorRecord) {
-    auto opCtx = _makeOperationContext(serviceContext);
+template <typename Callable>
+boost::optional<SharedSemiFuture<void>> ReshardingTxnCloner::_withSessionCheckedOut(
+    OperationContext* opCtx, const SessionTxnRecord& donorRecord, Callable&& callable) {
     opCtx->setLogicalSessionId(donorRecord.getSessionId());
     opCtx->setTxnNumber(donorRecord.getTxnNum());
 
-    auto ocs = std::make_unique<MongoDOperationContextSession>(opCtx.get());
-    auto txnParticipant = TransactionParticipant::get(opCtx.get());
+    MongoDOperationContextSession ocs(opCtx);
+    auto txnParticipant = TransactionParticipant::get(opCtx);
 
     try {
-        txnParticipant.beginOrContinue(
-            opCtx.get(), donorRecord.getTxnNum(), boost::none, boost::none);
+        txnParticipant.beginOrContinue(opCtx, donorRecord.getTxnNum(), boost::none, boost::none);
     } catch (const DBException& ex) {
         if (ex.code() == ErrorCodes::TransactionTooOld) {
             // donorRecord.getTxnNum() < recipientTxnNumber
-            ocs.reset();
+            return boost::none;
         } else if (ex.code() == ErrorCodes::IncompleteTransactionHistory) {
             // donorRecord.getTxnNum() == recipientTxnNumber &&
             // !txnParticipant.transactionIsInRetryableWriteMode()
-            ocs.reset();
+            return boost::none;
         } else if (ex.code() == ErrorCodes::PreparedTransactionInProgress) {
             // txnParticipant.transactionIsPrepared()
-            return txnParticipant.onExitPrepare().thenRunOn(executor).then(
-                [this, serviceContext, executor, donorRecord = std::move(donorRecord)] {
-                    return _checkOutAndUpdateSession(
-                        serviceContext, std::move(executor), std::move(donorRecord));
-                });
+            return txnParticipant.onExitPrepare();
         } else {
             throw;
         }
     }
 
-    if (ocs) {
-        _updateSessionRecord(opCtx.get());
-    }
-
-    return ExecutorFuture(std::move(executor), *opCtx->getLogicalSessionId());
+    callable();
+    return boost::none;
 }
 
 void ReshardingTxnCloner::_updateSessionRecord(OperationContext* opCtx) {
@@ -278,10 +236,35 @@ void ReshardingTxnCloner::_updateProgressDocument(OperationContext* opCtx,
         {1, WriteConcernOptions::SyncMode::UNSET, Seconds(0)});
 }
 
+/**
+ * Invokes the 'callable' function with a fresh OperationContext.
+ *
+ * The OperationContext is configured so the RstlKillOpThread would always interrupt the operation
+ * on step-up or stepdown, regardless of whether the operation has acquired any locks. This
+ * interruption is best-effort to stop doing wasteful work on stepdown as quickly as possible. It
+ * isn't required for the ReshardingTxnCloner's correctness. In particular, it is possible for an
+ * OperationContext to be constructed after stepdown has finished, for the ReshardingTxnCloner to
+ * run a getMore on the aggregation against the donor shards, and for the ReshardingTxnCloner to
+ * only discover afterwards the recipient had already stepped down from a NotPrimary error when
+ * updating a session record locally.
+ *
+ * Note that the recipient's primary-only service is responsible for managing the
+ * ReshardingTxnCloner and would shut down the ReshardingTxnCloner's task executor following the
+ * recipient stepping down.
+ *
+ * Also note that the ReshardingTxnCloner is only created after step-up as part of the recipient's
+ * primary-only service and therefore would never be interrupted by step-up.
+ */
 template <typename Callable>
-auto ReshardingTxnCloner::_withTemporaryOperationContext(ServiceContext* serviceContext,
-                                                         Callable&& callable) {
-    auto opCtx = _makeOperationContext(serviceContext);
+auto ReshardingTxnCloner::_withTemporaryOperationContext(Callable&& callable) {
+    auto& client = cc();
+    {
+        stdx::lock_guard<Client> lk(client);
+        invariant(client.canKillSystemOperationInStepdown(lk));
+    }
+
+    auto opCtx = client.makeOperationContext();
+    opCtx->setAlwaysInterruptAtStepDownOrUp();
 
     // The BlockingResultsMerger underlying by the $mergeCursors stage records how long the
     // recipient spent waiting for documents from the donor shards. It doing so requires the CurOp
@@ -294,71 +277,126 @@ auto ReshardingTxnCloner::_withTemporaryOperationContext(ServiceContext* service
     }
 }
 
-ExecutorFuture<void> ReshardingTxnCloner::_updateSessionRecordsUntilPipelineExhausted(
-    ServiceContext* serviceContext,
-    std::shared_ptr<executor::TaskExecutor> executor,
-    std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
-    int progressCounter) {
-    auto doc = _withTemporaryOperationContext(serviceContext, [&](auto* opCtx) {
-        pipeline->reattachToOperationContext(opCtx);
-        auto doc = pipeline->getNext();
-        pipeline->detachFromOperationContext();
-        return doc;
-    });
-
-    if (!doc) {
-        return ExecutorFuture(std::move(executor));
-    }
-
-    progressCounter = (progressCounter + 1) % resharding::gReshardingTxnClonerProgressBatchSize;
-
-    auto donorRecord = SessionTxnRecord::parse(
-        IDLParserErrorContext("resharding config.transactions cloning"), doc->toBson());
-
-    return _checkOutAndUpdateSession(serviceContext, executor, std::move(donorRecord))
-        .then([this, serviceContext, progressCounter](auto progressLsid) {
-            if (progressCounter == 0) {
-                _withTemporaryOperationContext(serviceContext, [&](auto* opCtx) {
-                    _updateProgressDocument(opCtx, progressLsid);
-                });
-            }
-        })
-        .then([this,
-               serviceContext,
-               executor,
-               pipeline = std::move(pipeline),
-               progressCounter]() mutable {
-            return _updateSessionRecordsUntilPipelineExhausted(
-                serviceContext, std::move(executor), std::move(pipeline), progressCounter);
-        });
-}
-
 ExecutorFuture<void> ReshardingTxnCloner::run(
     ServiceContext* serviceContext,
     std::shared_ptr<executor::TaskExecutor> executor,
+    CancelationToken cancelToken,
     std::shared_ptr<MongoProcessInterface> mongoProcessInterface_forTest) {
-    return ExecutorFuture(executor)
-        .then([this, serviceContext] {
-            return _withTemporaryOperationContext(
-                serviceContext, [&](auto* opCtx) { return _fetchProgressLsid(opCtx); });
-        })
-        .then([this, serviceContext, mongoProcessInterface_forTest](auto progressLsid) {
-            return _withTemporaryOperationContext(serviceContext, [&](auto* opCtx) {
-                auto mongoProcessInterface = MONGO_unlikely(mongoProcessInterface_forTest)
-                    ? std::move(mongoProcessInterface_forTest)
-                    : MongoProcessInterface::create(opCtx);
+    struct ChainContext {
+        std::unique_ptr<Pipeline, PipelineDeleter> pipeline;
+        boost::optional<SessionTxnRecord> donorRecord = boost::none;
+        bool moreToCome = true;
+        int progressCounter = 0;
+    };
 
-                auto pipeline = _targetAggregationRequest(
-                    opCtx, *makePipeline(opCtx, std::move(mongoProcessInterface), progressLsid));
+    auto chainCtx = std::make_shared<ChainContext>();
 
-                pipeline->detachFromOperationContext();
-                return pipeline;
-            });
+    return AsyncTry([this, chainCtx, mongoProcessInterface_forTest] {
+               if (!chainCtx->pipeline) {
+                   chainCtx->pipeline = _withTemporaryOperationContext([&](auto* opCtx) {
+                       auto progressLsid = _fetchProgressLsid(opCtx);
+
+                       auto mongoProcessInterface = MONGO_unlikely(mongoProcessInterface_forTest)
+                           ? mongoProcessInterface_forTest
+                           : MongoProcessInterface::create(opCtx);
+
+                       auto pipeline = _targetAggregationRequest(
+                           opCtx,
+                           *makePipeline(opCtx, std::move(mongoProcessInterface), progressLsid));
+
+                       pipeline->detachFromOperationContext();
+                       pipeline.get_deleter().dismissDisposal();
+                       return pipeline;
+                   });
+
+                   chainCtx->donorRecord = boost::none;
+               }
+
+               // A donor record will have been stashed on the ChainContext if we are resuming due
+               // to a prepared transaction having been in progress.
+               if (!chainCtx->donorRecord) {
+                   chainCtx->donorRecord = _withTemporaryOperationContext([&](auto* opCtx) {
+                       chainCtx->pipeline->reattachToOperationContext(opCtx);
+                       auto doc = chainCtx->pipeline->getNext();
+                       chainCtx->pipeline->detachFromOperationContext();
+
+                       return doc ? SessionTxnRecord::parse(
+                                        {"resharding config.transactions cloning"}, doc->toBson())
+                                  : boost::optional<SessionTxnRecord>{};
+                   });
+               }
+
+               if (!chainCtx->donorRecord) {
+                   chainCtx->moreToCome = false;
+                   return makeReadyFutureWith([] {}).share();
+               }
+
+               auto hitPreparedTxn = _withTemporaryOperationContext([&](auto* opCtx) {
+                   return _withSessionCheckedOut(
+                       opCtx, *chainCtx->donorRecord, [&] { _updateSessionRecord(opCtx); });
+               });
+
+               if (hitPreparedTxn) {
+                   return *hitPreparedTxn;
+               }
+
+               chainCtx->progressCounter = (chainCtx->progressCounter + 1) %
+                   resharding::gReshardingTxnClonerProgressBatchSize;
+
+               if (chainCtx->progressCounter == 0) {
+                   _withTemporaryOperationContext([&](auto* opCtx) {
+                       _updateProgressDocument(opCtx, chainCtx->donorRecord->getSessionId());
+                   });
+               }
+
+               chainCtx->donorRecord = boost::none;
+               return makeReadyFutureWith([] {}).share();
+           })
+        .until([this, chainCtx](Status status) {
+            if (status.isOK() && chainCtx->moreToCome) {
+                return false;
+            }
+
+            if (chainCtx->pipeline) {
+                _withTemporaryOperationContext([&](auto* opCtx) {
+                    chainCtx->pipeline->dispose(opCtx);
+                    chainCtx->pipeline.reset();
+                });
+            }
+
+            if (status.isA<ErrorCategory::CancelationError>() ||
+                status.isA<ErrorCategory::NotPrimaryError>()) {
+                // Cancellation and NotPrimary errors indicate the primary-only service Instance
+                // will be shut down or is shutting down now. Don't retry and leave resuming to when
+                // the RecipientStateMachine is restarted on the new primary.
+                return true;
+            }
+
+            if (status.isA<ErrorCategory::RetriableError>() ||
+                status.isA<ErrorCategory::CursorInvalidatedError>() ||
+                status == ErrorCodes::Interrupted) {
+                // Do retry on any other types of retryable errors though. Also retry on errors from
+                // stray killCursors and killOp commands being run.
+                LOGV2(5461600,
+                      "Transient error while cloning config.transactions collection",
+                      "sourceId"_attr = _sourceId,
+                      "fetchTimestamp"_attr = _fetchTimestamp,
+                      "error"_attr = redact(status));
+                return false;
+            }
+
+            if (!status.isOK()) {
+                LOGV2(5461601,
+                      "Operation-fatal error for resharding while cloning config.transactions"
+                      " collection",
+                      "sourceId"_attr = _sourceId,
+                      "fetchTimestamp"_attr = _fetchTimestamp,
+                      "error"_attr = redact(status));
+            }
+
+            return true;
         })
-        .then([this, serviceContext, executor](auto pipeline) {
-            return _updateSessionRecordsUntilPipelineExhausted(
-                serviceContext, std::move(executor), std::move(pipeline), 0);
-        });
+        .on(std::move(executor), std::move(cancelToken));
 }
 
 std::unique_ptr<Pipeline, PipelineDeleter> createConfigTxnCloningPipelineForResharding(

@@ -455,7 +455,7 @@ ReshardingRecipientService::RecipientStateMachine::_cloneThenTransitionToApplyin
     }
 
     return _collectionCloner->run(**executor, cancelToken)
-        .then([this, executor] {
+        .then([this, executor, cancelToken] {
             if (_txnCloners.empty()) {
                 return SemiFuture<void>::makeReady();
             }
@@ -464,7 +464,7 @@ ReshardingRecipientService::RecipientStateMachine::_cloneThenTransitionToApplyin
 
             std::vector<ExecutorFuture<void>> txnClonerFutures;
             for (auto&& txnCloner : _txnCloners) {
-                txnClonerFutures.push_back(txnCloner->run(serviceContext, **executor));
+                txnClonerFutures.push_back(txnCloner->run(serviceContext, **executor, cancelToken));
             }
 
             return whenAllSucceed(std::move(txnClonerFutures));
