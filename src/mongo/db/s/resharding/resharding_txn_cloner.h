@@ -77,6 +77,7 @@ public:
     ExecutorFuture<void> run(
         ServiceContext* serviceContext,
         std::shared_ptr<executor::TaskExecutor> executor,
+        CancelationToken cancelToken,
         std::shared_ptr<MongoProcessInterface> mongoProcessInterface_forTest = nullptr);
 
     void updateProgressDocument_forTest(OperationContext* opCtx, const LogicalSessionId& progress) {
@@ -89,25 +90,16 @@ private:
     std::unique_ptr<Pipeline, PipelineDeleter> _targetAggregationRequest(OperationContext* opCtx,
                                                                          const Pipeline& pipeline);
 
-    ServiceContext::UniqueOperationContext _makeOperationContext(ServiceContext* serviceContext);
-
-    ExecutorFuture<LogicalSessionId> _checkOutAndUpdateSession(
-        ServiceContext* serviceContext,
-        std::shared_ptr<executor::TaskExecutor> executor,
-        SessionTxnRecord donorRecord);
+    template <typename Callable>
+    boost::optional<SharedSemiFuture<void>> _withSessionCheckedOut(
+        OperationContext* opCtx, const SessionTxnRecord& donorRecord, Callable&& callable);
 
     void _updateSessionRecord(OperationContext* opCtx);
 
     void _updateProgressDocument(OperationContext* opCtx, const LogicalSessionId& progress);
 
     template <typename Callable>
-    auto _withTemporaryOperationContext(ServiceContext* serviceContext, Callable&& callable);
-
-    ExecutorFuture<void> _updateSessionRecordsUntilPipelineExhausted(
-        ServiceContext* serviceContext,
-        std::shared_ptr<executor::TaskExecutor> executor,
-        std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
-        int progressCounter);
+    auto _withTemporaryOperationContext(Callable&& callable);
 
     const ReshardingSourceId _sourceId;
     const Timestamp _fetchTimestamp;
