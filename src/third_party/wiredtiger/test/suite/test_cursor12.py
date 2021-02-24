@@ -330,7 +330,7 @@ class test_cursor12(wttest.WiredTigerTestCase):
 
         # Crash and recover in a new directory.
         newdir = 'RESTART'
-        copy_wiredtiger_home('.', newdir)
+        copy_wiredtiger_home(self, '.', newdir)
         self.conn.close()
         self.conn = self.setUpConnectionOpen(newdir)
         self.session = self.setUpSessionOpen(self.conn)

@@ -126,6 +126,7 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
     WT_TRET(__wt_conn_remove_data_source(session));
     WT_TRET(__wt_conn_remove_encryptor(session));
     WT_TRET(__wt_conn_remove_extractor(session));
+    WT_TRET(__wt_conn_remove_storage_source(session));
 
     /* Disconnect from shared cache - must be before cache destroy. */
     WT_TRET(__wt_conn_cache_pool_destroy(session));

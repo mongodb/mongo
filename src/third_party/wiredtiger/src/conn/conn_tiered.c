@@ -51,6 +51,7 @@ __tier_storage_remove_local(WT_SESSION_IMPL *session, const char *uri, bool forc
     char *config, *newfile;
     const char *cfg[2], *filename;
 
+    config = newfile = NULL;
     if (uri == NULL)
         return (0);
     __wt_verbose(session, WT_VERB_TIERED, "Removing tree %s", uri);

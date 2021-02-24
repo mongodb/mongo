@@ -119,7 +119,7 @@ class test_bug018(wttest.WiredTigerTestCase, suite_subprocess):
 
         # Make a backup for forensics in case something goes wrong.
         backup_dir = 'BACKUP'
-        copy_wiredtiger_home(new_home_dir, backup_dir, True)
+        copy_wiredtiger_home(self, new_home_dir, backup_dir, True)
 
         # After reopening and running recovery both tables should be in
         # sync even though table 1 was successfully written and table 2
