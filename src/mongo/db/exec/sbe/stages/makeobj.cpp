@@ -381,9 +381,9 @@ std::unique_ptr<PlanStageStats> MakeObjStageBase<O>::getStats(bool includeDebugI
 
     if (includeDebugInfo) {
         BSONObjBuilder bob;
-        bob.appendNumber("objSlot", static_cast<long long>(_objSlot));
+        bob.appendIntOrLL("objSlot", _objSlot);
         if (_rootSlot) {
-            bob.appendNumber("rootSlot", static_cast<long long>(*_rootSlot));
+            bob.appendIntOrLL("rootSlot", *_rootSlot);
         }
         if (_fieldBehavior) {
             bob.append("fieldBehavior", *_fieldBehavior == FieldBehavior::drop ? "drop" : "keep");

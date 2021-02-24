@@ -405,10 +405,9 @@ public:
         }
 
         result.appendNumber(HelloCommandReply::kMaxBsonObjectSizeFieldName, BSONObjMaxUserSize);
-        result.appendNumber(HelloCommandReply::kMaxMessageSizeBytesFieldName,
-                            static_cast<long long>(MaxMessageSizeBytes));
+        result.appendNumber(HelloCommandReply::kMaxMessageSizeBytesFieldName, MaxMessageSizeBytes);
         result.appendNumber(HelloCommandReply::kMaxWriteBatchSizeFieldName,
-                            static_cast<long long>(write_ops::kMaxWriteBatchSize));
+                            write_ops::kMaxWriteBatchSize);
         result.appendDate(HelloCommandReply::kLocalTimeFieldName, jsTime());
         result.append(HelloCommandReply::kLogicalSessionTimeoutMinutesFieldName,
                       localLogicalSessionTimeoutMinutes);

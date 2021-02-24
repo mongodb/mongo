@@ -179,7 +179,7 @@ public:
         }
         auto intVal = stdx::get_if<std::int64_t>(&_w);
         invariant(intVal);
-        builder->appendNumber("w", static_cast<long long>(*intVal));
+        builder->appendIntOrLL("w", *intVal);
     }
 
     WriteConcernW() : _w{1}, _usedDefault{true} {};
