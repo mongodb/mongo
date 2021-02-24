@@ -163,7 +163,7 @@ if not test_config:
 #####################################################################
 f='../src/config/config_def.c'
 if test_config:
-    f = '../test/cppsuite/test_config.c'
+    f = '../src/config/test_config.c'
 tfile = open(tmp_file, 'w')
 
 tfile.write('''/* DO NOT EDIT: automatically built by dist/api_config.py. */
