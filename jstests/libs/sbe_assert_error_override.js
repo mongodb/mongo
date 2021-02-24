@@ -151,4 +151,18 @@ const assertWriteErrorWithCodeOriginal = assert.writeErrorWithCode;
 assert.writeErrorWithCode = function(res, expectedCode, msg) {
     return assertWriteErrorWithCodeOriginal(res, lookupEquivalentErrorCodes(expectedCode), msg);
 };
+
+// NOTE: Consider using 'assert.commandFailedWithCode' and 'assert.writeErrorWithCode' instead.
+// This function should be only used when error code does not come from command. For instance, when
+// validating explain output, which includes error code in the execution stats.
+assert.errorCodeEq = function(actualErrorCode, expectedErrorCodes, msg) {
+    if (expectedErrorCodes === assert._kAnyErrorCode) {
+        return;
+    }
+
+    const equivalentErrorCodes = lookupEquivalentErrorCodes(expectedErrorCodes);
+    assert(equivalentErrorCodes.includes(actualErrorCode),
+           actualErrorCode + " not found in the list of expected error codes: " +
+               tojson(equivalentErrorCodes) + ": " + msg);
+};
 }());
