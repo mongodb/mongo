@@ -119,11 +119,6 @@ private:
     std::vector<std::vector<const OplogEntry*>> _fillWriterVectors(OperationContext* opCtx,
                                                                    TenantOplogBatch* batch);
 
-    OpTime _getRecipientOpTime(const OpTime& donorOpTime);
-    // This is a convenience call for getRecipientOpTime which handles boost::none and nulls.
-    boost::optional<OpTime> _maybeGetRecipientOpTime(const boost::optional<OpTime>);
-    // _setRecipientOpTime must be called in optime order.
-    void _setRecipientOpTime(const OpTime& donorOpTime, const OpTime& recipientOpTime);
     /**
      * Sets the _finalStatus to the new status if and only if the old status is "OK".
      */
