@@ -16,9 +16,9 @@ class thread_context {
     {
     }
 
-    thread_context(thread_operation type) : _running(false), _type(type)
+    thread_context(thread_operation type)
+        : _running(false), _session(nullptr), _thread(nullptr), _type(type)
     {
-        thread_context(nullptr, {}, type);
     }
 
     ~thread_context()
