@@ -42,11 +42,6 @@
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
-namespace {
-// This is the minimum valid timestamp; it can be used for reads that need to see all untimestamped
-// data but no timestamped data.  We cannot use 0 here because 0 means see all timestamped data.
-const uint64_t kMinimumTimestamp = 1;
-}  // namespace
 
 MONGO_FAIL_POINT_DEFINE(WTPausePrimaryOplogDurabilityLoop);
 
@@ -68,7 +63,7 @@ void WiredTigerOplogManager::start(OperationContext* opCtx,
         LOG(1) << "Setting oplog visibility at startup. Val: " << oplogVisibility;
     } else {
         // Avoid setting oplog visibility to 0. That means "everything is visible".
-        setOplogReadTimestamp(Timestamp(kMinimumTimestamp));
+        setOplogReadTimestamp(Timestamp(StorageEngine::kMinimumTimestamp));
     }
 
     // Need to obtain the mutex before starting the thread, as otherwise it may race ahead
@@ -207,7 +202,7 @@ void WiredTigerOplogManager::_oplogJournalThreadLoop(WiredTigerSessionCache* ses
         _opsWaitingForJournal = false;
         lk.unlock();
 
-        const uint64_t newTimestamp = fetchAllDurableValue(sessionCache->conn());
+        const uint64_t newTimestamp = sessionCache->getKVEngine()->getAllDurableTimestamp().asULL();
 
         // The newTimestamp may actually go backward during secondary batch application,
         // where we commit data file changes separately from oplog changes, so ignore
@@ -247,24 +242,6 @@ void WiredTigerOplogManager::_setOplogReadTimestamp(WithLock, uint64_t newTimest
     _oplogReadTimestamp.store(newTimestamp);
     _opsBecameVisibleCV.notify_all();
     LOG(2) << "Setting new oplogReadTimestamp: " << Timestamp(newTimestamp);
-}
-
-uint64_t WiredTigerOplogManager::fetchAllDurableValue(WT_CONNECTION* conn) {
-    // Fetch the latest all_durable value from the storage engine. This value will be a timestamp
-    // that has no holes (uncommitted transactions with lower timestamps) behind it.
-    char buf[(2 * 8 /*bytes in hex*/) + 1 /*nul terminator*/];
-    auto wtstatus = conn->query_timestamp(conn, buf, "get=all_durable");
-    if (wtstatus == WT_NOTFOUND) {
-        // Treat this as lowest possible timestamp; we need to see all preexisting data but no new
-        // (timestamped) data.
-        return kMinimumTimestamp;
-    } else {
-        invariantWTOK(wtstatus);
-    }
-
-    uint64_t tmp;
-    fassert(38002, parseNumberFromStringWithBase(buf, 16, &tmp));
-    return tmp;
 }
 
 }  // namespace mongo

@@ -78,10 +78,6 @@ public:
     void waitForAllEarlierOplogWritesToBeVisible(const WiredTigerRecordStore* oplogRecordStore,
                                                  OperationContext* opCtx);
 
-    // Returns the all_durable timestamp. All transactions with timestamps earlier than the
-    // all_durable timestamp are committed.
-    uint64_t fetchAllDurableValue(WT_CONNECTION* conn);
-
 private:
     void _oplogJournalThreadLoop(WiredTigerSessionCache* sessionCache,
                                  WiredTigerRecordStore* oplogRecordStore);
