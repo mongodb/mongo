@@ -937,6 +937,62 @@ std::vector<std::unique_ptr<QuerySolutionNode>> QueryPlannerAccess::collapseEqui
     return collapsedScans;
 }
 
+/**
+ * Returns true if this is a null query that can retrieve all the information it needs directly from
+ * the index, and so does not need a FETCH stage on top of it. Returns false otherwise.
+ */
+bool isCoveredNullQuery(const CanonicalQuery& query,
+                        MatchExpression* root,
+                        IndexTag* tag,
+                        const vector<IndexEntry>& indices,
+                        const QueryPlannerParams& params) {
+    // We are only interested in queries checking for an indexed field equalling null.
+    // This optimization can only be done when the index is not multikey, otherwise empty arrays
+    // in the collection will be treated as null/undefined by the index. Additionally,
+    // sparse indexes and hashed indexes should not use this optimization as they will require a
+    // FETCH stage with a filter.
+    if (indices[tag->index].multikey || indices[tag->index].sparse ||
+        indices[tag->index].type == IndexType::INDEX_HASHED ||
+        !ComparisonMatchExpressionBase::isEquality(root->matchType())) {
+        return false;
+    }
+
+    // Check if the query is looking for null values.
+    const auto node = static_cast<const ComparisonMatchExpressionBase*>(root);
+    if (node->getData().type() != BSONType::jstNULL) {
+        return false;
+    }
+
+    // If nothing is being projected, the query is fully covered without a fetch.
+    // This is trivially true for a count query.
+    if (params.options & QueryPlannerParams::Options::IS_COUNT) {
+        return true;
+    }
+
+    // This optimization can only be used for find when the index covers the projection completely.
+    // However, if the indexed field is in the projection, the index may return an incorrect value
+    // for the field, since it does not distinguish between null and undefined. Hence, only find
+    // queries projecting _id are covered.
+    auto proj = query.getProj();
+    if (!proj) {
+        return false;
+    }
+
+    // We can cover projections on _id and generated fields and expressions depending only on _id.
+    // However, if the projection is an exclusion, requires match details, requires the full
+    // document, or requires metadata, we will still need a FETCH stage.
+    if (proj->type() == projection_ast::ProjectType::kInclusion && !proj->requiresMatchDetails() &&
+        proj->metadataDeps().none() && !proj->requiresDocument()) {
+        auto projFields = proj->getRequiredFields();
+        // Note that it is not possible to project onto dotted paths of _id here, since they may be
+        // null or missing, and the index cannot differentiate between the two cases, so we would
+        // still need a FETCH stage.
+        return projFields.size() == 1 && projFields[0] == "_id";
+    }
+
+    return false;
+}
+
 bool QueryPlannerAccess::processIndexScans(const CanonicalQuery& query,
                                            MatchExpression* root,
                                            bool inArrayOperator,
@@ -944,7 +1000,7 @@ bool QueryPlannerAccess::processIndexScans(const CanonicalQuery& query,
                                            const QueryPlannerParams& params,
                                            std::vector<std::unique_ptr<QuerySolutionNode>>* out) {
     // Initialize the ScanBuildingState.
-    ScanBuildingState scanState(root, inArrayOperator, indices);
+    ScanBuildingState scanState(root, indices, inArrayOperator);
 
     while (scanState.curChild < root->numChildren()) {
         MatchExpression* child = root->getChild(scanState.curChild);
@@ -977,6 +1033,11 @@ bool QueryPlannerAccess::processIndexScans(const CanonicalQuery& query,
 
         // If we're here, we now know that 'child' can use an index directly and the index is
         // over the child's field.
+
+        // We need to track if this is a covered null query so that we can have this information
+        // at hand when handling the filter on an indexed AND.
+        scanState.isCoveredNullQuery =
+            isCoveredNullQuery(query, child, scanState.ixtag, indices, params);
 
         // If 'child' is a NOT, then the tag we're interested in is on the NOT's
         // child node.
@@ -1437,7 +1498,11 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::_buildIndexedDataAccess(
             // superset of documents that satisfy the predicate, and we must check the
             // predicate.
 
-            if (tightness == IndexBoundsBuilder::EXACT) {
+            // We may also be able to avoid adding an extra fetch stage even though the bounds are
+            // inexact because the query is counting null values on an indexed field without
+            // projecting that field.
+            if (tightness == IndexBoundsBuilder::EXACT ||
+                isCoveredNullQuery(query, root, tag, indices, params)) {
                 return soln;
             } else if (tightness == IndexBoundsBuilder::INEXACT_COVERED &&
                        !indices[tag->index].multikey) {
@@ -1584,8 +1649,13 @@ void QueryPlannerAccess::handleFilterAnd(ScanBuildingState* scanState) {
         // should always be affixed as a filter. We keep 'curChild' in the $and
         // for affixing later.
         ++scanState->curChild;
-    } else if (scanState->tightness == IndexBoundsBuilder::EXACT) {
+    } else if (scanState->tightness == IndexBoundsBuilder::EXACT || scanState->isCoveredNullQuery) {
+        // The tightness of the bounds is exact or we are dealing with a covered null query.
+        // Either way, we want to remove this child so that when control returns to handleIndexedAnd
+        // we know that we don't need it to create a FETCH stage.
         root->getChildVector()->erase(root->getChildVector()->begin() + scanState->curChild);
+        // Since we are not attaching this child to a filter or tracking it anywhere else, it is
+        // safe to delete it here.
         delete child;
     } else if (scanState->tightness == IndexBoundsBuilder::INEXACT_COVERED &&
                (INDEX_TEXT == index.type || !index.multikey)) {

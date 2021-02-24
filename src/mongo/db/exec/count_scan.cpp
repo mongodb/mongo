@@ -151,6 +151,8 @@ PlanStage::StageState CountScan::doWork(WorkingSetID* out) {
     }
 
     WorkingSetID id = _workingSet->allocate();
+    WorkingSetMember* member = _workingSet->get(id);
+    member->recordId = entry->loc;
     _workingSet->transitionToRecordIdAndObj(id);
     *out = id;
     return PlanStage::ADVANCED;
