@@ -57,6 +57,50 @@ TEST_F(QueryPlannerTest, PlannerAddsFetchToIxscanForCountWhenFetchFilterNonempty
         "{pattern: {x: 1}, bounds: {x: [[5,5,true,true]]}}}}}");
 }
 
+TEST_F(QueryPlannerTest, PlannerUsesCoveredIxscanForCountWhenIndexSatisfiesNullQuery) {
+    params.options = QueryPlannerParams::IS_COUNT;
+    addIndex(BSON("x" << 1));
+    runQuery(fromjson("{x: null}"));
+    ASSERT_EQUALS(getNumSolutions(), 1U);
+    assertSolutionExists(
+        "{ixscan: {pattern: {x: 1}, bounds: "
+        "{x: [[undefined,undefined,true,true],[null,null,true,true]]}}}");
+}
+
+TEST_F(QueryPlannerTest, PlannerAddsFetchForCountWhenMultikeyIndexSatisfiesNullQuery) {
+    params.options = QueryPlannerParams::IS_COUNT;
+    addIndex(BSON("x" << 1), true);
+    runQuery(fromjson("{x: null}"));
+    ASSERT_EQUALS(getNumSolutions(), 1U);
+    assertSolutionExists(
+        "{fetch: {filter: {x: null}, node: {ixscan: "
+        "{pattern: {x: 1}, bounds: "
+        "{x: [[undefined,undefined,true,true],[null,null,true,true]]}}}}}");
+}
+
+TEST_F(QueryPlannerTest, PlannerUsesCoveredIxscanFindWhenIndexSatisfiesNullQuery) {
+    params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    addIndex(fromjson("{x: 1, _id: 1}"));
+    runQuerySortProj(fromjson("{x: null}}"), BSONObj(), fromjson("{_id: 1}}"));
+    ASSERT_EQUALS(getNumSolutions(), 1U);
+    assertSolutionExists(
+        "{proj: {spec: {_id: 1}, node:"
+        "{ixscan: {pattern: {x: 1, _id: 1}, bounds: "
+        "{x: [[undefined,undefined,true,true],[null,null,true,true]]}}}}}");
+}
+
+TEST_F(QueryPlannerTest, PlannerAddsFetchForFindWhenMultikeyIndexSatisfiesNullQuery) {
+    params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    addIndex(fromjson("{x: 1, _id: 1}"), true);
+    runQuerySortProj(fromjson("{x: null}}"), BSONObj(), fromjson("{_id: 1}}"));
+    ASSERT_EQUALS(getNumSolutions(), 1U);
+    assertSolutionExists(
+        "{proj: {spec: {_id: 1}, node:"
+        "{fetch: {filter: {x: null}, node: {ixscan: "
+        "{pattern: {x: 1, _id: 1}, bounds: "
+        "{x: [[undefined,undefined,true,true],[null,null,true,true]]}}}}}}}");
+}
+
 //
 // Sparse indices, SERVER-8067
 // Each index in this block of tests is sparse.

@@ -1577,6 +1577,25 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
 namespace {
 
 /**
+ * If the given 'bounds' contains a single null interval return its position, otherwise return
+ * boost::none.
+ */
+boost::optional<size_t> boundsHasExactlyOneNullInterval(const IndexBounds& bounds) {
+    boost::optional<size_t> nullFieldNo;
+    for (size_t fieldNo = 0; fieldNo < bounds.fields.size(); ++fieldNo) {
+        const OrderedIntervalList& oil = bounds.fields[fieldNo];
+        if (IndexBoundsBuilder::isNullInterval(oil)) {
+            // Return boost::none if we have multiple null intervals.
+            if (nullFieldNo) {
+                return boost::none;
+            }
+            nullFieldNo = fieldNo;
+        }
+    }
+    return nullFieldNo;
+}
+
+/**
  * Returns 'true' if the provided solution 'soln' can be rewritten to use
  * a fast counting stage.  Mutates the tree in 'soln->root'.
  *
@@ -1617,25 +1636,81 @@ bool turnIxscanIntoCount(QuerySolution* soln) {
     BSONObj endKey;
     bool endKeyInclusive;
 
+    auto makeCountScan = [&isn](BSONObj& csnStartKey,
+                                bool startKeyInclusive,
+                                BSONObj& csnEndKey,
+                                bool endKeyInclusive) {
+        // Since count scans return no data, they are always forward scans. Index scans, on the
+        // other hand, may need to scan the index in reverse order in order to obtain a sort. If the
+        // index scan direction is backwards, then we need to swap the start and end of the count
+        // scan bounds.
+        if (isn->direction < 0) {
+            csnStartKey.swap(csnEndKey);
+            std::swap(startKeyInclusive, endKeyInclusive);
+        }
+
+        auto csn = std::make_unique<CountScanNode>(isn->index);
+        csn->startKey = csnStartKey;
+        csn->startKeyInclusive = startKeyInclusive;
+        csn->endKey = csnEndKey;
+        csn->endKeyInclusive = endKeyInclusive;
+        return csn;
+    };
+
     if (!IndexBoundsBuilder::isSingleInterval(
             isn->bounds, &startKey, &startKeyInclusive, &endKey, &endKeyInclusive)) {
+        // If we have exactly one null interval, we should split the bounds and try to construct
+        // two COUNT_SCAN stages joined by an OR stage. If we had multiple null intervals, we would
+        // need 2^N count scans for N intervals, meaning this would quickly explode to a
+        // point where it would just be more efficient to use a single index scan. Consequently, we
+        // draw the line at one null interval.
+        if (auto nullFieldNo = boundsHasExactlyOneNullInterval(isn->bounds)) {
+            OrderedIntervalList undefinedPointOil, nullPointOil;
+            undefinedPointOil.intervals.push_back(IndexBoundsBuilder::kUndefinedPointInterval);
+            nullPointOil.intervals.push_back(IndexBoundsBuilder::kNullPointInterval);
+
+            tassert(5506501,
+                    "The index of the null interval is invalid",
+                    *nullFieldNo < isn->bounds.fields.size());
+            auto makeNullBoundsCountScan =
+                [&](OrderedIntervalList& oil) -> std::unique_ptr<QuerySolutionNode> {
+                std::swap(isn->bounds.fields[*nullFieldNo], oil);
+                ON_BLOCK_EXIT([&] { std::swap(isn->bounds.fields[*nullFieldNo], oil); });
+
+                BSONObj startKey, endKey;
+                bool startKeyInclusive, endKeyInclusive;
+                if (IndexBoundsBuilder::isSingleInterval(
+                        isn->bounds, &startKey, &startKeyInclusive, &endKey, &endKeyInclusive)) {
+                    return makeCountScan(startKey, startKeyInclusive, endKey, endKeyInclusive);
+                }
+
+                return nullptr;
+            };
+
+            auto undefinedCsn = makeNullBoundsCountScan(undefinedPointOil);
+
+            if (undefinedCsn) {
+                // If undefinedCsn is non-null, then we should also be able to successfully generate
+                // a count scan for the null interval case.
+                auto nullCsn = makeNullBoundsCountScan(nullPointOil);
+                tassert(5506500, "Invalid null bounds COUNT_SCAN", nullCsn);
+
+                auto csns = makeVector(std::move(undefinedCsn), std::move(nullCsn));
+
+                // Note that there is no need to deduplicate here because this optimization cannot
+                // be applied to multikey indexes.
+                auto orn = std::make_unique<OrNode>();
+                orn->addChildren(std::move(csns));
+                soln->setRoot(std::move(orn));
+
+                return true;
+            }
+        }
         return false;
     }
 
-    // Since count scans return no data, they are always forward scans. Index scans, on the other
-    // hand, may need to scan the index in reverse order in order to obtain a sort. If the index
-    // scan direction is backwards, then we need to swap the start and end of the count scan bounds.
-    if (isn->direction < 0) {
-        startKey.swap(endKey);
-        std::swap(startKeyInclusive, endKeyInclusive);
-    }
-
     // Make the count node that we replace the fetch + ixscan with.
-    auto csn = std::make_unique<CountScanNode>(isn->index);
-    csn->startKey = startKey;
-    csn->startKeyInclusive = startKeyInclusive;
-    csn->endKey = endKey;
-    csn->endKeyInclusive = endKeyInclusive;
+    auto csn = makeCountScan(startKey, startKeyInclusive, endKey, endKeyInclusive);
     // Takes ownership of 'cn' and deletes the old root.
     soln->setRoot(std::move(csn));
     return true;

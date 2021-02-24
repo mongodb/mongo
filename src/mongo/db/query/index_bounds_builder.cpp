@@ -129,11 +129,10 @@ const Interval kHashedNullInterval =
     IndexBoundsBuilder::makePointInterval(ExpressionMapping::hash(kNullElementObj.firstElement()));
 
 Interval makeUndefinedPointInterval(bool isHashed) {
-    return isHashed ? kHashedUndefinedInterval
-                    : IndexBoundsBuilder::makePointInterval(kUndefinedElementObj);
+    return isHashed ? kHashedUndefinedInterval : IndexBoundsBuilder::kUndefinedPointInterval;
 }
 Interval makeNullPointInterval(bool isHashed) {
-    return isHashed ? kHashedNullInterval : IndexBoundsBuilder::makePointInterval(kNullElementObj);
+    return isHashed ? kHashedNullInterval : IndexBoundsBuilder::kNullPointInterval;
 }
 
 void makeNullEqualityBounds(const IndexEntry& index,
@@ -500,6 +499,11 @@ void buildBoundsForQueryElementForGT(BSONElement dataElt,
 }
 
 }  // namespace
+
+const Interval IndexBoundsBuilder::kUndefinedPointInterval =
+    IndexBoundsBuilder::makePointInterval(kUndefinedElementObj);
+const Interval IndexBoundsBuilder::kNullPointInterval =
+    IndexBoundsBuilder::makePointInterval(kNullElementObj);
 
 void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
                                              const BSONElement& elt,
@@ -1453,6 +1457,14 @@ bool IndexBoundsBuilder::isSingleInterval(const IndexBounds& bounds,
     } else {
         return false;
     }
+}
+
+// static
+bool IndexBoundsBuilder::isNullInterval(const OrderedIntervalList& oil) {
+    // Checks if the the intervals are [undefined, undefined] and [null, null].
+    // Note: the order is always the same (see makeNullEqualityBounds()).
+    return 2 == oil.intervals.size() && oil.intervals[0].equals(kUndefinedPointInterval) &&
+        oil.intervals[1].equals(kNullPointInterval);
 }
 
 }  // namespace mongo
