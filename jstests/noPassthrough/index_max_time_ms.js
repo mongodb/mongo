@@ -3,7 +3,6 @@
  * (based on expiration derived from maxTimeMS).
  * @tags: [
  *   requires_replication,
- *   sbe_incompatible,
  * ]
  */
 (function() {

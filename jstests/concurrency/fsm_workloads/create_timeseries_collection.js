@@ -9,7 +9,6 @@ load("jstests/core/timeseries/libs/timeseries.js");
  *   assumes_no_implicit_collection_creation_after_drop,
  *   does_not_support_stepdowns,
  *   requires_fcv_49,
- *   sbe_incompatible,
  * ]
  */
 var $config = (function() {

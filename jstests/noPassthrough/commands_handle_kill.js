@@ -8,9 +8,6 @@ const db = mongod.getDB("test");
 const collName = jsTest.name();
 const coll = db.getCollection(collName);
 
-const isSbeEnabled = assert.commandWorked(db.adminCommand({getParameter: 1, featureFlagSBE: 1}))
-                         .featureFlagSBE.value;
-
 // How many works it takes to yield.
 const yieldIterations = 2;
 assert.commandWorked(
@@ -94,9 +91,7 @@ function assertCommandPropogatesPlanExecutorKillReason(cmdObj, options) {
         {command: {drop: collName}, message: 'collection dropped'},
     ];
 
-    // TODO SERVER-49385: SBE currently does not fail queries in the expected way when an index is
-    // dropped.
-    if (options.usesIndex && !isSbeEnabled) {
+    if (options.usesIndex) {
         invalidatingCommands.push(
             {command: {dropIndexes: collName, index: {a: 1}}, message: 'index \'a_1\' dropped'});
     }

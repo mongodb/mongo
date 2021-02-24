@@ -1,7 +1,7 @@
 // Test dropping an index that is being used by an agg pipeline.
-// @tags: [
-//   sbe_incompatible,
-// ]
+(function() {
+"use strict";
+
 var coll = db.server14969;
 var docsPerBatch = 3;
 coll.drop();
@@ -33,3 +33,4 @@ try {
 
 // Verify that the server hasn't crashed.
 assert.commandWorked(db.adminCommand({ping: 1}));
+}());

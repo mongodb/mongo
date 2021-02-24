@@ -93,6 +93,13 @@ protected:
     void doAttachToTrialRunTracker(TrialRunTracker* tracker) override;
 
 private:
+    /**
+     * When this stage is re-opened after being closed, or during yield recovery, called to verify
+     * that the index (and the index's collection) remain valid. If any validity check fails, throws
+     * a UserException that terminates execution of the query.
+     */
+    void restoreCollectionAndIndex();
+
     const CollectionUUID _collUuid;
     const std::string _indexName;
     const bool _forward;
