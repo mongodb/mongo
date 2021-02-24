@@ -29,6 +29,9 @@
 global:
     cpp_namespace: "mongo"
 
+imports:
+    - "mongo/idl/basic_types.idl"
+
 structs:
     ImportedStableNewFieldReply:
         description: "This reply contains a field that is unstable in the old command but is
@@ -37,3 +40,13 @@ structs:
             stableNewField:
                 type: string
                 unstable: true
+
+commands:
+    importCommand:
+        description: "Defines command in import file."
+        command_name: importCommand
+        namespace: ignored
+        cpp_name: importCommand
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
