@@ -799,7 +799,7 @@ Status StorageEngineImpl::_dropCollectionsNoTimestamp(OperationContext* opCtx,
         while (ii->more()) {
             const IndexCatalogEntry* ice = ii->next();
 
-            audit::logDropIndex(&cc(), ice->descriptor()->indexName(), nss.ns());
+            audit::logDropIndex(&cc(), ice->descriptor()->indexName(), nss);
 
             catalog::removeIndex(opCtx,
                                  ice->descriptor()->indexName(),
@@ -809,7 +809,7 @@ Status StorageEngineImpl::_dropCollectionsNoTimestamp(OperationContext* opCtx,
                                  ice->getSharedIdent());
         }
 
-        audit::logDropCollection(&cc(), nss.ns());
+        audit::logDropCollection(&cc(), nss);
 
         Status result = catalog::dropCollection(
             opCtx, coll->ns(), coll->getCatalogId(), coll->getSharedIdent());

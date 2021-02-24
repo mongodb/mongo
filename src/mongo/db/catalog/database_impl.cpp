@@ -394,7 +394,7 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
                           << numIndexesInProgress << " index builds in progress.",
             numIndexesInProgress == 0);
 
-    audit::logDropCollection(&cc(), nss.toString());
+    audit::logDropCollection(&cc(), nss);
 
     auto serviceContext = opCtx->getServiceContext();
     Top::get(serviceContext).collectionDropped(nss);
@@ -627,7 +627,7 @@ Status DatabaseImpl::createView(OperationContext* opCtx,
             opCtx, this, viewName, viewOnNss, pipeline, options.collation, options.timeseries);
     }
 
-    audit::logCreateView(&cc(), viewName.toString(), viewOnNss.toString(), pipeline, status.code());
+    audit::logCreateView(&cc(), viewName, viewOnNss.toString(), pipeline, status.code());
     return status;
 }
 
@@ -693,7 +693,7 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
 
     _checkCanCreateCollection(opCtx, nss, optionsWithUUID);
     assertMovePrimaryInProgress(opCtx, nss);
-    audit::logCreateCollection(&cc(), nss.ns());
+    audit::logCreateCollection(&cc(), nss);
 
     LOGV2(20320,
           "createCollection: {namespace} with {generatedUUID_generated_provided} UUID: "

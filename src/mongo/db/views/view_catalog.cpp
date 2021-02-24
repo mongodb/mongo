@@ -251,7 +251,7 @@ void ViewCatalog::clear(const Database* db) {
     // First, iterate through the views on this database and audit them before they are dropped.
     for (auto&& view : catalog->_viewMap) {
         audit::logDropView(&cc(),
-                           (*view.second).name().ns(),
+                           (*view.second).name(),
                            (*view.second).viewOn().ns(),
                            (*view.second).pipeline(),
                            ErrorCodes::OK);
