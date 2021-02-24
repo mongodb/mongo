@@ -33,6 +33,7 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/s/dist_lock_manager.h"
 #include "mongo/db/s/reshard_collection_coordinator.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
@@ -75,6 +76,13 @@ public:
                 ErrorCodes::CommandNotSupported,
                 "Resharding is not supported for this version, please update the FCV to latest.",
                 !serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading());
+
+            DistLockManager::ScopedDistLock dbDistLock(
+                uassertStatusOK(DistLockManager::get(opCtx)->lock(
+                    opCtx, ns().db(), "reshardCollection", DistLockManager::kDefaultLockTimeout)));
+            DistLockManager::ScopedDistLock collDistLock(
+                uassertStatusOK(DistLockManager::get(opCtx)->lock(
+                    opCtx, ns().ns(), "reshardCollection", DistLockManager::kDefaultLockTimeout)));
 
             auto reshardCollectionCoordinator =
                 std::make_shared<ReshardCollectionCoordinator>(opCtx, request());

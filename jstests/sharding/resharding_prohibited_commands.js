@@ -51,7 +51,7 @@ reshardingTest.withReshardingInBackground(
 
         assert.commandFailedWithCode(
             mongos.adminCommand({moveChunk: ns, find: {oldKey: -10}, to: donorShardNames[1]}),
-            ErrorCodes.ConflictingOperationInProgress);
+            ErrorCodes.LockBusy);
         assert.commandFailedWithCode(db.runCommand({collMod: 'coll'}),
                                      ErrorCodes.ReshardCollectionInProgress);
         assert.commandFailedWithCode(sourceCollection.createIndexes([{newKey: 1}]),
