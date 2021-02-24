@@ -134,6 +134,20 @@ AccumulationExpression genericParseSingleExpressionAccumulator(ExpressionContext
 }
 
 /**
+ * A parser that desugars { $count: {} } to { $sum: 1 }.
+ */
+inline AccumulationExpression parseCountAccumulator(ExpressionContext* const expCtx,
+                                                    BSONElement elem,
+                                                    VariablesParseState vps) {
+    uassert(ErrorCodes::TypeMismatch,
+            "$count takes no arguments, i.e. $count:{}",
+            elem.type() == BSONType::Object && elem.Obj().isEmpty());
+    auto initializer = ExpressionConstant::create(expCtx, Value(BSONNULL));
+    auto argument = ExpressionConstant::create(expCtx, Value(1));
+    return {initializer, argument, [expCtx]() { return AccumulatorSum::create(expCtx); }};
+}
+
+/**
  * A class representing a user-specified accumulation, including the field name to put the
  * accumulated result in, which accumulator to use, and the expression used to obtain the input to
  * the AccumulatorState.
