@@ -94,6 +94,12 @@ public:
         repl::ReadConcernLevel readConcern,
         const boost::optional<BSONObj>& hint = boost::none) override;
 
+    std::pair<CollectionType, std::vector<ChunkType>> getCollectionAndChunks(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const ChunkVersion& sinceVersion,
+        const repl::ReadConcernArgs& readConcern) override;
+
     StatusWith<std::vector<TagsType>> getTagsForCollection(OperationContext* opCtx,
                                                            const NamespaceString& nss) override;
 

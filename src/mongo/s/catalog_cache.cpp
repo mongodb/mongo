@@ -218,13 +218,11 @@ StatusWith<ChunkManager> CatalogCache::_getCollectionRoutingInfoAt(
                 if (acquireTries == kMaxInconsistentRoutingInfoRefreshAttempts) {
                     return ex.toStatus();
                 }
-            } catch (ExceptionFor<ErrorCodes::BadValue>& ex) {
+            } catch (ExceptionFor<ErrorCodes::QueryPlanKilled>& ex) {
                 // TODO SERVER-53283: Remove once 5.0 has branched out.
-                // This would happen when the query to config.chunks fails because the index
-                // specified in the 'hint' provided by ConfigServerCatalogCache loader does no
-                // longer exist because it was dropped as part of the FCV upgrade/downgrade process
-                // to/from 5.0.
-                LOGV2_FOR_CATALOG_REFRESH(5310502,
+                // This would happen when the query to config.chunks is killed because the index it
+                // relied on has been dropped while the query was ongoing.
+                LOGV2_FOR_CATALOG_REFRESH(5310503,
                                           0,
                                           "Collection refresh failed",
                                           "namespace"_attr = nss,
@@ -234,11 +232,8 @@ StatusWith<ChunkManager> CatalogCache::_getCollectionRoutingInfoAt(
                 if (acquireTries == kMaxInconsistentRoutingInfoRefreshAttempts) {
                     return ex.toStatus();
                 }
-            } catch (ExceptionFor<ErrorCodes::QueryPlanKilled>& ex) {
-                // TODO SERVER-53283: Remove once 5.0 has branched out.
-                // This would happen when the query to config.chunks is killed because the index it
-                // relied on has been dropped while the query was ongoing.
-                LOGV2_FOR_CATALOG_REFRESH(5310503,
+            } catch (ExceptionForCat<ErrorCategory::SnapshotError>& ex) {
+                LOGV2_FOR_CATALOG_REFRESH(5487402,
                                           0,
                                           "Collection refresh failed",
                                           "namespace"_attr = nss,
