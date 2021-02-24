@@ -70,7 +70,8 @@ def get_new_commands(
                     raise ValueError(f"Cannot parse {new_idl_file_path}")
 
                 for new_cmd in new_idl_file.spec.symbols.commands:
-                    if new_cmd.api_version == "":
+                    # Ignore imported commands as they will be processed in their own file.
+                    if new_cmd.api_version == "" or new_cmd.imported:
                         continue
 
                     if new_cmd.api_version != "1":
@@ -523,7 +524,8 @@ def check_compatibility(old_idl_dir: str, new_idl_dir: str,
                     raise ValueError(f"Cannot parse {old_idl_file_path}")
 
                 for old_cmd in old_idl_file.spec.symbols.commands:
-                    if old_cmd.api_version == "":
+                    # Ignore imported commands as they will be processed in their own file.
+                    if old_cmd.api_version == "" or old_cmd.imported:
                         continue
 
                     if old_cmd.api_version != "1":
