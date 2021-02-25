@@ -2212,16 +2212,17 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorWith
 
     const boost::intrusive_ptr<ExpressionContext> expCtx;
     const ExtensionsCallbackReal extensionsCallback(opCtx, &collection->ns());
-    auto cqWithoutProjection =
+
+    auto cqWithoutProjection = uassertStatusOKWithContext(
         CanonicalQuery::canonicalize(opCtx,
                                      std::move(findCommand),
                                      cq->getExplain(),
                                      expCtx,
                                      extensionsCallback,
-                                     MatchExpressionParser::kAllowAllSpecialFeatures);
+                                     MatchExpressionParser::kAllowAllSpecialFeatures),
+        "Unable to canonicalize query");
 
-    return getExecutor(
-        opCtx, coll, std::move(cqWithoutProjection.getValue()), yieldPolicy, plannerOptions);
+    return getExecutor(opCtx, coll, std::move(cqWithoutProjection), yieldPolicy, plannerOptions);
 }
 }  // namespace
 
