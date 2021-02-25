@@ -141,6 +141,7 @@ env.Library(
 env.Library(
     target='auth_impl_internal',
     source=[
+        'access_checks.idl',
         'authorization_contract.idl',
         'authorization_manager_impl.cpp',
         'authorization_session_impl.cpp',

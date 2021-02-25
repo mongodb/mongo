@@ -33,6 +33,7 @@
 #include <string>
 
 #include "mongo/base/string_data.h"
+#include "mongo/db/auth/action_type_gen.h"
 #include "mongo/db/namespace_string.h"
 
 namespace mongo {
@@ -53,7 +54,7 @@ public:
      * Returns a pattern that matches absolutely any resource.
      */
     static ResourcePattern forAnyResource() {
-        return ResourcePattern(matchAnyResource);
+        return ResourcePattern(MatchTypeEnum::kMatchAnyResource);
     }
 
     /**
@@ -61,14 +62,14 @@ public:
      * which ns.isSystem().
      */
     static ResourcePattern forAnyNormalResource() {
-        return ResourcePattern(matchAnyNormalResource);
+        return ResourcePattern(MatchTypeEnum::kMatchAnyNormalResource);
     }
 
     /**
      * Returns a pattern that matches the "cluster" resource.
      */
     static ResourcePattern forClusterResource() {
-        return ResourcePattern(matchClusterResource);
+        return ResourcePattern(MatchTypeEnum::kMatchClusterResource);
     }
 
     /**
@@ -76,7 +77,7 @@ public:
      * "ns" for which ns.isSystem() is false and ns.db() == dbname.
      */
     static ResourcePattern forDatabaseName(StringData dbName) {
-        return ResourcePattern(matchDatabaseName, NamespaceString(dbName, ""));
+        return ResourcePattern(MatchTypeEnum::kMatchDatabaseName, NamespaceString(dbName, ""));
     }
 
     /**
@@ -84,61 +85,62 @@ public:
      * collectionName.
      */
     static ResourcePattern forCollectionName(StringData collectionName) {
-        return ResourcePattern(matchCollectionName, NamespaceString("", collectionName));
+        return ResourcePattern(MatchTypeEnum::kMatchCollectionName,
+                               NamespaceString("", collectionName));
     }
 
     /**
      * Returns a pattern that matches the given exact namespace string.
      */
     static ResourcePattern forExactNamespace(const NamespaceString& ns) {
-        return ResourcePattern(matchExactNamespace, ns);
+        return ResourcePattern(MatchTypeEnum::kMatchExactNamespace, ns);
     }
 
     /**
      * Constructs a pattern that never matches.
      */
-    ResourcePattern() : _matchType(matchNever) {}
+    ResourcePattern() : _matchType(MatchTypeEnum::kMatchNever) {}
 
     /**
      * Returns true if this pattern matches only exact namespaces.
      */
     bool isExactNamespacePattern() const {
-        return _matchType == matchExactNamespace;
+        return _matchType == MatchTypeEnum::kMatchExactNamespace;
     }
 
     /**
      * Returns true if this pattern matches on the database name only.
      */
     bool isDatabasePattern() const {
-        return _matchType == matchDatabaseName;
+        return _matchType == MatchTypeEnum::kMatchDatabaseName;
     }
 
     /**
      * Returns true if this pattern matches on the collection name only.
      */
     bool isCollectionPattern() const {
-        return _matchType == matchCollectionName;
+        return _matchType == MatchTypeEnum::kMatchCollectionName;
     }
 
     /**
      * Returns true if this pattern matches the cluster resource only.
      */
     bool isClusterResourcePattern() const {
-        return _matchType == matchClusterResource;
+        return _matchType == MatchTypeEnum::kMatchClusterResource;
     }
 
     /**
      * Returns true if this pattern matches only any normal resource.
      */
     bool isAnyNormalResourcePattern() const {
-        return _matchType == matchAnyNormalResource;
+        return _matchType == MatchTypeEnum::kMatchAnyNormalResource;
     }
 
     /**
      * Returns true if this pattern matches any resource.
      */
     bool isAnyResourcePattern() const {
-        return _matchType == matchAnyResource;
+        return _matchType == MatchTypeEnum::kMatchAnyResource;
     }
 
     /**
@@ -186,20 +188,10 @@ public:
     }
 
 private:
-    enum MatchType {
-        matchNever = 0,              /// Matches no resource.
-        matchClusterResource = 1,    /// Matches if the resource is the cluster resource.
-        matchDatabaseName = 2,       /// Matches if the resource's database name is _ns.db().
-        matchCollectionName = 3,     /// Matches if the resource's collection name is _ns.coll().
-        matchExactNamespace = 4,     /// Matches if the resource's namespace name is _ns.
-        matchAnyNormalResource = 5,  /// Matches all databases and non-system collections.
-        matchAnyResource = 6         /// Matches absolutely anything.
-    };
+    explicit ResourcePattern(MatchTypeEnum type) : _matchType(type) {}
+    ResourcePattern(MatchTypeEnum type, const NamespaceString& ns) : _matchType(type), _ns(ns) {}
 
-    explicit ResourcePattern(MatchType type) : _matchType(type) {}
-    ResourcePattern(MatchType type, const NamespaceString& ns) : _matchType(type), _ns(ns) {}
-
-    MatchType _matchType;
+    MatchTypeEnum _matchType;
     NamespaceString _ns;
 };
 
