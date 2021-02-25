@@ -44,7 +44,6 @@ using namespace mongo;
 TEST(GetMoreRequestTest, parseFromBSONEmptyCommandObject) {
     StatusWith<GetMoreRequest> result = GetMoreRequest::parseFromBSON("db", BSONObj());
     ASSERT_NOT_OK(result.getStatus());
-    ASSERT_EQUALS(ErrorCodes::FailedToParse, result.getStatus().code());
 }
 
 TEST(GetMoreRequestTest, parseFromBSONCursorIdNotNumeric) {
@@ -52,32 +51,36 @@ TEST(GetMoreRequestTest, parseFromBSONCursorIdNotNumeric) {
                                                                       BSON("getMore"
                                                                            << "not a number"
                                                                            << "collection"
-                                                                           << "coll"));
+                                                                           << "coll"
+                                                                           << "$db"
+                                                                           << "db"));
     ASSERT_NOT_OK(result.getStatus());
-    ASSERT_EQUALS(ErrorCodes::TypeMismatch, result.getStatus().code());
 }
 
 TEST(GetMoreRequestTest, parseFromBSONCursorIdNotLongLong) {
-    StatusWith<GetMoreRequest> result = GetMoreRequest::parseFromBSON("db",
-                                                                      BSON("getMore"
-                                                                           << "not a number"
-                                                                           << "collection" << 123));
+    StatusWith<GetMoreRequest> result =
+        GetMoreRequest::parseFromBSON("db",
+                                      BSON("getMore"
+                                           << "not a number"
+                                           << "collection" << 123 << "$db"
+                                           << "db"));
     ASSERT_NOT_OK(result.getStatus());
-    ASSERT_EQUALS(ErrorCodes::TypeMismatch, result.getStatus().code());
 }
 
 TEST(GetMoreRequestTest, parseFromBSONMissingCollection) {
     StatusWith<GetMoreRequest> result =
-        GetMoreRequest::parseFromBSON("db", BSON("getMore" << CursorId(123)));
+        GetMoreRequest::parseFromBSON("db",
+                                      BSON("getMore" << CursorId(123) << "$db"
+                                                     << "db"));
     ASSERT_NOT_OK(result.getStatus());
-    ASSERT_EQUALS(ErrorCodes::FailedToParse, result.getStatus().code());
 }
 
 TEST(GetMoreRequestTest, parseFromBSONCollectionNotString) {
     StatusWith<GetMoreRequest> result = GetMoreRequest::parseFromBSON(
-        "db", BSON("getMore" << CursorId(123) << "collection" << 456));
+        "db",
+        BSON("getMore" << CursorId(123) << "collection" << 456 << "$db"
+                       << "db"));
     ASSERT_NOT_OK(result.getStatus());
-    ASSERT_EQUALS(ErrorCodes::TypeMismatch, result.getStatus().code());
 }
 
 TEST(GetMoreRequestTest, parseFromBSONBatchSizeNotInteger) {
@@ -86,25 +89,29 @@ TEST(GetMoreRequestTest, parseFromBSONBatchSizeNotInteger) {
                                       BSON("getMore" << CursorId(123) << "collection"
                                                      << "coll"
                                                      << "batchSize"
-                                                     << "not a number"));
+                                                     << "not a number"
+                                                     << "$db"
+                                                     << "db"));
     ASSERT_NOT_OK(result.getStatus());
-    ASSERT_EQUALS(ErrorCodes::TypeMismatch, result.getStatus().code());
 }
 
 TEST(GetMoreRequestTest, parseFromBSONInvalidCursorId) {
     StatusWith<GetMoreRequest> result =
         GetMoreRequest::parseFromBSON("db",
                                       BSON("getMore" << CursorId(0) << "collection"
-                                                     << "coll"));
+                                                     << "coll"
+                                                     << "$db"
+                                                     << "db"));
     ASSERT_NOT_OK(result.getStatus());
-    ASSERT_EQUALS(ErrorCodes::BadValue, result.getStatus().code());
 }
 
 TEST(GetMoreRequestTest, parseFromBSONNegativeCursorId) {
     StatusWith<GetMoreRequest> result =
         GetMoreRequest::parseFromBSON("db",
                                       BSON("getMore" << CursorId(-123) << "collection"
-                                                     << "coll"));
+                                                     << "coll"
+                                                     << "$db"
+                                                     << "db"));
     ASSERT_OK(result.getStatus());
     ASSERT_EQUALS("db.coll", result.getValue().nss.toString());
     ASSERT_EQUALS(CursorId(-123), result.getValue().cursorid);
@@ -116,9 +123,9 @@ TEST(GetMoreRequestTest, parseFromBSONUnrecognizedFieldName) {
         GetMoreRequest::parseFromBSON("db",
                                       BSON("getMore" << CursorId(123) << "collection"
                                                      << "coll"
-                                                     << "unknown_field" << 1));
+                                                     << "unknown_field" << 1 << "$db"
+                                                     << "db"));
     ASSERT_NOT_OK(result.getStatus());
-    ASSERT_EQUALS(ErrorCodes::FailedToParse, result.getStatus().code());
 }
 
 TEST(GetMoreRequestTest, parseFromBSONInvalidBatchSize) {
@@ -126,9 +133,9 @@ TEST(GetMoreRequestTest, parseFromBSONInvalidBatchSize) {
         GetMoreRequest::parseFromBSON("db",
                                       BSON("getMore" << CursorId(123) << "collection"
                                                      << "coll"
-                                                     << "batchSize" << -1));
+                                                     << "batchSize" << -1 << "$db"
+                                                     << "db"));
     ASSERT_NOT_OK(result.getStatus());
-    ASSERT_EQUALS(ErrorCodes::BadValue, result.getStatus().code());
 }
 
 TEST(GetMoreRequestTest, parseFromBSONInvalidBatchSizeOfZero) {
@@ -136,16 +143,18 @@ TEST(GetMoreRequestTest, parseFromBSONInvalidBatchSizeOfZero) {
         GetMoreRequest::parseFromBSON("db",
                                       BSON("getMore" << CursorId(123) << "collection"
                                                      << "coll"
-                                                     << "batchSize" << 0));
+                                                     << "batchSize" << 0 << "$db"
+                                                     << "db"));
     ASSERT_NOT_OK(result.getStatus());
-    ASSERT_EQUALS(ErrorCodes::BadValue, result.getStatus().code());
 }
 
 TEST(GetMoreRequestTest, parseFromBSONNoBatchSize) {
     StatusWith<GetMoreRequest> result =
         GetMoreRequest::parseFromBSON("db",
                                       BSON("getMore" << CursorId(123) << "collection"
-                                                     << "coll"));
+                                                     << "coll"
+                                                     << "$db"
+                                                     << "db"));
     ASSERT_OK(result.getStatus());
     ASSERT_EQUALS("db.coll", result.getValue().nss.toString());
     ASSERT_EQUALS(CursorId(123), result.getValue().cursorid);
@@ -157,7 +166,8 @@ TEST(GetMoreRequestTest, parseFromBSONBatchSizeProvided) {
         GetMoreRequest::parseFromBSON("db",
                                       BSON("getMore" << CursorId(123) << "collection"
                                                      << "coll"
-                                                     << "batchSize" << 200));
+                                                     << "batchSize" << 200 << "$db"
+                                                     << "db"));
     ASSERT_EQUALS("db.coll", result.getValue().nss.toString());
     ASSERT_EQUALS(CursorId(123), result.getValue().cursorid);
     ASSERT(result.getValue().batchSize);
@@ -170,7 +180,9 @@ TEST(GetMoreRequestTest, parseFromBSONIgnoreQueryOptions) {
                                       BSON("getMore" << CursorId(123) << "collection"
                                                      << "coll"
                                                      << "$queryOptions"
-                                                     << "bar"));
+                                                     << "bar"
+                                                     << "$db"
+                                                     << "db"));
     ASSERT_OK(result.getStatus());
     ASSERT_EQUALS("db.coll", result.getValue().nss.toString());
     ASSERT_EQUALS(CursorId(123), result.getValue().cursorid);
@@ -181,7 +193,8 @@ TEST(GetMoreRequestTest, parseFromBSONHasMaxTimeMS) {
         GetMoreRequest::parseFromBSON("db",
                                       BSON("getMore" << CursorId(123) << "collection"
                                                      << "coll"
-                                                     << "maxTimeMS" << 100));
+                                                     << "maxTimeMS" << 100 << "$db"
+                                                     << "db"));
     ASSERT_OK(result.getStatus());
     ASSERT_EQUALS("db.coll", result.getValue().nss.toString());
     ASSERT(result.getValue().awaitDataTimeout);
@@ -194,7 +207,8 @@ TEST(GetMoreRequestTest, parseFromBSONHasMaxTimeMSOfZero) {
         GetMoreRequest::parseFromBSON("db",
                                       BSON("getMore" << CursorId(123) << "collection"
                                                      << "coll"
-                                                     << "maxTimeMS" << 0));
+                                                     << "maxTimeMS" << 0 << "$db"
+                                                     << "db"));
     ASSERT_OK(result.getStatus());
     ASSERT_EQUALS("db.coll", result.getValue().nss.toString());
     ASSERT_EQUALS(CursorId(123), result.getValue().cursorid);

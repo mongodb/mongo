@@ -38,12 +38,9 @@ imports:
     - "mongo/idl/basic_types.idl"
 
 structs:
-    InitialResponseCursor:
-        description: "A struct representing an initial response cursor."
+    ResponseCursorBase:
+        description: "Common fields of initial and subsequent cursor responses."
         fields:
-            firstBatch:
-                description: "The first batch of the cursor."
-                type: array<object>
             id:
                 cpp_name: "cursorId"
                 description: "The cursor id of the cursor."
@@ -63,9 +60,36 @@ structs:
                 description: "Boolean represents whether partial results are being returned."
                 type: optionalBool
 
+    InitialResponseCursor:
+        description: "A struct representing an initial response cursor."
+        inline_chained_structs: true
+        chained_structs:
+            ResponseCursorBase: ResponseCursorBase
+        fields:
+            firstBatch:
+                description: "The first batch of the cursor."
+                type: array<object>
+
     CursorInitialReply:
         description: "A struct representing a initial cursor reply."
         fields:
             cursor:
                 description: "A response cursor object."
                 type: InitialResponseCursor
+
+    GetMoreResponseCursor:
+        description: "A struct representing a subsequent response cursor."
+        inline_chained_structs: true
+        chained_structs:
+            ResponseCursorBase: ResponseCursorBase
+        fields:
+            nextBatch:
+                description: "The subsequent batch of the cursor."
+                type: array<object>
+
+    CursorGetMoreReply:
+        description: "A struct representing a getMore cursor reply."
+        fields:
+            cursor:
+                description: "A response cursor object."
+                type: GetMoreResponseCursor

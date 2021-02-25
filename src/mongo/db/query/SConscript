@@ -191,6 +191,7 @@ env.Library(
     source=[
         "distinct_command.idl",
         "find_command.idl",
+        "getmore_command.idl",
         "query_request_helper.cpp",
         "max_time_ms_parser.cpp",
         "tailable_mode.cpp",
@@ -200,8 +201,6 @@ env.Library(
         "$BUILD_DIR/mongo/base",
         "$BUILD_DIR/mongo/db/api_parameters",
         "$BUILD_DIR/mongo/db/catalog/collection_catalog",
-        # TODO: This dependency edge can be removed when the 'allowDiskUse' option no longer depends
-        # on enabling test commands.
         "$BUILD_DIR/mongo/db/commands/test_commands_enabled",
         "$BUILD_DIR/mongo/db/pipeline/runtime_constants_idl",
         "$BUILD_DIR/mongo/db/repl/read_concern_args",
