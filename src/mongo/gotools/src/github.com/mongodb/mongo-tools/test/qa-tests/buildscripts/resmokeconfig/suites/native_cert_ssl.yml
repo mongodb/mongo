@@ -1,0 +1,14 @@
+selector:
+  js_test:
+    roots:
+    - jstests/ssl/*.js
+
+# ssl tests start their own mongod's.
+executor:
+  js_test:
+    config:
+      shell_options:
+        nodb: ''
+        ssl: ''
+        sslAllowInvalidCertificates: ''
+        readMode: commands

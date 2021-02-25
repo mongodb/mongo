@@ -111,8 +111,7 @@ buildflags() {
     UNAME_S=$(PATH="/usr/bin:/bin" uname -s)
     case $UNAME_S in
         Linux)
-            # SPLUNK - gcc go does not have support for buildmode
-            #flags="-buildmode=pie"
+            flags="-buildmode=pie"
         ;;
     esac
     echo "$flags"

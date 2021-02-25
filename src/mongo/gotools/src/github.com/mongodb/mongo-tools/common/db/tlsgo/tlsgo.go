@@ -40,7 +40,7 @@ func (c *TLSDBConnector) Configure(opts options.ToolOptions) error {
 
 	c.config = NewTLSConfig()
 
-	if opts.SSLAllowInvalidCert || opts.SSLAllowInvalidHost {
+	if opts.SSLAllowInvalidCert || opts.SSLAllowInvalidHost || opts.TLSInsecure {
 		c.config.SetInsecure(true)
 	}
 
