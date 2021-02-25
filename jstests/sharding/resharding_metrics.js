@@ -29,7 +29,7 @@ function verifyMetrics(metrics, expected) {
     }
 }
 
-function verifyServerStatusOutput(reshardingTest, inputCollection) {
+function verifyServerStatusOutput(reshardingTest, inputCollection, expectedMetrics) {
     function testMetricsArePresent(mongo) {
         const stats = mongo.getDB('admin').serverStatus({});
         assert(stats.hasOwnProperty('shardingStatistics'), stats);
@@ -38,16 +38,7 @@ function verifyServerStatusOutput(reshardingTest, inputCollection) {
                `Missing resharding section in ${tojson(shardingStats)}`);
 
         const metrics = shardingStats.resharding;
-        verifyMetrics(metrics, {
-            "countReshardingOperations": 0,
-            "countReshardingSuccessful": 0,
-            "countReshardingFailures": 0,
-            "countReshardingCanceled": 0,
-            "documentsCopied": 0,
-            "bytesCopied": 0,
-            "oplogEntriesApplied": 0,
-            "countWritesDuringCriticalSection": 0,
-        });
+        verifyMetrics(metrics, expectedMetrics);
     }
 
     const donorShardNames = reshardingTest.donorShardNames;
@@ -60,7 +51,6 @@ function verifyServerStatusOutput(reshardingTest, inputCollection) {
     testMetricsArePresent(new Mongo(topology.shards[donorShardNames[1]].primary));
     testMetricsArePresent(new Mongo(topology.shards[recipientShardNames[0]].primary));
     testMetricsArePresent(new Mongo(topology.shards[recipientShardNames[1]].primary));
-    testMetricsArePresent(new Mongo(topology.configsvr.nodes[0]));
 }
 
 // Tests the currentOp output for each donor, each recipient, and the coordinator.
@@ -156,14 +146,27 @@ const inputCollection = reshardingTest.createShardedCollection({
     ],
 });
 
-verifyServerStatusOutput(reshardingTest, inputCollection);
+var initialServerStatusMetrics = {
+    "countReshardingOperations": 0,
+    "countReshardingSuccessful": 0,
+    "countReshardingFailures": 0,
+    "countReshardingCanceled": 0,
+    "documentsCopied": 0,
+    "bytesCopied": 0,
+    "oplogEntriesApplied": 0,
+    "countWritesDuringCriticalSection": 0,
+};
 
-assert.commandWorked(inputCollection.insert([
+verifyServerStatusOutput(reshardingTest, inputCollection, initialServerStatusMetrics);
+
+var documentsInserted = [
     {_id: "stays on shard0", oldKey: -10, newKey: -10},
     {_id: "moves to shard0", oldKey: 10, newKey: -10},
     {_id: "moves to shard1", oldKey: -10, newKey: 10},
     {_id: "stays on shard1", oldKey: 10, newKey: 10},
-]));
+];
+
+assert.commandWorked(inputCollection.insert(documentsInserted));
 
 const recipientShardNames = reshardingTest.recipientShardNames;
 reshardingTest.withReshardingInBackground(  //
@@ -177,6 +180,19 @@ reshardingTest.withReshardingInBackground(  //
     (tempNs) => {
         verifyCurrentOpOutput(reshardingTest, inputCollection);
     });
+
+var finalServerStatusMetrics = {
+    "countReshardingOperations": 1,
+    "countReshardingSuccessful": 1,
+    "countReshardingFailures": 0,
+    "countReshardingCanceled": 0,
+    "documentsCopied": 2,
+    "bytesCopied": Object.bsonsize(documentsInserted[1]) + Object.bsonsize(documentsInserted[2]),
+    "oplogEntriesApplied": 0,
+    "countWritesDuringCriticalSection": 0,
+};
+
+verifyServerStatusOutput(reshardingTest, inputCollection, finalServerStatusMetrics);
 
 reshardingTest.teardown();
 })();

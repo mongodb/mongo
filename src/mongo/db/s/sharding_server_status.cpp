@@ -118,7 +118,8 @@ public:
         // checking whether the resharding feature is enabled here.
         if (resharding::gFeatureFlagResharding.isEnabledAndIgnoreFCV()) {
             BSONObjBuilder subObjBuilder(result.subobjStart("resharding"));
-            ReshardingMetrics::get(opCtx->getServiceContext())->serialize(&subObjBuilder);
+            ReshardingMetrics::get(opCtx->getServiceContext())
+                ->serializeCumulativeOpMetrics(&subObjBuilder);
         }
 
         return result.obj();

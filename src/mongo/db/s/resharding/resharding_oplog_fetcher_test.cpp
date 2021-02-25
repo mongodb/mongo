@@ -307,7 +307,8 @@ public:
 
     long long metricsFetchedCount() const {
         BSONObjBuilder bob;
-        _metrics->serialize(&bob, ReshardingMetrics::ReporterOptions::Role::kRecipient);
+        _metrics->serializeCurrentOpMetrics(&bob,
+                                            ReshardingMetrics::ReporterOptions::Role::kRecipient);
         return bob.obj()["oplogEntriesFetched"_sd].Long();
     }
 
