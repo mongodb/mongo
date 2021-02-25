@@ -117,6 +117,16 @@ std::pair<value::TypeTags, value::Value> genericCompare(
             auto result = op(value::bitcastTo<int32_t>(val), 0);
             return {value::TypeTags::Boolean, value::bitcastFrom<bool>(result)};
         }
+    } else if (isObjectId(lhsTag) && isObjectId(rhsTag)) {
+        auto lhsObjId = lhsTag == value::TypeTags::ObjectId
+            ? value::getObjectIdView(lhsValue)->data()
+            : value::bitcastTo<uint8_t*>(lhsValue);
+        auto rhsObjId = rhsTag == value::TypeTags::ObjectId
+            ? value::getObjectIdView(rhsValue)->data()
+            : value::bitcastTo<uint8_t*>(rhsValue);
+        auto threeWayResult = memcmp(lhsObjId, rhsObjId, sizeof(value::ObjectIdType));
+        auto booleanResult = op(threeWayResult, 0);
+        return {value::TypeTags::Boolean, value::bitcastFrom<bool>(booleanResult)};
     }
 
     return {value::TypeTags::Nothing, 0};
