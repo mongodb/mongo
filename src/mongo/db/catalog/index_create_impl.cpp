@@ -336,14 +336,22 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlockImpl::init(const std::vector<BSO
     } catch (const WriteConflictException&) {
         throw;
     } catch (...) {
-        return {exceptionToStatus().code(),
+        auto status = exceptionToStatus();
+        std::string separator =
+            (status.reason().size() > 0 && status.reason()[status.reason().size() - 1] == '.')
+            ? ""
+            : ".";
+        return {status.code(),
                 str::stream() << "Caught exception during index builder initialization "
                               << _collection->ns().toString()
                               << " ("
                               << _collection->uuid()
                               << "): "
+                              << status.reason()
+                              << separator
+                              << " First index spec (of "
                               << indexSpecs.size()
-                              << " provided. First index spec: "
+                              << "): "
                               << (indexSpecs.empty() ? BSONObj() : indexSpecs[0])};
     }
 }
