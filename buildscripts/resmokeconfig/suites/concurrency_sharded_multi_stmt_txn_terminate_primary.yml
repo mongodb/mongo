@@ -224,6 +224,9 @@ selector:
   - requires_profiling
   # mongos does not support inserts on timeseries collections
   - requires_timeseries
+  - requires_full_ddl_support
+  - does_not_support_transactions
+  - does_not_support_stepdowns
 
   # Note that "requires_non_retryable_writes" does not need to be blacklisted because some writes
   # that are not individually retryable can be retried if they are part of a transaction.
