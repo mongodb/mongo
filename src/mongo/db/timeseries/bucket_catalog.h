@@ -146,6 +146,42 @@ public:
     void appendExecutionStats(const NamespaceString& ns, BSONObjBuilder* builder) const;
 
 private:
+    /**
+     * This class provides a mutex with shared and exclusive locking semantics. Unlike some shared
+     * mutex implementations, it does not allow for writer starvation (assuming the underlying
+     * Mutex implemenation does not allow for starvation). The underlying mechanism is simply an
+     * array of Mutex instances. To take a shared lock, a thread's ID is hashed, mapping the thread
+     * to a particular mutex, which is then locked. To take an exclusive lock, all mutexes are
+     * locked.
+     *
+     * This behavior makes it easy to allow concurrent read access while still allowing writes to
+     * occur safely with exclusive access. It should only be used for situations where observed
+     * access patterns are read-mostly.
+     *
+     * A shared lock *cannot* be upgraded to an exclusive lock.
+     */
+    class StripedMutex {
+    public:
+        static constexpr std::size_t kNumStripes = 16;
+        StripedMutex() = default;
+
+        using SharedLock = stdx::unique_lock<Mutex>;
+        SharedLock lockShared() const;
+
+        class ExclusiveLock {
+        public:
+            ExclusiveLock() = default;
+            explicit ExclusiveLock(const StripedMutex&);
+
+        private:
+            std::array<stdx::unique_lock<Mutex>, kNumStripes> _locks;
+        };
+        ExclusiveLock lockExclusive() const;
+
+    private:
+        mutable std::array<Mutex, kNumStripes> _mutexes;
+    };
+
     struct BucketMetadata {
     public:
         BucketMetadata() = default;
@@ -353,37 +389,44 @@ private:
         Bucket* operator->();
         operator bool() const;
 
-        // release the bucket lock, typically in order to reacquire the catalog lock
+        // Release the bucket lock, typically in order to reacquire the catalog lock.
         void release();
 
         /**
          * Close the existing, full bucket and open a new one for the same metadata.
          * Parameter is a function which should check that the bucket is indeed still full after
          * reacquiring the necessary locks. The first parameter will give the function access to
-         * this BucketAccess instance, with the bucket locked. The second parameter may provide
-         * the precomputed key hash for the _bucketIds map (or 0, if is hasn't been computed yet).
+         * this BucketAccess instance, with the bucket locked.
          */
-        void rollover(const std::function<bool(BucketAccess*, std::size_t)>& isBucketFull);
+        void rollover(const std::function<bool(BucketAccess*)>& isBucketFull);
 
-        // retrieve the (safely cached) id of the bucket
+        // Retrieve the (safely cached) id of the bucket.
         const BucketIdInternal& id();
 
-        /**
-         * Adjust the time associated with the bucket (id) if it hasn't been committed yet. The
-         * hash parameter is the precomputed hash corresponding to the bucket's key for lookup in
-         * the _bucketIds map (to save computation).
-         */
-        void setTime(std::size_t hash);
+        // Adjust the time associated with the bucket (id) if it hasn't been committed yet.
+        void setTime();
 
     private:
+        // Constructor helper to find and lock an existing bucket. Takes a shared lock on the
+        // catalog.
+        bool _findAndLockExisting(std::size_t hash);
+
+        // Constructor helper to find a bucket if it exists, create it if it doesn't, and lock it.
+        // Takes an exclusive lock on the catalog.
+        void _findOrCreateAndLock(std::size_t hash);
+
+        // Lock _bucket.
         void _acquire();
 
-        BucketCatalog* _catalog;
-        const std::tuple<NamespaceString, BucketMetadata>* _key;
-        ExecutionStats* _stats;
-        const Date_t* _time;
+        // Allocate a new bucket and add it to the catalog with the given ID.
+        void _create(const BucketId& id);
 
-        BucketIdInternal _id;
+        BucketCatalog* _catalog;
+        const std::tuple<NamespaceString, BucketMetadata>* _key = nullptr;
+        ExecutionStats* _stats = nullptr;
+        const Date_t* _time = nullptr;
+
+        BucketIdInternal _id = BucketIdInternal::min();
         std::shared_ptr<Bucket> _bucket;
         stdx::unique_lock<Mutex> _guard;
     };
@@ -393,7 +436,8 @@ private:
     using NsBuckets = std::set<std::tuple<NamespaceString, BucketId>>;
     using IdleBuckets = std::set<BucketId>;
 
-    stdx::unique_lock<Mutex> _lock() const;
+    StripedMutex::SharedLock _lockShared() const;
+    StripedMutex::ExclusiveLock _lockExclusive() const;
 
     /**
      * Removes the given bucket from the bucket catalog's internal data structures.
@@ -422,19 +466,22 @@ private:
     const std::shared_ptr<ExecutionStats> _getExecutionStats(const NamespaceString& ns) const;
 
     /**
-     * You must hold _mutex when accessing _buckets, _bucketIds, or _nsBuckets. While, holding a
-     * lock on _mutex, you can take a lock on an individual bucket, then release _mutex. Any
-     * iterators on the protected structures should be considered invalid once the lock is released.
-     * Any subsequent access to the structures requires relocking _mutex. You must *not* be holding
-     * a lock on a bucket when you attempt to acquire the lock on _mutex, as this can result in
-     * deadlock.
+     * You must hold a lock on _stripedMutex when accessing _buckets, _bucketIds, or _nsBuckets.
+     * While holding a lock on _stripedMutex, you can take a lock on an individual bucket, then
+     * release _stripedMutex. Any iterators on the protected structures should be considered invalid
+     * once the lock is released. Any subsequent access to the structures requires relocking
+     * _stripedMutex. You must *not* be holding a lock on a bucket when you attempt to acquire the
+     * lock on _mutex, as this can result in deadlock.
+     *
+     * The StripedMutex class has both shared (read-only) and exclusive (write) locks. If you are
+     * going to write to any of the three protected structures, you must hold an exclusive lock.
      *
      * Typically, if you want to acquire a bucket, you should use the BucketAccess RAII
      * class to do so, as it will take care of most of this logic for you. Only use the _mutex
      * directly for more global maintenance where you want to take the lock once and interact with
      * multiple buckets atomically.
      */
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("BucketCatalog::_mutex");
+    mutable StripedMutex _stripedMutex;
 
     // All buckets currently in the catalog, including buckets which are full but not yet committed.
     stdx::unordered_map<BucketId, std::shared_ptr<Bucket>> _buckets;
