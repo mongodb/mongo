@@ -33,8 +33,8 @@ import sys
 from pathlib import Path
 
 import networkx
-import graph_analyzer
-from libdeps_graph_enums import CountTypes, LinterTypes
+import libdeps.analyzer
+from libdeps.graph import CountTypes, LinterTypes
 
 
 class LinterSplitArgs(argparse.Action):
@@ -50,6 +50,7 @@ class LinterSplitArgs(argparse.Action):
         if invalid_choices:
             raise Exception(
                 f"Invalid choices: {invalid_choices}\nMust use choices from {self.valid_choices}")
+
         if 'all' in selected_choices or selected_choices == []:
             selected_choices = self.valid_choices
             selected_choices.remove('all')
@@ -74,38 +75,38 @@ class CustomFormatter(argparse.RawTextHelpFormatter, argparse.ArgumentDefaultsHe
     @staticmethod
     def _get_help_length(enum_type):
         max_length = max([len(name[0]) for name in enum_type.__members__.items()])
-        count_help = {}
+        help_text = {}
         for name in enum_type.__members__.items():
-            count_help[name[0]] = name[0] + ('-' * (max_length - len(name[0]))) + ": "
-        return count_help
+            help_text[name[0]] = name[0] + ('-' * (max_length - len(name[0]))) + ": "
+        return help_text
 
     def _get_help_string(self, action):
 
         if isinstance(action, CountSplitArgs):
-            count_help = self._get_help_length(CountTypes)
+            help_text = self._get_help_length(CountTypes)
             return textwrap.dedent(f"""\
                 {action.help}
                 default: all, choices:
-                    {count_help[CountTypes.all.name]}perform all counts
-                    {count_help[CountTypes.node.name]}count nodes
-                    {count_help[CountTypes.edge.name]}count edges
-                    {count_help[CountTypes.dir_edge.name]}count edges declared directly on a node
-                    {count_help[CountTypes.trans_edge.name]}count edges induced by direct public edges
-                    {count_help[CountTypes.dir_pub_edge.name]}count edges that are directly public
-                    {count_help[CountTypes.pub_edge.name]}count edges that are public
-                    {count_help[CountTypes.priv_edge.name]}count edges that are private
-                    {count_help[CountTypes.if_edge.name]}count edges that are interface
-                    {count_help[CountTypes.shim.name]}count shim nodes
-                    {count_help[CountTypes.lib.name]}count library nodes
-                    {count_help[CountTypes.prog.name]}count program nodes
+                    {help_text[CountTypes.all.name]}perform all counts
+                    {help_text[CountTypes.node.name]}count nodes
+                    {help_text[CountTypes.edge.name]}count edges
+                    {help_text[CountTypes.dir_edge.name]}count edges declared directly on a node
+                    {help_text[CountTypes.trans_edge.name]}count edges induced by direct public edges
+                    {help_text[CountTypes.dir_pub_edge.name]}count edges that are directly public
+                    {help_text[CountTypes.pub_edge.name]}count edges that are public
+                    {help_text[CountTypes.priv_edge.name]}count edges that are private
+                    {help_text[CountTypes.if_edge.name]}count edges that are interface
+                    {help_text[CountTypes.shim.name]}count shim nodes
+                    {help_text[CountTypes.lib.name]}count library nodes
+                    {help_text[CountTypes.prog.name]}count program nodes
                 """)
         elif isinstance(action, LintSplitArgs):
-            count_help = self._get_help_length(LinterTypes)
+            help_text = self._get_help_length(LinterTypes)
             return textwrap.dedent(f"""\
                 {action.help}
                 default: all, choices:
-                    {count_help[LinterTypes.all.name]}perform all linters
-                    {count_help[LinterTypes.node.name]}find unnecessary public libdeps
+                    {help_text[LinterTypes.all.name]}perform all linters
+                    {help_text[LinterTypes.public_unused.name]}find unnecessary public libdeps
                 """)
         return super()._get_help_string(action)
 
@@ -165,30 +166,30 @@ def main():
 
     args = setup_args_parser()
     graph = load_graph_data(args.graph_file, args.format)
-    libdeps = graph_analyzer.LibdepsGraph(graph)
+    libdeps_graph = libdeps.graph.LibdepsGraph(graph)
 
-    analysis = graph_analyzer.counter_factory(libdeps, args.counts)
+    analysis = libdeps.analyzer.counter_factory(libdeps_graph, args.counts)
 
     for depends in args.direct_depends:
-        analysis.append(graph_analyzer.DirectDependencies(libdeps, depends))
+        analysis.append(libdeps.analyzer.DirectDependencies(libdeps_graph, depends))
 
     for depends in args.common_depends:
-        analysis.append(graph_analyzer.CommonDependencies(libdeps, depends))
+        analysis.append(libdeps.analyzer.CommonDependencies(libdeps_graph, depends))
 
     for depends in args.exclude_depends:
-        analysis.append(graph_analyzer.ExcludeDependencies(libdeps, depends))
+        analysis.append(libdeps.analyzer.ExcludeDependencies(libdeps_graph, depends))
 
-    analysis += graph_analyzer.linter_factory(libdeps, args.lint)
+    analysis += libdeps.analyzer.linter_factory(libdeps_graph, args.lint)
 
     if args.build_data:
-        analysis.append(graph_analyzer.BuildDataReport(libdeps))
+        analysis.append(libdeps.analyzer.BuildDataReport(libdeps_graph))
 
-    ga = graph_analyzer.LibdepsGraphAnalysis(libdeps_graph=libdeps, analysis=analysis)
+    ga = libdeps.analyzer.LibdepsGraphAnalysis(libdeps_graph=libdeps_graph, analysis=analysis)
 
     if args.format == 'pretty':
-        ga_printer = graph_analyzer.GaPrettyPrinter(ga)
+        ga_printer = libdeps.analyzer.GaPrettyPrinter(ga)
     elif args.format == 'json':
-        ga_printer = graph_analyzer.GaJsonPrinter(ga)
+        ga_printer = libdeps.analyzer.GaJsonPrinter(ga)
     else:
         return
 

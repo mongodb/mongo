@@ -883,7 +883,7 @@ def _get_node_with_ixes(env, node, node_builder_type):
 _get_node_with_ixes.node_type_ixes = dict()
 
 def add_node_from(env, node):
-    from buildscripts.libdeps.libdeps_graph_enums import NodeProps
+    from buildscripts.libdeps.libdeps.graph import NodeProps
 
     env.GetLibdepsGraph().add_nodes_from([(
         str(node.abspath),
@@ -893,7 +893,7 @@ def add_node_from(env, node):
         })])
 
 def add_edge_from(env, depender_node, dependent_node, visibility, direct):
-    from buildscripts.libdeps.libdeps_graph_enums import EdgeProps
+    from buildscripts.libdeps.libdeps.graph import EdgeProps
 
     env.GetLibdepsGraph().add_edges_from([(
         dependent_node,
@@ -1247,7 +1247,7 @@ def generate_graph(env, target, source):
     import fileinput
     import networkx
     import json
-    from buildscripts.libdeps.libdeps_graph_enums import EdgeProps, NodeProps
+    from buildscripts.libdeps.libdeps.graph import EdgeProps, NodeProps
 
     for symbol_deps_file in source:
         with open(str(symbol_deps_file)) as f:
