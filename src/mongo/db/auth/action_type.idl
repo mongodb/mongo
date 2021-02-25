@@ -11,7 +11,7 @@
 #
 # You should have received a copy of the Server Side Public License
 # along with this program. If not, see
-# <http://www.mongodb.com/licensing/serversidepubliclicense>.
+# <http://www.mongodb.com/licensing/server-side-public-license>.
 #
 # As a special exception, the copyright holders give permission to link the
 # code of portions of this program with the OpenSSL library under certain
@@ -32,7 +32,8 @@
 # also may change between versions.
 #
 # Actions marked "ID only" are not used for permission checks, but to identify events in logs.
-
+global:
+    cpp_namespace: "mongo"
 
 enums:
     ActionType:
@@ -172,3 +173,21 @@ enums:
            viewRole :  "viewRole"
            viewUser :  "viewUser"
 
+    MatchType:
+        description: "test"
+        type: string
+        values:
+             # Matches no resource.
+            kMatchNever : "never"
+             # Matches if the resource is the cluster resource.
+            kMatchClusterResource : "cluster"
+            # Matches if the resource's database name is _ns.db().
+            kMatchDatabaseName : "database"
+            # Matches if the resource's collection name is _ns.coll().
+            kMatchCollectionName : "collection"
+            # Matches if the resource's namespace name is _ns.
+            kMatchExactNamespace : "exact_namespace"
+            # Matches all databases and non-system collections.
+            kMatchAnyNormalResource : "any_normal"
+            # Matches absolutely anything.
+            kMatchAnyResource : "any"

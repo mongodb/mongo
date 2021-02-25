@@ -38,19 +38,19 @@ namespace mongo {
 
 std::string ResourcePattern::toString() const {
     switch (_matchType) {
-        case matchNever:
+        case MatchTypeEnum::kMatchNever:
             return "<no resources>";
-        case matchClusterResource:
+        case MatchTypeEnum::kMatchClusterResource:
             return "<system resource>";
-        case matchDatabaseName:
+        case MatchTypeEnum::kMatchDatabaseName:
             return "<database " + _ns.db().toString() + ">";
-        case matchCollectionName:
+        case MatchTypeEnum::kMatchCollectionName:
             return "<collection " + _ns.coll().toString() + " in any database>";
-        case matchExactNamespace:
+        case MatchTypeEnum::kMatchExactNamespace:
             return "<" + _ns.ns() + ">";
-        case matchAnyNormalResource:
+        case MatchTypeEnum::kMatchAnyNormalResource:
             return "<all normal resources>";
-        case matchAnyResource:
+        case MatchTypeEnum::kMatchAnyResource:
             return "<all resources>";
         default:
             return "<unknown resource pattern type>";
