@@ -120,7 +120,7 @@ class TestTimeout(_ResmokeSelftest):
         rmtree(self.test_dir_inner, ignore_errors=True)
 
     def signal_resmoke(self):
-        hang_analyzer_options = f"-o=file -o=stdout -m=contains -d={self.resmoke_process.pid}"
+        hang_analyzer_options = f"-o=file -o=stdout -m=contains -p=python -d={self.resmoke_process.pid}"
         signal_resmoke_process = core.programs.make_process(
             self.logger, [sys.executable, "buildscripts/resmoke.py", "hang-analyzer"
                           ] + hang_analyzer_options.split())
