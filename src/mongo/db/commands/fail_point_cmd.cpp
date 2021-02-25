@@ -101,7 +101,7 @@ public:
              BSONObjBuilder& result) override {
         const std::string failPointName(cmdObj.firstElement().str());
         const auto timesEntered = setGlobalFailPoint(failPointName, cmdObj);
-        result.appendIntOrLL("count", timesEntered);
+        result.appendNumber("count", timesEntered);
         return true;
     }
 };

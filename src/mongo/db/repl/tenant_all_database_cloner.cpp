@@ -256,7 +256,7 @@ BSONObj TenantAllDatabaseCloner::Stats::toBSON() const {
 }
 
 void TenantAllDatabaseCloner::Stats::append(BSONObjBuilder* builder) const {
-    builder->appendNumber("databasesCloned", databasesCloned);
+    builder->appendNumber("databasesCloned", static_cast<long long>(databasesCloned));
     for (auto&& db : databaseStats) {
         BSONObjBuilder dbBuilder(builder->subobjStart(db.dbname));
         db.append(&dbBuilder);

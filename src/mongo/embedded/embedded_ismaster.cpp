@@ -76,8 +76,9 @@ public:
         result.appendBool("ismaster", true);
 
         result.appendNumber("maxBsonObjectSize", BSONObjMaxUserSize);
-        result.appendNumber("maxMessageSizeBytes", MaxMessageSizeBytes);
-        result.appendNumber("maxWriteBatchSize", write_ops::kMaxWriteBatchSize);
+        result.appendNumber("maxMessageSizeBytes", static_cast<long long>(MaxMessageSizeBytes));
+        result.appendNumber("maxWriteBatchSize",
+                            static_cast<long long>(write_ops::kMaxWriteBatchSize));
         result.appendDate("localTime", jsTime());
         result.append("logicalSessionTimeoutMinutes", localLogicalSessionTimeoutMinutes);
         result.appendNumber("connectionId", opCtx->getClient()->getConnectionId());

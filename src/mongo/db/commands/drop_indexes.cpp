@@ -252,7 +252,7 @@ public:
             }
         }
 
-        result.appendNumber("nIndexesWas", all.size());
+        result.appendNumber("nIndexesWas", static_cast<long long>(all.size()));
 
         std::unique_ptr<MultiIndexBlock> indexer = std::make_unique<MultiIndexBlock>();
         indexer->setIndexBuildMethod(IndexBuildMethod::kForeground);

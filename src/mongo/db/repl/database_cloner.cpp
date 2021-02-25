@@ -194,8 +194,8 @@ BSONObj DatabaseCloner::Stats::toBSON() const {
 }
 
 void DatabaseCloner::Stats::append(BSONObjBuilder* builder) const {
-    builder->appendNumber("collections", collections);
-    builder->appendNumber("clonedCollections", clonedCollections);
+    builder->appendNumber("collections", static_cast<long long>(collections));
+    builder->appendNumber("clonedCollections", static_cast<long long>(clonedCollections));
     if (start != Date_t()) {
         builder->appendDate("start", start);
         if (end != Date_t()) {

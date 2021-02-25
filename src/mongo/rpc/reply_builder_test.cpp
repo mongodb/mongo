@@ -101,7 +101,7 @@ BSONObj buildCommand() {
                   << "Bar"));
     a.done();
 
-    cursorBuilder.appendIntOrLL("id", 1);
+    cursorBuilder.appendNumber("id", 1);
     cursorBuilder.append("ns", "test.$cmd.blah");
     commandReplyBob.append("cursor", cursorBuilder.done());
     return commandReplyBob.obj();

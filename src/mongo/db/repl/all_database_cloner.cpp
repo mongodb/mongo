@@ -298,8 +298,8 @@ BSONObj AllDatabaseCloner::Stats::toBSON() const {
 }
 
 void AllDatabaseCloner::Stats::append(BSONObjBuilder* builder) const {
-    builder->appendNumber("databasesToClone", databasesToClone);
-    builder->appendNumber("databasesCloned", databasesCloned);
+    builder->appendNumber("databasesToClone", static_cast<long long>(databasesToClone));
+    builder->appendNumber("databasesCloned", static_cast<long long>(databasesCloned));
     for (auto&& db : databaseStats) {
         BSONObjBuilder dbBuilder(builder->subobjStart(db.dbname));
         db.append(&dbBuilder);

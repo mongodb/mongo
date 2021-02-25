@@ -98,7 +98,7 @@ StatusWith<size_t> validateTCMallocValue(StringData name, const BSONElement& new
         OperationContext*, BSONObjBuilder& b, const std::string& name) {             \
         auto swValue = getProperty(k##cls##PropertyName);                            \
         if (swValue.isOK()) {                                                        \
-            b.appendNumber(name, swValue.getValue());                                \
+            b.appendNumber(name, static_cast<long long>(swValue.getValue()));        \
         }                                                                            \
     }                                                                                \
     Status TCMalloc##cls##ServerParameter::set(const BSONElement& newValueElement) { \

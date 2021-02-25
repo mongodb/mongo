@@ -138,7 +138,7 @@ public:
 
         if (includeDebugInfo) {
             BSONObjBuilder bob;
-            bob.appendNumber("numTested", _specificStats.numTested);
+            bob.appendNumber("numTested", static_cast<long long>(_specificStats.numTested));
             bob.append("filter", DebugPrinter{}.print(_filter->debugPrint()));
             ret->debugInfo = bob.obj();
         }
