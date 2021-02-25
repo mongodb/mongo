@@ -23,7 +23,7 @@ if (!TimeseriesTest.timeseriesCollectionsEnabled(db.getMongo())) {
 const collNamePrefix = 'timeseries_index_';
 let collCountPostfix = 0;
 
-const timeFieldName = 'time';
+const timeFieldName = 'tm';
 const metaFieldName = 'mm';
 
 const doc = {
@@ -72,6 +72,22 @@ runTest({[metaFieldName]: -1}, {meta: -1});
 runTest({[metaFieldName + '.tag1']: 1}, {'meta.tag1': 1});
 runTest({[metaFieldName + '.tag1']: 1, [metaFieldName + '.tag2']: -1},
         {'meta.tag1': 1, 'meta.tag2': -1});
+
+runTest({[timeFieldName]: 1},
+        {['control.min.' + timeFieldName]: 1, ['control.max.' + timeFieldName]: 1});
+runTest({[metaFieldName + '.tag1']: 1, [timeFieldName]: 1},
+        {'meta.tag1': 1, ['control.min.' + timeFieldName]: 1, ['control.max.' + timeFieldName]: 1});
+runTest({[timeFieldName]: -1},
+        {['control.max.' + timeFieldName]: -1, ['control.min.' + timeFieldName]: -1});
+runTest(
+    {[metaFieldName + '.tag1']: 1, [timeFieldName]: -1},
+    {'meta.tag1': 1, ['control.max.' + timeFieldName]: -1, ['control.min.' + timeFieldName]: -1});
+runTest({[metaFieldName + '.tag1']: -1, [metaFieldName + '.tag2']: 1, [timeFieldName]: 1}, {
+    'meta.tag1': -1,
+    'meta.tag2': 1,
+    ['control.min.' + timeFieldName]: 1,
+    ['control.max.' + timeFieldName]: 1
+});
 
 // Check index creation error handling.
 
