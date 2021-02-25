@@ -44,7 +44,7 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
-#include "mongo/db/repl/wait_for_majority_service.h"
+#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/active_shard_collection_registry.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/config/initial_split_policy.h"
@@ -343,13 +343,10 @@ ShardCollectionTargetState calculateTargetState(OperationContext* opCtx,
 
     // Wait until the index is majority written, to prevent having the collection commited to the
     // config server, but the index creation rolled backed on stepdowns.
-    auto replCoord = repl::ReplicationCoordinator::get(opCtx->getServiceContext());
-    if (replCoord->isReplEnabled() && opCtx->writesAreReplicated()) {
-        auto opTime = uassertStatusOK(replCoord->getLatestWriteOpTime(opCtx));
-        WaitForMajorityService::get(opCtx->getServiceContext())
-            .waitUntilMajority(opTime)
-            .get(opCtx);
-    }
+    WriteConcernResult ignoreResult;
+    auto latestOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
+    uassertStatusOK(waitForWriteConcern(
+        opCtx, latestOpTime, ShardingCatalogClient::kMajorityWriteConcern, &ignoreResult));
 
     auto tags = getTagsAndValidate(opCtx, nss, proposedKey, shardKeyPattern);
     auto uuid = getOrGenerateUUID(opCtx, nss, request);
