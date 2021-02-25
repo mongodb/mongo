@@ -393,7 +393,7 @@ variables:
   - ubuntu1804-debug-suggested
   - enterprise-ubuntu1604-64
   - enterprise-ubuntu1604-arm64
-  - enterprise-ubuntu-dynamic-1804-clang-tidy-suggested
+  - enterprise-ubuntu-dynamic-1804-clang-tidy-required
   - ubuntu1804
   - ubuntu1804-arm64
   - ubuntu2004-arm64
@@ -11693,8 +11693,8 @@ buildvariants:
     distros:
     - ubuntu1604-small
 
-- name: enterprise-ubuntu-dynamic-1804-clang-tidy-suggested
-  display_name: "* Enterprise Clang Tidy"
+- name: enterprise-ubuntu-dynamic-1804-clang-tidy-required
+  display_name: "! Enterprise Clang Tidy"
   batchtime: 240 # 4 hours
   modules:
   - enterprise
