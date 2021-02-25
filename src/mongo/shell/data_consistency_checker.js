@@ -57,7 +57,8 @@ var CollInfos = class {
                 ns: ns,
                 host: this.conn.host,
                 UUID: collInfoRaw.info.uuid,
-                count: coll.find().itcount()
+                count: coll.find().itcount(),
+                raw: collInfoRaw,
             };
         }
 
