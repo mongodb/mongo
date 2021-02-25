@@ -947,6 +947,8 @@ inline BsonRegex getBsonRegexView(Value val) noexcept {
 
 std::pair<TypeTags, Value> makeCopyBsonRegex(const BsonRegex& regex);
 
+std::pair<TypeTags, Value> makeNewBsonRegex(std::string_view pattern, std::string_view flags);
+
 inline std::string_view getBsonJavascriptView(Value val) noexcept {
     return getStringView(TypeTags::StringBig, val);
 }

@@ -1541,16 +1541,24 @@ public:
     void visit(const RegexMatchExpression* expr) final {
         auto makePredicate = [expr](sbe::value::SlotId inputSlot,
                                     EvalStage inputStage) -> EvalExprStagePair {
-            auto [regexTag, regexVal] =
+            auto [bsonRegexTag, bsonRegexVal] =
+                sbe::value::makeNewBsonRegex(expr->getString(), expr->getFlags());
+            auto [compiledRegexTag, compiledRegexVal] =
                 sbe::value::makeNewPcreRegex(expr->getString(), expr->getFlags());
-            // TODO: In the future, this needs to account for the fact that the regex match
-            // expression matches strings, but also matches stored regexes. For example,
-            // {$match: {a: /foo/}} matches the document {a: /foo/} in addition to {a: "foobar"}.
-            return {makeFillEmptyFalse(sbe::makeE<sbe::EFunction>(
-                        "regexMatch",
-                        sbe::makeEs(sbe::makeE<sbe::EConstant>(regexTag, regexVal),
-                                    sbe::makeE<sbe::EVariable>(inputSlot)))),
-                    std::move(inputStage)};
+            // TODO SERVER-54837: Support BSONType::Symbol once it is added to SBE.
+            sbe::EVariable inputVar{inputSlot};
+            auto resultExpr = makeBinaryOp(
+                sbe::EPrimBinary::logicOr,
+                makeFillEmptyFalse(
+                    makeBinaryOp(sbe::EPrimBinary::eq,
+                                 inputVar.clone(),
+                                 sbe::makeE<sbe::EConstant>(bsonRegexTag, bsonRegexVal))),
+                makeFillEmptyFalse(
+                    makeFunction("regexMatch",
+                                 sbe::makeE<sbe::EConstant>(compiledRegexTag, compiledRegexVal),
+                                 inputVar.clone())));
+
+            return {std::move(resultExpr), std::move(inputStage)};
         };
 
         generatePredicate(_context, expr->fieldRef(), std::move(makePredicate));
