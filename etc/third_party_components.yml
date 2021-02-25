@@ -62,7 +62,7 @@ components:
     release_monitoring_id: 117
     local_directory_path: src/third_party/asio-master
     team_owner: "Service Architecture"
-    upgrade_suppression: TODO SERVER-44078
+    upgrade_suppression: TODO SERVER-54659
 
   benchmark:
     homepage_url: https://github.com/google/benchmark
