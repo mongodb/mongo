@@ -1,8 +1,182 @@
 /*! @arch_page arch-logging Logging
 
-WiredTiger writes all changes into a write-ahead log when configured.
-Log files are shared among all writers, so changes made to
-different tables, by different threads, are interleaved.
+The WiredTiger logging subsystem implements a write-ahead log when configured.
+It is a central resource recording changes made to different tables, by different
+threads, into a file on disk. Its purpose is so that changes made since the most recent
+checkpoint are not lost and can be recovered on restart after a crash (unclean shutdown).
 
-Internally, the current logging state is represented by the WT_LOG structure.
+@section log_files Log-related files in the database directory
+
+There are three log-related file variants that users can see in the database directory:
+\c WiredTigerLog.*, \c WiredTigerPreplog.* and \c WiredTigerTmplog.*.
+The actual write-ahead log files are prepended with the string \c WiredTigerLog.
+followed by ten digits of log file number. For example, \c WiredTigerLog.0000000001.
+The other two log-related filenames are for log file pre-allocation. When pre-allocation
+is configured (the default), new log files are created ahead of time containing the
+log file header content and are ready in the directory for use. The header content is
+written into a temporary file with the prefix \c WiredTigerTmplog. and again followed
+by a number. Once the temporary file is completely filled with the required content,
+synced to disk and closed, it is renamed to a prepared log file that other threads in
+the system can rename to use as the next real log file. Prepared pre-allocated log files
+that are ready to use have the prefix \c WiredTigerPreplog.
+
+Only the numbering of the actual \c WiredTigerLog.* files is significant. There is
+no relation between the numbers on those files and the number of the pre-allocated
+files. For pre-allocation, unique names are needed to avoid any possibility of naming
+collision and the numbering mechanism exists, so the code reuses it. But there is
+no meaning to the numbers on the two pre-allocated file types.
+
+There are a varying number of temporary and prepared log files in the directory. They
+are removed immediately on startup. Old pre-allocated log files cannot be reused
+on a restart because the log format and WiredTiger software could have changed in between runs.
+See \ref log_threads for a discussion of pre-allocation.
+
+@section log_configuration Configuration choices and their implications
+
+Once the logging subsystem is enabled for the system, then other configuration settings
+control the finer details of the logging subsystem. The \c archive=true setting turns
+on log file archiving. That means that log files earlier than the most recently
+completed checkpoint can be removed. (In this use, archive means removal not a form
+of cold storage.) There are times, even when configured on, that log archiving is
+temporarily disabled inside the WiredTiger library.
+
+Log archiving is disabled when a backup cursor is open. WiredTiger must guarantee
+that any log file name that may have been returned to a backup cursor remains in
+existence for the lifetime of that cursor. Log archiving is also disabled when
+a log cursor is open. This cursor could be positioned anywhere in the log that
+existed when the cursor was opened and walking the records, so all log files that
+existed at open must continue to exist.
+
+The (default) log file pre-allocation setting \c prealloc=true allows the system to
+pre-allocate log files so that when application threads are writing their log
+records, on the critical path, they do not incur the penalties of file creation
+and having to sync the header or directory to the disk. Similar to archiving,
+there are times when log file pre-allocation is disabled internally. Pre-allocation is
+disabled when a backup cursor is open. The user may not walk the list of files returned in
+the backup cursor, but can, instead, copy the directory contents itself. Therefore,
+backup has a contract that all files that existed when the backup cursor was opened will
+continue to exist for the lifetime of the backup cursor. Renaming pre-allocated log
+files would violate that contract.
+
+@section log_records Log operations and records
+
+The unit written to the write-ahead log is a log record. Some log records are made up
+of log operations. The most common log record containing operations is the transaction
+commit log record. Log records are of type \c WT_LOG_RECORD. There is a 16-byte header
+that contains information about this record such as its length on disk, its length
+in memory, a record checksum and whether it is compressed or encrypted. Then the end of
+the log record contains the data for the that record. All log records
+are a multiple of 128 bytes. The reason for that was to avoid any false memory sharing
+when writing records into a memory buffer.
+
+Log operations describe the changes in a transaction. Modifications are collected in
+a memory buffer in a transaction and then when the transaction commits, that set of
+operations is given to the logging subsystem to write as a single commit log record.
+Therefore, transactions consume memory with that buffer as long as the transaction
+is active. The other implication of using this operations buffer is that it is
+simply freed if the transaction is rolled back and there is nothing to record or
+do for a rolled back transaction.
+
+@section log_subsystem Logging subsystem data structures and algorithms
+
+A log sequence number (LSN) identifies the location of a log record. In WiredTiger,
+the LSN is a 64-bit number containing two values, a 32-bit file number and a 32-bit offset.
+The file number portion of the LSN maps to the number in the \c WiredTigerLog. file name.
+The offset portion of the LSN is the byte offset within that file where the log record starts.
+
+There is a \c WT_LOG structure that contains the live information about the state of
+the logging subsystem. This document does not itemize every field. It contains some
+locks and condition variables for synchronization and a large set of LSNs for keeping
+track of the state of the system. Some of the important LSNs maintained are:
+- alloc_lsn: This is the LSN for the next log record allocation.
+- ckpt_lsn: This is the LSN of the last checkpoint.
+- sync_lsn: This is the LSN of the last record synced to disk.
+- write_lsn: This is the LSN of the end of the last record written to the operating system.
+- write_start_lsn: This is the LSN of the start of the last record written to the operating system.
+
+As mentioned earlier, all log records are a multiple of 128 bytes, and that means
+they also have a 128 byte minimum record size. If a buffer is not a multiple, the
+logging subsystem allocates a 128-byte multiple rounded up buffer and copies the
+record into that buffer and zero fills the tail.
+
+Logging supports both compression and at-rest encryption. When compression is enabled,
+WiredTiger only compresses if doing so may result in space savings. Therefore, small records
+that already are below the 128 byte minimum size will not result in any space savings.
+All user log records are encrypted when enabled, regardless of size. When both
+compression and encryption are enabled, compression is performed first, then encryption.
+That resulting log record is then rounded up to the 128-byte multiple.
+
+WiredTiger uses a lock free mechanism to write records to the log
+in the common path.  WiredTiger has a pool of log buffers called
+slots and each thread entering the logging code reserves its memory
+buffer via atomic operations and then fills in its part of the
+memory. When all threads that are using the slot finish their copies
+into the memory, then the slot can be released and written to the
+file system. Slots remain open and the memory available for the
+next thread to use until a flush is forced, the memory fills or a
+timer expires.
+
+This means that for the common case of a user committing a transaction with the
+default synchronization setting of memory-only, the path of writing its record into
+the write-ahead log becomes, essentially, two atomic operations and memory copies. The
+common path does not require acquiring locks.
+
+@section log_threads Internal Threads
+There are several internal logging-related threads that perform
+housekeeping on the logging subsystem. The main thread, called \c
+log_server, is a general thread, meaning it performs several unrelated
+tasks. It flushes out the current slot to the file system. It does
+this flush every 50 milliseconds and this is done so that if a
+system becomes idle, buffered log records in the memory of a slot
+do not languish. The thread also performs log archiving to remove
+any log files that are no longer needed based on the checkpoint
+LSN. Finally the main thread performs log file pre-allocation, if
+configured. The pre-allocation algorithm is adaptable. If the thread
+did not make sufficient numbers of pre-allocated log files the
+system then makes more. If too few were used, then later pre-allocation
+will create fewer of them.
+
+There is another internal thread dedicated to managing operations on log files. This
+is the \c log_file_server thread. I/O operations can be slow and costly so this
+thread takes the burden of closing and syncing files to disk off of user application threads.
+If a log file needs to be closed, then the application thread moves its file handle to the
+\c log->log_close_fh field and signals this thread. This thread will fsync the file
+handle, and then close it. Updating the \c log_close_lsn and the \c sync_lsn values when
+those I/O operations are complete.
+
+The third internal thread manages advancing the \c write_lsn. As the \c write_lsn must
+be advanced in proper LSN order, it becomes a point of single threading
+in the path of writing a log record. The goal is to avoid single threading application
+threads. So after a log slot is written to the file system, the application thread
+only needs to set the slot's state to a special state \c WT_LOG_SLOT_WRITTEN and
+return. This internal thread then walks the array of log slots looking for written
+slots and advances the \c write_lsn in the proper order. Along the way the thread
+will coalesce adjacent LSNs of slots in order to advance the LSN in larger increments.
+This thread will then clean up and mark the state of the processed slots
+as \c WT_LOG_SLOT_FREE.
+
+@section log_usage Using the log
+
+In addition to storing a record of the operations performed to data in the write-ahead
+log, users can write their own strings into the logs via the \c WT_SESSION::log_printf
+method. That method takes a printf-style format string and arguments and will write
+that string into the write-ahead log as a message record type.
+
+Transactions are stored in the write-ahead log and their purpose is to allow recovery
+in the case of crash or failure. When the system is restarted, WiredTiger will always
+run recovery. If the system previously shutdown cleanly, then recovery determines that
+the log does not need to be replayed. Otherwise, recovery replays all operations from
+the LSN of the most recent checkpoint. When timestamps are in use, recovery also
+performs a rollback-to-stable operation on tables that are not logged.
+This aspect of recovery is discussed in @ref arch-rts.
+
+Users can access and view the records in the log using one of two methods. The most
+common method is via the \c wt printlog command. The command utility will print the
+entire log by default. The user can specify optional starting and ending LSNs on the
+command line to limit the output. See @ref command_line for more information.
+
+A log cursor can be opened up on a running system and that cursor
+can walk forward through the log.  Log cursors are described in great detail on
+the @ref cursor_log page.
+
 */
