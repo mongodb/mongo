@@ -197,6 +197,11 @@ public:
     //
     Status checkIfCanBuildIndex() final;
 
+    bool checkIfShouldBlockTTL() const final {
+        // There is no TTL race at the donor side. See parent class for details.
+        return false;
+    }
+
     /**
      * If the given opTime is the commit or abort opTime and the completion promise has not been
      * fulfilled, calls _onMajorityCommitCommitOpTime or _onMajorityCommitAbortOpTime to transition

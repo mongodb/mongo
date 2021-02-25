@@ -139,7 +139,8 @@ TEST_F(TenantMigrationRecipientAccessBlockerTest, StateReject) {
         mtab.appendInfoForServerStatus(&builder);
         ASSERT_BSONOBJ_EQ(builder.obj(),
                           BSON(getTenantId() << BSON("state"
-                                                     << "reject")));
+                                                     << "reject"
+                                                     << "ttlIsBlocked" << true)));
     }
 
     // Default read concern.
@@ -173,11 +174,11 @@ TEST_F(TenantMigrationRecipientAccessBlockerTest, StateRejectBefore) {
     {
         BSONObjBuilder builder;
         mtab.appendInfoForServerStatus(&builder);
-        ASSERT_BSONOBJ_EQ(
-            builder.obj(),
-            BSON(getTenantId() << BSON("state"
-                                       << "rejectBefore"
-                                       << "rejectBeforeTimestamp" << Timestamp(1, 1))));
+        ASSERT_BSONOBJ_EQ(builder.obj(),
+                          BSON(getTenantId() << BSON("state"
+                                                     << "rejectBefore"
+                                                     << "rejectBeforeTimestamp" << Timestamp(1, 1)
+                                                     << "ttlIsBlocked" << true)));
     }
 
     // Advance 'rejectBeforeTimestamp'.
@@ -185,11 +186,11 @@ TEST_F(TenantMigrationRecipientAccessBlockerTest, StateRejectBefore) {
     {
         BSONObjBuilder builder;
         mtab.appendInfoForServerStatus(&builder);
-        ASSERT_BSONOBJ_EQ(
-            builder.obj(),
-            BSON(getTenantId() << BSON("state"
-                                       << "rejectBefore"
-                                       << "rejectBeforeTimestamp" << Timestamp(2, 1))));
+        ASSERT_BSONOBJ_EQ(builder.obj(),
+                          BSON(getTenantId() << BSON("state"
+                                                     << "rejectBefore"
+                                                     << "rejectBeforeTimestamp" << Timestamp(2, 1)
+                                                     << "ttlIsBlocked" << true)));
     }
 
     // Default read concern.

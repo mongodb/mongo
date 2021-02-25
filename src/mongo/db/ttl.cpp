@@ -50,6 +50,7 @@
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/tenant_migration_access_blocker_registry.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/db/storage/durable_catalog.h"
@@ -251,11 +252,27 @@ private:
             return;
 
         if (MONGO_unlikely(hangTTLMonitorWithLock.shouldFail())) {
-            LOGV2(22534, "Hanging due to hangTTLMonitorWithLock fail point");
+            LOGV2(22534,
+                  "Hanging due to hangTTLMonitorWithLock fail point",
+                  "ttlPasses"_attr = ttlPasses.get());
             hangTTLMonitorWithLock.pauseWhileSet(opCtx);
         }
 
         if (!repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss)) {
+            return;
+        }
+
+        std::shared_ptr<TenantMigrationAccessBlocker> mtab;
+        if (coll.getDb() &&
+            nullptr !=
+                (mtab = TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
+                            .getTenantMigrationAccessBlockerForDbName(coll.getDb()->name())) &&
+            mtab->checkIfShouldBlockTTL()) {
+            LOGV2_DEBUG(53768,
+                        1,
+                        "Postpone TTL of DB because of active tenant migration",
+                        "tenantMigrationAccessBlocker"_attr = mtab->getDebugInfo().jsonString(),
+                        "database"_attr = coll.getDb()->name());
             return;
         }
 

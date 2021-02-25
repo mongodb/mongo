@@ -136,6 +136,16 @@ Status TenantMigrationRecipientAccessBlocker::checkIfCanBuildIndex() {
     return Status::OK();
 }
 
+bool TenantMigrationRecipientAccessBlocker::checkIfShouldBlockTTL() const {
+    stdx::lock_guard<Latch> lg(_mutex);
+    return _ttlIsBlocked;
+}
+
+void TenantMigrationRecipientAccessBlocker::stopBlockingTTL() {
+    stdx::lock_guard<Latch> lg(_mutex);
+    _ttlIsBlocked = false;
+}
+
 void TenantMigrationRecipientAccessBlocker::onMajorityCommitPointUpdate(repl::OpTime opTime) {
     // Nothing to do.
     return;
@@ -150,6 +160,7 @@ void TenantMigrationRecipientAccessBlocker::appendInfoForServerStatus(
     if (_rejectBeforeTimestamp) {
         tenantBuilder.append("rejectBeforeTimestamp", _rejectBeforeTimestamp.get());
     }
+    tenantBuilder.append("ttlIsBlocked", _ttlIsBlocked);
     builder->append(_tenantId, tenantBuilder.obj());
 }
 
