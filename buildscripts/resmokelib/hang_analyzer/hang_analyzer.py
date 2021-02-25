@@ -41,7 +41,12 @@ class HangAnalyzer(Subcommand):
         self.options = options
         self.root_logger = None
         self.interesting_processes = [
-            "mongo", "mongod", "mongos", "_test", "dbtest", "python", "java"
+            # Remove "python", "java" from the list to avoid hang analyzer multiple invocations
+            "mongo",
+            "mongod",
+            "mongos",
+            "_test",
+            "dbtest"
         ]
         self.go_processes = []
         self.process_ids = []
