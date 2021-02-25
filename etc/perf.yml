@@ -28,7 +28,7 @@ variables:
   # _skip_compile: &_compile
   #     []
   # _skip_expansions: &_expansion_updates
-  #   - key: mongodb_binary_archive
+  #   - key: mdb_binary_for_server
   #     value: https://mciuploads.s3.amazonaws.com/perf/5f6ca2392fbabe40badf39c4/c39af144b2370be0537410d9bc79be66a1a5f3c7/linux/mongodb-5f6ca2392fbabe40badf39c4.tar.gz
   ###
 
