@@ -98,14 +98,18 @@ void TenantMigrationRecipientOpObserver::onUpdate(OperationContext* opCtx,
             auto mtab = tenant_migration_access_blocker::getTenantMigrationRecipientAccessBlocker(
                 opCtx->getServiceContext(), recipientStateDoc.getTenantId());
 
-            if (recipientStateDoc.getExpireAt() && mtab &&
-                mtab->getState() == TenantMigrationRecipientAccessBlocker::State::kReject) {
-                // The TenantMigrationRecipientAccessBlocker entry needs to be removed to re-allow
-                // reads and future migrations with the same tenantId as this migration has already
-                // been aborted and forgotten.
-                TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
-                    .remove(recipientStateDoc.getTenantId());
-                return;
+            if (recipientStateDoc.getExpireAt() && mtab) {
+                if (mtab->getState() == TenantMigrationRecipientAccessBlocker::State::kReject) {
+                    // The TenantMigrationRecipientAccessBlocker entry needs to be removed to
+                    // re-allow reads and future migrations with the same tenantId as this migration
+                    // has already been aborted and forgotten.
+                    TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
+                        .remove(recipientStateDoc.getTenantId());
+                    return;
+                }
+                // Once the state doc is marked garbage collectable the TTL deletions should be
+                // unblocked.
+                mtab->stopBlockingTTL();
             }
 
             switch (recipientStateDoc.getState()) {

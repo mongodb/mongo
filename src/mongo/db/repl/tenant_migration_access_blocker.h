@@ -68,6 +68,14 @@ public:
     //
     virtual Status checkIfCanBuildIndex() = 0;
 
+    // We suspend TTL deletions at the recipient side to avoid the race when a document is updated
+    // at the donor side, which may prevent it from being garbage collected by TTL, while the
+    // recipient side document is deleted by the TTL. The donor side update will fail to propagate
+    // to the recipient because of non-existing recipient side document. There is no necessity to
+    // suspend TTL at the donor side, as the writes are blocked by checking the other related
+    // methods in this class.
+    virtual bool checkIfShouldBlockTTL() const = 0;
+
     /**
      * If the given opTime is the commit or abort opTime and the completion promise has not been
      * fulfilled, calls _onMajorityCommitCommitOpTime or _onMajorityCommitAbortOpTime to transition

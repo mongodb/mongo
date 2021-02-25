@@ -95,6 +95,12 @@ public:
     //
     Status checkIfCanBuildIndex() final;
 
+    // @return true if TTL is blocked
+    bool checkIfShouldBlockTTL() const final;
+
+    // Clear TTL blocker once the state doc is garbage collectable.
+    void stopBlockingTTL();
+
     /**
      * Called when an optime is majority committed.
      */
@@ -135,6 +141,10 @@ private:
     State _state{State::kReject};
 
     boost::optional<Timestamp> _rejectBeforeTimestamp;
+
+    // Start with blocked TTL, unblock when the migration document is marked as
+    // garbage collectable.
+    bool _ttlIsBlocked = true;
 
     std::shared_ptr<executor::TaskExecutor> _asyncBlockingOperationsExecutor;
 };
