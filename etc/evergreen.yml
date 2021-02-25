@@ -9694,10 +9694,12 @@ buildvariants:
             featureFlagShardingFullDDLSupportTimestampedVersion: true,
             featureFlagWindowFunctions: true,
             featureFlagUseSecondaryDelaySecs: true,
+            featureFlagChangeStreamsOptimization: true,
         }"
         --mongosSetParameters="{
             featureFlagTimeseriesCollection: true,
             featureFlagWindowFunctions: true,
+            featureFlagChangeStreamsOptimization: true,
         }"
         --excludeWithAnyTags=incompatible_with_windows_tls
 
@@ -9800,10 +9802,12 @@ buildvariants:
             featureFlagShardingFullDDLSupportTimestampedVersion: true,
             featureFlagWindowFunctions: true,
             featureFlagUseSecondaryDelaySecs: true,
+            featureFlagChangeStreamsOptimization: true,
         }"
         --mongosSetParameters="{
             featureFlagTimeseriesCollection: true,
             featureFlagWindowFunctions: true,
+            featureFlagChangeStreamsOptimization: true,
         }"
         --excludeWithAnyTags=incompatible_with_windows_tls
 
@@ -10372,10 +10376,12 @@ buildvariants:
             featureFlagShardingFullDDLSupportTimestampedVersion: true,
             featureFlagWindowFunctions: true,
             featureFlagUseSecondaryDelaySecs: true,
+            featureFlagChangeStreamsOptimization: true,
         }"
         --mongosSetParameters="{
             featureFlagTimeseriesCollection: true,
             featureFlagWindowFunctions: true,
+            featureFlagChangeStreamsOptimization: true,
         }"
   tasks:
   - name: compile_test_and_package_parallel_core_stream_TG
@@ -11647,10 +11653,12 @@ buildvariants:
             featureFlagShardingFullDDLSupportTimestampedVersion: true,
             featureFlagWindowFunctions: true,
             featureFlagUseSecondaryDelaySecs: true,
+            featureFlagChangeStreamsOptimization: true,
         }"
         --mongosSetParameters="{
             featureFlagTimeseriesCollection: true,
             featureFlagWindowFunctions: true,
+            featureFlagChangeStreamsOptimization: true,
         }"
   tasks:
   - name: compile_test_and_package_serial_TG
@@ -12413,10 +12421,12 @@ buildvariants:
             featureFlagShardingFullDDLSupportTimestampedVersion: true,
             featureFlagWindowFunctions: true,
             featureFlagUseSecondaryDelaySecs: true,
+            featureFlagChangeStreamsOptimization: true,
         }"
         --mongosSetParameters="{
             featureFlagTimeseriesCollection: true,
             featureFlagWindowFunctions: true,
+            featureFlagChangeStreamsOptimization: true,
         }"
   tasks:
   - name: compile_test_and_package_serial_TG
@@ -12582,10 +12592,12 @@ buildvariants:
             featureFlagShardingFullDDLSupportTimestampedVersion: true,
             featureFlagWindowFunctions: true,
             featureFlagUseSecondaryDelaySecs: true,
+            featureFlagChangeStreamsOptimization: true,
         }"
         --mongosSetParameters="{
             featureFlagTimeseriesCollection: true,
             featureFlagWindowFunctions: true,
+            featureFlagChangeStreamsOptimization: true,
         }"
     multiversion_platform: ubuntu1804
     multiversion_edition: enterprise
@@ -12696,10 +12708,12 @@ buildvariants:
             featureFlagShardingFullDDLSupportTimestampedVersion: true,
             featureFlagWindowFunctions: true,
             featureFlagUseSecondaryDelaySecs: true,
+            featureFlagChangeStreamsOptimization: true,
         }"
         --mongosSetParameters="{
             featureFlagTimeseriesCollection: true,
             featureFlagWindowFunctions: true,
+            featureFlagChangeStreamsOptimization: true,
         }"
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under {A,UB}SAN build.
     hang_analyzer_dump_core: false
