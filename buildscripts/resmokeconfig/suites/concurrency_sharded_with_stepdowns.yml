@@ -182,6 +182,7 @@ selector:
   - requires_profiling
   # mongos does not support inserts on timeseries collections
   - requires_timeseries
+  - does_not_support_stepdowns
 
 executor:
   archive:
