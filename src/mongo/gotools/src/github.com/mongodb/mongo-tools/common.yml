@@ -207,7 +207,10 @@ mongo_tools_variables:
       mongod_args: ""
       mongod_port: 33333
     ssl: &mongod_ssl_startup_args
-      mongod_args: "--sslMode requireSSL --sslCAFile common/db/openssl/testdata/ca.pem --sslPEMKeyFile common/db/openssl/testdata/server.pem"
+      mongod_args: "--sslMode requireSSL --sslCAFile common/db/openssl/testdata/ca-ia.pem --sslPEMKeyFile common/db/openssl/testdata/test-server.pem --bind_ip localhost"
+      mongod_port: 33333
+    ssl: &mongod_ssl_startup_args_windows
+      mongod_args: "--sslMode requireSSL --sslCAFile common/db/openssl/testdata/ia-ca.pem --sslPEMKeyFile common/db/openssl/testdata/test-server.pem --bind_ip localhost"
       mongod_port: 33333
     # Set storage engine as mmapv1 for 32 bit variants because WiredTiger requires 64 bit support.
     win32: &mongod_win32_startup_args
@@ -219,7 +222,7 @@ mongo_tools_variables:
       mongo_args: &mongo_default_startup_args_string "--port 33333"
       mongod_port: 33333
     ssl: &mongo_ssl_startup_args
-      mongo_args: "--port 33333 --ssl --sslCAFile ./common/db/openssl/testdata/ca.pem --sslPEMKeyFile ./common/db/openssl/testdata/server.pem --sslAllowInvalidCertificates"
+      mongo_args: "--port 33333 --ssl --sslCAFile ./common/db/openssl/testdata/ca-ia.pem --sslPEMKeyFile ./common/db/openssl/testdata/test-client.pem --sslAllowInvalidCertificates"
       mongod_port: 33333
 
 functions:
@@ -1612,7 +1615,7 @@ buildvariants:
   run_on:
   - debian71-test
   expansions:
-    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
+    gorootvars: 'PATH="/opt/go1.11/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.11/go'
     build_tags: "sasl ssl"
   tasks:
   - name: dist
@@ -1832,7 +1835,7 @@ buildvariants:
   run_on:
   - windows-64-vs2013-compile
   expansions:
-    <<: *mongod_ssl_startup_args
+    <<: *mongod_ssl_startup_args_windows
     <<: *mongo_ssl_startup_args
     mongo_os: "windows-64"
     mongo_target: "windows_x86_64-2008plus-ssl"
@@ -1947,7 +1950,7 @@ buildvariants:
   stepback: false
   batchtime: 10080 # weekly
   expansions:
-    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go CC=/opt/mongodbtoolchain/v2/bin/s390x-mongodb-linux-gcc'
+    gorootvars: 'PATH="/opt/go1.11/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.11/go CC=/opt/mongodbtoolchain/v2/bin/s390x-mongodb-linux-gcc'
     build_tags: "sasl ssl"
   tasks:
   - name: dist
@@ -1982,7 +1985,7 @@ buildvariants:
   stepback: false
   batchtime: 10080 # weekly
   expansions:
-    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go CC=/opt/mongodbtoolchain/v2/bin/s390x-mongodb-linux-gcc'
+    gorootvars: 'PATH="/opt/go1.11/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.11/go CC=/opt/mongodbtoolchain/v2/bin/s390x-mongodb-linux-gcc'
     build_tags: "sasl ssl"
   tasks:
   - name: dist
