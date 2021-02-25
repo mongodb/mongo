@@ -280,7 +280,8 @@ public:
 
     long long metricsAppliedCount() const {
         BSONObjBuilder bob;
-        _metrics->serialize(&bob, ReshardingMetrics::ReporterOptions::Role::kRecipient);
+        _metrics->serializeCurrentOpMetrics(&bob,
+                                            ReshardingMetrics::ReporterOptions::Role::kRecipient);
         return bob.obj()["oplogEntriesApplied"_sd].Long();
     }
 
