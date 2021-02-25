@@ -100,18 +100,18 @@ DEATH_TEST_F(ReshardingMetricsTest, UpdateMetricsBeforeOnStart, "No operation is
 }
 
 DEATH_TEST_F(ReshardingMetricsTest, RunOnCompletionBeforeOnStart, "No operation is in progress") {
-    getMetrics()->onCompletion(ReshardingMetrics::OperationStatus::kSucceeded);
+    getMetrics()->onCompletion(ReshardingOperationStatusEnum::kSuccess);
 }
 
 TEST_F(ReshardingMetricsTest, OperationStatus) {
     auto constexpr kTag = "opStatus";
     // No operation has completed yet, so the status is unknown.
-    checkMetrics(kTag, (int)ReshardingMetrics::OperationStatus::kUnknown);
-    for (auto status : {ReshardingMetrics::OperationStatus::kSucceeded,
-                        ReshardingMetrics::OperationStatus::kFailed,
-                        ReshardingMetrics::OperationStatus::kCanceled}) {
+    checkMetrics(kTag, (int)ReshardingOperationStatusEnum::kInactive);
+    for (auto status : {ReshardingOperationStatusEnum::kSuccess,
+                        ReshardingOperationStatusEnum::kFailure,
+                        ReshardingOperationStatusEnum::kCanceled}) {
         getMetrics()->onStart();
-        checkMetrics(kTag, (int)ReshardingMetrics::OperationStatus::kUnknown);
+        checkMetrics(kTag, (int)ReshardingOperationStatusEnum::kRunning);
         getMetrics()->onCompletion(status);
         checkMetrics(kTag, (int)status);
     }
@@ -124,17 +124,17 @@ TEST_F(ReshardingMetricsTest, TestOperationStatus) {
 
     for (auto i = 0; i < kNumSuccessfulOps; i++) {
         getMetrics()->onStart();
-        getMetrics()->onCompletion(ReshardingMetrics::OperationStatus::kSucceeded);
+        getMetrics()->onCompletion(ReshardingOperationStatusEnum::kSuccess);
     }
 
     for (auto i = 0; i < kNumFailedOps; i++) {
         getMetrics()->onStart();
-        getMetrics()->onCompletion(ReshardingMetrics::OperationStatus::kFailed);
+        getMetrics()->onCompletion(ReshardingOperationStatusEnum::kFailure);
     }
 
     for (auto i = 0; i < kNumCanceledOps; i++) {
         getMetrics()->onStart();
-        getMetrics()->onCompletion(ReshardingMetrics::OperationStatus::kCanceled);
+        getMetrics()->onCompletion(ReshardingOperationStatusEnum::kCanceled);
     }
 
     checkMetrics("countReshardingSuccessful", kNumSuccessfulOps);
@@ -150,7 +150,7 @@ TEST_F(ReshardingMetricsTest, TestOperationStatus) {
 TEST_F(ReshardingMetricsTest, TestElapsedTime) {
     getMetrics()->onStart();
     advanceTime();
-    getMetrics()->onCompletion(ReshardingMetrics::OperationStatus::kSucceeded);
+    getMetrics()->onCompletion(ReshardingOperationStatusEnum::kSuccess);
     checkMetrics("totalOperationTimeElapsedMillis", kTimerStep);
 }
 
@@ -176,7 +176,7 @@ TEST_F(ReshardingMetricsTest, TestDonorAndRecipientMetrics) {
     advanceTime();
 
     const auto report = getReport();
-    getMetrics()->onCompletion(ReshardingMetrics::OperationStatus::kSucceeded);
+    getMetrics()->onCompletion(ReshardingOperationStatusEnum::kSuccess);
 
     checkMetrics(report, "totalCopyTimeElapsedMillis", kTimerStep);
     checkMetrics(report, "bytesCopied", kBytesToCopy * kCopyProgress / 100);
@@ -195,7 +195,7 @@ TEST_F(ReshardingMetricsTest, MetricsAreRetainedAfterCompletion) {
 
     getMetrics()->onStart();
     advanceTime();
-    getMetrics()->onCompletion(ReshardingMetrics::OperationStatus::kSucceeded);
+    getMetrics()->onCompletion(ReshardingOperationStatusEnum::kSuccess);
     advanceTime();
 
     checkMetrics(kTag, kTimerStep, "Metrics are not retained");
@@ -258,7 +258,7 @@ TEST_F(ReshardingMetricsTest, CurrentOpReportForDonor) {
                              "countWritesDuringCriticalSection: 0,"
                              "totalCriticalSectionTimeElapsed : 3,"
                              "donorState: \"{4}\","
-                             "opStatus: \"actively running\" }}",
+                             "opStatus: \"running\" }}",
                              options.id.toString(),
                              options.nss.toString(),
                              options.shardKey.toString(),
@@ -322,7 +322,7 @@ TEST_F(ReshardingMetricsTest, CurrentOpReportForRecipient) {
                              "oplogEntriesApplied: 0,"
                              "totalApplyTimeElapsed: 0,"
                              "recipientState: \"{11}\","
-                             "opStatus: \"actively running\" }}",
+                             "opStatus: \"running\" }}",
                              options.id.toString(),
                              options.nss.toString(),
                              options.shardKey.toString(),
@@ -367,7 +367,7 @@ TEST_F(ReshardingMetricsTest, CurrentOpReportForCoordinator) {
                              "totalOperationTimeElapsed: {4},"
                              "remainingOperationTimeEstimated: -1,"
                              "coordinatorState: \"{5}\","
-                             "opStatus: \"actively running\" }}",
+                             "opStatus: \"running\" }}",
                              options.id.toString(),
                              options.nss.toString(),
                              options.shardKey.toString(),

@@ -80,6 +80,16 @@ enums:
             kDone: "done"
             kError: "error"
 
+    ReshardingOperationStatus:
+        description: "The status of the current or most recent resharding operation."
+        type: string
+        values:
+            kSuccess: "success"
+            kFailure: "failure"
+            kCanceled: "canceled"
+            kRunning: "running"
+            kInactive: "inactive"
+
 structs:
     CommonReshardingMetadata:
         description: "Metadata shared across all node types for a resharding operation."

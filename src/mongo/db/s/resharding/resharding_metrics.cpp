@@ -94,20 +94,21 @@ void ReshardingMetrics::onStart() noexcept {
     // Create a new operation and record the time it started.
     _currentOp.emplace(_svcCtx->getFastClockSource());
     _currentOp->runningOperation.start();
+    _currentOp->opStatus = ReshardingOperationStatusEnum::kRunning;
     _started++;
 }
 
-void ReshardingMetrics::onCompletion(ReshardingMetrics::OperationStatus status) noexcept {
+void ReshardingMetrics::onCompletion(ReshardingOperationStatusEnum status) noexcept {
     stdx::lock_guard<Latch> lk(_mutex);
     invariant(_currentOp.has_value() && !_currentOp->isCompleted(), kNoOperationInProgress);
     switch (status) {
-        case OperationStatus::kSucceeded:
+        case ReshardingOperationStatusEnum::kSuccess:
             _succeeded++;
             break;
-        case OperationStatus::kFailed:
+        case ReshardingOperationStatusEnum::kFailure:
             _failed++;
             break;
-        case OperationStatus::kCanceled:
+        case ReshardingOperationStatusEnum::kCanceled:
             _canceled++;
             break;
         default:
@@ -119,7 +120,7 @@ void ReshardingMetrics::onCompletion(ReshardingMetrics::OperationStatus status) 
     _currentOp->copyingDocuments.tryEnd();
     _currentOp->applyingOplogEntries.tryEnd();
     _currentOp->inCriticalSection.tryEnd();
-    _currentOp->completionStatus.emplace(std::move(status));
+    _currentOp->opStatus = status;
 }
 
 void ReshardingMetrics::setDonorState(DonorStateEnum state) noexcept {
@@ -233,20 +234,6 @@ Milliseconds ReshardingMetrics::OperationMetrics::TimeInterval::duration() const
     return duration_cast<Milliseconds>(_end.value() - _start.value());
 }
 
-std::string OperationStatus_serializer(const ReshardingMetrics::OperationStatus& status) noexcept {
-    switch (status) {
-        case ReshardingMetrics::OperationStatus::kUnknown:
-            return "actively running";
-        case ReshardingMetrics::OperationStatus::kSucceeded:
-            return "success";
-        case ReshardingMetrics::OperationStatus::kFailed:
-            return "failure";
-        case ReshardingMetrics::OperationStatus::kCanceled:
-            return "canceled";
-    }
-    MONGO_UNREACHABLE;
-}
-
 void ReshardingMetrics::OperationMetrics::append(BSONObjBuilder* bob, Role role) const {
     auto getElapsedTime = [role](const TimeInterval& interval) -> int64_t {
         if (role == Role::kAll)
@@ -296,25 +283,24 @@ void ReshardingMetrics::OperationMetrics::append(BSONObjBuilder* bob, Role role)
                     getElapsedTime(inCriticalSection));
     }
 
-    const auto operationStatus = completionStatus.value_or(OperationStatus::kUnknown);
     switch (role) {
         case Role::kDonor:
             bob->append(kDonorState, DonorState_serializer(donorState));
-            bob->append(kCompletionStatus, OperationStatus_serializer(operationStatus));
+            bob->append(kCompletionStatus, ReshardingOperationStatus_serializer(opStatus));
             break;
         case Role::kRecipient:
             bob->append(kRecipientState, RecipientState_serializer(recipientState));
-            bob->append(kCompletionStatus, OperationStatus_serializer(operationStatus));
+            bob->append(kCompletionStatus, ReshardingOperationStatus_serializer(opStatus));
             break;
         case Role::kCoordinator:
             bob->append(kCoordinatorState, CoordinatorState_serializer(coordinatorState));
-            bob->append(kCompletionStatus, OperationStatus_serializer(operationStatus));
+            bob->append(kCompletionStatus, ReshardingOperationStatus_serializer(opStatus));
             break;
         case Role::kAll:
             bob->append(kDonorState, donorState);
             bob->append(kRecipientState, recipientState);
             bob->append(kCoordinatorState, coordinatorState);
-            bob->append(kCompletionStatus, operationStatus);
+            bob->append(kCompletionStatus, opStatus);
             break;
         default:
             MONGO_UNREACHABLE;

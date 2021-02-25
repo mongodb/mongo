@@ -270,7 +270,7 @@ SemiFuture<void> ReshardingRecipientService::RecipientStateMachine::run(
                 stdx::lock_guard<Latch> lg(_mutex);
                 if (_completionPromise.getFuture().isReady()) {
                     // interrupt() was called before we got here.
-                    _metrics()->onCompletion(ReshardingMetrics::OperationStatus::kCanceled);
+                    _metrics()->onCompletion(ReshardingOperationStatusEnum::kCanceled);
                     return;
                 }
             }
@@ -287,15 +287,15 @@ SemiFuture<void> ReshardingRecipientService::RecipientStateMachine::run(
                 }
 
                 _removeRecipientDocument();
-                _metrics()->onCompletion(ReshardingMetrics::OperationStatus::kSucceeded);
+                _metrics()->onCompletion(ReshardingOperationStatusEnum::kSuccess);
                 stdx::lock_guard<Latch> lg(_mutex);
                 if (!_completionPromise.getFuture().isReady()) {
                     _completionPromise.emplaceValue();
                 }
             } else {
                 _metrics()->onCompletion(ErrorCodes::isCancelationError(status)
-                                             ? ReshardingMetrics::OperationStatus::kCanceled
-                                             : ReshardingMetrics::OperationStatus::kFailed);
+                                             ? ReshardingOperationStatusEnum::kCanceled
+                                             : ReshardingOperationStatusEnum::kFailure);
                 stdx::lock_guard<Latch> lg(_mutex);
                 if (!_completionPromise.getFuture().isReady()) {
                     _completionPromise.setError(status);
