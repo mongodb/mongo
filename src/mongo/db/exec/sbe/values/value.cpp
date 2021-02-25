@@ -45,9 +45,25 @@ namespace sbe {
 namespace value {
 
 std::pair<TypeTags, Value> makeCopyBsonRegex(const BsonRegex& regex) {
-    auto buffer = new char[regex.byteSize()];
-    memcpy(buffer, regex.data(), regex.byteSize());
-    return {TypeTags::bsonRegex, bitcastFrom<char*>(buffer)};
+    auto buffer = std::make_unique<char[]>(regex.byteSize());
+    memcpy(buffer.get(), regex.data(), regex.byteSize());
+    return {TypeTags::bsonRegex, bitcastFrom<char*>(buffer.release())};
+}
+
+std::pair<TypeTags, Value> makeNewBsonRegex(std::string_view pattern, std::string_view flags) {
+    // Add 2 to account NULL bytes after pattern and flags.
+    auto totalSize = pattern.size() + flags.size() + 2;
+    auto buffer = std::make_unique<char[]>(totalSize);
+    auto rawBuffer = buffer.get();
+
+    // Copy pattern first and flags after it.
+    memcpy(rawBuffer, pattern.data(), pattern.size());
+    memcpy(rawBuffer + pattern.size() + 1, flags.data(), flags.size());
+
+    // Ensure NULL byte is placed after each part.
+    rawBuffer[pattern.size()] = '\0';
+    rawBuffer[totalSize - 1] = '\0';
+    return {TypeTags::bsonRegex, bitcastFrom<char*>(buffer.release())};
 }
 
 std::pair<TypeTags, Value> makeCopyBsonJavascript(std::string_view code) {

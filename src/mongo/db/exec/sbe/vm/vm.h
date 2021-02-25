@@ -127,6 +127,11 @@ std::pair<value::TypeTags, value::Value> genericCompare(
         auto threeWayResult = memcmp(lhsObjId, rhsObjId, sizeof(value::ObjectIdType));
         auto booleanResult = op(threeWayResult, 0);
         return {value::TypeTags::Boolean, value::bitcastFrom<bool>(booleanResult)};
+    } else if (lhsTag == value::TypeTags::bsonRegex && rhsTag == value::TypeTags::bsonRegex) {
+        auto lhsRegex = value::getBsonRegexView(lhsValue);
+        auto rhsRegex = value::getBsonRegexView(rhsValue);
+        auto result = op(lhsRegex.dataView(), rhsRegex.dataView());
+        return {value::TypeTags::Boolean, value::bitcastFrom<bool>(result)};
     }
 
     return {value::TypeTags::Nothing, 0};
