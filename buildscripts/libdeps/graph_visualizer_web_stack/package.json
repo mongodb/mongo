@@ -1,0 +1,56 @@
+{
+  "name": "graph_visualizer",
+  "version": "4.0.0",
+  "private": true,
+  "engines": {
+    "node": ">=12.0.0"
+  },
+  "engineStrict": true,
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "start-flask": "cd flask && flask run --no-debugger",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject"
+  },
+  "dependencies": {
+    "@emotion/react": "^11.1.4",
+    "@emotion/styled": "^11.0.0",
+    "@material-ui/core": "^5.0.0-alpha.1",
+    "@material-ui/icons": "^5.0.0-alpha.1",
+    "@material-ui/lab": "^5.0.0-alpha.1",
+    "canvas": "^2.5.0",
+    "date-fns": "^2.16.1",
+    "dayjs": "^1.9.7",
+    "http-server": "^0.12.3",
+    "luxon": "^1.25.0",
+    "moment": "^2.29.1",
+    "p-limit": "^3.0.2",
+    "react": "^16.8",
+    "react-dom": "^16.0.0",
+    "react-force-graph-2d": "^1.18.1",
+    "react-force-graph-3d": "^1.18.8",
+    "react-indiana-drag-scroll": "^1.8.0",
+    "react-redux": "^7.2.2",
+    "react-scripts": "latest",
+    "react-split-pane": "^0.1.92",
+    "react-virtualized": "^9.22.2",
+    "react-window": "^1.8.6",
+    "redux": "^4.0.5",
+    "socket.io-client": "latest",
+    "typescript": "^3.9.7"
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "proxy": "http://localhost:5000"
+}

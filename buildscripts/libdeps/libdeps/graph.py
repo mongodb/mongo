@@ -29,6 +29,8 @@ These are used for attributing data across the build scripts and analyzer script
 
 from enum import Enum, auto
 
+import networkx
+
 
 class CountTypes(Enum):
     """Enums for the different types of counts to perform on a graph."""
@@ -76,3 +78,16 @@ class NodeProps(Enum):
 
     shim = auto()
     bin_type = auto()
+
+
+class LibdepsGraph(networkx.DiGraph):
+    """Class for analyzing the graph."""
+
+    def __init__(self, graph=networkx.DiGraph()):
+        """Load the graph data."""
+
+        super().__init__(incoming_graph_data=graph)
+
+        # Load in the graph and store a reversed version as well for quick look ups
+        # the in directions.
+        self.rgraph = graph.reverse()

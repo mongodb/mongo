@@ -39,6 +39,7 @@
 *.*sdf
 *.psess
 *.tmp
+*.eslintcache
 *#
 .#*
 
@@ -55,6 +56,10 @@
 /src/third_party/*/*.cache
 /src/third_party/*/*.tlog
 /src/third_party/*/*.lastbuildstate
+/buildscripts/libdeps/graph_visualizer_web_stack/build
+/buildscripts/libdeps/graph_visualizer_web_stack/node_modules
+package-lock.json
+libdeps.graphml
 config.log
 settings.py
 log_config.py
