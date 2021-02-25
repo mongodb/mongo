@@ -400,7 +400,7 @@ tasks:
         file: ./expansions.yml
     - command: shell.exec
       params:
-        script: ./src/genny/scripts/genny_auto_tasks.sh all_tasks
+        script: ./src/dsi/run-dsi schedule_tasks --tasks all_tasks
     - command: generate.tasks
       params:
         files:
@@ -416,7 +416,7 @@ tasks:
         file: ./expansions.yml
     - command: shell.exec
       params:
-        script: ./src/genny/scripts/genny_auto_tasks.sh variant_tasks
+        script: ./src/dsi/run-dsi schedule_tasks --tasks variant_tasks
     - command: generate.tasks
       params:
         files:
@@ -432,7 +432,7 @@ tasks:
         file: ./expansions.yml
     - command: shell.exec
       params:
-        script: ./src/genny/scripts/genny_auto_tasks.sh patch_tasks
+        script: ./src/dsi/run-dsi schedule_tasks --tasks patch_tasks
     - command: generate.tasks
       params:
         files:
