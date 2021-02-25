@@ -77,7 +77,7 @@ void ReplSetHeartbeatResponse::addToBSON(BSONObjBuilder* builder) const {
         *builder << kConfigFieldName << _config.toBSON();
     }
     if (_stateSet) {
-        builder->appendIntOrLL(kMemberStateFieldName, _state.s);
+        builder->appendNumber(kMemberStateFieldName, _state.s);
     }
     if (_configVersion != -1) {
         *builder << kConfigVersionFieldName << _configVersion;

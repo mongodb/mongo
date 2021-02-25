@@ -274,14 +274,14 @@ std::unique_ptr<PlanStageStats> TraverseStage::getStats(bool includeDebugInfo) c
     if (includeDebugInfo) {
         DebugPrinter printer;
         BSONObjBuilder bob;
-        bob.appendNumber("innerOpens", _specificStats.innerOpens);
-        bob.appendNumber("innerCloses", _specificStats.innerCloses);
-        bob.appendIntOrLL("inputSlot", _inField);
-        bob.appendIntOrLL("outputSlot", _outField);
-        bob.appendIntOrLL("outputSlotInner", _outFieldInner);
+        bob.appendNumber("innerOpens", static_cast<long long>(_specificStats.innerOpens));
+        bob.appendNumber("innerCloses", static_cast<long long>(_specificStats.innerCloses));
+        bob.appendNumber("inputSlot", static_cast<long long>(_inField));
+        bob.appendNumber("outputSlot", static_cast<long long>(_outField));
+        bob.appendNumber("outputSlotInner", static_cast<long long>(_outFieldInner));
         bob.append("correlatedSlots", _correlatedSlots);
         if (_nestedArraysDepth) {
-            bob.appendNumber("nestedArraysDepth", *_nestedArraysDepth);
+            bob.appendNumber("nestedArraysDepth", static_cast<long long>(*_nestedArraysDepth));
         }
         if (_fold) {
             bob.append("fold", printer.print(_fold->debugPrint()));
