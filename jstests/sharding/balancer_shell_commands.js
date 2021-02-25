@@ -2,6 +2,12 @@
  * Test shell balancer commands.
  *  sh.setBalancerState
  *  sh.getBalancerState
+ *
+ *  @tags: [
+ *   # SERVER-54796 sh.enableAutoSplit() writes to the config server
+ *   # through mongos that doesn't support retries to config server
+ *   does_not_support_config_stepdowns,
+ * ]
  */
 
 var db;
