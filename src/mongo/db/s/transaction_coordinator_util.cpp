@@ -274,11 +274,19 @@ Future<PrepareVoteConsensus> sendPrepare(ServiceContext* service,
                // Initial value
                PrepareVoteConsensus{int(participants.size())},
                // Aggregates an incoming response (next) with the existing aggregate value (result)
-               [&prepareScheduler = *prepareScheduler](PrepareVoteConsensus& result,
-                                                       const PrepareResponse& next) {
+               [&prepareScheduler = *prepareScheduler, txnNumber](PrepareVoteConsensus& result,
+                                                                  const PrepareResponse& next) {
                    result.registerVote(next);
 
                    if (next.vote == PrepareVote::kAbort) {
+                       LOGV2_DEBUG(5141701,
+                                   1,
+                                   "Received abort prepare vote from node",
+                                   "shardId"_attr = next.shardId,
+                                   "txnNumber"_attr = txnNumber,
+                                   "error"_attr = (next.abortReason.has_value()
+                                                       ? next.abortReason.value().reason()
+                                                       : ""));
                        prepareScheduler.shutdown(
                            {ErrorCodes::TransactionCoordinatorReachedAbortDecision,
                             str::stream() << "Received abort vote from " << next.shardId});
