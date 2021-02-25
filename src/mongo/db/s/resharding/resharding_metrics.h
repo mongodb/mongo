@@ -41,8 +41,6 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/uuid.h"
 
-#pragma once
-
 namespace mongo {
 
 /*
@@ -83,8 +81,7 @@ public:
 
     // Marks the completion of the current (active) resharding operation. Aborts the process if no
     // resharding operation is in progress.
-    enum class OperationStatus { kUnknown = -1, kSucceeded = 0, kFailed = 1, kCanceled = 2 };
-    void onCompletion(OperationStatus) noexcept;
+    void onCompletion(ReshardingOperationStatusEnum) noexcept;
 
     struct ReporterOptions {
         enum class Role { kAll, kDonor, kRecipient, kCoordinator };
@@ -103,6 +100,14 @@ public:
     };
     BSONObj reportForCurrentOp(const ReporterOptions& options) const noexcept;
 
+    /**
+     * Append metrics to the builder in CurrentOp format for the given `role`.
+     * If `role` is omitted, append in ServerStatus format.
+     * There are significant format differences. ServerStatus:
+     *   - Uses integers instead of names for enum values to improve FTDC compression.
+     *   - Uses millisecond time intervals and + 'Millis' field name suffixes.
+     *   - Has no role. Any data from any available resharding role is merged in.
+     */
     void serialize(BSONObjBuilder*, ReporterOptions::Role role = ReporterOptions::Role::kAll) const;
 
     // Reports the elapsed time for the active resharding operation, or `boost::none`.
@@ -151,11 +156,12 @@ private:
         void append(BSONObjBuilder*, Role) const;
 
         bool isCompleted() const noexcept {
-            return completionStatus.has_value();
+            return !(opStatus == ReshardingOperationStatusEnum::kRunning ||
+                     opStatus == ReshardingOperationStatusEnum::kInactive);
         }
 
         TimeInterval runningOperation;
-        boost::optional<OperationStatus> completionStatus;
+        ReshardingOperationStatusEnum opStatus = ReshardingOperationStatusEnum::kInactive;
 
         TimeInterval copyingDocuments;
         int64_t documentsToCopy = 0;
