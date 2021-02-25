@@ -226,6 +226,35 @@ structs:
                     lte: 2.0
                     gte: -2.98
                     callback: "callback"
+    AddedOptionalTypeFieldStruct:
+        description: "This struct contains a field that is added and optional in the new version"
+
+    StableOptionalTypeFieldStruct:
+        description: "This struct contains a field that is stable and optional in the new version
+                      but unstable in the corresponding old version"
+        fields:
+            addedOptionalTypeField:
+                type: string
+                unstable: true
+
+    RemovedUnstableTypeFieldStruct:
+        description: "This struct contains a field that is unstable in the old version and
+                      is removed in the new version"
+        fields:
+            removedUnstableTypeField:
+                type: string
+                unstable: true
+
+    AddedUnstableTypeFieldStruct:
+        description: "This struct contains a field that is added and unstable in the new version"
+
+    KeptUnstableTypeFieldStruct:
+        description: "This struct contains a field that is unstable in the new version and also
+                      exists in the old version"
+        fields:
+            keptUnstableTypeField:
+                type: string
+                unstable: true
 
 commands:
     testCommand:
@@ -610,6 +639,60 @@ commands:
         namespace: type
         type: OptionalNewField
         cpp_name: newTypeFieldOptional
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    newTypeFieldAddedOptional:
+        description: "new optional type field is added and should pass"
+        command_name: newTypeFieldAddedOptional
+        namespace: type
+        type: AddedOptionalTypeFieldStruct
+        cpp_name: newTypeFieldAddedOptional
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    newTypeFieldStableOptional:
+        description: "new command has an optional type field that is unstable
+                      in the corresponding old command and still passes"
+        command_name: newTypeFieldStableOptional
+        namespace: type
+        type: StableOptionalTypeFieldStruct
+        cpp_name: newTypeFieldStableOptional
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    removeTypeFieldUnstable:
+        description: "new command removes type field that is unstable
+                      in the corresponding old command and still passes"
+        command_name: removeTypeFieldUnstable
+        namespace: type
+        type: RemovedUnstableTypeFieldStruct
+        cpp_name: removeTypeFieldUnstable
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    addedUnstableTypeField:
+        description: "new command has a new unstable type field that does not
+                      exist in the corresponding old command and still passes"
+        command_name: addedUnstableTypeField
+        namespace: type
+        type: AddedUnstableTypeFieldStruct
+        cpp_name: addedUnstableTypeField
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    keptUnstableTypeField:
+        description: "new command has an unstable type field that also
+                      exists in the corresponding old command and still passes"
+        command_name: keptUnstableTypeField
+        namespace: type
+        type: KeptUnstableTypeFieldStruct
+        cpp_name: keptUnstableTypeField
         strict: true
         api_version: "1"
         reply_type: OkReply
