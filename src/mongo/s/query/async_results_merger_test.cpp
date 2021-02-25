@@ -1094,7 +1094,10 @@ TEST_F(AsyncResultsMergerTest, GetMoreBatchSizes) {
     readyEvent = unittest::assertGet(arm->nextEvent());
 
     BSONObj scheduledCmd = getNthPendingRequest(0).cmdObj;
-    auto request = GetMoreRequest::parseFromBSON("anydbname", scheduledCmd);
+    auto request = GetMoreRequest::parseFromBSON("anydbname",
+                                                 scheduledCmd.addField(BSON("$db"
+                                                                            << "anydbname")
+                                                                           .firstElement()));
     ASSERT_OK(request.getStatus());
     ASSERT_EQ(*request.getValue().batchSize, 1LL);
     ASSERT_EQ(request.getValue().cursorid, 1LL);
