@@ -267,6 +267,19 @@ structs:
                     gte: -2.98
                     callback: "callback"
 
+    AddedRequiredTypeFieldStruct:
+        description: "This struct contains a field that is added and required in the new version."
+        fields:
+            addedRequiredTypeField:
+                type: string
+
+    StableRequiredTypeFieldStruct:
+        description: "This struct contains a field that is stable and required in the new version
+                      that was unstable in the old version"
+        fields:
+            stableRequiredTypeField:
+                type: string
+
 commands:
     invalidAPIVersionNew:
         description: "new command fails because of invalid API version"
@@ -829,6 +842,28 @@ commands:
         namespace: type
         type: MissingNewFieldReply
         cpp_name: newTypeFieldMissing
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    newTypeFieldAddedRequired:
+        description: "new command fails because it has an added type field that is required
+                      when it should be optional"
+        command_name: newTypeFieldAddedRequired
+        namespace: type
+        type: AddedRequiredTypeFieldStruct
+        cpp_name: newTypeFieldAddedRequired
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    newTypeFieldStableRequired:
+        description: "new required stable type field fails because it is unstable
+                      in the corresponding old command"
+        command_name: newTypeFieldStableRequired
+        namespace: type
+        type: StableRequiredTypeFieldStruct
+        cpp_name: newTypeFieldStableRequired
         strict: true
         api_version: "1"
         reply_type: OkReply

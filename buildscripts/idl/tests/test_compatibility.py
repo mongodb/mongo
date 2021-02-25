@@ -106,7 +106,7 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
             path.join(dir_path, "compatibility_test_fail/new"), ["src"])
 
         self.assertTrue(error_collection.has_errors())
-        self.assertTrue(error_collection.count() == 56)
+        self.assertTrue(error_collection.count() == 58)
 
         invalid_api_version_new_error = error_collection.get_error_by_command_name(
             "invalidAPIVersionNew")
@@ -386,6 +386,14 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
         new_type_field_missing_error = error_collection.get_error_by_error_id(
             idl_compatibility_errors.ERROR_ID_NEW_COMMAND_TYPE_FIELD_MISSING)
         self.assertRegex(str(new_type_field_missing_error), "newTypeFieldMissing")
+
+        new_type_field_added_required_error = error_collection.get_error_by_error_id(
+            idl_compatibility_errors.ERROR_ID_NEW_COMMAND_TYPE_FIELD_ADDED_REQUIRED)
+        self.assertRegex(str(new_type_field_added_required_error), "newTypeFieldAddedRequired")
+
+        new_type_field_stable_required_error = error_collection.get_error_by_error_id(
+            idl_compatibility_errors.ERROR_ID_NEW_COMMAND_TYPE_FIELD_STABLE_REQUIRED)
+        self.assertRegex(str(new_type_field_stable_required_error), "newTypeFieldStableRequired")
 
         new_reply_field_variant_type_error = error_collection.get_error_by_error_id(
             idl_compatibility_errors.ERROR_ID_NEW_REPLY_FIELD_VARIANT_TYPE)
