@@ -640,23 +640,50 @@ boost::optional<TimeseriesOptions> getTimeseriesOptions(OperationContext* opCtx,
 BSONObj makeTimeseriesIndexSpecKey(const TimeseriesOptions& timeseriesOptions,
                                    const CreateIndexesCommand& origCmd,
                                    const BSONObj& origKey) {
+    auto timeField = timeseriesOptions.getTimeField();
     auto metaField = timeseriesOptions.getMetaField();
 
     BSONObjBuilder builder;
     for (const auto& elem : origKey) {
-        if (metaField) {
-            if (elem.fieldNameStringData() == *metaField) {
-                builder.appendAs(elem, BucketUnpacker::kBucketMetaFieldName);
-                continue;
+        // Determine if the index requested on the time field is ascending or descending.
+        // The final index spec will be subjected to a more complete validation in
+        // index_key_validate::validateKeyPattern().
+        if (elem.fieldNameStringData() == timeField) {
+            uassert(
+                ErrorCodes::CannotCreateIndex,
+                str::stream() << "Failed to convert index spec for time-series collection: "
+                              << redact(origCmd.toBSON({}))  // 'origKey' is included in 'origCmd'
+                              << ". Indexes on the time field must be ascending or descending "
+                                 "(numbers only): "
+                              << elem,
+                elem.isNumber());
+            if (elem.number() >= 0) {
+                builder.appendAs(elem, str::stream() << "control.min." << timeField);
+                builder.appendAs(elem, str::stream() << "control.max." << timeField);
+            } else {
+                builder.appendAs(elem, str::stream() << "control.max." << timeField);
+                builder.appendAs(elem, str::stream() << "control.min." << timeField);
             }
+            continue;
+        }
 
-            if (elem.fieldNameStringData().startsWith(*metaField + ".")) {
-                builder.appendAs(elem,
-                                 str::stream()
-                                     << BucketUnpacker::kBucketMetaFieldName << "."
-                                     << elem.fieldNameStringData().substr(metaField->size() + 1));
-                continue;
-            }
+        uassert(ErrorCodes::CannotCreateIndex,
+                str::stream() << "Failed to convert index spec for time-series collection: "
+                              << redact(origCmd.toBSON({}))  // 'origKey' is included in 'origCmd'
+                              << ". Index must be either on the meta or the time field: " << elem,
+                metaField);
+
+        if (elem.fieldNameStringData() == *metaField) {
+            builder.appendAs(elem, BucketUnpacker::kBucketMetaFieldName);
+            continue;
+        }
+
+        if (elem.fieldNameStringData().startsWith(*metaField + ".")) {
+            builder.appendAs(elem,
+                             str::stream()
+                                 << BucketUnpacker::kBucketMetaFieldName << "."
+                                 << elem.fieldNameStringData().substr(metaField->size() + 1));
+            continue;
         }
 
         uasserted(ErrorCodes::CannotCreateIndex,
