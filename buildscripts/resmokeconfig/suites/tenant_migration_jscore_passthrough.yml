@@ -87,19 +87,6 @@ selector:
   - jstests/core/notablescan_capped.js
   # captrunc command is not blocked during tenant migration.
   - jstests/core/capped6.js
-  # TODO (SERVER-54449): Enable index related tests in tenant_migration_jscore_passthrough suite.
-  - jstests/core/*explain*.js
-  - jstests/core/*geo*.js
-  - jstests/core/*index*.js
-  - jstests/core/*multikey*.js
-  - jstests/core/*stage*.js
-  - jstests/core/agg_hint.js
-  - jstests/core/geo_s2sparse.js
-  - jstests/core/insert_illegal_doc.js
-  - jstests/core/ord.js
-  - jstests/core/or2.js
-  - jstests/core/sort_merge.js
-  - jstests/core/splitvector.js
   # TODO (SERVER-51774): Ensure the donor's TenantMigrationCommitted/TenantMigrationAborted write
   # errors don't exceed the max BSON size.
   - jstests/core/batch_write_command_delete.js
