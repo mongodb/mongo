@@ -21,16 +21,14 @@ if (!TimeseriesTest.timeseriesCollectionsEnabled(db.getMongo())) {
     return;
 }
 
-const testDB = db.getSiblingDB(jsTestName());
-assert.commandWorked(testDB.dropDatabase());
-
-const coll = testDB.getCollection('ts');
-const bucketsColl = testDB.getCollection('system.buckets.' + coll.getName());
+const coll = db.timeseries_bucket_index;
+const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
 
 const timeFieldName = 'time';
-assert.commandWorked(
-    testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
-assert.contains(bucketsColl.getName(), testDB.getCollectionNames());
+
+coll.drop();
+assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
+assert.contains(bucketsColl.getName(), db.getCollectionNames());
 
 assert.commandWorked(bucketsColl.createIndex({"control.min.time": 1}));
 
@@ -52,15 +50,15 @@ const maxTime = buckets[0].control.min.time;
 
 assert.docEq(buckets, bucketsColl.find({_id: bucketId}).toArray());
 let explain = bucketsColl.find({_id: bucketId}).explain();
-assert(planHasStage(testDB, explain, "COLLSCAN"), explain);
+assert(planHasStage(db, explain, "COLLSCAN"), explain);
 
 assert.docEq(buckets, bucketsColl.find({"control.min.time": minTime}).toArray());
 explain = bucketsColl.find({"control.min.time": minTime}).explain();
-assert(planHasStage(testDB, explain, "IXSCAN"), explain);
+assert(planHasStage(db, explain, "IXSCAN"), explain);
 
 assert.docEq(buckets, bucketsColl.find({"control.max.time": maxTime}).toArray());
 explain = bucketsColl.find({"control.max.time": minTime}).explain();
-assert(planHasStage(testDB, explain, "IXSCAN"), explain);
+assert(planHasStage(db, explain, "IXSCAN"), explain);
 
 let res = assert.commandWorked(bucketsColl.validate());
 assert(res.valid, res);
