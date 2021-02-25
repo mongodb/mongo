@@ -32,8 +32,10 @@
 
 #include <memory>
 #include <string>
+#include <utility>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/base/status.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/time_support.h"
@@ -44,6 +46,8 @@ struct _timelib_tzdb;
 struct _timelib_tzinfo;
 
 namespace mongo {
+
+using namespace std::string_literals;
 
 /**
  * A TimeZone object represents one way of formatting/reading dates to compute things like the day
@@ -194,15 +198,15 @@ public:
      * Converts a date object to a string according to 'format'. 'format' can be any string literal,
      * containing 0 or more format specifiers like %Y (year) or %d (day of month). Callers must pass
      * a valid format string for 'format', i.e. one that has already been passed to
-     * validateFormat().
+     * validateFormat(). May return a Status indicating that the date value is an unprintable range.
      */
-    std::string formatDate(StringData format, Date_t) const;
+    StatusWith<std::string> formatDate(StringData format, Date_t) const;
 
     /**
      * Like formatDate, except outputs to an output stream like a std::ostream or a StringBuilder.
      */
     template <typename OutputStream>
-    void outputDateWithFormat(OutputStream& os, StringData format, Date_t date) const {
+    auto outputDateWithFormat(OutputStream& os, StringData format, Date_t date) const {
         auto parts = dateParts(date);
         for (auto&& it = format.begin(); it != format.end(); ++it) {
             if (*it != '%') {
@@ -219,51 +223,105 @@ public:
                     break;
                 case 'Y':  // Year
                 {
-                    insertPadded(os, parts.year, 4);
+                    auto status = insertPadded(os, parts.year, 4);
+                    if (status != Status::OK())
+                        return status;
                     break;
                 }
                 case 'm':  // Month
-                    insertPadded(os, parts.month, 2);
+                {
+                    auto status = insertPadded(os, parts.month, 2);
+                    if (status != Status::OK())
+                        return status;
                     break;
+                }
                 case 'd':  // Day of month
-                    insertPadded(os, parts.dayOfMonth, 2);
+                {
+                    auto status = insertPadded(os, parts.dayOfMonth, 2);
+                    if (status != Status::OK())
+                        return status;
                     break;
+                }
                 case 'H':  // Hour
-                    insertPadded(os, parts.hour, 2);
+                {
+                    auto status = insertPadded(os, parts.hour, 2);
+                    if (status != Status::OK())
+                        return status;
                     break;
+                }
                 case 'M':  // Minute
-                    insertPadded(os, parts.minute, 2);
+                {
+                    auto status = insertPadded(os, parts.minute, 2);
+                    if (status != Status::OK())
+                        return status;
                     break;
+                }
                 case 'S':  // Second
-                    insertPadded(os, parts.second, 2);
+                {
+                    auto status = insertPadded(os, parts.second, 2);
+                    if (status != Status::OK())
+                        return status;
                     break;
+                }
                 case 'L':  // Millisecond
-                    insertPadded(os, parts.millisecond, 3);
+                {
+                    auto status = insertPadded(os, parts.millisecond, 3);
+                    if (status != Status::OK())
+                        return status;
                     break;
+                }
                 case 'j':  // Day of year
-                    insertPadded(os, dayOfYear(date), 3);
+                {
+                    auto status = insertPadded(os, dayOfYear(date), 3);
+                    if (status != Status::OK())
+                        return status;
                     break;
+                }
                 case 'w':  // Day of week
-                    insertPadded(os, dayOfWeek(date), 1);
+                {
+                    auto status = insertPadded(os, dayOfWeek(date), 1);
+                    if (status != Status::OK())
+                        return status;
                     break;
+                }
                 case 'U':  // Week
-                    insertPadded(os, week(date), 2);
+                {
+                    auto status = insertPadded(os, week(date), 2);
+                    if (status != Status::OK())
+                        return status;
                     break;
+                }
                 case 'G':  // Iso year of week
-                    insertPadded(os, isoYear(date), 4);
+                {
+                    auto status = insertPadded(os, isoYear(date), 4);
+                    if (status != Status::OK())
+                        return status;
                     break;
+                }
                 case 'V':  // Iso week
-                    insertPadded(os, isoWeek(date), 2);
+                {
+                    auto status = insertPadded(os, isoWeek(date), 2);
+                    if (status != Status::OK())
+                        return status;
                     break;
+                }
                 case 'u':  // Iso day of week
-                    insertPadded(os, isoDayOfWeek(date), 1);
+                {
+                    auto status = insertPadded(os, isoDayOfWeek(date), 1);
+                    if (status != Status::OK())
+                        return status;
                     break;
+                }
                 case 'z':  // UTC offset as ±hhmm.
                 {
                     auto offset = utcOffset(date);
-                    os << ((offset.count() < 0) ? "-" : "+");                            // sign
-                    insertPadded(os, std::abs(durationCount<Hours>(offset)), 2);         // hh
-                    insertPadded(os, std::abs(durationCount<Minutes>(offset)) % 60, 2);  // mm
+                    os << ((offset.count() < 0) ? "-" : "+");  // sign
+                    auto status = insertPadded(os, std::abs(durationCount<Hours>(offset)), 2);
+                    if (status != Status::OK())  // hh
+                        return status;
+                    status = insertPadded(os, std::abs(durationCount<Minutes>(offset)) % 60, 2);
+                    if (status != Status::OK())  // mm
+                        return status;
                     break;
                 }
                 case 'Z':  // UTC offset in minutes.
@@ -274,6 +332,7 @@ public:
                     MONGO_UNREACHABLE;
             }
         }
+        return Status::OK();
     }
 
     /**
@@ -291,15 +350,15 @@ private:
      * count of number we simply insert the number without padding.
      */
     template <typename OutputStream>
-    void insertPadded(OutputStream& os, int number, int width) const {
+    static auto insertPadded(OutputStream& os, int number, int width) {
         invariant(width >= 1);
         invariant(width <= 4);
 
-        uassert(18537,
-                str::stream() << "Could not convert date to string: date component was outside "
-                              << "the supported range of 0-9999: "
-                              << number,
-                (number >= 0) && (number <= 9999));
+        if ((number < 0) || (number > 9999))
+            return Status(ErrorCodes::Error(18537),
+                          str::stream() << "Could not convert date to string: date component was "
+                                           "outside the supported range of 0-9999: "
+                                        << number);
 
         int digits = 1;
 
@@ -315,6 +374,7 @@ private:
             os.write("0000", width - digits);
         }
         os << number;
+        return Status::OK();
     }
 
     struct TimelibTZInfoDeleter {
@@ -326,7 +386,7 @@ private:
 
     // represents the UTC offset in seconds if _tzInfo is null and it is not 0
     Seconds _utcOffset{0};
-};
+};  // namespace mongo
 
 /**
  * A C++ interface wrapping the third-party timelib library. A single instance of this class can be
