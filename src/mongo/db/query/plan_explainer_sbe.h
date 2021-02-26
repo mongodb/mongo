@@ -47,10 +47,10 @@ public:
                      bool isMultiPlan)
         : PlanExplainer{solution},
           _root{root},
+          _rootData{data},
           _solution{solution},
           _rejectedCandidates{std::move(rejectedCandidates)},
-          _isMultiPlan{isMultiPlan},
-          _execPlanDebugInfo{buildExecPlanDebugInfo(_root, data)} {}
+          _isMultiPlan{isMultiPlan} {}
 
     bool isMultiPlan() const final {
         return _isMultiPlan;
@@ -75,16 +75,12 @@ private:
         return boost::none;
     }
 
+    // These fields are are owned elsewhere (e.g. the PlanExecutor or CandidatePlan).
     const sbe::PlanStage* _root{nullptr};
+    const stage_builder::PlanStageData* _rootData{nullptr};
     const QuerySolution* _solution{nullptr};
+
     const std::vector<sbe::plan_ranker::CandidatePlan> _rejectedCandidates;
     const bool _isMultiPlan{false};
-    // Contains information about the slots returned by the PlanStage tree, along with the tree
-    // itself, serialized into a string. This optional object is then included into explain output
-    // and is only initialized when the _root of the PlanStage tree is available. The only case when
-    // it's not available is when PlanStatsDetails are generated from the plan cache (by
-    // calling getCachedPlanStats()), in which case this debug info is already included into the
-    // plan cache entry as part of a serialized winning plan.
-    boost::optional<BSONObj> _execPlanDebugInfo;
 };
 }  // namespace mongo

@@ -487,7 +487,8 @@ PlanExplainer::PlanStatsDetails PlanExplainerSBE::getWinningPlanStats(
     invariant(_root);
     invariant(_solution);
     auto stats = _root->getStats(true /* includeDebugInfo  */);
-    return buildPlanStatsDetails(_solution->root(), stats.get(), _execPlanDebugInfo, verbosity);
+    return buildPlanStatsDetails(
+        _solution->root(), stats.get(), buildExecPlanDebugInfo(_root, _rootData), verbosity);
 }
 
 std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerSBE::getRejectedPlansStats(
