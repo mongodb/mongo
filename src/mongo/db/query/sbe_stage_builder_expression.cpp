@@ -2307,7 +2307,21 @@ public:
         unsupportedExpression(expr->getOpName());
     }
     void visit(ExpressionReverseArray* expr) final {
-        unsupportedExpression(expr->getOpName());
+        auto frameId = _context->frameIdGenerator->generate();
+        auto binds = sbe::makeEs(_context->popExpr());
+        sbe::EVariable inputRef{frameId, 0};
+
+        auto argumentIsNotArray = makeNot(makeFunction("isArray", inputRef.clone()));
+        auto exprRevArr = buildMultiBranchConditional(
+            CaseValuePair{generateNullOrMissing(inputRef),
+                          makeConstant(sbe::value::TypeTags::Null, 0)},
+            CaseValuePair{std::move(argumentIsNotArray),
+                          sbe::makeE<sbe::EFail>(ErrorCodes::Error{5154901},
+                                                 "$reverseArray argument must be an array")},
+            makeFunction("reverseArray", inputRef.clone()));
+
+        _context->pushExpr(
+            sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(exprRevArr)));
     }
     void visit(ExpressionSlice* expr) final {
         unsupportedExpression(expr->getOpName());
