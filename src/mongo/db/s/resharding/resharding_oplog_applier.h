@@ -49,6 +49,21 @@ class ThreadPool;
 /**
  * Applies oplog entries from a specific donor for resharding.
  *
+ * @param sourceId combines the resharding run's UUID with the donor ShardId.
+ * @param oplogNs is the namespace for the collection containing oplog entries this
+ *                ReshardingOplogApplier will read from and apply. There is one oplog per donor.
+ * @param nsBeingResharded is the namespace of the collection being resharded.
+ * @param collUUIDBeingResharded is the UUID of the collection being resharded.
+ * @param allStashNss are the namespaces of the stash collections. There is one stash collection for
+ *                    each donor. This ReshardingOplogApplier will write documents as necessary to
+ *                    the stash collection at `myStashIdx` and may need to read and delete documents
+ *                    from any of the other stash collections.
+ * @param myStashIdx -- see above.
+ * @param reshardingCloneFinishedTs is the timestamp that represents when cloning documents
+ *                                  finished. Applying entries through this time implies the
+ *                                  resharded collection contains a consistent snapshot of data at
+ *                                  that timestamp.
+ *
  * This is not thread safe.
  */
 class ReshardingOplogApplier {

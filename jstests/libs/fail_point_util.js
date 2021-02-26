@@ -33,6 +33,21 @@ configureFailPoint = function(conn, failPointName, data = {}, failPointMode = "a
                     maxTimeMS: maxTimeMS
                 }));
             },
+        waitWithTimeout:
+            function(timeoutMS) {
+                // This function has three possible outcomes:
+                //
+                // 1) Returns true when the failpoint was hit.
+                // 2) Returns false when the command returned a `MaxTimeMSExpired` response.
+                // 3) Otherwise, this throws for an unexpected error.
+                let res = assert.commandWorkedOrFailedWithCode(conn.adminCommand({
+                    waitForFailPoint: failPointName,
+                    timesEntered: this.timesEntered + 1,
+                    maxTimeMS: timeoutMS
+                }),
+                                                               ErrorCodes.MaxTimeMSExpired);
+                return res["ok"] === 1;
+            },
         off:
             function() {
                 assert.commandWorked(

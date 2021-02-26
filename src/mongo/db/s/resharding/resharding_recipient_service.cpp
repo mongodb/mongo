@@ -551,9 +551,9 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
                                                        _recipientDoc.getDonorShards());
     }();
 
-    size_t i = 0;
     auto futuresToWaitOn = std::move(_oplogFetcherFutures);
-    for (const auto& donor : _recipientDoc.getDonorShards()) {
+    for (size_t donorIdx = 0; donorIdx < _recipientDoc.getDonorShards().size(); ++donorIdx) {
+        const auto& donor = _recipientDoc.getDonorShards()[donorIdx];
         {
             stdx::lock_guard<Latch> lk(_mutex);
             _oplogApplierWorkers.emplace_back(
@@ -580,13 +580,13 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
             _recipientDoc.getNss(),
             _recipientDoc.getExistingUUID(),
             stashCollections,
-            i,
+            donorIdx,
             fetchTimestamp,
             // The recipient applies oplog entries from the donor starting from the progress value
             // in progress_applier. Otherwise, it starts at fetchTimestamp, which corresponds to
             // {clusterTime: fetchTimestamp, ts: fetchTimestamp} as a resume token value.
             std::make_unique<ReshardingDonorOplogIterator>(
-                oplogBufferNss, std::move(idToResumeFrom), _oplogFetchers[i].get()),
+                oplogBufferNss, std::move(idToResumeFrom), _oplogFetchers[donorIdx].get()),
             sourceChunkMgr,
             **executor,
             _oplogApplierWorkers.back().get()));
@@ -599,28 +599,39 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
         auto* applier = _oplogAppliers.back().get();
         futuresToWaitOn.emplace_back(applier->applyUntilCloneFinishedTs().then(
             [applier] { return applier->applyUntilDone(); }));
-        ++i;
     }
 
-    return whenAllSucceed(std::move(futuresToWaitOn)).thenRunOn(**executor).then([this] {
-        _transitionState(RecipientStateEnum::kStrictConsistency);
+    return whenAllSucceed(std::move(futuresToWaitOn))
+        .thenRunOn(**executor)
+        .then([this, stashCollections] {
+            auto opCtxRaii = cc().makeOperationContext();
 
-        bool isDonor = [& id = _recipientDoc.get_id()] {
-            auto opCtx = cc().makeOperationContext();
-            auto instance =
-                resharding::tryGetReshardingStateMachine<ReshardingDonorService,
-                                                         ReshardingDonorService::DonorStateMachine,
-                                                         ReshardingDonorDocument>(opCtx.get(), id);
+            for (auto&& stashNss : stashCollections) {
+                AutoGetCollection autoCollOutput(opCtxRaii.get(), stashNss, MODE_IS);
+                uassert(5356800,
+                        "Resharding completed with non-empty stash collections",
+                        autoCollOutput->isEmpty(opCtxRaii.get()));
+            }
+        })
+        .then([this] {
+            _transitionState(RecipientStateEnum::kStrictConsistency);
 
-            return !!instance;
-        }();
+            bool isDonor = [& id = _recipientDoc.get_id()] {
+                auto opCtx = cc().makeOperationContext();
+                auto instance = resharding::tryGetReshardingStateMachine<
+                    ReshardingDonorService,
+                    ReshardingDonorService::DonorStateMachine,
+                    ReshardingDonorDocument>(opCtx.get(), id);
 
-        if (!isDonor) {
-            _critSec.emplace(cc().getServiceContext(), _recipientDoc.getNss());
-        }
+                return !!instance;
+            }();
 
-        _updateCoordinator();
-    });
+            if (!isDonor) {
+                _critSec.emplace(cc().getServiceContext(), _recipientDoc.getNss());
+            }
+
+            _updateCoordinator();
+        });
 }
 
 ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::

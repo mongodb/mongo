@@ -262,8 +262,7 @@ ReshardingOplogApplier::ReshardingOplogApplier(
       _oplogNs(std::move(oplogNs)),
       _nsBeingResharded(std::move(nsBeingResharded)),
       _uuidBeingResharded(std::move(collUUIDBeingResharded)),
-      _outputNs(_nsBeingResharded.db(),
-                "system.resharding.{}"_format(_uuidBeingResharded.toString())),
+      _outputNs(constructTemporaryReshardingNss(_nsBeingResharded.db(), _uuidBeingResharded)),
       _reshardingCloneFinishedTs(std::move(reshardingCloneFinishedTs)),
       _batchPreparer{CollatorInterface::cloneCollator(sourceChunkMgr.getDefaultCollator())},
       _applicationRules(ReshardingOplogApplicationRules(
