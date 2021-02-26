@@ -45,7 +45,7 @@ if (!featureFlagParam.featureFlagShardingFullDDLSupportTimestampedVersion.value)
     return;
 }
 
-let csrs_config_db = st.configRS.getPrimary().getDB('config');
+let configDB = st.s.getDB('config');
 
 assert.commandWorked(st.s.adminCommand({enableSharding: kDbName}));
 
@@ -53,7 +53,7 @@ assert.commandWorked(st.s.adminCommand({enableSharding: kDbName}));
 assert.commandWorked(st.s.adminCommand({shardCollection: kNs, key: {x: 1}}));
 
 // Check that timestamp is created in ConfigSvr and propagated to the shards.
-let coll = csrs_config_db.collections.findOne({_id: kNs});
+let coll = configDB.collections.findOne({_id: kNs});
 assert.neq(null, coll.timestamp);
 let timestampAfterCreate = coll.timestamp;
 checkTimestampConsistencyInPersistentMetadata(kNs, timestampAfterCreate);
@@ -61,7 +61,7 @@ checkTimestampConsistencyInPersistentMetadata(kNs, timestampAfterCreate);
 // Drop the collection and create it again. Collection timestamp should then be updated.
 st.s.getDB(kDbName).coll.drop();
 assert.commandWorked(st.s.adminCommand({shardCollection: kNs, key: {x: 1}}));
-coll = csrs_config_db.collections.findOne({_id: kNs});
+coll = configDB.collections.findOne({_id: kNs});
 assert.neq(null, coll.timestamp);
 let timestampAfterDropCreate = coll.timestamp;
 assert.eq(timestampCmp(timestampAfterDropCreate, timestampAfterCreate), 1);
@@ -70,7 +70,7 @@ checkTimestampConsistencyInPersistentMetadata(kNs, timestampAfterDropCreate);
 // Refine sharding key. Collection timestamp should then be updated.
 assert.commandWorked(st.s.getCollection(kNs).createIndex({x: 1, y: 1}));
 assert.commandWorked(st.s.adminCommand({refineCollectionShardKey: kNs, key: {x: 1, y: 1}}));
-coll = csrs_config_db.collections.findOne({_id: kNs});
+coll = configDB.collections.findOne({_id: kNs});
 assert.neq(null, coll.timestamp);
 let timestampAfterRefine = coll.timestamp;
 assert.eq(timestampCmp(timestampAfterRefine, timestampAfterDropCreate), 1);

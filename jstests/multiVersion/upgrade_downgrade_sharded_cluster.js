@@ -27,17 +27,17 @@ load("jstests/sharding/libs/find_chunks_util.js");
 //
 // This test must be removed once 5.0 is defined as the lastLTS (SERVER-52630)
 function testDroppedAndDistributionModeFieldsSetup() {
-    let csrs_config_db = st.configRS.getPrimary().getDB('config');
+    let configDB = st.s.getDB('config');
     // Setup sharded collections
     assert.commandWorked(st.s.adminCommand({shardCollection: 'sharded.foo', key: {x: 1}}));
     assert.commandWorked(st.s.adminCommand({shardCollection: 'sharded.bar', key: {x: 1}}));
 
     {
-        var collFoo = csrs_config_db.collections.findOne({_id: 'sharded.foo'});
+        var collFoo = configDB.collections.findOne({_id: 'sharded.foo'});
         assert.eq('sharded', collFoo.distributionMode);
         assert.eq(false, collFoo.dropped);
 
-        var collBar = csrs_config_db.collections.findOne({_id: 'sharded.bar'});
+        var collBar = configDB.collections.findOne({_id: 'sharded.bar'});
         assert.eq('sharded', collBar.distributionMode);
         assert.eq(false, collBar.dropped);
     }
@@ -45,17 +45,17 @@ function testDroppedAndDistributionModeFieldsSetup() {
     // Drop a collection so that it's metadata is left over on the config server's
     // config.collections as 'dropped: true'
     st.s.getDB('sharded').foo.drop();
-    assert.eq(true, csrs_config_db.collections.findOne({_id: 'sharded.foo'}).dropped);
-    assert.neq(null, csrs_config_db.collections.findOne({_id: 'sharded.bar'}));
+    assert.eq(true, configDB.collections.findOne({_id: 'sharded.foo'}).dropped);
+    assert.neq(null, configDB.collections.findOne({_id: 'sharded.bar'}));
 }
 
 function testDroppedAndDistributionModeFieldsChecksAfterUpgrade() {
-    let csrs_config_db = st.configRS.getPrimary().getDB('config');
+    let configDB = st.s.getDB('config');
 
     // Check that the left over metadata at csrs config.collections has been cleaned up.
-    assert.eq(null, csrs_config_db.collections.findOne({_id: 'sharded.foo'}));
+    assert.eq(null, configDB.collections.findOne({_id: 'sharded.foo'}));
 
-    var collBar = csrs_config_db.collections.findOne({_id: 'sharded.bar'});
+    var collBar = configDB.collections.findOne({_id: 'sharded.bar'});
     assert.eq(undefined, collBar.distributionMode);
     assert.eq(undefined, collBar.dropped);
 }
@@ -109,11 +109,10 @@ function testTimestampFieldSetup() {
 }
 
 function testTimestampFieldChecksAfterUpgrade() {
-    let csrs_config_db = st.configRS.getPrimary().getDB('config');
+    let configDB = st.s.getDB('config');
 
     // Check that 'timestamp' has been created in configsvr config.databases
-    let dbTimestampInConfigSvr =
-        csrs_config_db.databases.findOne({_id: 'sharded'}).version.timestamp;
+    let dbTimestampInConfigSvr = configDB.databases.findOne({_id: 'sharded'}).version.timestamp;
     assert.neq(null, dbTimestampInConfigSvr);
 
     let primaryShard = st.getPrimaryShard('sharded');
@@ -124,8 +123,7 @@ function testTimestampFieldChecksAfterUpgrade() {
         primaryShard.getDB('config').cache.databases.findOne({_id: 'sharded'}).version.timestamp);
 
     // Check that 'timestamp' has been created in configsvr config.collections
-    let collTimestampInConfigSvr =
-        csrs_config_db.collections.findOne({_id: 'sharded.test3'}).timestamp;
+    let collTimestampInConfigSvr = configDB.collections.findOne({_id: 'sharded.test3'}).timestamp;
     assert.neq(null, collTimestampInConfigSvr);
 
     // Check that 'timestamp' has been propagated to config.cache.collections
@@ -142,11 +140,11 @@ function testTimestampFieldChecksAfterUpgrade() {
 }
 
 function testTimestampFieldChecksAfterFCVDowngrade() {
-    let csrs_config_db = st.configRS.getPrimary().getDB('config');
+    let configDB = st.s.getDB('config');
     let primaryShard = st.getPrimaryShard('sharded');
 
     // Check that the 'timestamp' has been removed from config.databases
-    assert.eq(null, csrs_config_db.databases.findOne({_id: 'sharded'}).version.timestamp);
+    assert.eq(null, configDB.databases.findOne({_id: 'sharded'}).version.timestamp);
 
     // Check that the 'timestamp' has been removed from config.cache.databases.
     assert.eq(
@@ -154,7 +152,7 @@ function testTimestampFieldChecksAfterFCVDowngrade() {
         primaryShard.getDB('config').cache.databases.findOne({_id: 'sharded'}).version.timestamp);
 
     // Check that the 'timestamp' has been removed from config.collections.
-    let collAfterUpgrade = csrs_config_db.collections.findOne({_id: 'sharded.test3'});
+    let collAfterUpgrade = configDB.collections.findOne({_id: 'sharded.test3'});
     assert.eq(null, collAfterUpgrade.timestamp);
 
     // Check that the 'timestamp' has been removed from config.cache.collections.
