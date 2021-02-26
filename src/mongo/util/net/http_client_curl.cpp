@@ -221,11 +221,6 @@ CurlEasyHandle createCurlEasyHandle(Protocols protocol) {
     curl_easy_setopt(handle.get(), CURLOPT_SSLVERSION, CURL_SSLVERSION_TLSv1_2);
 #endif
 
-#if LIBCURL_VERSION_NUM > 0x073400
-    // Requires >= 7.52.0
-    curl_easy_setopt(handle.get(), CURLOPT_SSLVERSION, CURL_SSLVERSION_TLSv1_3);
-#endif
-
 
     curl_easy_setopt(handle.get(), CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
     curl_easy_setopt(handle.get(), CURLOPT_HEADERFUNCTION, WriteMemoryCallback);
@@ -567,7 +562,16 @@ HostAndPort exactHostAndPortFromUrl(StringData url) {
         url = url.substr(0, url.find("/"));
     }
 
-    return HostAndPort(url);
+    auto hp = HostAndPort(url);
+    if (!hp.hasPort()) {
+        if (url.startsWith("http://"_sd)) {
+            return HostAndPort(hp.host(), 80);
+        }
+
+        return HostAndPort(hp.host(), 443);
+    }
+
+    return hp;
 }
 
 /**
@@ -642,7 +646,7 @@ private:
                         cdr.length() == 0);
                 // Per https://curl.se/libcurl/c/CURLOPT_POST.html
                 // We need to reset the type of request we want to make when reusing the request
-                // curl_easy_setopt(handle, CURLOPT_HTTPGET, 1);
+                curl_easy_setopt(handle, CURLOPT_HTTPGET, 1);
                 break;
             case HttpMethod::kPOST:
                 curl_easy_setopt(handle, CURLOPT_PUT, 0);
