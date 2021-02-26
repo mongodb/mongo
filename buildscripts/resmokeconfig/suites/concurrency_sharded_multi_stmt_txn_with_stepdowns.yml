@@ -223,7 +223,6 @@ executor:
           runningWithShardStepdowns: true
           traceExceptions: false
           useStepdownPermittedFile: true
-          usingReplicaSetShards: true
   hooks:
   - class: ContinuousStepdown
     config_stepdown: true

@@ -223,7 +223,7 @@ if (TestData.discoverTopology !== false) {
         clusterOptions.replication.enabled = true;
         clusterOptions.replication.numNodes = topology.nodes.length;
     } else if (topology.type === Topology.kShardedCluster) {
-        clusterOptions.replication.enabled = TestData.usingReplicaSetShards || false;
+        clusterOptions.replication.enabled = true;
         clusterOptions.sharded.enabled = true;
         clusterOptions.sharded.enableAutoSplit =
             TestData.hasOwnProperty('runningWithAutoSplit') ? TestData.runningWithAutoSplit : true;

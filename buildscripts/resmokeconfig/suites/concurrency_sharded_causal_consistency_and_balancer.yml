@@ -133,7 +133,6 @@ executor:
       global_vars:
         TestData:
           runningWithCausalConsistency: true
-          usingReplicaSetShards: true
   hooks:
   - class: CheckReplDBHashInBackground
   - class: CheckReplDBHash

@@ -19,9 +19,6 @@ executor:
   config:
     shell_options:
       readMode: commands
-      global_vars:
-        TestData:
-          usingReplicaSetShards: true
   hooks:
   - class: CheckReplDBHashInBackground
   - class: CheckReplDBHash

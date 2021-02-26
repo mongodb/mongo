@@ -16,7 +16,6 @@ executor:
       global_vars:
         TestData:
           runningWithCausalConsistency: true
-          usingReplicaSetShards: true
   hooks:
   - class: FuzzerRestoreSettings
   - class: CheckReplDBHash

@@ -129,7 +129,6 @@ executor:
       readMode: commands
       global_vars:
         TestData:
-          usingReplicaSetShards: true
           runningWithAutoSplit: false
           runningWithBalancer: false
   hooks:
