@@ -755,7 +755,7 @@ public:
 
         void doCheckAuthorization(OperationContext* opCtx) const {
             Privilege p(CommandHelpers::resourcePatternForNamespace(ns().toString()),
-                        {ActionType::createIndex});
+                        ActionType::createIndex);
             uassert(ErrorCodes::Unauthorized,
                     "Unauthorized",
                     AuthorizationSession::get(opCtx->getClient())->isAuthorizedForPrivilege(p));

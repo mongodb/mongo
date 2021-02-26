@@ -49,6 +49,8 @@ namespace mongo {
  * authorization_session.cpp for details.
  */
 class ResourcePattern {
+    friend class AuthorizationContract;
+
 public:
     /**
      * Returns a pattern that matches absolutely any resource.
@@ -185,6 +187,13 @@ public:
     template <typename H>
     friend H AbslHashValue(H h, const ResourcePattern& rp) {
         return H::combine(std::move(h), rp._ns, rp._matchType);
+    }
+
+private:
+    // AuthorizationContract works directly with MatchTypeEnum. Users should not be concerned with
+    // how a ResourcePattern was constructed.
+    MatchTypeEnum matchType() const {
+        return _matchType;
     }
 
 private:

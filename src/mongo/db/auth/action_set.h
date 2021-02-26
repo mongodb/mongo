@@ -49,13 +49,13 @@ public:
     ActionSet() = default;
     ActionSet(std::initializer_list<ActionType> actions);
 
-    void addAction(const ActionType& action);
+    void addAction(ActionType action);
     void addAllActionsFromSet(const ActionSet& actionSet);
     void addAllActions();
 
     // Removes action from the set.  Also removes the "anyAction" action, if present.
     // Note: removing the "anyAction" action does *not* remove all other actions.
-    void removeAction(const ActionType& action);
+    void removeAction(ActionType action);
     void removeAllActionsFromSet(const ActionSet& actionSet);
     void removeAllActions();
 
@@ -67,7 +67,10 @@ public:
         return this->_actions == other._actions;
     }
 
-    bool contains(const ActionType& action) const;
+    bool contains(ActionType action) const;
+
+    // Returns true if this action set contains the entire other action set
+    bool contains(const ActionSet& other) const;
 
     // Returns true only if this ActionSet contains all the actions present in the 'other'
     // ActionSet.

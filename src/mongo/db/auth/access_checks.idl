@@ -35,3 +35,4 @@ enums:
         values:
            kIsAuthenticated :  "is_authenticated"
            kIsCoAuthorized :  "is_coauthorized"
+           kIsAuthorizedToParseNamespaceElement : "is_authorized_to_parse_namespace_element"
